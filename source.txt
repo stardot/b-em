@@ -1,0 +1,81 @@
+             ██████████▄           █████████  ████▄    ▄████
+             ██       ▀██          ██         ██ ▀██▄▄██▀ ██
+             ██       ▄██          ██         ██   ▀██▀   ██
+             ███████████    █████  █████      ██          ██
+             ██       ▀██          ██         ██          ██
+             ██       ▄██          ██         ██          ██
+             ██████████▀           █████████  ██          ██
+
+                                 Version 0.3a
+                                 Source code
+
+Introduction
+~~~~~~~~~~~~
+
+B-Em is an attempt to emulate a BBC Micro, made by Acorn Computers in the 80's
+This is the source code.
+
+This is the second source release of 0.3a, as the first release was missing
+the gfx.h file, and had much worse documentation.
+
+If you want to use the source code as reference for writing your own emulator,
+that's fine. If you want to steal the odd function from it, that's fine too.
+If you want to use large sections (such as the 6502 emulation, for example),
+then email me. If you are kind and want to improve B-em, then by all means go
+ahead. BUT, you can't just modify a few bits and distribute it under a
+different name (or the same name), and if you do use bits out of it, you must
+acknowledge the fact that I wrote it.
+
+Also note that some of the code was taken from Beebem, as it was the only
+emulator source code I had at the time, and I had very few docs.
+
+If you do want to contribute to B-em, then there is a list of stuff that needs
+doing at the bottom of this file.
+
+
+What's needed to compile
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+B-em was written using DJGPP 2.02, GCC 2.81, and BNU 2.81. If you have a
+similar distribution, then everything should compile.
+
+
+What files are what
+~~~~~~~~~~~~~~~~~~~
+
+6502.*     - 6502 emulation core (don't compile!)
+6850.*     - 6850 ACIA core
+8271.*     - i8271 disc controller
+adc.*      - Analogue to digital converter
+bem.c      - B-em main file (includes 6502.c)
+disk.*     - TFS
+mem.*      - Memory core
+scan2bbc.h - PC to BBC scancode table
+serial.*   - Serial ULA emulation
+snapshot.* - Snapshot handling
+sound.*    - Sound emulation
+uef.*      - UEF file handling
+vias.*     - VIA emulation
+video.*    - Video emulation
+
+There is also setup.c, which is the setup program. The file makeall.bat will
+compile everything. The files gfx.a and gfx.h are the graphics library, you
+can use this for anything you want.
+
+
+Stuff which needs doing
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Can anyone help me with any of this?
+
+Speed up the 6502 emulation
+Speed up the video emulation
+Fix the 6850 emulation
+Fix some bugs in the 6522 emulation
+Sort out sound emulation
+Get bem.c to compile with optimisation
+Neaten up the source code (no chance!)
+
+Tom.
+
+tommowalker@hotmail.com

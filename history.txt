@@ -1,0 +1,115 @@
+16/10/99 - Started work on 6502 emulation
+24/10/99 - Gave up for a while because it doesn't work
+20/5/00  - Rewrote the 6502 emulation (it was very badly written anyway).
+           Still doesn't work
+22/7/00  - Added some mode 7 emulation. Now boots (but that's about it)
+24/7/00  - Got the keyboard working. Discovered that most of BASIC didn't work
+Version 0.0 finalised
+
+26/7/00  - Added cursor and true mode 7 emulation (instead of assuming things)
+27/7/00  - Added a bit of colour to mode 7 (not correct colours though - still
+           many control characters missing)
+5/8/00   - Fixed BRK emulation, so error messages now work. Discovered that
+           BASIC doesn't really work because almost everything you type is
+           treated as a Syntax error. Tested a couple of programs; the
+           introduction to Cybertron works, but Arcadians and Magic Mushrooms
+           crash. No loaded BASIC programs work though
+6/8/00   - Corrected mode 7 colours. Teletext graphics added, though not
+           correct yet. Tested more games - the instructions on Frenzy work.
+           Added generic .inf loader
+8/8/00   - Added mode 2 emulation
+9/8/00   - Added modes 1+5
+10/8/00  - Wrote primitive FS (by trapping the OS). Only loading and *RUNing
+           work
+20/8/00  - Added error messages to the FS, instead of dumping back to DOS
+22/8/00  - First version of *CAT added. Relies on files.lst file
+27/8/00  - Fixed bug in setczvn (still not perfect though). Loads more BASIC
+           now works, but it broke Chuckie Egg :(
+28/8/00  - Added cursor to Modes 1+5
+29/8/00  - Fixed shift and control keys.
+30/8/00  - Tweaked Mode 2 emulation. Frenzy & Jet-Pac almost work. Added GUI
+3/9/00   - Fixed bug in *LOAD, *RUN etc. Killer Gorilla & Blagger run more
+Version 0.1 finalised
+
+6/9/00   - Increased VIA delay, HUGE speedup but VIA accuracy falls apart.
+7/9/00   - Randomized User VIA Port B (&FE60) - Snapper starts now (still
+           unplayable). Added snapshots
+8/9/00   - Model A emulation added.
+9/9/00   - More accurate cycle count.
+25/9/00  - Went back to fixed cycle count, as most programs run better with it.
+1/10/00  - Started sound hardware emulation (no sound output though)
+2/10/00  - Added command line options for model A/B emulation, sound log,
+           fixed cycles, etc. Now save sound output to sound.pcm (very out of
+           tune though)
+4/10/00  - Changed 76489->samples algorithim, sounds slightly better.
+           Hardwired joystick to no buttons pressed, Bumble Bee now works
+5/10/00  - Added periodic noise to sound code.
+8/10/00  - Added -fixed1 switch, 6502 goes bloody fast but VIAs slow down.
+           Rewrote a lot of the System VIA code - must've fixed a timer bug,
+           because the emulator is about 200% faster
+10/10/00 - Logfiles now disassemble 6502 code. Added 1 bpp modes (0,3,4 & 6)
+12/10/00 - Set System VIA initial latches to 0xffff on reset - loads more
+           games run. Patched some weird OS System VIA routine in an attempt
+           to get Magic Mushrooms to work.
+13/10/00 - Rewrote most of 6502 ADC+SBC instructions. Most of BASIC now works (!)
+           and the game compatibility has gone up loads
+14/10/00 - Started work on 8271 FDC emulation. Can now boot up with Watford
+           DFS (v1.10)
+Version 0.2 finalised
+
+15/10/00 - 8271 FDC emulation. Emulates :
+                - a single, single sided, 80 track disc drive
+                - a subset of the 8271 FDC commands
+                - boots and works with Acorn & Watford DFSs
+           Repton 3 now works, except for scrolling bugs
+16/10/00 - Scrolling bug now fixed - now using System VIA hardware scrolling
+           regs as well as CRTC ones. Added ANC instruction, Repton 2 now
+           works. Removed bug that crashed the BBC every minute or so by
+           removing the flashing colours. Added option to supply the DIP
+           switches. Mode 0 now displays the whole width of the screen (if in
+           640x400 or higher)
+17/10/00 - Finally sorted out vsync interrupt, so more games (and flashing
+           colours) now work. Added Xbeeb __CATALOG__ support for tape filing
+           system
+18/10/00 - Started 6850 ACIA emulation (although all my code spells it ACAI..)
+19/10/00 - First attempt at sampled tape emulation. Doesn't work.
+20/10/00 - Added support for double sided discs
+21/10/00 - Scanline drawing added (-scanline) in an attempt to get Revs
+           working (Revs still doesn't work, but Rocket Raid now looks better).
+22/10/00 - First attempt at sound output. Sounds horrible.
+23/10/00 - Added seperated Teletext graphics.
+27/10/00 - Inlined some more 6502 instructions in an attempt to increase the
+           emulator's speed, since it didn't speed it up I suspect there's a
+           VIA timer bug or two somewhere. Played about with the user VIA
+           polling code, got Firetrack and Starquake to work.
+28/10/00 - Started printer emulation. Forgot to make SBC BCD affect P, now
+           fixed (Zalaga and Planetoids now work). Added SAX+ASR instructions
+           for Zalaga.
+30/10/00 - Fixed bugs in ADC+SBC BCD. Reptons 1+2 now play music. Added LAX,
+           RLA, and all NOPs, Android Attack now works. Sound output improved.
+31/10/00 - Worked on noise generator (a bit better). Added some more 6502
+           instructions.
+1/11/00  - RRA,DCP,SRE & SBX instructions implemented, ie instructions 0-&4F
+           and &A0-&FF implemented. Still not added, ARR, SHA, SHX, SHY, SHS,
+           some SAX, and HALT instructions.
+2/11/00  - Did some more optimisations - converted most `static inline's to
+           #defines - you can now compile bem.c with optimisation again. Added
+           the rest of the undocumented instructions, all instructions
+           emulated (hopefully...).
+3/11/00  - More accurate cycle times. Added patch to get Frak! to work.
+4/11/00  - Improved cycles times. Started Tube emulation again.
+5/11/00  - Abandoned Tube emulation.
+7/11/00  - Added a few instructions I missed out.
+29/11/00 - Removed 6502 debugging info, significant speed increase.
+30/11/00 - Optimised video routines, BBC now runs at almost 6mhz in mode 2 on
+           a PII-350.
+13/12/00 - Fixed a couple of 6502 bugs (nothing fixed though).
+14/12/00 - Fixed BRK bug - error messages now work properly.
+21/12/00 - Added frameskip, and cleaned up code a bit.
+21/1/01  - Got a copy of the Advanced User Guide.
+24/1/01  - Fixed a few VIA bugs, increased compatibility.
+31/3/01  - Added UEF support, changed video modes. Improved setup program.
+Version 0.3 finalised and released
+10/4/01  - Removed the `clear screen' command, moved everything into seperate directories,
+           improved UEF support a little, and added American BBC support.
+Version 0.3a finalised and released

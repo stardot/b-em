@@ -1,0 +1,14 @@
+unsigned int WrapAddr(int in);
+char *BeebMemPtrWithWrap(int a, int n);
+unsigned int WrapAddrMo7(int in);
+char *BeebMemPtrWithWrapMo7(int a, int n);
+//unsigned char readmem(unsigned short address);
+void writemem(unsigned short address,unsigned char value);
+void initmem();
+unsigned char ram[65536];
+unsigned short oldaddr;
+unsigned char oldvalue;
+unsigned short oldraddr;
+unsigned char oldrvalue;
+unsigned int currom;
+int modela;
