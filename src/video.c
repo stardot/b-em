@@ -1,12 +1,32 @@
-/*B-em 0.6 by Tom Walker*/
+/*B-em 0.7 by Tom Walker*/
 /*Video emulation*/
 
 #include <allegro.h>
 #include "bbctext.h"
 #include "b-em.h"
 
+int soundon;
+int interlaceline=0;
+int lns;
 unsigned short vidmask;
 int output;
+
+int sndupdate;
+AUDIOSTREAM *as;
+unsigned char *poi;
+
+inline void trysoundupdate2()
+{
+        if (!soundon) return;
+        poi=(unsigned char *)get_audio_stream_buffer(as);
+//        printf("Trying sound update %08X\n",p);
+        if (poi)
+        {
+                updatebuffer(poi,624);
+//                free_audio_stream_buffer(as);
+                sndupdate=0;
+        }
+}
 
 PALETTE beebpal=
 {
@@ -77,6 +97,7 @@ unsigned short startaddr;
 int curline=0,physline=0;
 
 int vc=0,sc=0,sc6=0;
+int model;
 
 void writecrtc(unsigned short addr, unsigned char val)
 {
@@ -85,6 +106,8 @@ void writecrtc(unsigned short addr, unsigned char val)
         else
         {
                 crtc[crtcreg]=val;
+//                printf("CRTCreg %i=%02X %i\n",crtcreg,val,lns);
+//                if (output) exit(-1);
                 if (crtcreg==6) clear(buffer);
         }
 }
@@ -197,8 +220,8 @@ void dumpcrtc()
 {
         int c;
         initframe();
-        printf("Start addr %04X\n",startaddr);
-        for (c=0;c<17;c++) printf("%02X ",crtc[c]);
+//        printf("Start addr %04X\n",startaddr);
+//        for (c=0;c<17;c++) printf("%02X ",crtc[c]);
 }
 
 void resetcrtc()
@@ -397,10 +420,12 @@ void drawteletextline()
 //                memcpy(olddbl,dbl,sizeof(dbl));
         hline(buffer,0,physline,xoffset,0);
 //        memset(buffer->line[physline],0,xoffset);
+//        if (!sc) printf("addr %04X\n",(addr&vidmask)|vidbank);
         for (x=0;x<crtc[1];x++)
         {
                 if (addr&0x8000) addr-=0x400;
                 cr=ram[(addr&vidmask)|vidbank];
+//                if (!sc) printf("%04X : CHR %02X  ",(addr&vidmask)|vidbank,cr);
                 if (cr&0x80)
                 {
                         switch (cr)
@@ -459,6 +484,7 @@ void drawteletextline()
                    cr=multable[temp]+((sc>>1)*6)+30;
                 temp2=colours[1];
                 if (flashing && !flash) colours[1]=colours[0];
+//                if (!sc) printf(" %i %i  %i\n",colours[0],colours[1],physline&511);
                 for (xx=0;xx<6;xx++)
                 {
                         if (chrset[cr++])
@@ -494,11 +520,17 @@ void drawcursor()
 //           drawstring(b,font,tempx<<3,tempy<<3,st,15);
 }
 
+int delaylcount=0;
 void drawline(int line6502)
 {
         int tline;
         int x,y;
         int c;
+        if (interlaceline)
+        {
+                interlaceline=0;
+//                return;
+        }
         if (curline>511 || physline>511) /*Something has obviously gone wrong in this case*/
         {
                 curline=physline=0;
@@ -507,9 +539,11 @@ void drawline(int line6502)
         {
                 sc=vc=0;
                 if (physline>15 && physline<300) memset(buffer->line[physline],0,400);
+                delaylcount=crtc[5];
         }
-        if (curline<crtc[5])
+        if (delaylcount)//curline<crtc[5])
         {
+                delaylcount--;
                 curline++;
                 physline++;
                 if (physline>15 && physline<300) memset(buffer->line[physline],0,400);
@@ -582,12 +616,14 @@ void drawline(int line6502)
         if (vc==crtc[7] && sc==3)
         {
                 vblankint();
+//                printf("Framefly %i\n",lns);
 //                printf("Framefly - after %i lines\n6502 reckons it's line %i, SYSVIA IER %02X, I flag %i, PC %04X\n",linesdrawn,line6502,sysvia.ier,p.i,pc);
                 linesdrawn=0;
                 physline=0;
                 if (bbcmode==7)
                    drawcursor();
                 firstline=0;
+//                trysoundupdate2();
                 if (blurred)
                 {
                         for (y=16;y<300;y++)
@@ -602,6 +638,7 @@ void drawline(int line6502)
                 }
                 else
                    blit(buffer,screen,0,16,0,0,400,284);
+//                trysoundupdate2();
                 flashint++;
                 if (flash && flashint==35)
                    flashint=flash=0;
@@ -610,17 +647,21 @@ void drawline(int line6502)
                         flashint=0;
                         flash=1;
                 }
+                interlaceline=1;
         }
         if (vc==crtc[4]+1)
         {
                 if (crtc[7]>=crtc[4])
                 {
+//                        printf("%i %i\n",crtc[7],crtc[4]);
                         vc=sc=0;
                         initframe();
-//                        printf("Rupture at %i\n",line6502);
+//                        printf("Rupture at %i\n",lns);
+                        delaylcount=crtc[5];
                 }
                 else
                 {
+//                        printf("Vblank started %i\n",lns);
                         curline=0;
 //                        waitforsync();
                         frames++;

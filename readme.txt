@@ -6,7 +6,7 @@
              ██       ▄██          ██         ██          ██
              ██████████▀           █████████  ██          ██
 
-                                 Version 0.61
+                                 Version 0.7
                          A freeware BBC Micro emulator
 
 Introduction
@@ -14,19 +14,16 @@ Introduction
 
 B-Em is an attempt to emulate a BBC Micro, made by Acorn Computers in the 80's
 
-If you are using anything less than 500mhz, then I would _strongly_ suggest
-using the DOS version instead, as it is much faster.
-
 Features
 ~~~~~~~~
 
-- Emulates Models A, B, and B+
+- Emulates Models A, B, B+, and Master 128
 - All documented video modes supported
 - All documented and some undocumented 6502 instructions
-- 8271 Floppy Disc Controller emulated (double drive, double sided, 80 track)
-- 1770 Floppy Disc Controller emulated (double drive, double sided, 80 track)
-- Supports five formats for BBC storage on PC - .ssd, .dsd, .inf, .uef and
-  __catalog__
+- 8271 Floppy Disc Controller emulated (double drive, double sided, 80 track, read only)
+- 1770 Floppy Disc Controller emulated (double drive, double sided, 80 track, read/write)
+- Supports six formats for BBC storage on PC - .ssd, .dsd, .adf, .inf, .uef
+  and __catalog__
 - Sound emulation, including sample playback
 - Some CRTC tricks, such as overscan, raster splitting and rupture.
 - Sideways RAM emulation
@@ -36,12 +33,15 @@ Features
 Differences from last version
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- ADFS support
-- Model A support
-- Model B+ fixed a bit, Level 9 adventures now show pictures
-- Win32 version improved a bit
-- Some undocumented sound stuff emulated - Crazee Rider now has correct drums.
-- Some other misc changes
+- Master 128 emulation (buggy)
+- Better video timing, Uridium works
+- VIA interrupt bug fixed, many games better
+- Interrupt bug fixed, Empire Strikes Back now working
+- Disc write (B+ and Master 128 only)
+- Sound mixing now 16 bit
+- Low pass filter for sound
+- Improved disc drive noise
+- More reliable tape emulation
 
 
 Requirements
@@ -49,14 +49,14 @@ Requirements
 
 B-Em (bbc model B EMulator), requires the following :
 
-A Pentium or better computer (try a P166 at least for DOS,
-                              a P500 at least for Windows)
-4mb RAM (?)
+A Pentium or better computer (try a P233 at least)
+16mb RAM (?)
 
-Several ROM images are provided with B-em -
+Eight ROM images are provided with B-em -
 os           - UK BBC MOS
 usos         - US BBC MOS
 bpos         - BBC B+ MOS
+mos3.20      - Master 128 MOS 3.20
 a\basic.rom  - BBC BASIC 2
 b\basic.rom
 bp\basic.rom
@@ -71,29 +71,32 @@ directory B or BP.
 Known bugs
 ~~~~~~~~~~
 
-Still a few 6502 emulation bugs
-TFS doesn't work in NTSC mode - I need the OSFSC/OSFILE entry points on the US
-OS (no they don't use vectors)
-Windows port still has a few issues
+Master 128 has various bugs
+TFS only works on PAL models A and B AFAIK
+ADFS corrupts on COMPACT command
+Formatting not supported
+UEF has problems on some games
 
 
 Hardware emulated
 ~~~~~~~~~~~~~~~~~
 
 The 6502 processor - Most instructions should be emulated. Attempts to be cycle
-                     perfect.
-The 6845 CRTC      - Accurate line-by-line engine. Firetrack, Revs, and TYB's
-                     'Retribution' demo work, and Uridium _almost_ works
+                     perfect. 65C02 is emulated for Master 128 mode, but is
+                     probably missing some opcodes.
+The 6845 CRTC      - Accurate line-by-line engine. Firetrack, Revs, and
+                     Uridium all work.
 The Video ULA      - All modes emulated.
 The System VIA     - Keyboard and sound emulated.
 The User VIA       - Emulated.
 8271 FDC           - Double disc, double sided, 40/80 tracks, read only. With
                      authentic noise. Only in model B mode.
-1770 FDC           - Double disc, double sided, 40/80 tracks, read only. With
-                     authentic noise. Only in model B+ mode.
+1770 FDC           - Double disc, double sided, 40/80 tracks, read/write. With
+                     authentic noise. Only in model B+ and Master 128 mode.
 tape filing system - Supports .inf and __CATALOG__ format.
 Sound              - All channels emulated, with sample support and some
-                     undocumented behaviour (Crazee Rider).
+                     undocumented behaviour (Crazee Rider). With optional low
+                     pass filter.
 ADC                - Real joystick emulation, supporting both joysticks.
 
 
@@ -104,7 +107,6 @@ serial port
 AMX mouse
 Tube
 Econet
-Low pass filter (muffles sound)
 Printer
 
 
@@ -127,9 +129,6 @@ BASIC
 
 or some other variation.
 
-The 6502 emulation is about 95% bug free, but there is still the odd bug
-stopping a couple of games from working perfectly.
-
 
 Keyboard mapping :
 ~~~~~~~~~~~~~~~~~~
@@ -151,7 +150,7 @@ BBC key     - PC key
 Shift lock -    ALT
 
 Note that when you do a hard reset (CTRL-Break), unlike a real BBC, this
-performs a cold boot instead, to wipe traces of programs such as W.A.R, which
+performs a cold boot instead, to wipe traces of programs such as W.A.R which
 hang the BBC on reset.
 
 
@@ -163,16 +162,17 @@ The options are :
 
 File :
         Return - return to emulator.
-        Exit   - exit to DOS/Windows/whatever.
+        Exit   - exit to Windows.
 
 Model :
-        PAL A      - emulate a PAL model A.
-        NTSC A     - emulate an NTSC model A.
-        PAL B      - emulate a PAL model B.
-        NTSC B     - emulate an NTSC model B.
-        PAL B+     - emulate a PAL model B+ with 64k RAM.
-        PAL B+96K  - emulate a PAL model B+ with 96k RAM.
-        PAL B+128K - emulate a PAL model B+ with 128k RAM.
+        PAL A          - emulate a PAL model A.
+        NTSC A         - emulate an NTSC model A.
+        PAL B          - emulate a PAL model B.
+        NTSC B         - emulate an NTSC model B.
+        PAL B+         - emulate a PAL model B+ with 64k RAM.
+        PAL B+96K      - emulate a PAL model B+ with 96k RAM.
+        PAL B+128K     - emulate a PAL model B+ with 128k RAM.
+        PAL Master 128 - emulate a PAL Master 128 (buggy).
 
 Disc :
         Load drive 0/2 - load a disc into drives 0 and 2.
@@ -185,15 +185,16 @@ Tape :
         Tape enable - enables the UEF support, but disables the INF support.
 
 Video :
-        Blur filter - enable a blurring filter. Makes games with hi-res
+        Blur filter - enable a blurring filter. Can make games with hi-res
                       dithering look better.
         Monochrome  - disables colour.
 
 Sound options :
-        Sound enable   - enable/disable sound.
-        Waveform       - alters the waveform type. Original BBC uses square.
-        Start SN log   - start logging sound to an SN file.
-        Stop SN log    - stop logging sound.
+        Sound enable    - enable/disable sound.
+        Low pass filter - applies a low pass filter to the sound.
+        Waveform        - alters the waveform type. Original BBC uses square.
+        Start SN log    - start logging sound to an SN file.
+        Stop SN log     - stop logging sound.
 
 Misc options :
         Calibrate joystick 1 - Calibrates the first joystick.
@@ -212,8 +213,7 @@ directory, and is the format used by all the files at The BBC Lives!. This
 patches into the OS to take over tape handling.
 
 The second is the new UEF emulation. This is more accurate, as it emulates the
-tape hardware. However, it is much slower (although not as slow as the real
-thing).
+tape hardware. However, it is much slower, read only, and has some bugs.
 
 
 FAQ :
@@ -225,22 +225,17 @@ A : If the screen is just off centre, then use the positioning controls. If
     there's not much you can do.
 
 Q : Why have I got no sound?
-A : B-em should work with 100% SoundBlaster compatibles, ESS Audiodrive,
-    Ensoniq Soundscape, and Windoze $ound System. It will not work with cards
-    not in that list (such as Creative's newer SoundBlasters, which aren't
-    really compatible, or sadly the GUS), it will not work with non-100%
-    compatibles with crappy drivers (such as the ones found in laptops) and it
-    will not work if you have a bad BLASTER enviroment label.
-    Minor addition to this, if you use a poor quality card (such as a
-    SoundBlaster) and you have some sound running in the background in Windows,
-    B-em will deliver no sound. The answer is to upgrade to a good card.
+A : B-em should work with all DirectSound compatible cards. If you get no
+    sound, check your drivers. Also, some older cards (like the pre-Live
+    SoundBlasters), can't have sound playing in two programs simulatiously,
+    so close whatever other program is playing sound.
 
 Q : What happened to snapshots?
 A : They were removed for technical reasons. They will probably return in the
     next release (if there is one).
 
 Q : How do I contact you?
-A : E-mail me at tommowalker@hotmail.com
+A : E-mail me at b-em@bbcmicro.com
 
 
 Tested games :
@@ -257,27 +252,44 @@ Aardvark    Frak
 Aardvark    Zalaga
 
 Acornsoft   Arcadians
+Acornsoft   Elite
 Acornsoft   Magic Mushrooms
 Acornsoft   Planetoids
 Acornsoft   Revs
+Acornsoft   Rocket Raid
+
+Audiogenic  Sphere of Destiny
+
+Domark      Empire Strikes Back
+
+Godax       Skirmish
+
+Hewson      Uridium
+
+Imagine     Pedro
 
 Mandarin    Cute To Kill
 
 Micropower  Bumble
 Micropower  Castle Quest
 Micropower  Cybertron
-Micropower  Dr. Who (B+ version)
+Micropower  Dr. Who (B+ and Master version)
 Micropower  Ghouls
 
-Superior    Crazee Rider (go for enhanced mode! - model B only though)
+Superior    Crazee Rider (go for enhanced mode! - not on B+ though)
 Superior    Citadel
 Superior    Citadel 2
+Superior    Codename Droid
 Superior    Exile
 Superior    Galaforce 2
 Superior    Overdrive
+Superior    Pipeline
 Superior    Repton
 Superior    Repton 2
 Superior    Repton 3
+Superior    Road Runner
+
+Tynesoft    Rig Attack
 
 Ultimate    Alien 8
 Ultimate    Cookie
@@ -289,16 +301,11 @@ US Gold     Spy Hunter
 US Gold     Tapper
 
 Working imperfectly :
-Acornsoft   Elite (flashing raster split)
-Acornsoft   Rocket Raid (weird slowdown)
 
-Audiogenic  Psycastria (very low down screen)
+Audiogenic  Psycastria  (screen low down, but who cares? Go play Uridium)
 
-Superior    Road Runner (sound effects last too long)
-
-Hewson      Uridium (timing is 4 scanlines off)
-
-Not working :
+Superior    Stryker's Run             (bad gfx in places?)
+Superior    Vertigo (master 128 mode) (video bugs?)
 
 
 Thanks to :
@@ -309,17 +316,16 @@ David Gilbert for writing Beebem and distributing the sources with it
 James Fidell for writing Xbeeb and distributing the sources with it
 
 Tom Seddon for updating Model B recently, indirectly motivating me to do
-another update this year.
+another update this year, and for identifying the Empire Strikes Back bug.
 
 Ken Lowe for assistance with the Level 9 adventures.
+
+Richard Gellman for help with a few things.
 
 Thomas Harte for some UEF code - I wrote my own in the end - and for inventing
 UEF files.
 
-Dave Moore for making the B-em site, and for being kind enough to put it on
-The Stairway To Hell.
-
-The Emuunlim guys for hosting the B-em site.
+Dave Moore for making and hosting the B-em site
 
 Robert Schmidt for The BBC Lives!
 
@@ -344,7 +350,7 @@ of the BBC Computer (among others too numerous to mention)
 
 Tom Walker
 
-tommowalker@hotmail.com
+b-em@bbcmicro.com
 
 
 Appendix A : The source code
@@ -442,17 +448,17 @@ The Stairway To Hell - www.stairwaytohell.com
 A decent BBC/Electron site, with plenty of games and emulators. Was the
 original home of B-em.
 
-The BBC Lives! - www.nvg.ntnu.no/bbc
+The BBC Lives! - bbc.nvg.org
 Another good BBC site, with even more games and emulators.
 
 
 Other BBC emulators :
 
-Model B - www.tomseddon.plus.com/beeb/beeb.html
+Model B - modelb.bbcmicro.com
 Massively improved over the old versions, this is now one of the best BBC
 emulators and runs pretty much everything.
 
-Beebem - www.rickynet.net/beebem
+Beebem - beebem.bbcmicro.com - eventually
 The most famous BBC emulator. Runs pretty much everything, but is really slow.
 
 BeebIt - homepages.paradise.net.nz/mjfoot/bbc.htm
@@ -463,7 +469,7 @@ pcBBC - can't remember the site address
 One of the few non-free BBC emulators, this one has good compatibility, but
 bad sound and costs money.
 
-BeebInC - get it from The BBC Lives!, the site is down
-Seemingly dead, this is one of my favourite emulators. Surprisingly fast and
+BeebInC - www.beebinc.net
+Seemingly dead, this was one of my favourite emulators. Surprisingly fast and
 compatible, but let down by poor sound (uses sine waves, not square waves) and
 low refresh rate (25 fps instead of 50 fps).

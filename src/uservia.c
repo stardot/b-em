@@ -1,4 +1,4 @@
-/*B-em 0.6 by Tom Walker*/
+/*B-em 0.7 by Tom Walker*/
 /*User VIA emulation*/
 
 #include <stdio.h>
@@ -45,11 +45,13 @@ void updateuserIFR()
         }
 }
 
+int lns;
 void updateusertimers()
 {
         if (uservia.t1c<-4)
         {
                 uservia.t1c+=uservia.t1l+4;
+//                printf("Timer 1 reset line %i %04X\n",lns,uservia.t1c);
                 t1back=uservia.t1c;
                 if (!uservia.t1hit)
                 {
@@ -80,17 +82,17 @@ void writeuservia(unsigned short addr, unsigned char val, int line)
         switch (addr&0xF)
         {
                 case ORA:
+                uservia.ifr&=0xfc;//~PORTAINT;
+                updateuserIFR();
                 case ORAnh:
                 uservia.ora=val;
                 uservia.porta=(uservia.porta & ~uservia.ddra)|(uservia.ora & uservia.ddra);
-                uservia.ifr&=~PORTAINT;
-                updateuserIFR();
                 break;
 
                 case ORB:
                 uservia.orb=val;
                 uservia.portb=(uservia.portb & ~uservia.ddrb)|(uservia.orb & uservia.ddrb);
-                uservia.ifr&=~PORTBINT;
+                uservia.ifr&=0xfe;//~PORTBINT;
                 updateuserIFR();
                 break;
 
@@ -108,20 +110,25 @@ void writeuservia(unsigned short addr, unsigned char val, int line)
                 break;
                 case T1LL:
                 case T1CL:
-//                printf("T1L write %02X at %04X\n",val,pc);
+//                printf("T1L write %02X at %04X %i\n",val,pc,lns);
                 uservia.t1l&=0x1FE00;
                 uservia.t1l|=(val<<1);
                 break;
                 case T1LH:
-//                printf("T1LH write %02X at %04X\n",val,pc);
+//                printf("T1LH write %02X at %04X %i\n",val,pc,lns);
                 uservia.t1l&=0x1FE;
                 uservia.t1l|=(val<<9);
+                if (uservia.acr&0x40)
+                {
+                        uservia.ifr&=~TIMER1INT;
+                        updateuserIFR();
+                }
                 break;
                 case T1CH:
-//                printf("T1CH write %02X at %04X\n",val,pc);
+//                printf("T1CH write %02X at %04X %i\n",val,pc,lns);
                 uservia.t1l&=0x1FE;
                 uservia.t1l|=(val<<9);
-//                printf("T1 l now %04X\n",uservia.t1l);
+//                printf("T1 l now %05X\n",uservia.t1l);
                 uservia.t1c=uservia.t1l;
                 uservia.ifr&=~TIMER1INT;
                 updateuserIFR();
@@ -177,7 +184,7 @@ unsigned char readuservia(unsigned short addr)
                 return temp;
 
                 case ORB:
-                uservia.ifr&=~PORTBINT;
+//                uservia.ifr&=~PORTBINT;
                 updateuserIFR();
                 temp=uservia.orb & uservia.ddrb;
                 if (uservia.acr&2)
@@ -192,9 +199,9 @@ unsigned char readuservia(unsigned short addr)
                 case DDRB:
                 return uservia.ddrb;
                 case T1LL:
-                return uservia.t1l&0xFF;
+                return (uservia.t1l&0x1FE)>>1;
                 case T1LH:
-                return uservia.t1l>>8;
+                return uservia.t1l>>9;
                 case T1CL:
                 uservia.ifr&=~TIMER1INT;
                 updateuserIFR();

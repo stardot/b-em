@@ -1,4 +1,4 @@
-/*B-em 0.6 by Tom Walker*/
+/*B-em 0.7 by Tom Walker*/
 /*Serial ULA emulation*/
 
 #include "serial.h"
@@ -19,6 +19,7 @@ unsigned char readserial(unsigned short addr)
 {
         /*Reading from this has the same effect as writing &FE*/
         motor=0;
+//        printf("Serial read %04X\n",addr);
         return 0;
 }
 
@@ -39,6 +40,7 @@ void writeserial(unsigned short addr, unsigned char val)
                 /*Tape*/
                 aciasr&=~8; /*Clear acia CTS*/
         }
+//        printf("Motor %i\n",motor);
 }
 
 void updateserialreg()

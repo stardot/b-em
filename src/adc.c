@@ -1,4 +1,4 @@
-/*B-em 0.5 by Tom Walker*/
+/*B-em 0.7 by Tom Walker*/
 /*ADC emulation*/
 
 #include <allegro.h>
@@ -27,7 +27,7 @@ unsigned char readadc(unsigned short addr)
 
 void writeadc(unsigned short addr, unsigned char val)
 {
-        if (addr==0xFEC0)
+        if (!(addr&3))
         {
                 adclatch=val;
                 adcconvert=1;

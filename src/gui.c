@@ -1,9 +1,10 @@
-/*B-em 0.6 by Tom Walker*/
+/*B-em 0.7 by Tom Walker*/
 /*GUI*/
 
 #include <stdio.h>
 #include <allegro.h>
 
+int soundfilter;
 AUDIOSTREAM *as;
 char uefname[260]="test.uef";
 int uefena=0;
@@ -26,6 +27,7 @@ void save_config()
         fputc(blurred,f);
         fputc(mono,f);
         fputc(uefena,f);
+        fputc(soundfilter,f);
         fwrite(discname[0],260,1,f);
         fwrite(discname[1],260,1,f);
         fwrite(uefname,260,1,f);
@@ -42,6 +44,7 @@ void load_config()
         blurred=getc(f);
         mono=getc(f);
         uefena=getc(f);
+        soundfilter=getc(f);
         fread(discname[0],260,1,f);
         fread(discname[1],260,1,f);
         fread(uefname,260,1,f);
@@ -61,8 +64,8 @@ int gui_return()
 
 MENU filemenu[]=
 {
-        {"Return",gui_return,NULL,NULL,NULL},
-        {"Exit",gui_exit,NULL,NULL,NULL},
+        {"&Return",gui_return,NULL,NULL,NULL},
+        {"&Exit",gui_exit,NULL,NULL,NULL},
         {NULL,NULL,NULL,NULL,NULL}
 };
 
@@ -74,6 +77,7 @@ int gui_changedisc0()
         ret=file_select_ex("Please choose a disc image",tempname,"SSD;DSD;IMG;ADF;ADL",260,384,192);
         if (ret)
         {
+                checkdiscchanged(0);
                 memcpy(discname[0],tempname,260);
                 for (c=0;c<strlen(discname[0]);c++)
                 {
@@ -101,6 +105,7 @@ int gui_changedisc1()
         ret=file_select_ex("Please choose a disc image",tempname,"SSD;DSD;IMG;ADF;ADL",260,384,192);
         if (ret)
         {
+                checkdiscchanged(1);
                 memcpy(discname[1],tempname,260);
                 for (c=0;c<strlen(discname[1]);c++)
                 {
@@ -132,9 +137,9 @@ int ddsounds()
 
 MENU discmenu[]=
 {
-        {"Load drive 0/2",gui_changedisc0,NULL,NULL,NULL},
-        {"Load drive 1/3",gui_changedisc1,NULL,NULL,NULL},
-        {"Disc sounds",ddsounds,NULL,NULL,NULL},
+        {"Load drive &0/2",gui_changedisc0,NULL,NULL,NULL},
+        {"Load drive &1/3",gui_changedisc1,NULL,NULL,NULL},
+        {"&Disc sounds",ddsounds,NULL,NULL,NULL},
         {NULL,NULL,NULL,NULL,NULL}
 };
 
@@ -174,13 +179,13 @@ int tapeena()
 
 MENU tapemenu[]=
 {
-        {"Change tape",changetape,NULL,NULL,NULL},
-        {"Rewind tape",rewindtape,NULL,NULL,NULL},
-        {"Tape enable",tapeena,NULL,NULL,NULL},
+        {"&Change tape",changetape,NULL,NULL,NULL},
+        {"&Rewind tape",rewindtape,NULL,NULL,NULL},
+        {"&Tape enable",tapeena,NULL,NULL,NULL},
         {NULL,NULL,NULL,NULL,NULL}
 };
 
-MENU modelmenu[8];
+MENU modelmenu[9];
 
 int mpala()
 {
@@ -194,7 +199,7 @@ int mpala()
         resetsysvia();
         resetuservia();
         memset(ram,0,32768);
-        for (c=0;c<7;c++) modelmenu[c].flags=0;
+        for (c=0;c<8;c++) modelmenu[c].flags=0;
         modelmenu[0].flags=D_SELECTED;
         return D_EXIT;
 }
@@ -211,7 +216,7 @@ int mntsca()
         resetsysvia();
         resetuservia();
         memset(ram,0,32768);
-        for (c=0;c<7;c++) modelmenu[c].flags=0;
+        for (c=0;c<8;c++) modelmenu[c].flags=0;
         modelmenu[1].flags=D_SELECTED;
         return D_EXIT;
 }
@@ -228,7 +233,7 @@ int mpalb()
         resetsysvia();
         resetuservia();
         memset(ram,0,32768);
-        for (c=0;c<7;c++) modelmenu[c].flags=0;
+        for (c=0;c<8;c++) modelmenu[c].flags=0;
         modelmenu[2].flags=D_SELECTED;
         return D_EXIT;
 }
@@ -245,7 +250,7 @@ int mntscb()
         resetsysvia();
         resetuservia();
         memset(ram,0,32768);
-        for (c=0;c<7;c++) modelmenu[c].flags=0;
+        for (c=0;c<8;c++) modelmenu[c].flags=0;
         modelmenu[3].flags=D_SELECTED;
         return D_EXIT;
 }
@@ -262,7 +267,7 @@ int mpalbp()
         resetsysvia();
         resetuservia();
         memset(ram,0,65536);
-        for (c=0;c<7;c++) modelmenu[c].flags=0;
+        for (c=0;c<8;c++) modelmenu[c].flags=0;
         modelmenu[4].flags=D_SELECTED;
         return D_EXIT;
 }
@@ -279,7 +284,7 @@ int mpalbp96()
         resetsysvia();
         resetuservia();
         memset(ram,0,65536);
-        for (c=0;c<7;c++) modelmenu[c].flags=0;
+        for (c=0;c<8;c++) modelmenu[c].flags=0;
         modelmenu[5].flags=D_SELECTED;
         return D_EXIT;
 }
@@ -296,8 +301,25 @@ int mpalbp128()
         resetsysvia();
         resetuservia();
         memset(ram,0,65536);
-        for (c=0;c<7;c++) modelmenu[c].flags=0;
+        for (c=0;c<8;c++) modelmenu[c].flags=0;
         modelmenu[6].flags=D_SELECTED;
+        return D_EXIT;
+}
+
+int mpalm128()
+{
+        int c;
+        model=7;
+        remaketables();
+        loadroms();
+        reset6502();
+        reset8271(0);
+        reset1770();
+        resetsysvia();
+        resetuservia();
+        memset(ram,0,65536);
+        for (c=0;c<8;c++) modelmenu[c].flags=0;
+        modelmenu[7].flags=D_SELECTED;
         return D_EXIT;
 }
 
@@ -310,6 +332,7 @@ MENU modelmenu[]=
         {"PAL B+",mpalbp,NULL,NULL,NULL},
         {"PAL B+96K",mpalbp96,NULL,NULL,NULL},
         {"PAL B+128K",mpalbp128,NULL,NULL,NULL},
+        {"PAL Master 128",mpalm128,NULL,NULL,NULL},
         {NULL,NULL,NULL,NULL,NULL}
 };
 
@@ -334,8 +357,8 @@ int monochrome()
 
 MENU videomenu[]=
 {
-        {"Blur filter",blurfilter,NULL,NULL,NULL},
-        {"Monochrome",monochrome,NULL,NULL,NULL},
+        {"&Blur filter",blurfilter,NULL,NULL,NULL},
+        {"&Monochrome",monochrome,NULL,NULL,NULL},
         {NULL,NULL,NULL,NULL,NULL}
 };
 
@@ -375,22 +398,28 @@ int mtri()
 
 MENU wavemenu[]=
 {
-        {"Square",msquare,NULL,NULL,NULL},
-        {"Sawtooth",msaw,NULL,NULL,NULL},
-        {"Sine",msine,NULL,NULL,NULL},
-        {"Triangle",mtri,NULL,NULL,NULL},
+        {"&Square",msquare,NULL,NULL,NULL},
+        {"S&awtooth",msaw,NULL,NULL,NULL},
+        {"S&ine",msine,NULL,NULL,NULL},
+        {"&Triangle",mtri,NULL,NULL,NULL},
         {NULL,NULL,NULL,NULL,NULL}
 };
 
-MENU soundmenu[5];
+MENU soundmenu[6];
 
 int soundena()
 {
         soundon^=1;
         if (soundon) soundmenu[0].flags=D_SELECTED;
         else         soundmenu[0].flags=0;
-//        if (!soundon) set_volume(0,0);
-//        else          set_volume(255,0);
+        return D_EXIT;
+}
+
+int lowpass()
+{
+        soundfilter^=1;
+        if (soundfilter) soundmenu[1].flags=D_SELECTED;
+        else             soundmenu[1].flags=0;
         return D_EXIT;
 }
 
@@ -398,7 +427,7 @@ int startlog()
 {
         char tempname[260]="";
         int ret;
-        ret=file_select_ex("Please enter a file name",tempname,"SN",260,384,192);
+        ret=file_select_ex("Please enter a file name",tempname,"VGM",260,384,192);
         if (ret)
            startsnlog(tempname);
         return D_EXIT;
@@ -412,10 +441,11 @@ int stoplog()
 
 MENU soundmenu[]=
 {
-        {"Sound enable",soundena,NULL,NULL,NULL},
-        {"Waveform",NULL,wavemenu,NULL,NULL},
-        {"Start SN log",startlog,NULL,NULL,NULL},
-        {"Stop SN log",stoplog,NULL,NULL,NULL},
+        {"Sound &enable",soundena,NULL,NULL,NULL},
+        {"&Low pass filter",lowpass,NULL,NULL,NULL},
+        {"&Waveform",NULL,wavemenu,NULL,NULL},
+        {"&Start VGM log",startlog,NULL,NULL,NULL},
+        {"S&top VGM log",stoplog,NULL,NULL,NULL},
         {NULL,NULL,NULL,NULL,NULL}
 };
 
@@ -469,27 +499,27 @@ int mscrshot()
 
 MENU joymenu[]=
 {
-        {"Calibrate joystick 1",calib1,NULL,NULL,NULL},
-        {"Calibrate joystick 2",calib2,NULL,NULL,NULL},
-        {"Save screenshot",mscrshot,NULL,NULL,NULL},
+        {"Calibrate joystick &1",calib1,NULL,NULL,NULL},
+        {"Calibrate joystick &2",calib2,NULL,NULL,NULL},
+        {"&Save screenshot",mscrshot,NULL,NULL,NULL},
         {NULL,NULL,NULL,NULL,NULL}
 };
 
 MENU mainmenu[]=
 {
-        {"File",NULL,filemenu,NULL,NULL},
-        {"Model",NULL,modelmenu,NULL,NULL},
-        {"Disc",NULL,discmenu,NULL,NULL},
-        {"Tape",NULL,tapemenu,NULL,NULL},
-        {"Video",NULL,videomenu,NULL,NULL},
-        {"Sound",NULL,soundmenu,NULL,NULL},
-        {"Misc",NULL,joymenu,NULL,NULL},
+        {"&File",NULL,filemenu,NULL,NULL},
+        {"&Model",NULL,modelmenu,NULL,NULL},
+        {"&Disc",NULL,discmenu,NULL,NULL},
+        {"&Tape",NULL,tapemenu,NULL,NULL},
+        {"&Video",NULL,videomenu,NULL,NULL},
+        {"&Sound",NULL,soundmenu,NULL,NULL},
+        {"&Misc",NULL,joymenu,NULL,NULL},
         {NULL,NULL,NULL,NULL,NULL}
 };
 
 DIALOG bemgui[]=
 {
-      {d_ctext_proc, 200, 260, 0,  0, 15,0,0,0,     0,0,"B-em v0.61"},
+      {d_ctext_proc, 200, 260, 0,  0, 15,0,0,0,     0,0,"B-em v0.7"},
       {d_menu_proc,  0,   0,   0,  0, 15,0,0,0,     0,0,mainmenu},
       {0,0,0,0,0,0,0,0,0,0,0,NULL,NULL,NULL}
 };
@@ -499,6 +529,7 @@ BITMAP *mouse,*_mouse_sprite;
 void entergui()
 {
         int x,y;
+        DIALOG_PLAYER *dp;
         fadepal();
         if (uefena) tapemenu[2].flags=D_SELECTED;
         else        tapemenu[2].flags=0;
@@ -510,8 +541,13 @@ void entergui()
         else         discmenu[2].flags=0;
         if (soundon) soundmenu[0].flags=D_SELECTED;
         else         soundmenu[0].flags=0;
+        if (soundfilter) soundmenu[1].flags=D_SELECTED;
+        else             soundmenu[1].flags=0;
         modelmenu[0].flags=modelmenu[1].flags=modelmenu[2].flags=modelmenu[3].flags=modelmenu[4].flags=modelmenu[5].flags=modelmenu[6].flags=0;
         modelmenu[model].flags=D_SELECTED;
+//        if (model==0) modelmenu[0].flags=D_SELECTED;
+//        if (model==1) modelmenu[1].flags=D_SELECTED;
+//        if (model==2) modelmenu[2].flags=D_SELECTED;
         wavemenu[0].flags=wavemenu[1].flags=wavemenu[2].flags=wavemenu[3].flags=0;
         wavemenu[curwave].flags=D_SELECTED;
 /*        if (!mouse)
@@ -540,8 +576,17 @@ void entergui()
         gui_fg_color=15;
         clear_keybuf();
         if (soundon) stop_audio_stream(as);
-        do_dialog(bemgui,0);
-        if (soundon) as=play_audio_stream(624,8,0,31250,255,127);
+        x=1;
+        dp=init_dialog(bemgui,0);
+        show_mouse(screen);
+        while (x && !key[KEY_F11] && !(mouse_b&2))
+        {
+                x=update_dialog(dp);
+        }
+        show_mouse(NULL);
+        shutdown_dialog(dp);
+        while ((mouse_b&2) || key[KEY_F11] || key[KEY_ESC]) yield_timeslice();
+        if (soundon) as=play_audio_stream(624,16,0,31250,255,127);
 //        do_menu(mainmenu,0,0);
         clear_keybuf();
         restorepal();

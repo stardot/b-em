@@ -1,4 +1,4 @@
-/*B-em 0.6 by Tom Walker*/
+/*B-em 0.7 by Tom Walker*/
 /*UEF handling*/
 
 #include <zlib.h>
@@ -51,6 +51,7 @@ void polltape()
       if (!inchunk)
       {
             gzread(uef,&chunkid,2);
+            printf("Chunk %03X\n",chunkid);
             gzread(uef,&chunklen,4);
             if (gzeof(uef))
             {
@@ -107,7 +108,7 @@ void polltape()
             if (!intone)
             {
                   dcd();
-                  intone=7;
+                  intone=11;
             }
             else
             {

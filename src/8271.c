@@ -1,4 +1,4 @@
-/*B-em 0.6 by Tom Walker*/
+/*B-em 0.7 by Tom Walker*/
 /*8271 FDC emulation*/
 
 #include <stdio.h>
@@ -14,6 +14,9 @@
 
 #define SIDE ((drvctrloutp>>5) & 1)
 
+int soundiniteded=0;
+int adfs[2];
+int sides[2];
 int nmiwait=0;
 int output;
 int nmi;
@@ -30,16 +33,31 @@ unsigned char discs[2][SIDES][SECTORS*TRACKS][SECTORSIZE];
 
 int ddnoise=1;
 SAMPLE *seeksmp;
+SAMPLE *seek2smp;
+SAMPLE *seek3smp;
 SAMPLE *stepsmp;
 SAMPLE *motorsmp;
+SAMPLE *motoroffsmp;
+SAMPLE *motoronsmp;
 void (*docommand)();
 void (*doint)();
 
 void loaddiscsamps()
 {
         seeksmp=load_wav("seek.wav");
+        seek2smp=load_wav("seek2.wav");
+        seek3smp=load_wav("seek3.wav");
         stepsmp=load_wav("step.wav");
         motorsmp=load_wav("motor.wav");
+        motoroffsmp=load_wav("motoroff.wav");
+        motoronsmp=load_wav("motoron.wav");
+        if (!seeksmp) { printf("no seeksmp"); exit(-1); }
+        if (!seek2smp) { printf("no seek2"); exit(-1); }
+        if (!seek3smp) { printf("no seek3"); exit(-1); }
+        if (!stepsmp) { printf("no step"); exit(-1); }
+        if (!motorsmp) { printf("no motorsmp"); exit(-1); }
+        if (!motoronsmp) { printf("no motoronsmp"); exit(-1); }
+        if (!motoroffsmp) { printf("no motoroffsmp"); exit(-1); }
 }
 
 void set8271poll(int time)
@@ -62,9 +80,10 @@ void error8271(unsigned char err)
 
 void motoroff()
 {
-//        printf("Motor off\n");
+//        printf("Motor off %i\n",soundiniteded);
         driveled=0;
         stop_sample(motorsmp);
+//        if (soundiniteded) play_sample(motoroffsmp,255,127,1000,0);
 }
 
 void setspindown()
@@ -81,6 +100,8 @@ int load8271ssd(char *fn, int disc)
         int eof=0,temp;
         if (!ff)
            return -1;
+        sides[disc]=1;
+        adfs[disc]=0;
                 for (e=0;e<TRACKS;e++)
                 {
                         for (d=0;d<10;d++)
@@ -122,6 +143,8 @@ int load8271dsd(char *fn, int disc)
         int eof=0,temp;
         if (!ff)
            return -1;
+        sides[disc]=2;
+        adfs[disc]=0;
 //        for (f=0;f<SIDES;f++)
 //        {
 //                for (e=0;e<TRACKS;e++)
@@ -189,6 +212,7 @@ void dumpdisc()
 void reset8271(int reload)
 {
         int c;
+        motoroff();
         statusreg=0;
         resultreg=0;
         disctime=0;
@@ -233,7 +257,6 @@ void reset8271(int reload)
            load8271ssd(discname[1],1);
 //        atexit(dumpdisc);
         }
-        motoroff();
 }
 
 char str[40];
@@ -350,12 +373,16 @@ void writespecial()
 void seek()
 {
         int drv=-1;
+        int diff;
         char s[40];
         if (!driveled)
         {
                 driveled=1;
                 if (ddnoise)
-                   play_sample(motorsmp,255,127,1000,TRUE);
+                {
+                        play_sample(motorsmp,255,127,1000,TRUE);
+                        play_sample(motoronsmp,255,127,1000,0);
+                }
         }
         doselects();
         if (selects[0])
@@ -367,13 +394,38 @@ void seek()
                 error8271(0x10);
                 return;
         }
+        diff=curtrack[0]-parameters[0];
+//        printf("Diff %i %i-%i\n",diff,curtrack[0],parameters[0]);
         curtrack[0]=parameters[0];
         statusreg=0x80;
         //printf("Seek NMI\n");
         NMI();
-        set8271poll(100);
-        if (ddnoise)
-           play_sample(seeksmp,255,127,1000,0);
+        //set8271poll(100);
+        if (ddnoise && diff)
+        {
+                if (diff==1)
+                {
+                        play_sample(stepsmp,255,127,1000,0);
+                        set8271poll(1000);
+                }
+                else if (diff<7)
+                {
+                        play_sample(seeksmp,255,127,1000,0);
+                        set8271poll(1000);
+                }
+                else if (diff<30)
+                {
+                        play_sample(seek3smp,255,127,1000,0);
+                        set8271poll(1200000);
+                }
+                else
+                {
+                        play_sample(seek2smp,255,127,1000,0);
+                        set8271poll(2000000);
+                }
+        }
+        else
+           set8271poll(100);
 }
 
 void seekint()
@@ -391,11 +443,14 @@ int bytesread=0;
 void readvarlen()
 {
         char s[40];
-        int drv=-1;
+        int drv=-1,dif;
         if (!driveled)
         {
                 if (ddnoise)
-                   play_sample(motorsmp,255,127,1000,TRUE);
+                {
+                        play_sample(motorsmp,255,127,1000,TRUE);
+                        play_sample(motoronsmp,255,127,1000,0);
+                }
                 driveled=1;
         }
         doselects();
@@ -409,8 +464,9 @@ void readvarlen()
                 return;
         }
         curr8271drv=drv;
-        if (curtrack[0]!=parameters[0] && ddnoise)
-           play_sample(stepsmp,255,127,1000,0);
+        dif=ABS(curtrack[0]-parameters[0]);
+//        if (curtrack[0]!=parameters[0] && ddnoise)
+//           play_sample(stepsmp,255,127,1000,0);
         curtrack[0]=parameters[0];
         cursec[0]=parameters[1];
         sectorsleft=parameters[2]&0x1F;
@@ -420,7 +476,33 @@ void readvarlen()
         statusreg=0x80;
         //printf("Read NMI\n");
         NMI();
-        set8271poll(BYTETIME);
+        if (ddnoise)
+        {
+                if (!dif)
+                   set8271poll(BYTETIME);
+                else if (dif==1)
+                {
+                        play_sample(stepsmp,255,127,1000,0);
+                        set8271poll(BYTETIME);
+                }
+                else if (dif<7)
+                {
+                        play_sample(seeksmp,255,127,1000,0);
+                        set8271poll(BYTETIME*15);
+                }
+                else if (dif<30)
+                {
+                        play_sample(seek3smp,255,127,1000,0);
+                        set8271poll(1200000);
+                }
+                else
+                {
+                        play_sample(seek2smp,255,127,1000,0);
+                        set8271poll(2000000);
+                }
+        }
+        else
+           set8271poll(BYTETIME);
         bytesread=0;
 }
 

@@ -1,4 +1,4 @@
-/*B-em 0.6 by Tom Walker*/
+/*B-em 0.7 by Tom Walker*/
 /*6850 acia emulation*/
 /*God this is old :)*/
 #include <stdio.h>
@@ -8,6 +8,7 @@
 #define DCD     4
 #define RECIEVE 1
 
+int lns;
 int dreg=0;
 int output;
 int cleardcd=0;
@@ -22,7 +23,7 @@ unsigned char aciadrs;
 
 void updateaciaint()
 {
-        if (aciasr&0x80 && aciacr&0x80)
+        if ((aciasr&0x80) && (aciacr&0x80))
         {
                 interrupt|=4;
 //                output=1;
@@ -44,10 +45,11 @@ unsigned char readacia(unsigned short addr)
         unsigned char temp;
         if (addr&1)
         {
+//                printf("Reading ACIA data %02X %i %i\n",aciadr,lns,dreg);
                 aciasr&=~0x81;
                 updateaciaint();
                 temp=aciadr;
-                aciadr=aciadrs;
+                if (dreg==2) aciadr=aciadrs;
                 if (dreg) dreg--;
                 return temp;
         }
@@ -90,6 +92,7 @@ void dcd()
 {
         aciasr|=DCD|0x80;
         updateaciaint();
+//        printf("DCD high\n");
 //        if (aciacr&0x80) interrupt|=4;
 }
 
@@ -98,12 +101,14 @@ void dcdlow()
         aciasr|=0x80;
         aciasr&=~DCD;
         updateaciaint();
+//        printf("DCD low\n");
 //        if (aciacr&0x80) interrupt|=4;
 }
 
 void receive(unsigned char val) /*Called when the acia recives some data*/
 {
         char s[80];
+//        printf("Receiving %02X %i\n",val,lns);
 //        printf("Receiving %02X %02X %02X\n",val,aciacr,aciasr);
 //        sprintf(s,"Writing %02X to acia\n",val);
 //        fputs(s,tapelog);
@@ -119,7 +124,7 @@ void receive(unsigned char val) /*Called when the acia recives some data*/
         }
         else
         {
-                printf("Missed a byte\n");
+//                printf("Missed a byte\n");
         }
         aciadrf=1;
         aciasr|=RECIEVE|0x80;
@@ -129,14 +134,20 @@ void receive(unsigned char val) /*Called when the acia recives some data*/
 
 void pollacia()
 {
+//        printf("Motor status %i\n",motor);
         if (motor)
         {
                 if (dreg)
                 {
+//                        printf("dreg\n");
                         aciasr|=RECIEVE|0x80;
                         updateaciaint();
                 }
                 else
-                   polltape();
+                {
+                        polltape();
+//                        printf("Polling tape\n");
+                }
+
         }
 }

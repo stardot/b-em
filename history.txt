@@ -247,3 +247,32 @@ Version 0.6 finalised and released
            1770 seeking/stepping speeded up a bit.
 27/01/04 - Played with sound a bit.
 28/01/04 - Added ADFS support.
+Version 0.6 finalised and released
+23/02/04 - Started Master 128 emulation. Currently hangs.
+29/02/04 - Added CMOS RAM. Acorn's implementation of this is a bit odd, but
+           it's easier than the Archie's I2C chip.
+           Fixed bugs in TSB/TRB (hangover from Snem, where the implementation
+           is taken from). MOS 3.20 now boots, but has the odd problem - like
+           the inability to initialise the CRTC properly.
+10/03/04 - Fixed Empire Strikes Back, thanks to Tom Seddon.
+13/03/04 - Master CRTC problem turns out to be bad CMOS data.
+14/03/04 - Implemented low pass filter
+           Fixed bug with VIA interrupts, no more jumping rasters in some games
+           Started to look at Uridium again. With non-interlace emulation,
+           interrupts are stable, but raster split still scrolls.
+15/03/04 - Implemented vertical adjust after rupture, Uridium working!
+           Fixed read of FE46/FE47 - fixed sound in Pipeline, Road Runner,
+           Chuckie Egg loader, etc.
+           Implemented 1770 write. Write won't be available in 8271 because of
+           the difficulty involved in modifying my ancient code.
+           Fixed Skirmish.
+           Slowed tape speed - takes longer, but much more reliable.
+16/03/04 - Slowed tape speed more. I hate this tape stuff, I don't want to play
+           anymore.
+           Played with disc sound - more authentic now.
+17/03/04 - Low pass filter added to config.
+25/03/04 - Replaced SN logging with VGM - seems OK.
+03/04/04 - Updated Ming/W - Master 128 mode now usable in Windows version.
+04/04/04 - Fixed tape and joysticks in Master 128 mode.
+           The GUI can now be exited by F11 and right mouse click.
+Version 0.7 finalised

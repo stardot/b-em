@@ -1,9 +1,19 @@
-/*B-em 0.6 by Tom Walker*/
+/*B-em 0.7 by Tom Walker*/
 /*System VIA emulation*/
 
+unsigned short pc;
 #include <allegro.h>
 #include <stdio.h>
 #include "b-em.h"
+
+void updatekeyboard();
+unsigned char *ram;
+void dumpram2()
+{
+        FILE *f=fopen("ram.dmp","wb");
+        fwrite(ram,0x8000,1,f);
+        fclose(f);
+}
 
 #define TIMER1INT 0x40
 #define TIMER2INT 0x20
@@ -27,6 +37,7 @@
 #define         IER     0x0e
 #define         ORAnh 0x0f
 
+int model;
 void updatesysIFR()
 {
         if ((sysvia.ifr&0x7F)&(sysvia.ier&0x7F))
@@ -41,11 +52,13 @@ void updatesysIFR()
         }
 }
 
+int lns;
 void updatesystimers()
 {
         if (sysvia.t1c<-4)
         {
                 sysvia.t1c+=sysvia.t1l+4;
+//                printf("Timer 1 reset line %i %04X %04X\n",lns,sysvia.t1c,sysvia.t1l);
                 if (!sysvia.t1hit)
                 {
                        sysvia.ifr|=TIMER1INT;
@@ -73,6 +86,7 @@ void vblankint()
 {
         sysvia.ifr|=2;
         updatesysIFR();
+//        printf("VBLANK %02X %i\n",sysvia.ier,p.i);
 }
 
 void syscb1()
@@ -90,6 +104,24 @@ int keysdown=0;
 
 unsigned char sdbval;
 
+unsigned short cmosaddr;
+int cmosena,cmosrw,cmosstrobe,cmosold;
+unsigned char cmos[64];
+
+void loadcmos()
+{
+        FILE *f=fopen("cmos.bin","rb");
+        fread(cmos,64,1,f);
+        fclose(f);
+}
+
+void savecmos()
+{
+        FILE *f=fopen("cmos.bin","wb");
+        fwrite(cmos,64,1,f);
+        fclose(f);
+}
+
 void writeIC32(unsigned char val)
 {
         unsigned char oldIC32=IC32;
@@ -102,6 +134,14 @@ void writeIC32(unsigned char val)
            updatekeyboard();
         if (!(IC32&1))
            soundwrite(sdbval);
+        if (model==7)
+        {
+                cmosrw=IC32&2;
+                cmosstrobe=(IC32&4)^cmosold;
+                cmosold=IC32&4;
+                if (cmosstrobe && cmosena && !cmosrw && cmosaddr>0xB) cmos[cmosaddr]=sdbval; //printf("CMOS write %02X %02X\n",cmosaddr,sdbval);
+                if (cmosena && cmosrw) { sysvia.ora=cmos[cmosaddr]; /*printf("CMOS read %02X %02X\n",cmosaddr,sysvia.ora);*/ }
+        }
 }
 
 void writedatabus(unsigned char val)
@@ -115,27 +155,37 @@ void writedatabus(unsigned char val)
         }
         if (!(IC32&1))
            soundwrite(val);
+                if (model==7 && cmosstrobe && cmosena && !cmosrw && cmosaddr>0xB) cmos[cmosaddr]=sdbval;
+//        if (model==7 && cmosstrobe && !cmosrw && cmosena) printf("CMOS write %02X %02X\n",cmosaddr,sdbval);
 }
 
 void writesysvia(unsigned short addr, unsigned char val, int line)
 {
+//        if (addr==0xFE40) printf("FE40 write %02X\n",val);
         switch (addr&0xF)
         {
                 case ORA:
+                sysvia.ifr&=0xfc;
+                updatesysIFR();
+//                printf("Port A clear\n");
                 case ORAnh:
                 sysvia.ora=val;
                 sysvia.porta=(sysvia.porta & ~sysvia.ddra)|(sysvia.ora & sysvia.ddra);
-                sysvia.ifr&=~PORTAINT;
                 writedatabus(val);
-                updatesysIFR();
                 break;
 
                 case ORB:
                 sysvia.orb=val;
                 sysvia.portb=(sysvia.portb & ~sysvia.ddrb)|(sysvia.orb & sysvia.ddrb);
-                sysvia.ifr&=~PORTBINT;
+                sysvia.ifr&=0xee;//~PORTBINT;
                 writeIC32(val);
                 updatesysIFR();
+                if (model==7) /*CMOS*/
+                {
+                        if (val&0x80) cmosaddr=sysvia.ora&63;
+                        cmosena=val&0x40;
+//                        printf("CMOSena %i CMOSaddr %02X\n",cmosena,cmosaddr);
+                }
                 break;
 
                 case DDRA:
@@ -158,6 +208,11 @@ void writesysvia(unsigned short addr, unsigned char val, int line)
                 case T1LH:
                 sysvia.t1l&=0x1FE;
                 sysvia.t1l|=(val<<9);
+                if (sysvia.acr&0x40)
+                {
+                        sysvia.ifr&=~TIMER1INT;
+                        updatesysIFR();
+                }
                 break;
                 case T1CH:
                 sysvia.t1l&=0x1FE;
@@ -189,6 +244,7 @@ void writesysvia(unsigned short addr, unsigned char val, int line)
 //                printf("now %02X line %i\n",sysvia.ier,line);
                 break;
                 case IFR:
+//                printf("Interrupt clear %02X\n",val&0x7F);
                 sysvia.ifr&=~(val&0x7F);
                 updatesysIFR();
                 break;
@@ -201,18 +257,32 @@ unsigned char readsysvia(unsigned short addr)
         switch (addr&0xF)
         {
                 case ORA:
+//                printf("Port A clear\n");
                 sysvia.ifr&=~PORTAINT;
                 updatesysIFR();
                 case ORAnh:
+                if (model==7 && cmosrw && cmosena)
+                {
+                        sysvia.ora=cmos[cmosaddr];
+//                        printf("CMOS read %02X %02X\n",cmosaddr,sysvia.ora);
+                        temp=sysvia.ora & ~sysvia.ddra;
+                        return temp;
+                }
                 temp=sysvia.ora & sysvia.ddra;
                 temp|=(sysvia.porta & ~sysvia.ddra);
-                temp&=0x7F;
-                if (bbckey[keycol][keyrow])
-                   return temp|0x80;
+                if (model<7 || !cmosena)
+                {
+                        temp&=0x7F;
+                        if (bbckey[keycol][keyrow])
+                        {
+//                                printf("Key col %i row %i down\n",keycol,keyrow);
+                                return temp|0x80;
+                        }
+                }
                 return temp;
 
                 case ORB:
-                sysvia.ifr&=~PORTBINT;
+                sysvia.ifr&=0xEF;//~PORTBINT;
                 updatesysIFR();
                 temp=sysvia.orb & sysvia.ddrb;
                 if (sysvia.acr&2)
@@ -229,9 +299,9 @@ unsigned char readsysvia(unsigned short addr)
                 case DDRB:
                 return sysvia.ddrb;
                 case T1LL:
-                return sysvia.t1l&0xFF;
+                return (sysvia.t1l&0x1FE)>>1;
                 case T1LH:
-                return sysvia.t1l>>8;
+                return sysvia.t1l>>9;
                 case T1CL:
                 sysvia.ifr&=~TIMER1INT;
                 updatesysIFR();
@@ -281,16 +351,15 @@ unsigned char codeconvert[128]=
         60,61,62,63,64,65,66,67,
         68,87,88,1,41,12,13,14,
         15,26,27,28,39,40,43,86,
-        51,52,53,57,0,83,0,79,
+        51,52,53,57,81,83,0,79,
         0,0,75,77,72,80,0,55,
         74,78,83,0,84,0,115,125,
         112,121,123,42,54,29,0,56,
         0,91,92,93,70,69,58,0,
-        0,0,0,0,0,0,0,0,
+        0,0,0,0,0,0,58,0,
         0,0,0,0,0,0,0,0,
 };
 
-void updatekeyboard();
 inline void presskey(int row, int col)
 {
         bbckey[col][row]=1;
@@ -344,6 +413,10 @@ void checkkeys()
            presskey(0,1);
         else
            releasekey(0,1);
+        if (key[KEY_CAPSLOCK])
+           presskey(4,0);
+        else
+           releasekey(4,0);
         for (c=0;c<128;c++)
             keys2[c]=key[c];
 }
@@ -387,4 +460,5 @@ void initDIPS(unsigned char dips)
                    releasekey(0,c);
                 dips>>=1;
         }
+        keysdown=0;
 }
