@@ -1,4 +1,4 @@
-/*B-em 0.7 by Tom Walker*/
+/*B-em 0.71b by Tom Walker*/
 /*Sound emulation*/
 
 int vgmsamples;

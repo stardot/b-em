@@ -1,4 +1,4 @@
-/*B-em 0.7 by Tom Walker*/
+/*B-em 0.71b by Tom Walker*/
 /*GUI*/
 
 #include <stdio.h>
@@ -631,10 +631,11 @@ void entergui()
         while (x && !key[KEY_F11] && !(mouse_b&2) && !key[KEY_ESC])
         {
                 x=update_dialog(dp);
+                sleep(1);
         }
         show_mouse(NULL);
         shutdown_dialog(dp);
-        while ((mouse_b&2) || key[KEY_F11] || key[KEY_ESC]) yield_timeslice();
+        while ((mouse_b&2) || key[KEY_F11] || key[KEY_ESC]) sleep(1);
         if (soundon) as=play_audio_stream(624,16,0,31250,255,127);
         clear_keybuf();
         restorepal();

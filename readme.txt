@@ -20,7 +20,7 @@ Features
 - Emulates Models A, B, B+, and Master 128
 - All documented video modes supported
 - All documented and some undocumented 6502 instructions
-- 8271 Floppy Disc Controller emulated (double drive, double sided, 80 track, read only)
+- 8271 Floppy Disc Controller emulated (double drive, double sided, 80 track, read/write)
 - 1770 Floppy Disc Controller emulated (double drive, double sided, 80 track, read/write)
 - Supports six formats for BBC storage on PC - .ssd, .dsd, .adf, .inf, .uef
   and __catalog__
@@ -33,13 +33,9 @@ Features
 Differences from last version
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- Stupid bug in Master 128 fixed - most Master stuff should work now
-- High resolution video now supported
-- 2xSaI filter
-- Bugs fixed in CRTC, Uridium and Psycastria now look better
-- Sound volume now logarithmic
-- Couple of other bug fixes
-- Win32 port can now run in a window
+- 8271 FDC now supports writing
+- FDC no longer crashes B-em in The Hobbit
+- Windows version should be more responsive
 
 
 Requirements
@@ -69,18 +65,18 @@ directory B or BP.
 Notes
 ~~~~~
 
-You can save to disc, but not in model A&B modes. You can use the .INF filing
-system (disable tape), but _only_ in model A&B modes (and only in PAL).
+You can use the .INF filing system (disable tape) _only_ in model A&B modes
+(and only in PAL).
+
+The UEF filing system is read-only. All others should be able to be written
+to.
 
 400x300 mode doesn't work on some machines. If you end up with a bad display,
 hit CTRL-ALT-END to kill it.
 
-Sound is generally better in a window, but only if your machine is fast enough.
-
 Known bugs
 ~~~~~~~~~~
 
-INF filing system only works on PAL models A and B AFAIK
 ADFS corrupts on COMPACT command
 Formatting not supported
 UEF has problems on some games
@@ -151,8 +147,8 @@ Sound options :
         Sound enable    - enable/disable sound.
         Low pass filter - applies a low pass filter to the sound.
         Waveform        - alters the waveform type. Original BBC uses square.
-        Start SN log    - start logging sound to an SN file.
-        Stop SN log     - stop logging sound.
+        Start VGM log   - start logging sound to an VGM file.
+        Stop VGM log    - stop logging sound.
 
 Misc options :
         Calibrate joystick 1 - Calibrates the first joystick.
@@ -173,12 +169,8 @@ A : If you have a disc image (.ssd, .dsd, .img etc) load it through the disc
     CHAIN""
 
 Q : Why have I got no sound?
-A : B-em should work with 100% SoundBlaster compatibles, ESS Audiodrive,
-    Ensoniq Soundscape, and Windoze $ound System. It will not work with cards
-    not in that list (such as Creative's newer SoundBlasters, which aren't
-    really compatible, or sadly the GUS), it will not work with non-100%
-    compatibles with crappy drivers (such as the ones found in laptops) and it
-    will not work if you have a bad BLASTER enviroment label.
+A : B-em should work with any Directsound or waveout compatible card. If it
+    doesn't work, try new drivers.
     Minor addition to this, if you use a poor quality card (such as a
     SoundBlaster) and you have some sound running in the background in Windows,
     B-em will deliver no sound. The answer is to upgrade to a good card. B-em
@@ -203,10 +195,11 @@ The 6845 CRTC      - Accurate line-by-line engine. Firetrack, Revs, and
 The Video ULA      - All modes emulated.
 The System VIA     - Keyboard and sound emulated.
 The User VIA       - Emulated.
-8271 FDC           - Double disc, double sided, 40/80 tracks, read only. With
+8271 FDC           - Double disc, double sided, 40/80 tracks, read/write. With
                      authentic noise. Only in model B mode.
 1770 FDC           - Double disc, double sided, 40/80 tracks, read/write. With
                      authentic noise. Only in model B+ and Master 128 mode.
+6850 ACIA          - Cassette emulation via UEF files. Occasionally has problems
 tape filing system - Supports .inf and __CATALOG__ format.
 Sound              - All channels emulated, with sample support and some
                      undocumented behaviour (Crazee Rider). With optional low
@@ -457,7 +450,7 @@ pcBBC - can't remember the site address
 One of the few non-free BBC emulators, this one has good compatibility, but
 bad sound and costs money.
 
-BeebInC - www.beebinc.net
+BeebInC - beebinc.bbcmicro.com
 Seemingly dead, this was one of my favourite emulators. Surprisingly fast and
 compatible, but let down by poor sound (uses sine waves, not square waves) and
 low refresh rate (25 fps instead of 50 fps).

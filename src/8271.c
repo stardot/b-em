@@ -1,4 +1,4 @@
-/*B-em 0.7 by Tom Walker*/
+/*B-em 0.71b by Tom Walker*/
 /*8271 FDC emulation*/
 
 #include <stdio.h>
@@ -14,6 +14,7 @@
 
 #define SIDE ((drvctrloutp>>5) & 1)
 
+int discaltered[2];
 int soundiniteded=0;
 int adfs[2];
 int sides[2];
@@ -31,6 +32,7 @@ unsigned char resultreg=0;
 unsigned char error=0;
 unsigned char discs[2][SIDES][SECTORS*TRACKS][SECTORSIZE];
 
+int firstwriteint=0;
 int ddnoise=1;
 SAMPLE *seeksmp;
 SAMPLE *seek2smp;
@@ -470,7 +472,6 @@ void readvarlen()
         curtrack[0]=parameters[0];
         cursec[0]=parameters[1];
         sectorsleft=parameters[2]&0x1F;
-        //printf("Reading track %i sector %i num of sectors %i\n",curtrack[0],cursec[0],sectorsleft);
         sectorlen=1<<(7+((parameters[2]>>5)&7));
         byteinsec=0;
         statusreg=0x80;
@@ -570,7 +571,114 @@ void readint()
 //        output=1;
 }
 
-#define COMMS 6
+void writeint()
+{
+        int c;
+        int done=0;
+//        printf("Write int %i %i %i %i %i\n",curdisc,SIDE,curtrack[0],cursec[0],byteinsec);
+        if (sectorsleft<0)
+        {
+//                printf("End of command\n");
+                statusreg=0x18;
+                NMI();
+                return;
+//                exit(-1);
+        }
+        if (firstwriteint) firstwriteint=0;
+        else
+        {
+        discs[curdisc][SIDE][cursec[0]+(curtrack[0]*16)][byteinsec]=datareg;
+
+        byteinsec++;
+        if (byteinsec>=256)
+        {
+//                printf("\n");
+//                for (c=0;c<256;c++) printf("%c",discs[0][0][0][c]);
+//                printf("\n");
+                byteinsec=0;
+                sectorsleft--;
+                if (sectorsleft)
+                {
+                        cursec[0]++;
+                        if (cursec[0]==10)
+                        {
+                                done=1;
+                                sectorsleft=-1;
+                                cursec[0]=0;
+                        }
+                }
+                else
+                {
+                        done=1;
+                        sectorsleft=-1;
+                }
+        }
+        }
+        statusreg=0x8C;
+        NMI();
+        set8271poll(BYTETIME);
+}
+
+void writevarlen()
+{
+        int drv=-1;
+        doselects();
+        if (selects[0])
+           drv=0;
+        if (selects[1])
+           drv=1;
+        if (drv==-1)
+        {
+                error8271(0x10);
+                return;
+        }
+        curr8271drv=drv;
+        curtrack[0]=parameters[0];
+        cursec[0]=parameters[1];
+        sectorsleft=parameters[2]&0x1F;
+        sectorlen=1<<(7+((parameters[2]>>5)&7));
+        byteinsec=0;
+        statusreg=0x80;
+        NMI();
+        set8271poll(1200);
+        firstwriteint=1;
+        discaltered[drv]=1;
+//        printf("Write track %i sector %i length %i sectors\n",parameters[0],parameters[1],parameters[2]&0x1F);
+//        exit(-1);
+}
+
+void verifyvarlen()
+{
+        int drv=-1;
+        doselects();
+        if (selects[0])
+           drv=0;
+        if (selects[1])
+           drv=1;
+        if (drv==-1)
+        {
+                error8271(0x10);
+                return;
+        }
+        curr8271drv=drv;
+        curtrack[0]=parameters[0];
+        cursec[0]=parameters[1];
+        statusreg=0x80;
+        NMI();
+        set8271poll(BYTETIME);
+        firstwriteint=1;
+}
+
+void verifyint()
+{
+//        FILE *f=fopen("d:/djgpp/b-em6/disc.ssd","wb");
+//        fwrite(&discs[0][0][0][0],256*10*80,1,f);
+//        fclose(f);
+        statusreg=0x18;
+        NMI();
+}
+
+#define COMMS 8
 FDCCOMMAND fdccomms[COMMS+1] =
 {
         {0x2C,0,0x3F,readdrvstatus,NULL},
@@ -579,6 +687,8 @@ FDCCOMMAND fdccomms[COMMS+1] =
         {0x35,4,0xFF,specify,NULL},
         {0x29,1,0x3F,seek,seekint},
         {0x13,3,0x3F,readvarlen,readint},
+        {0x0b,3,0x3F,writevarlen,writeint},
+        {0x1f,3,0x3F,verifyvarlen,verifyint},
         {0xFF,0,0x00,NULL,NULL}
 };
 
@@ -611,9 +721,9 @@ void commandwrite(unsigned char val)
                 doint=NULL;
                 error8271(0x10);
 //                closegfx();
-//                //printf("Unrecognized 8271 command %X\n",val);
-//                exit(-1);
-//                return;
+                printf("Unrecognized 8271 command %X\n",val);
+                exit(-1);
+                return;
 
         }
 //        if (val==0x53) output=1;
@@ -699,6 +809,7 @@ void write8271(unsigned short addr, unsigned char val)
                 statusreg&=~0xC;
                 NMI();
                 datareg=val;
+//                printf("%c",val);
                 break;
         }
 }

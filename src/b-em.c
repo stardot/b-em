@@ -1,4 +1,4 @@
-/*B-em 0.7 by Tom Walker*/
+/*B-em 0.71b by Tom Walker*/
 /*Main loop*/
 
 #include <allegro.h>
@@ -35,31 +35,54 @@ int main()
 //        printf("B-em v0.7\n");
 //        atexit(dumpram2);
         load_config();
+        printf("load_config\n");
         loadcmos();
+        printf("loadcmos\n");
         allegro_init();
+        printf("allegro_init\n");
         install_keyboard();
+        printf("install_keyboard\n");
         key_led_flag=0;
         install_timer();
+        printf("install_timer\n");
         install_mouse();
+        printf("install_mouse\n");
         initmem();
+        printf("initmem\n");
         loadroms();
+        printf("loadroms\n");
         reset6502();
+        printf("reset6502\n");
         resetsysvia();
+        printf("resetsysvia\n");
         resetuservia();
+        printf("resetuservia\n");
         resetcrtc();
+        printf("resetcrtc\n");
         resetacia();
+        printf("resetacia\n");
         initserial();
+        printf("initserial\n");
         initvideo();
+        printf("initvideo\n");
         initsnd();
+        printf("initsnd\n");
         initadc();
+        printf("initadc\n");
         reset8271(1);
+        printf("reset8271\n");
         reset1770();
+        printf("reset1770\n");
         loaddiscsamps();
+        printf("loaddiscsamples\n");
         openuef(uefname);
+        printf("openuef\n");
         if (!uefena && model<4) trapos();
+        printf("trapos\n");
         set_window_title("B-em 0.71");
         install_int_ex(update50,MSEC_TO_TIMER(20));
         install_int_ex(update200,BPS_TO_TIMER(65));
+        printf("All initialised\n");
         while (!quit)
         {
                 exec6502(312,128);
@@ -71,7 +94,10 @@ int main()
                 {
                         p=0;
                         while (!p)
-                              p=(unsigned short *)get_audio_stream_buffer(as);
+                        {
+                                p=(unsigned short *)get_audio_stream_buffer(as);
+                                sleep(1);
+                        }
                         updatebuffer(p,624);
                         free_audio_stream_buffer(as);
                 }
@@ -79,7 +105,7 @@ int main()
                 {
                         while (!scupdate)
                         {
-                                yield_timeslice();
+                                sleep(1);
                                 if (soundon && sndupdate)
                                 {
                                         p=(unsigned short *)get_audio_stream_buffer(as);
@@ -121,12 +147,12 @@ int main()
                 }
                 if (key[KEY_F11])
                 {
-                        while (key[KEY_F11]) yield_timeslice();
+                        while (key[KEY_F11]) sleep(1);
                         entergui();
                 }
                 if (mouse_b&2)
                 {
-                        while (mouse_b&2) yield_timeslice();
+                        while (mouse_b&2) sleep(1);
                         entergui();
                 }
         }

@@ -1,4 +1,4 @@
-/*B-em 0.7 by Tom Walker*/
+/*B-em 0.71b by Tom Walker*/
 /*6502 emulation*/
 
 unsigned char curromdat;
@@ -1865,12 +1865,31 @@ void exec6502(int lines, int cpl)
                                 break;
 
                                 default:
-                                allegro_exit();
+                switch (opcode&0xF)
+                {
+                        case 0xA:
+                        break;
+                        case 0x0:
+                        case 0x2:
+                        case 0x3:
+                        case 0x4:
+                        case 0x7:
+                        case 0x9:
+                        case 0xB:
+                        pc++;
+                        break;
+                        case 0xC:
+                        case 0xE:
+                        case 0xF:
+                        pc+=2;
+                        break;
+                }
+/*                                allegro_exit();
                                 printf("Error : Bad opcode %02X\n",opcode);
                                 pc--;
                                 dumpregs();
                                 printf("Current ROM %02X\n",currom);
-                                exit(-1);
+                                exit(-1);*/
                         }
                         if (output) printf("A=%02X X=%02X Y=%02X PC=%04X %c%c%c%c%c%c\n",a,x,y,pc,(p.n)?'N':' ',(p.v)?'V':' ',(p.d)?'D':' ',(p.i)?'I':' ',(p.z)?'Z':' ',(p.c)?'C':' ');
                         ins++;
