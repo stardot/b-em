@@ -6,7 +6,7 @@
              ██       ▄██          ██         ██          ██
              ██████████▀           █████████  ██          ██
 
-                                 Version 0.4a
+                                 Version 0.6
                          A freeware BBC Micro emulator
 
 Introduction
@@ -17,29 +17,31 @@ B-Em is an attempt to emulate a BBC Micro, made by Acorn Computers in the 80's
 Features
 ~~~~~~~~
 
-- Emulates Models A & B
+- Emulates Model B and B+
 - All documented video modes supported
-- All documented and undocumented 6502 instructions
-- 8271 Floppy Disc Controller emulated (single drive, double sided, 80 track)
-- Supports four formats for BBC storage on PC - .ssd, .dsd, .inf and
+- All documented and some undocumented 6502 instructions
+- 8271 Floppy Disc Controller emulated (double drive, double sided, 80 track)
+- 1770 Floppy Disc Controller emulated (double drive, double sided, 80 track)
+- Supports five formats for BBC storage on PC - .ssd, .dsd, .inf, .uef and
   __catalog__
-- Sound emulation
+- Sound emulation, including sample playback
 - Snapshots
-- Some CRTC tricks, such as overscan and raster splitting emulated.
+- Some CRTC tricks, such as overscan, raster splitting and rupture.
 - Sideways RAM emulation
+- Joystick emulation
 
 
 Differences from last version
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- Some 6502 bugs fixed, Exile now working properly.
-- Re-added Model A emulation.
-- Disc drive noise added.
-- Default config file no longer points to a non-existant file.
-- Can now log sound - invented new file format for this (.sn - player and
-  format description included)
-- Arrow keys and delete/copy now work again.
-- Updated documentation
+- Model B+ support, along with 1770 emulation
+- Totally rewritten 6502 core - faster, more accurate
+- Fixed some VIA timing - Revs now works
+- UEF works better
+- New GUI
+- Improved sound core - now supports sample playback
+- Now emulates two disc drives
+- Win32 version now available
 
 
 Requirements
@@ -47,49 +49,49 @@ Requirements
 
 B-Em (bbc model B EMulator), requires the following :
 
-A 386-SX16 or better computer (realisticaly a P166)
+A Pentium or better computer (try a P166 at least)
 4mb RAM (?)
+Windows 95 or better
+DirectX 7
 
-Four ROMs are provided with B-em -
-os        - UK BBC MOS
-usos      - US BBC MOS
-basic.rom - BBC BASIC 2
-dfs.rom   - Watford DFS 1.30
+Seven ROM images are provided with B-em -
+os          - UK BBC MOS
+usos        - US BBC MOS
+bpos        - BBC B+ MOS
+b\basic.rom - BBC BASIC 2
+bp\basic.rom
+b\dfs.rom   - Watford DFS 1.30
+bp\dfs.rom  - Acorn 1770 DFS
 
-If you want to use more paged ROMs, put them in the roms directory.
+If you want to use more paged ROMs, put them in the roms directory, in either
+directory B or BP.
 
 
 Known bugs
 ~~~~~~~~~~
 
-In line mode, resetting can cause odd things, such as no prompt, the startup
-text being written slowly, and crashing out.
-Still a few 6502 emulation bugs (mostly noticeably Phantom Combat, Frak! and
-Zalaga)
-Sideways RAM doesn't quite work properly.
-Only first character of print job gets sent to file.
-A bit slow.
+Still a few 6502 emulation bugs
 TFS doesn't work in NTSC mode - I need the OSFSC/OSFILE entry points on the US
 OS (no they don't use vectors)
-The cancel button in the file selector does the same thing as the OK button.
 
 
 Hardware emulated
 ~~~~~~~~~~~~~~~~~
 
-The 6502 processor - All instructions emulated. Timing is a bit suspect though
-The 6845 CRTC      - Many effects, such as overscan, are emulated.
+The 6502 processor - Most instructions should be emulated. Attempts to be cycle
+                     perfect.
+The 6845 CRTC      - Accurate line-by-line engine. Firetrack, Revs, and TYB's
+                     'Retribution' demo work, and Uridium _almost_ works
 The Video ULA      - All modes emulated.
 The System VIA     - Keyboard and sound emulated.
-The User VIA       - Printer emulated.
-8271 FDC           - Single disc, double sided, 40/80 tracks, read only. With
-                     authentic noise.
+The User VIA       - Emulated.
+8271 FDC           - Double disc, double sided, 40/80 tracks, read only. With
+                     authentic noise. Only in model B mode.
+1770 FDC           - Double disc, double sided, 40/80 tracks, read only. With
+                     authentic noise. Only in model B+ mode.
 tape filing system - Supports .inf and __CATALOG__ format.
-Sound              - Tone generators are fine, but noise is a bit crap.
-ADC                - No real joystick emulation yet though
-Printer            - Prints to file printer.txt. Very buggy
-Joystick           - With numlock off, the arrow keys control the stick and
-                     insert is the button.
+Sound              - Now with correct sample playback (SPEECH!, sample demos).
+ADC                - Real joystick emulation, supporting both joysticks.
 
 
 Hardware NOT emulated
@@ -100,11 +102,13 @@ AMX mouse
 Tube
 Econet
 Low pass filter (muffles sound)
+Printer
+
 
 Running :
 ~~~~~~~~~
 
-When you type b-em, you get the standard start-up text -
+When you run B-em, you get the standard start-up text -
 
 BBC Computer 32K
 Watford DFS 1.30
@@ -118,49 +122,15 @@ Watford DFS 1.30
 BASIC
 >_
 
-Isn't it nice to relive the 80's again?
+or even
 
-The 6502 emulation is about 80% bug free, but has a few problems with some
-BASIC programs, and out of the 85 games I have tested so far, 79 (93%) are
-playable.
+Acorn OS 128k
+Acorn 1770 DFS
+BASIC
+>_
 
-
-Command line options :
-~~~~~~~~~~~~~~~~~~~~~~
-
-Most of these are obselete, due to the GUI, but they can be used as
-`overrides'.
-
--frameskip: Follow this with the number of frames you want to skip, plus 1.
-            The default value is 1. The following values are legal :
-            2 - skip every other frame
-            3 - skip every third frame
-            4 - skip every fourth frame, etc
-            Frameskip doesn't do anything when scanlines are enabled.
--dips     : Follow this with an 8-bit number (decimal, octal or hex),
-            containing a binary combination of the 8 DIL switches underneath a
-            BBC keyboard. Most of the switches are ignored, but you can set
-            the initial screen mode by inverting the bits and putting the
-            result after -dips. For the lazy people out there, here are the
-            combinations :
-              -dips 0 - Mode 7
-              -dips 1 - Mode 6
-              -dips 2 - Mode 5
-              -dips 3 - Mode 4
-              -dips 4 - Mode 3
-              -dips 5 - Mode 2
-              -dips 6 - Mode 1
-              -dips 7 - Mode 0
--disc     : Follow this with the disc image you would like loaded into disc
-            drive 0 of the BBC. You can use long filenames (if in Windows),
-            and the number of sides on the disc is determined by the first
-            letter of the file extension (if it is D then the disc has 2 sides,
-            ie .DSD, .DAD etc, otherwise it has 1 side).
--scanline : Enables scanline drawing. Use this if you are trying to run a
-            program that uses split mode/palette displays. It doesn't really
-            help because of timing problems.
--fast     : Disables slowdown, so that B-em goes as fast as your PC will run
-            it.
+The 6502 emulation is about 95% bug free, but there is still the odd bug
+stopping a couple of games from working perfectly.
 
 
 Keyboard mapping :
@@ -183,8 +153,65 @@ BBC key     - PC key
 Shift lock -    ALT
 
 Note that when you do a hard reset (CTRL-Break), unlike a real BBC, this
-preforms a cold boot instead, to wipe traces of programs such as W.A.R, which
+performs a cold boot instead, to wipe traces of programs such as W.A.R, which
 hang the BBC on reset.
+
+
+GUI :
+~~~~~
+
+Hit F11 or click the right mouse button to go to the GUI.
+The options are :
+
+File :
+        Return - return to emulator.
+        Exit   - exit to DOS/Windows/whatever.
+
+Model :
+        PAL B  - emulate a PAL model B.
+        NTSC B - emulate an NTSC model B.
+        PAL B+ - emulate a PAL model B+.
+
+Disc :
+        Load disc 1 - load a disc into drive 1.
+        Load disc 2 - load a disc into drive 2.
+        Disc sounds - emulate authentic 5.25" disc drive noise.
+
+Tape :
+        Change tape - load a new UEF file.
+        Rewind tape - rewind the emulated tape.
+        Tape enable - enables the UEF support, but disables the INF support.
+
+Video :
+        Blur filter - enable a blurring filter. Makes games with hi-res
+                      dithering look better.
+        Monochrome  - disables colour.
+
+Sound options :
+        Sound enable   - enable/disable sound.
+        Waveform       - alters the waveform type. Original BBC uses square.
+        Start SN log   - start logging sound to an SN file.
+        Stop SN log    - stop logging sound.
+
+Misc options :
+        Calibrate joystick 1 - Calibrates the first joystick.
+        Calibrate joystick 2 - Calibrates the second joystick.
+        Save screenshot      - saves screenshot in BMP,PCX, or TGA format.
+
+
+Tape emulation :
+~~~~~~~~~~~~~~~~
+
+Currently, *TAPE can select one of two filing systems, depending on the tape
+enable option in the GUI.
+
+The first is the old .INF/__CATALOG__ FS. This always loads from the INF
+directory, and is the format used by all the files at The BBC Lives!. This
+patches into the OS to take over tape handling.
+
+The second is the new UEF emulation. This is more accurate, as it emulates the
+tape hardware. However, it is much slower (although not as slow as the real
+thing).
 
 
 FAQ :
@@ -192,252 +219,85 @@ FAQ :
 
 Q : Why doesn't B-em look right on my monitor?
 A : If the screen is just off centre, then use the positioning controls. If
-    not, then try Scitech Display Doctor, and see if that helps. If not, your
-    monitor just won't handle B-em's 400x300 video mode, and there's not much
-    you can do about it.
+    not, then your monitor just won't handle B-em's 400x300 video mode, and
+    there's not much you can do.
 
 Q : Why have I got no sound?
-A : B-em should work with 100% SoundBlaster compatibles, ESS Audiodrive,
-    Ensoniq Soundscape, and Windoze $ound System. It will not work with cards
-    not in that list (such as Creative's newer SoundBlasters, which aren't
-    really compatible, or sadly the GUS), it will not work with non-100%
-    compatibles with crappy drivers (such as the ones found in laptops) and it
-    will not work if you have a bad BLASTER enviroment label.
+A : B-em should work with any soundcard supported by Windows and DirectX. If you
+    have no drivers, you get no sound.
+    Minor addition to this, if you use a poor quality card (such as a
+    SoundBlaster) and you have some sound running in the background, B-em will
+    deliver no sound. The answer is to upgrade to a good card.
 
-Q : Why has B-em crashed?
-A : There are three known circumstances where B-em will crash:
-    1. When an application tries to play a sample or complicated sound effect
-       (such as the start of Spy Hunter). This is not a bug in B-em, this is
-       a bug in Allegro, which B-em uses for graphics and sound.
-    2. When you run a model B app in model A mode.
-    3. When you try to play Fortress.
-    If it crashes for any other reason, email me.
+Q : What happened to snapshots?
+A : They were removed for technical reasons. They will probably return in the
+    next release (if there is one).
 
-Q : What is playsn?
-A : playsn will play back any .sn file B-em generates.
+Q : Why is the Windows release so jerky?
+A : Your guess is as good as mine. If anyone knows why this is happening, can they
+    please tell me?
 
 Q : How do I contact you?
 A : E-mail me at tommowalker@hotmail.com
 
 
-Filing System (FS) :
-~~~~~~~~~~~~~~~~~~~~
-
-The FS is very primitive at the moment. It patches the OS to essentially
-create a tape emulation. LOAD, *RUN, *LOAD and *CAT are currently supported.
-*ENABLE, *OPT and *TAPE are ignored, everything else will probably bomb back
-to DOS. If you are trying to load a file that doesn't exist, the emulator will
-also bomb back to DOS. Entering the filename as "" will currently bomb out,
-although I may have implemented that by the next version.
-
-You can use both .INF format and __CATALOG__ format (at the same time).
-
-
-Sound :
-~~~~~~~
-
-The sound is much better than 0.3. The noise is a bit hissy though, and
-periodic noise sounds too 'strong'.
-
-
-Menu :
-~~~~~~
-
-Press F11 to bring up the menu.
-
-The menu options are:
-
-Return - return to emulator.
-
-Exit - Exit to DOS/Windoze/OS2/Linux/Desqview/whatever
-
-Change disc image - change disc
-
-Sound - enable/disable sound
-
-Line drawing mode - switches drawing mode. In line drawing mode, frameskip is
-                    not used, and it is slower, but it attempts to reproduce
-                    split palette/mode effects.
-
-TV standard - choose between PAL/NTSC beeb.
-
-Model A - when ticked, emulates a model A.
-
-Monochrome - switches between mono/colour TV/monitor
-
-Disc drive noise - enables 5.25" disc drive noise, sampled from my drive with
-                   a 99p microphone.
-
-Frameskip - sets the number of frames skipped - the higher the number, the
-            faster the emulation, but the animation gets jerkier.
-
-Load snapshot - loads a previously saved snapshot
-Save snapshot - saves a snapshot
-
-Save screenshot - saves a screenshot
-
-Start SN log - starts logging sound
-Stop SN log  - stops logging sound
-
-
 Tested games :
 ~~~~~~~~~~~~~~
 
+Slightly less impressive than before, but the previous lists were over the top.
 
 Working perfectly (as far as I know) :
-A&B Computing  Ripton
+A & F       Chuckie Egg
+A & F       Cylon Attack
 
-A+F Software   Chuckie Egg
-A+F Software   Chuckie Egg II (not actual Chuckie Egg II, that game was never released on BBC AFAIK)
-A+F Software   Cylon Attack
-A+F Software   Painter
+Aardvark    Firetrack
+Aardvark    Frak
+Aardvark    Zalaga
 
-Acornsoft      Arcadians
-Acornsoft      Carousel (better than arcade version IMO)
-Acornsoft      Hopper
-Acornsoft      Magic Mushrooms
-Acornsoft      Monsters
-Acornsoft      Planetoids
-Acornsoft      Simcity
-Acornsoft      Snapper
-Acornsoft      Star Swarm
+Acornsoft   Arcadians
+Acornsoft   Magic Mushrooms
+Acornsoft   Planetoids
+Acornsoft   Revs
 
-Alligata       Blagger
-Alligate       Dambusters
+Mandarin    Cute To Kill
 
-Atarisoft      Donkey Kong Jr
-Atarisoft      Sinistar
+Micropower  Bumble
+Micropower  Castle Quest
+Micropower  Cybertron
+Micropower  Dr. Who (B+ version)
+Micropower  Ghouls
 
-Bug Byte       Twin Kingdom Valley
+Superior    Crazee Rider (go for enhanced mode!)
+Superior    Citadel
+Superior    Citadel 2
+Superior    Exile
+Superior    Galaforce 2
+Superior    Overdrive
+Superior    Repton
+Superior    Repton 2
+Superior    Repton 3
 
-Comsoft        SAS Commander
+Ultimate    Cookie
+Ultimate    Jetpac
+Ultimate    Sabre Wulf
 
-Elite          Commando (crap version)
-Elite          Paperboy
-
-Icon Software  Chrysalis
-Icon Software  Contraption
-
-IJK            Caterpiller
-
-Impact Soft.   Zenon
-
-Lothlorien     Battlezone 2000
-
-Martech        Gisburne's Castle
-
-Pace           Sorcery
-
-Program Power  Bumble Bee
-Program Power  Castle Quest
-Program Power  Cybertron
-Program Power  Danger UXB
-Program Power  Dr. Who and the Mines of Terror
-Program Power  Frenzy
-Program Power  Ghouls
-Program Power  Imogen
-Program Power  Killer Gorilla
-Program Power  Mr. EE
-
-Soft. Invasion 3D Grand Prix
-
-Soft. Projects Jet Set Willy (what I've spending hours revamping mode 1 for)
-Soft. Projects Manic Miner   (unplayable, just like on a real beeb)
-Soft. Projects Pyramid       (is it just me, or were all the sprites ripped
-                              from Citadel?)
-
-Superior Soft  Citadel
-Superior Soft  Exile
-Superior Soft  Overdrive
-Superior Soft  Quest
-Superior Soft  Repton
-Superior Soft  Repton 2 (Speech crashes when sound is on)
-Superior Soft  Repton 3 (Speech crashes when sound is on)
-Superior Soft  Speech! (Crashes with sound on though, so a bit useless)
-Superior Soft  Stryker's Run
-Superior Soft  Stryker's Run Part 2 (Codename Droid)
-Superior Soft  Tempest
-Superior Soft  Thrust
-Superior Soft  Wallaby
-Superior Soft  Winged Warlords
-
-Ultimate PTG   Alien 8
-Ultimate PTG   Atic Atac
-Ultimate PTG   Jet-Pac
-Ultimate PTG   Knight Lore
-Ultimate PTG   Nightshade
-
-US Gold        Dambusters
-US Gold        Impossible Mission
-US Gold        Spy Hunter
-US Gold        Tapper
-
-Virgin         Bug Bomb
-Virgin         Microbe
-
-?????????????  Boffin
-?????????????  Star Wars
+US Gold     Impossible Mission
+US Gold     Spy Hunter
+US Gold     Tapper
 
 Working imperfectly :
-Aardvark Soft  FireTrack (Horrible scrolling)
+Acornsoft   Elite (flashing raster split)
+Acornsoft   Rocket Raid (weird slowdown)
 
-Acornsoft      Elite (Split mode slightly off, but otherwise playable)
-Acornsoft      Rocket Raid (Split mode problems)
+Audiogenic  Psycastria (very low down screen)
 
-Alligata       Olympic Decathlon (Palette split is a bit jumpy)
+Superior    Road Runner (sound effects last too long)
 
-Bubble Bus     Starquake (Palette split a bit wrong)
-
-Dr Soft        Phantom (Graphic errors)
-
-Elite          Airwolf (Helicopter graphics go wrong sometimes)
-
-Superior Soft  Repton Infinity (Frequent slowdowns)
-
-US Gold        Bounty Bob Strikes Back (wrong colours)
-
-Ultimate PTG   Sabre Wulf (Wrong colours)
-
+Hewson      Uridium (timing is 4 scanlines off)
 
 Not working :
-Aardvark Soft  Frak! (Crashes)
-Aardvark Soft  Zalaga (Crashes)
 
-Acornsoft      Revs (Relies on exact timing)
-
-BBC Soft       Dr. Who The 1st Adventure (You can't control the game)
-
-Virgin Games   Trench (Hangs)
-
-
-Things for version 0.5 :
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-Complete rewrite of 6502 emulation (in progress)
-1770 FDC emulation (I just got docs)
-Working printer emulation
-Better sideways RAM emulation
-
-
-Wanted :
-~~~~~~~~
-
-Replica 2 (good tape-to-disc menu prog).
-Tube docs.
-Working ACIA emulation.
-Any ideas on how to get SN76489 samples working in Allegro's sound mixer.
-Pinouts for the BBC tape port (and to know if it's safe to poke wires in
-there - I can't be bothered to make a real cable).
-
-
-Todo list :
-~~~~~~~~~~~
-
-Rewrite 6502 emulation (in progress)
-Make the noise better
-Implement joystick reading
-Fix the ACIA emulation (can someone help with this?) - to be honest this isn't
-likely to happen soon, as I don't really care about tapes.
+Ultimate    Alien 8 (ignores keyboard input)
 
 
 Thanks to :
@@ -447,6 +307,17 @@ David Gilbert for writing Beebem and distributing the sources with it
 
 James Fidell for writing Xbeeb and distributing the sources with it
 
+Tom Seddon for updating Model B recently, indirectly motivating me to do
+another update this year.
+
+Thomas Harte for some UEF code - I wrote my own in the end - and for inventing
+UEF files.
+
+Dave Moore for making the B-em site, and for being kind enough to put it on
+The Stairway To Hell.
+
+The Emuunlim guys for hosting the B-em site.
+
 Robert Schmidt for The BBC Lives!
 
 DJ Delorie for DJGPP
@@ -454,12 +325,6 @@ DJ Delorie for DJGPP
 Shawn Hargreaves for Allegro
 
 Acorn for making the BBC in the first place
-
-Thomas Harte for some UEF code - I wrote my own in the end - and for inventing
-UEF files.
-
-Dave Moore for making the B-em web page, and for being kind enough to put it
-on The Stairway To Hell.
 
 David Allen,Bob Austin,Ram Banerjee,Paul Bond,Allen Boothroyd,Cambridge,
 Cleartone,John Coll,John Cox,Andy Cripps,Chris Curry,6502 designers,
@@ -484,15 +349,14 @@ Appendix A : The source code
 
 If you want to use the source code for anything, that's fine. But, if you can,
 you are encouraged to contribute to it by adding new features and/or fixing it
-To recompile the code, you will need DJGPP 2, GCC and Allegro 4. Note that
-some of the source code is either David Gilbert's or James Fidell's, so you
-should acknowledge that if you use it.
+To recompile the code, you will need MING/W and Allegro 4.
 
 
 Appendix B : Transfering BBC files to the PC
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-There are several ways to do this, five of which are listed here :
+There are several ways to do this, seven of which are listed here :
+
 
 Serial cable
 ~~~~~~~~~~~~
@@ -521,6 +385,13 @@ read single density discs (ie DFS ones), but if yours can, you can use FDC or
 Anadisk to read them.
 
 
+Cassette
+~~~~~~~~
+
+Hook up the BBC cassette port to a PC, load the data off disc, save it to the
+cassette, and use a converting program.
+
+
 Hex editor
 ~~~~~~~~~~
 
@@ -536,8 +407,15 @@ If you don't want to mess about with soldering iron, you can use the
 Archimedes (or RISC PC), and a BBC disc drive and adapter, to copy the files
 off BBC disc onto PC disc. However, you may have to end up doing this at your
 nearest school, and you might have to actually *buy* a disc drive and adapter.
-Or, of course, you could just copy the games off the Internet, but that's
-illegal (maybe).
+Also, as I have discovered, some disc drives seem to be incompatible with at
+least the RiscPC.
+
+
+The Internet
+~~~~~~~~~~~~
+
+Go find.
+You could page down and try one of the sites listed in the next section.
 
 
 Appendix C : Misc stuff
@@ -558,7 +436,8 @@ The BBC Advanced User Guide - Bray, Dickens and Holmes - VIA info
 Web sites :
 
 The Stairway To Hell - www.stairwaytohell.com
-A decent BBC/Electron site, with plenty of games and emulators.
+A decent BBC/Electron site, with plenty of games and emulators. Was the
+original home of B-em.
 
 The BBC Lives! - www.nvg.ntnu.no/bbc
 Another good BBC site, with even more games and emulators.
@@ -566,20 +445,22 @@ Another good BBC site, with even more games and emulators.
 
 Other BBC emulators :
 
+Model B - www.tomseddon.plus.com/beeb/beeb.html
+Massively improved over the old versions, this is now one of the best BBC
+emulators and runs pretty much everything.
+
 Beebem - www.rickynet.net/beebem
-The main BBC emulator at the moment. Runs pretty much everything (including
-Revs), but is really slow.
+The most famous BBC emulator. Runs pretty much everything, but is really slow.
+
+BeebIt -
+The main BBC emulator for the RiscPC. I can't really comment on this (my ARM6
+is way too slow), but according to the author, it's really really good.
 
 pcBBC - can't remember the site address
 One of the few non-free BBC emulators, this one has good compatibility, but
 bad sound and costs money.
 
 BeebInC - get it from The BBC Lives!, the site is down
-Seemingly dead, this is one of my favourite emulators. Probably the most
-compatible of the lot, but let down by poor sound (uses sine waves, not square
-waves) and low refresh rate (25 fps instead of 50 fps).
-
-Model B - get it from The BBC Lives!, the site is down
-Also dead, this is the fastest BBC emulator I've seen. It's also one of the
-first for DOS, although it suffers from low compatibility, bad sound, and
-runs too fast on most machines.
+Seemingly dead, this is one of my favourite emulators. Surprisingly fast and
+compatible, but let down by poor sound (uses sine waves, not square waves) and
+low refresh rate (25 fps instead of 50 fps).

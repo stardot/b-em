@@ -1,32 +1,15 @@
-/*           ██████████            █████████  ████      ████
-             ██        ██          ██         ██  ██  ██  ██
-             ██        ██          ██         ██    ██    ██
-             ██████████     █████  █████      ██          ██
-             ██        ██          ██         ██          ██
-             ██        ██          ██         ██          ██
-             ██████████            █████████  ██          ██
-
-                     BBC Model B Emulator Version 0.4a
-
-
-              All of this code is written by Tom Walker
-         You may use SMALL sections from this program (ie 20 lines)
-       If you want to use larger sections, you must contact the author
-
-              If you don't agree with this, don't use B-Em
-
-*/
-
+/*B-em 0.6 by Tom Walker*/
 /*TFS - tape filing system*/
 
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <allegro.h>
-#include "6502.h"
-#include "disk.h"
-#include "mem.h"
+#include "tfs.h"
 
+unsigned char a,x,y,s;
+unsigned char *ram,os[16384];
+unsigned short pc;
 FILE *catalog;
 int exeaddr,load,start,end;
 void copyfilename(int src, char *dest);
@@ -69,12 +52,13 @@ void loadcatalog()
 
 void trapos()
 {
-        if (diskenabled)
-        {
-                ram[0xF27D]=0x92;
-                ram[0xF1B1]=0x2;
-                loadcatalog();
-        }
+//        diskenabled=1;
+//        if (diskenabled)
+//        {
+                os[0x327D]=0x92;
+                os[0x31B1]=0x2;
+//                loadcatalog();
+//        }
 }
 
 void loadfilelist()
@@ -148,7 +132,7 @@ int loadfile(char *fn, char *fn2)
                 length=ftell(f);
                 fseek(f,0,SEEK_SET);
                 for (c=0;c<length+1;c++)
-                    writemem(c+load,getc(f));
+                    writememl(c+load,getc(f));
                 fclose(f);
                 if (chdir(".."))
                 {
@@ -174,7 +158,7 @@ int loadfile(char *fn, char *fn2)
                                 length=ftell(f);
                                 fseek(f,0,SEEK_SET);
                                 for (c=0;c<length+1;c++)
-                                    writemem(c+load,getc(f));
+                                    writememl(c+load,getc(f));
                                 fclose(f);
                                 if (chdir(".."))
                                 {
@@ -236,6 +220,7 @@ int OSFILE()
         int c;
         int paramblock=(y<<8)|x;
         int fnaddr=ram[paramblock]|(ram[paramblock+1]<<8);
+//        printf("OSFILE %02X\n",a);
         if (a==0xFF)
         {
                 copyfilename(fnaddr,fname);
@@ -245,6 +230,7 @@ int OSFILE()
                    load=0;
                 for (c=0;c<16;c++)
                     fname2[c]=fname[c];
+//                printf("Loading file %s\n",fname);
                 if (loadfile(fname,fname2))
                    return 0x7F;
                 return 0xFF;
@@ -286,7 +272,7 @@ char catted[]="*CAT\n";
 char ran[]="RUN\n";
 
 #define PUSH(val)\
-        writemem(0x100+s,val);\
+        writememl(0x100+s,val);\
         s--;
 
 int OSFSC()
@@ -295,6 +281,7 @@ int OSFSC()
         char fname2[16];
         int c;
         int fnaddr=(y<<8)+x;
+//        printf("OSFSC %02X\n",a);
         if (catstatus)
            a=5;
         if (a==2||a==3||a==4) /*2= / command, 3=unknown * command, 4=*RUN*/
@@ -343,6 +330,9 @@ int OSFSC()
                 a=files[catline][catchar-1];
                 return 255;
         }
+       set_gfx_mode(GFX_TEXT,0,0,0,0);
+       printf("Error : unknown OSFSC operation %X [%i]\n",a,a);
+       exit(-1);
         return 0x80;
 }
 

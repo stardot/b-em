@@ -6,14 +6,11 @@
              ██       ▄██          ██         ██          ██
              ██████████▀           █████████  ██          ██
 
-                                 Version 0.4a
-                                 Source code
+                                 Version 0.6
+                         A freeware BBC Micro emulator
 
-Introduction
-~~~~~~~~~~~~
-
-B-Em is an attempt to emulate a BBC Micro, made by Acorn Computers in the 80's
-This is the source code.
+Source code
+~~~~~~~~~~~
 
 If you want to use the source code as reference for writing your own emulator,
 that's fine. If you want to steal the odd function from it, that's fine too.
@@ -23,56 +20,40 @@ ahead. BUT, you can't just modify a few bits and distribute it under a
 different name (or the same name), and if you do use bits out of it, you must
 acknowledge the fact that I wrote it.
 
-Also note that some of the code was taken from Beebem, as it was the only
-emulator source code I had at the time, and I had very few docs.
+To compile B-em, you will need :
 
-If you do want to contribute to B-em, then there is a list of stuff that needs
-doing at the bottom of this file.
+DJGPP 2
+GCC
+Allegro 4 (3 might work as well)
+LibZ
 
+If you want to compile for Win32 instead, use Ming/W instead of DJGPP.
 
-What's needed to compile
-~~~~~~~~~~~~~~~~~~~~~~~~
+You will need to compile all the C files, and link them with Allegro and GZip.
 
-B-em was written using DJGPP 2.02, GCC 2.81, and BNU 2.81. If you have a
-similar distribution, then everything should compile. You will also need
-Allegro, 3.12 will not work, B-em was developed with 3.9.37, and should work
-with 4.
+There may be some minor changes that need making when compiling with Ming/W
+or DJGPP, I can't remember which compiler compiled this code last.
 
 
 What files are what
 ~~~~~~~~~~~~~~~~~~~
 
+1770.*     - WD1770 disc controller
 6502.*     - 6502 emulation core
+6850acia.* - 6850 ACIA emulation
 8271.*     - i8271 disc controller
 adc.*      - Analogue to digital converter
-bem.c      - B-em main file (includes 6502.c)
-codes.h    - Allegro scancode to PC scancode table
-disk.*     - TFS
+b-em.c     - B-em main file
 gui.c      - GUI
-mem.*      - Memory core
 scan2bbc.h - PC to BBC scancode table
-snapshot.* - Snapshot handling
+serial.*   - Serial ULA emulation
 sound.*    - Sound emulation
-vias.*     - VIA emulation
+sysvia.*   - System VIA and keyboard emulation
+tfs.*      - TFS
+uef.*      - UEF handling
+uservia.*  - User VIA emulation
 video.*    - Video emulation
 
-There is also playsn.c, which is the .SN player. The file makeit.bat will
-compile everything.
-
-
-
-Stuff which needs doing
-~~~~~~~~~~~~~~~~~~~~~~~
-
-Can anyone help me with any of this?
-
-Sound core needs redoing to handle samples in Allegro's crappy sample mixer.
-Ideas on speeding up 6502 emulation in C (not this specific emulator, I'm
-writing a replacement core)
-Speed up the video emulation
-Fix some bugs in the 6522 emulation (probably will also be rewritten)
-Neaten up the source code (no chance!)
-
-Tom.
-
+Tom Walker
 tommowalker@hotmail.com
+

@@ -1,30 +1,12 @@
-/*           ██████████            █████████  ████      ████
-             ██        ██          ██         ██  ██  ██  ██
-             ██        ██          ██         ██    ██    ██
-             ██████████     █████  █████      ██          ██
-             ██        ██          ██         ██          ██
-             ██        ██          ██         ██          ██
-             ██████████            █████████  ██          ██
-
-                     BBC Model B Emulator Version 0.4a
-
-
-              All of this code is written by Tom Walker
-         You may use SMALL sections from this program (ie 20 lines)
-       If you want to use larger sections, you must contact the author
-
-              If you don't agree with this, don't use B-Em
-
-*/
-
+/*B-em 0.5 by Tom Walker*/
 /*ADC emulation*/
 
 #include <allegro.h>
-#include "adc.h"
 
 int joy1x,joy1y,joy2x,joy2y;
 
 unsigned char adcstatus,adchigh,adclow,adclatch;
+int adcconvert;
 
 unsigned char readadc(unsigned short addr)
 {
@@ -49,33 +31,41 @@ void writeadc(unsigned short addr, unsigned char val)
         {
                 adclatch=val;
                 adcconvert=1;
-                if (adclatch&8)
-                   adctime=20000;
-                else
-                   adctime=8000;
                 adcstatus=(val&0xF)|0x80; /*Busy, converting*/
         }
 }
 
-void adcpoll()
+void polladc()
 {
-        int val;
-        joy1x=joy1y=0;
-        if (!(key_shifts&KB_NUMLOCK_FLAG))
+        unsigned long val;
+        if (adcconvert)
         {
-                if (key[KEY_LEFT])
-                   joy1x=-4095;
-                else if (key[KEY_RIGHT])
-                   joy1x=4095;
-                else
-                   joy1x=0;
-                if (key[KEY_UP])
-                   joy1y=-4095;
-                else if (key[KEY_DOWN])
-                   joy1y=4095;
-                else
-                   joy1y=0;
-        }
+        joy1x=joy1y=0;
+        if (joy[0].stick[0].axis[0].d1)
+           joy1x=0xFFFF;
+        else if (joy[0].stick[0].axis[0].d2)
+           joy1x=0;
+        else
+           joy1x=0x8000;
+        if (joy[0].stick[0].axis[1].d1)
+           joy1y=0xFFFF;
+        else if (joy[0].stick[0].axis[1].d2)
+           joy1y=0;
+        else
+           joy1y=0x8000;
+        joy2x=joy2y=0;
+        if (joy[1].stick[0].axis[0].d1)
+           joy2x=0xFFFF;
+        else if (joy[1].stick[0].axis[0].d2)
+           joy2x=0x7FFF;
+        else
+           joy2x=0;
+        if (joy[1].stick[0].axis[1].d1)
+           joy2y=0xFFFF;
+        else if (joy[1].stick[0].axis[1].d2)
+           joy2y=0x7FFF;
+        else
+           joy2y=0;
         adcstatus=(adcstatus&0xF)|0x40; /*Not busy, conversion complete*/
         switch (adcstatus&3)
         {
@@ -95,7 +85,9 @@ void adcpoll()
         adcstatus|=(val&0xC000)>>10;
         adchigh=val>>8;
         adclow=val&0xFF;
-        SysCB1(1);
+        syscb1();
+        }
+        adcconvert=0;
 }
 
 void initadc()
@@ -103,4 +95,6 @@ void initadc()
         adcstatus=0x40;            /*Not busy, conversion complete*/
         adchigh=adclow=adclatch=0;
         adcconvert=0;
+//        load_joystick_data("joystick.dat");
+        install_joystick(JOY_TYPE_2PADS);
 }

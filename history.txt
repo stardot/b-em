@@ -1,50 +1,57 @@
+I still have most of the old versions, if anyone wants them then email me.
+
+(note : when I started B-em, I had only been coding in C for about 2 months.
+ So therefore it took ages to get anything working. I didn't keep an accurate
+ log before 24th July, I got the starting date from the source and made up the
+ rest.)
+
 16/10/99 - Started work on 6502 emulation
 24/10/99 - Gave up for a while because it doesn't work
-20/5/00  - Rewrote the 6502 emulation (it was very badly written anyway).
+20/05/00 - Rewrote the 6502 emulation (it was very badly written anyway).
            Still doesn't work
-22/7/00  - Added some mode 7 emulation. Now boots (but that's about it)
-24/7/00  - Got the keyboard working. Discovered that most of BASIC didn't work
+22/07/00 - Added some mode 7 emulation. Now boots (but that's about it)
+24/07/00 - Got the keyboard working. Discovered that most of BASIC didn't work
 Version 0.0 finalised
 
-26/7/00  - Added cursor and true mode 7 emulation (instead of assuming things)
-27/7/00  - Added a bit of colour to mode 7 (not correct colours though - still
+26/07/00 - Added cursor and true mode 7 emulation (instead of assuming things)
+27/07/00 - Added a bit of colour to mode 7 (not correct colours though - still
            many control characters missing)
-5/8/00   - Fixed BRK emulation, so error messages now work. Discovered that
+05/08/00 - Fixed BRK emulation, so error messages now work. Discovered that
            BASIC doesn't really work because almost everything you type is
            treated as a Syntax error. Tested a couple of programs; the
            introduction to Cybertron works, but Arcadians and Magic Mushrooms
            crash. No loaded BASIC programs work though
-6/8/00   - Corrected mode 7 colours. Teletext graphics added, though not
+06/08/00 - Corrected mode 7 colours. Teletext graphics added, though not
            correct yet. Tested more games - the instructions on Frenzy work.
            Added generic .inf loader
-8/8/00   - Added mode 2 emulation
-9/8/00   - Added modes 1+5
-10/8/00  - Wrote primitive FS (by trapping the OS). Only loading and *RUNing
+08/08/00 - Added mode 2 emulation
+09/08/00 - Added modes 1+5
+10/08/00 - Wrote primitive FS (by trapping the OS). Only loading and *RUNing
            work
-20/8/00  - Added error messages to the FS, instead of dumping back to DOS
-22/8/00  - First version of *CAT added. Relies on files.lst file
-27/8/00  - Fixed bug in setczvn (still not perfect though). Loads more BASIC
+20/08/00 - Added error messages to the FS, instead of dumping back to DOS
+22/08/00 - First version of *CAT added. Relies on files.lst file
+27/08/00 - Fixed bug in setczvn (still not perfect though). Loads more BASIC
            now works, but it broke Chuckie Egg :(
-28/8/00  - Added cursor to Modes 1+5
-29/8/00  - Fixed shift and control keys.
-30/8/00  - Tweaked Mode 2 emulation. Frenzy & Jet-Pac almost work. Added GUI
-3/9/00   - Fixed bug in *LOAD, *RUN etc. Killer Gorilla & Blagger run more
+28/08/00 - Added cursor to Modes 1+5
+29/08/00 - Fixed shift and control keys.
+30/08/00 - Tweaked Mode 2 emulation. Frenzy & Jet-Pac almost work. Added GUI
+03/09/00 - Fixed bug in *LOAD, *RUN etc. Killer Gorilla & Blagger run more
 Version 0.1 finalised
 
-6/9/00   - Increased VIA delay, HUGE speedup but VIA accuracy falls apart.
-7/9/00   - Randomized User VIA Port B (&FE60) - Snapper starts now (still
+06/09/00 - Increased VIA delay, HUGE speedup but VIA accuracy falls apart.
+07/09/00 - Randomized User VIA Port B (&FE60) - Snapper starts now (still
            unplayable). Added snapshots
-8/9/00   - Model A emulation added.
-9/9/00   - More accurate cycle count.
-25/9/00  - Went back to fixed cycle count, as most programs run better with it.
-1/10/00  - Started sound hardware emulation (no sound output though)
-2/10/00  - Added command line options for model A/B emulation, sound log,
+08/09/00 - Model A emulation added.
+09/09/00 - More accurate cycle count.
+25/09/00 - Went back to fixed cycle count, as most programs run better with it.
+01/10/00 - Started sound hardware emulation (no sound output though)
+02/10/00 - Added command line options for model A/B emulation, sound log,
            fixed cycles, etc. Now save sound output to sound.pcm (very out of
            tune though)
-4/10/00  - Changed 76489->samples algorithim, sounds slightly better.
+04/10/00 - Changed 76489->samples algorithim, sounds slightly better.
            Hardwired joystick to no buttons pressed, Bumble Bee now works
-5/10/00  - Added periodic noise to sound code.
-8/10/00  - Added -fixed1 switch, 6502 goes bloody fast but VIAs slow down.
+05/10/00 - Added periodic noise to sound code.
+08/10/00 - Added -fixed1 switch, 6502 goes bloody fast but VIAs slow down.
            Rewrote a lot of the System VIA code - must've fixed a timer bug,
            because the emulator is about 200% faster
 10/10/00 - Logfiles now disassemble 6502 code. Added 1 bpp modes (0,3,4 & 6)
@@ -89,31 +96,32 @@ Version 0.2 finalised
            RLA, and all NOPs, Android Attack now works. Sound output improved.
 31/10/00 - Worked on noise generator (a bit better). Added some more 6502
            instructions.
-1/11/00  - RRA,DCP,SRE & SBX instructions implemented, ie instructions 0-&4F
+01/11/00 - RRA,DCP,SRE & SBX instructions implemented, ie instructions 0-&4F
            and &A0-&FF implemented. Still not added, ARR, SHA, SHX, SHY, SHS,
            some SAX, and HALT instructions.
-2/11/00  - Did some more optimisations - converted most `static inline's to
+02/11/00 - Did some more optimisations - converted most `static inline's to
            #defines - you can now compile bem.c with optimisation again. Added
            the rest of the undocumented instructions, all instructions
            emulated (hopefully...).
-3/11/00  - More accurate cycle times. Added patch to get Frak! to work.
-4/11/00  - Improved cycles times. Started Tube emulation again.
-5/11/00  - Abandoned Tube emulation.
-7/11/00  - Added a few instructions I missed out.
+03/11/00 - More accurate cycle times. Added patch to get Frak! to work.
+04/11/00 - Improved cycles times. Started Tube emulation again.
+05/11/00 - Abandoned Tube emulation.
+07/11/00 - Added a few instructions I missed out.
 29/11/00 - Removed 6502 debugging info, significant speed increase.
 30/11/00 - Optimised video routines, BBC now runs at almost 6mhz in mode 2 on
            a PII-350.
 13/12/00 - Fixed a couple of 6502 bugs (nothing fixed though).
 14/12/00 - Fixed BRK bug - error messages now work properly.
 21/12/00 - Added frameskip, and cleaned up code a bit.
-21/1/01  - Got a copy of the Advanced User Guide.
-24/1/01  - Fixed a few VIA bugs, increased compatibility.
-31/3/01  - Added UEF support, changed video modes. Improved setup program.
+(Break due to C64 emulator development)
+21/01/01 - Got a copy of the Advanced User Guide.
+24/01/01 - Fixed a few VIA bugs, increased compatibility.
+31/03/01 - Added UEF support, changed video modes. Improved setup program.
 Version 0.3 finalised and released
-10/4/01  - Removed the `clear screen' command, moved everything into seperate directories,
-           improved UEF support a little, and added American BBC support.
+10/04/01 - Removed the `clear screen' command, moved everything into seperate
+           directories, improved UEF support a little, and added American BBC
+           support.
 Version 0.3a finalised and released
-
 12/10/01 - Changed graphics library to Allegro, and ported over the SN76489
            emulation from YAAME. Sound is really good now, but the keyboard is
            broken.
@@ -145,3 +153,89 @@ Version 0.4 finalised and released.
            model A emulation. Invented .sn file format, wrote player, and
            added logging.
 Version 0.4a finalised and released.
+10/10/02 - Started new B-em with Elkulator 6502 core. Buggered keyboard.
+19/10/02 - Fixed keyboard. Added user VIA. Added modes 2+5. Added 8271+TFS
+           (broken though).
+20/10/02 - Fixed TFS (bug in OSFILE replacement op) and 8271 (NMI handling).
+           Added line-by-line semi-complete CRTC emulation (Firetrack works,
+           but has a tendency to crash - as does everything actually). Uridium
+           won't even start, 6502 bug it appears.
+22/10/02 - Attempted Uridium again. 0.4a has the same bug, although my
+           hacked-up unstable copy doesn't (but it's too unstable to be useful)
+23/10/02 - VIA timers now should hold current values, Bumble Bee now works.
+           Fixed BCD, Zalaga now works (but enemies move waaay too fast).
+03/11/02 - Fixed VBL interrupt (now interrupts 1 time a frame instead of 8 :)
+           Zalaga, Frak!, Arcadians, Planetoid, Rocket Raid etc now work fine.
+           Discovered that DNFS sets PAGE to &1B00 instead of &1900, breaking
+           Uridium, Planetoid and Rocket Raid.
+           Added preliminary rupture (for Uridium - bugged).
+           Screen is now centered.
+04/11/02 - Started work on new sound engine. The BBC OS sound handling appears
+           to be completely broken.
+16/11/02 - Tracked OS sound handling down to broken V flag. Now working.
+           Reverted back to old sound engine, the new one sounds even worse
+           than Beebem.
+17/11/02 - Re-added all the mode 7 control codes. Added modes 0,3 and 6.
+19/11/02 - Started GUI
+24/11/02 - More work on the GUI
+03/12/02 - Fixed SBC V flag (again), Exile now works (except for the manual
+           check). Added hack to get sound working again after samples. Fixed
+           really stupid timing bug, Firetrack and some other stuff works
+           again. More GUI work.
+04/12/02 - Added sideways RAM. Oddly enough this fixes Exile.
+05/12/02 - Fixed a load of illegal NOP instructions.
+06/12/02 - Started joystick emulation. My joystick seems to need extra
+           calibration though.
+07/12/02 - Allegro doesn't want to calibrate so I'll leave it out. Hopefully
+           other joysticks won't need calibration.
+           Seemingly the NOP fixes fixed Firetrack - it now loads the correct
+           level data.
+18/12/02 - Snapshot support re-added. Unfortunately, due to internal changes
+           most pre-0.5 snapshots won't work correctly.
+19/12/02 - Config added. Added modes 0,1,3,4,6 and 8 to less accurate video
+           engine.
+20/12/02 - Fixed stupid bug with video initialisation. Fixed periodic sound
+           frequency (I hope). Added support for second joystick (totally
+           untested, I only have one).
+Version 0.5 finalised and released.
+18/06/03 - Started new CPU core + VIAs. Boots and runs BASIC correctly.
+19/06/03 - Re-added 8271 emulation and fixed some timer stuff.
+           Attempted to fix irritating pauses in some games, tracked Crazee
+           Rider's pauses down to sudden rush of OS calls for some reason.
+20/06/03 - Fixed stupid NMI bug, Firetrack working again (totally glitchless
+           this time!). Fixed timing, Revs is now perfect! Uridium doesn't
+           work properly - splits are four lines apart on consecutive frames.
+           I can't be arsed to fix it - two out of three isn't bad.
+22/06/03 - Started new GUI
+24/06/03 - Re-added sound support, but with new sound engine supporting sample
+           playback.
+25/06/03 - Attempted to add low pass filter to sound, but failed (I don't know
+           how to emulate one).
+15/07/03 - Added more opcodes for Repton 2 and Zalaga.
+           Have decided to finally add support for a second disc drive. I will
+           do this a bit later, the FDC code is the oldest remaining code in
+           B-em (dating back from October 2000), and making it work with 0.5
+           was scary enough.
+16/07/03 - Added opcode for Exile. Added second disc drive support (most of the
+           code was actually in place from years ago, I just had to finish it
+           off). Added B+ support (partial at least - Dr Who doesn't work, and
+           I can't see pictures in Time & Magik) and 1770 emulation.
+           Implemented UEF support again (working properly this time!).
+           Did more work on GUI.
+           Fixed a silly VIA timer bug.
+           Implemented joysticks again (working properly as well)
+17/07/03 - Worked around a bug that corrupted some video pointers, occasionally
+           corrupting the screen on BREAK (by moving it forward 4 megs).
+           Fixed a bug with the paged ROMs loading backwards, which was
+           confusing just about everyone. At least Dr. Who B+ and Bubble Bobble
+           were affected.
+           Added cursor in mode 7.
+           Catered for Arcadian's bizarre behaviour when it kills you.
+           Fixed flashing colours, therefore fixing Jetpac & Sabre Wulf colours.
+18/07/03 - Changed sound init code, so that if the sound fails to initialise,
+           it is disabled. At last I can have STSound running while debugging
+           B-em :)
+19/07/03 - Fixed VIA timer 2 bug, Castle Quest & Citadel work again.
+           Slowed down ADC to 5 conversion/frame. This should still be enough
+           to sample all four channels, and lessen the CPU load.
+Version 0.6 finalised and released.
