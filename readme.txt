@@ -6,7 +6,7 @@
              ██       ▄██          ██         ██          ██
              ██████████▀           █████████  ██          ██
 
-                                 Version 0.6
+                                 Version 0.61
                          A freeware BBC Micro emulator
 
 Introduction
@@ -14,10 +14,13 @@ Introduction
 
 B-Em is an attempt to emulate a BBC Micro, made by Acorn Computers in the 80's
 
+If you are using anything less than 500mhz, then I would _strongly_ suggest
+using the DOS version instead, as it is much faster.
+
 Features
 ~~~~~~~~
 
-- Emulates Model B and B+
+- Emulates Models A, B, and B+
 - All documented video modes supported
 - All documented and some undocumented 6502 instructions
 - 8271 Floppy Disc Controller emulated (double drive, double sided, 80 track)
@@ -25,7 +28,6 @@ Features
 - Supports five formats for BBC storage on PC - .ssd, .dsd, .inf, .uef and
   __catalog__
 - Sound emulation, including sample playback
-- Snapshots
 - Some CRTC tricks, such as overscan, raster splitting and rupture.
 - Sideways RAM emulation
 - Joystick emulation
@@ -34,14 +36,12 @@ Features
 Differences from last version
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- Model B+ support, along with 1770 emulation
-- Totally rewritten 6502 core - faster, more accurate
-- Fixed some VIA timing - Revs now works
-- UEF works better
-- New GUI
-- Improved sound core - now supports sample playback
-- Now emulates two disc drives
-- Win32 version now available
+- ADFS support
+- Model A support
+- Model B+ fixed a bit, Level 9 adventures now show pictures
+- Win32 version improved a bit
+- Some undocumented sound stuff emulated - Crazee Rider now has correct drums.
+- Some other misc changes
 
 
 Requirements
@@ -49,19 +49,20 @@ Requirements
 
 B-Em (bbc model B EMulator), requires the following :
 
-A Pentium or better computer (try a P166 at least)
+A Pentium or better computer (try a P166 at least for DOS,
+                              a P500 at least for Windows)
 4mb RAM (?)
-Windows 95 or better
-DirectX 7
 
-Seven ROM images are provided with B-em -
-os          - UK BBC MOS
-usos        - US BBC MOS
-bpos        - BBC B+ MOS
-b\basic.rom - BBC BASIC 2
+Several ROM images are provided with B-em -
+os           - UK BBC MOS
+usos         - US BBC MOS
+bpos         - BBC B+ MOS
+a\basic.rom  - BBC BASIC 2
+b\basic.rom
 bp\basic.rom
-b\dfs.rom   - Watford DFS 1.30
-bp\dfs.rom  - Acorn 1770 DFS
+b\dfs.rom    - Watford DFS 1.30
+bp\dfs.rom   - Acorn 1770 DFS
+bp\nadfs.rom - Acorn ADFS
 
 If you want to use more paged ROMs, put them in the roms directory, in either
 directory B or BP.
@@ -73,6 +74,7 @@ Known bugs
 Still a few 6502 emulation bugs
 TFS doesn't work in NTSC mode - I need the OSFSC/OSFILE entry points on the US
 OS (no they don't use vectors)
+Windows port still has a few issues
 
 
 Hardware emulated
@@ -90,7 +92,8 @@ The User VIA       - Emulated.
 1770 FDC           - Double disc, double sided, 40/80 tracks, read only. With
                      authentic noise. Only in model B+ mode.
 tape filing system - Supports .inf and __CATALOG__ format.
-Sound              - Now with correct sample playback (SPEECH!, sample demos).
+Sound              - All channels emulated, with sample support and some
+                     undocumented behaviour (Crazee Rider).
 ADC                - Real joystick emulation, supporting both joysticks.
 
 
@@ -108,7 +111,7 @@ Printer
 Running :
 ~~~~~~~~~
 
-When you run B-em, you get the standard start-up text -
+When you type b-em, you get the standard start-up text -
 
 BBC Computer 32K
 Watford DFS 1.30
@@ -117,17 +120,12 @@ BASIC
 
 or
 
-Acorn OS
-Watford DFS 1.30
-BASIC
->_
-
-or even
-
 Acorn OS 128k
 Acorn 1770 DFS
 BASIC
 >_
+
+or some other variation.
 
 The 6502 emulation is about 95% bug free, but there is still the odd bug
 stopping a couple of games from working perfectly.
@@ -168,13 +166,17 @@ File :
         Exit   - exit to DOS/Windows/whatever.
 
 Model :
-        PAL B  - emulate a PAL model B.
-        NTSC B - emulate an NTSC model B.
-        PAL B+ - emulate a PAL model B+.
+        PAL A      - emulate a PAL model A.
+        NTSC A     - emulate an NTSC model A.
+        PAL B      - emulate a PAL model B.
+        NTSC B     - emulate an NTSC model B.
+        PAL B+     - emulate a PAL model B+ with 64k RAM.
+        PAL B+96K  - emulate a PAL model B+ with 96k RAM.
+        PAL B+128K - emulate a PAL model B+ with 128k RAM.
 
 Disc :
-        Load disc 1 - load a disc into drive 1.
-        Load disc 2 - load a disc into drive 2.
+        Load drive 0/2 - load a disc into drives 0 and 2.
+        Load drive 1/3 - load a disc into drives 1 and 3.
         Disc sounds - emulate authentic 5.25" disc drive noise.
 
 Tape :
@@ -223,19 +225,19 @@ A : If the screen is just off centre, then use the positioning controls. If
     there's not much you can do.
 
 Q : Why have I got no sound?
-A : B-em should work with any soundcard supported by Windows and DirectX. If you
-    have no drivers, you get no sound.
+A : B-em should work with 100% SoundBlaster compatibles, ESS Audiodrive,
+    Ensoniq Soundscape, and Windoze $ound System. It will not work with cards
+    not in that list (such as Creative's newer SoundBlasters, which aren't
+    really compatible, or sadly the GUS), it will not work with non-100%
+    compatibles with crappy drivers (such as the ones found in laptops) and it
+    will not work if you have a bad BLASTER enviroment label.
     Minor addition to this, if you use a poor quality card (such as a
-    SoundBlaster) and you have some sound running in the background, B-em will
-    deliver no sound. The answer is to upgrade to a good card.
+    SoundBlaster) and you have some sound running in the background in Windows,
+    B-em will deliver no sound. The answer is to upgrade to a good card.
 
 Q : What happened to snapshots?
 A : They were removed for technical reasons. They will probably return in the
     next release (if there is one).
-
-Q : Why is the Windows release so jerky?
-A : Your guess is as good as mine. If anyone knows why this is happening, can they
-    please tell me?
 
 Q : How do I contact you?
 A : E-mail me at tommowalker@hotmail.com
@@ -267,7 +269,7 @@ Micropower  Cybertron
 Micropower  Dr. Who (B+ version)
 Micropower  Ghouls
 
-Superior    Crazee Rider (go for enhanced mode!)
+Superior    Crazee Rider (go for enhanced mode! - model B only though)
 Superior    Citadel
 Superior    Citadel 2
 Superior    Exile
@@ -277,6 +279,7 @@ Superior    Repton
 Superior    Repton 2
 Superior    Repton 3
 
+Ultimate    Alien 8
 Ultimate    Cookie
 Ultimate    Jetpac
 Ultimate    Sabre Wulf
@@ -297,8 +300,6 @@ Hewson      Uridium (timing is 4 scanlines off)
 
 Not working :
 
-Ultimate    Alien 8 (ignores keyboard input)
-
 
 Thanks to :
 ~~~~~~~~~~~
@@ -309,6 +310,8 @@ James Fidell for writing Xbeeb and distributing the sources with it
 
 Tom Seddon for updating Model B recently, indirectly motivating me to do
 another update this year.
+
+Ken Lowe for assistance with the Level 9 adventures.
 
 Thomas Harte for some UEF code - I wrote my own in the end - and for inventing
 UEF files.
@@ -349,7 +352,7 @@ Appendix A : The source code
 
 If you want to use the source code for anything, that's fine. But, if you can,
 you are encouraged to contribute to it by adding new features and/or fixing it
-To recompile the code, you will need MING/W and Allegro 4.
+To recompile the code, you will need DJGPP 2, GCC and Allegro 4.
 
 
 Appendix B : Transfering BBC files to the PC
@@ -452,7 +455,7 @@ emulators and runs pretty much everything.
 Beebem - www.rickynet.net/beebem
 The most famous BBC emulator. Runs pretty much everything, but is really slow.
 
-BeebIt -
+BeebIt - homepages.paradise.net.nz/mjfoot/bbc.htm
 The main BBC emulator for the RiscPC. I can't really comment on this (my ARM6
 is way too slow), but according to the author, it's really really good.
 

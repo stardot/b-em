@@ -1,59 +1,9 @@
-             ██████████▄           █████████  ████▄    ▄████
-             ██       ▀██          ██         ██ ▀██▄▄██▀ ██
-             ██       ▄██          ██         ██   ▀██▀   ██
-             ███████████    █████  █████      ██          ██
-             ██       ▀██          ██         ██          ██
-             ██       ▄██          ██         ██          ██
-             ██████████▀           █████████  ██          ██
+B-em 0.61 Source release
+~~~~~~~~~~~~~~~~~~~~~~~~
 
-                                 Version 0.6
-                         A freeware BBC Micro emulator
-
-Source code
-~~~~~~~~~~~
-
-If you want to use the source code as reference for writing your own emulator,
-that's fine. If you want to steal the odd function from it, that's fine too.
-If you want to use large sections (such as the 6502 emulation, for example),
-then email me. If you are kind and want to improve B-em, then by all means go
-ahead. BUT, you can't just modify a few bits and distribute it under a
-different name (or the same name), and if you do use bits out of it, you must
-acknowledge the fact that I wrote it.
-
-To compile B-em, you will need :
-
-DJGPP 2
-GCC
-Allegro 4 (3 might work as well)
-LibZ
-
-If you want to compile for Win32 instead, use Ming/W instead of DJGPP.
-
-You will need to compile all the C files, and link them with Allegro and GZip.
-
-There may be some minor changes that need making when compiling with Ming/W
-or DJGPP, I can't remember which compiler compiled this code last.
-
-
-What files are what
-~~~~~~~~~~~~~~~~~~~
-
-1770.*     - WD1770 disc controller
-6502.*     - 6502 emulation core
-6850acia.* - 6850 ACIA emulation
-8271.*     - i8271 disc controller
-adc.*      - Analogue to digital converter
-b-em.c     - B-em main file
-gui.c      - GUI
-scan2bbc.h - PC to BBC scancode table
-serial.*   - Serial ULA emulation
-sound.*    - Sound emulation
-sysvia.*   - System VIA and keyboard emulation
-tfs.*      - TFS
-uef.*      - UEF handling
-uservia.*  - User VIA emulation
-video.*    - Video emulation
+This contains the source for both the DOS and Windows versions. You will need
+DJGPP (for DOS) or Ming/W (for Windows), along with Allegro, in order to
+compile.
 
 Tom Walker
-tommowalker@hotmail.com
-
+tommowalker@yahoo.co.uk (don't spread)

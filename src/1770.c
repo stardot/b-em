@@ -1,6 +1,7 @@
 /*B-em 0.6 by Tom Walker*/
 /*1770 emulator*/
 #include <allegro.h>
+#include <stdio.h>
 
 int motorofff;
 int ddnoise;
@@ -9,7 +10,7 @@ BITMAP *buffer;
 
 #define SIDES 2
 #define TRACKS 80
-#define SECTORS 10
+#define SECTORS 16
 #define SECTORSIZE 256
 
 SAMPLE *seeksmp;
@@ -30,6 +31,35 @@ struct
         unsigned char track,sector,data,command,control,status;
         int curtrack,cursector;
 } wd1770;
+
+int load1770adfs(char *fn, int disc)
+{
+        int c,d,e,f,sides;
+        int len;
+        FILE *ff=fopen(fn,"rb");
+        if (!ff) return -1;
+        fseek(ff,-1,SEEK_END);
+        len=ftell(ff);
+        fseek(ff,0,SEEK_SET);
+        if (len>(80*16*256)) sides=2;
+        else                 sides=1;
+        for (d=0;d<80;d++)
+        {
+                for (c=0;c<sides;c++)
+                {
+//                        printf("Track %i side %i at %i\n",d,c,ftell(ff));
+                        for (e=0;e<16;e++)
+                        {
+                                for (f=0;f<256;f++)
+                                {
+                                        if (!feof(ff)) discs[disc][c][(d*16)+e][f]=getc(ff);
+                                        else           discs[disc][c][(d*16)+e][f]=0;
+                                }
+                        }
+                }
+        }
+        fclose(ff);
+}
 
 void reset1770()
 {
@@ -64,10 +94,10 @@ void start1770command()
         motorofff=0;
         switch (wd1770.command>>4)
         {
-                case 0: set1770poll(15000); if (ddnoise) play_sample(seeksmp,255,127,1000,FALSE); break; /*Restore*/
-                case 1: set1770poll(15000); if (ddnoise) play_sample(seeksmp,255,127,1000,FALSE); break; /*Seek*/
-                case 5: set1770poll(15000); if (ddnoise) play_sample(stepsmp,255,127,1000,FALSE); break; /*Step in*/
-                case 8: wd1770.status&=~4; set1770poll(15000); sectorpos=0; wd1770.curtrack=wd1770.track; wd1770.cursector=wd1770.sector; break; /*Read sector*/
+                case 0: set1770poll(2000); if (ddnoise) play_sample(seeksmp,255,127,1000,FALSE); break; /*Restore*/
+                case 1: set1770poll(2000); if (ddnoise) play_sample(seeksmp,255,127,1000,FALSE); break; /*Seek*/
+                case 5: set1770poll(2000); if (ddnoise) play_sample(stepsmp,255,127,1000,FALSE); break; /*Step in*/
+                case 8: wd1770.status&=~4; set1770poll(2000); sectorpos=0; wd1770.curtrack=wd1770.track; wd1770.cursector=wd1770.sector; break; /*Read sector*/
                 default:
                 printf("Bad 1770 command %01X\n",wd1770.command>>4);
                 dumpregs();
@@ -166,7 +196,7 @@ void poll1770()
                 break;
 
                 case 8: /*Read sector*/
-                wd1770.data=discs[curdisc][curside][(wd1770.curtrack*10)+wd1770.cursector][sectorpos++];
+                wd1770.data=discs[curdisc][curside][(wd1770.curtrack*16)+wd1770.cursector][sectorpos++];
                 sectorpos&=255;
                 if (endcommand)
                 {

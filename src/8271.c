@@ -9,7 +9,7 @@
 
 #define SIDES 2
 #define TRACKS 80
-#define SECTORS 10
+#define SECTORS 16
 #define SECTORSIZE 256
 
 #define SIDE ((drvctrloutp>>5) & 1)
@@ -83,7 +83,7 @@ int load8271ssd(char *fn, int disc)
            return -1;
                 for (e=0;e<TRACKS;e++)
                 {
-                        for (d=0;d<SECTORS;d++)
+                        for (d=0;d<10;d++)
                         {
                                 for (c=0;c<SECTORSIZE;c++)
                                 {
@@ -92,20 +92,20 @@ int load8271ssd(char *fn, int disc)
                                                 temp=getc(ff);
                                                 if (temp==EOF)
                                                 {
-                                                        discs[disc][0][(e*10)+d][c]=0;
-                                                        discs[disc][1][(e*10)+d][c]=0;
+                                                        discs[disc][0][(e*16)+d][c]=0;
+                                                        discs[disc][1][(e*16)+d][c]=0;
                                                         eof=1;
                                                 }
                                                 else
                                                 {
-                                                        discs[disc][0][(e*10)+d][c]=temp;
-                                                        discs[disc][1][(e*10)+d][c]=0;
+                                                        discs[disc][0][(e*16)+d][c]=temp;
+                                                        discs[disc][1][(e*16)+d][c]=0;
                                                 }
                                         }
                                         else
                                         {
-                                                discs[disc][0][(e*10)+d][c]=0;
-                                                discs[disc][1][(e*10)+d][c]=0;
+                                                discs[disc][0][(e*16)+d][c]=0;
+                                                discs[disc][1][(e*16)+d][c]=0;
                                         }
                                 }
                         }
@@ -132,7 +132,7 @@ int load8271dsd(char *fn, int disc)
                         {
                                 for (f=0;f<2;f++)
                                 {
-                                for (e=0;e<SECTORS;e++)
+                                for (e=0;e<10;e++)
                                 {
                                 for (c=0;c<SECTORSIZE;c++)
                                 {
@@ -141,14 +141,14 @@ int load8271dsd(char *fn, int disc)
                                                 temp=getc(ff);
                                                 if (temp==EOF)
                                                 {
-                                                        discs[disc][f][(d*10)+e][c]=0;
+                                                        discs[disc][f][(d*16)+e][c]=0;
                                                         eof=1;
                                                 }
                                                 else
-                                                   discs[disc][f][(d*10)+e][c]=temp;
+                                                   discs[disc][f][(d*16)+e][c]=temp;
                                         }
                                         else
-                                           discs[disc][f][(d*256)+e][c]=0;
+                                           discs[disc][f][(d*16)+e][c]=0;
                                 }
                                 }
                                 }
@@ -182,7 +182,7 @@ void empty8271disc(int disc)
 void dumpdisc()
 {
         FILE *f=fopen("disc.dmp","wb");
-        fwrite(discs[0],80*10*256,1,f);
+        fwrite(discs[0],80*16*256,1,f);
         fclose(f);
 }
 
@@ -446,7 +446,7 @@ void readint()
         }
         bytesread++;
         if (cursec[0]<(800))
-           datareg=discs[curdisc][SIDE][cursec[0]+(curtrack[0]*10)][byteinsec];
+           datareg=discs[curdisc][SIDE][cursec[0]+(curtrack[0]*16)][byteinsec];
         else
         {
                 error8271(0x1E);

@@ -122,14 +122,14 @@ void polltape()
             return;
 
             case 0x112: /*Gap*/
-            inchunk=0;
+/*            inchunk=0;
             gzgetc(uef); gzgetc(uef);
-            return;
+            return;*/
             if (!intone)
             {
 //                  printf("GAP\n");
                   dcd();
-                  intone=7;
+                  intone=50;
             }
             else
             {

@@ -5,6 +5,7 @@
 #include "bbctext.h"
 #include "b-em.h"
 
+unsigned short vidmask;
 int output;
 
 PALETTE beebpal=
@@ -95,8 +96,10 @@ unsigned char readcrtc(unsigned short addr)
         return crtc[crtcreg];
 }
 
+unsigned long lookuptab[256];
 unsigned char ulactrl;
 int clut[16],clut2[16];
+int remakelookup=1;
 
 void updateclut()
 {
@@ -115,6 +118,7 @@ void updateclut()
 
 void writeula(unsigned short addr, unsigned char val, int line)
 {
+        remakelookup=1;
         if (addr&1)
         {
                 clut2[val>>4]=(val^7)&0xF;
@@ -138,6 +142,41 @@ void writeula(unsigned short addr, unsigned char val, int line)
         }
 }
 
+void remaketab()
+{
+        int c;
+        switch (bbcmode)
+        {
+                case 0:
+                for (c=0;c<256;c++)
+                {
+                        lookuptab[c]=clut[table4bpp[c][0]]&7;
+                        lookuptab[c]|=(clut[table4bpp[c][2]]&7)<<8;
+                        lookuptab[c]|=(clut[table4bpp[c][4]]&7)<<16;
+                        lookuptab[c]|=(clut[table4bpp[c][6]]&7)<<24;
+                }
+                break;
+                case 1:
+                for (c=0;c<256;c++)
+                {
+                        lookuptab[c]=clut[table4bpp[c][0]]&7;
+                        lookuptab[c]|=(clut[table4bpp[c][1]]&7)<<8;
+                        lookuptab[c]|=(clut[table4bpp[c][2]]&7)<<16;
+                        lookuptab[c]|=(clut[table4bpp[c][3]]&7)<<24;
+                }
+                break;
+                case 2:
+                for (c=0;c<256;c++)
+                {
+                        lookuptab[c]=clut[table4bpp[c][0]]&7;
+                        lookuptab[c]|=(clut[table4bpp[c][0]]&7)<<8;
+                        lookuptab[c]|=(clut[table4bpp[c][1]]&7)<<16;
+                        lookuptab[c]|=(clut[table4bpp[c][1]]&7)<<24;
+                }
+                break;
+        }
+}
+
 void initframe()
 {
         unsigned char tmphigh;
@@ -151,7 +190,7 @@ void initframe()
         }
         else
            startaddr=(crtc[13]|(crtc[12]<<8))<<3;
-        if (startaddr==0x5300) output=1;
+//        if (startaddr==0x5300) output=1;
 }
 
 void dumpcrtc()
@@ -184,12 +223,13 @@ void drawmode0line()
         for (x=0;x<crtc[1];x++)
         {
                 if (addr&0x8000) addr-=screenlen[scrsize];
-                val=ram[(addr&0x7FFF)|vidbank];
+                val=ram[(addr&vidmask)|vidbank];
                 addr+=8;
-                buffer->line[physline&511][(xoffset)&511]=clut[table4bpp[val][0]]&7;
-                buffer->line[physline&511][(xoffset+1)&511]=clut[table4bpp[val][2]]&7;
-                buffer->line[physline&511][(xoffset+2)&511]=clut[table4bpp[val][4]]&7;
-                buffer->line[physline&511][(xoffset+3)&511]=clut[table4bpp[val][6]]&7;
+                ((unsigned long *)buffer->line[physline&511])[(xoffset>>2)&127]=lookuptab[val];
+//                buffer->line[physline&511][(xoffset)&511]=clut[table4bpp[val][0]]&7;
+//                buffer->line[physline&511][(xoffset+1)&511]=clut[table4bpp[val][2]]&7;
+//                buffer->line[physline&511][(xoffset+2)&511]=clut[table4bpp[val][4]]&7;
+//                buffer->line[physline&511][(xoffset+3)&511]=clut[table4bpp[val][6]]&7;
                 xoffset+=4;
         }
         hline(buffer,xoffset,physline,399,0);
@@ -211,12 +251,13 @@ void drawmode1line()
         for (x=0;x<crtc[1];x++)
         {
                 if (addr&0x8000) addr-=screenlen[scrsize];
-                val=ram[(addr&0x7FFF)|vidbank];
+                val=ram[(addr&vidmask)|vidbank];
                 addr+=8;
-                buffer->line[physline&511][(xoffset)&511]=clut[table4bpp[val][0]]&7;
-                buffer->line[physline&511][(xoffset+1)&511]=clut[table4bpp[val][1]]&7;
-                buffer->line[physline&511][(xoffset+2)&511]=clut[table4bpp[val][2]]&7;
-                buffer->line[physline&511][(xoffset+3)&511]=clut[table4bpp[val][3]]&7;
+                ((unsigned long *)buffer->line[physline&511])[(xoffset>>2)&127]=lookuptab[val];
+//                buffer->line[physline&511][(xoffset)&511]=clut[table4bpp[val][0]]&7;
+//                buffer->line[physline&511][(xoffset+1)&511]=clut[table4bpp[val][1]]&7;
+//                buffer->line[physline&511][(xoffset+2)&511]=clut[table4bpp[val][2]]&7;
+//                buffer->line[physline&511][(xoffset+3)&511]=clut[table4bpp[val][3]]&7;
                 xoffset+=4;
         }
         hline(buffer,xoffset,physline,399,0);
@@ -238,10 +279,11 @@ void drawmode2line()
         for (x=0;x<crtc[1];x++)
         {
                 if (addr&0x8000) addr-=screenlen[scrsize];
-                val=ram[(addr&0x7FFF)|vidbank];
+                val=ram[(addr&vidmask)|vidbank];
                 addr+=8;
-                buffer->line[physline&511][(xoffset)&511]=buffer->line[physline&511][(xoffset+1)&511]=clut[table4bpp[val][0]]&7;
-                buffer->line[physline&511][(xoffset+2)&511]=buffer->line[physline&511][(xoffset+3)&511]=clut[table4bpp[val][1]]&7;
+                ((unsigned long *)buffer->line[physline&511])[(xoffset>>2)&127]=lookuptab[val];
+//                buffer->line[physline&511][(xoffset)&511]=buffer->line[physline&511][(xoffset+1)&511]=clut[table4bpp[val][0]]&7;
+//                buffer->line[physline&511][(xoffset+2)&511]=buffer->line[physline&511][(xoffset+3)&511]=clut[table4bpp[val][1]]&7;
                 xoffset+=4;
         }
         hline(buffer,xoffset,physline,399,0);
@@ -264,7 +306,7 @@ void drawmode4line()
         for (x=0;x<crtc[1];x++)
         {
                 if (addr&0x8000) addr-=screenlen[scrsize];
-                val=ram[(addr&0x7FFF)|vidbank];
+                val=ram[(addr&vidmask)|vidbank];
                 addr+=8;
                 buffer->line[physline&511][(xoffset)&511]=clut[table4bpp[val][0]]&7;
                 buffer->line[physline&511][(xoffset+1)&511]=clut[table4bpp[val][1]]&7;
@@ -295,7 +337,7 @@ void drawmode5line()
         for (x=0;x<crtc[1];x++)
         {
                 if (addr&0x8000) addr-=screenlen[scrsize];
-                val=ram[(addr&0x7FFF)|vidbank];
+                val=ram[(addr&vidmask)|vidbank];
                 addr+=8;
                 buffer->line[physline&511][(xoffset)&511]=buffer->line[physline&511][(xoffset+1)&511]=clut[table4bpp[val][0]]&7;
                 buffer->line[physline&511][(xoffset+2)&511]=buffer->line[physline&511][(xoffset+3)&511]=clut[table4bpp[val][1]]&7;
@@ -322,7 +364,7 @@ void drawmode8line()
         for (x=0;x<crtc[1];x++)
         {
                 if (addr&0x8000) addr-=screenlen[scrsize];
-                val=ram[(addr&0x7FFF)|vidbank];
+                val=ram[(addr&vidmask)|vidbank];
                 addr+=8;
                 buffer->line[physline&511][(xoffset)&511]=buffer->line[physline&511][(xoffset+1)&511]=clut[table4bpp[val][0]]&7;
                 buffer->line[physline&511][(xoffset+2)&511]=buffer->line[physline&511][(xoffset+3)&511]=clut[table4bpp[val][0]]&7;
@@ -358,7 +400,7 @@ void drawteletextline()
         for (x=0;x<crtc[1];x++)
         {
                 if (addr&0x8000) addr-=0x400;
-                cr=ram[(addr&0x7FFF)|vidbank];
+                cr=ram[(addr&vidmask)|vidbank];
                 if (cr&0x80)
                 {
                         switch (cr)
@@ -448,7 +490,7 @@ void drawcursor()
         tempy=temp/crtc[1];
 //        sprintf(st,"_");
         if (flash)
-           hline(buffer,(tempx*6)+xoffset+1,(tempy*10)+firstline+9,((tempx*6)+5)+xoffset,makecol(255,255,255));
+           hline(buffer,(tempx*6)+xoffset+1,(tempy*10)+firstline+9,((tempx*6)+5)+xoffset,7);
 //           drawstring(b,font,tempx<<3,tempy<<3,st,15);
 }
 
@@ -477,6 +519,7 @@ void drawline(int line6502)
         if (!vc && !sc) initframe();
         if (vc<crtc[6])
         {
+                if (remakelookup) remaketab();
                 if ((crtc[8]&0x30)==0x30)
                 {
                         if (physline>15 && physline<300)

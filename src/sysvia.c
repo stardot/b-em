@@ -290,6 +290,7 @@ unsigned char codeconvert[128]=
         0,0,0,0,0,0,0,0,
 };
 
+void updatekeyboard();
 inline void presskey(int row, int col)
 {
         bbckey[col][row]=1;

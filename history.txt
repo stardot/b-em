@@ -197,7 +197,7 @@ Version 0.4a finalised and released.
 20/12/02 - Fixed stupid bug with video initialisation. Fixed periodic sound
            frequency (I hope). Added support for second joystick (totally
            untested, I only have one).
-Version 0.5 finalised and released.
+Version 0.5 finalised and released
 18/06/03 - Started new CPU core + VIAs. Boots and runs BASIC correctly.
 19/06/03 - Re-added 8271 emulation and fixed some timer stuff.
            Attempted to fix irritating pauses in some games, tracked Crazee
@@ -238,4 +238,12 @@ Version 0.5 finalised and released.
 19/07/03 - Fixed VIA timer 2 bug, Castle Quest & Citadel work again.
            Slowed down ADC to 5 conversion/frame. This should still be enough
            to sample all four channels, and lessen the CPU load.
-Version 0.6 finalised and released.
+Version 0.6 finalised and released
+26/01/04 - Fixed up B+ sideways RAM, thanks to Ken Lowe (I did this ages ago,
+           but lost the source). Level 9 games now show pictures. Found out
+           that the OS recognises a 96K B+.
+           Added some undocumented sound behaviour - Crazee Rider music now
+           perfect.
+           1770 seeking/stepping speeded up a bit.
+27/01/04 - Played with sound a bit.
+28/01/04 - Added ADFS support.

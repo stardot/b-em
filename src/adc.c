@@ -96,5 +96,5 @@ void initadc()
         adchigh=adclow=adclatch=0;
         adcconvert=0;
 //        load_joystick_data("joystick.dat");
-        install_joystick(JOY_TYPE_2PADS);
+        install_joystick(JOY_TYPE_AUTODETECT);
 }

@@ -4,6 +4,7 @@
 #include <allegro.h>
 #include "b-em.h"
 
+int model;
 int uefena;
 int soundon;
 int logging;
@@ -13,10 +14,23 @@ unsigned char *ram;
 int quit=0;
 char uefname[260];
 
+int scupdate=0,sndupdate=0;
+static void update50()
+{
+        scupdate=1;
+}
+END_OF_FUNCTION(update50);
+
+static void update200()
+{
+        sndupdate=1;
+}
+END_OF_FUNCTION(update200);
+
 int main()
 {
         unsigned char *p;
-        printf("B-em v0.6\n");
+        printf("B-em v0.61\n");
         load_config();
         allegro_init();
         install_keyboard();
@@ -38,21 +52,22 @@ int main()
         loaddiscsamps();
         openuef(uefname);
         if (!uefena) trapos();
+        install_int_ex(update50,MSEC_TO_TIMER(20));
+        install_int_ex(update200,MSEC_TO_TIMER(5));
         while (!quit)
         {
                 exec6502(312,128);
+                copyvols();
                 if (logging) logsound();
 //                drawscr();
                 checkkeys();
                 poll_joystick();
-                if (soundon)
+                while (!scupdate)
                 {
-                        p=0;
-                        while (!p)
-                              p=(unsigned char *)get_audio_stream_buffer(as);
-                        updatebuffer(p,624);
-                        free_audio_stream_buffer(as);
+                        yield_timeslice();
+                        p++;
                 }
+                scupdate=0;
                 if (key[KEY_F12])
                 {
                         if (key[KEY_LCONTROL] || key[KEY_RCONTROL])
@@ -65,7 +80,8 @@ int main()
 //                        initserial();
 //                        reset1770();
 //                        reset8271(0);
-                        remaketables();
+                        if (model<2) remaketablesa();
+                        else         remaketables();
                         reset6502();
                 }
                 if (key[KEY_F11])
@@ -81,7 +97,7 @@ int main()
         }
         allegro_exit();
         save_config();
-//        dumpregs();
+        dumpregs();
 //        printf("%i\n",vidbank);
 //        dumpcrtc();
         return 0;

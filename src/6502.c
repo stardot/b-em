@@ -3,14 +3,17 @@
 
 #include <allegro.h>
 #include <stdio.h>
-#include <dir.h>
 
 #include "b-em.h"
 #include "8271.h"
 #include "serial.h"
 
+unsigned short vidmask;
 int adcconvert;
 int shadowaddr[16]={0,0,0,0,0,0,0,0,0,0,1,0,1,1,0,0};
+
+int sndupdate;
+AUDIOSTREAM *as;
 
 int countit=0;
 unsigned char oldfa;
@@ -53,13 +56,35 @@ void initmem()
         ram=(unsigned char *)malloc(0x10000);
         rom=(unsigned char *)malloc(0x40000);
         memset(ram,0,0x8000);
-        for (c=0x00;c<0x080;c++) mem[c]=(unsigned char *)(ram+(c<<8));
+        if (model<2)
+        {
+                for (c=0x00;c<0x080;c++) mem[c]=(unsigned char *)(ram+((c&0x3F)<<8));
+                vidmask=0x3FFF;
+        }
+        else
+        {
+                for (c=0x00;c<0x080;c++) mem[c]=(unsigned char *)(ram+(c<<8));
+                vidmask=0x7FFF;
+        }
         for (c=0x80;c<0x0C0;c++) mem[c]=(unsigned char *)(rom+((c&0x3F)<<8));
         for (c=0xC0;c<0x100;c++) mem[c]=(unsigned char *)(os+((c&0x3F)<<8));
         for (c=0x00;c<0x080;c++) memstat[c]=0;
         for (c=0x80;c<0x100;c++) memstat[c]=1;
         memstat[0xFE]=2;
 //        atexit(dumpram);
+}
+
+inline void trysoundupdate()
+{
+        unsigned char *p;
+        p=(unsigned char *)get_audio_stream_buffer(as);
+//        printf("Trying sound update %08X\n",p);
+        if (p)
+        {
+                updatebuffer(p,624);
+                free_audio_stream_buffer(as);
+                sndupdate=0;
+        }
 }
 
 void remaketables()
@@ -71,24 +96,20 @@ void remaketables()
         for (c=0x00;c<0x080;c++) memstat[c]=0;
         for (c=0x80;c<0x100;c++) memstat[c]=1;
         memstat[0xFE]=2;
+        vidmask=0x7FFF;
 }
 
-#if 0
-typedef struct ffblk {
-  char lfn_magic[6];    /* LFN: the magic "LFN32" signature */
-  short lfn_handle;    /* LFN: the handle used by findfirst/findnext */
-  unsigned short lfn_ctime; /* LFN: file creation time */
-  unsigned short lfn_cdate; /* LFN: file creation date */
-  unsigned short lfn_atime; /* LFN: file last access time (usually 0) */
-  unsigned short lfn_adate; /* LFN: file last access date */
-  char ff_reserved[5];      /* used to hold the state of the search */
-  unsigned char ff_attrib;  /* actual attributes of the file found */
-  unsigned short ff_ftime;  /* hours:5, minutes:6, (seconds/2):5 */
-  unsigned short ff_fdate;  /* (year-1980):7, month:4, day:5 */
-  unsigned long ff_fsize;   /* size of file */
-  char ff_name[260];        /* name of file as ASCIIZ string */
-} ffblk;
-#endif
+void remaketablesa()
+{
+        int c;
+        for (c=0x00;c<0x080;c++) mem[c]=(unsigned char *)(ram+((c&0x3F)<<8));
+        for (c=0x80;c<0x0C0;c++) mem[c]=(unsigned char *)(rom+((c&0x3F)<<8));
+        for (c=0xC0;c<0x100;c++) mem[c]=(unsigned char *)(os+((c&0x3F)<<8));
+        for (c=0x00;c<0x080;c++) memstat[c]=0;
+        for (c=0x80;c<0x100;c++) memstat[c]=1;
+        memstat[0xFE]=2;
+        vidmask=0x3FFF;
+}
 
 void loadroms()
 {
@@ -98,30 +119,32 @@ void loadroms()
         FILE *f;
         struct al_ffblk ff;
         if (chdir("roms"))
-        {
-                perror("roms");
-                exit(-1);
-        }
+           perror("roms");
         switch (model)
         {
-                case 0: f=fopen("os","rb"); break;
-                case 1: f=fopen("usos","rb"); break;
-                case 2: f=fopen("bpos","rb"); break;
+                case 0: case 2: f=fopen("os","rb"); break;
+                case 1: case 3: f=fopen("usos","rb"); break;
+                case 4: case 5: case 6: f=fopen("bpos","rb"); break;
         }
         fread(os,0x4000,1,f);
         fclose(f);
         switch (model)
         {
-                case 0: case 1: if (chdir("b")) { perror("b"); exit(-1); } break;
-                case 2: if (chdir("bp")) { perror("bp"); exit(-1); } break;
+                case 0: case 1: if (chdir("a")) perror("a"); break;
+                case 2: case 3: if (chdir("b")) perror("b"); break;
+                case 4: case 5: case 6: if (chdir("bp")) perror("bp"); break;
         }
-        c=al_findfirst("*.rom",&ff,FA_RDONLY|FA_HIDDEN|FA_SYSTEM|FA_LABEL|FA_DIREC|FA_ARCH);
-//        printf("Results : %i %i\n",c,errno);
-        for (c=0;c<16;c++) writeablerom[c]=1;
+        al_findfirst("*.rom",&ff,FA_RDONLY|FA_HIDDEN|FA_SYSTEM|FA_LABEL|FA_DIREC|FA_ARCH);
+        for (c=0;c<16;c++) writeablerom[c]=((model==4)||(model==5)||(model==6))?0:1;
         memset(rom,0,0x40000);
         while (romslot >= 0 && !finished)
         {
-//                printf("Loading %s into slot %01X offset %05X\n",ff.name,romslot,addr);
+                if ((model==4 || model==5 || model==6) && (romslot==0 || romslot==1 || romslot==12 || romslot==13))
+                {
+                        addr-=0x4000;
+                        romslot--;
+                        goto donext;
+                }
                 f=fopen(ff.name,"rb");
                 if (!f)
                 {
@@ -130,21 +153,19 @@ void loadroms()
                 }
                 fread(rom+addr,16384,1,f);
                 fclose(f);
-                addr-=0x4000;
+//                printf("Loaded %s into slot %i\n",ff.ff_name,romslot);
                 writeablerom[romslot]=0;
+                addr-=0x4000;
                 romslot--;
                 finished = al_findnext(&ff);
+                donext:
         }
+        if (model==5) writeablerom[0]=writeablerom[1]=1;
+        if (model==6) writeablerom[0]=writeablerom[1]=writeablerom[12]=writeablerom[13]=1;
         if (chdir(".."))
-        {
-                perror("..");
-                exit(-1);
-        }
+           perror("..");
         if (chdir(".."))
-        {
-                perror("..");
-                exit(-1);
-        }
+           perror("..");
 }
 
 unsigned char acccon=0;
@@ -205,7 +226,7 @@ unsigned char readmeml(unsigned short addr)
                 case 0xFE30: if (addr==0xFE34) return 0; break;
                 case 0xFE40: case 0xFE48: case 0xFE50: case 0xFE58: return readsysvia(addr);
                 case 0xFE60: case 0xFE68: case 0xFE70: case 0xFE78: return readuservia(addr);
-                case 0xFE80: case 0xFE88: case 0xFE90: case 0xFE98: if (model==2) return read1770(addr); else return read8271(addr);
+                case 0xFE80: case 0xFE88: case 0xFE90: case 0xFE98: if (model>3) return read1770(addr); else return read8271(addr);
                 case 0xFEA0: case 0xFEA8: return 0xFE; /*I wonder what Arcadians wants with Econet...*/
                 case 0xFEC0: case 0xFEC8: case 0xFED0: case 0xFED8: return readadc(addr);
                 case 0xFEE0: return 0;
@@ -227,34 +248,34 @@ unsigned char writememl(unsigned short addr, unsigned char val, int line)
                 case 0xFE30:
                 if (addr==0xFE34)
                 {
-                        if (model==2)
+                        if (model>3)
                         {
                                 writeacccon(val);
                         }
                         return;
                 }
-                if (addr==0xFE32) return; /*??? - Time and Magik writes here*/
-                if (addr==0xFE30)
+//                if (addr==0xFE32) return; /*??? - Time and Magik writes here*/
+                if ((addr==0xFE30) || (addr==0xFE32))
                 {
 //                        if (output2) printf("Current ROM %02X at %04X %i %05X\n",val,pc,ins,(val&15)<<14);
                         currom=val;
                         for (c=0x80;c<0xC0;c++) mem[c]=(unsigned char *)(rom+((val&15)<<14)+((c&0x3F)<<8));
                         for (c=0x80;c<0xC0;c++) memstat[c]=(writeablerom[val&15])?0:1;
-                        if (val&0x80 && model==2)
+                        if (val&0x80 && model>3)
                         {
 //                                printf("Mapping in 8000-AFFF at %04X\n",pc);
                                 for (c=0x80;c<0xB0;c++) mem[c]=(unsigned char *)(ram+(c<<8));
                                 for (c=0x80;c<0xB0;c++) memstat[c]=0;
                                 shadowaddr[0xA]=1;
                         }
-                        else if (model==2) shadowaddr[0xA]=0;
+                        else if (model>3) shadowaddr[0xA]=0;
                         return;
                 }
                 break;
                 case 0xFE38: return;
                 case 0xFE40: case 0xFE48: case 0xFE50: case 0xFE58: writesysvia(addr,val,line); return;
                 case 0xFE60: case 0xFE68: case 0xFE70: case 0xFE78: writeuservia(addr,val,line); return;
-                case 0xFE80: case 0xFE88: case 0xFE90: case 0xFE98: if (model==2) write1770(addr,val); else write8271(addr,val); return;
+                case 0xFE80: case 0xFE88: case 0xFE90: case 0xFE98: if (model>3) write1770(addr,val); else write8271(addr,val); return;
                 case 0xFEA0: return; /*Now Repton Infinity wants Econet as well!*/
                 case 0xFEC0: case 0xFEC8: case 0xFED0: case 0xFED8: writeadc(addr,val); return;
                 case 0xFEE0: return;
@@ -286,7 +307,7 @@ void dumpregs()
         printf("6502 registers :\n");
         printf("A=%02X X=%02X Y=%02X S=01%02X PC=%04X\n",a,x,y,s,pc);
         printf("Status : %c%c%c%c%c%c\n",(p.n)?'N':' ',(p.v)?'V':' ',(p.d)?'D':' ',(p.i)?'I':' ',(p.z)?'Z':' ',(p.c)?'C':' ');
-        printf("%i instructions executed\n",ins);
+        printf("%i instructions executed   current ROM %i\n",ins,currom);
         printf("%04X %04X %04X\n",oldpc,oldoldpc,pc3);
         printf("%i\n",countit);
 }
@@ -409,7 +430,7 @@ void exec6502(int lines, int cpl)
 //                        pc3=oldoldpc;
 //                        oldoldpc=oldpc;
 //                        oldpc=pc;
-                        if (model==2 && vidbank)
+                        if (model>3 && vidbank)
                         {
                                 if (!inA && shadowaddr[pc>>12])     shadowram(1);
                                 else if (inA && !shadowaddr[pc>>12]) shadowram(0);
@@ -1497,14 +1518,6 @@ void exec6502(int lines, int cpl)
                                 polltime(3);
                                 break;
 
-                                case 0xE1: /*SBC (,x)*/
-                                temp=readmem(pc)+x; pc++;
-                                addr=readmem(temp)|(readmem(temp+1)<<8);
-                                temp=readmem(addr);
-                                SBC(temp);
-                                polltime(6);
-                                break;
-
                                 case 0xE4: /*CPX zp*/
                                 addr=readmem(pc); pc++;
                                 temp=ram[addr];
@@ -1728,6 +1741,14 @@ void exec6502(int lines, int cpl)
                                 printf("Current ROM %02X\n",currom);
                                 exit(-1);
                         }
+/*                        if (pc==0xED22)
+                        {
+                                printf("Pitch %i %02X\n",a,a);
+                        }
+                        if (pc==0xED2F)
+                        {
+                                printf("Octave %i semitone %i pitch %i\n",ram[0x83D],a,ram[0x830]);
+                        }*/
 //                        if (pc==0xF00F) printf("Enter key press %02X\n",x);
 /*                        if (pc<0x8000 && (pc&0x0F00)!=0xD00 && !output2)
                         {*/
@@ -1754,6 +1775,7 @@ void exec6502(int lines, int cpl)
 //                                printf("Interrupt line %i %02X %02X %02X %02X\n",lines,sysvia.ifr&sysvia.ier,uservia.ifr&uservia.ier,uservia.ier,uservia.ifr);
                         }
                 }
+                trysoundupdate();
                 oldnmi=nmi;
                 if (discint)
                 {
@@ -1761,8 +1783,8 @@ void exec6502(int lines, int cpl)
                         if (discint<=0)
                         {
                                 discint=0;
-                                if (model==2) poll1770();
-                                else          poll8271();
+                                if (model>3) poll1770();
+                                else         poll8271();
                         }
                 }
                 if (nmi && !oldnmi && !nmilock)
@@ -1796,7 +1818,7 @@ void exec6502(int lines, int cpl)
                         break;
                 }*/
                 if (!(lines&0x1F)) pollacia();
-                if (!(lines&0x3F) && adcconvert && !motor) polladc();
+                if (!(lines&0x7) && adcconvert && !motor) polladc();
                 if (lines!=-1) drawline(lines);
 //                else           printf("line -2 - skipping\n");
         }
