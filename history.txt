@@ -276,3 +276,14 @@ Version 0.6 finalised and released
 04/04/04 - Fixed tape and joysticks in Master 128 mode.
            The GUI can now be exited by F11 and right mouse click.
 Version 0.7 finalised
+03/07/04 - High resolution video added.
+           Slight hack in place to fix clipping of Uridium display.
+           Fixed stupid bug in Master 128 memory mapping - graphics modes now
+           work! (ANDY mapping was broken, which is where character definitions
+           are stored).
+           Masked off CRTC registers - Psycastria display now in right place.
+04/07/04 - Sound volume now logarithmic.
+           Improved sample playback - Speech! now always audible.
+           Fixed bug with INF handling.
+           Added 2xSaI mode.
+           Fixed bug in user VIA - Snapper now right speed.

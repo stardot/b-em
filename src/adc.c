@@ -27,7 +27,7 @@ unsigned char readadc(unsigned short addr)
 
 void writeadc(unsigned short addr, unsigned char val)
 {
-        if (!(addr&3))
+        if (addr==0xFEC0)
         {
                 adclatch=val;
                 adcconvert=1;

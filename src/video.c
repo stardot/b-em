@@ -4,29 +4,14 @@
 #include <allegro.h>
 #include "bbctext.h"
 #include "b-em.h"
+#include "2xsai.h"
 
-int soundon;
+int fullscreen;
+int hires=1;
 int interlaceline=0;
 int lns;
 unsigned short vidmask;
 int output;
-
-int sndupdate;
-AUDIOSTREAM *as;
-unsigned char *poi;
-
-inline void trysoundupdate2()
-{
-        if (!soundon) return;
-        poi=(unsigned char *)get_audio_stream_buffer(as);
-//        printf("Trying sound update %08X\n",p);
-        if (poi)
-        {
-                updatebuffer(poi,624);
-//                free_audio_stream_buffer(as);
-                sndupdate=0;
-        }
-}
 
 PALETTE beebpal=
 {
@@ -67,7 +52,7 @@ unsigned char *ram;
 
 int linesdrawn=0;
 
-BITMAP *buffer,*buffer2;
+BITMAP *buffer,*buffer2,*buf16,*buf162;
 int multable[128];
 int scrsize;
 int screenlen[4]={0x4000,0x5000,0x2000,0x2800};
@@ -98,14 +83,14 @@ int curline=0,physline=0;
 
 int vc=0,sc=0,sc6=0;
 int model;
-
+unsigned char crtcmask[32]={0xFF,0xFF,0xFF,0xFF,0x7F,0x1F,0x7F,0x7F,0xF3,0x1F,0x7F,0x1F,0x3F,0xFF,0x3F,0xFF,0x3F,0xFF};
 void writecrtc(unsigned short addr, unsigned char val)
 {
         if (!(addr&1))
            crtcreg=val&31;
         else
         {
-                crtc[crtcreg]=val;
+                crtc[crtcreg]=val&crtcmask[crtcreg];
 //                printf("CRTCreg %i=%02X %i\n",crtcreg,val,lns);
 //                if (output) exit(-1);
                 if (crtcreg==6) clear(buffer);
@@ -120,6 +105,7 @@ unsigned char readcrtc(unsigned short addr)
 }
 
 unsigned long lookuptab[256];
+unsigned long lookuptabh[256],lookuptabh2[256],lookuptabh3[256],lookuptabh4[256];
 unsigned char ulactrl;
 int clut[16],clut2[16];
 int remakelookup=1;
@@ -168,35 +154,111 @@ void writeula(unsigned short addr, unsigned char val, int line)
 void remaketab()
 {
         int c;
-        switch (bbcmode)
+        if (hires==1)
         {
-                case 0:
-                for (c=0;c<256;c++)
+                switch (bbcmode)
                 {
-                        lookuptab[c]=clut[table4bpp[c][0]]&7;
-                        lookuptab[c]|=(clut[table4bpp[c][2]]&7)<<8;
-                        lookuptab[c]|=(clut[table4bpp[c][4]]&7)<<16;
-                        lookuptab[c]|=(clut[table4bpp[c][6]]&7)<<24;
+                        case 0:
+                        for (c=0;c<256;c++)
+                        {
+                                lookuptabh[c]=clut[table4bpp[c][0]]&7;
+                                lookuptabh[c]|=(clut[table4bpp[c][1]]&7)<<8;
+                                lookuptabh[c]|=(clut[table4bpp[c][2]]&7)<<16;
+                                lookuptabh[c]|=(clut[table4bpp[c][3]]&7)<<24;
+                                lookuptabh2[c]=clut[table4bpp[c][4]]&7;
+                                lookuptabh2[c]|=(clut[table4bpp[c][5]]&7)<<8;
+                                lookuptabh2[c]|=(clut[table4bpp[c][6]]&7)<<16;
+                                lookuptabh2[c]|=(clut[table4bpp[c][7]]&7)<<24;
+                        }
+                        break;
+                        case 1:
+                        for (c=0;c<256;c++)
+                        {
+                                lookuptabh[c]=(clut[table4bpp[c][0]]&7)|((clut[table4bpp[c][0]]&7)<<8);
+                                lookuptabh[c]|=((clut[table4bpp[c][1]]&7)<<16)|((clut[table4bpp[c][1]]&7)<<24);
+                                lookuptabh2[c]=(clut[table4bpp[c][2]]&7)|((clut[table4bpp[c][2]]&7)<<8);
+                                lookuptabh2[c]|=((clut[table4bpp[c][3]]&7)<<16)|((clut[table4bpp[c][3]]&7)<<24);
+//                                lookuptabh[c]|=(clut[table4bpp[c][1]]&7)<<16;
+//                                lookuptabh[c]|=(lookuptabh[c]<<8);
+//                                lookuptabh2[c]|=(clut[table4bpp[c][2]]&7);
+//                                lookuptabh2[c]|=(clut[table4bpp[c][3]]&7)<<16;
+//                                lookuptabh2[c]|=(lookuptabh2[c]<<8);
+                        }
+                        break;
+                        case 2:
+                        for (c=0;c<256;c++)
+                        {
+                                lookuptabh[c]= (clut[table4bpp[c][0]]&7)|((clut[table4bpp[c][0]]&7)<<8);
+                                lookuptabh[c]|=((clut[table4bpp[c][0]]&7)<<16)|((clut[table4bpp[c][0]]&7)<<24);
+                                lookuptabh2[c]= (clut[table4bpp[c][1]]&7)|((clut[table4bpp[c][1]]&7)<<8);
+                                lookuptabh2[c]|=((clut[table4bpp[c][1]]&7)<<16)|((clut[table4bpp[c][1]]&7)<<24);
+/*                                lookuptabh[c]|=(lookuptabh[c]<<8);
+                                lookuptabh[c]|=(lookuptabh[c]<<16);
+                                lookuptabh2[c]|=clut[table4bpp[c][1]]&7;
+                                lookuptabh2[c]|=(lookuptabh2[c]<<8);
+                                lookuptabh2[c]|=(lookuptabh2[c]<<16);*/
+                        }
+                        break;
+                        case 4:
+                        for (c=0;c<256;c++)
+                        {
+                                lookuptabh[c]=   (clut[table4bpp[c][0]]&7)|     ((clut[table4bpp[c][0]]&7)<<8);
+                                lookuptabh[c]|= ((clut[table4bpp[c][1]]&7)<<16)|((clut[table4bpp[c][1]]&7)<<24);
+                                lookuptabh2[c]=  (clut[table4bpp[c][2]]&7)|     ((clut[table4bpp[c][2]]&7)<<8);
+                                lookuptabh2[c]|=((clut[table4bpp[c][3]]&7)<<16)|((clut[table4bpp[c][3]]&7)<<24);
+                                lookuptabh3[c]=  (clut[table4bpp[c][4]]&7)|     ((clut[table4bpp[c][4]]&7)<<8);
+                                lookuptabh3[c]|=((clut[table4bpp[c][5]]&7)<<16)|((clut[table4bpp[c][5]]&7)<<24);
+                                lookuptabh4[c]=  (clut[table4bpp[c][6]]&7)|     ((clut[table4bpp[c][6]]&7)<<8);
+                                lookuptabh4[c]|=((clut[table4bpp[c][7]]&7)<<16)|((clut[table4bpp[c][7]]&7)<<24);
+                        }
+                        break;
+                        case 5:
+                        for (c=0;c<256;c++)
+                        {
+                                lookuptabh[c]=   (clut[table4bpp[c][0]]&7)|     ((clut[table4bpp[c][0]]&7)<<8);
+                                lookuptabh[c]|= ((clut[table4bpp[c][0]]&7)<<16)|((clut[table4bpp[c][0]]&7)<<24);
+                                lookuptabh2[c]=  (clut[table4bpp[c][1]]&7)|     ((clut[table4bpp[c][1]]&7)<<8);
+                                lookuptabh2[c]|=((clut[table4bpp[c][1]]&7)<<16)|((clut[table4bpp[c][1]]&7)<<24);
+                                lookuptabh3[c]=  (clut[table4bpp[c][2]]&7)|     ((clut[table4bpp[c][2]]&7)<<8);
+                                lookuptabh3[c]|=((clut[table4bpp[c][2]]&7)<<16)|((clut[table4bpp[c][2]]&7)<<24);
+                                lookuptabh4[c]=  (clut[table4bpp[c][3]]&7)|     ((clut[table4bpp[c][3]]&7)<<8);
+                                lookuptabh4[c]|=((clut[table4bpp[c][3]]&7)<<16)|((clut[table4bpp[c][3]]&7)<<24);
+                        }
+                        break;
                 }
-                break;
-                case 1:
-                for (c=0;c<256;c++)
+        }
+        else
+        {
+                switch (bbcmode)
                 {
-                        lookuptab[c]=clut[table4bpp[c][0]]&7;
-                        lookuptab[c]|=(clut[table4bpp[c][1]]&7)<<8;
-                        lookuptab[c]|=(clut[table4bpp[c][2]]&7)<<16;
-                        lookuptab[c]|=(clut[table4bpp[c][3]]&7)<<24;
+                        case 0:
+                        for (c=0;c<256;c++)
+                        {
+                                lookuptab[c]=clut[table4bpp[c][0]]&7;
+                                lookuptab[c]|=(clut[table4bpp[c][2]]&7)<<8;
+                                lookuptab[c]|=(clut[table4bpp[c][4]]&7)<<16;
+                                lookuptab[c]|=(clut[table4bpp[c][6]]&7)<<24;
+                        }
+                        break;
+                        case 1:
+                        for (c=0;c<256;c++)
+                        {
+                                lookuptab[c]=clut[table4bpp[c][0]]&7;
+                                lookuptab[c]|=(clut[table4bpp[c][1]]&7)<<8;
+                                lookuptab[c]|=(clut[table4bpp[c][2]]&7)<<16;
+                                lookuptab[c]|=(clut[table4bpp[c][3]]&7)<<24;
+                        }
+                        break;
+                        case 2:
+                        for (c=0;c<256;c++)
+                        {
+                                lookuptab[c]=clut[table4bpp[c][0]]&7;
+                                lookuptab[c]|=(clut[table4bpp[c][0]]&7)<<8;
+                                lookuptab[c]|=(clut[table4bpp[c][1]]&7)<<16;
+                                lookuptab[c]|=(clut[table4bpp[c][1]]&7)<<24;
+                        }
+                        break;
                 }
-                break;
-                case 2:
-                for (c=0;c<256;c++)
-                {
-                        lookuptab[c]=clut[table4bpp[c][0]]&7;
-                        lookuptab[c]|=(clut[table4bpp[c][0]]&7)<<8;
-                        lookuptab[c]|=(clut[table4bpp[c][1]]&7)<<16;
-                        lookuptab[c]|=(clut[table4bpp[c][1]]&7)<<24;
-                }
-                break;
         }
 }
 
@@ -220,8 +282,8 @@ void dumpcrtc()
 {
         int c;
         initframe();
-//        printf("Start addr %04X\n",startaddr);
-//        for (c=0;c<17;c++) printf("%02X ",crtc[c]);
+        printf("Start addr %04X\n",startaddr);
+        for (c=0;c<17;c++) printf("%02X ",crtc[c]);
 }
 
 void resetcrtc()
@@ -241,22 +303,15 @@ void drawmode0line()
                 return;
         }
         hline(buffer,0,physline,xoffset,0);
-//        printf("line %i addr %04X\n",physline,addr);
-//        memset(buffer->line[physline],0,xoffset);
         for (x=0;x<crtc[1];x++)
         {
                 if (addr&0x8000) addr-=screenlen[scrsize];
                 val=ram[(addr&vidmask)|vidbank];
                 addr+=8;
                 ((unsigned long *)buffer->line[physline&511])[(xoffset>>2)&127]=lookuptab[val];
-//                buffer->line[physline&511][(xoffset)&511]=clut[table4bpp[val][0]]&7;
-//                buffer->line[physline&511][(xoffset+1)&511]=clut[table4bpp[val][2]]&7;
-//                buffer->line[physline&511][(xoffset+2)&511]=clut[table4bpp[val][4]]&7;
-//                buffer->line[physline&511][(xoffset+3)&511]=clut[table4bpp[val][6]]&7;
                 xoffset+=4;
         }
         hline(buffer,xoffset,physline,399,0);
-//        memset(buffer->line[physline]+xoffset,0,400-xoffset);
 }
 
 void drawmode1line()
@@ -270,21 +325,15 @@ void drawmode1line()
                 return;
         }
         hline(buffer,0,physline,xoffset,0);
-//        memset(buffer->line[physline],0,xoffset);
         for (x=0;x<crtc[1];x++)
         {
                 if (addr&0x8000) addr-=screenlen[scrsize];
                 val=ram[(addr&vidmask)|vidbank];
                 addr+=8;
                 ((unsigned long *)buffer->line[physline&511])[(xoffset>>2)&127]=lookuptab[val];
-//                buffer->line[physline&511][(xoffset)&511]=clut[table4bpp[val][0]]&7;
-//                buffer->line[physline&511][(xoffset+1)&511]=clut[table4bpp[val][1]]&7;
-//                buffer->line[physline&511][(xoffset+2)&511]=clut[table4bpp[val][2]]&7;
-//                buffer->line[physline&511][(xoffset+3)&511]=clut[table4bpp[val][3]]&7;
                 xoffset+=4;
         }
         hline(buffer,xoffset,physline,399,0);
-//        memset(buffer->line[physline]+xoffset,0,400-xoffset);
 }
 
 void drawmode2line()
@@ -298,19 +347,15 @@ void drawmode2line()
                 return;
         }
         hline(buffer,0,physline,xoffset,0);
-//        memset(buffer->line[physline],0,xoffset);
         for (x=0;x<crtc[1];x++)
         {
                 if (addr&0x8000) addr-=screenlen[scrsize];
                 val=ram[(addr&vidmask)|vidbank];
                 addr+=8;
                 ((unsigned long *)buffer->line[physline&511])[(xoffset>>2)&127]=lookuptab[val];
-//                buffer->line[physline&511][(xoffset)&511]=buffer->line[physline&511][(xoffset+1)&511]=clut[table4bpp[val][0]]&7;
-//                buffer->line[physline&511][(xoffset+2)&511]=buffer->line[physline&511][(xoffset+3)&511]=clut[table4bpp[val][1]]&7;
                 xoffset+=4;
         }
         hline(buffer,xoffset,physline,399,0);
-//        memset(buffer->line[physline]+xoffset,0,400-xoffset);
 }
 
 void drawmode4line()
@@ -324,8 +369,6 @@ void drawmode4line()
                 return;
         }
         hline(buffer,0,physline,xoffset,0);
-//        printf("line %i addr %04X\n",physline,addr);
-//        memset(buffer->line[physline],0,xoffset);
         for (x=0;x<crtc[1];x++)
         {
                 if (addr&0x8000) addr-=screenlen[scrsize];
@@ -342,7 +385,6 @@ void drawmode4line()
                 xoffset+=8;
         }
         hline(buffer,xoffset,physline,399,0);
-//        memset(buffer->line[physline]+xoffset,0,400-xoffset);
 }
 
 void drawmode5line()
@@ -356,7 +398,6 @@ void drawmode5line()
                 return;
         }
         hline(buffer,0,physline,xoffset,0);
-//        memset(buffer->line[physline],0,xoffset);
         for (x=0;x<crtc[1];x++)
         {
                 if (addr&0x8000) addr-=screenlen[scrsize];
@@ -369,7 +410,6 @@ void drawmode5line()
                 xoffset+=8;
         }
         hline(buffer,xoffset,physline,399,0);
-//        memset(buffer->line[physline]+xoffset,0,400-xoffset);
 }
 
 void drawmode8line()
@@ -383,7 +423,6 @@ void drawmode8line()
                 return;
         }
         hline(buffer,0,physline,xoffset,0);
-//        memset(buffer->line[physline],0,xoffset);
         for (x=0;x<crtc[1];x++)
         {
                 if (addr&0x8000) addr-=screenlen[scrsize];
@@ -396,7 +435,54 @@ void drawmode8line()
                 xoffset+=8;
         }
         hline(buffer,xoffset,physline,399,0);
-//        memset(buffer->line[physline]+xoffset,0,400-xoffset);
+}
+
+void drawmode2lineh()
+{
+        int addr=startaddr+sc,x;
+        unsigned char val;
+        int xoffset=200-(crtc[1]<<1);
+        if (sc&8)
+        {
+                hline(buffer,0,physline<<1,800,0);
+                return;
+        }
+        hline(buffer,0,physline<<1,xoffset<<1,0);
+        for (x=0;x<crtc[1];x++)
+        {
+                if (addr&0x8000) addr-=screenlen[scrsize];
+                val=ram[(addr&vidmask)|vidbank];
+                addr+=8;
+                ((unsigned long *)buffer->line[(physline&511)<<1])[(xoffset>>1)&255]=lookuptabh[val];
+                ((unsigned long *)buffer->line[(physline&511)<<1])[((xoffset>>1)+1)&255]=lookuptabh2[val];
+                xoffset+=4;
+        }
+        hline(buffer,xoffset<<1,physline<<1,799,0);
+}
+
+void drawmodelowlineh()
+{
+        int addr=startaddr+sc,x;
+        unsigned char val;
+        int xoffset=200-(crtc[1]<<2);
+        if (sc&8)
+        {
+                hline(buffer,0,physline<<1,800,0);
+                return;
+        }
+        hline(buffer,0,physline<<1,xoffset<<1,0);
+        for (x=0;x<crtc[1];x++)
+        {
+                if (addr&0x8000) addr-=screenlen[scrsize];
+                val=ram[(addr&vidmask)|vidbank];
+                addr+=8;
+                ((unsigned long *)buffer->line[(physline&511)<<1])[(xoffset>>1)&255]=lookuptabh[val];
+                ((unsigned long *)buffer->line[(physline&511)<<1])[((xoffset>>1)+1)&255]=lookuptabh2[val];
+                ((unsigned long *)buffer->line[(physline&511)<<1])[((xoffset>>1)+2)&255]=lookuptabh3[val];
+                ((unsigned long *)buffer->line[(physline&511)<<1])[((xoffset>>1)+3)&255]=lookuptabh4[val];
+                xoffset+=8;
+        }
+        hline(buffer,xoffset<<1,physline<<1,799,0);
 }
 
 int olddbl[64],dbl[64];
@@ -418,7 +504,8 @@ void drawteletextline()
                 }
         }
 //                memcpy(olddbl,dbl,sizeof(dbl));
-        hline(buffer,0,physline,xoffset,0);
+        if (hires==1) hline(buffer,0,physline<<1,xoffset<<1,0);
+        else          hline(buffer,0,physline,xoffset,0);
 //        memset(buffer->line[physline],0,xoffset);
 //        if (!sc) printf("addr %04X\n",(addr&vidmask)|vidbank);
         for (x=0;x<crtc[1];x++)
@@ -485,19 +572,43 @@ void drawteletextline()
                 temp2=colours[1];
                 if (flashing && !flash) colours[1]=colours[0];
 //                if (!sc) printf(" %i %i  %i\n",colours[0],colours[1],physline&511);
-                for (xx=0;xx<6;xx++)
+                if (hires==1)
                 {
-                        if (chrset[cr++])
-                           buffer->line[physline&511][(xoffset+xx)&511]=colours[1];
-                        else
-                           buffer->line[physline&511][(xoffset+xx)&511]=colours[0];
+                        for (xx=0;xx<6;xx++)
+                        {
+                                if (chrset[cr++])
+                                {
+                                        buffer->line[(physline&511)<<1][((xoffset+xx)&511)<<1]=colours[1];
+                                        buffer->line[(physline&511)<<1][(((xoffset+xx)&511)<<1)+1]=colours[1];
+                                }
+                                else
+                                {
+                                        buffer->line[(physline&511)<<1][((xoffset+xx)&511)<<1]=colours[0];
+                                        buffer->line[(physline&511)<<1][(((xoffset+xx)&511)<<1)+1]=colours[0];
+                                }
+                        }
+                }
+                else
+                {
+                        for (xx=0;xx<6;xx++)
+                        {
+                                if (!buffer)
+                                {
+                                        *(unsigned char *)(0)=1;
+                                }
+                                if (chrset[cr++])
+                                   buffer->line[physline&511][(xoffset+xx)&511]=colours[1];
+                                else
+                                   buffer->line[physline&511][(xoffset+xx)&511]=colours[0];
+                        }
                 }
                 colours[1]=temp2;
                 xoffset+=6;
                 addr++;
                 if (!sc) dbl[x]=dblhigh;
         }
-        hline(buffer,xoffset,physline,399,0);
+        if (hires==1) hline(buffer,xoffset<<1,physline<<1,799,0);
+        else       hline(buffer,xoffset,physline,399,0);
 //        memset(buffer->line[physline]+xoffset,0,400-xoffset);
 }
 
@@ -516,7 +627,10 @@ void drawcursor()
         tempy=temp/crtc[1];
 //        sprintf(st,"_");
         if (flash)
-           hline(buffer,(tempx*6)+xoffset+1,(tempy*10)+firstline+9,((tempx*6)+5)+xoffset,7);
+        {
+                if (hires==1) hline(buffer,((tempx*6)+xoffset+1)<<1,((tempy*10)+firstline+9)<<1,(((tempx*6)+5)+xoffset)<<1,7);
+                else       hline(buffer,(tempx*6)+xoffset+1,(tempy*10)+firstline+9,((tempx*6)+5)+xoffset,7);
+        }
 //           drawstring(b,font,tempx<<3,tempy<<3,st,15);
 }
 
@@ -538,7 +652,11 @@ void drawline(int line6502)
         if (!curline)
         {
                 sc=vc=0;
-                if (physline>15 && physline<300) memset(buffer->line[physline],0,400);
+                if (physline>0 && physline<300)
+                {
+                        if (hires==1) memset(buffer->line[physline<<1],0,800);
+                        else       memset(buffer->line[physline],0,400);
+                }
                 delaylcount=crtc[5];
         }
         if (delaylcount)//curline<crtc[5])
@@ -546,7 +664,11 @@ void drawline(int line6502)
                 delaylcount--;
                 curline++;
                 physline++;
-                if (physline>15 && physline<300) memset(buffer->line[physline],0,400);
+                if (physline>0 && physline<300)
+                {
+                        if (hires==1) memset(buffer->line[physline<<1],0,800);
+                        else       memset(buffer->line[physline],0,400);
+                }
                 return;
         }
         tline=curline-crtc[5];
@@ -556,28 +678,37 @@ void drawline(int line6502)
                 if (remakelookup) remaketab();
                 if ((crtc[8]&0x30)==0x30)
                 {
-                        if (physline>15 && physline<300)
-                           memset(buffer->line[physline],0,400);
+                        if (physline>0 && physline<300)
+                        {
+                                if (hires==1) memset(buffer->line[physline<<1],0,800);
+                                else       memset(buffer->line[physline],0,400);
+                        }
                 }
                 else
                 {
+//                        if (!vc) printf("%i %i : %04X %04X\n",vc,sc,((startaddr+sc)&vidmask)|vidbank,vidbank);
                         if (!firstline) firstline=physline;
                         switch (bbcmode)
                         {
                                 case 0:
-                                drawmode0line();
+                                if (hires==1) drawmode2lineh();
+                                else       drawmode0line();
                                 break;
                                 case 1:
-                                drawmode1line();
+                                if (hires==1) drawmode2lineh();
+                                else       drawmode1line();
                                 break;
                                 case 2:
-                                drawmode2line();
+                                if (hires==1) drawmode2lineh();
+                                else       drawmode2line();
                                 break;
                                 case 4:
-                                drawmode4line();
+                                if (hires==1) drawmodelowlineh();
+                                else       drawmode4line();
                                 break;
                                 case 5:
-                                drawmode5line();
+                                if (hires==1) drawmodelowlineh();
+                                else       drawmode5line();
                                 break;
                                 case 7:
                                 sc6=sc*6;
@@ -602,7 +733,11 @@ void drawline(int line6502)
         }
         else
         {
-                if (physline>15 && physline<300) memset(buffer->line[physline],0,400);
+                if (physline>15 && physline<300)
+                {
+                        if (hires==1) memset(buffer->line[physline<<1],0,800);
+                        else          memset(buffer->line[physline],0,400);
+                }
                 sc++;
                 if (sc==crtc[9]+1 || ((sc==(crtc[9]>>1)+1) && crtc[8]&2))
                 {
@@ -613,7 +748,7 @@ void drawline(int line6502)
         curline++;
         physline++;
         linesdrawn++;
-        if (vc==crtc[7] && sc==3)
+        if (vc==crtc[7] && (sc==((crtc[5]==4)?1:3)))
         {
                 vblankint();
 //                printf("Framefly %i\n",lns);
@@ -623,22 +758,46 @@ void drawline(int line6502)
                 if (bbcmode==7)
                    drawcursor();
                 firstline=0;
-//                trysoundupdate2();
-                if (blurred)
+                if (hires==1)
                 {
-                        for (y=16;y<300;y++)
+                        if (blurred)
                         {
-                                buffer2->line[y][0]=buffer->line[y][0];
-                                for (x=1;x<400;x++)
+                                for (y=16;y<300;y++)
                                 {
-                                        buffer2->line[y][x]=128+buffer->line[y][x]+(buffer->line[y][x-1]<<3);
+                                        buffer2->line[y<<1][0]=buffer->line[y<<1][0];
+                                        for (x=1;x<400;x++)
+                                        {
+                                                buffer2->line[y<<1][x<<1]=buffer2->line[y<<1][(x<<1)+1]=128+buffer->line[y<<1][x<<1]+(buffer->line[y<<1][(x-1)<<1]<<3);
+                                        }
                                 }
+                                blit(buffer2,screen,0,32,0,16,800,568);
                         }
-                        blit(buffer2,screen,0,16,0,0,400,284);
+                        else
+                           blit(buffer,screen,0,32,0,16,800,568);
+                }
+                else if (hires==2)
+                {
+                        blit(buffer,buf16,0,16,0,0,400,284);
+                        Super2xSaI(buf16,buf162,0,0,0,0,800,568);
+                        blit(buf162,screen,0,0,0,16,800,568);
                 }
                 else
-                   blit(buffer,screen,0,16,0,0,400,284);
-//                trysoundupdate2();
+                {
+                        if (blurred)
+                        {
+                                for (y=16;y<300;y++)
+                                {
+                                        buffer2->line[y][0]=buffer->line[y][0];
+                                        for (x=1;x<400;x++)
+                                        {
+                                                buffer2->line[y][x]=128+buffer->line[y][x]+(buffer->line[y][x-1]<<3);
+                                        }
+                                }
+                                blit(buffer2,screen,0,16,0,0,400,284);
+                        }
+                        else
+                           blit(buffer,screen,0,16,0,0,400,284);
+                }
                 flashint++;
                 if (flash && flashint==35)
                    flashint=flash=0;
@@ -665,20 +824,6 @@ void drawline(int line6502)
                         curline=0;
 //                        waitforsync();
                         frames++;
-                }
-        }
-}
-
-void drawscr()
-{
-        int x,y;
-        unsigned short addr=0x7C00;
-        _farsetsel(_dos_ds);
-        for (y=0;y<25;y++)
-        {
-                for (x=0;x<40;x++)
-                {
-                        _farnspokeb(0xB8000+(x<<1)+(y*160),ram[addr++]);
                 }
         }
 }
@@ -735,19 +880,55 @@ void updatepalette()
         else      set_palette(beebpal);
 }
 
+void updategfxmode()
+{
+        if (hires==2) set_color_depth(16);
+        else          set_color_depth(8);
+        if (fullscreen)
+        {
+                if (hires) set_gfx_mode(GFX_AUTODETECT_FULLSCREEN,800,600,0,0);
+                else       set_gfx_mode(GFX_AUTODETECT_FULLSCREEN,400,300,0,0);
+        }
+        else
+        {
+                if (hires) set_gfx_mode(GFX_AUTODETECT_WINDOWED,800,600,0,0);
+                else       set_gfx_mode(GFX_AUTODETECT_WINDOWED,400,300,0,0);
+        }
+        if (mono) set_palette(monopal);
+        else      set_palette(beebpal);
+        clear(buffer);
+}
+
 void initvideo()
 {
         int c;
+        Init_2xSaI(16);
         for (c=8;c<256;c++)
             beebpal[c]=beebpal[c&7];
         for (c=8;c<256;c++)
             monopal[c]=monopal[c&7];
         genpal();
-        buffer=create_bitmap(512,700);
-        buffer2=create_bitmap(404,304);
+        buffer=create_bitmap(1024,1024);
+        buffer2=create_bitmap(808,608);
+        set_color_depth(16);
+        buf16=create_bitmap(400,284);
+        buf162=create_bitmap(800,568);
+        set_color_depth(8);
         clear(buffer);
         clear(buffer2);
-        set_gfx_mode(GFX_AUTODETECT,400,300,0,0);
+        clear(buf16);
+        clear(buf162);
+        if (hires==2) set_color_depth(16);
+        if (fullscreen)
+        {
+                if (hires) set_gfx_mode(GFX_AUTODETECT_FULLSCREEN,800,600,0,0);
+                else       set_gfx_mode(GFX_AUTODETECT_FULLSCREEN,400,300,0,0);
+        }
+        else
+        {
+                if (hires) set_gfx_mode(GFX_AUTODETECT_WINDOWED,800,600,0,0);
+                else       set_gfx_mode(GFX_AUTODETECT_WINDOWED,400,300,0,0);
+        }
         for (c=0;c<128;c++)
             multable[c]=c*60;
         maketable2();
@@ -798,4 +979,12 @@ void scrshot(char *fn)
 {
         if (mono) save_bitmap(fn,buffer,monopal);
         else      save_bitmap(fn,buffer,beebpal);
+}
+
+void savebuffers()
+{
+        save_bitmap("buffer.bmp",buffer,beebpal);
+        save_bitmap("buffer2.bmp",buffer2,beebpal);
+        save_bitmap("buf16.bmp",buf16,beebpal);
+        save_bitmap("buf162.bmp",buf162,beebpal);
 }

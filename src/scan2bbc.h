@@ -25,10 +25,10 @@ unsigned char scan2bbc[128]=              // IBM      SCAN CODE            BBC
                         0x75,0x16,                                                      // f7,f8        65,66
                         0x76,0x77,0xAA,                                                 // f9,f10   67,68,69
                         0xAA,                            //                     70
-                        0x01,0x39,0xAA,0xAA,                                    //      hme upA pgu     min     71,72,73,74
+                        0xAA,0x39,0xAA,0xAA,                                    //      hme upA pgu     min     71,72,73,74
                 0x19,0xaa,0x79,0xaa,                                    //      lft mid rgt plu 74,75,76,77
                 0x69,0x29,0xaa,                                         //      end dna pgd                     78,79,80
-                0x40,0x59,                                                              //      ins del ...                     81,82,83
+                0xAA,0x59,                                                              //      ins del ...                     81,82,83
                 0xAA,0xAA,                                                              //                              84,85
                 0xAA,                                                                           //                              86
                         0x28,0xaa,                                                              // f11,f12      87,88                                   --,BRK

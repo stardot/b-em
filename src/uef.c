@@ -51,7 +51,7 @@ void polltape()
       if (!inchunk)
       {
             gzread(uef,&chunkid,2);
-            printf("Chunk %03X\n",chunkid);
+//            printf("Chunk %03X\n",chunkid);
             gzread(uef,&chunklen,4);
             if (gzeof(uef))
             {

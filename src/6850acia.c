@@ -134,20 +134,14 @@ void receive(unsigned char val) /*Called when the acia recives some data*/
 
 void pollacia()
 {
-//        printf("Motor status %i\n",motor);
         if (motor)
         {
                 if (dreg)
                 {
-//                        printf("dreg\n");
                         aciasr|=RECIEVE|0x80;
                         updateaciaint();
                 }
                 else
-                {
-                        polltape();
-//                        printf("Polling tape\n");
-                }
-
+                   polltape();
         }
 }

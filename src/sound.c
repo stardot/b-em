@@ -8,8 +8,15 @@ void dumpsound();
 #include <stdio.h>
 #include "sound.h"
 
+float volslog[16]=
+{
+        0.00000f,0.59715f,0.75180f,0.94650f,
+        1.19145f,1.50000f,1.88835f,2.37735f,
+        2.99295f,3.76785f,4.74345f,5.97165f,
+        7.51785f,9.46440f,11.9194f,15.0000f
+};
+
 FILE *soundf;
-FILE *snlog2;
 //FILE *slog;
 AUDIOSTREAM *as;
 #define SNCLOCK (4000000>>5)
@@ -22,7 +29,7 @@ FILE *biglog;
 int soundwave;
 int us;
 int logging=0;
-FILE *snlog;
+FILE *snlog,*snlog2;
 unsigned char snfreqhi[4],snfreqlo[4];
 unsigned char snvol[4];
 unsigned char snnoise;
@@ -80,19 +87,14 @@ static unsigned char snnoises[NOISEBUFFER];
 
 fixed sncount[4],snlatch[4],snstat[4];
 int sntone[4];
-int snvols[312][4],snvols2[312][4];
-
-void copyvols()
-{
-        memcpy(snvols,snvols2,sizeof(snvols));
-}
+int snvols[312][4];
 
 void logvols(int line)
 {
-        snvols2[311-line][0]=snvol[0];
-        snvols2[311-line][1]=snvol[1];
-        snvols2[311-line][2]=snvol[2];
-        snvols2[311-line][3]=snvol[3];
+        snvols[311-line][0]=snvol[0];
+        snvols[311-line][1]=snvol[1];
+        snvols[311-line][2]=snvol[2];
+        snvols[311-line][3]=snvol[3];
 }
 
 void drawsound(BITMAP *b)
@@ -104,23 +106,21 @@ void drawsound(BITMAP *b)
 
 signed short lastbuffer[2]={0,0};
 
-signed short sndbuf[624*16];
-
 void updatebuffer(signed short *buffer, int len)
 {
         int c,d,diff[1024];
         unsigned char oldlast[4];
         float tempf;
-        unsigned short *sbuf=sndbuf;
-        for (c=0;c<len;c++) buffer[c]=sndbuf[c];
-        free_audio_stream_buffer(as);
+        unsigned short *sbuf=buffer;
         for (d=0;d<len;d++)
         {
-                sndbuf[d]=0;
+//                printf("Latch : %i %i %i\n",snlatch[1],snlatch[2],snlatch[3]);
+                buffer[d]=0;
                 for (c=0;c<3;c++)
                 {
                         c++;
-                        sndbuf[d]+=(snwaves[curwave][snstat[c]]*snvols[d>>1][c]);
+                        if (snlatch[c]>256) buffer[d]+=(snwaves[curwave][snstat[c]]*volslog[snvols[d>>1][c]]);
+                        else                buffer[d]+=volslog[snvols[d>>1][c]]*128;
                         sncount[c]-=8192;
                         while ((int)sncount[c]<0)
                         {
@@ -130,8 +130,8 @@ void updatebuffer(signed short *buffer, int len)
                         }
                         c--;
                 }
-                if (!(snnoise&4)) sndbuf[d]+=(snperiodic[snstat[0]]*snvols[d>>1][0]);
-                else              sndbuf[d]+=(snnoises[snstat[0]]*snvols[d>>1][0]);
+                if (!(snnoise&4)) buffer[d]+=(snperiodic[snstat[0]]*volslog[snvols[d>>1][0]]);
+                else              buffer[d]+=(snnoises[snstat[0]]*volslog[snvols[d>>1][0]]);
                 sncount[0]-=512;
                 while ((int)sncount[0]<0)
                 {
@@ -140,9 +140,9 @@ void updatebuffer(signed short *buffer, int len)
                         snstat[0]&=32767;
                 }
                 if (soundfilter) tempf=(float)lastbuffer[0]*((float)11/(float)16);
-                if (soundfilter) sndbuf[d]+=tempf;
+                if (soundfilter) buffer[d]+=tempf;
                 lastbuffer[1]=lastbuffer[0];
-                lastbuffer[0]=sndbuf[d];
+                lastbuffer[0]=buffer[d];
         }
         for (d=0;d<len;d++) sbuf[d]^=0x8000;
 }
@@ -151,13 +151,21 @@ void initsnd()
 {
       int c;
       FILE *f;
+/*      for (c=0;c<32;c++)
+      {
+                snwaves[3][c]=fsin((c<<2)<<16)>>8;
+                printf("%i=%i\n",c,fsin((c<<2)<<16)>>8);
+      }*/
+//      if (soundon)
+//      {
+//        atexit(dumpsound);
+//          soundf=fopen("sound.pcm","wb");
       reserve_voices(8,0);
       if (install_sound(DIGI_AUTODETECT,MIDI_NONE,0))
       {
                 soundon=0;
                 return;
       }
-//      soundf=fopen("sound.pcm","wb");
       soundiniteded=1;
       f=fopen("sn76489.dat","rb");
       fread(snnoises,32768,1,f);
@@ -169,8 +177,25 @@ void initsnd()
       for (c=0;c<32;c++)
           snwaves[3][c]-=128;
         as=play_audio_stream(624,16,0,31250,255,127);
-        snlatch[0]=snlatch[1]=snlatch[2]=snlatch[3]=0xFFFFF;
-        soundinited=1;
+/*            for (c=1;c<4;c++)
+            {
+                  snsample[c]=create_sample(8,0,320,32);
+                  if (snsample[c])
+                     memcpy(snsample[c]->data,snwaves[soundwave],32);
+                  else
+                     exit(-1);
+//                  play_sample(snsample[c],(soundinited)?0:63,127,(SNCLOCK/0x3FF)*100,TRUE);
+            }
+                  snsample[0]=create_sample(8,0,160,NOISEBUFFER);
+                  if (snsample[0])
+                     memcpy(snsample[0]->data,snperiodic,NOISEBUFFER);
+                  else
+                     exit(-1);
+//                  play_sample(snsample[0],(soundinited)?0:127,127,100*100,TRUE);*/
+      snlatch[0]=snlatch[1]=snlatch[2]=snlatch[3]=0xFFFFF;
+      soundinited=1;
+//      }
+//      slog=fopen("slog.pcm","wb");
 }
 
 void resetsound()
@@ -233,8 +258,8 @@ unsigned char firstdat;
 unsigned char lastdat;
 void soundwrite(unsigned char data)
 {
-      int freq;
-      int c;
+        int freq;
+        int c;
         if (logging && vgmpos!=1024 && data!=lastdat)
         {
                 vgmdat[vgmpos++]=0x50;

@@ -6,7 +6,6 @@ unsigned short pc;
 #include <stdio.h>
 #include "b-em.h"
 
-void updatekeyboard();
 unsigned char *ram;
 void dumpram2()
 {
@@ -125,6 +124,7 @@ void savecmos()
 void writeIC32(unsigned char val)
 {
         unsigned char oldIC32=IC32;
+        int temp=0;
         if (val&8)
            IC32|=(1<<(val&7));
         else
@@ -134,6 +134,12 @@ void writeIC32(unsigned char val)
            updatekeyboard();
         if (!(IC32&1))
            soundwrite(sdbval);
+        if ((IC32&192)!=(oldIC32&192))
+        {
+                if (!(IC32&64)) temp|=KB_CAPSLOCK_FLAG;
+                if (!(IC32&128)) temp|=KB_SCROLOCK_FLAG;
+//                set_leds(temp);
+        }
         if (model==7)
         {
                 cmosrw=IC32&2;
@@ -274,10 +280,7 @@ unsigned char readsysvia(unsigned short addr)
                 {
                         temp&=0x7F;
                         if (bbckey[keycol][keyrow])
-                        {
-//                                printf("Key col %i row %i down\n",keycol,keyrow);
-                                return temp|0x80;
-                        }
+                           return temp|0x80;
                 }
                 return temp;
 
@@ -351,12 +354,12 @@ unsigned char codeconvert[128]=
         60,61,62,63,64,65,66,67,
         68,87,88,1,41,12,13,14,
         15,26,27,28,39,40,43,86,
-        51,52,53,57,81,83,0,79,
+        51,52,53,57,0,83,0,79,
         0,0,75,77,72,80,0,55,
         74,78,83,0,84,0,115,125,
         112,121,123,42,54,29,0,56,
-        0,91,92,93,70,69,58,0,
-        0,0,0,0,0,0,58,0,
+        0,91,92,56,70,69,58,0,
+        0,0,58,0,0,0,0,0,
         0,0,0,0,0,0,0,0,
 };
 
@@ -398,6 +401,7 @@ void checkkeys()
                 {
                         if (TranslateKey(codeconvert[c],&row,&col)>0)
                         {
+//                                printf("%i - %i,%i\n",c,row,col);
                                 if (key[c])
                                    presskey(row,col);
                                 else
@@ -405,6 +409,10 @@ void checkkeys()
                         }
                 }
         }
+//        if (key[KEY_CAPSLOCK])
+//           presskey(1,0);
+//        else
+//           releasekey(1,0);
         if (key[KEY_RSHIFT]||key[KEY_LSHIFT])
            presskey(0,0);
         else
@@ -413,10 +421,6 @@ void checkkeys()
            presskey(0,1);
         else
            releasekey(0,1);
-        if (key[KEY_CAPSLOCK])
-           presskey(4,0);
-        else
-           releasekey(4,0);
         for (c=0;c<128;c++)
             keys2[c]=key[c];
 }
@@ -460,5 +464,4 @@ void initDIPS(unsigned char dips)
                    releasekey(0,c);
                 dips>>=1;
         }
-        keysdown=0;
 }

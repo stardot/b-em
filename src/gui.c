@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <allegro.h>
 
+int fullscreen=0;
+int hires;
 int soundfilter;
 AUDIOSTREAM *as;
 char uefname[260]="test.uef";
@@ -28,6 +30,8 @@ void save_config()
         fputc(mono,f);
         fputc(uefena,f);
         fputc(soundfilter,f);
+        fputc(hires,f);
+        fputc(fullscreen,f);
         fwrite(discname[0],260,1,f);
         fwrite(discname[1],260,1,f);
         fwrite(uefname,260,1,f);
@@ -45,6 +49,8 @@ void load_config()
         mono=getc(f);
         uefena=getc(f);
         soundfilter=getc(f);
+        hires=getc(f);
+        fullscreen=getc(f);
         fread(discname[0],260,1,f);
         fread(discname[1],260,1,f);
         fread(uefname,260,1,f);
@@ -73,8 +79,9 @@ int gui_changedisc0()
 {
         char tempname[260];
         int ret,c;
+        int xsize=(hires)?768:384,ysize=(hires)?384:192;
         memcpy(tempname,discname[0],260);
-        ret=file_select_ex("Please choose a disc image",tempname,"SSD;DSD;IMG;ADF;ADL",260,384,192);
+        ret=file_select_ex("Please choose a disc image",tempname,"SSD;DSD;IMG;ADF;ADL",260,xsize,ysize);
         if (ret)
         {
                 checkdiscchanged(0);
@@ -101,8 +108,9 @@ int gui_changedisc1()
 {
         char tempname[260];
         int ret,c;
+        int xsize=(hires)?768:384,ysize=(hires)?384:192;
         memcpy(tempname,discname[1],260);
-        ret=file_select_ex("Please choose a disc image",tempname,"SSD;DSD;IMG;ADF;ADL",260,384,192);
+        ret=file_select_ex("Please choose a disc image",tempname,"SSD;DSD;IMG;ADF;ADL",260,xsize,ysize);
         if (ret)
         {
                 checkdiscchanged(1);
@@ -149,8 +157,9 @@ int changetape()
 {
         char tempname[260];
         int ret;
+        int xsize=(hires)?768:384,ysize=(hires)?384:192;
         memcpy(tempname,uefname,260);
-        ret=file_select_ex("Please choose a tape image",tempname,"UEF",260,384,192);
+        ret=file_select_ex("Please choose a tape image",tempname,"UEF",260,xsize,ysize);
         if (ret)
         {
                 memcpy(uefname,tempname,260);
@@ -234,7 +243,7 @@ int mpalb()
         resetuservia();
         memset(ram,0,32768);
         for (c=0;c<8;c++) modelmenu[c].flags=0;
-        modelmenu[2].flags=D_SELECTED;
+        modelmenu[1].flags=D_SELECTED;
         return D_EXIT;
 }
 
@@ -251,7 +260,7 @@ int mntscb()
         resetuservia();
         memset(ram,0,32768);
         for (c=0;c<8;c++) modelmenu[c].flags=0;
-        modelmenu[3].flags=D_SELECTED;
+        modelmenu[2].flags=D_SELECTED;
         return D_EXIT;
 }
 
@@ -268,7 +277,7 @@ int mpalbp()
         resetuservia();
         memset(ram,0,65536);
         for (c=0;c<8;c++) modelmenu[c].flags=0;
-        modelmenu[4].flags=D_SELECTED;
+        modelmenu[3].flags=D_SELECTED;
         return D_EXIT;
 }
 
@@ -285,7 +294,7 @@ int mpalbp96()
         resetuservia();
         memset(ram,0,65536);
         for (c=0;c<8;c++) modelmenu[c].flags=0;
-        modelmenu[5].flags=D_SELECTED;
+        modelmenu[4].flags=D_SELECTED;
         return D_EXIT;
 }
 
@@ -302,7 +311,7 @@ int mpalbp128()
         resetuservia();
         memset(ram,0,65536);
         for (c=0;c<8;c++) modelmenu[c].flags=0;
-        modelmenu[6].flags=D_SELECTED;
+        modelmenu[5].flags=D_SELECTED;
         return D_EXIT;
 }
 
@@ -319,14 +328,14 @@ int mpalm128()
         resetuservia();
         memset(ram,0,65536);
         for (c=0;c<8;c++) modelmenu[c].flags=0;
-        modelmenu[7].flags=D_SELECTED;
+        modelmenu[6].flags=D_SELECTED;
         return D_EXIT;
 }
 
 MENU modelmenu[]=
 {
         {"PAL A",mpala,NULL,NULL,NULL},
-        {"NTSC A",mntsca,NULL,NULL,NULL},
+//        {"NTSC A",mntsca,NULL,NULL,NULL},
         {"PAL B",mpalb,NULL,NULL,NULL},
         {"NTSC B",mntscb,NULL,NULL,NULL},
         {"PAL B+",mpalbp,NULL,NULL,NULL},
@@ -338,25 +347,79 @@ MENU modelmenu[]=
 
 MENU videomenu[3];
 
+int mlow()
+{
+        hires=0;
+        fullscreen=0;
+        return D_EXIT;
+}
+
+int mhigh()
+{
+        hires=1;
+        fullscreen=0;
+        return D_EXIT;
+}
+
+int m2x()
+{
+        hires=2;
+        fullscreen=0;
+        return D_EXIT;
+}
+
+int mlowf()
+{
+        hires=0;
+        fullscreen=1;
+        return D_EXIT;
+}
+
+int mhighf()
+{
+        hires=1;
+        fullscreen=1;
+        return D_EXIT;
+}
+
+int m2xf()
+{
+        hires=2;
+        fullscreen=1;
+        return D_EXIT;
+}
+
+MENU modemenu[7]=
+{
+        {"&400x300 windowed",mlow,NULL,NULL,NULL},
+        {"&800x600 windowed",mhigh,NULL,NULL,NULL},
+        {"&800x600 windowed with 2xSaI",m2x,NULL,NULL,NULL},
+        {"&400x300 fullscreen",mlowf,NULL,NULL,NULL},
+        {"&800x600 fullscreen",mhighf,NULL,NULL,NULL},
+        {"&800x600 fullscreen with 2xSaI",m2xf,NULL,NULL,NULL},
+        {NULL,NULL,NULL,NULL,NULL}
+};
+
 int blurfilter()
 {
         blurred^=1;
-        if (blurred) videomenu[0].flags=D_SELECTED;
-        else         videomenu[0].flags=0;
+        if (blurred) videomenu[1].flags=D_SELECTED;
+        else         videomenu[1].flags=0;
         return D_EXIT;
 }
 
 int monochrome()
 {
         mono^=1;
-        if (mono) videomenu[1].flags=D_SELECTED;
-        else      videomenu[1].flags=0;
+        if (mono) videomenu[2].flags=D_SELECTED;
+        else      videomenu[2].flags=0;
         updatepalette();
         return D_EXIT;
 }
 
 MENU videomenu[]=
 {
+        {"&Video mode",NULL,modemenu,NULL,NULL},
         {"&Blur filter",blurfilter,NULL,NULL,NULL},
         {"&Monochrome",monochrome,NULL,NULL,NULL},
         {NULL,NULL,NULL,NULL,NULL}
@@ -427,7 +490,8 @@ int startlog()
 {
         char tempname[260]="";
         int ret;
-        ret=file_select_ex("Please enter a file name",tempname,"VGM",260,384,192);
+        int xsize=(hires)?768:384,ysize=(hires)?384:192;
+        ret=file_select_ex("Please enter a file name",tempname,"VGM",260,xsize,ysize);
         if (ret)
            startsnlog(tempname);
         return D_EXIT;
@@ -488,7 +552,8 @@ int calib2()
 int mscrshot()
 {
         char fn[260];
-        if (file_select_ex("Enter a file name",fn,"BMP;PCX;TGA;LBM",260,384,192))
+        int xsize=(hires)?768:384,ysize=(hires)?384:192;
+        if (file_select_ex("Enter a file name",fn,"BMP;PCX;TGA;LBM",260,xsize,ysize))
         {
                 restorepal();
                 scrshot(fn);
@@ -519,7 +584,7 @@ MENU mainmenu[]=
 
 DIALOG bemgui[]=
 {
-      {d_ctext_proc, 200, 260, 0,  0, 15,0,0,0,     0,0,"B-em v0.7"},
+      {d_ctext_proc, 200, 260, 0,  0, 15,0,0,0,     0,0,"B-em v0.71"},
       {d_menu_proc,  0,   0,   0,  0, 15,0,0,0,     0,0,mainmenu},
       {0,0,0,0,0,0,0,0,0,0,0,NULL,NULL,NULL}
 };
@@ -529,14 +594,15 @@ BITMAP *mouse,*_mouse_sprite;
 void entergui()
 {
         int x,y;
+        int oldhires=hires,oldfs=fullscreen;
         DIALOG_PLAYER *dp;
         fadepal();
         if (uefena) tapemenu[2].flags=D_SELECTED;
         else        tapemenu[2].flags=0;
-        if (blurred) videomenu[0].flags=D_SELECTED;
-        else         videomenu[0].flags=0;
-        if (mono) videomenu[1].flags=D_SELECTED;
-        else      videomenu[1].flags=0;
+        if (blurred) videomenu[1].flags=D_SELECTED;
+        else         videomenu[1].flags=0;
+        if (mono) videomenu[2].flags=D_SELECTED;
+        else      videomenu[2].flags=0;
         if (ddnoise) discmenu[2].flags=D_SELECTED;
         else         discmenu[2].flags=0;
         if (soundon) soundmenu[0].flags=D_SELECTED;
@@ -544,42 +610,25 @@ void entergui()
         if (soundfilter) soundmenu[1].flags=D_SELECTED;
         else             soundmenu[1].flags=0;
         modelmenu[0].flags=modelmenu[1].flags=modelmenu[2].flags=modelmenu[3].flags=modelmenu[4].flags=modelmenu[5].flags=modelmenu[6].flags=0;
-        modelmenu[model].flags=D_SELECTED;
-//        if (model==0) modelmenu[0].flags=D_SELECTED;
-//        if (model==1) modelmenu[1].flags=D_SELECTED;
-//        if (model==2) modelmenu[2].flags=D_SELECTED;
+        modelmenu[(model)?(model-1):0].flags=D_SELECTED;
+        modemenu[0].flags=modemenu[1].flags=modemenu[2].flags=0;
+        modemenu[3].flags=modemenu[4].flags=modemenu[5].flags=0;
+        modemenu[hires+((fullscreen)?3:0)].flags=D_SELECTED;
         wavemenu[0].flags=wavemenu[1].flags=wavemenu[2].flags=wavemenu[3].flags=0;
         wavemenu[curwave].flags=D_SELECTED;
-/*        if (!mouse)
-        {
-                mouse=create_bitmap(10,16);
-                for (y=0;y<16;y++)
-                {
-                        for (x=0;x<10;x++)
-                        {
-                                switch (getpixel(_mouse_sprite,x,y))
-                                {
-                                        case 0:
-                                        putpixel(mouse,x,y,0);
-                                        break;
-                                        case 16:
-                                        putpixel(mouse,x,y,15);
-                                        break;
-                                        case 255:
-                                        putpixel(mouse,x,y,0);
-                                        break;
-                                }
-                        }
-                }
-                set_mouse_sprite(mouse);
-        }*/
-        gui_fg_color=15;
+        set_mouse_sprite(NULL);
+        gui_fg_color=makecol(255,255,255); gui_bg_color=makecol(0,0,0);
+        bemgui[0].fg=makecol(255,255,255);
         clear_keybuf();
         if (soundon) stop_audio_stream(as);
         x=1;
+        if (hires) { bemgui[0].x=400; bemgui[0].y=560; }
+        else       { bemgui[0].x=200; bemgui[0].y=260; }
+        if (hires) set_mouse_range(0,0,799,599);
+        else       set_mouse_range(0,0,399,299);
         dp=init_dialog(bemgui,0);
         show_mouse(screen);
-        while (x && !key[KEY_F11] && !(mouse_b&2))
+        while (x && !key[KEY_F11] && !(mouse_b&2) && !key[KEY_ESC])
         {
                 x=update_dialog(dp);
         }
@@ -587,7 +636,6 @@ void entergui()
         shutdown_dialog(dp);
         while ((mouse_b&2) || key[KEY_F11] || key[KEY_ESC]) yield_timeslice();
         if (soundon) as=play_audio_stream(624,16,0,31250,255,127);
-//        do_menu(mainmenu,0,0);
         clear_keybuf();
         restorepal();
         if (rewnd)
@@ -595,4 +643,6 @@ void entergui()
                 rewindit();
                 rewnd=0;
         }
+        if (hires!=oldhires || fullscreen!=oldfs) updategfxmode();
+        clear(screen);
 }

@@ -6,7 +6,7 @@
              ██       ▄██          ██         ██          ██
              ██████████▀           █████████  ██          ██
 
-                                 Version 0.7
+                                 Version 0.71
                          A freeware BBC Micro emulator
 
 Introduction
@@ -33,15 +33,13 @@ Features
 Differences from last version
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- Master 128 emulation (buggy)
-- Better video timing, Uridium works
-- VIA interrupt bug fixed, many games better
-- Interrupt bug fixed, Empire Strikes Back now working
-- Disc write (B+ and Master 128 only)
-- Sound mixing now 16 bit
-- Low pass filter for sound
-- Improved disc drive noise
-- More reliable tape emulation
+- Stupid bug in Master 128 fixed - most Master stuff should work now
+- High resolution video now supported
+- 2xSaI filter
+- Bugs fixed in CRTC, Uridium and Psycastria now look better
+- Sound volume now logarithmic
+- Couple of other bug fixes
+- Win32 port can now run in a window
 
 
 Requirements
@@ -49,8 +47,8 @@ Requirements
 
 B-Em (bbc model B EMulator), requires the following :
 
-A Pentium or better computer (try a P233 at least)
-16mb RAM (?)
+A Pentium or better computer (try a P2-350 at least)
+16mb RAM (probably more)
 
 Eight ROM images are provided with B-em -
 os           - UK BBC MOS
@@ -68,66 +66,24 @@ If you want to use more paged ROMs, put them in the roms directory, in either
 directory B or BP.
 
 
+Notes
+~~~~~
+
+You can save to disc, but not in model A&B modes. You can use the .INF filing
+system (disable tape), but _only_ in model A&B modes (and only in PAL).
+
+400x300 mode doesn't work on some machines. If you end up with a bad display,
+hit CTRL-ALT-END to kill it.
+
+Sound is generally better in a window, but only if your machine is fast enough.
+
 Known bugs
 ~~~~~~~~~~
 
-Master 128 has various bugs
-TFS only works on PAL models A and B AFAIK
+INF filing system only works on PAL models A and B AFAIK
 ADFS corrupts on COMPACT command
 Formatting not supported
 UEF has problems on some games
-
-
-Hardware emulated
-~~~~~~~~~~~~~~~~~
-
-The 6502 processor - Most instructions should be emulated. Attempts to be cycle
-                     perfect. 65C02 is emulated for Master 128 mode, but is
-                     probably missing some opcodes.
-The 6845 CRTC      - Accurate line-by-line engine. Firetrack, Revs, and
-                     Uridium all work.
-The Video ULA      - All modes emulated.
-The System VIA     - Keyboard and sound emulated.
-The User VIA       - Emulated.
-8271 FDC           - Double disc, double sided, 40/80 tracks, read only. With
-                     authentic noise. Only in model B mode.
-1770 FDC           - Double disc, double sided, 40/80 tracks, read/write. With
-                     authentic noise. Only in model B+ and Master 128 mode.
-tape filing system - Supports .inf and __CATALOG__ format.
-Sound              - All channels emulated, with sample support and some
-                     undocumented behaviour (Crazee Rider). With optional low
-                     pass filter.
-ADC                - Real joystick emulation, supporting both joysticks.
-
-
-Hardware NOT emulated
-~~~~~~~~~~~~~~~~~~~~~
-
-serial port
-AMX mouse
-Tube
-Econet
-Printer
-
-
-Running :
-~~~~~~~~~
-
-When you type b-em, you get the standard start-up text -
-
-BBC Computer 32K
-Watford DFS 1.30
-BASIC
->_
-
-or
-
-Acorn OS 128k
-Acorn 1770 DFS
-BASIC
->_
-
-or some other variation.
 
 
 Keyboard mapping :
@@ -162,11 +118,10 @@ The options are :
 
 File :
         Return - return to emulator.
-        Exit   - exit to Windows.
+        Exit   - exit to DOS/Windows/whatever.
 
 Model :
         PAL A          - emulate a PAL model A.
-        NTSC A         - emulate an NTSC model A.
         PAL B          - emulate a PAL model B.
         NTSC B         - emulate an NTSC model B.
         PAL B+         - emulate a PAL model B+ with 64k RAM.
@@ -185,6 +140,9 @@ Tape :
         Tape enable - enables the UEF support, but disables the INF support.
 
 Video :
+        Video mode  - choose windowed or fullscreen, 400x300 or 800x600, and
+                      with or without 2xSaI filter. 400x300 is by far the
+                      fastest, but won't work on some machines.
         Blur filter - enable a blurring filter. Can make games with hi-res
                       dithering look better.
         Monochrome  - disables colour.
@@ -202,33 +160,29 @@ Misc options :
         Save screenshot      - saves screenshot in BMP,PCX, or TGA format.
 
 
-Tape emulation :
-~~~~~~~~~~~~~~~~
-
-Currently, *TAPE can select one of two filing systems, depending on the tape
-enable option in the GUI.
-
-The first is the old .INF/__CATALOG__ FS. This always loads from the INF
-directory, and is the format used by all the files at The BBC Lives!. This
-patches into the OS to take over tape handling.
-
-The second is the new UEF emulation. This is more accurate, as it emulates the
-tape hardware. However, it is much slower, read only, and has some bugs.
-
-
 FAQ :
 ~~~~~
 
-Q : Why doesn't B-em look right on my monitor?
-A : If the screen is just off centre, then use the positioning controls. If
-    not, then your monitor just won't handle B-em's 400x300 video mode, and
-    there's not much you can do.
+Q : How do I run a game?
+A : If you have a disc image (.ssd, .dsd, .img etc) load it through the disc
+    menu, then hold SHIFT and tap F12.
+    If you have a tape image (.uef) load it through the tape menu, ensure
+    that 'tape enable' is ticked, then type the following commands :
+    *TAPE
+    PAGE=&E00
+    CHAIN""
 
 Q : Why have I got no sound?
-A : B-em should work with all DirectSound compatible cards. If you get no
-    sound, check your drivers. Also, some older cards (like the pre-Live
-    SoundBlasters), can't have sound playing in two programs simulatiously,
-    so close whatever other program is playing sound.
+A : B-em should work with 100% SoundBlaster compatibles, ESS Audiodrive,
+    Ensoniq Soundscape, and Windoze $ound System. It will not work with cards
+    not in that list (such as Creative's newer SoundBlasters, which aren't
+    really compatible, or sadly the GUS), it will not work with non-100%
+    compatibles with crappy drivers (such as the ones found in laptops) and it
+    will not work if you have a bad BLASTER enviroment label.
+    Minor addition to this, if you use a poor quality card (such as a
+    SoundBlaster) and you have some sound running in the background in Windows,
+    B-em will deliver no sound. The answer is to upgrade to a good card. B-em
+    will disable sound in this case, so you have to enable it again afterwards.
 
 Q : What happened to snapshots?
 A : They were removed for technical reasons. They will probably return in the
@@ -238,10 +192,44 @@ Q : How do I contact you?
 A : E-mail me at b-em@bbcmicro.com
 
 
+Hardware emulated
+~~~~~~~~~~~~~~~~~
+
+The 6502 processor - Most instructions should be emulated. Attempts to be cycle
+                     perfect. 65C02 is emulated for Master 128 mode, but is
+                     probably missing some opcodes.
+The 6845 CRTC      - Accurate line-by-line engine. Firetrack, Revs, and
+                     Uridium all work.
+The Video ULA      - All modes emulated.
+The System VIA     - Keyboard and sound emulated.
+The User VIA       - Emulated.
+8271 FDC           - Double disc, double sided, 40/80 tracks, read only. With
+                     authentic noise. Only in model B mode.
+1770 FDC           - Double disc, double sided, 40/80 tracks, read/write. With
+                     authentic noise. Only in model B+ and Master 128 mode.
+tape filing system - Supports .inf and __CATALOG__ format.
+Sound              - All channels emulated, with sample support and some
+                     undocumented behaviour (Crazee Rider). With optional low
+                     pass filter.
+ADC                - Real joystick emulation, supporting both joysticks.
+
+
+Hardware NOT emulated
+~~~~~~~~~~~~~~~~~~~~~
+
+serial port
+AMX mouse
+Tube
+Econet
+Printer
+
+
 Tested games :
 ~~~~~~~~~~~~~~
 
 Slightly less impressive than before, but the previous lists were over the top.
+Strangely, both the 'working imperfectly' and 'not working' lists are empty
+this time round.
 
 Working perfectly (as far as I know) :
 A & F       Chuckie Egg
@@ -252,12 +240,14 @@ Aardvark    Frak
 Aardvark    Zalaga
 
 Acornsoft   Arcadians
-Acornsoft   Elite
+Acornsoft   Arcade Action (even works in model A mode)
+Acornsoft   Elite (and Master version)
 Acornsoft   Magic Mushrooms
 Acornsoft   Planetoids
 Acornsoft   Revs
 Acornsoft   Rocket Raid
 
+Audiogenic  Psycastria (Uridium's still better though)
 Audiogenic  Sphere of Destiny
 
 Domark      Empire Strikes Back
@@ -288,6 +278,9 @@ Superior    Repton
 Superior    Repton 2
 Superior    Repton 3
 Superior    Road Runner
+Superior    Spellbinder
+Superior    Stryker's Run (also go for enhanced mode - if you can get any enjoyment from this game at all)
+Superior    Vertigo (enhanced yet again)
 
 Tynesoft    Rig Attack
 
@@ -300,12 +293,6 @@ US Gold     Impossible Mission
 US Gold     Spy Hunter
 US Gold     Tapper
 
-Working imperfectly :
-
-Audiogenic  Psycastria  (screen low down, but who cares? Go play Uridium)
-
-Superior    Stryker's Run             (bad gfx in places?)
-Superior    Vertigo (master 128 mode) (video bugs?)
 
 
 Thanks to :
@@ -315,8 +302,8 @@ David Gilbert for writing Beebem and distributing the sources with it
 
 James Fidell for writing Xbeeb and distributing the sources with it
 
-Tom Seddon for updating Model B recently, indirectly motivating me to do
-another update this year, and for identifying the Empire Strikes Back bug.
+Tom Seddon for updating Model B, indirectly motivating me to do v0.6, and for
+identifying the Empire Strikes Back bug.
 
 Ken Lowe for assistance with the Level 9 adventures.
 
@@ -358,7 +345,7 @@ Appendix A : The source code
 
 If you want to use the source code for anything, that's fine. But, if you can,
 you are encouraged to contribute to it by adding new features and/or fixing it
-To recompile the code, you will need DJGPP 2, GCC and Allegro 4.
+To recompile the code, you will need DJGPP 2, GCC, Allegro 4, Zlib and 2xSaI.
 
 
 Appendix B : Transfering BBC files to the PC
@@ -459,7 +446,8 @@ Massively improved over the old versions, this is now one of the best BBC
 emulators and runs pretty much everything.
 
 Beebem - beebem.bbcmicro.com - eventually
-The most famous BBC emulator. Runs pretty much everything, but is really slow.
+The most famous BBC emulator. Runs pretty much everything, but is really
+quite slow.
 
 BeebIt - homepages.paradise.net.nz/mjfoot/bbc.htm
 The main BBC emulator for the RiscPC. I can't really comment on this (my ARM6
@@ -473,3 +461,41 @@ BeebInC - www.beebinc.net
 Seemingly dead, this was one of my favourite emulators. Surprisingly fast and
 compatible, but let down by poor sound (uses sine waves, not square waves) and
 low refresh rate (25 fps instead of 50 fps).
+
+
+Appendix D: Config file format
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+It occured to me that anyone wanting to write a frontend will need this.
+Windows config files are 790 bytes, DOS config files are 789.
+
+Model - 1 byte
+  From the following :
+    0 - PAL model A
+    1 - NTSC model A (doesn't work - there's no such thing apparently)
+    2 - PAL model B
+    3 - NTSC model B
+    4 - PAL model B+
+    5 - PAL model B+96K
+    6 - PAL model B+128K
+    7 - PAL Master 128
+Sound enable - 1 byte (1=enable, 0=disable)
+Sound wave - 1 byte
+  From the following :
+    0 - Square (original)
+    1 - Sawtooth
+    2 - Sine
+    3 - Triangle
+Disc drive noise enable - 1 byte
+Blur filter enable - 1 byte
+Mono enable - 1 byte (1=mono, 0=colour)
+UEF enable - 1 byte (1=UEF, 0=INF (but only on models A & B))
+Sound filter enable - 1 byte
+Resolution - 1 byte
+  0 - 400x300
+  1 - 800x600
+  2 - 800x600 with 2xSaI
+(WINDOWS ONLY) Fullscreen - 1 byte (1=fullscreen, 0=windowed)
+Path to disc 0 - 260 bytes
+Path to disc 1 - 260 bytes
+Path to UEF file - 260 bytes

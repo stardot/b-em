@@ -19,7 +19,6 @@ unsigned char readserial(unsigned short addr)
 {
         /*Reading from this has the same effect as writing &FE*/
         motor=0;
-//        printf("Serial read %04X\n",addr);
         return 0;
 }
 
@@ -40,7 +39,6 @@ void writeserial(unsigned short addr, unsigned char val)
                 /*Tape*/
                 aciasr&=~8; /*Clear acia CTS*/
         }
-//        printf("Motor %i\n",motor);
 }
 
 void updateserialreg()

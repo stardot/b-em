@@ -60,6 +60,12 @@ void updateusertimers()
                 }
                 if (!(uservia.acr&0x40))
                    uservia.t1hit=1;
+                if (uservia.acr&0x80)
+                {
+                        uservia.orb^=0x80;
+                        uservia.irb^=0x80;
+                        uservia.portb^=0x80;
+                }
         }
         if (!(uservia.acr&0x20)/* && !uservia.t2hit*/)
         {
@@ -191,8 +197,8 @@ unsigned char readuservia(unsigned short addr)
                    temp|=(uservia.irb & ~uservia.ddrb);
                 else
                    temp|=(uservia.portb & ~uservia.ddrb);
-                temp|=0xF0;
-                return rand()&255;
+//                temp|=0xF0;
+                return temp;
 
                 case DDRA:
                 return uservia.ddra;

@@ -1,8 +1,6 @@
 /*B-em 0.7 by Tom Walker*/
 /*6502 emulation*/
 
-int sndupdatehappened=0;
-int soundon,sndupdate;
 unsigned char curromdat;
 int frms=0;
 unsigned char osram[0x2000],swram[0x1000];
@@ -16,7 +14,7 @@ int timetolive;
 #include "8271.h"
 #include "serial.h"
 
-AUDIOSTREAM *as;
+int uefena;
 unsigned short vidmask;
 int adcconvert;
 int shadowaddr[16]={0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0};
@@ -50,22 +48,28 @@ int cycles=0;
 int output=0;
 int ins=0;
 
-void dumpinitram()
+int sndupdate,soundon;
+AUDIOSTREAM *as;
+int fullscreen;
+void trysoundupdate()
 {
-        FILE *f=fopen("bootram.dmp","wb");
-        fwrite(ram,65536,1,f);
-        fwrite(&rom[4*0x4000],0x10000,1,f);
-        fwrite(osram,0x2000,1,f);
-        fwrite(swram,0x1000,1,f);
-        fclose(f);
+        unsigned short *p;
+        if (!soundon || !sndupdate) return;
+        p=(unsigned short *)get_audio_stream_buffer(as);
+        if (p)
+        {
+                updatebuffer(p,624);
+                free_audio_stream_buffer(as);
+        }
+        sndupdate=0;
 }
 
 void dumpram()
 {
         int c;
-/*        FILE *f=fopen("ram.dmp","wb");
-        fwrite(ram,32768,1,f);
-        fclose(f);*/
+        FILE *f=fopen("ram.dmp","wb");
+        fwrite(ram,65536,1,f);
+        fclose(f);
 /*        f=fopen("terminal.dmp","wb");
         fwrite(&rom[15*0x4000],0x4000,1,f);
         fclose(f);*/
@@ -96,7 +100,9 @@ void initmem()
         int c;
         ram=(unsigned char *)malloc(0x10000);
         rom=(unsigned char *)malloc(0x40000);
-        memset(ram,0,0x8000);
+        memset(ram,0,0x10000);
+        memset(osram,0,0x2000);
+        memset(swram,0,0x1000);
         if (model<2)
         {
                 for (c=0x00;c<0x080;c++) mem[c]=(unsigned char *)(ram+((c&0x3F)<<8));
@@ -160,22 +166,6 @@ void loadmasterroms()
         return;
 }
 
-unsigned char *farsndbuf;
-inline void trysoundupdate()
-{
-        unsigned char *p;
-        if (!soundon) return;
-        farsndbuf=(unsigned char *)get_audio_stream_buffer(as);
-//        printf("Trying sound update %08X\n",p);
-        if (farsndbuf)
-        {
-//                sndupdatehappened=1;
-                updatebuffer(farsndbuf,624);
-//                free_audio_stream_buffer(as);
-                sndupdate=0;
-        }
-}
-
 void loadroms()
 {
         int addr=0x3C000;
@@ -192,7 +182,7 @@ void loadroms()
            perror("roms");
         switch (model)
         {
-                case 0: case 2: f=fopen("os","rb"); break;
+                case 0: case 2: f=fopen("os","rb"); if (!uefena) trapos(); break;
                 case 1: case 3: f=fopen("usos","rb"); break;
                 case 4: case 5: case 6: f=fopen("bpos","rb"); break;
         }
@@ -281,7 +271,7 @@ void writeaccconm(unsigned char v)
 //                        printf("Mapping in OS ROM\n");
                         for (c=0xC0;c<0xE0;c++)
                         {
-                                mem[c]=(unsigned char *)(os+((c&0x3F)<<8));
+                                mem[c]=(unsigned char *)(os+((c&0x1F)<<8));
                                 memstat[c]=1;
                         }
                 }
@@ -356,7 +346,7 @@ unsigned char writememl(unsigned short addr, unsigned char val, int line)
                         for (c=0x80;c<0xC0;c++) memstat[c]=(writeablerom[val&15])?0:1;
                         if (val&0x80 && model==7)
                         {
-                                for (c=0x80;c<0x90;c++) mem[c]=(unsigned char *)(swram+(c<<8));
+                                for (c=0x80;c<0x90;c++) mem[c]=(unsigned char *)(swram+((c&0xF)<<8));
                                 for (c=0x80;c<0x90;c++) memstat[c]=0;
                         }
                         if (val&0x80 && model>3 && model<7)
@@ -395,8 +385,8 @@ unsigned char writememl(unsigned short addr, unsigned char val, int line)
         exit(-1);
 }
 
-#define readmem(a) ((memstat[a>>8]==2)?readmeml(a):mem[a>>8][a&0xFF])
-#define writemem(a,b) if (memstat[a>>8]==0) mem[a>>8][a&0xFF]=b; else if (memstat[a>>8]==2) writememl(a,b,lines)
+#define readmem(a) ((memstat[(a)>>8]==2)?readmeml(a):mem[(a)>>8][(a)&0xFF])
+#define writemem(a,b) if (memstat[(a)>>8]==0) mem[(a)>>8][(a)&0xFF]=b; else if (memstat[(a)>>8]==2) writememl(a,b,lines)
 #define getw() (readmem(pc)|(readmem(pc+1)<<8)); pc+=2
 
 void reset6502()
@@ -1912,7 +1902,7 @@ void exec6502(int lines, int cpl)
 //                                printf("skipint=2\n");
                         }
                 }
-                if (sndupdate) trysoundupdate();
+                if (sndupdate && soundon && fullscreen) trysoundupdate();
                 oldnmi=nmi;
                 if (discint)
                 {
@@ -3376,6 +3366,12 @@ void exec65c02(int lines, int cpl)
                                 printf("Current ROM %02X\n",currom);
                                 exit(-1);
                         }
+//                        if (pc==0xFFF4 && (a==0xA1 || a==0xA2))
+//                           printf("OSBYTE %02X %02X %02X\n",a,x,y);
+//                        if (ins==1000000) { output=1; timetolive=500; }
+//                        if (currom==8) output=1; else { if (output) printf("Output end\n"); output=0; }
+//                        if (pc==0x813D) printf("813D Y=%02X %04X %04X\n",y,oldpc,oldoldpc);
+//                        if (pc==0xE583 && currom==9) { dumpregs(); exit(0); }
 //                        if (output) printf("A=%02X X=%02X Y=%02X S=%02X PC=%04X %c%c%c%c%c%c op=%02X\n",a,x,y,s,pc,(p.n)?'N':' ',(p.v)?'V':' ',(p.d)?'D':' ',(p.i)?'I':' ',(p.z)?'Z':' ',(p.c)?'C':' ',opcode);
                         ins++;
                         if (timetolive)
@@ -3398,7 +3394,7 @@ void exec65c02(int lines, int cpl)
 //                                printf("Interrupt line %i %02X %02X %02X %02X\n",lines,sysvia.ifr&sysvia.ier,uservia.ifr&uservia.ier,uservia.ier,uservia.ifr);
                         }
                 }
-                if (sndupdate) trysoundupdate();
+                if (sndupdate && soundon && fullscreen) trysoundupdate();
                 oldnmi=nmi;
                 if (discint)
                 {
@@ -3427,11 +3423,7 @@ void exec65c02(int lines, int cpl)
                 }
                 logvols(lines);
                 lines--;
-                if (!(lines&0x7F))
-                {
-                        pollacia();
-//                        printf("Poll ACIA line %i\n",lines);
-                }
+                if (!(lines&0x7F)) pollacia();
                 if (!(lines&0x7F) && adcconvert && !motor) polladc();
                 if (lines!=-1) drawline(lines);
         }
