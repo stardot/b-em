@@ -6,10 +6,10 @@
              ██        ██          ██         ██          ██
              ██████████            █████████  ██          ██
 
-                     BBC Model B Emulator Version 0.3
+                     BBC Model B Emulator Version 0.4a
 
 
-              All of this code is (C)opyright Tom Walker 1999
+              All of this code is written by Tom Walker
          You may use SMALL sections from this program (ie 20 lines)
        If you want to use larger sections, you must contact the author
 
@@ -17,9 +17,9 @@
 
 */
 
-/*vias.c - VIA emulation (user + system)*/
+/*VIA emulation (user + system)*/
 
-#include "gfx.h"
+#include <allegro.h>
 #include <stdio.h>
 #include "6502.h"
 #include "vias.h"
@@ -43,6 +43,7 @@
 #define         IER     0x0e
 #define         ORAnh   0x0f
 
+int Cycles;
 int orbwrites=0,orareads=0;
 unsigned char IC32State=0;
 unsigned char UIC32State=0;
@@ -379,7 +380,7 @@ int SysVIARead(int Address)
                 {
                         tmp=((SysVIA.orb & SysVIA.ddrb) | (SysVIA.pbl & ~SysVIA.ddrb))|48|192;
                 }
-                if (!(shifts&SHIFT_NUMLOCK)&&keys[KEY_INSERT])
+                if (!(key_shifts&KB_NUMLOCK_FLAG)&&key[KEY_INSERT])
                    tmp^=16;
 //                if ((SysVIA.pcr&0xE0)==0x20||(SysVIA.pcr&0xE0)==0x60)
 //                   SysVIA.ifr&=0xEF;

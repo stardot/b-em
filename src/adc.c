@@ -6,10 +6,10 @@
              ██        ██          ██         ██          ██
              ██████████            █████████  ██          ██
 
-                     BBC Model B Emulator Version 0.3
+                     BBC Model B Emulator Version 0.4a
 
 
-              All of this code is (C)opyright Tom Walker 1999
+              All of this code is written by Tom Walker
          You may use SMALL sections from this program (ie 20 lines)
        If you want to use larger sections, you must contact the author
 
@@ -19,7 +19,7 @@
 
 /*ADC emulation*/
 
-#include "gfx.h"
+#include <allegro.h>
 #include "adc.h"
 
 int joy1x,joy1y,joy2x,joy2y;
@@ -61,17 +61,17 @@ void adcpoll()
 {
         int val;
         joy1x=joy1y=0;
-        if (!(shifts&SHIFT_NUMLOCK))
+        if (!(key_shifts&KB_NUMLOCK_FLAG))
         {
-                if (keys[KEY_LEFT])
+                if (key[KEY_LEFT])
                    joy1x=-4095;
-                else if (keys[KEY_RIGHT])
+                else if (key[KEY_RIGHT])
                    joy1x=4095;
                 else
                    joy1x=0;
-                if (keys[KEY_UP])
+                if (key[KEY_UP])
                    joy1y=-4095;
-                else if (keys[KEY_DOWN])
+                else if (key[KEY_DOWN])
                    joy1y=4095;
                 else
                    joy1y=0;

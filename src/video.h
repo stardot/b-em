@@ -29,7 +29,7 @@ unsigned char CRTC_CursorPosHigh;        /* R14 */
 unsigned char CRTC_CursorPosLow;         /* R15 */
 unsigned char CRTC_LightPenHigh;         /* R16 */
 unsigned char CRTC_LightPenLow;          /* R17 */
-BMP *b;
+BITMAP *b;
 unsigned char screencheck[32768];
 int VideoULA_Palette[16];
 unsigned char VideoULA_ControlReg;

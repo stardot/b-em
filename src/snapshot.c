@@ -6,10 +6,10 @@
              ██        ██          ██         ██          ██
              ██████████            █████████  ██          ██
 
-                     BBC Model B Emulator Version 0.3
+                     BBC Model B Emulator Version 0.4a
 
 
-              All of this code is (C)opyright Tom Walker 1999
+              All of this code is written by Tom Walker
          You may use SMALL sections from this program (ie 20 lines)
        If you want to use larger sections, you must contact the author
 
@@ -20,7 +20,7 @@
 /*Snapshot loading and saving*/
 
 #include <stdio.h>
-#include "gfx.h"
+#include <allegro.h>
 #include "6502.h"
 #include "mem.h"
 #include "vias.h"
@@ -34,11 +34,11 @@ unsigned char statusreg;
 unsigned char datareg;
 unsigned char resultreg;
 
-void savesnapshot()
+void savesnapshot(char *fn)
 {
         FILE *f;
         int c,d;
-        f=fopen("snap0000.snp","wb");
+        f=fopen(fn,"wb");
         /*Header*/
         /*Add snapshot ID - 0x422D5353 ('B-SS')*/
         putc(0x42,f); putc(0x2D,f); putc(0x53,f); putc(0x53,f);
@@ -166,11 +166,11 @@ void savesnapshot()
         fclose(f);
 }
 
-void loadsnapshot()
+void loadsnapshot(char *fn)
 {
         FILE *f;
         int c,d;
-        f=fopen("snap0000.snp","rb");
+        f=fopen(fn,"rb");
         /*Header*/
         for (c=0;c<8;c++)
             getc(f);
@@ -278,7 +278,6 @@ void loadsnapshot()
 
         /*Serial ULA*/
         serialreg=getc(f);
-        updateserialreg();
 
         /*ACIA*/
         acaicr=getc(f);

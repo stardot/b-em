@@ -6,7 +6,7 @@
              ██       ▄██          ██         ██          ██
              ██████████▀           █████████  ██          ██
 
-                                 Version 0.3a
+                                 Version 0.4a
                                  Source code
 
 Introduction
@@ -14,9 +14,6 @@ Introduction
 
 B-Em is an attempt to emulate a BBC Micro, made by Acorn Computers in the 80's
 This is the source code.
-
-This is the second source release of 0.3a, as the first release was missing
-the gfx.h file, and had much worse documentation.
 
 If you want to use the source code as reference for writing your own emulator,
 that's fine. If you want to steal the odd function from it, that's fine too.
@@ -37,30 +34,31 @@ What's needed to compile
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 B-em was written using DJGPP 2.02, GCC 2.81, and BNU 2.81. If you have a
-similar distribution, then everything should compile.
+similar distribution, then everything should compile. You will also need
+Allegro, 3.12 will not work, B-em was developed with 3.9.37, and should work
+with 4.
 
 
 What files are what
 ~~~~~~~~~~~~~~~~~~~
 
-6502.*     - 6502 emulation core (don't compile!)
-6850.*     - 6850 ACIA core
+6502.*     - 6502 emulation core
 8271.*     - i8271 disc controller
 adc.*      - Analogue to digital converter
 bem.c      - B-em main file (includes 6502.c)
+codes.h    - Allegro scancode to PC scancode table
 disk.*     - TFS
+gui.c      - GUI
 mem.*      - Memory core
 scan2bbc.h - PC to BBC scancode table
-serial.*   - Serial ULA emulation
 snapshot.* - Snapshot handling
 sound.*    - Sound emulation
-uef.*      - UEF file handling
 vias.*     - VIA emulation
 video.*    - Video emulation
 
-There is also setup.c, which is the setup program. The file makeall.bat will
-compile everything. The files gfx.a and gfx.h are the graphics library, you
-can use this for anything you want.
+There is also playsn.c, which is the .SN player. The file makeit.bat will
+compile everything.
+
 
 
 Stuff which needs doing
@@ -68,12 +66,11 @@ Stuff which needs doing
 
 Can anyone help me with any of this?
 
-Speed up the 6502 emulation
+Sound core needs redoing to handle samples in Allegro's crappy sample mixer.
+Ideas on speeding up 6502 emulation in C (not this specific emulator, I'm
+writing a replacement core)
 Speed up the video emulation
-Fix the 6850 emulation
-Fix some bugs in the 6522 emulation
-Sort out sound emulation
-Get bem.c to compile with optimisation
+Fix some bugs in the 6522 emulation (probably will also be rewritten)
 Neaten up the source code (no chance!)
 
 Tom.

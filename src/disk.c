@@ -6,10 +6,10 @@
              ██        ██          ██         ██          ██
              ██████████            █████████  ██          ██
 
-                     BBC Model B Emulator Version 0.3
+                     BBC Model B Emulator Version 0.4a
 
 
-              All of this code is (C)opyright Tom Walker 1999
+              All of this code is written by Tom Walker
          You may use SMALL sections from this program (ie 20 lines)
        If you want to use larger sections, you must contact the author
 
@@ -22,24 +22,10 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include "gfx.h"
+#include <allegro.h>
 #include "6502.h"
 #include "disk.h"
 #include "mem.h"
-
-int uefon=0;
-FILE *tapelog;
-typedef struct UEFFILE
-{
-        char name[20];
-        unsigned char *blocks[128];
-        unsigned short loadaddr,runaddr;
-        int existant;
-        int numblocks;
-} UEFFILE;
-
-UEFFILE getfile(unsigned char *fn);
-UEFFILE nofile;
 
 FILE *catalog;
 int exeaddr,load,start,end;
@@ -122,8 +108,6 @@ int loadfile(char *fn, char *fn2)
         int d;
         unsigned char val;
         FILE *f;
-        if (!uefon)
-        {
         loaded=1;
         if (chdir("inf"))
         {
@@ -219,30 +203,6 @@ int loadfile(char *fn, char *fn2)
                 exit(-1);
         }
         return 0;
-        }
-        else
-        {
-        UEFFILE f=getfile(fn);
-        if (!f.existant)
-        {
-                sprintf(error,"File not found %s\n%c",fn,0xD);
-                ram[0xB0]=0;
-                ram[0xB1]=0xFF;
-                for (c=0;c<strlen(error);c++)
-                    ram[0xB2+c]=error[c];
-                pc=0xB0;
-                return -1;
-        }
-        addr=f.loadaddr;
-        exeaddr=f.runaddr;
-        for (c=0;c<f.numblocks;c++)
-        {
-                memcpy(ram+addr,f.blocks[c],256);
-                addr+=256;
-        }
-        return 0;
-        }
-        return 0;
 }
 
 void savefile(char fname[16],char fname2[16],int start,int end)
@@ -313,7 +273,7 @@ int OSFILE()
                         savefile(fname, fname2, start, end);
                         return 0;
        }
-       closegfx();
+       set_gfx_mode(GFX_TEXT,0,0,0,0);
        printf("Error : unknown OSFILE operation %X [%i]\n",a,a);
        exit(-1);
        return 0;
@@ -422,8 +382,13 @@ void copyfilename(int src, char *dest)
                         done=1;
                         break;
                 }
-                dest[start+c]=ram[src+c];
-                c++;
+                if (ram[src+c]!='.')
+                {
+                        dest[start+c]=ram[src+c];
+                        c++;
+                }
+                else
+                   src++; /*Cheap hack to get directories to work (ish)*/
         }
         dest[start+c]=0;
 }

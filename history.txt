@@ -113,3 +113,35 @@ Version 0.3 finalised and released
 10/4/01  - Removed the `clear screen' command, moved everything into seperate directories,
            improved UEF support a little, and added American BBC support.
 Version 0.3a finalised and released
+
+12/10/01 - Changed graphics library to Allegro, and ported over the SN76489
+           emulation from YAAME. Sound is really good now, but the keyboard is
+           broken.
+14/10/01 - Keyboard now fixed by using older version of Allegro (someone
+           changed the scancodes). I must update the keytable before release.
+12/12/01 - Changed timing method, so the 6502 emulation executes a scanline,
+           then updates everything. Used different method for colour selection
+           (everything uses the mode 2 table), except modes 1+5 didn't like
+           the change and broke.
+13/12/01 - Attempted to fix broken modes, failed.
+14/12/01 - Misc optimisations.
+15/12/01 - Fixed the bug in modes 1 and 5 (a variable was signed instead of
+           unsigned). Put a real font in mode 7.
+16/12/01 - Fixed up mode 7 emulation (really good now). Fixed scanline
+           emulation so the emulated CRTC generates 312 lines instead of 304.
+           Went back to newer version of Allegro - must redo keytable.
+17/12/01 - Redid keytable - working now. Fixed some misc bugs.
+31/12/01 - Rewrote BCD maths. SBC now seems to work fine, but ADC is a bit
+01/01/02   fucked. Whoever wrote the BCD maths routines in 64doc.txt got it
+           completely wrong.
+02/01/02 - Added simple GUI.
+04/01/02 - Improvements to GUI. Monochrome mode added
+12/01/02 - More improvements to GUI. Serial code completely removed. Did
+           compatibility test.
+Version 0.4 finalised and released.
+14/01/02 - Found microphone and sampled disc drive.
+15/01/02 - Disc drive noise added.
+19/01/02 - Fixed a few bugs, Exile and Star Swarm work fine now. Re-added
+           model A emulation. Invented .sn file format, wrote player, and
+           added logging.
+Version 0.4a finalised and released.

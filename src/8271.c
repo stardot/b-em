@@ -6,10 +6,10 @@
              ██        ██          ██         ██          ██
              ██████████            █████████  ██          ██
 
-                     BBC Model B Emulator Version 0.3
+                     BBC Model B Emulator Version 0.4a
 
 
-              All of this code is (C)opyright Tom Walker 1999
+              All of this code is (C)opyright Tom Walker 1999-2002
          You may use SMALL sections from this program (ie 20 lines)
        If you want to use larger sections, you must contact the author
 
@@ -20,6 +20,7 @@
 /*8271 FDC emulation*/
 
 #include <stdio.h>
+#include <allegro.h>
 #include "6502.h"
 #include "8271.h"
 
@@ -32,6 +33,7 @@
 
 #define SIDE ((drvctrloutp>>5) & 1)
 
+int driveled=0;
 char discname[260];
 int discside=0;
 int dsd=0;
@@ -40,6 +42,20 @@ unsigned char datareg=0;
 unsigned char resultreg=0;
 unsigned char error=0;
 unsigned char discs[2][SIDES][SECTORS*TRACKS][SECTORSIZE];
+
+int ddnoise;
+SAMPLE *seeksmp;
+SAMPLE *stepsmp;
+SAMPLE *motorsmp;
+void (*docommand)();
+void (*doint)();
+
+void loaddiscsamps()
+{
+        seeksmp=load_wav("seek.wav");
+        stepsmp=load_wav("step.wav");
+        motorsmp=load_wav("motor.wav");
+}
 
 void set8271poll(int time)
 {
@@ -55,6 +71,18 @@ void error8271(unsigned char err)
                 statusreg=0x80;
                 set8271poll(50);
         }
+}
+
+void motoroff()
+{
+        driveled=0;
+        stop_sample(motorsmp);
+}
+
+void setspindown()
+{
+        set8271poll(2000000);
+        doint=motoroff;
 }
 
 int load8271ssd(char *fn, int disc)
@@ -165,8 +193,6 @@ void reset8271()
         resultreg=0;
         disctime=0;
         discint=0;
-//        curtrack[0]=0;
-//        empty8271disc(0);
         for (c=0;c<strlen(discname);c++)
         {
                 if (discname[c]=='.')
@@ -180,23 +206,11 @@ void reset8271()
                 empty8271disc(0);
                 return;
         }
-        if (chdir("discs"))
-        {
-                perror("discs");
-                exit(-1);
-        }
         if (discname[c]=='d'||discname[c]=='D')
            load8271dsd(discname,0);
         else
            load8271ssd(discname,0);
-        if (chdir(".."))
-        {
-                perror("..");
-                exit(-1);
-        }
-//        if (load8271ssd("test.ssd",0))
-//           if (load8271dsd("test.dsd",0))
-//              empty8271disc(0);
+        motoroff();
 }
 
 char str[40];
@@ -269,7 +283,7 @@ void readspecial()
                 retval=drvctrloutp;
                 break;
                 default:
-                closegfx();
+                set_gfx_mode(GFX_TEXT,0,0,0,0);
                 printf("Unimplemented 8271 read special register - param %X\n",parameters[0]);
                 exit(-1);
                 break;
@@ -296,7 +310,7 @@ void writespecial()
                 selects[1]=parameters[1]&0x80;
                 break;
                 default:
-                closegfx();
+                set_gfx_mode(GFX_TEXT,0,0,0,0);
                 printf("Unimplemented 8271 write special register - params %X %X\n",parameters[0],parameters[1]);
                 exit(-1);
                 break;
@@ -307,6 +321,12 @@ void seek()
 {
         int drv=-1;
         char s[40];
+        if (!driveled)
+        {
+                driveled=1;
+                if (ddnoise)
+                   play_sample(motorsmp,255,127,1000,TRUE);
+        }
         doselects();
         if (selects[0])
            drv=0;
@@ -321,6 +341,8 @@ void seek()
         statusreg=0x80;
         NMI();
         set8271poll(100);
+        if (ddnoise)
+           play_sample(seeksmp,255,127,1000,0);
 }
 
 void seekint()
@@ -329,6 +351,7 @@ void seekint()
         statusreg=0x18;
         NMI();
         resultreg=0;
+        setspindown();
 }
 
 int bytesread=0;
@@ -337,6 +360,12 @@ void readvarlen()
 {
         char s[40];
         int drv=-1;
+        if (!driveled)
+        {
+                if (ddnoise)
+                   play_sample(motorsmp,255,127,1000,TRUE);
+                driveled=1;
+        }
         doselects();
         if (selects[0])
            drv=0;
@@ -348,6 +377,8 @@ void readvarlen()
                 return;
         }
         curr8271drv=drv;
+        if (curtrack[0]!=parameters[0] && ddnoise)
+           play_sample(stepsmp,255,127,1000,0);
         curtrack[0]=parameters[0];
         cursec[0]=parameters[1];
         sectorsleft=parameters[2]&0x1F;
@@ -359,14 +390,21 @@ void readvarlen()
         bytesread=0;
 }
 
+void readdoneint()
+{
+        setspindown();
+        statusreg=0x18;
+        NMI();
+}
+
 void readint()
 {
         int done=0;
         char s[40];
         if (sectorsleft==-1)
         {
-                statusreg=0x18;
-                NMI();
+                set8271poll(20000);
+                doint=readdoneint;
                 return;
         }
         bytesread++;
@@ -388,21 +426,18 @@ void readint()
                         cursec[0]++;
                         if (cursec[0]==10)
                         {
-                        done=1;
-                        sectorsleft=-1;
-
+                                done=1;
+                                sectorsleft=-1;
                                 cursec[0]=0;
-                                curtrack[0]++;
+//                                curtrack[0]++;
+//                                play_sample(stepsmp,255,127,1000,0);
                         }
                 }
                 else
                 {
-//                        statusreg=0x9C;
-//                        NMI();
                         done=1;
+//                        play_sample(stepsmp,255,127,1000,0);
                         sectorsleft=-1;
-
-//                        set8271poll(16);
                 }
         }
 
@@ -424,9 +459,6 @@ FDCCOMMAND fdccomms[COMMS+1] =
         {0x13,3,0x3F,readvarlen,readint},
         {0xFF,0,0x00,NULL,NULL}
 };
-
-void (*docommand)();
-void (*doint)();
 
 FDCCOMMAND getcommand(unsigned char comm)
 {
@@ -549,6 +581,7 @@ void poll8271()
                 statusreg=0x18;
                 error=0;
                 NMI();
+                driveled=0;
         }
         else
         {

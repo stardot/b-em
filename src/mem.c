@@ -6,10 +6,10 @@
              ██        ██          ██         ██          ██
              ██████████            █████████  ██          ██
 
-                     BBC Model B Emulator Version 0.3
+                     BBC Model B Emulator Version 0.4a
 
 
-              All of this code is (C)opyright Tom Walker 1999
+              All of this code is written by Tom Walker
           You may use SMALL sections from this file (ie 20 lines)
        If you want to use larger sections, you must contact the author
 
@@ -17,22 +17,24 @@
 
 */
 
-/*mem.c - Memory emulation*/
+/*Memory emulation*/
 
 #include <dir.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include "gfx.h"
+#include <allegro.h>
 #include "6502.h"
 #include "video.h"
 #include "vias.h"
 #include "mem.h"
 #include "8271.h"
 
+int writeable[16];
+int writeablerom=0;
 int us;
 int tingtable[32768][2];
-BMP *b;
+BITMAP *b;
 int VideoULA_Palette[16];
 int mode2;
 int mode2table[256][2];
@@ -42,34 +44,22 @@ unsigned char roms[16][16384];
 int Cycles;
 void changerom(int newrom)
 {
+        if (writeablerom)
+           memcpy(roms[currom],ram+0x8000,0x4000);
         currom=newrom;
+        writeablerom=writeable[currom];
         memcpy(ram+0x8000,roms[currom],0x4000);
 }
 
 void writemem(unsigned short address,unsigned char value)
 {
-        #ifdef MEMLOGFILE
-        char s[40];
-        sprintf(s,"memwrite %X %X %X\n",address,value,pc);
-        fputs(s,logfile);
-        #endif
-
-        int c,d;
-        char s[40];
         if (address > 0x8000)
         {
-                if (address>0xFE0F&&address<0xFE20)
+                if ((address<0xC000)&&writeablerom)
                 {
-                        writeserial(address,value);
-                        return;
+                     ram[address]=value;
+                     return;
                 }
-
-                if (address>0xFE07&&address<0xFE10)
-                {
-                        writeacai(address,value);
-                        return;
-                }
-
                 if ((address&~0x1F)==0xFEC0)
                 {
                         writeadc(address,value);
@@ -82,7 +72,7 @@ void writemem(unsigned short address,unsigned char value)
                         return;
                 }
 
-                if ((address & ~0xf)==0xfe60 || (address & ~0xf)==0xfe70)
+                if ((address & ~0xf)==0xfe60 || (address & ~0xf)==0xfe70 && !modela)
                 {
                        UVIAWrite((address & 0xf),value);
                        return;
@@ -113,8 +103,6 @@ void writemem(unsigned short address,unsigned char value)
                 }
                 return;
         }
-        oldaddr=address;
-        oldvalue=value;
         if (modela)
             ram[address&0x3FFF]=value;
         else
@@ -162,7 +150,11 @@ void initmem()
                 printf("Error : No ROMs found\n");
                 exit(-1);
         }
+        for (currom=0;currom<16;currom++)
+            writeable[currom]=0;
+        writeable[0]=writeable[1]=1;
         currom=0xF;
+        writeablerom=0;
         memcpy(ram+0x8000,roms[0xF],0x4000);
         fclose(f);
         if (chdir(".."))

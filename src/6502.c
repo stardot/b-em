@@ -6,10 +6,10 @@
              ██        ██          ██         ██          ██
              ██████████            █████████  ██          ██
 
-                     BBC Model B Emulator Version 0.3
+                     BBC Model B Emulator Version 0.4a
 
 
-              All of this code is (C)opyright Tom Walker 1999
+              All of this code is written by Tom Walker
          You may use SMALL sections from this program (ie 20 lines)
        If you want to use larger sections, you must contact the author
 
@@ -19,15 +19,32 @@
 
 /*6502 emulation*/
 
+#include <stdio.h>
+#include <allegro.h>
+#include "6502.h"
+#include "mem.h"
+#include "vias.h"
+#include "video.h"
+#include "8271.h"
+#include "disk.h"
+#include "adc.h"
+#include "serial.h"
+
 #define INLINE static inline
 
 #define UNDOCUMENTEDINS
+
+int logging;
+int numcycles;
 int screencount=0;
 int videocycles;
 int temp=0;
 int acaitime=33333;
 int videoline,scancount;
-static int cycletable[256]=
+int frametime;
+int modela;
+
+static int cycletable2[256]=
 {
         7,6,0,0,0,3,5,5,3,2,2,0,0,4,6,0,
         2,5,0,0,0,4,6,0,2,4,0,0,0,4,7,0,
@@ -47,6 +64,26 @@ static int cycletable[256]=
         2,5,0,0,0,4,6,0,2,4,0,0,0,4,7,0
 };
 
+static int cycletable[]={
+  7,6,0,0,0,3,5,5,3,2,2,0,0,4,6,0, /* 0 */
+  2,5,0,0,0,4,6,0,2,4,0,0,0,4,7,0, /* 1 */
+  6,6,0,0,3,3,5,0,4,2,2,0,4,4,6,0, /* 2 */
+  2,5,0,0,0,4,6,0,2,4,0,0,0,4,7,0, /* 3 */
+  6,6,0,0,0,3,5,0,3,2,2,2,3,4,6,0, /* 4 */
+  2,5,0,0,0,4,6,0,2,4,0,0,0,4,7,0, /* 5 */
+  6,6,0,0,0,3,5,0,4,2,2,0,5,4,6,0, /* 6 */
+  2,5,0,0,0,4,6,0,2,4,0,0,0,4,7,0, /* 7 */
+  2,6,0,0,3,3,3,3,2,0,2,0,4,4,4,0, /* 8 */
+  2,6,0,0,4,4,4,0,2,5,2,0,0,5,0,0, /* 9 */
+  2,6,2,0,3,3,3,0,2,2,2,0,4,4,4,0, /* a */
+  2,5,0,0,4,4,4,0,2,4,2,0,4,4,4,0, /* b */
+  2,6,0,0,3,3,5,0,2,2,2,0,4,4,6,0, /* c */
+  2,5,0,0,0,4,6,0,2,4,0,0,4,4,7,0, /* d */
+  2,6,0,0,3,3,5,0,2,2,2,0,4,4,6,0, /* e */
+  2,5,0,0,0,4,6,0,2,4,0,0,0,4,7,0  /* f */
+}; /* CyclesTable */
+
+int output=0;
 int waitforkey=0;
 char string[80];
 int oldpc;
@@ -69,18 +106,16 @@ INLINE unsigned char readmem(unsigned short address)
 //        oldraddr=address;
         if ((address > 0xfc00) && (address < 0xff00))
         {
-                if (address>0xFE0F&&address<0xFE20)
-                   return readserial(address);
-                if ((address&~0x1F)==0xFEC0)
-                   return readadc(address);
                 if ((address & ~0xf)==0xfe40 || (address & ~0xf)==0xfe50)
                    return SysVIARead(address & 0xf);
+                if (((address & ~0xf)==0xfe60 || (address & ~0xf)==0xfe70) && !modela)
+                   return UVIARead(address & 0xf);
                 if (address==0xFE60)
                    return rand()&255;
                 if (address==0xFE70)
                    return rand()&255;
-                if ((address & ~0xf)==0xfe60 || (address & ~0xf)==0xfe70)
-                   return UVIARead(address & 0xf);
+                if ((address&~0x1F)==0xFEC0)
+                   return readadc(address);
                 if ((address & ~15)==0xfe00)
                    return CRTCRead(address & 0x1);
                 if ((address & ~0xf)==0xfe20)
@@ -89,16 +124,18 @@ INLINE unsigned char readmem(unsigned short address)
                    return currom;
                 if ((address&~0x1F)==0xFE80)
                    return read8271(address);
-                return 0xfe;
+                return 0;
         }
 //        ////sprintf(string,"Read %X\n",address);
 //        fputs(string,logfile);
+        if (modela && address<0x8000)
+           return ram[address&0x3FFF];
         return ram[address];
 }
 
 #define fastwrite(addr,val)    \
         tempaddr=addr;           \
-        if (tempaddr<0x8000)       \
+        if (tempaddr<0x4000)       \
            ram[tempaddr]=val;      \
         else                   \
            writemem(tempaddr,val);
@@ -226,40 +263,55 @@ INLINE void setzvn(int z, int v, int n)
 
 INLINE void ADCBCD(unsigned char s)
 {
-        unsigned
-           AL=a&0xF, /* low nybble of accumulator */
-           AH=a>>4, /* high nybble of accumulator */
-
-           C=p&1,  /* Carry flag */
-           Z=p&2,  /* Zero flag */
-           V=p&64,  /* oVerflow flag */
-           N=p&128;  /* Negative flag */
-        unsigned char olda=a;
-                int                     vlo = (s) & 0x0f;
-                int                     vhi = (s) >> 4;
-
-                AL += vlo + C;
-                if ( AL >= 10 )
-                {
-                        AL -= 10;
-                        AH++;
-                }
-                AH += vhi;
-                a = ( AL + ( AH << 4 )) & 0xff;
-//                Z=(a==0);
-//                N=(a&0x80);
-//                V=(!((olda^s)&0x80)&&((olda^a)&0x80));
-                C = 0;
-                if ( AH >= 10 )
-                {
-                        AH += 6;
-                        if ( AH > 15 )
-                                C=1;
-                        AH &= 0xf;
-                }
-                a = AL + ( AH << 4 );
-
-        setczvn(C,Z,V,N);
+/*      unsigned int al,ah;
+      int hc=0,c,z=0,v=0,n=0;
+      c=p&1;
+      if (!(a+s+c))
+         z=1;
+      al=(a&0xF)+(s&0xF)+c;
+      ah=(a>>4)+(s>>4);
+      if (al>9)
+      {
+            al+=6;
+            al&=0xF;
+            hc=1;
+      }
+      if (ah&8)
+         n=1;
+      v=(((ah << 4) ^ a) & 128) && !((a ^ s) & 128);
+      c=0;
+      if (hc) ah++;
+      if (ah>9)
+      {
+            ah+=6;
+            ah&=0xF;
+            c=1;
+      }*/
+      unsigned char al,ah=0;
+      int c=p&1,z=0,v=0,n=0;
+      unsigned char res=a+s+c;
+      if (!res)
+         z=1;
+      al=(a&0xF)+(s&0xF)+c;
+      if (al>9)
+      {
+            al-=10;
+            al&=0xF;
+            ah=1;
+      }
+      ah+=((a>>4)+(s>>4));
+      if (ah&8)
+         n=1;
+      v=(((ah << 4) ^ a) & 128) && !((a ^ s) & 128);
+      c=0;
+      if (ah>9)
+      {
+            c=1;
+            ah-=10;
+            ah&=0xF;
+      }
+      a=(al&0xF)|(ah<<4);
+      setczvn(c,z,v,n);
 }
 
 INLINE void ADC(unsigned short addr)
@@ -273,8 +325,8 @@ INLINE void ADC(unsigned short addr)
         if (!(p&8))
         {
                 newa = a + (val) + C;
-                C = newa >> 8;
-                a = newa & 0xff;
+                C=(newa >> 8)&1;
+                a=newa & 0xff;
                 Z=(a==0);
                 N=(a&0x80);
                 V=(!((olda^val)&0x80)&&((olda^a)&0x80));
@@ -344,7 +396,7 @@ INLINE void ASLA()
         unsigned char olda=a;
         a<<=1;
         setczn((olda & 0x80)>0, a==0, a & 128);
-        Cycles=2;
+        //Cycles=2;
 }
 
 #define ASR(addr) a&=fastread(addr); a>>=1
@@ -381,7 +433,8 @@ INLINE void BRK()
         PUSH(p);
         p|=0x4;
         pc=fastread(0xFFFE)|(fastread(0xFFFF)<<8);
-        Cycles=7;
+//        output=1;
+        //Cycles=7;
 }
 
 #define CLC() p&=0xFE
@@ -391,15 +444,15 @@ INLINE void BRK()
 
 #define CMP(addr) \
         val=fastread(addr); \
-        setczn(a>=val,a==val,(a-val) & 0x80); Cycles=2
+        setczn(a>=val,a==val,(a-val) & 0x80); //Cycles=2
 
 #define CPX(addr) \
         val=fastread(addr); \
-        setczn(x>=val,x==val,(x-val) & 0x80); Cycles=2
+        setczn(x>=val,x==val,(x-val) & 0x80); //Cycles=2
 
 #define CPY(addr) \
         val=fastread(addr); \
-        setczn(y>=val,y==val,(y-val) & 0x80); Cycles=2
+        setczn(y>=val,y==val,(y-val) & 0x80); //Cycles=2
 
 #define DCP(addr) \
         val=fastread(addr)-1; \
@@ -454,14 +507,14 @@ INLINE void INC(unsigned short addr)
         PUSH((pc-1) >> 8); \
         PUSH((pc-1) & 0xFF); \
         pc=addr;             \
-        Cycles=6*/
+        //Cycles=6*/
 
 INLINE void JSR(unsigned short addr)
 {
         PUSH((pc-1) >> 8);
         PUSH((pc-1) & 0xFF);
         pc=addr;
-        Cycles=6;
+        //Cycles=6;
 }
 
 #define LAS(addr)          \
@@ -496,11 +549,11 @@ INLINE void LSR(unsigned short addr)
 
 #define ORA(addr) a|=fastread(addr); setzn(a)
 
-#define PHA() PUSH(a); Cycles=3
-#define PHP() PUSH(p|0x10); Cycles=3
+#define PHA() PUSH(a); //Cycles=3
+#define PHP() PUSH(p|0x10); //Cycles=3
 
-#define PLA() a=PULL(); setzn(a); Cycles=4
-#define PLP() p=PULL(); Cycles=4
+#define PLA() a=PULL(); setzn(a); //Cycles=4
+#define PLP() p=PULL(); //Cycles=4
 
 INLINE void RLA(unsigned short addr)
 {
@@ -573,47 +626,40 @@ INLINE void RTI()
         pc=PULL()|(PULL()<<8);
         NMILock=0;
         inint=0;
-        Cycles=6;
+        //Cycles=6;
 }
 
-#define RTS() pc=(PULL()|(PULL()<<8))+1; Cycles=6
+#define RTS() pc=(PULL()|(PULL()<<8))+1; //Cycles=6
 
 #define SAX(addr) fastwrite(addr,a&x)
 
 INLINE void SBCBCD(unsigned char s)
 {
-        unsigned
-           AL=a&0xF, /* low nybble of accumulator */
-           AH=a>>4, /* high nybble of accumulator */
-
-           C=p&1,  /* Carry flag */
-           Z=p&2,  /* Zero flag */
-           V=p&64,  /* oVerflow flag */
-           N=p&128;  /* Negative flag */
-
-        unsigned char olda=a;
-        C = (a - s - !C) & 256 != 0;
-//        Z = (a - s - !C) & 255 != 0;
-//        V = ((a - s - !C) ^ s) & 128 && (a ^ s) & 128;
-//        N = (a - s - !C) & 128 != 0;
-
-                AL -= (s&0xF) + (p&1) - 1;
-                if ( AL < 0 )
-                {
-                        AL += 10;
-                        AH--;
-                }
-
-                if (AL>9)
-                {
-                        AL=9;
-                        AH--;
-                }
-                AH -= ((s>>4)&0xF);
-                if ( AH < 0 )
-                        AH += 10;
-        a = ((AH << 4) | (AL & 15)) & 255;
-        setczvn(C,Z,V,N);
+      unsigned int al,ah,c=p&1,z=0,v=0,n=0,hc=0;
+      al=(a&15)-(s&15)-((c)?0:1);
+      ah=(a>>4)-(s>>4);
+      if (al>9)
+      {
+            al-=6;
+            al&=0xF;
+            hc=1;
+      }
+      if (hc) ah--;
+      if (ah>9)
+      {
+            ah-=6;
+            ah&=0xF;
+      }
+      c=0;
+      if (a>=s)
+         c=1;
+      if (!(a-s-((c)?0:1)))
+         z=1;
+      if ((a-s-((c)?0:1))&0x80)
+         n=1;
+      v=(((a-s-((c)?0:1))^s)&128)&&((a^s)&128);
+      a=(al&0xF)|((ah&0xF)<<4);
+      setczvn(c,z,v,n);
 }
 
 INLINE void SBC(unsigned short addr)
@@ -628,7 +674,7 @@ INLINE void SBC(unsigned short addr)
                 tempv=(signed char)olda-(signed char)val-(1-(p&1));
                 tempc=a-val-(1-(p&1));
                 a=(unsigned char)tempc & 0xFF;
-                setczvn(tempc>=0, a==0, ((a & 128)>0) ^ ((tempv & 0xFF)!=0), a & 128);
+                setczvn((olda-(1-C))>=val, a==0, ((a & 128)>0) ^ ((tempv & 0x100)!=0), a & 128);
         }
         else
         {
@@ -780,19 +826,27 @@ INLINE void doNMI()
 
 int haddiscting=0;
 int frakhack=0;
-INLINE void do6502()
+int oldczvn;
+int frameskip,fskip;
+int slowdown;
+int us;
+
+void do6502()
 {
         unsigned char val;
         int c;
         int redoins=0;
-        for (c=0;c<20000;c++)
+        Cycles=0;
+        for (c=0;c<312;c++)
+        {
+        while (Cycles<128)
         {
         oldpc=pc;
-        if (frakhack)
-           ram[0xDCF]=0x60;
+//        if (frakhack)
+//           ram[0xDCF]=0x60;
         val=ram[pc++];
         lastins=val;
-        Cycles=2;
+        //Cycles=2;
         doins:
         redoins=0;
         switch (val)
@@ -804,7 +858,7 @@ INLINE void do6502()
                 break;
                 case 0x01:
                 ORA(preindexx());
-                Cycles=6;
+                //Cycles=6;
                 //sprintf(disassemble,"ORA (%X,%X)",GETABS,x);
                 break;
                 case 0x02:
@@ -820,12 +874,12 @@ INLINE void do6502()
                 break;
                 case 0x05:
                 ORA(ram[pc++]);
-                Cycles=3;
+                //Cycles=3;
                 //sprintf(disassemble,"ORA %X     ",GETZP);
                 break;
                 case 0x06:
                 ASL(ram[pc++]);
-                Cycles=5;
+                //Cycles=5;
                 //sprintf(disassemble,"ASL %X     ",GETZP);
                 break;
                 case 0x08:
@@ -842,12 +896,12 @@ INLINE void do6502()
                 break;
                 case 0x0D:
                 ORA(absolute());
-                Cycles=4;
+                //Cycles=4;
                 //sprintf(disassemble,"ORA %X     ",GETABS);
                 break;
                 case 0x0E:
                 ASL(absolute());
-                Cycles=6;
+                //Cycles=6;
                 //sprintf(disassemble,"ASL %X     ",GETABS);
                 break;
                 case 0x10:
@@ -856,17 +910,17 @@ INLINE void do6502()
                 break;
                 case 0x11:
                 ORA(postindexy());
-                Cycles=6;
+                //Cycles=6;
                 //sprintf(disassemble,"ORA (%X)),%X",GETZP,y);
                 break;
                 case 0x15:
                 ORA(zeropagex());
-                Cycles=4;
+                //Cycles=4;
                 //sprintf(disassemble,"ORA %X,%X  ",GETZP,x);
                 break;
                 case 0x16:
                 ASL(zeropagex());
-                Cycles=6;
+                //Cycles=6;
                 //sprintf(disassemble,"ASL %X,%X  ",GETZP,x);
                 break;
                 case 0x18:
@@ -875,42 +929,42 @@ INLINE void do6502()
                 break;
                 case 0x19:
                 ORA(absolutey());
-                Cycles=5;
+                //Cycles=5;
                 //sprintf(disassemble,"ORA %X,%X  ",GETABS,y);
                 break;
                 case 0x1D:
                 ORA(absolutex());
-                Cycles=5;
+                //Cycles=5;
                 //sprintf(disassemble,"ORA %X,%X  ",GETABS,x);
                 break;
                 case 0x1E:
                 ASL(absolutex());
-                Cycles=7;
+                //Cycles=7;
                 //sprintf(disassemble,"ASL %X,%X",GETABS,x);
                 break;
                 case 0x20:
                 JSR(absolute());
-                Cycles=6;
+                //Cycles=6;
                 //sprintf(disassemble,"JSR %X   ",GETABS);
                 break;
                 case 0x21:
                 AND(preindexx());
-                Cycles=6;
+                //Cycles=6;
                 //sprintf(disassemble,"AND (%X,%X)",GETABS,x);
                 break;
                 case 0x24:
                 BIT(ram[pc++]);
-                Cycles=3;
+                //Cycles=3;
                 //sprintf(disassemble,"BIT %X   ",GETZP);
                 break;
                 case 0x25:
                 AND(ram[pc++]);
-                Cycles=3;
+                //Cycles=3;
                 //sprintf(disassemble,"AND %X   ",GETZP);
                 break;
                 case 0x26:
                 ROL(ram[pc++]);
-                Cycles=5;
+                //Cycles=5;
                 //sprintf(disassemble,"ROL %X   ",GETZP);
                 break;
                 case 0x28:
@@ -927,17 +981,17 @@ INLINE void do6502()
                 break;
                 case 0x2C:
                 BIT(absolute());
-                Cycles=4;
+                //Cycles=4;
                 //sprintf(disassemble,"BIT %X  ",GETABS);
                 break;
                 case 0x2D:
                 AND(absolute());
-                Cycles=4;
+                //Cycles=4;
                 //sprintf(disassemble,"AND %X  ",GETABS);
                 break;
                 case 0x2E:
                 ROL(absolute());
-                Cycles=6;
+                //Cycles=6;
                 //sprintf(disassemble,"ROL %X  ",GETABS);
                 break;
                 case 0x30:
@@ -946,17 +1000,17 @@ INLINE void do6502()
                 break;
                 case 0x31:
                 AND(postindexy());
-                Cycles=6;
+                //Cycles=6;
                 //sprintf(disassemble,"AND (%X),%X",GETZP,y);
                 break;
                 case 0x35:
                 AND(zeropagex());
-                Cycles=4;
+                //Cycles=4;
                 //sprintf(disassemble,"AND %X,%X",GETZP,x);
                 break;
                 case 0x36:
                 ROL(zeropagex());
-                Cycles=6;
+                //Cycles=6;
                 //sprintf(disassemble,"ROL %X,%X",GETZP,x);
                 break;
                 case 0x38:
@@ -965,17 +1019,17 @@ INLINE void do6502()
                 break;
                 case 0x39:
                 AND(absolutey());
-                Cycles=5;
+                //Cycles=5;
                 //sprintf(disassemble,"AND %X,%X",GETABS,y);
                 break;
                 case 0x3D:
                 AND(absolutex());
-                Cycles=5;
+                //Cycles=5;
                 //sprintf(disassemble,"AND %X,%X",GETABS,x);
                 break;
                 case 0x3E:
                 ROL(absolutex());
-                Cycles=7;
+                //Cycles=7;
                 //sprintf(disassemble,"ROL %X,%X",GETABS,x);
                 break;
                 case 0x40:
@@ -984,17 +1038,17 @@ INLINE void do6502()
                 break;
                 case 0x41:
                 EOR(preindexx());
-                Cycles=6;
+                //Cycles=6;
                 //sprintf(disassemble,"EOR (%X,%X)",GETABS,x);
                 break;
                 case 0x45:
                 EOR(ram[pc++]);
-                Cycles=3;
+                //Cycles=3;
                 //sprintf(disassemble,"EOR %X   ",GETZP);
                 break;
                 case 0x46:
                 LSR(ram[pc++]);
-                Cycles=5;
+                //Cycles=5;
                 //sprintf(disassemble,"LSR %X   ",GETZP);
                 break;
                 case 0x48:
@@ -1011,17 +1065,17 @@ INLINE void do6502()
                 break;
                 case 0x4C:
                 JMP(absolute());
-                Cycles=3;
+                //Cycles=3;
                 //sprintf(disassemble,"JMP %X ",GETABS);
                 break;
                 case 0x4D:
                 EOR(absolute());
-                Cycles=4;
+                //Cycles=4;
                 //sprintf(disassemble,"EOR %X",GETABS);
                 break;
                 case 0x4E:
                 LSR(absolute());
-                Cycles=6;
+                //Cycles=6;
                 //sprintf(disassemble,"LSR %X",GETABS);
                 break;
                 case 0x50:
@@ -1030,17 +1084,17 @@ INLINE void do6502()
                 break;
                 case 0x51:
                 EOR(postindexy());
-                Cycles=6;
+                //Cycles=6;
                 //sprintf(disassemble,"EOR (%X),%X",GETZP,y);
                 break;
                 case 0x55:
                 EOR(zeropagex());
-                Cycles=4;
+                //Cycles=4;
                 //sprintf(disassemble,"EOR %X,%X",GETZP,x);
                 break;
                 case 0x56:
                 LSR(zeropagex());
-                Cycles=6;
+                //Cycles=6;
                 //sprintf(disassemble,"LSR %X,%X",GETZP,x);
                 break;
                 case 0x58:
@@ -1049,17 +1103,17 @@ INLINE void do6502()
                 break;
                 case 0x59:
                 EOR(absolutey());
-                Cycles=5;
+                //Cycles=5;
                 //sprintf(disassemble,"EOR %X,%X",GETABS,y);
                 break;
                 case 0x5D:
                 EOR(absolutex());
-                Cycles=5;
+                //Cycles=5;
                 //sprintf(disassemble,"EOR %X,%X",GETABS,x);
                 break;
                 case 0x5E:
                 LSR(absolutex());
-                Cycles=7;
+                //Cycles=7;
                 //sprintf(disassemble,"LSR %X,%X",GETABS,x);
                 break;
                 case 0x60:
@@ -1068,17 +1122,17 @@ INLINE void do6502()
                 break;
                 case 0x61:
                 ADC(preindexx());
-                Cycles=6;
+                //Cycles=6;
                 //sprintf(disassemble,"ADC (%X,%X)",GETABS,x);
                 break;
                 case 0x65:
                 ADC(ram[pc++]);
-                Cycles=3;
+                //Cycles=3;
                 //sprintf(disassemble,"ADC %X  ",GETZP);
                 break;
                 case 0x66:
                 ROR(ram[pc++]);
-                Cycles=5;
+                //Cycles=5;
                 //sprintf(disassemble,"ROR %X  ",GETZP);
                 break;
                 case 0x68:
@@ -1095,17 +1149,17 @@ INLINE void do6502()
                 break;
                 case 0x6C:
                 JMP(indirect());
-                Cycles=5;
+                //Cycles=5;
                 //sprintf(disassemble,"JMP (%X)",GETABS);
                 break;
                 case 0x6D:
                 ADC(absolute());
-                Cycles=4;
+                //Cycles=4;
                 //sprintf(disassemble,"ADC %X",GETABS);
                 break;
                 case 0x6E:
                 ROR(absolute());
-                Cycles=6;
+                //Cycles=6;
                 //sprintf(disassemble,"ROR %X",GETABS);
                 break;
                 case 0x70:
@@ -1114,17 +1168,17 @@ INLINE void do6502()
                 break;
                 case 0x71:
                 ADC(postindexy());
-                Cycles=6;
+                //Cycles=6;
                 //sprintf(disassemble,"ADC (%X),%X",GETZP,y);
                 break;
                 case 0x75:
                 ADC(zeropagex());
-                Cycles=4;
+                //Cycles=4;
                 //sprintf(disassemble,"ADC %X,%X",GETZP,x);
                 break;
                 case 0x76:
                 ROR(zeropagex());
-                Cycles=6;
+                //Cycles=6;
                 //sprintf(disassemble,"ROR %X,%X",GETZP,x);
                 break;
                 case 0x78:
@@ -1133,22 +1187,22 @@ INLINE void do6502()
                 break;
                 case 0x79:
                 ADC(absolutey());
-                Cycles=5;
+                //Cycles=5;
                 //sprintf(disassemble,"ADC %X,%X",GETABS,y);
                 break;
                 case 0x7D:
                 ADC(absolutex());
-                Cycles=5;
+                //Cycles=5;
                 //sprintf(disassemble,"ADC %X,%X",GETABS,x);
                 break;
                 case 0x7E:
                 ROR(absolutex());
-                Cycles=7;
+                //Cycles=7;
                 //sprintf(disassemble,"ROR %X,%X",GETABS,x);
                 break;
                 case 0x81:
                 STA(preindexx());
-                Cycles=6;
+                //Cycles=6;
                 //sprintf(disassemble,"STA (%X,%X)",GETABS,x);
                 break;
                 case 0x84:
@@ -1174,17 +1228,17 @@ INLINE void do6502()
                 break;
                 case 0x8C:
                 STY(absolute());
-                Cycles=4;
+                //Cycles=4;
                 //sprintf(disassemble,"STY %X",GETABS);
                 break;
                 case 0x8D:
                 STA(absolute());
-                Cycles=4;
+                //Cycles=4;
                 //sprintf(disassemble,"STA %X",GETABS);
                 break;
                 case 0x8E:
                 STX(absolute());
-                Cycles=4;
+                //Cycles=4;
                 //sprintf(disassemble,"STX %X",GETABS);
                 break;
                 case 0x90:
@@ -1193,7 +1247,7 @@ INLINE void do6502()
                 break;
                 case 0x91:
                 STA(postindexy());
-                Cycles=6;
+                //Cycles=6;
                 //sprintf(disassemble,"STA (%X),%X",GETZP,y);
                 break;
                 case 0x92:
@@ -1209,17 +1263,17 @@ INLINE void do6502()
                 break;
                 case 0x94:
                 STY(zeropagex());
-                Cycles=4;
+                //Cycles=4;
                 //sprintf(disassemble,"ORA %X,%X",GETZP,x);
                 break;
                 case 0x95:
                 STA(zeropagex());
-                Cycles=4;
+                //Cycles=4;
                 //sprintf(disassemble,"ORA %X,%X",GETZP,x);
                 break;
                 case 0x96:
                 STX(zeropagey());
-                Cycles=4;
+                //Cycles=4;
                 //sprintf(disassemble,"STX %X,%X",GETZP,y);
                 break;
                 case 0x98:
@@ -1229,7 +1283,7 @@ INLINE void do6502()
                 break;
                 case 0x99:
                 STA(absolutey());
-                Cycles=5;
+                //Cycles=5;
                 //sprintf(disassemble,"STA %X,%X",GETABS,y);
                 break;
                 case 0x9A:
@@ -1238,7 +1292,7 @@ INLINE void do6502()
                 break;
                 case 0x9D:
                 STA(absolutex());
-                Cycles=5;
+                //Cycles=5;
                 //sprintf(disassemble,"STA %X,%X",GETABS,x);
                 break;
                 case 0xA0:
@@ -1247,7 +1301,7 @@ INLINE void do6502()
                 break;
                 case 0xA1:
                 LDA(preindexx());
-                Cycles=6;
+                //Cycles=6;
                 //sprintf(disassemble,"LDA (%X,%X)",GETABS,x);
                 break;
                 case 0xA2:
@@ -1256,17 +1310,17 @@ INLINE void do6502()
                 break;
                 case 0xA4:
                 LDY(ram[pc++]);
-                Cycles=3;
+                //Cycles=3;
                 //sprintf(disassemble,"LDY %X    ",GETZP);
                 break;
                 case 0xA5:
                 LDA(ram[pc++]);
-                Cycles=3;
+                //Cycles=3;
                 //sprintf(disassemble,"LDA %X    ",GETZP);
                 break;
                 case 0xA6:
                 LDX(ram[pc++]);
-                Cycles=3;
+                //Cycles=3;
                 //sprintf(disassemble,"LDX %X    ",GETZP);
                 break;
                 case 0xA8:
@@ -1285,17 +1339,17 @@ INLINE void do6502()
                 break;
                 case 0xAC:
                 LDY(absolute());
-                Cycles=4;
+                //Cycles=4;
                 //sprintf(disassemble,"LDY %X  ",GETABS);
                 break;
                 case 0xAD:
                 LDA(absolute());
-                Cycles=4;
+                //Cycles=4;
                 //sprintf(disassemble,"LDA %X  ",GETABS);
                 break;
                 case 0xAE:
                 LDX(absolute());
-                Cycles=4;
+                //Cycles=4;
                 //sprintf(disassemble,"LDX %X  ",GETABS);
                 break;
                 case 0xB0:
@@ -1304,22 +1358,22 @@ INLINE void do6502()
                 break;
                 case 0xB1:
                 LDA(postindexy());
-                Cycles=6;
+                //Cycles=6;
                 //sprintf(disassemble,"LDA (%X),%X",GETZP,y);
                 break;
                 case 0xB4:
                 LDY(zeropagex());
-                Cycles=4;
+                //Cycles=4;
                 //sprintf(disassemble,"LDY %X,%X",GETZP,x);
                 break;
                 case 0xB5:
                 LDA(zeropagex());
-                Cycles=4;
+                //Cycles=4;
                 //sprintf(disassemble,"LDA %X,%X",GETZP,x);
                 break;
                 case 0xB6:
                 LDX(zeropagey());
-                Cycles=4;
+                //Cycles=4;
                 //sprintf(disassemble,"LDX %X,%X",GETZP,y);
                 break;
                 case 0xB8:
@@ -1328,7 +1382,7 @@ INLINE void do6502()
                 break;
                 case 0xB9:
                 LDA(absolutey());
-                Cycles=5;
+                //Cycles=5;
                 //sprintf(disassemble,"LDA %X,%X",GETABS,y);
                 break;
                 case 0xBA:
@@ -1338,17 +1392,17 @@ INLINE void do6502()
                 break;
                 case 0xBC:
                 LDY(absolutex());
-                Cycles=5;
+                //Cycles=5;
                 //sprintf(disassemble,"LDY %X,%X",GETABS,x);
                 break;
                 case 0xBD:
                 LDA(absolutex());
-                Cycles=5;
+                //Cycles=5;
                 //sprintf(disassemble,"LDA %X,%X",GETABS,x);
                 break;
                 case 0xBE:
                 LDX(absolutey());
-                Cycles=5;
+                //Cycles=5;
                 //sprintf(disassemble,"LDX %X,%X",GETABS,y);
                 break;
                 case 0xC0:
@@ -1357,22 +1411,22 @@ INLINE void do6502()
                 break;
                 case 0xC1:
                 CMP(preindexx());
-                Cycles=6;
+                //Cycles=6;
                 //sprintf(disassemble,"CMP (%X,%X)",GETABS,x);
                 break;
                 case 0xC4:
                 CPY(ram[pc++]);
-                Cycles=3;
+                //Cycles=3;
                 //sprintf(disassemble,"CPY %X  ",GETZP);
                 break;
                 case 0xC5:
                 CMP(ram[pc++]);
-                Cycles=3;
+                //Cycles=3;
                 //sprintf(disassemble,"CMP %X  ",GETZP);
                 break;
                 case 0xC6:
                 DEC(ram[pc++]);
-                Cycles=5;
+                //Cycles=5;
                 //sprintf(disassemble,"DEC %X  ",GETZP);
                 break;
                 case 0xC8:
@@ -1389,17 +1443,17 @@ INLINE void do6502()
                 break;
                 case 0xCC:
                 CPY(absolute());
-                Cycles=4;
+                //Cycles=4;
                 //sprintf(disassemble,"CPY %X",GETABS);
                 break;
                 case 0xCD:
                 CMP(absolute());
-                Cycles=4;
+                //Cycles=4;
                 //sprintf(disassemble,"CMP %X",GETABS);
                 break;
                 case 0xCE:
                 DEC(absolute());
-                Cycles=6;
+                //Cycles=6;
                 //sprintf(disassemble,"DEC %X",GETABS);
                 break;
                 case 0xD0:
@@ -1408,17 +1462,17 @@ INLINE void do6502()
                 break;
                 case 0xD1:
                 CMP(postindexy());
-                Cycles=6;
+                //Cycles=6;
                 //sprintf(disassemble,"CMP (%X),%X",GETZP,y);
                 break;
                 case 0xD5:
                 CMP(zeropagex());
-                Cycles=4;
+                //Cycles=4;
                 //sprintf(disassemble,"CMP %X,%X",GETZP,x);
                 break;
                 case 0xD6:
                 DEC(zeropagex());
-                Cycles=6;
+                //Cycles=6;
                 //sprintf(disassemble,"DEC %X,%X",GETZP,x);
                 break;
                 case 0xD8:
@@ -1427,17 +1481,17 @@ INLINE void do6502()
                 break;
                 case 0xD9:
                 CMP(absolutey());
-                Cycles=5;
+                //Cycles=5;
                 //sprintf(disassemble,"CMP %X,%X",GETABS,y);
                 break;
                 case 0xDD:
                 CMP(absolutex());
-                Cycles=5;
+                //Cycles=5;
                 //sprintf(disassemble,"CMP %X,%X",GETABS,x);
                 break;
                 case 0xDE:
                 DEC(absolutex());
-                Cycles=7;
+                //Cycles=7;
                 //sprintf(disassemble,"DEC %X,%X",GETABS,x);
                 break;
                 case 0xE0:
@@ -1446,22 +1500,22 @@ INLINE void do6502()
                 break;
                 case 0xE1:
                 SBC(preindexx());
-                Cycles=6;
+                //Cycles=6;
                 //sprintf(disassemble,"SBC (%X,%X)",GETABS,x);
                 break;
                 case 0xE4:
                 CPX(ram[pc++]);
-                Cycles=3;
+                //Cycles=3;
                 //sprintf(disassemble,"CPX %X   ",GETZP);
                 break;
                 case 0xE5:
                 SBC(ram[pc++]);
-                Cycles=3;
+                //Cycles=3;
                 //sprintf(disassemble,"SBC %X  ",GETZP);
                 break;
                 case 0xE6:
                 INC(ram[pc++]);
-                Cycles=5;
+                //Cycles=5;
                 //sprintf(disassemble,"INC %X  ",GETZP);
                 break;
                 case 0xE8:
@@ -1474,17 +1528,17 @@ INLINE void do6502()
                 break;
                 case 0xEC:
                 CPX(absolute());
-                Cycles=4;
+                //Cycles=4;
                 //sprintf(disassemble,"CPX %X",GETABS);
                 break;
                 case 0xED:
                 SBC(absolute());
-                Cycles=4;
+                //Cycles=4;
                 //sprintf(disassemble,"SBC %X",GETABS);
                 break;
                 case 0xEE:
                 INC(absolute());
-                Cycles=6;
+                //Cycles=6;
                 //sprintf(disassemble,"INC %X",GETABS);
                 break;
                 case 0xF0:
@@ -1493,17 +1547,17 @@ INLINE void do6502()
                 break;
                 case 0xF1:
                 SBC(postindexy());
-                Cycles=6;
+                //Cycles=6;
                 //sprintf(disassemble,"SBC (%X),%X",GETABS,y);
                 break;
                 case 0xF5:
                 SBC(zeropagex());
-                Cycles=4;
+                //Cycles=4;
                 //sprintf(disassemble,"SBC %X,%X",GETZP,x);
                 break;
                 case 0xF6:
                 INC(zeropagex());
-                Cycles=6;
+                //Cycles=6;
                 //sprintf(disassemble,"INC %X,%X",GETZP,x);
                 break;
                 case 0xF8:
@@ -1512,29 +1566,29 @@ INLINE void do6502()
                 break;
                 case 0xF9:
                 SBC(absolutey());
-                Cycles=5;
+                //Cycles=5;
                 //sprintf(disassemble,"SBC %X,%X",GETABS,y);
                 break;
                 case 0xFD:
                 SBC(absolutex());
-                Cycles=5;
+                //Cycles=5;
                 //sprintf(disassemble,"SBC %X,%X",GETABS,x);
                 break;
                 case 0xFE:
                 INC(absolutex());
-                Cycles=7;
+                //Cycles=7;
                 //sprintf(disassemble,"INC %X,%X",GETABS,x);
                 break;
                 /*Undocumented instructions*/
                 #ifdef UNDOCUMENTEDINS
                 case 0x03: /*SLO - ASL prex + ORA*/
                 SLO(preindexx());
-                Cycles=6;
+                //Cycles=6;
                 //sprintf(disassemble,"SLO (%X,X) ",GETZP);
                 break;
                 case 0x07: /*SLO - ASL zp + ORA*/
                 SLO(ram[pc++]);
-                Cycles=5;
+                //Cycles=5;
                 //sprintf(disassemble,"SLO %X     ",GETZP);
                 break;
                 case 0x0B: /*ANC - A=byte&A*/
@@ -1543,27 +1597,27 @@ INLINE void do6502()
                 break;
                 case 0x0F: /*SLO - ASL abs + ORA*/
                 SLO(absolute());
-                Cycles=6;
+                //Cycles=6;
                 //sprintf(disassemble,"SLO %X     ",GETABS);
                 break;
                 case 0x13: /*SLO - ASL posty + ORA*/
                 SLO(postindexy());
-                Cycles=8;
+                //Cycles=8;
                 //sprintf(disassemble,"SLO (%X),Y ",GETZP);
                 break;
                 case 0x17: /*SLO - ASL zpx + ORA*/
                 SLO(zeropagex());
-                Cycles=6;
+                //Cycles=6;
                 //sprintf(disassemble,"SLO %X,X   ",GETZP);
                 break;
                 case 0x1B: /*SLO - ASL absy + ORA*/
                 SLO(absolutey());
-                Cycles=7;
+                //Cycles=7;
                 //sprintf(disassemble,"SLO %X,Y   ",GETZP);
                 break;
                 case 0x1F: /*SLO - ASL absx + ORA*/
                 SLO(absolutex());
-                Cycles=7;
+                //Cycles=7;
                 //sprintf(disassemble,"SLO %X,X   ",GETZP);
                 break;
                 case 0x2B: /*ANC - A=byte&A*/
@@ -1572,123 +1626,123 @@ INLINE void do6502()
                 break;
                 case 0x2F: /*RLA - ROL abs + AND*/
                 RLA(absolute());
-                Cycles=6;
+                //Cycles=6;
                 break;
                 case 0x43: /*SRE - LSR + EOR*/
                 SRE(preindexx());
-                Cycles=6;
+                //Cycles=6;
                 break;
                 case 0x47: /*SRE - LSR + EOR*/
                 SRE(ram[pc++]);
-                Cycles=5;
+                //Cycles=5;
                 break;
                 case 0x4B: /*ASR - A=(A&byte)>>1*/
                 ASR(pc++);
                 break;
                 case 0x4F: /*SRE - LSR + EOR*/
                 SRE(absolute());
-                Cycles=6;
+                //Cycles=6;
                 break;
                 case 0x53: /*SRE - LSR + EOR*/
                 SRE(postindexy());
-                Cycles=8;
+                //Cycles=8;
                 break;
                 case 0x57: /*SRE - LSR + EOR*/
                 SRE(zeropagex());
-                Cycles=6;
+                //Cycles=6;
                 break;
                 case 0x5B: /*SRE - LSR + EOR*/
                 SRE(absolutey());
-                Cycles=7;
+                //Cycles=7;
                 break;
                 case 0x5F: /*SRE - LSR + EOR*/
                 SRE(absolutex());
-                Cycles=7;
+                //Cycles=7;
                 break;
                 case 0x63: /*RRA - ROR + ADC*/
                 RRA(preindexx());
-                Cycles=6;
+                //Cycles=6;
                 break;
                 case 0x67: /*RRA - ROR + ADC*/
                 RRA(ram[pc++]);
-                Cycles=5;
+                //Cycles=5;
                 break;
                 case 0x6B: /*ARR - AND + ROR + weird ADC stuff*/
                 ARR(pc++);
                 break;
                 case 0x6F: /*RRA - ROR + ADC*/
                 RRA(absolute());
-                Cycles=6;
+                //Cycles=6;
                 break;
                 case 0x73: /*RRA - ROR + ADC*/
                 RRA(postindexy());
-                Cycles=8;
+                //Cycles=8;
                 break;
                 case 0x77: /*RRA - ROR + ADC*/
                 RRA(zeropagex());
-                Cycles=6;
+                //Cycles=6;
                 break;
                 case 0x7B: /*RRA - ROR + ADC*/
                 RRA(absolutey());
-                Cycles=7;
+                //Cycles=7;
                 break;
                 case 0x7F: /*RRA - ROR + ADC*/
                 RRA(absolutex());
-                Cycles=7;
+                //Cycles=7;
                 break;
                 case 0x83: /*SAX - store A & X*/
                 SAX(preindexx());
-                Cycles=6;
+                //Cycles=6;
                 break;
                 case 0x87: /*SAX - store A & X*/
                 SAX(ram[pc++]);
-                Cycles=3;
+                //Cycles=3;
                 break;
                 case 0x8B: /*ANE - A=(A|&EE)&x&byte*/
                 ANE(pc++);
                 break;
                 case 0x8F: /*SAX - store A & X*/
                 SAX(absolute());
-                Cycles=4;
+                //Cycles=4;
                 break;
                 case 0x93: /*SHA - mem=(A & X) & (ADDR_HI+1)*/
                 SHA(postindexy());
-                Cycles=6;
+                //Cycles=6;
                 break;
                 case 0x97: /*SAX - store A & X*/
                 SAX(zeropagey());
-                Cycles=4;
+                //Cycles=4;
                 break;
                 case 0x9B: /*SHX - mem=X & (ADDR_HI+1)*/
                 SHS(absolutey());
-                Cycles=5;
+                //Cycles=5;
                 break;
                 case 0x9C: /*SHY - mem=Y & (ADDR_HI+1)*/
                 SHY(absolutex());
-                Cycles=5;
+                //Cycles=5;
                 break;
                 case 0x9E: /*SHX - mem=X & (ADDR_HI+1)*/
                 SHX(absolutey());
-                Cycles=5;
+                //Cycles=5;
                 break;
                 case 0x9F: /*SHA - mem=(A&X)&(ADDR_HI+1)*/
                 SHA(absolutey());
-                Cycles=5;
+                //Cycles=5;
                 break;
                 case 0xAB: /*LXA - A=X=(A&byte) - apparently some randomness involved?*/
                 LXA(pc++);
                 break;
                 case 0xAF: /*LAX - A=X=byte*/
                 LAX(absolute());
-                Cycles=4;
+                //Cycles=4;
                 break;
                 case 0xBB: /*LAS - X=S=A=(S&byte)*/
                 LAS(absolutey());
-                Cycles=5;
+                //Cycles=5;
                 break;
                 case 0xC3: /*DCP - DEC + CMP*/
                 DCP(preindexx());
-                Cycles=6;
+                //Cycles=6;
                 break;
                 case 0xC7: /*DCP - DEC + CMP*/
                 DCP(ram[pc++]);
@@ -1698,50 +1752,50 @@ INLINE void do6502()
                 break;
                 case 0xCF: /*DCP - DEC + CMP*/
                 DCP(absolute());
-                Cycles=6;
+                //Cycles=6;
                 break;
                 case 0xD3: /*DCP - DEC + CMP*/
                 DCP(postindexy());
-                Cycles=8;
+                //Cycles=8;
                 break;
                 case 0xD7: /*DCP - DEC + CMP*/
                 DCP(zeropagex());
-                Cycles=6;
+                //Cycles=6;
                 break;
                 case 0xDB: /*DCP - DEC + CMP*/
                 DCP(absolutey());
-                Cycles=7;
+                //Cycles=7;
                 break;
                 case 0xDF: /*DCP - DEC + CMP*/
                 DCP(absolutex());
-                Cycles=7;
+                //Cycles=7;
                 break;
                 case 0xE3: /*ISB - mem=mem+1, A=A-mem*/
                 ISB(preindexx());
-                Cycles=6;
+                //Cycles=6;
                 break;
                 case 0xE7: /*ISB - mem=mem+1, A=A-mem*/
                 ISB(ram[pc++]);
-                Cycles=5;
+                //Cycles=5;
                 break;
                 case 0xEB: /*SBC imm (undocumented copy of &E9)*/
                 SBC(pc++);
                 break;
                 case 0xEF: /*ISB - mem=mem+1, A=A-mem*/
                 ISB(absolute());
-                Cycles=6;
+                //Cycles=6;
                 break;
                 case 0xF3: /*ISB - mem=mem+1, A=A-mem*/
                 ISB(postindexy());
-                Cycles=8;
+                //Cycles=8;
                 break;
                 case 0xFB: /*ISB - mem=mem+1, A=A-mem*/
                 ISB(absolutey());
-                Cycles=7;
+                //Cycles=7;
                 break;
                 case 0xFF: /*ISB - mem=mem+1, A=A-mem*/
                 ISB(absolutex());
-                Cycles=7;
+                //Cycles=7;
                 break;
                 /*NOPs*/
                 case 0x04:
@@ -1814,84 +1868,60 @@ INLINE void do6502()
                 break;
                 #endif
                 default:
-                closegfx();
+                set_gfx_mode(GFX_TEXT,0,0,0,0);
                 printf("Illegal instruction %X at %X\n",val,pc);
                 exit(-1);
                 break;
         }
         if (redoins)
            goto doins;
-        if (log)
+        if (output)
         {
-                //sprintf(string,"%s \tPC %X A %X X %X Y %X S %X P %X I %X\n",disassemble,pc,a,x,y,s,p,lastins/*,ram[pc-3],ram[pc-2],ram[pc-1],ram[pc+1],ram[pc+2],ram[pc+3],currom*/);
+                if (!logfile)
+                   logfile=fopen("log.txt","wt");
+                sprintf(string,"PC %X A %X X %X Y %X S %X P %X I %X\n",pc,a,x,y,s,p,lastins);
                 fputs(string,logfile);
         }
-        OldNMIStatus=NMIStatus;
-
+        Cycles+=(cycletable[val])?cycletable[val]:4;
+        SysVIA_poll(cycletable[val]);
+        UserVIA_poll(cycletable[val]);
         if (intStatus && !(p&4))
         {
                 doint();
+                Cycles+=7;
+                SysVIA_poll(7);
+                UserVIA_poll(7);
         }
+        }
+        OldNMIStatus=NMIStatus;
+
         TotalCycles+=Cycles;
-//        viacycles+=Cycles;
-//        if (viacycles>255)
-//        {
-                SysVIA_poll(Cycles);
-                UserVIA_poll(Cycles);
-//                viacycles-=256;
-//        }
 
         videodelay+=Cycles;
         screencount+=Cycles;
         if (!scanlinedraw||VideoState.IsTeletext)
         {
-                if (!us)
-                {
-                if (videodelay>40000)
+                if (videodelay>frametime)
                 {
                         SysVIATriggerCA1Int(0);
+                        if (logging)
+                           logsound();
                         if (screencount>fskip)
                         {
                                 doscreen();
                                 screencount-=fskip;
                         }
-                        videodelay-=40000;
-                }
-                }
-                else
-                {
-                if (videodelay>33333)
-                {
-                        SysVIATriggerCA1Int(0);
-                        if (screencount>fskip)
-                        {
-                                doscreen();
-                                screencount-=fskip;
-                        }
-                        videodelay-=33333;
-                }
+                        videodelay-=frametime;
                 }
         }
         else
         {
-                if (videodelay>videoline)
-                {
-                        doscreen();
-                        videodelay-=videoline;
-                }
-                if (!us)
-                {
-                if (scancount==300)
-                   SysVIATriggerCA1Int(1);
+                doscreen();
                 if (scancount==0)
-                   SysVIATriggerCA1Int(0);
-                }
-                else
                 {
-                if (scancount==258)
-                   SysVIATriggerCA1Int(1);
-                if (scancount==0)
-                   SysVIATriggerCA1Int(0);
+                        SysVIATriggerCA1Int(0);
+                        if (logging)
+                           logsound();
                 }
         }
 
@@ -1907,16 +1937,13 @@ INLINE void do6502()
                 }
         }
 
-        printertime+=Cycles;
-        if (printertime>printtarget)
-           pollprinter();
-/*        acaitime-=Cycles;
-        if (acaitime<0)
+        Cycles-=128;
+        if ((NMIStatus) && (!OldNMIStatus))
         {
-                pollacia();
-                acaitime+=33333;
-        }*/
-        numcycles+=Cycles;
-        if ((NMIStatus) && (!OldNMIStatus)) doNMI();
+                doNMI();
+                Cycles+=7;
+                SysVIA_poll(7);
+                UserVIA_poll(7);
+        }
         }
 }
