@@ -1,6 +1,7 @@
-/*B-em 0.71b by Tom Walker*/
+/*B-em 0.8 by Tom Walker*/
 /*ADC emulation*/
 
+#include <stdio.h>
 #include <allegro.h>
 
 int joy1x,joy1y,joy2x,joy2y;
@@ -97,4 +98,22 @@ void initadc()
         adcconvert=0;
 //        load_joystick_data("joystick.dat");
         install_joystick(JOY_TYPE_AUTODETECT);
+}
+
+void saveadcstate(FILE *f)
+{
+        putc(adcstatus,f);
+        putc(adclow,f);
+        putc(adchigh,f);
+        putc(adclatch,f);
+        putc(adcconvert,f);
+}
+
+void loadadcstate(FILE *f)
+{
+        adcstatus=getc(f);
+        adclow=getc(f);
+        adchigh=getc(f);
+        adclatch=getc(f);
+        adcconvert=getc(f);
 }

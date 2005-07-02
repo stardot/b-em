@@ -1,5 +1,4 @@
 /*PC Scancode to BBC col+row table*/
-/*Originally stolen from the DOS port of Beebem, this has been modified a bit*/
 
 unsigned char scan2bbc[128]=              // IBM      SCAN CODE            BBC
 {

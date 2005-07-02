@@ -48,7 +48,7 @@ Version 0.1 finalised
 02/10/00 - Added command line options for model A/B emulation, sound log,
            fixed cycles, etc. Now save sound output to sound.pcm (very out of
            tune though)
-04/10/00 - Changed 76489->samples algorithim, sounds slightly better.
+04/10/00 - Changed 76489->samples algorithm, sounds slightly better.
            Hardwired joystick to no buttons pressed, Bumble Bee now works
 05/10/00 - Added periodic noise to sound code.
 08/10/00 - Added -fixed1 switch, 6502 goes bloody fast but VIAs slow down.
@@ -293,3 +293,33 @@ Version 0.71a finalised
 27/07/04 - Added write commands to 8271 FDC.
            Some more improvements to Windows port.
 Version 0.71b finalised
+26/11/04 - Fixed Planetoids/Super Defender/etc
+27/11/04 - 1770 FDC now recognises single sided discs and generates an error
+           if an access is made to the other side - fixes single sided Level 9
+           adventures in B+ mode.
+28/11/04 - Properly fixed Planetoids/Super Defender/etc
+           Slight hack in User VIA timer 2 to improve Volcano speed
+29/11/04 - Fixed timer 2 overflow behaviour - Volcano now fine without hack.
+           Attempted to improve timing overall.
+30/11/04 - More timing improvements, Frogman now works. 8271 FDC had to be
+           slowed down quite a bit though.
+01/12/04 - Sorted issues with NMI and interrupts - FDC sped up again.
+           Fixed User VIA reset state, Cute To Kill now works again.
+02/12/04 - Faked lightpen updating, Pharoah's Curse now works.
+           Fixed 8271 FDC NMIs
+04/12/04 - Improvements to Tube emulation. Still broken though.
+05/12/04 - Started ARM tube emulation. Speed is tragic. Hangs after startup
+           message.
+10/01/05 - Improvements to Tube emulation. ARM tube now boots (more or less),
+           6502 and Z80 tubes still hang.
+21/01/05 - Altered reset code, *FX200,3 then BREAK on B+ now works.
+22/03/05 - Removed tube emulation for now.
+04/06/05 - Added high pass filter, both filters together sounds very BBCish.
+           Also added SID waveform - sounds quite nice on some games.
+           Timing improved in Master 128 mode - Frogman works there as well now.
+           Added savestates.
+05/06/05 - Fixed some stupid bugs in ACIA emulation - tapes now load properly.
+           Added HQ-UEF support.
+           Config file now human readable
+01/07/05 - Altered video timing a bit, improved Planetoids and Road Runner.
+02/07/05 - Improved sound a little.

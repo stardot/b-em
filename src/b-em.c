@@ -1,10 +1,18 @@
-/*B-em 0.71b by Tom Walker*/
+/*B-em 0.8 by Tom Walker*/
 /*Main loop*/
 
+#include <stdio.h>
 #include <allegro.h>
+#include <winalleg.h>
 #include "b-em.h"
 
-int fullscreen;
+char exname[512];
+int snline;
+int fullscreen,updatewindow;
+char discname[2][260];
+void updatemenu();
+int blurred,mono;
+int hires,ddnoise,curwave,soundfilter;
 void dumpram();
 int model;
 int uefena;
@@ -16,158 +24,586 @@ unsigned char *ram;
 int quit=0;
 char uefname[260];
 
-static int scupdate=0;
-int sndupdate=0;
+/*  Declare Windows procedure  */
+LRESULT CALLBACK WindowProcedure (HWND, UINT, WPARAM, LPARAM);
+
+/*  Make the class name into a global variable  */
+char szClassName[ ] = "WindowsApp";
+HWND ghwnd;
+int infocus;
+
+static int spdcount=0;
 static void update50()
 {
-        scupdate=1;
+        spdcount++;
 }
 END_OF_FUNCTION(update50);
-static void update200()
-{
-        sndupdate=1;
-}
-END_OF_FUNCTION(update200);
 
-int main()
+HMENU menu;
+#define IDM_FILE_LSNAP     40000
+#define IDM_FILE_SSNAP     40001
+#define IDM_FILE_EXIT      40002
+#define IDM_DISC_CHANGE0   40010
+#define IDM_DISC_CHANGE1   40011
+#define IDM_DISC_SOUND     40012
+#define IDM_TAPE_CHANGE    40020
+#define IDM_TAPE_REWIND    40021
+#define IDM_TAPE_ENABLE    40022
+#define IDM_MODEL_PALA     40030
+#define IDM_MODEL_PALB     40031
+#define IDM_MODEL_PALBSW   40032
+#define IDM_MODEL_NTSCB    40033
+#define IDM_MODEL_PALB64   40034
+#define IDM_MODEL_PALB96   40035
+#define IDM_MODEL_PALB128  40036
+#define IDM_MODEL_PALM128  40037
+#define IDM_VIDEO_RES      40040
+#define IDM_VIDEO_FULLSCR  40041
+#define IDM_VIDEO_BLUR     40042
+#define IDM_VIDEO_MONO     40043
+#define IDM_SOUND_ENABLE   40050
+#define IDM_SOUND_LOW      40051
+#define IDM_SOUND_HIGH     40052
+#define IDM_SOUND_WAVEFORM 40053
+#define IDM_SOUND_STARTVGM 40054
+#define IDM_SOUND_STOPVGM  40055
+#define IDM_MISC_SCRSHOT   40060
+#define IDM_RES_LOW        40070
+#define IDM_RES_HIGH       40071
+#define IDM_RES_HIGH2      40072
+#define IDM_RES_2XSAI      40073
+#define IDM_WAVE_SQU       40080
+#define IDM_WAVE_SAW       40081
+#define IDM_WAVE_SIN       40082
+#define IDM_WAVE_TRI       40083
+#define IDM_WAVE_SID       40084
+
+void updatewindowsize(int x, int y)
+{
+        RECT r;
+        GetWindowRect(ghwnd,&r);
+        MoveWindow(ghwnd,r.left,r.top,
+                     x+(GetSystemMetrics(SM_CXFIXEDFRAME)*2),
+                     y+(GetSystemMetrics(SM_CYFIXEDFRAME)*2)+GetSystemMetrics(SM_CYMENUSIZE)+GetSystemMetrics(SM_CYCAPTION)+1,
+                     TRUE);
+}
+
+void makemenu()
+{
+        HMENU hpop,hpop2;
+        menu=CreateMenu();
+        hpop=CreateMenu();
+        AppendMenu(hpop,MF_STRING,IDM_FILE_LSNAP,"&Load Snapshot");
+        AppendMenu(hpop,MF_STRING,IDM_FILE_SSNAP,"&Save Snapshot");
+        AppendMenu(hpop,MF_SEPARATOR,0,NULL);
+        AppendMenu(hpop,MF_STRING,IDM_FILE_EXIT,"E&xit");
+        AppendMenu(menu,MF_POPUP,hpop,"&File");
+        hpop=CreateMenu();
+        AppendMenu(hpop,MF_STRING,IDM_DISC_CHANGE0,"Change Disc &0/2");
+        AppendMenu(hpop,MF_STRING,IDM_DISC_CHANGE1,"Change Disc &1/3");
+        AppendMenu(hpop,MF_STRING,IDM_DISC_SOUND,"&Disc Sounds");
+        AppendMenu(menu,MF_POPUP,hpop,"&Disc");
+        hpop=CreateMenu();
+        AppendMenu(hpop,MF_STRING,IDM_TAPE_CHANGE,"&Change Tape");
+        AppendMenu(hpop,MF_STRING,IDM_TAPE_REWIND,"&Rewind Tape");
+        AppendMenu(hpop,MF_STRING,IDM_TAPE_ENABLE,"&Tape Enable");
+        AppendMenu(menu,MF_POPUP,hpop,"&Tape");
+        hpop=CreateMenu();
+        AppendMenu(hpop,MF_STRING,IDM_MODEL_PALA,"PAL &A");
+        AppendMenu(hpop,MF_STRING,IDM_MODEL_PALB,"PAL &B");
+        AppendMenu(hpop,MF_STRING,IDM_MODEL_PALBSW,"PAL B + &SWRAM");
+        AppendMenu(hpop,MF_STRING,IDM_MODEL_NTSCB,"&NTSC B");
+        AppendMenu(hpop,MF_STRING,IDM_MODEL_PALB64,"PAL B&+");
+        AppendMenu(hpop,MF_STRING,IDM_MODEL_PALB96,"PAL B+&96K");
+        AppendMenu(hpop,MF_STRING,IDM_MODEL_PALB128,"PAL B+&128K");
+        AppendMenu(hpop,MF_STRING,IDM_MODEL_PALM128,"PAL &Master 128");
+        AppendMenu(menu,MF_POPUP,hpop,"&Model");
+        hpop=CreateMenu();
+        hpop2=CreateMenu();
+        AppendMenu(hpop2,MF_STRING,IDM_RES_LOW,"&Low");
+        AppendMenu(hpop2,MF_STRING,IDM_RES_HIGH2,"High With &Scanlines");
+        AppendMenu(hpop2,MF_STRING,IDM_RES_HIGH,"&High");
+        AppendMenu(hpop2,MF_STRING,IDM_RES_2XSAI,"&2xSaI");
+        AppendMenu(hpop,MF_POPUP,hpop2,"&Resolution");
+        AppendMenu(hpop,MF_STRING,IDM_VIDEO_FULLSCR,"&Fullscreen");
+        AppendMenu(hpop,MF_STRING,IDM_VIDEO_BLUR,"&Blur Filter");
+        AppendMenu(hpop,MF_STRING,IDM_VIDEO_MONO,"&Monochrome");
+        AppendMenu(menu,MF_POPUP,hpop,"&Video");
+        hpop=CreateMenu();
+        AppendMenu(hpop,MF_STRING,IDM_SOUND_ENABLE,"Sound &Enable");
+        AppendMenu(hpop,MF_STRING,IDM_SOUND_LOW, "&Low Pass Filter");
+        AppendMenu(hpop,MF_STRING,IDM_SOUND_HIGH,"&High Pass Filter");
+        hpop2=CreateMenu();
+        AppendMenu(hpop2,MF_STRING,IDM_WAVE_SQU,"&Square");
+        AppendMenu(hpop2,MF_STRING,IDM_WAVE_SAW,"S&awtooth");
+        AppendMenu(hpop2,MF_STRING,IDM_WAVE_SIN,"S&ine");
+        AppendMenu(hpop2,MF_STRING,IDM_WAVE_TRI,"&Triangle");
+        AppendMenu(hpop2,MF_STRING,IDM_WAVE_SID,"SI&D");
+        AppendMenu(hpop,MF_POPUP,hpop2,"&Waveform");
+        AppendMenu(hpop,MF_STRING,IDM_SOUND_STARTVGM, "&Start VGM Log");
+        AppendMenu(hpop,MF_STRING,IDM_SOUND_STOPVGM, "S&top VGM Log");
+        AppendMenu(menu,MF_POPUP,hpop,"&Sound");
+        hpop=CreateMenu();
+        AppendMenu(hpop,MF_STRING,IDM_MISC_SCRSHOT,"&Save Screenshot");
+        AppendMenu(menu,MF_POPUP,hpop,"M&isc");
+}
+
+int WINAPI WinMain (HINSTANCE hThisInstance,
+                    HINSTANCE hPrevInstance,
+                    LPSTR lpszArgument,
+                    int nFunsterStil)
 {
         unsigned short *p;
-//        printf("B-em v0.7\n");
-//        atexit(dumpram2);
-        load_config();
-        printf("load_config\n");
-        loadcmos();
-        printf("loadcmos\n");
+        int resetting=0;
+        int framenum=0;
+        char s[160];
+//        FILE *tempf=fopen("temp.txt","wt");
+        /* This is the handle for our window */
+        MSG messages;            /* Here messages to the application are saved */
+        WNDCLASSEX wincl;        /* Data structure for the windowclass */
+
+        /* The Window structure */
+        wincl.hInstance = hThisInstance;
+        wincl.lpszClassName = szClassName;
+        wincl.lpfnWndProc = WindowProcedure;      /* This function is called by windows */
+        wincl.style = CS_DBLCLKS;                 /* Catch double-clicks */
+        wincl.cbSize = sizeof (WNDCLASSEX);
+
+        /* Use default icon and mouse-pointer */
+        wincl.hIcon = LoadIcon (NULL, IDI_APPLICATION);
+        wincl.hIconSm = LoadIcon (NULL, IDI_APPLICATION);
+        wincl.hCursor = LoadCursor (NULL, IDC_ARROW);
+        wincl.lpszMenuName = NULL;                 /* No menu */
+        wincl.cbClsExtra = 0;                      /* No extra bytes after the window class */
+        wincl.cbWndExtra = 0;                      /* structure or the window instance */
+        /* Use Windows's default color as the background of the window */
+        wincl.hbrBackground = (HBRUSH) COLOR_BACKGROUND;
+
+        /* Register the window class, and if it fails quit the program */
+        if (!RegisterClassEx (&wincl))
+           return 0;
+
+        makemenu();
+        /* The class is registered, let's create the program*/
+        ghwnd = CreateWindowEx (
+           0,                   /* Extended possibilites for variation */
+           szClassName,         /* Classname */
+           "B-em v0.8",         /* Title Text */
+           WS_OVERLAPPEDWINDOW&~(WS_MAXIMIZEBOX|WS_SIZEBOX), /* default window */
+           CW_USEDEFAULT,       /* Windows decides the position */
+           CW_USEDEFAULT,       /* where the window ends up on the screen */
+           400+(GetSystemMetrics(SM_CXFIXEDFRAME)*2),/* The programs width */
+           300+(GetSystemMetrics(SM_CYFIXEDFRAME)*2)+GetSystemMetrics(SM_CYMENUSIZE)+GetSystemMetrics(SM_CYCAPTION)+1,/* and height in pixels */
+           HWND_DESKTOP,        /* The window is a child-window to desktop */
+           menu,                /* No menu */
+           hThisInstance,       /* Program Instance handler */
+           NULL                 /* No Window Creation data */
+           );
+
+        /* Make the window visible on the screen */
+        ShowWindow (ghwnd, nFunsterStil);
+        win_set_window(ghwnd);
         allegro_init();
-        printf("allegro_init\n");
+        get_executable_name(exname,511);
+        load_config();
+        if (hires) updatewindowsize(800,600);
+        loadcmos();
         install_keyboard();
-        printf("install_keyboard\n");
         key_led_flag=0;
         install_timer();
-        printf("install_timer\n");
         install_mouse();
-        printf("install_mouse\n");
         initmem();
-        printf("initmem\n");
         loadroms();
-        printf("loadroms\n");
         reset6502();
-        printf("reset6502\n");
         resetsysvia();
-        printf("resetsysvia\n");
         resetuservia();
-        printf("resetuservia\n");
         resetcrtc();
-        printf("resetcrtc\n");
         resetacia();
-        printf("resetacia\n");
         initserial();
-        printf("initserial\n");
         initvideo();
-        printf("initvideo\n");
         initsnd();
-        printf("initsnd\n");
         initadc();
-        printf("initadc\n");
         reset8271(1);
-        printf("reset8271\n");
         reset1770();
-        printf("reset1770\n");
+//        loadarmrom();
+//        resetarm();
+//        resettube();
+//        tubeinit6502();
+//        tubeinitz80();
         loaddiscsamps();
-        printf("loaddiscsamples\n");
         openuef(uefname);
-        printf("openuef\n");
-        if (!uefena && model<4) trapos();
-        printf("trapos\n");
-        set_window_title("B-em 0.71");
+        if (!uefena && model<3) trapos();
         install_int_ex(update50,MSEC_TO_TIMER(20));
-        install_int_ex(update200,BPS_TO_TIMER(65));
-        printf("All initialised\n");
+        CheckMenuItem(menu,model+40030,MF_CHECKED);
+        CheckMenuItem(menu,curwave+40080,MF_CHECKED);
+        updatemenu();
         while (!quit)
         {
-                exec6502(312,128);
-                if (logging) logsound();
-//                drawscr();
-                checkkeys();
-//                poll_joystick();
-                if (soundon && !fullscreen)
+                if (framenum==5 && soundon)
                 {
+//                        fputs("Sound\n",tempf);
+                        framenum=0;
                         p=0;
                         while (!p)
                         {
                                 p=(unsigned short *)get_audio_stream_buffer(as);
-                                sleep(1);
+                                yield_timeslice();
+//                                rest(0);
                         }
-                        updatebuffer(p,624);
+                        updatebuffer(p,3120);
                         free_audio_stream_buffer(as);
+//                        spdcount=1;
+                        snline=0;
                 }
-                else
+                if (infocus && spdcount)
                 {
-                        while (!scupdate)
+                        exec6502(312,128);
+                        if (logging) logsound();
+                        checkkeys();
+                        poll_joystick();
+                        spdcount=0;
+                        framenum++;
+                }
+                if (fullscreen)
+                {
+                        if (key[KEY_F11])
                         {
-                                sleep(1);
-                                if (soundon && sndupdate)
-                                {
-                                        p=(unsigned short *)get_audio_stream_buffer(as);
-                                        if (p)
-                                        {
-                                                updatebuffer(p,624);
-                                                free_audio_stream_buffer(as);
-                                        }
-                                        sndupdate=0;
-                                }
+                                while (key[KEY_F11]) yield_timeslice();
+                                entergui();
                         }
-                        scupdate=0;
-                        if (soundon && sndupdate)
+                        if (mouse_b&2)
                         {
-                                p=(unsigned short *)get_audio_stream_buffer(as);
-                                if (p)
-                                {
-                                        updatebuffer(p,624);
-                                        free_audio_stream_buffer(as);
-                                }
-                                sndupdate=0;
+                                while (mouse_b&2) yield_timeslice();
+                                entergui();
                         }
                 }
-                if (key[KEY_F12])
+                if (updatewindow)
+                {
+                        if (hires) updatewindowsize(800,600);
+                        else       updatewindowsize(400,300);
+                        updatewindow=0;
+                }
+                if (resetting && !key[KEY_F12]) resetting=0;
+                if (key[KEY_F12] && !resetting)
                 {
                         if (key[KEY_LCONTROL] || key[KEY_RCONTROL])
                         {
                                 resetsysvia();
-                                resetuservia();
                                 memset(ram,0,65536);
                         }
-//                        resetacia();
-//                        initserial();
-//                        reset1770();
-//                        reset8271(0);
-                        if (model<2) remaketablesa();
+                        resetuservia();
+                        reset1770s();
+                        reset8271s();
+                        if (model<1) remaketablesa();
                         else         remaketables();
                         reset6502();
+                        resetting=1;
+                }
+                if (PeekMessage(&messages,NULL,0,0,PM_REMOVE))
+                {
+                        if (messages.message==WM_QUIT)
+                           quit=1;
+                        /* Translate virtual-key messages into character messages */
+                        TranslateMessage(&messages);
+                        /* Send message to WindowProcedure */
+                        DispatchMessage(&messages);
+                }
+//                rest(1);
+//                sprintf(s,"B-em %i %i",spdcount,framenum);
+//                set_window_title(s);
+        }
+/*                if (resetting && !key[KEY_F12]) resetting=0;
+                if (key[KEY_F12] && !resetting)
+                {
+                        if (key[KEY_LCONTROL] || key[KEY_RCONTROL])
+                        {
+                                resetsysvia();
+                                memset(ram,0,65536);
+                        }
+                        resetuservia();
+//                        resetacia();
+//                        initserial();
+                        reset1770s();
+                        reset8271s();
+                        if (model<1) remaketablesa();
+                        else         remaketables();
+                        reset6502();
+//                        printf("Reset\n");
+                        resetting=1;
+//                        while (key[KEY_F12])
+//                        {
+//                                sleep(1);
+//                        }
                 }
                 if (key[KEY_F11])
                 {
-                        while (key[KEY_F11]) sleep(1);
+                        while (key[KEY_F11]) yield_timeslice();
                         entergui();
                 }
                 if (mouse_b&2)
                 {
-                        while (mouse_b&2) sleep(1);
+                        while (mouse_b&2) yield_timeslice();
                         entergui();
-                }
-        }
+                }*/
 //        dumpram();
-        allegro_exit();
         save_config();
+        allegro_exit();
         savecmos();
+//        dumpregs();
 //        savebuffers();
 //        dumpregs();
         checkdiscchanged(0);
         checkdiscchanged(1);
-//        dumpram2();
+/*        dumptuberegs();
+        dumptube();
+        dumpram2();
+        dumpuservia();
+        dumparmregs();*/
+//        dumpsysvia();
 //        printf("%i\n",vidbank);
 //        dumpcrtc();
         return 0;
 }
 
-END_OF_MAIN();
+void updatemenu()
+{
+        CheckMenuItem(menu,IDM_RES_LOW,MF_UNCHECKED);
+        CheckMenuItem(menu,IDM_RES_HIGH,MF_UNCHECKED);
+        CheckMenuItem(menu,IDM_RES_HIGH2,MF_UNCHECKED);
+        CheckMenuItem(menu,IDM_RES_2XSAI,MF_UNCHECKED);
+        switch (hires)
+        {
+                case 0: CheckMenuItem(menu,IDM_RES_LOW,MF_CHECKED); break;
+                case 1: CheckMenuItem(menu,IDM_RES_HIGH2,MF_CHECKED); break;
+                case 2: CheckMenuItem(menu,IDM_RES_2XSAI,MF_CHECKED); break;
+                case 3: CheckMenuItem(menu,IDM_RES_HIGH,MF_CHECKED); break;
+        }
+        if (blurred) CheckMenuItem(menu,IDM_VIDEO_BLUR,MF_CHECKED);
+        else         CheckMenuItem(menu,IDM_VIDEO_BLUR,MF_UNCHECKED);
+        if (mono) CheckMenuItem(menu,IDM_VIDEO_MONO,MF_CHECKED);
+        else      CheckMenuItem(menu,IDM_VIDEO_MONO,MF_UNCHECKED);
+        if (uefena) CheckMenuItem(menu,IDM_TAPE_ENABLE,MF_CHECKED);
+        else        CheckMenuItem(menu,IDM_TAPE_ENABLE,MF_UNCHECKED);
+        if (ddnoise) CheckMenuItem(menu,IDM_DISC_SOUND,MF_CHECKED);
+        else         CheckMenuItem(menu,IDM_DISC_SOUND,MF_UNCHECKED);
+        if (soundfilter&1) CheckMenuItem(menu,IDM_SOUND_HIGH,MF_CHECKED);
+        else               CheckMenuItem(menu,IDM_SOUND_HIGH,MF_UNCHECKED);
+        if (soundfilter&2) CheckMenuItem(menu,IDM_SOUND_LOW,MF_CHECKED);
+        else               CheckMenuItem(menu,IDM_SOUND_LOW,MF_UNCHECKED);
+        if (soundon) CheckMenuItem(menu,IDM_SOUND_ENABLE,MF_CHECKED);
+        else         CheckMenuItem(menu,IDM_SOUND_ENABLE,MF_UNCHECKED);
+}
+
+int getfn(HWND hwnd, char *f, char *s, int save, char *de)
+{
+        char fn[512];
+        char start[512];
+        OPENFILENAME ofn;
+        fn[0]=0;
+        start[0]=0;
+        strcpy(fn,s);
+        ZeroMemory(&ofn, sizeof(ofn));
+        ofn.lStructSize = sizeof(ofn);
+        ofn.hwndOwner = hwnd;
+        ofn.lpstrFile = fn;
+        ofn.nMaxFile = 260;
+        ofn.lpstrFilter = f;//"All\0*.*\0Text\0*.TXT\0";
+        ofn.nFilterIndex = 1;
+        ofn.lpstrFileTitle = NULL;
+        ofn.nMaxFileTitle = 0;
+        ofn.lpstrInitialDir = NULL;
+        ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_OVERWRITEPROMPT | 0x10000000;//OFN_FORCESHOWHIDDEN;
+        ofn.lpstrDefExt=de;
+        if (save)
+        {
+                if (GetSaveFileName(&ofn))
+                {
+                        strcpy(s,fn);
+                        return 0;
+                }
+        }
+        else
+        {
+                if (GetOpenFileName(&ofn))
+                {
+                        strcpy(s,fn);
+                        return 0;
+                }
+        }
+        return -1;
+}
+
+/*  This function is called by the Windows function DispatchMessage()  */
+LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+        int c;
+        char s[260];
+        HMENU hmenu;
+        switch (message)                  /* handle the messages */
+        {
+                case WM_COMMAND:
+                switch (LOWORD(wParam))
+                {
+                        case IDM_FILE_LSNAP:
+                        s[0]=0;
+                        if (!getfn(hwnd,"B-em Savestate (*.SNP)\0*.SNP\0All\0*.*\0\0",s,0,"SNP"))
+                           loadstate(s);
+                        return 0;
+                        case IDM_FILE_SSNAP:
+                        s[0]=0;
+                        if (!getfn(hwnd,"B-em Savestate (*.SNP)\0*.SNP\0All\0*.*\0\0",s,1,"SNP"))
+                           savestate(s);
+                        return 0;
+                        case IDM_FILE_EXIT:
+                        PostQuitMessage(0);
+                        return 0;
+                        case IDM_DISC_CHANGE0:
+                        if (!getfn(hwnd,"DFS Single Sided Disc Image (*.SSD)\0*.SSD\0DFS Double Sided Disc Image (*.DSD)\0*.DSD\0ADFS Disc Image (*.ADF)\0*.ADF\0All\0*.*\0\0",discname[0],0,"SSD"))
+                        {
+                                for (c=0;c<strlen(discname[0]);c++)
+                                {
+                                        if (discname[0][c]=='.')
+                                        {
+                                                c++;
+                                                break;
+                                        }
+                                }
+                                if ((discname[0][c]=='d'||discname[0][c]=='D')&&(c!=strlen(discname[0])))
+                                   load8271dsd(discname[0],0);
+                                else if ((discname[0][c]=='a'||discname[0][c]=='A')&&(c!=strlen(discname[0])))
+                                   load1770adfs(discname[0],0);
+                                else if (c!=strlen(discname[0]))
+                                   load8271ssd(discname[0],0);
+                        }
+                        return 0;
+                        case IDM_DISC_CHANGE1:
+                        if (!getfn(hwnd,"DFS Single Sided Disc Image (*.SSD)\0*.SSD\0DFS Double Sided Disc Image (*.DSD)\0*.DSD\0ADFS Disc Image (*.ADF)\0*.ADF\0All\0*.*\0\0",discname[1],0,"SSD"))
+                        {
+                                for (c=0;c<strlen(discname[1]);c++)
+                                {
+                                        if (discname[1][c]=='.')
+                                        {
+                                                c++;
+                                                break;
+                                        }
+                                }
+                                if ((discname[1][c]=='d'||discname[1][c]=='D')&&(c!=strlen(discname[1])))
+                                   load8271dsd(discname[1],0);
+                                else if ((discname[1][c]=='a'||discname[1][c]=='A')&&(c!=strlen(discname[1])))
+                                   load1770adfs(discname[1],0);
+                                else if (c!=strlen(discname[1]))
+                                   load8271ssd(discname[1],0);
+                        }
+                        return 0;
+                        case IDM_DISC_SOUND:
+                        ddnoise^=1;
+                        updatemenu();
+                        return 0;
+                        case IDM_TAPE_CHANGE:
+                        if (!getfn(hwnd,"UEF Tape Image (*.UEF)\0*.UEF\0All\0*.*\0\0",uefname,0,"UEF"))
+                           openuef(uefname);
+                        return 0;
+                        case IDM_TAPE_REWIND:
+                        rewindit();
+                        return 0;
+                        case IDM_TAPE_ENABLE:
+                        uefena^=1;
+                        if (uefena) loadroms();
+                        else if (model>2) trapos();
+                        updatemenu();
+                        return 0;
+                        case IDM_MODEL_PALA: case IDM_MODEL_PALB:
+                        case IDM_MODEL_PALBSW: case IDM_MODEL_NTSCB:
+                        case IDM_MODEL_PALB64: case IDM_MODEL_PALB96:
+                        case IDM_MODEL_PALB128: case IDM_MODEL_PALM128:
+                        CheckMenuItem(menu,model+40030,MF_UNCHECKED);
+                        CheckMenuItem(menu,LOWORD(wParam),MF_CHECKED);
+                        model=LOWORD(wParam)-40030;
+                        if (model) remaketables();
+                        else       remaketablesa();
+                        loadroms();
+                        reset6502();
+                        reset8271(0);
+                        reset1770();
+                        resetsysvia();
+                        resetuservia();
+                        memset(ram,0,65536);
+                        return 0;
+                        case IDM_RES_LOW:
+                        hires=0;
+                        updategfxmode();
+                        updatemenu();
+                        updatewindowsize(400,300);
+                        return 0;
+                        case IDM_RES_HIGH:
+                        hires=3;
+                        updategfxmode();
+                        updatemenu();
+                        updatewindowsize(800,600);
+                        return 0;
+                        case IDM_RES_HIGH2:
+                        hires=1;
+                        updategfxmode();
+                        updatemenu();
+                        updatewindowsize(800,600);
+                        return 0;
+                        case IDM_RES_2XSAI:
+                        hires=2;
+                        updategfxmode();
+                        updatemenu();
+                        updatewindowsize(800,600);
+                        return 0;
+                        case IDM_VIDEO_FULLSCR:
+                        fullscreen=1;
+                        updategfxmode();
+                        return 0;
+                        case IDM_VIDEO_BLUR:
+                        blurred^=1;
+                        updatemenu();
+                        return 0;
+                        case IDM_VIDEO_MONO:
+                        mono^=1;
+                        updatepalette();
+                        updatemenu();
+                        return 0;
+                        case IDM_MISC_SCRSHOT:
+                        s[0]=0;
+                        if (!getfn(hwnd,"Bitmap (*.BMP)\0*.BMP\0All\0*.*\0\0",s,1,"BMP"))
+                           scrshot(s);
+                        return 0;
+                        case IDM_WAVE_SQU: case IDM_WAVE_SAW: case IDM_WAVE_SIN:
+                        case IDM_WAVE_TRI: case IDM_WAVE_SID:
+                        CheckMenuItem(menu,curwave+40080,MF_UNCHECKED);
+                        CheckMenuItem(menu,LOWORD(wParam),MF_CHECKED);
+                        curwave=LOWORD(wParam)-40080;
+                        return 0;
+                        case IDM_SOUND_ENABLE:
+                        soundon^=1;
+                        if (!soundon) stop_audio_stream(as);
+                        else          as=play_audio_stream(3120,16,0,31200,255,127);
+                        updatemenu();
+                        return 0;
+                        case IDM_SOUND_HIGH:
+                        soundfilter^=1;
+                        updatemenu();
+                        return 0;
+                        case IDM_SOUND_LOW:
+                        soundfilter^=2;
+                        updatemenu();
+                        return 0;
+                }
+                return DefWindowProc (hwnd, message, wParam, lParam);
+                case WM_SETFOCUS:
+                infocus=1;
+                break;
+                case WM_KILLFOCUS:
+                infocus=0;
+                break;
+                case WM_DESTROY:
+                PostQuitMessage (0);       /* send a WM_QUIT to the message queue */
+                break;
+                default:                      /* for messages that we don't deal with */
+                return DefWindowProc (hwnd, message, wParam, lParam);
+        }
+        return 0;
+}

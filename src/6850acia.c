@@ -1,6 +1,6 @@
-/*B-em 0.71b by Tom Walker*/
+/*B-em 0.8 by Tom Walker*/
 /*6850 acia emulation*/
-/*God this is old :)*/
+
 #include <stdio.h>
 #include "acia.h"
 #include "serial.h"
@@ -8,6 +8,8 @@
 #define DCD     4
 #define RECIEVE 1
 
+unsigned short pc;
+int chunklen;
 int lns;
 int dreg=0;
 int output;
@@ -30,11 +32,11 @@ void updateaciaint()
         }
         else
            interrupt&=~4;
+//        printf("Update int %02X %02X %i\n",aciasr,aciacr,interrupt);
 }
 
 void resetacia()
 {
-        aciadrf=0;
         aciasr=(aciasr&8)|4;
         updateaciaint();
 }
@@ -45,25 +47,15 @@ unsigned char readacia(unsigned short addr)
         unsigned char temp;
         if (addr&1)
         {
-//                printf("Reading ACIA data %02X %i %i\n",aciadr,lns,dreg);
                 aciasr&=~0x81;
                 updateaciaint();
                 temp=aciadr;
-                if (dreg==2) aciadr=aciadrs;
-                if (dreg) dreg--;
+//                printf("Read data %02X\n",temp);
                 return temp;
         }
         else
         {
-//                sprintf(s,"Reading 6850 status reg %02X\n",aciasr);
-//                fputs(s,tapelog);
-                if (aciasr&DCD && !cleardcd)
-                   cleardcd=2;
-                else if (aciasr&DCD)
-                {
-                        cleardcd--;
-                        if (!cleardcd) aciasr&=~DCD;
-                }
+//                printf("Read status %02X\n",aciasr);
                 return aciasr;
         }
 }
@@ -72,19 +64,15 @@ void writeacia(unsigned short addr, unsigned char val)
 {
         if (addr&1)
         {
-//                sprintf(s,"Writing 6850 data reg %02X\n",val);
-//                fputs(s,tapelog);
                 aciadr=val;
                 aciasr&=0xFD;
         }
         else
         {
-//                sprintf(s,"Writing 6850 control reg %02X\n",val);
-//                fputs(s,tapelog);
-//                printf("Write CR %02X\n",val);
                 aciacr=val;
                 if (val==3)
                    resetacia();
+//                printf("Write CTRL %02X %04X\n",val,pc);
         }
 }
 
@@ -92,56 +80,24 @@ void dcd()
 {
         aciasr|=DCD|0x80;
         updateaciaint();
-//        printf("DCD high\n");
-//        if (aciacr&0x80) interrupt|=4;
 }
 
 void dcdlow()
 {
-        aciasr|=0x80;
         aciasr&=~DCD;
         updateaciaint();
-//        printf("DCD low\n");
-//        if (aciacr&0x80) interrupt|=4;
 }
 
 void receive(unsigned char val) /*Called when the acia recives some data*/
 {
-        char s[80];
-//        printf("Receiving %02X %i\n",val,lns);
-//        printf("Receiving %02X %02X %02X\n",val,aciacr,aciasr);
-//        sprintf(s,"Writing %02X to acia\n",val);
-//        fputs(s,tapelog);
-        if (!dreg)
-        {
-                aciadr=val;
-                dreg=1;
-        }
-        else if (dreg==1)
-        {
-                aciadrs=val;
-                dreg=2;
-        }
-        else
-        {
-//                printf("Missed a byte\n");
-        }
-        aciadrf=1;
+        aciadr=val;
         aciasr|=RECIEVE|0x80;
         updateaciaint();
-//        output=1;
+//        printf("Recieved %02X\n",val);
 }
 
 void pollacia()
 {
         if (motor)
-        {
-                if (dreg)
-                {
-                        aciasr|=RECIEVE|0x80;
-                        updateaciaint();
-                }
-                else
-                   polltape();
-        }
+           polltape();
 }

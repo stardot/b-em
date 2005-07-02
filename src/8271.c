@@ -1,4 +1,4 @@
-/*B-em 0.71b by Tom Walker*/
+/*B-em 0.8 by Tom Walker*/
 /*8271 FDC emulation*/
 
 #include <stdio.h>
@@ -44,15 +44,24 @@ SAMPLE *motoronsmp;
 void (*docommand)();
 void (*doint)();
 
+char exname[512];
 void loaddiscsamps()
 {
-        seeksmp=load_wav("seek.wav");
-        seek2smp=load_wav("seek2.wav");
-        seek3smp=load_wav("seek3.wav");
-        stepsmp=load_wav("step.wav");
-        motorsmp=load_wav("motor.wav");
-        motoroffsmp=load_wav("motoroff.wav");
-        motoronsmp=load_wav("motoron.wav");
+        char fn[512];
+        append_filename(fn,exname,"seek.wav",511);
+        seeksmp=load_wav(fn);
+        append_filename(fn,exname,"seek2.wav",511);
+        seek2smp=load_wav(fn);
+        append_filename(fn,exname,"seek3.wav",511);
+        seek3smp=load_wav(fn);
+        append_filename(fn,exname,"step.wav",511);
+        stepsmp=load_wav(fn);
+        append_filename(fn,exname,"motor.wav",511);
+        motorsmp=load_wav(fn);
+        append_filename(fn,exname,"motoroff.wav",511);
+        motoroffsmp=load_wav(fn);
+        append_filename(fn,exname,"motoron.wav",511);
+        motoronsmp=load_wav(fn);
         if (!seeksmp) { printf("no seeksmp"); exit(-1); }
         if (!seek2smp) { printf("no seek2"); exit(-1); }
         if (!seek3smp) { printf("no seek3"); exit(-1); }
@@ -261,6 +270,16 @@ void reset8271(int reload)
         }
 }
 
+void reset8271s()
+{
+        int c;
+//        motoroff();
+        statusreg=0;
+        resultreg=0;
+        disctime=0;
+        discint=0;
+}
+
 char str[40];
 
 static inline void NMI()
@@ -336,8 +355,8 @@ void readspecial()
                 retval=drvctrloutp;
                 break;
                 default:
-                set_gfx_mode(GFX_TEXT,0,0,0,0);
-                //printf("Unimplemented 8271 read special register - param %X\n",parameters[0]);
+//                set_gfx_mode(GFX_TEXT,0,0,0,0);
+                printf("Unimplemented 8271 read special register - param %X\n",parameters[0]);
                 exit(-1);
                 break;
         }
@@ -364,9 +383,10 @@ void writespecial()
                 selects[0]=parameters[1]&0x40;
                 selects[1]=parameters[1]&0x80;
                 break;
+                case 0x10: case 0x11: case 0x18: case 0x19: break;
                 default:
                 set_gfx_mode(GFX_TEXT,0,0,0,0);
-                //printf("Unimplemented 8271 write special register - params %X %X\n",parameters[0],parameters[1]);
+                printf("Unimplemented 8271 write special register - params %X %X\n",parameters[0],parameters[1]);
                 exit(-1);
                 break;
         }
@@ -382,8 +402,8 @@ void seek()
                 driveled=1;
                 if (ddnoise)
                 {
-                        play_sample(motorsmp,255,127,1000,TRUE);
-                        play_sample(motoronsmp,255,127,1000,0);
+                        play_sample(motorsmp,127,127,1000,TRUE);
+                        play_sample(motoronsmp,127,127,1000,0);
                 }
         }
         doselects();
@@ -407,22 +427,22 @@ void seek()
         {
                 if (diff==1)
                 {
-                        play_sample(stepsmp,255,127,1000,0);
+                        play_sample(stepsmp,127,127,1000,0);
                         set8271poll(1000);
                 }
                 else if (diff<7)
                 {
-                        play_sample(seeksmp,255,127,1000,0);
+                        play_sample(seeksmp,127,127,1000,0);
                         set8271poll(1000);
                 }
                 else if (diff<30)
                 {
-                        play_sample(seek3smp,255,127,1000,0);
+                        play_sample(seek3smp,127,127,1000,0);
                         set8271poll(1200000);
                 }
                 else
                 {
-                        play_sample(seek2smp,255,127,1000,0);
+                        play_sample(seek2smp,127,127,1000,0);
                         set8271poll(2000000);
                 }
         }
@@ -450,8 +470,8 @@ void readvarlen()
         {
                 if (ddnoise)
                 {
-                        play_sample(motorsmp,255,127,1000,TRUE);
-                        play_sample(motoronsmp,255,127,1000,0);
+                        play_sample(motorsmp,127,127,1000,TRUE);
+                        play_sample(motoronsmp,127,127,1000,0);
                 }
                 driveled=1;
         }
@@ -483,22 +503,22 @@ void readvarlen()
                    set8271poll(BYTETIME);
                 else if (dif==1)
                 {
-                        play_sample(stepsmp,255,127,1000,0);
+                        play_sample(stepsmp,127,127,1000,0);
                         set8271poll(BYTETIME);
                 }
                 else if (dif<7)
                 {
-                        play_sample(seeksmp,255,127,1000,0);
-                        set8271poll(BYTETIME*15);
+                        play_sample(seeksmp,127,127,1000,0);
+                        set8271poll(BYTETIME*7);
                 }
                 else if (dif<30)
                 {
-                        play_sample(seek3smp,255,127,1000,0);
+                        play_sample(seek3smp,127,127,1000,0);
                         set8271poll(1200000);
                 }
                 else
                 {
-                        play_sample(seek2smp,255,127,1000,0);
+                        play_sample(seek2smp,127,127,1000,0);
                         set8271poll(2000000);
                 }
         }
@@ -708,6 +728,7 @@ FDCCOMMAND getcommand(unsigned char comm)
 void commandwrite(unsigned char val)
 {
         FDCCOMMAND comm;
+        if (val==0xF5) return; /*Seems to be written on reset sometimes*/
         presentparam=0;
         statusreg|=0x90;
         //printf("Command write NMI\n");
@@ -720,6 +741,7 @@ void commandwrite(unsigned char val)
                 docommand=NULL;
                 doint=NULL;
                 error8271(0x10);
+                return;
 //                closegfx();
                 printf("Unrecognized 8271 command %X\n",val);
                 exit(-1);

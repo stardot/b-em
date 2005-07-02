@@ -1,8 +1,7 @@
-/*B-em 0.71b by Tom Walker*/
+/*B-em 0.8 by Tom Walker*/
 /*This code currently doesn't do anything.
   It is the beginnings of SASI hard disc emulation
-  but due to lack of docs is not completed or working
-  Anyone want to help?*/
+  but due to lack of docs is not completed or working*/
 /*FC41 format :
   bit 1 - BUSY
   bit 5 - BUSY (as well)

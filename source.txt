@@ -1,7 +1,7 @@
-B-em v0.71b
-===========
+B-em v0.8
+=========
 
-Source for both the DOS and Windows versions are included. One or both
+Source for both the DOS and Windows versions are included. The DOS version
 should/may also compile under Linux/MacOS/QNX/BeOS, although I haven't tried
 this.
 
@@ -20,4 +20,4 @@ Zlib
 Just compile and link all the C files with the above libraries.
 
 Tom Walker
-tommowalker@yahoo.co.uk
+b-em@bbcmicro.com

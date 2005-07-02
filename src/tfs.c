@@ -1,4 +1,4 @@
-/*B-em 0.71b by Tom Walker*/
+/*B-em 0.8 by Tom Walker*/
 /*TFS - tape filing system*/
 
 #include <string.h>
@@ -7,6 +7,7 @@
 #include <allegro.h>
 #include "tfs.h"
 
+int uefena,model;
 unsigned char a,x,y,s;
 unsigned char *ram,os[16384];
 unsigned short pc;
@@ -52,9 +53,11 @@ void loadcatalog()
 
 void trapos()
 {
+        if (uefena || model>2) return;
 //        diskenabled=1;
 //        if (diskenabled)
 //        {
+//printf("OS TRAPPED\n");
                 os[0x327D]=0x92;
                 os[0x31B1]=0x2;
 //                loadcatalog();

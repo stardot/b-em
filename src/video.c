@@ -1,12 +1,16 @@
-/*B-em 0.71b by Tom Walker*/
+/*B-em 0.8 by Tom Walker*/
 /*Video emulation*/
 
+#include <stdio.h>
 #include <allegro.h>
+#include <winalleg.h>
 #include "bbctext.h"
 #include "b-em.h"
 #include "2xsai.h"
 
-int fullscreen;
+int fullscreen=0;
+int chunkid,chunklen,intone;
+int vsyncint=0;
 int hires=1;
 int interlaceline=0;
 int lns;
@@ -91,6 +95,7 @@ void writecrtc(unsigned short addr, unsigned char val)
         else
         {
                 crtc[crtcreg]=val&crtcmask[crtcreg];
+//                if (crtcreg==12 || crtcreg==13) printf("CRTC write %i %i %04X %i %i %i\n",crtcreg,val,pc,vc,sc,curline);
 //                printf("CRTCreg %i=%02X %i\n",crtcreg,val,lns);
 //                if (output) exit(-1);
                 if (crtcreg==6) clear(buffer);
@@ -125,7 +130,7 @@ void updateclut()
         }
 }
 
-void writeula(unsigned short addr, unsigned char val, int line)
+void writeula(unsigned short addr, unsigned char val)
 {
         remakelookup=1;
         if (addr&1)
@@ -154,7 +159,7 @@ void writeula(unsigned short addr, unsigned char val, int line)
 void remaketab()
 {
         int c;
-        if (hires==1)
+        if (hires&1)
         {
                 switch (bbcmode)
                 {
@@ -260,6 +265,13 @@ void remaketab()
                         break;
                 }
         }
+}
+
+void latchpen()
+{
+        int temp=(vc*crtc[9]*128)+(sc*128);
+        crtc[0x10]=(temp>>7)&0x3F;
+        crtc[0x11]=temp<<1;
 }
 
 void initframe()
@@ -441,36 +453,54 @@ void drawmode2lineh()
 {
         int addr=startaddr+sc,x;
         unsigned char val;
+        int xl;
         int xoffset=200-(crtc[1]<<1);
         if (sc&8)
         {
                 hline(buffer,0,physline<<1,800,0);
+                if (hires==3) hline(buffer,0,(physline<<1)+1,800,0);
                 return;
         }
         hline(buffer,0,physline<<1,xoffset<<1,0);
-        for (x=0;x<crtc[1];x++)
+        if (hires==3) hline(buffer,0,(physline<<1)+1,xoffset<<1,0);
+        if (crtc[1]<88) xl=crtc[1];
+        else            xl=88;
+        xoffset=200-(xl<<1);
+        for (x=0;x<xl;x++)
         {
                 if (addr&0x8000) addr-=screenlen[scrsize];
                 val=ram[(addr&vidmask)|vidbank];
                 addr+=8;
                 ((unsigned long *)buffer->line[(physline&511)<<1])[(xoffset>>1)&255]=lookuptabh[val];
                 ((unsigned long *)buffer->line[(physline&511)<<1])[((xoffset>>1)+1)&255]=lookuptabh2[val];
+                if (hires==3)
+                {
+                        ((unsigned long *)buffer->line[((physline&511)<<1)+1])[(xoffset>>1)&255]=lookuptabh[val];
+                        ((unsigned long *)buffer->line[((physline&511)<<1)+1])[((xoffset>>1)+1)&255]=lookuptabh2[val];
+                }
                 xoffset+=4;
         }
         hline(buffer,xoffset<<1,physline<<1,799,0);
+        if (hires==3) hline(buffer,xoffset<<1,(physline<<1)+1,799,0);
 }
 
 void drawmodelowlineh()
 {
         int addr=startaddr+sc,x;
         unsigned char val;
+        int xl;
         int xoffset=200-(crtc[1]<<2);
         if (sc&8)
         {
                 hline(buffer,0,physline<<1,800,0);
+                if (hires==3) hline(buffer,0,(physline<<1)+1,800,0);
                 return;
         }
         hline(buffer,0,physline<<1,xoffset<<1,0);
+        if (hires==3) hline(buffer,0,(physline<<1)+1,xoffset<<1,0);
+        if (crtc[1]<44) xl=crtc[1];
+        else            xl=44;
+        xoffset=200-(xl<<2);
         for (x=0;x<crtc[1];x++)
         {
                 if (addr&0x8000) addr-=screenlen[scrsize];
@@ -480,9 +510,17 @@ void drawmodelowlineh()
                 ((unsigned long *)buffer->line[(physline&511)<<1])[((xoffset>>1)+1)&255]=lookuptabh2[val];
                 ((unsigned long *)buffer->line[(physline&511)<<1])[((xoffset>>1)+2)&255]=lookuptabh3[val];
                 ((unsigned long *)buffer->line[(physline&511)<<1])[((xoffset>>1)+3)&255]=lookuptabh4[val];
+                if (hires==3)
+                {
+                        ((unsigned long *)buffer->line[((physline&511)<<1)+1])[(xoffset>>1)&255]=lookuptabh[val];
+                        ((unsigned long *)buffer->line[((physline&511)<<1)+1])[((xoffset>>1)+1)&255]=lookuptabh2[val];
+                        ((unsigned long *)buffer->line[((physline&511)<<1)+1])[((xoffset>>1)+2)&255]=lookuptabh3[val];
+                        ((unsigned long *)buffer->line[((physline&511)<<1)+1])[((xoffset>>1)+3)&255]=lookuptabh4[val];
+                }
                 xoffset+=8;
         }
         hline(buffer,xoffset<<1,physline<<1,799,0);
+        if (hires==3) hline(buffer,xoffset<<1,(physline<<1)+1,799,0);
 }
 
 int olddbl[64],dbl[64];
@@ -491,10 +529,11 @@ void drawteletextline()
 {
         int addr=startaddr,x,xx,temp2;
         int xoffset=200-(crtc[1]*3);
-        int cr,temp;
+        int cr,temp,xl;
         unsigned char *chrset=teletext_characters;
         int colours[2]={0,7};
         int dblhigh=0,sepgfx=0,flashing=0;
+        char s[160];
         if (!sc)
         {
                 for (x=0;x<64;x++)
@@ -504,12 +543,22 @@ void drawteletextline()
                 }
         }
 //                memcpy(olddbl,dbl,sizeof(dbl));
-        if (hires==1) hline(buffer,0,physline<<1,xoffset<<1,0);
-        else          hline(buffer,0,physline,xoffset,0);
+        if (hires&1) hline(buffer,0,physline<<1,xoffset<<1,0);
+        else         hline(buffer,0,physline,xoffset,0);
+        if (hires==3) hline(buffer,0,(physline<<1)+1,xoffset<<1,0);
 //        memset(buffer->line[physline],0,xoffset);
 //        if (!sc) printf("addr %04X\n",(addr&vidmask)|vidbank);
-        for (x=0;x<crtc[1];x++)
+        chrset=teletext_characters;
+        if (crtc[1]>64) xl=64;
+        else            xl=crtc[1];
+        for (x=0;x<xl;x++)
         {
+/*                if (!buffer)
+                {
+                        sprintf(s,"BUFFER=NULL %i %i %i %i",x,vc,sc,curline);
+                        MessageBox(NULL,s,"B-em",MB_OK);
+                        exit(-1);
+                }*/
                 if (addr&0x8000) addr-=0x400;
                 cr=ram[(addr&vidmask)|vidbank];
 //                if (!sc) printf("%04X : CHR %02X  ",(addr&vidmask)|vidbank,cr);
@@ -551,7 +600,7 @@ void drawteletextline()
                                 case 157:
                                 colours[0]=colours[1];
                                 break;
-                                default:
+//                                default:
 //                                if (cr>127 && cr<160)
 //                                   printf("Bad control character %i\n",cr);
 //                                cr&=127;
@@ -565,37 +614,31 @@ void drawteletextline()
 //                }
                 temp=cr;
                 cr=multable[cr]+sc6;
-                if (dblhigh && chrset==teletext_characters)
+                if (dblhigh && chrset==(unsigned char *)teletext_characters)
                    cr=multable[temp]+((sc>>1)*6);
-                if (dblhigh && olddbl[x] && chrset==teletext_characters) /*Last line was doublehigh*/
+                if (dblhigh && olddbl[x] && chrset==(unsigned char *)teletext_characters) /*Last line was doublehigh*/
                    cr=multable[temp]+((sc>>1)*6)+30;
                 temp2=colours[1];
                 if (flashing && !flash) colours[1]=colours[0];
 //                if (!sc) printf(" %i %i  %i\n",colours[0],colours[1],physline&511);
-                if (hires==1)
+                if (hires&1)
                 {
                         for (xx=0;xx<6;xx++)
                         {
-                                if (chrset[cr++])
+                                buffer->line[(physline&511)<<1][((xoffset+xx)&511)<<1]=colours[chrset[cr]];
+                                buffer->line[(physline&511)<<1][(((xoffset+xx)&511)<<1)+1]=colours[chrset[cr]];
+                                if (hires==3)
                                 {
-                                        buffer->line[(physline&511)<<1][((xoffset+xx)&511)<<1]=colours[1];
-                                        buffer->line[(physline&511)<<1][(((xoffset+xx)&511)<<1)+1]=colours[1];
+                                        buffer->line[((physline&511)<<1)+1][((xoffset+xx)&511)<<1]=colours[chrset[cr]];
+                                        buffer->line[((physline&511)<<1)+1][(((xoffset+xx)&511)<<1)+1]=colours[chrset[cr]];
                                 }
-                                else
-                                {
-                                        buffer->line[(physline&511)<<1][((xoffset+xx)&511)<<1]=colours[0];
-                                        buffer->line[(physline&511)<<1][(((xoffset+xx)&511)<<1)+1]=colours[0];
-                                }
+                                cr++;
                         }
                 }
                 else
                 {
                         for (xx=0;xx<6;xx++)
                         {
-                                if (!buffer)
-                                {
-                                        *(unsigned char *)(0)=1;
-                                }
                                 if (chrset[cr++])
                                    buffer->line[physline&511][(xoffset+xx)&511]=colours[1];
                                 else
@@ -607,8 +650,9 @@ void drawteletextline()
                 addr++;
                 if (!sc) dbl[x]=dblhigh;
         }
-        if (hires==1) hline(buffer,xoffset<<1,physline<<1,799,0);
-        else       hline(buffer,xoffset,physline,399,0);
+        if (hires&1) hline(buffer,xoffset<<1,physline<<1,799,0);
+        else         hline(buffer,xoffset,physline,399,0);
+        if (hires==3) hline(buffer,xoffset<<1,(physline<<1)+1,799,0);
 //        memset(buffer->line[physline]+xoffset,0,400-xoffset);
 }
 
@@ -628,8 +672,9 @@ void drawcursor()
 //        sprintf(st,"_");
         if (flash)
         {
-                if (hires==1) hline(buffer,((tempx*6)+xoffset+1)<<1,((tempy*10)+firstline+9)<<1,(((tempx*6)+5)+xoffset)<<1,7);
-                else       hline(buffer,(tempx*6)+xoffset+1,(tempy*10)+firstline+9,((tempx*6)+5)+xoffset,7);
+                if (hires&1) hline(buffer,((tempx*6)+xoffset+1)<<1,((tempy*10)+firstline+9)<<1,(((tempx*6)+5)+xoffset)<<1,7);
+                else         hline(buffer,(tempx*6)+xoffset+1,(tempy*10)+firstline+9,((tempx*6)+5)+xoffset,7);
+                if (hires==3) hline(buffer,((tempx*6)+xoffset+1)<<1,(((tempy*10)+firstline+9)<<1)+1,(((tempx*6)+5)+xoffset)<<1,7);
         }
 //           drawstring(b,font,tempx<<3,tempy<<3,st,15);
 }
@@ -648,16 +693,19 @@ void drawline(int line6502)
         if (curline>511 || physline>511) /*Something has obviously gone wrong in this case*/
         {
                 curline=physline=0;
+                if (model==3) physline+=16;
         }
         if (!curline)
         {
                 sc=vc=0;
                 if (physline>0 && physline<300)
                 {
-                        if (hires==1) memset(buffer->line[physline<<1],0,800);
-                        else       memset(buffer->line[physline],0,400);
+                        if (hires&1)  memset(buffer->line[physline<<1],0,800);
+                        else          memset(buffer->line[physline],0,400);
+                        if (hires==3) memset(buffer->line[(physline<<1)+1],0,800);
                 }
                 delaylcount=crtc[5];
+                initframe();
         }
         if (delaylcount)//curline<crtc[5])
         {
@@ -666,13 +714,13 @@ void drawline(int line6502)
                 physline++;
                 if (physline>0 && physline<300)
                 {
-                        if (hires==1) memset(buffer->line[physline<<1],0,800);
-                        else       memset(buffer->line[physline],0,400);
+                        if (hires&1)  memset(buffer->line[physline<<1],0,800);
+                        else          memset(buffer->line[physline],0,400);
+                        if (hires==3) memset(buffer->line[(physline<<1)+1],0,800);
                 }
                 return;
         }
         tline=curline-crtc[5];
-        if (!vc && !sc) initframe();
         if (vc<crtc[6])
         {
                 if (remakelookup) remaketab();
@@ -680,8 +728,9 @@ void drawline(int line6502)
                 {
                         if (physline>0 && physline<300)
                         {
-                                if (hires==1) memset(buffer->line[physline<<1],0,800);
-                                else       memset(buffer->line[physline],0,400);
+                                if (hires&1)  memset(buffer->line[physline<<1],0,800);
+                                else          memset(buffer->line[physline],0,400);
+                                if (hires==3) memset(buffer->line[(physline<<1)+1],0,800);
                         }
                 }
                 else
@@ -691,23 +740,23 @@ void drawline(int line6502)
                         switch (bbcmode)
                         {
                                 case 0:
-                                if (hires==1) drawmode2lineh();
+                                if (hires&1) drawmode2lineh();
                                 else       drawmode0line();
                                 break;
                                 case 1:
-                                if (hires==1) drawmode2lineh();
+                                if (hires&1) drawmode2lineh();
                                 else       drawmode1line();
                                 break;
                                 case 2:
-                                if (hires==1) drawmode2lineh();
+                                if (hires&1) drawmode2lineh();
                                 else       drawmode2line();
                                 break;
                                 case 4:
-                                if (hires==1) drawmodelowlineh();
+                                if (hires&1) drawmodelowlineh();
                                 else       drawmode4line();
                                 break;
                                 case 5:
-                                if (hires==1) drawmodelowlineh();
+                                if (hires&1) drawmodelowlineh();
                                 else       drawmode5line();
                                 break;
                                 case 7:
@@ -715,7 +764,8 @@ void drawline(int line6502)
                                 drawteletextline();
                                 break;
                                 case 8:
-                                drawmode8line();
+                                if (hires&1) drawmodelowlineh();
+                                else       drawmode8line();
                                 break;
                         }
                 }
@@ -735,8 +785,9 @@ void drawline(int line6502)
         {
                 if (physline>15 && physline<300)
                 {
-                        if (hires==1) memset(buffer->line[physline<<1],0,800);
+                        if (hires&1)  memset(buffer->line[physline<<1],0,800);
                         else          memset(buffer->line[physline],0,400);
+                        if (hires==3) memset(buffer->line[(physline<<1)+1],0,800);
                 }
                 sc++;
                 if (sc==crtc[9]+1 || ((sc==(crtc[9]>>1)+1) && crtc[8]&2))
@@ -750,11 +801,13 @@ void drawline(int line6502)
         linesdrawn++;
         if (vc==crtc[7] && (sc==((crtc[5]==4)?1:3)))
         {
+//                vsyncint=1;
                 vblankint();
 //                printf("Framefly %i\n",lns);
 //                printf("Framefly - after %i lines\n6502 reckons it's line %i, SYSVIA IER %02X, I flag %i, PC %04X\n",linesdrawn,line6502,sysvia.ier,p.i,pc);
                 linesdrawn=0;
                 physline=0;
+                if (model==3) physline+=16;
                 if (bbcmode==7)
                    drawcursor();
                 firstline=0;
@@ -774,12 +827,30 @@ void drawline(int line6502)
                         }
                         else
                            blit(buffer,screen,0,32,0,16,800,568);
+//                        textprintf(screen,font,0,584,makecol(255,255,255),"%03i %02X %04X %i %i     ",blocks,motor,chunkid,chunklen,intone);
                 }
                 else if (hires==2)
                 {
                         blit(buffer,buf16,0,16,0,0,400,284);
                         Super2xSaI(buf16,buf162,0,0,0,0,800,568);
                         blit(buf162,screen,0,0,0,16,800,568);
+                }
+                else if (hires==3)
+                {
+                        if (blurred)
+                        {
+                                for (y=32;y<600;y++)
+                                {
+                                        buffer2->line[y][0]=buffer->line[y][0];
+                                        for (x=1;x<400;x++)
+                                        {
+                                                buffer2->line[y][x<<1]=buffer2->line[y][(x<<1)+1]=128+buffer->line[y][x<<1]+(buffer->line[y][(x-1)<<1]<<3);
+                                        }
+                                }
+                                blit(buffer2,screen,0,32,0,16,800,568);
+                        }
+                        else
+                           blit(buffer,screen,0,32,0,16,800,568);
                 }
                 else
                 {
@@ -882,17 +953,37 @@ void updatepalette()
 
 void updategfxmode()
 {
-        if (hires==2) set_color_depth(16);
-        else          set_color_depth(8);
+        int x,y,depth;
+        set_color_depth(16);
         if (fullscreen)
         {
-                if (hires) set_gfx_mode(GFX_AUTODETECT_FULLSCREEN,800,600,0,0);
-                else       set_gfx_mode(GFX_AUTODETECT_FULLSCREEN,400,300,0,0);
+                if (hires!=2) set_color_depth(8);
+                if (hires)
+                   set_gfx_mode(GFX_AUTODETECT_FULLSCREEN,800,600,0,0);
+                else
+                   set_gfx_mode(GFX_AUTODETECT_FULLSCREEN,400,300,0,0);
         }
         else
         {
-                if (hires) set_gfx_mode(GFX_AUTODETECT_WINDOWED,800,600,0,0);
-                else       set_gfx_mode(GFX_AUTODETECT_WINDOWED,400,300,0,0);
+                if (hires) {x=800; y=600;}
+                else       {x=400; y=300;}
+                depth=desktop_color_depth();
+                if (depth==16)
+                {
+                        set_color_depth(16);
+                        if (set_gfx_mode(GFX_AUTODETECT_WINDOWED,x,y,0,0))
+                        {
+                                set_color_depth(15);
+                                set_gfx_mode(GFX_AUTODETECT_WINDOWED,x,y,0,0);
+                        }
+                }
+                else if (depth)
+                {
+                        set_color_depth(depth);
+                        set_gfx_mode(GFX_AUTODETECT_WINDOWED,x,y,0,0);
+                }
+                else
+                   set_gfx_mode(GFX_AUTODETECT_WINDOWED,x,y,0,0);
         }
         if (mono) set_palette(monopal);
         else      set_palette(beebpal);
@@ -902,6 +993,7 @@ void updategfxmode()
 void initvideo()
 {
         int c;
+        int x,y,depth;
         Init_2xSaI(16);
         for (c=8;c<256;c++)
             beebpal[c]=beebpal[c&7];
@@ -918,16 +1010,36 @@ void initvideo()
         clear(buffer2);
         clear(buf16);
         clear(buf162);
-        if (hires==2) set_color_depth(16);
+        set_color_depth(16);
         if (fullscreen)
         {
-                if (hires) set_gfx_mode(GFX_AUTODETECT_FULLSCREEN,800,600,0,0);
-                else       set_gfx_mode(GFX_AUTODETECT_FULLSCREEN,400,300,0,0);
+                if (hires!=2) set_color_depth(8);
+                if (hires)
+                   set_gfx_mode(GFX_AUTODETECT_FULLSCREEN,800,600,0,0);
+                else
+                   set_gfx_mode(GFX_AUTODETECT_FULLSCREEN,400,300,0,0);
         }
         else
         {
-                if (hires) set_gfx_mode(GFX_AUTODETECT_WINDOWED,800,600,0,0);
-                else       set_gfx_mode(GFX_AUTODETECT_WINDOWED,400,300,0,0);
+                if (hires) {x=800; y=600;}
+                else       {x=400; y=300;}
+                depth=desktop_color_depth();
+                if (depth==16)
+                {
+                        set_color_depth(16);
+                        if (set_gfx_mode(GFX_AUTODETECT_WINDOWED,x,y,0,0))
+                        {
+                                set_color_depth(15);
+                                set_gfx_mode(GFX_AUTODETECT_WINDOWED,x,y,0,0);
+                        }
+                }
+                else if (depth)
+                {
+                        set_color_depth(depth);
+                        set_gfx_mode(GFX_AUTODETECT_WINDOWED,x,y,0,0);
+                }
+                else
+                   set_gfx_mode(GFX_AUTODETECT_WINDOWED,x,y,0,0);
         }
         for (c=0;c<128;c++)
             multable[c]=c*60;
@@ -978,7 +1090,13 @@ void restorepal()
 void scrshot(char *fn)
 {
         if (mono) save_bitmap(fn,buffer,monopal);
-        else      save_bitmap(fn,buffer,beebpal);
+        else
+        {
+                if (save_bmp(fn,buffer,beebpal))
+                {
+                        printf("Save failed : %s\n",allegro_error);
+                }
+        }
 }
 
 void savebuffers()
@@ -987,4 +1105,50 @@ void savebuffers()
         save_bitmap("buffer2.bmp",buffer2,beebpal);
         save_bitmap("buf16.bmp",buf16,beebpal);
         save_bitmap("buf162.bmp",buf162,beebpal);
+}
+
+void savecrtcstate(FILE *f)
+{
+        fwrite(crtc,18,1,f);
+        putc(crtcreg,f);
+        putc(vc,f);
+        putc(sc,f);
+        putc(curline&0xFF,f);
+        putc(curline>>8,f);
+        putc(physline&0xFF,f);
+        putc(physline>>8,f);
+        putc(delaylcount,f);
+        putc(interlaceline,f);
+}
+
+void loadcrtcstate(FILE *f)
+{
+        fread(crtc,18,1,f);
+        crtcreg=getc(f);
+        vc=getc(f);
+        sc=getc(f);
+        sc6=sc*6;
+        curline=getc(f);
+        curline|=(getc(f)<<8);
+        physline=getc(f);
+        physline|=(getc(f)<<8);
+        delaylcount=getc(f);
+        interlaceline=getc(f);
+}
+
+void saveulastate(FILE *f)
+{
+        int c;
+        for (c=0;c<16;c++)
+            putc(clut2[c],f);
+        putc(ulactrl,f);
+}
+
+void loadulastate(FILE *f)
+{
+        int c;
+        for (c=0;c<16;c++)
+            clut2[c]=getc(f);
+        ulactrl=getc(f);
+        writeula(0,ulactrl);
 }

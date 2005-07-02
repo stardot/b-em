@@ -6,7 +6,7 @@
              ██       ▄██          ██         ██          ██
              ██████████▀           █████████  ██          ██
 
-                                 Version 0.71
+                                 Version 0.8
                          A freeware BBC Micro emulator
 
 Introduction
@@ -20,7 +20,7 @@ Features
 - Emulates Models A, B, B+, and Master 128
 - All documented video modes supported
 - All documented and some undocumented 6502 instructions
-- 8271 Floppy Disc Controller emulated (double drive, double sided, 80 track, read/write)
+- 8271 Floppy Disc Controller emulated (double drive, double sided, 80 track, read only)
 - 1770 Floppy Disc Controller emulated (double drive, double sided, 80 track, read/write)
 - Supports six formats for BBC storage on PC - .ssd, .dsd, .adf, .inf, .uef
   and __catalog__
@@ -28,14 +28,22 @@ Features
 - Some CRTC tricks, such as overscan, raster splitting and rupture.
 - Sideways RAM emulation
 - Joystick emulation
+- Save states
 
 
 Differences from last version
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- 8271 FDC now supports writing
-- FDC no longer crashes B-em in The Hobbit
-- Windows version should be more responsive
+- Timing improvements, some stuff that encrypts via timers (eg Frogman) now
+  works
+- VIA improvements - fixed Planetoids/Super Defender/whatever, Volcano and
+  Pharoah's Curse
+- Improvements to sound accuracy, Ghouls and Killer Gorilla (and probably
+  others) have better sound
+- Cassette emulation now much more reliable
+- Save states are implemented again
+- Config file now in English
+- Added high pass sound filter and SID waveform
 
 
 Requirements
@@ -43,8 +51,8 @@ Requirements
 
 B-Em (bbc model B EMulator), requires the following :
 
-A Pentium or better computer (try a P2-350 at least)
-16mb RAM (probably more)
+A Pentium or better computer (try a P233 at least)
+8mb RAM (?)
 
 Eight ROM images are provided with B-em -
 os           - UK BBC MOS
@@ -74,12 +82,16 @@ to.
 400x300 mode doesn't work on some machines. If you end up with a bad display,
 hit CTRL-ALT-END to kill it.
 
+Savestates do not save states of FDCs or serial stuff, so don't save during
+loading.
+
+
 Known bugs
 ~~~~~~~~~~
 
 ADFS corrupts on COMPACT command
 Formatting not supported
-UEF has problems on some games
+Still some timing bugs on protected games (eg Hypersports)
 
 
 Keyboard mapping :
@@ -114,16 +126,19 @@ The options are :
 
 File :
         Return - return to emulator.
+        Load State - Load a saved state.
+        Save State - Save current machine state.
         Exit   - exit to DOS/Windows/whatever.
 
 Model :
         PAL A          - emulate a PAL model A.
         PAL B          - emulate a PAL model B.
-        NTSC B         - emulate an NTSC model B.
+        PAL B + SWRAM  - emulate a PAL model B with sideways RAM.
+        NTSC B         - emulate an NTSC model B with sideways RAM.
         PAL B+         - emulate a PAL model B+ with 64k RAM.
         PAL B+96K      - emulate a PAL model B+ with 96k RAM.
         PAL B+128K     - emulate a PAL model B+ with 128k RAM.
-        PAL Master 128 - emulate a PAL Master 128 (buggy).
+        PAL Master 128 - emulate a PAL Master 128.
 
 Disc :
         Load drive 0/2 - load a disc into drives 0 and 2.
@@ -136,19 +151,20 @@ Tape :
         Tape enable - enables the UEF support, but disables the INF support.
 
 Video :
-        Video mode  - choose windowed or fullscreen, 400x300 or 800x600, and
-                      with or without 2xSaI filter. 400x300 is by far the
-                      fastest, but won't work on some machines.
+        Video mode  - select a video mode. 400x300 is by far the fastest, and
+                      800x600 with 2xSaI the slowest. 400x300 does not work
+                      correctly on some machine though.
         Blur filter - enable a blurring filter. Can make games with hi-res
                       dithering look better.
         Monochrome  - disables colour.
 
 Sound options :
-        Sound enable    - enable/disable sound.
-        Low pass filter - applies a low pass filter to the sound.
-        Waveform        - alters the waveform type. Original BBC uses square.
-        Start VGM log   - start logging sound to an VGM file.
-        Stop VGM log    - stop logging sound.
+        Sound enable     - enable/disable sound.
+        Low pass filter  - applies a low pass filter to the sound.
+        High pass filter - applies a high pass filter to the sound.
+        Waveform         - alters the waveform type. Original BBC uses square.
+        Start VGM log    - start logging sound to an VGM file.
+        Stop VGM log     - stop logging sound.
 
 Misc options :
         Calibrate joystick 1 - Calibrates the first joystick.
@@ -169,16 +185,16 @@ A : If you have a disc image (.ssd, .dsd, .img etc) load it through the disc
     CHAIN""
 
 Q : Why have I got no sound?
-A : B-em should work with any Directsound or waveout compatible card. If it
-    doesn't work, try new drivers.
+A : B-em should work with 100% SoundBlaster compatibles, ESS Audiodrive,
+    Ensoniq Soundscape, and Windoze $ound System. It will not work with cards
+    not in that list (such as Creative's newer SoundBlasters, which aren't
+    really compatible, or sadly the GUS), it will not work with non-100%
+    compatibles with crappy drivers (such as the ones found in laptops) and it
+    will not work if you have a bad BLASTER enviroment label.
     Minor addition to this, if you use a poor quality card (such as a
     SoundBlaster) and you have some sound running in the background in Windows,
     B-em will deliver no sound. The answer is to upgrade to a good card. B-em
     will disable sound in this case, so you have to enable it again afterwards.
-
-Q : What happened to snapshots?
-A : They were removed for technical reasons. They will probably return in the
-    next release (if there is one).
 
 Q : How do I contact you?
 A : E-mail me at b-em@bbcmicro.com
@@ -199,12 +215,13 @@ The User VIA       - Emulated.
                      authentic noise. Only in model B mode.
 1770 FDC           - Double disc, double sided, 40/80 tracks, read/write. With
                      authentic noise. Only in model B+ and Master 128 mode.
-6850 ACIA          - Cassette emulation via UEF files. Occasionally has problems
 tape filing system - Supports .inf and __CATALOG__ format.
 Sound              - All channels emulated, with sample support and some
                      undocumented behaviour (Crazee Rider). With optional low
                      pass filter.
 ADC                - Real joystick emulation, supporting both joysticks.
+6850 ACIA          - Emulated for cassettes. Read only.
+Serial ULA         - Emulated.
 
 
 Hardware NOT emulated
@@ -215,77 +232,6 @@ AMX mouse
 Tube
 Econet
 Printer
-
-
-Tested games :
-~~~~~~~~~~~~~~
-
-Slightly less impressive than before, but the previous lists were over the top.
-Strangely, both the 'working imperfectly' and 'not working' lists are empty
-this time round.
-
-Working perfectly (as far as I know) :
-A & F       Chuckie Egg
-A & F       Cylon Attack
-
-Aardvark    Firetrack
-Aardvark    Frak
-Aardvark    Zalaga
-
-Acornsoft   Arcadians
-Acornsoft   Arcade Action (even works in model A mode)
-Acornsoft   Elite (and Master version)
-Acornsoft   Magic Mushrooms
-Acornsoft   Planetoids
-Acornsoft   Revs
-Acornsoft   Rocket Raid
-
-Audiogenic  Psycastria (Uridium's still better though)
-Audiogenic  Sphere of Destiny
-
-Domark      Empire Strikes Back
-
-Godax       Skirmish
-
-Hewson      Uridium
-
-Imagine     Pedro
-
-Mandarin    Cute To Kill
-
-Micropower  Bumble
-Micropower  Castle Quest
-Micropower  Cybertron
-Micropower  Dr. Who (B+ and Master version)
-Micropower  Ghouls
-
-Superior    Crazee Rider (go for enhanced mode! - not on B+ though)
-Superior    Citadel
-Superior    Citadel 2
-Superior    Codename Droid
-Superior    Exile
-Superior    Galaforce 2
-Superior    Overdrive
-Superior    Pipeline
-Superior    Repton
-Superior    Repton 2
-Superior    Repton 3
-Superior    Road Runner
-Superior    Spellbinder
-Superior    Stryker's Run (also go for enhanced mode - if you can get any enjoyment from this game at all)
-Superior    Vertigo (enhanced yet again)
-
-Tynesoft    Rig Attack
-
-Ultimate    Alien 8
-Ultimate    Cookie
-Ultimate    Jetpac
-Ultimate    Sabre Wulf
-
-US Gold     Impossible Mission
-US Gold     Spy Hunter
-US Gold     Tapper
-
 
 
 Thanks to :
@@ -332,6 +278,10 @@ Tom Walker
 
 b-em@bbcmicro.com
 
+<plug>
+Also check out Elkulator (elkulator.acornelectron.co.uk), my Electron emulator,
+and Arculator (b-em.bbcmicro.com/arculator), my A3xx/A4xx/A3000/A540 emulator
+</plug>
 
 Appendix A : The source code
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -438,57 +388,19 @@ Model B - modelb.bbcmicro.com
 Massively improved over the old versions, this is now one of the best BBC
 emulators and runs pretty much everything.
 
-Beebem - beebem.bbcmicro.com - eventually
+Beebem - www.mikebuk.dsl.pipex.com/beebem
 The most famous BBC emulator. Runs pretty much everything, but is really
 quite slow.
 
 BeebIt - homepages.paradise.net.nz/mjfoot/bbc.htm
-The main BBC emulator for the RiscPC. I can't really comment on this (my ARM6
-is way too slow), but according to the author, it's really really good.
+The main BBC emulator for the RiscPC. I can't really comment on this (my
+RPC600 is far too slow), but according to the author, it's really really good.
 
 pcBBC - can't remember the site address
 One of the few non-free BBC emulators, this one has good compatibility, but
-bad sound and costs money.
+bad sound, an awful interface and costs money.
 
 BeebInC - beebinc.bbcmicro.com
 Seemingly dead, this was one of my favourite emulators. Surprisingly fast and
 compatible, but let down by poor sound (uses sine waves, not square waves) and
 low refresh rate (25 fps instead of 50 fps).
-
-
-Appendix D: Config file format
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-It occured to me that anyone wanting to write a frontend will need this.
-Windows config files are 790 bytes, DOS config files are 789.
-
-Model - 1 byte
-  From the following :
-    0 - PAL model A
-    1 - NTSC model A (doesn't work - there's no such thing apparently)
-    2 - PAL model B
-    3 - NTSC model B
-    4 - PAL model B+
-    5 - PAL model B+96K
-    6 - PAL model B+128K
-    7 - PAL Master 128
-Sound enable - 1 byte (1=enable, 0=disable)
-Sound wave - 1 byte
-  From the following :
-    0 - Square (original)
-    1 - Sawtooth
-    2 - Sine
-    3 - Triangle
-Disc drive noise enable - 1 byte
-Blur filter enable - 1 byte
-Mono enable - 1 byte (1=mono, 0=colour)
-UEF enable - 1 byte (1=UEF, 0=INF (but only on models A & B))
-Sound filter enable - 1 byte
-Resolution - 1 byte
-  0 - 400x300
-  1 - 800x600
-  2 - 800x600 with 2xSaI
-(WINDOWS ONLY) Fullscreen - 1 byte (1=fullscreen, 0=windowed)
-Path to disc 0 - 260 bytes
-Path to disc 1 - 260 bytes
-Path to UEF file - 260 bytes

@@ -1,4 +1,4 @@
-/*B-em 0.71b by Tom Walker*/
+/*B-em 0.8 by Tom Walker*/
 /*System VIA emulation*/
 
 unsigned short pc;
@@ -6,6 +6,8 @@ unsigned short pc;
 #include <stdio.h>
 #include "b-em.h"
 
+char exname[512];
+void updatekeyboard();
 unsigned char *ram;
 void dumpram2()
 {
@@ -70,7 +72,7 @@ void updatesystimers()
         {
                 if (sysvia.t2c<-4)
                 {
-                        sysvia.t2c+=sysvia.t2l+4;
+//                        sysvia.t2c+=sysvia.t2l+4;
                         if (!sysvia.t2hit)
                         {
                                 sysvia.ifr|=TIMER2INT;
@@ -109,14 +111,20 @@ unsigned char cmos[64];
 
 void loadcmos()
 {
-        FILE *f=fopen("cmos.bin","rb");
+        FILE *f;
+        char fn[512];
+        append_filename(fn,exname,"cmos.bin",511);
+        f=fopen(fn,"rb");
         fread(cmos,64,1,f);
         fclose(f);
 }
 
 void savecmos()
 {
-        FILE *f=fopen("cmos.bin","wb");
+        FILE *f;
+        char fn[512];
+        append_filename(fn,exname,"cmos.bin",511);
+        f=fopen(fn,"wb");
         fwrite(cmos,64,1,f);
         fclose(f);
 }
@@ -204,6 +212,10 @@ void writesysvia(unsigned short addr, unsigned char val, int line)
                 sysvia.acr=val;
                 break;
                 case PCR:
+                if ((sysvia.pcr&0xE0)==0xC0 && (val&0xE0)==0xE0)
+                {
+                        latchpen();
+                }
                 sysvia.pcr=val;
                 break;
                 case T1LL:
@@ -260,6 +272,8 @@ void writesysvia(unsigned short addr, unsigned char val, int line)
 unsigned char readsysvia(unsigned short addr)
 {
         unsigned char temp;
+        addr&=0xF;
+//        if (addr>=4 && addr<=9) printf("Read %04X\n",addr);
         switch (addr&0xF)
         {
                 case ORA:
@@ -309,18 +323,18 @@ unsigned char readsysvia(unsigned short addr)
                 sysvia.ifr&=~TIMER1INT;
                 updatesysIFR();
                 if (sysvia.t1c<0) return 0xFF;
-                return (sysvia.t1c>>1)&0xFF;
+                return ((sysvia.t1c+2)>>1)&0xFF;
                 case T1CH:
                 if (sysvia.t1c<0) return 0xFF;
-                return (sysvia.t1c>>1)>>8;
+                return ((sysvia.t1c+2)>>1)>>8;
                 case T2CL:
                 sysvia.ifr&=~TIMER2INT;
                 updatesysIFR();
-                if (sysvia.t2c<0) return 0xFF;
-                return (sysvia.t2c>>1)&0xFF;
+//                if (sysvia.t2c<0) return 0xFF;
+                return ((sysvia.t2c+2)>>1)&0xFF;
                 case T2CH:
-                if (sysvia.t2c<0) return 0xFF;
-                return (sysvia.t2c>>1)>>8;
+//                if (sysvia.t2c<0) return 0xFF;
+                return ((sysvia.t2c+2)>>1)>>8;
                 case ACR:
                 return sysvia.acr;
                 case PCR:
@@ -464,4 +478,72 @@ void initDIPS(unsigned char dips)
                    releasekey(0,c);
                 dips>>=1;
         }
+}
+
+void savesysviastate(FILE *f)
+{
+        fwrite(&sysvia,sizeof(sysvia),1,f);
+        putc(IC32,f);
+        putc(sdbval,f);
+}
+
+void savekeyboardstate(FILE *f)
+{
+        int c,d;
+        putc(keycol,f);
+        putc(keyrow,f);
+        putc(keysdown,f);
+        for (c=0;c<16;c++)
+        {
+                for (d=0;d<16;d++)
+                {
+                        putc(bbckey[c][d],f);
+                }
+        }
+        for (c=0;c<128;c++)
+            putc(keys2[c],f);
+}
+
+void savecmosstate(FILE *f)
+{
+        if (model!=7) return;
+        putc(cmosaddr,f);
+        putc(cmosena,f);
+        putc(cmosrw,f);
+        putc(cmosstrobe,f);
+        putc(cmosold,f);
+}
+
+void loadsysviastate(FILE *f)
+{
+        fread(&sysvia,sizeof(sysvia),1,f);
+        IC32=getc(f);
+        sdbval=getc(f);
+}
+
+void loadkeyboardstate(FILE *f)
+{
+        int c,d;
+        keycol=getc(f);
+        keyrow=getc(f);
+        keysdown=getc(f);
+        for (c=0;c<16;c++)
+        {
+                for (d=0;d<16;d++)
+                {
+                        bbckey[c][d]=getc(f);
+                }
+        }
+        for (c=0;c<128;c++)
+            keys2[c]=getc(f);
+}
+
+void loadcmosstate(FILE *f)
+{
+        if (model!=7) return;
+        cmosaddr=getc(f);
+        cmosena=getc(f);
+        cmosrw=getc(f);
+        cmosstrobe=getc(f);
+        cmosold=getc(f);
 }

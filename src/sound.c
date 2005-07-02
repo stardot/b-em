@@ -1,6 +1,9 @@
-/*B-em 0.71b by Tom Walker*/
+/*B-em 0.8 by Tom Walker*/
 /*Sound emulation*/
 
+#define NOISEBUFFER 32768
+static signed char snperiodic[2][NOISEBUFFER];
+int rectpos=0,rectdir=0;
 int vgmsamples;
 int soundfilter=0;
 void dumpsound();
@@ -21,7 +24,6 @@ FILE *soundf;
 AUDIOSTREAM *as;
 #define SNCLOCK (4000000>>5)
 
-#define NOISEBUFFER 32768
 
 SAMPLE *snsample[4];
 FILE *biglog;
@@ -38,7 +40,7 @@ int lasttone;
 int soundon=1;
 int curwave=0;
 
-signed short snwaves[4][32]=
+signed short snwaves[5][32]=
 {
         {
                 127,127,127,127,127,127,127,127,127,127,127,127,127,127,127,127,
@@ -59,6 +61,14 @@ signed short snwaves[4][32]=
         }
 };
 
+void updaterectwave(int d)
+{
+        int c;
+        c>>=3;
+        for (c=0;c<d;c++) snwaves[4][c]=snperiodic[1][c]=127;
+        for (;c<32;c++)   snwaves[4][c]=snperiodic[1][c]=-127;
+}
+
 void updatesoundwave()
 {
         memcpy(snsample[1]->data,snwaves[soundwave],32);
@@ -76,7 +86,7 @@ static unsigned char snsamples[32] =    /* a simple sine (sort of) wave */
 
 int soundinited=0;
 int soundiniteded;
-static signed char snperiodic[NOISEBUFFER];
+static signed char snperiodic[2][NOISEBUFFER];
 static signed char snperiodic2[32] =
 {
       -127,-127,127,127,127,127,127,127,127,127,127,127,127,127,127,127,
@@ -87,14 +97,23 @@ static unsigned char snnoises[NOISEBUFFER];
 
 fixed sncount[4],snlatch[4],snstat[4];
 int sntone[4];
-int snvols[312][4];
+int snvols[3120][4],snnoise2[3120];
+fixed snlatchs[3120][4];
+int snline;
 
-void logvols(int line)
+void logvols()
 {
-        snvols[311-line][0]=snvol[0];
-        snvols[311-line][1]=snvol[1];
-        snvols[311-line][2]=snvol[2];
-        snvols[311-line][3]=snvol[3];
+        snvols[snline][0]=snvol[0];
+        snvols[snline][1]=snvol[1];
+        snvols[snline][2]=snvol[2];
+        snvols[snline][3]=snvol[3];
+        snlatchs[snline][0]=snlatch[0];
+        snlatchs[snline][1]=snlatch[1];
+        snlatchs[snline][2]=snlatch[2];
+        snlatchs[snline][3]=snlatch[3];
+        snnoise2[snline]=snnoise;
+        snline++;
+        if (snline==1560) snline=0;
 }
 
 void drawsound(BITMAP *b)
@@ -112,6 +131,7 @@ void updatebuffer(signed short *buffer, int len)
         unsigned char oldlast[4];
         float tempf;
         unsigned short *sbuf=buffer;
+        int sidcount=0;
         for (d=0;d<len;d++)
         {
 //                printf("Latch : %i %i %i\n",snlatch[1],snlatch[2],snlatch[3]);
@@ -119,30 +139,52 @@ void updatebuffer(signed short *buffer, int len)
                 for (c=0;c<3;c++)
                 {
                         c++;
-                        if (snlatch[c]>256) buffer[d]+=(snwaves[curwave][snstat[c]]*volslog[snvols[d>>1][c]]);
-                        else                buffer[d]+=volslog[snvols[d>>1][c]]*128;
+                        if (snlatchs[d>>1][c]>256) buffer[d]+=(snwaves[curwave][snstat[c]]*volslog[snvols[d>>1][c]]);
+                        else                       buffer[d]+=volslog[snvols[d>>1][c]]*128;
                         sncount[c]-=8192;
                         while ((int)sncount[c]<0)
                         {
-                                sncount[c]+=snlatch[c];
+                                sncount[c]+=snlatchs[d>>1][c];
                                 snstat[c]++;
                                 snstat[c]&=31;
                         }
                         c--;
                 }
-                if (!(snnoise&4)) buffer[d]+=(snperiodic[snstat[0]]*volslog[snvols[d>>1][0]]);
+                if (!(snnoise2[d>>1]&4))
+                {
+                        if (curwave==4) buffer[d]+=(snperiodic[1][snstat[0]&31]*volslog[snvols[d>>1][0]]);
+                        else            buffer[d]+=(snperiodic[0][snstat[0]]*volslog[snvols[d>>1][0]]);
+                }
                 else              buffer[d]+=(snnoises[snstat[0]]*volslog[snvols[d>>1][0]]);
                 sncount[0]-=512;
                 while ((int)sncount[0]<0)
                 {
-                        sncount[0]+=snlatch[0];
+                        sncount[0]+=snlatchs[d>>1][0];
                         snstat[0]++;
                         snstat[0]&=32767;
                 }
-                if (soundfilter) tempf=(float)lastbuffer[0]*((float)11/(float)16);
+                tempf=0;
+                if (soundfilter&1) tempf+=(float)lastbuffer[0]*((float)11/(float)16);
+                if (soundfilter&2) tempf-=(float)lastbuffer[0]*((float)7/(float)16);
                 if (soundfilter) buffer[d]+=tempf;
                 lastbuffer[1]=lastbuffer[0];
                 lastbuffer[0]=buffer[d];
+                sidcount++;
+                if (sidcount==624)
+                {
+                        sidcount=0;
+                        if (!rectdir)
+                        {
+                                rectpos++;
+                                if (rectpos==30) rectdir=1;
+                        }
+                        else
+                        {
+                                rectpos--;
+                                if (rectpos==1) rectdir=0;
+                        }
+                        updaterectwave(rectpos);
+                }
         }
         for (d=0;d<len;d++) sbuf[d]^=0x8000;
 }
@@ -173,10 +215,10 @@ void initsnd()
       for (c=0;c<NOISEBUFFER;c++)
           snnoises[c]=snnoises[c]*255;
       for (c=32;c<NOISEBUFFER;c++)
-          snperiodic[c]=snperiodic2[c&31];
+          snperiodic[0][c]=snperiodic2[c&31];
       for (c=0;c<32;c++)
           snwaves[3][c]-=128;
-        as=play_audio_stream(624,16,0,31250,255,127);
+        as=play_audio_stream(3120,16,0,31200,255,127);
 /*            for (c=1;c<4;c++)
             {
                   snsample[c]=create_sample(8,0,320,32);
@@ -192,7 +234,10 @@ void initsnd()
                   else
                      exit(-1);
 //                  play_sample(snsample[0],(soundinited)?0:127,127,100*100,TRUE);*/
-      snlatch[0]=snlatch[1]=snlatch[2]=snlatch[3]=0xFFFFF;
+      snlatch[0]=snlatch[1]=snlatch[2]=snlatch[3]=0x3FF<<6;
+      snvol[0]=snvol[1]=snvol[2]=snvol[3]=8;
+      sncount[0]=sncount[1]=sncount[2]=sncount[3]=0;
+      snnoise=3;
       soundinited=1;
 //      }
 //      slog=fopen("slog.pcm","wb");
@@ -284,6 +329,7 @@ void soundwrite(unsigned char data)
                         case 0x10:
                         data&=0xF;
                         snvol[3]=0xF-data;
+//                        printf("Vol 3 %i\n",snvol[3]);
                         break;
                         case 0x20:
                         snfreqlo[2]=data&0xF;
@@ -292,6 +338,7 @@ void soundwrite(unsigned char data)
                         case 0x30:
                         data&=0xF;
                         snvol[2]=0xF-data;
+//                        printf("Vol 2 %i\n",snvol[2]);
                         break;
                         case 0x40:
                         snfreqlo[1]=data&0xF;
@@ -300,8 +347,10 @@ void soundwrite(unsigned char data)
                         case 0x50:
                         data&=0xF;
                         snvol[1]=0xF-data;
+//                        printf("Vol 1 %i\n",snvol[1]);
                         break;
                         case 0x60:
+//                        printf("SNNOISE %01X\n",data&0xF);
                         if ((data&3)!=(snnoise&3)) sncount[0]=0;
                         snnoise=data&0xF;
                         if ((data&3)==3)
@@ -315,21 +364,21 @@ void soundwrite(unsigned char data)
                                 switch (data&3)
                                 {
                                         case 0:
-                                        snlatch[0]=256<<7;
+                                        snlatch[0]=128<<7;
                                         curfreq[0]=SNCLOCK/256;
-                                        snlatch[0]=0x800;
+                                        snlatch[0]=0x400;
                                         sncount[0]=0;
                                         break;
                                         case 1:
-                                        snlatch[0]=512<<7;
+                                        snlatch[0]=256<<7;
                                         curfreq[0]=SNCLOCK/512;
-                                        snlatch[0]=0x1000;
+                                        snlatch[0]=0x800;
                                         sncount[0]=0;
                                         break;
                                         case 2:
-                                        snlatch[0]=1024<<7;
+                                        snlatch[0]=512<<7;
                                         curfreq[0]=SNCLOCK/1024;
-                                        snlatch[0]=0x2000;
+                                        snlatch[0]=0x1000;
                                         sncount[0]=0;
                                         break;
                                         case 3:
@@ -337,6 +386,7 @@ void soundwrite(unsigned char data)
 //                                        printf("SN 0 latch %04X\n",snlatch[0]);
                                         sncount[0]=0;
                                 }
+                                if (snnoise&4) snlatch[0]<<=1;
                         }
                         break;
                         case 0x70:
@@ -362,21 +412,21 @@ void soundwrite(unsigned char data)
                                 switch (data&3)
                                 {
                                         case 0:
-                                        snlatch[0]=256<<7;
+                                        snlatch[0]=128<<7;
                                         curfreq[0]=SNCLOCK/256;
-                                        snlatch[0]=0x800;
+                                        snlatch[0]=0x400;
                                         sncount[0]=0;
                                         break;
                                         case 1:
-                                        snlatch[0]=512<<7;
+                                        snlatch[0]=256<<7;
                                         curfreq[0]=SNCLOCK/512;
-                                        snlatch[0]=0x1000;
+                                        snlatch[0]=0x800;
                                         sncount[0]=0;
                                         break;
                                         case 2:
-                                        snlatch[0]=1024<<7;
+                                        snlatch[0]=512<<7;
                                         curfreq[0]=SNCLOCK/1024;
-                                        snlatch[0]=0x2000;
+                                        snlatch[0]=0x1000;
                                         sncount[0]=0;
                                         break;
                                         case 3:
@@ -384,6 +434,7 @@ void soundwrite(unsigned char data)
 //                                        printf("SN 0 latch %04X\n",snlatch[0]);
                                         sncount[0]=0;
                                 }
+                                if (snnoise&4) snlatch[0]<<=1;
                         }
                         return;
                 }
@@ -533,4 +584,22 @@ void restoresound()
         adjust_sample(snsample[1],snvol[1]<<4,127,curfreq[1]*100,TRUE);
         adjust_sample(snsample[2],snvol[2]<<4,127,curfreq[2]*100,TRUE);
         adjust_sample(snsample[3],snvol[3]<<4,127,curfreq[3]*100,TRUE);
+}
+
+void savesoundstate(FILE *f)
+{
+        fwrite(snlatch,16,1,f);
+        fwrite(sncount,16,1,f);
+        fwrite(snstat,16,1,f);
+        fwrite(snvol,4,1,f);
+        putc(snnoise,f);
+}
+
+void loadsoundstate(FILE *f)
+{
+        fread(snlatch,16,1,f);
+        fread(sncount,16,1,f);
+        fread(snstat,16,1,f);
+        fread(snvol,4,1,f);
+        snnoise=getc(f);
 }
