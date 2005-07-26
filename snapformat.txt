@@ -1,0 +1,61 @@
+Snapshot format :
+
+Header - "BEMSNAP1"
+Machine block -
+ model - 0=PAL A, 2=PAL B, 3=NTSC B, 4=B+, 5=B+96k, 6=B+128k, 7=Master 128 - 1 byte
+ mapped rom no. - 1 byte (includes high bit for B+ and M128 mapping)
+ ACCCON - 1 byte (for B+ and M128)
+ inA - 1 byte
+6502 block -
+ A - 1 byte
+ X - 1 byte
+ Y - 1 byte
+ P - 1 byte
+ S - 1 byte
+ PC - 2 bytes
+ NMI stat - 1 byte
+ INT stat - 1 byte
+CRTC block -
+ CRTC registers - 18 bytes
+ CRTC reg select - 1 byte
+ Current VC - 1 byte
+ Current SC - 1 byte
+ Current logical line - 2 bytes
+ Current physical line - 2 bytes
+ R5 delay left - 1 byte
+ Current line interlace half line - 1 byte
+ULA block -
+ Palette - 16 bytes
+ Control register - 1 byte
+System VIA block
+ Registers - size of VIA struct
+ IC32 status - 1 byte
+ Slow data bus value - 1 byte
+User VIA block
+ Registers - size of VIA struct
+Keyboard block
+ Column - 1 byte
+ Row - 1 byte
+ Keys held down - 1 byte
+ Key matrix - 256 bytes
+CMOS block (M128 only)
+ CMOS address - 1 byte
+ CMOS enable - 1 byte
+ CMOS RW - 1 byte
+ CMOS strobe - 1 byte
+ CMOS strobe old - 1 byte
+Sound block -
+ Latch data - 16 bytes
+ Count data - 16 bytes
+ Stat data  - 16 bytes
+ Volume data - 4 bytes
+ Noise data - 1 byte
+ADC block -
+ Status - 1 byte
+ Low data - 1 byte
+ High data - 1 byte
+ Latch - 1 byte
+ Conversion in progress - 1 byte
+RAM - 32768 bytes
+Other RAM - 32768 bytes (B+ and M128 only)
+Sideways RAM - 32768 or 65536 bytes (Depending on model)

@@ -1,4 +1,4 @@
-/*B-em 0.8 by Tom Walker*/
+/*B-em 0.81 by Tom Walker*/
 /*1770 emulator*/
 #include <allegro.h>
 #include <stdio.h>
@@ -189,6 +189,7 @@ void start1770command(addr)
                 case 5: if (ddnoise) play_sample(stepsmp,127,127,1000,FALSE); set1770poll(2000); break; /*Step in*/
                 case 8: wd1770.status&=~4; if (ddnoise) { play1770seek(wd1770.track); } else { set1770poll(2000); } sectorpos=0; wd1770.curtrack=wd1770.track; wd1770.cursector=wd1770.sector; break; /*Read sector*/
                 case 0xA: wd1770.status&=~4; if (ddnoise) { play1770seek(wd1770.track); } else { set1770poll(2000); } sectorpos=-1; wd1770.curtrack=wd1770.track; wd1770.cursector=wd1770.sector; wd1770.dat=0; break; /*Write sector*/
+                case 0xF: wd1770.status&=~4; set1770poll(2000); sectorpos=0; wd1770.cursector=0; break; /*Write track*/
                 default:
                 printf("Bad 1770 command %01X\n",wd1770.command>>4);
                 dumpregs();
@@ -395,8 +396,30 @@ void poll1770()
                         set1770spindown();
                         return;
                 }
-                nmi|=2;
-                wd1770.status|=2;
+                else
+                {
+                        nmi|=2;
+                        wd1770.status|=2;
+                }
+                set1770poll(200);
+                break;
+
+                case 0xF: /*Write track*/
+                discs[curdisc][curside][(wd1770.curtrack*16)+wd1770.cursector][sectorpos++]=0;
+                if (sectorpos==256)
+                {
+//                        printf("Formatted track %i sector %i\n",wd1770.curtrack,wd1770.cursector);
+                        sectorpos=0;
+                        wd1770.cursector++;
+                        if (wd1770.cursector==(adfs[curdisc]?16:10))
+                        {
+                                wd1770.cursector=0;
+                                wd1770.status&=~1;
+                                nmi|=1;
+                                set1770spindown();
+                                return;
+                        }
+                }
                 set1770poll(200);
                 break;
 

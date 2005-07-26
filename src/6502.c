@@ -1,6 +1,7 @@
-/*B-em 0.8 by Tom Walker*/
+/*B-em 0.81 by Tom Walker*/
 /*6502 emulation*/
 
+char exname[512];
 void shadowram(int stat);
 void exec65c02(int lines, int cpl);
 int tapelcount,tapellatch;
@@ -150,7 +151,10 @@ void remaketablesa()
 void loadmasterroms()
 {
         int c;
-        FILE *f=fopen("roms/mos3.20","rb");
+        FILE *f;
+        char fn[512];
+        append_filename(fn,exname,"roms/mos3.20",511);
+        f=fopen(fn,"rb");
         fread(os,0x4000,1,f);
         memset(rom,0xFF,0x40000);
         for (c=9;c<16;c++)
@@ -168,13 +172,16 @@ void loadroms()
         int finished=0,romslot=0xF;
         FILE *f;
         struct al_ffblk ff;
+        char fn[512],olddir[512];
         if (model==7)
         {
                 loadmasterroms();
                 return;
         }
-        if (chdir("roms"))
-           perror("roms");
+        getcwd(olddir,511);
+        append_filename(fn,exname,"roms",511);
+        if (chdir(fn))
+           perror(fn);
         switch (model)
         {
                 case 0: case 1: case 2: f=fopen("os","rb"); break;
@@ -185,10 +192,12 @@ void loadroms()
         fclose(f);
         switch (model)
         {
-                case 0: if (chdir("a")) perror("a"); break;
-                case 1: case 2: case 3: if (chdir("b")) perror("b"); break;
-                case 4: case 5: case 6: if (chdir("bp")) perror("bp"); break;
+                case 0: append_filename(fn,exname,"roms/a",511); break;
+                case 1: case 2: case 3: append_filename(fn,exname,"roms/b",511); break;
+                case 4: case 5: case 6: append_filename(fn,exname,"roms/bp",511); break;
         }
+        if (chdir(fn))
+           perror(fn);
         al_findfirst("*.rom",&ff,0xFFFF);
         for (c=0;c<16;c++) writeablerom[c]=((model==4)||(model==5)||(model==6))?0:1;
         memset(rom,0,0x40000);
@@ -225,10 +234,8 @@ void loadroms()
                     writeablerom[c]=0;
         }
 //        for (c=0;c<16;c++) printf("Writeable slot %i %i\n",c,writeablerom[c]);
-        if (chdir(".."))
-           perror("..");
-        if (chdir(".."))
-           perror("..");
+        if (chdir(olddir))
+           perror(olddir);
 }
 
 unsigned char acccon=0;

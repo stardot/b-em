@@ -1,4 +1,4 @@
-/*B-em 0.8 by Tom Walker*/
+/*B-em 0.81 by Tom Walker*/
 /*GUI*/
 
 #include <stdio.h>
@@ -78,7 +78,7 @@ void load_config()
         mono=get_config_int(NULL,"monochrome",0);
         uefena=get_config_int(NULL,"uef_enable",1);
         soundfilter=get_config_int(NULL,"sound_filter",3);
-        hires=get_config_int(NULL,"resolution",1);
+        hires=get_config_int(NULL,"resolution",0);
         fullscreen=get_config_int(NULL,"fullscreen",0);
 }
 
@@ -698,4 +698,5 @@ void entergui()
         }
         if ((hires!=oldhires) || (fullscreen!=oldfs)) updategfxmode();
         clear(screen);
+        if (!fullscreen) remove_mouse();
 }

@@ -1,4 +1,4 @@
-/*B-em 0.8 by Tom Walker*/
+/*B-em 0.81 by Tom Walker*/
 /*System VIA emulation*/
 
 unsigned short pc;
@@ -346,12 +346,16 @@ unsigned char readsysvia(unsigned short addr)
         }
 }
 
+void presskey(int row, int col);
+int autoboot;
 void resetsysvia()
 {
         sysvia.ifr=sysvia.ier=0;
         sysvia.t1c=sysvia.t1l=0x1FFFE;
         sysvia.t2c=sysvia.t2l=0x1FFFE;
         sysvia.t1hit=sysvia.t2hit=0;
+        if (autoboot)
+           presskey(0,0);
 }
 
 /*Keyboard*/
@@ -377,7 +381,7 @@ unsigned char codeconvert[128]=
         0,0,0,0,0,0,0,0,
 };
 
-inline void presskey(int row, int col)
+void presskey(int row, int col)
 {
         bbckey[col][row]=1;
         keysdown++;
@@ -385,7 +389,7 @@ inline void presskey(int row, int col)
 //        printf("Key pressed %01X %01X %02X %02X\n",row,col,sysvia.ifr,sysvia.ier);
 }
 
-inline void releasekey(int row, int col)
+void releasekey(int row, int col)
 {
         bbckey[col][row]=0;
         keysdown--;
@@ -427,7 +431,7 @@ void checkkeys()
 //           presskey(1,0);
 //        else
 //           releasekey(1,0);
-        if (key[KEY_RSHIFT]||key[KEY_LSHIFT])
+        if (key[KEY_RSHIFT]||key[KEY_LSHIFT]||autoboot)
            presskey(0,0);
         else
            releasekey(0,0);

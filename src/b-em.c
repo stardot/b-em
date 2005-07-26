@@ -1,4 +1,4 @@
-/*B-em 0.8 by Tom Walker*/
+/*B-em 0.81 by Tom Walker*/
 /*Main loop*/
 
 #include <stdio.h>
@@ -6,6 +6,8 @@
 #include <winalleg.h>
 #include "b-em.h"
 
+int wah=0;
+int autoboot=0;
 char exname[512];
 int snline;
 int fullscreen,updatewindow;
@@ -148,6 +150,83 @@ void makemenu()
         AppendMenu(menu,MF_POPUP,hpop,"M&isc");
 }
 
+void parsecommandline(LPSTR s)
+{
+        char *t;
+        int c;
+        char fn[256],s2[256];
+        int found;
+//        FILE *f=fopen("cmdline.txt","wt");
+        for (t=strtok(s," ");t;t=strtok(0," "))
+        {
+                if (!stricmp(t,"-fullscreen"))
+                   fullscreen=1;
+                if (!stricmp(t,"-disc"))
+                {
+                        found=0;
+                        t=strtok(0," ");
+                        if (!t) return;
+                        if (t[0]=='\"') /*Quoted filename*/
+                        {
+                                strcpy(fn,t+1);
+                                while (1)
+                                {
+//                                        printf("filename : %s\n",fn);
+                                        for (c=0;c<strlen(fn);c++)
+                                        {
+                                                if (fn[c]=='\"')
+                                                {
+                                                        found=1;
+                                                        break;
+                                                }
+                                        }
+                                        if (found) break;
+                                        t=strtok(0," ");
+                                        if (!t) break;
+                                        strcat(fn," ");
+                                        strcat(fn,t);
+                                }
+                                if (!found) return;
+                                fn[c]=0;
+//                                sprintf(s2,"Filename : %s\n",fn);
+//                                fputs(s2,f);
+                                strcpy(discname[0],fn);
+                        }
+                        else
+                           strcpy(discname[0],t);
+/*                        t=strtok(0," ");
+                        if (t)
+                        {
+                                if (t[0]=='"')
+                                strcpy(discname[0],t);
+                        }
+                        else
+                           return;*/
+                }
+                if (!stricmp(t,"-autoboot"))
+                   autoboot=50;
+                if (!stricmp(t,"-esc"))
+                   wah=1;
+                if (!stricmp(t,"-model"))
+                {
+                        t=strtok(0," ");
+                        if (t)
+                        {
+                                if (!stricmp(t,"a"))     model=0;
+                                if (!stricmp(t,"b"))     model=1;
+                                if (!stricmp(t,"bsw"))   model=2;
+                                if (!stricmp(t,"ntscb")) model=3;
+                                if (!stricmp(t,"b+"))    model=4;
+                                if (!stricmp(t,"b+96"))  model=5;
+                                if (!stricmp(t,"b+128")) model=6;
+                                if (!stricmp(t,"m128"))  model=7;
+                        }
+                        else
+                           return;
+                }
+        }
+}
+
 int WINAPI WinMain (HINSTANCE hThisInstance,
                     HINSTANCE hPrevInstance,
                     LPSTR lpszArgument,
@@ -188,7 +267,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         ghwnd = CreateWindowEx (
            0,                   /* Extended possibilites for variation */
            szClassName,         /* Classname */
-           "B-em v0.8",         /* Title Text */
+           "B-em v0.81",         /* Title Text */
            WS_OVERLAPPEDWINDOW&~(WS_MAXIMIZEBOX|WS_SIZEBOX), /* default window */
            CW_USEDEFAULT,       /* Windows decides the position */
            CW_USEDEFAULT,       /* where the window ends up on the screen */
@@ -206,12 +285,13 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         allegro_init();
         get_executable_name(exname,511);
         load_config();
+        parsecommandline(lpszArgument);
         if (hires) updatewindowsize(800,600);
         loadcmos();
         install_keyboard();
         key_led_flag=0;
         install_timer();
-        install_mouse();
+        if (fullscreen) install_mouse();
         initmem();
         loadroms();
         reset6502();
@@ -263,6 +343,12 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
                         poll_joystick();
                         spdcount=0;
                         framenum++;
+                        if (autoboot)
+                        {
+                                autoboot--;
+                                if (!autoboot)
+                                   releasekey(0,0);
+                        }
                 }
                 if (fullscreen)
                 {
@@ -307,6 +393,11 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
                         TranslateMessage(&messages);
                         /* Send message to WindowProcedure */
                         DispatchMessage(&messages);
+                }
+                if (wah && key[KEY_ESC])
+                {
+                        PostQuitMessage (0);
+                        wah=0;
                 }
 //                rest(1);
 //                sprintf(s,"B-em %i %i",spdcount,framenum);
@@ -488,11 +579,11 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                                         }
                                 }
                                 if ((discname[1][c]=='d'||discname[1][c]=='D')&&(c!=strlen(discname[1])))
-                                   load8271dsd(discname[1],0);
+                                   load8271dsd(discname[1],1);
                                 else if ((discname[1][c]=='a'||discname[1][c]=='A')&&(c!=strlen(discname[1])))
-                                   load1770adfs(discname[1],0);
+                                   load1770adfs(discname[1],1);
                                 else if (c!=strlen(discname[1]))
-                                   load8271ssd(discname[1],0);
+                                   load8271ssd(discname[1],1);
                         }
                         return 0;
                         case IDM_DISC_SOUND:
@@ -556,6 +647,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         case IDM_VIDEO_FULLSCR:
                         fullscreen=1;
                         updategfxmode();
+                        install_mouse();
                         return 0;
                         case IDM_VIDEO_BLUR:
                         blurred^=1;

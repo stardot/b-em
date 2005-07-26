@@ -1,4 +1,4 @@
-/*B-em 0.8 by Tom Walker*/
+/*B-em 0.81 by Tom Walker*/
 /*Snapshot loading and saving*/
 
 #include <stdio.h>

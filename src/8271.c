@@ -1,11 +1,11 @@
-/*B-em 0.8 by Tom Walker*/
+/*B-em 0.81 by Tom Walker*/
 /*8271 FDC emulation*/
 
 #include <stdio.h>
 #include <allegro.h>
 #include "8271.h"
 
-#define BYTETIME 160
+#define BYTETIME 200
 
 #define SIDES 2
 #define TRACKS 80
@@ -31,6 +31,7 @@ unsigned char datareg=0;
 unsigned char resultreg=0;
 unsigned char error=0;
 unsigned char discs[2][SIDES][SECTORS*TRACKS][SECTORSIZE];
+int byteswritten=0;
 
 int firstwriteint=0;
 int ddnoise=1;
@@ -44,24 +45,15 @@ SAMPLE *motoronsmp;
 void (*docommand)();
 void (*doint)();
 
-char exname[512];
 void loaddiscsamps()
 {
-        char fn[512];
-        append_filename(fn,exname,"seek.wav",511);
-        seeksmp=load_wav(fn);
-        append_filename(fn,exname,"seek2.wav",511);
-        seek2smp=load_wav(fn);
-        append_filename(fn,exname,"seek3.wav",511);
-        seek3smp=load_wav(fn);
-        append_filename(fn,exname,"step.wav",511);
-        stepsmp=load_wav(fn);
-        append_filename(fn,exname,"motor.wav",511);
-        motorsmp=load_wav(fn);
-        append_filename(fn,exname,"motoroff.wav",511);
-        motoroffsmp=load_wav(fn);
-        append_filename(fn,exname,"motoron.wav",511);
-        motoronsmp=load_wav(fn);
+        seeksmp=load_wav("seek.wav");
+        seek2smp=load_wav("seek2.wav");
+        seek3smp=load_wav("seek3.wav");
+        stepsmp=load_wav("step.wav");
+        motorsmp=load_wav("motor.wav");
+        motoroffsmp=load_wav("motoroff.wav");
+        motoronsmp=load_wav("motoron.wav");
         if (!seeksmp) { printf("no seeksmp"); exit(-1); }
         if (!seek2smp) { printf("no seek2"); exit(-1); }
         if (!seek3smp) { printf("no seek3"); exit(-1); }
@@ -595,18 +587,11 @@ void writeint()
 {
         int c;
         int done=0;
-//        printf("Write int %i %i %i %i %i\n",curdisc,SIDE,curtrack[0],cursec[0],byteinsec);
-        if (sectorsleft<0)
-        {
-//                printf("End of command\n");
-                statusreg=0x18;
-                NMI();
-                return;
-//                exit(-1);
-        }
+//        printf("Write int %i %i %i %i %03i\n",curdisc,SIDE,curtrack[0],cursec[0],byteinsec);
         if (firstwriteint) firstwriteint=0;
         else
         {
+//        printf("Written %03i\n",byteinsec);
         discs[curdisc][SIDE][cursec[0]+(curtrack[0]*16)][byteinsec]=datareg;
 
         byteinsec++;
@@ -633,6 +618,14 @@ void writeint()
                         sectorsleft=-1;
                 }
         }
+        }
+        if (sectorsleft<0)
+        {
+//                printf("End of command\n");
+                statusreg=0x18;
+                NMI();
+                return;
+//                exit(-1);
         }
         statusreg=0x8C;
         NMI();
@@ -698,7 +691,44 @@ void verifyint()
         NMI();
 }
 
-#define COMMS 8
+void format()
+{
+        curtrack[0]=parameters[0];
+        cursec[0]=0;
+        sectorsleft=parameters[2]&0x1F;
+        set8271poll(BYTETIME);
+        byteinsec=0;
+        statusreg=0x80;
+        NMI();
+//        printf("Format command\n");
+//        printf("Track %i\n",parameters[0]);
+//        printf("Number of sectors %i Record length %i\n",parameters[2]&0x1F,parameters[2]>>5);
+//        dumpregs();
+//        exit(-1);
+}
+
+void formatint()
+{
+        discs[curdisc][SIDE][cursec[0]+(curtrack[0]*16)][byteinsec]=0;
+        byteinsec++;
+        if (byteinsec==256)
+        {
+                byteinsec=0;
+//                printf("Formatted track %i sector %i\n",curtrack[0],cursec[0]);
+                cursec[0]++;
+                sectorsleft--;
+                if (!sectorsleft)
+                {
+                        statusreg=0x18;
+                        NMI();
+//                        printf("End of format command\n");
+                        return;
+                }
+        }
+        set8271poll(BYTETIME);
+}
+
+#define COMMS 9
 FDCCOMMAND fdccomms[COMMS+1] =
 {
         {0x2C,0,0x3F,readdrvstatus,NULL},
@@ -709,6 +739,7 @@ FDCCOMMAND fdccomms[COMMS+1] =
         {0x13,3,0x3F,readvarlen,readint},
         {0x0b,3,0x3F,writevarlen,writeint},
         {0x1f,3,0x3F,verifyvarlen,verifyint},
+        {0x23,5,0x3F,format,formatint},
         {0xFF,0,0x00,NULL,NULL}
 };
 
@@ -743,9 +774,9 @@ void commandwrite(unsigned char val)
                 error8271(0x10);
                 return;
 //                closegfx();
-                printf("Unrecognized 8271 command %X\n",val);
-                exit(-1);
-                return;
+//                printf("Unrecognized 8271 command %X\n",val);
+//                exit(-1);
+//                return;
 
         }
 //        if (val==0x53) output=1;
@@ -831,6 +862,7 @@ void write8271(unsigned short addr, unsigned char val)
                 statusreg&=~0xC;
                 NMI();
                 datareg=val;
+//                printf("%03i write %02X\n",byteswritten++,datareg);
 //                printf("%c",val);
                 break;
         }

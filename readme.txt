@@ -6,7 +6,7 @@
              ██       ▄██          ██         ██          ██
              ██████████▀           █████████  ██          ██
 
-                                 Version 0.8
+                                 Version 0.81
                          A freeware BBC Micro emulator
 
 Introduction
@@ -34,16 +34,10 @@ Features
 Differences from last version
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- Timing improvements, some stuff that encrypts via timers (eg Frogman) now
-  works
-- VIA improvements - fixed Planetoids/Super Defender/whatever, Volcano and
-  Pharoah's Curse
-- Improvements to sound accuracy, Ghouls and Killer Gorilla (and probably
-  others) have better sound
-- Cassette emulation now much more reliable
-- Save states are implemented again
-- Config file now in English
-- Added high pass sound filter and SID waveform
+- Fixed bugs in 8271 and 1770 FDCs, all write operations should now work. The
+  Hobbit also now works correctly.
+- Fixed some crash bugs
+- Added command line options, mainly for use by frontends
 
 
 Requirements
@@ -172,6 +166,15 @@ Misc options :
         Save screenshot      - saves screenshot in BMP,PCX, or TGA format.
 
 
+Command line options :
+~~~~~~~~~~~~~~~~~~~~~~
+
+-fullscreen    : Force fullscreen mode (Windows only)
+-autoboot      : Automatically boot from drive 0
+-disc file.ssd : Load file.ssd into drive 0/2
+-esc           : Quit emulator by pressing escape
+
+
 FAQ :
 ~~~~~
 
@@ -283,6 +286,7 @@ Also check out Elkulator (elkulator.acornelectron.co.uk), my Electron emulator,
 and Arculator (b-em.bbcmicro.com/arculator), my A3xx/A4xx/A3000/A540 emulator
 </plug>
 
+
 Appendix A : The source code
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -389,7 +393,7 @@ Massively improved over the old versions, this is now one of the best BBC
 emulators and runs pretty much everything.
 
 Beebem - www.mikebuk.dsl.pipex.com/beebem
-The most famous BBC emulator. Runs pretty much everything, but is really
+The most famous BBC emulator. Runs pretty much everything, but can be really
 quite slow.
 
 BeebIt - homepages.paradise.net.nz/mjfoot/bbc.htm

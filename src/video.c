@@ -1,4 +1,4 @@
-/*B-em 0.8 by Tom Walker*/
+/*B-em 0.81 by Tom Walker*/
 /*Video emulation*/
 
 #include <stdio.h>
@@ -951,9 +951,11 @@ void updatepalette()
         else      set_palette(beebpal);
 }
 
+int deskdepth;
+
 void updategfxmode()
 {
-        int x,y,depth;
+        int x,y;
         set_color_depth(16);
         if (fullscreen)
         {
@@ -967,8 +969,7 @@ void updategfxmode()
         {
                 if (hires) {x=800; y=600;}
                 else       {x=400; y=300;}
-                depth=desktop_color_depth();
-                if (depth==16)
+                if (deskdepth==16)
                 {
                         set_color_depth(16);
                         if (set_gfx_mode(GFX_AUTODETECT_WINDOWED,x,y,0,0))
@@ -977,9 +978,9 @@ void updategfxmode()
                                 set_gfx_mode(GFX_AUTODETECT_WINDOWED,x,y,0,0);
                         }
                 }
-                else if (depth)
+                else if (deskdepth)
                 {
-                        set_color_depth(depth);
+                        set_color_depth(deskdepth);
                         set_gfx_mode(GFX_AUTODETECT_WINDOWED,x,y,0,0);
                 }
                 else
@@ -1011,6 +1012,7 @@ void initvideo()
         clear(buf16);
         clear(buf162);
         set_color_depth(16);
+        depth=deskdepth=desktop_color_depth();
         if (fullscreen)
         {
                 if (hires!=2) set_color_depth(8);
@@ -1023,7 +1025,6 @@ void initvideo()
         {
                 if (hires) {x=800; y=600;}
                 else       {x=400; y=300;}
-                depth=desktop_color_depth();
                 if (depth==16)
                 {
                         set_color_depth(16);
