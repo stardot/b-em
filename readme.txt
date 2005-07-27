@@ -6,7 +6,7 @@
              ██       ▄██          ██         ██          ██
              ██████████▀           █████████  ██          ██
 
-                                 Version 0.81
+                                 Version 0.81a
                          A freeware BBC Micro emulator
 
 Introduction
@@ -34,10 +34,8 @@ Features
 Differences from last version
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- Fixed bugs in 8271 and 1770 FDCs, all write operations should now work. The
-  Hobbit also now works correctly.
-- Fixed some crash bugs
-- Added command line options, mainly for use by frontends
+- Adjusted audio a bit, less lagging in Windows port
+- Fixed VGM logging
 
 
 Requirements

@@ -95,18 +95,18 @@ void makemenu()
         HMENU hpop,hpop2;
         menu=CreateMenu();
         hpop=CreateMenu();
-        AppendMenu(hpop,MF_STRING,IDM_FILE_LSNAP,"&Load Snapshot");
-        AppendMenu(hpop,MF_STRING,IDM_FILE_SSNAP,"&Save Snapshot");
+        AppendMenu(hpop,MF_STRING,IDM_FILE_LSNAP,"&Load Snapshot...");
+        AppendMenu(hpop,MF_STRING,IDM_FILE_SSNAP,"&Save Snapshot...");
         AppendMenu(hpop,MF_SEPARATOR,0,NULL);
         AppendMenu(hpop,MF_STRING,IDM_FILE_EXIT,"E&xit");
         AppendMenu(menu,MF_POPUP,hpop,"&File");
         hpop=CreateMenu();
-        AppendMenu(hpop,MF_STRING,IDM_DISC_CHANGE0,"Change Disc &0/2");
-        AppendMenu(hpop,MF_STRING,IDM_DISC_CHANGE1,"Change Disc &1/3");
+        AppendMenu(hpop,MF_STRING,IDM_DISC_CHANGE0,"Change Disc &0/2...");
+        AppendMenu(hpop,MF_STRING,IDM_DISC_CHANGE1,"Change Disc &1/3...");
         AppendMenu(hpop,MF_STRING,IDM_DISC_SOUND,"&Disc Sounds");
         AppendMenu(menu,MF_POPUP,hpop,"&Disc");
         hpop=CreateMenu();
-        AppendMenu(hpop,MF_STRING,IDM_TAPE_CHANGE,"&Change Tape");
+        AppendMenu(hpop,MF_STRING,IDM_TAPE_CHANGE,"&Change Tape...");
         AppendMenu(hpop,MF_STRING,IDM_TAPE_REWIND,"&Rewind Tape");
         AppendMenu(hpop,MF_STRING,IDM_TAPE_ENABLE,"&Tape Enable");
         AppendMenu(menu,MF_POPUP,hpop,"&Tape");
@@ -142,11 +142,11 @@ void makemenu()
         AppendMenu(hpop2,MF_STRING,IDM_WAVE_TRI,"&Triangle");
         AppendMenu(hpop2,MF_STRING,IDM_WAVE_SID,"SI&D");
         AppendMenu(hpop,MF_POPUP,hpop2,"&Waveform");
-        AppendMenu(hpop,MF_STRING,IDM_SOUND_STARTVGM, "&Start VGM Log");
+        AppendMenu(hpop,MF_STRING,IDM_SOUND_STARTVGM, "&Start VGM Log...");
         AppendMenu(hpop,MF_STRING,IDM_SOUND_STOPVGM, "S&top VGM Log");
         AppendMenu(menu,MF_POPUP,hpop,"&Sound");
         hpop=CreateMenu();
-        AppendMenu(hpop,MF_STRING,IDM_MISC_SCRSHOT,"&Save Screenshot");
+        AppendMenu(hpop,MF_STRING,IDM_MISC_SCRSHOT,"&Save Screenshot...");
         AppendMenu(menu,MF_POPUP,hpop,"M&isc");
 }
 
@@ -267,7 +267,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         ghwnd = CreateWindowEx (
            0,                   /* Extended possibilites for variation */
            szClassName,         /* Classname */
-           "B-em v0.81",         /* Title Text */
+           "B-em v0.81a",        /* Title Text */
            WS_OVERLAPPEDWINDOW&~(WS_MAXIMIZEBOX|WS_SIZEBOX), /* default window */
            CW_USEDEFAULT,       /* Windows decides the position */
            CW_USEDEFAULT,       /* where the window ends up on the screen */
@@ -319,7 +319,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         updatemenu();
         while (!quit)
         {
-                if (framenum==5 && soundon)
+                if (framenum==4 && soundon)
                 {
 //                        fputs("Sound\n",tempf);
                         framenum=0;
@@ -330,7 +330,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
                                 yield_timeslice();
 //                                rest(0);
                         }
-                        updatebuffer(p,3120);
+                        updatebuffer(p,2496);
                         free_audio_stream_buffer(as);
 //                        spdcount=1;
                         snline=0;
@@ -549,6 +549,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         PostQuitMessage(0);
                         return 0;
                         case IDM_DISC_CHANGE0:
+                        if (soundon) stop_audio_stream(as);
                         if (!getfn(hwnd,"DFS Single Sided Disc Image (*.SSD)\0*.SSD\0DFS Double Sided Disc Image (*.DSD)\0*.DSD\0ADFS Disc Image (*.ADF)\0*.ADF\0All\0*.*\0\0",discname[0],0,"SSD"))
                         {
                                 for (c=0;c<strlen(discname[0]);c++)
@@ -566,8 +567,10 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                                 else if (c!=strlen(discname[0]))
                                    load8271ssd(discname[0],0);
                         }
+                        if (soundon) as=play_audio_stream(2496,16,0,31200,255,127);
                         return 0;
                         case IDM_DISC_CHANGE1:
+                        if (soundon) stop_audio_stream(as);
                         if (!getfn(hwnd,"DFS Single Sided Disc Image (*.SSD)\0*.SSD\0DFS Double Sided Disc Image (*.DSD)\0*.DSD\0ADFS Disc Image (*.ADF)\0*.ADF\0All\0*.*\0\0",discname[1],0,"SSD"))
                         {
                                 for (c=0;c<strlen(discname[1]);c++)
@@ -585,6 +588,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                                 else if (c!=strlen(discname[1]))
                                    load8271ssd(discname[1],1);
                         }
+                        if (soundon) as=play_audio_stream(2496,16,0,31200,255,127);
                         return 0;
                         case IDM_DISC_SOUND:
                         ddnoise^=1;
@@ -672,7 +676,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         case IDM_SOUND_ENABLE:
                         soundon^=1;
                         if (!soundon) stop_audio_stream(as);
-                        else          as=play_audio_stream(3120,16,0,31200,255,127);
+                        else          as=play_audio_stream(2496,16,0,31200,255,127);
                         updatemenu();
                         return 0;
                         case IDM_SOUND_HIGH:
@@ -682,6 +686,14 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         case IDM_SOUND_LOW:
                         soundfilter^=2;
                         updatemenu();
+                        return 0;
+                        case IDM_SOUND_STARTVGM:
+                        s[0]=0;
+                        if (!getfn(hwnd,"VGM Sound file (*.VGM)\0*.VGM\0All\0*.*\0\0",s,1,"VGM"))
+                           startsnlog(s);
+                        return 0;
+                        case IDM_SOUND_STOPVGM:
+                        stopsnlog();
                         return 0;
                 }
                 return DefWindowProc (hwnd, message, wParam, lParam);

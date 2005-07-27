@@ -113,7 +113,7 @@ void logvols()
         snlatchs[snline][3]=snlatch[3];
         snnoise2[snline]=snnoise;
         snline++;
-        if (snline==1560) snline=0;
+        if (snline==1248) snline=0;
 }
 
 void drawsound(BITMAP *b)
@@ -123,13 +123,13 @@ void drawsound(BITMAP *b)
 //        textprintf_ex(b,font,0,32,7,0,"%i %04X",snlatch[3],snlatch[3]);
 }
 
-signed short lastbuffer[2]={0,0};
+signed short lastbuffer[4]={0,0,0,0};
 
 void updatebuffer(signed short *buffer, int len)
 {
         int c,d,diff[1024];
         unsigned char oldlast[4];
-        float tempf;
+        float tempf,tempf2;
         unsigned short *sbuf=buffer;
         int sidcount=0;
         for (d=0;d<len;d++)
@@ -163,12 +163,15 @@ void updatebuffer(signed short *buffer, int len)
                         snstat[0]++;
                         snstat[0]&=32767;
                 }
-                tempf=0;
+                tempf=tempf2=0;
                 if (soundfilter&1) tempf+=(float)lastbuffer[0]*((float)11/(float)16);
-                if (soundfilter&2) tempf-=(float)lastbuffer[0]*((float)7/(float)16);
-                if (soundfilter) buffer[d]+=tempf;
+                if (soundfilter&1) buffer[d]+=tempf;
                 lastbuffer[1]=lastbuffer[0];
                 lastbuffer[0]=buffer[d];
+                if (soundfilter&2) tempf2-=(float)lastbuffer[2]*((float)7/(float)16);
+                if (soundfilter&2) buffer[d]+=tempf2;
+                lastbuffer[3]=lastbuffer[2];
+                lastbuffer[2]=buffer[d];
                 sidcount++;
                 if (sidcount==624)
                 {
@@ -193,6 +196,7 @@ void initsnd()
 {
       int c;
       FILE *f;
+      unsigned short *p;
 /*      for (c=0;c<32;c++)
       {
                 snwaves[3][c]=fsin((c<<2)<<16)>>8;
@@ -202,11 +206,14 @@ void initsnd()
 //      {
 //        atexit(dumpsound);
 //          soundf=fopen("sound.pcm","wb");
-      reserve_voices(8,0);
-      if (install_sound(DIGI_AUTODETECT,MIDI_NONE,0))
+      reserve_voices(4,0);
+      if (install_sound(DIGI_DIRECTX(0),MIDI_NONE,0))
       {
-                soundon=0;
-                return;
+                if (install_sound(DIGI_AUTODETECT,MIDI_NONE,0))
+                {
+                        soundon=0;
+                        return;
+                }
       }
       soundiniteded=1;
       f=fopen("sn76489.dat","rb");
@@ -218,7 +225,16 @@ void initsnd()
           snperiodic[0][c]=snperiodic2[c&31];
       for (c=0;c<32;c++)
           snwaves[3][c]-=128;
-        as=play_audio_stream(3120,16,0,31200,255,127);
+        as=play_audio_stream(2496,16,0,31200,255,127);
+                        p=0;
+                        while (!p)
+                        {
+                                p=(unsigned short *)get_audio_stream_buffer(as);
+                                yield_timeslice();
+                        }
+     for (c=0;c<2496;c++) p[c]=0x8000;
+     free_audio_stream_buffer(as);
+
 /*            for (c=1;c<4;c++)
             {
                   snsample[c]=create_sample(8,0,320,32);
@@ -518,7 +534,7 @@ void stopsnlog()
         int c,len;
         unsigned char buffer[32];
         putc(0x66,snlog);
-        len=ftell(snlog);
+        len=ftell(snlog)-4;
         fclose(snlog);
         snlog=fopen("temp.vgm","rb");
         for (c=0;c<4;c++) putc(getc(snlog),snlog2);
@@ -528,14 +544,15 @@ void stopsnlog()
         putc(len>>24,snlog2);
         for (c=0;c<4;c++) getc(snlog);
         for (c=0;c<16;c++) putc(getc(snlog),snlog2);
+//        vgmsamples*=2;
         putc(vgmsamples,snlog2);
         putc(vgmsamples>>8,snlog2);
         putc(vgmsamples>>16,snlog2);
         putc(vgmsamples>>24,snlog2);
+        for (c=0;c<4;c++) getc(snlog);
         while (!feof(snlog))
         {
-                fread(buffer,32,1,snlog);
-                fwrite(buffer,32,1,snlog2);
+                putc(getc(snlog),snlog2);
         }
         fclose(snlog2);
         fclose(snlog);
@@ -546,6 +563,7 @@ void stopsnlog()
 void logsound()
 {
         if (vgmpos) fwrite(vgmdat,vgmpos,1,snlog);
+        vgmpos=0;
         putc(0x63,snlog);
         vgmsamples+=882;
 /*        putc(snfreqlo[1],snlog);

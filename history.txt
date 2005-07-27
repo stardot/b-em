@@ -334,3 +334,7 @@ Version 0.8 finalised and released
            density, though I was unable to find an ADFS formatter.
 26/07/05 - Added command line parser to DOS port.
 Version 0.81 finalised and released
+27/07/05 - Adjusted sound, buffer length of 4 frames (80ms) rather than 5 frames
+           (100ms).
+           Fixed bug in VGM logging.
+Version 0.81a finalised and released

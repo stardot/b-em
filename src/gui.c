@@ -629,7 +629,7 @@ MENU mainmenu[]=
 
 DIALOG bemgui[]=
 {
-      {d_ctext_proc, 200, 260, 0,  0, 15,0,0,0,     0,0,"B-em v0.8"},
+      {d_ctext_proc, 200, 260, 0,  0, 15,0,0,0,     0,0,"B-em v0.81a"},
       {d_menu_proc,  0,   0,   0,  0, 15,0,0,0,     0,0,mainmenu},
       {0,0,0,0,0,0,0,0,0,0,0,NULL,NULL,NULL}
 };
@@ -688,7 +688,7 @@ void entergui()
         show_mouse(NULL);
         shutdown_dialog(dp);
         while ((mouse_b&2) || key[KEY_F11] || key[KEY_ESC]) yield_timeslice();
-        if (soundon) as=play_audio_stream(3120,16,0,31200,255,127);
+        if (soundon) as=play_audio_stream(2496,16,0,31200,255,127);
         clear_keybuf();
         restorepal();
         if (rewnd)
