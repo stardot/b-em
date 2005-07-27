@@ -989,6 +989,7 @@ void updategfxmode()
         if (mono) set_palette(monopal);
         else      set_palette(beebpal);
         clear(buffer);
+        clear(buffer2);
 }
 
 void initvideo()

@@ -6,6 +6,7 @@
 #include <winalleg.h>
 #include "b-em.h"
 
+int soundbuflen;
 int wah=0;
 int autoboot=0;
 char exname[512];
@@ -79,6 +80,8 @@ HMENU menu;
 #define IDM_WAVE_SIN       40082
 #define IDM_WAVE_TRI       40083
 #define IDM_WAVE_SID       40084
+#define IDM_BUF_80         40090
+#define IDM_BUF_100        40091
 
 void updatewindowsize(int x, int y)
 {
@@ -142,6 +145,10 @@ void makemenu()
         AppendMenu(hpop2,MF_STRING,IDM_WAVE_TRI,"&Triangle");
         AppendMenu(hpop2,MF_STRING,IDM_WAVE_SID,"SI&D");
         AppendMenu(hpop,MF_POPUP,hpop2,"&Waveform");
+        hpop2=CreateMenu();
+        AppendMenu(hpop2,MF_STRING,IDM_BUF_80,"&80ms");
+        AppendMenu(hpop2,MF_STRING,IDM_BUF_100,"&100ms");
+        AppendMenu(hpop,MF_POPUP,hpop2,"&Sound Buffer");
         AppendMenu(hpop,MF_STRING,IDM_SOUND_STARTVGM, "&Start VGM Log...");
         AppendMenu(hpop,MF_STRING,IDM_SOUND_STOPVGM, "S&top VGM Log");
         AppendMenu(menu,MF_POPUP,hpop,"&Sound");
@@ -227,6 +234,8 @@ void parsecommandline(LPSTR s)
         }
 }
 
+int framenum=0;
+
 int WINAPI WinMain (HINSTANCE hThisInstance,
                     HINSTANCE hPrevInstance,
                     LPSTR lpszArgument,
@@ -234,7 +243,6 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
 {
         unsigned short *p;
         int resetting=0;
-        int framenum=0;
         char s[160];
 //        FILE *tempf=fopen("temp.txt","wt");
         /* This is the handle for our window */
@@ -267,7 +275,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         ghwnd = CreateWindowEx (
            0,                   /* Extended possibilites for variation */
            szClassName,         /* Classname */
-           "B-em v0.81a",        /* Title Text */
+           "B-em v0.81b",        /* Title Text */
            WS_OVERLAPPEDWINDOW&~(WS_MAXIMIZEBOX|WS_SIZEBOX), /* default window */
            CW_USEDEFAULT,       /* Windows decides the position */
            CW_USEDEFAULT,       /* where the window ends up on the screen */
@@ -319,7 +327,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         updatemenu();
         while (!quit)
         {
-                if (framenum==4 && soundon)
+                if (framenum>=((soundbuflen==3120)?5:4) && soundon)
                 {
 //                        fputs("Sound\n",tempf);
                         framenum=0;
@@ -330,7 +338,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
                                 yield_timeslice();
 //                                rest(0);
                         }
-                        updatebuffer(p,2496);
+                        updatebuffer(p,soundbuflen);
                         free_audio_stream_buffer(as);
 //                        spdcount=1;
                         snline=0;
@@ -483,6 +491,16 @@ void updatemenu()
         else               CheckMenuItem(menu,IDM_SOUND_LOW,MF_UNCHECKED);
         if (soundon) CheckMenuItem(menu,IDM_SOUND_ENABLE,MF_CHECKED);
         else         CheckMenuItem(menu,IDM_SOUND_ENABLE,MF_UNCHECKED);
+        if (soundbuflen==3120)
+        {
+                CheckMenuItem(menu,IDM_BUF_100,MF_CHECKED);
+                CheckMenuItem(menu,IDM_BUF_80,MF_UNCHECKED);
+        }
+        else
+        {
+                CheckMenuItem(menu,IDM_BUF_100,MF_UNCHECKED);
+                CheckMenuItem(menu,IDM_BUF_80,MF_CHECKED);
+        }
 }
 
 int getfn(HWND hwnd, char *f, char *s, int save, char *de)
@@ -567,7 +585,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                                 else if (c!=strlen(discname[0]))
                                    load8271ssd(discname[0],0);
                         }
-                        if (soundon) as=play_audio_stream(2496,16,0,31200,255,127);
+                        if (soundon) as=play_audio_stream(soundbuflen,16,0,31200,255,127);
                         return 0;
                         case IDM_DISC_CHANGE1:
                         if (soundon) stop_audio_stream(as);
@@ -588,7 +606,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                                 else if (c!=strlen(discname[1]))
                                    load8271ssd(discname[1],1);
                         }
-                        if (soundon) as=play_audio_stream(2496,16,0,31200,255,127);
+                        if (soundon) as=play_audio_stream(soundbuflen,16,0,31200,255,127);
                         return 0;
                         case IDM_DISC_SOUND:
                         ddnoise^=1;
@@ -649,9 +667,12 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         updatewindowsize(800,600);
                         return 0;
                         case IDM_VIDEO_FULLSCR:
+                        if (soundon) stop_audio_stream(as);
                         fullscreen=1;
                         updategfxmode();
                         install_mouse();
+                        if (soundon) as=play_audio_stream(soundbuflen,16,0,31200,255,127);
+                        framenum=0;
                         return 0;
                         case IDM_VIDEO_BLUR:
                         blurred^=1;
@@ -676,7 +697,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         case IDM_SOUND_ENABLE:
                         soundon^=1;
                         if (!soundon) stop_audio_stream(as);
-                        else          as=play_audio_stream(2496,16,0,31200,255,127);
+                        else          as=play_audio_stream(soundbuflen,16,0,31200,255,127);
                         updatemenu();
                         return 0;
                         case IDM_SOUND_HIGH:
@@ -694,6 +715,20 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         return 0;
                         case IDM_SOUND_STOPVGM:
                         stopsnlog();
+                        return 0;
+                        case IDM_BUF_80:
+                        if (soundon) stop_audio_stream(as);
+                        soundbuflen=2496;
+                        updatemenu();
+                        if (soundon) as=play_audio_stream(soundbuflen,16,0,31200,255,127);
+                        framenum=0;
+                        return 0;
+                        case IDM_BUF_100:
+                        if (soundon) stop_audio_stream(as);
+                        soundbuflen=3120;
+                        updatemenu();
+                        if (soundon) as=play_audio_stream(soundbuflen,16,0,31200,255,127);
+                        framenum=0;
                         return 0;
                 }
                 return DefWindowProc (hwnd, message, wParam, lParam);

@@ -338,3 +338,7 @@ Version 0.81 finalised and released
            (100ms).
            Fixed bug in VGM logging.
 Version 0.81a finalised and released
+28/07/05 - Altered memory code so instructions like STA $FFFF,x work (for 3D
+           Grand Prix).
+           Made sound buffer length user selectable.
+           temp.vgm no longer hangs around after VGM logging.

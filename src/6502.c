@@ -50,8 +50,10 @@ unsigned short pc;
 //} p;
 
 /*Memory structures*/
-unsigned char *mem[0x100];
-int memstat[0x100];
+/*There is an extra entry to allow for stupid programs (3d grand prix) doing
+  something stupid like STA $FFFF,x*/
+unsigned char *mem[0x101];
+int memstat[0x101];
 unsigned char *ram,*rom;
 unsigned char os[0x4000];
 int writeablerom[16];
@@ -116,6 +118,8 @@ void initmem()
         memstat[0xFC]=2;
         memstat[0xFD]=2;
         memstat[0xFE]=2;
+        memstat[0x100]=memstat[0];
+        mem[0x100]=mem[0];
 //        atexit(dumpram);
 }
 

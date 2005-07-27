@@ -6,7 +6,7 @@
              ██       ▄██          ██         ██          ██
              ██████████▀           █████████  ██          ██
 
-                                 Version 0.81a
+                                 Version 0.81b
                          A freeware BBC Micro emulator
 
 Introduction
@@ -34,8 +34,9 @@ Features
 Differences from last version
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- Adjusted audio a bit, less lagging in Windows port
-- Fixed VGM logging
+- Audio buffer length now user selectable
+- Fixed bug with instructions like STA $FFFF,x - 3D Grand Prix no longer
+  crashes
 
 
 Requirements

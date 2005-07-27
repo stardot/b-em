@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <allegro.h>
 
+int framenum;
+int soundbuflen;
 char exname[512];
 int updatewindow=0;
 int fullscreen;
@@ -36,6 +38,7 @@ void save_config()
         set_config_int(NULL,"sound_filter",soundfilter);
         set_config_int(NULL,"resolution",hires);
         set_config_int(NULL,"fullscreen",fullscreen);
+        set_config_int(NULL,"sound_buffer_length",soundbuflen);
 }
 
 void load_config()
@@ -80,6 +83,7 @@ void load_config()
         soundfilter=get_config_int(NULL,"sound_filter",3);
         hires=get_config_int(NULL,"resolution",0);
         fullscreen=get_config_int(NULL,"fullscreen",0);
+        soundbuflen=get_config_int(NULL,"sound_buffer_length",3120);
 }
 
 int gui_exit()
@@ -504,6 +508,33 @@ MENU wavemenu[]=
         {NULL,NULL,NULL,NULL,NULL}
 };
 
+MENU sbufmenu[3];
+
+int m80()
+{
+        sbufmenu[0].flags=D_SELECTED;
+        sbufmenu[1].flags=0;
+        soundbuflen=2496;
+        framenum=0;
+        return D_EXIT;
+}
+
+int m100()
+{
+        sbufmenu[1].flags=D_SELECTED;
+        sbufmenu[0].flags=0;
+        soundbuflen=3120;
+        framenum=0;
+        return D_EXIT;
+}
+
+MENU sbufmenu[]=
+{
+        {"&80ms",m80,NULL,NULL,NULL},
+        {"&100ms",m100,NULL,NULL,NULL},
+        {NULL,NULL,NULL,NULL,NULL},
+};
+
 MENU soundmenu[7];
 
 int soundena()
@@ -553,6 +584,7 @@ MENU soundmenu[]=
         {"&Low pass filter",lowpass,NULL,NULL,NULL},
         {"&High pass filter",highpass,NULL,NULL,NULL},
         {"&Waveform",NULL,wavemenu,NULL,NULL},
+        {"&Sound buffer",NULL,sbufmenu,NULL,NULL},
         {"&Start VGM log",startlog,NULL,NULL,NULL},
         {"S&top VGM log",stoplog,NULL,NULL,NULL},
         {NULL,NULL,NULL,NULL,NULL}
@@ -629,7 +661,7 @@ MENU mainmenu[]=
 
 DIALOG bemgui[]=
 {
-      {d_ctext_proc, 200, 260, 0,  0, 15,0,0,0,     0,0,"B-em v0.81a"},
+      {d_ctext_proc, 200, 260, 0,  0, 15,0,0,0,     0,0,"B-em v0.81b"},
       {d_menu_proc,  0,   0,   0,  0, 15,0,0,0,     0,0,mainmenu},
       {0,0,0,0,0,0,0,0,0,0,0,NULL,NULL,NULL}
 };
@@ -688,7 +720,7 @@ void entergui()
         show_mouse(NULL);
         shutdown_dialog(dp);
         while ((mouse_b&2) || key[KEY_F11] || key[KEY_ESC]) yield_timeslice();
-        if (soundon) as=play_audio_stream(2496,16,0,31200,255,127);
+        if (soundon) as=play_audio_stream(soundbuflen,16,0,31200,255,127);
         clear_keybuf();
         restorepal();
         if (rewnd)

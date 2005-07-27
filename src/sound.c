@@ -11,6 +11,7 @@ void dumpsound();
 #include <stdio.h>
 #include "sound.h"
 
+int soundbuflen;
 float volslog[16]=
 {
         0.00000f,0.59715f,0.75180f,0.94650f,
@@ -113,7 +114,7 @@ void logvols()
         snlatchs[snline][3]=snlatch[3];
         snnoise2[snline]=snnoise;
         snline++;
-        if (snline==1248) snline=0;
+        if (snline>=(soundbuflen>>1)) snline=0;
 }
 
 void drawsound(BITMAP *b)
@@ -190,6 +191,7 @@ void updatebuffer(signed short *buffer, int len)
                 }
         }
         for (d=0;d<len;d++) sbuf[d]^=0x8000;
+        snline=0;
 }
 
 void initsnd()
@@ -225,14 +227,14 @@ void initsnd()
           snperiodic[0][c]=snperiodic2[c&31];
       for (c=0;c<32;c++)
           snwaves[3][c]-=128;
-        as=play_audio_stream(2496,16,0,31200,255,127);
+        as=play_audio_stream(soundbuflen,16,0,31200,255,127);
                         p=0;
                         while (!p)
                         {
                                 p=(unsigned short *)get_audio_stream_buffer(as);
                                 yield_timeslice();
                         }
-     for (c=0;c<2496;c++) p[c]=0x8000;
+     for (c=0;c<soundbuflen;c++) p[c]=0x8000;
      free_audio_stream_buffer(as);
 
 /*            for (c=1;c<4;c++)
@@ -556,6 +558,7 @@ void stopsnlog()
         }
         fclose(snlog2);
         fclose(snlog);
+        remove("temp.vgm");
 //        printf("%08X samples\n",vgmsamples);
         logging=0;
 }
