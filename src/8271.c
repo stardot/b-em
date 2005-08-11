@@ -728,7 +728,56 @@ void formatint()
         set8271poll(BYTETIME);
 }
 
-#define COMMS 9
+void readid()
+{
+        curtrack[0]=parameters[0];
+        sectorsleft=parameters[2]&0x1F;
+        printf("Read ID track %i %i id fields\n",parameters[0],parameters[2]);
+        set8271poll(BYTETIME);
+        byteinsec=0;
+        statusreg=0x80;
+        NMI();
+//        dumpregs();
+//        exit(-1);
+}
+
+void readidint()
+{
+        if (!sectorsleft)
+        {
+                statusreg=0x18;
+                NMI();
+                return;
+        }
+        switch (byteinsec)
+        {
+                case 0:
+                datareg=curtrack[0];
+                break;
+                case 1:
+                datareg=SIDE;
+                break;
+                case 2:
+                datareg=cursec[0];
+                break;
+                case 3:
+                datareg=1;
+                break;
+        }
+        byteinsec++;
+        if (byteinsec>=4)
+        {
+                byteinsec=0;
+                cursec[0]++;
+                if (cursec[0]==10) cursec[0]=0;
+                sectorsleft--;
+        }
+        set8271poll(BYTETIME);
+        statusreg=0x8C;
+        NMI();
+}
+
+#define COMMS 10
 FDCCOMMAND fdccomms[COMMS+1] =
 {
         {0x2C,0,0x3F,readdrvstatus,NULL},
@@ -740,6 +789,7 @@ FDCCOMMAND fdccomms[COMMS+1] =
         {0x0b,3,0x3F,writevarlen,writeint},
         {0x1f,3,0x3F,verifyvarlen,verifyint},
         {0x23,5,0x3F,format,formatint},
+        {0x1B,3,0x3F,readid,readidint},
         {0xFF,0,0x00,NULL,NULL}
 };
 

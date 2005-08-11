@@ -332,13 +332,8 @@ Version 0.8 finalised and released
 19/07/05 - Command line parser now works with filenames with quotes in.
 25/07/05 - Added formatting to both FDCs. Should work in both single and double
            density, though I was unable to find an ADFS formatter.
-26/07/05 - Added command line parser to DOS port.
 Version 0.81 finalised and released
-27/07/05 - Adjusted sound, buffer length of 4 frames (80ms) rather than 5 frames
-           (100ms).
-           Fixed bug in VGM logging.
-Version 0.81a finalised and released
-28/07/05 - Altered memory code so instructions like STA $FFFF,x work (for 3D
-           Grand Prix).
-           Made sound buffer length user selectable.
-           temp.vgm no longer hangs around after VGM logging.
+02/08/05 - Switched ADC/SBC back to pre-0.8 - I don't even remember changing them!
+03/08/05 - Added Read ID commands to 8271, for Superior Collection.
+05/08/05 - Added back Tube support, for ARM only.
+09/08/05 - Added menu option for Tube.

@@ -1,8 +1,5 @@
-/*B-em 0.8 by Tom Walker
-  ARM emulation (for ARM tube)
-  There are a handful of bugs here which I haven't fixed yet - a few details
-  in the shift modes need to be fixed (and have been in Arculator) and there
-  are a couple of others that I haven't tracked down yet.*/
+/*B-em 0.82 by Tom Walker
+  ARM emulation (for ARM tube)*/
 
 #include <stdio.h>
 #include "arm.h"
@@ -95,6 +92,7 @@ void resetarm()
         *armregs[15]=0x0C00000B;
         mode=3;
         memmode=2;
+        memcpy(armramb,armromb,0x4000);
 }
 
 void dumparmregs()
@@ -230,7 +228,12 @@ inline unsigned long shift(unsigned long opcode)
         unsigned long temp;
         int cflag=CFSET;
         if (!(opcode&0xFF0)) return *armregs[RM];
-        if (opcode&0x10)     shiftamount=*armregs[(opcode>>8)&15]&0xFF;
+        if (opcode&0x10)
+        {
+                shiftamount=*armregs[(opcode>>8)&15]&0xFF;
+                if (shiftmode==3)
+                   shiftamount&=0x1F;
+        }
         temp=*armregs[RM];
         if (RM==15)        temp+=4;
         if (opcode&0x100000 && shiftamount) *armregs[15]&=~CFLAG;
@@ -251,10 +254,15 @@ inline unsigned long shift(unsigned long opcode)
                 return temp<<shiftamount;
 
                 case 1: /*LSR*/
+                if (!shiftamount && !(opcode&0x10))
+                {
+                        shiftamount=32;
+                }
                 if (!shiftamount) return temp;
                 if (shiftamount==32)
                 {
                         if (temp&0x80000000 && opcode&0x100000) *armregs[15]|=CFLAG;
+                        else if (opcode&0x100000)               *armregs[15]&=~CFLAG;
                         return 0;
                 }
                 if (shiftamount>32) return 0;
@@ -307,7 +315,7 @@ inline unsigned long shift(unsigned long opcode)
                 break;
                 default:
                 printf("Shift mode %i amount %i\n",shiftmode,shiftamount);
-                dumpregs();
+                dumparmregs();
                 exit(-1);
         }
 }
@@ -319,25 +327,28 @@ inline unsigned shift2(unsigned opcode)
         unsigned long temp;
         int cflag=CFSET;
         if (!(opcode&0xFF0)) return *armregs[RM];
-        if (opcode&0x10) shiftamount=*armregs[(opcode>>8)&15]&0xFF;
+        if (opcode&0x10)
+        {
+                shiftamount=*armregs[(opcode>>8)&15]&0xFF;
+                if (shiftmode==3)
+                   shiftamount&=0x1F;
+        }
         temp=*armregs[RM];
         if (RM==15) temp+=4;
         switch (shiftmode)
         {
                 case 0: /*LSL*/
                 if (!shiftamount)    return temp;
-                if (shiftamount==32) return 0;
-                if (shiftamount>32)  return 0;
+                if (shiftamount>=32) return 0;
                 return temp<<shiftamount;
 
                 case 1: /*LSR*/
-                if (!shiftamount)    return temp;
-                if (shiftamount==32) return 0;
-                if (shiftamount>32)  return 0;
+                if (!shiftamount && !(opcode&0x10))    return 0;
+                if (shiftamount>=32) return 0;
                 return temp>>shiftamount;
 
                 case 2: /*ASR*/
-                if (!shiftamount) return temp;
+                if (!shiftamount && !(opcode&0x10)) shiftamount=32;
                 if (shiftamount>=32)
                 {
                         if (temp&0x80000000)
@@ -354,7 +365,7 @@ inline unsigned shift2(unsigned opcode)
 
                 default:
                 printf("Shift2 mode %i amount %i\n",shiftmode,shiftamount);
-                dumpregs();
+                dumparmregs();
                 exit(-1);
         }
 }
@@ -493,9 +504,9 @@ void execarm(int cycles)
                                 if (RD==15)
                                 {
                                         templ=shift2(opcode);
-                                        printf("R15=%08X-%08X+4=",GETADDR(RN),templ);
+//                                        printf("R15=%08X-%08X+4=",GETADDR(RN),templ);
                                         *armregs[15]=(((GETADDR(RN)-templ)+4)&0x3FFFFFC)|(*armregs[15]&0xFC000003);
-                                        printf("%08X\n",*armregs[15]);
+//                                        printf("%08X\n",*armregs[15]);
                                 }
                                 else
                                 {
@@ -702,7 +713,7 @@ void execarm(int cycles)
                                         opcode&=~0x100000;
                                         *armregs[15]&=0x3FFFFFC;
                                         *armregs[15]|=((GETADDR(RN)+shift2(opcode))&0xFC000003);
-                                        printf("R15 now %08X %08X\n",*armregs[15],*armregs[15]&0xFC000003);
+//                                        printf("R15 now %08X %08X\n",*armregs[15],*armregs[15]&0xFC000003);
                                 }
                                 else
                                    setadd(GETADDR(RN),shift2(opcode),GETADDR(RN)+shift2(opcode));
@@ -1010,7 +1021,7 @@ void execarm(int cycles)
                                         opcode&=~0x100000;
                                         templ=*armregs[15]&0x3FFFFFC;
                                         *armregs[15]=((GETADDR(RN)&rotate(opcode))&0xFC000003)|templ;
-                                        printf("R15 now %08X %08X\n",*armregs[15],*armregs[15]&0xFC000003);
+//                                        printf("R15 now %08X %08X\n",*armregs[15],*armregs[15]&0xFC000003);
                                 }
                                 else
                                 {
@@ -1052,7 +1063,7 @@ void execarm(int cycles)
                                         opcode&=~0x100000;
                                         *armregs[15]&=0x3FFFFFC;
                                         *armregs[15]|=((GETADDR(RN)+rotate(opcode))&0xFC000003);
-                                        printf("R15 now %08X %08X\n",*armregs[15],*armregs[15]&0xFC000003);
+//                                        printf("R15 now %08X %08X\n",*armregs[15],*armregs[15]&0xFC000003);
                                 }
                                 else
                                    setadd(GETADDR(RN),rotate(opcode),GETADDR(RN)+rotate(opcode));
@@ -1513,6 +1524,24 @@ void execarm(int cycles)
                                 cycles--;
                                 break;
 
+                                case 0x8E: /*STMIA !^*/
+                                mask=1;
+                                addr=*armregs[RN];
+                                for (c=0;c<16;c++)
+                                {
+                                        if (opcode&mask)
+                                        {
+                                                if (c==15) { writearml(addr,userregs[c]+4); }
+                                                else       { writearml(addr,userregs[c]); }
+                                                addr+=4;
+                                                *armregs[RN]+=4;
+                                                cycles--;
+                                        }
+                                        mask<<=1;
+                                }
+                                cycles--;
+                                break;
+
                                 case 0x8F: /*LDMIA !^*/
                                 mask=1;
                                 addr=*armregs[RN];
@@ -1825,7 +1854,7 @@ void execarm(int cycles)
                         *armregs[14]=templ;
                         *armregs[15]&=0xFC000001;
                         *armregs[15]|=0x0C000020;
-                        printf("Parasite FIQ %08X\n",PC+4);
+//                        printf("Parasite FIQ %08X\n",PC+4);
                 }
                 else if (tubeirq && !(*armregs[15]&0x8000000))
                 {
@@ -1835,16 +1864,16 @@ void execarm(int cycles)
                         *armregs[14]=templ;
                         *armregs[15]&=0xFC000002;
                         *armregs[15]|=0x0800001C;
-                        printf("Parasite IRQ\n");
+//                        printf("Parasite IRQ\n");
                 }
                 if ((*armregs[15]&3)!=mode) updatemode(*armregs[15]&3);
                 *armregs[15]+=4;
-                if (!PC)
+/*                if (!PC)
                 {
                         printf("Branch through zero\n");
                         dumpregs();
                         exit(-1);
-                }
+                }*/
                 if (endtimeslice)
                 {
                         endtimeslice=0;

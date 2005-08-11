@@ -1,9 +1,13 @@
-B-em v0.81a
-===========
+B-em v0.82
+==========
 
-Source for both the DOS and Windows versions are included. The DOS version
-should/may also compile under Linux/MacOS/QNX/BeOS, although I haven't tried
-this.
+Source for the DOS, Windows and OS X versions are included. The DOS and OSX
+versions should/may also compile under Linux/QNX/BeOS, although I haven't
+tried this. The Windows version uses a lot of platform-specific code, and will
+not compile on other platforms.
+The DOS and Windows versions will not compile under GCC 4 as I have this bad
+habit of declaring variables in multiple source files instead of using header
+files properly. The OS X version has been corrected and does compile.
 
 For the DOS version, you will need :
 DJGPP
@@ -16,6 +20,11 @@ Ming/W
 Allegro
 Zlib
 2xSaI (modified Allegro version)
+
+For the OS X version you need :
+Xcode
+Allegro
+Zlib
 
 Just compile and link all the C files with the above libraries.
 

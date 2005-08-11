@@ -6,6 +6,7 @@
 #include <winalleg.h>
 #include "b-em.h"
 
+int tube;
 int soundbuflen;
 int wah=0;
 int autoboot=0;
@@ -60,6 +61,7 @@ HMENU menu;
 #define IDM_MODEL_PALB96   40035
 #define IDM_MODEL_PALB128  40036
 #define IDM_MODEL_PALM128  40037
+#define IDM_MODEL_ARM      40038
 #define IDM_VIDEO_RES      40040
 #define IDM_VIDEO_FULLSCR  40041
 #define IDM_VIDEO_BLUR     40042
@@ -122,6 +124,7 @@ void makemenu()
         AppendMenu(hpop,MF_STRING,IDM_MODEL_PALB96,"PAL B+&96K");
         AppendMenu(hpop,MF_STRING,IDM_MODEL_PALB128,"PAL B+&128K");
         AppendMenu(hpop,MF_STRING,IDM_MODEL_PALM128,"PAL &Master 128");
+        AppendMenu(hpop,MF_STRING,IDM_MODEL_ARM,    "&ARM Evaluation System");
         AppendMenu(menu,MF_POPUP,hpop,"&Model");
         hpop=CreateMenu();
         hpop2=CreateMenu();
@@ -216,6 +219,7 @@ void parsecommandline(LPSTR s)
                    wah=1;
                 if (!stricmp(t,"-model"))
                 {
+                        tube=0;
                         t=strtok(0," ");
                         if (t)
                         {
@@ -227,6 +231,7 @@ void parsecommandline(LPSTR s)
                                 if (!stricmp(t,"b+96"))  model=5;
                                 if (!stricmp(t,"b+128")) model=6;
                                 if (!stricmp(t,"m128"))  model=7;
+                                if (!stricmp(t,"arm"))   { model=7; tube=1; }
                         }
                         else
                            return;
@@ -275,7 +280,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         ghwnd = CreateWindowEx (
            0,                   /* Extended possibilites for variation */
            szClassName,         /* Classname */
-           "B-em v0.81b",        /* Title Text */
+           "B-em v0.82",        /* Title Text */
            WS_OVERLAPPEDWINDOW&~(WS_MAXIMIZEBOX|WS_SIZEBOX), /* default window */
            CW_USEDEFAULT,       /* Windows decides the position */
            CW_USEDEFAULT,       /* where the window ends up on the screen */
@@ -313,18 +318,21 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         initadc();
         reset8271(1);
         reset1770();
-//        loadarmrom();
-//        resetarm();
-//        resettube();
+        loadarmrom();
+        resetarm();
+        resettube();
 //        tubeinit6502();
 //        tubeinitz80();
         loaddiscsamps();
         openuef(uefname);
         if (!uefena && model<3) trapos();
         install_int_ex(update50,MSEC_TO_TIMER(20));
-        CheckMenuItem(menu,model+40030,MF_CHECKED);
+        if (!tube) CheckMenuItem(menu,model+40030,MF_CHECKED);
+        else       CheckMenuItem(menu,40038,MF_CHECKED);
         CheckMenuItem(menu,curwave+40080,MF_CHECKED);
         updatemenu();
+//        sprintf(s,"Model %i Tube %i",model,tube);
+//        MessageBox(NULL,s,s,MB_OK);
         while (!quit)
         {
                 if (framenum>=((soundbuflen==3120)?5:4) && soundon)
@@ -385,6 +393,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
                                 resetsysvia();
                                 memset(ram,0,65536);
                         }
+                        resetarm();
                         resetuservia();
                         reset1770s();
                         reset8271s();
@@ -622,22 +631,32 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         case IDM_TAPE_ENABLE:
                         uefena^=1;
                         if (uefena) loadroms();
-                        else if (model>2) trapos();
+                        else if (model<3) trapos();
                         updatemenu();
                         return 0;
                         case IDM_MODEL_PALA: case IDM_MODEL_PALB:
                         case IDM_MODEL_PALBSW: case IDM_MODEL_NTSCB:
                         case IDM_MODEL_PALB64: case IDM_MODEL_PALB96:
                         case IDM_MODEL_PALB128: case IDM_MODEL_PALM128:
-                        CheckMenuItem(menu,model+40030,MF_UNCHECKED);
+                        case IDM_MODEL_ARM:
+                        if (!tube) CheckMenuItem(menu,model+40030,MF_UNCHECKED);
+                        else       CheckMenuItem(menu,40038,MF_UNCHECKED);
                         CheckMenuItem(menu,LOWORD(wParam),MF_CHECKED);
                         model=LOWORD(wParam)-40030;
+                        if (model==8)
+                        {
+                                model=7;
+                                tube=1;
+                        }
+                        else
+                           tube=0;
                         if (model) remaketables();
                         else       remaketablesa();
                         loadroms();
                         reset6502();
                         reset8271(0);
                         reset1770();
+                        resetarm();
                         resetsysvia();
                         resetuservia();
                         memset(ram,0,65536);

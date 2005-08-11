@@ -6,21 +6,22 @@
              ██       ▄██          ██         ██          ██
              ██████████▀           █████████  ██          ██
 
-                                 Version 0.81b
+                                 Version 0.82
                          A freeware BBC Micro emulator
 
 Introduction
 ~~~~~~~~~~~~
 
-B-Em is an attempt to emulate a BBC Micro, made by Acorn Computers in the 80's
+B-em is an attempt to emulate a BBC Micro, made by Acorn Computers in the 80's
 
 Features
 ~~~~~~~~
 
 - Emulates Models A, B, B+, and Master 128
+- Also emulates ARM evaluation system on Master 128
 - All documented video modes supported
 - All documented and some undocumented 6502 instructions
-- 8271 Floppy Disc Controller emulated (double drive, double sided, 80 track, read only)
+- 8271 Floppy Disc Controller emulated (double drive, double sided, 80 track, read/write)
 - 1770 Floppy Disc Controller emulated (double drive, double sided, 80 track, read/write)
 - Supports six formats for BBC storage on PC - .ssd, .dsd, .adf, .inf, .uef
   and __catalog__
@@ -34,20 +35,22 @@ Features
 Differences from last version
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- Audio buffer length now user selectable
-- Fixed bug with instructions like STA $FFFF,x - 3D Grand Prix no longer
-  crashes
+- ARM Evaluation System emulation. Beware that this is quite slow and probably
+  buggy (I don't have any software to test on it).
+- Fixed ADC/SBC BCD flags that were broken in 0.8 - Exile works again.
+- Added read ID commands to 8271 FDC - Superior Collection now works.
+- Ported to OS X
 
 
 Requirements
 ~~~~~~~~~~~~
 
-B-Em (bbc model B EMulator), requires the following :
+B-em (bbc model B EMulator), requires the following :
 
 A Pentium or better computer (try a P233 at least)
 8mb RAM (?)
 
-Eight ROM images are provided with B-em -
+Nine ROM images are provided with B-em -
 os           - UK BBC MOS
 usos         - US BBC MOS
 bpos         - BBC B+ MOS
@@ -58,6 +61,7 @@ bp\basic.rom
 b\dfs.rom    - Watford DFS 1.30
 bp\dfs.rom   - Acorn 1770 DFS
 bp\nadfs.rom - Acorn ADFS
+tube\arm.rom - ARM tube parasite ROM
 
 If you want to use more paged ROMs, put them in the roms directory, in either
 directory B or BP.
@@ -78,12 +82,12 @@ hit CTRL-ALT-END to kill it.
 Savestates do not save states of FDCs or serial stuff, so don't save during
 loading.
 
+Savestates don't save tube state either.
+
 
 Known bugs
 ~~~~~~~~~~
 
-ADFS corrupts on COMPACT command
-Formatting not supported
 Still some timing bugs on protected games (eg Hypersports)
 
 
@@ -132,6 +136,7 @@ Model :
         PAL B+96K      - emulate a PAL model B+ with 96k RAM.
         PAL B+128K     - emulate a PAL model B+ with 128k RAM.
         PAL Master 128 - emulate a PAL Master 128.
+        ARM Evaluation System - emulate a PAL Master 128 with an ARM attached.
 
 Disc :
         Load drive 0/2 - load a disc into drives 0 and 2.
@@ -163,15 +168,6 @@ Misc options :
         Calibrate joystick 1 - Calibrates the first joystick.
         Calibrate joystick 2 - Calibrates the second joystick.
         Save screenshot      - saves screenshot in BMP,PCX, or TGA format.
-
-
-Command line options :
-~~~~~~~~~~~~~~~~~~~~~~
-
--fullscreen    : Force fullscreen mode (Windows only)
--autoboot      : Automatically boot from drive 0
--disc file.ssd : Load file.ssd into drive 0/2
--esc           : Quit emulator by pressing escape
 
 
 FAQ :
@@ -208,6 +204,8 @@ Hardware emulated
 The 6502 processor - Most instructions should be emulated. Attempts to be cycle
                      perfect. 65C02 is emulated for Master 128 mode, but is
                      probably missing some opcodes.
+The ARM processor  - As a parasite processor on the Master 128 only. A bug or
+                     two remains, and not all opcodes are implemented.
 The 6845 CRTC      - Accurate line-by-line engine. Firetrack, Revs, and
                      Uridium all work.
 The Video ULA      - All modes emulated.
@@ -220,7 +218,7 @@ The User VIA       - Emulated.
 tape filing system - Supports .inf and __CATALOG__ format.
 Sound              - All channels emulated, with sample support and some
                      undocumented behaviour (Crazee Rider). With optional low
-                     pass filter.
+                     and high pass filters.
 ADC                - Real joystick emulation, supporting both joysticks.
 6850 ACIA          - Emulated for cassettes. Read only.
 Serial ULA         - Emulated.
@@ -231,7 +229,6 @@ Hardware NOT emulated
 
 serial port
 AMX mouse
-Tube
 Econet
 Printer
 
@@ -251,7 +248,7 @@ Ken Lowe for assistance with the Level 9 adventures.
 Richard Gellman for help with a few things.
 
 Thomas Harte for some UEF code - I wrote my own in the end - and for inventing
-UEF files.
+UEF files. And for the OS X port.
 
 Dave Moore for making and hosting the B-em site
 
@@ -284,7 +281,6 @@ b-em@bbcmicro.com
 Also check out Elkulator (elkulator.acornelectron.co.uk), my Electron emulator,
 and Arculator (b-em.bbcmicro.com/arculator), my A3xx/A4xx/A3000/A540 emulator
 </plug>
-
 
 Appendix A : The source code
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -392,7 +388,7 @@ Massively improved over the old versions, this is now one of the best BBC
 emulators and runs pretty much everything.
 
 Beebem - www.mikebuk.dsl.pipex.com/beebem
-The most famous BBC emulator. Runs pretty much everything, but can be really
+The most famous BBC emulator. Runs pretty much everything, but is really
 quite slow.
 
 BeebIt - homepages.paradise.net.nz/mjfoot/bbc.htm

@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <allegro.h>
 
+int tube;
 int framenum;
 int soundbuflen;
 char exname[512];
@@ -39,6 +40,7 @@ void save_config()
         set_config_int(NULL,"resolution",hires);
         set_config_int(NULL,"fullscreen",fullscreen);
         set_config_int(NULL,"sound_buffer_length",soundbuflen);
+        set_config_int(NULL,"tube",tube);
 }
 
 void load_config()
@@ -74,6 +76,7 @@ void load_config()
         else
            uefname[0]=0;
         model=get_config_int(NULL,"model",1);
+        tube=get_config_int(NULL,"tube",0);
         soundon=get_config_int(NULL,"sound_enable",1);
         curwave=get_config_int(NULL,"current_waveform",0);
         ddnoise=get_config_int(NULL,"disc_noise",1);
@@ -253,7 +256,7 @@ MENU tapemenu[]=
         {NULL,NULL,NULL,NULL,NULL}
 };
 
-MENU modelmenu[9];
+MENU modelmenu[10];
 
 int mpala()
 {
@@ -267,6 +270,7 @@ int mpala()
         resetsysvia();
         resetuservia();
         memset(ram,0,32768);
+        tube=0;
         return D_EXIT;
 }
 
@@ -282,6 +286,7 @@ int mpalb()
         resetsysvia();
         resetuservia();
         memset(ram,0,32768);
+        tube=0;
         return D_EXIT;
 }
 
@@ -297,6 +302,7 @@ int mpalbsw()
         resetsysvia();
         resetuservia();
         memset(ram,0,32768);
+        tube=0;
         return D_EXIT;
 }
 
@@ -312,6 +318,7 @@ int mntscb()
         resetsysvia();
         resetuservia();
         memset(ram,0,32768);
+        tube=0;
         return D_EXIT;
 }
 
@@ -327,6 +334,7 @@ int mpalbp()
         resetsysvia();
         resetuservia();
         memset(ram,0,65536);
+        tube=0;
         return D_EXIT;
 }
 
@@ -342,6 +350,7 @@ int mpalbp96()
         resetsysvia();
         resetuservia();
         memset(ram,0,65536);
+        tube=0;
         return D_EXIT;
 }
 
@@ -357,6 +366,7 @@ int mpalbp128()
         resetsysvia();
         resetuservia();
         memset(ram,0,65536);
+        tube=0;
         return D_EXIT;
 }
 
@@ -372,6 +382,24 @@ int mpalm128()
         resetsysvia();
         resetuservia();
         memset(ram,0,65536);
+        tube=0;
+        return D_EXIT;
+}
+
+int mpalm128arm()
+{
+        int c;
+        model=7;
+        remaketables();
+        loadroms();
+        reset6502();
+        reset8271(0);
+        reset1770();
+        resetsysvia();
+        resetuservia();
+        resetarm();
+        memset(ram,0,65536);
+        tube=1;
         return D_EXIT;
 }
 
@@ -385,6 +413,7 @@ MENU modelmenu[]=
         {"PAL B+96K",mpalbp96,NULL,NULL,NULL},
         {"PAL B+128K",mpalbp128,NULL,NULL,NULL},
         {"PAL Master 128",mpalm128,NULL,NULL,NULL},
+        {"ARM Evaluation System",mpalm128arm,NULL,NULL,NULL},
         {NULL,NULL,NULL,NULL,NULL}
 };
 
@@ -426,16 +455,16 @@ MENU modemenu[5]=
 int blurfilter()
 {
         blurred^=1;
-        if (blurred) videomenu[1].flags=D_SELECTED;
-        else         videomenu[1].flags=0;
+        if (blurred) videomenu[2].flags=D_SELECTED;
+        else         videomenu[2].flags=0;
         return D_EXIT;
 }
 
 int monochrome()
 {
         mono^=1;
-        if (mono) videomenu[2].flags=D_SELECTED;
-        else      videomenu[2].flags=0;
+        if (mono) videomenu[3].flags=D_SELECTED;
+        else      videomenu[3].flags=0;
         updatepalette();
         return D_EXIT;
 }
@@ -535,7 +564,7 @@ MENU sbufmenu[]=
         {NULL,NULL,NULL,NULL,NULL},
 };
 
-MENU soundmenu[7];
+MENU soundmenu[8];
 
 int soundena()
 {
@@ -661,8 +690,9 @@ MENU mainmenu[]=
 
 DIALOG bemgui[]=
 {
-      {d_ctext_proc, 200, 260, 0,  0, 15,0,0,0,     0,0,"B-em v0.81b"},
+      {d_ctext_proc, 200, 260, 0,  0, 15,0,0,0,     0,0,"B-em v0.82"},
       {d_menu_proc,  0,   0,   0,  0, 15,0,0,0,     0,0,mainmenu},
+          {d_yield_proc},
       {0,0,0,0,0,0,0,0,0,0,0,NULL,NULL,NULL}
 };
 
@@ -677,10 +707,10 @@ void entergui()
         fadepal();
         if (uefena) tapemenu[2].flags=D_SELECTED;
         else        tapemenu[2].flags=0;
-        if (blurred) videomenu[1].flags=D_SELECTED;
-        else         videomenu[1].flags=0;
-        if (mono) videomenu[2].flags=D_SELECTED;
-        else      videomenu[2].flags=0;
+        if (blurred) videomenu[2].flags=D_SELECTED;
+        else         videomenu[2].flags=0;
+        if (mono) videomenu[3].flags=D_SELECTED;
+        else      videomenu[3].flags=0;
         if (ddnoise) discmenu[2].flags=D_SELECTED;
         else         discmenu[2].flags=0;
         if (soundon) soundmenu[0].flags=D_SELECTED;
@@ -689,8 +719,9 @@ void entergui()
         else               soundmenu[1].flags=0;
         if (soundfilter&2) soundmenu[2].flags=D_SELECTED;
         else               soundmenu[2].flags=0;
-        modelmenu[0].flags=modelmenu[1].flags=modelmenu[2].flags=modelmenu[3].flags=modelmenu[4].flags=modelmenu[5].flags=modelmenu[6].flags=modelmenu[7].flags=0;
-        modelmenu[model].flags=D_SELECTED;
+        modelmenu[0].flags=modelmenu[1].flags=modelmenu[2].flags=modelmenu[3].flags=modelmenu[4].flags=modelmenu[5].flags=modelmenu[6].flags=modelmenu[7].flags=modelmenu[8].flags=0;
+        if (tube && model==7) modelmenu[8].flags=D_SELECTED;
+        else                  modelmenu[model].flags=D_SELECTED;
         modemenu[0].flags=modemenu[1].flags=modemenu[2].flags=modemenu[3].flags=0;
         switch (hires)
         {
@@ -721,6 +752,7 @@ void entergui()
         shutdown_dialog(dp);
         while ((mouse_b&2) || key[KEY_F11] || key[KEY_ESC]) yield_timeslice();
         if (soundon) as=play_audio_stream(soundbuflen,16,0,31200,255,127);
+        framenum=0;
         clear_keybuf();
         restorepal();
         if (rewnd)

@@ -194,6 +194,7 @@ void loadroms()
         }
         fread(os,0x4000,1,f);
         fclose(f);
+        trapos();
         switch (model)
         {
                 case 0: append_filename(fn,exname,"roms/a",511); break;
@@ -319,7 +320,7 @@ unsigned char readmeml(unsigned short addr)
                 case 0xFE80: case 0xFE88: case 0xFE90: case 0xFE98: if (model>3 && model<7) return read1770(addr); else if (model!=7) return read8271(addr); return 0xFF;
                 case 0xFEA0: case 0xFEA8: return 0xFE; /*I wonder what Arcadians wants with Econet...*/
                 case 0xFEC0: case 0xFEC8: case 0xFED0: case 0xFED8: if (model<7) return readadc(addr); break;
-                case 0xFEE0: return readtubehost(addr);
+                case 0xFEE0: if (acccon&0x10) return 0; return readtubehost(addr);
         }
         if ((addr&0xFE00)==0xFC00) return 0xFF;
         if (model==7 && ((addr&0xE000)==0xC000)) return osram[addr&0x1FFF];
@@ -387,7 +388,7 @@ unsigned char writememl(unsigned short addr, unsigned char val)
                 case 0xFE80: case 0xFE88: case 0xFE90: case 0xFE98: if (model>3 && model<7) write1770(addr,val); else if (model!=7) write8271(addr,val); return;
                 case 0xFEA0: return; /*Now Repton Infinity wants Econet as well!*/
                 case 0xFEC0: case 0xFEC8: case 0xFED0: case 0xFED8: if (model<7) writeadc(addr,val); return;
-                case 0xFEE0: writetubehost(addr,val); return;
+                case 0xFEE0: if (acccon&0x10) return; writetubehost(addr,val); return;
         }
         if (!(addr&0x8000))
         {
@@ -438,6 +439,77 @@ unsigned short tempw;
 int tempv,hc,al,ah;
 unsigned char tempb;
 
+#define ADC(temp)       if (!p.d)                            \
+                        {                                  \
+                                tempw=(a+temp+(p.c?1:0));        \
+                                p.v=(!((a^temp)&0x80)&&((a^tempw)&0x80));  \
+                                a=tempw&0xFF;                  \
+                                p.c=tempw&0x100;                  \
+                                setzn(a);                  \
+                        }                                  \
+                        else                               \
+                        {                                  \
+                                ah=0;        \
+                                tempb=a+temp+(p.c?1:0);                            \
+                                if (!tempb)                                      \
+                                   p.z=1;                                          \
+                                al=(a&0xF)+(temp&0xF)+(p.c?1:0);                            \
+                                if (al>9)                                        \
+                                {                                                \
+                                        al-=10;                                  \
+                                        al&=0xF;                                 \
+                                        ah=1;                                    \
+                                }                                                \
+                                ah+=((a>>4)+(temp>>4));                             \
+                                if (ah&8) p.n=1;                                   \
+                                p.v=(((ah << 4) ^ a) & 128) && !((a ^ temp) & 128);   \
+                                p.c=0;                                             \
+                                if (ah>9)                                        \
+                                {                                                \
+                                        p.c=1;                                     \
+                                        ah-=10;                                  \
+                                        ah&=0xF;                                 \
+                                }                                                \
+                                a=(al&0xF)|(ah<<4);                              \
+                        }
+
+#define SBC(temp)       if (!p.d)                            \
+                        {                                  \
+                                tempw=a-(temp+(p.c?0:1));    \
+                                tempv=(short)a-(short)(temp+(p.c?0:1));            \
+                                p.v=((a^(temp+(p.c?0:1)))&(a^(unsigned char)tempv)&0x80); \
+                                p.c=tempv>=0;\
+                                a=tempw&0xFF;              \
+                                setzn(a);                  \
+                        }                                  \
+                        else                               \
+                        {                                  \
+                                hc=0;                               \
+                                p.z=p.n=0;                            \
+                                if (!((a-temp)-((p.c)?0:1)))            \
+                                   p.z=1;                             \
+                                al=(a&15)-(temp&15)-((p.c)?0:1);      \
+                                if (al&16)                           \
+                                {                                   \
+                                        al-=6;                      \
+                                        al&=0xF;                    \
+                                        hc=1;                       \
+                                }                                   \
+                                ah=(a>>4)-(temp>>4);                \
+                                if (hc) ah--;                       \
+                                if ((a-(temp+((p.c)?0:1)))&0x80)        \
+                                   p.n=1;                             \
+                                p.v=(((a-(temp+((p.c)?0:1)))^temp)&128)&&((a^temp)&128); \
+                                p.c=1; \
+                                if (ah&16)                           \
+                                {                                   \
+                                        p.c=0; \
+                                        ah-=6;                      \
+                                        ah&=0xF;                    \
+                                }                                   \
+                                a=(al&0xF)|((ah&0xF)<<4);                 \
+                        }
+#if 0
 #define ADC(temp)       if (!p.d)                            \
                         {                                  \
                                 tempw=(a+temp+(p.c?1:0));            \
@@ -510,6 +582,7 @@ unsigned char tempb;
                                 }                                   \
                                 a=(al&0xF)|((ah&0xF)<<4);                 \
                         }
+#endif
 /*
                                 temp+=(p.c?0:1);          \
                                 tempw=a-temp;    \
@@ -3576,6 +3649,11 @@ void exec65c02(int lines, int cpl)
                                 skipint=2;
 //                                printf("skipint=2\n");
                         }
+                        if (tube)
+                        {
+                                exectube(tubecycs);
+                                tubecycs=0;
+                        }
 /*                                if (interrupt && !p.i)
                                 {
 //                                        printf("Interrupt %04X\n",pc);
@@ -3644,7 +3722,7 @@ void exec65c02(int lines, int cpl)
                 tapelcount--;
                 if (!(lines&0x7F) && adcconvert && !motor) polladc();
                 if (lines!=-1) drawline(lines);
-                if (tube) exectube();
+//                if (tube) exectube();
                 tubecycs=0;
         }
         frms++;
