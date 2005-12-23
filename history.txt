@@ -122,6 +122,11 @@ Version 0.3 finalised and released
            directories, improved UEF support a little, and added American BBC
            support.
 Version 0.3a finalised and released
+21/4/01  - Attempted to increase speed.
+24/4/01  - Attempted to fix 6850 emulation - failed. I'm not giving up though.
+05/5/01  - Added Richard Gellman's ACIA code - doesn't work.
+06/5/01  - Gave up on tape emulation. I really can't see the point, as I was
+           spending so long on a feature that no-one would use.
 12/10/01 - Changed graphics library to Allegro, and ported over the SN76489
            emulation from YAAME. Sound is really good now, but the keyboard is
            broken.
@@ -247,7 +252,7 @@ Version 0.6 finalised and released
            1770 seeking/stepping speeded up a bit.
 27/01/04 - Played with sound a bit.
 28/01/04 - Added ADFS support.
-Version 0.6 finalised and released
+Version 0.61 finalised and released
 23/02/04 - Started Master 128 emulation. Currently hangs.
 29/02/04 - Added CMOS RAM. Acorn's implementation of this is a bit odd, but
            it's easier than the Archie's I2C chip.
@@ -337,3 +342,25 @@ Version 0.81 finalised and released
 03/08/05 - Added Read ID commands to 8271, for Superior Collection.
 05/08/05 - Added back Tube support, for ARM only.
 09/08/05 - Added menu option for Tube.
+Version 0.82 finalised and released
+25/10/05 - Fixed bug in ACIA emulation, Joust now loads loader.
+06/11/05 - Started FDI support. Can read unprotected images + Mr. Ee!
+07/11/05 - FDI now supports 80 track images. Fixed Level 9 protection, Elite,
+           Revs, Exile (both 40 track and dual format)
+08/11/05 - Blank tracks and sector not found error now supported - fixed a lot
+           of Acornsoft titles. Also added CRC checking/errors.
+           Some Acornsoft games don't work - some will try to execute a read
+           command for 0 (?) sectors, others will read a lot of CRC-bad sectors
+           and will then hang...
+10/11/05 - Added FDI emulation to 1770 FDC - for Master and B+.
+14/11/05 - Added Master Compact emulation
+22/11/05 - Sector ID count uses all 8 bits on 8271 - Felix in the Factory now
+           works.
+08/12/05 - CPX # takes 2 cycles, not 3. Joust tape now works.
+09/12/05 - TAY takes 2 cycles, not 0. Some Kevin Edwards protections now work.
+12/12/05 - Fast tape loading now much faster.
+           Fixed bug in video - should be a bit faster now.
+           Tidied up source code.
+           Brought ARM emulation in sync with Arculator - faster, less buggy.
+14/12/05 - Downgraded to Allegro 4.0.3 - sound works in DOS again.
+           Added disc drive noise to FDI.

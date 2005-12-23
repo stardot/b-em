@@ -1,25 +1,21 @@
-/*B-em 0.8 by Tom Walker*/
+/*B-em 1.0 by Tom Walker*/
 /*6850 acia emulation*/
 
 #include <stdio.h>
+#include "b-em.h"
 #include "acia.h"
 #include "serial.h"
 
 #define DCD     4
 #define RECIEVE 1
 
-unsigned short pc;
-int chunklen;
-int lns;
 int dreg=0;
-int output;
 int cleardcd=0;
 int tapedelay=0;
 unsigned char serialreg;
 FILE *tape;
 FILE *tapelog;
 int tapepos;
-int interrupt;
 unsigned char aciasr=8;
 unsigned char aciadrs;
 
@@ -56,7 +52,7 @@ unsigned char readacia(unsigned short addr)
         else
         {
 //                printf("Read status %02X\n",aciasr);
-                return aciasr;
+                return (aciasr&0x7F)|(aciasr&aciacr&0x80);
         }
 }
 

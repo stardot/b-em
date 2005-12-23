@@ -1,4 +1,4 @@
-/*B-em 0.81 by Tom Walker*/
+/*B-em 1.0 by Tom Walker*/
 /*GUI*/
 
 #include <stdio.h>
@@ -23,6 +23,7 @@ unsigned char *ram;
 int model;
 char discname[2][260];
 int quit;
+int fasttape;
 
 void save_config()
 {
@@ -41,6 +42,7 @@ void save_config()
         set_config_int(NULL,"fullscreen",fullscreen);
         set_config_int(NULL,"sound_buffer_length",soundbuflen);
         set_config_int(NULL,"tube",tube);
+        set_config_int(NULL,"fast_tape",fasttape);
 }
 
 void load_config()
@@ -87,6 +89,7 @@ void load_config()
         hires=get_config_int(NULL,"resolution",0);
         fullscreen=get_config_int(NULL,"fullscreen",0);
         soundbuflen=get_config_int(NULL,"sound_buffer_length",3120);
+        fasttape=get_config_int(NULL,"fast_tape",1);
 }
 
 int gui_exit()
@@ -143,7 +146,7 @@ int gui_changedisc0()
         int ret,c;
         int xsize=(hires)?768:384,ysize=(hires)?384:192;
         memcpy(tempname,discname[0],260);
-        ret=file_select_ex("Please choose a disc image",tempname,"SSD;DSD;IMG;ADF;ADL",260,xsize,ysize);
+        ret=file_select_ex("Please choose a disc image",tempname,"SSD;DSD;IMG;ADF;ADL;FDI",260,xsize,ysize);
         if (ret)
         {
                 checkdiscchanged(0);
@@ -158,6 +161,8 @@ int gui_changedisc0()
                 }
                 if ((discname[0][c]=='d'||discname[0][c]=='D')&&(c!=strlen(discname[0])))
                    load8271dsd(discname[0],0);
+                else if ((discname[0][c]=='f'||discname[0][c]=='F')&&(c!=strlen(discname[0])))
+                   load8271fdi(discname[0],0);
                 else if ((discname[0][c]=='a'||discname[0][c]=='A')&&(c!=strlen(discname[0])))
                    load1770adfs(discname[0],0);
                 else if (c!=strlen(discname[0]))
@@ -172,7 +177,7 @@ int gui_changedisc1()
         int ret,c;
         int xsize=(hires)?768:384,ysize=(hires)?384:192;
         memcpy(tempname,discname[1],260);
-        ret=file_select_ex("Please choose a disc image",tempname,"SSD;DSD;IMG;ADF;ADL",260,xsize,ysize);
+        ret=file_select_ex("Please choose a disc image",tempname,"SSD;DSD;IMG;ADF;ADL;FDI",260,xsize,ysize);
         if (ret)
         {
                 checkdiscchanged(1);
@@ -187,8 +192,10 @@ int gui_changedisc1()
                 }
                 if ((discname[1][c]=='d'||discname[1][c]=='D')&&(c!=strlen(discname[1])))
                    load8271dsd(discname[1],1);
+                else if ((discname[0][c]=='f'||discname[0][c]=='F')&&(c!=strlen(discname[0])))
+                   load8271fdi(discname[1],1);
                 else if ((discname[1][c]=='a'||discname[1][c]=='A')&&(c!=strlen(discname[1])))
-                   load1770adfs(discname[0],1);
+                   load1770adfs(discname[1],1);
                 else if (c!=strlen(discname[1]))
                    load8271ssd(discname[1],1);
         }
@@ -213,7 +220,7 @@ MENU discmenu[]=
         {NULL,NULL,NULL,NULL,NULL}
 };
 
-MENU tapemenu[4];
+MENU tapemenu[5];
 
 int changetape()
 {
@@ -248,15 +255,22 @@ int tapeena()
         return D_EXIT;
 }
 
+int tapefast()
+{
+        fasttape^=1;
+        return D_EXIT;
+}
+
 MENU tapemenu[]=
 {
         {"&Change tape",changetape,NULL,NULL,NULL},
         {"&Rewind tape",rewindtape,NULL,NULL,NULL},
         {"&Tape enable",tapeena,NULL,NULL,NULL},
+        {"&Fast tape",tapefast,NULL,NULL,NULL},
         {NULL,NULL,NULL,NULL,NULL}
 };
 
-MENU modelmenu[10];
+MENU modelmenu[11];
 
 int mpala()
 {
@@ -386,6 +400,22 @@ int mpalm128()
         return D_EXIT;
 }
 
+int mpalmc()
+{
+        int c;
+        model=8;
+        remaketables();
+        loadroms();
+        reset6502();
+        reset8271(0);
+        reset1770();
+        resetsysvia();
+        resetuservia();
+        memset(ram,0,65536);
+        tube=0;
+        return D_EXIT;
+}
+
 int mpalm128arm()
 {
         int c;
@@ -413,6 +443,7 @@ MENU modelmenu[]=
         {"PAL B+96K",mpalbp96,NULL,NULL,NULL},
         {"PAL B+128K",mpalbp128,NULL,NULL,NULL},
         {"PAL Master 128",mpalm128,NULL,NULL,NULL},
+        {"PAL Master Compact",mpalmc,NULL,NULL,NULL},
         {"ARM Evaluation System",mpalm128arm,NULL,NULL,NULL},
         {NULL,NULL,NULL,NULL,NULL}
 };
@@ -690,7 +721,7 @@ MENU mainmenu[]=
 
 DIALOG bemgui[]=
 {
-      {d_ctext_proc, 200, 260, 0,  0, 15,0,0,0,     0,0,"B-em v0.82"},
+      {d_ctext_proc, 200, 260, 0,  0, 15,0,0,0,     0,0,"B-em v1.0"},
       {d_menu_proc,  0,   0,   0,  0, 15,0,0,0,     0,0,mainmenu},
           {d_yield_proc},
       {0,0,0,0,0,0,0,0,0,0,0,NULL,NULL,NULL}
@@ -705,6 +736,8 @@ void entergui()
         int oldfs=fullscreen;
         DIALOG_PLAYER *dp;
         fadepal();
+        if (fasttape) tapemenu[3].flags=D_SELECTED;
+        else          tapemenu[3].flags=0;
         if (uefena) tapemenu[2].flags=D_SELECTED;
         else        tapemenu[2].flags=0;
         if (blurred) videomenu[2].flags=D_SELECTED;
@@ -719,8 +752,8 @@ void entergui()
         else               soundmenu[1].flags=0;
         if (soundfilter&2) soundmenu[2].flags=D_SELECTED;
         else               soundmenu[2].flags=0;
-        modelmenu[0].flags=modelmenu[1].flags=modelmenu[2].flags=modelmenu[3].flags=modelmenu[4].flags=modelmenu[5].flags=modelmenu[6].flags=modelmenu[7].flags=modelmenu[8].flags=0;
-        if (tube && model==7) modelmenu[8].flags=D_SELECTED;
+        modelmenu[0].flags=modelmenu[1].flags=modelmenu[2].flags=modelmenu[3].flags=modelmenu[4].flags=modelmenu[5].flags=modelmenu[6].flags=modelmenu[7].flags=modelmenu[8].flags=modelmenu[9].flags=0;
+        if (tube && model==7) modelmenu[9].flags=D_SELECTED;
         else                  modelmenu[model].flags=D_SELECTED;
         modemenu[0].flags=modemenu[1].flags=modemenu[2].flags=modemenu[3].flags=0;
         switch (hires)
@@ -760,6 +793,7 @@ void entergui()
                 rewindit();
                 rewnd=0;
         }
+        if (!fullscreen) recreatemenu();
         if ((hires!=oldhires) || (fullscreen!=oldfs)) updategfxmode();
         clear(screen);
         if (!fullscreen) remove_mouse();

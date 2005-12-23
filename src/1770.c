@@ -1,36 +1,16 @@
-/*B-em 0.81 by Tom Walker*/
+/*B-em 1.0 by Tom Walker*/
 /*1770 emulator*/
 #include <allegro.h>
 #include <stdio.h>
-
-int discaltered[2]={0,0};
-int sides[2];
-int adfs[2]={0,0};
-unsigned short pc;
-int motorofff;
-int ddnoise;
-
-BITMAP *buffer;
+#include "b-em.h"
 
 #define SIDES 2
 #define TRACKS 80
 #define SECTORS 16
 #define SECTORSIZE 256
 
-SAMPLE *seeksmp;
-SAMPLE *seek2smp;
-SAMPLE *seek3smp;
-SAMPLE *stepsmp;
-SAMPLE *motorsmp;
-
-int output;
-unsigned char discs[2][SIDES][SECTORS*TRACKS][SECTORSIZE];
 int endcommand=0;
-int curside,curdisc;
-int nmi;
-int discint;
 
-int sectorpos;
 struct
 {
         unsigned char track,sector,data,command,control,status;
@@ -49,6 +29,8 @@ int load1770adfs(char *fn, int disc)
         if (len>(80*16*256)) sides[disc]=2;
         else                 sides[disc]=1;
         adfs[disc]=1;
+        fdiin[disc]=0;
+//        discmaxtracks[disc]=80;
         for (d=0;d<80;d++)
         {
                 for (c=0;c<sides[disc];c++)
@@ -74,6 +56,7 @@ void checkdiscchanged(int disc)
         FILE *ff;
         int c,d,e,f;
         if (!discaltered[disc]) return;
+        if (fdiin[disc]) return;
 //        alert("Writing disc",discname[disc],NULL,"OK",NULL,0,0);
         discaltered[disc]=0;
         ff=fopen(discname[disc],"wb");
@@ -116,8 +99,12 @@ void reset1770()
         wd1770.status=0x80;
         discint=0;
         nmi=0;
-        stop_sample(motorsmp);
-        motorofff=0;
+        if (driveled)
+        {
+                stop_sample(motorsmp);
+                play_sample(motoroffsmp,127,127,1000,0);
+        }
+        motorofff=driveled=0;
 }
 
 void reset1770s()
@@ -126,7 +113,12 @@ void reset1770s()
         wd1770.status=0x80;
         discint=0;
         nmi=0;
-//        stop_sample(motorsmp);
+        if (driveled)
+        {
+                stop_sample(motorsmp);
+                play_sample(motoroffsmp,127,127,1000,0);
+                driveled=0;
+        }
         motorofff=0;
 }
 
@@ -161,33 +153,95 @@ void play1770seek(int target)
         else if (dif<35)
         {
                 play_sample(seek3smp,127,127,1000,0);
-                set1770poll(1200000);
+                set1770poll(500000);
         }
         else
         {
                 play_sample(seek2smp,127,127,1000,0);
-                set1770poll(2000000);
+                set1770poll(1400000);
         }
 //        printf("dif %i discint %i\n",dif,discint);
 }
 
-void start1770command(addr)
+void write1770fdcdata(unsigned char v)
+{
+//        printf("Recieved data %02X  ",v);
+        wd1770.data=v;
+        nmi|=2;
+        wd1770.status|=2;
+//        printf("NMI %i\n",nmi);
+}
+
+void end1770readid()
+{
+        endcommand=1;
+        set1770poll(200);
+}
+
+void idcrcerror1770()
+{
+        wd1770.status=0x98;
+        inreadop=0;
+        nmi|=1;
+        set1770spindown();
+//        printf("ID CRC error\n");
+}
+
+void datacrcerror1770()
+{
+        wd1770.status=0x88;
+        inreadop=0;
+        nmi|=1;
+        set1770spindown();
+//        printf("Data CRC error\n");
+}
+
+void sectorerror1770()
+{
+        wd1770.status=0x90;
+        inreadop=0;
+        nmi|=1;
+        set1770spindown();
+//        printf("Sector error\n");
+//        output=1;
+//        timetolive=500;
+}
+
+void start1770command(unsigned short addr)
 {
         wd1770.status=0x81;
 //        wd1770.status|=1;
         endcommand=0;
-        if (ddnoise)
+        if (ddnoise && !driveled)
         {
-                stop_sample(motorsmp);
+                play_sample(motoronsmp,127,127,1000,0);
                 play_sample(motorsmp,127,127,1000,TRUE);
+                driveled=1;
         }
         motorofff=0;
+//        printf("1770 command %02X\n",wd1770.command);
         switch (wd1770.command>>4)
         {
                 case 0: if (ddnoise) play1770seek(0); else set1770poll(2000); break; /*Restore*/
                 case 1: if (ddnoise) play1770seek(wd1770.data); else set1770poll(2000); break; /*Seek*/
                 case 5: if (ddnoise) play_sample(stepsmp,127,127,1000,FALSE); set1770poll(2000); break; /*Step in*/
-                case 8: wd1770.status&=~4; if (ddnoise) { play1770seek(wd1770.track); } else { set1770poll(2000); } sectorpos=0; wd1770.curtrack=wd1770.track; wd1770.cursector=wd1770.sector; break; /*Read sector*/
+                case 8: /*Read sector*/
+                wd1770.status&=~4;
+                if (ddnoise) { play1770seek(wd1770.track); }
+                else { set1770poll(2000); }
+                if (fdiin[curdisc])
+                {
+//                        printf("FDI in\n");
+                        set1770poll(0);
+                        inreadop=1;
+                }
+                sectorpos=0;
+                curtrack[0]=inttrack[0]=wd1770.curtrack=wd1770.track;
+                cursec[0]=wd1770.cursector=wd1770.sector;
+//                printf("Read %i %i\n",curtrack[0],cursec[0]);
+                sectorsleft=1;
+                idmarks=0;
+                break;
                 case 0xA: wd1770.status&=~4; if (ddnoise) { play1770seek(wd1770.track); } else { set1770poll(2000); } sectorpos=-1; wd1770.curtrack=wd1770.track; wd1770.cursector=wd1770.sector; wd1770.dat=0; break; /*Write sector*/
                 case 0xF: wd1770.status&=~4; set1770poll(2000); sectorpos=0; wd1770.cursector=0; break; /*Write track*/
                 default:
@@ -215,6 +269,9 @@ void write1770(unsigned short addr, unsigned char val)
                 if (val&1) curdisc=0;
                 if (val&2) curdisc=1;
                 if (val&16) curside=1; else curside=0;
+                ddensity=!(val&0x20);
+//                if (ddensity) printf("Double density mode\n");
+//                else          printf("Single density mode\n");
                 return;
                 case 0xFE84: /*Command*/
                 case 0xFE28:
@@ -257,7 +314,7 @@ unsigned char read1770(unsigned short addr)
                 case 0xFE84: /*Status register*/
                 case 0xFE28:
                 nmi&=~1;
-//                printf("Read status %02X\n",wd1770.status);
+//                if (output) printf("Read status %02X\n",wd1770.status);
                 return wd1770.status;
                 case 0xFE85: /*Track register*/
                 case 0xFE29:
@@ -267,6 +324,7 @@ unsigned char read1770(unsigned short addr)
                 return wd1770.sector;
                 case 0xFE87: /*Data register*/
                 case 0xFE2B:
+//                printf("Read data register %02X\n",wd1770.data);
                 wd1770.status&=~2;
                 nmi&=~2;
                 return wd1770.data;
@@ -278,20 +336,24 @@ unsigned char read1770(unsigned short addr)
 
 void poll1770()
 {
-        if (motorofff)
+//        printf("Polled %02X\n",wd1770.command);
+        if (motorofff && driveled)
         {
                 motorofff=0;
+                driveled=0;
                 stop_sample(motorsmp);
+                play_sample(motoroffsmp,127,127,1000,0);
                 return;
         }
         switch (wd1770.command>>4)
         {
                 case 0: /*Restore*/
-                wd1770.track=wd1770.curtrack=0;
+                curtrack[0]=inttrack[0]=wd1770.track=wd1770.curtrack=0;
                 wd1770.status&=~1;
                 wd1770.status|=4;
                 nmi|=1;
                 set1770spindown();
+//                printf("Restore callback\n");
                 break;
 
                 case 1: /*Seek*/
@@ -304,16 +366,19 @@ void poll1770()
                 }
                 else
                 {
-                        wd1770.track=wd1770.curtrack=wd1770.data;
+                        curtrack[0]=inttrack[0]=wd1770.track=wd1770.curtrack=wd1770.data;
                         wd1770.status&=~5;
                         if (!wd1770.curtrack) wd1770.status|=4;
                         nmi|=1;
                         set1770spindown();
+//                        printf("Seek to track %i\n",curtrack[0]);
                 }
+//                printf("Track now %i\n",curtrack[0]);
                 break;
 
                 case 5: /*Step in*/
                 wd1770.curtrack++;
+                curtrack[0]=inttrack[0]=wd1770.curtrack;
                 wd1770.track=wd1770.curtrack;
                 wd1770.status&=~5;
                 nmi|=1;

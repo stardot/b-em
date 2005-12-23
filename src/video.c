@@ -1,4 +1,4 @@
-/*B-em 0.81 by Tom Walker*/
+/*B-em 1.0 by Tom Walker*/
 /*Video emulation*/
 
 #include <stdio.h>
@@ -159,6 +159,7 @@ void writeula(unsigned short addr, unsigned char val)
 void remaketab()
 {
         int c;
+        remakelookup=0;
         if (hires&1)
         {
                 switch (bbcmode)
@@ -698,7 +699,7 @@ void drawline(int line6502)
         if (!curline)
         {
                 sc=vc=0;
-                if (physline>0 && physline<300)
+                if (physline>0 && physline<300 && (!(fasttape && motor) || !flashint))
                 {
                         if (hires&1)  memset(buffer->line[physline<<1],0,800);
                         else          memset(buffer->line[physline],0,400);
@@ -712,7 +713,7 @@ void drawline(int line6502)
                 delaylcount--;
                 curline++;
                 physline++;
-                if (physline>0 && physline<300)
+                if (physline>0 && physline<300 && (!(fasttape && motor) || !flashint))
                 {
                         if (hires&1)  memset(buffer->line[physline<<1],0,800);
                         else          memset(buffer->line[physline],0,400);
@@ -724,6 +725,8 @@ void drawline(int line6502)
         if (vc<crtc[6])
         {
                 if (remakelookup) remaketab();
+                if (!(fasttape && motor) || !flashint)
+                {
                 if ((crtc[8]&0x30)==0x30)
                 {
                         if (physline>0 && physline<300)
@@ -769,6 +772,7 @@ void drawline(int line6502)
                                 break;
                         }
                 }
+                }
                 sc++;
                 sc&=31;
                 if (sc==crtc[9]+1 || ((sc==(crtc[9]>>1)+1) && crtc[8]&2))
@@ -811,6 +815,8 @@ void drawline(int line6502)
                 if (bbcmode==7)
                    drawcursor();
                 firstline=0;
+                if (!(fasttape && motor) || !flashint)
+                {
                 if (hires==1)
                 {
                         if (blurred)
@@ -823,16 +829,24 @@ void drawline(int line6502)
                                                 buffer2->line[y<<1][x<<1]=buffer2->line[y<<1][(x<<1)+1]=128+buffer->line[y<<1][x<<1]+(buffer->line[y<<1][(x-1)<<1]<<3);
                                         }
                                 }
+                                rectfill(screen,0,0,799,15,0);
+                                rectfill(screen,0,584,799,599,0);
                                 blit(buffer2,screen,0,32,0,16,800,568);
                         }
                         else
-                           blit(buffer,screen,0,32,0,16,800,568);
+                        {
+                                rectfill(screen,0,0,799,15,0);
+                                rectfill(screen,0,584,799,599,0);
+                                blit(buffer,screen,0,32,0,16,800,568);
+                        }
 //                        textprintf(screen,font,0,584,makecol(255,255,255),"%03i %02X %04X %i %i     ",blocks,motor,chunkid,chunklen,intone);
                 }
                 else if (hires==2)
                 {
                         blit(buffer,buf16,0,16,0,0,400,284);
                         Super2xSaI(buf16,buf162,0,0,0,0,800,568);
+                        rectfill(screen,0,0,799,15,0);
+                        rectfill(screen,0,584,799,599,0);
                         blit(buf162,screen,0,0,0,16,800,568);
                 }
                 else if (hires==3)
@@ -847,10 +861,17 @@ void drawline(int line6502)
                                                 buffer2->line[y][x<<1]=buffer2->line[y][(x<<1)+1]=128+buffer->line[y][x<<1]+(buffer->line[y][(x-1)<<1]<<3);
                                         }
                                 }
+                                rectfill(screen,0,0,799,15,0);
+                                rectfill(screen,0,584,799,599,0);
                                 blit(buffer2,screen,0,32,0,16,800,568);
                         }
                         else
-                           blit(buffer,screen,0,32,0,16,800,568);
+                        {
+                                rectfill(screen,0,0,799,15,0);
+                                rectfill(screen,0,584,799,599,0);
+//                                rectfill(buffer,0,0,799,31,0);
+                                blit(buffer,screen,0,32,0,16,800,568);
+                        }
                 }
                 else
                 {
@@ -864,10 +885,15 @@ void drawline(int line6502)
                                                 buffer2->line[y][x]=128+buffer->line[y][x]+(buffer->line[y][x-1]<<3);
                                         }
                                 }
+                                rectfill(screen,0,284,399,299,0);
                                 blit(buffer2,screen,0,16,0,0,400,284);
                         }
                         else
-                           blit(buffer,screen,0,16,0,0,400,284);
+                        {
+                                rectfill(screen,0,284,399,299,0);
+                                blit(buffer,screen,0,16,0,0,400,284);
+                        }
+                }
                 }
                 flashint++;
                 if (flash && flashint==35)
@@ -990,6 +1016,7 @@ void updategfxmode()
         else      set_palette(beebpal);
         clear(buffer);
         clear(buffer2);
+        clear(screen);
 }
 
 void initvideo()

@@ -1,4 +1,4 @@
-/*B-em 0.81 by Tom Walker*/
+/*B-em 1.0 by Tom Walker*/
 /*6502 emulation*/
 
 char exname[512];
@@ -169,6 +169,28 @@ void loadmasterroms()
         return;
 }
 
+/*Master Compact uses a 512 kbit ROM chip to store OS and 3 sideways ROMs
+  This is dumped as 4 seperate files though*/
+void loadmastercroms()
+{
+        int c;
+        FILE *f=fopen("roms/masterc/os51.rom","rb");
+        fread(os,0x4000,1,f);
+        fclose(f);
+        memset(rom,0xFF,0x40000);
+        f=fopen("roms/masterc/utils.rom","rb");
+        fread(&rom[15<<14],0x4000,1,f);
+        fclose(f);
+        f=fopen("roms/masterc/basic48.rom","rb");
+        fread(&rom[14<<14],0x4000,1,f);
+        fclose(f);
+        f=fopen("roms/masterc/adfs210.rom","rb");
+        fread(&rom[13<<14],0x4000,1,f);
+        fclose(f);
+        for (c=0;c<16;c++) writeablerom[c]=0;
+        for (c=4;c<8;c++)  writeablerom[c]=1;
+}
+
 void loadroms()
 {
         int addr=0x3C000;
@@ -180,6 +202,11 @@ void loadroms()
         if (model==7)
         {
                 loadmasterroms();
+                return;
+        }
+        if (model==8)
+        {
+                loadmastercroms();
                 return;
         }
         getcwd(olddir,511);
@@ -245,7 +272,8 @@ void loadroms()
 
 unsigned char acccon=0;
 
-#define polltime(c) { tubecycs+=c; curcyc+=c; cycles-=c; sysvia.t1c-=c; sysvia.t2c-=c; if (sysvia.t1c<-4 || sysvia.t2c<-4) { updatesystimers(); } uservia.t1c-=c; uservia.t2c-=c; if (uservia.t1c<-4 || uservia.t2c<-4) updateusertimers(); }
+int disccount=0;
+#define polltime(c) { disccount-=c; tubecycs+=c; cycles-=c; sysvia.t1c-=c; sysvia.t2c-=c; if (sysvia.t1c<-4 || sysvia.t2c<-4) { updatesystimers(); } uservia.t1c-=c; uservia.t2c-=c; if (uservia.t1c<-4 || uservia.t2c<-4) updateusertimers(); }
 
 void writeacccon(unsigned char v)
 {
@@ -311,10 +339,10 @@ unsigned char readmeml(unsigned short addr)
                 case 0xFE00: return readcrtc(addr);
                 case 0xFE08: temp=readacia(addr); return temp;
                 case 0xFE10: return readserial(addr);
-                case 0xFE18: if (model==7) return readadc(addr); break;
-                case 0xFE20: if (model==7 && addr&4) return read1770(addr); break;
-                case 0xFE28: if (model==7) { if (addr&4) return 0; return read1770(addr); } break;
-                case 0xFE30: if (addr==0xFE34 && model==7) return acccon; return 0xFE;
+                case 0xFE18: if (model>=7) return readadc(addr); break;
+                case 0xFE20: if (model>=7 && addr&4) return read1770(addr); break;
+                case 0xFE28: if (model>=7) { if (addr&4) return 0; return read1770(addr); } break;
+                case 0xFE30: if (addr==0xFE34 && model>=7) return acccon; return 0xFE;
                 case 0xFE40: case 0xFE48: case 0xFE50: case 0xFE58: if (cycles&1) {polltime(2);} else { polltime(1); } temp=readsysvia(addr); return temp;
                 case 0xFE60: case 0xFE68: case 0xFE70: case 0xFE78: if (cycles&1) {polltime(2);} else {polltime(1);} temp=readuservia(addr); return temp;
                 case 0xFE80: case 0xFE88: case 0xFE90: case 0xFE98: if (model>3 && model<7) return read1770(addr); else if (model!=7) return read8271(addr); return 0xFF;
@@ -323,7 +351,7 @@ unsigned char readmeml(unsigned short addr)
                 case 0xFEE0: if (acccon&0x10) return 0; return readtubehost(addr);
         }
         if ((addr&0xFE00)==0xFC00) return 0xFF;
-        if (model==7 && ((addr&0xE000)==0xC000)) return osram[addr&0x1FFF];
+        if (model>=7 && ((addr&0xE000)==0xC000)) return osram[addr&0x1FFF];
         return 0xFF;
         printf("Error : Bad read from %04X\n",addr);
         dumpregs();
@@ -339,9 +367,9 @@ unsigned char writememl(unsigned short addr, unsigned char val)
                 case 0xFE00: writecrtc(addr,val); return;
                 case 0xFE08: writeacia(addr,val); return;
                 case 0xFE10: writeserial(addr,val); return;
-                case 0xFE18: if (model==7) { writeadc(addr,val); return; } break;
-                case 0xFE20: if (cycles&1) {polltime(2);} else { polltime(1); }  if (model==7 && addr&4) write1770(addr,val); else writeula(addr,val); return;
-                case 0xFE28: if (model==7) { write1770(addr,val); return; } break;
+                case 0xFE18: if (model>=7) { writeadc(addr,val); return; } break;
+                case 0xFE20: if (cycles&1) {polltime(2);} else { polltime(1); }  if (model>=7 && addr&4) write1770(addr,val); else writeula(addr,val); return;
+                case 0xFE28: if (model>=7) { write1770(addr,val); return; } break;
                 case 0xFE30:
                 if (addr==0xFE34)
                 {
@@ -349,7 +377,7 @@ unsigned char writememl(unsigned short addr, unsigned char val)
                         {
                                 writeacccon(val);
                         }
-                        else if (model==7)
+                        else if (model>=7)
                         {
 //                                printf("write %04X %02X\n",addr,val);
                                 writeaccconm(val);
@@ -366,7 +394,7 @@ unsigned char writememl(unsigned short addr, unsigned char val)
                         currom=val&15;
                         for (c=0x80;c<0xC0;c++) mem[c]=(unsigned char *)(rom+((val&15)<<14)+((c&0x3F)<<8));
                         for (c=0x80;c<0xC0;c++) memstat[c]=(writeablerom[val&15])?0:1;
-                        if (val&0x80 && model==7)
+                        if (val&0x80 && model>=7)
                         {
                                 for (c=0x80;c<0x90;c++) mem[c]=(unsigned char *)(swram+((c&0xF)<<8));
                                 for (c=0x80;c<0x90;c++) memstat[c]=0;
@@ -396,7 +424,7 @@ unsigned char writememl(unsigned short addr, unsigned char val)
                 return;
         }
         if (addr<0xC000) return;
-        if (model==7 && ((addr&0xE000)==0xC000))
+        if (model>=7 && ((addr&0xE000)==0xC000))
         {
                 osram[addr&0x1FFF]=val;
                 return;
@@ -603,7 +631,7 @@ void shadowram(int stat)
                 for (c=0x30;c<0x080;c++)
                     mem[c]=(unsigned char *)(ram+((c|0x80)<<8));
         }
-        else if (!((model==7) && (acccon&4)))
+        else if (!((model>=7) && (acccon&4)))
         {
                 for (c=0x30;c<0x080;c++)
                     mem[c]=(unsigned char *)(ram+(c<<8));
@@ -622,15 +650,13 @@ void exec6502(int lines, int cpl)
         int tempi;
         signed char offset;
         int c;
-        if (model==7) /*Master 128 uses seperate CPU emulation*/
+        if (model>=7) /*Master 128 uses seperate CPU emulation*/
         {
                 exec65c02(lines,cpl);
                 return;
         }
         while (lines>=0)
         {
-                tubelinecycs=128;
-                lns=lines;
                 if (interlaceline)
                 {
                         if (crtc[8]&1)
@@ -640,11 +666,11 @@ void exec6502(int lines, int cpl)
                    cycles+=cpl;
                 while (cycles>0)
                 {
-                        pc3=oldoldpc;
+/*                        pc3=oldoldpc;
                         oldoldpc=oldpc;
-                        oldpc=pc;
+                        oldpc=pc;*/
                         if (skipint==1) skipint=0;
-                        curcyc=0;
+//                        curcyc=0;
                         if (model>3 && vidbank)
                         {
                                 if (!inA && shadowaddr[pc>>12])     shadowram(1);
@@ -733,11 +759,13 @@ void exec6502(int lines, int cpl)
                                 addr=getw();
                                 polltime(4);
                                 temp=readmem(addr);
+//                                if (addr==0xFE69) printf("Start %02X ",temp);
                                 polltime(1);
                                 writemem(addr,temp);
                                 polltime(1);
                                 p.c=temp&0x80;
                                 temp<<=1;
+//                                if (addr==0xFE69) printf("now %02X\n",temp);
                                 setzn(temp);
                                 writemem(addr,temp);
                                 break;
@@ -797,9 +825,9 @@ void exec6502(int lines, int cpl)
                                 addr=getw();
                                 if ((addr&0xFF00)^((addr+x)&0xFF00)) polltime(1);
                                 addr+=x;
+                                polltime(4);
                                 a|=readmem(addr);
                                 setzn(a);
-                                polltime(4);
                                 break;
 
                                 case 0x1E: /*ASL abs,x*/
@@ -1027,7 +1055,7 @@ void exec6502(int lines, int cpl)
                                 polltime(3);
                                 break;
 
-                                case 0x49: /*EOR*/
+                                case 0x49: /*EOR imm*/
                                 a^=readmem(pc); pc++;
                                 setzn(a);
                                 polltime(2);
@@ -1417,11 +1445,10 @@ void exec6502(int lines, int cpl)
 
                                 case 0x9D: /*STA abs,x*/
                                 addr=getw();
-                                polltime(3);
+                                polltime(4);
                                 readmem((addr&0xFF00)|((addr+x)&0xFF));
                                 polltime(1);
                                 writemem(addr+x,a);
-                                polltime(1);
                                 break;
 
                                 case 0xA0: /*LDY imm*/
@@ -1468,6 +1495,7 @@ void exec6502(int lines, int cpl)
                                 case 0xA8: /*TAY*/
                                 y=a;
                                 setzn(y);
+                                polltime(2);
                                 break;
 
                                 case 0xA9: /*LDA imm*/
@@ -1554,14 +1582,12 @@ void exec6502(int lines, int cpl)
                                 break;
 
                                 case 0xB9: /*LDA abs,y*/
-                                tempi=cycles;
                                 addr=getw();
                                 polltime(3);
                                 if ((addr&0xFF00)^((addr+y)&0xFF00)) polltime(1);
                                 a=readmem(addr+y);
                                 setzn(a);
                                 polltime(1);
-                                tempi-=cycles;
 //                                if (pc<0x8000) printf("LDA ,y %i cycles\n",tempi);
                                 break;
 
@@ -1665,7 +1691,7 @@ void exec6502(int lines, int cpl)
                                 addr=getw();
                                 polltime(4);
                                 temp=readmem(addr);
-                                if (output) printf("CMP %02X %02X\n",a,temp);
+//                                if (output) printf("CMP %02X %02X\n",a,temp);
                                 setzn(a-temp);
                                 p.c=(a>=temp);
                                 break;
@@ -1691,6 +1717,7 @@ void exec6502(int lines, int cpl)
 //                                        if (pc<0x8000) printf("%04X %i\n",(pc&0xFF00)^((pc+offset)&0xFF00),temp);
                                         pc+=offset;
                                 }
+//                                if (output) printf("BNE %i cycles\n",temp);
                                 polltime(temp);
                                 break;
 
@@ -1754,7 +1781,7 @@ void exec6502(int lines, int cpl)
                                 temp=readmem(pc); pc++;
                                 setzn(x-temp);
                                 p.c=(x>=temp);
-                                polltime(3);
+                                polltime(2);
                                 break;
 
                                 case 0xE4: /*CPX zp*/
@@ -2041,12 +2068,23 @@ void exec6502(int lines, int cpl)
                                 printf("Current ROM %02X\n",currom);
                                 exit(-1);*/
                         }
-/*                        if (output) printf("A=%02X X=%02X Y=%02X S=%02X PC=%04X %c%c%c%c%c%c op=%02X\n",a,x,y,s,pc,(p.n)?'N':' ',(p.v)?'V':' ',(p.d)?'D':' ',(p.i)?'I':' ',(p.z)?'Z':' ',(p.c)?'C':' ',opcode);
-                        ins++;
-                        if (timetolive)
+/*                        if (output && (pc<0x8000) && ((pc&0xFF00)!=0xD00))
                         {
-                                timetolive--;
-                                if (!timetolive) output=0;
+                                printf("%i A=%02X X=%02X Y=%02X S=%02X PC=%04X %c%c%c%c%c%c op=%02X %i\n",totalc,a,x,y,s,pc,(p.n)?'N':' ',(p.v)?'V':' ',(p.d)?'D':' ',(p.i)?'I':' ',(p.z)?'Z':' ',(p.c)?'C':' ',opcode,cycles);
+                                if (timetolive)
+                                {
+                                        timetolive--;
+                                        if (!timetolive) output=0;
+                                }
+                        }
+                        ins++;*/
+//                        if (pc==0x1B00) output=1;
+//                        if (pc>=0x8000 && pc<0xC000) output=0;
+/*                        if (ins==-2147250325) output=0;
+                        if (ins==1589700)
+                        {
+                                output=1;
+//                                timetolive=4000;
                         }*/
 /*                        if (pc==0xF39C)
                         {
@@ -2055,13 +2093,20 @@ void exec6502(int lines, int cpl)
 /*                        if (pc==0xE68B) output=1;
                         if (pc==0xE6AF) output=1;
                         if (pc==0xFFF4) printf("OSBYTE %i %02X %04X %04X\n",a,x,oldpc,oldoldpc);*/
+/*                        if (pc==0x4023) printf("4023\n");
+                        if (pc==0x402D) printf("402D\n");
+                        if (pc==0x4038) printf("4038\n");*/
+//                        if (pc==0x4000) output=1;
+//                        if (pc==0x4042) output=0;
                         if ((interrupt && !p.i && !skipint) || skipint==2)
                         {
 //                                if (skipint==2) printf("interrupt\n");
+
                                 skipint=0;
                                 push(pc>>8);
                                 push(pc&0xFF);
                                 temp=0x20;
+//                                if (pc>=0x2000 && pc<=0x5000) { output=1; timetolive=30; }
                                 if (p.c) temp|=1; if (p.z) temp|=2;
                                 if (p.i) temp|=4; if (p.d) temp|=8;
                                 if (p.v) temp|=0x40; if (p.n) temp|=0x80;
@@ -2098,43 +2143,37 @@ void exec6502(int lines, int cpl)
 //                                skipint=2;
 //                                printf("skipint=2\n");
 //                        }
-                }
-                oldnmi=nmi;
-                if (discint)
-                {
-                        discint-=64;
-                        if (discint<=0)
+                        if (disccount<0)
                         {
-                                discint=0;
-                                if (model>3) poll1770();
-                                else         poll8271();
+                                disccount+=16;
+                                oldnmi=nmi;
+                                if (discint)
+                                {
+                                        discint-=4;
+                                        if (discint<=0)
+                                        {
+                                                discint=0;
+                                                if (model>3) poll1770();
+                                                else         poll8271();
+                                        }
+                                }
+                                if (inreadop) pollbyte();
+                                if (nmi && !oldnmi && !nmilock)
+                                {
+                                        push(pc>>8);
+                                        push(pc&0xFF);
+                                        temp=0x20;
+                                        if (p.c) temp|=1; if (p.z) temp|=2;
+                                        if (p.i) temp|=4; if (p.d) temp|=8;
+                                        if (p.v) temp|=0x40; if (p.n) temp|=0x80;
+                                        push(temp);
+                                        pc=readmem(0xFFFA)|(readmem(0xFFFB)<<8);
+                                        p.i=1;
+                                        polltime(7);
+                                        nmi=0;
+                                        nmilock=1;
+                                }
                         }
-                }
-/*                if (sasicallback)
-                {
-                        sasicallback-=64;
-                        if (sasicallback<=0)
-                        {
-                                sasicallback=0;
-                                pollsasi();
-                        }
-                }*/
-                if (nmi && !oldnmi && !nmilock)
-                {
-//                        intpend=0;
-                        push(pc>>8);
-                        push(pc&0xFF);
-                        temp=0x20;
-                        if (p.c) temp|=1; if (p.z) temp|=2;
-                        if (p.i) temp|=4; if (p.d) temp|=8;
-                        if (p.v) temp|=0x40; if (p.n) temp|=0x80;
-                        push(temp);
-                        pc=readmem(0xFFFA)|(readmem(0xFFFB)<<8);
-                        p.i=1;
-                        polltime(7);
-                        nmi=0;
-                        nmilock=1;
-//                        printf("NMI at line %i\n",lines);
                 }
                 logvols(lines);
                 lines--;
@@ -3433,7 +3472,7 @@ void exec65c02(int lines, int cpl)
                                 temp=readmem(pc); pc++;
                                 setzn(x-temp);
                                 p.c=(x>=temp);
-                                polltime(3);
+                                polltime(2);
                                 break;
 
                                 case 0xE4: /*CPX zp*/
@@ -3617,10 +3656,37 @@ void exec65c02(int lines, int cpl)
 //                        if (pc==0x813D) printf("813D Y=%02X %04X %04X\n",y,oldpc,oldoldpc);
 //                        if (pc==0xE583 && currom==9) { dumpregs(); exit(0); }
 //                        printf("A=%02X X=%02X Y=%02X S=%02X PC=%04X %c%c%c%c%c%c op=%02X %02X\n",a,x,y,s,pc,(p.n)?'N':' ',(p.v)?'V':' ',(p.d)?'D':' ',(p.i)?'I':' ',(p.z)?'Z':' ',(p.c)?'C':' ',opcode,ram[1]);
-                        if (vsyncint/* && cycles<=32*/)
+                        if (disccount<0)
                         {
-                                vblankint();
-                                vsyncint=0;
+                                disccount+=(ddensity)?8:16;
+                                oldnmi=nmi;
+                                if (discint)
+                                {
+                                        discint-=(ddensity)?4:2;
+                                        if (discint<=0)
+                                        {
+                                                discint=0;
+                                                if (model>3) poll1770();
+                                                else         poll8271();
+                                        }
+                                }
+                                if (inreadop)
+                                   pollbyte();
+                                if (nmi && !oldnmi && !nmilock)
+                                {
+                                        push(pc>>8);
+                                        push(pc&0xFF);
+                                        temp=0x20;
+                                        if (p.c) temp|=1; if (p.z) temp|=2;
+                                        if (p.i) temp|=4; if (p.d) temp|=8;
+                                        if (p.v) temp|=0x40; if (p.n) temp|=0x80;
+                                        push(temp);
+                                        pc=readmem(0xFFFA)|(readmem(0xFFFB)<<8);
+                                        p.i=1;
+                                        polltime(7);
+                                        nmi=0;
+                                        nmilock=1;
+                                }
                         }
                         ins++;
                         if (timetolive)
@@ -3676,17 +3742,6 @@ void exec65c02(int lines, int cpl)
 //                                printf("skipint=2\n");
 //                        }
                 }
-                oldnmi=nmi;
-                if (discint)
-                {
-                        discint-=64;
-                        if (discint<=0)
-                        {
-                                discint=0;
-                                if (model>3) poll1770();
-                                else         poll8271();
-                        }
-                }
 /*                if (sasicallback)
                 {
                         sasicallback-=64;
@@ -3696,22 +3751,6 @@ void exec65c02(int lines, int cpl)
                                 pollsasi();
                         }
                 }*/
-                if (nmi && !oldnmi && !nmilock)
-                {
-//                        intpend=0;
-                        push(pc>>8);
-                        push(pc&0xFF);
-                        temp=0x20;
-                        if (p.c) temp|=1; if (p.z) temp|=2;
-                        if (p.i) temp|=4; if (p.d) temp|=8;
-                        if (p.v) temp|=0x40; if (p.n) temp|=0x80;
-                        push(temp);
-                        pc=readmem(0xFFFA)|(readmem(0xFFFB)<<8);
-                        p.i=1;
-                        polltime(7);
-                        nmi=0;
-                        nmilock=1;
-                }
                 logvols(lines);
                 lines--;
                 if (!tapelcount)

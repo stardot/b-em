@@ -1,4 +1,4 @@
-/*B-em 0.81 by Tom Walker*/
+/*B-em 1.0 by Tom Walker*/
 /*Main loop*/
 
 #include <stdio.h>
@@ -6,6 +6,7 @@
 #include <winalleg.h>
 #include "b-em.h"
 
+int fasttape;
 int tube;
 int soundbuflen;
 int wah=0;
@@ -53,6 +54,7 @@ HMENU menu;
 #define IDM_TAPE_CHANGE    40020
 #define IDM_TAPE_REWIND    40021
 #define IDM_TAPE_ENABLE    40022
+#define IDM_TAPE_FAST      40023
 #define IDM_MODEL_PALA     40030
 #define IDM_MODEL_PALB     40031
 #define IDM_MODEL_PALBSW   40032
@@ -61,7 +63,8 @@ HMENU menu;
 #define IDM_MODEL_PALB96   40035
 #define IDM_MODEL_PALB128  40036
 #define IDM_MODEL_PALM128  40037
-#define IDM_MODEL_ARM      40038
+#define IDM_MODEL_PALMC    40038
+#define IDM_MODEL_ARM      40039
 #define IDM_VIDEO_RES      40040
 #define IDM_VIDEO_FULLSCR  40041
 #define IDM_VIDEO_BLUR     40042
@@ -95,6 +98,11 @@ void updatewindowsize(int x, int y)
                      TRUE);
 }
 
+void recreatemenu()
+{
+        SetMenu(ghwnd,menu);
+}
+
 void makemenu()
 {
         HMENU hpop,hpop2;
@@ -114,6 +122,7 @@ void makemenu()
         AppendMenu(hpop,MF_STRING,IDM_TAPE_CHANGE,"&Change Tape...");
         AppendMenu(hpop,MF_STRING,IDM_TAPE_REWIND,"&Rewind Tape");
         AppendMenu(hpop,MF_STRING,IDM_TAPE_ENABLE,"&Tape Enable");
+        AppendMenu(hpop,MF_STRING,IDM_TAPE_FAST,"&Fast Tape");
         AppendMenu(menu,MF_POPUP,hpop,"&Tape");
         hpop=CreateMenu();
         AppendMenu(hpop,MF_STRING,IDM_MODEL_PALA,"PAL &A");
@@ -124,6 +133,7 @@ void makemenu()
         AppendMenu(hpop,MF_STRING,IDM_MODEL_PALB96,"PAL B+&96K");
         AppendMenu(hpop,MF_STRING,IDM_MODEL_PALB128,"PAL B+&128K");
         AppendMenu(hpop,MF_STRING,IDM_MODEL_PALM128,"PAL &Master 128");
+        AppendMenu(hpop,MF_STRING,IDM_MODEL_PALMC,"PAL Master &Compact");
         AppendMenu(hpop,MF_STRING,IDM_MODEL_ARM,    "&ARM Evaluation System");
         AppendMenu(menu,MF_POPUP,hpop,"&Model");
         hpop=CreateMenu();
@@ -280,7 +290,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         ghwnd = CreateWindowEx (
            0,                   /* Extended possibilites for variation */
            szClassName,         /* Classname */
-           "B-em v0.82",        /* Title Text */
+           "B-em v1.0",         /* Title Text */
            WS_OVERLAPPEDWINDOW&~(WS_MAXIMIZEBOX|WS_SIZEBOX), /* default window */
            CW_USEDEFAULT,       /* Windows decides the position */
            CW_USEDEFAULT,       /* where the window ends up on the screen */
@@ -298,6 +308,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         allegro_init();
         get_executable_name(exname,511);
         load_config();
+        if (fullscreen) SetMenu(ghwnd,NULL);
         parsecommandline(lpszArgument);
         if (hires) updatewindowsize(800,600);
         loadcmos();
@@ -328,14 +339,14 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         if (!uefena && model<3) trapos();
         install_int_ex(update50,MSEC_TO_TIMER(20));
         if (!tube) CheckMenuItem(menu,model+40030,MF_CHECKED);
-        else       CheckMenuItem(menu,40038,MF_CHECKED);
+        else       CheckMenuItem(menu,40039,MF_CHECKED);
         CheckMenuItem(menu,curwave+40080,MF_CHECKED);
         updatemenu();
 //        sprintf(s,"Model %i Tube %i",model,tube);
 //        MessageBox(NULL,s,s,MB_OK);
         while (!quit)
         {
-                if (framenum>=((soundbuflen==3120)?5:4) && soundon)
+                if (framenum>=((soundbuflen==3120)?5:4) && soundon && !(spdcount || (fasttape && motor)))
                 {
 //                        fputs("Sound\n",tempf);
                         framenum=0;
@@ -351,7 +362,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
 //                        spdcount=1;
                         snline=0;
                 }
-                if (infocus && spdcount)
+                if (infocus && (spdcount || (fasttape && motor)))
                 {
                         exec6502(312,128);
                         if (logging) logsound();
@@ -364,6 +375,16 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
                                 autoboot--;
                                 if (!autoboot)
                                    releasekey(0,0);
+                        }
+                        if (fasttape && motor)
+                        {
+                                p=(unsigned short *)get_audio_stream_buffer(as);
+                                if (p)
+                                {
+                                        memset(p,0,soundbuflen*2);
+                                        free_audio_stream_buffer(as);
+                                        framenum=snline=0;
+                                }
                         }
                 }
                 if (fullscreen)
@@ -492,6 +513,8 @@ void updatemenu()
         else      CheckMenuItem(menu,IDM_VIDEO_MONO,MF_UNCHECKED);
         if (uefena) CheckMenuItem(menu,IDM_TAPE_ENABLE,MF_CHECKED);
         else        CheckMenuItem(menu,IDM_TAPE_ENABLE,MF_UNCHECKED);
+        if (fasttape) CheckMenuItem(menu,IDM_TAPE_FAST,MF_CHECKED);
+        else          CheckMenuItem(menu,IDM_TAPE_FAST,MF_UNCHECKED);
         if (ddnoise) CheckMenuItem(menu,IDM_DISC_SOUND,MF_CHECKED);
         else         CheckMenuItem(menu,IDM_DISC_SOUND,MF_UNCHECKED);
         if (soundfilter&1) CheckMenuItem(menu,IDM_SOUND_HIGH,MF_CHECKED);
@@ -577,7 +600,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         return 0;
                         case IDM_DISC_CHANGE0:
                         if (soundon) stop_audio_stream(as);
-                        if (!getfn(hwnd,"DFS Single Sided Disc Image (*.SSD)\0*.SSD\0DFS Double Sided Disc Image (*.DSD)\0*.DSD\0ADFS Disc Image (*.ADF)\0*.ADF\0All\0*.*\0\0",discname[0],0,"SSD"))
+                        if (!getfn(hwnd,"Disc Image\0*.SSD;*.DSD;*.ADF;*.ADL;*.FDI\0DFS Single Sided Disc Image (*.SSD)\0*.SSD\0DFS Double Sided Disc Image (*.DSD)\0*.DSD\0ADFS Disc Image (*.ADF)\0*.ADF\0FDI Disc Image (*.FDI)\0All\0*.*\0\0",discname[0],0,"SSD"))
                         {
                                 for (c=0;c<strlen(discname[0]);c++)
                                 {
@@ -589,6 +612,8 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                                 }
                                 if ((discname[0][c]=='d'||discname[0][c]=='D')&&(c!=strlen(discname[0])))
                                    load8271dsd(discname[0],0);
+                                else if ((discname[0][c]=='f'||discname[0][c]=='F')&&(c!=strlen(discname[0])))
+                                   load8271fdi(discname[0],0);
                                 else if ((discname[0][c]=='a'||discname[0][c]=='A')&&(c!=strlen(discname[0])))
                                    load1770adfs(discname[0],0);
                                 else if (c!=strlen(discname[0]))
@@ -598,7 +623,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         return 0;
                         case IDM_DISC_CHANGE1:
                         if (soundon) stop_audio_stream(as);
-                        if (!getfn(hwnd,"DFS Single Sided Disc Image (*.SSD)\0*.SSD\0DFS Double Sided Disc Image (*.DSD)\0*.DSD\0ADFS Disc Image (*.ADF)\0*.ADF\0All\0*.*\0\0",discname[1],0,"SSD"))
+                        if (!getfn(hwnd,"Disc Image\0*.SSD;*.DSD;*.ADF;*.ADL;*.FDI\0DFS Single Sided Disc Image (*.SSD)\0*.SSD\0DFS Double Sided Disc Image (*.DSD)\0*.DSD\0ADFS Disc Image (*.ADF)\0*.ADF\0FDI Disc Image (*.FDI)\0All\0*.*\0\0",discname[0],0,"SSD"))
                         {
                                 for (c=0;c<strlen(discname[1]);c++)
                                 {
@@ -610,6 +635,8 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                                 }
                                 if ((discname[1][c]=='d'||discname[1][c]=='D')&&(c!=strlen(discname[1])))
                                    load8271dsd(discname[1],1);
+                                else if ((discname[0][c]=='f'||discname[0][c]=='F')&&(c!=strlen(discname[0])))
+                                   load8271fdi(discname[0],0);
                                 else if ((discname[1][c]=='a'||discname[1][c]=='A')&&(c!=strlen(discname[1])))
                                    load1770adfs(discname[1],1);
                                 else if (c!=strlen(discname[1]))
@@ -634,16 +661,20 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         else if (model<3) trapos();
                         updatemenu();
                         return 0;
+                        case IDM_TAPE_FAST:
+                        fasttape^=1;
+                        updatemenu();
+                        return 0;
                         case IDM_MODEL_PALA: case IDM_MODEL_PALB:
                         case IDM_MODEL_PALBSW: case IDM_MODEL_NTSCB:
                         case IDM_MODEL_PALB64: case IDM_MODEL_PALB96:
                         case IDM_MODEL_PALB128: case IDM_MODEL_PALM128:
-                        case IDM_MODEL_ARM:
+                        case IDM_MODEL_ARM: case IDM_MODEL_PALMC:
                         if (!tube) CheckMenuItem(menu,model+40030,MF_UNCHECKED);
-                        else       CheckMenuItem(menu,40038,MF_UNCHECKED);
+                        else       CheckMenuItem(menu,40039,MF_UNCHECKED);
                         CheckMenuItem(menu,LOWORD(wParam),MF_CHECKED);
                         model=LOWORD(wParam)-40030;
-                        if (model==8)
+                        if (model==9)
                         {
                                 model=7;
                                 tube=1;
@@ -686,12 +717,14 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         updatewindowsize(800,600);
                         return 0;
                         case IDM_VIDEO_FULLSCR:
+                        SetMenu(hwnd,NULL);
                         if (soundon) stop_audio_stream(as);
                         fullscreen=1;
                         updategfxmode();
                         install_mouse();
                         if (soundon) as=play_audio_stream(soundbuflen,16,0,31200,255,127);
                         framenum=0;
+                        clear(screen);
                         return 0;
                         case IDM_VIDEO_BLUR:
                         blurred^=1;

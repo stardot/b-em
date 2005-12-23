@@ -1,4 +1,4 @@
-/*B-em 0.8 by Tom Walker*/
+/*B-em 1.0 by Tom Walker*/
 /*User VIA emulation*/
 
 #include <stdio.h>

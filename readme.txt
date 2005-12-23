@@ -6,7 +6,7 @@
              ██       ▄██          ██         ██          ██
              ██████████▀           █████████  ██          ██
 
-                                 Version 0.82
+                                 Version 1.0
                          A freeware BBC Micro emulator
 
 Introduction
@@ -17,14 +17,15 @@ B-em is an attempt to emulate a BBC Micro, made by Acorn Computers in the 80's
 Features
 ~~~~~~~~
 
-- Emulates Models A, B, B+, and Master 128
+- Emulates Models A, B, B+, Master 128 and Master Compact
 - Also emulates ARM evaluation system on Master 128
 - All documented video modes supported
 - All documented and some undocumented 6502 instructions
 - 8271 Floppy Disc Controller emulated (double drive, double sided, 80 track, read/write)
 - 1770 Floppy Disc Controller emulated (double drive, double sided, 80 track, read/write)
-- Supports six formats for BBC storage on PC - .ssd, .dsd, .adf, .inf, .uef
-  and __catalog__
+- Supports seven formats for BBC storage on PC - .ssd, .dsd, .adf, .fdi, .inf,
+  .uef and __catalog__
+- Can run many protected disc and tape games.
 - Sound emulation, including sample playback
 - Some CRTC tricks, such as overscan, raster splitting and rupture.
 - Sideways RAM emulation
@@ -35,11 +36,15 @@ Features
 Differences from last version
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- ARM Evaluation System emulation. Beware that this is quite slow and probably
-  buggy (I don't have any software to test on it).
-- Fixed ADC/SBC BCD flags that were broken in 0.8 - Exile works again.
-- Added read ID commands to 8271 FDC - Superior Collection now works.
-- Ported to OS X
+- FDI support. Allows use of copy protected disc images. A few bugs in FDC
+  emulation remain, however about 75% of FDI images dumped so far work.
+- Improvements to timing, Joust now works, along with some Kevin Edwards
+  protected games.
+- Master Compact emulation (largely for some of the dumped FDI images).
+- Slight improvements to cassette emulation, loader on Joust now works,
+  speedup now available.
+- Faster tape loading.
+- Fixes and optimisations to ARM emulation
 
 
 Requirements
@@ -47,8 +52,8 @@ Requirements
 
 B-em (bbc model B EMulator), requires the following :
 
-A Pentium or better computer (try a P233 at least)
-8mb RAM (?)
+A Pentium or better computer (try a P300 at least)
+16mb RAM (?)
 
 Nine ROM images are provided with B-em -
 os           - UK BBC MOS
@@ -89,6 +94,7 @@ Known bugs
 ~~~~~~~~~~
 
 Still some timing bugs on protected games (eg Hypersports)
+Some bugs in FDC emulations, eg some Acornsoft titles won't pass protection
 
 
 Keyboard mapping :
@@ -136,6 +142,7 @@ Model :
         PAL B+96K      - emulate a PAL model B+ with 96k RAM.
         PAL B+128K     - emulate a PAL model B+ with 128k RAM.
         PAL Master 128 - emulate a PAL Master 128.
+        PAL Master Compact - emulate a Master Compact
         ARM Evaluation System - emulate a PAL Master 128 with an ARM attached.
 
 Disc :
@@ -152,6 +159,8 @@ Video :
         Video mode  - select a video mode. 400x300 is by far the fastest, and
                       800x600 with 2xSaI the slowest. 400x300 does not work
                       correctly on some machine though.
+        Fullscreen  - switches to fullscreen display
+        Windowed    - switches to windowed display
         Blur filter - enable a blurring filter. Can make games with hi-res
                       dithering look better.
         Monochrome  - disables colour.
@@ -182,18 +191,6 @@ A : If you have a disc image (.ssd, .dsd, .img etc) load it through the disc
     PAGE=&E00
     CHAIN""
 
-Q : Why have I got no sound?
-A : B-em should work with 100% SoundBlaster compatibles, ESS Audiodrive,
-    Ensoniq Soundscape, and Windoze $ound System. It will not work with cards
-    not in that list (such as Creative's newer SoundBlasters, which aren't
-    really compatible, or sadly the GUS), it will not work with non-100%
-    compatibles with crappy drivers (such as the ones found in laptops) and it
-    will not work if you have a bad BLASTER enviroment label.
-    Minor addition to this, if you use a poor quality card (such as a
-    SoundBlaster) and you have some sound running in the background in Windows,
-    B-em will deliver no sound. The answer is to upgrade to a good card. B-em
-    will disable sound in this case, so you have to enable it again afterwards.
-
 Q : How do I contact you?
 A : E-mail me at b-em@bbcmicro.com
 
@@ -212,9 +209,11 @@ The Video ULA      - All modes emulated.
 The System VIA     - Keyboard and sound emulated.
 The User VIA       - Emulated.
 8271 FDC           - Double disc, double sided, 40/80 tracks, read/write. With
-                     authentic noise. Only in model B mode.
+                     authentic noise. Only in model B mode. Supports read-only
+                     access of protected FDI images.
 1770 FDC           - Double disc, double sided, 40/80 tracks, read/write. With
                      authentic noise. Only in model B+ and Master 128 mode.
+                     Supports read-only access of protected FDI images.
 tape filing system - Supports .inf and __CATALOG__ format.
 Sound              - All channels emulated, with sample support and some
                      undocumented behaviour (Crazee Rider). With optional low
@@ -279,8 +278,10 @@ b-em@bbcmicro.com
 
 <plug>
 Also check out Elkulator (elkulator.acornelectron.co.uk), my Electron emulator,
-and Arculator (b-em.bbcmicro.com/arculator), my A3xx/A4xx/A3000/A540 emulator
+and Arculator (b-em.bbcmicro.com/arculator), my A3xx/A4xx/A3000/A540 emulator.
+Also possibly soon, RPCemu, my RiscPC/A7000 emulator.
 </plug>
+
 
 Appendix A : The source code
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
