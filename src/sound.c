@@ -1,4 +1,4 @@
-/*B-em 1.0 by Tom Walker*/
+/*B-em 1.1 by Tom Walker*/
 /*Sound emulation*/
 
 #define NOISEBUFFER 32768
@@ -510,8 +510,8 @@ void startsnlog(char *fn)
         putc(' ',snlog);
         /*We don't know file length yet so just store 0*/
         putc(0,snlog); putc(0,snlog); putc(0,snlog); putc(0,snlog);
-        /*Version number*/
-        putc(1,snlog); putc(1,snlog); putc(0,snlog); putc(0,snlog);
+        /*Version number - 1.50*/
+        putc(0x50,snlog); putc(1,snlog); putc(0,snlog); putc(0,snlog);
         /*Clock speed - 4mhz*/
         putc(4000000&255,snlog);
         putc(4000000>>8,snlog);
@@ -528,7 +528,18 @@ void startsnlog(char *fn)
         putc(0,snlog); putc(0,snlog); putc(0,snlog); putc(0,snlog);
         /*50hz. This is true even in NTSC mode as the sound log is always updated at 50hz*/
         putc(50,snlog); putc(0,snlog); putc(0,snlog); putc(0,snlog);
-        for (c=0x28;c<0x40;c++) putc(0,snlog);
+        /*White noise feedback pattern & length*/
+        putc(3,snlog); putc(0,snlog); putc(15,snlog); putc(0,snlog);
+        /*We don't have an FM chip*/
+        putc(0,snlog); putc(0,snlog); putc(0,snlog); putc(0,snlog);
+        /*We don't have an FM chip*/
+        putc(0,snlog); putc(0,snlog); putc(0,snlog); putc(0,snlog);
+        /*Data offset*/
+        putc(0xC,snlog); putc(0,snlog); putc(0,snlog); putc(0,snlog);
+        /*Reserved*/
+        putc(0,snlog); putc(0,snlog); putc(0,snlog); putc(0,snlog);
+        putc(0,snlog); putc(0,snlog); putc(0,snlog); putc(0,snlog);
+        putc(0,snlog); putc(0,snlog); putc(0,snlog); putc(0,snlog);
 }
 
 void stopsnlog()
@@ -536,7 +547,7 @@ void stopsnlog()
         int c,len;
         unsigned char buffer[32];
         putc(0x66,snlog);
-        len=ftell(snlog)-4;
+        len=ftell(snlog);
         fclose(snlog);
         snlog=fopen("temp.vgm","rb");
         for (c=0;c<4;c++) putc(getc(snlog),snlog2);
@@ -546,7 +557,6 @@ void stopsnlog()
         putc(len>>24,snlog2);
         for (c=0;c<4;c++) getc(snlog);
         for (c=0;c<16;c++) putc(getc(snlog),snlog2);
-//        vgmsamples*=2;
         putc(vgmsamples,snlog2);
         putc(vgmsamples>>8,snlog2);
         putc(vgmsamples>>16,snlog2);
@@ -566,20 +576,9 @@ void stopsnlog()
 void logsound()
 {
         if (vgmpos) fwrite(vgmdat,vgmpos,1,snlog);
-        vgmpos=0;
         putc(0x63,snlog);
         vgmsamples+=882;
-/*        putc(snfreqlo[1],snlog);
-        putc(snfreqhi[1],snlog);
-        putc(snvol[1],snlog);
-        putc(snfreqlo[2],snlog);
-        putc(snfreqhi[2],snlog);
-        putc(snvol[2],snlog);
-        putc(snfreqlo[3],snlog);
-        putc(snfreqhi[3],snlog);
-        putc(snvol[3],snlog);
-        putc(snnoise,snlog);
-        putc(snvol[0],snlog);*/
+        vgmpos=0;
 }
 
 void dumpsound()

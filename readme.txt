@@ -6,7 +6,7 @@
              ██       ▄██          ██         ██          ██
              ██████████▀           █████████  ██          ██
 
-                                 Version 1.0
+                                 Version 1.1
                          A freeware BBC Micro emulator
 
 Introduction
@@ -36,15 +36,15 @@ Features
 Differences from last version
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- FDI support. Allows use of copy protected disc images. A few bugs in FDC
-  emulation remain, however about 75% of FDI images dumped so far work.
-- Improvements to timing, Joust now works, along with some Kevin Edwards
-  protected games.
-- Master Compact emulation (largely for some of the dumped FDI images).
-- Slight improvements to cassette emulation, loader on Joust now works,
-  speedup now available.
-- Faster tape loading.
-- Fixes and optimisations to ARM emulation
+- Can now emulate a Model B with 1770 FDC
+- Better mode 7 emulation - many programs improved, eg Granny's Garden
+- Added cursor to modes 0-6
+- Altered video timing a little
+- Added more commands to 1770 FDC - Watford DDFS now works (single density
+  mode only)
+- Some optimisations to video code
+- Update VGM logging to latest spec
+- New 'Autostart' option
 
 
 Requirements

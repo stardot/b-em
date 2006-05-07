@@ -1,4 +1,4 @@
-/*B-em 1.0 by Tom Walker*/
+/*B-em 1.1 by Tom Walker*/
 /*TFS - tape filing system*/
 
 #include <string.h>

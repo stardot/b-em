@@ -1,9 +1,10 @@
-/*B-em 1.0 by Tom Walker*/
+/*B-em 1.1 by Tom Walker*/
 /*GUI*/
 
 #include <stdio.h>
 #include <allegro.h>
 
+int autoboot;
 int tube;
 int framenum;
 int soundbuflen;
@@ -88,7 +89,7 @@ void load_config()
         soundfilter=get_config_int(NULL,"sound_filter",3);
         hires=get_config_int(NULL,"resolution",0);
         fullscreen=get_config_int(NULL,"fullscreen",0);
-        soundbuflen=get_config_int(NULL,"sound_buffer_length",3120);
+        soundbuflen=3120;//get_config_int(NULL,"sound_buffer_length",3120);
         fasttape=get_config_int(NULL,"fast_tape",1);
 }
 
@@ -139,6 +140,47 @@ MENU filemenu[]=
         {"&Exit",gui_exit,NULL,NULL,NULL},
         {NULL,NULL,NULL,NULL,NULL}
 };
+
+int gui_autostart()
+{
+        char tempname[260];
+        int ret,c;
+        int xsize=(hires)?768:384,ysize=(hires)?384:192;
+        memcpy(tempname,discname[0],260);
+        ret=file_select_ex("Please choose a disc image",tempname,"SSD;DSD;IMG;ADF;ADL;FDI",260,xsize,ysize);
+        if (ret)
+        {
+                checkdiscchanged(0);
+                memcpy(discname[0],tempname,260);
+                for (c=0;c<strlen(discname[0]);c++)
+                {
+                        if (discname[0][c]=='.')
+                        {
+                                c++;
+                                break;
+                        }
+                }
+                if ((discname[0][c]=='d'||discname[0][c]=='D')&&(c!=strlen(discname[0])))
+                   load8271dsd(discname[0],0);
+                else if ((discname[0][c]=='f'||discname[0][c]=='F')&&(c!=strlen(discname[0])))
+                   load8271fdi(discname[0],0);
+                else if ((discname[0][c]=='a'||discname[0][c]=='A')&&(c!=strlen(discname[0])))
+                   load1770adfs(discname[0],0);
+                else if (c!=strlen(discname[0]))
+                   load8271ssd(discname[0],0);
+                autoboot=50;
+                resetsysvia();
+                memset(ram,0,65536);
+                resetarm();
+                resetuservia();
+                reset1770s();
+                reset8271s();
+                if (model<1) remaketablesa();
+                else         remaketables();
+                reset6502();
+        }
+        return D_EXIT;
+}
 
 int gui_changedisc0()
 {
@@ -202,7 +244,7 @@ int gui_changedisc1()
         return D_EXIT;
 }
 
-MENU discmenu[4];
+MENU discmenu[5];
 
 int ddsounds()
 {
@@ -214,6 +256,7 @@ int ddsounds()
 
 MENU discmenu[]=
 {
+        {"&Autostart drive &0/2",gui_autostart,NULL,NULL,NULL},
         {"Load drive &0/2",gui_changedisc0,NULL,NULL,NULL},
         {"Load drive &1/3",gui_changedisc1,NULL,NULL,NULL},
         {"&Disc sounds",ddsounds,NULL,NULL,NULL},
@@ -270,7 +313,7 @@ MENU tapemenu[]=
         {NULL,NULL,NULL,NULL,NULL}
 };
 
-MENU modelmenu[11];
+MENU modelmenu[12];
 
 int mpala()
 {
@@ -320,7 +363,7 @@ int mpalbsw()
         return D_EXIT;
 }
 
-int mntscb()
+int mpalb1770()
 {
         int c;
         model=3;
@@ -336,7 +379,7 @@ int mntscb()
         return D_EXIT;
 }
 
-int mpalbp()
+int mntscb()
 {
         int c;
         model=4;
@@ -347,12 +390,12 @@ int mpalbp()
         reset1770();
         resetsysvia();
         resetuservia();
-        memset(ram,0,65536);
+        memset(ram,0,32768);
         tube=0;
         return D_EXIT;
 }
 
-int mpalbp96()
+int mpalbp()
 {
         int c;
         model=5;
@@ -368,7 +411,7 @@ int mpalbp96()
         return D_EXIT;
 }
 
-int mpalbp128()
+int mpalbp96()
 {
         int c;
         model=6;
@@ -384,7 +427,7 @@ int mpalbp128()
         return D_EXIT;
 }
 
-int mpalm128()
+int mpalbp128()
 {
         int c;
         model=7;
@@ -400,7 +443,7 @@ int mpalm128()
         return D_EXIT;
 }
 
-int mpalmc()
+int mpalm128()
 {
         int c;
         model=8;
@@ -416,10 +459,26 @@ int mpalmc()
         return D_EXIT;
 }
 
+int mpalmc()
+{
+        int c;
+        model=9;
+        remaketables();
+        loadroms();
+        reset6502();
+        reset8271(0);
+        reset1770();
+        resetsysvia();
+        resetuservia();
+        memset(ram,0,65536);
+        tube=0;
+        return D_EXIT;
+}
+
 int mpalm128arm()
 {
         int c;
-        model=7;
+        model=8;
         remaketables();
         loadroms();
         reset6502();
@@ -435,18 +494,20 @@ int mpalm128arm()
 
 MENU modelmenu[]=
 {
-        {"PAL A",mpala,NULL,NULL,NULL},
-        {"PAL B",mpalb,NULL,NULL,NULL},
-        {"PAL B + SWRAM",mpalbsw,NULL,NULL,NULL},
-        {"NTSC B",mntscb,NULL,NULL,NULL},
-        {"PAL B+",mpalbp,NULL,NULL,NULL},
-        {"PAL B+96K",mpalbp96,NULL,NULL,NULL},
-        {"PAL B+128K",mpalbp128,NULL,NULL,NULL},
-        {"PAL Master 128",mpalm128,NULL,NULL,NULL},
-        {"PAL Master Compact",mpalmc,NULL,NULL,NULL},
+        {"Model A",mpala,NULL,NULL,NULL},
+        {"Model B",mpalb,NULL,NULL,NULL},
+        {"Model B + SWRAM",mpalbsw,NULL,NULL,NULL},
+        {"Model B + 1770",mpalb1770,NULL,NULL,NULL},
+        {"NTSC Model B",mntscb,NULL,NULL,NULL},
+        {"Model B+",mpalbp,NULL,NULL,NULL},
+        {"Model B+96K",mpalbp96,NULL,NULL,NULL},
+        {"Model B+128K",mpalbp128,NULL,NULL,NULL},
+        {"Master 128",mpalm128,NULL,NULL,NULL},
+        {"Master Compact",mpalmc,NULL,NULL,NULL},
         {"ARM Evaluation System",mpalm128arm,NULL,NULL,NULL},
         {NULL,NULL,NULL,NULL,NULL}
 };
+
 
 MENU videomenu[5];
 

@@ -1,4 +1,4 @@
-/*B-em 1.0 by Tom Walker*/
+/*B-em 1.1 by Tom Walker*/
 /*6502 emulation*/
 
 char exname[512];
@@ -105,11 +105,13 @@ void initmem()
         {
                 for (c=0x00;c<0x080;c++) mem[c]=(unsigned char *)(ram+((c&0x3F)<<8));
                 vidmask=0x3FFF;
+                vidlimit=0x4000;
         }
         else
         {
                 for (c=0x00;c<0x080;c++) mem[c]=(unsigned char *)(ram+(c<<8));
                 vidmask=0x7FFF;
+                vidlimit=0x8000;
         }
         for (c=0x80;c<0x0C0;c++) mem[c]=(unsigned char *)(rom+((c&0x3F)<<8));
         for (c=0xC0;c<0x100;c++) mem[c]=(unsigned char *)(os+((c&0x3F)<<8));
@@ -135,6 +137,7 @@ void remaketables()
         memstat[0xFD]=2;
         memstat[0xFE]=2;
         vidmask=0x7FFF;
+        vidlimit=0x8000;
 }
 
 void remaketablesa()
@@ -149,6 +152,7 @@ void remaketablesa()
         memstat[0xFD]=2;
         memstat[0xFE]=2;
         vidmask=0x3FFF;
+        vidlimit=0x4000;
 }
 
 /*Master 128 uses a 1mbit ROM chip to store OS and 7 sideways ROMs*/
@@ -199,12 +203,12 @@ void loadroms()
         FILE *f;
         struct al_ffblk ff;
         char fn[512],olddir[512];
-        if (model==7)
+        if (model==8)
         {
                 loadmasterroms();
                 return;
         }
-        if (model==8)
+        if (model==9)
         {
                 loadmastercroms();
                 return;
@@ -215,9 +219,9 @@ void loadroms()
            perror(fn);
         switch (model)
         {
-                case 0: case 1: case 2: f=fopen("os","rb"); break;
+                case 0: case 1: case 2: case 4: f=fopen("os","rb"); break;
                 case 3: f=fopen("usos","rb"); break;
-                case 4: case 5: case 6: f=fopen("bpos","rb"); break;
+                case 5: case 6: case 7: f=fopen("bpos","rb"); break;
         }
         fread(os,0x4000,1,f);
         fclose(f);
@@ -226,16 +230,17 @@ void loadroms()
         {
                 case 0: append_filename(fn,exname,"roms/a",511); break;
                 case 1: case 2: case 3: append_filename(fn,exname,"roms/b",511); break;
-                case 4: case 5: case 6: append_filename(fn,exname,"roms/bp",511); break;
+                case 4: append_filename(fn,exname,"roms/b1770",511); break;
+                case 5: case 6: case 7: append_filename(fn,exname,"roms/bp",511); break;
         }
         if (chdir(fn))
            perror(fn);
         al_findfirst("*.rom",&ff,0xFFFF);
-        for (c=0;c<16;c++) writeablerom[c]=((model==4)||(model==5)||(model==6))?0:1;
+        for (c=0;c<16;c++) writeablerom[c]=((model==5)||(model==6)||(model==7))?0:1;
         memset(rom,0,0x40000);
         while (romslot >= 0 && !finished)
         {
-                if ((model==4 || model==5 || model==6) && (romslot==0 || romslot==1 || romslot==12 || romslot==13))
+                if ((model==5 || model==6 || model==7) && (romslot==0 || romslot==1 || romslot==12 || romslot==13))
                 {
                         addr-=0x4000;
                         romslot--;
@@ -258,8 +263,8 @@ void loadroms()
                 rest(0);
         }
         al_findclose(&ff);
-        if (model==5) writeablerom[0]=writeablerom[1]=1;
-        if (model==6) writeablerom[0]=writeablerom[1]=writeablerom[12]=writeablerom[13]=1;
+        if (model==6) writeablerom[0]=writeablerom[1]=1;
+        if (model==7) writeablerom[0]=writeablerom[1]=writeablerom[12]=writeablerom[13]=1;
         if (model<2)
         {
                 for (c=0;c<16;c++)
@@ -279,6 +284,7 @@ void writeacccon(unsigned char v)
 {
         acccon=v;
         vidbank=(v&0x80)?0x8000:0;
+        vidlimit=(v&0x80)?0x10000:0x8000;
         if (!vidbank) shadowram(0);
 }
 
@@ -321,6 +327,7 @@ void writeaccconm(unsigned char v)
                 }
 //        }
         vidbank=(v&1)?0x8000:0;
+        vidlimit=(v&1)?0x10000:0x8000;
         acccon=v;
 //        printf("VIDBANK %04X\n",vidbank);
 }
@@ -339,19 +346,19 @@ unsigned char readmeml(unsigned short addr)
                 case 0xFE00: return readcrtc(addr);
                 case 0xFE08: temp=readacia(addr); return temp;
                 case 0xFE10: return readserial(addr);
-                case 0xFE18: if (model>=7) return readadc(addr); break;
-                case 0xFE20: if (model>=7 && addr&4) return read1770(addr); break;
-                case 0xFE28: if (model>=7) { if (addr&4) return 0; return read1770(addr); } break;
-                case 0xFE30: if (addr==0xFE34 && model>=7) return acccon; return 0xFE;
+                case 0xFE18: if (model>=8) return readadc(addr); break;
+                case 0xFE20: if (model>=8 && addr&4) return read1770(addr); break;
+                case 0xFE28: if (model>=8) { if (addr&4) return 0; return read1770(addr); } break;
+                case 0xFE30: if (addr==0xFE34 && model>=8) return acccon; return 0xFE;
                 case 0xFE40: case 0xFE48: case 0xFE50: case 0xFE58: if (cycles&1) {polltime(2);} else { polltime(1); } temp=readsysvia(addr); return temp;
                 case 0xFE60: case 0xFE68: case 0xFE70: case 0xFE78: if (cycles&1) {polltime(2);} else {polltime(1);} temp=readuservia(addr); return temp;
-                case 0xFE80: case 0xFE88: case 0xFE90: case 0xFE98: if (model>3 && model<7) return read1770(addr); else if (model!=7) return read8271(addr); return 0xFF;
+                case 0xFE80: case 0xFE88: case 0xFE90: case 0xFE98: if (model>3 && model<8) return read1770(addr); else if (model<8) return read8271(addr); return 0xFF;
                 case 0xFEA0: case 0xFEA8: return 0xFE; /*I wonder what Arcadians wants with Econet...*/
-                case 0xFEC0: case 0xFEC8: case 0xFED0: case 0xFED8: if (model<7) return readadc(addr); break;
+                case 0xFEC0: case 0xFEC8: case 0xFED0: case 0xFED8: if (model<8) return readadc(addr); break;
                 case 0xFEE0: if (acccon&0x10) return 0; return readtubehost(addr);
         }
         if ((addr&0xFE00)==0xFC00) return 0xFF;
-        if (model>=7 && ((addr&0xE000)==0xC000)) return osram[addr&0x1FFF];
+        if (model>=8 && ((addr&0xE000)==0xC000)) return osram[addr&0x1FFF];
         return 0xFF;
         printf("Error : Bad read from %04X\n",addr);
         dumpregs();
@@ -367,17 +374,17 @@ unsigned char writememl(unsigned short addr, unsigned char val)
                 case 0xFE00: writecrtc(addr,val); return;
                 case 0xFE08: writeacia(addr,val); return;
                 case 0xFE10: writeserial(addr,val); return;
-                case 0xFE18: if (model>=7) { writeadc(addr,val); return; } break;
-                case 0xFE20: if (cycles&1) {polltime(2);} else { polltime(1); }  if (model>=7 && addr&4) write1770(addr,val); else writeula(addr,val); return;
-                case 0xFE28: if (model>=7) { write1770(addr,val); return; } break;
+                case 0xFE18: if (model>=8) { writeadc(addr,val); return; } break;
+                case 0xFE20: if (cycles&1) {polltime(2);} else { polltime(1); }  if (model>=8 && addr&4) write1770(addr,val); else writeula(addr,val); return;
+                case 0xFE28: if (model>=8) { write1770(addr,val); return; } break;
                 case 0xFE30:
                 if (addr==0xFE34)
                 {
-                        if (model>3 && model<7)
+                        if (model>4 && model<8)
                         {
                                 writeacccon(val);
                         }
-                        else if (model>=7)
+                        else if (model>=8)
                         {
 //                                printf("write %04X %02X\n",addr,val);
                                 writeaccconm(val);
@@ -394,28 +401,28 @@ unsigned char writememl(unsigned short addr, unsigned char val)
                         currom=val&15;
                         for (c=0x80;c<0xC0;c++) mem[c]=(unsigned char *)(rom+((val&15)<<14)+((c&0x3F)<<8));
                         for (c=0x80;c<0xC0;c++) memstat[c]=(writeablerom[val&15])?0:1;
-                        if (val&0x80 && model>=7)
+                        if (val&0x80 && model>=8)
                         {
                                 for (c=0x80;c<0x90;c++) mem[c]=(unsigned char *)(swram+((c&0xF)<<8));
                                 for (c=0x80;c<0x90;c++) memstat[c]=0;
                         }
-                        if (val&0x80 && model>3 && model<7)
+                        if (val&0x80 && model>4 && model<8)
                         {
 //                                printf("Mapping in 8000-AFFF at %04X\n",pc);
                                 for (c=0x80;c<0xB0;c++) mem[c]=(unsigned char *)(ram+(c<<8));
                                 for (c=0x80;c<0xB0;c++) memstat[c]=0;
                                 shadowaddr[0xA]=1;
                         }
-                        else if (model>3 && model<7) shadowaddr[0xA]=0;
+                        else if (model>4 && model<8) shadowaddr[0xA]=0;
                         return;
                 }
                 break;
                 case 0xFE38: return;
                 case 0xFE40: case 0xFE48: case 0xFE50: case 0xFE58: if (cycles&1) {polltime(2);} else { polltime(1); } writesysvia(addr,val,line); return;
                 case 0xFE60: case 0xFE68: case 0xFE70: case 0xFE78: if (cycles&1) {polltime(2);} else { polltime(1); } writeuservia(addr,val,line); return;
-                case 0xFE80: case 0xFE88: case 0xFE90: case 0xFE98: if (model>3 && model<7) write1770(addr,val); else if (model!=7) write8271(addr,val); return;
+                case 0xFE80: case 0xFE88: case 0xFE90: case 0xFE98: if (model>3 && model<8) write1770(addr,val); else if (model<8) write8271(addr,val); return;
                 case 0xFEA0: return; /*Now Repton Infinity wants Econet as well!*/
-                case 0xFEC0: case 0xFEC8: case 0xFED0: case 0xFED8: if (model<7) writeadc(addr,val); return;
+                case 0xFEC0: case 0xFEC8: case 0xFED0: case 0xFED8: if (model<8) writeadc(addr,val); return;
                 case 0xFEE0: if (acccon&0x10) return; writetubehost(addr,val); return;
         }
         if (!(addr&0x8000))
@@ -424,7 +431,7 @@ unsigned char writememl(unsigned short addr, unsigned char val)
                 return;
         }
         if (addr<0xC000) return;
-        if (model>=7 && ((addr&0xE000)==0xC000))
+        if (model>=8 && ((addr&0xE000)==0xC000))
         {
                 osram[addr&0x1FFF]=val;
                 return;
@@ -631,7 +638,7 @@ void shadowram(int stat)
                 for (c=0x30;c<0x080;c++)
                     mem[c]=(unsigned char *)(ram+((c|0x80)<<8));
         }
-        else if (!((model>=7) && (acccon&4)))
+        else if (!((model>=8) && (acccon&4)))
         {
                 for (c=0x30;c<0x080;c++)
                     mem[c]=(unsigned char *)(ram+(c<<8));
@@ -650,7 +657,7 @@ void exec6502(int lines, int cpl)
         int tempi;
         signed char offset;
         int c;
-        if (model>=7) /*Master 128 uses seperate CPU emulation*/
+        if (model>=8) /*Master 128 uses seperate CPU emulation*/
         {
                 exec65c02(lines,cpl);
                 return;
@@ -671,7 +678,7 @@ void exec6502(int lines, int cpl)
                         oldpc=pc;*/
                         if (skipint==1) skipint=0;
 //                        curcyc=0;
-                        if (model>3 && vidbank)
+                        if (model>4 && vidbank)
                         {
                                 if (!inA && shadowaddr[pc>>12])     shadowram(1);
                                 else if (inA && !shadowaddr[pc>>12]) shadowram(0);
@@ -3835,10 +3842,10 @@ void saveramstate(FILE *f)
         fwrite(ram,32768,1,f);
         if (model>1)
         {
-                if (model>3) fwrite(ram+32768,32768,1,f);
-                if (model!=4) fwrite(rom,32768,1,f);
-                if (model==6) fwrite(rom+(12*16384),32768,1,f);
-                else if (model!=4 && model!=5) fwrite(rom+32768,32768,1,f);
+                if (model>4) fwrite(ram+32768,32768,1,f);
+                if (model!=5) fwrite(rom,32768,1,f);
+                if (model==7) fwrite(rom+(12*16384),32768,1,f);
+                else if (model!=5 && model!=6) fwrite(rom+32768,32768,1,f);
         }
 }
 
@@ -3847,9 +3854,9 @@ void loadramstate(FILE *f)
         fread(ram,32768,1,f);
         if (model>1)
         {
-                if (model>3) fread(ram+32768,32768,1,f);
-                if (model!=4) fread(rom,32768,1,f);
-                if (model==6) fread(rom+(12*16384),32768,1,f);
-                else if (model!=4 && model!=5) fread(rom+32768,32768,1,f);
+                if (model>4) fread(ram+32768,32768,1,f);
+                if (model!=5) fread(rom,32768,1,f);
+                if (model==7) fread(rom+(12*16384),32768,1,f);
+                else if (model!=5 && model!=6) fread(rom+32768,32768,1,f);
         }
 }

@@ -93,6 +93,7 @@ BITMAP *buffer;
 unsigned char crtc[32];
 int interlaceline;
 unsigned short vidmask;
+unsigned long vidlimit;
 
 /*ADC*/
 int adcconvert;

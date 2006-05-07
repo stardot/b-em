@@ -1,4 +1,4 @@
-/*B-em 1.0 by Tom Walker*/
+/*B-em 1.1 by Tom Walker*/
 /*6850 acia emulation*/
 
 #include <stdio.h>

@@ -1,10 +1,13 @@
-B-em v1.0
+B-em v1.1
 =========
 
 Source for the DOS, Windows and OS X versions are included. The DOS
 version should/may also compile under Linux/QNX/BeOS, although I haven't
 tried this. The Windows and OS X versions use a lot of platform-specific code,
 and will not compile on other platforms.
+
+The OS X source is of version v1.0, the others are of v1.1.
+
 The DOS and Windows versions will not compile under GCC 4 as I have this bad
 habit of declaring variables in multiple source files instead of using header
 files properly. The OS X version has been corrected and does compile. For v1.0

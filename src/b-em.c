@@ -1,4 +1,4 @@
-/*B-em 1.0 by Tom Walker*/
+/*B-em 1.1 by Tom Walker*/
 /*Main loop*/
 
 #include <stdio.h>
@@ -48,6 +48,7 @@ HMENU menu;
 #define IDM_FILE_LSNAP     40000
 #define IDM_FILE_SSNAP     40001
 #define IDM_FILE_EXIT      40002
+#define IDM_DISC_AUTOSTART 40013
 #define IDM_DISC_CHANGE0   40010
 #define IDM_DISC_CHANGE1   40011
 #define IDM_DISC_SOUND     40012
@@ -59,13 +60,14 @@ HMENU menu;
 #define IDM_MODEL_PALB     40031
 #define IDM_MODEL_PALBSW   40032
 #define IDM_MODEL_NTSCB    40033
-#define IDM_MODEL_PALB64   40034
-#define IDM_MODEL_PALB96   40035
-#define IDM_MODEL_PALB128  40036
-#define IDM_MODEL_PALM128  40037
-#define IDM_MODEL_PALMC    40038
-#define IDM_MODEL_ARM      40039
-#define IDM_VIDEO_RES      40040
+#define IDM_MODEL_B1770    40034
+#define IDM_MODEL_PALB64   40035
+#define IDM_MODEL_PALB96   40036
+#define IDM_MODEL_PALB128  40037
+#define IDM_MODEL_PALM128  40038
+#define IDM_MODEL_PALMC    40039
+#define IDM_MODEL_ARM      40040
+#define IDM_VIDEO_RES      40044
 #define IDM_VIDEO_FULLSCR  40041
 #define IDM_VIDEO_BLUR     40042
 #define IDM_VIDEO_MONO     40043
@@ -114,6 +116,7 @@ void makemenu()
         AppendMenu(hpop,MF_STRING,IDM_FILE_EXIT,"E&xit");
         AppendMenu(menu,MF_POPUP,hpop,"&File");
         hpop=CreateMenu();
+        AppendMenu(hpop,MF_STRING,IDM_DISC_AUTOSTART,"Autostart Disc &0/2...");
         AppendMenu(hpop,MF_STRING,IDM_DISC_CHANGE0,"Change Disc &0/2...");
         AppendMenu(hpop,MF_STRING,IDM_DISC_CHANGE1,"Change Disc &1/3...");
         AppendMenu(hpop,MF_STRING,IDM_DISC_SOUND,"&Disc Sounds");
@@ -125,15 +128,16 @@ void makemenu()
         AppendMenu(hpop,MF_STRING,IDM_TAPE_FAST,"&Fast Tape");
         AppendMenu(menu,MF_POPUP,hpop,"&Tape");
         hpop=CreateMenu();
-        AppendMenu(hpop,MF_STRING,IDM_MODEL_PALA,"PAL &A");
-        AppendMenu(hpop,MF_STRING,IDM_MODEL_PALB,"PAL &B");
-        AppendMenu(hpop,MF_STRING,IDM_MODEL_PALBSW,"PAL B + &SWRAM");
+        AppendMenu(hpop,MF_STRING,IDM_MODEL_PALA,"Model &A");
+        AppendMenu(hpop,MF_STRING,IDM_MODEL_PALB,"Model &B");
+        AppendMenu(hpop,MF_STRING,IDM_MODEL_PALBSW,"Model B + &SWRAM");
+        AppendMenu(hpop,MF_STRING,IDM_MODEL_B1770,"Model B + &1770");
         AppendMenu(hpop,MF_STRING,IDM_MODEL_NTSCB,"&NTSC B");
-        AppendMenu(hpop,MF_STRING,IDM_MODEL_PALB64,"PAL B&+");
-        AppendMenu(hpop,MF_STRING,IDM_MODEL_PALB96,"PAL B+&96K");
-        AppendMenu(hpop,MF_STRING,IDM_MODEL_PALB128,"PAL B+&128K");
-        AppendMenu(hpop,MF_STRING,IDM_MODEL_PALM128,"PAL &Master 128");
-        AppendMenu(hpop,MF_STRING,IDM_MODEL_PALMC,"PAL Master &Compact");
+        AppendMenu(hpop,MF_STRING,IDM_MODEL_PALB64,"B&+");
+        AppendMenu(hpop,MF_STRING,IDM_MODEL_PALB96,"B+&96K");
+        AppendMenu(hpop,MF_STRING,IDM_MODEL_PALB128,"B+&128K");
+        AppendMenu(hpop,MF_STRING,IDM_MODEL_PALM128,"&Master 128");
+        AppendMenu(hpop,MF_STRING,IDM_MODEL_PALMC,"Master &Compact");
         AppendMenu(hpop,MF_STRING,IDM_MODEL_ARM,    "&ARM Evaluation System");
         AppendMenu(menu,MF_POPUP,hpop,"&Model");
         hpop=CreateMenu();
@@ -250,6 +254,7 @@ void parsecommandline(LPSTR s)
 }
 
 int framenum=0;
+//FILE *spdlog;
 
 int WINAPI WinMain (HINSTANCE hThisInstance,
                     HINSTANCE hPrevInstance,
@@ -259,9 +264,10 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         unsigned short *p;
         int resetting=0;
         char s[160];
+        MSG messages;            /* Here messages to the application are saved */
+//        spdlog=fopen("spdlog.txt","wt");
 //        FILE *tempf=fopen("temp.txt","wt");
         /* This is the handle for our window */
-        MSG messages;            /* Here messages to the application are saved */
         WNDCLASSEX wincl;        /* Data structure for the windowclass */
 
         /* The Window structure */
@@ -272,8 +278,8 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         wincl.cbSize = sizeof (WNDCLASSEX);
 
         /* Use default icon and mouse-pointer */
-        wincl.hIcon = LoadIcon (NULL, IDI_APPLICATION);
-        wincl.hIconSm = LoadIcon (NULL, IDI_APPLICATION);
+        wincl.hIcon = LoadIcon(hThisInstance, "allegro_icon");
+        wincl.hIconSm = LoadIcon(hThisInstance, "allegro_icon");
         wincl.hCursor = LoadCursor (NULL, IDC_ARROW);
         wincl.lpszMenuName = NULL;                 /* No menu */
         wincl.cbClsExtra = 0;                      /* No extra bytes after the window class */
@@ -290,7 +296,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         ghwnd = CreateWindowEx (
            0,                   /* Extended possibilites for variation */
            szClassName,         /* Classname */
-           "B-em v1.0",         /* Title Text */
+           "B-em v1.1",         /* Title Text */
            WS_OVERLAPPEDWINDOW&~(WS_MAXIMIZEBOX|WS_SIZEBOX), /* default window */
            CW_USEDEFAULT,       /* Windows decides the position */
            CW_USEDEFAULT,       /* where the window ends up on the screen */
@@ -339,14 +345,27 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         if (!uefena && model<3) trapos();
         install_int_ex(update50,MSEC_TO_TIMER(20));
         if (!tube) CheckMenuItem(menu,model+40030,MF_CHECKED);
-        else       CheckMenuItem(menu,40039,MF_CHECKED);
+        else       CheckMenuItem(menu,40040,MF_CHECKED);
         CheckMenuItem(menu,curwave+40080,MF_CHECKED);
         updatemenu();
+        fasttape=1;
+        while (spdcount<25)
+        {
+                if (PeekMessage(&messages,NULL,0,0,PM_REMOVE))
+                {
+                        if (messages.message==WM_QUIT)
+                           quit=1;
+                        /* Translate virtual-key messages into character messages */
+                        TranslateMessage(&messages);
+                        /* Send message to WindowProcedure */
+                        DispatchMessage(&messages);
+                }
+        }
 //        sprintf(s,"Model %i Tube %i",model,tube);
 //        MessageBox(NULL,s,s,MB_OK);
         while (!quit)
         {
-                if (framenum>=((soundbuflen==3120)?5:4) && soundon && !(spdcount || (fasttape && motor)))
+                if (framenum==5 && !(fasttape && motor))
                 {
 //                        fputs("Sound\n",tempf);
                         framenum=0;
@@ -354,7 +373,8 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
                         while (!p)
                         {
                                 p=(unsigned short *)get_audio_stream_buffer(as);
-                                yield_timeslice();
+                                sleep(0);
+//                                yield_timeslice();
 //                                rest(0);
                         }
                         updatebuffer(p,soundbuflen);
@@ -441,6 +461,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
 //                sprintf(s,"B-em %i %i",spdcount,framenum);
 //                set_window_title(s);
         }
+//        fclose(spdlog);
 /*                if (resetting && !key[KEY_F12]) resetting=0;
                 if (key[KEY_F12] && !resetting)
                 {
@@ -478,7 +499,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         save_config();
         allegro_exit();
         savecmos();
-//        dumpregs();
+        dumpregs();
 //        savebuffers();
 //        dumpregs();
         checkdiscchanged(0);
@@ -543,8 +564,9 @@ int getfn(HWND hwnd, char *f, char *s, int save, char *de)
         fn[0]=0;
         start[0]=0;
         strcpy(fn,s);
+
         ZeroMemory(&ofn, sizeof(ofn));
-        ofn.lStructSize = sizeof(ofn);
+        ofn.lStructSize = sizeof(OPENFILENAME);
         ofn.hwndOwner = hwnd;
         ofn.lpstrFile = fn;
         ofn.nMaxFile = 260;
@@ -553,7 +575,7 @@ int getfn(HWND hwnd, char *f, char *s, int save, char *de)
         ofn.lpstrFileTitle = NULL;
         ofn.nMaxFileTitle = 0;
         ofn.lpstrInitialDir = NULL;
-        ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_OVERWRITEPROMPT | 0x10000000;//OFN_FORCESHOWHIDDEN;
+        ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_OVERWRITEPROMPT;// | 0x10000000;//OFN_FORCESHOWHIDDEN;
         ofn.lpstrDefExt=de;
         if (save)
         {
@@ -598,7 +620,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         case IDM_FILE_EXIT:
                         PostQuitMessage(0);
                         return 0;
-                        case IDM_DISC_CHANGE0:
+                        case IDM_DISC_CHANGE0: case IDM_DISC_AUTOSTART:
                         if (soundon) stop_audio_stream(as);
                         if (!getfn(hwnd,"Disc Image\0*.SSD;*.DSD;*.ADF;*.ADL;*.FDI\0DFS Single Sided Disc Image (*.SSD)\0*.SSD\0DFS Double Sided Disc Image (*.DSD)\0*.DSD\0ADFS Disc Image (*.ADF)\0*.ADF\0FDI Disc Image (*.FDI)\0All\0*.*\0\0",discname[0],0,"SSD"))
                         {
@@ -620,6 +642,19 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                                    load8271ssd(discname[0],0);
                         }
                         if (soundon) as=play_audio_stream(soundbuflen,16,0,31200,255,127);
+                        if (LOWORD(wParam)==IDM_DISC_AUTOSTART)
+                        {
+                                autoboot=50;
+                                resetsysvia();
+                                memset(ram,0,65536);
+                                resetarm();
+                                resetuservia();
+                                reset1770s();
+                                reset8271s();
+                                if (model<1) remaketablesa();
+                                else         remaketables();
+                                reset6502();
+                        }
                         return 0;
                         case IDM_DISC_CHANGE1:
                         if (soundon) stop_audio_stream(as);
@@ -670,13 +705,14 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         case IDM_MODEL_PALB64: case IDM_MODEL_PALB96:
                         case IDM_MODEL_PALB128: case IDM_MODEL_PALM128:
                         case IDM_MODEL_ARM: case IDM_MODEL_PALMC:
+                        case IDM_MODEL_B1770:
                         if (!tube) CheckMenuItem(menu,model+40030,MF_UNCHECKED);
-                        else       CheckMenuItem(menu,40039,MF_UNCHECKED);
+                        else       CheckMenuItem(menu,40040,MF_UNCHECKED);
                         CheckMenuItem(menu,LOWORD(wParam),MF_CHECKED);
                         model=LOWORD(wParam)-40030;
-                        if (model==9)
+                        if (model==10)
                         {
-                                model=7;
+                                model=8;
                                 tube=1;
                         }
                         else
@@ -685,8 +721,8 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         else       remaketablesa();
                         loadroms();
                         reset6502();
-                        reset8271(0);
                         reset1770();
+                        reset8271(0);
                         resetarm();
                         resetsysvia();
                         resetuservia();

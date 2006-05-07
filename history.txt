@@ -364,3 +364,16 @@ Version 0.82 finalised and released
            Brought ARM emulation in sync with Arculator - faster, less buggy.
 14/12/05 - Downgraded to Allegro 4.0.3 - sound works in DOS again.
            Added disc drive noise to FDI.
+Version 1.0 finalised and released
+23/02/06 - Added some endian-neutral code from the Mac port.
+           Now possible to emulate model B with 1770 FDC.
+           Altered video timing - better split on Elite, Firetrack display now
+           rock solid. Uridium one line off now though. Perfect emulation of
+           Elite will need a cycle based renderer rather than a line based, as
+           the mode switch takes something like 176 cycles.
+28/02/06 - Added cursor to bitmap modes (about time!)
+02/04/06 - Fixed cursor and mode 5.
+03/04/06 - Improvements to mode 7.
+           Optimisations to inner drawing loop.
+04/04/06 - Now only blits active areas of screen.
+01/05/06 - Added more commands to 1770 FDC - Watford DDFS now works.

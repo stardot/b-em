@@ -1,4 +1,4 @@
-/*B-em 1.0 by Tom Walker*/
+/*B-em 1.1 by Tom Walker*/
 /*System VIA emulation*/
 
 unsigned short pc;
@@ -87,7 +87,11 @@ void vblankint()
 {
         sysvia.ifr|=2;
         updatesysIFR();
-//        printf("VBLANK %02X %i\n",sysvia.ier,p.i);
+}
+void vblankintlow()
+{
+        sysvia.ifr&=~2;
+        updatesysIFR();
 }
 
 void syscb1()
@@ -148,7 +152,7 @@ void writeIC32(unsigned char val)
                 if (!(IC32&128)) temp|=KB_SCROLOCK_FLAG;
 //                set_leds(temp);
         }
-        if (model==7)
+        if (model==8 || model==9)
         {
                 cmosrw=IC32&2;
                 cmosstrobe=(IC32&4)^cmosold;
@@ -169,7 +173,7 @@ void writedatabus(unsigned char val)
         }
         if (!(IC32&1))
            soundwrite(val);
-                if (model==7 && cmosstrobe && cmosena && !cmosrw && cmosaddr>0xB) cmos[cmosaddr]=sdbval;
+                if ((model==8 || model==9) && cmosstrobe && cmosena && !cmosrw && cmosaddr>0xB) cmos[cmosaddr]=sdbval;
 //        if (model==7 && cmosstrobe && !cmosrw && cmosena) printf("CMOS write %02X %02X\n",cmosaddr,sdbval);
 }
 
@@ -194,7 +198,7 @@ void writesysvia(unsigned short addr, unsigned char val, int line)
                 sysvia.ifr&=0xee;//~PORTBINT;
                 writeIC32(val);
                 updatesysIFR();
-                if (model==7) /*CMOS*/
+                if (model==8 || model==9) /*CMOS*/
                 {
                         if (val&0x80) cmosaddr=sysvia.ora&63;
                         cmosena=val&0x40;
@@ -281,7 +285,7 @@ unsigned char readsysvia(unsigned short addr)
                 sysvia.ifr&=~PORTAINT;
                 updatesysIFR();
                 case ORAnh:
-                if (model==7 && cmosrw && cmosena)
+                if ((model==8 || model==9) && cmosrw && cmosena)
                 {
                         sysvia.ora=cmos[cmosaddr];
 //                        printf("CMOS read %02X %02X\n",cmosaddr,sysvia.ora);
@@ -290,7 +294,7 @@ unsigned char readsysvia(unsigned short addr)
                 }
                 temp=sysvia.ora & sysvia.ddra;
                 temp|=(sysvia.porta & ~sysvia.ddra);
-                if (model<7 || !cmosena)
+                if (model<8 || !cmosena)
                 {
                         temp&=0x7F;
                         if (bbckey[keycol][keyrow])
@@ -363,22 +367,22 @@ void resetsysvia()
 
 unsigned char codeconvert[128]=
 {
-        0,30,48,46,32,18,33,34,
-        35,23,36,37,38,50,49,24,
-        25,16,19,31,20,22,47,17,
-        45,21,44,11,2,3,4,5,
-        6,7,8,9,10,82,79,80,
-        81,75,76,77,71,72,73,59,
-        60,61,62,63,64,65,66,67,
-        68,87,88,1,41,12,13,14,
-        15,26,27,28,39,40,43,86,
-        51,52,53,57,0,83,0,79,
-        0,0,75,77,72,80,0,55,
-        74,78,83,0,84,0,115,125,
-        112,121,123,42,54,29,0,56,
-        0,91,92,56,70,69,58,0,
-        0,0,58,0,0,0,0,0,
-        0,0,0,0,0,0,58,0,
+        0,30,48,46,32,18,33,34,    //0
+        35,23,36,37,38,50,49,24,   //8
+        25,16,19,31,20,22,47,17,   //16
+        45,21,44,11,2,3,4,5,       //24
+        6,7,8,9,10,82,79,80,       //32
+        81,75,76,77,71,72,73,59,   //40
+        60,61,62,63,64,65,66,67,   //48
+        68,87,88,1,41,12,13,14,    //56
+        15,26,27,28,39,40,43,86,   //64
+        51,52,53,57,0,83,0,79,     //72
+        0,0,75,77,72,80,0,55,      //80
+        74,78,83,0,84,0,115,125,   //88
+        112,121,123,42,54,29,0,56, //96
+        0,39,92,56,70,69,58,0,     //104
+        0,0,58,0,0,0,0,0,          //112
+        0,0,0,0,0,0,58,0,          //120
 };
 
 void presskey(int row, int col)
@@ -510,7 +514,7 @@ void savekeyboardstate(FILE *f)
 
 void savecmosstate(FILE *f)
 {
-        if (model!=7) return;
+        if (model<8) return;
         putc(cmosaddr,f);
         putc(cmosena,f);
         putc(cmosrw,f);
@@ -544,7 +548,7 @@ void loadkeyboardstate(FILE *f)
 
 void loadcmosstate(FILE *f)
 {
-        if (model!=7) return;
+        if (model<8) return;
         cmosaddr=getc(f);
         cmosena=getc(f);
         cmosrw=getc(f);

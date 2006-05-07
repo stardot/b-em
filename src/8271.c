@@ -1,4 +1,4 @@
-/*B-em 1.0 by Tom Walker*/
+/*B-em 1.1 by Tom Walker*/
 /*8271 FDC emulation*/
 
 #include <stdio.h>
@@ -16,6 +16,9 @@
 
 #define SIDE ((drvctrloutp>>5) & 1)
 
+void idcrcerror();
+void datacrcerror();
+void sectorerror();
 int delayreadop=0;
 int idmarks=0;
 int waitforindex=0;
@@ -95,8 +98,9 @@ void motoroff()
         if (!driveled) return;
 //        printf("Motor off %i\n",soundiniteded);
         driveled=0;
+        if (!ddnoise) return;
         stop_sample(motorsmp);
-        play_sample(motoroffsmp,127,127,1000,0);
+//        play_sample(motoroffsmp,127,127,1000,0);
 //        if (soundiniteded) play_sample(motoroffsmp,255,127,1000,0);
 }
 
@@ -401,6 +405,7 @@ int curr8271drv;
 void reset8271(int reload)
 {
         int c;
+        ddensity=0;
         delayreadop=0;
         motoroff();
         statusreg=0;
@@ -463,6 +468,7 @@ void reset8271s()
         disctime=0;
         discint=0;
         inttrack[0]=curtrack[0]=0;
+        ddensity=0;
 }
 
 void doselects()
@@ -549,11 +555,11 @@ void seek()
         char s[40];
         if (!driveled)
         {
-                driveled=1;
                 if (ddnoise)
                 {
                         play_sample(motorsmp,127,127,1000,TRUE);
                         play_sample(motoronsmp,127,127,1000,0);
+                        driveled=1;
                 }
         }
         doselects();
@@ -657,8 +663,8 @@ void readvarlen()
                 {
                         play_sample(motorsmp,127,127,1000,TRUE);
                         play_sample(motoronsmp,127,127,1000,0);
+                        driveled=1;
                 }
-                driveled=1;
         }
         doselects();
         if (selects[0])
@@ -879,7 +885,7 @@ void writevarlen()
                 return;
         }
         curr8271drv=drv;
-        curtrack[0]=parameters[0];
+        inttrack[0]=curtrack[0]=parameters[0];
         cursec[0]=parameters[1];
         sectorsleft=parameters[2]&0x1F;
         sectorlen=1<<(7+((parameters[2]>>5)&7));
@@ -1131,51 +1137,8 @@ void endreadid()
         }
 }
 
-void idcrcerror()
-{
-        if (model>2)
-        {
-                idcrcerror1770();
-        }
-        else
-        {
-                resultreg=0x0C;
-                statusreg=0x18;
-                NMI();
-                inreadop=0;
-        }
-}
-
-void datacrcerror()
-{
-        if (model>2)
-        {
-                datacrcerror1770();
-        }
-        else
-        {
-                resultreg=0x0E;
-                statusreg=0x18;
-                NMI();
-                inreadop=0;
-        }
-}
-
-void sectorerror()
-{
-        if (model>2)
-        {
-                sectorerror1770();
-        }
-        else
-        {
-                resultreg=0x18;
-                statusreg=0x18;
-                NMI();
-                inreadop=0;
-        }
-}
-
+int invalidfor;
+int discoutput=0;
 /*What a mess!
   This function simulates the rotation of the disc and many of the functions
   of the 8271. This includes identifying syncs, decoding data, waiting for
@@ -1204,8 +1167,13 @@ void pollbyte()
                    tempi=discraw[curdisc][SIDE][curtrack[0]][discrawpos>>3]&(1<<(7-(discrawpos&7)));
                 databuffer<<=1;
                 databuffer|=(tempi?1:0);
-//                printf("%i %04X %02X %i %i %02X\n",discrawpos,databuffer,discraw[0][0][curtrack[0]][discrawpos>>3],curtrack[0],tempi,(1<<(7-(discrawpos&7))));
-//                printf("%i %04X\n",pollbitsleft,databuffer);
+//                if (readidpoll || discoutput) printf("%i %04X %02X %i %i %02X   ",discrawpos,databuffer,discraw[0][0][curtrack[0]][discrawpos>>3],curtrack[0],tempi,(1<<(7-(discrawpos&7))));
+//                if (readidpoll || discoutput) printf("%i %04X\n",pollbitsleft,databuffer);
+                if (invalidfor)
+                {
+                        invalidfor--;
+                        goto fini;
+                }
                 /*If we are actively reading data, then enter this lot*/
                 if (pollbitsleft)
                 {
@@ -1240,9 +1208,9 @@ void pollbyte()
                                                 crc=(ddensity)?0xcdb4:0xFFFF;
                                                 calccrc(0xFE);
                                                 for (c=0;c<4;c++) calccrc(discid[c]);
+//                                                printf("CRC : %04X %02X%02X %02X %02X %02X %02X\n",crc,discid[4],discid[5],discid[0],discid[1],discid[2],discid[3]);
                                                 if (((crc>>8)!=discid[4] || (crc&0xFF)!=discid[5]))
                                                 {
-//                                                        printf("CRC error : %04X %02X%02X\n",crc,discid[4],discid[5]);
                                                         idcrcerror();
                                                         return;
                                                         dumpregs();
@@ -1330,8 +1298,9 @@ void pollbyte()
                                                 if (sectorsleft)
                                                 {
                                                         cursec[0]++;
-//                                                        printf("READ continuing to sector %i %i\n",cursec[0],sectorsleft);
+//                                                        printf("%i READ continuing to sector %i %i\n",discrawpos,cursec[0],sectorsleft);
                                                         idmarks=0;
+                                                        invalidfor=50;
                                                 }
                                                 else
                                                 {
@@ -1396,6 +1365,8 @@ void pollbyte()
                                         pollbytesleft=sectorlen+2;
                                         pollbitsleft=16;
 //                                        printf("Reading found sector ID %i %i %i %i %02X %02X\n",discid[0],discid[1],discid[2],discid[3],ram[0xA6],ram[0xA7]);
+                                        if (discid[0]==21 && discid[2]==0) discoutput=1;
+                                        else                               discoutput=0;
                                         readflash|=1;
                                         crc=(ddensity)?0xcdb4:0xFFFF;
                                         if (databuffer==0xF56A) calccrc(0xF8);
@@ -1437,6 +1408,7 @@ void pollbyte()
                 }
                 }
         }
+        fini:
         /*Move ahead one bit*/
         discrawpos++;
         if (delayreadop) return;
@@ -1581,6 +1553,53 @@ void write8271(unsigned short addr, unsigned char val)
         }
 }
 
+void idcrcerror()
+{
+//        printf("ID CRC error\n");
+        if (model>2)
+        {
+                idcrcerror1770();
+        }
+        else
+        {
+                resultreg=0x0C;
+                statusreg=0x18;
+                NMI();
+                inreadop=0;
+        }
+}
+
+void datacrcerror()
+{
+//        printf("Data CRC error\n");
+        if (model>2)
+        {
+                datacrcerror1770();
+        }
+        else
+        {
+                resultreg=0x0E;
+                statusreg=0x18;
+                NMI();
+                inreadop=0;
+        }
+}
+
+void sectorerror()
+{
+        if (model>2)
+        {
+                sectorerror1770();
+        }
+        else
+        {
+                resultreg=0x18;
+                statusreg=0x18;
+                NMI();
+                inreadop=0;
+        }
+}
+
 void poll8271()
 {
         char s[40];
@@ -1605,7 +1624,7 @@ void poll8271()
                 statusreg=0x18;
                 error=0;
                 NMI();
-                driveled=0;
+                setspindown();
         }
         else
         {
