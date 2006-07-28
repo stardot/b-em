@@ -1,4 +1,4 @@
-/*B-em 1.1 by Tom Walker*/
+/*B-em 1.2 by Tom Walker*/
 /*1770 emulator*/
 #include <allegro.h>
 #include <stdio.h>
@@ -305,9 +305,9 @@ void write1770(unsigned short addr, unsigned char val)
                 wd1770.data=val;
                 return;
         }
-        printf("Bad 1770 write %04X %02X\n",addr,val);
+/*        printf("Bad 1770 write %04X %02X\n",addr,val);
         dumpregs();
-        exit(-1);
+        exit(-1);*/
 }
 
 unsigned char read1770(unsigned short addr)

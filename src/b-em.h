@@ -1,3 +1,4 @@
+#define printf rpclog
 #include <allegro.h>
 
 /*6502*/

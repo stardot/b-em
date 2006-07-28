@@ -6,7 +6,7 @@
              ██       ▄██          ██         ██          ██
              ██████████▀           █████████  ██          ██
 
-                                 Version 1.1
+                                 Version 1.2
                          A freeware BBC Micro emulator
 
 Introduction
@@ -23,8 +23,8 @@ Features
 - All documented and some undocumented 6502 instructions
 - 8271 Floppy Disc Controller emulated (double drive, double sided, 80 track, read/write)
 - 1770 Floppy Disc Controller emulated (double drive, double sided, 80 track, read/write)
-- Supports seven formats for BBC storage on PC - .ssd, .dsd, .adf, .fdi, .inf,
-  .uef and __catalog__
+- Supports eight formats for BBC storage on PC - .ssd, .dsd, .adf, .fdi, .inf,
+  .uef, .csw and __catalog__
 - Can run many protected disc and tape games.
 - Sound emulation, including sample playback
 - Some CRTC tricks, such as overscan, raster splitting and rupture.
@@ -36,15 +36,11 @@ Features
 Differences from last version
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- Can now emulate a Model B with 1770 FDC
-- Better mode 7 emulation - many programs improved, eg Granny's Garden
-- Added cursor to modes 0-6
-- Altered video timing a little
-- Added more commands to 1770 FDC - Watford DDFS now works (single density
-  mode only)
-- Some optimisations to video code
-- Update VGM logging to latest spec
-- New 'Autostart' option
+- Preliminary CSW support
+- Improved timing, more protected games work (eg Nightshade, Tapper,
+  Beach Head etc)
+- E00 DFS now supported
+- Disc writing works properly again
 
 
 Requirements
@@ -53,20 +49,22 @@ Requirements
 B-em (bbc model B EMulator), requires the following :
 
 A Pentium or better computer (try a P300 at least)
-16mb RAM (?)
+8mb RAM (?)
 
 Nine ROM images are provided with B-em -
-os           - UK BBC MOS
-usos         - US BBC MOS
-bpos         - BBC B+ MOS
-mos3.20      - Master 128 MOS 3.20
-a\basic.rom  - BBC BASIC 2
+os            - UK BBC MOS
+usos          - US BBC MOS
+bpos          - BBC B+ MOS
+mos3.20       - Master 128 MOS 3.20
+a\basic.rom   - BBC BASIC 2
 b\basic.rom
+b1770\basic.rom
 bp\basic.rom
-b\dfs.rom    - Watford DFS 1.30
-bp\dfs.rom   - Acorn 1770 DFS
-bp\nadfs.rom - Acorn ADFS
-tube\arm.rom - ARM tube parasite ROM
+b\dfs.rom     - Watford DFS 1.30
+b1770\dfs.rom - Acorn 1770 DFS
+bp\dfs.rom
+bp\nadfs.rom  - Acorn ADFS
+tube\arm.rom  - ARM tube parasite ROM
 
 If you want to use more paged ROMs, put them in the roms directory, in either
 directory B or BP.
@@ -93,7 +91,6 @@ Savestates don't save tube state either.
 Known bugs
 ~~~~~~~~~~
 
-Still some timing bugs on protected games (eg Hypersports)
 Some bugs in FDC emulations, eg some Acornsoft titles won't pass protection
 
 
@@ -134,16 +131,17 @@ File :
         Exit   - exit to DOS/Windows/whatever.
 
 Model :
-        PAL A          - emulate a PAL model A.
-        PAL B          - emulate a PAL model B.
-        PAL B + SWRAM  - emulate a PAL model B with sideways RAM.
-        NTSC B         - emulate an NTSC model B with sideways RAM.
-        PAL B+         - emulate a PAL model B+ with 64k RAM.
-        PAL B+96K      - emulate a PAL model B+ with 96k RAM.
-        PAL B+128K     - emulate a PAL model B+ with 128k RAM.
-        PAL Master 128 - emulate a PAL Master 128.
-        PAL Master Compact - emulate a Master Compact
-        ARM Evaluation System - emulate a PAL Master 128 with an ARM attached.
+        Model A         - emulate a model A.
+        Model B         - emulate a model B.
+        Model B w/SWRAM - emulate a model B with sideways RAM.
+        Model B w/1770  - emulate a model B with 1770 FDC
+        NTSC Model B    - emulate an American model B with sideways RAM.
+        Model B+        - emulate a model B+ with 64k RAM.
+        Model B+96K     - emulate a model B+ with 96k RAM.
+        Model B+128K    - emulate a model B+ with 128k RAM.
+        Master 128      - emulate a Master 128.
+        Master Compact  - emulate a Master Compact
+        ARM Evaluation System - emulate a Master 128 with an ARM attached.
 
 Disc :
         Load drive 0/2 - load a disc into drives 0 and 2.
@@ -159,8 +157,6 @@ Video :
         Video mode  - select a video mode. 400x300 is by far the fastest, and
                       800x600 with 2xSaI the slowest. 400x300 does not work
                       correctly on some machine though.
-        Fullscreen  - switches to fullscreen display
-        Windowed    - switches to windowed display
         Blur filter - enable a blurring filter. Can make games with hi-res
                       dithering look better.
         Monochrome  - disables colour.
@@ -185,8 +181,8 @@ FAQ :
 Q : How do I run a game?
 A : If you have a disc image (.ssd, .dsd, .img etc) load it through the disc
     menu, then hold SHIFT and tap F12.
-    If you have a tape image (.uef) load it through the tape menu, ensure
-    that 'tape enable' is ticked, then type the following commands :
+    If you have a tape image (.uef, .csw) load it through the tape menu,
+    ensure that 'tape enable' is ticked, then type the following commands :
     *TAPE
     PAGE=&E00
     CHAIN""
@@ -278,8 +274,8 @@ b-em@bbcmicro.com
 
 <plug>
 Also check out Elkulator (elkulator.acornelectron.co.uk), my Electron emulator,
-and Arculator (b-em.bbcmicro.com/arculator), my A3xx/A4xx/A3000/A540 emulator.
-Also possibly soon, RPCemu, my RiscPC/A7000 emulator.
+Arculator (b-em.bbcmicro.com/arculator), my Archimedes emulator, and RPCemu
+(same as Arculator), my RiscPC/A7000 emulator.
 </plug>
 
 
@@ -316,12 +312,13 @@ than the serial cable (as you won't have to search for a DIN-5 plug), and the
 transfer rates faster.
 
 
-Connecting a BBC drive to a PC
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Connecting a 5.25" drive to a PC
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-I shall be attempting this soon. Apparently, many PC disc controllers can't
-read single density discs (ie DFS ones), but if yours can, you can use FDC or
-Anadisk to read them.
+Apparently, many PC disc controllers can't read single density discs (ie DFS
+ones), but if yours can, you can use FDC or Anadisk to read them. Omnidisk
+seems to be more compatible with single density than the others, so give that
+a try.
 
 
 Cassette
@@ -346,8 +343,6 @@ If you don't want to mess about with soldering iron, you can use the
 Archimedes (or RISC PC), and a BBC disc drive and adapter, to copy the files
 off BBC disc onto PC disc. However, you may have to end up doing this at your
 nearest school, and you might have to actually *buy* a disc drive and adapter.
-Also, as I have discovered, some disc drives seem to be incompatible with at
-least the RiscPC.
 
 
 The Internet

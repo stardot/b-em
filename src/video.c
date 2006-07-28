@@ -1,4 +1,4 @@
-/*B-em 1.1 by Tom Walker*/
+/*B-em 1.2 by Tom Walker*/
 /*Video emulation*/
 
 #include <stdio.h>
@@ -873,6 +873,7 @@ void drawline(int line6502)
                                         blit(buffer,screen,firstx,firstline,firstx,firstline-16,lastx-firstx,lastline-firstline);
                                 }
                         }
+//                        textprintf(screen,font,0,0,makecol(255,255,255),"%04X %i  ",pc,motor);
                         if (drawfull)
                            drawfull--;
                 }

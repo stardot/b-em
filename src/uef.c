@@ -1,9 +1,10 @@
-/*B-em 1.1 by Tom Walker*/
+/*B-em 1.2 by Tom Walker*/
 /*UEF handling (including HQ-UEF support)*/
 
 #include <allegro.h>
 #include <zlib.h>
 #include <stdio.h>
+#include "b-em.h"
 
 int startchunk;
 int blocks=0;
@@ -14,6 +15,7 @@ gzFile *uef;
 int inchunk=0,chunkid=0,chunklen=0;
 int chunkpos=0,chunkdatabits=8;
 float chunkf;
+int cswena;
 
 void openuef(char *fn)
 {
@@ -28,6 +30,7 @@ void openuef(char *fn)
       tapellatch=(1000000/(1200/10))/64;
       tapelcount=0;
       pps=120;
+      cswena=0;
 }
 
 void rewindit()
@@ -68,7 +71,7 @@ void polltape()
                 }
                 inchunk=1;
                 chunkpos=0;
-//                printf("Chunk ID %04X len %i\n",chunkid,chunklen);
+                printf("Chunk ID %04X len %i\n",chunkid,chunklen);
         }
 //        else
 //           printf("Chunk %04X\n",chunkid);

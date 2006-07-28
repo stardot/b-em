@@ -1,4 +1,4 @@
-/*B-em 1.1 by Tom Walker*/
+/*B-em 1.2 by Tom Walker*/
 /*6850 acia emulation*/
 
 #include <stdio.h>
@@ -8,6 +8,9 @@
 
 #define DCD     4
 #define RECIEVE 1
+
+char err2[256];
+FILE *cswlog;
 
 int dreg=0;
 int cleardcd=0;
@@ -41,17 +44,21 @@ unsigned char readacia(unsigned short addr)
 {
         char s[80];
         unsigned char temp;
+//        if (!cswlog) cswlog=fopen("cswlog.txt","wt");
         if (addr&1)
         {
                 aciasr&=~0x81;
                 updateaciaint();
                 temp=aciadr;
-//                printf("Read data %02X\n",temp);
+//                printf("Read data %02X %04X\n",temp,pc);
+//                sprintf(err2,"Read data %02X\n",temp);
+//                fputs(err2,cswlog);
                 return temp;
         }
         else
         {
-//                printf("Read status %02X\n",aciasr);
+//                sprintf(err2,"Read status %02X\n",aciasr);
+//                fputs(err2,cswlog);
                 return (aciasr&0x7F)|(aciasr&aciacr&0x80);
         }
 }
@@ -74,6 +81,7 @@ void writeacia(unsigned short addr, unsigned char val)
 
 void dcd()
 {
+        if (aciasr&DCD) return;
         aciasr|=DCD|0x80;
         updateaciaint();
 }
@@ -89,11 +97,20 @@ void receive(unsigned char val) /*Called when the acia recives some data*/
         aciadr=val;
         aciasr|=RECIEVE|0x80;
         updateaciaint();
-//        printf("Recieved %02X\n",val);
+//        printf("Recieved %02X %04X   ",val,pc);
+//        sprintf(err2,"Recieved %02X\n",val);
+//        fputs(err2,cswlog);
 }
 
+int cswena;
 void pollacia()
 {
+        int c;
         if (motor)
-           polltape();
+        {
+                if (cswena) pollcsw();
+                else        polltape();
+//                for (c=0;c<2;c++) pollcsw();
+        }
+//           polltape();
 }

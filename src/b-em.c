@@ -1,4 +1,4 @@
-/*B-em 1.1 by Tom Walker*/
+/*B-em 1.2 by Tom Walker*/
 /*Main loop*/
 
 #include <stdio.h>
@@ -130,8 +130,8 @@ void makemenu()
         hpop=CreateMenu();
         AppendMenu(hpop,MF_STRING,IDM_MODEL_PALA,"Model &A");
         AppendMenu(hpop,MF_STRING,IDM_MODEL_PALB,"Model &B");
-        AppendMenu(hpop,MF_STRING,IDM_MODEL_PALBSW,"Model B + &SWRAM");
-        AppendMenu(hpop,MF_STRING,IDM_MODEL_B1770,"Model B + &1770");
+        AppendMenu(hpop,MF_STRING,IDM_MODEL_PALBSW,"Model B w/&SWRAM");
+        AppendMenu(hpop,MF_STRING,IDM_MODEL_B1770,"Model B w/&1770");
         AppendMenu(hpop,MF_STRING,IDM_MODEL_NTSCB,"&NTSC B");
         AppendMenu(hpop,MF_STRING,IDM_MODEL_PALB64,"B&+");
         AppendMenu(hpop,MF_STRING,IDM_MODEL_PALB96,"B+&96K");
@@ -262,7 +262,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
                     int nFunsterStil)
 {
         unsigned short *p;
-        int resetting=0;
+        int resetting=0,c;
         char s[160];
         MSG messages;            /* Here messages to the application are saved */
 //        spdlog=fopen("spdlog.txt","wt");
@@ -296,7 +296,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         ghwnd = CreateWindowEx (
            0,                   /* Extended possibilites for variation */
            szClassName,         /* Classname */
-           "B-em v1.1",         /* Title Text */
+           "B-em v1.2",         /* Title Text */
            WS_OVERLAPPEDWINDOW&~(WS_MAXIMIZEBOX|WS_SIZEBOX), /* default window */
            CW_USEDEFAULT,       /* Windows decides the position */
            CW_USEDEFAULT,       /* where the window ends up on the screen */
@@ -341,7 +341,21 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
 //        tubeinit6502();
 //        tubeinitz80();
         loaddiscsamps();
-        openuef(uefname);
+                                for (c=(strlen(uefname)-1);c>0;c--)
+                                {
+                                        if (uefname[c]=='.')
+                                        {
+                                                c++;
+                                                break;
+                                        }
+                                }
+  //                              rpclog("Loading %s %c\n",uefname,uefname[c]);
+                                if (uefname[c]=='u'||uefname[c]=='U')
+                                   openuef(uefname);
+                                else if (uefname[c]=='c'||uefname[c]=='C')
+                                   opencsw(uefname);
+        c=0;
+//        openuef(uefname);
         if (!uefena && model<3) trapos();
         install_int_ex(update50,MSEC_TO_TIMER(20));
         if (!tube) CheckMenuItem(menu,model+40030,MF_CHECKED);
@@ -382,6 +396,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
 //                        spdcount=1;
                         snline=0;
                 }
+                if (framenum==5) framenum=0;
                 if (infocus && (spdcount || (fasttape && motor)))
                 {
                         exec6502(312,128);
@@ -401,7 +416,9 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
                                 p=(unsigned short *)get_audio_stream_buffer(as);
                                 if (p)
                                 {
-                                        memset(p,0,soundbuflen*2);
+                                        for (c=0;c<soundbuflen;c++)
+                                            p[c]=0x8000;
+//                                        memset(p,0,soundbuflen*2);
                                         free_audio_stream_buffer(as);
                                         framenum=snline=0;
                                 }
@@ -499,11 +516,12 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         save_config();
         allegro_exit();
         savecmos();
-        dumpregs();
+//        dumpregs();
 //        savebuffers();
 //        dumpregs();
         checkdiscchanged(0);
         checkdiscchanged(1);
+//        dumpram();
 /*        dumptuberegs();
         dumptube();
         dumpram2();
@@ -632,6 +650,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                                                 break;
                                         }
                                 }
+                                checkdiscchanged(0);
                                 if ((discname[0][c]=='d'||discname[0][c]=='D')&&(c!=strlen(discname[0])))
                                    load8271dsd(discname[0],0);
                                 else if ((discname[0][c]=='f'||discname[0][c]=='F')&&(c!=strlen(discname[0])))
@@ -668,6 +687,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                                                 break;
                                         }
                                 }
+                                checkdiscchanged(1);
                                 if ((discname[1][c]=='d'||discname[1][c]=='D')&&(c!=strlen(discname[1])))
                                    load8271dsd(discname[1],1);
                                 else if ((discname[0][c]=='f'||discname[0][c]=='F')&&(c!=strlen(discname[0])))
@@ -684,8 +704,23 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         updatemenu();
                         return 0;
                         case IDM_TAPE_CHANGE:
-                        if (!getfn(hwnd,"UEF Tape Image (*.UEF)\0*.UEF\0All\0*.*\0\0",uefname,0,"UEF"))
-                           openuef(uefname);
+                        if (!getfn(hwnd,"Tape Image (*.UEF,*.CSW)\0*.UEF;*.CSW\0All\0*.*\0\0",uefname,0,"UEF"))
+                        {
+                                for (c=(strlen(uefname)-1);c>0;c--)
+                                {
+                                        if (uefname[c]=='.')
+                                        {
+                                                c++;
+                                                break;
+                                        }
+                                }
+//                                rpclog("Loading %s %c\n",uefname,uefname[c]);
+                                if (uefname[c]=='u'||uefname[c]=='U')
+                                   openuef(uefname);
+                                else if (uefname[c]=='c'||uefname[c]=='C')
+                                   opencsw(uefname);
+                        }
+//                           openuef(uefname);
                         return 0;
                         case IDM_TAPE_REWIND:
                         rewindit();

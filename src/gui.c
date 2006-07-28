@@ -1,5 +1,5 @@
-/*B-em 1.1 by Tom Walker*/
-/*GUI*/
+/*B-em 1.2 by Tom Walker*/
+/*Fullscreen GUI*/
 
 #include <stdio.h>
 #include <allegro.h>
@@ -268,14 +268,23 @@ MENU tapemenu[5];
 int changetape()
 {
         char tempname[260];
-        int ret;
+        int ret,c;
         int xsize=(hires)?768:384,ysize=(hires)?384:192;
         memcpy(tempname,uefname,260);
-        ret=file_select_ex("Please choose a tape image",tempname,"UEF",260,xsize,ysize);
+        ret=file_select_ex("Please choose a tape image",tempname,"UEF;CSW",260,xsize,ysize);
         if (ret)
         {
                 memcpy(uefname,tempname,260);
-                openuef(uefname);
+                for (c=(strlen(uefname)-1);c>0;c--)
+                {
+                        if (uefname[c]=='.')
+                        {
+                                c++;
+                                break;
+                        }
+                }
+                if (uefname[c]=='c' || uefname[c]=='C') opencsw(uefname);
+                else                                    openuef(uefname);
         }
         return D_EXIT;
 }
@@ -496,8 +505,8 @@ MENU modelmenu[]=
 {
         {"Model A",mpala,NULL,NULL,NULL},
         {"Model B",mpalb,NULL,NULL,NULL},
-        {"Model B + SWRAM",mpalbsw,NULL,NULL,NULL},
-        {"Model B + 1770",mpalb1770,NULL,NULL,NULL},
+        {"Model B w/SWRAM",mpalbsw,NULL,NULL,NULL},
+        {"Model B w/1770",mpalb1770,NULL,NULL,NULL},
         {"NTSC Model B",mntscb,NULL,NULL,NULL},
         {"Model B+",mpalbp,NULL,NULL,NULL},
         {"Model B+96K",mpalbp96,NULL,NULL,NULL},
@@ -782,7 +791,7 @@ MENU mainmenu[]=
 
 DIALOG bemgui[]=
 {
-      {d_ctext_proc, 200, 260, 0,  0, 15,0,0,0,     0,0,"B-em v1.0"},
+      {d_ctext_proc, 200, 260, 0,  0, 15,0,0,0,     0,0,"B-em v1.2"},
       {d_menu_proc,  0,   0,   0,  0, 15,0,0,0,     0,0,mainmenu},
           {d_yield_proc},
       {0,0,0,0,0,0,0,0,0,0,0,NULL,NULL,NULL}

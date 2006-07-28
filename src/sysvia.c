@@ -1,10 +1,23 @@
-/*B-em 1.1 by Tom Walker*/
+/*B-em 1.2 by Tom Walker*/
 /*System VIA emulation*/
 
 unsigned short pc;
 #include <allegro.h>
 #include <stdio.h>
 #include "b-em.h"
+
+FILE *arclog;
+void rpclog(const char *format, ...)
+{
+   char buf[256];
+   return;
+        if (!arclog) arclog=fopen("e:\\devcpp\\b-em8\\arclog.txt","wt");
+   va_list ap;
+   va_start(ap, format);
+   vsprintf(buf, format, ap);
+   va_end(ap);
+   fputs(buf,arclog);
+}
 
 char exname[512];
 void updatekeyboard();
@@ -41,6 +54,7 @@ void dumpram2()
 int model;
 void updatesysIFR()
 {
+//        if (output) printf("Update IFR %02X %02X %i\n",sysvia.ifr,sysvia.ier,sysvia.t1c);
         if ((sysvia.ifr&0x7F)&(sysvia.ier&0x7F))
         {
                 sysvia.ifr|=0x80;
@@ -56,12 +70,15 @@ void updatesysIFR()
 int lns;
 void updatesystimers()
 {
-        if (sysvia.t1c<-4)
+//        if (output) printf("IFR start %02X\n",sysvia.ifr);
+        if (sysvia.t1c<-3)
         {
-                sysvia.t1c+=sysvia.t1l+4;
-//                printf("Timer 1 reset line %i %04X %04X\n",lns,sysvia.t1c,sysvia.t1l);
+                while (sysvia.t1c<-3)
+                      sysvia.t1c+=sysvia.t1l+4;
+//                if (output) rpclog("Timer 1 reset line %i %04X %04X %i\n",lns,sysvia.t1c,sysvia.t1l,sysvia.t1hit);
                 if (!sysvia.t1hit)
                 {
+//                        if (output) printf("TIMER INTERRUPT\n");
                        sysvia.ifr|=TIMER1INT;
                        updatesysIFR();
                 }
@@ -70,17 +87,20 @@ void updatesystimers()
         }
         if (!(sysvia.acr&0x20)/* && !sysvia.t2hit*/)
         {
-                if (sysvia.t2c<-4)
+                if (sysvia.t2c<-3)
                 {
 //                        sysvia.t2c+=sysvia.t2l+4;
                         if (!sysvia.t2hit)
                         {
+//                                if (y==0x8F)
+//                                   rpclog("Timer 2 reset line %i %04X %04X\n",lns,sysvia.t2c,sysvia.t2l);
                                 sysvia.ifr|=TIMER2INT;
                                 updatesysIFR();
                         }
                         sysvia.t2hit=1;
                 }
         }
+//        if (output) printf("IFR end %02X\n",sysvia.ifr);
 }
 
 void vblankint()
@@ -179,6 +199,7 @@ void writedatabus(unsigned char val)
 
 void writesysvia(unsigned short addr, unsigned char val, int line)
 {
+//        if (y==0x8F) rpclog("Write %04X %02X %04X %i\n",addr,val,pc,sysvia.t2c);
 //        if (addr==0xFE40) printf("FE40 write %02X\n",val);
         switch (addr&0xF)
         {
@@ -239,19 +260,28 @@ void writesysvia(unsigned short addr, unsigned char val, int line)
                 case T1CH:
                 sysvia.t1l&=0x1FE;
                 sysvia.t1l|=(val<<9);
-                sysvia.t1c=sysvia.t1l;
+//                if (sysvia.t1c<1) printf("ST1 reload %i\n",sysvia.t1c);
+                sysvia.t1c=sysvia.t1l+1;
                 sysvia.ifr&=~TIMER1INT;
                 updatesysIFR();
                 sysvia.t1hit=0;
+//                rpclog("Timer reloaded - c %i\n",sysvia.t1c);
                 break;
                 case T2CL:
                 sysvia.t2l&=0x1FE00;
                 sysvia.t2l|=(val<<1);
                 break;
                 case T2CH:
+                if (sysvia.t2c==-3 && (sysvia.ier&TIMER2INT) && !(sysvia.ifr&TIMER2INT))
+                {
+                        interrupt|=128;
+//                        rpclog("Timer 2 extra interrupt\n");
+                }
+//                if (output) rpclog("Write T2CH %i\n",sysvia.t2c);
                 sysvia.t2l&=0x1FE;
                 sysvia.t2l|=(val<<9);
-                sysvia.t2c=sysvia.t2l;
+//                if (sysvia.t2c<1) printf("ST2 reload %i\n",sysvia.t2c);
+                sysvia.t2c=sysvia.t2l+1;
                 sysvia.ifr&=~TIMER2INT;
                 updatesysIFR();
                 sysvia.t2hit=0;
@@ -277,6 +307,7 @@ unsigned char readsysvia(unsigned short addr)
 {
         unsigned char temp;
         addr&=0xF;
+//        if (y==0x8F) rpclog("Read %04X %04X\n",addr,pc);
 //        if (addr>=4 && addr<=9) printf("Read %04X\n",addr);
         switch (addr&0xF)
         {
@@ -324,21 +355,25 @@ unsigned char readsysvia(unsigned short addr)
                 case T1LH:
                 return sysvia.t1l>>9;
                 case T1CL:
+//                rpclog("Read t1l %05X %i\n",sysvia.t1c,sysvia.t1c);
                 sysvia.ifr&=~TIMER1INT;
                 updatesysIFR();
-                if (sysvia.t1c<0) return 0xFF;
-                return ((sysvia.t1c+2)>>1)&0xFF;
+                if (sysvia.t1c<-1) return 0xFF;
+                return ((sysvia.t1c+1)>>1)&0xFF;
                 case T1CH:
-                if (sysvia.t1c<0) return 0xFF;
-                return ((sysvia.t1c+2)>>1)>>8;
+//                rpclog("Read t1h %05X %i\n",sysvia.t1c,sysvia.t1c);
+                if (sysvia.t1c<-1) return 0xFF;
+                return ((sysvia.t1c+1)>>1)>>8;
                 case T2CL:
                 sysvia.ifr&=~TIMER2INT;
                 updatesysIFR();
 //                if (sysvia.t2c<0) return 0xFF;
-                return ((sysvia.t2c+2)>>1)&0xFF;
+                if (sysvia.acr&0x20) return (sysvia.t2c>>1)&0xFF;
+                return ((sysvia.t2c+1)>>1)&0xFF;
                 case T2CH:
 //                if (sysvia.t2c<0) return 0xFF;
-                return ((sysvia.t2c+2)>>1)>>8;
+                if (sysvia.acr&0x20) return (sysvia.t2c>>1)>>8;
+                return ((sysvia.t2c+1)>>1)>>8;
                 case ACR:
                 return sysvia.acr;
                 case PCR:

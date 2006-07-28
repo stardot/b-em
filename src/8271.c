@@ -1,4 +1,4 @@
-/*B-em 1.1 by Tom Walker*/
+/*B-em 1.2 by Tom Walker*/
 /*8271 FDC emulation*/
 
 #include <stdio.h>

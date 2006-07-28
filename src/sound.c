@@ -1,4 +1,4 @@
-/*B-em 1.1 by Tom Walker*/
+/*B-em 1.2 by Tom Walker*/
 /*Sound emulation*/
 
 #define NOISEBUFFER 32768

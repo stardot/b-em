@@ -1,4 +1,4 @@
-/*B-em 1.1 by Tom Walker*/
+/*B-em 1.2 by Tom Walker*/
 /*User VIA emulation*/
 
 #include <stdio.h>
@@ -52,10 +52,11 @@ int timerout=1;
 int lns;
 void updateusertimers()
 {
-        if (uservia.t1c<-4)
+        if (uservia.t1c<-3)
         {
-                uservia.t1c+=uservia.t1l+4;
-//                printf("Timer 1 reset line %i %04X %04X\n",lns,uservia.t1c,pc);
+                while (uservia.t1c<-3)
+                      uservia.t1c+=uservia.t1l+4;
+//                rpclog("User Timer 1 reset line %04X %04X %04X\n",uservia.t1c,uservia.t1l,pc);
                 t1back=uservia.t1c;
                 if (!uservia.t1hit)
                 {
@@ -74,10 +75,10 @@ void updateusertimers()
         }
         if (!(uservia.acr&0x20)/* && !uservia.t2hit*/)
         {
-                if (uservia.t2c<-4 && !uservia.t2hit)
+                if (uservia.t2c<-3 && !uservia.t2hit)
                 {
 //                        uservia.t2c+=uservia.t2l+4;
-//                        printf("Timer 2 reset %05X %05X %04X\n",uservia.t2c,uservia.t2l,pc);
+//                        rpclog("User Timer 2 reset %05X %05X %04X\n",uservia.t2c,uservia.t2l,pc);
                         if (!uservia.t2hit)
                         {
                                 uservia.ifr|=TIMER2INT;
@@ -91,7 +92,7 @@ void updateusertimers()
 
 void writeuservia(unsigned short addr, unsigned char val, int line)
 {
-//        printf("User VIA write %04X %02X %04X\n",addr,val,pc);
+//        rpclog("User VIA write %04X %02X %04X\n",addr,val,pc);
         switch (addr&0xF)
         {
                 case ORA:
@@ -142,8 +143,9 @@ void writeuservia(unsigned short addr, unsigned char val, int line)
 //                printf("T1CH write %02X at %04X %i\n",val,pc,lns);
                 uservia.t1l&=0x1FE;
                 uservia.t1l|=(val<<9);
+//                if (uservia.t1c<1) printf("UT1 reload %i\n",uservia.t1c);
 //                printf("T1 l now %05X\n",uservia.t1l);
-                uservia.t1c=uservia.t1l;
+                uservia.t1c=uservia.t1l+1;
                 uservia.ifr&=~TIMER1INT;
                 updateuserIFR();
                 uservia.t1hit=0;
@@ -153,10 +155,18 @@ void writeuservia(unsigned short addr, unsigned char val, int line)
                 uservia.t2l|=(val<<1);
 //                printf("T2CL=%02X at line %i\n",val,line);
                 break;
-                case T2CH:
+                case T2CH:  // && !(uservia.ifr&TIMER2INT))
+                if ((uservia.t2c==-3 && (uservia.ier&TIMER2INT)) ||
+                    (uservia.ifr&uservia.ier&TIMER2INT))
+                {
+                        interrupt|=128;
+//                        rpclog("uTimer 2 extra interrupt\n");
+                }
+//                if (output) rpclog("Write uT2CH %i\n",uservia.t2c);
                 uservia.t2l&=0x1FE;
                 uservia.t2l|=(val<<9);
-                uservia.t2c=uservia.t2l;
+//                if (uservia.t2c<1) printf("UT2 reload %i\n",uservia.t2c);
+                uservia.t2c=uservia.t2l+1;
                 uservia.ifr&=~TIMER2INT;
                 updateuserIFR();
                 uservia.t2hit=0;
@@ -189,7 +199,7 @@ unsigned char readuservia(unsigned short addr)
         unsigned char temp;
         addr&=0xF;
 //        if (addr>=4 && addr<=9) printf("Read U %04X %04X\n",addr,pc);
-//        printf("Read user VIA %04X %04X\n",addr,pc);
+//        rpclog("Read user VIA %04X %04X\n",addr,pc);
         switch (addr&0xF)
         {
                 case ORA:
@@ -221,7 +231,7 @@ unsigned char readuservia(unsigned short addr)
                 case DDRB:
                 return uservia.ddrb;
                 case T1LL:
-//                printf("Read T1LL %02X\n",(uservia.t1l&0x1FE)>>1);
+//                printf("Read T1LL %02X %04X\n",(uservia.t1l&0x1FE)>>1,uservia.t1l);
                 return (uservia.t1l&0x1FE)>>1;
                 case T1LH:
 //                printf("Read T1LH %02X\n",uservia.t1l>>9);
@@ -229,24 +239,24 @@ unsigned char readuservia(unsigned short addr)
                 case T1CL:
                 uservia.ifr&=~TIMER1INT;
                 updateuserIFR();
-//                printf("Read T1CL %02X\n",((uservia.t1c+2)>>1)&0xFF);
-                if (uservia.t1c<0) return 0xFF;
-                return ((uservia.t1c+2)>>1)&0xFF;
+//                printf("Read T1CL %02X %i %08X\n",((uservia.t1c+2)>>1)&0xFF,uservia.t1c,uservia.t1c);
+                if (uservia.t1c<-1) return 0xFF;
+                return ((uservia.t1c+1)>>1)&0xFF;
                 case T1CH:
 //                printf("Read T1CH %02X\n",((uservia.t1c+2)>>1)>>8);
-                if (uservia.t1c<0) return 0xFF;
-                return ((uservia.t1c+2)>>1)>>8;
+                if (uservia.t1c<-1) return 0xFF;
+                return (uservia.t1c+1)>>9;
                 case T2CL:
                 uservia.ifr&=~TIMER2INT;
                 updateuserIFR();
 //                printf("Read T2CL %02X\n",((uservia.t2c+2)>>1)&0xFF);
 //                if (uservia.t2c<0) return 0xFF;
-                return ((uservia.t2c+2)>>1)&0xFF;
+                return ((uservia.t2c+1)>>1)&0xFF;
                 case T2CH:
 //                printf("Read T2CH %02X\n",((uservia.t2c+2)>>1)>>8);
 //                printf("T2CH read %05X %04X %02X %04X %i %02X\n",uservia.t2c,uservia.t2c>>1,uservia.t2c>>9,pc,p.i,a);
 //                if (uservia.t2c<0) return 0xFF;
-                return (uservia.t2c+2)>>9;
+                return (uservia.t2c+1)>>9;
                 case ACR:
                 return uservia.acr;
                 case PCR:

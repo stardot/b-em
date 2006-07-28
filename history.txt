@@ -377,3 +377,12 @@ Version 1.0 finalised and released
            Optimisations to inner drawing loop.
 04/04/06 - Now only blits active areas of screen.
 01/05/06 - Added more commands to 1770 FDC - Watford DDFS now works.
+Version 1.1 finalised and released
+17/06/06 - Added CSW support
+04/07/06 - Fixed timing in VIAs, more protection stuff works.
+05/07/06 - Improved CSW support
+20/07/06 - More timing improvements.
+24/07/06 - Added support for ZDFS (E00)
+27/07/06 - More timing improvements, Nightshade now works!
+28/07/06 - Tidied up various issues. CSW now same speed as UEF.
+Version 1.2 finalised and released

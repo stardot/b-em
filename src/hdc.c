@@ -1,4 +1,4 @@
-/*B-em 1.1 by Tom Walker*/
+/*B-em 1.2 by Tom Walker*/
 /*This code currently doesn't do anything.
   It is the beginnings of SASI hard disc emulation
   but due to lack of docs is not completed or working*/

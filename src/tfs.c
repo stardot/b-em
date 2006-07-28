@@ -1,4 +1,4 @@
-/*B-em 1.1 by Tom Walker*/
+/*B-em 1.2 by Tom Walker*/
 /*TFS - tape filing system*/
 
 #include <string.h>
@@ -99,6 +99,7 @@ int loadfile(char *fn, char *fn2)
         if (chdir("inf"))
         {
                 perror("inf");
+                printf("File error\n");
                 exit(-1);
         }
         strcat(fn2,".inf");
@@ -127,6 +128,7 @@ int loadfile(char *fn, char *fn2)
                         if (chdir(".."))
                         {
                                 perror("..");
+                                printf("file not found\n");
                                 exit(-1);
                         }
                         return -1;
@@ -140,6 +142,7 @@ int loadfile(char *fn, char *fn2)
                 if (chdir(".."))
                 {
                         perror("..");
+                        printf("file really not found\n");
                         exit(-1);
                 }
                 return 0;
@@ -166,6 +169,7 @@ int loadfile(char *fn, char *fn2)
                                 if (chdir(".."))
                                 {
                                         perror("..");
+                                        printf("xbeeb file not found\n");
                                         exit(-1);
                                 }
                                 return 0;
@@ -180,6 +184,7 @@ int loadfile(char *fn, char *fn2)
                 if (chdir(".."))
                 {
                         perror("..");
+                        printf("even more file not found\n");
                         exit(-1);
                 }
                 return -1;
@@ -187,6 +192,7 @@ int loadfile(char *fn, char *fn2)
         if (chdir(".."))
         {
                 perror("..");
+                printf("Blarg\n");
                 exit(-1);
         }
         return 0;
@@ -199,6 +205,7 @@ void savefile(char fname[16],char fname2[16],int start,int end)
         if (chdir("inf"))
         {
                 perror("inf");
+                printf("save file error\n");
                 exit(-1);
         }
         strcat(fname2,".inf");
@@ -212,6 +219,7 @@ void savefile(char fname[16],char fname2[16],int start,int end)
         if (chdir(".."))
         {
                 perror("..");
+                printf("save file error 2\n");
                 exit(-1);
         }
 }
