@@ -1,4 +1,4 @@
-/*B-em 1.2 by Tom Walker*/
+/*B-em 1.3 by Tom Walker*/
 /*Sound emulation*/
 
 #define NOISEBUFFER 32768
@@ -91,19 +91,22 @@ static signed char snperiodic[2][NOISEBUFFER];
 static signed char snperiodic2[32] =
 {
       -127,-127,127,127,127,127,127,127,127,127,127,127,127,127,127,127,
-      127,127,127,127,127,127,127,127,127,127,127,127,127,127,127,127
+       127, 127,127,127,127,127,127,127,127,127,127,127,127,127,127,127
 };
 
 static unsigned char snnoises[NOISEBUFFER];
 
 fixed sncount[4],snlatch[4],snstat[4];
 int sntone[4];
-int snvols[3120][4],snnoise2[3120];
-fixed snlatchs[3120][4];
-int snline;
+int snvols[3125<<1][4],snnoise2[3125<<1];
+fixed snlatchs[3125<<1][4];
+int snline=0,snlinec=0;
 
 void logvols()
 {
+        int c;
+        for (c=0;c<2;c++)
+        {
         snvols[snline][0]=snvol[0];
         snvols[snline][1]=snvol[1];
         snvols[snline][2]=snvol[2];
@@ -114,7 +117,28 @@ void logvols()
         snlatchs[snline][3]=snlatch[3];
         snnoise2[snline]=snnoise;
         snline++;
-        if (snline>=(soundbuflen>>1)) snline=0;
+  //      rpclog("Log %i\n",snline);
+        }
+//        return;
+//        if (snline>=(soundbuflen>>1)) snline=0;
+        snlinec++;
+        if (snlinec==312)
+        {
+                snvols[snline][0]=snvol[0];
+                snvols[snline][1]=snvol[1];
+                snvols[snline][2]=snvol[2];
+                snvols[snline][3]=snvol[3];
+                snlatchs[snline][0]=snlatch[0];
+                snlatchs[snline][1]=snlatch[1];
+                snlatchs[snline][2]=snlatch[2];
+                snlatchs[snline][3]=snlatch[3];
+                snnoise2[snline]=snnoise;
+                snlinec=0;
+                snline++;
+//        rpclog("Log2 %i\n",snline);
+        }
+        if (snline>=3125) snline=0;
+//        rpclog("SNline now %i\n",snline);
 }
 
 void drawsound(BITMAP *b)
@@ -133,37 +157,55 @@ void updatebuffer(signed short *buffer, int len)
         float tempf,tempf2;
         unsigned short *sbuf=buffer;
         int sidcount=0;
+        int lcount=0;
+//        rpclog("update\n");
         for (d=0;d<len;d++)
         {
+//                rpclog("Update pos %i %i\n",d,len);
 //                printf("Latch : %i %i %i\n",snlatch[1],snlatch[2],snlatch[3]);
+/*                lcount++;
+                if (lcount==625)
+                {
+                        lcount=0;
+                        buffer[d]=buffer[d-1];
+                }
+                else
+                {*/
                 buffer[d]=0;
                 for (c=0;c<3;c++)
                 {
                         c++;
-                        if (snlatchs[d>>1][c]>256) buffer[d]+=(snwaves[curwave][snstat[c]]*volslog[snvols[d>>1][c]]);
-                        else                       buffer[d]+=volslog[snvols[d>>1][c]]*128;
+                        if (snlatchs[d][c]>256) buffer[d]+=(snwaves[curwave][snstat[c]]*volslog[snvols[d][c]]);
+                        else                    buffer[d]+=volslog[snvols[d][c]]*128;
                         sncount[c]-=8192;
-                        while ((int)sncount[c]<0)
+                        while ((int)sncount[c]<0  && snlatchs[d][c])
                         {
-                                sncount[c]+=snlatchs[d>>1][c];
+                                sncount[c]+=snlatchs[d][c];
                                 snstat[c]++;
                                 snstat[c]&=31;
                         }
                         c--;
                 }
-                if (!(snnoise2[d>>1]&4))
+                if (!(snnoise2[d]&4))
                 {
-                        if (curwave==4) buffer[d]+=(snperiodic[1][snstat[0]&31]*volslog[snvols[d>>1][0]]);
-                        else            buffer[d]+=(snperiodic[0][snstat[0]]*volslog[snvols[d>>1][0]]);
+                        if (curwave==4) buffer[d]+=(snperiodic[1][snstat[0]&31]*volslog[snvols[d][0]]);
+                        else            buffer[d]+=(snperiodic[0][snstat[0]]*volslog[snvols[d][0]]);
                 }
-                else              buffer[d]+=(snnoises[snstat[0]]*volslog[snvols[d>>1][0]]);
+                else              buffer[d]+=(snnoises[snstat[0]]*volslog[snvols[d][0]]);
                 sncount[0]-=512;
-                while ((int)sncount[0]<0)
+                while ((int)sncount[0]<0 && snlatchs[d][0])
                 {
-                        sncount[0]+=snlatchs[d>>1][0];
+                        sncount[0]+=snlatchs[d][0];
                         snstat[0]++;
-                        snstat[0]&=32767;
+//                        if (snstat[0]==30) snstat[0]=0;
+//                        snstat[0]&=32767;
                 }
+                if (!(snnoise2[d]&4))
+                {
+                        while (snstat[0]>=30) snstat[0]-=30;
+                }
+                else
+                   snstat[0]&=32767;
                 tempf=tempf2=0;
                 if (soundfilter&1) tempf+=(float)lastbuffer[0]*((float)11/(float)16);
                 if (soundfilter&1) buffer[d]+=tempf;
@@ -189,9 +231,14 @@ void updatebuffer(signed short *buffer, int len)
                         }
                         updaterectwave(rectpos);
                 }
+//                }
         }
-        for (d=0;d<len;d++) sbuf[d]^=0x8000;
-        snline=0;
+        for (d=0;d<len;d++)
+        {
+//                rpclog("Flipping %i %i\n",d,len);
+                sbuf[d]^=0x8000;
+        }
+//        snline=0;
 }
 
 void initsnd()
@@ -223,11 +270,11 @@ void initsnd()
       fclose(f);
       for (c=0;c<NOISEBUFFER;c++)
           snnoises[c]=snnoises[c]*255;
-      for (c=32;c<NOISEBUFFER;c++)
+      for (c=0;c<NOISEBUFFER;c++)
           snperiodic[0][c]=snperiodic2[c&31];
       for (c=0;c<32;c++)
           snwaves[3][c]-=128;
-        as=play_audio_stream(soundbuflen,16,0,31200,255,127);
+        as=play_audio_stream(soundbuflen,16,0,31250,255,127);
                         p=0;
                         while (!p)
                         {

@@ -1,4 +1,4 @@
-/*B-em 1.2 by Tom Walker*/
+/*B-em 1.3 by Tom Walker*/
 /*6502 emulation*/
 
 char exname[512];
@@ -458,7 +458,7 @@ unsigned char writememl(unsigned short addr, unsigned char val)
 }
 
 #define readmem(a) ((memstat[(a)>>8]==2)?readmeml(a):mem[(a)>>8][(a)&0xFF])
-#define writemem(a,b) if (((a)&0xC000)==0x4000 || ((a)==0xCD7)) printf("Write %04X %02X %04X\n",a,b,pc); if (memstat[(a)>>8]==0) mem[(a)>>8][(a)&0xFF]=b; else if (memstat[(a)>>8]==2) writememl(a,b)
+#define writemem(a,b) if (memstat[(a)>>8]==0) mem[(a)>>8][(a)&0xFF]=b; else if (memstat[(a)>>8]==2) writememl(a,b)
 #define getw() (readmem(pc)|(readmem(pc+1)<<8)); pc+=2
 
 void reset6502()
@@ -559,89 +559,7 @@ unsigned char tempb;
                                 }                                   \
                                 a=(al&0xF)|((ah&0xF)<<4);                 \
                         }
-#if 0
-#define ADC(temp)       if (!p.d)                            \
-                        {                                  \
-                                tempw=(a+temp+(p.c?1:0));            \
-                                p.v=(!((a^temp)&0x80)&&((a^tempw)&0x80));  \
-                                a=tempw&0xFF;                  \
-                                p.c=tempw&0x100;                  \
-                                setzn(a);                  \
-                        }                                  \
-                        else                               \
-                        {                                  \
-                                ah=0;        \
-                                temp+=(p.c?1:0);         \
-                                tempb=a+temp;                            \
-                                if (!tempb)                                      \
-                                   p.z=1;                                          \
-                                al=(a&0xF)+(temp&0xF)+(p.c?1:0);                            \
-                                if (al>9)                                        \
-                                {                                                \
-                                        al-=10;                                  \
-                                        al&=0xF;                                 \
-                                        ah=1;                                    \
-                                }                                                \
-                                ah+=((a>>4)+(temp>>4));                             \
-                                if (ah&8) p.n=1;                                   \
-                                p.v=(((ah << 4) ^ a) & 128) && !((a ^ temp) & 128);   \
-                                p.c=0;                                             \
-                                if (ah>9)                                        \
-                                {                                                \
-                                        p.c=1;                                     \
-                                        ah-=10;                                  \
-                                        ah&=0xF;                                 \
-                                }                                                \
-                                a=(al&0xF)|(ah<<4);                              \
-                        }
 
-#define SBC(temp)       if (!p.d)                            \
-                        {                                  \
-                                temp^=0xFF;                \
-                                tempw=(a+temp+(p.c?1:0));   \
-                                p.v=(!((a^temp)&0x80)&&((a^tempw)&0x80));  \
-                                a=tempw&0xFF;                  \
-                                p.c=tempw&0x100;                  \
-                                setzn(a);                  \
-                        }                                  \
-                        else                               \
-                        {                                  \
-                                hc=0;                               \
-                                p.z=p.n=0;                            \
-                                temp+=(p.c?0:1);                     \
-                                if (!(a-temp))            \
-                                   p.z=1;                             \
-                                al=(a&15)-(temp&15);            \
-                                if (al&16)                           \
-                                {                                   \
-                                        al-=6;                      \
-                                        al&=0xF;                    \
-                                        hc=1;                       \
-                                }                                   \
-                                ah=(a>>4)-(temp>>4);                \
-                                if (hc) ah--;                       \
-                                if ((a-temp)&0x80)        \
-                                   p.n=1;                             \
-                                p.v=(((a-(temp))^temp)&128)&&((a^temp)&128); \
-                                p.c=1; \
-                                if (ah&16)                           \
-                                {                                   \
-                                        p.c=0; \
-                                        ah-=6;                      \
-                                        ah&=0xF;                    \
-                                }                                   \
-                                a=(al&0xF)|((ah&0xF)<<4);                 \
-                        }
-#endif
-/*
-                                temp+=(p.c?0:1);          \
-                                tempw=a-temp;    \
-                                tempv=(short)a-(short)temp;            \
-                                p.v=((a^temp)&(a^(unsigned char)tempv)&0x80); \
-                                p.c=tempv>=0;\
-                                a=tempw&0xFF;              \
-                                setzn(a);                  \
-*/
 int inA=0;
 
 void shadowram(int stat)
@@ -688,9 +606,9 @@ void exec6502(int lines, int cpl)
                    cycles+=cpl;
                 while (cycles>0)
                 {
-/*                        pc3=oldoldpc;
+                        pc3=oldoldpc;
                         oldoldpc=oldpc;
-                        oldpc=pc;*/
+                        oldpc=pc;
                         if (skipint==1) skipint=0;
 //                        curcyc=0;
                         if (model>4 && vidbank)
@@ -703,7 +621,7 @@ void exec6502(int lines, int cpl)
                         switch (opcode)
                         {
                                 case 0x00: /*BRK*/
-//                                printf("BRK! %04X\n",pc);
+//                                rpclog("BRK! %04X %04X %04X %04X  %02X %c %c %c %c %c %c\n",pc,oldpc,oldoldpc,pc3,ram[pc],ram[pc+1],ram[pc+2],ram[pc+3],ram[pc+4],ram[pc+5],ram[pc+6]);
                                 pc++;
                                 push(pc>>8);
                                 push(pc&0xFF);
@@ -2298,7 +2216,7 @@ void exec6502(int lines, int cpl)
 //                        if (pc==0xDC5D) output=0;
 //                        if (output)
 //                        {
-//                                rpclog("%i A=%02X X=%02X Y=%02X S=%02X PC=%04X %c%c%c%c%c%c op=%02X %i  %04X %i %04X %i %04X  %04X %i %04X %i  %02X %02X\n",takeint,a,x,y,s,pc,(p.n)?'N':' ',(p.v)?'V':' ',(p.d)?'D':' ',(p.i)?'I':' ',(p.z)?'Z':' ',(p.c)?'C':' ',opcode,cycles,sysvia.t1c>>1,sysvia.t1c,sysvia.t2c>>1,sysvia.t2c,sysvia.t2l,uservia.t1c>>1,uservia.t1c,uservia.t2c>>1,uservia.t2c,sysvia.ifr,uservia.ifr);
+//                                rpclog("%i A=%02X X=%02X Y=%02X S=%02X PC=%04X %c%c%c%c%c%c op=%02X %i  %04X %i %04X %i %04X  %04X %i %04X %i  %02X %02X\n",curtrack[0],a,x,y,s,pc,(p.n)?'N':' ',(p.v)?'V':' ',(p.d)?'D':' ',(p.i)?'I':' ',(p.z)?'Z':' ',(p.c)?'C':' ',opcode,cycles,sysvia.t1c>>1,sysvia.t1c,sysvia.t2c>>1,sysvia.t2c,sysvia.t2l,uservia.t1c>>1,uservia.t1c,uservia.t2c>>1,uservia.t2c,sysvia.ifr,uservia.ifr);
 /*                                if (timetolive)
                                 {
                                         timetolive--;
@@ -2357,6 +2275,7 @@ void exec6502(int lines, int cpl)
 //                                skipint=2;
 //                                printf("skipint=2\n");
 //                        }
+//                                if (pc==0x9FB8) rpclog("9FB8 %04X %04X %04X %04X  %02X %c %c %c %c %c %c\n",pc,oldpc,oldoldpc,pc3,ram[pc],ram[pc+1],ram[pc+2],ram[pc+3],ram[pc+4],ram[pc+5],ram[pc+6]);
                         if (disccount<0)
                         {
                                 disccount+=16;
@@ -2389,7 +2308,7 @@ void exec6502(int lines, int cpl)
                                 }
                         }
                 }
-                logvols(lines);
+                if (lines) logvols(lines);
                 lines--;
                 if (!tapelcount)
                 {
@@ -2404,7 +2323,7 @@ void exec6502(int lines, int cpl)
                         pollacia();
                         acialines=130;
                 }*/
-                if (!(lines&0x7F) && adcconvert && !motor) polladc();
+                if (!(lines&0x7F) && adcconvert && !motor) { polladc(); }
                 if (lines!=-1) drawline(lines);
                 if (tube) exectube();
                 tubecycs=0;

@@ -1,4 +1,4 @@
-/*B-em 1.2 by Tom Walker*/
+/*B-em 1.3 by Tom Walker*/
 /*1770 emulator*/
 #include <allegro.h>
 #include <stdio.h>
@@ -78,7 +78,7 @@ void checkdiscchanged(int disc)
 
 void dumpdisc2()
 {
-        FILE *f=fopen("d:/djgpp/b-em6/disc.ssd","wb");
+/*        FILE *f=fopen("d:/djgpp/b-em6/disc.ssd","wb");
         int c,d,e;
         for (c=0;c<80;c++)
         {
@@ -90,7 +90,7 @@ void dumpdisc2()
                         }
                 }
         }
-        fclose(f);
+        fclose(f);*/
 }
 
 void reset1770()
@@ -99,10 +99,10 @@ void reset1770()
         wd1770.status=0x80;
         discint=0;
         nmi=0;
-        if (driveled && ddnoise)
+        if (driveled)
         {
                 stop_sample(motorsmp);
-//                play_sample(motoroffsmp,127,127,1000,0);
+                play_sample(motoroffsmp,127,127,1000,0);
         }
         motorofff=driveled=0;
 }
@@ -113,12 +113,13 @@ void reset1770s()
         wd1770.status=0x80;
         discint=0;
         nmi=0;
-        if (driveled && ddnoise)
+        if (driveled)
         {
                 stop_sample(motorsmp);
-//                play_sample(motoroffsmp,127,127,1000,0);
+                play_sample(motoroffsmp,127,127,1000,0);
+                driveled=0;
         }
-        motorofff=driveled=0;
+        motorofff=0;
 }
 
 void set1770poll(int c)
@@ -147,17 +148,17 @@ void play1770seek(int target)
         else if (dif<7)
         {
                 play_sample(seeksmp,127,127,1000,0);
-                set1770poll(1400);
+                set1770poll(1000);
         }
         else if (dif<35)
         {
                 play_sample(seek3smp,127,127,1000,0);
-                set1770poll(250000);
+                set1770poll(500000);
         }
         else
         {
                 play_sample(seek2smp,127,127,1000,0);
-                set1770poll(800000);
+                set1770poll(1400000);
         }
 //        printf("dif %i discint %i\n",dif,discint);
 }
@@ -222,13 +223,12 @@ void start1770command(unsigned short addr)
         switch (wd1770.command>>4)
         {
                 case 0: if (ddnoise) play1770seek(0); else set1770poll(2000); break; /*Restore*/
-                case 1: if (ddnoise) play1770seek(wd1770.data); else set1770poll(200); break; /*Seek*/
-                case 5: if (ddnoise) play_sample(stepsmp,127,127,1000,FALSE); set1770poll(100); break; /*Step in*/
+                case 1: if (ddnoise) play1770seek(wd1770.data); else set1770poll(2000); break; /*Seek*/
+                case 5: if (ddnoise) play_sample(stepsmp,127,127,1000,FALSE); set1770poll(2000); break; /*Step in*/
                 case 8: /*Read sector*/
-                case 9: /*Read multiple sectors*/
                 wd1770.status&=~4;
                 if (ddnoise) { play1770seek(wd1770.track); }
-                else { set1770poll(100); }
+                else { set1770poll(2000); }
                 if (fdiin[curdisc])
                 {
 //                        printf("FDI in\n");
@@ -243,13 +243,6 @@ void start1770command(unsigned short addr)
                 idmarks=0;
                 break;
                 case 0xA: wd1770.status&=~4; if (ddnoise) { play1770seek(wd1770.track); } else { set1770poll(2000); } sectorpos=-1; wd1770.curtrack=wd1770.track; wd1770.cursector=wd1770.sector; wd1770.dat=0; break; /*Write sector*/
-                case 0xD: /*Force interrupt*/
-                set1770poll(0);
-                if (wd1770.command&8) nmi|=1;
-                else                  nmi&=~1;
-                wd1770.status=0x80;
-                set1770spindown();
-                break;
                 case 0xF: wd1770.status&=~4; set1770poll(2000); sectorpos=0; wd1770.cursector=0; break; /*Write track*/
                 default:
                 printf("Bad 1770 command %01X\n",wd1770.command>>4);
@@ -305,9 +298,9 @@ void write1770(unsigned short addr, unsigned char val)
                 wd1770.data=val;
                 return;
         }
-/*        printf("Bad 1770 write %04X %02X\n",addr,val);
+        printf("Bad 1770 write %04X %02X\n",addr,val);
         dumpregs();
-        exit(-1);*/
+        exit(-1);
 }
 
 unsigned char read1770(unsigned short addr)
@@ -344,18 +337,12 @@ unsigned char read1770(unsigned short addr)
 void poll1770()
 {
 //        printf("Polled %02X\n",wd1770.command);
-        if (motorofff)
+        if (motorofff && driveled)
         {
                 motorofff=0;
-                if (driveled)
-                {
-                        driveled=0;
-                        if (ddnoise)
-                        {
-                                stop_sample(motorsmp);
-                                play_sample(motoroffsmp,127,127,1000,0);
-                        }
-                }
+                driveled=0;
+                stop_sample(motorsmp);
+                play_sample(motoroffsmp,127,127,1000,0);
                 return;
         }
         switch (wd1770.command>>4)
@@ -423,37 +410,6 @@ void poll1770()
                 wd1770.status|=2;
                 set1770poll(100);
 //                output=1;
-                break;
-                case 9: /*Read multiple sector*/
-                if ((sides[curdisc]==1) && curside) /*Seek error*/
-                {
-                        wd1770.status&=~5;
-                        wd1770.status|=0x10;
-                        nmi|=1;
-                        set1770spindown();
-                        return;
-                }
-                if (endcommand)
-                {
-                        sectorpos=0;
-                        wd1770.status&=~1;
-                        nmi|=1;
-                        set1770spindown();
-                        endcommand=0;
-                        wd1770.command=-1;
-                        return;
-                }
-                wd1770.data=discs[curdisc][curside][(wd1770.curtrack*16)+wd1770.cursector][sectorpos++];
-                sectorpos&=255;
-                if (!sectorpos)
-                {
-                        wd1770.cursector++;
-                        if (wd1770.cursector>=(adfs[curdisc]?16:10))
-                           endcommand=1;
-                }
-                nmi|=2;
-                wd1770.status|=2;
-                set1770poll(100);
                 break;
 
                 case 0xA: /*Write sector*/

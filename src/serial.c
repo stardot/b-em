@@ -1,4 +1,4 @@
-/*B-em 1.2 by Tom Walker*/
+/*B-em 1.3 by Tom Walker*/
 /*Serial ULA emulation*/
 
 #include "serial.h"
@@ -29,7 +29,7 @@ void writeserial(unsigned short addr, unsigned char val)
         transmitrate=val&0x7;
         reciverate=(val>>3)&0x7;
         motor=val&0x80;
-//        printf("Write serial %02X %04X\n",val,pc);
+//        rpclog("Write serial %02X %04X\n",val,pc);
 //        if (motor) output=1;
         if (val&0x40)
         {

@@ -6,7 +6,7 @@
              ██       ▄██          ██         ██          ██
              ██████████▀           █████████  ██          ██
 
-                                 Version 1.2
+                                 Version 1.3
                          A freeware BBC Micro emulator
 
 Introduction
@@ -36,11 +36,14 @@ Features
 Differences from last version
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- Preliminary CSW support
-- Improved timing, more protected games work (eg Nightshade, Tapper,
-  Beach Head etc)
-- E00 DFS now supported
-- Disc writing works properly again
+- Better sound in Windows version
+- Better CSW support
+- Bugfix in mode 7
+- Bugfix in cursor handling - Frogman works again, no more random crashes in some games
+- Periodic noise pitch now correct - see Icarus, Cute To Kill
+- Video can now use hardware scaling - should be faster
+- Removed colour errors with 2xSaI filter
+- File dialogs now work properly
 
 
 Requirements
@@ -50,6 +53,9 @@ B-em (bbc model B EMulator), requires the following :
 
 A Pentium or better computer (try a P300 at least)
 8mb RAM (?)
+
+You will need a lot more to use the ARM Evaluation System.
+
 
 Nine ROM images are provided with B-em -
 os            - UK BBC MOS
@@ -86,12 +92,6 @@ Savestates do not save states of FDCs or serial stuff, so don't save during
 loading.
 
 Savestates don't save tube state either.
-
-
-Known bugs
-~~~~~~~~~~
-
-Some bugs in FDC emulations, eg some Acornsoft titles won't pass protection
 
 
 Keyboard mapping :

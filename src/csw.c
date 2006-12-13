@@ -1,4 +1,4 @@
-/*B-em 1.2 by Tom Walker*/
+/*B-em 1.3 by Tom Walker*/
 /*CSW handling*/
 #include <stdio.h>
 
@@ -11,6 +11,8 @@ int cswpoint;
 unsigned char cswhead[0x34];
 int tapelcount,tapellatch,pps;
 int cswena;
+int cswskip=0;
+int tapespeed;
 
 void opencsw(char *fn)
 {
@@ -64,9 +66,13 @@ void pollcsw()
         for (c=0;c<10;c++)
         {
                 dat=cswdat[cswpoint++];
-                if (cintone && dat>0xD) /*Not in tone any more - data start bit*/
+                if (cswpoint>=(8*1024*1024)) cswpoint=0;
+                if (cswskip)
+                   cswskip--;
+                else if (cintone && dat>0xD) /*Not in tone any more - data start bit*/
                 {
                         cswpoint++; /*Skip next half of wave*/
+                        if (tapespeed) cswskip=6;
                         cintone=0;
                         cindat=1;
 //                        sprintf(csws,"Entered data at %i\n",ftell(cswf));
@@ -78,10 +84,12 @@ void pollcsw()
                 else if (cindat && datbits!=-1 && datbits!=-2)
                 {
                         cswpoint++; /*Skip next half of wave*/
+                        if (tapespeed) cswskip=6;
                         enddat>>=1;
                         if (dat<=0xD)
                         {
                                 cswpoint+=2;
+                                if (tapespeed) cswskip+=6;
                                 enddat|=0x80;
                         }
                         datbits++;
@@ -97,7 +105,12 @@ void pollcsw()
                 else if (cindat && datbits==-2) /*Deal with stop bit*/
                 {
                         cswpoint++;
-                        if (dat<=0xD) cswpoint+=2;
+                        if (tapespeed) cswskip=6;
+                        if (dat<=0xD)
+                        {
+                                cswpoint+=2;
+                                if (tapespeed) cswskip+=6;
+                        }
                         datbits=-1;
                 }
                 else if (cindat && datbits==-1)
@@ -115,6 +128,7 @@ void pollcsw()
                         else /*Start bit*/
                         {
                                 cswpoint++; /*Skip next half of wave*/
+                                if (tapespeed) cswskip+=6;
                                 datbits=0;
                                 enddat=0;
                         }

@@ -1,4 +1,4 @@
-/*B-em 1.2 by Tom Walker*/
+/*B-em 1.3 by Tom Walker*/
 /*Main loop*/
 
 #include <stdio.h>
@@ -162,10 +162,10 @@ void makemenu()
         AppendMenu(hpop2,MF_STRING,IDM_WAVE_TRI,"&Triangle");
         AppendMenu(hpop2,MF_STRING,IDM_WAVE_SID,"SI&D");
         AppendMenu(hpop,MF_POPUP,hpop2,"&Waveform");
-        hpop2=CreateMenu();
+/*        hpop2=CreateMenu();
         AppendMenu(hpop2,MF_STRING,IDM_BUF_80,"&80ms");
         AppendMenu(hpop2,MF_STRING,IDM_BUF_100,"&100ms");
-        AppendMenu(hpop,MF_POPUP,hpop2,"&Sound Buffer");
+        AppendMenu(hpop,MF_POPUP,hpop2,"&Sound Buffer");*/
         AppendMenu(hpop,MF_STRING,IDM_SOUND_STARTVGM, "&Start VGM Log...");
         AppendMenu(hpop,MF_STRING,IDM_SOUND_STOPVGM, "S&top VGM Log");
         AppendMenu(menu,MF_POPUP,hpop,"&Sound");
@@ -253,6 +253,7 @@ void parsecommandline(LPSTR s)
         }
 }
 
+int framelimit=5;
 int framenum=0;
 //FILE *spdlog;
 
@@ -262,6 +263,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
                     int nFunsterStil)
 {
         unsigned short *p;
+        unsigned short tempbuf[3125];
         int resetting=0,c;
         char s[160];
         MSG messages;            /* Here messages to the application are saved */
@@ -296,7 +298,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         ghwnd = CreateWindowEx (
            0,                   /* Extended possibilites for variation */
            szClassName,         /* Classname */
-           "B-em v1.2",         /* Title Text */
+           "B-em v1.3",         /* Title Text */
            WS_OVERLAPPEDWINDOW&~(WS_MAXIMIZEBOX|WS_SIZEBOX), /* default window */
            CW_USEDEFAULT,       /* Windows decides the position */
            CW_USEDEFAULT,       /* where the window ends up on the screen */
@@ -311,12 +313,13 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         /* Make the window visible on the screen */
         ShowWindow (ghwnd, nFunsterStil);
         win_set_window(ghwnd);
-        allegro_init();
+        install_allegro(SYSTEM_AUTODETECT,&errno,atexit);
         get_executable_name(exname,511);
         load_config();
         if (fullscreen) SetMenu(ghwnd,NULL);
         parsecommandline(lpszArgument);
-        if (hires) updatewindowsize(800,600);
+/*        if (hires==5)   updatewindowsize(800,300);
+        else */if (hires) updatewindowsize(800,600);
         loadcmos();
         install_keyboard();
         key_led_flag=0;
@@ -363,55 +366,51 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         CheckMenuItem(menu,curwave+40080,MF_CHECKED);
         updatemenu();
         fasttape=1;
-        while (spdcount<25)
-        {
-                if (PeekMessage(&messages,NULL,0,0,PM_REMOVE))
-                {
-                        if (messages.message==WM_QUIT)
-                           quit=1;
-                        /* Translate virtual-key messages into character messages */
-                        TranslateMessage(&messages);
-                        /* Send message to WindowProcedure */
-                        DispatchMessage(&messages);
-                }
-        }
+        if (soundbuflen==3125)  framelimit=5;
+        else                    framelimit=4;
+//        rpclog("Running\n");
 //        sprintf(s,"Model %i Tube %i",model,tube);
 //        MessageBox(NULL,s,s,MB_OK);
         while (!quit)
         {
-                if (framenum==5 && !(fasttape && motor))
+//                #if 0
+                if (framenum>=framelimit && !(fasttape && motor) && soundon)
                 {
+//                        rpclog("Sound! %i %i\n",framelimit,soundbuflen);
 //                        fputs("Sound\n",tempf);
                         framenum=0;
+//                        rpclog("Start update buffer\n");
+                        updatebuffer(tempbuf,soundbuflen);
+//                        rpclog("Finish update buffer\n");
                         p=0;
                         while (!p)
                         {
                                 p=(unsigned short *)get_audio_stream_buffer(as);
-                                sleep(0);
+//                                sleep(0);
 //                                yield_timeslice();
 //                                rest(0);
                         }
-                        updatebuffer(p,soundbuflen);
+                        memcpy(p,tempbuf,3125<<1);
                         free_audio_stream_buffer(as);
 //                        spdcount=1;
                         snline=0;
                 }
-                if (framenum==5) framenum=0;
+//                #endif
+                if (framenum>=framelimit) framenum=0;
                 if (infocus && (spdcount || (fasttape && motor)))
                 {
+                        spdcount=0;
                         exec6502(312,128);
                         if (logging) logsound();
                         checkkeys();
                         poll_joystick();
-                        spdcount=0;
-                        framenum++;
                         if (autoboot)
                         {
                                 autoboot--;
                                 if (!autoboot)
                                    releasekey(0,0);
                         }
-                        if (fasttape && motor)
+                        if (fasttape && motor && soundon)
                         {
                                 p=(unsigned short *)get_audio_stream_buffer(as);
                                 if (p)
@@ -423,6 +422,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
                                         framenum=snline=0;
                                 }
                         }
+                        framenum++;
                 }
                 if (fullscreen)
                 {
@@ -474,9 +474,6 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
                         PostQuitMessage (0);
                         wah=0;
                 }
-//                rest(1);
-//                sprintf(s,"B-em %i %i",spdcount,framenum);
-//                set_window_title(s);
         }
 //        fclose(spdlog);
 /*                if (resetting && !key[KEY_F12]) resetting=0;
@@ -514,6 +511,8 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
                 }*/
 //        dumpram();
         save_config();
+        if (soundon) stop_audio_stream(as);
+        closevideo();
         allegro_exit();
         savecmos();
 //        dumpregs();
@@ -542,7 +541,7 @@ void updatemenu()
         switch (hires)
         {
                 case 0: CheckMenuItem(menu,IDM_RES_LOW,MF_CHECKED); break;
-                case 1: CheckMenuItem(menu,IDM_RES_HIGH2,MF_CHECKED); break;
+                case 5: CheckMenuItem(menu,IDM_RES_HIGH2,MF_CHECKED); break;
                 case 2: CheckMenuItem(menu,IDM_RES_2XSAI,MF_CHECKED); break;
                 case 3: CheckMenuItem(menu,IDM_RES_HIGH,MF_CHECKED); break;
         }
@@ -620,6 +619,8 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
         int c;
         char s[260];
         HMENU hmenu;
+        HDC hdc;
+        PAINTSTRUCT ps;
         switch (message)                  /* handle the messages */
         {
                 case WM_COMMAND:
@@ -640,6 +641,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         return 0;
                         case IDM_DISC_CHANGE0: case IDM_DISC_AUTOSTART:
                         if (soundon) stop_audio_stream(as);
+                                checkdiscchanged(0);
                         if (!getfn(hwnd,"Disc Image\0*.SSD;*.DSD;*.ADF;*.ADL;*.FDI\0DFS Single Sided Disc Image (*.SSD)\0*.SSD\0DFS Double Sided Disc Image (*.DSD)\0*.DSD\0ADFS Disc Image (*.ADF)\0*.ADF\0FDI Disc Image (*.FDI)\0All\0*.*\0\0",discname[0],0,"SSD"))
                         {
                                 for (c=0;c<strlen(discname[0]);c++)
@@ -650,7 +652,6 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                                                 break;
                                         }
                                 }
-                                checkdiscchanged(0);
                                 if ((discname[0][c]=='d'||discname[0][c]=='D')&&(c!=strlen(discname[0])))
                                    load8271dsd(discname[0],0);
                                 else if ((discname[0][c]=='f'||discname[0][c]=='F')&&(c!=strlen(discname[0])))
@@ -660,7 +661,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                                 else if (c!=strlen(discname[0]))
                                    load8271ssd(discname[0],0);
                         }
-                        if (soundon) as=play_audio_stream(soundbuflen,16,0,31200,255,127);
+                        if (soundon) as=play_audio_stream(soundbuflen,16,0,31250,255,127);
                         if (LOWORD(wParam)==IDM_DISC_AUTOSTART)
                         {
                                 autoboot=50;
@@ -677,6 +678,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         return 0;
                         case IDM_DISC_CHANGE1:
                         if (soundon) stop_audio_stream(as);
+                        checkdiscchanged(1);
                         if (!getfn(hwnd,"Disc Image\0*.SSD;*.DSD;*.ADF;*.ADL;*.FDI\0DFS Single Sided Disc Image (*.SSD)\0*.SSD\0DFS Double Sided Disc Image (*.DSD)\0*.DSD\0ADFS Disc Image (*.ADF)\0*.ADF\0FDI Disc Image (*.FDI)\0All\0*.*\0\0",discname[0],0,"SSD"))
                         {
                                 for (c=0;c<strlen(discname[1]);c++)
@@ -687,7 +689,6 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                                                 break;
                                         }
                                 }
-                                checkdiscchanged(1);
                                 if ((discname[1][c]=='d'||discname[1][c]=='D')&&(c!=strlen(discname[1])))
                                    load8271dsd(discname[1],1);
                                 else if ((discname[0][c]=='f'||discname[0][c]=='F')&&(c!=strlen(discname[0])))
@@ -697,7 +698,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                                 else if (c!=strlen(discname[1]))
                                    load8271ssd(discname[1],1);
                         }
-                        if (soundon) as=play_audio_stream(soundbuflen,16,0,31200,255,127);
+                        if (soundon) as=play_audio_stream(soundbuflen,16,0,31250,255,127);
                         return 0;
                         case IDM_DISC_SOUND:
                         ddnoise^=1;
@@ -770,7 +771,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         updatewindowsize(400,300);
                         return 0;
                         case IDM_RES_HIGH:
-                        hires=3;
+                        hires=5;
                         updategfxmode();
                         updatemenu();
                         updatewindowsize(800,600);
@@ -793,7 +794,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         fullscreen=1;
                         updategfxmode();
                         install_mouse();
-                        if (soundon) as=play_audio_stream(soundbuflen,16,0,31200,255,127);
+                        if (soundon) as=play_audio_stream(soundbuflen,16,0,31250,255,127);
                         framenum=0;
                         clear(screen);
                         return 0;
@@ -820,7 +821,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         case IDM_SOUND_ENABLE:
                         soundon^=1;
                         if (!soundon) stop_audio_stream(as);
-                        else          as=play_audio_stream(soundbuflen,16,0,31200,255,127);
+                        else          as=play_audio_stream(soundbuflen,16,0,31250,255,127);
                         updatemenu();
                         return 0;
                         case IDM_SOUND_HIGH:
@@ -841,16 +842,18 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         return 0;
                         case IDM_BUF_80:
                         if (soundon) stop_audio_stream(as);
-                        soundbuflen=2496;
+                        soundbuflen=2500;
+                        framelimit=4;
                         updatemenu();
-                        if (soundon) as=play_audio_stream(soundbuflen,16,0,31200,255,127);
+                        if (soundon) as=play_audio_stream(soundbuflen,16,0,31250,255,127);
                         framenum=0;
                         return 0;
                         case IDM_BUF_100:
                         if (soundon) stop_audio_stream(as);
-                        soundbuflen=3120;
+                        soundbuflen=3125;
+                        framelimit=5;
                         updatemenu();
-                        if (soundon) as=play_audio_stream(soundbuflen,16,0,31200,255,127);
+                        if (soundon) as=play_audio_stream(soundbuflen,16,0,31250,255,127);
                         framenum=0;
                         return 0;
                 }
@@ -864,6 +867,13 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                 case WM_DESTROY:
                 PostQuitMessage (0);       /* send a WM_QUIT to the message queue */
                 break;
+                case WM_PAINT:
+                if (fullscreen)
+                {
+                        hdc=BeginPaint(hwnd,&ps);
+                        EndPaint(hwnd,&ps);
+                        return 0;
+                }
                 default:                      /* for messages that we don't deal with */
                 return DefWindowProc (hwnd, message, wParam, lParam);
         }

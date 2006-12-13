@@ -1,8 +1,8 @@
-/*B-em 1.2
+/*B-em 1.3
   Tube emulation
   Emulates 4mhz 65C02, 4mhz Z80 and 8mhz ARM tubes for now*/
 /*Doesn't actually work - so most of it has been commented out*/
-/*The ARM tube now works*/
+/*The ARM tube now works as of v0.81*/
 #include <stdio.h>
 /*#include "m6502.h"
 #include "mz80.h"*/

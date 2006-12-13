@@ -1,4 +1,4 @@
-/*B-em 1.2 by Tom Walker*/
+/*B-em 1.3 by Tom Walker*/
 /*Fullscreen GUI*/
 
 #include <stdio.h>
@@ -89,7 +89,7 @@ void load_config()
         soundfilter=get_config_int(NULL,"sound_filter",3);
         hires=get_config_int(NULL,"resolution",0);
         fullscreen=get_config_int(NULL,"fullscreen",0);
-        soundbuflen=3120;//get_config_int(NULL,"sound_buffer_length",3120);
+        soundbuflen=3125;//get_config_int(NULL,"sound_buffer_length",3120);
         fasttape=get_config_int(NULL,"fast_tape",1);
 }
 
@@ -791,7 +791,7 @@ MENU mainmenu[]=
 
 DIALOG bemgui[]=
 {
-      {d_ctext_proc, 200, 260, 0,  0, 15,0,0,0,     0,0,"B-em v1.2"},
+      {d_ctext_proc, 200, 260, 0,  0, 15,0,0,0,     0,0,"B-em v1.3"},
       {d_menu_proc,  0,   0,   0,  0, 15,0,0,0,     0,0,mainmenu},
           {d_yield_proc},
       {0,0,0,0,0,0,0,0,0,0,0,NULL,NULL,NULL}

@@ -122,10 +122,10 @@ Version 0.3 finalised and released
            directories, improved UEF support a little, and added American BBC
            support.
 Version 0.3a finalised and released
-21/4/01  - Attempted to increase speed.
-24/4/01  - Attempted to fix 6850 emulation - failed. I'm not giving up though.
-05/5/01  - Added Richard Gellman's ACIA code - doesn't work.
-06/5/01  - Gave up on tape emulation. I really can't see the point, as I was
+21/04/01 - Attempted to increase speed.
+24/04/01 - Attempted to fix 6850 emulation - failed. I'm not giving up though.
+05/05/01 - Added Richard Gellman's ACIA code - doesn't work.
+06/05/01 - Gave up on tape emulation. I really can't see the point, as I was
            spending so long on a feature that no-one would use.
 12/10/01 - Changed graphics library to Allegro, and ported over the SN76489
            emulation from YAAME. Sound is really good now, but the keyboard is
@@ -145,7 +145,7 @@ Version 0.3a finalised and released
            Went back to newer version of Allegro - must redo keytable.
 17/12/01 - Redid keytable - working now. Fixed some misc bugs.
 31/12/01 - Rewrote BCD maths. SBC now seems to work fine, but ADC is a bit
-01/01/02   fucked. Whoever wrote the BCD maths routines in 64doc.txt got it
+01/01/02   broken. Whoever wrote the BCD maths routines in 64doc.txt got it
            completely wrong.
 02/01/02 - Added simple GUI.
 04/01/02 - Improvements to GUI. Monochrome mode added
@@ -210,7 +210,7 @@ Version 0.5 finalised and released
 20/06/03 - Fixed stupid NMI bug, Firetrack working again (totally glitchless
            this time!). Fixed timing, Revs is now perfect! Uridium doesn't
            work properly - splits are four lines apart on consecutive frames.
-           I can't be arsed to fix it - two out of three isn't bad.
+           I can't be bothered to fix it - two out of three isn't bad.
 22/06/03 - Started new GUI
 24/06/03 - Re-added sound support, but with new sound engine supporting sample
            playback.
@@ -386,3 +386,13 @@ Version 1.1 finalised and released
 27/07/06 - More timing improvements, Nightshade now works!
 28/07/06 - Tidied up various issues. CSW now same speed as UEF.
 Version 1.2 finalised and released
+25/10/06 - Improved CSW support, 300 baud now supported, couple more games work
+01/12/06 - Altered sound code - more stable
+           Periodic noise cycle is 15 not 16, everything that uses it (especially
+           Beyond Infinity) sounds much better
+           High resolution (without scanlines) now uses hardware stretching
+02/12/06 - Fixed several memory overflow bugs
+           Fixed bugs in newer high resolution mode
+           Cursor emulation better - now doesn't appear in Revs, Arcadians etc
+13/12/06 - Fixed bugs in video
+14/12/06 - Fixed bugs relating to 2xSaI filter

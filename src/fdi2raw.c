@@ -2026,7 +2026,7 @@ FDI *fdi2raw_header(FILE *f)
                 fdi_free(fdi);
                 return NULL;
         }
-        if ((fdi->header[140] != 1 && fdi->header[140] != 2) || fdi->header[141] != 0) {
+        if ((fdi->header[140] != 1 && fdi->header[140] != 2) || (fdi->header[141] != 0 && !(fdi->header[140]==2 && fdi->header[141]==1))) {
                 fdi_free(fdi);
                 return NULL;
         }

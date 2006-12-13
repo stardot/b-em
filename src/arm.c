@@ -1,4 +1,4 @@
-/*B-em 1.2 by Tom Walker
+/*B-em 1.3 by Tom Walker
   ARM emulation (for ARM tube)*/
 
 #include <stdio.h>

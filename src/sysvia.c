@@ -1,4 +1,4 @@
-/*B-em 1.2 by Tom Walker*/
+/*B-em 1.3 by Tom Walker*/
 /*System VIA emulation*/
 
 unsigned short pc;
@@ -9,14 +9,18 @@ unsigned short pc;
 FILE *arclog;
 void rpclog(const char *format, ...)
 {
+        char *x;
    char buf[256];
    return;
-        if (!arclog) arclog=fopen("e:\\devcpp\\b-em8\\arclog.txt","wt");
+        if (!arclog) arclog=fopen("arclog.txt","wt");
+//        x=0;
+//        *x=0;
    va_list ap;
    va_start(ap, format);
    vsprintf(buf, format, ap);
    va_end(ap);
    fputs(buf,arclog);
+   fflush(arclog);
 }
 
 char exname[512];
@@ -59,6 +63,7 @@ void updatesysIFR()
         {
                 sysvia.ifr|=0x80;
                 interrupt|=1;
+//                if (sysvia.ifr&sysvia.ier&0x10) rpclog("CB1 set %02X\n",sysvia.ifr);
         }
         else
         {

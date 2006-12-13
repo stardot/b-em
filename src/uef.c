@@ -1,4 +1,4 @@
-/*B-em 1.2 by Tom Walker*/
+/*B-em 1.3 by Tom Walker*/
 /*UEF handling (including HQ-UEF support)*/
 
 #include <allegro.h>
@@ -71,7 +71,7 @@ void polltape()
                 }
                 inchunk=1;
                 chunkpos=0;
-                printf("Chunk ID %04X len %i\n",chunkid,chunklen);
+//                printf("Chunk ID %04X len %i\n",chunkid,chunklen);
         }
 //        else
 //           printf("Chunk %04X\n",chunkid);

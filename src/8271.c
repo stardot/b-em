@@ -1,4 +1,4 @@
-/*B-em 1.2 by Tom Walker*/
+/*B-em 1.3 by Tom Walker*/
 /*8271 FDC emulation*/
 
 #include <stdio.h>
@@ -16,9 +16,6 @@
 
 #define SIDE ((drvctrloutp>>5) & 1)
 
-void idcrcerror();
-void datacrcerror();
-void sectorerror();
 int delayreadop=0;
 int idmarks=0;
 int waitforindex=0;
@@ -84,7 +81,7 @@ void set8271poll(int time)
 
 void error8271(unsigned char err)
 {
-        //printf("error %02X\n",err);
+//        rpclog("error %02X\n",err);
         if (!nmi)
         {
                 error=err;
@@ -98,9 +95,8 @@ void motoroff()
         if (!driveled) return;
 //        printf("Motor off %i\n",soundiniteded);
         driveled=0;
-        if (!ddnoise) return;
         stop_sample(motorsmp);
-//        play_sample(motoroffsmp,127,127,1000,0);
+        play_sample(motoroffsmp,127,127,1000,0);
 //        if (soundiniteded) play_sample(motoroffsmp,255,127,1000,0);
 }
 
@@ -405,7 +401,6 @@ int curr8271drv;
 void reset8271(int reload)
 {
         int c;
-        ddensity=0;
         delayreadop=0;
         motoroff();
         statusreg=0;
@@ -468,7 +463,6 @@ void reset8271s()
         disctime=0;
         discint=0;
         inttrack[0]=curtrack[0]=0;
-        ddensity=0;
 }
 
 void doselects()
@@ -486,6 +480,7 @@ void specify()
 
 void readdrvstatus()
 {
+//        rpclog("READ DRV %i ",curtrack[0]);
         resultreg=0x80;
         if (selects[0])
            resultreg|=0x4;
@@ -496,6 +491,7 @@ void readdrvstatus()
            resultreg|=2;
         //printf("Read drive status %02X\n",resultreg);
         statusreg|=0x10;
+//        rpclog("%i\n",curtrack[0]);
 }
 
 void readspecial()
@@ -555,11 +551,11 @@ void seek()
         char s[40];
         if (!driveled)
         {
+                driveled=1;
                 if (ddnoise)
                 {
                         play_sample(motorsmp,127,127,1000,TRUE);
                         play_sample(motoronsmp,127,127,1000,0);
-                        driveled=1;
                 }
         }
         doselects();
@@ -635,7 +631,8 @@ int bytesread=0;
 
 void readdoneint()
 {
-//        printf("Read done\n");
+//        rpclog("Read done %i\n",curtrack[0]);
+//        if (curtrack[0]==54) output=1;
 //        output=1;
 //        timetolive=500;
         setspindown();
@@ -663,8 +660,8 @@ void readvarlen()
                 {
                         play_sample(motorsmp,127,127,1000,TRUE);
                         play_sample(motoronsmp,127,127,1000,0);
-                        driveled=1;
                 }
+                driveled=1;
         }
         doselects();
         if (selects[0])
@@ -677,6 +674,7 @@ void readvarlen()
                 return;
         }
         curr8271drv=drv;
+//        rpclog("%i %i %i\n",curtrack[0],parameters[0],inttrack[0]);
         dif=ABS(curtrack[0]-parameters[0]);
         diff=parameters[0]-inttrack[0];
 //        if (curtrack[0]!=parameters[0] && ddnoise)
@@ -706,7 +704,7 @@ void readvarlen()
         sectorlen=1<<(7+((parameters[2]>>5)&7));
         byteinsec=0;
         statusreg=0x80;
-//        printf("READ track %i %i sector %i sectorsleft %i sectorlen %i %i\n",curtrack[0],inttrack[0],cursec[0],sectorsleft,sectorlen,parameters[2]>>5);
+//        rpclog("READ track %i %i sector %i sectorsleft %i sectorlen %i %i\n",curtrack[0],inttrack[0],cursec[0],sectorsleft,sectorlen,parameters[2]>>5);
 //        printf("FDIIN %i\n",fdiin[drv]);
         //printf("Read NMI\n");
         NMI();
@@ -885,7 +883,7 @@ void writevarlen()
                 return;
         }
         curr8271drv=drv;
-        inttrack[0]=curtrack[0]=parameters[0];
+        curtrack[0]=parameters[0];
         cursec[0]=parameters[1];
         sectorsleft=parameters[2]&0x1F;
         sectorlen=1<<(7+((parameters[2]>>5)&7));
@@ -1137,8 +1135,51 @@ void endreadid()
         }
 }
 
-int invalidfor;
-int discoutput=0;
+void idcrcerror()
+{
+        if (model>2)
+        {
+                idcrcerror1770();
+        }
+        else
+        {
+                resultreg=0x0C;
+                statusreg=0x18;
+                NMI();
+                inreadop=0;
+        }
+}
+
+void datacrcerror()
+{
+        if (model>2)
+        {
+                datacrcerror1770();
+        }
+        else
+        {
+                resultreg=0x0E;
+                statusreg=0x18;
+                NMI();
+                inreadop=0;
+        }
+}
+
+void sectorerror()
+{
+        if (model>2)
+        {
+                sectorerror1770();
+        }
+        else
+        {
+                resultreg=0x18;
+                statusreg=0x18;
+                NMI();
+                inreadop=0;
+        }
+}
+
 /*What a mess!
   This function simulates the rotation of the disc and many of the functions
   of the 8271. This includes identifying syncs, decoding data, waiting for
@@ -1167,13 +1208,8 @@ void pollbyte()
                    tempi=discraw[curdisc][SIDE][curtrack[0]][discrawpos>>3]&(1<<(7-(discrawpos&7)));
                 databuffer<<=1;
                 databuffer|=(tempi?1:0);
-//                if (readidpoll || discoutput) printf("%i %04X %02X %i %i %02X   ",discrawpos,databuffer,discraw[0][0][curtrack[0]][discrawpos>>3],curtrack[0],tempi,(1<<(7-(discrawpos&7))));
-//                if (readidpoll || discoutput) printf("%i %04X\n",pollbitsleft,databuffer);
-                if (invalidfor)
-                {
-                        invalidfor--;
-                        goto fini;
-                }
+//                printf("%i %04X %02X %i %i %02X\n",discrawpos,databuffer,discraw[0][0][curtrack[0]][discrawpos>>3],curtrack[0],tempi,(1<<(7-(discrawpos&7))));
+//                printf("%i %04X\n",pollbitsleft,databuffer);
                 /*If we are actively reading data, then enter this lot*/
                 if (pollbitsleft)
                 {
@@ -1208,9 +1244,9 @@ void pollbyte()
                                                 crc=(ddensity)?0xcdb4:0xFFFF;
                                                 calccrc(0xFE);
                                                 for (c=0;c<4;c++) calccrc(discid[c]);
-//                                                printf("CRC : %04X %02X%02X %02X %02X %02X %02X\n",crc,discid[4],discid[5],discid[0],discid[1],discid[2],discid[3]);
                                                 if (((crc>>8)!=discid[4] || (crc&0xFF)!=discid[5]))
                                                 {
+//                                                        printf("CRC error : %04X %02X%02X\n",crc,discid[4],discid[5]);
                                                         idcrcerror();
                                                         return;
                                                         dumpregs();
@@ -1298,9 +1334,8 @@ void pollbyte()
                                                 if (sectorsleft)
                                                 {
                                                         cursec[0]++;
-//                                                        printf("%i READ continuing to sector %i %i\n",discrawpos,cursec[0],sectorsleft);
+//                                                        printf("READ continuing to sector %i %i\n",cursec[0],sectorsleft);
                                                         idmarks=0;
-                                                        invalidfor=50;
                                                 }
                                                 else
                                                 {
@@ -1365,8 +1400,6 @@ void pollbyte()
                                         pollbytesleft=sectorlen+2;
                                         pollbitsleft=16;
 //                                        printf("Reading found sector ID %i %i %i %i %02X %02X\n",discid[0],discid[1],discid[2],discid[3],ram[0xA6],ram[0xA7]);
-                                        if (discid[0]==21 && discid[2]==0) discoutput=1;
-                                        else                               discoutput=0;
                                         readflash|=1;
                                         crc=(ddensity)?0xcdb4:0xFFFF;
                                         if (databuffer==0xF56A) calccrc(0xF8);
@@ -1408,7 +1441,6 @@ void pollbyte()
                 }
                 }
         }
-        fini:
         /*Move ahead one bit*/
         discrawpos++;
         if (delayreadop) return;
@@ -1475,6 +1507,7 @@ void commandwrite(unsigned char val)
                 statusreg&=0x7E;
                 NMI();
                 docommand();
+//                rpclog("Running command %02X\n",command);
         }
 }
 
@@ -1488,6 +1521,7 @@ void paramwrite(unsigned char val)
                 NMI();
                 if (presentparam==params)
                 {
+//                        rpclog("Running command %02X  %02X %02X %02X %02X\n",command,parameters[0],parameters[1],parameters[2],parameters[3]);
                         statusreg&=0x7E;
                         NMI();
                         docommand();
@@ -1520,6 +1554,7 @@ unsigned char read8271(unsigned short addr)
                 statusreg&=~0xC;
                 NMI();
                 val=datareg;
+//                rpclog("Read data %02X\n",val);
                 break;
                 default:
                 val=0;
@@ -1531,6 +1566,8 @@ unsigned char read8271(unsigned short addr)
 void write8271(unsigned short addr, unsigned char val)
 {
         char s[40];
+//        rpclog("Write %04X %02X %04X %i\n",addr,val,pc,curtrack[0]);
+//        if (output) exit(-1);
 //        printf("Writing %04X %02X\n",addr,val);
         switch(addr&7)
         {
@@ -1550,53 +1587,6 @@ void write8271(unsigned short addr, unsigned char val)
 //                printf("%03i write %02X\n",byteswritten++,datareg);
 //                printf("%c",val);
                 break;
-        }
-}
-
-void idcrcerror()
-{
-//        printf("ID CRC error\n");
-        if (model>2)
-        {
-                idcrcerror1770();
-        }
-        else
-        {
-                resultreg=0x0C;
-                statusreg=0x18;
-                NMI();
-                inreadop=0;
-        }
-}
-
-void datacrcerror()
-{
-//        printf("Data CRC error\n");
-        if (model>2)
-        {
-                datacrcerror1770();
-        }
-        else
-        {
-                resultreg=0x0E;
-                statusreg=0x18;
-                NMI();
-                inreadop=0;
-        }
-}
-
-void sectorerror()
-{
-        if (model>2)
-        {
-                sectorerror1770();
-        }
-        else
-        {
-                resultreg=0x18;
-                statusreg=0x18;
-                NMI();
-                inreadop=0;
         }
 }
 
@@ -1624,7 +1614,8 @@ void poll8271()
                 statusreg=0x18;
                 error=0;
                 NMI();
-                setspindown();
+                driveled=0;
+//                rpclog("Error %02X\n",error);
         }
         else
         {
