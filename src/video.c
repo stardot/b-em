@@ -774,13 +774,17 @@ void drawcursor()
 int delaylcount=0;
 int olx,ofx,oll,ofl;
 int vblcount=0;
+int interlaceframe=0;
 void drawline(int line6502)
 {
         int tline;
         int x,y;
 //        return;
         if (interlaceline)
-           interlaceline=0;
+        {
+                interlaceline=0;
+                return;
+        }
         lns=curline;
         if (vblcount)
         {
@@ -925,9 +929,10 @@ void drawline(int line6502)
                                 }
                                 else
                                 {
-//                                        if (readflash) rectfill(buffer,368,0,400,20,readflash);
+                                        if (readflash) rectfill(buffer,368,0,400,20,readflash);
                                         readflash=0;
-                                        blit(buffer,screen,firstx,firstline,firstx,firstline-16,lastx-firstx,lastline-firstline);
+                                        blit(buffer,screen,0,16,0,0,400,300);
+//                                        blit(buffer,screen,firstx,firstline,firstx,firstline-16,lastx-firstx,lastline-firstline);
                                 }
                         }
 //                        textprintf(screen,font,0,0,makecol(255,255,255),"%04X %i  ",pc,motor);
@@ -944,7 +949,8 @@ void drawline(int line6502)
                         flashint=0;
                         flash=1;
                 }
-                interlaceline=1;
+                interlaceframe^=1;
+                interlaceline=interlaceframe&(crtc[8]&1);
         }
         if (delaylcount)
         {

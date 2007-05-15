@@ -162,6 +162,11 @@ void loadmasterroms()
         int c;
         FILE *f;
         char fn[512];
+        char olddir[512];
+        int romslot=3;
+        int finished=0;
+        struct al_ffblk ff;
+
         append_filename(fn,exname,"roms/mos3.20",511);
         f=fopen(fn,"rb");
         fread(os,0x4000,1,f);
@@ -171,7 +176,26 @@ void loadmasterroms()
         fclose(f);
         for (c=0;c<16;c++) writeablerom[c]=0;
         for (c=4;c<8;c++)  writeablerom[c]=1;
-        return;
+
+        getcwd(olddir,511);
+        if (tube && tubetype==TUBE6502) append_filename(fn,exname,"roms/mt",511);
+        else                            append_filename(fn,exname,"roms/m128",511);
+        if (chdir(fn))
+           perror(fn);
+
+        al_findfirst("*.rom",&ff,0xFFFF);
+        while (romslot >= 0 && !finished)
+        {
+                f=fopen(ff.name,"rb");
+                if (!f) break;
+                fread(rom+(romslot<<14),16384,1,f);
+                fclose(f);
+                romslot--;
+                finished = al_findnext(&ff);
+        }
+
+        if (chdir(olddir))
+           perror(olddir);
 }
 
 /*Master Compact uses a 512 kbit ROM chip to store OS and 3 sideways ROMs
@@ -194,6 +218,7 @@ void loadmastercroms()
         fclose(f);
         for (c=0;c<16;c++) writeablerom[c]=0;
         for (c=4;c<8;c++)  writeablerom[c]=1;
+
 }
 
 void loadroms()
@@ -285,7 +310,11 @@ void loadroms()
 unsigned char acccon=0;
 
 int disccount=0;
-#define polltime(c) { disccount-=c; tubecycs+=c; cycles-=c; sysvia.t1c-=c; if (!(sysvia.acr&0x20)) sysvia.t2c-=c; if (sysvia.t1c<-3 || sysvia.t2c<-3) { updatesystimers(); } uservia.t1c-=c; if (!(uservia.acr&0x20)) uservia.t2c-=c; if (uservia.t1c<-3 || uservia.t2c<-3) updateusertimers(); }
+int linecount=0;
+int soundcount=0;
+int otherstuffcount=0;
+int adccount=0;
+#define polltime(c) { otherstuffcount-=c; soundcount-=c; if (soundcount<=0) { soundcount+=64; logvols(); } linecount-=c; if (linecount<=0) { linecount+=128; drawline(0); } disccount-=c; tubecycs+=c; cycles-=c; sysvia.t1c-=c; if (!(sysvia.acr&0x20)) sysvia.t2c-=c; if (sysvia.t1c<-3 || sysvia.t2c<-3) { updatesystimers(); } uservia.t1c-=c; if (!(uservia.acr&0x20)) uservia.t2c-=c; if (uservia.t1c<-3 || uservia.t2c<-3) updateusertimers(); }
 
 void writeacccon(unsigned char v)
 {
@@ -363,7 +392,7 @@ unsigned char readmeml(unsigned short addr)
                 case 0xFE80: case 0xFE88: case 0xFE90: case 0xFE98: if (model>3 && model<8) return read1770(addr); else if (model<8) return read8271(addr); return 0xFF;
                 case 0xFEA0: case 0xFEA8: return 0xFE; /*I wonder what Arcadians wants with Econet...*/
                 case 0xFEC0: case 0xFEC8: case 0xFED0: case 0xFED8: if (model<8) return readadc(addr); break;
-                case 0xFEE0: if (acccon&0x10) return 0; return readtubehost(addr);
+                case 0xFEE0: if (acccon&0x10 && model>=8) return 0; return readtubehost(addr);
         }
         if ((addr&0xFE00)==0xFC00) return 0xFF;
         if (model>=8 && ((addr&0xE000)==0xC000)) return osram[addr&0x1FFF];
@@ -432,7 +461,7 @@ unsigned char writememl(unsigned short addr, unsigned char val)
                 case 0xFE80: case 0xFE88: case 0xFE90: case 0xFE98: if (model>3 && model<8) write1770(addr,val); else if (model<8) write8271(addr,val); return;
                 case 0xFEA0: return; /*Now Repton Infinity wants Econet as well!*/
                 case 0xFEC0: case 0xFEC8: case 0xFED0: case 0xFED8: if (model<8) writeadc(addr,val); return;
-                case 0xFEE0: if (acccon&0x10) return; writetubehost(addr,val); return;
+                case 0xFEE0: if (acccon&0x10 && model>=8) return; writetubehost(addr,val); return;
         }
         if (!(addr&0x8000))
         {
@@ -467,16 +496,17 @@ void reset6502()
         pc=readmem(0xFFFC)|(readmem(0xFFFD)<<8);
         p.i=1;
         nmi=oldnmi=nmilock=0;
+        tubecycs=tubelinecycs=0;
 }
 
 void dumpregs()
 {
-        printf("6502 registers :\n");
-        printf("A=%02X X=%02X Y=%02X S=01%02X PC=%04X\n",a,x,y,s,pc);
-        printf("Status : %c%c%c%c%c%c\n",(p.n)?'N':' ',(p.v)?'V':' ',(p.d)?'D':' ',(p.i)?'I':' ',(p.z)?'Z':' ',(p.c)?'C':' ');
-        printf("%i instructions executed   current ROM %i\n",ins,currom);
-        printf("%04X %04X %04X\n",oldpc,oldoldpc,pc3);
-        printf("%i\n",countit);
+        rpclog("6502 registers :\n");
+        rpclog("A=%02X X=%02X Y=%02X S=01%02X PC=%04X\n",a,x,y,s,pc);
+        rpclog("Status : %c%c%c%c%c%c\n",(p.n)?'N':' ',(p.v)?'V':' ',(p.d)?'D':' ',(p.i)?'I':' ',(p.z)?'Z':' ',(p.c)?'C':' ');
+        rpclog("%i instructions executed   current ROM %i\n",ins,currom);
+        rpclog("%04X %04X %04X\n",oldpc,oldoldpc,pc3);
+        rpclog("%i\n",countit);
 }
 
 #define setzn(v) p.z=!(v); p.n=(v)&0x80
@@ -590,12 +620,13 @@ void exec6502(int lines, int cpl)
         int tempi;
         signed char offset;
         int c;
+        cycles+=40000;
         if (model>=8) /*Master 128 uses seperate CPU emulation*/
         {
                 exec65c02(lines,cpl);
                 return;
         }
-        while (lines>=0)
+/*        while (lines>=0)
         {
                 if (interlaceline)
                 {
@@ -603,7 +634,7 @@ void exec6502(int lines, int cpl)
                            cycles+=(cpl>>1);
                 }
                 else
-                   cycles+=cpl;
+                   cycles+=cpl;*/
                 while (cycles>0)
                 {
                         pc3=oldoldpc;
@@ -2249,6 +2280,26 @@ void exec6502(int lines, int cpl)
 //                                printf("IRQ1V %04X IRQ2V %04X\n",ram[0x204]|(ram[0x205]<<8),ram[0x206]|(ram[0x207]<<8));
                         }
                         interrupt&=~128;
+//                        otherstuffcount-=tubecycs;
+                        if (otherstuffcount<=0)
+                        {
+                                otherstuffcount+=128;
+                                if (!tapelcount)
+                                {
+                                        pollacia();
+                                        tapelcount=tapellatch;
+                                }
+                                tapelcount--;
+                                if (!(adccount) && adcconvert && !motor) { polladc(); adccount+=100;}
+                                adccount--;
+
+                        }
+                        if (tube)
+                        {
+                                exectube(tubecycs);
+                                tubecycs=0;
+                        }
+
 /*                        if (interrupt && !p.i && skipint)
                         {
                                 skipint=2;
@@ -2308,6 +2359,7 @@ void exec6502(int lines, int cpl)
                                 }
                         }
                 }
+                #if 0
                 if (lines) logvols(lines);
                 lines--;
                 if (!tapelcount)
@@ -2325,9 +2377,10 @@ void exec6502(int lines, int cpl)
                 }*/
                 if (!(lines&0x7F) && adcconvert && !motor) { polladc(); }
                 if (lines!=-1) drawline(lines);
-                if (tube) exectube();
+//                if (tube) exectube();
                 tubecycs=0;
         }
+        #endif
         frms++;
 }
 
@@ -2339,9 +2392,9 @@ void exec65c02(int lines, int cpl)
         int tempi;
         signed char offset;
         int c;
-        while (lines>=0)
-        {
-                tubelinecycs=128;
+//        while (lines>=0)
+//        {
+/*                tubelinecycs=128;
                 lns=lines;
                 if (interlaceline)
                 {
@@ -2349,7 +2402,7 @@ void exec65c02(int lines, int cpl)
                            cycles+=(cpl>>1);
                 }
                 else
-                   cycles+=cpl;
+                   cycles+=cpl;*/
                 while (cycles>0)
                 {
                         pc3=oldoldpc;
@@ -3788,7 +3841,7 @@ void exec65c02(int lines, int cpl)
 //                        if (currom==8) output=1; else { if (output) printf("Output end\n"); output=0; }
 //                        if (pc==0x813D) printf("813D Y=%02X %04X %04X\n",y,oldpc,oldoldpc);
 //                        if (pc==0xE583 && currom==9) { dumpregs(); exit(0); }
-//                        printf("A=%02X X=%02X Y=%02X S=%02X PC=%04X %c%c%c%c%c%c op=%02X %02X\n",a,x,y,s,pc,(p.n)?'N':' ',(p.v)?'V':' ',(p.d)?'D':' ',(p.i)?'I':' ',(p.z)?'Z':' ',(p.c)?'C':' ',opcode,ram[1]);
+                        if (output) printf("A=%02X X=%02X Y=%02X S=%02X PC=%04X %c%c%c%c%c%c op=%02X %02X\n",a,x,y,s,pc,(p.n)?'N':' ',(p.v)?'V':' ',(p.d)?'D':' ',(p.i)?'I':' ',(p.z)?'Z':' ',(p.c)?'C':' ',opcode,ram[1]);
                         if (disccount<0)
                         {
                                 disccount+=(ddensity)?8:16;
@@ -3822,11 +3875,11 @@ void exec65c02(int lines, int cpl)
                                 }
                         }
                         ins++;
-/*                        if (timetolive)
+                        if (timetolive)
                         {
                                 timetolive--;
-                                if (!timetolive) exit(-1);
-                        }*/
+                                if (!timetolive) output=0;
+                        }
                         if ((interrupt && !p.i && !skipint) || skipint==2)
                         {
 //                                if (skipint==2) printf("interrupt\n");
@@ -3849,6 +3902,19 @@ void exec65c02(int lines, int cpl)
 //                                printf("skipint=2\n");
                         }
                         interrupt&=~128;
+                        if (otherstuffcount<=0)
+                        {
+                                otherstuffcount+=128;
+                                if (!tapelcount)
+                                {
+                                        pollacia();
+                                        tapelcount=tapellatch;
+                                }
+                                tapelcount--;
+                                if (!(adccount) && adcconvert && !motor) { polladc(); adccount+=100;}
+                                adccount--;
+
+                        }
                         if (tube)
                         {
                                 exectube(tubecycs);
@@ -3884,8 +3950,8 @@ void exec65c02(int lines, int cpl)
                                 sasicallback=0;
                                 pollsasi();
                         }
-                }*/
-                logvols(lines);
+                }*//*
+                if (lines) logvols();
                 lines--;
                 if (!tapelcount)
                 {
@@ -3897,7 +3963,7 @@ void exec65c02(int lines, int cpl)
                 if (lines!=-1) drawline(lines);
 //                if (tube) exectube();
                 tubecycs=0;
-        }
+        }*/
         frms++;
 }
 

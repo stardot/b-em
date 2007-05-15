@@ -37,10 +37,12 @@ char szClassName[ ] = "WindowsApp";
 HWND ghwnd;
 int infocus;
 
+static HANDLE frameevent;
 static int spdcount=0;
 static void update50()
 {
-        spdcount++;
+        SetEvent(frameevent);
+//        spdcount++;
 }
 END_OF_FUNCTION(update50);
 
@@ -67,28 +69,35 @@ HMENU menu;
 #define IDM_MODEL_PALM128  40038
 #define IDM_MODEL_PALMC    40039
 #define IDM_MODEL_ARM      40040
-#define IDM_VIDEO_RES      40044
-#define IDM_VIDEO_FULLSCR  40041
-#define IDM_VIDEO_BLUR     40042
-#define IDM_VIDEO_MONO     40043
-#define IDM_SOUND_ENABLE   40050
-#define IDM_SOUND_LOW      40051
-#define IDM_SOUND_HIGH     40052
-#define IDM_SOUND_WAVEFORM 40053
-#define IDM_SOUND_STARTVGM 40054
-#define IDM_SOUND_STOPVGM  40055
-#define IDM_MISC_SCRSHOT   40060
-#define IDM_RES_LOW        40070
-#define IDM_RES_HIGH       40071
-#define IDM_RES_HIGH2      40072
-#define IDM_RES_2XSAI      40073
-#define IDM_WAVE_SQU       40080
-#define IDM_WAVE_SAW       40081
-#define IDM_WAVE_SIN       40082
-#define IDM_WAVE_TRI       40083
-#define IDM_WAVE_SID       40084
-#define IDM_BUF_80         40090
-#define IDM_BUF_100        40091
+#define IDM_MODEL_PALMT    40041
+#define IDM_MODEL_PALTUBE  40042
+#define IDM_VIDEO_RES      40054
+#define IDM_VIDEO_FULLSCR  40051
+#define IDM_VIDEO_BLUR     40052
+#define IDM_VIDEO_MONO     40053
+#define IDM_SOUND_ENABLE   40060
+#define IDM_SOUND_LOW      40061
+#define IDM_SOUND_HIGH     40062
+#define IDM_SOUND_WAVEFORM 40063
+#define IDM_SOUND_STARTVGM 40064
+#define IDM_SOUND_STOPVGM  40065
+#define IDM_MISC_SCRSHOT   40070
+#define IDM_RES_LOW        40080
+#define IDM_RES_HIGH       40081
+#define IDM_RES_HIGH2      40082
+#define IDM_RES_2XSAI      40083
+#define IDM_WAVE_SQU       40090
+#define IDM_WAVE_SAW       40091
+#define IDM_WAVE_SIN       40092
+#define IDM_WAVE_TRI       40093
+#define IDM_WAVE_SID       40094
+#define IDM_BUF_80         40100
+#define IDM_BUF_100        40101
+#define IDM_TUBE_4         40200
+#define IDM_TUBE_8         40201
+#define IDM_TUBE_16        40202
+#define IDM_TUBE_32        40203
+#define IDM_TUBE_64        40204
 
 void updatewindowsize(int x, int y)
 {
@@ -132,13 +141,22 @@ void makemenu()
         AppendMenu(hpop,MF_STRING,IDM_MODEL_PALB,"Model &B");
         AppendMenu(hpop,MF_STRING,IDM_MODEL_PALBSW,"Model B w/&SWRAM");
         AppendMenu(hpop,MF_STRING,IDM_MODEL_B1770,"Model B w/&1770");
+        AppendMenu(hpop,MF_STRING,IDM_MODEL_PALTUBE,"Model B w/&6502 tube");
         AppendMenu(hpop,MF_STRING,IDM_MODEL_NTSCB,"&NTSC B");
         AppendMenu(hpop,MF_STRING,IDM_MODEL_PALB64,"B&+");
         AppendMenu(hpop,MF_STRING,IDM_MODEL_PALB96,"B+&96K");
         AppendMenu(hpop,MF_STRING,IDM_MODEL_PALB128,"B+&128K");
         AppendMenu(hpop,MF_STRING,IDM_MODEL_PALM128,"&Master 128");
+        AppendMenu(hpop,MF_STRING,IDM_MODEL_PALMT,"Master &Turbo");
         AppendMenu(hpop,MF_STRING,IDM_MODEL_PALMC,"Master &Compact");
         AppendMenu(hpop,MF_STRING,IDM_MODEL_ARM,    "&ARM Evaluation System");
+        hpop2=CreateMenu();
+        AppendMenu(hpop2,MF_STRING,IDM_TUBE_4,"&4mhz");
+        AppendMenu(hpop2,MF_STRING,IDM_TUBE_8,"&8mhz");
+        AppendMenu(hpop2,MF_STRING,IDM_TUBE_16,"&16mhz");
+        AppendMenu(hpop2,MF_STRING,IDM_TUBE_32,"&32mhz");
+        AppendMenu(hpop2,MF_STRING,IDM_TUBE_64,"&64mhz");
+        AppendMenu(hpop,MF_POPUP,hpop2,"&6502 tube speed");
         AppendMenu(menu,MF_POPUP,hpop,"&Model");
         hpop=CreateMenu();
         hpop2=CreateMenu();
@@ -228,7 +246,7 @@ void parsecommandline(LPSTR s)
                            return;*/
                 }
                 if (!stricmp(t,"-autoboot"))
-                   autoboot=50;
+                   autoboot=100;
                 if (!stricmp(t,"-esc"))
                    wah=1;
                 if (!stricmp(t,"-model"))
@@ -257,6 +275,72 @@ int framelimit=5;
 int framenum=0;
 //FILE *spdlog;
 
+static HANDLE soundobject;
+int soundthreadon=0;
+
+#define BUFLEN (625*4)
+void soundthread(PVOID pvoid)
+{
+        unsigned short *p;
+        int c;
+        soundthreadon=1;
+        while (!quit)
+        {
+                if (infocus && soundon)
+                {
+//                        rpclog("waiting for soundobject\n");
+                        WaitForSingleObject(soundobject,INFINITE);
+//                        rpclog("entering pollsound\n");
+                        if (!quit && infocus) pollsoundthread();
+//                        rpclog("left pollsound\n");
+                }
+                else
+                {
+//                        rpclog("entering silence\n");
+                        p=NULL;
+                        while (!p && !quit)
+                        {
+                                sleep(1);
+                                p=get_audio_stream_buffer(as);
+                        }
+                        if (!quit)
+                        {
+//                                rpclog("found silence soundbuffer!\n");
+                                for (c=0;c<BUFLEN;c++) p[c]=0x8000;
+                                free_audio_stream_buffer(as);
+//                                rpclog("left silence\n");
+                        }
+                }
+        }
+        soundthreadon=0;
+//        rpclog("closing sound thread...\n");
+}
+
+void wakeupsoundthread()
+{
+        SetEvent(soundobject);
+}
+
+void sleepsoundthread()
+{
+        SetEvent(soundobject);
+//        ResetEvent(soundobject);
+}
+
+void endsoundthread()
+{
+        if (!soundthreadon) return;
+//        rpclog("ending sound thread...\n");
+        quit=1;
+        while (soundthreadon)
+        {
+                SetEvent(soundobject);
+                sleep(1);
+        }
+//        rpclog("sound thread over!\n");
+}
+
+int maininfocus=1,menuinfocus=1;
 int WINAPI WinMain (HINSTANCE hThisInstance,
                     HINSTANCE hPrevInstance,
                     LPSTR lpszArgument,
@@ -267,6 +351,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         int resetting=0,c;
         char s[160];
         MSG messages;            /* Here messages to the application are saved */
+        HANDLE soundthreadh;
 //        spdlog=fopen("spdlog.txt","wt");
 //        FILE *tempf=fopen("temp.txt","wt");
         /* This is the handle for our window */
@@ -341,9 +426,9 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         loadarmrom();
         resetarm();
         resettube();
-//        tubeinit6502();
-//        tubeinitz80();
+        tubeinit6502();
         loaddiscsamps();
+
                                 for (c=(strlen(uefname)-1);c>0;c--)
                                 {
                                         if (uefname[c]=='.')
@@ -362,19 +447,32 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         if (!uefena && model<3) trapos();
         install_int_ex(update50,MSEC_TO_TIMER(20));
         if (!tube) CheckMenuItem(menu,model+40030,MF_CHECKED);
-        else       CheckMenuItem(menu,40040,MF_CHECKED);
+        else
+        {
+                if (tubetype==TUBEARM) CheckMenuItem(menu,IDM_MODEL_ARM,MF_CHECKED);
+                else if (model==8)     CheckMenuItem(menu,IDM_MODEL_PALMT,MF_CHECKED);
+                else                   CheckMenuItem(menu,IDM_MODEL_PALTUBE,MF_CHECKED);
+        }
         CheckMenuItem(menu,curwave+40080,MF_CHECKED);
+        CheckMenuItem(menu,tubespeed+IDM_TUBE_4-1,MF_CHECKED);
         updatemenu();
         fasttape=1;
         if (soundbuflen==3125)  framelimit=5;
         else                    framelimit=4;
+        frameevent=CreateEvent(NULL, FALSE, FALSE, NULL);
+        soundobject=CreateEvent(NULL, FALSE, FALSE, NULL);
+//SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
+        soundthreadh=(HANDLE)_beginthread(soundthread,0,NULL);
+        atexit(endsoundthread);
+        SetThreadPriority(soundthreadh,THREAD_PRIORITY_TIME_CRITICAL);
+
 //        rpclog("Running\n");
 //        sprintf(s,"Model %i Tube %i",model,tube);
 //        MessageBox(NULL,s,s,MB_OK);
         while (!quit)
         {
 //                #if 0
-                if (framenum>=framelimit && !(fasttape && motor) && soundon)
+/*                if (framenum>=framelimit && !(fasttape && motor) && soundon)
                 {
 //                        rpclog("Sound! %i %i\n",framelimit,soundbuflen);
 //                        fputs("Sound\n",tempf);
@@ -394,11 +492,13 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
                         free_audio_stream_buffer(as);
 //                        spdcount=1;
                         snline=0;
-                }
+                }*/
 //                #endif
-                if (framenum>=framelimit) framenum=0;
-                if (infocus && (spdcount || (fasttape && motor)))
+//                if (framenum>=framelimit) framenum=0;
+                if (infocus)// && (spdcount || (fasttape && motor)))
                 {
+                        if (!(fasttape && motor))
+                           WaitForSingleObject(frameevent,INFINITE);
                         spdcount=0;
                         exec6502(312,128);
                         if (logging) logsound();
@@ -410,7 +510,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
                                 if (!autoboot)
                                    releasekey(0,0);
                         }
-                        if (fasttape && motor && soundon)
+/*                        if (fasttape && motor && soundon)
                         {
                                 p=(unsigned short *)get_audio_stream_buffer(as);
                                 if (p)
@@ -421,9 +521,11 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
                                         free_audio_stream_buffer(as);
                                         framenum=snline=0;
                                 }
-                        }
+                        }*/
                         framenum++;
                 }
+                else
+                   sleep(1);
                 if (fullscreen)
                 {
                         if (key[KEY_F11])
@@ -452,6 +554,8 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
                                 memset(ram,0,65536);
                         }
                         resetarm();
+                        tubereset6502();
+                        resettube();
                         resetuservia();
                         reset1770s();
                         reset8271s();
@@ -475,6 +579,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
                         wah=0;
                 }
         }
+        endsoundthread();
 //        fclose(spdlog);
 /*                if (resetting && !key[KEY_F12]) resetting=0;
                 if (key[KEY_F12] && !resetting)
@@ -511,13 +616,14 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
                 }*/
 //        dumpram();
         save_config();
-        if (soundon) stop_audio_stream(as);
+//        if (soundon) soundoff();
         closevideo();
+//        rpclog("Closing normally!\n");
         allegro_exit();
         savecmos();
 //        dumpregs();
 //        savebuffers();
-//        dumpregs();
+        tubedumpregs();
         checkdiscchanged(0);
         checkdiscchanged(1);
 //        dumpram();
@@ -532,6 +638,11 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         return 0;
 }
 
+int soundprocess;
+void waitforsoundoff()
+{
+        while (soundprocess) sleep(1);
+}
 void updatemenu()
 {
         CheckMenuItem(menu,IDM_RES_LOW,MF_UNCHECKED);
@@ -640,7 +751,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         PostQuitMessage(0);
                         return 0;
                         case IDM_DISC_CHANGE0: case IDM_DISC_AUTOSTART:
-                        if (soundon) stop_audio_stream(as);
+//                        if (soundon) soundoff();
                                 checkdiscchanged(0);
                         if (!getfn(hwnd,"Disc Image\0*.SSD;*.DSD;*.ADF;*.ADL;*.FDI\0DFS Single Sided Disc Image (*.SSD)\0*.SSD\0DFS Double Sided Disc Image (*.DSD)\0*.DSD\0ADFS Disc Image (*.ADF)\0*.ADF\0FDI Disc Image (*.FDI)\0All\0*.*\0\0",discname[0],0,"SSD"))
                         {
@@ -661,10 +772,10 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                                 else if (c!=strlen(discname[0]))
                                    load8271ssd(discname[0],0);
                         }
-                        if (soundon) as=play_audio_stream(soundbuflen,16,0,31250,255,127);
+//                        if (soundon) resetsound();
                         if (LOWORD(wParam)==IDM_DISC_AUTOSTART)
                         {
-                                autoboot=50;
+                                autoboot=100;
                                 resetsysvia();
                                 memset(ram,0,65536);
                                 resetarm();
@@ -677,7 +788,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         }
                         return 0;
                         case IDM_DISC_CHANGE1:
-                        if (soundon) stop_audio_stream(as);
+//                        if (soundon) soundoff();
                         checkdiscchanged(1);
                         if (!getfn(hwnd,"Disc Image\0*.SSD;*.DSD;*.ADF;*.ADL;*.FDI\0DFS Single Sided Disc Image (*.SSD)\0*.SSD\0DFS Double Sided Disc Image (*.DSD)\0*.DSD\0ADFS Disc Image (*.ADF)\0*.ADF\0FDI Disc Image (*.FDI)\0All\0*.*\0\0",discname[0],0,"SSD"))
                         {
@@ -698,7 +809,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                                 else if (c!=strlen(discname[1]))
                                    load8271ssd(discname[1],1);
                         }
-                        if (soundon) as=play_audio_stream(soundbuflen,16,0,31250,255,127);
+//                        if (soundon) resetsound();
                         return 0;
                         case IDM_DISC_SOUND:
                         ddnoise^=1;
@@ -741,15 +852,31 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         case IDM_MODEL_PALB64: case IDM_MODEL_PALB96:
                         case IDM_MODEL_PALB128: case IDM_MODEL_PALM128:
                         case IDM_MODEL_ARM: case IDM_MODEL_PALMC:
-                        case IDM_MODEL_B1770:
-                        if (!tube) CheckMenuItem(menu,model+40030,MF_UNCHECKED);
-                        else       CheckMenuItem(menu,40040,MF_UNCHECKED);
+                        case IDM_MODEL_B1770: case IDM_MODEL_PALMT:
+                        case IDM_MODEL_PALTUBE:
+                        if (!tube)                  CheckMenuItem(menu,model+40030,MF_UNCHECKED);
+                        else if (tubetype==TUBEARM) CheckMenuItem(menu,IDM_MODEL_ARM,MF_UNCHECKED);
+                        else if (model==8)          CheckMenuItem(menu,IDM_MODEL_PALMT,MF_UNCHECKED);
+                        else                        CheckMenuItem(menu,IDM_MODEL_PALTUBE,MF_UNCHECKED);
                         CheckMenuItem(menu,LOWORD(wParam),MF_CHECKED);
                         model=LOWORD(wParam)-40030;
                         if (model==10)
                         {
                                 model=8;
                                 tube=1;
+                                tubetype=TUBEARM;
+                        }
+                        else if (model==11)
+                        {
+                                model=8;
+                                tube=1;
+                                tubetype=TUBE6502;
+                        }
+                        else if (model==12)
+                        {
+                                model=4;
+                                tube=1;
+                                tubetype=TUBE6502;
                         }
                         else
                            tube=0;
@@ -760,9 +887,18 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         reset1770();
                         reset8271(0);
                         resetarm();
+                        tubeloadrom();
+                        tubereset6502();
+                        resettube();
                         resetsysvia();
                         resetuservia();
                         memset(ram,0,65536);
+                        return 0;
+                        case IDM_TUBE_4: case IDM_TUBE_8: case IDM_TUBE_16:
+                        case IDM_TUBE_32: case IDM_TUBE_64:
+                        CheckMenuItem(menu,tubespeed+IDM_TUBE_4-1,MF_UNCHECKED);
+                        tubespeed=(LOWORD(wParam)-IDM_TUBE_4)+1;
+                        CheckMenuItem(menu,LOWORD(wParam),MF_CHECKED);
                         return 0;
                         case IDM_RES_LOW:
                         hires=0;
@@ -790,11 +926,11 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         return 0;
                         case IDM_VIDEO_FULLSCR:
                         SetMenu(hwnd,NULL);
-                        if (soundon) stop_audio_stream(as);
+//                        if (soundon) soundoff();
                         fullscreen=1;
                         updategfxmode();
                         install_mouse();
-                        if (soundon) as=play_audio_stream(soundbuflen,16,0,31250,255,127);
+//                        if (soundon) resetsound();
                         framenum=0;
                         clear(screen);
                         return 0;
@@ -814,14 +950,14 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         return 0;
                         case IDM_WAVE_SQU: case IDM_WAVE_SAW: case IDM_WAVE_SIN:
                         case IDM_WAVE_TRI: case IDM_WAVE_SID:
-                        CheckMenuItem(menu,curwave+40080,MF_UNCHECKED);
+                        CheckMenuItem(menu,curwave+IDM_WAVE_SQU,MF_UNCHECKED);
                         CheckMenuItem(menu,LOWORD(wParam),MF_CHECKED);
-                        curwave=LOWORD(wParam)-40080;
+                        curwave=LOWORD(wParam)-IDM_WAVE_SQU;
                         return 0;
                         case IDM_SOUND_ENABLE:
                         soundon^=1;
-                        if (!soundon) stop_audio_stream(as);
-                        else          as=play_audio_stream(soundbuflen,16,0,31250,255,127);
+                        if (!soundon) soundoff();
+                        else          resetsound();
                         updatemenu();
                         return 0;
                         case IDM_SOUND_HIGH:
@@ -840,7 +976,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         case IDM_SOUND_STOPVGM:
                         stopsnlog();
                         return 0;
-                        case IDM_BUF_80:
+/*                        case IDM_BUF_80:
                         if (soundon) stop_audio_stream(as);
                         soundbuflen=2500;
                         framelimit=4;
@@ -855,14 +991,39 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         updatemenu();
                         if (soundon) as=play_audio_stream(soundbuflen,16,0,31250,255,127);
                         framenum=0;
-                        return 0;
+                        return 0;*/
                 }
                 return DefWindowProc (hwnd, message, wParam, lParam);
                 case WM_SETFOCUS:
-                infocus=1;
+                maininfocus=1;
+                infocus=maininfocus&menuinfocus;
+/*                if (soundon)
+                {
+                        resetsound();
+                }*/
                 break;
                 case WM_KILLFOCUS:
-                infocus=0;
+                maininfocus=0;
+                infocus=maininfocus&menuinfocus;
+                wakeupsoundthread();
+//                waitforsoundoff();
+//                if (soundon) soundoff();
+                break;
+
+                case WM_ENTERMENULOOP:
+                menuinfocus=0;
+                infocus=maininfocus&menuinfocus;
+                wakeupsoundthread();
+//                waitforsoundoff();
+//                if (soundon) soundoff();
+                break;
+                case WM_EXITMENULOOP:
+                menuinfocus=1;
+                infocus=maininfocus&menuinfocus;
+/*                if (soundon)
+                {
+                        resetsound();
+                }*/
                 break;
                 case WM_DESTROY:
                 PostQuitMessage (0);       /* send a WM_QUIT to the message queue */

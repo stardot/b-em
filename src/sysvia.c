@@ -12,7 +12,7 @@ void rpclog(const char *format, ...)
         char *x;
    char buf[256];
    return;
-        if (!arclog) arclog=fopen("arclog.txt","wt");
+        if (!arclog) arclog=fopen("e:/devcpp/b-em8/arclog.txt","wt");
 //        x=0;
 //        *x=0;
    va_list ap;

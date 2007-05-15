@@ -102,11 +102,60 @@ int snvols[3125<<1][4],snnoise2[3125<<1];
 fixed snlatchs[3125<<1][4];
 int snline=0,snlinec=0;
 
+#define BUFLEN ((625*2)*2)
+unsigned short sndbuffers[12][BUFLEN];
+
+int sndqlen=0,sndwpos=0,sndrpos=0;
+
+void updatebuffer(signed short *buffer, int len);
+int infocus;
+int soundprocess=0;
+void pollsoundthread()
+{
+        int c;
+        unsigned short *p;
+//        rpclog("poll sound\n");
+        if (!infocus) return;
+        if (!soundon) return;
+        if (sndqlen)
+        {
+                soundprocess=1;
+                p=NULL;
+                while (!p)
+                      p=get_audio_stream_buffer(as);
+                for (c=0;c<BUFLEN;c++) p[c]=sndbuffers[sndrpos][c];//^0x8000;
+                free_audio_stream_buffer(as);
+                sndrpos++;
+                sndrpos&=7;
+//                if (sndrpos==12) sndrpos=0;
+//                sndrpos&=7;
+                sndqlen--;
+                soundprocess=0;
+        }
+        else
+        {
+                soundprocess=1;
+                p=NULL;
+                while (!p)
+                      p=get_audio_stream_buffer(as);
+                for (c=0;c<BUFLEN;c++) p[c]=0;//x8000;
+                free_audio_stream_buffer(as);
+                soundprocess=0;
+        }
+}
+
+void resetsound()
+{
+//        as=play_audio_stream(BUFLEN,16,0,31250,255,127);
+        sndqlen=sndwpos=sndrpos=0;
+        snline=0;
+}
 void logvols()
 {
         int c;
-        for (c=0;c<2;c++)
-        {
+//        return;
+//        for (c=0;c<2;c++)
+//        {
         snvols[snline][0]=snvol[0];
         snvols[snline][1]=snvol[1];
         snvols[snline][2]=snvol[2];
@@ -117,11 +166,11 @@ void logvols()
         snlatchs[snline][3]=snlatch[3];
         snnoise2[snline]=snnoise;
         snline++;
-  //      rpclog("Log %i\n",snline);
-        }
+//        rpclog("Log %i\n",snline);
+//        }
 //        return;
 //        if (snline>=(soundbuflen>>1)) snline=0;
-        snlinec++;
+/*        snlinec++;
         if (snlinec==312)
         {
                 snvols[snline][0]=snvol[0];
@@ -133,11 +182,32 @@ void logvols()
                 snlatchs[snline][2]=snlatch[2];
                 snlatchs[snline][3]=snlatch[3];
                 snnoise2[snline]=snnoise;
-                snlinec=0;
                 snline++;
-//        rpclog("Log2 %i\n",snline);
+                snlinec=0;
+//                snlinec=snline=0;
+//                snline++;
+//                return;
+        }*/
+        if (snline==BUFLEN)
+        {
+                snline=0;
+                if (sndqlen==8)
+                {
+                        sndqlen--;
+                        sndwpos--;
+                        sndwpos&=7;
+//                        if (sndwpos<0) sndwpos=11;
+                }
+                updatebuffer(sndbuffers[sndwpos],BUFLEN);
+//                if (!soundf) soundf=fopen("sound.pcm","wb");
+//                fwrite(sndbuffers[sndwpos],BUFLEN<<1
+                sndwpos++;
+//                if (sndwpos==12) sndwpos=0;
+                sndwpos&=7;
+                sndqlen++;
+                wakeupsoundthread();
         }
-        if (snline>=3125) snline=0;
+//        if (snline>=3125) snline=0;
 //        rpclog("SNline now %i\n",snline);
 }
 
@@ -158,7 +228,11 @@ void updatebuffer(signed short *buffer, int len)
         unsigned short *sbuf=buffer;
         int sidcount=0;
         int lcount=0;
-//        rpclog("update\n");
+//        rpclog("Update - %i\n",curwave);
+/*        rpclog("update %i %i %i\n",snstat[0],snstat[1],snstat[2]);
+        for (c=0;c<32;c++)
+            rpclog("%02X ",snwaves[curwave][c]);
+        rpclog("\n");*/
         for (d=0;d<len;d++)
         {
 //                rpclog("Update pos %i %i\n",d,len);
@@ -233,6 +307,7 @@ void updatebuffer(signed short *buffer, int len)
                 }
 //                }
         }
+//        fwrite(sbuf,len<<1,1,soundf);
         for (d=0;d<len;d++)
         {
 //                rpclog("Flipping %i %i\n",d,len);
@@ -241,11 +316,21 @@ void updatebuffer(signed short *buffer, int len)
 //        snline=0;
 }
 
+void soundoff()
+{
+        wakeupsoundthread();
+        while (soundprocess) sleep(1);
+//        if (as) stop_audio_stream(as);
+//        as=NULL;
+}
+
 void initsnd()
 {
       int c;
       FILE *f;
       unsigned short *p;
+//      rpclog("Soundon %i\n",soundon);
+//      soundf=fopen("sound.pcm","wb");
 /*      for (c=0;c<32;c++)
       {
                 snwaves[3][c]=fsin((c<<2)<<16)>>8;
@@ -255,12 +340,14 @@ void initsnd()
 //      {
 //        atexit(dumpsound);
 //          soundf=fopen("sound.pcm","wb");
+soundbuflen=625;
       reserve_voices(4,0);
       if (install_sound(DIGI_DIRECTX(0),MIDI_NONE,0))
       {
                 if (install_sound(DIGI_AUTODETECT,MIDI_NONE,0))
                 {
                         soundon=0;
+                        rpclog("Sound failed!\n");
                         return;
                 }
       }
@@ -274,7 +361,8 @@ void initsnd()
           snperiodic[0][c]=snperiodic2[c&31];
       for (c=0;c<32;c++)
           snwaves[3][c]-=128;
-        as=play_audio_stream(soundbuflen,16,0,31250,255,127);
+        as=play_audio_stream(BUFLEN,16,0,31250,255,127);
+soundbuflen=BUFLEN;
                         p=0;
                         while (!p)
                         {
@@ -308,12 +396,12 @@ void initsnd()
 //      slog=fopen("slog.pcm","wb");
 }
 
-void resetsound()
+/*void resetsound()
 {
         int c;
         for (c=0;c<4;c++) stop_sample(snsample[c]);
         for (c=0;c<4;c++) play_sample(snsample[c],0,127,100*100,TRUE);
-}
+}*/
 
 void closesnd()
 {

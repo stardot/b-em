@@ -9,6 +9,7 @@
 #define SECTORS 16
 #define SECTORSIZE 256
 
+int tubeoutput=0;
 int endcommand=0;
 
 struct
@@ -124,6 +125,7 @@ void reset1770s()
 
 void set1770poll(int c)
 {
+//        rpclog("Set 1770 poll %i\n",c);
         discint=c;
 }
 
@@ -216,10 +218,10 @@ void start1770command(unsigned short addr)
         {
                 play_sample(motoronsmp,127,127,1000,0);
                 play_sample(motorsmp,127,127,1000,TRUE);
-                driveled=1;
         }
+        driveled=1;
         motorofff=0;
-//        printf("1770 command %02X\n",wd1770.command);
+//        rpclog("1770 command %02X\n",wd1770.command);
         switch (wd1770.command>>4)
         {
                 case 0: if (ddnoise) play1770seek(0); else set1770poll(2000); break; /*Restore*/
@@ -235,6 +237,7 @@ void start1770command(unsigned short addr)
                         set1770poll(0);
                         inreadop=1;
                 }
+                readflash=1;
                 sectorpos=0;
                 curtrack[0]=inttrack[0]=wd1770.curtrack=wd1770.track;
                 cursec[0]=wd1770.cursector=wd1770.sector;
@@ -242,7 +245,8 @@ void start1770command(unsigned short addr)
                 sectorsleft=1;
                 idmarks=0;
                 break;
-                case 0xA: wd1770.status&=~4; if (ddnoise) { play1770seek(wd1770.track); } else { set1770poll(2000); } sectorpos=-1; wd1770.curtrack=wd1770.track; wd1770.cursector=wd1770.sector; wd1770.dat=0; break; /*Write sector*/
+                case 0xA: wd1770.status&=~4; if (ddnoise) { play1770seek(wd1770.track); } else { set1770poll(2000); } sectorpos=-1; wd1770.curtrack=wd1770.track; wd1770.cursector=wd1770.sector; wd1770.dat=0; /*tubeoutput=1;*/
+                /*rpclog("Write sector track %i sector %i\n",wd1770.curtrack,wd1770.cursector); */break; /*Write sector*/
                 case 0xF: wd1770.status&=~4; set1770poll(2000); sectorpos=0; wd1770.cursector=0; break; /*Write track*/
                 default:
                 printf("Bad 1770 command %01X\n",wd1770.command>>4);
@@ -253,7 +257,7 @@ void start1770command(unsigned short addr)
 
 void write1770(unsigned short addr, unsigned char val)
 {
-//        if (addr!=0xFE87) printf("1770 write %04X %02X %04X\n",addr,val,pc);
+//        rpclog("1770 write %04X %02X %04X\n",addr,val,pc);
         switch (addr)
         {
                 case 0xFE80: /*B+ Control register*/
@@ -292,7 +296,7 @@ void write1770(unsigned short addr, unsigned char val)
                 case 0xFE87: /*Data register*/
                 case 0xFE2B:
                 wd1770.dat=1;
-//                printf("Data register write %02X\n",val);
+//                rpclog("Data register write %02X %i\n",val,sectorpos);
                 wd1770.status&=~2;
                 nmi&=~2;
                 wd1770.data=val;
@@ -314,6 +318,7 @@ unsigned char read1770(unsigned short addr)
                 case 0xFE84: /*Status register*/
                 case 0xFE28:
                 nmi&=~1;
+//                rpclog("Read status %02X\n",wd1770.status);
 //                if (output) printf("Read status %02X\n",wd1770.status);
                 return wd1770.status;
                 case 0xFE85: /*Track register*/
@@ -386,7 +391,7 @@ void poll1770()
                 break;
 
                 case 8: /*Read sector*/
-                if ((sides[curdisc]==1) && curside) /*Seek error*/
+                if (((sides[curdisc]==1) && curside) || wd1770.cursector>=((adfs[curdisc])?16:10)) /*Seek error*/
                 {
                         wd1770.status&=~5;
                         wd1770.status|=0x10;
@@ -413,7 +418,7 @@ void poll1770()
                 break;
 
                 case 0xA: /*Write sector*/
-                if ((sides[curdisc]==1) && curside) /*Seek error*/
+                if (((sides[curdisc]==1) && curside) || wd1770.cursector>=((adfs[curdisc])?16:10)) /*Seek error*/
                 {
                         wd1770.status&=~5;
                         wd1770.status|=0x10;
@@ -432,7 +437,7 @@ void poll1770()
 //                if (!sectorpos) dumpram2();
 //                dumpregs();
 //                exit(-1);
-//                printf("Write sector %02X %02X %i\n",sectorpos,wd1770.data,endcommand);
+//                rpclog("Write sector %02X %02X %i %i\n",sectorpos,wd1770.data,endcommand,wd1770.dat);
                 if (endcommand)
                 {
                         dumpdisc2();
@@ -454,6 +459,7 @@ void poll1770()
                 sectorpos&=255;
                 if (!sectorpos)
                 {
+//                        rpclog("Command over\n");
 //                        dumpdisc2();
                         sectorpos=0;
                         wd1770.status&=~1;

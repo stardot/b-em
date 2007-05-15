@@ -396,3 +396,11 @@ Version 1.2 finalised and released
            Cursor emulation better - now doesn't appear in Revs, Arcadians etc
 13/12/06 - Fixed bugs in video
 14/12/06 - Fixed bugs relating to 2xSaI filter
+Version 1.3 finalised and released
+11/01/07 - Added (working!) 65c12 tube emulation. Runs Elite quite nicely
+13/01/07 - Fixed bug in tube emulation, file transfers now work okay
+           Changes to Windows timing, should be better and smoother now
+14/01/07 - Added tube option for model B.
+04/05/07 - Altered sound code.
+15/05/07 - Fixed sound code and changed timing.
+Version 1.4 finalised and released

@@ -80,10 +80,12 @@ int curwave;
 int blurred,mono;
 int ddnoise;
 int model,tube;
+int tubetype;
 char discname[2][260];
 int quit;
 int autoboot;
 int fasttape;
+int tubespeed;
 
 /*Sound*/
 AUDIOSTREAM *as;
@@ -100,6 +102,10 @@ unsigned long vidlimit;
 int adcconvert;
 
 /*Tube*/
+#define TUBE6502 1
+#define TUBEZ80  2 /*Not implemented!!!*/
+#define TUBEARM  3
+
 int tubeirq;
 int tubecycs;
 

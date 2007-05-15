@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <allegro.h>
+#include "b-em.h"
 
 int autoboot;
 int tube;
@@ -43,7 +44,9 @@ void save_config()
         set_config_int(NULL,"fullscreen",fullscreen);
         set_config_int(NULL,"sound_buffer_length",soundbuflen);
         set_config_int(NULL,"tube",tube);
+        set_config_int(NULL,"tube_type",tubetype);
         set_config_int(NULL,"fast_tape",fasttape);
+        set_config_int(NULL,"tube_speed",tubespeed);
 }
 
 void load_config()
@@ -80,6 +83,7 @@ void load_config()
            uefname[0]=0;
         model=get_config_int(NULL,"model",1);
         tube=get_config_int(NULL,"tube",0);
+        tubetype=get_config_int(NULL,"tube_type",3);
         soundon=get_config_int(NULL,"sound_enable",1);
         curwave=get_config_int(NULL,"current_waveform",0);
         ddnoise=get_config_int(NULL,"disc_noise",1);
@@ -89,8 +93,10 @@ void load_config()
         soundfilter=get_config_int(NULL,"sound_filter",3);
         hires=get_config_int(NULL,"resolution",0);
         fullscreen=get_config_int(NULL,"fullscreen",0);
-        soundbuflen=3125;//get_config_int(NULL,"sound_buffer_length",3120);
+//        soundbuflen=625;//get_config_int(NULL,"sound_buffer_length",3120);
         fasttape=get_config_int(NULL,"fast_tape",1);
+        tubespeed=get_config_int(NULL,"tube_speed",1);
+//        rpclog("Load config - curwave %i\n",curwave);
 }
 
 int gui_exit()
@@ -839,7 +845,7 @@ void entergui()
         gui_fg_color=makecol(255,255,255); gui_bg_color=makecol(0,0,0);
         bemgui[0].fg=makecol(255,255,255);
         clear_keybuf();
-        if (soundon) stop_audio_stream(as);
+//        if (soundon) soundoff();
         x=1;
         if (hires) { bemgui[0].x=400; bemgui[0].y=560; }
         else       { bemgui[0].x=200; bemgui[0].y=260; }
@@ -854,7 +860,7 @@ void entergui()
         show_mouse(NULL);
         shutdown_dialog(dp);
         while ((mouse_b&2) || key[KEY_F11] || key[KEY_ESC]) yield_timeslice();
-        if (soundon) as=play_audio_stream(soundbuflen,16,0,31200,255,127);
+//        if (soundon) resetsound();
         framenum=0;
         clear_keybuf();
         restorepal();

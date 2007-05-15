@@ -6,7 +6,7 @@
              ██       ▄██          ██         ██          ██
              ██████████▀           █████████  ██          ██
 
-                                 Version 1.3
+                                 Version 1.4
                          A freeware BBC Micro emulator
 
 Introduction
@@ -17,7 +17,7 @@ B-em is an attempt to emulate a BBC Micro, made by Acorn Computers in the 80's
 Features
 ~~~~~~~~
 
-- Emulates Models A, B, B+, Master 128 and Master Compact
+- Emulates Models A, B, B+, Master 128, Master Turbo and Master Compact
 - Also emulates ARM evaluation system on Master 128
 - All documented video modes supported
 - All documented and some undocumented 6502 instructions
@@ -36,14 +36,11 @@ Features
 Differences from last version
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- Better sound in Windows version
-- Better CSW support
-- Bugfix in mode 7
-- Bugfix in cursor handling - Frogman works again, no more random crashes in some games
-- Periodic noise pitch now correct - see Icarus, Cute To Kill
-- Video can now use hardware scaling - should be faster
-- Removed colour errors with 2xSaI filter
-- File dialogs now work properly
+- 65c012 tube emulation (+ Master Turbo) - from 4mhz to 64mhz
+- Fixed bug in ARM tube emulation
+- Sideways ROMs supported in Master emulation
+- Windows version now releases unneeded CPU time
+- Sound should hopefully be better
 
 
 Requirements
@@ -55,22 +52,6 @@ A Pentium or better computer (try a P300 at least)
 8mb RAM (?)
 
 You will need a lot more to use the ARM Evaluation System.
-
-
-Nine ROM images are provided with B-em -
-os            - UK BBC MOS
-usos          - US BBC MOS
-bpos          - BBC B+ MOS
-mos3.20       - Master 128 MOS 3.20
-a\basic.rom   - BBC BASIC 2
-b\basic.rom
-b1770\basic.rom
-bp\basic.rom
-b\dfs.rom     - Watford DFS 1.30
-b1770\dfs.rom - Acorn 1770 DFS
-bp\dfs.rom
-bp\nadfs.rom  - Acorn ADFS
-tube\arm.rom  - ARM tube parasite ROM
 
 If you want to use more paged ROMs, put them in the roms directory, in either
 directory B or BP.
@@ -131,17 +112,20 @@ File :
         Exit   - exit to DOS/Windows/whatever.
 
 Model :
-        Model A         - emulate a model A.
-        Model B         - emulate a model B.
-        Model B w/SWRAM - emulate a model B with sideways RAM.
-        Model B w/1770  - emulate a model B with 1770 FDC
-        NTSC Model B    - emulate an American model B with sideways RAM.
-        Model B+        - emulate a model B+ with 64k RAM.
-        Model B+96K     - emulate a model B+ with 96k RAM.
-        Model B+128K    - emulate a model B+ with 128k RAM.
-        Master 128      - emulate a Master 128.
-        Master Compact  - emulate a Master Compact
+        Model A               - emulate a model A.
+        Model B               - emulate a model B.
+        Model B w/SWRAM       - emulate a model B with sideways RAM.
+        Model B w/1770        - emulate a model B with 1770 FDC
+        Model B + 6502 tube   - emulate a model B with a 65C02 tube
+        NTSC Model B          - emulate an American model B with sideways RAM.
+        Model B+              - emulate a model B+ with 64k RAM.
+        Model B+96K           - emulate a model B+ with 96k RAM.
+        Model B+128K          - emulate a model B+ with 128k RAM.
+        Master 128            - emulate a Master 128.
+        Master Turbo          - emulate a Master Turbo (Master 128 with 65C102 tube)
+        Master Compact        - emulate a Master Compact
         ARM Evaluation System - emulate a Master 128 with an ARM attached.
+        6502 tube speed - select the speed of the 6502 tube, from 4mhz to 64mhz
 
 Disc :
         Load drive 0/2 - load a disc into drives 0 and 2.
@@ -197,6 +181,7 @@ Hardware emulated
 The 6502 processor - Most instructions should be emulated. Attempts to be cycle
                      perfect. 65C02 is emulated for Master 128 mode, but is
                      probably missing some opcodes.
+The 65C12 tube     - As a parasite processor on the Master 128 only.
 The ARM processor  - As a parasite processor on the Master 128 only. A bug or
                      two remains, and not all opcodes are implemented.
 The 6845 CRTC      - Accurate line-by-line engine. Firetrack, Revs, and
