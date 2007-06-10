@@ -1,4 +1,4 @@
-/*B-em 1.3 by Tom Walker*/
+/*B-em 1.4 by Tom Walker*/
 /*1770 emulator*/
 #include <allegro.h>
 #include <stdio.h>

@@ -1,4 +1,4 @@
-/*B-em 1.3 by Tom Walker*/
+/*B-em 1.4 by Tom Walker*/
 /*Fullscreen GUI*/
 
 #include <stdio.h>
@@ -153,7 +153,7 @@ int gui_autostart()
         int ret,c;
         int xsize=(hires)?768:384,ysize=(hires)?384:192;
         memcpy(tempname,discname[0],260);
-        ret=file_select_ex("Please choose a disc image",tempname,"SSD;DSD;IMG;ADF;ADL;FDI",260,xsize,ysize);
+        ret=file_select_ex("Please choose a disc image",tempname,"SSD;DSD;IMG;ADF;ADL",260,xsize,ysize);
         if (ret)
         {
                 checkdiscchanged(0);
@@ -168,8 +168,10 @@ int gui_autostart()
                 }
                 if ((discname[0][c]=='d'||discname[0][c]=='D')&&(c!=strlen(discname[0])))
                    load8271dsd(discname[0],0);
+#if 0
                 else if ((discname[0][c]=='f'||discname[0][c]=='F')&&(c!=strlen(discname[0])))
                    load8271fdi(discname[0],0);
+#endif
                 else if ((discname[0][c]=='a'||discname[0][c]=='A')&&(c!=strlen(discname[0])))
                    load1770adfs(discname[0],0);
                 else if (c!=strlen(discname[0]))
@@ -194,7 +196,7 @@ int gui_changedisc0()
         int ret,c;
         int xsize=(hires)?768:384,ysize=(hires)?384:192;
         memcpy(tempname,discname[0],260);
-        ret=file_select_ex("Please choose a disc image",tempname,"SSD;DSD;IMG;ADF;ADL;FDI",260,xsize,ysize);
+        ret=file_select_ex("Please choose a disc image",tempname,"SSD;DSD;IMG;ADF;ADL",260,xsize,ysize);
         if (ret)
         {
                 checkdiscchanged(0);
@@ -209,8 +211,10 @@ int gui_changedisc0()
                 }
                 if ((discname[0][c]=='d'||discname[0][c]=='D')&&(c!=strlen(discname[0])))
                    load8271dsd(discname[0],0);
+#if 0
                 else if ((discname[0][c]=='f'||discname[0][c]=='F')&&(c!=strlen(discname[0])))
                    load8271fdi(discname[0],0);
+#endif
                 else if ((discname[0][c]=='a'||discname[0][c]=='A')&&(c!=strlen(discname[0])))
                    load1770adfs(discname[0],0);
                 else if (c!=strlen(discname[0]))
@@ -225,7 +229,7 @@ int gui_changedisc1()
         int ret,c;
         int xsize=(hires)?768:384,ysize=(hires)?384:192;
         memcpy(tempname,discname[1],260);
-        ret=file_select_ex("Please choose a disc image",tempname,"SSD;DSD;IMG;ADF;ADL;FDI",260,xsize,ysize);
+        ret=file_select_ex("Please choose a disc image",tempname,"SSD;DSD;IMG;ADF;ADL",260,xsize,ysize);
         if (ret)
         {
                 checkdiscchanged(1);
@@ -240,8 +244,10 @@ int gui_changedisc1()
                 }
                 if ((discname[1][c]=='d'||discname[1][c]=='D')&&(c!=strlen(discname[1])))
                    load8271dsd(discname[1],1);
+#if 0
                 else if ((discname[0][c]=='f'||discname[0][c]=='F')&&(c!=strlen(discname[0])))
                    load8271fdi(discname[1],1);
+#endif
                 else if ((discname[1][c]=='a'||discname[1][c]=='A')&&(c!=strlen(discname[1])))
                    load1770adfs(discname[1],1);
                 else if (c!=strlen(discname[1]))
@@ -797,7 +803,7 @@ MENU mainmenu[]=
 
 DIALOG bemgui[]=
 {
-      {d_ctext_proc, 200, 260, 0,  0, 15,0,0,0,     0,0,"B-em v1.3"},
+      {d_ctext_proc, 200, 260, 0,  0, 15,0,0,0,     0,0,"B-em v1.4a"},
       {d_menu_proc,  0,   0,   0,  0, 15,0,0,0,     0,0,mainmenu},
           {d_yield_proc},
       {0,0,0,0,0,0,0,0,0,0,0,NULL,NULL,NULL}

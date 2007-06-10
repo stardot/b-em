@@ -1,4 +1,4 @@
-/*B-em 1.3 by Tom Walker*/
+/*B-em 1.4 by Tom Walker*/
 /*Main loop*/
 
 #include <stdio.h>
@@ -281,7 +281,7 @@ int soundthreadon=0;
 #define BUFLEN (625*4)
 void soundthread(PVOID pvoid)
 {
-        unsigned short *p;
+        unsigned short *sp;
         int c;
         soundthreadon=1;
         while (!quit)
@@ -296,19 +296,22 @@ void soundthread(PVOID pvoid)
                 }
                 else
                 {
-//                        rpclog("entering silence\n");
-                        p=NULL;
-                        while (!p && !quit)
+                        rpclog("entering silence\n");
+                        sp=NULL;
+                        while (!sp && !quit && as)
                         {
                                 sleep(1);
-                                p=get_audio_stream_buffer(as);
+                                if (as) sp=get_audio_stream_buffer(as);
                         }
                         if (!quit)
                         {
-//                                rpclog("found silence soundbuffer!\n");
-                                for (c=0;c<BUFLEN;c++) p[c]=0x8000;
-                                free_audio_stream_buffer(as);
-//                                rpclog("left silence\n");
+                                if (sp)
+                                {
+                                rpclog("found silence soundbuffer!\n");
+                                        for (c=0;c<BUFLEN;c++) sp[c]=0x8000;
+                                        free_audio_stream_buffer(as);
+                                }
+                                rpclog("left silence\n");
                         }
                 }
         }
@@ -329,15 +332,16 @@ void sleepsoundthread()
 
 void endsoundthread()
 {
+        rpclog("ending sound thread 0...\n");
         if (!soundthreadon) return;
-//        rpclog("ending sound thread...\n");
+        rpclog("ending sound thread...\n");
         quit=1;
         while (soundthreadon)
         {
                 SetEvent(soundobject);
                 sleep(1);
         }
-//        rpclog("sound thread over!\n");
+        rpclog("sound thread over!\n");
 }
 
 int maininfocus=1,menuinfocus=1;
@@ -383,7 +387,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         ghwnd = CreateWindowEx (
            0,                   /* Extended possibilites for variation */
            szClassName,         /* Classname */
-           "B-em v1.3",         /* Title Text */
+           "B-em v1.4a",        /* Title Text */
            WS_OVERLAPPEDWINDOW&~(WS_MAXIMIZEBOX|WS_SIZEBOX), /* default window */
            CW_USEDEFAULT,       /* Windows decides the position */
            CW_USEDEFAULT,       /* where the window ends up on the screen */
@@ -579,6 +583,8 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
                         wah=0;
                 }
         }
+        save_config();
+//        rpclog("B-em quit!\n");
         endsoundthread();
 //        fclose(spdlog);
 /*                if (resetting && !key[KEY_F12]) resetting=0;
@@ -615,7 +621,6 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
                         entergui();
                 }*/
 //        dumpram();
-        save_config();
 //        if (soundon) soundoff();
         closevideo();
 //        rpclog("Closing normally!\n");
@@ -753,7 +758,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         case IDM_DISC_CHANGE0: case IDM_DISC_AUTOSTART:
 //                        if (soundon) soundoff();
                                 checkdiscchanged(0);
-                        if (!getfn(hwnd,"Disc Image\0*.SSD;*.DSD;*.ADF;*.ADL;*.FDI\0DFS Single Sided Disc Image (*.SSD)\0*.SSD\0DFS Double Sided Disc Image (*.DSD)\0*.DSD\0ADFS Disc Image (*.ADF)\0*.ADF\0FDI Disc Image (*.FDI)\0All\0*.*\0\0",discname[0],0,"SSD"))
+                        if (!getfn(hwnd,"Disc Image\0*.SSD;*.DSD;*.ADF;*.ADL\0DFS Single Sided Disc Image (*.SSD)\0*.SSD\0DFS Double Sided Disc Image (*.DSD)\0*.DSD\0ADFS Disc Image (*.ADF)\0*.ADF\0All\0*.*\0\0",discname[0],0,"SSD"))
                         {
                                 for (c=0;c<strlen(discname[0]);c++)
                                 {
@@ -765,8 +770,10 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                                 }
                                 if ((discname[0][c]=='d'||discname[0][c]=='D')&&(c!=strlen(discname[0])))
                                    load8271dsd(discname[0],0);
+#if 0
                                 else if ((discname[0][c]=='f'||discname[0][c]=='F')&&(c!=strlen(discname[0])))
                                    load8271fdi(discname[0],0);
+#endif
                                 else if ((discname[0][c]=='a'||discname[0][c]=='A')&&(c!=strlen(discname[0])))
                                    load1770adfs(discname[0],0);
                                 else if (c!=strlen(discname[0]))
@@ -790,7 +797,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         case IDM_DISC_CHANGE1:
 //                        if (soundon) soundoff();
                         checkdiscchanged(1);
-                        if (!getfn(hwnd,"Disc Image\0*.SSD;*.DSD;*.ADF;*.ADL;*.FDI\0DFS Single Sided Disc Image (*.SSD)\0*.SSD\0DFS Double Sided Disc Image (*.DSD)\0*.DSD\0ADFS Disc Image (*.ADF)\0*.ADF\0FDI Disc Image (*.FDI)\0All\0*.*\0\0",discname[0],0,"SSD"))
+                        if (!getfn(hwnd,"Disc Image\0*.SSD;*.DSD;*.ADF;*.ADL\0DFS Single Sided Disc Image (*.SSD)\0*.SSD\0DFS Double Sided Disc Image (*.DSD)\0*.DSD\0ADFS Disc Image (*.ADF)\0*.ADF\0All\0*.*\0\0",discname[0],0,"SSD"))
                         {
                                 for (c=0;c<strlen(discname[1]);c++)
                                 {
@@ -802,8 +809,10 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                                 }
                                 if ((discname[1][c]=='d'||discname[1][c]=='D')&&(c!=strlen(discname[1])))
                                    load8271dsd(discname[1],1);
+#if 0
                                 else if ((discname[0][c]=='f'||discname[0][c]=='F')&&(c!=strlen(discname[0])))
                                    load8271fdi(discname[0],0);
+#endif
                                 else if ((discname[1][c]=='a'||discname[1][c]=='A')&&(c!=strlen(discname[1])))
                                    load1770adfs(discname[1],1);
                                 else if (c!=strlen(discname[1]))

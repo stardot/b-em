@@ -1,4 +1,4 @@
-/*B-em 1.3 by Tom Walker*/
+/*B-em 1.4 by Tom Walker*/
 /*8271 FDC emulation*/
 
 #include <stdio.h>
@@ -222,6 +222,7 @@ unsigned char decodefm(unsigned short dat)
         return temp;
 }
 
+#if 0
 int load8271fdi(char *fn, int disc)
 {
         unsigned char fdihead[512],trackhead[16],sectorid[4];
@@ -333,7 +334,7 @@ int load8271fdi(char *fn, int disc)
         fclose(f);
 //        exit(-1);
 }
-
+#endif
 void empty8271disc(int disc)
 {
         int c,d,e,f;
@@ -426,8 +427,10 @@ void reset8271(int reload)
         }
         if (discname[0][c]=='d'||discname[0][c]=='D')
            load8271dsd(discname[0],0);
+#if 0
         else if (discname[0][c]=='f'||discname[0][c]=='F')
            load8271fdi(discname[0],0);
+#endif
         else
            load8271ssd(discname[0],0);
 
@@ -446,8 +449,10 @@ void reset8271(int reload)
         }
         if (discname[1][c]=='d'||discname[1][c]=='D')
            load8271dsd(discname[1],1);
+#if 0
         else if (discname[1][c]=='f'||discname[1][c]=='F')
            load8271fdi(discname[1],1);
+#endif
         else
            load8271ssd(discname[1],1);
 //        atexit(dumpdisc);

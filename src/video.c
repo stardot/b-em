@@ -1,4 +1,4 @@
-/*B-em 1.3 by Tom Walker*/
+/*B-em 1.4 by Tom Walker*/
 /*Video emulation*/
 
 #include <stdio.h>
@@ -107,7 +107,7 @@ void redocursor()
         int y;
         int size;
 //        return;
-        for (y=cursorstart;y<cursorend;y++)
+        for (y=cursorstart;y<=cursorend;y++)
         {
                 if (y<16)
                    cursorram[(cursoraddr+y)&0xFFFF]=cursorram[(cursoraddr+16+y)&0xFFFF]=cursorram[(cursoraddr+32+y)&0xFFFF]=cursorram[(cursoraddr+48+y)&0xFFFF]=0;
@@ -397,7 +397,7 @@ void drawmode2line()
         if (firstx>xoffset) firstx=xoffset;
         if (sc&8)
         {
-                hline(buffer,0,physline,399,0);
+                hline(buffer,0,physline&511,399,0);
         }
         else
         {
@@ -409,13 +409,14 @@ void drawmode2line()
                         bufferp[(xoffset>>2)&127]=lookuptab[val];
                         xoffset+=4;
                 }
+                if (lastx<xoffset) lastx=xoffset;
+                if (drawfull) hline(buffer,xoffset,physline,399,0);
+                xoffset=200-(crtc[1]<<1);
+                if (drawfull) hline(buffer,0,physline,xoffset,0);
         }
-        if (lastx<xoffset) lastx=xoffset;
-        if (drawfull) hline(buffer,xoffset,physline,399,0);
-        xoffset=200-(crtc[1]<<1);
-        if (drawfull) hline(buffer,0,physline,xoffset,0);
         if (sc>=cursorstart && sc<=cursorend)
         {
+                xoffset=200-(crtc[1]<<1);
                 for (x=0;x<crtc[1];x++)
                 {
                         if (caddr&0x10000) caddr-=(screenlen[scrsize]<<1);
@@ -436,10 +437,12 @@ void drawmode4line()
         if (firstx>xoffset) firstx=xoffset;
         if (sc&8)
         {
-                hline(buffer,0,physline,399,0);
+//                rpclog("Blanking line %i\n",physline);
+                hline(buffer,0,physline&511,398,0);
         }
         else
         {
+//                rpclog("Drawling line %i\n",physline);
                 for (x=0;x<crtc[1];x++)
                 {
                         if (addr & vidlimit) { addr-=screenlen[scrsize]; addr&=0xFFFF; }
@@ -449,13 +452,15 @@ void drawmode4line()
                         bufferp[((xoffset+4)>>2)&127]=lookuptab2[val];
                         xoffset+=8;
                 }
+                if (lastx<xoffset) lastx=xoffset;
+                if (drawfull) hline(buffer,xoffset,physline,399,0);
+                xoffset=200-(crtc[1]<<2);
+                if (drawfull) hline(buffer,0,physline,xoffset,0);
         }
-        if (lastx<xoffset) lastx=xoffset;
-        if (drawfull) hline(buffer,xoffset,physline,399,0);
-        xoffset=200-(crtc[1]<<2);
-        if (drawfull) hline(buffer,0,physline,xoffset,0);
         if (sc>=cursorstart && sc<=cursorend)
         {
+                xoffset=200-(crtc[1]<<2);
+//                rpclog("Cursor on at line %i\n",physline);
                 for (x=0;x<crtc[1];x++)
                 {
                         if (caddr&0x10000) caddr-=(screenlen[scrsize]<<1);
@@ -504,12 +509,12 @@ void drawmode2lineh(int line)
                         }
                         xoffset+=4;
                 }
-        }
-        if (lastx<xoffset) lastx=xoffset;
-        if (drawfull)
-        {
-                hline(buffer,xoffset<<1,line,799,0);
-                if (hires==3) hline(buffer,xoffset<<1,line+1,799,0);
+                if (lastx<xoffset) lastx=xoffset;
+                if (drawfull)
+                {
+                        hline(buffer,xoffset<<1,line,799,0);
+                        if (hires==3) hline(buffer,xoffset<<1,line+1,799,0);
+                }
         }
         xoffset=200-(crtc[1]<<1);
         if (sc>=cursorstart && sc<=cursorend)

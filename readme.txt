@@ -6,7 +6,7 @@
              ██       ▄██          ██         ██          ██
              ██████████▀           █████████  ██          ██
 
-                                 Version 1.4
+                                 Version 1.4a
                          A freeware BBC Micro emulator
 
 Introduction
@@ -23,8 +23,7 @@ Features
 - All documented and some undocumented 6502 instructions
 - 8271 Floppy Disc Controller emulated (double drive, double sided, 80 track, read/write)
 - 1770 Floppy Disc Controller emulated (double drive, double sided, 80 track, read/write)
-- Supports eight formats for BBC storage on PC - .ssd, .dsd, .adf, .fdi, .inf,
-  .uef, .csw and __catalog__
+- Supports seven formats for BBC storage on PC - .ssd, .dsd, .adf, .inf, .uef, .csw and __catalog__
 - Can run many protected disc and tape games.
 - Sound emulation, including sample playback
 - Some CRTC tricks, such as overscan, raster splitting and rupture.
@@ -190,11 +189,9 @@ The Video ULA      - All modes emulated.
 The System VIA     - Keyboard and sound emulated.
 The User VIA       - Emulated.
 8271 FDC           - Double disc, double sided, 40/80 tracks, read/write. With
-                     authentic noise. Only in model B mode. Supports read-only
-                     access of protected FDI images.
+                     authentic noise. Only in model B mode.
 1770 FDC           - Double disc, double sided, 40/80 tracks, read/write. With
                      authentic noise. Only in model B+ and Master 128 mode.
-                     Supports read-only access of protected FDI images.
 tape filing system - Supports .inf and __CATALOG__ format.
 Sound              - All channels emulated, with sample support and some
                      undocumented behaviour (Crazee Rider). With optional low

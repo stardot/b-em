@@ -1,17 +1,20 @@
-B-em v1.4
-=========
+B-em v1.4a
+==========
 
 Source for the DOS, Windows and OS X versions are included. The DOS
 version should/may also compile under Linux/QNX/BeOS, although I haven't
 tried this. The Windows and OS X versions use a lot of platform-specific code,
 and will not compile on other platforms.
 
-The OS X source is of version v1.0, DOS is v1.1, and Windows is v1.4.
+The OS X source is of version v1.0, DOS is v1.1, and Windows is v1.4a.
 
 The DOS and Windows versions will not compile under GCC 4 as I have this bad
 habit of declaring variables in multiple source files instead of using header
 files properly. The OS X version has been corrected and does compile. For v1.0
 I tried to correct this, at least in the DOS port.
+
+The DOS and OSX ports require fdi2raw.c and fdi2raw.h from WinUAE. These are not
+included anymore due to licensing problems.
 
 For the DOS version, you will need :
 DJGPP

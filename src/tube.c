@@ -1,5 +1,5 @@
 unsigned short tubepc;
-/*B-em 1.3
+/*B-em 1.4
   Tube emulation
   Emulates 4mhz 65C02, 4mhz Z80 and 8mhz ARM tubes for now*/
 /*Doesn't actually work - so most of it has been commented out*/

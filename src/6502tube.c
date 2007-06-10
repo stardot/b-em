@@ -1,4 +1,4 @@
-/*B-em 1.3 by Tom Walker*/
+/*B-em 1.4 by Tom Walker*/
 /*6502 tube emulation*/
 
 int tubetimetolive,tubeoutput;
@@ -220,7 +220,7 @@ void tubeexec65c02(int tubecycs)
         signed char offset;
         int c;
         tubecycles+=tubecycs;
-        rpclog("Tube exec %i %04X\n",tubecycs,pc);
+//        rpclog("Tube exec %i %04X\n",tubecycs,pc);
                 while (tubecycles>0)
                 {
                         oldtpc2=oldtpc;
@@ -229,7 +229,7 @@ void tubeexec65c02(int tubecycs)
                         switch (opcode)
                         {
                                 case 0x00: /*BRK*/
-                                rpclog("Tube BRK at %04X! %04X %04X\n",pc,oldtpc,oldtpc2);
+//                                rpclog("Tube BRK at %04X! %04X %04X\n",pc,oldtpc,oldtpc2);
                                 pc++;
                                 push(pc>>8);
                                 push(pc&0xFF);
