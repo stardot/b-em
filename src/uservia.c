@@ -56,7 +56,7 @@ void updateusertimers()
         {
                 while (uservia.t1c<-3)
                       uservia.t1c+=uservia.t1l+4;
-//                rpclog("User Timer 1 reset line %04X %04X %04X\n",uservia.t1c,uservia.t1l,pc);
+//                rpclog("User Timer 1 reset line %04X %04X %04X %i\n",uservia.t1c,uservia.t1l,pc,lns);
                 t1back=uservia.t1c;
                 if (!uservia.t1hit)
                 {
@@ -137,6 +137,7 @@ void writeuservia(unsigned short addr, unsigned char val, int line)
                         uservia.ifr&=~TIMER1INT;
                         updateuserIFR();
                 }
+//                printf("%04X\n",uservia.t1l>>1);
                 break;
                 case T1CH:
                 if ((uservia.acr&0xC0)==0x80) timerout=0;
@@ -184,12 +185,14 @@ void writeuservia(unsigned short addr, unsigned char val, int line)
                 else
                    uservia.ier&=~(val&0x7F);
                 updateuserIFR();
+//                rpclog("Write IER %02X %04X %02X\n",val,pc,uservia.ier);
 //                if (uservia.ier&0x40) printf("0x40 enabled at %04X\n",pc);
 //                uservia.ifr&=~uservia.ier;
                 break;
                 case IFR:
                 uservia.ifr&=~(val&0x7F);
                 updateuserIFR();
+//                rpclog("Write IFR %02X %04X %02X\n",val,pc,uservia.ifr);
                 break;
         }
 }
@@ -264,7 +267,7 @@ unsigned char readuservia(unsigned short addr)
                 case IER:
                 return uservia.ier|0x80;
                 case IFR:
-//                printf("IFR %02X\n",uservia.ifr);
+//                rpclog("IFR %02X\n",uservia.ifr);
                 return uservia.ifr;
         }
 }
@@ -282,8 +285,8 @@ void resetuservia()
 
 void dumpuservia()
 {
-        printf("T1 = %04X %04X T2 = %04X %04X\n",uservia.t1c,uservia.t1l,uservia.t2c,uservia.t2l);
-        printf("%02X %02X  %02X %02X\n",uservia.ifr,uservia.ier,uservia.pcr,uservia.acr);
+        rpclog("T1 = %04X %04X T2 = %04X %04X\n",uservia.t1c,uservia.t1l,uservia.t2c,uservia.t2l);
+        rpclog("%02X %02X  %02X %02X\n",uservia.ifr,uservia.ier,uservia.pcr,uservia.acr);
 }
 
 void saveuserviastate(FILE *f)

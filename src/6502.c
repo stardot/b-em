@@ -65,6 +65,7 @@ int ins=0;
 void dumpram()
 {
         int c;
+        return;
         printf("Exiting at %04X\n",pc);
         FILE *f=fopen("ram.dmp","wb");
         fwrite(ram,65536,1,f);
@@ -123,7 +124,7 @@ void initmem()
         memstat[0xFE]=2;
         memstat[0x100]=memstat[0];
         mem[0x100]=mem[0];
-//        atexit(dumpram);
+        atexit(dumpram);
 }
 
 void remaketables()
@@ -487,7 +488,7 @@ unsigned char writememl(unsigned short addr, unsigned char val)
 }
 
 #define readmem(a) ((memstat[(a)>>8]==2)?readmeml(a):mem[(a)>>8][(a)&0xFF])
-#define writemem(a,b) if (memstat[(a)>>8]==0) mem[(a)>>8][(a)&0xFF]=b; else if (memstat[(a)>>8]==2) writememl(a,b)
+#define writemem(a,b) if (((a)&~1)==0x98) printf("Write USPOS+%i %02X %04X\n",(a)&1,b,pc); if (memstat[(a)>>8]==0) mem[(a)>>8][(a)&0xFF]=b; else if (memstat[(a)>>8]==2) writememl(a,b)
 #define getw() (readmem(pc)|(readmem(pc+1)<<8)); pc+=2
 
 void reset6502()
@@ -637,6 +638,7 @@ void exec6502(int lines, int cpl)
                    cycles+=cpl;*/
                 while (cycles>0)
                 {
+//                        if (pc==0x19D7) output=1;
                         pc3=oldoldpc;
                         oldoldpc=oldpc;
                         oldpc=pc;
@@ -769,6 +771,7 @@ void exec6502(int lines, int cpl)
                                 temp=readmem(pc); pc++;
                                 addr=readmem(temp)+(readmem(temp+1)<<8);
                                 if ((addr&0xFF00)^((addr+y)&0xFF00)) polltime(1);
+//                                if ((addr&0xFF00)==0x2800) printf("Read %04X %02X %02X\n",addr+y,a,ram[addr+y]);
                                 a|=readmem(addr+y);
                                 setzn(a);
                                 polltime(5);
@@ -959,6 +962,7 @@ void exec6502(int lines, int cpl)
                                 temp=readmem(pc); pc++;
                                 addr=readmem(temp)+(readmem(temp+1)<<8);
                                 if ((addr&0xFF00)^((addr+y)&0xFF00)) polltime(1);
+//                                if ((addr&0xFF00)==0x2A00) printf("Read %04X %02X %02X\n",addr+y,a,ram[addr+y]);
                                 a&=readmem(addr+y);
                                 setzn(a);
                                 polltime(5);
@@ -1270,7 +1274,7 @@ void exec6502(int lines, int cpl)
 
                                 case 0x6C: /*JMP ()*/
                                 addr=getw();
-                                if (addr==0xFFFC) output=0;
+//                                if (addr==0xFFFC) output=0;
                                 if ((addr&0xFF)==0xFF) pc=readmem(addr)|(readmem(addr-0xFF)<<8);
                                 else                   pc=readmem(addr)|(readmem(addr+1)<<8);
                                 polltime(5);
@@ -1476,6 +1480,7 @@ void exec6502(int lines, int cpl)
                                 temp=readmem(pc); pc++;
 //                                if (temp==0xB0) printf("STA\n");
                                 addr=readmem(temp)+(readmem(temp+1)<<8)+y;
+//                                if (output) printf("STA %04X %02X %04X\n",addr-y,y,addr);
                                 writemem(addr,a);
                                 polltime(6);
                                 takeint=(interrupt && !p.i);
@@ -1568,6 +1573,7 @@ void exec6502(int lines, int cpl)
 
                                 case 0xA5: /*LDA zp*/
                                 addr=readmem(pc); pc++;
+                                if (addr==0xB1) printf("Read B1 %04X %02X\n",pc,ram[addr]);
                                 a=ram[addr];
                                 setzn(a);
                                 polltime(3);
@@ -1614,6 +1620,7 @@ void exec6502(int lines, int cpl)
 
                                 case 0xAD: /*LDA abs*/
                                 addr=getw();
+                                if (addr==0xB1) printf("Read B1 %04X %02X\n",pc,ram[addr]);
                                 polltime(4);
                                 takeint=(interrupt && !p.i);
 //                                if (output) printf("Takeint %i %i %i\n",takeint,interrupt,p.i);
@@ -1648,6 +1655,7 @@ void exec6502(int lines, int cpl)
                                 temp=readmem(pc); pc++;
                                 addr=readmem(temp)+(readmem(temp+1)<<8);
                                 if ((addr&0xFF00)^((addr+y)&0xFF00)) polltime(1);
+//                                if (output) rpclog("ADDR %04X %02X %04X\n",addr,y,addr+y);
                                 a=readmem(addr+y);
                                 setzn(a);
                                 polltime(5);
@@ -1759,6 +1767,7 @@ void exec6502(int lines, int cpl)
                                 case 0xC5: /*CMP zp*/
                                 addr=readmem(pc); pc++;
                                 temp=ram[addr];
+//                                if (output) printf("Comparing %02X %02X\n",a,temp);
                                 setzn(a-temp);
                                 p.c=(a>=temp);
                                 polltime(3);
@@ -1809,7 +1818,7 @@ void exec6502(int lines, int cpl)
                                 polltime(4);
                                 takeint=(interrupt && !p.i);
                                 temp=readmem(addr);
-//                                if (output) printf("CMP %02X %02X\n",a,temp);
+                                if (output) printf("CMP %02X %02X\n",a,temp);
                                 setzn(a-temp);
                                 p.c=(a>=temp);
                                 break;
@@ -2245,15 +2254,28 @@ void exec6502(int lines, int cpl)
 //                        if (currom==14)
 //                        if (pc==0x3000) output=1;
 //                        if (pc==0xDC5D) output=0;
-//                        if (output)
-//                        {
-//                                rpclog("%i A=%02X X=%02X Y=%02X S=%02X PC=%04X %c%c%c%c%c%c op=%02X %i  %04X %i %04X %i %04X  %04X %i %04X %i  %02X %02X\n",curtrack[0],a,x,y,s,pc,(p.n)?'N':' ',(p.v)?'V':' ',(p.d)?'D':' ',(p.i)?'I':' ',(p.z)?'Z':' ',(p.c)?'C':' ',opcode,cycles,sysvia.t1c>>1,sysvia.t1c,sysvia.t2c>>1,sysvia.t2c,sysvia.t2l,uservia.t1c>>1,uservia.t1c,uservia.t2c>>1,uservia.t2c,sysvia.ifr,uservia.ifr);
-/*                                if (timetolive)
+//if (pc==0x19BD) printf("19BD %02X%02X\n",ram[0x81],ram[0x80]);
+/*                        if (output && pc<0x8000 && 0)
+                        {
+                                rpclog("A=%02X X=%02X Y=%02X S=%02X PC=%04X %c%c%c%c%c%c op=%02X %02X%02X\n",a,x,y,s,pc,(p.n)?'N':' ',(p.v)?'V':' ',(p.d)?'D':' ',(p.i)?'I':' ',(p.z)?'Z':' ',(p.c)?'C':' ',opcode,ram[0x78],ram[0x79]);
+                                if (timetolive)
                                 {
                                         timetolive--;
                                         if (!timetolive) output=0;
-                                }*/
-//                        }
+                                }
+                        }*/
+//                        if (p.i && pc<0x2000) output=1;
+//                        else                  output=0;
+//                        if (pc==0x19b5) printf("MUSPTR %02X%02X\n",ram[0x81],ram[0x80]);
+//                        if (pc==0x1A30) printf("ENVPTR %02X\n",a);
+//                        if (pc==0x1A54) printf("GETMUS from %04X\n",oldpc);
+//                        if (pc==0x19ac) output=1;
+//                        if (pc==0x1958) printf("DATA %02X\n",a);
+//                        if (pc==0x1971) printf("DATA2 %02X\n",a);
+//                        if (pc==0x1A87) printf("Frame! %i %04X\n",uservia.t1l,uservia.t1l>>1);
+//                        if (pc>=0x1902 && pc<0x19D2) output=1;
+//                        else output=0;
+//                        if (pc==0x1D15) output=0;
 //#endif
 //                        if (pc==0x3000) output=1;
 //                        if (pc==0x240B) output=0;
@@ -2262,7 +2284,7 @@ void exec6502(int lines, int cpl)
                         if (takeint)
                         {
                                 interrupt&=~128;
-//                                if (skipint==2) printf("interrupt\n");
+//                                printf("interrupt\n");
                                 takeint=0;
                                 skipint=0;
                                 push(pc>>8);
@@ -2276,7 +2298,9 @@ void exec6502(int lines, int cpl)
                                 pc=readmem(0xFFFE)|(readmem(0xFFFF)<<8);
                                 p.i=1;
                                 polltime(7);
-//                                printf("Interrupt line %i %i %02X %02X %02X %02X\n",interrupt,lines,sysvia.ifr&sysvia.ier,uservia.ifr&uservia.ier,uservia.ier,uservia.ifr);
+//                                printf("Interrupt line %i %i %02X %02X %02X %02X\n",interrupt,cycles,sysvia.ifr&sysvia.ier,uservia.ifr&uservia.ier,uservia.ier,uservia.ifr);
+//                                output=1;
+//                                timetolive=50;
 //                                printf("IRQ1V %04X IRQ2V %04X\n",ram[0x204]|(ram[0x205]<<8),ram[0x206]|(ram[0x207]<<8));
                         }
                         interrupt&=~128;
@@ -2299,6 +2323,11 @@ void exec6502(int lines, int cpl)
                                 exectube(tubecycs);
                                 tubecycs=0;
                         }
+//                        if (pc==0x1D53) output=1;
+//                        if (pc==0x1D6B) output=0;
+//                        if (pc==0x2099) output=1;
+//                        if (pc==0x2099) printf("Destbomb %02X,%02X %02X %02X\n",x,y,ram[0xA0],ram[0xA1]);
+//                        if (pc==0x20A7) printf("Pos - %02X %02X  %02X\n",ram[0x400+x],ram[0x401+x],x);
 
 /*                        if (interrupt && !p.i && skipint)
                         {
@@ -3841,7 +3870,7 @@ void exec65c02(int lines, int cpl)
 //                        if (currom==8) output=1; else { if (output) printf("Output end\n"); output=0; }
 //                        if (pc==0x813D) printf("813D Y=%02X %04X %04X\n",y,oldpc,oldoldpc);
 //                        if (pc==0xE583 && currom==9) { dumpregs(); exit(0); }
-                        if (output) printf("A=%02X X=%02X Y=%02X S=%02X PC=%04X %c%c%c%c%c%c op=%02X %02X\n",a,x,y,s,pc,(p.n)?'N':' ',(p.v)?'V':' ',(p.d)?'D':' ',(p.i)?'I':' ',(p.z)?'Z':' ',(p.c)?'C':' ',opcode,ram[1]);
+                        if (output) printf("A=%02X X=%02X Y=%02X S=%02X PC=%04X %c%c%c%c%c%c op=%02X %02X  %02X %02X  %02X\n",a,x,y,s,pc,(p.n)?'N':' ',(p.v)?'V':' ',(p.d)?'D':' ',(p.i)?'I':' ',(p.z)?'Z':' ',(p.c)?'C':' ',opcode,ram[1],sysvia.ifr,uservia.ifr,currom);
                         if (disccount<0)
                         {
                                 disccount+=(ddensity)?8:16;
@@ -3880,9 +3909,11 @@ void exec65c02(int lines, int cpl)
                                 timetolive--;
                                 if (!timetolive) output=0;
                         }
+//                        if (pc>0x1900 && pc<0x1B00 && p.i) output=1;
+//                        else output=0;
                         if ((interrupt && !p.i && !skipint) || skipint==2)
                         {
-//                                if (skipint==2) printf("interrupt\n");
+//                                printf("interrupt\n");
                                 skipint=0;
                                 push(pc>>8);
                                 push(pc&0xFF);
@@ -3894,7 +3925,7 @@ void exec65c02(int lines, int cpl)
                                 pc=readmem(0xFFFE)|(readmem(0xFFFF)<<8);
                                 p.i=1;
                                 polltime(7);
-//                                printf("Interrupt line %i %i %02X %02X %02X %02X\n",interrupt,lines,sysvia.ifr&sysvia.ier,uservia.ifr&uservia.ier,uservia.ier,uservia.ifr);
+                                printf("Interrupt line %i %i %02X %02X %02X %02X\n",interrupt,lines,sysvia.ifr&sysvia.ier,uservia.ifr&uservia.ier,sysvia.ier,sysvia.ifr);
                         }
                         if (interrupt && !p.i && skipint)
                         {

@@ -6,7 +6,7 @@
              ██       ▄██          ██         ██          ██
              ██████████▀           █████████  ██          ██
 
-                                 Version 1.4a
+                                 Version 1.5
                          A freeware BBC Micro emulator
 
 Introduction
@@ -19,11 +19,13 @@ Features
 
 - Emulates Models A, B, B+, Master 128, Master Turbo and Master Compact
 - Also emulates ARM evaluation system on Master 128
+- Also emulates 6502 and Z80 tubes.
 - All documented video modes supported
 - All documented and some undocumented 6502 instructions
 - 8271 Floppy Disc Controller emulated (double drive, double sided, 80 track, read/write)
 - 1770 Floppy Disc Controller emulated (double drive, double sided, 80 track, read/write)
-- Supports seven formats for BBC storage on PC - .ssd, .dsd, .adf, .inf, .uef, .csw and __catalog__
+- Supports eight formats for BBC storage on PC - .ssd, .dsd, .adf, .fdi, .inf,
+  .uef, .csw and __catalog__
 - Can run many protected disc and tape games.
 - Sound emulation, including sample playback
 - Some CRTC tricks, such as overscan, raster splitting and rupture.
@@ -35,11 +37,10 @@ Features
 Differences from last version
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- 65c012 tube emulation (+ Master Turbo) - from 4mhz to 64mhz
-- Fixed bug in ARM tube emulation
-- Sideways ROMs supported in Master emulation
-- Windows version now releases unneeded CPU time
-- Sound should hopefully be better
+- Acorn Z80 tube emulation
+- Various fixes to video and sound
+- New bandpass sound filter - recommended! (sounds very BBC-ish)
+- Fixed crash bug on exit
 
 
 Requirements
@@ -48,7 +49,7 @@ Requirements
 B-em (bbc model B EMulator), requires the following :
 
 A Pentium or better computer (try a P300 at least)
-8mb RAM (?)
+16mb RAM (?)
 
 You will need a lot more to use the ARM Evaluation System.
 
@@ -116,6 +117,7 @@ Model :
         Model B w/SWRAM       - emulate a model B with sideways RAM.
         Model B w/1770        - emulate a model B with 1770 FDC
         Model B + 6502 tube   - emulate a model B with a 65C02 tube
+        Model B + Z80 tube    - emulate a model B with an Acorn Z80 tube
         NTSC Model B          - emulate an American model B with sideways RAM.
         Model B+              - emulate a model B+ with 64k RAM.
         Model B+96K           - emulate a model B+ with 96k RAM.
@@ -181,21 +183,26 @@ The 6502 processor - Most instructions should be emulated. Attempts to be cycle
                      perfect. 65C02 is emulated for Master 128 mode, but is
                      probably missing some opcodes.
 The 65C12 tube     - As a parasite processor on the Master 128 only.
+The Z80 tube       - As a parasite processor on the model B only. Probably a
+                     few bugs. Timing a bit off (runs at 8mhz to get Tube protocols
+                     to work). Was cycle accurate once, probably not now.
 The ARM processor  - As a parasite processor on the Master 128 only. A bug or
                      two remains, and not all opcodes are implemented.
 The 6845 CRTC      - Accurate line-by-line engine. Firetrack, Revs, and
-                     Uridium all work.
+                     Uridium all work. Most video tricks should work.
 The Video ULA      - All modes emulated.
 The System VIA     - Keyboard and sound emulated.
 The User VIA       - Emulated.
 8271 FDC           - Double disc, double sided, 40/80 tracks, read/write. With
-                     authentic noise. Only in model B mode.
+                     authentic noise. Only in model B mode. Supports read-only
+                     access of protected FDI images.
 1770 FDC           - Double disc, double sided, 40/80 tracks, read/write. With
                      authentic noise. Only in model B+ and Master 128 mode.
+                     Supports read-only access of protected FDI images.
 tape filing system - Supports .inf and __CATALOG__ format.
 Sound              - All channels emulated, with sample support and some
-                     undocumented behaviour (Crazee Rider). With optional low
-                     and high pass filters.
+                     undocumented behaviour (Crazee Rider). With optional bandpass
+                     filter.
 ADC                - Real joystick emulation, supporting both joysticks.
 6850 ACIA          - Emulated for cassettes. Read only.
 Serial ULA         - Emulated.
@@ -257,7 +264,7 @@ b-em@bbcmicro.com
 <plug>
 Also check out Elkulator (elkulator.acornelectron.co.uk), my Electron emulator,
 Arculator (b-em.bbcmicro.com/arculator), my Archimedes emulator, and RPCemu
-(same as Arculator), my RiscPC/A7000 emulator.
+(same as Arculator), my StrongARM RiscPC/A7000 emulator.
 </plug>
 
 

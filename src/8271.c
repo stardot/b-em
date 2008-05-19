@@ -5,7 +5,7 @@
 #include <allegro.h>
 #include "b-em.h"
 #include "8271.h"
-#include "fdi2raw.h"
+#include "fditoraw.h"
 
 #define BYTETIME 200
 
@@ -96,7 +96,7 @@ void motoroff()
 //        printf("Motor off %i\n",soundiniteded);
         driveled=0;
         stop_sample(motorsmp);
-        play_sample(motoroffsmp,127,127,1000,0);
+        play_sample(motoroffsmp,96,127,1000,0);
 //        if (soundiniteded) play_sample(motoroffsmp,255,127,1000,0);
 }
 
@@ -105,7 +105,7 @@ void setspindown()
 //        printf("Set spindown\n");
         if (ddnoise)
         {
-                set8271poll(2000000);
+                set8271poll(1000000);
                 doint=motoroff;
         }
 }
@@ -222,7 +222,7 @@ unsigned char decodefm(unsigned short dat)
         return temp;
 }
 
-#if 0
+#if FDIEN
 int load8271fdi(char *fn, int disc)
 {
         unsigned char fdihead[512],trackhead[16],sectorid[4];
@@ -240,7 +240,7 @@ int load8271fdi(char *fn, int disc)
         int datleft,datbitsleft;
         FILE *f=fopen(fn,"rb");
         fdiin[disc]=1;
-        fdi=fdi2raw_header(f);
+        fdi=fditoraw_open(f);
         lasttrack=fdi2raw_get_last_track(fdi);
 //        printf("%i tracks\n",lasttrack);
 //        exit(-1);
@@ -270,6 +270,7 @@ int load8271fdi(char *fn, int disc)
 //        printf("End of track : %i\n",ftell(f));
         fclose(f);
         discmaxtracks[disc]=lasttrack;
+//        printf("Lasttrack %i\n",lasttrack);
 //        if (lasttrack<50) discmaxtracks[disc]=40;
 //        else              discmaxtracks[disc]=80;
 /*f=fopen("arc.ssd","wb");
@@ -412,7 +413,7 @@ void reset8271(int reload)
         if (reload)
         {
         //printf("Disc name %s\n",discname);
-        for (c=0;c<strlen(discname[0]);c++)
+        for (c=(strlen(discname[0])-1);c>=0;c--)
         {
                 if (discname[0][c]=='.')
                 {
@@ -427,14 +428,16 @@ void reset8271(int reload)
         }
         if (discname[0][c]=='d'||discname[0][c]=='D')
            load8271dsd(discname[0],0);
-#if 0
+#if FDIEN
         else if (discname[0][c]=='f'||discname[0][c]=='F')
            load8271fdi(discname[0],0);
 #endif
+        else if (discname[0][c]=='a'||discname[0][c]=='A')
+           load1770adfs(discname[0],0);
         else
            load8271ssd(discname[0],0);
 
-        for (c=0;c<strlen(discname[1]);c++)
+        for (c=(strlen(discname[1])-1);c>=0;c--)
         {
                 if (discname[1][c]=='.')
                 {
@@ -449,10 +452,12 @@ void reset8271(int reload)
         }
         if (discname[1][c]=='d'||discname[1][c]=='D')
            load8271dsd(discname[1],1);
-#if 0
+#if FDIEN
         else if (discname[1][c]=='f'||discname[1][c]=='F')
            load8271fdi(discname[1],1);
 #endif
+        else if (discname[1][c]=='a'||discname[1][c]=='A')
+           load1770adfs(discname[1],1);
         else
            load8271ssd(discname[1],1);
 //        atexit(dumpdisc);
@@ -559,8 +564,8 @@ void seek()
                 driveled=1;
                 if (ddnoise)
                 {
-                        play_sample(motorsmp,127,127,1000,TRUE);
-                        play_sample(motoronsmp,127,127,1000,0);
+                        play_sample(motorsmp,96,127,1000,TRUE);
+                        play_sample(motoronsmp,96,127,1000,0);
                 }
         }
         doselects();
@@ -599,22 +604,22 @@ void seek()
         {
                 if (diff==1)
                 {
-                        play_sample(stepsmp,127,127,1000,0);
+                        play_sample(stepsmp,96,127,1000,0);
                         set8271poll(1000);
                 }
                 else if (diff<7)
                 {
-                        play_sample(seeksmp,127,127,1000,0);
+                        play_sample(seeksmp,96,127,1000,0);
                         set8271poll(1000);
                 }
                 else if (diff<30)
                 {
-                        play_sample(seek3smp,127,127,1000,0);
+                        play_sample(seek3smp,96,127,1000,0);
                         set8271poll(500000);
                 }
                 else
                 {
-                        play_sample(seek2smp,127,127,1000,0);
+                        play_sample(seek2smp,96,127,1000,0);
                         set8271poll(1400000);
                 }
         }
@@ -663,8 +668,8 @@ void readvarlen()
         {
                 if (ddnoise)
                 {
-                        play_sample(motorsmp,127,127,1000,TRUE);
-                        play_sample(motoronsmp,127,127,1000,0);
+                        play_sample(motorsmp,96,127,1000,TRUE);
+                        play_sample(motoronsmp,96,127,1000,0);
                 }
                 driveled=1;
         }
@@ -732,22 +737,22 @@ void readvarlen()
                    set8271poll(BYTETIME);
                 else if (diff==1)
                 {
-                        play_sample(stepsmp,127,127,1000,0);
+                        play_sample(stepsmp,96,127,1000,0);
                         set8271poll(BYTETIME);
                 }
                 else if (diff<7)
                 {
-                        play_sample(seeksmp,127,127,1000,0);
+                        play_sample(seeksmp,96,127,1000,0);
                         set8271poll(BYTETIME*7);
                 }
                 else if (diff<30)
                 {
-                        play_sample(seek3smp,127,127,1000,0);
+                        play_sample(seek3smp,96,127,1000,0);
                         set8271poll(500000);
                 }
                 else
                 {
-                        play_sample(seek2smp,127,127,1000,0);
+                        play_sample(seek2smp,96,127,1000,0);
                         set8271poll(1400000);
                 }
         }

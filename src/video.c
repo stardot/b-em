@@ -1,6 +1,7 @@
 /*B-em 1.4 by Tom Walker*/
 /*Video emulation*/
 
+int dispon=0;
 #include <stdio.h>
 #include <allegro.h>
 #include <winalleg.h>
@@ -141,12 +142,12 @@ void writecrtc(unsigned short addr, unsigned char val)
         {
                 crtc[crtcreg]=val&crtcmask[crtcreg];
                 if (crtcreg==0 || crtcreg==1 || crtcreg==4 || crtcreg==6) drawfull=2;
-                if (crtcreg==6) clear(buffer);
+//                if (crtcreg==6) clear(buffer);
                 if (crtcreg==14 || crtcreg==15 || crtcreg==10 || crtcreg==11)
                 {
                         redocursor();
                 }
-//                rpclog("Write CRTC R%i %04X %02X %04X\n",crtcreg,addr,val,pc);
+//                if (crtcreg==8 || crtcreg==7 || crtcreg==4) rpclog("Write CRTC R%i %04X %02X %04X\n",crtcreg,addr,val,pc);
         }
 }
 unsigned char readcrtc(unsigned short addr)
@@ -173,12 +174,13 @@ void updateclut()
 
 void writeula(unsigned short addr, unsigned char val)
 {
+//        rpclog("Write ULA %04X %02X\n",addr,val);
         remakelookup=1;
         if (addr&1)
         {
                 clut2[val>>4]=(val^7)&0xF;
                 updateclut();
-//                printf("CLUT %i=%i at line %i %04X\n",val>>4,(val^7)&0xF,line,pc);
+//                printf("CLUT %i=%i at line %i %i %i %04X\n",val>>4,(val^7)&0xF,vc,sc,(vc<<3)+sc,pc);
         }
         else
         {
@@ -370,6 +372,7 @@ void initframe()
         }
         else
            startaddr=(crtc[13]|(crtc[12]<<8))<<3;
+//        rpclog("Startaddr %04X\n",startaddr);
 //        if (startaddr==0x5300) output=1;
 }
 
@@ -494,10 +497,12 @@ void drawmode2lineh(int line)
         }
         else
         {
+//                rpclog("Drawing line %i %04X %02X %04X %i %i\n",line>>1,addr,ram[addr],vidlimit,buffer->line[196<<1][xoffset<<1],xoffset);
                 for (x=0;x<crtc[1];x++)
                 {
                         if (addr & vidlimit) { addr-=screenlen[scrsize]; addr&=0xFFFF; }
                         val=ram[addr];
+//                        if (!x) rpclog("Addr %04X %02X %i %08X %08X\n",addr,ram[addr],crtc[1],lookuptabh[val],lookuptabh2[val]);
                         addr+=8;
                         xp=(xoffset>>1)&255;
                         bufferp[xp]=lookuptabh[val];
@@ -558,6 +563,7 @@ void drawmodelowlineh(int line)
         }
         else
         {
+//                rpclog("Drawing line %i %04X %02X %04X\n",line,addr,ram[addr],vidlimit);
                 for (x=0;x<crtc[1];x++)
                 {
                         if (addr & vidlimit) { addr-=screenlen[scrsize]; addr&=0xFFFF; }
@@ -627,7 +633,7 @@ void drawteletextline(int line)
         }
         if (drawfull)
         {
-                if (hires&1 && hires!=5) hline(buffer,0,line,xoffset<<1,0);
+                if (hires&1/* && hires!=5*/) hline(buffer,0,line,xoffset<<1,0);
                 else         hline(buffer,0,line,xoffset,0);
                 if (hires==3) hline(buffer,0,line+1,xoffset<<1,0);
         }
@@ -743,7 +749,7 @@ void drawteletextline(int line)
         if (lastx<xoffset) lastx=xoffset;
         if (drawfull)
         {
-                if (hires&1 && hires!=5) hline(buffer,xoffset<<1,line,799,0);
+                if (hires&1/* && hires!=5*/) hline(buffer,xoffset<<1,line,799,0);
                 else         hline(buffer,xoffset,   line,399,0);
                 if (hires==3) hline(buffer,xoffset<<1,line+1,799,0);
         }
@@ -784,9 +790,11 @@ void drawline(int line6502)
 {
         int tline;
         int x,y;
+//        rpclog("VC %i %i\n",vc,curline);
 //        return;
         if (interlaceline)
         {
+//                rpclog("INTERLACELINE\n");
                 interlaceline=0;
                 return;
         }
@@ -795,13 +803,23 @@ void drawline(int line6502)
         {
                 vblcount--;
                 if (!vblcount)
-                   vblankint();
+                {
+//                        rpclog("VBLint\n");
+                        vblankint();
+                }
         }
-        if (curline>511 || physline>511) /*Something has obviously gone wrong in this case*/
+        if (curline>1023 || physline>1023) /*Something has obviously gone wrong in this case*/
         {
                 curline=physline=0;
                 if (model==3) physline+=16;
         }
+        if (delaylcount==-1)
+        {
+                delaylcount=0;
+                sc=vc=0;
+                initframe();
+        }
+        #if 0
         if (!curline)
         {
                 sc=vc=0;
@@ -824,12 +842,17 @@ void drawline(int line6502)
                         }
                 }
                 delaylcount=crtc[5];
-                initframe();
+                if (!delaylcount) initframe();
+//                rpclog("INITFRAME\n");
         }
+        #endif
         if (vc==crtc[7] && sc==0)
         {
+//                rpclog("VBLANK\n");
+                curline=0;
                 vblankintlow();
                 vblcount=crtc[3]>>4;
+//                rpclog("VBLANK - vblcount %i\n",vblcount);
                 linesdrawn=0;
                 physline=0;
                 if (model==3)   physline+=16;
@@ -845,6 +868,7 @@ void drawline(int line6502)
                         {
                                 clear_to_color(screen,makecol(0,0,0));
                         }
+//                        rpclog("%i,%i to %i,%i\n",firstx,firstline,lastx,lastline);
                         if (drawfull)
                         {
                                 firstline=16;
@@ -853,6 +877,8 @@ void drawline(int line6502)
                                 lastx=400;
                         }
 //                        textprintf(buffer,font,0,firstline,7,"%i %i %i %i",firstline,lastline,firstx,lastx);
+//                        blit(buffer,screen,0,0,0,0,800,600);
+
                         if (hires==1)
                         {
                                 if (blurred)
@@ -940,6 +966,7 @@ void drawline(int line6502)
 //                                        blit(buffer,screen,firstx,firstline,firstx,firstline-16,lastx-firstx,lastline-firstline);
                                 }
                         }
+
 //                        textprintf(screen,font,0,0,makecol(255,255,255),"%04X %i  ",pc,motor);
                         if (drawfull)
                            drawfull--;
@@ -959,9 +986,16 @@ void drawline(int line6502)
         }
         if (delaylcount)
         {
+                dodelayl:
+//                rpclog("Delaylcount %i %i %i\n",sc,dispon,physline);
                 delaylcount--;
-                curline++;
-                physline++;
+                if (!delaylcount) delaylcount=-1;
+                if (dispon) goto drawingit;
+                else
+                {
+                        curline++;
+                        physline++;
+                }
                 if (!(fasttape && motor) || !flashint)
                 {
                         if (physline>0 && physline<300)
@@ -976,6 +1010,9 @@ void drawline(int line6502)
         tline=curline-crtc[5];
         if (vc<crtc[6])
         {
+                drawingit:
+                if (!vc && !sc) { /*rpclog("Start draw\n");*/ dispon=1; }
+//                rpclog("Drawing %i %i %02X %04X %i\n",vc,sc,crtc[8]&0x30,startaddr,physline);
                 if (remakelookup)
                 {
                         remaketab();
@@ -1028,14 +1065,28 @@ void drawline(int line6502)
                 {
                         sc=0;
                         vc++;
+                        vc&=127;
                         if (ulactrl&2)
                            startaddr+=crtc[1];
                         else
                            startaddr+=crtc[1]<<3;
                 }
+                if (delaylcount)
+                {
+                        curline++;
+                        physline++;
+                        if (delaylcount==-1)
+                        {
+                                delaylcount=0;
+                                initframe();
+                                vc=sc=0;
+                        }
+                        return;
+                }
         }
         else
         {
+                if (vc==crtc[6] && !sc) dispon=0;
                 if (physline>15 && physline<300)
                 {
                         if (hires&1 && hires!=5)  memset(buffer->line[physline<<1],0,800);
@@ -1047,6 +1098,7 @@ void drawline(int line6502)
                 {
                         sc=0;
                         vc++;
+                        vc&=127;
                 }
         }
         curline++;
@@ -1054,11 +1106,10 @@ void drawline(int line6502)
         linesdrawn++;
         if (vc==crtc[4]+1)
         {
-                if (crtc[7]>=crtc[4])
-                {
-                        vc=sc=0;
-                        initframe();
-                        delaylcount=crtc[5];
+//                rpclog("Frame over! %i %02X %i\n",crtc[4],crtc[3],crtc[7]);
+//                if (crtc[7]>=crtc[4])
+//                {
+//                        rpclog("RUPTURE %i %i %i\n",vc,sc,physline);
                         cursorcount++;
                         switch (cursorblink)
                         {
@@ -1068,12 +1119,33 @@ void drawline(int line6502)
                                 case 3: cursorcount&=31; if (!cursorcount) cursoron^=1; break;
                         }
                         redocursor();
-                }
+                        delaylcount=crtc[5];
+                        if (!delaylcount)
+                        {
+                                initframe();
+                                vc=sc=0;
+                        }
+                        else
+                        {
+                                if (hires&1 && hires!=5)  memset(buffer->line[physline<<1],0,800);
+                                else          memset(buffer->line[physline],0,(hires==5)?800:400);
+                                if (hires==3) memset(buffer->line[(physline<<1)+1],0,800);
+                        }
+
+/*                        else if (dispon)
+                        {
+                                curline--;
+                                physline--;
+                                rpclog("Jumping!\n");
+                                goto dodelayl;
+                        }*/
+/*                }
                 else
                 {
+                        rpclog("vretrace\n");
                         curline=0;
                         frames++;
-                }
+                }*/
         }
 }
 

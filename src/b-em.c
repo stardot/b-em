@@ -71,6 +71,7 @@ HMENU menu;
 #define IDM_MODEL_ARM      40040
 #define IDM_MODEL_PALMT    40041
 #define IDM_MODEL_PALTUBE  40042
+#define IDM_MODEL_PALZ80   40043
 #define IDM_VIDEO_RES      40054
 #define IDM_VIDEO_FULLSCR  40051
 #define IDM_VIDEO_BLUR     40052
@@ -142,6 +143,7 @@ void makemenu()
         AppendMenu(hpop,MF_STRING,IDM_MODEL_PALBSW,"Model B w/&SWRAM");
         AppendMenu(hpop,MF_STRING,IDM_MODEL_B1770,"Model B w/&1770");
         AppendMenu(hpop,MF_STRING,IDM_MODEL_PALTUBE,"Model B w/&6502 tube");
+        AppendMenu(hpop,MF_STRING,IDM_MODEL_PALZ80,"Model B w/&Z80 tube");
         AppendMenu(hpop,MF_STRING,IDM_MODEL_NTSCB,"&NTSC B");
         AppendMenu(hpop,MF_STRING,IDM_MODEL_PALB64,"B&+");
         AppendMenu(hpop,MF_STRING,IDM_MODEL_PALB96,"B+&96K");
@@ -171,8 +173,7 @@ void makemenu()
         AppendMenu(menu,MF_POPUP,hpop,"&Video");
         hpop=CreateMenu();
         AppendMenu(hpop,MF_STRING,IDM_SOUND_ENABLE,"Sound &Enable");
-        AppendMenu(hpop,MF_STRING,IDM_SOUND_LOW, "&Low Pass Filter");
-        AppendMenu(hpop,MF_STRING,IDM_SOUND_HIGH,"&High Pass Filter");
+        AppendMenu(hpop,MF_STRING,IDM_SOUND_LOW, "&Bandpass Filter");
         hpop2=CreateMenu();
         AppendMenu(hpop2,MF_STRING,IDM_WAVE_SQU,"&Square");
         AppendMenu(hpop2,MF_STRING,IDM_WAVE_SAW,"S&awtooth");
@@ -296,7 +297,7 @@ void soundthread(PVOID pvoid)
                 }
                 else
                 {
-                        rpclog("entering silence\n");
+//                        rpclog("entering silence\n");
                         sp=NULL;
                         while (!sp && !quit && as)
                         {
@@ -305,13 +306,13 @@ void soundthread(PVOID pvoid)
                         }
                         if (!quit)
                         {
-                                if (sp)
+                                if (sp && as)
                                 {
-                                rpclog("found silence soundbuffer!\n");
+//                                rpclog("found silence soundbuffer!\n");
                                         for (c=0;c<BUFLEN;c++) sp[c]=0x8000;
                                         free_audio_stream_buffer(as);
                                 }
-                                rpclog("left silence\n");
+//                                rpclog("left silence\n");
                         }
                 }
         }
@@ -332,16 +333,16 @@ void sleepsoundthread()
 
 void endsoundthread()
 {
-        rpclog("ending sound thread 0...\n");
+//        rpclog("ending sound thread 0...\n");
         if (!soundthreadon) return;
-        rpclog("ending sound thread...\n");
+//        rpclog("ending sound thread...\n");
         quit=1;
         while (soundthreadon)
         {
                 SetEvent(soundobject);
                 sleep(1);
         }
-        rpclog("sound thread over!\n");
+//        rpclog("sound thread over!\n");
 }
 
 int maininfocus=1,menuinfocus=1;
@@ -387,7 +388,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         ghwnd = CreateWindowEx (
            0,                   /* Extended possibilites for variation */
            szClassName,         /* Classname */
-           "B-em v1.4a",        /* Title Text */
+           "B-em v1.5",        /* Title Text */
            WS_OVERLAPPEDWINDOW&~(WS_MAXIMIZEBOX|WS_SIZEBOX), /* default window */
            CW_USEDEFAULT,       /* Windows decides the position */
            CW_USEDEFAULT,       /* where the window ends up on the screen */
@@ -431,6 +432,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         resetarm();
         resettube();
         tubeinit6502();
+        tubeinitz80();
         loaddiscsamps();
 
                                 for (c=(strlen(uefname)-1);c>0;c--)
@@ -559,6 +561,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
                         }
                         resetarm();
                         tubereset6502();
+                        resetz80();
                         resettube();
                         resetuservia();
                         reset1770s();
@@ -585,7 +588,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         }
         save_config();
 //        rpclog("B-em quit!\n");
-        endsoundthread();
+//        endsoundthread();
 //        fclose(spdlog);
 /*                if (resetting && !key[KEY_F12]) resetting=0;
                 if (key[KEY_F12] && !resetting)
@@ -622,21 +625,24 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
                 }*/
 //        dumpram();
 //        if (soundon) soundoff();
-        closevideo();
+//        closevideo();
 //        rpclog("Closing normally!\n");
-        allegro_exit();
         savecmos();
-//        dumpregs();
-//        savebuffers();
-        tubedumpregs();
         checkdiscchanged(0);
         checkdiscchanged(1);
+//        allegro_exit();
+//        dumpregs();
+//        savebuffers();
+//        dumpregs();
+//        tubedumpregs();
+//        z80_dumpregs();
+//        z80_dumpram();
 //        dumpram();
 /*        dumptuberegs();
         dumptube();
-        dumpram2();
-        dumpuservia();
-        dumparmregs();*/
+        dumpram2();*/
+//        dumpuservia();
+/*        dumparmregs();*/
 //        dumpsysvia();
 //        printf("%i\n",vidbank);
 //        dumpcrtc();
@@ -657,9 +663,9 @@ void updatemenu()
         switch (hires)
         {
                 case 0: CheckMenuItem(menu,IDM_RES_LOW,MF_CHECKED); break;
-                case 5: CheckMenuItem(menu,IDM_RES_HIGH2,MF_CHECKED); break;
+                case 1: CheckMenuItem(menu,IDM_RES_HIGH2,MF_CHECKED); break;
                 case 2: CheckMenuItem(menu,IDM_RES_2XSAI,MF_CHECKED); break;
-                case 3: CheckMenuItem(menu,IDM_RES_HIGH,MF_CHECKED); break;
+                case 5: CheckMenuItem(menu,IDM_RES_HIGH,MF_CHECKED); break;
         }
         if (blurred) CheckMenuItem(menu,IDM_VIDEO_BLUR,MF_CHECKED);
         else         CheckMenuItem(menu,IDM_VIDEO_BLUR,MF_UNCHECKED);
@@ -673,8 +679,8 @@ void updatemenu()
         else         CheckMenuItem(menu,IDM_DISC_SOUND,MF_UNCHECKED);
         if (soundfilter&1) CheckMenuItem(menu,IDM_SOUND_HIGH,MF_CHECKED);
         else               CheckMenuItem(menu,IDM_SOUND_HIGH,MF_UNCHECKED);
-        if (soundfilter&2) CheckMenuItem(menu,IDM_SOUND_LOW,MF_CHECKED);
-        else               CheckMenuItem(menu,IDM_SOUND_LOW,MF_UNCHECKED);
+        if (soundfilter) CheckMenuItem(menu,IDM_SOUND_LOW,MF_CHECKED);
+        else             CheckMenuItem(menu,IDM_SOUND_LOW,MF_UNCHECKED);
         if (soundon) CheckMenuItem(menu,IDM_SOUND_ENABLE,MF_CHECKED);
         else         CheckMenuItem(menu,IDM_SOUND_ENABLE,MF_UNCHECKED);
         if (soundbuflen==3120)
@@ -758,9 +764,9 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         case IDM_DISC_CHANGE0: case IDM_DISC_AUTOSTART:
 //                        if (soundon) soundoff();
                                 checkdiscchanged(0);
-                        if (!getfn(hwnd,"Disc Image\0*.SSD;*.DSD;*.ADF;*.ADL\0DFS Single Sided Disc Image (*.SSD)\0*.SSD\0DFS Double Sided Disc Image (*.DSD)\0*.DSD\0ADFS Disc Image (*.ADF)\0*.ADF\0All\0*.*\0\0",discname[0],0,"SSD"))
+                        if (!getfn(hwnd,"Disc Image\0*.SSD;*.DSD;*.ADF;*.ADL;*.FDI\0DFS Single Sided Disc Image (*.SSD)\0*.SSD\0DFS Double Sided Disc Image (*.DSD)\0*.DSD\0ADFS Disc Image (*.ADF)\0*.ADF\0FDI Disc Image (*.FDI)\0*.FDI\0All\0*.*\0\0",discname[0],0,"SSD"))
                         {
-                                for (c=0;c<strlen(discname[0]);c++)
+                                for (c=(strlen(discname[0])-1);c>0;c--)
                                 {
                                         if (discname[0][c]=='.')
                                         {
@@ -770,7 +776,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                                 }
                                 if ((discname[0][c]=='d'||discname[0][c]=='D')&&(c!=strlen(discname[0])))
                                    load8271dsd(discname[0],0);
-#if 0
+#if FDIEN
                                 else if ((discname[0][c]=='f'||discname[0][c]=='F')&&(c!=strlen(discname[0])))
                                    load8271fdi(discname[0],0);
 #endif
@@ -797,9 +803,9 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         case IDM_DISC_CHANGE1:
 //                        if (soundon) soundoff();
                         checkdiscchanged(1);
-                        if (!getfn(hwnd,"Disc Image\0*.SSD;*.DSD;*.ADF;*.ADL\0DFS Single Sided Disc Image (*.SSD)\0*.SSD\0DFS Double Sided Disc Image (*.DSD)\0*.DSD\0ADFS Disc Image (*.ADF)\0*.ADF\0All\0*.*\0\0",discname[0],0,"SSD"))
+                        if (!getfn(hwnd,"Disc Image\0*.SSD;*.DSD;*.ADF;*.ADL;*.FDI\0DFS Single Sided Disc Image (*.SSD)\0*.SSD\0DFS Double Sided Disc Image (*.DSD)\0*.DSD\0ADFS Disc Image (*.ADF)\0*.ADF\0FDI Disc Image (*.FDI)\0*.FDI\0All\0*.*\0\0",discname[0],0,"SSD"))
                         {
-                                for (c=0;c<strlen(discname[1]);c++)
+                                for (c=(strlen(discname[1])-1);c>0;c--)
                                 {
                                         if (discname[1][c]=='.')
                                         {
@@ -809,7 +815,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                                 }
                                 if ((discname[1][c]=='d'||discname[1][c]=='D')&&(c!=strlen(discname[1])))
                                    load8271dsd(discname[1],1);
-#if 0
+#if FDIEN
                                 else if ((discname[0][c]=='f'||discname[0][c]=='F')&&(c!=strlen(discname[0])))
                                    load8271fdi(discname[0],0);
 #endif
@@ -862,7 +868,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         case IDM_MODEL_PALB128: case IDM_MODEL_PALM128:
                         case IDM_MODEL_ARM: case IDM_MODEL_PALMC:
                         case IDM_MODEL_B1770: case IDM_MODEL_PALMT:
-                        case IDM_MODEL_PALTUBE:
+                        case IDM_MODEL_PALTUBE: case IDM_MODEL_PALZ80:
                         if (!tube)                  CheckMenuItem(menu,model+40030,MF_UNCHECKED);
                         else if (tubetype==TUBEARM) CheckMenuItem(menu,IDM_MODEL_ARM,MF_UNCHECKED);
                         else if (model==8)          CheckMenuItem(menu,IDM_MODEL_PALMT,MF_UNCHECKED);
@@ -886,6 +892,12 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                                 model=4;
                                 tube=1;
                                 tubetype=TUBE6502;
+                        }
+                        else if (model==13)
+                        {
+                                model=4;
+                                tube=1;
+                                tubetype=TUBEZ80;
                         }
                         else
                            tube=0;
@@ -974,7 +986,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         updatemenu();
                         return 0;
                         case IDM_SOUND_LOW:
-                        soundfilter^=2;
+                        soundfilter=!soundfilter;
                         updatemenu();
                         return 0;
                         case IDM_SOUND_STARTVGM:

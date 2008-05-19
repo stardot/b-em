@@ -23,6 +23,7 @@ int load1770adfs(char *fn, int disc)
         int c,d,e,f;
         int len;
         FILE *ff=fopen(fn,"rb");
+//        rpclog("Load drive %i ADFS with %s\n",disc,fn);
         if (!ff) return -1;
         fseek(ff,-1,SEEK_END);
         len=ftell(ff);
@@ -100,10 +101,10 @@ void reset1770()
         wd1770.status=0x80;
         discint=0;
         nmi=0;
-        if (driveled)
+        if (driveled && ddnoise)
         {
                 stop_sample(motorsmp);
-                play_sample(motoroffsmp,127,127,1000,0);
+                play_sample(motoroffsmp,96,127,1000,0);
         }
         motorofff=driveled=0;
 }
@@ -114,10 +115,10 @@ void reset1770s()
         wd1770.status=0x80;
         discint=0;
         nmi=0;
-        if (driveled)
+        if (driveled && ddnoise)
         {
                 stop_sample(motorsmp);
-                play_sample(motoroffsmp,127,127,1000,0);
+                play_sample(motoroffsmp,96,127,1000,0);
                 driveled=0;
         }
         motorofff=0;
@@ -131,7 +132,7 @@ void set1770poll(int c)
 
 void set1770spindown()
 {
-        set1770poll(2000000);
+        set1770poll(700000);
         motorofff=1;
 }
 
@@ -144,23 +145,23 @@ void play1770seek(int target)
         }
         else if (dif==1)
         {
-                play_sample(stepsmp,127,127,1000,0);
+                play_sample(stepsmp,96,127,1000,0);
                 set1770poll(100);
         }
         else if (dif<7)
         {
-                play_sample(seeksmp,127,127,1000,0);
+                play_sample(seeksmp,96,127,1000,0);
                 set1770poll(1000);
         }
         else if (dif<35)
         {
-                play_sample(seek3smp,127,127,1000,0);
-                set1770poll(500000);
+                play_sample(seek3smp,96,127,1000,0);
+                set1770poll(500000/2);
         }
         else
         {
-                play_sample(seek2smp,127,127,1000,0);
-                set1770poll(1400000);
+                play_sample(seek2smp,96,127,1000,0);
+                set1770poll(1400000/2);
         }
 //        printf("dif %i discint %i\n",dif,discint);
 }
@@ -216,24 +217,24 @@ void start1770command(unsigned short addr)
         endcommand=0;
         if (ddnoise && !driveled)
         {
-                play_sample(motoronsmp,127,127,1000,0);
-                play_sample(motorsmp,127,127,1000,TRUE);
+                play_sample(motoronsmp,96,127,1000,0);
+                play_sample(motorsmp,96,127,1000,TRUE);
         }
         driveled=1;
         motorofff=0;
 //        rpclog("1770 command %02X\n",wd1770.command);
         switch (wd1770.command>>4)
         {
-                case 0: if (ddnoise) play1770seek(0); else set1770poll(2000); break; /*Restore*/
-                case 1: if (ddnoise) play1770seek(wd1770.data); else set1770poll(2000); break; /*Seek*/
-                case 5: if (ddnoise) play_sample(stepsmp,127,127,1000,FALSE); set1770poll(2000); break; /*Step in*/
+                case 0: if (ddnoise) play1770seek(0); else set1770poll(1000); break; /*Restore*/
+                case 1: if (ddnoise) play1770seek(wd1770.data); else set1770poll(1000); break; /*Seek*/
+                case 5: if (ddnoise) play_sample(stepsmp,96,127,1000,FALSE); set1770poll(500); break; /*Step in*/
                 case 8: /*Read sector*/
                 wd1770.status&=~4;
                 if (ddnoise) { play1770seek(wd1770.track); }
-                else { set1770poll(2000); }
+                else { set1770poll(1000); }
                 if (fdiin[curdisc])
                 {
-//                        printf("FDI in\n");
+                        printf("FDI in\n");
                         set1770poll(0);
                         inreadop=1;
                 }
@@ -346,8 +347,11 @@ void poll1770()
         {
                 motorofff=0;
                 driveled=0;
-                stop_sample(motorsmp);
-                play_sample(motoroffsmp,127,127,1000,0);
+                if (ddnoise)
+                {
+                        stop_sample(motorsmp);
+                        play_sample(motoroffsmp,96,127,1000,0);
+                }
                 return;
         }
         switch (wd1770.command>>4)
@@ -393,6 +397,7 @@ void poll1770()
                 case 8: /*Read sector*/
                 if (((sides[curdisc]==1) && curside) || wd1770.cursector>=((adfs[curdisc])?16:10)) /*Seek error*/
                 {
+//                        rpclog("Read sector error - %i %i %i %i\n",sides[curdisc],curside,wd1770.cursector,adfs[curdisc]);
                         wd1770.status&=~5;
                         wd1770.status|=0x10;
                         nmi|=1;
@@ -413,7 +418,7 @@ void poll1770()
                 if (!sectorpos) endcommand=1;
                 nmi|=2;
                 wd1770.status|=2;
-                set1770poll(100);
+                set1770poll(50);
 //                output=1;
                 break;
 

@@ -401,6 +401,10 @@ Version 1.3 finalised and released
 13/01/07 - Fixed bug in tube emulation, file transfers now work okay
            Changes to Windows timing, should be better and smoother now
 14/01/07 - Added tube option for model B.
-04/05/07 - Altered sound code.
-15/05/07 - Fixed sound code and changed timing.
 Version 1.4 finalised and released
+November-January - Sound fixes (sorry, didn't keep a good log!)
+07/01/08 - Video fixes, Blurp now works
+10/01/08 - Added Z80 tube.
+18/05/08 - Fixed crash bug on exit. Fixed junk left on screen following mode change.
+           Fixed occasional bug with periodic noise.
+Version 1.5 finalised and released

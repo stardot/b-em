@@ -12,7 +12,7 @@ void rpclog(const char *format, ...)
         char *x;
    char buf[256];
    return;
-        if (!arclog) arclog=fopen("e:/devcpp/b-em8/arclog.txt","wt");
+        if (!arclog) arclog=fopen("arclog.txt","wt");
 //        x=0;
 //        *x=0;
    va_list ap;
@@ -80,10 +80,10 @@ void updatesystimers()
         {
                 while (sysvia.t1c<-3)
                       sysvia.t1c+=sysvia.t1l+4;
-//                if (output) rpclog("Timer 1 reset line %i %04X %04X %i\n",lns,sysvia.t1c,sysvia.t1l,sysvia.t1hit);
+//                rpclog("Timer 1 reset line %i %04X %04X %i\n",lns,sysvia.t1c,sysvia.t1l,sysvia.t1hit);
                 if (!sysvia.t1hit)
                 {
-//                        if (output) printf("TIMER INTERRUPT\n");
+//                        printf("TIMER INTERRUPT\n");
                        sysvia.ifr|=TIMER1INT;
                        updatesysIFR();
                 }
@@ -156,6 +156,7 @@ void savecmos()
         f=fopen(fn,"wb");
         fwrite(cmos,64,1,f);
         fclose(f);
+        rpclog("IER %02X IFR %02X\n",sysvia.ier,sysvia.ifr);
 }
 
 void writeIC32(unsigned char val)
@@ -204,7 +205,7 @@ void writedatabus(unsigned char val)
 
 void writesysvia(unsigned short addr, unsigned char val, int line)
 {
-//        if (y==0x8F) rpclog("Write %04X %02X %04X %i\n",addr,val,pc,sysvia.t2c);
+//        rpclog("Write %04X %02X %04X %02X\n",addr,val,pc,sysvia.ier);
 //        if (addr==0xFE40) printf("FE40 write %02X\n",val);
         switch (addr&0xF)
         {
@@ -256,6 +257,7 @@ void writesysvia(unsigned short addr, unsigned char val, int line)
                 case T1LH:
                 sysvia.t1l&=0x1FE;
                 sysvia.t1l|=(val<<9);
+//                rpclog("T1 timer now %04X\n",sysvia.t1l);
                 if (sysvia.acr&0x40)
                 {
                         sysvia.ifr&=~TIMER1INT;

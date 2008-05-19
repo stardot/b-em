@@ -103,8 +103,10 @@ int adcconvert;
 
 /*Tube*/
 #define TUBE6502 1
-#define TUBEZ80  2 /*Not implemented!!!*/
+#define TUBEZ80  2
 #define TUBEARM  3
+#define TUBE186  4  /*Not implemented yet!!!*/
+#define TUBE386  5  /*And why not. Doesn't matter that Acorn never made one*/
 
 int tubeirq;
 int tubecycs;
@@ -115,3 +117,5 @@ int chunklen;
 int blocks,motor;
 int chunkid,chunklen,intone;
 
+
+#define FDIEN 1

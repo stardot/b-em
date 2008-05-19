@@ -1,5 +1,5 @@
-B-em v1.4a
-==========
+B-em v1.5
+=========
 
 Source for the DOS, Windows and OS X versions are included. The DOS
 version should/may also compile under Linux/QNX/BeOS, although I haven't
