@@ -1,13 +1,13 @@
-/*B-em 1.4 by Tom Walker*/
-/*Serial ULA emulation*/
+/*B-em v2.0 by Tom Walker
+  Serial ULA emulation*/
 
+#include <stdio.h>
+#include "b-em.h"
 #include "serial.h"
 #include "acia.h"
 
-unsigned short pc;
-int output;
-unsigned char serialreg;
-unsigned char transmitrate,reciverate;
+uint8_t serialreg;
+uint8_t transmitrate,reciverate;
 
 void initserial()
 {
@@ -16,20 +16,22 @@ void initserial()
         motor=0;
 }
 
-unsigned char readserial(unsigned short addr)
+uint8_t readserial(uint16_t addr)
 {
         /*Reading from this has the same effect as writing &FE*/
+        if (motor) tapemotorchange(0);
         motor=0;
         return 0;
 }
 
-void writeserial(unsigned short addr, unsigned char val)
+void writeserial(uint16_t addr, uint8_t val)
 {
         serialreg=val;
         transmitrate=val&0x7;
         reciverate=(val>>3)&0x7;
-        motor=val&0x80;
-//        rpclog("Write serial %02X %04X\n",val,pc);
+        if (motor != (val&0x80)) tapemotorchange(val>>7);
+        motor=(val&0x80) && tapeloaded;
+//        printf("Write serial %02X %04X\n",val,pc);
 //        if (motor) output=1;
         if (val&0x40)
         {

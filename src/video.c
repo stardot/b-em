@@ -1,23 +1,252 @@
-/*B-em 1.4 by Tom Walker*/
-/*Video emulation*/
+/*B-em v2.0 by Tom Walker
+  Video emulation
+  Incorporates 6845 CRTC, Video ULA and SAA5050*/
 
-int dispon=0;
 #include <stdio.h>
 #include <allegro.h>
-#include <winalleg.h>
-#include "bbctext.h"
+#include <stdint.h>
 #include "b-em.h"
-#include "2xsai.h"
+#include "bbctext.h"
+#include "serial.h"
 
-int drawfull=2;
-int fullscreen=0;
-int chunkid,chunklen,intone;
-int vsyncint=0;
-int hires=1;
-int interlaceline=0;
-int lns;
-unsigned short vidmask;
-int output;
+uint16_t vidbank;
+uint8_t crtc[32];
+uint8_t crtcmask[32]={0xFF,0xFF,0xFF,0xFF,0x7F,0x1F,0x7F,0x7F,0xF3,0x1F,0x7F,0x1F,0x3F,0xFF,0x3F,0xFF,0x3F,0xFF};
+int crtci;
+int screenlen[4]={0x4000,0x5000,0x2000,0x2800};
+
+int fullborders=1;
+int collook[8];
+uint32_t col0;
+uint8_t m7lookup[8][8][16];
+
+int fskipmax=3,fskipcount=0;
+int vsynctime;
+uint16_t ma,maback;
+int interline;
+int vdispen,dispen;
+int hvblcount;
+int frameodd;
+int con,cdraw,coff;
+int cursoron;
+int frcount;
+int charsleft;
+int hc,vc,sc,vadj;
+
+void resetcrtc()
+{
+        hc=vc=sc=vadj=0;
+        interline=0;
+        vsynctime=0;
+        hvblcount=0;
+        frameodd=0;
+        con=cdraw=0;
+        cursoron=0;
+        charsleft=0;
+        crtc[9]=10;
+//      printf("%i %i\n",sizeof(uint16_t),sizeof(uint32_t));
+}
+
+void writecrtc(uint16_t addr, uint8_t val)
+{
+        if (!(addr&1)) crtci=val&31;
+        else
+        {
+                crtc[crtci]=val&crtcmask[crtci];
+//                if (crtci!=12 && crtci!=13 && crtci!=14 && crtci!=15) printf("Write CRTC R%i %02X\n",crtci,val);
+        }
+}
+
+uint8_t readcrtc(uint16_t addr)
+{
+        if (!(addr&1)) return crtci;
+        return crtc[crtci];
+}
+
+uint8_t ulactrl;
+uint8_t ulapal[16],bakpal[16];
+int ulamode;
+int crtcmode;
+
+uint32_t pixlookuph[4][256][2];
+uint32_t pixlookupl[4][256][4];
+uint8_t table4bpp[4][256][16];
+
+void makelookuplow()
+{
+/*        int c;
+        switch (ulamode)
+        {
+                case 0:
+                for (c=0;c<256;c++)
+                {
+                        pixlookupl[0][c][0]=pixlookupl[0][c][1]=ulapal[table4bpp[c][0]]|(ulapal[table4bpp[c][0]]<<8)|(ulapal[table4bpp[c][0]]<<16)|(ulapal[table4bpp[c][0]]<<24);
+                        pixlookupl[0][c][2]=pixlookupl[0][c][3]=ulapal[table4bpp[c][1]]|(ulapal[table4bpp[c][1]]<<8)|(ulapal[table4bpp[c][1]]<<16)|(ulapal[table4bpp[c][1]]<<24);
+                }
+                break;
+
+                case 1:
+                for (c=0;c<256;c++)
+                {
+                        pixlookupl[1][c][0]=ulapal[table4bpp[c][0]]|(ulapal[table4bpp[c][0]]<<8)|(ulapal[table4bpp[c][0]]<<16)|(ulapal[table4bpp[c][0]]<<24);
+                        pixlookupl[1][c][1]=ulapal[table4bpp[c][1]]|(ulapal[table4bpp[c][1]]<<8)|(ulapal[table4bpp[c][1]]<<16)|(ulapal[table4bpp[c][1]]<<24);
+                        pixlookupl[1][c][2]=ulapal[table4bpp[c][2]]|(ulapal[table4bpp[c][2]]<<8)|(ulapal[table4bpp[c][2]]<<16)|(ulapal[table4bpp[c][2]]<<24);
+                        pixlookupl[1][c][3]=ulapal[table4bpp[c][3]]|(ulapal[table4bpp[c][3]]<<8)|(ulapal[table4bpp[c][3]]<<16)|(ulapal[table4bpp[c][3]]<<24);
+                }
+                break;
+
+                case 2:
+                for (c=0;c<256;c++)
+                {
+                        pixlookupl[2][c][0]=ulapal[table4bpp[c][0]]|(ulapal[table4bpp[c][0]]<<8)|(ulapal[table4bpp[c][1]]<<16)|(ulapal[table4bpp[c][1]]<<24);
+                        pixlookupl[2][c][1]=ulapal[table4bpp[c][2]]|(ulapal[table4bpp[c][2]]<<8)|(ulapal[table4bpp[c][3]]<<16)|(ulapal[table4bpp[c][3]]<<24);
+                        pixlookupl[2][c][2]=ulapal[table4bpp[c][4]]|(ulapal[table4bpp[c][4]]<<8)|(ulapal[table4bpp[c][5]]<<16)|(ulapal[table4bpp[c][5]]<<24);
+                        pixlookupl[2][c][3]=ulapal[table4bpp[c][6]]|(ulapal[table4bpp[c][6]]<<8)|(ulapal[table4bpp[c][7]]<<16)|(ulapal[table4bpp[c][7]]<<24);
+                }
+                break;
+
+                case 3:
+                for (c=0;c<256;c++)
+                {
+                        pixlookupl[3][c][0]=ulapal[table4bpp[c][0]]|(ulapal[table4bpp[c][1]]<<8)|(ulapal[table4bpp[c][2]]<<16)|(ulapal[table4bpp[c][3]]<<24);
+                        pixlookupl[3][c][1]=ulapal[table4bpp[c][4]]|(ulapal[table4bpp[c][5]]<<8)|(ulapal[table4bpp[c][6]]<<16)|(ulapal[table4bpp[c][7]]<<24);
+                        pixlookupl[3][c][2]=ulapal[table4bpp[c][8]]|(ulapal[table4bpp[c][9]]<<8)|(ulapal[table4bpp[c][10]]<<16)|(ulapal[table4bpp[c][11]]<<24);
+                        pixlookupl[3][c][3]=ulapal[table4bpp[c][12]]|(ulapal[table4bpp[c][13]]<<8)|(ulapal[table4bpp[c][14]]<<16)|(ulapal[table4bpp[c][15]]<<24);
+                }
+                break;
+        }*/
+}
+
+void makelookuphigh()
+{
+/*        int c;
+        switch (ulamode)
+        {
+                case 0:
+                for (c=0;c<256;c++)
+                {
+                        pixlookuph[0][c][0]=pixlookuph[0][c][1]=ulapal[table4bpp[c][0]]|(ulapal[table4bpp[c][0]]<<8)|(ulapal[table4bpp[c][0]]<<16)|(ulapal[table4bpp[c][0]]<<24);
+                }
+                break;
+
+                case 1:
+                for (c=0;c<256;c++)
+                {
+                        pixlookuph[1][c][0]=ulapal[table4bpp[c][0]]|(ulapal[table4bpp[c][0]]<<8)|(ulapal[table4bpp[c][0]]<<16)|(ulapal[table4bpp[c][0]]<<24);
+                        pixlookuph[1][c][1]=ulapal[table4bpp[c][1]]|(ulapal[table4bpp[c][1]]<<8)|(ulapal[table4bpp[c][1]]<<16)|(ulapal[table4bpp[c][1]]<<24);
+                }
+                break;
+
+                case 2:
+                for (c=0;c<256;c++)
+                {
+                        pixlookuph[2][c][0]=ulapal[table4bpp[c][0]]|(ulapal[table4bpp[c][0]]<<8)|(ulapal[table4bpp[c][1]]<<16)|(ulapal[table4bpp[c][1]]<<24);
+                        pixlookuph[2][c][1]=ulapal[table4bpp[c][2]]|(ulapal[table4bpp[c][2]]<<8)|(ulapal[table4bpp[c][3]]<<16)|(ulapal[table4bpp[c][3]]<<24);
+                }
+                break;
+
+                case 3:
+                for (c=0;c<256;c++)
+                {
+                        pixlookuph[3][c][0]=ulapal[table4bpp[c][0]]|(ulapal[table4bpp[c][1]]<<8)|(ulapal[table4bpp[c][2]]<<16)|(ulapal[table4bpp[c][3]]<<24);
+                        pixlookuph[3][c][1]=ulapal[table4bpp[c][4]]|(ulapal[table4bpp[c][5]]<<8)|(ulapal[table4bpp[c][6]]<<16)|(ulapal[table4bpp[c][7]]<<24);
+                }
+                break;
+        }*/
+}
+
+void makelookup()
+{
+/*        int c;
+        for (c=0;c<256;c++)
+        {
+                pixlookuph[0][c][0]=pixlookuph[0][c][1]=ulapal[table4bpp[c][0]]|(ulapal[table4bpp[c][0]]<<8)|(ulapal[table4bpp[c][0]]<<16)|(ulapal[table4bpp[c][0]]<<24);
+
+                pixlookuph[1][c][0]=ulapal[table4bpp[c][0]]|(ulapal[table4bpp[c][0]]<<8)|(ulapal[table4bpp[c][0]]<<16)|(ulapal[table4bpp[c][0]]<<24);
+                pixlookuph[1][c][1]=ulapal[table4bpp[c][1]]|(ulapal[table4bpp[c][1]]<<8)|(ulapal[table4bpp[c][1]]<<16)|(ulapal[table4bpp[c][1]]<<24);
+
+                pixlookuph[2][c][0]=ulapal[table4bpp[c][0]]|(ulapal[table4bpp[c][0]]<<8)|(ulapal[table4bpp[c][1]]<<16)|(ulapal[table4bpp[c][1]]<<24);
+                pixlookuph[2][c][1]=ulapal[table4bpp[c][2]]|(ulapal[table4bpp[c][2]]<<8)|(ulapal[table4bpp[c][3]]<<16)|(ulapal[table4bpp[c][3]]<<24);
+
+                pixlookuph[3][c][0]=ulapal[table4bpp[c][0]]|(ulapal[table4bpp[c][1]]<<8)|(ulapal[table4bpp[c][2]]<<16)|(ulapal[table4bpp[c][3]]<<24);
+                pixlookuph[3][c][1]=ulapal[table4bpp[c][4]]|(ulapal[table4bpp[c][5]]<<8)|(ulapal[table4bpp[c][6]]<<16)|(ulapal[table4bpp[c][7]]<<24);
+
+                pixlookupl[0][c][0]=pixlookupl[0][c][1]=ulapal[table4bpp[c][0]]|(ulapal[table4bpp[c][0]]<<8)|(ulapal[table4bpp[c][0]]<<16)|(ulapal[table4bpp[c][0]]<<24);
+                pixlookupl[0][c][2]=pixlookupl[0][c][3]=ulapal[table4bpp[c][1]]|(ulapal[table4bpp[c][1]]<<8)|(ulapal[table4bpp[c][1]]<<16)|(ulapal[table4bpp[c][1]]<<24);
+
+                pixlookupl[1][c][0]=ulapal[table4bpp[c][0]]|(ulapal[table4bpp[c][0]]<<8)|(ulapal[table4bpp[c][0]]<<16)|(ulapal[table4bpp[c][0]]<<24);
+                pixlookupl[1][c][1]=ulapal[table4bpp[c][1]]|(ulapal[table4bpp[c][1]]<<8)|(ulapal[table4bpp[c][1]]<<16)|(ulapal[table4bpp[c][1]]<<24);
+                pixlookupl[1][c][2]=ulapal[table4bpp[c][2]]|(ulapal[table4bpp[c][2]]<<8)|(ulapal[table4bpp[c][2]]<<16)|(ulapal[table4bpp[c][2]]<<24);
+                pixlookupl[1][c][3]=ulapal[table4bpp[c][3]]|(ulapal[table4bpp[c][3]]<<8)|(ulapal[table4bpp[c][3]]<<16)|(ulapal[table4bpp[c][3]]<<24);
+
+                pixlookupl[2][c][0]=ulapal[table4bpp[c][0]]|(ulapal[table4bpp[c][0]]<<8)|(ulapal[table4bpp[c][1]]<<16)|(ulapal[table4bpp[c][1]]<<24);
+                pixlookupl[2][c][1]=ulapal[table4bpp[c][2]]|(ulapal[table4bpp[c][2]]<<8)|(ulapal[table4bpp[c][3]]<<16)|(ulapal[table4bpp[c][3]]<<24);
+                pixlookupl[2][c][2]=ulapal[table4bpp[c][4]]|(ulapal[table4bpp[c][4]]<<8)|(ulapal[table4bpp[c][5]]<<16)|(ulapal[table4bpp[c][5]]<<24);
+                pixlookupl[2][c][3]=ulapal[table4bpp[c][6]]|(ulapal[table4bpp[c][6]]<<8)|(ulapal[table4bpp[c][7]]<<16)|(ulapal[table4bpp[c][7]]<<24);
+
+                pixlookupl[3][c][0]=ulapal[table4bpp[c][0]]|(ulapal[table4bpp[c][1]]<<8)|(ulapal[table4bpp[c][2]]<<16)|(ulapal[table4bpp[c][3]]<<24);
+                pixlookupl[3][c][1]=ulapal[table4bpp[c][4]]|(ulapal[table4bpp[c][5]]<<8)|(ulapal[table4bpp[c][6]]<<16)|(ulapal[table4bpp[c][7]]<<24);
+                pixlookupl[3][c][2]=ulapal[table4bpp[c][8]]|(ulapal[table4bpp[c][9]]<<8)|(ulapal[table4bpp[c][10]]<<16)|(ulapal[table4bpp[c][11]]<<24);
+                pixlookupl[3][c][3]=ulapal[table4bpp[c][12]]|(ulapal[table4bpp[c][13]]<<8)|(ulapal[table4bpp[c][14]]<<16)|(ulapal[table4bpp[c][15]]<<24);
+        }*/
+}
+
+void writeula(uint16_t addr, uint8_t val)
+{
+        int c;
+//        rpclog("ULA write %04X %02X %i\n",addr,val,hc);
+        if (!(addr&1))
+        {
+//        printf("ULA write %04X %02X\n",addr,val);
+                if ((ulactrl^val)&1)
+                {
+                        if (val&1)
+                        {
+                                for (c=0;c<16;c++)
+                                {
+                                        if (bakpal[c]&8) ulapal[c]=collook[bakpal[c]&7];
+                                        else             ulapal[c]=collook[(bakpal[c]&7)^7];
+                                }
+                        }
+                        else
+                        {
+                                for (c=0;c<16;c++)
+                                    ulapal[c]=collook[(bakpal[c]&7)^7];
+                        }
+//                        makelookup();
+                }
+//                if ((ulactrl^val)&1) makelookup();
+                ulactrl=val;
+                ulamode=(ulactrl>>2)&3;
+/*                if (crtcmode==1 && (val&0x12))       makelookuplow();
+                else if (crtcmode!=1 && !(val&0x12)) makelookuphigh();*/
+                if (val&2)         crtcmode=0;
+                else if (val&0x10) crtcmode=1;
+                else               crtcmode=2;
+//                printf("ULAmode %i\n",ulamode);
+        }
+        else
+        {
+//        printf("ULA write %04X %02X\n",addr,val);
+                c=bakpal[val>>4];
+                bakpal[val>>4]=val&15;
+                ulapal[val>>4]=collook[(val&7)^7];
+                if (val&8) ulapal[val>>4]=collook[val&7];
+//                makelookup();
+/*                if ((val&15)!=c)
+                {
+                        makelookup();
+                        if (crtcmode==1) makelookuphigh();
+                        else             makelookuplow();
+                }*/
+        }
+}
+
+
+BITMAP *b,*b16,*b16x;
+#ifdef WIN32
+BITMAP *vb;
+#endif
 
 PALETTE beebpal=
 {
@@ -31,1131 +260,57 @@ PALETTE beebpal=
         {63,63,63},
 };
 
-PALETTE monopal =
+int inverttbl[256];
+int dcol;
+PALETTE pal;
+
+void initvideo()
 {
-      {0,0,0},
-      {16,16,16},
-      {24,24,24},
-      {40,40,40},
-      {8,8,8},
-      {24,24,24},
-      {32,32,32},
-      {56,56,56},
-      {0,0,0},
-      {16,16,16},
-      {24,24,24},
-      {40,40,40},
-      {8,8,8},
-      {24,24,24},
-      {32,32,32},
-      {56,56,56},
-};
+        int c,d;
+        int temp,temp2,left;
 
-int flash=0,flashint=0;
-unsigned short pc;
-
-unsigned char *ram;
-
-int linesdrawn=0;
-
-BITMAP *buffer,*buffer2,*buf16,*buf162,*vbuffer;
-int multable[128];
-int scrsize;
-int screenlen[4]={0x4000,0x5000,0x2000,0x2800};
-int bbcmode;
-
-int mono=0;
-
-int blurred=0;
-int frames;
-volatile int fps=0;
-
-static void secint()
-{
-        fps=frames;
-        frames=0;
-}
-
-END_OF_FUNCTION(secint);
-
-unsigned char table4bpp[256][8];
-
-int crtcreg;
-unsigned char basecrtc[32]={127,40,98,0x28,38,0,25,34,0,7,0,0,6,0,0,0,0,0};
-unsigned char crtc[32];
-
-unsigned short startaddr;
-int curline=0,physline=0;
-
-int vc=0,sc=0,sc6=0;
-int model;
-unsigned char crtcmask[32]={0xFF,0xFF,0xFF,0xFF,0x7F,0x1F,0x7F,0x7F,0xF3,0x1F,0x7F,0x1F,0x3F,0xFF,0x3F,0xFF,0x3F,0xFF};
-unsigned long cursordat[4]={0xFF,0xFFFF0000,0xFFFF,0xFFFFFFFF};
-unsigned long cursoraddr;
-int cursorstart,cursorend;
-int cursorblink,cursoron,cursorcount;
-unsigned char cursorram[65536/*<<1*/]; /*Horrible method of generating cursor, but
-                                  (hopefully) fast*/
-
-unsigned long lookuptab[256],lookuptab2[256];
-unsigned long lookuptabh[256],lookuptabh2[256],lookuptabh3[256],lookuptabh4[256];
-unsigned char ulactrl;
-int clut[16],clut2[16];
-int remakelookup=1;
-
-void redocursor()
-{
-        int y;
-        int size;
-//        return;
-        for (y=cursorstart;y<=cursorend;y++)
+        dcol=desktop_color_depth();
+        set_color_depth(dcol);
+        set_gfx_mode(GFX_AUTODETECT_WINDOWED,832,624,0,0);
+        #ifdef WIN32
+        vb=create_video_bitmap(832,312);
+        #endif
+b16x=create_bitmap(832,614);
+        b16=create_bitmap(832,614);
+        set_color_depth(8);
+        for (c=1;c<16;c++)
         {
-                if (y<16)
-                   cursorram[(cursoraddr+y)&0xFFFF]=cursorram[(cursoraddr+16+y)&0xFFFF]=cursorram[(cursoraddr+32+y)&0xFFFF]=cursorram[(cursoraddr+48+y)&0xFFFF]=0;
-        }
-        cursoraddr=(crtc[15]|(crtc[14]<<8))<<4;
-        cursorstart=crtc[10]&0x1F;
-        cursorend=(crtc[11]&0x1F);
-        cursorblink=(crtc[10]>>5)&3;
-//        printf("Cursoraddr %04X %04X %02X %02X %i %i %04X\n",cursoraddr,cursoraddr>>1,crtc[15],crtc[14],cursorstart,cursorend,startaddr);
-        size=(ulactrl>>5)&3;
-        if (cursoraddr&0x20000) return;
-        while (cursoraddr&0x10000) cursoraddr-=(screenlen[scrsize]<<1);
-        if (!(ulactrl&0xE0) || (crtc[8]&0xC0)==0xC0 || cursorend<=cursorstart) return;
-        for (y=cursorstart;y<=cursorend;y++)
-        {
-                if (y<16 && cursoron)
+                for (d=0;d<8;d++)
                 {
-                        cursorram[(cursoraddr+y)&0xFFFF]=cursordat[size]&0xFF;
-                        cursorram[(cursoraddr+16+y)&0xFFFF]=cursordat[size]>>8;
-                        cursorram[(cursoraddr+32+y)&0xFFFF]=cursordat[size]>>16;
-                        cursorram[(cursoraddr+48+y)&0xFFFF]=cursordat[size]>>24;
+                        beebpal[(c<<4)+d].r=(beebpal[d].r*(15-c))/15;
+                        beebpal[(c<<4)+d].g=(beebpal[d].g*(15-c))/15;
+                        beebpal[(c<<4)+d].b=(beebpal[d].b*(15-c))/15;
                 }
         }
-}
-
-void writecrtc(unsigned short addr, unsigned char val)
-{
-        if (!(addr&1))
-           crtcreg=val&31;
-        else
-        {
-                crtc[crtcreg]=val&crtcmask[crtcreg];
-                if (crtcreg==0 || crtcreg==1 || crtcreg==4 || crtcreg==6) drawfull=2;
-//                if (crtcreg==6) clear(buffer);
-                if (crtcreg==14 || crtcreg==15 || crtcreg==10 || crtcreg==11)
-                {
-                        redocursor();
-                }
-//                if (crtcreg==8 || crtcreg==7 || crtcreg==4) rpclog("Write CRTC R%i %04X %02X %04X\n",crtcreg,addr,val,pc);
-        }
-}
-unsigned char readcrtc(unsigned short addr)
-{
-        if (!(addr&1))
-           return crtcreg;
-        return crtc[crtcreg];
-}
-
-void updateclut()
-{
-        int c;
+        generate_332_palette(pal);
+        set_palette(pal);
+        collook[0]=makecol(0,0,0);
+        col0=collook[0]|(collook[0]<<8)|(collook[0]<<16)|(collook[0]<<24);
+        collook[1]=makecol(255,0,0);
+        collook[2]=makecol(0,255,0);
+        collook[3]=makecol(255,255,0);
+        collook[4]=makecol(0,0,255);
+        collook[5]=makecol(255,0,255);
+        collook[6]=makecol(0,255,255);
+        collook[7]=makecol(255,255,255);
         for (c=0;c<16;c++)
         {
-                if (clut2[c]&8)
+                for (d=0;d<64;d++)
                 {
-                        if (ulactrl&1) clut[c]=clut2[c]^7;
-                        else           clut[c]=clut2[c];
-                }
-                else
-                   clut[c]=clut2[c];
-        }
-}
-
-void writeula(unsigned short addr, unsigned char val)
-{
-//        rpclog("Write ULA %04X %02X\n",addr,val);
-        remakelookup=1;
-        if (addr&1)
-        {
-                clut2[val>>4]=(val^7)&0xF;
-                updateclut();
-//                printf("CLUT %i=%i at line %i %i %i %04X\n",val>>4,(val^7)&0xF,vc,sc,(vc<<3)+sc,pc);
-        }
-        else
-        {
-                ulactrl=val;
-                if (val&2) bbcmode=7;
-                else switch (val&0x1C)
-                {
-                        case 0x00: bbcmode=8; break;
-                        case 0x04: bbcmode=5; break;
-                        case 0x08: bbcmode=4; break;
-                        case 0x14: bbcmode=2; break;
-                        case 0x18: bbcmode=1; break;
-                        case 0x1C: bbcmode=0; break;
-                }
-                updateclut();
-        }
-}
-
-unsigned long cursorcol;
-void remaketab()
-{
-        int c;
-                unsigned char *tb;
-//              return;
-        cursorcol=clut2[15]|(clut2[15]<<8)|(clut2[15]<<16)|(clut2[15]<<24);
-        if (hires&1)
-        {
-                switch (bbcmode)
-                {
-                        case 0:
-                        for (c=0;c<256;c++)
-                        {
-                                                        tb = (unsigned char *)&lookuptabh[c];
-                                                                tb[0] = clut[table4bpp[c][0]]&7;
-                                                                tb[1] = clut[table4bpp[c][1]]&7;
-                                                                tb[2] = clut[table4bpp[c][2]]&7;
-                                tb[3] = clut[table4bpp[c][3]]&7;
-
-                                                        tb = (unsigned char *)&lookuptabh2[c];
-                                tb[0]=clut[table4bpp[c][4]]&7;
-                                tb[1]=clut[table4bpp[c][5]]&7;
-                                tb[2]=clut[table4bpp[c][6]]&7;
-                                tb[3]=clut[table4bpp[c][7]]&7;
-                        }
-                        break;
-                        case 1:
-                        for (c=0;c<256;c++)
-                        {
-                                                        tb = (unsigned char *)&lookuptabh[c];
-                                                                tb[0] = tb[1] = clut[table4bpp[c][0]]&7;
-                                                                tb[2] = tb[3] = clut[table4bpp[c][1]]&7;
-                                                        tb = (unsigned char *)&lookuptabh2[c];
-                                                                tb[0] = tb[1] = clut[table4bpp[c][2]]&7;
-                                                                tb[2] = tb[3] = clut[table4bpp[c][3]]&7;
-                        }
-                        break;
-                        case 2:
-                        for (c=0;c<256;c++)
-                        {
-                                                        tb = (unsigned char *)&lookuptabh[c];
-                                                                tb[0] = tb[1] =
-                                                                tb[2] = tb[3] = clut[table4bpp[c][0]]&7;
-
-                                                        tb = (unsigned char *)&lookuptabh2[c];
-                                                                tb[0] = tb[1] =
-                                                                tb[2] = tb[3] = clut[table4bpp[c][1]]&7;
-                        }
-                        break;
-                        case 4:
-                        for (c=0;c<256;c++)
-                        {
-                                                        tb = (unsigned char *)&lookuptabh[c];
-                                                                tb[0] = tb[1] = clut[table4bpp[c][0]];
-                                                                tb[2] = tb[3] = clut[table4bpp[c][1]];
-
-                                                        tb = (unsigned char *)&lookuptabh2[c];
-                                                                tb[0] = tb[1] = clut[table4bpp[c][2]];
-                                                                tb[2] = tb[3] = clut[table4bpp[c][3]];
-
-                                                        tb = (unsigned char *)&lookuptabh3[c];
-                                                                tb[0] = tb[1] = clut[table4bpp[c][4]];
-                                                                tb[2] = tb[3] = clut[table4bpp[c][5]];
-
-                                                        tb = (unsigned char *)&lookuptabh4[c];
-                                                                tb[0] = tb[1] = clut[table4bpp[c][6]];
-                                                                tb[2] = tb[3] = clut[table4bpp[c][7]];
-                        }
-                        break;
-                        case 5:
-                        for (c=0;c<256;c++)
-                        {
-                                lookuptabh[c]=   (clut[table4bpp[c][0]]&7)|     ((clut[table4bpp[c][0]]&7)<<8);
-                                lookuptabh[c]|= ((clut[table4bpp[c][0]]&7)<<16)|((clut[table4bpp[c][0]]&7)<<24);
-                                lookuptabh2[c]=  (clut[table4bpp[c][1]]&7)|     ((clut[table4bpp[c][1]]&7)<<8);
-                                lookuptabh2[c]|=((clut[table4bpp[c][1]]&7)<<16)|((clut[table4bpp[c][1]]&7)<<24);
-                                lookuptabh3[c]=  (clut[table4bpp[c][2]]&7)|     ((clut[table4bpp[c][2]]&7)<<8);
-                                lookuptabh3[c]|=((clut[table4bpp[c][2]]&7)<<16)|((clut[table4bpp[c][2]]&7)<<24);
-                                lookuptabh4[c]=  (clut[table4bpp[c][3]]&7)|     ((clut[table4bpp[c][3]]&7)<<8);
-                                lookuptabh4[c]|=((clut[table4bpp[c][3]]&7)<<16)|((clut[table4bpp[c][3]]&7)<<24);
-                        }
-                        break;
+                        m7lookup[d&7][(d>>3)&7][c]=makecol(     (((d&1)*c)*255)/15 + ((((d&8)>>3)*(15-c))*255)/15,
+                                                            ((((d&2)>>1)*c)*255)/15 + ((((d&16)>>4)*(15-c))*255)/15,
+                                                            ((((d&4)>>2)*c)*255)/15 + ((((d&32)>>5)*(15-c))*255)/15);
                 }
         }
-        else
-        {
-                switch (bbcmode)
-                {
-                        case 0:
-                        for (c=0;c<256;c++)
-                        {
-                                                        tb = (unsigned char *)&lookuptab[c];
-                                tb[0]=clut[table4bpp[c][0]]&7;
-                                tb[1]=clut[table4bpp[c][2]]&7;
-                                tb[2]=clut[table4bpp[c][4]]&7;
-                                tb[3]=clut[table4bpp[c][6]]&7;
-                        }
-                        break;
-                        case 1:
-                        for (c=0;c<256;c++)
-                        {
-                                                        tb = (unsigned char *)&lookuptab[c];
-                                tb[0]=clut[table4bpp[c][0]]&7;
-                                tb[1]=clut[table4bpp[c][1]]&7;
-                                tb[2]=clut[table4bpp[c][2]]&7;
-                                tb[3]=clut[table4bpp[c][3]]&7;
-                        }
-                        break;
-                        case 2:
-                        for (c=0;c<256;c++)
-                        {
-                                                        tb = (unsigned char *)&lookuptab[c];
-                                tb[0]=clut[table4bpp[c][0]]&7;
-                                tb[1]=clut[table4bpp[c][0]]&7;
-                                tb[2]=clut[table4bpp[c][1]]&7;
-                                tb[3]=clut[table4bpp[c][1]]&7;
-                        }
-                        break;
-                        case 4:
-                        for (c=0;c<256;c++)
-                        {
-                                tb = (unsigned char *)&lookuptab[c];
-                                tb[0] = clut[table4bpp[c][0]];
-                                tb[1] = clut[table4bpp[c][1]];
-                                tb[2] = clut[table4bpp[c][2]];
-                                tb[3] = clut[table4bpp[c][3]];
-                                tb = (unsigned char *)&lookuptab2[c];
-                                tb[0] = clut[table4bpp[c][4]];
-                                tb[1] = clut[table4bpp[c][5]];
-                                tb[2] = clut[table4bpp[c][6]];
-                                tb[3] = clut[table4bpp[c][7]];
-                        }
-                        break;
-                        case 5:
-                        for (c=0;c<256;c++)
-                        {
-                                tb = (unsigned char *)&lookuptab[c];
-                                tb[0] = clut[table4bpp[c][0]];
-                                tb[1] = clut[table4bpp[c][0]];
-                                tb[2] = clut[table4bpp[c][1]];
-                                tb[3] = clut[table4bpp[c][1]];
-                                tb = (unsigned char *)&lookuptab2[c];
-                                tb[0] = clut[table4bpp[c][2]];
-                                tb[1] = clut[table4bpp[c][2]];
-                                tb[2] = clut[table4bpp[c][3]];
-                                tb[3] = clut[table4bpp[c][3]];
-                        }
-                        break;
-                }
-        }
-}
-
-void latchpen()
-{
-        int temp=(vc*crtc[9]*128)+(sc*128);
-        crtc[0x10]=(temp>>7)&0x3F;
-        crtc[0x11]=temp<<1;
-}
-
-void initframe()
-{
-        unsigned char tmphigh;
-        if (ulactrl&2)
-        {
-                tmphigh=crtc[12];
-                tmphigh^=0x20;
-                tmphigh+=0x74;
-                tmphigh&=255;
-                startaddr=crtc[13]|(tmphigh<<8);
-        }
-        else
-           startaddr=(crtc[13]|(crtc[12]<<8))<<3;
-//        rpclog("Startaddr %04X\n",startaddr);
-//        if (startaddr==0x5300) output=1;
-}
-
-void dumpcrtc()
-{
-        int c;
-        initframe();
-        printf("Start addr %04X\n",startaddr);
-        for (c=0;c<17;c++) printf("%02X ",crtc[c]);
-}
-
-void resetcrtc()
-{
-        vc=sc=curline=0;
-        for (sc6=0;sc6<32;sc6++) crtc[sc6]=basecrtc[sc6];
-}
-int firstx=65536,lastx=-1;
-
-void drawmode2line()
-{
-        int addr=(startaddr+sc)|vidbank,caddr=(startaddr<<1)+sc,x;
-        unsigned char val;
-        int xoffset=200-(crtc[1]<<1);
-        unsigned long *bufferp=(unsigned long *)buffer->line[physline&511];
-        if (firstx>xoffset) firstx=xoffset;
-        if (sc&8)
-        {
-                hline(buffer,0,physline&511,399,0);
-        }
-        else
-        {
-                for (x=0;x<crtc[1];x++)
-                {
-                        if (addr & vidlimit) { addr-=screenlen[scrsize]; addr&=0xFFFF; }
-                        val=ram[addr];
-                        addr+=8;
-                        bufferp[(xoffset>>2)&127]=lookuptab[val];
-                        xoffset+=4;
-                }
-                if (lastx<xoffset) lastx=xoffset;
-                if (drawfull) hline(buffer,xoffset,physline,399,0);
-                xoffset=200-(crtc[1]<<1);
-                if (drawfull) hline(buffer,0,physline,xoffset,0);
-        }
-        if (sc>=cursorstart && sc<=cursorend)
-        {
-                xoffset=200-(crtc[1]<<1);
-                for (x=0;x<crtc[1];x++)
-                {
-                        if (caddr&0x10000) caddr-=(screenlen[scrsize]<<1);
-                        if (cursorram[caddr])
-                           bufferp[(xoffset>>2)&127]^=0x07070707;
-                        caddr+=16;
-                        xoffset+=4;
-                }
-        }
-}
-
-void drawmode4line()
-{
-        int addr=(startaddr+sc)|vidbank,caddr=(startaddr<<1)+sc,x;
-        unsigned char val;
-        int xoffset=200-(crtc[1]<<2);
-        unsigned long *bufferp=(unsigned long *)buffer->line[physline&511];
-        if (firstx>xoffset) firstx=xoffset;
-        if (sc&8)
-        {
-//                rpclog("Blanking line %i\n",physline);
-                hline(buffer,0,physline&511,398,0);
-        }
-        else
-        {
-//                rpclog("Drawling line %i\n",physline);
-                for (x=0;x<crtc[1];x++)
-                {
-                        if (addr & vidlimit) { addr-=screenlen[scrsize]; addr&=0xFFFF; }
-                        val=ram[addr];
-                        addr+=8;
-                        bufferp[(xoffset>>2)&127]=lookuptab[val];
-                        bufferp[((xoffset+4)>>2)&127]=lookuptab2[val];
-                        xoffset+=8;
-                }
-                if (lastx<xoffset) lastx=xoffset;
-                if (drawfull) hline(buffer,xoffset,physline,399,0);
-                xoffset=200-(crtc[1]<<2);
-                if (drawfull) hline(buffer,0,physline,xoffset,0);
-        }
-        if (sc>=cursorstart && sc<=cursorend)
-        {
-                xoffset=200-(crtc[1]<<2);
-//                rpclog("Cursor on at line %i\n",physline);
-                for (x=0;x<crtc[1];x++)
-                {
-                        if (caddr&0x10000) caddr-=(screenlen[scrsize]<<1);
-                        if (cursorram[caddr]) {
-                           bufferp[(xoffset>>2)&127]^=0x07070707;
-                           bufferp[((xoffset+4)>>2)&127]^=0x07070707; }
-                        caddr+=16;
-                        xoffset+=8;
-                }
-        }
-}
-
-void drawmode2lineh(int line)
-{
-        int addr=(startaddr+sc)|vidbank,caddr=(startaddr<<1)+sc,x,xp;
-        unsigned char val;
-        unsigned long *bufferp=(unsigned long *)buffer->line[line];
-        unsigned long *bufferp2=(unsigned long *)buffer->line[line+1];
-        int xoffset=200-(crtc[1]<<1);
-        if (firstx>xoffset) firstx=xoffset;
-        if (drawfull)
-        {
-                hline(buffer,0,line,xoffset<<1,0);
-                if (hires==3) hline(buffer,0,line+1,xoffset<<1,0);
-        }
-        if (sc&8)
-        {
-                hline(buffer,0,line,799,0);
-                if (hires==3)
-                   hline(buffer,0,line+1,799,0);
-        }
-        else
-        {
-//                rpclog("Drawing line %i %04X %02X %04X %i %i\n",line>>1,addr,ram[addr],vidlimit,buffer->line[196<<1][xoffset<<1],xoffset);
-                for (x=0;x<crtc[1];x++)
-                {
-                        if (addr & vidlimit) { addr-=screenlen[scrsize]; addr&=0xFFFF; }
-                        val=ram[addr];
-//                        if (!x) rpclog("Addr %04X %02X %i %08X %08X\n",addr,ram[addr],crtc[1],lookuptabh[val],lookuptabh2[val]);
-                        addr+=8;
-                        xp=(xoffset>>1)&255;
-                        bufferp[xp]=lookuptabh[val];
-                        bufferp[xp+1]=lookuptabh2[val];
-                        if (hires==3)
-                        {
-                                bufferp2[xp]=lookuptabh[val];
-                                bufferp2[xp+1]=lookuptabh2[val];
-                        }
-                        xoffset+=4;
-                }
-                if (lastx<xoffset) lastx=xoffset;
-                if (drawfull)
-                {
-                        hline(buffer,xoffset<<1,line,799,0);
-                        if (hires==3) hline(buffer,xoffset<<1,line+1,799,0);
-                }
-        }
-        xoffset=200-(crtc[1]<<1);
-        if (sc>=cursorstart && sc<=cursorend)
-        {
-                for (x=0;x<crtc[1];x++)
-                {
-                        xp=(xoffset>>1)&255;
-                        if (caddr&0x10000) caddr-=(screenlen[scrsize]<<1);
-                        if (cursorram[caddr]) {
-                           bufferp[xp]^=0x07070707;
-                           bufferp[xp+1]^=0x07070707;
-                           if (hires==3) {
-                              bufferp2[xp]^=0x07070707;
-                              bufferp2[xp+1]^=0x07070707;
-                           }
-                        }
-                        caddr+=16;
-                        xoffset+=4;
-                }
-        }
-}
-
-void drawmodelowlineh(int line)
-{
-        int addr=(startaddr+sc)|vidbank,caddr=(startaddr<<1)+sc,x,xp;
-        unsigned char val;
-        unsigned long *bufferp=(unsigned long *)buffer->line[line];
-        unsigned long *bufferp2=(unsigned long *)buffer->line[line+1];
-        int xoffset=200-(crtc[1]<<2);
-        if (firstx>xoffset) firstx=xoffset;
-        if (drawfull)
-        {
-                hline(buffer,0,line,xoffset<<1,0);
-                if (hires==3) hline(buffer,0,line+1,xoffset<<1,0);
-        }
-        if (sc&8)
-        {
-                hline(buffer,0,line,799,0);
-                if (hires==3)
-                   hline(buffer,0,line+1,799,0);
-        }
-        else
-        {
-//                rpclog("Drawing line %i %04X %02X %04X\n",line,addr,ram[addr],vidlimit);
-                for (x=0;x<crtc[1];x++)
-                {
-                        if (addr & vidlimit) { addr-=screenlen[scrsize]; addr&=0xFFFF; }
-                        val=ram[addr];
-                        xp=(xoffset>>1)&255;
-                        addr+=8;
-                        bufferp[xp]=lookuptabh[val];
-                        bufferp[xp+1]=lookuptabh2[val];
-                        bufferp[xp+2]=lookuptabh3[val];
-                        bufferp[xp+3]=lookuptabh4[val];
-                        if (hires==3)
-                        {
-                                bufferp2[xp]=lookuptabh[val];
-                                bufferp2[xp+1]=lookuptabh2[val];
-                                bufferp2[xp+2]=lookuptabh3[val];
-                                bufferp2[xp+3]=lookuptabh4[val];
-                        }
-                        xoffset+=8;
-                }
-        }
-        if (drawfull)
-        {
-                hline(buffer,xoffset<<1,line,799,0);
-                if (hires==3) hline(buffer,xoffset<<1,line+1,799,0);
-        }
-        if (lastx<xoffset) lastx=xoffset;
-        xoffset=200-(crtc[1]<<2);
-        if (sc>=cursorstart && sc<=cursorend)
-        {
-                for (x=0;x<crtc[1];x++)
-                {
-                        xp=(xoffset>>1)&255;
-                        if (caddr&0x10000) caddr-=(screenlen[scrsize]<<1);
-                        if (cursorram[caddr]) {
-                           bufferp[xp  ]^=0x07070707; bufferp[xp+1]^=0x07070707;
-                           bufferp[xp+2]^=0x07070707; bufferp[xp+3]^=0x07070707;
-                           if (hires==3) {
-                              bufferp2[xp  ]^=0x07070707; bufferp2[xp+1]^=0x07070707;
-                              bufferp2[xp+2]^=0x07070707; bufferp2[xp+3]^=0x07070707;
-                           }
-                        }
-                        caddr+=16;
-                        xoffset+=8;
-                }
-        }
-}
-
-int olddbl[64],dbl[64];
-int curlinedbl,nextlinedbl=0;
-
-void drawteletextline(int line)
-{
-        int addr=startaddr,x,xx,temp2;
-        int prntdbl=0;
-        int xoffset=200-(crtc[1]*3);
-        int cr,temp,held=0;
-        unsigned char heldchar=0;
-        unsigned char *chrset=teletext_characters;
-        int colours[2]={0,7};
-        int dblhigh=0,sepgfx=0,flashing=0,graph=0;
-        unsigned char *bufferp,*bufferp2;
-        if (firstx>xoffset) firstx=xoffset;
-        if (!sc)
-        {
-                curlinedbl=nextlinedbl;
-                nextlinedbl=0;
-        }
-        if (drawfull)
-        {
-                if (hires&1/* && hires!=5*/) hline(buffer,0,line,xoffset<<1,0);
-                else         hline(buffer,0,line,xoffset,0);
-                if (hires==3) hline(buffer,0,line+1,xoffset<<1,0);
-        }
-        bufferp=buffer->line[line];
-        bufferp2=buffer->line[line+1];
-        for (x=0;x<crtc[1];x++)
-        {
-                if (addr&0x8000) addr-=0x400;
-                cr=ram[(addr&vidmask)|vidbank];
-//                if (!sc) rpclog("Loaded char %04X %i %02X ",addr,x,cr);
-                cr&=0x7F;
-                if (graph && (cr&32)) heldchar=cr;
-                if (cr<32)
-                {
-                        switch (cr|0x80)
-                        {
-                                case 129: case 130: case 131: case 132:
-                                case 133: case 134: case 135:
-                                colours[1]=cr&7;
-                                chrset=teletext_characters;
-                                graph=0;
-                                break;
-                                case 136:
-                                flashing=1;
-                                break;
-                                case 137:
-                                flashing=0;
-                                break;
-                                case 140: case 141:
-                                dblhigh=cr&1;
-                                if (dblhigh && !curlinedbl)
-                                   nextlinedbl=1;
-                                break;
-                                case 145: case 146: case 147: case 148:
-                                case 149: case 150: case 151:
-                                colours[1]=cr&7;
-                                if (sepgfx) chrset=teletext_separated_graphics;
-                                else        chrset=teletext_graphics;
-                                graph=1;
-                                break;
-                                case 152:
-                                colours[1]=colours[0];
-                                break;
-                                case 153:
-                                chrset=teletext_graphics;
-                                sepgfx=0;
-                                graph=1;
-                                break;
-                                case 154:
-                                chrset=teletext_separated_graphics;
-                                sepgfx=1;
-                                graph=1;
-                                break;
-                                case 156:
-                                colours[0]=0;
-                                break;
-                                case 157:
-                                colours[0]=colours[1];
-                                break;
-                                case 158:
-                                held=1;
-                                break;
-                                case 159:
-                                held=0;
-                                break;
-                        }
-                        if (held && graph)
-                           cr=heldchar;
-                        else
-                           cr=32;
-                }
-                if (cr<32) cr=0;
-                else cr-=32;
-                if (curlinedbl && !dblhigh) cr=0;
-//                if (!sc) rpclog("Ended up as %02X\n",cr);
-                temp=cr;
-                cr=multable[cr]+sc6;
-                if (dblhigh)
-                   cr=multable[temp]+((sc>>1)*6);
-                if (curlinedbl) /*Last line was doublehigh*/
-                   cr=multable[temp]+((sc>>1)*6)+30;
-                temp2=colours[1];
-                if (flashing && !flash) colours[1]=colours[0];
-                if (hires&1)
-                {
-                        for (xx=0;xx<6;xx++)
-                        {
-                                bufferp[((xoffset+xx)&511)<<1]=colours[chrset[cr]];
-                                bufferp[(((xoffset+xx)&511)<<1)+1]=colours[chrset[cr]];
-                                if (hires==3)
-                                {
-                                        bufferp2[((xoffset+xx)&511)<<1]=colours[chrset[cr]];
-                                        bufferp2[(((xoffset+xx)&511)<<1)+1]=colours[chrset[cr]];
-                                }
-                                cr++;
-                        }
-                }
-                else
-                {
-                        for (xx=0;xx<6;xx++)
-                        {
-                                if (chrset[cr++])
-                                   bufferp[(xoffset+xx)&511]=colours[1];
-                                else
-                                   bufferp[(xoffset+xx)&511]=colours[0];
-                        }
-                }
-                colours[1]=temp2;
-                xoffset+=6;
-                addr++;
-                if (!sc) dbl[x]=dblhigh;
-        }
-        if (lastx<xoffset) lastx=xoffset;
-        if (drawfull)
-        {
-                if (hires&1/* && hires!=5*/) hline(buffer,xoffset<<1,line,799,0);
-                else         hline(buffer,xoffset,   line,399,0);
-                if (hires==3) hline(buffer,xoffset<<1,line+1,799,0);
-        }
-}
-
-int firstline=-1,lastline=-1;
-
-void drawcursor()
-{
-        unsigned short temp,tempx,tempy;
-        int xoffset=200-(crtc[1]*3);
-//        return;
-        if ((ulactrl & 0xe0) == 0 || (crtc[10] & 0x40) == 0 || crtc[1]==0 || (crtc[8]&0xC0)==0xC0 || !cursoron)
-           return;
-        if ((crtc[10]&0x1F)>=(crtc[11]&0x1F)) return;
-        temp=crtc[15]+((((crtc[14] ^ 0x20) + 0x74) & 0xff)<<8);
-        initframe();
-        temp-=startaddr;
-        tempx=temp%crtc[1];
-        tempy=temp/crtc[1];
-//        sprintf(st,"_");
-//        if (flash)
-//        {
-                if (hires==5) hline(buffer,((tempx*6)+xoffset+1)<<1,((tempy*10)+firstline+9),(((tempx*6)+5)+xoffset)<<1,7);
-                else if (hires&1) hline(buffer,((tempx*6)+xoffset+1)<<1,((tempy*10)+firstline+9)<<1,(((tempx*6)+5)+xoffset)<<1,7);
-                else         hline(buffer,(tempx*6)+xoffset+1,(tempy*10)+firstline+9,((tempx*6)+5)+xoffset,7);
-                if (hires==3) hline(buffer,((tempx*6)+xoffset+1)<<1,(((tempy*10)+firstline+9)<<1)+1,(((tempx*6)+5)+xoffset)<<1,7);
-//        }
-//           drawstring(b,font,tempx<<3,tempy<<3,st,15);
-}
-
-
-int delaylcount=0;
-int olx,ofx,oll,ofl;
-int vblcount=0;
-int interlaceframe=0;
-void drawline(int line6502)
-{
-        int tline;
-        int x,y;
-//        rpclog("VC %i %i\n",vc,curline);
-//        return;
-        if (interlaceline)
-        {
-//                rpclog("INTERLACELINE\n");
-                interlaceline=0;
-                return;
-        }
-        lns=curline;
-        if (vblcount)
-        {
-                vblcount--;
-                if (!vblcount)
-                {
-//                        rpclog("VBLint\n");
-                        vblankint();
-                }
-        }
-        if (curline>1023 || physline>1023) /*Something has obviously gone wrong in this case*/
-        {
-                curline=physline=0;
-                if (model==3) physline+=16;
-        }
-        if (delaylcount==-1)
-        {
-                delaylcount=0;
-                sc=vc=0;
-                initframe();
-        }
-        #if 0
-        if (!curline)
-        {
-                sc=vc=0;
-                cursorcount++;
-                switch (cursorblink)
-                {
-                        case 0: cursoron=1; break;
-                        case 1: cursoron=0; break;
-                        case 2: cursorcount&=15; if (!cursorcount) cursoron^=1; break;
-                        case 3: cursorcount&=31; if (!cursorcount) cursoron^=1; break;
-                }
-                redocursor();
-                if (!(fasttape && motor) || !flashint)
-                {
-                        if (physline>0 && physline<300)
-                        {
-                                if (hires&1 && hires!=5)  memset(buffer->line[physline<<1],0,800);
-                                else          memset(buffer->line[physline],0,(hires==5)?800:400);
-                                if (hires==3) memset(buffer->line[(physline<<1)+1],0,800);
-                        }
-                }
-                delaylcount=crtc[5];
-                if (!delaylcount) initframe();
-//                rpclog("INITFRAME\n");
-        }
-        #endif
-        if (vc==crtc[7] && sc==0)
-        {
-//                rpclog("VBLANK\n");
-                curline=0;
-                vblankintlow();
-                vblcount=crtc[3]>>4;
-//                rpclog("VBLANK - vblcount %i\n",vblcount);
-                linesdrawn=0;
-                physline=0;
-                if (model==3)   physline+=16;
-                if (bbcmode==7) drawcursor();
-                if (!(fasttape && motor) || !flashint)
-                {
-                        lastline++;
-                        if ((olx!=lastx) || (ofx!=firstx) || (oll!=lastline) || (ofl!=firstline) && (drawfull<3))
-                           drawfull=2;
-                        oll=lastline; ofl=firstline;
-                        olx=lastx; ofx=firstx;
-                        if (drawfull==3)
-                        {
-                                clear_to_color(screen,makecol(0,0,0));
-                        }
-//                        rpclog("%i,%i to %i,%i\n",firstx,firstline,lastx,lastline);
-                        if (drawfull)
-                        {
-                                firstline=16;
-                                firstx=0;
-                                lastline=300;
-                                lastx=400;
-                        }
-//                        textprintf(buffer,font,0,firstline,7,"%i %i %i %i",firstline,lastline,firstx,lastx);
-//                        blit(buffer,screen,0,0,0,0,800,600);
-
-                        if (hires==1)
-                        {
-                                if (blurred)
-                                {
-                                        for (y=firstline;y<lastline;y++)
-                                        {
-                                                buffer2->line[y<<1][0]=buffer->line[y<<1][0];
-                                                for (x=(firstx+1);x<lastx;x++)
-                                                {
-                                                        buffer2->line[y<<1][x<<1]=buffer2->line[y<<1][(x<<1)+1]=128+buffer->line[y<<1][x<<1]+(buffer->line[y<<1][(x-1)<<1]<<3);
-                                                }
-                                        }
-                                        blit(buffer2,screen,firstx<<1,firstline<<1,firstx<<1,(firstline<<1)-32,(lastx-firstx)<<1,(lastline-firstline)<<1);
-                                }
-                                else
-                                   blit(buffer,screen,firstx<<1,firstline<<1,firstx<<1,(firstline<<1)-32,(lastx-firstx)<<1,(lastline-firstline)<<1);
-                        }
-                        else if (hires==2)
-                        {
-                                blit(buffer,buf16,firstx,firstline,firstx,firstline-16,lastx-firstx,lastline-firstline);
-                                Super2xSaI(buf16,buf162,(firstx-1),(firstline-1)-16,(firstx-1)<<1,((firstline-1)-16)<<1,(lastx-firstx)+2,(lastline-firstline)+2);
-                                hline(screen,firstx<<1,((firstline-16)<<1)-1,lastx<<1,0);
-                                blit(buf162,screen,(firstx<<1),((firstline-16)<<1),firstx<<1,(firstline-16)<<1,(lastx-firstx)<<1,(lastline-firstline)<<1);
-//                                blit(buffer,buf16,firstx,firstline,0,0,lastx-firstx,lastline-firstline);
-//                                Super2xSaI(buf16,buf162,0,0,0,0,(lastx-firstx)<<1,(lastline-firstline)<<1);
-//                                blit(buf162,screen,1,1,(firstx<<1)+1,(firstline<<1)-31,((lastx-firstx)<<1)-2,((lastline-firstline)<<1)-2);
-                        }
-                        else if (hires==3)
-                        {
-                                if (blurred)
-                                {
-                                        for (y=(firstline<<1);y<(lastline<<1);y++)
-                                        {
-                                                buffer2->line[y][0]=buffer->line[y][0];
-                                                for (x=firstx+1;x<lastx;x++)
-                                                {
-                                                        buffer2->line[y][x<<1]=buffer2->line[y][(x<<1)+1]=128+buffer->line[y][x<<1]+(buffer->line[y][(x-1)<<1]<<3);
-                                                }
-                                        }
-                                        blit(buffer2,screen,firstx<<1,firstline<<1,firstx<<1,(firstline<<1)-32,(lastx-firstx)<<1,(lastline-firstline)<<1);
-                                }
-                                else
-                                   blit(buffer,screen,firstx<<1,firstline<<1,firstx<<1,(firstline<<1)-32,(lastx-firstx)<<1,(lastline-firstline)<<1);
-                        }
-                        else if (hires==5)
-                        {
-                                if (blurred)
-                                {
-                                        for (y=firstline;y<lastline;y++)
-                                        {
-                                                buffer2->line[y][0]=buffer->line[y][0];
-                                                for (x=firstx+1;x<lastx;x++)
-                                                {
-                                                        buffer2->line[y][x<<1]=buffer2->line[y][(x<<1)+1]=128+buffer->line[y][x<<1]+(buffer->line[y][(x-1)<<1]<<3);
-                                                }
-                                        }
-                                        blit(buffer2,vbuffer,firstx<<1,firstline,firstx<<1,firstline-16,(lastx-firstx)<<1,lastline-firstline);
-                                        stretch_blit(vbuffer,screen,0,0,800,300,0,0,800,600);
-                                }
-                                else
-                                {
-                                        blit(buffer,vbuffer,firstx<<1,firstline,firstx<<1,firstline-16,(lastx-firstx)<<1,lastline-firstline);
-                                        stretch_blit(vbuffer,screen,0,0,800,300,0,0,800,600);
-                                }
-                        }
-                        else
-                        {
-                                if (blurred)
-                                {
-                                        for (y=firstline;y<lastline;y++)
-                                        {
-                                                buffer2->line[y][0]=buffer->line[y][0];
-                                                for (x=firstx+1;x<lastx;x++)
-                                                {
-                                                        buffer2->line[y][x]=128+buffer->line[y][x]+(buffer->line[y][x-1]<<3);
-                                                }
-                                        }
-                                        blit(buffer2,screen,firstx,firstline,firstx,firstline-16,lastx-firstx,lastline-firstline);
-                                }
-                                else
-                                {
-                                        if (readflash) rectfill(buffer,368,0,400,20,readflash);
-                                        readflash=0;
-                                        blit(buffer,screen,0,16,0,0,400,300);
-//                                        blit(buffer,screen,firstx,firstline,firstx,firstline-16,lastx-firstx,lastline-firstline);
-                                }
-                        }
-
-//                        textprintf(screen,font,0,0,makecol(255,255,255),"%04X %i  ",pc,motor);
-                        if (drawfull)
-                           drawfull--;
-                }
-                firstline=lastline=lastx=-1;
-                firstx=65536;
-                flashint++;
-                if (flash && flashint==35)
-                   flashint=flash=0;
-                else if (!flash && flashint==15)
-                {
-                        flashint=0;
-                        flash=1;
-                }
-                interlaceframe^=1;
-                interlaceline=interlaceframe&(crtc[8]&1);
-        }
-        if (delaylcount)
-        {
-                dodelayl:
-//                rpclog("Delaylcount %i %i %i\n",sc,dispon,physline);
-                delaylcount--;
-                if (!delaylcount) delaylcount=-1;
-                if (dispon) goto drawingit;
-                else
-                {
-                        curline++;
-                        physline++;
-                }
-                if (!(fasttape && motor) || !flashint)
-                {
-                        if (physline>0 && physline<300)
-                        {
-                                if (hires&1 && hires!=5)  memset(buffer->line[physline<<1],0,800);
-                                else          memset(buffer->line[physline],0,(hires==5)?800:400);
-                                if (hires==3) memset(buffer->line[(physline<<1)+1],0,800);
-                        }
-                }
-                return;
-        }
-        tline=curline-crtc[5];
-        if (vc<crtc[6])
-        {
-                drawingit:
-                if (!vc && !sc) { /*rpclog("Start draw\n");*/ dispon=1; }
-//                rpclog("Drawing %i %i %02X %04X %i\n",vc,sc,crtc[8]&0x30,startaddr,physline);
-                if (remakelookup)
-                {
-                        remaketab();
-                        remakelookup=0;
-                }
-                if (!(fasttape && motor) || !flashint)
-                {
-                        if ((crtc[8]&0x30)==0x30)
-                        {
-                                if (physline>0 && physline<300)
-                                {
-                                        if (hires&1 && hires!=5)  memset(buffer->line[physline<<1],0,800);
-                                        else          memset(buffer->line[physline],0,(hires==5)?800:400);
-                                        if (hires==3) memset(buffer->line[(physline<<1)+1],0,800);
-                                }
-                        }
-                        else
-                        {
-                                if (firstline==-1) firstline=physline;
-                                lastline=physline;
-                                switch (bbcmode)
-                                {
-                                        case 0: case 1: case 2:
-                                        if (hires&1)
-                                        {
-                                                if (hires==5) drawmode2lineh(physline&511);
-                                                else          drawmode2lineh((physline&511)<<1);
-                                        }
-                                        else       drawmode2line();
-                                        break;
-                                        case 4: case 5: case 8:
-                                        if (hires&1)
-                                        {
-                                                if (hires==5) drawmodelowlineh(physline&511);
-                                                else          drawmodelowlineh((physline&511)<<1);
-                                        }
-                                        else       drawmode4line();
-                                        break;
-                                        case 7:
-                                        sc6=sc*6;
-                                        if (hires&1 && hires!=5) drawteletextline((physline&511)<<1);
-                                        else                     drawteletextline(physline&511);
-                                        break;
-                                }
-                        }
-                }
-                sc++;
-                sc&=31;
-                if (sc==crtc[9]+1 || ((sc==(crtc[9]>>1)+1) && crtc[8]&2))
-                {
-                        sc=0;
-                        vc++;
-                        vc&=127;
-                        if (ulactrl&2)
-                           startaddr+=crtc[1];
-                        else
-                           startaddr+=crtc[1]<<3;
-                }
-                if (delaylcount)
-                {
-                        curline++;
-                        physline++;
-                        if (delaylcount==-1)
-                        {
-                                delaylcount=0;
-                                initframe();
-                                vc=sc=0;
-                        }
-                        return;
-                }
-        }
-        else
-        {
-                if (vc==crtc[6] && !sc) dispon=0;
-                if (physline>15 && physline<300)
-                {
-                        if (hires&1 && hires!=5)  memset(buffer->line[physline<<1],0,800);
-                        else          memset(buffer->line[physline],0,(hires==5)?800:400);
-                        if (hires==3) memset(buffer->line[(physline<<1)+1],0,800);
-                }
-                sc++;
-                if (sc==crtc[9]+1 || ((sc==(crtc[9]>>1)+1) && crtc[8]&2))
-                {
-                        sc=0;
-                        vc++;
-                        vc&=127;
-                }
-        }
-        curline++;
-        physline++;
-        linesdrawn++;
-        if (vc==crtc[4]+1)
-        {
-//                rpclog("Frame over! %i %02X %i\n",crtc[4],crtc[3],crtc[7]);
-//                if (crtc[7]>=crtc[4])
-//                {
-//                        rpclog("RUPTURE %i %i %i\n",vc,sc,physline);
-                        cursorcount++;
-                        switch (cursorblink)
-                        {
-                                case 0: cursoron=1; break;
-                                case 1: cursoron=0; break;
-                                case 2: cursorcount&=15; if (!cursorcount) cursoron^=1; break;
-                                case 3: cursorcount&=31; if (!cursorcount) cursoron^=1; break;
-                        }
-                        redocursor();
-                        delaylcount=crtc[5];
-                        if (!delaylcount)
-                        {
-                                initframe();
-                                vc=sc=0;
-                        }
-                        else
-                        {
-                                if (hires&1 && hires!=5)  memset(buffer->line[physline<<1],0,800);
-                                else          memset(buffer->line[physline],0,(hires==5)?800:400);
-                                if (hires==3) memset(buffer->line[(physline<<1)+1],0,800);
-                        }
-
-/*                        else if (dispon)
-                        {
-                                curline--;
-                                physline--;
-                                rpclog("Jumping!\n");
-                                goto dodelayl;
-                        }*/
-/*                }
-                else
-                {
-                        rpclog("vretrace\n");
-                        curline=0;
-                        frames++;
-                }*/
-        }
-}
-
-void maketable2()
-{
-        int temp,left,right,temp2,c,col,bits;
         for (temp=0;temp<256;temp++)
         {
                 temp2=temp;
-                for (c=0;c<8;c++)
+                for (c=0;c<16;c++)
                 {
                      left=0;
                      if (temp2&2)
@@ -1166,314 +321,756 @@ void maketable2()
                         left|=4;
                      if (temp2&128)
                         left|=8;
-                     table4bpp[temp][c]=left;
-                     temp2<<=1;
+                     table4bpp[3][temp][c]=left;
+                     temp2<<=1; temp2|=1;
+                }
+                for (c=0;c<16;c++)
+                {
+                        table4bpp[2][temp][c]=table4bpp[3][temp][c>>1];
+                        table4bpp[1][temp][c]=table4bpp[3][temp][c>>2];
+                        table4bpp[0][temp][c]=table4bpp[3][temp][c>>3];
                 }
         }
+//        set_palette(beebpal);
+        b=create_bitmap(1280,800);
+        clear_to_color(b,collook[0]);
+        for (c=0;c<256;c++) inverttbl[c]=makecol(255-pal[c].r,255-pal[c].g,255-pal[c].b);
 }
 
-void genpal()
+void clearscreen()
 {
-        int c,d;
-        for (c=0;c<8;c++)
-        {
-                for (d=0;d<8;d++)
-                {
-                        beebpal[c+(d<<3)+128].r=beebpal[c&7].r>>1;
-                        beebpal[c+(d<<3)+128].r+=beebpal[d&7].r>>1;
-                        beebpal[c+(d<<3)+128].g=beebpal[c&7].g>>1;
-                        beebpal[c+(d<<3)+128].g+=beebpal[d&7].g>>1;
-                        beebpal[c+(d<<3)+128].b=beebpal[c&7].b>>1;
-                        beebpal[c+(d<<3)+128].b+=beebpal[d&7].b>>1;
-                        monopal[c+(d<<3)+128].r=monopal[c&7].r>>1;
-                        monopal[c+(d<<3)+128].r+=monopal[d&7].r>>1;
-                        monopal[c+(d<<3)+128].g=monopal[c&7].g>>1;
-                        monopal[c+(d<<3)+128].g+=monopal[d&7].g>>1;
-                        monopal[c+(d<<3)+128].b=monopal[c&7].b>>1;
-                        monopal[c+(d<<3)+128].b+=monopal[d&7].b>>1;
-                }
-        }
-}
-
-void updatepalette()
-{
-        if (mono) set_palette(monopal);
-        else      set_palette(beebpal);
-}
-
-int deskdepth;
-int depth16=16;
-
-void updategfxmode()
-{
-        int x,y;
-        int depth;
-        destroy_bitmap(vbuffer);
-        destroy_bitmap(buf16);
-        destroy_bitmap(buf162);
-        set_color_depth(16);
-        if (fullscreen)
-        {
-                depth16=16;
-//                if (hires!=2 && hires!=5) set_color_depth(8);
-                set_color_depth(16);
-                if (hires)
-                {
-                        if (set_gfx_mode(GFX_AUTODETECT_FULLSCREEN,800,600,0,0))
-                        {
-                                set_color_depth(15);
-                                depth16=15;
-                                set_gfx_mode(GFX_AUTODETECT_FULLSCREEN,800,600,0,0);
-                        }
-                }
-                else
-                {
-                        if (set_gfx_mode(GFX_AUTODETECT_FULLSCREEN,400,300,0,0))
-                        {
-                                set_color_depth(15);
-                                depth16=15;
-                                set_gfx_mode(GFX_AUTODETECT_FULLSCREEN,400,300,0,0);
-                        }
-                }
-        }
-        else
-        {
-                if (hires) {x=800; y=600;}
-                else       {x=400; y=300;}
-                if (deskdepth==16)
-                {
-                        set_color_depth(16);
-                        if (set_gfx_mode(GFX_AUTODETECT_WINDOWED,x,y,0,0))
-                        {
-                                set_color_depth(15);
-                                depth16=15;
-                                set_gfx_mode(GFX_AUTODETECT_WINDOWED,x,y,0,0);
-                        }
-                }
-                else if (deskdepth)
-                {
-                        set_color_depth(deskdepth);
-                        depth16=deskdepth;
-                        set_gfx_mode(GFX_AUTODETECT_WINDOWED,x,y,0,0);
-                }
-                else
-                   set_gfx_mode(GFX_AUTODETECT_WINDOWED,x,y,0,0);
-                if (deskdepth==15) depth16=15;
-        }
-        depth=get_color_depth();
-        set_color_depth(depth16);
-        Init_2xSaI(depth16);
-        buf16=create_bitmap(400,284);
-        buf162=create_bitmap(800,568);
-        clear(buf16);
-        clear(buf162);
-          rest(500);
-        set_color_depth(depth);
-        if (mono) set_palette(monopal);
-        else      set_palette(beebpal);
-        clear(buffer);
-        clear(buffer2);
-        clear_to_color(screen,makecol(0,0,0));
-        drawfull=3;
-        vbuffer=create_system_bitmap(800,300);
-        clear(vbuffer);
-}
-
-void initvideo()
-{
-        int c;
-        int x,y,depth;
-        for (c=8;c<256;c++)
-            beebpal[c]=beebpal[c&7];
-        for (c=8;c<256;c++)
-            monopal[c]=monopal[c&7];
-        genpal();
-        buffer=create_bitmap(1024,1024);
-        buffer2=create_bitmap(808,608);
+        set_color_depth(dcol);
+        #ifdef WIN32
+        clear(vb);
+        #endif
+        clear(b16);
+        clear(b16x);
+        clear(screen);
         set_color_depth(8);
-        clear(buffer);
-        clear(buffer2);
-//      set_color_depth(16);
-        depth=deskdepth=desktop_color_depth();
-        if (fullscreen)
-        {
-                set_color_depth(16);
-                if (hires)
-                {
-                        if (set_gfx_mode(GFX_AUTODETECT_FULLSCREEN,800,600,0,0))
-                        {
-                                set_color_depth(15);
-                                depth16=15;
-                                set_gfx_mode(GFX_AUTODETECT_FULLSCREEN,800,600,0,0);
-                        }
-                }
-                else
-                {
-                        if (set_gfx_mode(GFX_AUTODETECT_FULLSCREEN,400,300,0,0))
-                        {
-                                set_color_depth(15);
-                                depth16=15;
-                                set_gfx_mode(GFX_AUTODETECT_FULLSCREEN,400,300,0,0);
-                        }
-                }
-                depth=get_color_depth();
-        }
-        else
-        {
-                if (hires) {x=800; y=600;}
-                else       {x=400; y=300;}
-                if (depth==16)
-                {
-                        set_color_depth(16);
-                        if (set_gfx_mode(GFX_AUTODETECT_WINDOWED,x,y,0,0))
-                        {
-                                set_color_depth(15);
-                                depth16=15;
-                                set_gfx_mode(GFX_AUTODETECT_WINDOWED,x,y,0,0);
-                        }
-                }
-                else if (depth)
-                {
-                        set_color_depth(depth);
-                        depth16=depth;
-                        set_gfx_mode(GFX_AUTODETECT_WINDOWED,x,y,0,0);
-                }
-                else
-                {
-                        set_gfx_mode(GFX_AUTODETECT_WINDOWED,x,y,0,0);
-                }
-                if (depth==15) depth16=15;
-                depth=get_color_depth();
-        }
-        set_color_depth(depth16);
-        Init_2xSaI(depth16);
-        buf16=create_bitmap(400,284);
-        buf162=create_bitmap(800,568);
-        clear(buf16);
-        clear(buf162);
-          rest(500);
-        set_color_depth(depth);
-        clear_to_color(screen,makecol(0,0,0));
-        vbuffer=create_system_bitmap(800,300);
-        clear(vbuffer);
-        for (c=0;c<128;c++)
-            multable[c]=c*60;
-        maketable2();
-        updatepalette();
-        LOCK_VARIABLE(fps);
-        LOCK_FUNCTION(secint);
-        install_int_ex(secint,MSEC_TO_TIMER(1000));
-        vidbank=0;
-        drawfull=3;
-}
-
-void fadepal()
-{
-        int c;
-        for (c=0;c<8;c++) beebpal[c].r>>=1;
-        for (c=0;c<8;c++) beebpal[c].g>>=1;
-        for (c=0;c<8;c++) beebpal[c].b>>=1;
-        for (c=128;c<256;c++) beebpal[c].r>>=1;
-        for (c=128;c<256;c++) beebpal[c].g>>=1;
-        for (c=128;c<256;c++) beebpal[c].b>>=1;
-        for (c=0;c<8;c++) monopal[c].r>>=1;
-        for (c=0;c<8;c++) monopal[c].g>>=1;
-        for (c=0;c<8;c++) monopal[c].b>>=1;
-        for (c=128;c<256;c++) monopal[c].r>>=1;
-        for (c=128;c<256;c++) monopal[c].g>>=1;
-        for (c=128;c<256;c++) monopal[c].b>>=1;
-        updatepalette();
-}
-
-void restorepal()
-{
-        int c;
-        for (c=0;c<8;c++) beebpal[c].r<<=1;
-        for (c=0;c<8;c++) beebpal[c].g<<=1;
-        for (c=0;c<8;c++) beebpal[c].b<<=1;
-        for (c=128;c<256;c++) beebpal[c].r<<=1;
-        for (c=128;c<256;c++) beebpal[c].g<<=1;
-        for (c=128;c<256;c++) beebpal[c].b<<=1;
-        for (c=0;c<8;c++) monopal[c].r<<=1;
-        for (c=0;c<8;c++) monopal[c].g<<=1;
-        for (c=0;c<8;c++) monopal[c].b<<=1;
-        for (c=128;c<256;c++) monopal[c].r<<=1;
-        for (c=128;c<256;c++) monopal[c].g<<=1;
-        for (c=128;c<256;c++) monopal[c].b<<=1;
-        updatepalette();
-}
-
-void scrshot(char *fn)
-{
-        if (mono) save_bitmap(fn,buffer,monopal);
-        else
-        {
-                if (save_bmp(fn,buffer,beebpal))
-                {
-                        printf("Save failed : %s\n",allegro_error);
-                }
-        }
-}
-
-void savebuffers()
-{
-        save_bitmap("buffer.bmp",buffer,beebpal);
-        save_bitmap("buffer2.bmp",buffer2,beebpal);
-        save_bitmap("buf16.bmp",buf16,beebpal);
-        save_bitmap("buf162.bmp",buf162,beebpal);
-}
-
-void savecrtcstate(FILE *f)
-{
-        fwrite(crtc,18,1,f);
-        putc(crtcreg,f);
-        putc(vc,f);
-        putc(sc,f);
-        putc(curline&0xFF,f);
-        putc(curline>>8,f);
-        putc(physline&0xFF,f);
-        putc(physline>>8,f);
-        putc(delaylcount,f);
-        putc(interlaceline,f);
-}
-
-void loadcrtcstate(FILE *f)
-{
-        fread(crtc,18,1,f);
-        crtcreg=getc(f);
-        vc=getc(f);
-        sc=getc(f);
-        sc6=sc*6;
-        curline=getc(f);
-        curline|=(getc(f)<<8);
-        physline=getc(f);
-        physline|=(getc(f)<<8);
-        delaylcount=getc(f);
-        interlaceline=getc(f);
-}
-
-void saveulastate(FILE *f)
-{
-        int c;
-        for (c=0;c<16;c++)
-            putc(clut2[c],f);
-        putc(ulactrl,f);
-}
-
-void loadulastate(FILE *f)
-{
-        int c;
-        for (c=0;c<16;c++)
-            clut2[c]=getc(f);
-        ulactrl=getc(f);
-        writeula(0,ulactrl);
+        clear_to_color(b,collook[0]);
 }
 
 void closevideo()
 {
-        destroy_bitmap(vbuffer);
-        destroy_bitmap(buf162);
-        destroy_bitmap(buf16);
-        destroy_bitmap(buffer2);
-        destroy_bitmap(buffer);
+        destroy_bitmap(b16x);
+        destroy_bitmap(b16);
+        destroy_bitmap(b);
+        #ifdef WIN32
+        destroy_bitmap(vb);
+        #endif
+}
+
+void enterfullscreen()
+{
+        #ifdef WIN32
+        destroy_bitmap(vb);
+        #endif
+        set_color_depth(dcol);
+        set_gfx_mode(GFX_AUTODETECT_FULLSCREEN,800,600,0,0);
+        #ifdef WIN32
+        vb=create_video_bitmap(832,312);
+        #endif
+        set_color_depth(8);
+        set_palette(pal);
+}
+void leavefullscreen()
+{
+        #ifdef WIN32
+        destroy_bitmap(vb);
+        #endif
+        set_color_depth(dcol);
+        set_gfx_mode(GFX_AUTODETECT_WINDOWED,832,624,0,0);
+        #ifdef WIN32
+        vb=create_video_bitmap(832,312);
+        #endif
+        set_color_depth(8);
+        set_palette(pal);
+        updatewindowsize(640,480);
+}
+
+uint8_t mode7chars[96*160],mode7charsi[96*160],mode7graph[96*160],mode7graphi[96*160],mode7sepgraph[96*160],mode7sepgraphi[96*160],mode7tempi[96*120],mode7tempi2[96*120];
+
+void makemode7chars()
+{
+        int c,d,y;
+        int offs1=0,offs2=0;
+        float x;
+        int x2;
+        int stat;
+        uint8_t *p=teletext_characters,*p2=mode7tempi;
+        for (c=0;c<96*60;c++) teletext_characters[c]*=15;
+        for (c=0;c<96*60;c++) teletext_graphics[c]*=15;
+        for (c=0;c<96*60;c++) teletext_separated_graphics[c]*=15;
+        for (c=0;c<(96*120);c++) mode7tempi2[c]=teletext_characters[c>>1];
+        for (c=0;c<960;c++)
+        {
+                x=0;
+                x2=0;
+                for (d=0;d<16;d++)
+                {
+                        mode7graph[offs2+d]=(int)(((float)teletext_graphics[offs1+x2]*(1.0-x))+((float)teletext_graphics[offs1+x2+1]*x));
+                        mode7sepgraph[offs2+d]=(int)(((float)teletext_separated_graphics[offs1+x2]*(1.0-x))+((float)teletext_separated_graphics[offs1+x2+1]*x));
+                        if (!d)
+                        {
+                                mode7graph[offs2+d]=mode7graphi[offs2+d]=teletext_graphics[offs1];
+                                mode7sepgraph[offs2+d]=mode7sepgraphi[offs2+d]=teletext_separated_graphics[offs1];
+                        }
+                        else if (d==15)
+                        {
+                                mode7graph[offs2+d]=mode7graphi[offs2+d]=teletext_graphics[offs1+5];
+                                mode7sepgraph[offs2+d]=mode7sepgraphi[offs2+d]=teletext_separated_graphics[offs1+5];
+                        }
+                        else
+                        {
+                                mode7graph[offs2+d]=mode7graphi[offs2+d]=teletext_graphics[offs1+x2];
+                                mode7sepgraph[offs2+d]=mode7sepgraphi[offs2+d]=teletext_separated_graphics[offs1+x2];
+                        }
+                        x+=(5.0/15.0);
+                        if (x>=1.0)
+                        {
+                                x2++;
+                                x-=1.0;
+                        }
+                        mode7charsi[offs2+d]=0;
+                }
+
+                for (d=0;d<16;d++)
+                {
+/*                        mode7chars[offs2+d]=(15-mode7chars[offs2+d])<<4;
+                        if (mode7chars[offs2+d]>=240) mode7chars[offs2+d]=255;
+                        mode7graph[offs2+d]=(15-mode7graph[offs2+d])<<4;
+                        if (mode7graph[offs2+d]>=240) mode7graph[offs2+d]=255;
+                        mode7sepgraph[offs2+d]=(15-mode7sepgraph[offs2+d])<<4;
+                        if (mode7sepgraph[offs2+d]>=240) mode7sepgraph[offs2+d]=255;*/
+                }
+
+                offs1+=6;
+                offs2+=16;
+        }
+        for (c=0;c<96;c++)
+        {
+                for (y=0;y<10;y++)
+                {
+                        for (d=0;d<6;d++)
+                        {
+                                stat=0;
+                                if (y<9 && p[(y*6)+d] && p[(y*6)+d+6]) stat=3; /*Above + below - set both*/
+                                if (y<9 && d>0 && p[(y*6)+d] && p[(y*6)+d+5] && !p[(y*6)+d-1]) stat|=1; /*Above + left - set left*/
+                                if (y<9 && d>0 && p[(y*6)+d+6] && p[(y*6)+d-1] && !p[(y*6)+d+5]) stat|=1; /*Below + left - set left*/
+                                if (y<9 && d<5 && p[(y*6)+d] && p[(y*6)+d+7] && !p[(y*6)+d+1]) stat|=2; /*Above + right - set right*/
+                                if (y<9 && d<5 && p[(y*6)+d+6] && p[(y*6)+d+1] && !p[(y*6)+d+7]) stat|=2; /*Below + right - set right*/
+//                                if (y<9 && p[(y*6)+d] && p[(y*6)+d+6]) stat=3; /*Above + below - set both*/
+//                                if (y<9 && d>0 && p[(y*6)+d] && p[(y*6)+d+5]) stat|=1; /*Above + left - set left*/
+//                                if (y<9 && d>0 && p[(y*6)+d+6] && p[(y*6)+d-1]) stat|=1; /*Below + left - set left*/
+//                                if (y<9 && d<5 && p[(y*6)+d] && p[(y*6)+d+7]) stat|=2; /*Above + right - set right*/
+//                                if (y<9 && d<5 && p[(y*6)+d+6] && p[(y*6)+d+1]) stat|=2; /*Below + right - set right*/
+                                p2[0]=(stat&1)?15:0;
+                                p2[1]=(stat&2)?15:0;
+                                p2+=2;
+                        }
+                }
+                p+=60;
+        }
+        offs1=offs2=0;
+        for (c=0;c<960;c++)
+        {
+                x=0;
+                x2=0;
+                for (d=0;d<16;d++)
+                {
+                        mode7chars[offs2+d]=(int)(((float)mode7tempi2[offs1+x2]*(1.0-x))+((float)mode7tempi2[offs1+x2+1]*x));
+                        mode7charsi[offs2+d]=(int)(((float)mode7tempi[offs1+x2]*(1.0-x))+((float)mode7tempi[offs1+x2+1]*x));
+                        x+=(11.0/15.0);
+                        if (x>=1.0)
+                        {
+                                x2++;
+                                x-=1.0;
+                        }
+                        if (c>=320 && c<640)
+                        {
+                                mode7graph[offs2+d]=mode7sepgraph[offs2+d]=mode7chars[offs2+d];
+                                mode7graphi[offs2+d]=mode7sepgraphi[offs2+d]=mode7charsi[offs2+d];
+                        }
+                }
+                offs1+=12;
+                offs2+=16;
+        }
+}
+
+
+/*  +++***
+
+    **++**
+
+    ******
+
+*/
+
+int vidclocks=0;
+int oddclock=0;
+int vidbytes=0;
+
+int scrx,scry;
+
+int mode7col=7,mode7bg=0;
+uint8_t m7buf[2];
+uint8_t *mode7p[2]={mode7chars,mode7charsi};
+int mode7sep=0;
+int mode7dbl,mode7nextdbl,mode7wasdbl;
+int mode7flash,m7flashon=0,m7flashtime=0;
+uint8_t heldchar,holdchar;
+
+int interlace=0,interlline=0,oldr8;
+
+int firstx,firsty,lastx,lasty;
+static inline void rendermode7(uint8_t dat)
+{
+        int t,c;
+        int off;
+        uint8_t *on;
+        t=m7buf[0];
+        m7buf[0]=m7buf[1];
+        m7buf[1]=dat;
+        dat=t;
+        if (dat==255)
+        {
+                for (c=0;c<16;c++)
+                {
+                        b->line[scry][scrx+c+16]=collook[0];
+                }
+                if (linedbl)
+                {
+                        for (c=0;c<16;c++)
+                        {
+                                b->line[scry+1][scrx+c+16]=collook[0];
+                        }
+                }
+                return;
+        }
+        if (dat<0x20)
+        {
+                switch (dat)
+                {
+                        case 1: case 2: case 3: case 4: case 5: case 6: case 7:
+                        mode7col=dat;
+                        mode7p[0]=mode7chars;
+                        mode7p[1]=mode7charsi;
+                        break;
+                        case 8: mode7flash=1; break;
+                        case 9: mode7flash=0; break;
+                        case 12: case 13:
+                        mode7dbl=dat&1;
+                        if (mode7dbl) mode7wasdbl=1;
+                        break;
+                        case 17: case 18: case 19: case 20: case 21: case 22: case 23:
+                        mode7col=dat&7;
+                        if (mode7sep)
+                        {
+                                mode7p[0]=mode7sepgraph;
+                                mode7p[1]=mode7sepgraphi;
+                        }
+                        else
+                        {
+                                mode7p[0]=mode7graph;
+                                mode7p[1]=mode7graphi;
+                        }
+                        break;
+                        case 24: mode7col=mode7bg; break;
+                        case 25: mode7p[0]=mode7graph;    mode7p[1]=mode7graphi;    mode7sep=0; break;
+                        case 26: mode7p[0]=mode7sepgraph; mode7p[1]=mode7sepgraphi; mode7sep=1; break;
+                        case 28: mode7bg=0; break;
+                        case 29: mode7bg=mode7col; break;
+                        case 30: holdchar=1; break;
+                        case 31: holdchar=0; break;
+                }
+                if (holdchar && mode7p[0]!=mode7chars)
+                   dat=heldchar;
+                else
+                   dat=0x20;
+        }
+        else if (mode7p[0]!=mode7chars)
+           heldchar=dat;
+        if (mode7dbl && !mode7nextdbl) t=((dat-0x20)*160)+((sc>>1)*16);
+        else if (mode7dbl)             t=((dat-0x20)*160)+((sc>>1)*16)+(5*16);
+        else                           t=((dat-0x20)*160)+(sc*16);
+        off=m7lookup[0][mode7bg&7][0];
+        on=m7lookup[mode7col&7][mode7bg&7];
+        if (!mode7dbl && mode7nextdbl) on=m7lookup[mode7bg&7][mode7bg&7];
+        for (c=0;c<16;c++)
+        {
+                if (mode7flash && !m7flashon)    b->line[scry][scrx+c+16]=off;
+                else if (mode7dbl/* || !(interlace || linedbl)*/) b->line[scry][scrx+c+16]=on[mode7p[sc&1][t]&15];
+                else                             b->line[scry][scrx+c+16]=on[mode7p[interlace&interlline][t]&15];
+                t++;
+        }
+//        if (dat!=0x20) rpclog("%i %i %08X %08X %08X %i\n",interlace,interlline,mode7p[0],mode7chars,mode7charsi,t);
+        if (linedbl)
+        {
+//                rpclog("linedbl!\n");
+                t-=16;
+                for (c=0;c<16;c++)
+                {
+                        if (mode7flash && !m7flashon)   b->line[scry+1][scrx+c+16]=off;
+                        else if (mode7dbl)              b->line[scry+1][scrx+c+16]=on[mode7p[sc&1][t]&15];
+                        else                            b->line[scry+1][scrx+c+16]=on[mode7p[1][t]&15];
+                        t++;
+                }
+        }
+        if ((scrx+16)<firstx) firstx=scrx+16;
+        if ((scrx+32)>lastx) lastx=scrx+32;
+}
+
+uint8_t cursorlook[7]={0,0,0,0x80,0x40,0x20,0x20};
+int cdrawlook[4]={3,2,1,0};
+
+int cmask[4]={0,0,16,32};
+
+int lasthc0=0,lasthc;
+int olddispen;
+int oldlen;
+int ccount=0;
+int mcount=8;
+int savescrshot=0;
+BITMAP *scrshotb,*scrshotb2;
+char scrshotname[260];
+
+void doblit()
+{
+        int c;
+        startblit();
+        if (savescrshot)
+        {
+                set_color_depth(dcol);
+                scrshotb=create_bitmap(lastx-firstx,(lasty-firsty<<1));
+                scrshotb2=create_bitmap(lastx-firstx,lasty-firsty);
+                if (interlace || linedbl)
+                {
+                        blit(b,scrshotb,firstx,firsty<<1,0,0,lastx-firstx,(lasty-firsty)<<1);
+                }
+                else
+                {
+                        blit(b,scrshotb2,firstx,firsty,0,0,lastx-firstx,lasty-firsty);
+                        stretch_blit(scrshotb2,scrshotb,0,0,lastx-firstx,lasty-firsty,0,0,lastx-firstx,(lasty-firsty)<<1);
+                }
+                save_bmp(scrshotname,scrshotb,NULL);
+                destroy_bitmap(scrshotb2);
+                destroy_bitmap(scrshotb);
+                set_color_depth(8);
+                savescrshot=0;
+        }
+        fskipcount++;
+        if (fskipcount>=fskipmax)
+        {
+                lasty++;
+                if (fullborders==1)
+                {
+//                        rpclog("%i %i %i %i  ",firstx,lastx,firsty,lasty);
+                        c=(lastx+firstx)/2;
+                        firstx=c-336;
+                        lastx=c+336;
+                        c=(lasty+firsty)/2;
+                        firsty=c-136;
+                        lasty=c+136;
+//                        rpclog("  %i %i %i %i\n",firstx,lastx,firsty,lasty);
+                }
+                else if (fullborders==2)
+                {
+                        firstx=240;
+                        lastx=240+832;
+                        firsty=8;
+                        lasty=312;
+                }
+                if (fullscreen)
+                {
+                        firstx=256;
+                        lastx=256+800;
+                        firsty=8;
+                        lasty=300;
+                }
+                if (!fullscreen) updatewindowsize(lastx-firstx,(lasty-firsty)<<1);
+                fskipcount=0;
+                if (comedyblit)
+                {
+                        #ifdef WIN32
+                        for (c=firsty;c<lasty;c++) blit(b,b16x,firstx,c,0,c<<1,lastx-firstx,1);
+                        blit(b16x,screen,0,firsty<<1,0,0,lastx-firstx,(lasty-firsty)<<1);
+                        #else
+                        blit(b,b16x,firstx,firsty,0,0,lastx-firstx,lasty-firsty);
+                        for (c=firsty;c<lasty;c++) blit(b16x,screen,0,c-firsty,0,(c-firsty)<<1,lastx-firstx,1);
+                        #endif
+                }
+                else if (interlace || linedbl) blit(b,screen,firstx,firsty<<1,0,0,lastx-firstx,(lasty-firsty)<<1);
+                else
+                {
+                        #ifdef WIN32
+//                      blit(b,vb,240,0,0,0,832,312);
+                        blit(b,vb,firstx,firsty,0,0,lastx-firstx,lasty-firsty);
+//                      stretch_blit(vb,screen,0,0,832,312,0,0,624,624);
+//                      stretch_blit(vb,screen,0,0,832,312,0,0,744,624);
+                        stretch_blit(vb,screen,0,0,lastx-firstx,lasty-firsty,0,0,lastx-firstx,(lasty-firsty)<<1);
+                        #else
+                        for (c=(firsty<<1);c<(lasty<<1);c++) blit(b,b16x,firstx,c>>1,0,c,lastx-firstx,1);
+                        blit(b16x,screen,0,firsty<<1,0,0,lastx-firstx,(lasty-firsty)<<1);
+                        #endif
+                }
+        }
+        firstx=firsty=65535;
+        lastx=lasty=0;
+
+        endblit();
+}
+
+int firstdispen=0;
+void pollvideo(int clocks)
+{
+        int c,oldvc;
+        uint16_t addr;
+        uint8_t dat;
+        while (clocks--)
+        {
+                scrx+=8;
+                vidclocks++;
+                oddclock=!oddclock;
+                if (!(ulactrl&0x10) && !oddclock) continue;
+
+/*                if (!hc && crtc[9])
+                {
+                        printf("VC %02i SC %02i Y %03i %i\n",vc,sc,scry,vidclocks-oldlen);
+                        oldlen=vidclocks;
+                }*/
+
+                if (hc==crtc[1])
+                {
+                        if (ulactrl&2 && dispen) charsleft=3;
+                        else charsleft=0;
+                        dispen=0;
+                }
+                if (hc==crtc[2])
+                {
+                        if (ulactrl&0x10) scrx=128-((crtc[3]&15)*4);
+                        else              scrx=128-((crtc[3]&15)*8);
+                        /*Don't need this as we blit from 240 onwards*/
+//                        if (interlace) memset(b->line[(scry<<1)+interlline],0,scrx);
+//                        else           memset(b->line[scry],0,scrx);
+//                        scrx=0;
+                        scry++;
+                        if (scry>=384)
+                        {
+                                scry=0;
+                                doblit();
+                        }
+                }
+
+                if (interlace) scry=(scry<<1)+interlline;
+                if (linedbl)   scry<<=1;
+                if (dispen)
+                {
+//                if (!ccount)
+//                {
+//                        if (!hc && crtc[9]) printf("%i start from %04X\n",scry,ma);
+                        if (!((ma^(crtc[15]|(crtc[14]<<8)))&0x3FFF) && con) cdraw=cdrawlook[crtc[8]>>6];
+                        if (ma&0x2000) dat=ram[0x7C00|(ma&0x3FF)|vidbank];
+                        else
+                        {
+                                if ((crtc[8]&3)==3) addr=(ma<<3)|((sc&3)<<1)|interlline;
+                                else           addr=(ma<<3)|(sc&7);
+                                if (addr&0x8000) addr-=screenlen[scrsize];
+                                dat=ram[(addr&0x7FFF)|vidbank];
+                        }
+/*                        if (firstdispen)
+                        {
+                                rpclog("DISPEN %i %i\n",scrx,scry);
+                        }*/
+                        if (scrx<1280)
+                        {
+                                if ((crtc[8]&0x30)==0x30 || ((sc&8) && !(ulactrl&2)))
+                                {
+                                        for (c=0;c<((ulactrl&0x10)?8:16);c++)
+                                        {
+                                                ((uint32_t *)b->line[scry])[(scrx+c)>>2]=col0;
+                                        }
+                                        if (linedbl)
+                                        {
+                                                for (c=0;c<((ulactrl&0x10)?8:16);c++)
+                                                {
+                                                        ((uint32_t *)b->line[scry+1])[(scrx+c)>>2]=col0;
+                                                }
+                                        }
+                                }
+                                else switch (crtcmode)
+                                {
+                                        case 0:
+                                        rendermode7(dat&0x7F);
+                                        break;
+                                        case 1:
+                                        if (scrx<firstx) firstx=scrx;
+                                        if ((scrx+8)>lastx) lastx=scrx+8;
+                                        for (c=0;c<8;c++)
+                                        {
+                                                b->line[scry][scrx+c]=ulapal[table4bpp[ulamode][dat][c]];
+                                        }
+                                        if (linedbl)
+                                        {
+                                                for (c=0;c<8;c++)
+                                                {
+                                                        b->line[scry+1][scrx+c]=ulapal[table4bpp[ulamode][dat][c]];
+                                                }
+                                        }
+//                                        ((uint32_t *)(&b->line[scry][scrx]))[0]=pixlookuph[ulamode][dat][0];
+//                                        ((uint32_t *)(&b->line[scry][scrx]))[1]=pixlookuph[ulamode][dat][1];
+                                        break;
+                                        case 2:
+                                        if (scrx<firstx) firstx=scrx;
+                                        if ((scrx+16)>lastx) lastx=scrx+16;
+                                        for (c=0;c<16;c++)
+                                        {
+                                                b->line[scry][scrx+c]=ulapal[table4bpp[ulamode][dat][c]];
+                                        }
+                                        if (linedbl)
+                                        {
+                                                for (c=0;c<16;c++)
+                                                {
+                                                        b->line[scry+1][scrx+c]=ulapal[table4bpp[ulamode][dat][c]];
+                                                }
+                                        }
+/*                                        ((uint32_t *)(&b->line[scry][scrx]))[0]=pixlookupl[ulamode][dat][0];
+                                        ((uint32_t *)(&b->line[scry][scrx]))[1]=pixlookupl[ulamode][dat][1];
+                                        ((uint32_t *)(&b->line[scry][scrx]))[2]=pixlookupl[ulamode][dat][2];
+                                        ((uint32_t *)(&b->line[scry][scrx]))[3]=pixlookupl[ulamode][dat][3];*/
+                                        break;
+                                }
+                                if (cdraw)
+                                {
+                                        if (cursoron && (ulactrl & cursorlook[cdraw]))
+                                        {
+                                                for (c=0;c<((ulactrl&0x10)?8:16);c++)
+                                                {
+                                                        b->line[scry][scrx+c]=inverttbl[b->line[scry][scrx+c]];
+                                                }
+                                                if (linedbl)
+                                                {
+                                                        for (c=0;c<((ulactrl&0x10)?8:16);c++)
+                                                        {
+                                                                b->line[scry+1][scrx+c]=inverttbl[b->line[scry+1][scrx+c]];
+                                                        }
+                                                }
+                                        }
+                                        cdraw++;
+                                        if (cdraw==7) cdraw=0;
+                                }
+                        }
+//                }
+                        ma++;
+                        vidbytes++;
+                }
+                else //if (!ccount)
+                {
+                        if (charsleft)
+                        {
+                                if (charsleft!=1) rendermode7(255);
+                                charsleft--;
+//                                rpclog("Charleft at %i,%i\n",scrx,scry);
+                        }
+                        else if (scrx<1280)
+                        {
+//                                if (!crtcmode) scrx+=16;
+//                                if (!vdispen) printf("%i %i\n",scrx,scry);
+                                for (c=0;c<((ulactrl&0x10)?8:16);c+=4)
+                                {
+                                        *((uint32_t *)&b->line[scry][scrx+c])=col0;
+                                }
+//                                if (vdispen && scrx<304) rpclog("Clear %i %i %i\n",scrx,scry,c);
+                                if (linedbl)
+                                {
+                                        for (c=0;c<((ulactrl&0x10)?8:16);c+=4)
+                                        {
+                                                *((uint32_t *)&b->line[scry+1][scrx+c])=col0;
+                                        }
+                                }
+//                                if (!crtcmode) scrx-=16;
+                                if (!crtcmode)
+                                {
+                                        for (c=0;c<16;c+=4)
+                                        {
+                                                *((uint32_t *)&b->line[scry][scrx+c+16])=col0;
+                                        }
+                                        if (linedbl)
+                                        {
+                                                for (c=0;c<16;c+=4)
+                                                {
+                                                        *((uint32_t *)&b->line[scry+1][scrx+c+16])=col0;
+                                                }
+                                        }
+                                }
+                        }
+                        if (cdraw && scrx<1280)
+                        {
+                                if (cursoron && (ulactrl & cursorlook[cdraw]))
+                                {
+                                        for (c=0;c<((ulactrl&0x10)?8:16);c++)
+                                        {
+                                                b->line[scry][scrx+c]=inverttbl[b->line[scry][scrx+c]];
+                                        }
+                                        if (linedbl)
+                                        {
+                                                for (c=0;c<((ulactrl&0x10)?8:16);c++)
+                                                {
+                                                        b->line[scry+1][scrx+c]=inverttbl[b->line[scry+1][scrx+c]];
+                                                }
+                                        }
+                                }
+                                cdraw++;
+                                if (cdraw=7) cdraw=0;
+                        }
+                }
+
+                if (linedbl)   scry>>=1;
+                if (interlace) scry>>=1;
+
+                if (hvblcount)
+                {
+                        hvblcount--;
+                        if (!hvblcount)
+                        {
+                                vblankintlow();
+                        }
+                }
+
+                if (interline && hc==(crtc[0]>>1))
+                {
+                        hc=interline=0;
+                        lasthc0=1;
+//                        if (crtc[9]) printf("Interlace line\n");
+                }
+                else if (hc==crtc[0])
+                {
+                        mode7col=7;
+                        mode7bg=0;
+                        holdchar=0;
+                        heldchar=0x20;
+                        mode7p[0]=mode7chars;
+                        mode7p[1]=mode7charsi;
+                        mode7flash=0;
+                        mode7sep=0;
+
+                        hc=0;
+                        if (sc==(crtc[11]&31) || ((crtc[8]&3)==3 && sc==((crtc[11]&31)>>1))) { con=0; coff=1; }
+                        if (vadj)
+                        {
+                                sc++;
+                                sc&=31;
+                                ma=maback;
+                                vadj--;
+                                if (!vadj)
+                                {
+                                        vdispen=1;
+                                        ma=maback=(crtc[13]|(crtc[12]<<8))&0x3FFF;
+//                                        if (crtc[9]) printf("1MA %04X\n",ma);
+                                        sc=0;
+                                }
+                        }
+                        else if (sc==crtc[9] || ((crtc[8]&3)==3 && sc==(crtc[9]>>1)))
+                        {
+                                maback=ma;
+//                                if (crtc[9]) printf("SC over %i %i %04X %i\n",scry,vc,maback,vdispen);
+                                sc=0;
+                                con=0;
+                                coff=0;
+                                if (mode7nextdbl) mode7nextdbl=0;
+                                else              mode7nextdbl=mode7wasdbl;
+                                oldvc=vc;
+                                vc++;
+                                vc&=127;
+                                if (vc==crtc[6]) vdispen=0;
+                                if (oldvc==crtc[4])
+                                {
+                                        vc=0;
+                                        vadj=crtc[5];
+                                        if (!vadj) vdispen=1;
+                                        if (!vadj) ma=maback=(crtc[13]|(crtc[12]<<8))&0x3FFF;
+//                                        if (crtc[9] && !vadj) printf("2MA %04X\n",ma);
+
+                                        frcount++;
+                                        if (!(crtc[10]&0x60)) cursoron=1;
+                                        else                 cursoron=frcount&cmask[(crtc[10]&0x60)>>5];
+//                                        if (crtc[9]) printf("Frame over! %i %i %04X %04X\n",scry,vdispen,ma,maback);
+                                }
+                                if (vc==crtc[7])
+                                {
+                                        if (!(crtc[8]&1) && oldr8) clear_to_color(b,col0);
+                                        frameodd^=1;
+                                        if (frameodd) interline=(crtc[8]&1);
+                                        interlline=frameodd && (crtc[8]&1);
+                                        oldr8=crtc[8]&1;
+                                        if (vidclocks>2 && !ccount)
+                                        {
+                                                doblit();
+                                        }
+                                        ccount++;
+                                        if (ccount==10 || ((!motor || !fasttape) && !key[KEY_PGUP])) ccount=0;
+                                        scry=0;
+                                        vblankint();
+                                        vsynctime=(crtc[3]>>4)+1;
+                                        m7flashtime++;
+                                        if ((m7flashon && m7flashtime==32) || (!m7flashon && m7flashtime==16))
+                                        {
+                                                m7flashon=!m7flashon;
+                                                m7flashtime=0;
+                                        }
+//                                        if (vidclocks>2) printf("%i clocks in frame %i bytes MA %04X %i %i %i %i %02X\n",vidclocks,vidbytes,ma,crtc[10]&31,crtc[11]&31,cursoron,frcount,crtc[9]);
+                                        vidclocks=vidbytes=0;
+                                }
+                        }
+                        else
+                        {
+                                sc++;
+                                sc&=31;
+                                ma=maback;
+                        }
+
+                        mode7dbl=mode7wasdbl=0;
+                        if ((sc==(crtc[10]&31) || ((crtc[8]&3)==3 && sc==((crtc[10]&31)>>1))) && !coff) con=1;
+
+                        if (vsynctime)
+                        {
+                                vsynctime--;
+                                if (!vsynctime)
+                                {
+                                        hvblcount=1;
+//                                        hvblcount=(crtc[3]&15)>>1;
+//                                printf("VBL int %i clocks\n",clocks);
+//                                        vblankintlow();
+                                        if (frameodd) interline=(crtc[8]&1);
+                                }
+                        }
+
+                        dispen=vdispen;
+                        if (dispen || vadj)
+                        {
+                                if (scry<firsty) firsty=scry;
+                                if ((scry+1)>lasty) lasty=scry;
+                        }
+//                        if (crtc[0]) rpclog("Dispen %i %i %i\n",dispen,scrx,scry);
+                        firstdispen=1;
+                        lasthc0=1;
+
+                        mcount--;
+                        if (!mcount)
+                        {
+                                mcount=24;
+                                if (curtube==3) domouse();
+                        }
+                        if (adcconvert)
+                        {
+                                adcconvert--;
+                                if (!adcconvert) polladc();
+                        }
+                }
+                else
+                {
+                        hc++;
+                        hc&=255;
+                }
+                lasthc=hc;
+        }
 }

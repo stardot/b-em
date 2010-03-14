@@ -1,71 +1,75 @@
-unsigned short tubepc;
-/*B-em 1.4
-  Tube emulation
-  Emulates 4mhz 65C02, 4mhz Z80 and 8mhz ARM tubes for now*/
-/*Doesn't actually work - so most of it has been commented out*/
-/*The ARM tube now works as of v0.81*/
-/*65C02 tube works as of v1.4*/
-int tubetimetolive,tubeoutput;
-int pollnextint;
+/*B-em v2.0 by Tom Walker
+  Tube ULA emulation*/
+
 #include <stdio.h>
 #include "b-em.h"
 /*#include "m6502.h"
 #include "mz80.h"*/
-#include "arm.h"
 
-#define TUBE6502 1
-#define TUBEZ80  2
-#define TUBEARM  3
+#define TUBE6502  1
+#define TUBEZ80   2
+#define TUBEARM   3
+#define TUBEX86   4
+#define TUBE65816 5
 
-void exectube2();
+int tube6502speed=1;
+int tubedat=0;
+
+int tubetimetolive,tubeoutput;
+int tubecycs,tubelinecycs;
+int tube;
+int tubeskipint;
+int tubenmi,tubeoldnmi,tubenmilock;
+int tubeirqx;
+
 int tubecycs=0,tubelinecycs;
 int tubeirq=0;
-int tubetype=TUBEARM;
+int tubetype=TUBEX86;
 int romin=1;
 int tube=1;
 int interrupt;
 int slicereads=0;
-unsigned short pc;
+uint16_t pc;
 /*struct m6502context m6502;
 struct mz80context mz80;*/
 
 struct
 {
-        unsigned char ph1[24],ph2,ph3[2],ph4;
-        unsigned char hp1,hp2,hp3[2],hp4;
-        unsigned char hstat[4],pstat[4],r1stat;
+        uint8_t ph1[24],ph2,ph3[2],ph4;
+        uint8_t hp1,hp2,hp3[2],hp4;
+        uint8_t hstat[4],pstat[4],r1stat;
         int ph1pos,ph3pos,hp3pos;
 } tubeula;
 
-unsigned char *tuberam,spareram[4096];
+uint8_t *tuberam,spareram[4096];
 
 void updatetubeints()
 {
         int oldtubeirq=tubeirq;
-        tubeirq=0;
+        tubeirq=tubeirqx=0;
         interrupt&=~8;
         if ((tubeula.r1stat&1) && (tubeula.hstat[3]&128)) interrupt|=8;
         if ((tubeula.r1stat&2) && (tubeula.pstat[0]&128)) tubeirq|=1;
         if ((tubeula.r1stat&4) && (tubeula.pstat[3]&128)) tubeirq|=1;
-        if ((tubeula.r1stat&8) && ((tubeula.pstat[2]&128) || !tubeula.ph3pos)) tubeirq|=2;
-//        if (pollnextint) printf("%02X %02X %i\n",tubeula.r1stat,tubeula.pstat[2],tubeula.ph3pos);
-//        if (tubeirq && !oldtubeirq) rpclog("TUBE IRQ %i\n",tubeirq);
-//        if (!tubeirq && oldtubeirq) printf("TUBE IRQ CLEARED\n");
-//        printf("%i %i\n",tubeirq,interrupt);
-//        if ((tubeula.r1stat&8) && (tubeula.pstat[3]&128)) tubeirq|=1;
-        pollnextint=0;
+        if ((tubeula.r1stat&2) && (tubeula.pstat[0]&128)) tubeirqx|=1;
+        if ((tubeula.r1stat&4) && (tubeula.pstat[3]&128)) tubeirqx|=2;
+
+//        if ((tubeula.r1stat&8) && ((tubeula.pstat[2]&128) || !tubeula.ph3pos)) tubeirq|=2;
+        if ((tubeula.r1stat&8) && !(tubeula.r1stat&16) && ((tubeula.hp3pos>0) || (tubeula.ph3pos==0))) tubeirq|=2;
+        if ((tubeula.r1stat&8) &&  (tubeula.r1stat&16) && ((tubeula.hp3pos>1) || (tubeula.ph3pos==0))) tubeirq|=2;
+//        if (tubeirq&2) printf("NMI set - %i %i %i\n",tubeula.r1stat&16,tubeula.hp3pos,tubeula.ph3pos);
 }
-unsigned char readtubehost(unsigned short addr)
+
+uint8_t readtubehost(uint16_t addr)
 {
-        unsigned char temp=0;
+        uint8_t temp=0;
         int c;
-        if (!tube) return 0xFE;
-        exectube2();
-//        if (pc!=0x6A1) printf("Tube host read %04X %04X  ",addr,pc);
+        if (!tubeexec) return 0xFE;
+//        rpclog("Read HOST  %04X ",addr);
+//        exit(-1);
         switch (addr&7)
         {
                 case 0: /*Reg 1 Stat*/
-//                printf("HSTAT %i R1STAT %i\n",tubeula.hstat[0],tubeula.r1stat);
                 temp=(tubeula.hstat[0]&0xC0)|tubeula.r1stat;
                 break;
                 case 1: /*Register 1*/
@@ -74,7 +78,6 @@ unsigned char readtubehost(unsigned short addr)
                 tubeula.ph1pos--;
                 tubeula.pstat[0]|=0x40;
                 if (!tubeula.ph1pos) tubeula.hstat[0]&=~0x80;
-//                printf("Read pos %i\n",tubeula.ph1pos);
                 break;
                 case 2: /*Register 2 Stat*/
                 temp=tubeula.hstat[1];
@@ -88,7 +91,6 @@ unsigned char readtubehost(unsigned short addr)
                 }
                 break;
                 case 4: /*Register 3 Stat*/
-//                printf("Tube host read hstat2 %02X\n",tubeula.hstat[2]);
                 temp=tubeula.hstat[2];
                 break;
                 case 5: /*Register 3*/
@@ -100,7 +102,6 @@ unsigned char readtubehost(unsigned short addr)
                         tubeula.pstat[2]|=0x40;
                         if (!tubeula.ph3pos) tubeula.hstat[2]&=~0x80;
                 }
-//                rpclog("Tube host reads R3DATA %04X\n",pc);
                 break;
                 case 6: /*Register 4 Stat*/
                 temp=tubeula.hstat[3];
@@ -113,28 +114,22 @@ unsigned char readtubehost(unsigned short addr)
                         tubeula.pstat[3]|=0x40;
                 }
                 break;
-//                default:
-//                printf("Tube host read %04X %04X\n",addr,pc);
         }
+//        rpclog("%02X\n",temp);
         updatetubeints();
-//        if (pc!=0x6A1) printf("%02X\n",temp);
-//        exectubeshort();
         return temp;
 }
 
-void writetubehost(unsigned short addr, unsigned char val)
+void writetubehost(uint16_t addr, uint8_t val)
 {
-        if (!tube) return;
-        exectube2();
-        rpclog("Tube host write %04X %04X %02X\n",addr,pc,val);
+        if (!tubeexec) return;
+//        rpclog("Write HOST %04X %02X\n",addr,val);
         switch (addr&7)
         {
                 case 0: /*Register 1 stat*/
                 if (val&0x80) tubeula.r1stat|=(val&0x3F);
                 else          tubeula.r1stat&=~(val&0x3F);
-//                printf("R1stat %02X %02X\n",tubeula.r1stat,val);
                 tubeula.hstat[0]=(tubeula.hstat[0]&0xC0)|(val&0x3F);
-//                rpclog("Tube R1STAT %02X %i\n",tubeula.r1stat,tubeula.ph3pos);
                 break;
                 case 1: /*Register 1*/
                 tubeula.hp1=val;
@@ -147,9 +142,9 @@ void writetubehost(unsigned short addr, unsigned char val)
                 tubeula.hstat[1]&=~0x40;
                 break;
                 case 5: /*Register 3*/
+                tubedat++;
                 if (tubeula.r1stat&16)
                 {
-                        printf("Write to R3 %i\n",tubeula.hp3pos);
                         if (tubeula.hp3pos<2)
                            tubeula.hp3[tubeula.hp3pos++]=val;
                         if (tubeula.hp3pos==2)
@@ -160,53 +155,39 @@ void writetubehost(unsigned short addr, unsigned char val)
                 }
                 else
                 {
-                        printf("R3 buffer is off!\n");
-                        pollnextint=1;
                         tubeula.hp3[0]=val;
                         tubeula.hp3pos=1;
                         tubeula.pstat[2]|=0x80;
                         tubeula.hstat[2]&=~0x40;
                         updatetubeints();
                 }
+//                printf("Write R3 %i\n",tubeula.hp3pos);
                 break;
                 case 7: /*Register 4*/
                 tubeula.hp4=val;
                 tubeula.pstat[3]|=0x80;
                 tubeula.hstat[3]&=~0x40;
-//                tubeirq|=1;
                 break;
-//                default:
-//                printf("Tube host write %04X %02X %04X\n",addr,val,pc);
         }
         updatetubeints();
-//        exectubeshort();
 }
 
-unsigned short get6502pc()
+uint16_t get6502pc()
 {
-/*        m6502zpGetContext(&m6502);
-        return m6502.m6502pc;*/
 }
 
-unsigned char readtube(unsigned long addr, char *p)
+uint8_t readtube(uint32_t addr)
 {
-        unsigned char temp=0;
-        /*if (PC!=0x3000D64) *///if (addr&1) printf("Tube Parasite read %04X %04X  ",addr,get6502pc());
-//        dumptuberegs();
+        uint8_t temp=0;
         switch (addr&7)
         {
                 case 0: /*Register 1 stat*/
                 if (romin)
                 {
-                        if (tubetype==TUBE6502)
+                        if (tubetype==TUBE6502 || tubetype==TUBE65816)
                            tube6502mapoutrom();
-                        if (tubetype==TUBEZ80)
-                           tubez80mapoutrom();
-//                        printf("ROM mapped out\n");
-//                        memcpy(tuberam+0xF000,spareram,0x1000);
                         romin=0;
                 }
-//                if (tubeula.hbytes[0]!=24) return tubeula.pstat[0]|0x40;
                 temp=tubeula.pstat[0]|tubeula.r1stat;
                 break;
                 case 1: /*Register 1*/
@@ -219,7 +200,6 @@ unsigned char readtube(unsigned long addr, char *p)
                 break;
                 case 2: /*Register 2 stat*/
                 temp=tubeula.pstat[1];
-//                printf("FEFA read %02X\n",temp);
                 break;
                 case 3: /*Register 2*/
                 temp=tubeula.hp2;
@@ -233,12 +213,19 @@ unsigned char readtube(unsigned long addr, char *p)
                 temp=tubeula.pstat[2];
                 break;
                 case 5: /*Register 3*/
-                printf("Read port 5\n");
+//                printf("Read tube R3 %i\n",tubeula.hp3pos);
+                tubedat--;
                 temp=tubeula.hp3[0];
-                tubeula.hp3[0]=tubeula.hp3[1];
-                tubeula.hp3pos--;
-                tubeula.hstat[2]|=0x40;
-                if (!tubeula.hp3pos) tubeula.pstat[2]&=~0x80;
+                if (tubeula.hp3pos>0)
+                {
+                        tubeula.hp3[0]=tubeula.hp3[1];
+                        tubeula.hp3pos--;
+                        if (!tubeula.hp3pos)
+                        {
+                                tubeula.hstat[2]|=0x40;
+                                tubeula.pstat[2]&=~0x80;
+                        }
+                }
                 break;
                 case 6: /*Register 4 stat*/
                 temp=tubeula.pstat[3];
@@ -250,36 +237,19 @@ unsigned char readtube(unsigned long addr, char *p)
                         tubeula.pstat[3]&=~0x80;
                         tubeula.hstat[3]|=0x40;
                 }
-//                rpclog("Read R4DATA %04X %02X%02X %04X\n",tubepc,tuberam[0xF5],tuberam[0xF4],pc);
-/*                if (temp==0x21) { output=1; timetolive=20; }
-                if (tubeoutput)
-                {
-                        tubeoutput=2;
-                        tubetimetolive=50;
-                }*/
-//                updatetubeints();
-//                tubeirq&=~1;
                 break;
-//                default:
-//                printf("Tube parasite read %04X\n",addr);
         }
         updatetubeints();
-        slicereads++;
-//        if (tube==TUBE6502 && slicereads==2) m6502zpReleaseTimeslice();
-//        if (addr&1) printf("%02X\n",temp);
         return temp;
 }
 
-void writetube(unsigned long addr, unsigned char val, struct MemoryWriteByte *p)
+void writetube(uint32_t addr, uint8_t val)
 {
-//        rpclog("Tube parasite write %04X %04X %02X\n",addr,tubepc,val);
-//        dumptuberegs();
         switch (addr&7)
         {
                 case 1: /*Register 1*/
                 if (tubeula.ph1pos<24)
                 {
-//                        printf("Write pos %i\n",tubeula.ph1pos);
                         tubeula.ph1[tubeula.ph1pos++]=val;
                         tubeula.hstat[0]|=0x80;
                         if (tubeula.ph1pos==24) tubeula.pstat[0]&=~0x40;
@@ -314,129 +284,70 @@ void writetube(unsigned long addr, unsigned char val, struct MemoryWriteByte *p)
                 tubeula.hstat[3]|=0x80;
                 tubeula.pstat[3]&=~0x40;
                 break;
-//                default:
-//                printf("Tube parasite write %04X %02X\n",addr,val);
         }
         updatetubeints();
-//        if (tube==TUBE6502) m6502zpReleaseTimeslice();
 }
-
-unsigned short readtubep(unsigned short port, char *pPR)
-{
-        return readtube(port,NULL);
-}
-static void writetubep(unsigned short port, unsigned char val, char *pPW)
-{
-        writetube(port,val,NULL);
-//        m6502zpReleaseTimeslice();
-}
-
-void write6502high(unsigned long addr, unsigned char val, char *p)
-{
-//        printf("%04X write %02X %i\n",addr,val,romin);
-        if (romin) spareram[addr&0xFFF]=val;
-        else       tuberam[addr]=val;
-}
-
-/*struct MemoryReadByte read6502tube[] =
-{
-        {0xFEF8,0xFEFF,readtube},
-        {-1,-1,NULL}
-};
-struct MemoryWriteByte write6502tube[] =
-{
-        {0xFEF8,0xFEFF,writetube},
-        {0xF000,0xFFFF,write6502high},
-        {-1,-1,NULL}
-};
-
-struct MemoryReadByte readz80tube[] =
-{
-        {-1,-1,NULL}
-};
-struct MemoryWriteByte writez80tube[] =
-{
-        {-1,-1,NULL}
-};
-struct z80PortRead readpz80tube[] =
-{
-        {0,7,readtubep,NULL},
-        {-1,-1,NULL}
-};
-struct z80PortWrite writepz80tube[] =
-{
-        {0,7,writetubep,NULL},
-        {-1,-1,NULL}
-};*/
 
 void tubeinit6502()
 {
+        tubetype=TUBE6502;
         tubeinitmem();
         tubeloadrom();
         tubereset6502();
-/*        FILE *f=fopen("roms/tube/6502tube.rom","rb");
-        fread(tuberam+0xF800,0x0800,1,f);
-        fclose(f);
-        m6502.m6502Base=tuberam;
-        m6502.m6502MemoryRead=read6502tube;
-        m6502.m6502MemoryWrite=write6502tube;
-        m6502zpSetContext(&m6502);
-        m6502zpreset();
-        tubeula.ph1pos=tubeula.ph3pos=tubeula.hp3pos=0;
-        tubeula.r1stat=0;
-        tubeula.hstat[0]=tubeula.hstat[1]=tubeula.hstat[2]=tubeula.hstat[3]=0x40;
-        tubeula.pstat[0]=tubeula.pstat[1]=tubeula.pstat[2]=tubeula.pstat[3]=0x40;*/
+        tubeexec=tubeexec65c02;
+        tubeshift=tube6502speed;//1;
+}
+
+void updatetubespeed()
+{
+        if (tubetype==TUBE6502) tubeshift=tube6502speed;
+}
+
+void tubeinitarm()
+{
+        tubetype=TUBEARM;
+        loadarmrom();
+        resetarm();
+        tubeexec=execarm;
+        tubeshift=1;
 }
 
 void tubeinitz80()
 {
-//        z80_initmem();
+        tubetype=TUBEZ80;
         z80_loadrom();
         resetz80();
-/*        FILE *f=fopen("roms/tube/z80_120.rom","rb");
-        fread(tuberam,0x1000,1,f);
-        fclose(f);
-        mz80.z80Base=tuberam;
-        mz80.z80MemRead=readz80tube;
-        mz80.z80MemWrite=writez80tube;
-        mz80.z80IoRead=readpz80tube;
-        mz80.z80IoWrite=writepz80tube;
-        mz80SetContext(&mz80);
-        mz80reset();
-        tubeula.ph1pos=tubeula.ph3pos=tubeula.hp3pos=0;
-        tubeula.r1stat=0;
-        tubeula.hstat[0]=tubeula.hstat[1]=tubeula.hstat[2]=tubeula.hstat[3]=0x40;
-        tubeula.pstat[0]=tubeula.pstat[1]=tubeula.pstat[2]=tubeula.pstat[3]=0x40;*/
-/*        tubeula.hpos[0]=tubeula.hpos[1]=tubeula.hpos2[0]=tubeula.hpos2[1]=0;
-        tubeula.ppos=tubeula.ppos2=0;
-        tubeula.hstat[0]=0;
-        tubeula.hbytes[0]=tubeula.hbytes[1]=0;
-        tubeula.hbytes[2]=tubeula.hbytes[3]=0;*/
+        tubeexec=execz80;
+        tubeshift=2;
+}
+
+void tubeinitx86()
+{
+        tubetype=TUBEX86;
+        initmemx86();
+        resetx86();
+        tubeexec=execx86;
+        tubeshift=2;
+}
+
+void tubeinit65816()
+{
+        tubetype=TUBE65816;
+        init65816();
+        reset65816();
+        tubeexec=exec65816;
+        tubeshift=3;
 }
 
 void resettube()
 {
-        tubeula.ph1pos=tubeula.ph3pos=tubeula.hp3pos=0;
+        tubeula.ph1pos=tubeula.hp3pos=0;
+        tubeula.ph3pos=1;
         tubeula.r1stat=0;
-        tubeula.hstat[0]=tubeula.hstat[1]=tubeula.hstat[2]=tubeula.hstat[3]=0x40;
+        tubeula.hstat[0]=tubeula.hstat[1]=tubeula.hstat[3]=0x40;
         tubeula.pstat[0]=tubeula.pstat[1]=tubeula.pstat[2]=tubeula.pstat[3]=0x40;
+        tubeula.hstat[2]=0xC0;
         romin=1;
-}
-
-void dumptuberegs()
-{
-/*        if (tubetype==TUBE6502)
-        {
-                m6502zpGetContext(&m6502);
-                printf("Tube regs :\n");
-                printf("A=%02X X=%02X Y=%02X PC=%04X\n",m6502.m6502af>>8,m6502.m6502x,m6502.m6502y,m6502.m6502pc);
-        }
-        else
-        {
-                mz80GetContext(&mz80);
-                printf("Tube regs :\n");
-                printf("AF=%04X BC=%04X DE=%04X HL=%04X PC=%04X\n",mz80.z80af.af,mz80.z80bc.bc,mz80.z80de.de,mz80.z80hl.hl,mz80.z80pc);
-        }*/
 }
 
 void dumptube()
@@ -446,131 +357,3 @@ void dumptube()
         fclose(f);
 }
 
-void exectube(int tubelinecycs)
-{
-        unsigned long res;
-        slicereads=0;
-        if (tubelinecycs<=0)
-        {
-                tubelinecycs=8;
-//                printf("Error - tubelinecycs %i\n",tubelinecycs);
-//                dumpregs();
-//                exit(-1);
-        }
-//        printf("Tube execute\n");
-        if (tubetype==TUBEZ80)
-        {
-                execz80(tubelinecycs<<2);
-/*                if (tubeirq&2)
-                   mz80nmi();
-                if (tubeirq&1)
-                   mz80int(0);
-                res=mz80exec(256);
-                if (res!=0x80000000)
-                {
-                        printf("Tube error %08X\n",res);
-                        dumpregs();
-                        dumptuberegs();
-                        dumptube();
-                        exit(-1);
-                }*/
-        }
-        else if (tubetype==TUBE6502)
-        {
-                tubeexec65c02(tubelinecycs<<tubespeed);
-/*                if (tubeirq&2)
-                   m6502zpnmi();
-                if (tubeirq&1)
-                   m6502zpint(0);
-                res=m6502zpexec(tubelinecycs*2);
-                if (res!=0x80000000)
-                {
-                        printf("Tube error %08X\n",res);
-                        dumpregs();
-                        dumptuberegs();
-                        dumptube();
-                        exit(-1);
-                }*/
-        }
-        else
-        {
-                execarm(tubelinecycs<<2);
-        }
-}
-
-/*void exectubeshort()
-{
-        unsigned long res;
-        slicereads=0;
-        if (tubetype==TUBEZ80)
-        {
-                if (tubeirq&2)
-                   mz80nmi();
-                if (tubeirq&1)
-                   mz80int(0);
-//                mz80nmi();
-                res=mz80exec(256);
-                if (res!=0x80000000)
-                {
-                        printf("Tube error %08X\n",res);
-                        dumpregs();
-                        dumptuberegs();
-                        dumptube();
-                        exit(-1);
-                }
-        }
-        else if (tubetype==TUBE6502)
-        {
-                if (tubeirq&2)
-                   m6502zpnmi();
-                if (tubeirq&1)
-                   m6502zpint(0);
-                res=m6502zpexec(128);
-                if (res!=0x80000000)
-                {
-                        printf("Tube error %08X\n",res);
-                        dumpregs();
-                        dumptuberegs();
-                        dumptube();
-                        exit(-1);
-                }
-        }
-        else
-        {
-                execarm(128);
-        }
-}*/
-
-void exectube2()
-{
-        unsigned long res;
-        if (tubecycs<=0)
-        {
-                return;
-//                printf("Error - tubecycs %i\n",tubecycs);
-//                dumpregs();
-//                dumpram();
-//                dumptuberegs();
-//                dumptube();
-//                exit(-1);
-        }
-//        printf("Execute for %i cycles\n",tubecycs);
-        if (tubetype==TUBE6502)
-        {
-/*                if (tubeirq&2)
-                   m6502zpnmi();
-                if (tubeirq&1)
-                   m6502zpint(0);
-                res=m6502zpexec(tubecycs*2);
-                if (res!=0x80000000)
-                {
-                        printf("Tube error %08X\n",res);
-                        dumpregs();
-                        dumptuberegs();
-                        dumptube();
-                        exit(-1);
-                }*/
-        }
-        tubelinecycs-=tubecycs;
-        tubecycs=0;
-}

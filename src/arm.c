@@ -1,14 +1,16 @@
-/*B-em 1.4 by Tom Walker
-  ARM emulation (for ARM tube)*/
+/*B-em v2.0 by Tom Walker
+  ARM1 parasite CPU emulation
+  Originally from Arculator*/
 
 #include <stdio.h>
+#include <stdint.h>
 #include "b-em.h"
 #include "arm.h"
 
-unsigned long opcode2,opcode3;
+uint32_t opcode2,opcode3;
 int armirq=0;
-unsigned long *armrom,*armram;
-unsigned char *armromb,*armramb;
+uint32_t *armrom,*armram;
+uint8_t *armromb,*armramb;
 #define USER       0
 #define FIQ        1
 #define IRQ        2
@@ -47,7 +49,7 @@ unsigned char *armromb,*armramb;
                                         armregs[15]&=0xFC000003;\
                                         armregs[15]|=0x08000008;\
                                         refillpipeline();\
-                                        cycles--
+                                        tubecycles--
 
 /*0=i/o, 1=all, 2=r/o, 3=os r/o, 4=super only, 5=read mem, write io*/
 /*0=user, 1=os, 2=super*/
@@ -123,14 +125,25 @@ void updatemode(int m)
         }
 }
 
-unsigned char flaglookup[16][16];
-unsigned long rotatelookup[4096];
+uint8_t flaglookup[16][16];
+uint32_t rotatelookup[4096];
 
 void refillpipeline2();
+
+#define countbits(c) countbitstable[c]
+int countbitstable[65536];
 void resetarm()
 {
         int c,d,exec,data;
-        unsigned long rotval,rotamount;
+        uint32_t rotval,rotamount;
+        for (c=0;c<65536;c++)
+        {
+                countbitstable[c]=0;
+                for (d=0;d<16;d++)
+                {
+                        if (c&(1<<d)) countbitstable[c]+=4;
+                }
+        }
         for (c=0;c<16;c++)
         {
                 for (d=0;d<16;d++)
@@ -188,51 +201,71 @@ void dumparmregs()
         printf("PC =%07X\n",PC);
 }
 
-unsigned long *armread[64];
+uint32_t *armread[64];
+uint32_t armmask[64];
 void loadarmrom()
 {
         FILE *f;
         int c;
-        armrom=(unsigned long *)malloc(0x4000);
-        armram=(unsigned long *)malloc(0x400000);
-        armromb=(unsigned char *)armrom;
-        armramb=(unsigned char *)armram;
-        f=fopen("roms/tube/armeval_100.rom","rb");
+        char fn[256];
+        if (!armrom) armrom=(uint32_t *)malloc(0x4000);
+        if (!armram) armram=(uint32_t *)malloc(0x400000);
+        armromb=(uint8_t *)armrom;
+        armramb=(uint8_t *)armram;
+        append_filename(fn,exedir,"roms/tube/ARMeval_100.rom",511);
+        f=fopen(fn,"rb");
         fread(armromb,0x4000,1,f);
         fclose(f);
         memcpy(armramb,armromb,0x4000);
         for (c=0;c<64;c++) armread[c]=0;
         for (c=0;c<4;c++) armread[c]=&armram[c*0x40000];
         armread[48]=armrom;
+        for (c=0;c<64;c++) armmask[c]=0xFFFFF;
+        armmask[48]=0x3FFF;
+}
+
+void closearm()
+{
+        if (armrom) free(armrom);
+        if (armram) free(armram);
 }
 
 int endtimeslice=0;
-#define readarml(a) ((armread[(a>>20)&63])?armread[(a>>20)&63][(a&0xFFFFF)>>2]:readarmfl(a))
+uint32_t readarmfl(uint32_t addr);
+uint32_t readarml(uint32_t a)
+{
+        if (armread[(a>>20)&63])
+                return armread[(a>>20)&63][(a&0xFFFFF)>>2];
+        return readarmfl(a);
+}
+//#define readarml(a) ((armread[(a>>20)&63])?armread[(a>>20)&63][(a&0xFFFFF)>>2]:readarmfl(a))
 
-unsigned char readarmb(unsigned long addr)
+uint8_t readarmb(uint32_t addr)
 {
         if (addr<0x400000) return armramb[addr];
         if ((addr&~0x1F)==0x1000000)
         {
                 //printf("Read %08X\n",addr);
-                return readtube((addr&0x1C)>>2,NULL);
+                return readtube((addr&0x1C)>>2);
         }
         if ((addr>=0x3000000) && (addr<0x3004000)) return armromb[addr&0x3FFF];
-        printf("Bad ARM read byte %08X\n",addr);
+        return 0xFF;
+/*        printf("Bad ARM read byte %08X\n",addr);
         dumparmregs();
-        exit(-1);
+        exit(-1);*/
 }
-unsigned long readarmfl(unsigned long addr)
+uint32_t readarmfl(uint32_t addr)
 {
         if (addr<0x400000) return armram[addr>>2];
         if (addr<0x400010) return 0xFFFFFFFF;
         if ((addr>=0x3000000) && (addr<0x3004000)) return armrom[(addr&0x3FFC)>>2];
-        printf("Bad ARM read long %08X\n",addr);
+        return 0xFFFFFFFF;
+/*        printf("Bad ARM read long %08X\n",addr);
         dumparmregs();
-        exit(-1);
+        exit(-1);*/
 }
 
-void writearmb(unsigned long addr, unsigned char val)
+void writearmb(uint32_t addr, uint8_t val)
 {
         if (addr<0x400000)
         {
@@ -242,31 +275,31 @@ void writearmb(unsigned long addr, unsigned char val)
         if ((addr&~0x1F)==0x1000000)
         {
 //                printf("Write %08X %02X\n",addr,val);
-                writetube((addr&0x1C)>>2,val,NULL);
+                writetube((addr&0x1C)>>2,val);
                 endtimeslice=1;
                 return;
         }
-        printf("Bad ARM write byte %08X %02X\n",addr,val);
+/*        printf("Bad ARM write byte %08X %02X\n",addr,val);
         dumparmregs();
-        exit(-1);
+        exit(-1);*/
 }
-void writearml(unsigned long addr, unsigned long val)
+void writearml(uint32_t addr, uint32_t val)
 {
         if (addr<0x400000)
         {
                 armram[addr>>2]=val;
                 return;
         }
-        if (addr<0x400010) return;
+/*        if (addr<0x400010) return;
         printf("Bad ARM write long %08X %08X\n",addr,val);
         dumparmregs();
-        exit(-1);
+        exit(-1);*/
 }
 
 #define checkneg(v) (v&0x80000000)
 #define checkpos(v) !(v&0x80000000)
 
-inline void setadd(unsigned long op1, unsigned long op2, unsigned long res)
+inline void setadd(uint32_t op1, uint32_t op2, uint32_t res)
 {
         armregs[15]&=0xFFFFFFF;
         if ((checkneg(op1) && checkneg(op2)) ||
@@ -279,7 +312,7 @@ inline void setadd(unsigned long op1, unsigned long op2, unsigned long res)
         else if (checkneg(res))            armregs[15]|=NFLAG;
 }
 
-inline void setsub(unsigned long op1, unsigned long op2, unsigned long res)
+inline void setsub(uint32_t op1, uint32_t op2, uint32_t res)
 {
         char s[80];
         armregs[15]&=0xFFFFFFF;
@@ -293,18 +326,18 @@ inline void setsub(unsigned long op1, unsigned long op2, unsigned long res)
             armregs[15]|=VFLAG;
 }
 
-inline void setarmzn(unsigned long op)
+inline void setarmzn(uint32_t op)
 {
         armregs[15]&=0x3FFFFFFF;
         if (!op)               armregs[15]|=ZFLAG;
         else if (checkneg(op)) armregs[15]|=NFLAG;
 }
 
-inline unsigned long shift(unsigned long opcode)
+inline uint32_t shift(uint32_t opcode)
 {
-        unsigned long shiftmode=(opcode>>5)&3;
-        unsigned long shiftamount=(opcode>>7)&31;
-        unsigned long temp;
+        uint32_t shiftmode=(opcode>>5)&3;
+        uint32_t shiftamount=(opcode>>7)&31;
+        uint32_t temp;
         int cflag=CFSET;
         if (!(opcode&0xFF0)) return armregs[RM];
         if (opcode&0x10)
@@ -392,11 +425,6 @@ inline unsigned long shift(unsigned long opcode)
                         if (((temp>>shiftamount)|(temp<<(32-shiftamount)))&0x80000000) armregs[15]|=CFLAG;
                 }
                 return (temp>>shiftamount)|(temp<<(32-shiftamount));
-                break;
-                default:
-                printf("Shift mode %i amount %i\n",shiftmode,shiftamount);
-                dumpregs();
-                exit(-1);
         }
 }
 
@@ -404,7 +432,7 @@ inline unsigned shift2(unsigned opcode)
 {
         unsigned shiftmode=(opcode>>5)&3;
         unsigned shiftamount=(opcode>>7)&31;
-        unsigned long temp;
+        uint32_t temp;
         int cflag=CFSET;
         if (!(opcode&0xFF0)) return armregs[RM];
         if (opcode&0x10)
@@ -441,18 +469,12 @@ inline unsigned shift2(unsigned opcode)
                 if (!shiftamount && !(opcode&0x10)) return (((cflag)?1:0)<<31)|(temp>>1);
                 if (!shiftamount)                   return temp;
                 return (temp>>shiftamount)|(temp<<(32-shiftamount));
-                break;
-
-                default:
-                printf("Shift2 mode %i amount %i\n",shiftmode,shiftamount);
-                dumpregs();
-                exit(-1);
         }
 }
 
 inline unsigned rotate(unsigned data)
 {
-        unsigned long rotval;
+        uint32_t rotval;
         rotval=rotatelookup[data&4095];
         if (data&0x100000 && data&0xF00)
         {
@@ -481,13 +503,13 @@ void refillpipeline2()
 }
 
 int accc=0;
-void execarm(int cycles)
+void execarm()
 {
-        unsigned long opcode,templ,templ2,mask,addr,addr2;
+        uint32_t opcode,templ,templ2,mask,addr,addr2;
         int exec,c;
-        unsigned char temp;
+        uint8_t temp;
         FILE *f;
-        while (cycles>0)
+        while (tubecycles>0)
         {
                 opcode=opcode2;
                 opcode2=opcode3;
@@ -497,39 +519,41 @@ void execarm(int cycles)
                                 switch ((opcode>>20)&0xFF)
                                 {
                                         case 0x00: /*AND reg*/
-                                        if (((opcode&0xE000090)==0x90)) /*MUL*/
-                                        {
-                                                armregs[MULRD]=(armregs[MULRM])*(armregs[MULRS]);
-                                                cycles-=17;
-                                        }
-                                        else
-                                        {
+//                                        if (((opcode&0xF0)==0x90)) /*MUL*/
+//                                        {
+//                                                armregs[MULRD]=(armregs[MULRM])*(armregs[MULRS]);
+//                                                if (MULRD==MULRM) armregs[MULRD]=0;
+//                                                cycles-=17;
+//                                        }
+//                                        else
+//                                        {
                                                 if (RD==15)
                                                 {
-                                                        templ=shift(opcode);
+                                                        templ=shift2(opcode);
                                                         armregs[15]=(((GETADDR(RN)&templ)+4)&0x3FFFFFC)|(armregs[15]&0xFC000003);
                                                         refillpipeline();
                                                 }
                                                 else
                                                 {
-                                                        templ=shift(opcode);
+                                                        templ=shift2(opcode);
                                                         armregs[RD]=GETADDR(RN)&templ;
                                                 }
-                                                cycles--;
-                                        }
+                                                tubecycles--;
+//                                        }
                                         break;
                                         case 0x01: /*ANDS reg*/
-                                        if (((opcode&0xE000090)==0x90)) /*MULS*/
-                                        {
-                                                armregs[MULRD]=(armregs[MULRM])*(armregs[MULRS]);
-                                                setarmzn(armregs[MULRD]);
-                                                cycles-=17;
-                                        }
-                                        else
-                                        {
+//                                        if (((opcode&0xF0)==0x90)) /*MULS*/
+//                                        {
+//                                                armregs[MULRD]=(armregs[MULRM])*(armregs[MULRS]);
+//                                                if (MULRD==MULRM) armregs[MULRD]=0;
+//                                                setarmzn(armregs[MULRD]);
+//                                                tubecycles-=17;
+//                                        }
+//                                        else
+//                                        {
                                                 if (RD==15)
                                                 {
-                                                        templ=shift(opcode);
+                                                        templ=shift2(opcode);
                                                         armregs[15]=(GETADDR(RN)&templ)+4;
                                                         refillpipeline();
                                                 }
@@ -539,41 +563,43 @@ void execarm(int cycles)
                                                         armregs[RD]=GETADDR(RN)&templ;
                                                         setarmzn(armregs[RD]);
                                                 }
-                                                cycles--;
-                                        }
+                                                tubecycles--;
+//                                        }
                                         break;
 
                                         case 0x02: /*EOR reg*/
-                                        if (((opcode&0xE000090)==0x90)) /*MLA*/
-                                        {
-                                                armregs[MULRD]=((armregs[MULRM])*(armregs[MULRS]))+armregs[MULRN];
-                                                cycles-=17;
-                                        }
-                                        else
-                                        {
+//                                        if (((opcode&0xF0)==0x90)) /*MLA*/
+///                                        {
+//                                                armregs[MULRD]=((armregs[MULRM])*(armregs[MULRS]))+armregs[MULRN];
+//                                                if (MULRD==MULRM) armregs[MULRD]=0;
+//                                                tubecycles-=17;
+//                                        }
+//                                        else
+//                                        {
                                                 if (RD==15)
                                                 {
-                                                        templ=shift(opcode);
+                                                        templ=shift2(opcode);
                                                         armregs[15]=(((GETADDR(RN)^templ)+4)&0x3FFFFFC)|(armregs[15]&0xFC000003);
                                                         refillpipeline();
                                                 }
                                                 else
                                                 {
-                                                        templ=shift(opcode);
+                                                        templ=shift2(opcode);
                                                         armregs[RD]=GETADDR(RN)^templ;
                                                 }
-                                                cycles--;
-                                        }
+                                                tubecycles--;
+//                                        }
                                         break;
                                         case 0x03: /*EORS reg*/
-                                        if (((opcode&0xE000090)==0x90)) /*MLA*/
-                                        {
-                                                armregs[MULRD]=((armregs[MULRM])*(armregs[MULRS]))+armregs[MULRN];
-                                                setarmzn(armregs[MULRD]);
-                                                cycles-=17;
-                                        }
-                                        else
-                                        {
+//                                        if (((opcode&0xF0)==0x90)) /*MLAS*/
+//                                        {
+//                                                armregs[MULRD]=((armregs[MULRM])*(armregs[MULRS]))+armregs[MULRN];
+//                                                if (MULRD==MULRM) armregs[MULRD]=0;
+//                                                setarmzn(armregs[MULRD]);
+//                                                tubecycles-=17;
+//                                        }
+//                                        else
+//                                        {
                                                 if (RD==15)
                                                 {
                                                         templ=shift2(opcode);
@@ -586,8 +612,8 @@ void execarm(int cycles)
                                                         armregs[RD]=GETADDR(RN)^templ;
                                                         setarmzn(armregs[RD]);
                                                 }
-                                                cycles--;
-                                        }
+                                                tubecycles--;
+//                                        }
                                         break;
 
                                         case 0x04: /*SUB reg*/
@@ -599,10 +625,10 @@ void execarm(int cycles)
                                         }
                                         else
                                         {
-                                                templ=shift(opcode);
+                                                templ=shift2(opcode);
                                                 armregs[RD]=GETADDR(RN)-templ;
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
                                         case 0x05: /*SUBS reg*/
                                         if (RD==15)
@@ -613,26 +639,26 @@ void execarm(int cycles)
                                         }
                                         else
                                         {
-                                                templ=shift(opcode);
+                                                templ=shift2(opcode);
                                                 setsub(GETADDR(RN),templ,GETADDR(RN)-templ);
                                                 armregs[RD]=GETADDR(RN)-templ;
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
 
                                         case 0x06: /*RSB reg*/
                                         if (RD==15)
                                         {
-                                                templ=shift(opcode);
+                                                templ=shift2(opcode);
                                                 armregs[15]=(((templ-GETADDR(RN))+4)&0x3FFFFFC)|(armregs[15]&0xFC000003);
                                                 refillpipeline();
                                         }
                                         else
                                         {
-                                                templ=shift(opcode);
+                                                templ=shift2(opcode);
                                                 armregs[RD]=templ-GETADDR(RN);
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
                                         case 0x07: /*RSBS reg*/
                                         if (RD==15)
@@ -643,48 +669,41 @@ void execarm(int cycles)
                                         }
                                         else
                                         {
-                                                templ=shift(opcode);
+                                                templ=shift2(opcode);
                                                 setsub(templ,GETADDR(RN),templ-GETADDR(RN));
                                                 armregs[RD]=templ-GETADDR(RN);
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
 
                                         case 0x08: /*ADD reg*/
                                         if (RD==15)
                                         {
                                                 templ=shift2(opcode);
-        //                                        printf("R15=%08X+%08X+4=",GETADDR(RN),templ);
                                                 armregs[15]=((GETADDR(RN)+templ+4)&0x3FFFFFC)|(armregs[15]&0xFC000003);
                                                 refillpipeline();
-        //                                        printf("%08X\n",armregs[15]);
                                         }
                                         else
                                         {
-                                                templ=shift(opcode);
+                                                templ=shift2(opcode);
                                                 armregs[RD]=GETADDR(RN)+templ;
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
                                         case 0x09: /*ADDS reg*/
                                         if (RD==15)
                                         {
                                                 templ=shift2(opcode);
-        //                                        printf("R15=%08X+%08X+4=",GETADDR(RN),templ);
                                                 armregs[15]=GETADDR(RN)+templ+4;
                                                 refillpipeline();
-        //                                        printf("%08X\n",armregs[15]);
                                         }
                                         else
                                         {
-                                                templ=shift(opcode);
+                                                templ=shift2(opcode);
                                                 setadd(GETADDR(RN),templ,GETADDR(RN)+templ);
-        //                                        printf("ADDS %08X+%08X = ",GETADDR(RN),templ);
                                                 armregs[RD]=GETADDR(RN)+templ;
-        //                                        printf("%08X\n",armregs[RD]);
-        //                                        setarmzn(templ);
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
 
                                         case 0x0A: /*ADC reg*/
@@ -698,10 +717,10 @@ void execarm(int cycles)
                                         else
                                         {
                                                 templ2=CFSET;
-                                                templ=shift(opcode);
+                                                templ=shift2(opcode);
                                                 armregs[RD]=GETADDR(RN)+templ+templ2;
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
                                         case 0x0B: /*ADCS reg*/
                                         if (RD==15)
@@ -714,11 +733,11 @@ void execarm(int cycles)
                                         else
                                         {
                                                 templ2=CFSET;
-                                                templ=shift(opcode);
-                                                setadd(GETADDR(RN),templ,GETADDR(RN)+templ+templ2);
+                                                templ=shift2(opcode);
+                                                setadc(GETADDR(RN),templ,GETADDR(RN)+templ+templ2);
                                                 armregs[RD]=GETADDR(RN)+templ+templ2;
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
 
                                         case 0x0C: /*SBC reg*/
@@ -731,10 +750,10 @@ void execarm(int cycles)
                                         }
                                         else
                                         {
-                                                templ=shift(opcode);
+                                                templ=shift2(opcode);
                                                 armregs[RD]=GETADDR(RN)-(templ+templ2);
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
                                         case 0x0D: /*SBCS reg*/
                                         templ2=(CFSET)?0:1;
@@ -746,11 +765,11 @@ void execarm(int cycles)
                                         }
                                         else
                                         {
-                                                templ=shift(opcode);
-                                                setsub(GETADDR(RN),templ,GETADDR(RN)-(templ+templ2));
+                                                templ=shift2(opcode);
+                                                setsbc(GETADDR(RN),templ,GETADDR(RN)-(templ+templ2));
                                                 armregs[RD]=GETADDR(RN)-(templ+templ2);
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
                                         case 0x0E: /*RSC reg*/
                                         templ2=(CFSET)?0:1;
@@ -762,108 +781,135 @@ void execarm(int cycles)
                                         }
                                         else
                                         {
-                                                templ=shift(opcode);
+                                                templ=shift2(opcode);
                                                 armregs[RD]=templ-(GETADDR(RN)+templ2);
                                         }
-                                        cycles--;
+                                        tubecycles--;
+                                        break;
+                                        case 0x0F: /*RSCS reg*/
+                                        templ2=(CFSET)?0:1;
+                                        if (RD==15)
+                                        {
+                                                templ=shift2(opcode);
+                                                armregs[15]=(templ-(GETADDR(RN)+templ2))+4;
+                                                refillpipeline();
+                                        }
+                                        else
+                                        {
+                                                templ=shift2(opcode);
+                                                setsbc(templ,GETADDR(RN),templ-(GETADDR(RN)+templ2));
+                                                armregs[RD]=templ-(GETADDR(RN)+templ2);
+                                        }
+                                        tubecycles--;
                                         break;
 
                                         case 0x10: /*SWP word*/
-                                        templ=armregs[15]-4;
-                                        armregs[15]|=3;
-                                        updatemode(SUPERVISOR);
-                                        armregs[14]=templ;
-                                        armregs[15]&=0xFC000003;
-                                        armregs[15]|=0x08000008;
-                                        cycles-=3;
-                                        refillpipeline();
                                         break;
 
                                         case 0x11: /*TST reg*/
                                         if (RD==15)
                                         {
-                                                opcode&=~0x100000;
-                                                templ=armregs[15]&0x3FFFFFC;
-                                                armregs[15]=((GETADDR(RN)&shift2(opcode))&0xFC000003)|templ;
-//                                                refillpipeline();
+                                                if (armregs[15]&3)
+                                                {
+                                                        templ=armregs[15]&0x3FFFFFC;
+                                                        armregs[15]=((GETADDR(RN)&shift2(opcode))&0xFC000003)|templ;
+                                                }
+                                                else
+                                                {
+                                                        templ=armregs[15]&0x0FFFFFFF;
+                                                        armregs[15]=((GETADDR(RN)&shift2(opcode))&0xF0000000)|templ;
+                                                }
                                         }
                                         else
                                         {
                                                 setarmzn(GETADDR(RN)&shift(opcode));
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
 
-                                        case 0x12: /*SWP byte*/
-                                        templ=armregs[15]-4;
-                                        armregs[15]|=3;
-                                        updatemode(SUPERVISOR);
-                                        armregs[14]=templ;
-                                        armregs[15]&=0xFC000003;
-                                        armregs[15]|=0x08000008;
-                                        cycles-=3;
-                                        refillpipeline();
+                                        case 0x12:
                                         break;
 
                                         case 0x13: /*TEQ reg*/
                                         if (RD==15)
                                         {
-                                                opcode&=~0x100000;
-                                                templ=armregs[15]&0x3FFFFFC;
-                                                armregs[15]=((GETADDR(RN)^shift(opcode))&0xFC000003)|templ;
-//                                                refillpipeline();
+                                                if (armregs[15]&3)
+                                                {
+                                                        templ=armregs[15]&0x3FFFFFC;
+                                                        armregs[15]=((GETADDR(RN)^shift2(opcode))&0xFC000003)|templ;
+                                                }
+                                                else
+                                                {
+                                                        templ=armregs[15]&0x0FFFFFFF;
+                                                        armregs[15]=((GETADDR(RN)^shift2(opcode))&0xF0000000)|templ;
+                                                }
                                         }
                                         else
                                         {
                                                 setarmzn(GETADDR(RN)^shift(opcode));
                                         }
-                                        cycles--;
+                                        tubecycles--;
+                                        break;
+
+                                        case 0x14: /*SWPB*/
                                         break;
 
                                         case 0x15: /*CMP reg*/
                                         if (RD==15)
                                         {
-                                                opcode&=~0x100000;
-                                                armregs[15]&=0x3FFFFFC;
-                                                armregs[15]|=((GETADDR(RN)-shift(opcode))&0xFC000003);
-//                                                refillpipeline();
+                                                if (armregs[15]&3)
+                                                {
+                                                        templ=armregs[15]&0x3FFFFFC;
+                                                        armregs[15]=((GETADDR(RN)-shift2(opcode))&0xFC000003)|templ;
+                                                }
+                                                else
+                                                {
+                                                        templ=armregs[15]&0x0FFFFFFF;
+                                                        armregs[15]=((GETADDR(RN)-shift2(opcode))&0xF0000000)|templ;
+                                                }
                                         }
                                         else
-                                           setsub(GETADDR(RN),shift(opcode),GETADDR(RN)-shift(opcode));
-                                        cycles--;
+                                           setsub(GETADDR(RN),shift(opcode),GETADDR(RN)-shift2(opcode));
+                                        tubecycles--;
                                         break;
 
                                         case 0x17: /*CMN reg*/
                                         if (RD==15)
                                         {
-                                                opcode&=~0x100000;
-                                                armregs[15]&=0x3FFFFFC;
-                                                armregs[15]|=((GETADDR(RN)+shift2(opcode))&0xFC000003);
-//                                                refillpipeline();
+                                                if (armregs[15]&3)
+                                                {
+                                                        templ=armregs[15]&0x3FFFFFC;
+                                                        armregs[15]=((GETADDR(RN)+shift2(opcode))&0xFC000003)|templ;
+                                                }
+                                                else
+                                                {
+                                                        templ=armregs[15]&0x0FFFFFFF;
+                                                        armregs[15]=((GETADDR(RN)+shift2(opcode))&0xF0000000)|templ;
+                                                }
                                         }
                                         else
                                            setadd(GETADDR(RN),shift2(opcode),GETADDR(RN)+shift2(opcode));
-                                        cycles--;
+                                        tubecycles--;
                                         break;
 
                                         case 0x18: /*ORR reg*/
                                         if (RD==15)
                                         {
-                                                templ=shift(opcode);
+                                                templ=shift2(opcode);
                                                 armregs[15]=(((GETADDR(RN)|templ)+4)&0x3FFFFFC)|(armregs[15]&0xFC000003);
                                                 refillpipeline();
                                         }
                                         else
                                         {
-                                                templ=shift(opcode);
+                                                templ=shift2(opcode);
                                                 armregs[RD]=GETADDR(RN)|templ;
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
                                         case 0x19: /*ORRS reg*/
                                         if (RD==15)
                                         {
-                                                templ=shift(opcode);
+                                                templ=shift2(opcode);
                                                 armregs[15]=(GETADDR(RN)|templ)+4;
                                                 refillpipeline();
                                         }
@@ -873,23 +919,24 @@ void execarm(int cycles)
                                                 armregs[RD]=GETADDR(RN)|templ;
                                                 setarmzn(armregs[RD]);
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
 
                                         case 0x1A: /*MOV reg*/
                                         if (RD==15)
                                         {
-                                                armregs[15]=(armregs[15]&0xFC000003)|((shift(opcode)+4)&0x3FFFFFC);
+                                                armregs[15]=(armregs[15]&0xFC000003)|((shift2(opcode)+4)&0x3FFFFFC);
                                                 refillpipeline();
                                         }
                                         else
-                                           armregs[RD]=shift(opcode);
-                                        cycles--;
+                                           armregs[RD]=shift2(opcode);
+                                        tubecycles--;
                                         break;
                                         case 0x1B: /*MOVS reg*/
                                         if (RD==15)
                                         {
-                                                armregs[15]=shift(opcode)+4;
+                                                if (armregs[15]&3) armregs[15]=shift2(opcode)+4;
+                                                else               armregs[15]=((shift2(opcode)+4)&0xF3FFFFFC)|(armregs[15]&0xC000003);
                                                 refillpipeline();
                                         }
                                         else
@@ -897,27 +944,27 @@ void execarm(int cycles)
                                                 armregs[RD]=shift(opcode);
                                                 setarmzn(armregs[RD]);
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
 
                                         case 0x1C: /*BIC reg*/
                                         if (RD==15)
                                         {
-                                                templ=shift(opcode);
+                                                templ=shift2(opcode);
                                                 armregs[15]=(((GETADDR(RN)&~templ)+4)&0x3FFFFFC)|(armregs[15]&0xFC000003);
                                                 refillpipeline();
                                         }
                                         else
                                         {
-                                                templ=shift(opcode);
+                                                templ=shift2(opcode);
                                                 armregs[RD]=GETADDR(RN)&~templ;
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
                                         case 0x1D: /*BICS reg*/
                                         if (RD==15)
                                         {
-                                                templ=shift(opcode);
+                                                templ=shift2(opcode);
                                                 armregs[15]=(GETADDR(RN)&~templ)+4;
                                                 refillpipeline();
                                         }
@@ -927,23 +974,23 @@ void execarm(int cycles)
                                                 armregs[RD]=GETADDR(RN)&~templ;
                                                 setarmzn(armregs[RD]);
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
 
                                         case 0x1E: /*MVN reg*/
                                         if (RD==15)
                                         {
-                                                armregs[15]=(armregs[15]&0xFC000003)|(((~shift(opcode))+4)&0x3FFFFFC);
+                                                armregs[15]=(armregs[15]&0xFC000003)|(((~shift2(opcode))+4)&0x3FFFFFC);
                                                 refillpipeline();
                                         }
                                         else
-                                           armregs[RD]=~shift(opcode);
-                                        cycles--;
+                                           armregs[RD]=~shift2(opcode);
+                                        tubecycles--;
                                         break;
                                         case 0x1F: /*MVNS reg*/
                                         if (RD==15)
                                         {
-                                                armregs[15]=(~shift(opcode))+4;
+                                                armregs[15]=(~shift2(opcode))+4;
                                                 refillpipeline();
                                         }
                                         else
@@ -951,7 +998,7 @@ void execarm(int cycles)
                                                 armregs[RD]=~shift(opcode);
                                                 setarmzn(armregs[RD]);
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
 
                                         case 0x20: /*AND imm*/
@@ -966,12 +1013,12 @@ void execarm(int cycles)
                                                 templ=rotate2(opcode);
                                                 armregs[RD]=GETADDR(RN)&templ;
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
                                         case 0x21: /*ANDS imm*/
                                         if (RD==15)
                                         {
-                                                templ=rotate(opcode);
+                                                templ=rotate2(opcode);
                                                 armregs[15]=(GETADDR(RN)&templ)+4;
                                                 refillpipeline();
                                         }
@@ -981,7 +1028,7 @@ void execarm(int cycles)
                                                 armregs[RD]=GETADDR(RN)&templ;
                                                 setarmzn(armregs[RD]);
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
 
                                         case 0x22: /*EOR imm*/
@@ -996,12 +1043,12 @@ void execarm(int cycles)
                                                 templ=rotate2(opcode);
                                                 armregs[RD]=GETADDR(RN)^templ;
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
                                         case 0x23: /*EORS imm*/
                                         if (RD==15)
                                         {
-                                                templ=rotate(opcode);
+                                                templ=rotate2(opcode);
                                                 armregs[15]=(GETADDR(RN)^templ)+4;
                                                 refillpipeline();
                                         }
@@ -1011,7 +1058,7 @@ void execarm(int cycles)
                                                 armregs[RD]=GETADDR(RN)^templ;
                                                 setarmzn(armregs[RD]);
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
 
                                         case 0x24: /*SUB imm*/
@@ -1026,22 +1073,22 @@ void execarm(int cycles)
                                                 templ=rotate2(opcode);
                                                 armregs[RD]=GETADDR(RN)-templ;
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
                                         case 0x25: /*SUBS imm*/
                                         if (RD==15)
                                         {
-                                                templ=rotate(opcode);
+                                                templ=rotate2(opcode);
                                                 armregs[15]=(GETADDR(RN)-templ)+4;
                                                 refillpipeline();
                                         }
                                         else
                                         {
-                                                templ=rotate(opcode);
+                                                templ=rotate2(opcode);
                                                 setsub(GETADDR(RN),templ,GETADDR(RN)-templ);
                                                 armregs[RD]=GETADDR(RN)-templ;
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
 
                                         case 0x26: /*RSB imm*/
@@ -1056,22 +1103,22 @@ void execarm(int cycles)
                                                 templ=rotate2(opcode);
                                                 armregs[RD]=templ-GETADDR(RN);
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
                                         case 0x27: /*RSBS imm*/
                                         if (RD==15)
                                         {
-                                                templ=rotate(opcode);
+                                                templ=rotate2(opcode);
                                                 armregs[15]=(templ-GETADDR(RN))+4;
                                                 refillpipeline();
                                         }
                                         else
                                         {
-                                                templ=rotate(opcode);
+                                                templ=rotate2(opcode);
                                                 setsub(templ,GETADDR(RN),templ-GETADDR(RN));
                                                 armregs[RD]=templ-GETADDR(RN);
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
 
                                         case 0x28: /*ADD imm*/
@@ -1086,22 +1133,22 @@ void execarm(int cycles)
                                                 templ=rotate2(opcode);
                                                 armregs[RD]=GETADDR(RN)+templ;
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
                                         case 0x29: /*ADDS imm*/
                                         if (RD==15)
                                         {
-                                                templ=rotate(opcode);
+                                                templ=rotate2(opcode);
                                                 armregs[15]=GETADDR(RN)+templ+4;
                                                 refillpipeline();
                                         }
                                         else
                                         {
-                                                templ=rotate(opcode);
+                                                templ=rotate2(opcode);
                                                 setadd(GETADDR(RN),templ,GETADDR(RN)+templ);
                                                 armregs[RD]=GETADDR(RN)+templ;
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
 
                                         case 0x2A: /*ADC imm*/
@@ -1118,24 +1165,24 @@ void execarm(int cycles)
                                                 templ=rotate2(opcode);
                                                 armregs[RD]=GETADDR(RN)+templ+templ2;
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
                                         case 0x2B: /*ADCS imm*/
                                         if (RD==15)
                                         {
                                                 templ2=CFSET;
-                                                templ=rotate(opcode);
+                                                templ=rotate2(opcode);
                                                 armregs[15]=GETADDR(RN)+templ+templ2+4;
                                                 refillpipeline();
                                         }
                                         else
                                         {
                                                 templ2=CFSET;
-                                                templ=rotate(opcode);
-                                                setadd(GETADDR(RN),templ,GETADDR(RN)+templ+templ2);
+                                                templ=rotate2(opcode);
+                                                setadc(GETADDR(RN),templ,GETADDR(RN)+templ+templ2);
                                                 armregs[RD]=GETADDR(RN)+templ+templ2;
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
 
                                         case 0x2C: /*SBC imm*/
@@ -1151,69 +1198,76 @@ void execarm(int cycles)
                                                 templ=rotate2(opcode);
                                                 armregs[RD]=GETADDR(RN)-(templ+templ2);
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
                                         case 0x2D: /*SBCS imm*/
                                         templ2=(CFSET)?0:1;
                                         if (RD==15)
                                         {
-                                                templ=rotate(opcode);
+                                                templ=rotate2(opcode);
                                                 armregs[15]=(GETADDR(RN)-(templ+templ2))+4;
                                                 refillpipeline();
                                         }
                                         else
                                         {
-                                                templ=rotate(opcode);
-                                                setsub(GETADDR(RN),templ,GETADDR(RN)-(templ+templ2));
+                                                templ=rotate2(opcode);
+                                                setsbc(GETADDR(RN),templ,GETADDR(RN)-(templ+templ2));
                                                 armregs[RD]=GETADDR(RN)-(templ+templ2);
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
                                         case 0x2E: /*RSC imm*/
                                         templ2=(CFSET)?0:1;
                                         if (RD==15)
                                         {
-                                                templ=rotate(opcode);
+                                                templ=rotate2(opcode);
                                                 armregs[15]=(((templ-(GETADDR(RN)+templ2))+4)&0x3FFFFFC)|(armregs[15]&0xFC000003);
                                                 refillpipeline();
                                         }
                                         else
                                         {
-                                                templ=rotate(opcode);
+                                                templ=rotate2(opcode);
                                                 armregs[RD]=templ-(GETADDR(RN)+templ2);
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
                                         case 0x2F: /*RSCS imm*/
                                         templ2=(CFSET)?0:1;
                                         if (RD==15)
                                         {
-                                                templ=rotate(opcode);
+                                                templ=rotate2(opcode);
                                                 armregs[15]=(templ-(GETADDR(RN)+templ2))+4;
                                                 refillpipeline();
                                         }
                                         else
                                         {
-                                                templ=rotate(opcode);
-                                                setsub(templ,GETADDR(RN),templ-(GETADDR(RN)+templ2));
+                                                templ=rotate2(opcode);
+                                                setsbc(templ,GETADDR(RN),templ-(GETADDR(RN)+templ2));
+//                                                setsub(templ,GETADDR(RN),templ-(GETADDR(RN)+templ2));
                                                 armregs[RD]=templ-(GETADDR(RN)+templ2);
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
 
                                         case 0x31: /*TST imm*/
                                         if (RD==15)
                                         {
-                                                opcode&=~0x100000;
-                                                templ=armregs[15]&0x3FFFFFC;
-                                                armregs[15]=((GETADDR(RN)&rotate2(opcode))&0xFC000003)|templ;
-//                                                refillpipeline();
+                                                if (armregs[15]&3)
+                                                {
+                                                        templ=armregs[15]&0x3FFFFFC;
+                                                        armregs[15]=((GETADDR(RN)&rotate2(opcode))&0xFC000003)|templ;
+                                                }
+                                                else
+                                                {
+                                                        templ=armregs[15]&0x0FFFFFFF;
+                                                        armregs[15]=((GETADDR(RN)&rotate2(opcode))&0xF0000000)|templ;
+                                                }
                                         }
                                         else
                                         {
                                                 setarmzn(GETADDR(RN)&rotate(opcode));
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
 
                                         case 0x33: /*TEQ imm*/
@@ -1224,48 +1278,59 @@ void execarm(int cycles)
                                                 {
                                                         templ=armregs[15]&0x3FFFFFC;
                                                         armregs[15]=((GETADDR(RN)^rotate2(opcode))&0xFC000003)|templ;
-//                                                        if (!olog) olog=fopen("armlog.txt","wt");
-//                                                        sprintf(s,"TEQP %08X %i\n",armregs[15],getline());
-//                                                        fputs(s,olog);
                                                 }
                                                 else
                                                 {
                                                         templ=armregs[15]&0x0FFFFFFF;
                                                         armregs[15]=((GETADDR(RN)^rotate2(opcode))&0xF0000000)|templ;
                                                 }
-//                                                refillpipeline();
                                         }
                                         else
                                         {
                                                 setarmzn(GETADDR(RN)^rotate(opcode));
+//                                                rpclog("TEQ %08X %08X\n",GETADDR(RN),rotate(opcode));
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
 
+                                        case 0x34:
+                                        break;
                                         case 0x35: /*CMP imm*/
                                         if (RD==15)
                                         {
-                                                opcode&=~0x100000;
-                                                armregs[15]&=0x3FFFFFC;
-                                                armregs[15]|=((GETADDR(RN)-rotate2(opcode))&0xFC000003);
-//                                                refillpipeline();
+                                                if (armregs[15]&3)
+                                                {
+                                                        templ=armregs[15]&0x3FFFFFC;
+                                                        armregs[15]=((GETADDR(RN)-rotate2(opcode))&0xFC000003)|templ;
+                                                }
+                                                else
+                                                {
+                                                        templ=armregs[15]&0x0FFFFFFF;
+                                                        armregs[15]=((GETADDR(RN)-rotate2(opcode))&0xF0000000)|templ;
+                                                }
                                         }
                                         else
-                                           setsub(GETADDR(RN),rotate(opcode),GETADDR(RN)-rotate(opcode));
-                                        cycles--;
+                                           setsub(GETADDR(RN),rotate2(opcode),GETADDR(RN)-rotate2(opcode));
+                                        tubecycles--;
                                         break;
 
                                         case 0x37: /*CMN imm*/
                                         if (RD==15)
                                         {
-                                                opcode&=~0x100000;
-                                                armregs[15]&=0x3FFFFFC;
-                                                armregs[15]|=((GETADDR(RN)+rotate2(opcode))&0xFC000003);
-//                                                refillpipeline();
+                                                if (armregs[15]&3)
+                                                {
+                                                        templ=armregs[15]&0x3FFFFFC;
+                                                        armregs[15]=((GETADDR(RN)+rotate2(opcode))&0xFC000003)|templ;
+                                                }
+                                                else
+                                                {
+                                                        templ=armregs[15]&0x0FFFFFFF;
+                                                        armregs[15]=((GETADDR(RN)+rotate2(opcode))&0xF0000000)|templ;
+                                                }
                                         }
                                         else
-                                           setadd(GETADDR(RN),rotate(opcode),GETADDR(RN)+rotate(opcode));
-                                        cycles--;
+                                           setadd(GETADDR(RN),rotate2(opcode),GETADDR(RN)+rotate2(opcode));
+                                        tubecycles--;
                                         break;
 
                                         case 0x38: /*ORR imm*/
@@ -1280,12 +1345,12 @@ void execarm(int cycles)
                                                 templ=rotate2(opcode);
                                                 armregs[RD]=GETADDR(RN)|templ;
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
                                         case 0x39: /*ORRS imm*/
                                         if (RD==15)
                                         {
-                                                templ=rotate(opcode);
+                                                templ=rotate2(opcode);
                                                 if (armregs[15]&3)
                                                    armregs[15]=(GETADDR(RN)|templ)+4;
                                                 else
@@ -1298,23 +1363,23 @@ void execarm(int cycles)
                                                 armregs[RD]=GETADDR(RN)|templ;
                                                 setarmzn(armregs[RD]);
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
 
                                         case 0x3A: /*MOV imm*/
                                         if (RD==15)
                                         {
-                                                armregs[15]=(armregs[15]&0xFC000003)|(rotate2(opcode)&0x3FFFFFC);
+                                                armregs[15]=(armregs[15]&0xFC000003)|((rotate2(opcode)+4)&0x3FFFFFC);
                                                 refillpipeline();
                                         }
                                         else
                                            armregs[RD]=rotate2(opcode);
-                                        cycles--;
+                                        tubecycles--;
                                         break;
                                         case 0x3B: /*MOVS imm*/
                                         if (RD==15)
                                         {
-                                                armregs[15]=rotate(opcode)+4;
+                                                armregs[15]=rotate2(opcode)+4;
                                                 refillpipeline();
                                         }
                                         else
@@ -1322,7 +1387,7 @@ void execarm(int cycles)
                                                 armregs[RD]=rotate(opcode);
                                                 setarmzn(armregs[RD]);
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
 
                                         case 0x3C: /*BIC imm*/
@@ -1337,13 +1402,14 @@ void execarm(int cycles)
                                                 templ=rotate2(opcode);
                                                 armregs[RD]=GETADDR(RN)&~templ;
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
                                         case 0x3D: /*BICS imm*/
                                         if (RD==15)
                                         {
-                                                templ=rotate(opcode);
-                                                armregs[15]=(GETADDR(RN)&~templ)+4;
+                                                templ=rotate2(opcode);
+                                                if (armregs[15]&3) armregs[15]=(GETADDR(RN)&~templ)+4;
+                                                else               armregs[15]=(((GETADDR(RN)&~templ)+4)&0xF3FFFFFC)|(armregs[15]&0xC000003);
                                                 refillpipeline();
                                         }
                                         else
@@ -1352,7 +1418,7 @@ void execarm(int cycles)
                                                 armregs[RD]=GETADDR(RN)&~templ;
                                                 setarmzn(armregs[RD]);
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
 
                                         case 0x3E: /*MVN imm*/
@@ -1363,12 +1429,12 @@ void execarm(int cycles)
                                         }
                                         else
                                            armregs[RD]=~rotate2(opcode);
-                                        cycles--;
+                                        tubecycles--;
                                         break;
                                         case 0x3F: /*MVNS imm*/
                                         if (RD==15)
                                         {
-                                                armregs[15]=(~rotate(opcode))+4;
+                                                armregs[15]=(~rotate2(opcode))+4;
                                                 refillpipeline();
                                         }
                                         else
@@ -1376,64 +1442,10 @@ void execarm(int cycles)
                                                 armregs[RD]=~rotate(opcode);
                                                 setarmzn(armregs[RD]);
                                         }
-                                        cycles--;
+                                        tubecycles--;
                                         break;
 
-                                        case 0x4A: /*STRT*/
-                                        addr=GETADDR(RN);
-                                        if (opcode&0x2000000) addr2=shift2(opcode);
-                                        else                  addr2=opcode&0xFFF;
-                                        if (!(opcode&0x800000))  addr2=-addr2;
-                                        if (opcode&0x1000000)
-                                        {
-                                                addr+=addr2;
-                                        }
-                                        templ=memmode;
-                                        memmode=0;
-                                        writearml(addr,armregs[RD]);
-                                        memmode=templ;
-                                        if (databort) break;
-                                        if (!(opcode&0x1000000))
-                                        {
-                                                addr+=addr2;
-                                                armregs[RN]=addr;
-                                        }
-                                        else
-                                        {
-                                                if (opcode&0x200000) armregs[RN]=addr;
-                                        }
-                                        cycles-=3;
-                                        break;
-
-                                        case 0x4B: /*LDRT*/
-                                        addr=GETADDR(RN);
-                                        if (opcode&0x2000000) addr2=shift2(opcode);
-                                        else                  addr2=opcode&0xFFF;
-                                        if (!(opcode&0x800000))  addr2=-addr2;
-                                        if (opcode&0x1000000)
-                                        {
-                                                addr+=addr2;
-                                        }
-                                        templ=memmode;
-                                        memmode=0;
-                                        templ2=readarml(addr);
-                                        memmode=templ;
-                                        if (databort) break;
-                                        templ2=ldrresult(templ2,addr);
-                                        LOADREG(RD,templ2);
-                                        if (!(opcode&0x1000000))
-                                        {
-                                                addr+=addr2;
-                                                armregs[RN]=addr;
-                                        }
-                                        else
-                                        {
-                                                if (opcode&0x200000) armregs[RN]=addr;
-                                        }
-                                        cycles-=4;
-                                        break;
-
-                                        case 0x47: /*LDRBT*/
+                                        case 0x47: case 0x4F: /*LDRBT*/
                                         addr=GETADDR(RN);
                                         if (opcode&0x2000000) addr2=shift2(opcode);
                                         else                  addr2=opcode&0xFFF;
@@ -1457,44 +1469,110 @@ void execarm(int cycles)
                                         {
                                                 if (opcode&0x200000) armregs[RN]=addr;
                                         }
-                                        cycles-=4;
+                                        tubecycles-=4;
                                         break;
 
-                                        case 0x60: case 0x68:
-                                        case 0x70: case 0x72: case 0x78: case 0x7A:
-                                        case 0x40: case 0x48: /*STR*/
-                                        case 0x50: case 0x52: case 0x58: case 0x5A:
-                                        if ((opcode&0x2000010)==0x2000010)
-                                        {
-                                                undefined();
-                                                break;
-                                        }
+                                        case 0x41: case 0x49: case 0x61: case 0x69: /*LDR Rd,[Rn],offset*/
                                         addr=GETADDR(RN);
                                         if (opcode&0x2000000) addr2=shift2(opcode);
                                         else                  addr2=opcode&0xFFF;
-                                        if (!(opcode&0x800000))  addr2=-addr2;
-                                        if (opcode&0x1000000)
-                                        {
-                                                addr+=addr2;
-                                        }
+                                        templ2=ldrresult(readarml(addr),addr);
+                                        if (databort) break;
+                                        LOADREG(RD,templ2);
+                                        if (opcode&0x800000) armregs[RN]+=addr2;
+                                        else                 armregs[RN]-=addr2;
+                                        tubecycles-=4;
+                                        break;
+                                        case 0x43: case 0x4B: case 0x63: case 0x6B: /*LDRT Rd,[Rn],offset*/
+                                        addr=GETADDR(RN);
+                                        if (opcode&0x2000000) addr2=shift2(opcode);
+                                        else                  addr2=opcode&0xFFF;
+                                        templ=memmode; memmode=0;
+                                        templ2=ldrresult(readarml(addr),addr);
+                                        memmode=templ;
+                                        if (databort) break;
+                                        LOADREG(RD,templ2);
+                                        if (opcode&0x800000) armregs[RN]+=addr2;
+                                        else                 armregs[RN]-=addr2;
+                                        tubecycles-=4;
+                                        break;
+
+                                        case 0x40: case 0x48: case 0x60: case 0x68: /*STR Rd,[Rn],offset*/
+                                        addr=GETADDR(RN);
+                                        if (opcode&0x2000000) addr2=shift2(opcode);
+                                        else                  addr2=opcode&0xFFF;
                                         if (RD==15) { writearml(addr,armregs[RD]+4); }
                                         else        { writearml(addr,armregs[RD]); }
                                         if (databort) break;
-                                        if (!(opcode&0x1000000))
-                                        {
-                                                addr+=addr2;
-                                                armregs[RN]=addr;
-                                        }
-                                        else
-                                        {
-                                                if (opcode&0x200000) armregs[RN]=addr;
-                                        }
-                                        cycles-=3;
+                                        if (opcode&0x800000) armregs[RN]+=addr2;
+                                        else                 armregs[RN]-=addr2;
+                                        tubecycles-=3;
+                                        break;
+                                        case 0x42: case 0x4A: case 0x62: case 0x6A: /*STRT Rd,[Rn],offset*/
+                                        addr=GETADDR(RN);
+                                        if (opcode&0x2000000) addr2=shift2(opcode);
+                                        else                  addr2=opcode&0xFFF;
+                                        if (RD==15) { writearml(addr,armregs[RD]+4); }
+                                        else        { writearml(addr,armregs[RD]); }
+                                        templ=memmode; memmode=0;
+                                        if (databort) break;
+                                        memmode=templ;
+                                        if (opcode&0x800000) armregs[RN]+=addr2;
+                                        else                 armregs[RN]-=addr2;
+                                        tubecycles-=3;
+                                        break;
+                                        case 0x50: case 0x58: case 0x70: case 0x78: /*STR Rd,[Rn,offset]*/
+                                        case 0x52: case 0x5A: case 0x72: case 0x7A: /*STR Rd,[Rn,offset]!*/
+                                        if (opcode&0x2000000) addr2=shift2(opcode);
+                                        else                  addr2=opcode&0xFFF;
+                                        if (opcode&0x800000) addr=GETADDR(RN)+addr2;
+                                        else                 addr=GETADDR(RN)-addr2;
+                                        if (RD==15) { writearml(addr,armregs[RD]+4); }
+                                        else        { writearml(addr,armregs[RD]); }
+                                        if (databort) break;
+                                        if (opcode&0x200000) armregs[RN]=addr;
+                                        tubecycles-=3;
                                         break;
 
-                                        case 0x41: case 0x49: /*LDR*/
+                                        case 0x44: case 0x4C: case 0x64: case 0x6C: /*STRB Rd,[Rn],offset*/
+                                        addr=GETADDR(RN);
+                                        if (opcode&0x2000000) addr2=shift2(opcode);
+                                        else                  addr2=opcode&0xFFF;
+                                        writearmb(addr,armregs[RD]);
+                                        if (databort) break;
+                                        if (opcode&0x800000) armregs[RN]+=addr2;
+                                        else                 armregs[RN]-=addr2;
+                                        tubecycles-=3;
+                                        break;
+                                        case 0x46: case 0x4E: case 0x66: case 0x6E: /*STRBT Rd,[Rn],offset*/
+                                        addr=GETADDR(RN);
+                                        if (opcode&0x2000000) addr2=shift2(opcode);
+                                        else                  addr2=opcode&0xFFF;
+                                        writearmb(addr,armregs[RD]);
+                                        templ=memmode;
+                                        memmode=0;
+                                        if (databort) break;
+                                        memmode=templ;
+                                        if (opcode&0x800000) armregs[RN]+=addr2;
+                                        else                 armregs[RN]-=addr2;
+                                        tubecycles-=3;
+                                        break;
+                                        case 0x54: case 0x5C: case 0x74: case 0x7C: /*STRB Rd,[Rn,offset]*/
+                                        case 0x56: case 0x5E: case 0x76: case 0x7E: /*STRB Rd,[Rn,offset]!*/
+                                        if (opcode&0x2000000) addr2=shift2(opcode);
+                                        else                  addr2=opcode&0xFFF;
+                                        if (opcode&0x800000) addr=GETADDR(RN)+addr2;
+                                        else                 addr=GETADDR(RN)-addr2;
+                                        writearmb(addr,armregs[RD]);
+                                        if (databort) break;
+                                        if (opcode&0x200000) armregs[RN]=addr;
+                                        tubecycles-=3;
+                                        break;
+
+
+//                                        case 0x41: case 0x49: /*LDR*/
                                         case 0x51: case 0x53: case 0x59: case 0x5B:
-                                        case 0x61: case 0x69:
+//                                        case 0x61: case 0x69:
                                         case 0x71: case 0x73: case 0x79: case 0x7B:
                                         if ((opcode&0x2000010)==0x2000010)
                                         {
@@ -1522,7 +1600,14 @@ void execarm(int cycles)
                                                 if (opcode&0x200000) armregs[RN]=addr;
                                         }
                                         LOADREG(RD,templ);
-                                        cycles-=4;
+//                                        if (RD==15) refillpipeline();
+                                        tubecycles-=4;
+/*                                        if (RD==7)
+                                        {
+                                                if (!olog) olog=fopen("armlog.txt","wt");
+                                                sprintf(s,"LDR R7 %08X,%07X\n",armregs[7],PC);
+                                                fputs(s,olog);
+                                        }*/
                                         break;
 
                                         case 0x65: case 0x6D:
@@ -1554,568 +1639,223 @@ void execarm(int cycles)
                                                 if (opcode&0x200000) armregs[RN]=addr;
                                         }
                                         armregs[RD]=templ;
-                                        cycles-=4;
+                                        tubecycles-=4;
                                         break;
 
-                                        case 0x64: case 0x6C:
-                                        case 0x74: case 0x76: case 0x7C: case 0x7E:
-                                        if (opcode&0x10)
-                                        {
-                                                undefined();
-                                                break;
-                                        }
-                                        case 0x44: case 0x4C: /*STRB*/
-                                        case 0x54: case 0x56: case 0x5C: case 0x5E:
-                                        addr=GETADDR(RN);
-                                        if (opcode&0x2000000) addr2=shift2(opcode);
-                                        else                  addr2=opcode&0xFFF;
-                                        if (!(opcode&0x800000))  addr2=-addr2;
-                                        if (opcode&0x1000000)
-                                        {
-                                                addr+=addr2;
-                                        }
-                                        writearmb(addr,armregs[RD]);
-                                        if (databort) break;
-                                        if (!(opcode&0x1000000))
-                                        {
-                                                addr+=addr2;
-                                                armregs[RN]=addr;
-                                        }
-                                        else
-                                        {
-                                                if (opcode&0x200000) armregs[RN]=addr;
-                                        }
-                                        cycles-=3;
-                                        break;
+#define STMfirst()      mask=1; \
+                        for (c=0;c<15;c++) \
+                        { \
+                                if (opcode&mask) \
+                                { \
+                                        if (!(addr&0xC)) tubecycles--; \
+                                        if (c==15) { writearml(addr,armregs[c]+4); } \
+                                        else       { writearml(addr,armregs[c]); } \
+                                        addr+=4; \
+                                        tubecycles--; \
+                                        break; \
+                                } \
+                                mask<<=1; \
+                        } \
+                        mask<<=1; c++;
+
+#define STMall()        for (;c<15;c++) \
+                        { \
+                                if (opcode&mask) \
+                                { \
+                                        if (!(addr&0xC)) tubecycles--; \
+                                        writearml(addr,armregs[c]); \
+                                        addr+=4; \
+                                        tubecycles--; \
+                                } \
+                                mask<<=1; \
+                        } \
+                        if (opcode&0x8000) \
+                        { \
+                                if (!(addr&0xC)) tubecycles--; \
+                                writearml(addr,armregs[15]+4); \
+                                tubecycles--; \
+                        }
+
+#define STMfirstS()     mask=1; \
+                        for (c=0;c<15;c++) \
+                        { \
+                                if (opcode&mask) \
+                                { \
+                                        if (!(addr&0xC)) tubecycles--; \
+                                        if (c==15) { writearml(addr,armregs[c]+4); } \
+                                        else       { writearml(addr,*usrregs[c]); } \
+                                        addr+=4; \
+                                        tubecycles--; \
+                                        break; \
+                                } \
+                                mask<<=1; \
+                        } \
+                        mask<<=1; c++;
+
+#define STMallS()       for (;c<15;c++) \
+                        { \
+                                if (opcode&mask) \
+                                { \
+                                        if (!(addr&0xC)) tubecycles--; \
+                                        writearml(addr,*usrregs[c]); \
+                                        addr+=4; \
+                                        tubecycles--; \
+                                } \
+                                mask<<=1; \
+                        } \
+                        if (opcode&0x8000) \
+                        { \
+                                if (!(addr&0xC)) tubecycles--; \
+                                writearml(addr,armregs[15]+4); \
+                                tubecycles--; \
+                        }
+
+#define LDMall()        mask=1; \
+                        for (c=0;c<15;c++) \
+                        { \
+                                if (opcode&mask) \
+                                { \
+                                        if (!(addr&0xC)) tubecycles--; \
+                                        templ=readarml(addr); if (!databort) armregs[c]=templ; \
+                                        addr+=4; \
+                                        tubecycles--; \
+                                } \
+                                mask<<=1; \
+                        } \
+                        if (opcode&0x8000) \
+                        { \
+                                if (!(addr&0xC)) tubecycles--; \
+                                templ=readarml(addr); \
+                                if (!databort) armregs[15]=(armregs[15]&0xFC000003)|((templ+4)&0x3FFFFFC); \
+                                tubecycles--; \
+                                refillpipeline(); \
+                        }
+
+#define LDMallS()       mask=1; \
+                        if (opcode&0x8000) \
+                        { \
+                                for (c=0;c<15;c++) \
+                                { \
+                                        if (opcode&mask) \
+                                        { \
+                                                if (!(addr&0xC)) tubecycles--; \
+                                                templ=readarml(addr); if (!databort) armregs[c]=templ; \
+                                                addr+=4; \
+                                                tubecycles--; \
+                                        } \
+                                        mask<<=1; \
+                                } \
+                                if (!(addr&0xC)) tubecycles--; \
+                                templ=readarml(addr); \
+                                if (!databort) \
+                                { \
+                                if (output) rpclog("Loading R15 with %08X\n",templ); \
+                                        if (armregs[15]&3) armregs[15]=(templ+4); \
+                                        else               armregs[15]=(armregs[15]&0x0C000003)|((templ+4)&0xF3FFFFFC); \
+                                } \
+                                tubecycles--; \
+                                refillpipeline(); \
+                        } \
+                        else \
+                        { \
+                                for (c=0;c<15;c++) \
+                                { \
+                                        if (opcode&mask) \
+                                        { \
+                                                if (!(addr&0xC)) tubecycles--; \
+                                                templ=readarml(addr); if (!databort) *usrregs[c]=templ; \
+                                                addr+=4; \
+                                                tubecycles--; \
+                                        } \
+                                        mask<<=1; \
+                                } \
+                        }
 
                                         case 0x80: /*STMDA*/
-                                        mask=0x8000;
+                                        case 0x82: /*STMDA !*/
+                                        case 0x90: /*STMDB*/
+                                        case 0x92: /*STMDB !*/
+                                        addr=armregs[RN]-countbits(opcode&0xFFFF);
+                                        if (!(opcode&0x1000000)) addr+=4;
+                                        STMfirst();
+                                        if (opcode&0x200000) armregs[RN]-=countbits(opcode&0xFFFF);
+                                        STMall()
+                                        tubecycles--;
+                                        break;
+                                        case 0x88: /*STMIA*/
+                                        case 0x8A: /*STMIA !*/
+                                        case 0x98: /*STMIB*/
+                                        case 0x9A: /*STMIB !*/
                                         addr=armregs[RN];
-                                        for (c=15;c>-1;c--)
-                                        {
-                                                if (opcode&mask)
-                                                {
-                                                        if (c==15) { writearml(addr,armregs[c]+4); }
-                                                        else       { writearml(addr,armregs[c]); }
-                                                        addr-=4;
-                                                        cycles--;
-                                                }
-                                                mask>>=1;
-                                        }
-                                        cycles-=2;
+                                        if (opcode&0x1000000) addr+=4;
+                                        STMfirst();
+                                        if (opcode&0x200000) armregs[RN]+=countbits(opcode&0xFFFF);
+                                        STMall();
+                                        tubecycles--;
+                                        break;
+                                        case 0x84: /*STMDA ^*/
+                                        case 0x86: /*STMDA ^!*/
+                                        case 0x94: /*STMDB ^*/
+                                        case 0x96: /*STMDB ^!*/
+                                        addr=armregs[RN]-countbits(opcode&0xFFFF);
+                                        if (!(opcode&0x1000000)) addr+=4;
+                                        STMfirstS();
+                                        if (opcode&0x200000) armregs[RN]-=countbits(opcode&0xFFFF);
+                                        STMallS()
+                                        tubecycles--;
+                                        break;
+                                        case 0x8C: /*STMIA ^*/
+                                        case 0x8E: /*STMIA ^!*/
+                                        case 0x9C: /*STMIB ^*/
+                                        case 0x9E: /*STMIB ^!*/
+                                        addr=armregs[RN];
+                                        if (opcode&0x1000000) addr+=4;
+                                        STMfirstS();
+                                        if (opcode&0x200000) armregs[RN]+=countbits(opcode&0xFFFF);
+                                        STMallS();
+                                        tubecycles--;
                                         break;
 
                                         case 0x81: /*LDMDA*/
-                                        mask=0x8000;
-                                        addr=armregs[RN];
-                                        for (c=15;c>-1;c--)
-                                        {
-                                                if (opcode&mask)
-                                                {
-                                                        if (c==15) armregs[15]=(armregs[15]&0xFC000003)|((readarml(addr)+4)&0x3FFFFFC);
-                                                        else       armregs[c]=readarml(addr);
-                                                        addr-=4;
-                                                        cycles--;
-                                                }
-                                                mask>>=1;
-                                        }
-                                        if (opcode&0x8000) refillpipeline();
-                                        cycles-=3;
-                                        break;
-
-                                        case 0x82: /*STMDA !*/
-                                        mask=0x8000;
-                                        addr=armregs[RN];
-                                        for (c=15;c>-1;c--)
-                                        {
-                                                if (opcode&mask)
-                                                {
-                                                        if (c==15) { writearml(addr,armregs[c]+4); }
-                                                        else       { writearml(addr,armregs[c]); }
-                                                        addr-=4;
-                                                        armregs[RN]-=4;
-                                                        cycles--;
-                                                }
-                                                mask>>=1;
-                                        }
-                                        cycles-=2;
-                                        break;
-
                                         case 0x83: /*LDMDA !*/
-                                        mask=0x8000;
-                                        addr=armregs[RN];
-                                        for (c=15;c>-1;c--)
-                                        {
-                                                if (opcode&mask)
-                                                {
-                                                        if (c==15) armregs[15]=(armregs[15]&0xFC000003)|((readarml(addr)+4)&0x3FFFFFC);
-                                                        else       armregs[c]=readarml(addr);
-                                                        addr-=4;
-                                                        armregs[RN]-=4;
-                                                        cycles--;
-                                                }
-                                                mask>>=1;
-                                        }
-                                        if (opcode&0x8000) refillpipeline();
-                                        cycles-=3;
-                                        break;
-
-                                        case 0x85: /*LDMDA ^*/
-                                        mask=0x8000;
-                                        addr=armregs[RN];
-                                        if (opcode&0x8000)
-                                        {
-                                                for (c=15;c>-1;c--)
-                                                {
-                                                        if (opcode&mask)
-                                                        {
-                                                                if (c==15 && !(armregs[15]&3))
-                                                                   armregs[15]=(readarml(addr)&0xF3FFFFFC)|(armregs[15]&0xC000003);
-                                                                else
-                                                                   armregs[c]=readarml(addr);
-                                                                addr-=4;
-                                                                cycles--;
-                                                        }
-                                                        mask>>=1;
-                                                }
-                                                armregs[15]+=4;
-                                                refillpipeline();
-                                        }
-                                        else
-                                        {
-                                                for (c=15;c>-1;c--)
-                                                {
-                                                        if (opcode&mask)
-                                                        {
-                                                                *usrregs[c]=readarml(addr);
-                                                                addr-=4;
-                                                                cycles--;
-                                                        }
-                                                        mask>>=1;
-                                                }
-                                        }
-                                        cycles-=3;
-                                        break;
-
-                                        case 0x88: /*STMIA*/
-                                        mask=1;
-                                        addr=armregs[RN];
-                                        for (c=0;c<16;c++)
-                                        {
-                                                if (opcode&mask)
-                                                {
-                                                        if (c==15) { writearml(addr,armregs[c]+4); }
-                                                        else       { writearml(addr,armregs[c]); }
-                                                        addr+=4;
-                                                        cycles--;
-                                                }
-                                                mask<<=1;
-                                        }
-                                        cycles-=2;
-                                        break;
-
-                                        case 0x89: /*LDMIA*/
-                                        mask=1;
-                                        addr=armregs[RN];
-                                        for (c=0;c<16;c++)
-                                        {
-                                                if (opcode&mask)
-                                                {
-                                                        if (c==15) armregs[15]=(armregs[15]&0xFC000003)|((readarml(addr)+4)&0x3FFFFFC);
-                                                        else       armregs[c]=readarml(addr);
-                                                        addr+=4;
-                                                        cycles--;
-                                                }
-                                                mask<<=1;
-                                        }
-                                        if (opcode&0x8000) refillpipeline();
-                                        cycles-=3;
-                                        break;
-
-                                        case 0x8A: /*STMIA !*/
-                                        mask=1;
-                                        addr=armregs[RN];
-                                        for (c=0;c<16;c++)
-                                        {
-                                                if (opcode&mask)
-                                                {
-                                                        if (c==15) { writearml(addr,armregs[c]+4); }
-                                                        else       { writearml(addr,armregs[c]); }
-                                                        addr+=4;
-                                                        armregs[RN]+=4;
-                                                        cycles--;
-                                                }
-                                                mask<<=1;
-                                        }
-                                        cycles-=2;
-                                        break;
-
-                                        case 0x8B: /*LDMIA !*/
-                                        mask=1;
-                                        addr=armregs[RN];
-                                        for (c=0;c<16;c++)
-                                        {
-                                                if (opcode&mask)
-                                                {
-                                                        if (c==15) armregs[15]=(armregs[15]&0xFC000003)|((readarml(addr)+4)&0x3FFFFFC);
-                                                        else       armregs[c]=readarml(addr);
-                                                        addr+=4;
-                                                        armregs[RN]+=4;
-                                                        cycles--;
-                                                }
-                                                        mask<<=1;
-                                        }
-                                        if (opcode&0x8000) refillpipeline();
-                                        cycles-=3;
-                                        break;
-
-                                        case 0x8C: /*STMIA ^*/
-                                        mask=1;
-                                        addr=armregs[RN];
-                                        for (c=0;c<16;c++)
-                                        {
-                                                if (opcode&mask)
-                                                {
-                                                        if (c==15) { writearml(addr,*usrregs[c]+4); }
-                                                        else       { writearml(addr,*usrregs[c]); }
-                                                        addr+=4;
-                                                        cycles--;
-                                                }
-                                                mask<<=1;
-                                        }
-                                        cycles-=2;
-                                        break;
-
-                                        case 0x8D: /*LDMIA ^*/
-                                        mask=1;
-                                        addr=armregs[RN];
-                                        if (opcode&0x8000)
-                                        {
-                                                for (c=0;c<16;c++)
-                                                {
-                                                        if (opcode&mask)
-                                                        {
-                                                                if (c==15 && !(armregs[15]&3))
-                                                                   armregs[15]=(readarml(addr)&0xF3FFFFFC)|(armregs[15]&0xC000003);
-                                                                else
-                                                                   armregs[c]=readarml(addr);
-                                                                addr+=4;
-                                                                cycles--;
-                                                        }
-                                                        mask<<=1;
-                                                }
-                                                armregs[15]+=4;
-                                                refillpipeline();
-                                        }
-                                        else
-                                        {
-                                                for (c=0;c<16;c++)
-                                                {
-                                                        if (opcode&mask)
-                                                        {
-                                                                *usrregs[c]=readarml(addr);
-                                                                addr+=4;
-                                                                cycles--;
-                                                        }
-                                                        mask<<=1;
-                                                }
-                                        }
-                                        cycles-=3;
-                                        break;
-
-                                        case 0x8F: /*LDMIA !^*/
-                                        mask=1;
-                                        addr=armregs[RN];
-                                        if (opcode&0x8000)
-                                        {
-                                                for (c=0;c<16;c++)
-                                                {
-                                                        if (opcode&mask)
-                                                        {
-                                                                if (c==15 && !(armregs[15]&3))
-                                                                   armregs[15]=(readarml(addr)&0xF3FFFFFC)|(armregs[15]&0xC000003);
-                                                                else
-                                                                   armregs[c]=readarml(addr);
-                                                                addr+=4;
-                                                                armregs[RN]+=4;
-                                                                cycles--;
-                                                        }
-                                                        mask<<=1;
-                                                }
-                                                armregs[15]+=4;
-                                                refillpipeline();
-                                        }
-                                        else
-                                        {
-                                                for (c=0;c<16;c++)
-                                                {
-                                                        if (opcode&mask)
-                                                        {
-                                                                *usrregs[c]=readarml(addr);
-                                                                addr+=4;
-                                                                armregs[RN]+=4;
-                                                                cycles--;
-                                                        }
-                                                        mask<<=1;
-                                                }
-                                        }
-                                        cycles-=3;
-                                        break;
-
-                                        case 0x90: /*STMDB*/
-                                        mask=0x8000;
-                                        addr=armregs[RN];
-                                        for (c=15;c>-1;c--)
-                                        {
-                                                if (opcode&mask)
-                                                {
-                                                        addr-=4;
-                                                        if (c==15) { writearml(addr,armregs[c]+4); }
-                                                        else       { writearml(addr,armregs[c]); }
-                                                        cycles--;
-                                                }
-                                                mask>>=1;
-                                        }
-                                        cycles-=2;
-                                        break;
-
                                         case 0x91: /*LDMDB*/
-                                        mask=0x8000;
-                                        addr=armregs[RN];
-                                        for (c=15;c>-1;c--)
-                                        {
-                                                if (opcode&mask)
-                                                {
-                                                        addr-=4;
-                                                        if (c==15) armregs[15]=(armregs[15]&0xFC000003)|((readarml(addr)+4)&0x3FFFFFC);
-                                                        else       armregs[c]=readarml(addr);
-                                                        cycles--;
-                                                }
-                                                mask>>=1;
-                                        }
-                                        if (opcode&0x8000) refillpipeline();
-                                        cycles-=3;
-                                        break;
-
-                                        case 0x92: /*STMDB !*/
-                                        mask=0x8000;
-                                        addr=armregs[RN];
-                                        templ=0;
-                                        for (c=15;c>-1;c--)
-                                        {
-                                                if (opcode&mask)
-                                                {
-                                                        addr-=4;
-                                                        armregs[RN]-=4;
-                                                        if (c==15)                { writearml(addr,armregs[c]+4); }
-                                                        else if (c==RN && !templ) { writearml(addr,armregs[c]+4); }
-                                                        else                      { writearml(addr,armregs[c]); templ=1;}
-                                                        cycles--;
-                                                }
-                                                mask>>=1;
-                                        }
-                                        cycles-=2;
-                                        break;
-
                                         case 0x93: /*LDMDB !*/
-                                        mask=0x8000;
-                                        addr=armregs[RN];
-                                        for (c=15;c>-1;c--)
-                                        {
-                                                if (opcode&mask)
-                                                {
-                                                        addr-=4;
-                                                        armregs[RN]-=4;
-                                                        if (c==15) armregs[15]=(armregs[15]&0xFC000003)|((readarml(addr)+4)&0x3FFFFFC);
-                                                        else       armregs[c]=readarml(addr);
-                                                        cycles--;
-                                                }
-                                                mask>>=1;
-                                        }
-                                        if (opcode&0x8000) refillpipeline();
-                                        cycles-=3;
+                                        addr=armregs[RN]-countbits(opcode&0xFFFF);
+//                                        rpclog("LDMDB %08X\n",addr);
+                                        if (!(opcode&0x1000000)) addr+=4;
+                                        if (opcode&0x200000) armregs[RN]-=countbits(opcode&0xFFFF);
+                                        LDMall();
+                                        tubecycles-=2;
                                         break;
-
-                                        case 0x94: /*STMDB ^*/
-                                        mask=0x8000;
-                                        addr=armregs[RN];
-                                        for (c=15;c>-1;c--)
-                                        {
-                                                if (opcode&mask)
-                                                {
-                                                        addr-=4;
-                                                        if (c==15) { writearml(addr,*usrregs[c]+4); }
-                                                        else       { writearml(addr,*usrregs[c]); }
-                                                        cycles--;
-                                                }
-                                                mask>>=1;
-                                        }
-                                        cycles-=2;
-                                        break;
-
-                                        case 0x95: /*LDMDB ^*/
-                                        mask=0x8000;
-                                        addr=armregs[RN];
-                                        if (opcode&0x8000)
-                                        {
-                                                for (c=15;c>-1;c--)
-                                                {
-                                                        if (opcode&mask)
-                                                        {
-                                                                addr-=4;
-                                                                if (c==15 && !(armregs[15]&3))
-                                                                   armregs[15]=(readarml(addr)&0xF3FFFFFC)|(armregs[15]&0xC000003);
-                                                                else
-                                                                   armregs[c]=readarml(addr);
-                                                                cycles--;
-                                                        }
-                                                        mask>>=1;
-                                                }
-                                                armregs[15]+=4;
-                                                refillpipeline();
-                                        }
-                                        else
-                                        {
-                                                for (c=15;c>-1;c--)
-                                                {
-                                                        if (opcode&mask)
-                                                        {
-                                                                addr-=4;
-                                                                *usrregs[c]=readarml(addr);
-                                                                cycles--;
-                                                        }
-                                                        mask>>=1;
-                                                }
-                                        }
-                                        cycles-=3;
-                                        break;
-
-                                        case 0x96: /*STMDB !^*/
-                                        mask=0x8000;
-                                        addr=armregs[RN];
-                                        templ=0;
-                                        for (c=15;c>-1;c--)
-                                        {
-                                                if (opcode&mask)
-                                                {
-                                                        addr-=4;
-                                                        armregs[RN]-=4;
-                                                        if (c==15)                { writearml(addr,*usrregs[c]+4); }
-                                                        else if (c==RN && !templ) { writearml(addr,*usrregs[c]+4); }
-                                                        else                      { writearml(addr,*usrregs[c]); }
-                                                        cycles--;
-                                                }
-                                                mask>>=1;
-                                        }
-                                        cycles-=2;
-                                        break;
-                                        case 0x98: /*STMIB*/
-                                        mask=1;
-                                        addr=armregs[RN];
-                                        for (c=0;c<16;c++)
-                                        {
-                                                if (opcode&mask)
-                                                {
-                                                        addr+=4;
-                                                        if (c==15) { writearml(addr,armregs[c]+4); }
-                                                        else       { writearml(addr,armregs[c]); }
-                                                        cycles--;
-                                                }
-                                                mask<<=1;
-                                        }
-                                        cycles-=2;
-                                        break;
-
+                                        case 0x89: /*LDMIA*/
+                                        case 0x8B: /*LDMIA !*/
                                         case 0x99: /*LDMIB*/
-                                        mask=1;
+                                        case 0x9B: /*LDMIB !*/
                                         addr=armregs[RN];
-                                        for (c=0;c<16;c++)
-                                        {
-                                                if (opcode&mask)
-                                                {
-                                                        addr+=4;
-                                                        if (c==15) armregs[15]=(armregs[15]&0xFC000003)|((readarml(addr)+4)&0x3FFFFFC);
-                                                        else       armregs[c]=readarml(addr);
-                                                        cycles--;
-                                                }
-                                                mask<<=1;
-                                        }
-                                        if (opcode&0x8000) refillpipeline();
-                                        cycles-=3;
+                                        if (opcode&0x1000000) addr+=4;
+                                        if (opcode&0x200000) armregs[RN]+=countbits(opcode&0xFFFF);
+                                        LDMall();
+                                        tubecycles-=2;
                                         break;
-
-                                        case 0x9A: /*STMIB !*/
-                                        mask=1;
-                                        addr=armregs[RN];
-                                        templ=0;
-                                        for (c=0;c<16;c++)
-                                        {
-                                                if (opcode&mask)
-                                                {
-                                                        addr+=4;
-                                                        armregs[RN]+=4;
-                                                        if (c==15)                { writearml(addr,armregs[c]+4); }
-                                                        else if (c==RN && !templ) { writearml(addr,armregs[c]-4); }
-                                                        else                      { writearml(addr,armregs[c]); }
-                                                        cycles--;
-                                                }
-                                                mask<<=1;
-                                        }
-                                        cycles-=2;
+                                        case 0x85: /*LDMDA ^*/
+                                        case 0x87: /*LDMDA ^!*/
+                                        case 0x95: /*LDMDB ^*/
+                                        case 0x97: /*LDMDB ^!*/
+                                        addr=armregs[RN]-countbits(opcode&0xFFFF);
+                                        if (!(opcode&0x1000000)) addr+=4;
+                                        if (opcode&0x200000) armregs[RN]-=countbits(opcode&0xFFFF);
+                                        LDMallS();
+                                        tubecycles-=2;
                                         break;
-
-                                        case 0x9C: /*STMIB ^*/
-                                        mask=1;
-                                        addr=armregs[RN];
-                                        for (c=0;c<16;c++)
-                                        {
-                                                if (opcode&mask)
-                                                {
-                                                        addr+=4;
-                                                        if (c==15) { writearml(addr,*usrregs[c]+4); }
-                                                        else       { writearml(addr,*usrregs[c]); }
-                                                        cycles--;
-                                                }
-                                                mask<<=1;
-                                        }
-                                        cycles-=2;
-                                        break;
-
+                                        case 0x8D: /*LDMIA ^*/
+                                        case 0x8F: /*LDMIA ^!*/
                                         case 0x9D: /*LDMIB ^*/
-                                        mask=1;
+                                        case 0x9F: /*LDMIB ^!*/
                                         addr=armregs[RN];
-                                        if (opcode&0x8000)
-                                        {
-                                                for (c=0;c<16;c++)
-                                                {
-                                                        if (opcode&mask)
-                                                        {
-                                                                addr+=4;
-                                                                if (c==15 && !(armregs[15]&3))
-                                                                   armregs[15]=(readarml(addr)&0xF3FFFFFC)|(armregs[15]&0xC000003);
-                                                                else
-                                                                   armregs[c]=readarml(addr);
-                                                                cycles--;
-                                                        }
-                                                        mask<<=1;
-                                                }
-                                                armregs[15]+=4;
-                                                refillpipeline();
-                                        }
-                                        else
-                                        {
-                                                for (c=0;c<16;c++)
-                                                {
-                                                        if (opcode&mask)
-                                                        {
-                                                                addr+=4;
-                                                                *usrregs[c]=readarml(addr);
-                                                                cycles--;
-                                                        }
-                                                        mask<<=1;
-                                                }
-                                        }
-                                        cycles-=3;
+                                        if (opcode&0x1000000) addr+=4;
+                                        if (opcode&0x200000) armregs[RN]+=countbits(opcode&0xFFFF);
+                                        LDMallS();
+                                        tubecycles-=2;
                                         break;
 
                                         case 0xB0: case 0xB1: case 0xB2: case 0xB3: /*BL*/
@@ -2126,7 +1866,7 @@ void execarm(int cycles)
                                         armregs[14]=armregs[15]-4;
                                         armregs[15]=((armregs[15]+templ+4)&0x3FFFFFC)|(armregs[15]&0xFC000003);
                                         refillpipeline();
-                                        cycles-=4;
+                                        tubecycles-=4;
                                         break;
 
                                         case 0xA0: case 0xA1: case 0xA2: case 0xA3: /*B*/
@@ -2136,7 +1876,7 @@ void execarm(int cycles)
                                         templ=(opcode&0xFFFFFF)<<2;
                                         armregs[15]=((armregs[15]+templ+4)&0x3FFFFFC)|(armregs[15]&0xFC000003);
                                         refillpipeline();
-                                        cycles-=4;
+                                        tubecycles-=4;
                                         break;
 
                                         case 0xE0: case 0xE2: case 0xE4: case 0xE6: /*MCR*/
@@ -2147,7 +1887,7 @@ void execarm(int cycles)
                                         armregs[14]=templ;
                                         armregs[15]&=0xFC000003;
                                         armregs[15]|=0x08000008;
-                                        cycles-=4;
+                                        tubecycles-=4;
                                         refillpipeline();
                                         break;
 
@@ -2159,7 +1899,7 @@ void execarm(int cycles)
                                         armregs[14]=templ;
                                         armregs[15]&=0xFC000003;
                                         armregs[15]|=0x08000008;
-                                        cycles-=4;
+                                        tubecycles-=4;
                                         refillpipeline();
                                         break;
 
@@ -2177,7 +1917,7 @@ void execarm(int cycles)
                                         armregs[14]=templ;
                                         armregs[15]&=0xFC000003;
                                         armregs[15]|=0x08000008;
-                                        cycles-=4;
+                                        tubecycles-=4;
                                         refillpipeline();
                                         break;
 
@@ -2191,14 +1931,12 @@ void execarm(int cycles)
                                         armregs[14]=templ;
                                         armregs[15]&=0xFC000003;
                                         armregs[15]|=0x0800000C;
-                                        cycles-=4;
+                                        tubecycles-=4;
                                         refillpipeline();
                                         break;
 
                                         default:
-                                        printf("Bad opcode %02X %08X at %07X\n",(opcode>>20)&0xFF,opcode,PC);
-                                        dumpregs();
-                                        exit(-1);
+                                        break;
                                 }
                         }
                         if (databort|armirq|tubeirq)
@@ -2252,7 +1990,7 @@ void execarm(int cycles)
                 armirq=tubeirq;
                 if ((armregs[15]&3)!=mode) updatemode(armregs[15]&3);
                 armregs[15]+=4;
-//                printf("%08X : %08X %08X %08X  %08X\n",PC,armregs[0],armregs[1],armregs[2],opcode);
+//                rpclog("%08X : %08X %08X %08X  %08X\n",PC,armregs[0],armregs[1],armregs[2],opcode);
 /*                if (!PC)
                 {
                         printf("Branch through zero\n");

@@ -1,1 +1,475 @@
+#include <windows.h>
+#include <allegro/keycodes.h>
+#include "resources.h"
+
+#define KEY_A 1
+#define KEY_B 2
+#define KEY_C 3
+#define KEY_D 4
+#define KEY_E 5
+#define KEY_F 6
+#define KEY_G 7
+#define KEY_H 8
+#define KEY_I 9
+#define KEY_J 10
+#define KEY_K 11
+#define KEY_L 12
+#define KEY_M 13
+#define KEY_N 14
+#define KEY_O 15
+#define KEY_P 16
+#define KEY_Q 17
+#define KEY_R 18
+#define KEY_S 19
+#define KEY_T 20
+#define KEY_U 21
+#define KEY_V 22
+#define KEY_W 23
+#define KEY_X 24
+#define KEY_Y 25
+#define KEY_Z 26
+#define KEY_0 27
+#define KEY_1 28
+#define KEY_2 29
+#define KEY_3 30
+#define KEY_4 31
+#define KEY_5 32
+#define KEY_6 33
+#define KEY_7 34
+#define KEY_8 35
+#define KEY_9 36
+#define KEY_0_PAD 37
+#define KEY_1_PAD 38
+#define KEY_2_PAD 39
+#define KEY_3_PAD 40
+#define KEY_4_PAD 41
+#define KEY_5_PAD 42
+#define KEY_6_PAD 43
+#define KEY_7_PAD 44
+#define KEY_8_PAD 45
+#define KEY_9_PAD 46
+#define KEY_F1 47
+#define KEY_F2 48
+#define KEY_F3 49
+#define KEY_F4 50
+#define KEY_F5 51
+#define KEY_F6 52
+#define KEY_F7 53
+#define KEY_F8 54
+#define KEY_F9 55
+#define KEY_F10 56
+#define KEY_F11 57
+#define KEY_F12 58
+#define KEY_ESC 59
+#define KEY_TILDE 60
+#define KEY_MINUS 61
+#define KEY_EQUALS 62
+#define KEY_BACKSPACE 63
+#define KEY_TAB 64
+#define KEY_OPENBRACE 65
+#define KEY_CLOSEBRACE 66
+#define KEY_ENTER 67
+#define KEY_COLON 68
+#define KEY_QUOTE 69
+#define KEY_BACKSLASH 70
+#define KEY_BACKSLASH2 71
+#define KEY_COMMA 72
+#define KEY_STOP 73
+#define KEY_SLASH 74
+#define KEY_SPACE 75
+#define KEY_INSERT 76
+#define KEY_DEL 77
+#define KEY_HOME 78
+#define KEY_END 79
+#define KEY_PGUP 80
+#define KEY_PGDN 81
+#define KEY_LEFT 82
+#define KEY_RIGHT 83
+#define KEY_UP 84
+#define KEY_DOWN 85
+#define KEY_SLASH_PAD 86
+#define KEY_ASTERISK 87
+#define KEY_MINUS_PAD 88
+#define KEY_PLUS_PAD 89
+#define KEY_DEL_PAD 90
+#define KEY_ENTER_PAD 91
+#define KEY_COLON2 101
+#define KEY_EQUALS_PAD 103
+#define KEY_BACKQUOTE 104
+#define KEY_SEMICOLON 105
+
+#define KEY_LSHIFT 115
+#define KEY_RSHIFT 116
+#define KEY_LCONTROL 117
+#define KEY_RCONTROL 118
+#define KEY_ALT 119
+#define KEY_ALTGR 120
+#define KEY_LWIN 121
+#define KEY_RWIN 122
+#define KEY_MENU 123
+#define KEY_SCRLOCK 124
+#define KEY_NUMLOCK 125
+#define KEY_CAPSLOCK 126
+
 allegro_icon ICON b-em.ico
+
+MainMenu MENU DISCARDABLE
+BEGIN
+        POPUP "&File"
+        BEGIN
+                MENUITEM "&Hard Reset",         IDM_FILE_RESET
+                MENUITEM "E&xit",               IDM_FILE_EXIT
+        END
+        POPUP "&Disc"
+        BEGIN
+                MENUITEM "Load disc :&0/2...",     IDM_DISC_LOAD_0
+                MENUITEM "Load disc :&1/3...",     IDM_DISC_LOAD_1
+                MENUITEM SEPARATOR
+                MENUITEM "Eject disc :0/2",        IDM_DISC_EJECT_0
+                MENUITEM "Eject disc :1/3",        IDM_DISC_EJECT_1
+                MENUITEM SEPARATOR
+                MENUITEM "New disc :0/2",          IDM_DISC_NEW_0
+                MENUITEM "New disc :1/3",          IDM_DISC_NEW_1
+                MENUITEM SEPARATOR
+                MENUITEM "Write protect disc :0/2",IDM_DISC_WPROT_0
+                MENUITEM "Write protect disc :1/3",IDM_DISC_WPROT_1
+                MENUITEM SEPARATOR
+                MENUITEM "Default write protect",  IDM_DISC_WPROT_D
+        END
+        POPUP "&Tape"
+        BEGIN
+                MENUITEM "&Load tape...", IDM_TAPE_LOAD
+                MENUITEM SEPARATOR
+                MENUITEM "&Eject tape", IDM_TAPE_EJECT
+                MENUITEM SEPARATOR
+                MENUITEM "&Rewind tape", IDM_TAPE_REWIND
+                MENUITEM "Show tape &catalogue", IDM_TAPE_CAT
+                POPUP "&Tape speed"
+                BEGIN
+                        MENUITEM "Normal", IDM_TAPES_NORMAL
+                        MENUITEM "Fast",   IDM_TAPES_FAST
+                END
+        END
+        POPUP "&Settings"
+        BEGIN
+                POPUP "&Model"
+                BEGIN
+                        MENUITEM "BBC A w/OS 0.1",              IDM_MODEL_0
+                        MENUITEM "BBC B w/OS 0.1",              IDM_MODEL_0+1
+                        MENUITEM "BBC A",                       IDM_MODEL_0+2
+                        MENUITEM "BBC B w/8271 FDC",            IDM_MODEL_0+3
+                        MENUITEM "BBC B w/8271+SWRAM",          IDM_MODEL_0+4
+                        MENUITEM "BBC B w/1770 FDC",            IDM_MODEL_0+5
+                        MENUITEM "BBC B US",                    IDM_MODEL_0+6
+                        MENUITEM "BBC B German",                IDM_MODEL_0+7
+                        MENUITEM "BBC B+ 64K",                  IDM_MODEL_0+8
+                        MENUITEM "BBC B+ 128K",                 IDM_MODEL_0+9
+                        MENUITEM "BBC Master 128",              IDM_MODEL_0+10
+                        MENUITEM "BBC Master 512",              IDM_MODEL_0+11
+                        MENUITEM "BBC Master Turbo",            IDM_MODEL_0+12
+                        MENUITEM "BBC Master Compact",          IDM_MODEL_0+13
+                        MENUITEM "ARM Evaluation System",       IDM_MODEL_0+14
+                END
+                POPUP "&Second Processor"
+                BEGIN
+                        MENUITEM "None", IDM_TUBE_NONE
+                        MENUITEM "6502", IDM_TUBE_6502
+                        MENUITEM "65816",IDM_TUBE_65816
+                        MENUITEM "Z80",  IDM_TUBE_Z80
+                        MENUITEM SEPARATOR
+                        POPUP "6502 Tube speed"
+                        BEGIN
+                                MENUITEM "&4mhz", IDM_TUBES_4
+                                MENUITEM "&8mhz", IDM_TUBES_8
+                                MENUITEM "&16mhz", IDM_TUBES_16
+                                MENUITEM "&32mhz", IDM_TUBES_32
+                                MENUITEM "&64mhz", IDM_TUBES_64
+                        END
+                END
+                POPUP "&Video"
+                BEGIN
+                        POPUP "&Display type"
+                        BEGIN
+                                MENUITEM "Software line doubling", IDM_VIDEO_SLINEDBL
+                                MENUITEM "Hardware line doubling", IDM_VIDEO_LINEDBL
+                                MENUITEM "Scanlines",         IDM_VIDEO_SCANLINES
+                                MENUITEM "Interlaced",        IDM_VIDEO_INTERLACED
+                        END
+                        POPUP "&Borders"
+                        BEGIN
+                                MENUITEM "&None",       IDM_VIDEO_NOBORDERS
+                                MENUITEM "&Small",      IDM_VIDEO_MBORDERS
+                                MENUITEM "&Full",       IDM_VIDEO_FBORDERS
+                        END
+                        MENUITEM "Fullscreen",          IDM_VIDEO_FULLSCR
+                END
+                POPUP "&Sound"
+                BEGIN
+                        MENUITEM "&Internal sound chip", IDM_SOUND_INTERNAL
+                        MENUITEM "&BeebSID",             IDM_SOUND_BEEBSID
+                        MENUITEM "&Disc drive noise",    IDM_SOUND_DDNOISE
+                        MENUITEM "&Tape noise",          IDM_SOUND_TAPE
+                        MENUITEM SEPARATOR
+                        MENUITEM "Internal sound &filter", IDM_SOUND_FILTER
+                        POPUP "Internal sound &waveform"
+                        BEGIN
+                                MENUITEM "Square",   IDM_WAVE_SQUARE
+                                MENUITEM "Saw",      IDM_WAVE_SAW
+                                MENUITEM "Sine",     IDM_WAVE_SINE
+                                MENUITEM "Triangle", IDM_WAVE_TRI
+                                MENUITEM "SID",      IDM_WAVE_SID
+                        END
+                        MENUITEM SEPARATOR
+                        POPUP "&reSID configuration"
+                        BEGIN
+                                POPUP "&Model"
+                                BEGIN
+                                        MENUITEM "6581",                        IDM_SID_TYPE+SID_MODEL_6581
+                                        MENUITEM "8580",                        IDM_SID_TYPE+SID_MODEL_8580
+                                        MENUITEM "8580 + digi boost",           IDM_SID_TYPE+SID_MODEL_8580D
+                                        MENUITEM "6581R4",                      IDM_SID_TYPE+SID_MODEL_6581R4
+                                        MENUITEM "6581R3 4885",                 IDM_SID_TYPE+SID_MODEL_6581R3_4885
+                                        MENUITEM "6581R3 0486S",                IDM_SID_TYPE+SID_MODEL_6581R3_0486S
+                                        MENUITEM "6581R3 3984",                 IDM_SID_TYPE+SID_MODEL_6581R3_3984
+                                        MENUITEM "6581R4AR 3789",               IDM_SID_TYPE+SID_MODEL_6581R4AR_3789
+                                        MENUITEM "6581R3 4485",                 IDM_SID_TYPE+SID_MODEL_6581R3_4485
+                                        MENUITEM "6581R4 1986S",                IDM_SID_TYPE+SID_MODEL_6581R4_1986S
+                                        MENUITEM "8580R5 3691",                 IDM_SID_TYPE+SID_MODEL_8580R5_3691
+                                        MENUITEM "8580R5 3691 + digi boost",    IDM_SID_TYPE+SID_MODEL_8580R5_3691D
+                                        MENUITEM "8580R5 1489",                 IDM_SID_TYPE+SID_MODEL_8580R5_1489
+                                        MENUITEM "8580R5 1489 + digi boost",    IDM_SID_TYPE+SID_MODEL_8580R5_1489D
+                                END
+                                POPUP "&Sample method"
+                                BEGIN
+                                        MENUITEM "&Interpolating",       IDM_SID_INTERP
+                                        MENUITEM "&Resampling",          IDM_SID_RESAMP
+                                END
+                        END
+                        MENUITEM SEPARATOR
+                        POPUP "Disc drive &type"
+                        BEGIN
+                                MENUITEM "&5.25",IDM_DDT_525
+                                MENUITEM "&3.5", IDM_DDT_35
+                        END
+                        POPUP "Disc drive &volume"
+                        BEGIN
+                                MENUITEM "&33%", IDM_DDV_33
+                                MENUITEM "&66%", IDM_DDV_66
+                                MENUITEM "&100%", IDM_DDV_100
+                        END
+                END
+                POPUP "&Keyboard"
+                BEGIN
+                        MENUITEM "&Redefine keys...", IDM_KEY_REDEFINE
+                        MENUITEM SEPARATOR
+                        MENUITEM "&Map CAPS/CTRL to A/S", IDM_KEY_AS
+                END
+        END
+        POPUP "&Misc"
+        BEGIN
+                MENUITEM "&Save screenshot",IDM_SCRSHOT
+                MENUITEM SEPARATOR
+                MENUITEM "&Debugger",       IDM_DEBUGGER
+        END
+END
+
+Redefine DIALOG 20, 20, 292, 132
+STYLE WS_CAPTION | WS_THICKFRAME
+CAPTION "Redefine keys"
+FONT 7, "MS Sans Serif"
+BEGIN
+   PUSHBUTTON "ESC", Button1+KEY_ESC, 16, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "1", Button1+KEY_1, 32, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "2", Button1+KEY_2, 48, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "3", Button1+KEY_3, 64, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "4", Button1+KEY_4, 80, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "5", Button1+KEY_5, 96, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "6", Button1+KEY_6, 112, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "7", Button1+KEY_7, 128, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "8", Button1+KEY_8, 144, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "9", Button1+KEY_9, 160, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "0", Button1+KEY_0, 176, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "=", Button1+KEY_MINUS, 192, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "^", Button1+KEY_EQUALS, 208, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "\\", Button1+KEY_BACKSLASH2, 224, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "LFT", Button1+KEY_LEFT, 240, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "RGT", Button1+KEY_RIGHT, 256, 24, 18, 15 , WS_TABSTOP
+   PUSHBUTTON "TAB", Button1+KEY_TAB, 16, 40, 24, 15 , WS_TABSTOP
+   PUSHBUTTON "Q", Button1+KEY_Q, 40, 40, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "W", Button1+KEY_W, 56, 40, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "E", Button1+KEY_E, 72, 40, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "R", Button1+KEY_R, 88, 40, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "T", Button1+KEY_T, 104, 40, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "Y", Button1+KEY_Y, 120, 40, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "U", Button1+KEY_U, 136, 40, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "I", Button1+KEY_I, 152, 40, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "O", Button1+KEY_O, 168, 40, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "P", Button1+KEY_P, 184, 40, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "@", Button1+KEY_OPENBRACE, 200, 40, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "[", Button1+KEY_CLOSEBRACE, 216, 40, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "_", Button1+KEY_TILDE, 232, 40, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "UP", Button1+KEY_UP, 248, 40, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "DWN", Button1+KEY_DOWN, 264, 40, 18, 15 , WS_TABSTOP
+   PUSHBUTTON "CLK", Button1+KEY_CAPSLOCK, 12, 56, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "CTL", Button1+KEY_CAPSLOCK, 28, 56, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "A", Button1+KEY_A, 44, 56, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "S", Button1+KEY_S, 60, 56, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "D", Button1+KEY_D, 76, 56, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "F", Button1+KEY_F, 92, 56, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "G", Button1+KEY_G, 108, 56, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "H", Button1+KEY_H, 124, 56, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "J", Button1+KEY_J, 140, 56, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "K", Button1+KEY_K, 156, 56, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "L", Button1+KEY_L, 172, 56, 16, 15 , WS_TABSTOP
+   PUSHBUTTON ";", Button1+KEY_SEMICOLON, 188, 56, 16, 15 , WS_TABSTOP
+   PUSHBUTTON ":", Button1+KEY_QUOTE, 204, 56, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "]", Button1+KEY_BACKSLASH, 220, 56, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "RET", Button1+KEY_ENTER, 236, 56, 32, 15 , WS_TABSTOP
+   PUSHBUTTON "SLK", Button1+KEY_ALT, 12, 72, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "SHIFT", Button1+KEY_LSHIFT, 28, 72, 24, 15 , WS_TABSTOP
+   PUSHBUTTON "Z", Button1+KEY_Z, 52, 72, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "X", Button1+KEY_X, 68, 72, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "C", Button1+KEY_C, 84, 72, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "V", Button1+KEY_V, 100, 72, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "B", Button1+KEY_B, 116, 72, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "N", Button1+KEY_N, 132, 72, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "M", Button1+KEY_M, 148, 72, 16, 15 , WS_TABSTOP
+   PUSHBUTTON ",", Button1+KEY_COMMA, 164, 72, 16, 15 , WS_TABSTOP
+   PUSHBUTTON ".", Button1+KEY_STOP, 180, 72, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "/", Button1+KEY_SLASH, 196, 72, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "SHIFT", Button1+KEY_RSHIFT, 212, 72, 24, 15 , WS_TABSTOP
+   PUSHBUTTON "DEL", Button1+KEY_DEL, 236, 72, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "CPY", Button1+KEY_END, 252, 72, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "SPACE", Button1+KEY_SPACE, 68, 88, 128, 15 , WS_TABSTOP
+   PUSHBUTTON "F0", Button1+KEY_F1, 52, 8, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "F1", Button1+KEY_F2, 68, 8, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "F2", Button1+KEY_F3, 84, 8, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "F3", Button1+KEY_F4, 100, 8, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "F4", Button1+KEY_F5, 116, 8, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "F5", Button1+KEY_F6, 132, 8, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "F6", Button1+KEY_F7, 148, 8, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "F7", Button1+KEY_F8, 164, 8, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "F8", Button1+KEY_F9, 180, 8, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "F9", Button1+KEY_F10, 196, 8, 16, 15 , WS_TABSTOP
+
+   PUSHBUTTON "OK", IDOK, 96, 112, 32, 16, WS_TABSTOP
+   PUSHBUTTON "Cancel", IDCANCEL, 136, 112, 32, 16, WS_TABSTOP
+END
+
+KeyDlg DIALOG 20,20,100,60
+STYLE WS_CAPTION | WS_THICKFRAME
+CAPTION "Press key to define"
+FONT 7, "MS Sans Serif"
+BEGIN
+   PUSHBUTTON "Cancel", IDCANCEL, 64, 40, 32, 16, WS_TABSTOP
+END
+
+RedefineM DIALOG 20, 20, 360, 132
+STYLE WS_CAPTION | WS_THICKFRAME
+CAPTION "Redefine keys"
+FONT 7, "MS Sans Serif"
+BEGIN
+   PUSHBUTTON "ESC", Button1+KEY_ESC, 16, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "1", Button1+KEY_1, 32, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "2", Button1+KEY_2, 48, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "3", Button1+KEY_3, 64, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "4", Button1+KEY_4, 80, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "5", Button1+KEY_5, 96, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "6", Button1+KEY_6, 112, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "7", Button1+KEY_7, 128, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "8", Button1+KEY_8, 144, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "9", Button1+KEY_9, 160, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "0", Button1+KEY_0, 176, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "=", Button1+KEY_MINUS, 192, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "^", Button1+KEY_EQUALS, 208, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "\\", Button1+KEY_BACKSLASH2, 224, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "LFT", Button1+KEY_LEFT, 240, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "RGT", Button1+KEY_RIGHT, 256, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "TAB", Button1+KEY_TAB, 16, 40, 24, 15 , WS_TABSTOP
+   PUSHBUTTON "Q", Button1+KEY_Q, 40, 40, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "W", Button1+KEY_W, 56, 40, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "E", Button1+KEY_E, 72, 40, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "R", Button1+KEY_R, 88, 40, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "T", Button1+KEY_T, 104, 40, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "Y", Button1+KEY_Y, 120, 40, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "U", Button1+KEY_U, 136, 40, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "I", Button1+KEY_I, 152, 40, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "O", Button1+KEY_O, 168, 40, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "P", Button1+KEY_P, 184, 40, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "@", Button1+KEY_OPENBRACE, 200, 40, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "[", Button1+KEY_CLOSEBRACE, 216, 40, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "_", Button1+KEY_TILDE, 232, 40, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "UP", Button1+KEY_UP, 248, 8, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "DWN", Button1+KEY_DOWN, 248, 40, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "CAPS", Button1+KEY_CAPSLOCK, 12, 56, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "CTRL", Button1+KEY_CAPSLOCK, 28, 56, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "A", Button1+KEY_A, 44, 56, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "S", Button1+KEY_S, 60, 56, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "D", Button1+KEY_D, 76, 56, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "F", Button1+KEY_F, 92, 56, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "G", Button1+KEY_G, 108, 56, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "H", Button1+KEY_H, 124, 56, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "J", Button1+KEY_J, 140, 56, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "K", Button1+KEY_K, 156, 56, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "L", Button1+KEY_L, 172, 56, 16, 15 , WS_TABSTOP
+   PUSHBUTTON ";", Button1+KEY_SEMICOLON, 188, 56, 16, 15 , WS_TABSTOP
+   PUSHBUTTON ":", Button1+KEY_QUOTE, 204, 56, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "]", Button1+KEY_BACKSLASH, 220, 56, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "RET", Button1+KEY_ENTER, 236, 56, 32, 15 , WS_TABSTOP
+   PUSHBUTTON "SHLK", Button1+KEY_ALT, 12, 72, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "SHIFT", Button1+KEY_LSHIFT, 28, 72, 24, 15 , WS_TABSTOP
+   PUSHBUTTON "Z", Button1+KEY_Z, 52, 72, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "X", Button1+KEY_X, 68, 72, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "C", Button1+KEY_C, 84, 72, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "V", Button1+KEY_V, 100, 72, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "B", Button1+KEY_B, 116, 72, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "N", Button1+KEY_N, 132, 72, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "M", Button1+KEY_M, 148, 72, 16, 15 , WS_TABSTOP
+   PUSHBUTTON ",", Button1+KEY_COMMA, 164, 72, 16, 15 , WS_TABSTOP
+   PUSHBUTTON ".", Button1+KEY_STOP, 180, 72, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "/", Button1+KEY_SLASH, 196, 72, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "SHIFT", Button1+KEY_RSHIFT, 212, 72, 24, 15 , WS_TABSTOP
+   PUSHBUTTON "DEL", Button1+KEY_DEL, 236, 72, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "COPY", Button1+KEY_END, 252, 72, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "SPACE", Button1+KEY_SPACE, 68, 88, 128, 15 , WS_TABSTOP
+   PUSHBUTTON "F0", Button1+KEY_F1, 40, 8, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "F1", Button1+KEY_F2, 56, 8, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "F2", Button1+KEY_F3, 72, 8, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "F3", Button1+KEY_F4, 88, 8, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "F4", Button1+KEY_F5, 104, 8, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "F5", Button1+KEY_F6, 120, 8, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "F6", Button1+KEY_F7, 136, 8, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "F7", Button1+KEY_F8, 152, 8, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "F8", Button1+KEY_F9, 168, 8, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "F9", Button1+KEY_F10, 184, 8, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "0", Button1+KEY_0_PAD, 284, 72, 16, 15 , WS_TABSTOP
+   PUSHBUTTON ".", Button1+KEY_PGDN, 300, 72, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "RET", Button1+KEY_ENTER_PAD, 316, 72, 32, 15 , WS_TABSTOP
+   PUSHBUTTON "1", Button1+KEY_1_PAD, 284, 56, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "2", Button1+KEY_2_PAD, 300, 56, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "3", Button1+KEY_3_PAD, 316, 56, 16, 15 , WS_TABSTOP
+   PUSHBUTTON ",", Button1+KEY_HOME, 332, 56, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "4", Button1+KEY_4_PAD, 284, 40, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "5", Button1+KEY_5_PAD, 300, 40, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "6", Button1+KEY_6_PAD, 316, 40, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "DEL", Button1+KEY_DEL_PAD, 332, 40, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "7", Button1+KEY_7_PAD, 284, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "8", Button1+KEY_8_PAD, 300, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "9", Button1+KEY_9_PAD, 316, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "#", Button1+KEY_0_PAD, 332, 24, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "+", Button1+KEY_PLUS_PAD, 284, 8, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "-", Button1+KEY_MINUS_PAD, 300, 8, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "/", Button1+KEY_SLASH_PAD, 316, 8, 16, 15 , WS_TABSTOP
+   PUSHBUTTON "*", Button1+KEY_ASTERISK, 332, 8, 16, 15 , WS_TABSTOP
+
+   PUSHBUTTON "OK", IDOK, 96, 112, 32, 16, WS_TABSTOP
+   PUSHBUTTON "Cancel", IDCANCEL, 136, 112, 32, 16, WS_TABSTOP
+END
+
+Catalogue DIALOG 20, 20, 197+64, 241
+STYLE WS_CAPTION | WS_THICKFRAME | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_SYSMENU
+CAPTION "Tape Catalogue"
+FONT 8, "FixedSys"
+BEGIN
+   LISTBOX ListBox1, 7, 5, 179+64, 230, WS_TABSTOP
+END

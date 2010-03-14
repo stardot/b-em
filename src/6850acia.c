@@ -1,5 +1,5 @@
-/*B-em 1.4 by Tom Walker*/
-/*6850 acia emulation*/
+/*B-em v2.0 by Tom Walker
+  6850 ACIA emulation*/
 
 #include <stdio.h>
 #include "b-em.h"
@@ -17,13 +17,13 @@ int tapespeed=0;
 int dreg=0;
 int cleardcd=0;
 int tapedelay=0;
-unsigned char serialreg;
+uint8_t serialreg;
 FILE *tape;
 FILE *tapelog;
 int tapepos;
-unsigned char aciasr=8;
-unsigned char aciadrs;
-unsigned char aciadrw;
+uint8_t aciasr=8;
+uint8_t aciadrs;
+uint8_t aciadrw;
 
 void updateaciaint()
 {
@@ -43,10 +43,9 @@ void resetacia()
         updateaciaint();
 }
 
-unsigned char readacia(unsigned short addr)
+uint8_t readacia(uint16_t addr)
 {
-        char s[80];
-        unsigned char temp;
+        uint8_t temp;
 //        if (!cswlog) cswlog=fopen("cswlog.txt","wt");
         if (addr&1)
         {
@@ -69,7 +68,7 @@ unsigned char readacia(unsigned short addr)
         }
 }
 
-void writeacia(unsigned short addr, unsigned char val)
+void writeacia(uint16_t addr, uint8_t val)
 {
 //        rpclog("Write ACIA %04X %02X %04X\n",addr,val,pc);
         if (addr&1)
@@ -106,26 +105,42 @@ void dcdlow()
         updateaciaint();
 }
 
-void receive(unsigned char val) /*Called when the acia recives some data*/
+uint16_t newdat;
+
+void receive(uint8_t val) /*Called when the acia recives some data*/
 {
         aciadr=val;
         aciasr|=RECIEVE|0x80;
 //        printf("recieve interrupt\n");
         updateaciaint();
+        newdat=val|0x100;
 //        printf("Recieved %02X %04X   ",val,pc);
 //        sprintf(err2,"Recieved %02X\n",val);
 //        fputs(err2,cswlog);
 }
 
 int cswena;
+/*Every 128 clocks, ie 15.625khz*/
+/*Div by 13 gives roughly 1200hz*/
+
+extern ueftoneon,cswtoneon;
 void pollacia()
 {
-        int c;
+//        int c;
+//        printf("Poll tape %i %i\n",motor,cswena);
         if (motor)
         {
+                startblit();
                 if (cswena) pollcsw();
                 else        polltape();
+                endblit();
 //                for (c=0;c<2;c++) pollcsw();
+                if (newdat&0x100)
+                {
+                        newdat&=0xFF;
+                        adddatnoise(newdat);
+                }
+                else if (cswtoneon || ueftoneon) addhighnoise();
         }
 //           polltape();
 }

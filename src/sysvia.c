@@ -1,44 +1,19 @@
-/*B-em 1.4 by Tom Walker*/
-/*System VIA emulation*/
+/*B-em v2.0 by Tom Walker
+  System VIA + keyboard emulation*/
 
-unsigned short pc;
 #include <allegro.h>
 #include <stdio.h>
 #include "b-em.h"
 
-FILE *arclog;
-void rpclog(const char *format, ...)
-{
-        char *x;
-   char buf[256];
-   return;
-        if (!arclog) arclog=fopen("arclog.txt","wt");
-//        x=0;
-//        *x=0;
-   va_list ap;
-   va_start(ap, format);
-   vsprintf(buf, format, ap);
-   va_end(ap);
-   fputs(buf,arclog);
-   fflush(arclog);
-}
-
-char exname[512];
+VIA sysvia;
 void updatekeyboard();
-unsigned char *ram;
-void dumpram2()
-{
-        FILE *f=fopen("ram.dmp","wb");
-        fwrite(ram,0x8000,1,f);
-        fclose(f);
-}
 
 #define TIMER1INT 0x40
 #define TIMER2INT 0x20
 #define PORTBINT  0x18
 #define PORTAINT  0x03
 
-#define         ORB   0x00
+#define         ORB     0x00
 #define         ORA     0x01
 #define         DDRB    0x02
 #define         DDRA    0x03
@@ -48,22 +23,20 @@ void dumpram2()
 #define         T1LH    0x07
 #define         T2CL    0x08
 #define         T2CH    0x09
-#define         SR         0x0a
+#define         SR      0x0a
 #define         ACR     0x0b
 #define         PCR     0x0c
 #define         IFR     0x0d
 #define         IER     0x0e
-#define         ORAnh 0x0f
+#define         ORAnh   0x0f
 
-int model;
 void updatesysIFR()
 {
-//        if (output) printf("Update IFR %02X %02X %i\n",sysvia.ifr,sysvia.ier,sysvia.t1c);
         if ((sysvia.ifr&0x7F)&(sysvia.ier&0x7F))
         {
                 sysvia.ifr|=0x80;
                 interrupt|=1;
-//                if (sysvia.ifr&sysvia.ier&0x10) rpclog("CB1 set %02X\n",sysvia.ifr);
+//                printf("Interrupt %02X %04X\n",sysvia.ifr,pc);
         }
         else
         {
@@ -75,48 +48,68 @@ void updatesysIFR()
 int lns;
 void updatesystimers()
 {
-//        if (output) printf("IFR start %02X\n",sysvia.ifr);
         if (sysvia.t1c<-3)
         {
                 while (sysvia.t1c<-3)
                       sysvia.t1c+=sysvia.t1l+4;
-//                rpclog("Timer 1 reset line %i %04X %04X %i\n",lns,sysvia.t1c,sysvia.t1l,sysvia.t1hit);
                 if (!sysvia.t1hit)
                 {
-//                        printf("TIMER INTERRUPT\n");
                        sysvia.ifr|=TIMER1INT;
                        updatesysIFR();
                 }
                 if (!(sysvia.acr&0x40))
                    sysvia.t1hit=1;
         }
-        if (!(sysvia.acr&0x20)/* && !sysvia.t2hit*/)
+        if (!(sysvia.acr&0x20))
         {
                 if (sysvia.t2c<-3)
                 {
-//                        sysvia.t2c+=sysvia.t2l+4;
                         if (!sysvia.t2hit)
                         {
-//                                if (y==0x8F)
-//                                   rpclog("Timer 2 reset line %i %04X %04X\n",lns,sysvia.t2c,sysvia.t2l);
                                 sysvia.ifr|=TIMER2INT;
                                 updatesysIFR();
                         }
                         sysvia.t2hit=1;
                 }
         }
-//        if (output) printf("IFR end %02X\n",sysvia.ifr);
 }
 
 void vblankint()
 {
-        sysvia.ifr|=2;
-        updatesysIFR();
+        if (!sysvia.ca1 && (sysvia.pcr&1))
+        {
+                sysvia.ifr|=2;
+                updatesysIFR();
+        }
+        sysvia.ca1=1;
 }
 void vblankintlow()
 {
-        sysvia.ifr&=~2;
-        updatesysIFR();
+        if (sysvia.ca1 && !(sysvia.pcr&1))
+        {
+                sysvia.ifr|=2;
+                updatesysIFR();
+        }
+        sysvia.ca1=0;
+}
+
+void sysca2high()
+{
+        if ((!sysvia.ca2 && (sysvia.pcr&4)) || OS01) /*OS 0.10 sets PCR to 0 and expects the keyboard to still work*/
+        {
+                sysvia.ifr|=1;
+                updatesysIFR();
+        }
+        sysvia.ca2=1;
+}
+void sysca2low()
+{
+        if (sysvia.ca2 && !(sysvia.pcr&4))
+        {
+                sysvia.ifr|=1;
+                updatesysIFR();
+        }
+        sysvia.ca2=0;
 }
 
 void syscb1()
@@ -125,70 +118,38 @@ void syscb1()
         updatesysIFR();
 }
 
-unsigned char IC32=0;
+uint8_t IC32=0;
 
 int scrsize;
 int keycol,keyrow;
 int bbckey[16][16];
 int keysdown=0;
 
-unsigned char sdbval;
+uint8_t sdbval;
 
-unsigned short cmosaddr;
-int cmosena,cmosrw,cmosstrobe,cmosold;
-unsigned char cmos[64];
-
-void loadcmos()
+void writeIC32(uint8_t val)
 {
-        FILE *f;
-        char fn[512];
-        append_filename(fn,exname,"cmos.bin",511);
-        f=fopen(fn,"rb");
-        fread(cmos,64,1,f);
-        fclose(f);
-}
-
-void savecmos()
-{
-        FILE *f;
-        char fn[512];
-        append_filename(fn,exname,"cmos.bin",511);
-        f=fopen(fn,"wb");
-        fwrite(cmos,64,1,f);
-        fclose(f);
-        rpclog("IER %02X IFR %02X\n",sysvia.ier,sysvia.ifr);
-}
-
-void writeIC32(unsigned char val)
-{
-        unsigned char oldIC32=IC32;
+        uint8_t oldIC32=IC32;
         int temp=0;
         if (val&8)
            IC32|=(1<<(val&7));
         else
            IC32&=~(1<<(val&7));
+//        printf("IC32 now %02X\n",IC32);
         scrsize=((IC32&16)?2:0)|((IC32&32)?1:0);
         if (!(IC32&8)&&(oldIC32&8))
            updatekeyboard();
         if (!(IC32&1))
-           soundwrite(sdbval);
+           writesound(sdbval);
         if ((IC32&192)!=(oldIC32&192))
         {
                 if (!(IC32&64)) temp|=KB_CAPSLOCK_FLAG;
                 if (!(IC32&128)) temp|=KB_SCROLOCK_FLAG;
-//                set_leds(temp);
         }
-        if (model==8 || model==9)
-        {
-                cmosrw=IC32&2;
-                cmosstrobe=(IC32&4)^cmosold;
-                cmosold=IC32&4;
-                if (cmosstrobe && cmosena && !cmosrw && cmosaddr>0xB) cmos[cmosaddr]=sdbval; //printf("CMOS write %02X %02X\n",cmosaddr,sdbval);
-                if (cmosena && cmosrw) { sysvia.ora=cmos[cmosaddr]; /*printf("CMOS read %02X %02X\n",cmosaddr,sysvia.ora);*/ }
-        }
+        if (MASTER) cmosupdate(IC32,sdbval);
 }
 
-void writedatabus(unsigned char val)
+void writedatabus(uint8_t val)
 {
         sdbval=val;
         if (!(IC32&8))
@@ -197,22 +158,18 @@ void writedatabus(unsigned char val)
                 keycol=val&0xF;
                 updatekeyboard();
         }
-        if (!(IC32&1))
-           soundwrite(val);
-                if ((model==8 || model==9) && cmosstrobe && cmosena && !cmosrw && cmosaddr>0xB) cmos[cmosaddr]=sdbval;
-//        if (model==7 && cmosstrobe && !cmosrw && cmosena) printf("CMOS write %02X %02X\n",cmosaddr,sdbval);
+        if (MASTER) cmosupdate(IC32,sdbval);
+        if (!(IC32&1)) writesound(val);
 }
 
-void writesysvia(unsigned short addr, unsigned char val, int line)
+void writesysvia(uint16_t addr, uint8_t val)
 {
-//        rpclog("Write %04X %02X %04X %02X\n",addr,val,pc,sysvia.ier);
-//        if (addr==0xFE40) printf("FE40 write %02X\n",val);
         switch (addr&0xF)
         {
                 case ORA:
-                sysvia.ifr&=0xfc;
+                sysvia.ifr&=0xfd;
+                if (!(sysvia.pcr&4) || (sysvia.pcr&8)) sysvia.ifr&=~1;
                 updatesysIFR();
-//                printf("Port A clear\n");
                 case ORAnh:
                 sysvia.ora=val;
                 sysvia.porta=(sysvia.porta & ~sysvia.ddra)|(sysvia.ora & sysvia.ddra);
@@ -222,15 +179,11 @@ void writesysvia(unsigned short addr, unsigned char val, int line)
                 case ORB:
                 sysvia.orb=val;
                 sysvia.portb=(sysvia.portb & ~sysvia.ddrb)|(sysvia.orb & sysvia.ddrb);
-                sysvia.ifr&=0xee;//~PORTBINT;
+                sysvia.ifr&=0xef;//~PORTBINT;
+                if (!(sysvia.pcr&0x40) || (sysvia.pcr&0x80)) sysvia.ifr&=~8;
                 writeIC32(val);
                 updatesysIFR();
-                if (model==8 || model==9) /*CMOS*/
-                {
-                        if (val&0x80) cmosaddr=sysvia.ora&63;
-                        cmosena=val&0x40;
-//                        printf("CMOSena %i CMOSaddr %02X\n",cmosena,cmosaddr);
-                }
+                if (MASTER) cmoswriteaddr(val);
                 break;
 
                 case DDRA:
@@ -243,101 +196,83 @@ void writesysvia(unsigned short addr, unsigned char val, int line)
                 sysvia.acr=val;
                 break;
                 case PCR:
-                if ((sysvia.pcr&0xE0)==0xC0 && (val&0xE0)==0xE0)
-                {
-                        latchpen();
-                }
                 sysvia.pcr=val;
+//                printf("PCR write %02X %04X\n",val,pc);
                 break;
                 case T1LL:
                 case T1CL:
                 sysvia.t1l&=0x1FE00;
                 sysvia.t1l|=(val<<1);
+//                rpclog("ST1L now %04X\n",sysvia.t1l);
                 break;
                 case T1LH:
                 sysvia.t1l&=0x1FE;
                 sysvia.t1l|=(val<<9);
-//                rpclog("T1 timer now %04X\n",sysvia.t1l);
                 if (sysvia.acr&0x40)
                 {
                         sysvia.ifr&=~TIMER1INT;
                         updatesysIFR();
                 }
+//                rpclog("ST1L now %04X\n",sysvia.t1l);
                 break;
                 case T1CH:
                 sysvia.t1l&=0x1FE;
                 sysvia.t1l|=(val<<9);
-//                if (sysvia.t1c<1) printf("ST1 reload %i\n",sysvia.t1c);
                 sysvia.t1c=sysvia.t1l+1;
                 sysvia.ifr&=~TIMER1INT;
                 updatesysIFR();
                 sysvia.t1hit=0;
-//                rpclog("Timer reloaded - c %i\n",sysvia.t1c);
+//                rpclog("ST1L now %04X\n",sysvia.t1l);
                 break;
                 case T2CL:
                 sysvia.t2l&=0x1FE00;
                 sysvia.t2l|=(val<<1);
+//                rpclog("ST2L now %04X\n",sysvia.t2l);
                 break;
                 case T2CH:
                 if (sysvia.t2c==-3 && (sysvia.ier&TIMER2INT) && !(sysvia.ifr&TIMER2INT))
                 {
                         interrupt|=128;
-//                        rpclog("Timer 2 extra interrupt\n");
                 }
-//                if (output) rpclog("Write T2CH %i\n",sysvia.t2c);
                 sysvia.t2l&=0x1FE;
                 sysvia.t2l|=(val<<9);
-//                if (sysvia.t2c<1) printf("ST2 reload %i\n",sysvia.t2c);
                 sysvia.t2c=sysvia.t2l+1;
                 sysvia.ifr&=~TIMER2INT;
                 updatesysIFR();
                 sysvia.t2hit=0;
+//                rpclog("ST2L now %04X\n",sysvia.t2l);
                 break;
                 case IER:
-//                printf("IER was %02X write %02X %04X\n",sysvia.ier,val,pc);
                 if (val&0x80)
                    sysvia.ier|=(val&0x7F);
                 else
                    sysvia.ier&=~(val&0x7F);
                 updatesysIFR();
-//                printf("now %02X line %i\n",sysvia.ier,line);
+//                printf("IER now %02X\n",sysvia.ier);
                 break;
                 case IFR:
-//                printf("Interrupt clear %02X\n",val&0x7F);
+//                        printf("Write IFR %02X %04X\n",val,pc);
                 sysvia.ifr&=~(val&0x7F);
                 updatesysIFR();
                 break;
         }
 }
 
-unsigned char readsysvia(unsigned short addr)
+uint8_t readsysvia(uint16_t addr)
 {
-        unsigned char temp;
+        uint8_t temp;
         addr&=0xF;
-//        if (y==0x8F) rpclog("Read %04X %04X\n",addr,pc);
-//        if (addr>=4 && addr<=9) printf("Read %04X\n",addr);
         switch (addr&0xF)
         {
                 case ORA:
-//                printf("Port A clear\n");
                 sysvia.ifr&=~PORTAINT;
                 updatesysIFR();
                 case ORAnh:
-                if ((model==8 || model==9) && cmosrw && cmosena)
-                {
-                        sysvia.ora=cmos[cmosaddr];
-//                        printf("CMOS read %02X %02X\n",cmosaddr,sysvia.ora);
-                        temp=sysvia.ora & ~sysvia.ddra;
-                        return temp;
-                }
+                if (MASTER && cmosenabled()) return cmosread();
                 temp=sysvia.ora & sysvia.ddra;
                 temp|=(sysvia.porta & ~sysvia.ddra);
-                if (model<8 || !cmosena)
-                {
-                        temp&=0x7F;
-                        if (bbckey[keycol][keyrow])
-                           return temp|0x80;
-                }
+                temp&=0x7F;
+                if (bbckey[keycol][keyrow]) return temp|0x80;
                 return temp;
 
                 case ORB:
@@ -349,8 +284,8 @@ unsigned char readsysvia(unsigned short addr)
                 else
                    temp|=(sysvia.portb & ~sysvia.ddrb);
                 temp|=0xF0;
-                if (joy[0].button[0].b) temp&=~0x10;
-                if (joy[1].button[0].b) temp&=~0x20;
+                if (joybutton[0]) temp&=~0x10;
+                if (joybutton[1]) temp&=~0x20;
                 return temp;
 
                 case DDRA:
@@ -362,23 +297,19 @@ unsigned char readsysvia(unsigned short addr)
                 case T1LH:
                 return sysvia.t1l>>9;
                 case T1CL:
-//                rpclog("Read t1l %05X %i\n",sysvia.t1c,sysvia.t1c);
                 sysvia.ifr&=~TIMER1INT;
                 updatesysIFR();
                 if (sysvia.t1c<-1) return 0xFF;
                 return ((sysvia.t1c+1)>>1)&0xFF;
                 case T1CH:
-//                rpclog("Read t1h %05X %i\n",sysvia.t1c,sysvia.t1c);
                 if (sysvia.t1c<-1) return 0xFF;
                 return ((sysvia.t1c+1)>>1)>>8;
                 case T2CL:
                 sysvia.ifr&=~TIMER2INT;
                 updatesysIFR();
-//                if (sysvia.t2c<0) return 0xFF;
                 if (sysvia.acr&0x20) return (sysvia.t2c>>1)&0xFF;
                 return ((sysvia.t2c+1)>>1)&0xFF;
                 case T2CH:
-//                if (sysvia.t2c<0) return 0xFF;
                 if (sysvia.acr&0x20) return (sysvia.t2c>>1)>>8;
                 return ((sysvia.t2c+1)>>1)>>8;
                 case ACR:
@@ -388,8 +319,10 @@ unsigned char readsysvia(unsigned short addr)
                 case IER:
                 return sysvia.ier|0x80;
                 case IFR:
+//                        printf("Reading IFR %02X\n",sysvia.ifr);
                 return sysvia.ifr;
         }
+        return 0xFE;
 }
 
 void presskey(int row, int col);
@@ -407,117 +340,136 @@ void resetsysvia()
 /*Keyboard*/
 #include "scan2bbc.h"
 
-unsigned char codeconvert[128]=
+uint8_t codeconvert[128]=
 {
         0,30,48,46,32,18,33,34,    //0
         35,23,36,37,38,50,49,24,   //8
         25,16,19,31,20,22,47,17,   //16
         45,21,44,11,2,3,4,5,       //24
-        6,7,8,9,10,82,79,80,       //32
-        81,75,76,77,71,72,73,59,   //40
+        6,7,8,9,10,100,101,102,       //32
+        103,104,105,106,107,108,109,59,   //40
         60,61,62,63,64,65,66,67,   //48
         68,87,88,1,41,12,13,14,    //56
         15,26,27,28,39,40,43,86,   //64
-        51,52,53,57,0,83,0,79,     //72
-        0,0,75,77,72,80,0,55,      //80
-        74,78,83,0,84,0,115,125,   //88
+        51,52,53,57,0,83,116,79,     //72
+        0,115,75,77,72,80,114,55,      //80
+        74,78,83,111,84,0,115,125,   //88
         112,121,123,42,54,29,0,56, //96
         0,39,92,56,70,69,58,0,     //104
         0,0,58,0,0,0,0,0,          //112
-        0,0,0,0,0,0,58,0,          //120
+        0,0,0,0,0,113,58,0,          //120
 };
 
 void presskey(int row, int col)
 {
         bbckey[col][row]=1;
-        keysdown++;
-        updatekeyboard();
-//        printf("Key pressed %01X %01X %02X %02X\n",row,col,sysvia.ifr,sysvia.ier);
 }
 
 void releasekey(int row, int col)
 {
         bbckey[col][row]=0;
-        keysdown--;
 }
 
 static inline int TranslateKey(int index, int *row, int *col)
 {
-        unsigned int    vkey=scan2bbc[index & 127];
-
-        if (vkey==0xaa) return(-1);
-
-        col[0] = vkey&15;
-        row[0] = (vkey>>4)&15;
-
-        return(row[0]);
+        unsigned int vkey=scan2bbc[index & 127];
+        if (vkey==0xaa) return -1;
+        *col=vkey&15;
+        *row=(vkey>>4)&15;
+        return *row;
 }
 
 int keys2[128];
 
-void checkkeys()
+void clearkeys()
 {
-        int c,cc;
+        int c;
         int row,col;
         for (c=0;c<128;c++)
         {
-                if (key[c]!=keys2[c] && c!=KEY_F11)
+                keys2[c]=0;
+                if (TranslateKey(codeconvert[keylookup[c]],&row,&col)>0) releasekey(row,col);
+        }
+}
+
+void checkkeys()
+{
+        int c;
+        int row,col;
+        int rc;
+        memset(bbckey,0,sizeof(bbckey));
+        for (c=0;c<128;c++)
+        {
+                rc=c;
+                if (keyas && c==KEY_A) rc=KEY_CAPSLOCK;
+//                if (keyas && c==KEY_S) rc=KEY_LCONTROL;
+                if (key[c]/*!=keys2[c] && */ && rc!=KEY_F11)
                 {
-                        if (TranslateKey(codeconvert[c],&row,&col)>0)
+//                rpclog("%i %i\n",c,rc);
+                        if (TranslateKey(codeconvert[keylookup[rc]],&row,&col)>0)
                         {
-//                                printf("%i - %i,%i\n",c,row,col);
                                 if (key[c])
                                    presskey(row,col);
-                                else
-                                   releasekey(row,col);
+//                                else
+//                                   releasekey(row,col);
                         }
                 }
         }
-//        if (key[KEY_CAPSLOCK])
-//           presskey(1,0);
-//        else
-//           releasekey(1,0);
-        if (key[KEY_RSHIFT]||key[KEY_LSHIFT]||autoboot)
+        if (key[keylookup[KEY_RSHIFT]]||key[keylookup[KEY_LSHIFT]]||autoboot)
            presskey(0,0);
-        else
-           releasekey(0,0);
-        if (key[KEY_LCONTROL]||key[KEY_RCONTROL])
+//        else
+//           releasekey(0,0);
+        if (key[keylookup[KEY_LCONTROL]] || key[keylookup[KEY_RCONTROL]] || (keyas && key[KEY_S]))
            presskey(0,1);
-        else
-           releasekey(0,1);
+//        else
+//           releasekey(0,1);
         for (c=0;c<128;c++)
             keys2[c]=key[c];
+        updatekeyboard();
 }
 
 void updatekeyboard()
 {
-        int c;
-        if (keysdown && (sysvia.pcr&0xC)==4)
-        {
-                sysvia.ifr&=~1;
+        int c,d;
+//        printf("Updatekeyboard %02X %i\n",sysvia.pcr,IC32&8);
+//        if ((sysvia.pcr&0xC)==4)
+//        {
                 if (IC32&8)
-                   sysvia.ifr|=1;
+                {
+//                        printf("Keyless scan!\n");
+                        for (d=0;d<((MASTER)?13:10);d++)
+                        {
+                                for (c=1;c<8;c++)
+                                {
+                                        if (bbckey[d][c])
+                                        {
+                                                sysca2high();
+//                                                sysvia.ifr|=1;
+                                                return;
+                                        }
+                                }
+                        }
+                        sysca2low();
+                }
                 else
                 {
-                        if (keycol<10)
+                        if (keycol<((MASTER)?13:10))
                         {
                                 for (c=1;c<8;c++)
                                 {
                                         if (bbckey[keycol][c])
                                         {
-                                                sysvia.ifr|=1;
-//                                                printf("Key %01X %01X %02X\n",keycol,c,sysvia.ier);
+                                                sysca2high();
+                                                return;
                                         }
                                 }
                         }
+                        sysca2low();
                 }
-//                gotoxy(0,23);
-//                printf("IFR %i %i %i\n",sysvia.ifr&1,keysdown,keycol);
-                updatesysIFR();
-        }
+//        }
 }
 
-void initDIPS(unsigned char dips)
+void initDIPS(uint8_t dips)
 {
         int c;
         for (c=9;c>=2;c--)
@@ -528,72 +480,4 @@ void initDIPS(unsigned char dips)
                    releasekey(0,c);
                 dips>>=1;
         }
-}
-
-void savesysviastate(FILE *f)
-{
-        fwrite(&sysvia,sizeof(sysvia),1,f);
-        putc(IC32,f);
-        putc(sdbval,f);
-}
-
-void savekeyboardstate(FILE *f)
-{
-        int c,d;
-        putc(keycol,f);
-        putc(keyrow,f);
-        putc(keysdown,f);
-        for (c=0;c<16;c++)
-        {
-                for (d=0;d<16;d++)
-                {
-                        putc(bbckey[c][d],f);
-                }
-        }
-        for (c=0;c<128;c++)
-            putc(keys2[c],f);
-}
-
-void savecmosstate(FILE *f)
-{
-        if (model<8) return;
-        putc(cmosaddr,f);
-        putc(cmosena,f);
-        putc(cmosrw,f);
-        putc(cmosstrobe,f);
-        putc(cmosold,f);
-}
-
-void loadsysviastate(FILE *f)
-{
-        fread(&sysvia,sizeof(sysvia),1,f);
-        IC32=getc(f);
-        sdbval=getc(f);
-}
-
-void loadkeyboardstate(FILE *f)
-{
-        int c,d;
-        keycol=getc(f);
-        keyrow=getc(f);
-        keysdown=getc(f);
-        for (c=0;c<16;c++)
-        {
-                for (d=0;d<16;d++)
-                {
-                        bbckey[c][d]=getc(f);
-                }
-        }
-        for (c=0;c<128;c++)
-            keys2[c]=getc(f);
-}
-
-void loadcmosstate(FILE *f)
-{
-        if (model<8) return;
-        cmosaddr=getc(f);
-        cmosena=getc(f);
-        cmosrw=getc(f);
-        cmosstrobe=getc(f);
-        cmosold=getc(f);
 }

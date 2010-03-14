@@ -1,8 +1,8 @@
-unsigned char aciacr; /*Control register*/
-unsigned char aciasr; /*Status register*/
-unsigned char aciadr; /*Data register*/
+uint8_t aciacr; /*Control register*/
+uint8_t aciasr; /*Status register*/
+uint8_t aciadr; /*Data register*/
 int aciadrf;          /*Data register full?*/
 
-unsigned char readacia(unsigned short addr);
-void writeacia(unsigned short addr, unsigned char val);
-void writetoacia(unsigned char val);
+uint8_t readacia(uint16_t addr);
+void writeacia(uint16_t addr, uint8_t val);
+void writetoacia(uint8_t val);

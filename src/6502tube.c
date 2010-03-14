@@ -1,29 +1,20 @@
-/*B-em 1.4 by Tom Walker*/
-/*6502 tube emulation*/
-
-int tubetimetolive,tubeoutput;
-int tubecycs,tubelinecycs;
-int tube;
-int tubeskipint;
-int tubenmi,tubeoldnmi,tubenmilock;
-int tubeirq;
+/*B-em v2.0 by Tom Walker
+  6502 parasite CPU emulation*/
 
 #include <allegro.h>
 #include <stdio.h>
 
 #include "b-em.h"
-//#include "8271.h"
-//#include "serial.h"
 
 #define a tubea
 #define x tubex
 #define y tubey
-#define s tubes
+#define s tubesp
 #define pc tubepc
 
 /*6502 registers*/
-unsigned char a,x,y,s;
-unsigned short pc;
+uint8_t a,x,y,s;
+uint16_t pc;
 struct
 {
         int c,z,i,d,v,n;
@@ -32,52 +23,48 @@ struct
 /*Memory structures*/
 /*There is an extra entry to allow for stupid programs (3d grand prix) doing
   something stupid like STA $FFFF,x*/
-unsigned char *tubemem[0x101];
+uint8_t *tubemem[0x101];
 int tubememstat[0x101];
-unsigned char *tuberam;
-unsigned char tuberom[0x1000];
+uint8_t *tuberam;
+uint8_t tuberom[0x1000];
 
 void tubeinitmem()
 {
         int c;
-        tuberam=(unsigned char *)malloc(0x10000);
+        if (!tuberam) tuberam=(uint8_t *)malloc(0x10000);
         memset(tuberam,0,0x10000);
-        for (c=0x00;c<0x100;c++) tubemem[c]=(unsigned char *)(tuberam+(c<<8));
+        for (c=0x00;c<0x100;c++) tubemem[c]=(uint8_t *)(tuberam+(c<<8));
         for (c=0x00;c<0x100;c++) tubememstat[c]=0;
         for (c=0xF0;c<0x100;c++) tubememstat[c]=2;
 //        tubememstat[0xFE]=tubememstat[0xFF]=2;
         tubemem[0x100]=tubemem[0];
         tubememstat[0x100]=tubememstat[0x101];
 }
-char exname[512];
+
+void closetube()
+{
+        if (tuberam) free(tuberam);
+}
+
 void tubeloadrom()
 {
         FILE *f;
         char fn[512];
-        if (model==4)
-        {
-                append_filename(fn,exname,"roms/tube/6502Tube.rom",511);
+                append_filename(fn,exedir,"roms/tube/6502Tube.rom",511);
                 f=fopen(fn,"rb");
                 fread(tuberom+0x800,0x800,1,f);
-        }
-        else
-        {
-                append_filename(fn,exname,"roms/tube/65C102_110.rom",511);
-                f=fopen(fn,"rb");
-                fread(tuberom,0x1000,1,f);
-        }
         fclose(f);
 }
 
+#undef printf
 void tubedumpregs()
 {
-        /*
         FILE *f=fopen("tuberam.dmp","wb");
         fwrite(tuberam,65536,1,f);
         fclose(f);
-        rpclog("Tube 65c12 registers :\n");
-        rpclog("A=%02X X=%02X Y=%02X S=01%02X PC=%04X\n",a,x,y,s,pc);
-        rpclog("Status : %c%c%c%c%c%c\n",(tubep.n)?'N':' ',(tubep.v)?'V':' ',(tubep.d)?'D':' ',(tubep.i)?'I':' ',(tubep.z)?'Z':' ',(tubep.c)?'C':' ');*/
+        printf("Tube 65c12 registers :\n");
+        printf("A=%02X X=%02X Y=%02X S=01%02X PC=%04X\n",a,x,y,s,pc);
+        printf("Status : %c%c%c%c%c%c\n",(tubep.n)?'N':' ',(tubep.v)?'V':' ',(tubep.d)?'D':' ',(tubep.i)?'I':' ',(tubep.z)?'Z':' ',(tubep.c)?'C':' ');
 }
 
 int tuberomin=1;
@@ -88,15 +75,21 @@ void tube6502mapoutrom()
 
 #define polltime(c) { tubecycles-=c; }
 
-unsigned char tubereadmeml(unsigned short addr)
+uint8_t tubereadmeml(uint16_t addr)
 {
-        if ((addr&~7)==0xFEF8) return readtube(addr);
+        uint8_t temp;
+        if ((addr&~7)==0xFEF8)
+        {
+                temp=readtube(addr);
+//                rpclog("Read tube  %04X %02X %04X\n",addr,temp,pc);
+                return temp;
+        }
         if ((addr&~0xFFF)==0xF000 && tuberomin) return tuberom[addr&0xFFF];
         return tuberam[addr];
 }
 
 int endtimeslice;
-unsigned char tubewritememl(unsigned short addr, unsigned char val)
+uint8_t tubewritememl(uint16_t addr, uint8_t val)
 {
 //        rpclog("Tube writemem %04X %02X %04X\n",addr,val,pc);
         if ((addr&~7)==0xFEF8)
@@ -106,7 +99,7 @@ unsigned char tubewritememl(unsigned short addr, unsigned char val)
                 endtimeslice=1;
                 return;
         }
-        if (addr==0xF4 || addr==0xF5) rpclog("TUBE PARASITE write %04X %02X\n",addr,val);
+//        if (addr==0xF4 || addr==0xF5) rpclog("TUBE PARASITE write %04X %02X\n",addr,val);
         tuberam[addr]=val;
 }
 
@@ -133,9 +126,9 @@ void tubereset6502()
 #define pull()  tuberam[0x100+(++s)]
 
 /*ADC/SBC temp variables*/
-unsigned short tempw;
+uint16_t tempw;
 int tempv,hc,al,ah;
-unsigned char tempb;
+uint8_t tempb;
 
 #define ADC(temp)       if (!tubep.d)                            \
                         {                                  \
@@ -175,7 +168,7 @@ unsigned char tempb;
                         {                                  \
                                 tempw=a-(temp+(tubep.c?0:1));    \
                                 tempv=(short)a-(short)(temp+(tubep.c?0:1));            \
-                                tubep.v=((a^(temp+(tubep.c?0:1)))&(a^(unsigned char)tempv)&0x80); \
+                                tubep.v=((a^(temp+(tubep.c?0:1)))&(a^(uint8_t)tempv)&0x80); \
                                 tubep.c=tempv>=0;\
                                 a=tempw&0xFF;              \
                                 setzn(a);                  \
@@ -209,23 +202,24 @@ unsigned char tempb;
                         }
 
 int interlaceline;
-unsigned short oldtpc,oldtpc2;
+uint16_t oldtpc,oldtpc2;
 int tubecycles=0;
-void tubeexec65c02(int tubecycs)
+void tubeexec65c02()
 {
-        unsigned char opcode;
-        unsigned short addr;
-        unsigned char temp,temp2;
+        uint8_t opcode;
+        uint16_t addr;
+        uint8_t temp,temp2;
         int tempi;
-        signed char offset;
+        int8_t offset;
         int c;
-        tubecycles+=tubecycs;
-//        rpclog("Tube exec %i %04X\n",tubecycs,pc);
+//        tubecycles+=(tubecycs<<1);
+//        printf("Tube exec %i %04X\n",tubecycles,pc);
                 while (tubecycles>0)
                 {
                         oldtpc2=oldtpc;
                         oldtpc=pc;
                         opcode=readmem(pc); pc++;
+//                        printf("Tube opcode %02X\n",opcode);
                         switch (opcode)
                         {
                                 case 0x00: /*BRK*/
@@ -331,7 +325,7 @@ void tubeexec65c02(int tubecycs)
                                 break;
 
                                 case 0x10: /*BPL*/
-                                offset=(signed char)readmem(pc); pc++;
+                                offset=(int8_t)readmem(pc); pc++;
                                 temp=2;
                                 if (!tubep.n)
                                 {
@@ -502,6 +496,7 @@ void tubeexec65c02(int tubecycs)
                                 case 0x2C: /*BIT abs*/
                                 addr=getw();
                                 temp=readmem(addr);
+//                                printf("BIT %04X\n",addr);
                                 tubep.z=!(a&temp);
                                 tubep.v=temp&0x40;
                                 tubep.n=temp&0x80;
@@ -531,7 +526,7 @@ void tubeexec65c02(int tubecycs)
                                 break;
 
                                 case 0x30: /*BMI*/
-                                offset=(signed char)readmem(pc); pc++;
+                                offset=(int8_t)readmem(pc); pc++;
                                 temp=2;
                                 if (tubep.n)
                                 {
@@ -702,7 +697,7 @@ void tubeexec65c02(int tubecycs)
                                 break;
 
                                 case 0x50: /*BVC*/
-                                offset=(signed char)readmem(pc); pc++;
+                                offset=(int8_t)readmem(pc); pc++;
                                 temp=2;
                                 if (!tubep.v)
                                 {
@@ -873,7 +868,7 @@ void tubeexec65c02(int tubecycs)
                                 break;
 
                                 case 0x70: /*BVS*/
-                                offset=(signed char)readmem(pc); pc++;
+                                offset=(int8_t)readmem(pc); pc++;
                                 temp=2;
                                 if (tubep.v)
                                 {
@@ -974,7 +969,7 @@ void tubeexec65c02(int tubecycs)
                                 break;
 
                                 case 0x80: /*BRA*/
-                                offset=(signed char)readmem(pc); pc++;
+                                offset=(int8_t)readmem(pc); pc++;
                                 temp=3;
                                 if ((pc&0xFF00)^((pc+offset)&0xFF00)) temp++;
                                 pc+=offset;
@@ -1045,7 +1040,7 @@ void tubeexec65c02(int tubecycs)
                                 break;
 
                                 case 0x90: /*BCC*/
-                                offset=(signed char)readmem(pc); pc++;
+                                offset=(int8_t)readmem(pc); pc++;
                                 temp=2;
                                 if (!tubep.c)
                                 {
@@ -1207,7 +1202,7 @@ void tubeexec65c02(int tubecycs)
                                 break;
 
                                 case 0xB0: /*BCS*/
-                                offset=(signed char)readmem(pc); pc++;
+                                offset=(int8_t)readmem(pc); pc++;
                                 temp=2;
                                 if (tubep.c)
                                 {
@@ -1386,7 +1381,7 @@ void tubeexec65c02(int tubecycs)
                                 break;
 
                                 case 0xD0: /*BNE*/
-                                offset=(signed char)readmem(pc); pc++;
+                                offset=(int8_t)readmem(pc); pc++;
                                 temp=2;
                                 if (!tubep.z)
                                 {
@@ -1539,7 +1534,7 @@ void tubeexec65c02(int tubecycs)
                                 break;
 
                                 case 0xF0: /*BEQ*/
-                                offset=(signed char)readmem(pc); pc++;
+                                offset=(int8_t)readmem(pc); pc++;
                                 temp=2;
                                 if (tubep.z)
                                 {
@@ -1640,13 +1635,13 @@ void tubeexec65c02(int tubecycs)
                                         break;
                                 }
                                 break;
-                                default:
-                                allegro_exit();
-                                printf("Error : Bad tube 65c02 opcode %02X\n",opcode);
-                                pc--;
-                                dumpregs();
+//                                default:
+//                                allegro_exit();
+//                                printf("Error : Bad tube 65c02 opcode %02X\n",opcode);
+//                                pc--;
+//                                dumpregs();
 //                                printf("Current ROM %02X\n",currom);
-                                exit(-1);
+//                                exit(-1);
                         }
                                 if ((tubeirq&2) && !tubeoldnmi)// && !tubenmilock)
                                 {
