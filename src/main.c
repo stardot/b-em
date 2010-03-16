@@ -109,7 +109,7 @@ void initbbc(int argc, char *argv[])
         int tapenext=0,discnext=0;
         char *p;
 
-        printf("B-em v2.0 RC 4\n");
+        printf("B-em v2.0a\n");
 
 //      comedyblit=0;
         fskipmax=1;

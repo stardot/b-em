@@ -34,7 +34,7 @@ void reset1770()
         nmi=0;
         wd1770.status=0;
         motorspin=0;
-//        printf("Reset 1770\n");
+//        rpclog("Reset 1770\n");
         fdctime=0;
         if (WD1770)
         {
@@ -84,7 +84,7 @@ void write1770(uint16_t addr, uint8_t val)
                 wd1770.density=!(wd1770.ctrl&8);
                 break;
                 case 0xFE24:
-                        //printf("Write CTRL %02X\n",val);
+                        //rpclog("Write CTRL %02X\n",val);
                 wd1770.ctrl=val;
                 if (val&2) curdrive=1;
                 else       curdrive=0;
@@ -93,8 +93,8 @@ void write1770(uint16_t addr, uint8_t val)
                 break;
                 case 0xFE84:
                 case 0xFE28:
-                if (wd1770.status&1 && (val>>4)!=0xD) { printf("Command rejected\n"); return; }
-//                printf("FDC command %02X %i %i %i\n",val,wd1770.curside,wd1770.track,wd1770.sector);
+                if (wd1770.status&1 && (val>>4)!=0xD) { rpclog("Command rejected\n"); return; }
+                rpclog("FDC command %02X %i %i %i\n",val,wd1770.curside,wd1770.track,wd1770.sector);
                 wd1770.command=val;
                 if ((val>>4)!=0xD)/* && !(val&8)) */spinup1770();
                 switch (val>>4)
@@ -151,7 +151,7 @@ void write1770(uint16_t addr, uint8_t val)
                         byte=0;
                         break;
                         case 0xD: /*Force interrupt*/
-//                        printf("Force interrupt\n");
+//                        rpclog("Force interrupt\n");
                         fdctime=0;
                         wd1770.status=0x80|track0;
                         nmi=(val&8)?1:0;
@@ -163,16 +163,16 @@ void write1770(uint16_t addr, uint8_t val)
                         break;
 
                         default:
-//                                printf("Bad 1770 command %02X\n",val);
-                        fdctime=0;
+//                                rpclog("Bad 1770 command %02X\n",val);
+/*                        fdctime=0;
                         nmi=1;
                         wd1770.status=0x90;
                         spindown1770();
-                        break;
-/*                        printf("Bad 1770 command %02X\n",val);
+                        break;*/
+                        rpclog("Bad 1770 command %02X\n",val);
                         dumpregs();
                         dumpram();
-                        exit(-1);*/
+                        exit(-1);
                 }
                 break;
                 case 0xFE85:
@@ -200,7 +200,7 @@ uint8_t read1770(uint16_t addr)
                 case 0xFE84:
                 case 0xFE28:
                 nmi&=~1;
-//                printf("Status %02X\n",wd1770.status);
+//                rpclog("Status %02X\n",wd1770.status);
                 return wd1770.status;
                 case 0xFE85:
                 case 0xFE29:
@@ -212,7 +212,7 @@ uint8_t read1770(uint16_t addr)
                 case 0xFE2B:
                 nmi&=~2;
                 wd1770.status&=~2;
-//                printf("Read data %02X %04X\n",wd1770.data,pc);
+//                rpclog("Read data %02X %04X\n",wd1770.data,pc);
                 return wd1770.data;
         }
         return 0xFE;
@@ -220,7 +220,7 @@ uint8_t read1770(uint16_t addr)
 
 void callback1770()
 {
-//        printf("FDC callback %02X\n",wd1770.command);
+        rpclog("FDC callback %02X\n",wd1770.command);
         fdctime=0;
         switch (wd1770.command>>4)
         {
@@ -288,7 +288,7 @@ void finishread1770()
 
 void notfound1770()
 {
-//        printf("Not found\n");
+//        rpclog("Not found\n");
         fdctime=0;
         nmi=1;
         wd1770.status=0x90;
@@ -297,7 +297,7 @@ void notfound1770()
 
 void datacrcerror1770()
 {
-//        printf("Data CRC\n");
+//        rpclog("Data CRC\n");
         fdctime=0;
         nmi=1;
         wd1770.status=0x88;
@@ -306,7 +306,7 @@ void datacrcerror1770()
 
 void headercrcerror1770()
 {
-//        printf("Header CRC\n");
+//        rpclog("Header CRC\n");
         fdctime=0;
         nmi=1;
         wd1770.status=0x98;
@@ -315,7 +315,7 @@ void headercrcerror1770()
 
 int getdata1770(int last)
 {
-//        printf("Disc get data\n");
+//        rpclog("Disc get data\n");
         if (!wd1770.written) return -1;
         if (!last)
         {

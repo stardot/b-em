@@ -60,7 +60,11 @@ void reset8271()
 
 static void NMI8271()
 {
-        if (i8271.status&8) nmi=1;
+        if (i8271.status&8)
+        {
+                nmi=1;
+                printf("NMI\n");
+        }
         else                nmi=0;
 }
 
@@ -109,16 +113,18 @@ uint8_t read8271(uint16_t addr)
         switch (addr&7)
         {
                 case 0: /*Status register*/
+                printf("Read status reg %04X %02X\n",pc,i8271.status);
                 return i8271.status;
                 case 1: /*Result register*/
                 i8271.status&=~0x18;
                 NMI8271();
-//                printf("Read result reg %04X\n",pc);
+                printf("Read result reg %04X %02X\n",pc,i8271.status);
   //              output=1; timetolive=50;
                 return i8271.result;
                 case 4: /*Data register*/
                 i8271.status&=~0xC;
                 NMI8271();
+                printf("Read data reg %04X %02X\n",pc,i8271.status);
                 return i8271.data;
         }
         return 0;
@@ -142,7 +148,7 @@ void write8271(uint16_t addr, uint8_t val)
                 if (i8271.status&0x80) return;
                 i8271.command=val&0x3F;
                 if (i8271.command==0x17) i8271.command=0x13;
-//                printf("8271 command %02X!\n",i8271.command);
+                printf("8271 command %02X!\n",i8271.command);
                 i8271.drivesel=val>>6;
                 if (val&0x80) curdrive=1;
                 else          curdrive=0;
@@ -206,7 +212,7 @@ void write8271(uint16_t addr, uint8_t val)
                                 verify8271=1;
                                 break;
                                 case 0x1B: /*Read ID*/
-//                                printf("8271 : Read ID start\n");
+                                printf("8271 : Read ID start\n");
                                 i8271.sectorsleft=i8271.params[2]&31;
                                 spinup8271();
                                 i8271.phase=0;
@@ -230,6 +236,7 @@ void write8271(uint16_t addr, uint8_t val)
                                 break;
                                 case 0x3A: /*Write special register*/
                                 i8271.status=0;
+                                printf("Write special %02X\n",i8271.params[0]);
                                 switch (i8271.params[0])
                                 {
                                         case 0x12: i8271.curtrack[0]=val; /*printf("Write real track now %i\n",val);*/ break;
@@ -271,14 +278,14 @@ void write8271(uint16_t addr, uint8_t val)
                                 break;
 
                                 default:
-                                i8271.result=0x18;
+/*                                i8271.result=0x18;
                                 i8271.status=0x18;
                                 NMI8271();
                                 fdctime=0;
-                                break;
-//                                printf("Unknown 8271 command %02X 2\n",i8271.command);
-//                                dumpregs();
-//                                exit(-1);
+                                break;*/
+                                printf("Unknown 8271 command %02X 2\n",i8271.command);
+                                dumpregs();
+                                exit(-1);
                         }
                 }
                 break;
@@ -298,7 +305,7 @@ void callback8271()
 {
         int diff=i8271.params[0]-i8271.curtrack[curdrive];
         fdctime=0;
-//        printf("Callback 8271 - command %02X\n",i8271.command);
+        printf("Callback 8271 - command %02X\n",i8271.command);
         switch (i8271.command)
         {
                 case 0x0B: /*Write*/
@@ -438,7 +445,7 @@ void data8271(uint8_t dat)
         i8271.status=0x8C;
         i8271.result=0;
         NMI8271();
-//        printf("%02X : Data %02X\n",byte,dat);
+        printf("%02X : Data %02X\n",byte,dat);
         byte++;
 }
 

@@ -6,7 +6,7 @@
              ██       ▄██          ██         ██          ██
              ██████████▀           █████████  ██          ██
 
-                                 Version 2.0
+                                 Version 2.0a
                          A freeware BBC Micro emulator
 
 Introduction
@@ -40,6 +40,8 @@ Features
 
 Differences from last version
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+v2.0a is a bugfix release, these were the changes for v2.0 :
 
 - Most of the emulator re-written
 - Cycle-accurate video emulation

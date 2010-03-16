@@ -33,6 +33,11 @@ void updatewindowsize(int x, int y)
 }
 
 int quited=0;
+void setquit()
+{
+        quited=1;
+}
+
 HINSTANCE hinstance;
 
 char **argv;
@@ -228,11 +233,11 @@ void updatewindowtitle()
 {
         if (curtube==3)
         {
-                if (!mousecapture) set_window_title("B-em v2.0 - click to capture mouse");
-                else               set_window_title("B-em v2.0 - CTRL-END to release mouse");
+                if (!mousecapture) set_window_title("B-em v2.0a - click to capture mouse");
+                else               set_window_title("B-em v2.0a - CTRL-END to release mouse");
         }
         else
-           set_window_title("B-em v2.0");
+           set_window_title("B-em v2.0a");
 }
 
 int WINAPI WinMain (HINSTANCE hThisInstance,
@@ -277,7 +282,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         hwnd = CreateWindowEx (
            0,                   /* Extended possibilites for variation */
            szClassName,         /* Classname */
-           "B-em v2.0", /* Title Text */
+           "B-em v2.0a", /* Title Text */
            WS_OVERLAPPEDWINDOW&~WS_SIZEBOX&~WS_THICKFRAME&~WS_MAXIMIZEBOX, /* default window */
            CW_USEDEFAULT,       /* Windows decides the position */
            CW_USEDEFAULT,       /* where the window ends up on the screen */
@@ -627,6 +632,8 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         break;
 
                         case IDM_DEBUGGER:
+                        EnterCriticalSection(&cs);
+                        rest(200);
                         if (!debugon)
                         {
                                 debug=debugon=1;
@@ -635,6 +642,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         else
                            debug^=1;
                         CheckMenuItem(hmenu,IDM_DEBUGGER,(debug)?MF_CHECKED:MF_UNCHECKED);
+                        LeaveCriticalSection(&cs);
                         break;
 
                         case IDM_SCRSHOT:

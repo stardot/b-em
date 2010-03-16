@@ -25,6 +25,7 @@ void resetmem()
         memset(swram,0,16);
         memset(ram,0,128*1024);
         memset(rom,0,16*16384);
+        memset(os,0,16384);
 }
 
 void closemem()
@@ -156,6 +157,8 @@ void romsetup_bplus128()
 void romsetup_master128()
 {
         FILE *f;
+//        printf("ROM setup Master 128\n");
+        memset(rom,0,16*16384);
         swram[0]=swram[1]=swram[2]=swram[3]=0;
         swram[4]=swram[5]=swram[6]=swram[7]=1;
         swram[8]=swram[9]=swram[10]=swram[11]=0;
@@ -164,8 +167,8 @@ void romsetup_master128()
         romused[4]=romused[5]=romused[6]=romused[7]=1;
         romused[8]=romused[9]=romused[10]=romused[11]=1;
         romused[12]=romused[13]=romused[14]=romused[15]=1;
-        memset(rom,0,16*16384);
         f=fopen("master/mos3.20","rb");
+//        printf("F %i\n",f);
         fread(os,16384,1,f);
         fread(rom+(9*16384),7*16384,1,f);
         fclose(f);

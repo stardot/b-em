@@ -163,6 +163,7 @@ void writemem(uint16_t addr, uint8_t val)
                 }
                 if (MASTER)
                 {
+                        printf("Write %04X %02X %i %i\n",addr,val,scry,scrx);
                         acccon=val;
                         ram8k=(val&8);
                         ram20k=(val&4);

@@ -85,6 +85,7 @@ void ddnoise_seek(int len)
         else if (len<7)  ddnoise_sstat=1;
         else if (len<30) ddnoise_sstat=2;
         else             ddnoise_sstat=3;
+        if (!sndddnoise) fdctime=200;
 //        rpclog("Start seek!\n");
 }
 

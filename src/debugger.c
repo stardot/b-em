@@ -122,6 +122,12 @@ void _debugthread(PVOID pvoid)
 
 HANDLE consf,cinf;
 
+BOOL CtrlHandler(DWORD fdwCtrlType)
+{
+        setquit();
+        return TRUE;
+}
+
 void startdebug()
 {
 
@@ -130,6 +136,7 @@ void startdebug()
         hinst=GetModuleHandle(NULL);
         debugthread=(HANDLE)_beginthread(_debugthread,0,NULL);
                 AllocConsole();
+                SetConsoleCtrlHandler((PHANDLER_ROUTINE)CtrlHandler,TRUE);
                 consf=GetStdHandle(STD_OUTPUT_HANDLE);
                 cinf=GetStdHandle(STD_INPUT_HANDLE);
         }
@@ -719,7 +726,10 @@ void dodebugger()
                                 }
                         }
                         break;
-                        case 'q': case 'Q': exit(0);
+                        case 'q': case 'Q':
+                        setquit();
+                        while (1);
+                        break;
                         case 'h': case 'H': case '?':
                         sprintf(outs,"\n    Debugger commands :\n\n");
                         debugout(outs);

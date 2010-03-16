@@ -320,3 +320,4 @@ extern int savescrshot;
 extern char scrshotname[260];
 extern int tapeloaded;
 extern int defaultwriteprot;
+void setquit();

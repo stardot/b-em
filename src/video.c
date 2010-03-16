@@ -232,6 +232,7 @@ void writeula(uint16_t addr, uint8_t val)
                 bakpal[val>>4]=val&15;
                 ulapal[val>>4]=collook[(val&7)^7];
                 if (val&8) ulapal[val>>4]=collook[val&7];
+//                ulapal[val>>4]=collook[(val>>4)&7];
 //                makelookup();
 /*                if ((val&15)!=c)
                 {
@@ -517,8 +518,10 @@ uint8_t m7buf[2];
 uint8_t *mode7p[2]={mode7chars,mode7charsi};
 int mode7sep=0;
 int mode7dbl,mode7nextdbl,mode7wasdbl;
+int mode7gfx;
 int mode7flash,m7flashon=0,m7flashtime=0;
 uint8_t heldchar,holdchar;
+char *heldp[2];
 
 int interlace=0,interlline=0,oldr8;
 
@@ -527,11 +530,19 @@ static inline void rendermode7(uint8_t dat)
 {
         int t,c;
         int off;
+        int mcolx=mode7col;
+        char *mode7px[2];
+        int mode7flashx=mode7flash,mode7dblx=mode7dbl;
         uint8_t *on;
+
         t=m7buf[0];
         m7buf[0]=m7buf[1];
         m7buf[1]=dat;
         dat=t;
+        mode7px[0]=mode7p[0];
+        mode7px[1]=mode7p[1];
+
+        if (!mode7dbl && mode7nextdbl) on=m7lookup[mode7bg&7][mode7bg&7];
         if (dat==255)
         {
                 for (c=0;c<16;c++)
@@ -552,6 +563,7 @@ static inline void rendermode7(uint8_t dat)
                 switch (dat)
                 {
                         case 1: case 2: case 3: case 4: case 5: case 6: case 7:
+                        mode7gfx=0;
                         mode7col=dat;
                         mode7p[0]=mode7chars;
                         mode7p[1]=mode7charsi;
@@ -563,6 +575,7 @@ static inline void rendermode7(uint8_t dat)
                         if (mode7dbl) mode7wasdbl=1;
                         break;
                         case 17: case 18: case 19: case 20: case 21: case 22: case 23:
+                        mode7gfx=1;
                         mode7col=dat&7;
                         if (mode7sep)
                         {
@@ -576,31 +589,42 @@ static inline void rendermode7(uint8_t dat)
                         }
                         break;
                         case 24: mode7col=mode7bg; break;
-                        case 25: mode7p[0]=mode7graph;    mode7p[1]=mode7graphi;    mode7sep=0; break;
-                        case 26: mode7p[0]=mode7sepgraph; mode7p[1]=mode7sepgraphi; mode7sep=1; break;
+                        case 25: if (mode7gfx) { mode7p[0]=mode7graph;    mode7p[1]=mode7graphi;    } mode7sep=0; break;
+                        case 26: if (mode7gfx) { mode7p[0]=mode7sepgraph; mode7p[1]=mode7sepgraphi; } mode7sep=1; break;
                         case 28: mode7bg=0; break;
                         case 29: mode7bg=mode7col; break;
                         case 30: holdchar=1; break;
                         case 31: holdchar=0; break;
                 }
                 if (holdchar && mode7p[0]!=mode7chars)
-                   dat=heldchar;
+                {
+                        dat=heldchar;
+                        if (dat>=0x40 && dat<0x60) dat=32;
+                        mode7px[0]=heldp[0];
+                        mode7px[1]=heldp[1];
+                }
                 else
                    dat=0x20;
+                if (mode7dblx!=mode7dbl) dat=32; /*Double height doesn't respect held characters*/
         }
         else if (mode7p[0]!=mode7chars)
-           heldchar=dat;
-        if (mode7dbl && !mode7nextdbl) t=((dat-0x20)*160)+((sc>>1)*16);
-        else if (mode7dbl)             t=((dat-0x20)*160)+((sc>>1)*16)+(5*16);
+        {
+                heldchar=dat;
+                heldp[0]=mode7px[0];
+                heldp[1]=mode7px[1];
+        }
+        if (mode7dblx && !mode7nextdbl) t=((dat-0x20)*160)+((sc>>1)*16);
+        else if (mode7dblx)             t=((dat-0x20)*160)+((sc>>1)*16)+(5*16);
         else                           t=((dat-0x20)*160)+(sc*16);
+
         off=m7lookup[0][mode7bg&7][0];
-        on=m7lookup[mode7col&7][mode7bg&7];
-        if (!mode7dbl && mode7nextdbl) on=m7lookup[mode7bg&7][mode7bg&7];
+        on=m7lookup[mcolx&7][mode7bg&7];
+
         for (c=0;c<16;c++)
         {
-                if (mode7flash && !m7flashon)    b->line[scry][scrx+c+16]=off;
-                else if (mode7dbl/* || !(interlace || linedbl)*/) b->line[scry][scrx+c+16]=on[mode7p[sc&1][t]&15];
-                else                             b->line[scry][scrx+c+16]=on[mode7p[interlace&interlline][t]&15];
+                if (mode7flashx && !m7flashon)    b->line[scry][scrx+c+16]=off;
+                else if (mode7dblx/* || !(interlace || linedbl)*/) b->line[scry][scrx+c+16]=on[mode7px[sc&1][t]&15];
+                else                             b->line[scry][scrx+c+16]=on[mode7px[interlace&interlline][t]&15];
                 t++;
         }
 //        if (dat!=0x20) rpclog("%i %i %08X %08X %08X %i\n",interlace,interlline,mode7p[0],mode7chars,mode7charsi,t);
@@ -611,8 +635,8 @@ static inline void rendermode7(uint8_t dat)
                 for (c=0;c<16;c++)
                 {
                         if (mode7flash && !m7flashon)   b->line[scry+1][scrx+c+16]=off;
-                        else if (mode7dbl)              b->line[scry+1][scrx+c+16]=on[mode7p[sc&1][t]&15];
-                        else                            b->line[scry+1][scrx+c+16]=on[mode7p[1][t]&15];
+                        else if (mode7dblx)             b->line[scry+1][scrx+c+16]=on[mode7px[sc&1][t]&15];
+                        else                            b->line[scry+1][scrx+c+16]=on[mode7px[1][t]&15];
                         t++;
                 }
         }
@@ -952,6 +976,10 @@ void pollvideo(int clocks)
                         mode7p[1]=mode7charsi;
                         mode7flash=0;
                         mode7sep=0;
+                        mode7gfx=0;
+                        heldchar=32;
+                        heldp[0]=mode7p[0];
+                        heldp[1]=mode7p[1];
 
                         hc=0;
                         if (sc==(crtc[11]&31) || ((crtc[8]&3)==3 && sc==((crtc[11]&31)>>1))) { con=0; coff=1; }

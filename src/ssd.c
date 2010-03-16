@@ -144,14 +144,16 @@ void ssd_readaddress(int drive, int track, int side, int density)
         ssdtrack=track;
         ssdside=side;
         ssddrive=drive;
+        printf("Read address %i %i %i %i\n",drive,track,side,density);
 
         if (!ssdf[drive] || (side && !dsd[drive]) || density || track!=ssdtrackc[drive])
         {
                 ssdnotfound=500;
                 return;
         }
-        ssdsector=1;
+        ssdrsector=0;
         ssdreadpos=0;
+        ssdreadaddr=1;
 }
 
 void ssd_format(int drive, int track, int side, int density)
