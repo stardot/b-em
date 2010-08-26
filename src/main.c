@@ -229,7 +229,9 @@ void initbbc(int argc, char *argv[])
 
         initvideo();
         makemode7chars();
+#ifndef WIN32
         install_keyboard();
+#endif
         install_timer();
 //        install_mouse();
         initmem();

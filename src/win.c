@@ -430,8 +430,10 @@ int getsfile(HWND hwnd, char *f, char *fn)
         return 1;
 }
 
+extern unsigned char hw_to_mycode[256];
 LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+        int c;
         HMENU hmenu;
         switch (message)
         {
@@ -706,6 +708,50 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         ClipCursor(&arcclip);
                         mousecapture=1;
                         updatewindowtitle();
+                }
+                break;
+
+                case WM_SYSKEYDOWN:
+                case WM_KEYDOWN:
+                if (LOWORD(wParam)!=255)
+                {
+                        //rpclog("Key %04X %04X\n",LOWORD(wParam),VK_LEFT);
+                        c=MapVirtualKey(LOWORD(wParam),0);
+                        c=hw_to_mycode[c];
+                        rpclog("MVK %i %i %i\n",c,hw_to_mycode[c],KEY_PGUP);
+                        if (LOWORD(wParam)==VK_LEFT)   c=KEY_LEFT;
+                        if (LOWORD(wParam)==VK_RIGHT)  c=KEY_RIGHT;
+                        if (LOWORD(wParam)==VK_UP)     c=KEY_UP;
+                        if (LOWORD(wParam)==VK_DOWN)   c=KEY_DOWN;
+                        if (LOWORD(wParam)==VK_HOME)   c=KEY_HOME;
+                        if (LOWORD(wParam)==VK_END)    c=KEY_END;
+                        if (LOWORD(wParam)==VK_INSERT) c=KEY_INSERT;
+                        if (LOWORD(wParam)==VK_DELETE) c=KEY_DEL;
+                        if (LOWORD(wParam)==VK_PRIOR)  c=KEY_PGUP;
+                        if (LOWORD(wParam)==VK_NEXT)   c=KEY_PGDN;
+                        //rpclog("MVK2 %i %i %i\n",c,hw_to_mycode[c],KEY_PGUP);
+                        key[c]=1;
+                }
+                break;
+                case WM_SYSKEYUP:
+                case WM_KEYUP:
+                if (LOWORD(wParam)!=255)
+                {
+//                        rpclog("Key %04X %04X\n",LOWORD(wParam),VK_LEFT);
+                        c=MapVirtualKey(LOWORD(wParam),0);
+                        c=hw_to_mycode[c];
+                        if (LOWORD(wParam)==VK_LEFT)   c=KEY_LEFT;
+                        if (LOWORD(wParam)==VK_RIGHT)  c=KEY_RIGHT;
+                        if (LOWORD(wParam)==VK_UP)     c=KEY_UP;
+                        if (LOWORD(wParam)==VK_DOWN)   c=KEY_DOWN;
+                        if (LOWORD(wParam)==VK_HOME)   c=KEY_HOME;
+                        if (LOWORD(wParam)==VK_END)    c=KEY_END;
+                        if (LOWORD(wParam)==VK_INSERT) c=KEY_INSERT;
+                        if (LOWORD(wParam)==VK_DELETE) c=KEY_DEL;
+                        if (LOWORD(wParam)==VK_PRIOR)  c=KEY_PGUP;
+                        if (LOWORD(wParam)==VK_NEXT)   c=KEY_PGDN;
+//                        rpclog("MVK %i\n",c);
+                        key[c]=0;
                 }
                 break;
 
