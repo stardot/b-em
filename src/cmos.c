@@ -1,4 +1,4 @@
-/*B-em v2.0 by Tom Walker
+/*B-em v2.1 by Tom Walker
   Master 128 CMOS emulation*/
 #include <stdio.h>
 #include "b-em.h"
@@ -40,11 +40,15 @@ void loadcmos(MODEL m)
         FILE *f;
         char fn[512];
         if (!m.cmos[0]) return;
-        sprintf(fn,"%s%s",exedir,m.cmos);
-        rpclog("Opening %s\n",fn);
-        f=fopen(fn,"rb");
-        fread(cmos,64,1,f);
-        fclose(f);
+        if (m.compact) loadcompactcmos(m);
+        else
+        {
+                sprintf(fn,"%s%s",exedir,m.cmos);
+                rpclog("Opening %s\n",fn);
+                f=fopen(fn,"rb");
+                fread(cmos,64,1,f);
+                fclose(f);
+        }
 }
 
 void savecmos(MODEL m)
@@ -52,9 +56,13 @@ void savecmos(MODEL m)
         FILE *f;
         char fn[512];
         if (!m.cmos[0]) return;
-        sprintf(fn,"%s%s",exedir,m.cmos);
-        rpclog("Opening %s\n",fn);
-        f=fopen(fn,"wb");
-        fwrite(cmos,64,1,f);
-        fclose(f);
+        if (m.compact) savecompactcmos(m);
+        else
+        {
+                sprintf(fn,"%s%s",exedir,m.cmos);
+                rpclog("Opening %s\n",fn);
+                f=fopen(fn,"wb");
+                fwrite(cmos,64,1,f);
+                fclose(f);
+        }
 }

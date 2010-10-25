@@ -1,4 +1,4 @@
-/*B-em v2.0 by Tom Walker
+/*B-em v2.1 by Tom Walker
   ROM handling*/
 
 #include <allegro.h>
@@ -21,8 +21,8 @@ void initmem()
 
 void resetmem()
 {
-        memset(romused,0,16);
-        memset(swram,0,16);
+        memset(romused,0,sizeof(romused));
+        memset(swram,0,sizeof(swram));
         memset(ram,0,128*1024);
         memset(rom,0,16*16384);
         memset(os,0,16384);
@@ -41,7 +41,10 @@ void dumpram()
         fwrite(ram,128*1024,1,f);
         fclose(f);
         f=fopen("swram.dmp","wb");
-        fwrite(&rom[romsel],16384,1,f);
+        fwrite(&rom[4*16384],16384,1,f);
+        fwrite(&rom[5*16384],16384,1,f);
+        fwrite(&rom[6*16384],16384,1,f);
+        fwrite(&rom[7*16384],16384,1,f);
         fclose(f);
 }
 
@@ -58,7 +61,7 @@ void loadswroms()
                 while (romused[c] && c>=0) c--;
                 if (c>=0)
                 {
-                        printf("Loading %s to slot %i\n",ffblk.name,c);
+//                        printf("Loading %s to slot %i\n",ffblk.name,c);
                         f=fopen(ffblk.name,"rb");
                         fread(rom+(c*16384),16384,1,f);
                         fclose(f);
@@ -75,7 +78,7 @@ void loadswroms()
                 while (romused[c] && c>=0) c--;
                 if (c>=0)
                 {
-                        printf("Loading %s to slot %i\n",ffblk.name,c);
+//                        printf("Loading %s to slot %i\n",ffblk.name,c);
                         f=fopen(ffblk.name,"rb");
                         fread(rom+(c*16384),16384,1,f);
                         fclose(f);
@@ -93,6 +96,24 @@ void fillswram()
         for (c=0;c<16;c++)
         {
                 if (!romused[c]) swram[c]=1;
+        }
+}
+
+void loadiderom()
+{
+        int c=15;
+        FILE *f;
+        char path[512];
+        sprintf(path,"%sroms/ADFS1-53.rom",exedir);
+        while (romused[c] && c>=0) c--;
+        if (c>=0)
+        {
+//                printf("Loading %s to slot %i\n",path,c);
+                f=fopen(path,"rb");
+                fread(rom+(c*16384),16384,1,f);
+                fclose(f);
+                romused[c]=1;
+                c--;
         }
 }
 
@@ -129,7 +150,7 @@ void romsetup_os01()
         chdir("a01");
         if (!al_findfirst("*.rom",&ffblk,FA_ALL))
         {
-                printf("Loading %s to slot %i\n",ffblk.name,c);
+//                printf("Loading %s to slot %i\n",ffblk.name,c);
                 f=fopen(ffblk.name,"rb");
                 fread(rom,16384,1,f);
                 fclose(f);
@@ -163,9 +184,9 @@ void romsetup_master128()
         swram[4]=swram[5]=swram[6]=swram[7]=1;
         swram[8]=swram[9]=swram[10]=swram[11]=0;
         swram[12]=swram[13]=swram[14]=swram[15]=0;
-        romused[0]=romused[1]=romused[2]=romused[3]=0;
+        romused[0]=romused[1]=romused[2]=romused[3]=romused[8]=0;
         romused[4]=romused[5]=romused[6]=romused[7]=1;
-        romused[8]=romused[9]=romused[10]=romused[11]=1;
+        romused[9]=romused[10]=romused[11]=1;
         romused[12]=romused[13]=romused[14]=romused[15]=1;
         f=fopen("master/mos3.20","rb");
 //        printf("F %i\n",f);
@@ -181,7 +202,7 @@ void romsetup_mastercompact()
         romused[4]=romused[5]=romused[6]=romused[7]=1;
         romused[8]=romused[9]=romused[10]=romused[11]=1;
         romused[12]=romused[13]=romused[14]=romused[15]=1;
-        printf("Master compact init\n");
+//        printf("Master compact init\n");
         f=fopen("compact/os51.rom","rb");
         fread(os,16384,1,f);
         fclose(f);
@@ -194,4 +215,20 @@ void romsetup_mastercompact()
         f=fopen("compact/utils.rom","rb");
         fread(rom+(15*16384),16384,1,f);
         fclose(f);
+}
+
+void savememstate(FILE *f)
+{
+        putc(ram_fe30,f);
+        putc(ram_fe34,f);
+        fwrite(ram,64*1024,1,f);
+        fwrite(rom,256*1024,1,f);
+}
+
+void loadmemstate(FILE *f)
+{
+        writemem(0xFE30,getc(f));
+        writemem(0xFE34,getc(f));
+        fread(ram,64*1024,1,f);
+        fread(rom,256*1024,1,f);
 }

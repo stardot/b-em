@@ -1,4 +1,4 @@
-/*B-em v2.0 by Tom Walker
+/*B-em v2.1 by Tom Walker
   Tape noise (not very good)*/
 
 #include <stdio.h>
@@ -25,7 +25,7 @@ void maketapenoise()
         getcwd(p2,511);
         if (ddtype) sprintf(path,"%sddnoise",exedir);
         else        sprintf(path,"%sddnoise",exedir);
-        printf("path now %s\n",path);
+//        printf("path now %s\n",path);
         chdir(path);
         tsamples[0]=load_wav("motoron.wav");
         tsamples[1]=load_wav("motoroff.wav");
@@ -56,7 +56,7 @@ void addhighnoise()
         }
 }
 
-void adddatnoise(unsigned char dat)
+void adddatnoise(uint8_t dat)
 {
         int c,d,e=0;
         float wavediv=(32.0f*2400.0f)/44100.0f;

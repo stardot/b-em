@@ -1,4 +1,4 @@
-/*B-em v2.0 by Tom Walker
+/*B-em v2.1 by Tom Walker
   Disc drive noise*/
 
 #include <allegro.h>
@@ -25,7 +25,7 @@ void loaddiscsamps()
         getcwd(p2,511);
         if (ddtype) sprintf(path,"%sddnoise/35",exedir);
         else        sprintf(path,"%sddnoise/525",exedir);
-        printf("path now %s\n",path);
+//        printf("path now %s\n",path);
         chdir(path);
         seeksmp[0][0]=load_wav("stepo.wav");
         if (seeksmp[0][0])
@@ -53,7 +53,7 @@ void loaddiscsamps()
         motorsmp[1]=load_wav("motor.wav");
         motorsmp[2]=load_wav("motoroff.wav");
         chdir(p2);
-        printf("done!\n");
+//        printf("done!\n");
 }
 
 void closeddnoise()

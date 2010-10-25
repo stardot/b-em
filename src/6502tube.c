@@ -1,4 +1,4 @@
-/*B-em v2.0 by Tom Walker
+/*B-em v2.1 by Tom Walker
   6502 parasite CPU emulation*/
 
 #include <allegro.h>
@@ -62,9 +62,9 @@ void tubedumpregs()
         FILE *f=fopen("tuberam.dmp","wb");
         fwrite(tuberam,65536,1,f);
         fclose(f);
-        printf("Tube 65c12 registers :\n");
-        printf("A=%02X X=%02X Y=%02X S=01%02X PC=%04X\n",a,x,y,s,pc);
-        printf("Status : %c%c%c%c%c%c\n",(tubep.n)?'N':' ',(tubep.v)?'V':' ',(tubep.d)?'D':' ',(tubep.i)?'I':' ',(tubep.z)?'Z':' ',(tubep.c)?'C':' ');
+        rpclog("Tube 65c12 registers :\n");
+        rpclog("A=%02X X=%02X Y=%02X S=01%02X PC=%04X\n",a,x,y,s,pc);
+        rpclog("Status : %c%c%c%c%c%c\n",(tubep.n)?'N':' ',(tubep.v)?'V':' ',(tubep.d)?'D':' ',(tubep.i)?'I':' ',(tubep.z)?'Z':' ',(tubep.c)?'C':' ');
 }
 
 int tuberomin=1;

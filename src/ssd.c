@@ -1,4 +1,4 @@
-/*B-em v2.0 by Tom Walker
+/*B-em v2.1 by Tom Walker
   SSD/DSD disc handling*/
 #include <stdio.h>
 #include "b-em.h"
@@ -71,7 +71,7 @@ void ssd_close(int drive)
 void ssd_seek(int drive, int track)
 {
         if (!ssdf[drive]) return;
-        printf("Seek :%i to %i\n",drive,track);
+//        printf("Seek :%i to %i\n",drive,track);
         ssdtrackc[drive]=track;
         if (dsd[drive])
         {
@@ -108,12 +108,12 @@ void ssd_readsector(int drive, int sector, int track, int side, int density)
         ssdtrack=track;
         ssdside=side;
         ssddrive=drive;
-        printf("Read sector %i %i %i %i\n",drive,side,track,sector);
+//        printf("Read sector %i %i %i %i\n",drive,side,track,sector);
 
         if (!ssdf[drive] || (side && !dsd[drive]) || density || track!=ssdtrackc[drive])
         {
                 ssdnotfound=500;
-//                printf("Not found!\n");
+///                printf("Not found!\n");
                 return;
         }
         ssdread=1;
@@ -127,7 +127,7 @@ void ssd_writesector(int drive, int sector, int track, int side, int density)
         ssdtrack=track;
         ssdside=side;
         ssddrive=drive;
-        printf("Write sector %i %i %i %i\n",drive,side,track,sector);
+//        printf("Write sector %i %i %i %i\n",drive,side,track,sector);
 
         if (!ssdf[drive] || (side && !dsd[drive]) || density || track!=ssdtrackc[drive])
         {
@@ -144,7 +144,7 @@ void ssd_readaddress(int drive, int track, int side, int density)
         ssdtrack=track;
         ssdside=side;
         ssddrive=drive;
-        printf("Read address %i %i %i %i\n",drive,track,side,density);
+//        printf("Read address %i %i %i %i\n",drive,track,side,density);
 
         if (!ssdf[drive] || (side && !dsd[drive]) || density || track!=ssdtrackc[drive])
         {

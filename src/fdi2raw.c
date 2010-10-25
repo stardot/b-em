@@ -1394,7 +1394,7 @@ STATIC_INLINE void addbit (uae_u8 *p, int bit)
 
 
 struct pulse_sample {
-        unsigned long size;
+        uint32_t size;
         int number_of_bits;
 };
 
@@ -1406,7 +1406,7 @@ static int array_index;
 static unsigned long total;
 static int totaldiv;
 
-static void init_array(unsigned long standard_MFM_2_bit_cell_size, int nb_of_bits)
+static void init_array(uint32_t standard_MFM_2_bit_cell_size, int nb_of_bits)
 {
         int i;
 
@@ -1421,12 +1421,12 @@ static void init_array(unsigned long standard_MFM_2_bit_cell_size, int nb_of_bit
 
 #if 0
 
-static void fdi2_decode (FDI *fdi, unsigned long totalavg, uae_u32 *avgp, uae_u32 *minp, uae_u32 *maxp, uae_u8 *idx, int maxidx, int *indexoffsetp, int pulses, int mfm)
+static void fdi2_decode (FDI *fdi, uint32_t totalavg, uae_u32 *avgp, uae_u32 *minp, uae_u32 *maxp, uae_u8 *idx, int maxidx, int *indexoffsetp, int pulses, int mfm)
 {
-        unsigned long adjust;
-        unsigned long adjusted_pulse;
-        unsigned long standard_MFM_2_bit_cell_size = totalavg / 50000;
-        unsigned long standard_MFM_8_bit_cell_size = totalavg / 12500;
+        uint32_t adjust;
+        uint32_t adjusted_pulse;
+        uint32_t standard_MFM_2_bit_cell_size = totalavg / 50000;
+        uint32_t standard_MFM_8_bit_cell_size = totalavg / 12500;
         int real_size, i, j, eodat, outstep;
         int indexoffset = *indexoffsetp;
         uae_u8 *d = fdi->track_dst_buffer;
@@ -1548,12 +1548,12 @@ static void fdi2_decode (FDI *fdi, unsigned long totalavg, uae_u32 *avgp, uae_u3
 
 #else
 
-static void fdi2_decode (FDI *fdi, unsigned long totalavg, uae_u32 *avgp, uae_u32 *minp, uae_u32 *maxp, uae_u8 *idx, int maxidx, int *indexoffsetp, int pulses, int mfm)
+static void fdi2_decode (FDI *fdi, uint32_t totalavg, uae_u32 *avgp, uae_u32 *minp, uae_u32 *maxp, uae_u8 *idx, int maxidx, int *indexoffsetp, int pulses, int mfm)
 {
-        unsigned long adjust;
-        unsigned long adjusted_pulse;
-        unsigned long standard_MFM_2_bit_cell_size = totalavg / 50000;
-        unsigned long standard_MFM_8_bit_cell_size = totalavg / 12500;
+        uint32_t adjust;
+        uint32_t adjusted_pulse;
+        uint32_t standard_MFM_2_bit_cell_size = totalavg / 50000;
+        uint32_t standard_MFM_8_bit_cell_size = totalavg / 12500;
         int real_size, i, j, nexti, eodat, outstep, randval;
         int indexoffset = *indexoffsetp;
         uae_u8 *d = fdi->track_dst_buffer;
@@ -1792,7 +1792,7 @@ static void fdi2_decode (FDI *fdi, unsigned long totalavg, uae_u32 *avgp, uae_u3
 
 #endif
 
-static void fdi2_celltiming (FDI *fdi, unsigned long totalavg, int bitoffset, uae_u16 *out)
+static void fdi2_celltiming (FDI *fdi, uint32_t totalavg, int bitoffset, uae_u16 *out)
 {
         uae_u16 *pt2, *pt;
         double avg_bit_len;

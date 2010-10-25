@@ -1,4 +1,4 @@
-/*B-em v2.0 by Tom Walker
+/*B-em v2.1 by Tom Walker
   UEF/HQ-UEF tape support*/
 
 #include <allegro.h>
@@ -36,9 +36,14 @@ tapeloaded=1;
 //      gzseek(uef,27535,SEEK_SET);
 }
 
+int uefpos()
+{
+        return gztell(uef);
+}
+
 void closeuef()
 {
-printf("CloseUEF\n");
+//printf("CloseUEF\n");
         if (uef)
         {
                 gzclose(uef);
@@ -280,7 +285,7 @@ void polltape()
                         templ|=(gzgetc(uef)<<24);
                         tempf=(float *)&templ;
                         chunkf=*tempf;
-                        printf("Gap %f %i\n",chunkf,pps);
+                        //printf("Gap %f %i\n",chunkf,pps);
                         chunkpos=1;
 //                        chunkf=4;
                 }

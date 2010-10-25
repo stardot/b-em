@@ -1,4 +1,4 @@
-/*B-em v2.0 by Tom Walker
+/*B-em v2.1 by Tom Walker
   Main loop + start/finish code*/
 
 #include <allegro.h>
@@ -14,7 +14,7 @@
 #undef printf
 
 int oldmodel;
-int I8271,WD1770,BPLUS,x65c02,MASTER,MODELA,OS01;
+int I8271,WD1770,BPLUS,x65c02,MASTER,MODELA,OS01,compactcmos;
 int curmodel,curtube,oldmodel;
 int samples;
 int comedyblit;
@@ -24,26 +24,27 @@ int selecttube=-1;
 int cursid=0;
 int sidmethod=0;
 int sndinternal=1,sndbeebsid=1,sndddnoise=1;
+int autoboot=0;
 
 int joybutton[2];
 
 MODEL models[]=
 {
-        {"BBC A w/OS 0.1",       1,0,0,0,0,0,1,1,"",     "a01",  "",         romsetup_os01,         -1},
-        {"BBC B w/OS 0.1",       1,0,0,0,0,0,0,1,"",     "a01",  "",         romsetup_os01,         -1},
-        {"BBC A",                1,0,0,0,0,0,1,0,"os",   "a",    "",         NULL,                  -1},
-        {"BBC B w/8271 FDC",     1,0,0,0,0,0,0,0,"os",   "b",    "",         NULL,                  -1},
-        {"BBC B w/8271+SWRAM",   1,0,0,0,0,1,0,0,"os",   "b",    "",         NULL,                  -1},
-        {"BBC B w/1770 FDC",     0,1,0,0,0,1,0,0,"os",   "b1770","",         NULL,                  -1},
-        {"BBC B US",             1,0,0,0,0,0,0,0,"usmos","us",   "",         NULL,                  -1},
-        {"BBC B German",         1,0,0,0,0,0,0,0,"deos", "us",   "",         NULL,                  -1},
-        {"BBC B+ 64K",           0,1,0,1,0,0,0,0,"bpos", "bp",   "",         NULL,                  -1},
-        {"BBC B+ 128K",          0,1,0,1,0,0,0,0,"bpos", "bp",   "",         romsetup_bplus128,     -1},
-        {"BBC Master 128",       0,1,1,0,1,0,0,0,"","master",    "cmos.bin", romsetup_master128,    -1},
-        {"BBC Master 512",       0,1,1,0,1,0,0,0,"","master",    "cmos.bin", romsetup_master128,    3},
-        {"BBC Master Turbo",     0,1,1,0,1,0,0,0,"","master",    "cmos.bin", romsetup_master128,    0},
-        {"BBC Master Compact",   0,1,1,0,1,0,0,0,"","compact",   "cmosc.bin",romsetup_mastercompact,-1},
-        {"ARM Evaluation System",0,1,1,0,1,0,0,0,"","master",    "cmosa.bin",romsetup_master128,    1},
+        {"BBC A w/OS 0.1",       1,0,0,0,0,0,1,1,0,"",     "a01",  "",         romsetup_os01,         -1},
+        {"BBC B w/OS 0.1",       1,0,0,0,0,0,0,1,0,"",     "a01",  "",         romsetup_os01,         -1},
+        {"BBC A",                1,0,0,0,0,0,1,0,0,"os",   "a",    "",         NULL,                  -1},
+        {"BBC B w/8271 FDC",     1,0,0,0,0,0,0,0,0,"os",   "b",    "",         NULL,                  -1},
+        {"BBC B w/8271+SWRAM",   1,0,0,0,0,1,0,0,0,"os",   "b",    "",         NULL,                  -1},
+        {"BBC B w/1770 FDC",     0,1,0,0,0,1,0,0,0,"os",   "b1770","",         NULL,                  -1},
+        {"BBC B US",             1,0,0,0,0,0,0,0,0,"usmos","us",   "",         NULL,                  -1},
+        {"BBC B German",         1,0,0,0,0,0,0,0,0,"deos", "us",   "",         NULL,                  -1},
+        {"BBC B+ 64K",           0,1,0,1,0,0,0,0,0,"bpos", "bp",   "",         NULL,                  -1},
+        {"BBC B+ 128K",          0,1,0,1,0,0,0,0,0,"bpos", "bp",   "",         romsetup_bplus128,     -1},
+        {"BBC Master 128",       0,1,1,0,1,0,0,0,0,"","master",    "cmos.bin", romsetup_master128,    -1},
+        {"BBC Master 512",       0,1,1,0,1,0,0,0,0,"","master",    "cmos.bin", romsetup_master128,    3},
+        {"BBC Master Turbo",     0,1,1,0,1,0,0,0,0,"","master",    "cmos.bin", romsetup_master128,    0},
+        {"BBC Master Compact",   0,1,1,0,1,0,0,0,1,"","compact",   "cmosc.bin",romsetup_mastercompact,-1},
+        {"ARM Evaluation System",0,1,1,0,1,0,0,0,0,"","master",    "cmosa.bin",romsetup_master128,    1},
         {0,0,0,0,0,0}
 };
 
@@ -67,6 +68,7 @@ TUBE tubes[]=
         {"Z80",tubeinitz80,resetz80},
         {"80186",tubeinitx86,resetx86},
         {"65816",tubeinit65816,reset65816},
+        {"32016",tubeinit32016,reset32016},
         {0,0,0}
 };
 
@@ -109,21 +111,17 @@ void initbbc(int argc, char *argv[])
         int tapenext=0,discnext=0;
         char *p;
 
-        printf("B-em v2.0a\n");
+        startblit();
 
+        printf("B-em v2.1\n");
+rpclog("Start\n");
 //      comedyblit=0;
         fskipmax=1;
 
         initalmain(argc,argv);
-        allegro_init();
+//        allegro_init();
+        //install_allegro(SYSTEM_AUTODETECT, &errno, atexit);
 
-
-        get_executable_name(exedir,511);
-        p=get_filename(exedir);
-        p[0]=0;
-//        printf("At dir %s\n",exedir);
-
-        loadconfig();
 
         append_filename(t,exedir,"roms\\tube\\ReCo6502ROM_816",511);
         if (!file_exists(t,FA_ALL,NULL) && selecttube==4) selecttube=-1;
@@ -140,6 +138,9 @@ void initbbc(int argc, char *argv[])
         ssd_reset();
         adf_reset();
         fdi_reset();
+
+        resetide();
+
 //        loaddisc(1,"BBCMaster512-Disc2-GemApplications.adf");
 //        loaddisc(0,"dosplus.adl");
 //        loaddisc(0,"buzz.ssd");
@@ -150,35 +151,38 @@ void initbbc(int argc, char *argv[])
 //        loaddisc(1,"stuff.ssd");
         for (c=1;c<argc;c++)
         {
-//                printf("%i : %s\n",c,argv[c]);
+//                rpclog("%i : %s\n",c,argv[c]);
 /*                if (!strcasecmp(argv[c],"-1770"))
                 {
                         I8271=0;
                         WD1770=1;
                 }
                 else*/
-#ifndef WIN32
+//#ifndef WIN32
                 if (!strcasecmp(argv[c],"--help"))
                 {
-                        printf("B-em v2.0 command line options :\n\n");
+                        printf("B-em v2.1 command line options :\n\n");
                         printf("-mx             - start as model x (see readme.txt for models)\n");
                         printf("-tx             - start with tube x (see readme.txt for tubes)\n");
                         printf("-disc disc.ssd  - load disc.ssd into drives :0/:2\n");
                         printf("-disc1 disc.ssd - load disc.ssd into drives :1/:3\n");
+                        printf("-autoboot       - boot disc in drive :0\n");
                         printf("-tape tape.uef  - load tape.uef\n");
                         printf("-fasttape       - set tape speed to fast\n");
                         printf("-s              - scanlines display mode\n");
                         printf("-i              - interlace display mode\n");
                         printf("-debug          - start debugger\n");
+                        printf("-opengl         - use OpenGL for video rendering\n");
+                        printf("-allegro        - use Allegro for video rendering\n");
                         exit(-1);
                 }
                 else
-#endif
+//#endif
                 if (!strcasecmp(argv[c],"-tape"))
                 {
                         tapenext=2;
                 }
-                else if (!strcasecmp(argv[c],"-disc"))
+                else if (!strcasecmp(argv[c],"-disc") || !strcasecmp(argv[c],"-disk"))
                 {
                         discnext=1;
                 }
@@ -198,6 +202,10 @@ void initbbc(int argc, char *argv[])
                 {
                         fasttape=1;
                 }
+                else if (!strcasecmp(argv[c],"-autoboot"))
+                {
+                        autoboot=150;
+                }
                 else if (argv[c][0]=='-' && (argv[c][1]=='f' || argv[c][1]=='F'))
                 {
                         sscanf(&argv[c][2],"%i",&fskipmax);
@@ -216,6 +224,10 @@ void initbbc(int argc, char *argv[])
                 {
                         interlace=1;
                 }
+#ifndef WIN32
+                else if (!strcasecmp(argv[c],"-opengl")) opengl=1;
+                else if (!strcasecmp(argv[c],"-allegro")) opengl=0;
+#endif
                 else if (tapenext)
                    strcpy(tapefn,argv[c]);
                 else if (discnext)
@@ -223,12 +235,18 @@ void initbbc(int argc, char *argv[])
                         strcpy(discfns[discnext-1],argv[c]);
                         discnext=0;
                 }
+                else
+                {
+                        strcpy(discfns[0],argv[c]);
+                        discnext=0;
+                        autoboot=150;
+                }
                 if (tapenext) tapenext--;
         }
 
-
         initvideo();
         makemode7chars();
+
 #ifndef WIN32
         install_keyboard();
 #endif
@@ -248,11 +266,13 @@ void initbbc(int argc, char *argv[])
         MASTER=models[curmodel].master;
         MODELA=models[curmodel].modela;
         OS01=models[curmodel].os01;
+        compactcmos=models[curmodel].compact;
         getcwd(t,511);
         append_filename(t2,exedir,"roms",511);
         chdir(t2);
         if (models[curmodel].romsetup) models[curmodel].romsetup();
         loadroms(models[curmodel]);
+        if (ideenable) loadiderom();
         if (curtube!=-1) tubes[curtube].init();
         resettube();
         chdir(t);
@@ -299,15 +319,18 @@ void initbbc(int argc, char *argv[])
         loaddisc(1,discfns[1]);
         loadtape(tapefn);
         if (defaultwriteprot) writeprot[0]=writeprot[1]=1;
+
+        endblit();
 }
 
 void restartbbc()
 {
         char t[512],t2[512];
+        startblit();
         if (curtube==3) remove_mouse();
         loadcmos(models[oldmodel]);
         oldmodel=curmodel;
-        waitforready();
+//        waitforready();
         I8271=models[curmodel].I8271;
         WD1770=models[curmodel].WD1770;
         BPLUS=models[curmodel].bplus;
@@ -315,6 +338,7 @@ void restartbbc()
         MASTER=models[curmodel].master;
         MODELA=models[curmodel].modela;
         OS01=models[curmodel].os01;
+        compactcmos=models[curmodel].compact;
         curtube=selecttube;
         if (models[curmodel].tube!=-1)     curtube=models[curmodel].tube;
         resetmem();
@@ -323,6 +347,7 @@ void restartbbc()
         chdir(t2);
         if (models[curmodel].romsetup) models[curmodel].romsetup();
         loadroms(models[curmodel]);
+        if (ideenable) loadiderom();
         if (curtube!=-1) tubes[curtube].init();
         resettube();
         chdir(t);
@@ -341,10 +366,16 @@ void restartbbc()
         resetsid();
         resumeready();
         if (curtube==3) install_mouse();
+        endblit();
 }
 
 int resetting=0;
 int framesrun=0;
+
+void cleardrawit()
+{
+        fcount=0;
+}
 
 void runbbc()
 {
@@ -352,6 +383,7 @@ void runbbc()
 
                 if ((fcount>0 || key[KEY_PGUP] || (motor && fasttape)))
                 {
+                        if (autoboot) autoboot--;
                         fcount--;
                         framesrun++;
                         if (key[KEY_PGUP] || (motor && fasttape)) fcount=0;
@@ -374,6 +406,8 @@ void runbbc()
                                         if (joy[c].button[d].b) joybutton[c]=1;
                                 }
                         }
+                if (wantloadstate) doloadstate();
+                if (wantsavestate) dosavestate();
                         if (key[KEY_F10] && debugon) debug=1;
                         if (key[KEY_F12] && !resetting)
                         {
@@ -381,6 +415,7 @@ void runbbc()
                                 reset8271();
                                 reset1770();
                                 resetsid();
+                                resetide();
 
 //                                tubereset6502();
 //                                resetarm();
@@ -421,6 +456,7 @@ void closebbc()
 //        rpclog("Dump ram\n");
 //        x86dumpregs();
 //        tubedumpregs();
+//dump32016regs();
 //        dumpram();
 
         saveconfig();
@@ -450,4 +486,10 @@ void closebbc()
 //        rpclog("Done!\n");
 //        printf("Allegro gone\n"); fflush(stdout);
 //dumpregs65816();
+}
+
+void changetimerspeed(int i)
+{
+        remove_int(int50);
+        install_int_ex(int50,BPS_TO_TIMER(i));
 }

@@ -1,4 +1,4 @@
-/*B-em v2.0 by Tom Walker
+/*B-em v2.1 by Tom Walker
   ADC emulation*/
 
 #include <stdio.h>
@@ -68,4 +68,22 @@ void initadc()
         adchigh=adclow=adclatch=0;
         adcconvert=0;
         install_joystick(JOY_TYPE_AUTODETECT);
+}
+
+void saveadcstate(FILE *f)
+{
+        putc(adcstatus,f);
+        putc(adclow,f);
+        putc(adchigh,f);
+        putc(adclatch,f);
+        putc(adcconvert,f);
+}
+
+void loadadcstate(FILE *f)
+{
+        adcstatus=getc(f);
+        adclow=getc(f);
+        adchigh=getc(f);
+        adclatch=getc(f);
+        adcconvert=getc(f);
 }

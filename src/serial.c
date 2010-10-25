@@ -1,4 +1,4 @@
-/*B-em v2.0 by Tom Walker
+/*B-em v2.1 by Tom Walker
   Serial ULA emulation*/
 
 #include <stdio.h>
@@ -60,4 +60,14 @@ void updateserialreg()
                 /*Tape*/
                 aciasr&=~8; /*Clear acia CTS*/
         }
+}
+
+void saveserialulastate(FILE *f)
+{
+        putc(serialreg,f);
+}
+
+void loadserialulastate(FILE *f)
+{
+        writeserial(0,getc(f));
 }

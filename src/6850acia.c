@@ -1,4 +1,4 @@
-/*B-em v2.0 by Tom Walker
+/*B-em v2.1 by Tom Walker
   6850 ACIA emulation*/
 
 #include <stdio.h>
@@ -143,4 +143,16 @@ void pollacia()
                 else if (cswtoneon || ueftoneon) addhighnoise();
         }
 //           polltape();
+}
+
+void saveaciastate(FILE *f)
+{
+        putc(aciacr,f);
+        putc(aciasr,f);
+}
+
+void loadaciastate(FILE *f)
+{
+        aciacr=getc(f);
+        aciasr=getc(f);
 }

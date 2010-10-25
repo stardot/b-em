@@ -1,4 +1,4 @@
-/*B-em v2.0 by Tom Walker
+/*B-em v2.1 by Tom Walker
   80186 emulation
   Originally from PCem
   A few bits of 80286 emulation hanging around also*/

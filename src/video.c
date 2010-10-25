@@ -1,14 +1,17 @@
-/*B-em v2.0 by Tom Walker
+/*B-em v2.1 by Tom Walker
   Video emulation
   Incorporates 6845 CRTC, Video ULA and SAA5050*/
 
 #include <stdio.h>
 #include <allegro.h>
 #include <stdint.h>
+#include <alleggl.h>
 #include "b-em.h"
 #include "bbctext.h"
 #include "serial.h"
 
+
+int opengl=0;
 uint16_t vidbank;
 uint8_t crtc[32];
 uint8_t crtcmask[32]={0xFF,0xFF,0xFF,0xFF,0x7F,0x1F,0x7F,0x7F,0xF3,0x1F,0x7F,0x1F,0x3F,0xFF,0x3F,0xFF,0x3F,0xFF};
@@ -194,7 +197,7 @@ void makelookup()
 void writeula(uint16_t addr, uint8_t val)
 {
         int c;
-//        rpclog("ULA write %04X %02X %i\n",addr,val,hc);
+//        rpclog("ULA write %04X %02X %i %i\n",addr,val,hc,vc);
         if (!(addr&1))
         {
 //        printf("ULA write %04X %02X\n",addr,val);
@@ -227,7 +230,7 @@ void writeula(uint16_t addr, uint8_t val)
         }
         else
         {
-//        printf("ULA write %04X %02X\n",addr,val);
+//        rpclog("ULA write %04X %02X\n",addr,val);
                 c=bakpal[val>>4];
                 bakpal[val>>4]=val&15;
                 ulapal[val>>4]=collook[(val&7)^7];
@@ -244,7 +247,7 @@ void writeula(uint16_t addr, uint8_t val)
 }
 
 
-BITMAP *b,*b16,*b16x;
+BITMAP *b,*b16,*b16x,*tb;
 #ifdef WIN32
 BITMAP *vb;
 #endif
@@ -264,6 +267,7 @@ PALETTE beebpal=
 int inverttbl[256];
 int dcol;
 PALETTE pal;
+BITMAP *tvb;
 
 void initvideo()
 {
@@ -272,11 +276,16 @@ void initvideo()
 
         dcol=desktop_color_depth();
         set_color_depth(dcol);
-        set_gfx_mode(GFX_AUTODETECT_WINDOWED,832,624,0,0);
+        if (opengl) openglinit();
+#ifdef WIN32
+        else        set_gfx_mode(GFX_AUTODETECT_WINDOWED,2048,2048,0,0);
+#else
+        else        set_gfx_mode(GFX_AUTODETECT_WINDOWED,640,480,0,0);
+#endif
         #ifdef WIN32
-        vb=create_video_bitmap(832,312);
+        if (!opengl) vb=create_video_bitmap(832,614);
         #endif
-b16x=create_bitmap(832,614);
+        b16x=create_bitmap(832,614);
         b16=create_bitmap(832,614);
         set_color_depth(8);
         for (c=1;c<16;c++)
@@ -336,57 +345,6 @@ b16x=create_bitmap(832,614);
         b=create_bitmap(1280,800);
         clear_to_color(b,collook[0]);
         for (c=0;c<256;c++) inverttbl[c]=makecol(255-pal[c].r,255-pal[c].g,255-pal[c].b);
-}
-
-void clearscreen()
-{
-        set_color_depth(dcol);
-        #ifdef WIN32
-        clear(vb);
-        #endif
-        clear(b16);
-        clear(b16x);
-        clear(screen);
-        set_color_depth(8);
-        clear_to_color(b,collook[0]);
-}
-
-void closevideo()
-{
-        destroy_bitmap(b16x);
-        destroy_bitmap(b16);
-        destroy_bitmap(b);
-        #ifdef WIN32
-        destroy_bitmap(vb);
-        #endif
-}
-
-void enterfullscreen()
-{
-        #ifdef WIN32
-        destroy_bitmap(vb);
-        #endif
-        set_color_depth(dcol);
-        set_gfx_mode(GFX_AUTODETECT_FULLSCREEN,800,600,0,0);
-        #ifdef WIN32
-        vb=create_video_bitmap(832,312);
-        #endif
-        set_color_depth(8);
-        set_palette(pal);
-}
-void leavefullscreen()
-{
-        #ifdef WIN32
-        destroy_bitmap(vb);
-        #endif
-        set_color_depth(dcol);
-        set_gfx_mode(GFX_AUTODETECT_WINDOWED,832,624,0,0);
-        #ifdef WIN32
-        vb=create_video_bitmap(832,312);
-        #endif
-        set_color_depth(8);
-        set_palette(pal);
-        updatewindowsize(640,480);
 }
 
 uint8_t mode7chars[96*160],mode7charsi[96*160],mode7graph[96*160],mode7graphi[96*160],mode7sepgraph[96*160],mode7sepgraphi[96*160],mode7tempi[96*120],mode7tempi2[96*120];
@@ -499,14 +457,6 @@ void makemode7chars()
 }
 
 
-/*  +++***
-
-    **++**
-
-    ******
-
-*/
-
 int vidclocks=0;
 int oddclock=0;
 int vidbytes=0;
@@ -531,6 +481,7 @@ static inline void rendermode7(uint8_t dat)
         int t,c;
         int off;
         int mcolx=mode7col;
+        int holdoff=0,holdclear=0;
         char *mode7px[2];
         int mode7flashx=mode7flash,mode7dblx=mode7dbl;
         uint8_t *on;
@@ -558,6 +509,7 @@ static inline void rendermode7(uint8_t dat)
                 }
                 return;
         }
+
         if (dat<0x20)
         {
                 switch (dat)
@@ -567,6 +519,8 @@ static inline void rendermode7(uint8_t dat)
                         mode7col=dat;
                         mode7p[0]=mode7chars;
                         mode7p[1]=mode7charsi;
+                        holdclear=1;
+//                        heldchar=32;
                         break;
                         case 8: mode7flash=1; break;
                         case 9: mode7flash=0; break;
@@ -588,15 +542,15 @@ static inline void rendermode7(uint8_t dat)
                                 mode7p[1]=mode7graphi;
                         }
                         break;
-                        case 24: mode7col=mode7bg; break;
+                        case 24: mode7col=mcolx=mode7bg; break;
                         case 25: if (mode7gfx) { mode7p[0]=mode7graph;    mode7p[1]=mode7graphi;    } mode7sep=0; break;
                         case 26: if (mode7gfx) { mode7p[0]=mode7sepgraph; mode7p[1]=mode7sepgraphi; } mode7sep=1; break;
                         case 28: mode7bg=0; break;
                         case 29: mode7bg=mode7col; break;
                         case 30: holdchar=1; break;
-                        case 31: holdchar=0; break;
+                        case 31: /*holdchar=0; heldchar=32; */ holdoff=1; break;
                 }
-                if (holdchar && mode7p[0]!=mode7chars)
+                if (holdchar)// && mode7p[0]!=mode7chars)
                 {
                         dat=heldchar;
                         if (dat>=0x40 && dat<0x60) dat=32;
@@ -613,12 +567,14 @@ static inline void rendermode7(uint8_t dat)
                 heldp[0]=mode7px[0];
                 heldp[1]=mode7px[1];
         }
+
         if (mode7dblx && !mode7nextdbl) t=((dat-0x20)*160)+((sc>>1)*16);
         else if (mode7dblx)             t=((dat-0x20)*160)+((sc>>1)*16)+(5*16);
         else                           t=((dat-0x20)*160)+(sc*16);
 
         off=m7lookup[0][mode7bg&7][0];
-        on=m7lookup[mcolx&7][mode7bg&7];
+        if (!mode7dbl && mode7nextdbl) on=m7lookup[mode7bg&7][mode7bg&7];
+        else                           on=m7lookup[mcolx&7][mode7bg&7];
 
         for (c=0;c<16;c++)
         {
@@ -634,7 +590,7 @@ static inline void rendermode7(uint8_t dat)
                 t-=16;
                 for (c=0;c<16;c++)
                 {
-                        if (mode7flash && !m7flashon)   b->line[scry+1][scrx+c+16]=off;
+                        if (mode7flashx && !m7flashon)   b->line[scry+1][scrx+c+16]=off;
                         else if (mode7dblx)             b->line[scry+1][scrx+c+16]=on[mode7px[sc&1][t]&15];
                         else                            b->line[scry+1][scrx+c+16]=on[mode7px[1][t]&15];
                         t++;
@@ -642,6 +598,12 @@ static inline void rendermode7(uint8_t dat)
         }
         if ((scrx+16)<firstx) firstx=scrx+16;
         if ((scrx+32)>lastx) lastx=scrx+32;
+        if (holdoff)
+        {
+                holdchar=0;
+                heldchar=32;
+        }
+        if (holdclear) heldchar=32;
 }
 
 uint8_t cursorlook[7]={0,0,0,0x80,0x40,0x20,0x20};
@@ -654,95 +616,13 @@ int olddispen;
 int oldlen;
 int ccount=0;
 int mcount=8;
-int savescrshot=0;
-BITMAP *scrshotb,*scrshotb2;
-char scrshotname[260];
 
-void doblit()
+void latchpen()
 {
-        int c;
-        startblit();
-        if (savescrshot)
-        {
-                set_color_depth(dcol);
-                scrshotb=create_bitmap(lastx-firstx,(lasty-firsty<<1));
-                scrshotb2=create_bitmap(lastx-firstx,lasty-firsty);
-                if (interlace || linedbl)
-                {
-                        blit(b,scrshotb,firstx,firsty<<1,0,0,lastx-firstx,(lasty-firsty)<<1);
-                }
-                else
-                {
-                        blit(b,scrshotb2,firstx,firsty,0,0,lastx-firstx,lasty-firsty);
-                        stretch_blit(scrshotb2,scrshotb,0,0,lastx-firstx,lasty-firsty,0,0,lastx-firstx,(lasty-firsty)<<1);
-                }
-                save_bmp(scrshotname,scrshotb,NULL);
-                destroy_bitmap(scrshotb2);
-                destroy_bitmap(scrshotb);
-                set_color_depth(8);
-                savescrshot=0;
-        }
-        fskipcount++;
-        if (fskipcount>=fskipmax)
-        {
-                lasty++;
-                if (fullborders==1)
-                {
-//                        rpclog("%i %i %i %i  ",firstx,lastx,firsty,lasty);
-                        c=(lastx+firstx)/2;
-                        firstx=c-336;
-                        lastx=c+336;
-                        c=(lasty+firsty)/2;
-                        firsty=c-136;
-                        lasty=c+136;
-//                        rpclog("  %i %i %i %i\n",firstx,lastx,firsty,lasty);
-                }
-                else if (fullborders==2)
-                {
-                        firstx=240;
-                        lastx=240+832;
-                        firsty=8;
-                        lasty=312;
-                }
-                if (fullscreen)
-                {
-                        firstx=256;
-                        lastx=256+800;
-                        firsty=8;
-                        lasty=300;
-                }
-                if (!fullscreen) updatewindowsize(lastx-firstx,(lasty-firsty)<<1);
-                fskipcount=0;
-                if (comedyblit)
-                {
-                        #ifdef WIN32
-                        for (c=firsty;c<lasty;c++) blit(b,b16x,firstx,c,0,c<<1,lastx-firstx,1);
-                        blit(b16x,screen,0,firsty<<1,0,0,lastx-firstx,(lasty-firsty)<<1);
-                        #else
-                        blit(b,b16x,firstx,firsty,0,0,lastx-firstx,lasty-firsty);
-                        for (c=firsty;c<lasty;c++) blit(b16x,screen,0,c-firsty,0,(c-firsty)<<1,lastx-firstx,1);
-                        #endif
-                }
-                else if (interlace || linedbl) blit(b,screen,firstx,firsty<<1,0,0,lastx-firstx,(lasty-firsty)<<1);
-                else
-                {
-                        #ifdef WIN32
-//                      blit(b,vb,240,0,0,0,832,312);
-                        blit(b,vb,firstx,firsty,0,0,lastx-firstx,lasty-firsty);
-//                      stretch_blit(vb,screen,0,0,832,312,0,0,624,624);
-//                      stretch_blit(vb,screen,0,0,832,312,0,0,744,624);
-                        stretch_blit(vb,screen,0,0,lastx-firstx,lasty-firsty,0,0,lastx-firstx,(lasty-firsty)<<1);
-                        #else
-                        for (c=(firsty<<1);c<(lasty<<1);c++) blit(b,b16x,firstx,c>>1,0,c,lastx-firstx,1);
-                        blit(b16x,screen,0,firsty<<1,0,0,lastx-firstx,(lasty-firsty)<<1);
-                        #endif
-                }
-        }
-        firstx=firsty=65535;
-        lastx=lasty=0;
-
-        endblit();
+        crtc[0x10]=(ma>>8)&0x3F;
+        crtc[0x11]=ma&0xFF;
 }
+
 
 int firstdispen=0;
 void pollvideo(int clocks)
@@ -784,7 +664,7 @@ void pollvideo(int clocks)
                                 doblit();
                         }
                 }
-
+//                if (vc==7 && !sc && !hc && crtc[0]) printf("MA %04X R14 %02X R15 %02X\n",ma,crtc[14],crtc[15]);
                 if (interlace) scry=(scry<<1)+interlline;
                 if (linedbl)   scry<<=1;
                 if (dispen)
@@ -793,6 +673,7 @@ void pollvideo(int clocks)
 //                {
 //                        if (!hc && crtc[9]) printf("%i start from %04X\n",scry,ma);
                         if (!((ma^(crtc[15]|(crtc[14]<<8)))&0x3FFF) && con) cdraw=cdrawlook[crtc[8]>>6];
+//                        if (vc==7 && crtc[0]) printf("%04X %i %i\n",ma,con,cdraw);
                         if (ma&0x2000) dat=ram[0x7C00|(ma&0x3FF)|vidbank];
                         else
                         {
@@ -867,6 +748,7 @@ void pollvideo(int clocks)
                                 {
                                         if (cursoron && (ulactrl & cursorlook[cdraw]))
                                         {
+//                                                rpclog("Render cursor at %i,%i  %i\n",scrx,scry,hc);
                                                 for (c=0;c<((ulactrl&0x10)?8:16);c++)
                                                 {
                                                         b->line[scry][scrx+c]=inverttbl[b->line[scry][scrx+c]];
@@ -893,7 +775,28 @@ void pollvideo(int clocks)
                         {
                                 if (charsleft!=1) rendermode7(255);
                                 charsleft--;
-//                                rpclog("Charleft at %i,%i\n",scrx,scry);
+//                                if (vc==7) rpclog("Charleft at %i,%i %i %i %02X %02X\n",scrx,scry,cdraw,cursoron,ulactrl,cursorlook[cdraw]);
+/*                                if (cdraw)
+                                {
+                                        if (cursoron && (ulactrl & cursorlook[cdraw]))
+                                        {
+                                                rpclog("Render cursor at %i,%i  %i\n",scrx,scry,hc);
+                                                for (c=0;c<((ulactrl&0x10)?8:16);c++)
+                                                {
+                                                        b->line[scry][scrx+c]=inverttbl[b->line[scry][scrx+c]];
+                                                }
+                                                if (linedbl)
+                                                {
+                                                        for (c=0;c<((ulactrl&0x10)?8:16);c++)
+                                                        {
+                                                                b->line[scry+1][scrx+c]=inverttbl[b->line[scry+1][scrx+c]];
+                                                        }
+                                                }
+                                        }
+                                        cdraw++;
+                                        if (cdraw==7) cdraw=0;
+                                }*/
+
                         }
                         else if (scrx<1280)
                         {
@@ -931,6 +834,7 @@ void pollvideo(int clocks)
                         {
                                 if (cursoron && (ulactrl & cursorlook[cdraw]))
                                 {
+//                                        rpclog("Render cursor at %i,%i  %i\n",scrx,scry,hc);
                                         for (c=0;c<((ulactrl&0x10)?8:16);c++)
                                         {
                                                 b->line[scry][scrx+c]=inverttbl[b->line[scry][scrx+c]];
@@ -944,7 +848,7 @@ void pollvideo(int clocks)
                                         }
                                 }
                                 cdraw++;
-                                if (cdraw=7) cdraw=0;
+                                if (cdraw==7) cdraw=0;
                         }
                 }
 
@@ -957,6 +861,7 @@ void pollvideo(int clocks)
                         if (!hvblcount)
                         {
                                 vblankintlow();
+//                                if (crtc[0]) printf("VBlank low %i %i %i\n",scry,vc,sc);
                         }
                 }
 
@@ -1038,7 +943,10 @@ void pollvideo(int clocks)
                                         if (ccount==10 || ((!motor || !fasttape) && !key[KEY_PGUP])) ccount=0;
                                         scry=0;
                                         vblankint();
+//                                        if (crtc[0]) printf("VBlank high %i %i %i\n",scry,vc,sc);
                                         vsynctime=(crtc[3]>>4)+1;
+                                        if (!(crtc[3]>>4)) vsynctime=17;
+//                                        vsynctime=16;
                                         m7flashtime++;
                                         if ((m7flashon && m7flashtime==32) || (!m7flashon && m7flashtime==16))
                                         {
@@ -1101,4 +1009,47 @@ void pollvideo(int clocks)
                 }
                 lasthc=hc;
         }
+}
+
+void savevideoulastate(FILE *f)
+{
+        int c;
+        putc(ulactrl,f);
+        for (c=0;c<16;c++) putc(bakpal[c],f);
+}
+
+void loadvideoulastate(FILE *f)
+{
+        int c;
+        writeula(0,getc(f));
+        for (c=0;c<16;c++) writeula(1,getc(f)|(c<<4));
+}
+
+void savecrtcstate(FILE *f)
+{
+        int c;
+        for (c=0;c<18;c++) putc(crtc[c],f);
+        putc(vc,f);
+        putc(sc,f);
+        putc(hc,f);
+        putc(ma,f); putc(ma>>8,f);
+        putc(maback,f); putc(maback>>8,f);
+        putc(scrx,f); putc(scrx>>8,f);
+        putc(scry,f); putc(scry>>8,f);
+        putc(oddclock,f);
+        putc(vidclocks,f); putc(vidclocks>>8,f); putc(vidclocks>>16,f); putc(vidclocks>>24,f);
+}
+
+void loadcrtcstate(FILE *f)
+{
+        int c;
+        for (c=0;c<18;c++) crtc[c]=getc(f);
+        vc=getc(f);
+        sc=getc(f);
+        hc=getc(f);
+        ma=getc(f); ma|=getc(f)<<8;
+        maback=getc(f); maback|=getc(f)<<8;
+        scrx=getc(f); scrx|=getc(f)<<8;
+        scry=getc(f); scry|=getc(f)<<8;
+        vidclocks=getc(f); vidclocks=getc(f)<<8; vidclocks=getc(f)<<16; vidclocks=getc(f)<<24;
 }

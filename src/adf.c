@@ -1,13 +1,14 @@
-/*B-em v2.0 by Tom Walker
+/*B-em v2.1 by Tom Walker
   ADFS disc support (really all double-density formats)*/
 
 #include <stdio.h>
 #include "b-em.h"
-
+#define printf rpclog
 FILE *adff[2];
 uint8_t trackinfoa[2][2][20*256];
 int adl[2];
 int adfsectors[2],adfsize[2],adftrackc[2];
+int adfdblstep[2];
 
 int adfsector,adftrack,adfside,adfdrive;
 int adfread,adfreadpos,adfwrite,adfreadaddr;
@@ -53,6 +54,7 @@ void adf_load(int drive, char *fn)
         drives[drive].readaddress=adf_readaddress;
         drives[drive].poll=adf_poll;
         drives[drive].format=adf_format;
+        adfdblstep[drive]=0;
 }
 
 void adl_load(int drive, char *fn)
@@ -75,9 +77,10 @@ void adl_load(int drive, char *fn)
         drives[drive].format=adf_format;
         adfsectors[drive]=16;
         adfsize[drive]=256;
+        adfdblstep[drive]=0;
 }
 
-void adl_loadex(int drive, char *fn, int sectors, int size)
+void adl_loadex(int drive, char *fn, int sectors, int size, int dblstep)
 {
         writeprot[drive]=0;
         adff[drive]=fopen(fn,"rb+");
@@ -98,6 +101,7 @@ void adl_loadex(int drive, char *fn, int sectors, int size)
         drives[drive].format=adf_format;
         adfsectors[drive]=sectors;
         adfsize[drive]=size;
+        adfdblstep[drive]=dblstep;
 }
 
 void adf_close(int drive)
@@ -109,7 +113,8 @@ void adf_close(int drive)
 void adf_seek(int drive, int track)
 {
         if (!adff[drive]) return;
-//        rpclog("Seek %i %i %i %i\n",drive,track,adfsectors[drive],adfsize[drive]);
+//        rpclog("Seek %i %i %i %i %i %i\n",drive,track,adfsectors[drive],adfsize[drive],adl[drive],adfsectors[drive]*adfsize[drive]);
+        if (adfdblstep[drive]) track/=2;
         adftrackc[drive]=track;
         if (adl[drive])
         {
@@ -126,6 +131,7 @@ void adf_seek(int drive, int track)
 void adf_writeback(int drive, int track)
 {
         if (!adff[drive]) return;
+        if (adfdblstep[drive]) track/=2;
         if (adl[drive])
         {
                 fseek(adff[drive],track*adfsectors[drive]*adfsize[drive]*2,SEEK_SET);
@@ -141,6 +147,7 @@ void adf_writeback(int drive, int track)
 
 void adf_readsector(int drive, int sector, int track, int side, int density)
 {
+//        if (adfdblstep[drive]) track/=2;
         adfsector=sector;
         adftrack=track;
         adfside=side;
@@ -150,15 +157,18 @@ void adf_readsector(int drive, int sector, int track, int side, int density)
 
         if (!adff[drive] || (side && !adl[drive]) || !density || (track!=adftrackc[drive]))
         {
+//                printf("Not found! %08X (%i %i) %i (%i %i)\n",adff[drive],side,adl[drive],density,track,adftrackc[drive]);
                 adfnotfound=500;
                 return;
         }
+//        printf("Found\n");
         adfread=1;
         adfreadpos=0;
 }
 
 void adf_writesector(int drive, int sector, int track, int side, int density)
 {
+//        if (adfdblstep[drive]) track/=2;
         adfsector=sector;
         adftrack=track;
         adfside=side;
@@ -177,6 +187,7 @@ void adf_writesector(int drive, int sector, int track, int side, int density)
 
 void adf_readaddress(int drive, int track, int side, int density)
 {
+        if (adfdblstep[drive]) track/=2;
         adfdrive=drive;
         adftrack=track;
         adfside=side;
@@ -193,6 +204,7 @@ void adf_readaddress(int drive, int track, int side, int density)
 
 void adf_format(int drive, int track, int side, int density)
 {
+        if (adfdblstep[drive]) track/=2;
         adfdrive=drive;
         adftrack=track;
         adfside=side;
@@ -263,7 +275,7 @@ void adf_poll()
         {
                 switch (adfreadpos)
                 {
-                        case 0: fdcdata(adftrack); break;
+                        case 0: /*if (adfdblstep[adfdrive]) fdcdata(adftrack/2); else */fdcdata(adftrack); break;
                         case 1: fdcdata(adfside); break;
                         case 2: fdcdata(adfrsector+(adfsize[adfdrive]!=256)?1:0); break;
                         case 3: fdcdata((adfsize[adfdrive]==256)?1:((adfsize[adfdrive]==512)?2:3)); break;
@@ -272,7 +284,7 @@ void adf_poll()
                         case 6:
                         adfreadaddr=0;
                         fdcfinishread();
-//                        rpclog("Read addr - %i %i %i 1 0 0\n",adftrack,adfside,adfsector);
+//                        rpclog("Read addr - %i %i %i %i 1 0 0\n",adfdrive,adftrack,adfside,adfsector);
                         adfrsector++;
                         if (adfrsector==adfsectors[adfdrive]) adfrsector=0;
                         break;

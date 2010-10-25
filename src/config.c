@@ -1,4 +1,4 @@
-/*B-em v2.0 by Tom Walker
+/*B-em v2.1 by Tom Walker
   Configuration handling*/
 
 #include <allegro.h>
@@ -19,6 +19,7 @@ void loadconfig()
         char s[256];
         char *p;
         sprintf(s,"%sb-em.cfg",exedir);
+        //printf("%s\n",s);
         set_config_file(s);
 
         p=(char *)get_config_string(NULL,"disc0",NULL);
@@ -56,8 +57,12 @@ void loadconfig()
         comedyblit=(c==2);
         interlace=(c==1);
         linedbl=(c==3);
+        videoresize=get_config_int(NULL,"video_resize",0);
+        opengl=get_config_int(NULL,"opengl",0);
 
         fasttape=get_config_int(NULL,"fasttape",0);
+
+        ideenable=get_config_int(NULL,"ideenable",0);
 
         keyas=get_config_int(NULL,"key_as",0);
         for (c=0;c<128;c++)
@@ -99,8 +104,12 @@ void saveconfig()
 
         set_config_int(NULL,"fullborders",fullborders);
         set_config_int(NULL,"displaymode",comedyblit?2:(interlace?1:(linedbl?3:0)));
+        set_config_int(NULL,"video_resize",videoresize);
+        set_config_int(NULL,"opengl",opengl);
 
         set_config_int(NULL,"fasttape",fasttape);
+
+        set_config_int(NULL,"ideenable",ideenable);
 
         set_config_int(NULL,"key_as",keyas);
 

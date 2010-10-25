@@ -1,4 +1,4 @@
-/*B-em v2.0 by Tom Walker
+/*B-em v2.1 by Tom Walker
   FDI disc support
   Interfaces with fdi2raw.c*/
 
@@ -55,7 +55,7 @@ void setupcrc(uint16_t poly, uint16_t rvalue)
 
 void fdi_reset()
 {
-        printf("FDI reset\n");
+//        printf("FDI reset\n");
         fdif[0]=fdif[1]=0;
         fdids[0]=fdids[1]=0;
         fdinotfound=0;
@@ -68,10 +68,10 @@ void fdi_load(int drive, char *fn)
         fdif[drive]=fopen(fn,"rb");
         if (!fdif[drive]) return;
         fdih[drive]=fdi2raw_header(fdif[drive]);
-        if (!fdih[drive]) printf("Failed to load!\n");
+//        if (!fdih[drive]) printf("Failed to load!\n");
         fdilasttrack[drive]=fdi2raw_get_last_track(fdih[drive]);
         fdisides[drive]=(fdilasttrack[drive]>83)?1:0;
-        printf("Last track %i\n",fdilasttrack[drive]);
+//        printf("Last track %i\n",fdilasttrack[drive]);
         drives[drive].seek=fdi_seek;
         drives[drive].readsector=fdi_readsector;
         drives[drive].writesector=fdi_writesector;
@@ -94,15 +94,15 @@ void fdi_seek(int drive, int track)
 //        printf("Track start %i\n",track);
         if (track<0) track=0;
         if (track>fdilasttrack[drive]) track=fdilasttrack[drive]-1;
-        c=fdi2raw_loadtrack(fdih[drive],ftrackinfo[drive][0][0],fditiming,track<<fdisides[drive],&ftracklen[drive][0][0],&ftrackindex[drive][0][0],NULL,0);
+        c=fdi2raw_loadtrack(fdih[drive],(uint16_t *)ftrackinfo[drive][0][0],(uint16_t *)fditiming,track<<fdisides[drive],&ftracklen[drive][0][0],&ftrackindex[drive][0][0],NULL,0);
         if (!c) memset(ftrackinfo[drive][0][0],0,ftracklen[drive][0][0]);
-        c=fdi2raw_loadtrack(fdih[drive],ftrackinfo[drive][0][1],fditiming,track<<fdisides[drive],&ftracklen[drive][0][1],&ftrackindex[drive][0][1],NULL,1);
+        c=fdi2raw_loadtrack(fdih[drive],(uint16_t *)ftrackinfo[drive][0][1],(uint16_t *)fditiming,track<<fdisides[drive],&ftracklen[drive][0][1],&ftrackindex[drive][0][1],NULL,1);
         if (!c) memset(ftrackinfo[drive][0][1],0,ftracklen[drive][0][1]);
         if (fdisides[drive])
         {
-                c=fdi2raw_loadtrack(fdih[drive],ftrackinfo[drive][1][0],fditiming,(track<<fdisides[drive])+1,&ftracklen[drive][1][0],&ftrackindex[drive][1][0],NULL,0);
+                c=fdi2raw_loadtrack(fdih[drive],(uint16_t *)ftrackinfo[drive][1][0],(uint16_t *)fditiming,(track<<fdisides[drive])+1,&ftracklen[drive][1][0],&ftrackindex[drive][1][0],NULL,0);
                 if (!c) memset(ftrackinfo[drive][1][0],0,ftracklen[drive][1][0]);
-                c=fdi2raw_loadtrack(fdih[drive],ftrackinfo[drive][1][1],fditiming,(track<<fdisides[drive])+1,&ftracklen[drive][1][1],&ftrackindex[drive][1][1],NULL,1);
+                c=fdi2raw_loadtrack(fdih[drive],(uint16_t *)ftrackinfo[drive][1][1],(uint16_t *)fditiming,(track<<fdisides[drive])+1,&ftracklen[drive][1][1],&ftrackindex[drive][1][1],NULL,1);
                 if (!c) memset(ftrackinfo[drive][1][1],0,ftracklen[drive][1][1]);
         }
         else
@@ -129,7 +129,7 @@ void fdi_readsector(int drive, int sector, int track, int side, int density)
         fdiside=side;
         fdidrive=drive;
         fdidensity=density;
-        printf("Read sector %i %i %i %i\n",drive,side,track,sector);
+//        printf("Read sector %i %i %i %i\n",drive,side,track,sector);
 
         fdiread=1;
         fdireadpos=0;
@@ -142,7 +142,7 @@ void fdi_writesector(int drive, int sector, int track, int side, int density)
         fditrack=track;
         fdiside=side;
         fdidrive=drive;
-        printf("Write sector %i %i %i %i\n",drive,side,track,sector);
+//        printf("Write sector %i %i %i %i\n",drive,side,track,sector);
 
         if (!fdif[drive] || (side && !fdids[drive]) || density)
         {
@@ -160,7 +160,7 @@ void fdi_readaddress(int drive, int track, int side, int density)
         fdiside=side;
         fdidensity=density;
         fdidrive=drive;
-        printf("Read address %i %i %i\n",drive,side,track);
+//        printf("Read address %i %i %i\n",drive,side,track);
 
         fdireadaddr=1;
         fdireadpos=0;
@@ -173,7 +173,7 @@ void fdi_format(int drive, int track, int side, int density)
         fdiside=side;
         fdidensity=density;
         fdidrive=drive;
-        printf("Format %i %i %i\n",drive,side,track);
+//        printf("Format %i %i %i\n",drive,side,track);
 
         fdiwrite=1;
         fdireadpos=0;
@@ -233,7 +233,7 @@ void fdi_poll()
                 fdirevs++;
                 if (fdirevs==3)
                 {
-                        printf("Not found!\n");
+//                        printf("Not found!\n");
                         fdcnotfound();
                         fdiread=fdireadaddr=0;
                         return;
@@ -299,7 +299,7 @@ void fdi_poll()
                                         fdiread=0;
                                         if ((crc>>8)!=sectorcrc[0] || (crc&0xFF)!=sectorcrc[1])// || (fditrack==79 && fdisect==4 && fdcside&1))
                                         {
-                                                printf("Data CRC error : %02X %02X %02X %02X %i %04X %02X%02X %i\n",crc>>8,crc&0xFF,sectorcrc[0],sectorcrc[1],fdipos,crc,sectorcrc[0],sectorcrc[1],ftracklen[0][0][fdidensity]);
+//                                                printf("Data CRC error : %02X %02X %02X %02X %i %04X %02X%02X %i\n",crc>>8,crc&0xFF,sectorcrc[0],sectorcrc[1],fdipos,crc,sectorcrc[0],sectorcrc[1],ftracklen[0][0][fdidensity]);
                                                 inreadop=0;
                                                 fdcdata(decodefm(lastfdidat[1]));
                                                 fdcfinishread();

@@ -6,7 +6,7 @@
              ██       ▄██          ██         ██          ██
              ██████████▀           █████████  ██          ██
 
-                                 Version 2.0a
+                                 Version 2.1
                          A freeware BBC Micro emulator
 
 Introduction
@@ -30,6 +30,7 @@ Features
 - 1770 Floppy Disc Controller emulated (double drive, double sided, 80 track, read/write)
 - Supports following formats - .ssd, .dsd, .adf, .adl, .img, .fdi, .uef and .csw
 - Can run many protected disc and tape games.
+- IDE hard disc emulation
 - Sound emulation, including sample playback
 - BeebSID emulation
 - Lots of video tricks, such as overscan, raster splitting, rupture, interlace, mid-line
@@ -41,20 +42,17 @@ Features
 Differences from last version
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-v2.0a is a bugfix release, these were the changes for v2.0 :
-
-- Most of the emulator re-written
-- Cycle-accurate video emulation
-- Higher quality mode 7
-- Added 80186 (Master 512) and 65816 second processors
-- BeebSID emulation (using resid-fp)
-- FDI support is back
-- Improved sound overall
-- Much more stable
-- Linux port (preliminary)
-- Debugger
-- Redefineable keyboard
-
+- IDE hard disc emulation
+- OpenGL video support (mainly for Linux)
+- Fixed 360k discs in Master 512 mode
+- Fixed some hanging bugs in Windows (mainly when resetting)
+- Resizeable window in Windows
+- Debugger improvements
+- VIA and video fixes, cassette version of Lunar Jetman now works
+- Lightpen fix, Pharaoh's Curse works
+- Some mode 7 fixes
+- Speed control
+- Savestates
 
 
 Default keyboard mapping :
@@ -84,10 +82,14 @@ GUI :
 The options are :
 
 File :
-        Hard reset - resets the emulator, clearing all memory.
-        Exit       - exit to Windows.
+        Hard reset     - resets the emulator, clearing all memory.
+        Load savestate - loads a savestate.
+        Save savestate - saves a savestate. B-em at present does not support second processor
+                         savestates, and no disc/tape info is saved - so don't save while loading!
+        Exit           - exit to Windows.
 
 Disc :
+        Autoboot disc 0/2      - load a disc image into drives 0 and 2, and boot it.
         Load disc 0/2          - load a disc image into drives 0 and 2.
         Load disc 1/3          - load a disc image into drives 1 and 3.
         Eject disc 0/2         - removes disc image from drives 0 and 2.
@@ -157,6 +159,8 @@ Settings :
         Keyboard :
                 Redefine keys        - redefine keyboard setup.
                 Map CAPS/CTRL to A/S - remaps those 2 keys. Useful for games where CAPS/CTRL are left/right.
+        IDE emulation :
+                Enable IDE emulation - enables IDE hard disc emulation and forces the loading of ADFS 1.53.
 
 Misc :
         Save screenshot      - saves screenshot in BMP, PCX, or TGA format.
@@ -166,9 +170,18 @@ Misc :
 Command line options :
 ~~~~~~~~~~~~~~~~~~~~~~
 
-b-em [discimage.ssd/dsd/adf/adl/fdi] [-u name.uef] [-mx] [-tx] [-i] [-c] [-fx]
+b-em [discimage.ssd/dsd/adf/adl/fdi] [-disc name.*] [-disc1 name.*] [-tape name.uef/csw] [-mx] [-tx] [-i] [-s] [-fx]
+     [-autoboot] [-debug] [-opengl] [-allegro]
 
--u name.uef - load UEF image name.uef
+[discimage.ssd/dsd/adf/adl/fdi] - load and boot disc image
+
+-disc name.* - load disc image into drives 0/2
+
+-disc1 name.* - load disc image into drives 1/3
+
+-tape name.* - load UEF or CSW image name.*
+
+-autoboot - boot disc image
 
 -mx - model to emulate, where x is
 0 - BBC A with OS 0.1
@@ -195,9 +208,25 @@ b-em [discimage.ssd/dsd/adf/adl/fdi] [-u name.uef] [-mx] [-tx] [-i] [-c] [-fx]
 4 - 65816 (if ROMs available)
 
 -i - enable interlace mode (only useful on a couple of demos)
--c - enables scanlines
+-s - enables scanlines
 -fx - set frameskip to x (1-9, 1=no skip)
 -fasttape - speeds up tape access
+-debug - start debugger (Linux only - Windows users use the menu option)
+-allegro - use Allegro for video
+-opengl - use OpenGL for video. May be faster for Linux users, Windows users should normally stick to Allegro
+
+
+IDE Hard Discs
+~~~~~~~~~~~~~~
+
+To initialise a hard disc, use the included HDINIT program. Press 'I' to investigate the drive - this will
+set up the default parameters for a 50 mb drive. If you want a different size press 'Z' and enter the desired
+size - it does not matter that this does not match the size given in the emulated hardware.
+
+Then press 'F' to format, and follow the prompts.
+
+You will probably want to stick to using a Master 128 with the hard disc, for memory reasons. You may also
+need to *UNPLUG the built-in ADFS.
 
 
 Master 512
@@ -208,6 +237,10 @@ window to capture it, and press CTRL + END to release.
 
 All disc images used by the Master 512 should have the .img extension - the type is determined by size. Both
 640k and 800k discs are supported, as well as DOS standard 360k and 720k.
+
+You can use the IDE hard disc emulation with this, run HDISK.CMD in DOS-Plus, then HDINSTAL.BAT. Go make a cup
+of tea while doing this, it takes _forever_! HDISK.CMD will create a file 'DRIVE_C' in ADFS so you will need
+to format the hard disc using ADFS first.
 
 
 65816 coprocessor
@@ -250,6 +283,8 @@ The User VIA       - Emulated.
 1770 FDC           - Double disc, double sided, 40/80 tracks, read/write. With authentic noise. Supports read-only
                      access of protected FDI images.
 
+IDE hard disc      - Emulates 2 discs. Emulation from Arculator.
+
 Sound              - All channels emulated, with sample support and some undocumented behaviour (Crazee Rider).
                      With optional bandpass filter.
 
@@ -270,6 +305,7 @@ serial port
 AMX mouse (Master 512 mouse is kind-of emulated though)
 Econet
 Printer
+32016 processor - though it can be enabled in the source. Doesn't actually run anything useful though.
 
 
 Thanks to :
@@ -291,6 +327,8 @@ Thomas Harte for some UEF code - I wrote my own in the end - and for the OS X po
 Dave Moore for making and hosting the B-em site
 
 Rich Talbot-Watkins and Peter Edwards (also Dave Moore) for testing
+
+J G Harston for the HDINIT program and ADFS 1.53
 
 Robert Schmidt for The BBC Lives!
 
@@ -326,4 +364,5 @@ with anymore).
 
 <plug>
 Also check out www.tommowalker.co.uk, for more emulators than is really necessary.
+And a bunch of BBC music discs!
 </plug>

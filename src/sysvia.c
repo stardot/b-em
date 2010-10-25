@@ -1,4 +1,4 @@
-/*B-em v2.0 by Tom Walker
+/*B-em v2.1 by Tom Walker
   System VIA + keyboard emulation*/
 
 #include <allegro.h>
@@ -46,6 +46,7 @@ void updatesysIFR()
 }
 
 int lns;
+int vc,sc;
 void updatesystimers()
 {
         if (sysvia.t1c<-3)
@@ -54,8 +55,9 @@ void updatesystimers()
                       sysvia.t1c+=sysvia.t1l+4;
                 if (!sysvia.t1hit)
                 {
-                       sysvia.ifr|=TIMER1INT;
-                       updatesysIFR();
+//                        rpclog("Sys timer 1 INT %i,%i\n",vc,sc);
+                        sysvia.ifr|=TIMER1INT;
+                        updatesysIFR();
                 }
                 if (!(sysvia.acr&0x40))
                    sysvia.t1hit=1;
@@ -66,6 +68,7 @@ void updatesystimers()
                 {
                         if (!sysvia.t2hit)
                         {
+//                                rpclog("Sys timer 2 INT %i,%i\n",vc,sc);
                                 sysvia.ifr|=TIMER2INT;
                                 updatesysIFR();
                         }
@@ -74,10 +77,13 @@ void updatesystimers()
         }
 }
 
+uint8_t crtc[32];
+
 void vblankint()
 {
         if (!sysvia.ca1 && (sysvia.pcr&1))
         {
+//                if (crtc[0]) printf("VBL\n");
                 sysvia.ifr|=2;
                 updatesysIFR();
         }
@@ -87,6 +93,7 @@ void vblankintlow()
 {
         if (sysvia.ca1 && !(sysvia.pcr&1))
         {
+//                printf("VBL\n");
                 sysvia.ifr|=2;
                 updatesysIFR();
         }
@@ -146,7 +153,7 @@ void writeIC32(uint8_t val)
                 if (!(IC32&64)) temp|=KB_CAPSLOCK_FLAG;
                 if (!(IC32&128)) temp|=KB_SCROLOCK_FLAG;
         }
-        if (MASTER) cmosupdate(IC32,sdbval);
+        if (MASTER && !compactcmos) cmosupdate(IC32,sdbval);
 }
 
 void writedatabus(uint8_t val)
@@ -158,12 +165,13 @@ void writedatabus(uint8_t val)
                 keycol=val&0xF;
                 updatekeyboard();
         }
-        if (MASTER) cmosupdate(IC32,sdbval);
+        if (MASTER && !compactcmos) cmosupdate(IC32,sdbval);
         if (!(IC32&1)) writesound(val);
 }
 
 void writesysvia(uint16_t addr, uint8_t val)
 {
+//        rpclog("Write SYS VIA %04X %02X %04X %i,%i\n",addr,val,pc,vc,sc);
         switch (addr&0xF)
         {
                 case ORA:
@@ -178,12 +186,17 @@ void writesysvia(uint16_t addr, uint8_t val)
 
                 case ORB:
                 sysvia.orb=val;
+                if (compactcmos)
+                {
+//                        rpclog("Port B write %02X %04X %02X\n",val&0x30,pc,ram_fe30);
+                        cmosi2cchange(val&0x20,val&0x10);
+                }
                 sysvia.portb=(sysvia.portb & ~sysvia.ddrb)|(sysvia.orb & sysvia.ddrb);
                 sysvia.ifr&=0xef;//~PORTBINT;
                 if (!(sysvia.pcr&0x40) || (sysvia.pcr&0x80)) sysvia.ifr&=~8;
                 writeIC32(val);
                 updatesysIFR();
-                if (MASTER) cmoswriteaddr(val);
+                if (MASTER && !compactcmos) cmoswriteaddr(val);
                 break;
 
                 case DDRA:
@@ -192,20 +205,30 @@ void writesysvia(uint16_t addr, uint8_t val)
                 case DDRB:
                 sysvia.ddrb=val;
                 break;
+                case SR:
+                sysvia.sr=val;
+                break;
                 case ACR:
                 sysvia.acr=val;
+//                printf("SYS ACR now %02X\n",val);
                 break;
                 case PCR:
+                if ((sysvia.pcr&0xE0)==0xC0 && (val&0xE0)==0xE0)
+                {
+                        latchpen();
+                }
                 sysvia.pcr=val;
 //                printf("PCR write %02X %04X\n",val,pc);
                 break;
                 case T1LL:
+//                        printf("SYS T1LL %02X\n",val);
                 case T1CL:
                 sysvia.t1l&=0x1FE00;
                 sysvia.t1l|=(val<<1);
 //                rpclog("ST1L now %04X\n",sysvia.t1l);
                 break;
                 case T1LH:
+//                        printf("SYS T1LH %02X\n",val);
                 sysvia.t1l&=0x1FE;
                 sysvia.t1l|=(val<<9);
                 if (sysvia.acr&0x40)
@@ -248,7 +271,7 @@ void writesysvia(uint16_t addr, uint8_t val)
                 else
                    sysvia.ier&=~(val&0x7F);
                 updatesysIFR();
-//                printf("IER now %02X\n",sysvia.ier);
+//                printf("SYS IER now %02X\n",sysvia.ier);
                 break;
                 case IFR:
 //                        printf("Write IFR %02X %04X\n",val,pc);
@@ -261,6 +284,7 @@ void writesysvia(uint16_t addr, uint8_t val)
 uint8_t readsysvia(uint16_t addr)
 {
         uint8_t temp;
+//        rpclog("Read SYS VIA %04X\n",addr);
         addr&=0xF;
         switch (addr&0xF)
         {
@@ -268,7 +292,7 @@ uint8_t readsysvia(uint16_t addr)
                 sysvia.ifr&=~PORTAINT;
                 updatesysIFR();
                 case ORAnh:
-                if (MASTER && cmosenabled()) return cmosread();
+                if (MASTER && cmosenabled() && !compactcmos) return cmosread();
                 temp=sysvia.ora & sysvia.ddra;
                 temp|=(sysvia.porta & ~sysvia.ddra);
                 temp&=0x7F;
@@ -279,13 +303,22 @@ uint8_t readsysvia(uint16_t addr)
                 sysvia.ifr&=0xEF;//~PORTBINT;
                 updatesysIFR();
                 temp=sysvia.orb & sysvia.ddrb;
-                if (sysvia.acr&2)
-                   temp|=(sysvia.irb & ~sysvia.ddrb);
+                if (compactcmos)
+                {
+                        sysvia.irb&=~0x30;
+                        if (i2cclock) sysvia.irb|=0x20;
+                        if (i2cdata)  sysvia.irb|=0x10;
+                }
                 else
-                   temp|=(sysvia.portb & ~sysvia.ddrb);
-                temp|=0xF0;
-                if (joybutton[0]) temp&=~0x10;
-                if (joybutton[1]) temp&=~0x20;
+                {
+                        sysvia.irb|=0xF0;
+                        if (joybutton[0]) sysvia.irb&=~0x10;
+                        if (joybutton[1]) sysvia.irb&=~0x20;
+                }
+//                if (sysvia.acr&2)
+                   temp|=(sysvia.irb & ~sysvia.ddrb);
+//                else
+//                   temp|=(sysvia.portb & ~sysvia.ddrb);
                 return temp;
 
                 case DDRA:
@@ -312,6 +345,8 @@ uint8_t readsysvia(uint16_t addr)
                 case T2CH:
                 if (sysvia.acr&0x20) return (sysvia.t2c>>1)>>8;
                 return ((sysvia.t2c+1)>>1)>>8;
+                case SR:
+                return sysvia.sr;
                 case ACR:
                 return sysvia.acr;
                 case PCR:
@@ -397,6 +432,7 @@ void checkkeys()
         int c;
         int row,col;
         int rc;
+//        if (key[KEY_A]) printf("KEY_A!\n");
         memset(bbckey,0,sizeof(bbckey));
         for (c=0;c<128;c++)
         {
@@ -480,4 +516,60 @@ void initDIPS(uint8_t dips)
                    releasekey(0,c);
                 dips>>=1;
         }
+}
+
+
+void savesysviastate(FILE *f)
+{
+        putc(sysvia.ora,f);
+        putc(sysvia.orb,f);
+        putc(sysvia.ira,f);
+        putc(sysvia.irb,f);
+        putc(sysvia.porta,f);
+        putc(sysvia.portb,f);
+        putc(sysvia.ddra,f);
+        putc(sysvia.ddrb,f);
+        putc(sysvia.sr,f);
+        putc(sysvia.acr,f);
+        putc(sysvia.pcr,f);
+        putc(sysvia.ifr,f);
+        putc(sysvia.ier,f);
+        putc(sysvia.t1l,f); putc(sysvia.t1l>>8,f); putc(sysvia.t1l>>16,f); putc(sysvia.t1l>>24,f);
+        putc(sysvia.t2l,f); putc(sysvia.t2l>>8,f); putc(sysvia.t2l>>16,f); putc(sysvia.t2l>>24,f);
+        putc(sysvia.t1c,f); putc(sysvia.t1c>>8,f); putc(sysvia.t1c>>16,f); putc(sysvia.t1c>>24,f);
+        putc(sysvia.t2c,f); putc(sysvia.t2c>>8,f); putc(sysvia.t2c>>16,f); putc(sysvia.t2c>>24,f);
+        putc(sysvia.t1hit,f);
+        putc(sysvia.t2hit,f);
+        putc(sysvia.ca1,f);
+        putc(sysvia.ca2,f);
+
+        putc(IC32,f);
+}
+
+void loadsysviastate(FILE *f)
+{
+        sysvia.ora=getc(f);
+        sysvia.orb=getc(f);
+        sysvia.ira=getc(f);
+        sysvia.irb=getc(f);
+        sysvia.porta=getc(f);
+        sysvia.portb=getc(f);
+        sysvia.ddra=getc(f);
+        sysvia.ddrb=getc(f);
+        sysvia.sr=getc(f);
+        sysvia.acr=getc(f);
+        sysvia.pcr=getc(f);
+        sysvia.ifr=getc(f);
+        sysvia.ier=getc(f);
+        sysvia.t1l=getc(f); sysvia.t1l|=getc(f)<<8; sysvia.t1l|=getc(f)<<16; sysvia.t1l|=getc(f)<<24;
+        sysvia.t2l=getc(f); sysvia.t2l|=getc(f)<<8; sysvia.t2l|=getc(f)<<16; sysvia.t2l|=getc(f)<<24;
+        sysvia.t1c=getc(f); sysvia.t1c|=getc(f)<<8; sysvia.t1c|=getc(f)<<16; sysvia.t1c|=getc(f)<<24;
+        sysvia.t2c=getc(f); sysvia.t2c|=getc(f)<<8; sysvia.t2c|=getc(f)<<16; sysvia.t2c|=getc(f)<<24;
+        sysvia.t1hit=getc(f);
+        sysvia.t2hit=getc(f);
+        sysvia.ca1=getc(f);
+        sysvia.ca2=getc(f);
+
+        IC32=getc(f);
+        scrsize=((IC32&16)?2:0)|((IC32&32)?1:0);
 }

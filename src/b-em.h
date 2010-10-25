@@ -1,8 +1,8 @@
-/*B-em v2.0 by Tom Walker
+/*B-em v2.1 by Tom Walker
   Main header file*/
 
 #include <stdint.h>
-#define printf rpclog
+//#define printf rpclog
 
 extern uint8_t *ram,*rom,*os;
 extern int romsel;
@@ -34,6 +34,7 @@ typedef struct VIA
 {
         uint8_t ora,orb,ira,irb;
         uint8_t ddra,ddrb;
+        uint8_t sr;
         uint32_t t1l,t2l;
         int t1c,t2c;
         uint8_t acr,pcr,ifr,ier;
@@ -72,6 +73,10 @@ void makemode7chars();
 void pollvideo(int clocks);
 uint8_t readcrtc(uint16_t addr);
 void writecrtc(uint16_t addr, uint8_t val);
+extern uint8_t crtc[32];
+extern int crtci;
+extern int hc,vc,sc;
+extern uint16_t ma;
 
 void initmem();
 void loadroms();
@@ -163,6 +168,8 @@ void write8271(uint16_t addr, uint8_t val);
 
 void writecrtc(uint16_t addr, uint8_t val);
 void writeula(uint16_t addr, uint8_t val);
+extern uint8_t bakpal[16];
+extern uint8_t ulactrl;
 
 void initserial();
 void writeserial(uint16_t addr, uint8_t val);
@@ -191,6 +198,7 @@ typedef struct
         int swram;
         int modela;
         int os01;
+        int compact;
         char os[32];
         char romdir[32];
         char cmos[32];
@@ -252,16 +260,19 @@ void tubeinitarm();
 void tubeinitz80();
 void tubeinitx86();
 void tubeinit65816();
+void tubeinit32016();
 void tubeexec65c02();
 void execarm();
 void execz80();
 void execx86();
 void exec65816();
+void exec32016();
 void tubereset6502();
 void resetarm();
 void resetz80();
 void resetx86();
 void reset65816();
+void reset32016();
 void dumpregs65816();
 uint8_t readtubehost(uint16_t addr);
 void writetubehost(uint16_t addr, uint8_t val);
@@ -292,6 +303,10 @@ uint8_t readsid(uint16_t addr);
 void writesid(uint16_t addr, uint8_t val);
 
 void initsound();
+extern uint32_t snlatch[4];
+extern uint8_t snvol[4];
+extern uint8_t snnoise;
+
 
 void initadc();
 uint8_t readadc(uint16_t addr);
@@ -314,6 +329,7 @@ extern int curwave;
 extern int ddvol,ddtype;
 extern int linedbl;
 extern int cswena;
+extern int videoresize;
 
 
 extern int savescrshot;
@@ -321,3 +337,19 @@ extern char scrshotname[260];
 extern int tapeloaded;
 extern int defaultwriteprot;
 void setquit();
+
+extern int idecallback;
+extern int opengl;
+extern int vidchange;
+extern int autoboot;
+extern int ideenable;
+
+extern uint8_t ram_fe30,ram_fe34;
+
+extern int wantloadstate,wantsavestate;
+extern char ssname[260];
+
+extern int i2cclock,i2cdata;
+extern int compactcmos;
+
+void openglreinit();

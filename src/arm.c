@@ -1,4 +1,4 @@
-/*B-em v2.0 by Tom Walker
+/*B-em v2.1 by Tom Walker
   ARM1 parasite CPU emulation
   Originally from Arculator*/
 
@@ -193,12 +193,12 @@ void dumparmregs()
         FILE *f=fopen("armram.dmp","wb");
         fwrite(armram,0x10000,1,f);
         fclose(f);
-        printf("R 0=%08X R 4=%08X R 8=%08X R12=%08X\n",armregs[0],armregs[4],armregs[8],armregs[12]);
-        printf("R 1=%08X R 5=%08X R 9=%08X R13=%08X\n",armregs[1],armregs[5],armregs[9],armregs[13]);
-        printf("R 2=%08X R 6=%08X R10=%08X R14=%08X\n",armregs[2],armregs[6],armregs[10],armregs[14]);
-        printf("R 3=%08X R 7=%08X R11=%08X R15=%08X\n",armregs[3],armregs[7],armregs[11],armregs[15]);
-        printf("f12=%08X  ",fiqregs[12]);
-        printf("PC =%07X\n",PC);
+        rpclog("R 0=%08X R 4=%08X R 8=%08X R12=%08X\n",armregs[0],armregs[4],armregs[8],armregs[12]);
+        rpclog("R 1=%08X R 5=%08X R 9=%08X R13=%08X\n",armregs[1],armregs[5],armregs[9],armregs[13]);
+        rpclog("R 2=%08X R 6=%08X R10=%08X R14=%08X\n",armregs[2],armregs[6],armregs[10],armregs[14]);
+        rpclog("R 3=%08X R 7=%08X R11=%08X R15=%08X\n",armregs[3],armregs[7],armregs[11],armregs[15]);
+        rpclog("f12=%08X  ",fiqregs[12]);
+        rpclog("PC =%07X\n",PC);
 }
 
 uint32_t *armread[64];
@@ -245,12 +245,12 @@ uint8_t readarmb(uint32_t addr)
         if (addr<0x400000) return armramb[addr];
         if ((addr&~0x1F)==0x1000000)
         {
-                //printf("Read %08X\n",addr);
+                //rpclog("Read %08X\n",addr);
                 return readtube((addr&0x1C)>>2);
         }
         if ((addr>=0x3000000) && (addr<0x3004000)) return armromb[addr&0x3FFF];
         return 0xFF;
-/*        printf("Bad ARM read byte %08X\n",addr);
+/*        rpclog("Bad ARM read byte %08X\n",addr);
         dumparmregs();
         exit(-1);*/
 }
@@ -260,7 +260,7 @@ uint32_t readarmfl(uint32_t addr)
         if (addr<0x400010) return 0xFFFFFFFF;
         if ((addr>=0x3000000) && (addr<0x3004000)) return armrom[(addr&0x3FFC)>>2];
         return 0xFFFFFFFF;
-/*        printf("Bad ARM read long %08X\n",addr);
+/*        rpclog("Bad ARM read long %08X\n",addr);
         dumparmregs();
         exit(-1);*/
 }
@@ -274,12 +274,12 @@ void writearmb(uint32_t addr, uint8_t val)
         }
         if ((addr&~0x1F)==0x1000000)
         {
-//                printf("Write %08X %02X\n",addr,val);
+//                rpclog("Write %08X %02X\n",addr,val);
                 writetube((addr&0x1C)>>2,val);
                 endtimeslice=1;
                 return;
         }
-/*        printf("Bad ARM write byte %08X %02X\n",addr,val);
+/*        rpclog("Bad ARM write byte %08X %02X\n",addr,val);
         dumparmregs();
         exit(-1);*/
 }
@@ -291,7 +291,7 @@ void writearml(uint32_t addr, uint32_t val)
                 return;
         }
 /*        if (addr<0x400010) return;
-        printf("Bad ARM write long %08X %08X\n",addr,val);
+        rpclog("Bad ARM write long %08X %08X\n",addr,val);
         dumparmregs();
         exit(-1);*/
 }
@@ -1605,7 +1605,7 @@ void execarm()
 /*                                        if (RD==7)
                                         {
                                                 if (!olog) olog=fopen("armlog.txt","wt");
-                                                sprintf(s,"LDR R7 %08X,%07X\n",armregs[7],PC);
+                                                srpclog(s,"LDR R7 %08X,%07X\n",armregs[7],PC);
                                                 fputs(s,olog);
                                         }*/
                                         break;
@@ -1972,7 +1972,7 @@ void execarm()
                                         armregs[15]&=0xFC000001;
                                         armregs[15]|=0x0C000020;
                                         refillpipeline();
-//                                        printf("FIQ\n");
+//                                        rpclog("FIQ\n");
                                 }
                                 else if ((armirq&1) && !(armregs[15]&0x8000000)) /*IRQ*/
                                 {
@@ -1983,17 +1983,17 @@ void execarm()
                                         armregs[15]&=0xFC000002;
                                         armregs[15]|=0x0800001C;
                                         refillpipeline();
-//                                        printf("IRQ\n");
+//                                        rpclog("IRQ\n");
                                 }
                         }
-//                if (armregs[12]==0x1000000) printf("R12=1000000 %08X  %i\n",PC,armins);
+//                if (armregs[12]==0x1000000) rpclog("R12=1000000 %08X  %i\n",PC,armins);
                 armirq=tubeirq;
                 if ((armregs[15]&3)!=mode) updatemode(armregs[15]&3);
                 armregs[15]+=4;
 //                rpclog("%08X : %08X %08X %08X  %08X\n",PC,armregs[0],armregs[1],armregs[2],opcode);
 /*                if (!PC)
                 {
-                        printf("Branch through zero\n");
+                        rpclog("Branch through zero\n");
                         dumpregs();
                         exit(-1);
                 }*/
@@ -2002,6 +2002,6 @@ void execarm()
                         endtimeslice=0;
                         return;
                 }
-//                if (output && !(*armregs[15]&0x8000000) && PC<0x2000000) printf("%07X : %08X %08X %08X %08X %08X %08X %08X %08X\n%08i: %08X %08X %08X %08X %08X %08X %08X %08X\n",PC,*armregs[0],*armregs[1],*armregs[2],*armregs[3],*armregs[4],*armregs[5],*armregs[6],*armregs[7],inscount,*armregs[8],*armregs[9],*armregs[10],*armregs[11],*armregs[12],*armregs[13],*armregs[14],*armregs[15]);
+//                if (output && !(*armregs[15]&0x8000000) && PC<0x2000000) rpclog("%07X : %08X %08X %08X %08X %08X %08X %08X %08X\n%08i: %08X %08X %08X %08X %08X %08X %08X %08X\n",PC,*armregs[0],*armregs[1],*armregs[2],*armregs[3],*armregs[4],*armregs[5],*armregs[6],*armregs[7],inscount,*armregs[8],*armregs[9],*armregs[10],*armregs[11],*armregs[12],*armregs[13],*armregs[14],*armregs[15]);
         }
 }

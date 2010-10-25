@@ -1,4 +1,4 @@
-/*B-em v2.0 by Tom Walker
+/*B-em v2.1 by Tom Walker
   OpenAL interface*/
 
 #include <stdio.h>
@@ -25,7 +25,7 @@ void check()
         ALenum error;
         if ((error = alGetError()) != AL_NO_ERROR)
         {
-                printf("AL Error : %08X\n", error);
+                //printf("AL Error : %08X\n", error);
                 //printf("Description : %s\n",alGetErrorString(error));
         }
 /*        if ((error = alutGetError()) != ALUT_ERROR_NO_ERROR)
@@ -37,12 +37,10 @@ void check()
 
 void initalmain(int argc, char *argv[])
 {
-printf("Start...\n");
-        alutInit(&argc, argv);
+        alutInit(0,NULL);//&argc, argv);
         check();
-printf("End!\n");
         atexit(closeal);
-        printf("AlutInit\n");
+//        printf("AlutInit\n");
 }
 
 void closeal()
@@ -80,7 +78,7 @@ void inital()
         check();
         alSourcePlay(source[0]);
         check();
-        printf("InitAL\n");
+//        printf("InitAL\n");
 
         alGenBuffers(4, buffersdd);
         check();
@@ -100,7 +98,7 @@ void inital()
         check();
         alSourcePlay(source[1]);
         check();
-        printf("InitAL\n");
+//        printf("InitAL\n");
 }
 
 int16_t zbuf[16384];
@@ -120,7 +118,7 @@ void givealbuffer(int16_t *buf)
         if (state==0x1014)
         {
                 alSourcePlay(source[0]);
-                printf("Resetting sound\n");
+//                printf("Resetting sound\n");
         }
 //        printf("State - %i %08X\n",state,state);
         alGetSourcei(source[0], AL_BUFFERS_PROCESSED, &processed);
@@ -175,27 +173,31 @@ void givealbufferdd(int16_t *buf)
         if (state==0x1014)
         {
                 alSourcePlay(source[1]);
-                printf("Resetting sounddd\n");
+//                printf("Resetting sounddd\n");
         }
         alGetSourcei(source[1], AL_BUFFERS_PROCESSED, &processed);
-
+//rpclog("Get source\n");
         check();
-
+//rpclog("Got source\n");
         if (processed>=1)
         {
                 ALuint buffer;
                 ALint temp;
 
+//rpclog("Unqueue\n");
                 alSourceUnqueueBuffers(source[1], 1, &buffer);
                 check();
 
                 for (c=0;c<(4410*2);c++) zbuf[c]=buf[c>>1];//^0x8000;
 
+//rpclog("BufferData\n");
                 alBufferData(buffer, AL_FORMAT_STEREO16, zbuf, 4410*4, 44100);
                 check();
 
+//rpclog("Queue\n");
                 alSourceQueueBuffers(source[1], 1, &buffer);
                 check();
         }
+
 //        rpclog("DDnoise3\n");
 }

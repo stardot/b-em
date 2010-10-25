@@ -1,4 +1,4 @@
-/*B-em v2.0 by Tom Walker
+/*B-em v2.1 by Tom Walker
   Debugger*/
 
 int debug;
@@ -10,9 +10,9 @@ extern int fcount;
 #include <wingdi.h>
 #include "b-em.h"
 
-
-HANDLE debugthread;
+HANDLE debugthread,debugconsolethread;
 HWND dhwnd;
+int debugstarted=0;
 char DebugszClassName[ ] = "B-emDebugWnd";
 LRESULT CALLBACK DebugWindowProcedure (HWND, UINT, WPARAM, LPARAM);
 HINSTANCE hinst;
@@ -29,7 +29,8 @@ void _debugthread(PVOID pvoid)
         int c,d;
 
         usdat=malloc(256*256*4);
-
+        if (!debugstarted)
+        {
         wincl.hInstance = hinst;
         wincl.lpszClassName = DebugszClassName;
         wincl.lpfnWndProc = DebugWindowProcedure;      /* This function is called by windows */
@@ -51,6 +52,7 @@ void _debugthread(PVOID pvoid)
         {
                 printf("Registerclass failed\n");
                 return;
+        }
         }
         dhwnd = CreateWindowEx (
            0,                   /* Extended possibilites for variation */
@@ -88,7 +90,8 @@ void _debugthread(PVOID pvoid)
     lpbmi.bmiHeader.biClrUsed=0;
         lpbmi.bmiHeader.biClrImportant=0;
 
-        while (1)
+        debugstarted=1;
+        while (debugon)
         {
                 Sleep(20);
 
@@ -118,6 +121,7 @@ void _debugthread(PVOID pvoid)
                 }
 //                if (indebug) pollmainwindow();
         }
+        free(usdat);
 }
 
 HANDLE consf,cinf;
@@ -128,13 +132,34 @@ BOOL CtrlHandler(DWORD fdwCtrlType)
         return TRUE;
 }
 
+char debugconsoleins[256];
+int gotstr=1;
+
+void _debugconsolethread(PVOID pvoid)
+{
+        int c,d;
+        return;
+        while (debug)
+        {
+                if (!gotstr)
+                {
+                        c=ReadConsoleA(cinf,debugconsoleins,255,(LPDWORD)&d,NULL);
+                        debugconsoleins[d]=0;
+                        gotstr=1;
+                }
+                else
+                        sleep(10);
+        }
+}
+
 void startdebug()
 {
-
         if (debug)
         {
-        hinst=GetModuleHandle(NULL);
-        debugthread=(HANDLE)_beginthread(_debugthread,0,NULL);
+                hinst=GetModuleHandle(NULL);
+                debugthread=(HANDLE)_beginthread(_debugthread,0,NULL);
+                debugconsolethread=(HANDLE)_beginthread(_debugconsolethread,0,NULL);
+
                 AllocConsole();
                 SetConsoleCtrlHandler((PHANDLER_ROUTINE)CtrlHandler,TRUE);
                 consf=GetStdHandle(STD_OUTPUT_HANDLE);
@@ -144,6 +169,15 @@ void startdebug()
 //        consf=GetStdHandle(STD_OUTPUT_HANDLE);
 //        cinf=GetStdHandle(STD_INPUT_HANDLE);
 //        WriteConsole(consf,"Hello",5,NULL,NULL);
+}
+
+void enddebug()
+{
+//        TerminateThread(debugconsolethread,0);
+//        TerminateThread(debugthread,0);
+//        if (usdat) free(usdat);
+        FreeConsole();
+        debug=debugon=0;
 }
 
 void killdebug()
@@ -170,7 +204,10 @@ LRESULT CALLBACK DebugWindowProcedure (HWND hwnd, UINT message, WPARAM wParam, L
 
 void debugout(char *s)
 {
+        startblit();
         WriteConsole(consf,s,strlen(s),NULL,NULL);
+        endblit();
+        rpclog("%s",s);
 }
 
 #else
@@ -427,30 +464,20 @@ void debugwrite(uint16_t addr, uint8_t val)
         }
 }
 
+uint16_t oldpc,oldoldpc,pc3;
 void dodebugger()
 {
-        int c,d,e;
+        int c,d,e,f;
         int params;
         uint8_t temp;
         char outs[256];
         char ins[256];
-        if (pc==0xFFDD)
+        if (!opcode)
         {
-                sprintf(outs,"    OSFILE!\n",pc);
-                debugout(outs);
-                c=4;
-                d=ram[x+(y<<8)]|(ram[x+(y<<8)+1]<<8);
-                while (ram[d]!=13)
-                {
-                        outs[c++]=ram[d++];
-                }
-                outs[c]=0;
-                debugout(outs);
-                sprintf(outs,"  %02X%02X\n",ram[x+(y<<8)+3],ram[x+(y<<8)+2]);
+                sprintf(outs,"BRK %04X! %04X %04X\n",pc,oldpc,oldoldpc);
                 debugout(outs);
         }
-
-//        if (!opcode) debug=1;
+        if (!opcode) debug=1;
 
         for (c=0;c<8;c++)
         {
@@ -462,7 +489,7 @@ void dodebugger()
                 }
         }
         if (!debug) return;
-        if (!opcode) printf("BRK at %04X\n",pc);
+//        if (!opcode) printf("BRK at %04X\n",pc);
         if (debugstep)
         {
                 debugstep--;
@@ -483,10 +510,18 @@ void dodebugger()
                 sprintf(outs,"  >",pc);
                 debugout(outs);
 #ifdef WIN32
-                c=ReadConsoleA(cinf,ins,255,&d,NULL);
+/*                gotstr=0;
+                while (!gotstr && debug) sleep(10);
+                if (!debug)
+                {
+                        indebug=0;
+                        return;
+                }
+                strcpy(ins,debugconsoleins);*/
+                c=ReadConsoleA(cinf,ins,255,(LPDWORD)&d,NULL);
                 ins[d]=0;
 #else
-                d=fgets(ins,255,stdin);
+                d=(int)fgets(ins,255,stdin);
 //                gets(ins);
 #endif
 //printf("Got %s %i\n",ins,d);
@@ -541,12 +576,87 @@ void dodebugger()
                         }
                         break;
                         case 'r': case 'R':
-                        sprintf(outs,"    6502 registers :\n");
-                        debugout(outs);
-                        sprintf(outs,"    A=%02X X=%02X Y=%02X S=01%02X PC=%04X\n",a,x,y,s,pc);
-                        debugout(outs);
-                        sprintf(outs,"    Status : %c%c%c%c%c%c\n",(p.n)?'N':' ',(p.v)?'V':' ',(p.d)?'D':' ',(p.i)?'I':' ',(p.z)?'Z':' ',(p.c)?'C':' ');
-                        debugout(outs);
+                        if (params)
+                        {
+                                if (!strncasecmp(&ins[d],"sysvia",7))
+                                {
+                                        sprintf(outs,"    System VIA registers :\n");
+                                        debugout(outs);
+                                        sprintf(outs,"    ORA  %02X ORB  %02X IRA %02X IRB %02X\n",sysvia.ora,sysvia.orb,sysvia.ira,sysvia.irb);
+                                        debugout(outs);
+                                        sprintf(outs,"    DDRA %02X DDRB %02X ACR %02X PCR %02X\n",sysvia.ddra,sysvia.ddrb,sysvia.acr,sysvia.pcr);
+                                        debugout(outs);
+                                        sprintf(outs,"    Timer 1 latch %04X   count %04X\n",sysvia.t1l/2,(sysvia.t1c/2)&0xFFFF);
+                                        debugout(outs);
+                                        sprintf(outs,"    Timer 2 latch %04X   count %04X\n",sysvia.t2l/2,(sysvia.t2c/2)&0xFFFF);
+                                        debugout(outs);
+                                        sprintf(outs,"    IER %02X IFR %02X\n",sysvia.ier,sysvia.ifr);
+                                        debugout(outs);
+                                }
+                                if (!strncasecmp(&ins[d],"uservia",7))
+                                {
+                                        sprintf(outs,"    User VIA registers :\n");
+                                        debugout(outs);
+                                        sprintf(outs,"    ORA  %02X ORB  %02X IRA %02X IRB %02X\n",uservia.ora,uservia.orb,uservia.ira,uservia.irb);
+                                        debugout(outs);
+                                        sprintf(outs,"    DDRA %02X DDRB %02X ACR %02X PCR %02X\n",uservia.ddra,uservia.ddrb,uservia.acr,uservia.pcr);
+                                        debugout(outs);
+                                        sprintf(outs,"    Timer 1 latch %04X   count %04X\n",uservia.t1l/2,(uservia.t1c/2)&0xFFFF);
+                                        debugout(outs);
+                                        sprintf(outs,"    Timer 2 latch %04X   count %04X\n",uservia.t2l/2,(uservia.t2c/2)&0xFFFF);
+                                        debugout(outs);
+                                        sprintf(outs,"    IER %02X IFR %02X\n",uservia.ier,uservia.ifr);
+                                        debugout(outs);
+                                }
+                                if (!strncasecmp(&ins[d],"crtc",4))
+                                {
+                                        sprintf(outs,"    CRTC registers :\n");
+                                        debugout(outs);
+                                        sprintf(outs,"    Index=%i\n",crtci);
+                                        debugout(outs);
+                                        sprintf(outs,"    R0 =%02X  R1 =%02X  R2 =%02X  R3 =%02X  R4 =%02X  R5 =%02X  R6 =%02X  R7 =%02X  R8 =%02X\n",crtc[0],crtc[1],crtc[2],crtc[3],crtc[4],crtc[5],crtc[6],crtc[7],crtc[8]);
+                                        debugout(outs);
+                                        sprintf(outs,"    R9 =%02X  R10=%02X  R11=%02X  R12=%02X  R13=%02X  R14=%02X  R15=%02X  R16=%02X  R17=%02X\n",crtc[9],crtc[10],crtc[11],crtc[12],crtc[13],crtc[14],crtc[15],crtc[16],crtc[17]);
+                                        debugout(outs);
+                                        sprintf(outs,"    VC=%i SC=%i HC=%i MA=%04X\n",vc,sc,hc,ma);
+                                        debugout(outs);
+                                }
+                                if (!strncasecmp(&ins[d],"vidproc",7))
+                                {
+                                        sprintf(outs,"    VIDPROC registers :\n");
+                                        debugout(outs);
+                                        sprintf(outs,"    Control=%02X\n",ulactrl);
+                                        debugout(outs);
+                                        sprintf(outs,"    Palette entries :\n");
+                                        debugout(outs);
+                                        sprintf(outs,"     0=%01X   1=%01X   2=%01X   3=%01X   4=%01X   5=%01X   6=%01X   7=%01X\n",bakpal[0],bakpal[1],bakpal[2],bakpal[3],bakpal[4],bakpal[5],bakpal[6],bakpal[7]);
+                                        debugout(outs);
+                                        sprintf(outs,"     8=%01X   9=%01X  10=%01X  11=%01X  12=%01X  13=%01X  14=%01X  15=%01X\n",bakpal[8],bakpal[9],bakpal[10],bakpal[11],bakpal[12],bakpal[13],bakpal[14],bakpal[15]);
+                                        debugout(outs);
+                                }
+                                if (!strncasecmp(&ins[d],"sound",5))
+                                {
+                                        sprintf(outs,"    Sound registers :\n");
+                                        debugout(outs);
+                                        sprintf(outs,"    Voice 0 frequency = %04X   volume = %i  control = %02X\n",snlatch[0]>>6,snvol[0],snnoise);
+                                        debugout(outs);
+                                        sprintf(outs,"    Voice 1 frequency = %04X   volume = %i\n",snlatch[1]>>6,snvol[1]);
+                                        debugout(outs);
+                                        sprintf(outs,"    Voice 2 frequency = %04X   volume = %i\n",snlatch[2]>>6,snvol[2]);
+                                        debugout(outs);
+                                        sprintf(outs,"    Voice 3 frequency = %04X   volume = %i\n",snlatch[3]>>6,snvol[3]);
+                                        debugout(outs);
+                                }
+                        }
+                        else
+                        {
+                                sprintf(outs,"    6502 registers :\n");
+                                debugout(outs);
+                                sprintf(outs,"    A=%02X X=%02X Y=%02X S=01%02X PC=%04X\n",a,x,y,s,pc);
+                                debugout(outs);
+                                sprintf(outs,"    Status : %c%c%c%c%c%c\n",(p.n)?'N':' ',(p.v)?'V':' ',(p.d)?'D':' ',(p.i)?'I':' ',(p.z)?'Z':' ',(p.c)?'C':' ');
+                                debugout(outs);
+                        }
                         break;
                         case 's': case 'S':
                         if (params) sscanf(&ins[d],"%i",&debugstep);
@@ -700,7 +810,7 @@ void dodebugger()
                                 {
                                         if (watchw[c]!=-1)
                                         {
-                                                sprintf(outs,"    Write watchpoint %i : %04X\n",c,watchr[c]);
+                                                sprintf(outs,"    Write watchpoint %i : %04X\n",c,watchw[c]);
                                                 debugout(outs);
                                         }
                                 }
@@ -725,6 +835,13 @@ void dodebugger()
                                         if (c==e) watchw[c]=-1;
                                 }
                         }
+                        else if (!strncasecmp(ins,"writem",6))
+                        {
+                                if (!params) break;
+                                sscanf(&ins[d],"%X %X",&e,&f);
+                                rpclog("WriteM %04X %04X\n",e,f);
+                                writemem(e,f);
+                        }
                         break;
                         case 'q': case 'Q':
                         setquit();
@@ -733,39 +850,51 @@ void dodebugger()
                         case 'h': case 'H': case '?':
                         sprintf(outs,"\n    Debugger commands :\n\n");
                         debugout(outs);
-                        sprintf(outs,"    bclear n  - clear breakpoint n or breakpoint at n\n");
+                        sprintf(outs,"    bclear n   - clear breakpoint n or breakpoint at n\n");
                         debugout(outs);
-                        sprintf(outs,"    bclearr n - clear read breakpoint n or read breakpoint at n\n");
+                        sprintf(outs,"    bclearr n  - clear read breakpoint n or read breakpoint at n\n");
                         debugout(outs);
-                        sprintf(outs,"    bclearw n - clear write breakpoint n or write breakpoint at n\n");
+                        sprintf(outs,"    bclearw n  - clear write breakpoint n or write breakpoint at n\n");
                         debugout(outs);
-                        sprintf(outs,"    blist     - list current breakpoints\n");
+                        sprintf(outs,"    blist      - list current breakpoints\n");
                         debugout(outs);
-                        sprintf(outs,"    break n   - set a breakpoint at n\n");
+                        sprintf(outs,"    break n    - set a breakpoint at n\n");
                         debugout(outs);
-                        sprintf(outs,"    breakr n  - break on reads from address n\n");
+                        sprintf(outs,"    breakr n   - break on reads from address n\n");
                         debugout(outs);
-                        sprintf(outs,"    breakw n  - break on writes to address n\n");
+                        sprintf(outs,"    breakw n   - break on writes to address n\n");
                         debugout(outs);
-                        sprintf(outs,"    c         - continue running indefinitely\n");
+                        sprintf(outs,"    c          - continue running indefinitely\n");
                         debugout(outs);
-                        sprintf(outs,"    d [n]     - disassemble from address n\n");
+                        sprintf(outs,"    d [n]      - disassemble from address n\n");
                         debugout(outs);
-                        sprintf(outs,"    m [n]     - memory dump from address n\n");
+                        sprintf(outs,"    m [n]      - memory dump from address n\n");
                         debugout(outs);
-                        sprintf(outs,"    q         - force emulator exit\n");
+                        sprintf(outs,"    q          - force emulator exit\n");
                         debugout(outs);
-                        sprintf(outs,"    r         - print 6502 registers\n");
+                        sprintf(outs,"    r          - print 6502 registers\n");
                         debugout(outs);
-                        sprintf(outs,"    s [n]     - step n instructions (or 1 if no parameter)\n\n");
+                        sprintf(outs,"    r sysvia   - print System VIA registers\n");
                         debugout(outs);
-                        sprintf(outs,"    watchr n  - watch reads from address n\n");
+                        sprintf(outs,"    r uservia  - print User VIA registers\n");
                         debugout(outs);
-                        sprintf(outs,"    watchw n  - watch writes to address n\n");
+                        sprintf(outs,"    r crtc     - print CRTC registers\n");
                         debugout(outs);
-                        sprintf(outs,"    wclearr n - clear read watchpoint n or read watchpoint at n\n");
+                        sprintf(outs,"    r vidproc  - print VIDPROC registers\n");
                         debugout(outs);
-                        sprintf(outs,"    wclearw n - clear write watchpoint n or write watchpoint at n\n");
+                        sprintf(outs,"    r sound    - print Sound registers\n");
+                        debugout(outs);
+                        sprintf(outs,"    s [n]      - step n instructions (or 1 if no parameter)\n\n");
+                        debugout(outs);
+                        sprintf(outs,"    watchr n   - watch reads from address n\n");
+                        debugout(outs);
+                        sprintf(outs,"    watchw n   - watch writes to address n\n");
+                        debugout(outs);
+                        sprintf(outs,"    wclearr n  - clear read watchpoint n or read watchpoint at n\n");
+                        debugout(outs);
+                        sprintf(outs,"    wclearw n  - clear write watchpoint n or write watchpoint at n\n");
+                        debugout(outs);
+                        sprintf(outs,"    writem a v - write to memory, a = address, v = value\n");
                         debugout(outs);
                         break;
                 }

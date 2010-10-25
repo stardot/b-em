@@ -1,4 +1,4 @@
-/*B-em v2.0 by Tom Walker
+/*B-em v2.1 by Tom Walker
   Tube ULA emulation*/
 
 #include <stdio.h>
@@ -11,6 +11,7 @@
 #define TUBEARM   3
 #define TUBEX86   4
 #define TUBE65816 5
+#define TUBE32016 6
 
 int tube6502speed=1;
 int tubedat=0;
@@ -337,6 +338,15 @@ void tubeinit65816()
         reset65816();
         tubeexec=exec65816;
         tubeshift=3;
+}
+
+void tubeinit32016()
+{
+        tubetype=TUBE32016;
+        init32016();
+        reset32016();
+        tubeexec=exec32016;
+        tubeshift=2;
 }
 
 void resettube()

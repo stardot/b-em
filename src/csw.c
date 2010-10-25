@@ -1,4 +1,4 @@
-/*B-em v2.0 by Tom Walker
+/*B-em v2.1 by Tom Walker
   CSW cassette support*/
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,7 +21,7 @@ int cswloop=1;
 void opencsw(char *fn)
 {
         int end,c;
-        unsigned long destlen=8*1024*1024;
+        uint32_t destlen=8*1024*1024;
         uint8_t *tempin;
         if (cswf) fclose(cswf);
         if (cswdat) free(cswdat);
@@ -50,7 +50,7 @@ void opencsw(char *fn)
 //        sprintf(csws,"Decompressing %i %i\n",destlen,end);
 //        fputs(csws,cswlog);
         /*Decompress*/
-        uncompress(cswdat,&destlen,tempin,end);
+        uncompress(cswdat,(unsigned long *)&destlen,tempin,end);
         free(tempin);
         /*Reset data pointer*/
         cswpoint=0;

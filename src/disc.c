@@ -1,4 +1,4 @@
-/*B-em v2.0 by Tom Walker
+/*B-em v2.1 by Tom Walker
   Disc support (also some tape)*/
 
 #include <allegro.h>
@@ -45,7 +45,7 @@ void loaddisc(int drive, char *fn)
                 }
                 c++;
         }
-        printf("Couldn't load %s %s\n",fn,p);
+//        printf("Couldn't load %s %s\n",fn,p);
         /*No extension match, so guess based on image size*/
         f=fopen(fn,"rb");
         if (!f) return;
@@ -68,13 +68,13 @@ void loaddisc(int drive, char *fn)
         if (c==(720*1024)) /*720k DOS - 80*2*9*512*/
         {
                 driveloaders[drive]=3;
-                adl_loadex(drive,fn,9,512);
+                adl_loadex(drive,fn,9,512,0);
                 return;
         }
         if (c==(360*1024)) /*360k DOS - 40*2*9*512*/
         {
                 driveloaders[drive]=3;
-                adl_loadex(drive,fn,9,512);
+                adl_loadex(drive,fn,9,512,1);
                 return;
         }
         if (c<=(200*1024)) /*200k DFS - 80*1*10*256*/

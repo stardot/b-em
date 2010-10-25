@@ -1,4 +1,4 @@
-/*B-em v2.0 by Tom Walker
+/*B-em v2.1 by Tom Walker
   Windows key redefinition*/
 
 #ifdef WIN32
@@ -41,7 +41,7 @@ void getkey(HWND parent)
 
                 /* Register the window class, and if it fails quit the program */
                 if (!RegisterClassEx (&wincl))
-                   return 0;
+                   return;
         }
 
         if (khwnd) SendMessage(khwnd,WM_CLOSE,0,0);

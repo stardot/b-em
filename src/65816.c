@@ -1,9 +1,11 @@
-/*B-em v2.0 by Tom Walker
+/*B-em v2.1 by Tom Walker
   65816 parasite CPU emulation
   Originally from Snem, with some bugfixes*/
 
 #include <stdio.h>
 #include "b-em.h"
+
+#define printf rpclog
 
 extern int tuberomin;
 uint8_t *w65816ram,*w65816rom;

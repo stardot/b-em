@@ -1,4 +1,4 @@
-void writeserial(unsigned short addr, unsigned char val);
-unsigned char readserial(unsigned short addr);
+void writeserial(uint16_t addr, uint8_t val);
+uint8_t readserial(uint16_t addr);
 void initserial();
 int motor;

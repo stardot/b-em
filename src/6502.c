@@ -1,4 +1,4 @@
-/*B-em v2.0 by Tom Walker
+/*B-em v2.1 by Tom Walker
   6502/65c02 host CPU emulation*/
 
 #include <stdio.h>
@@ -38,6 +38,7 @@ extern int scrx,scry;
 uint8_t readmem(uint16_t addr)
 {
         uint8_t temp;
+//        if (addr>=0x8000 && addr<0xC000 && ((romsel>>14)>=4 && (romsel>>14)<8)) rpclog("Read %04X %04X %02X\n",addr,pc,romsel);
         if (debugon) debugread(addr);
         if (pc==addr) fetchc[addr]=31;
         else          readc[addr]=31;
@@ -57,7 +58,12 @@ uint8_t readmem(uint16_t addr)
                 case 0xFC30: case 0xFC34: case 0xFC38: case 0xFC3C:
 //                case 0xFCE0: case 0xFCE4: case 0xFCE8: case 0xFCEC:
 //                case 0xFCF0: case 0xFCF4: case 0xFCF8: case 0xFCFC:
-                return readsid(addr);
+                if (sndbeebsid) return readsid(addr);
+                break;
+                case 0xFC40: case 0xFC44: case 0xFC48: case 0xFC4C:
+                case 0xFC50: case 0xFC54: case 0xFC58: case 0xFC5C:
+                if (ideenable) return readide(addr);
+                break;
                 case 0xFE00: case 0xFE04: return readcrtc(addr);
                 case 0xFE08: case 0xFE0C: return readacia(addr);
                 case 0xFE18: if (MASTER) return readadc(addr); break;
@@ -90,20 +96,31 @@ uint8_t readmem(uint16_t addr)
                 case 0xFEF0: case 0xFEF4: case 0xFEF8: case 0xFEFC:
                 return readtubehost(addr);
         }
+        if (addr>=0xFC00 && addr<0xFE00) return 0xFF;
         return addr>>8;
 }
+
+uint8_t ram_fe30,ram_fe34;
 
 void writemem(uint16_t addr, uint8_t val)
 {
         int c;
-//        if (addr>=0x3000 && addr<0x8000) rpclog("Write %04X %04X %02X\n",addr,pc,val);
+//        if ((addr&0xFF00)==0xFC00) rpclog("Write %04X %02X %04X\n",addr,val,pc);
+//        if (addr>=0x7B && addr<0x7F) rpclog("Write SND2 %04X %04X %02X\n",addr,pc,val);
+//        if (addr>=0xB0 && addr<0xBB) rpclog("Write SND %04X %04X %02X\n",addr,pc,val);
+//        if (addr>=0x400 && addr<0x600) rpclog("Write %04X %04X %02X\n",addr,pc,val);
 //        if ((addr&0xFFE0)==0xFFE0) printf("Write %04X %04X %02X\n",addr,pc,val);
 //        if (pc>=0x1000 && pc<0x2000 && addr>0xFF && (addr<0x1000 || addr>=0x2000) && ((addr&~0xFF)!=0xFC00))
 //           printf("Write %04X %04X %02X\n",addr,pc,val);
 //        if (addr>=0xD400 && addr<0xD420) printf("Write %04X %04X %02X\n",addr,pc,val);
 //        if (addr>=0xFC00 && addr<0xFCFF) printf("Write %04X %04X %02X\n",addr,pc,val);
 //        if (addr==0x31F) printf("Write 31F %02X %04X\n",val,pc);
+//if (val==0x2B && addr==0x21ED && pc>0xE00) output=1;
         if (debugon) debugwrite(addr,val);
+//        if (addr==0x3E || addr==0x3F) rpclog("WRITE    %04X %02X %04X\n",addr,val,pc);
+//        if (addr==0x28 || addr==0x3F) rpclog("WRITE    %04X %02X %04X\n",addr,val,pc);
+//        if (addr>=0x30C && addr<0x318) rpclog("Write %04X %02X %04X\n",addr,val,pc);
+//        if (addr>=0x36C && addr<0x378) rpclog("Write %04X %02X %04X\n",addr,val,pc);
 //        if (addr==0x1A) rpclog("Write 1A %04X %02X %02X\n",pc,val,ram[0x27]);
         writec[addr]=31;
 //        if (addr==(0x7C28+4)) printf("Write %04X %02X %i %i\n",addr,val,scry,scrx);
@@ -122,7 +139,11 @@ void writemem(uint16_t addr, uint8_t val)
                 case 0xFC20: case 0xFC24: case 0xFC28: case 0xFC2C:
                 case 0xFC30: case 0xFC34: case 0xFC38: case 0xFC3C:
 //                        rpclog("Write SID %04X %02X\n",addr,val);
-                writesid(addr,val);
+                if (sndbeebsid) writesid(addr,val);
+                break;
+                case 0xFC40: case 0xFC44: case 0xFC48: case 0xFC4C:
+                case 0xFC50: case 0xFC54: case 0xFC58: case 0xFC5C:
+                writeide(addr,val);
                 break;
                 case 0xFCE0: case 0xFCE4: case 0xFCE8: case 0xFCEC:
                 case 0xFCF0: case 0xFCF4: case 0xFCF8: case 0xFCFC:
@@ -136,6 +157,8 @@ void writemem(uint16_t addr, uint8_t val)
                 case 0xFE24: if (MASTER) write1770(addr,val); else writeula(addr,val); break;
                 case 0xFE28: if (MASTER) write1770(addr,val); break;
                 case 0xFE30:
+                ram_fe30=val;
+//                        printf("FE30 write %02X %04X\n",val,pc);
                 for (c=128;c<192;c++) memlook[0][c]=memlook[1][c]=&rom[(val&15)<<14]-0x8000;
                 for (c=128;c<192;c++) memstat[0][c]=memstat[1][c]=swram[val&15]?1:2;
                 romsel=(val&15)<<14;
@@ -154,6 +177,7 @@ void writemem(uint16_t addr, uint8_t val)
                 }
                 break;
                 case 0xFE34:
+                ram_fe34=val;
                 if (BPLUS)
                 {
                         acccon=val;
@@ -163,7 +187,7 @@ void writemem(uint16_t addr, uint8_t val)
                 }
                 if (MASTER)
                 {
-                        printf("Write %04X %02X %i %i\n",addr,val,scry,scrx);
+//                        printf("Write %04X %02X %i %i\n",addr,val,scry,scrx);
                         acccon=val;
                         ram8k=(val&8);
                         ram20k=(val&4);
@@ -186,12 +210,12 @@ void writemem(uint16_t addr, uint8_t val)
                 break;
                 case 0xFE40: case 0xFE44: case 0xFE48: case 0xFE4C:
                 case 0xFE50: case 0xFE54: case 0xFE58: case 0xFE5C:
-                        if (opcode!=0x8c && opcode!=0x8d && opcode!=0x8e && opcode!=0x2e && opcode!=0x6e && opcode!=0xce && opcode!=0xee && pc<0x8000) printf("Write SYS VIA %04X %04X %02X %02X\n",pc,addr,val,opcode);
+//                        if (opcode!=0x8c && opcode!=0x8d && opcode!=0x8e && opcode!=0x2e && opcode!=0x6e && opcode!=0xce && opcode!=0xee && pc<0x8000) printf("Write SYS VIA %04X %04X %02X %02X\n",pc,addr,val,opcode);
                 writesysvia(addr,val);
                 break;
                 case 0xFE60: case 0xFE64: case 0xFE68: case 0xFE6C:
                 case 0xFE70: case 0xFE74: case 0xFE78: case 0xFE7C:
-                        if (opcode!=0x8c && opcode!=0x8d && opcode!=0x8e && opcode!=0x2e && opcode!=0x6e && opcode!=0xce && opcode!=0xee && pc<0x8000) printf("Write USR VIA %04X %04X %02X %02X\n",pc,addr,val,opcode);
+//                        if (opcode!=0x8c && opcode!=0x8d && opcode!=0x8e && opcode!=0x2e && opcode!=0x6e && opcode!=0xce && opcode!=0xee && pc<0x8000) printf("Write USR VIA %04X %04X %02X %02X\n",pc,addr,val,opcode);
                 writeuservia(addr,val);
                 break;
                 case 0xFE80: case 0xFE84: case 0xFE88: case 0xFE8C:
@@ -418,6 +442,21 @@ static uint8_t tempb;
 
 int getpd() { return p.d; }
 
+void branchcycles(int temp)
+{
+                                if (temp>2)
+                                {
+                                        polltime(temp-1);
+                                        takeint=(interrupt && !p.i);
+                                        polltime(1);
+                                }
+                                else
+                                {
+                                        polltime(2);
+                                        takeint=(interrupt && !p.i);
+                                }
+}
+
 void exec6502()
 {
         uint16_t addr;
@@ -431,6 +470,7 @@ void exec6502()
                 pc3=oldoldpc;
                 oldoldpc=oldpc;
                 oldpc=pc;
+//                if (pc==0x2853) output=1;
 //                if (skipint==1) skipint=0;
                 vis20k=RAMbank[pc>>12];
                 opcode=readmem(pc);
@@ -439,7 +479,14 @@ void exec6502()
                 switch (opcode)
                 {
                                 case 0x00: /*BRK*/
-//                                printf("BRK! at %04X\n",pc);
+//                                if (output)
+//                                {
+                                        //printf("BRK! at %04X\n",pc);
+//                                        output=1;
+//                                        dumpregs();
+//                                        dumpram();
+//                                        exit(-1);
+//                                }
                                 pc++;
                                 push(pc>>8);
                                 push(pc&0xFF);
@@ -601,9 +648,7 @@ void exec6502()
                                         if ((pc&0xFF00)^((pc+offset)&0xFF00)) temp++;
                                         pc+=offset;
                                 }
-                                polltime(temp-1);
-                                takeint=(interrupt && !p.i);
-                                polltime(1);
+                                branchcycles(temp);
                                 break;
 
                                 case 0x11: /*ORA (),y*/
@@ -932,8 +977,7 @@ void exec6502()
                                         if ((pc&0xFF00)^((pc+offset)&0xFF00)) temp++;
                                         pc+=offset;
                                 }
-                                polltime(temp);
-                                takeint=(interrupt && !p.i);
+                                branchcycles(temp);
                                 break;
 
                                 case 0x31: /*AND (),y*/
@@ -1099,6 +1143,7 @@ void exec6502()
                                 break;
 
                                 case 0x40: /*RTI*/
+                                output=0;
                                 temp=pull();
                                 p.c=temp&1; p.z=temp&2;
                                 p.i=temp&4; p.d=temp&8;
@@ -1260,8 +1305,7 @@ void exec6502()
                                         if ((pc&0xFF00)^((pc+offset)&0xFF00)) temp++;
                                         pc+=offset;
                                 }
-                                polltime(temp);
-                                takeint=(interrupt && !p.i);
+                                branchcycles(temp);
                                 break;
 
                                 case 0x51: /*EOR (),y*/
@@ -1597,8 +1641,7 @@ void exec6502()
                                         if ((pc&0xFF00)^((pc+offset)&0xFF00)) temp++;
                                         pc+=offset;
                                 }
-                                polltime(temp);
-                                takeint=(interrupt && !p.i);
+                                branchcycles(temp);
                                 break;
 
                                 case 0x71: /*ADC (),y*/
@@ -1867,9 +1910,7 @@ void exec6502()
                                         if ((pc&0xFF00)^((pc+offset)&0xFF00)) temp++;
                                         pc+=offset;
                                 }
-                                polltime(temp-1);
-                                takeint=(interrupt && !p.i);
-                                polltime(1);
+                                branchcycles(temp);
                                 break;
 
                                 case 0x91: /*STA (),y*/
@@ -2117,8 +2158,7 @@ void exec6502()
                                         if ((pc&0xFF00)^((pc+offset)&0xFF00)) temp++;
                                         pc+=offset;
                                 }
-                                polltime(temp);
-                                takeint=(interrupt && !p.i);
+                                branchcycles(temp);
                                 break;
 
                                 case 0xB1: /*LDA (),y*/
@@ -2400,8 +2440,7 @@ void exec6502()
                                         if ((pc&0xFF00)^((pc+offset)&0xFF00)) temp++;
                                         pc+=offset;
                                 }
-                                polltime(temp);
-                                takeint=(interrupt && !p.i);
+                                branchcycles(temp);
                                 break;
 
                                 case 0xD1: /*CMP (),y*/
@@ -2699,8 +2738,7 @@ void exec6502()
 //                                        if (pc<0x8000) printf("%04X %02X\n",(pc&0xFF00)^((pc+offset)&0xFF00),temp);
                                         pc+=offset;
                                 }
-                                polltime(temp);
-                                takeint=(interrupt && !p.i);
+                                branchcycles(temp);
                                 break;
 
                                 case 0xF1: /*SBC (),y*/
@@ -2887,6 +2925,9 @@ void exec6502()
                                 break;
 #endif
                                 default:   /*Halt!*/
+//                                printf("HALT\n");
+                                dumpregs();
+                                exit(-1);
                                 pc--;      /*PC never moves on*/
                                 takeint=0; /*Interrupts never occur*/
                                 oldnmi=1;  /*NMIs never occur*/
@@ -2922,8 +2963,8 @@ void exec6502()
                         dumpram();
                         exit(-1);
                 }*/
-/*                if (pc==0x6041) output=1;
-                if (pc==0x6195)
+//                if (pc==0x1f00) output=1;
+/*                if (pc==0x6195)
                 {
                         dumpregs();
                         dumpram();
@@ -2931,11 +2972,30 @@ void exec6502()
                 }*/
 //                if (pc==0xCD7A) printf("CD7A from %04X\n",oldpc);
 //                if (pc==0xC565) printf("C565 from %04X\n",oldpc);
-                if (output)
+//if (pc>=0x2078 && pc<0x20CA){  output=1; rpclog("%04X\n",pc); }
+//if (pc==0x2770) output=1;
+//if (pc==0x277C) output=0;
+
+//                if (skipint) skipint--;
+/*                if (pc==0x6000) output=1;
+                if (pc==0x6204) output=1;
+                if (pc==0x6191)
+                {
+                        dumpregs();
+                        dumpram();
+                        exit(-1);
+                }
+                if (pc==0x612B)
+                {
+                        dumpregs();
+                        dumpram();
+                        exit(-1);
+                }*/
+/*                if (output)
                 {
 //                        #undef printf
-                        rpclog("A=%02X X=%02X Y=%02X S=%02X PC=%04X %c%c%c%c%c%c op=%02X %02X%02X\n",a,x,y,s,pc,(p.n)?'N':' ',(p.v)?'V':' ',(p.d)?'D':' ',(p.i)?'I':' ',(p.z)?'Z':' ',(p.c)?'C':' ',opcode,ram[0x78],ram[0x79]);
-                }
+                        rpclog("A=%02X X=%02X Y=%02X S=%02X PC=%04X %c%c%c%c%c%c op=%02X %02X%02X\n",a,x,y,s,pc,(p.n)?'N':' ',(p.v)?'V':' ',(p.d)?'D':' ',(p.i)?'I':' ',(p.z)?'Z':' ',(p.c)?'C':' ',opcode,ram[0x29],uservia.ifr);
+                }*/
 //                if (pc==0x400) output=1;
                 if (timetolive)
                 {
@@ -2944,6 +3004,7 @@ void exec6502()
                 }
                 if (takeint)
                 {
+//                        output=1;
                         interrupt&=~128;
                         takeint=0;
 //                        skipint=0;
@@ -3000,7 +3061,6 @@ void exec6502()
 //                        nmilock=1;
 //                        printf("NMI\n");
                 }
-                oldnmi=nmi;
         }
 }
 
@@ -3014,13 +3074,16 @@ void exec65c02()
         cycles+=40000;
         while (cycles>0)
         {
+//                if (pc==0x806F) rpclog("806F from %04X %04X\n",oldpc,oldoldpc);
+//                if (pc>0xDFF && pc<0x8000) rpclog("EXEC %04X\n",pc);
                 pc3=oldoldpc;
                 oldoldpc=oldpc;
                 oldpc=pc;
-                if (debugon) dodebugger();
 //                if (skipint==1) skipint=0;
                 vis20k=RAMbank[pc>>12];
-                opcode=readmem(pc); pc++;
+                opcode=readmem(pc);
+                if (debugon) dodebugger();
+                pc++;
                 switch (opcode)
                 {
                                 case 0x00: /*BRK*/
@@ -3157,9 +3220,7 @@ void exec65c02()
                                         if ((pc&0xFF00)^((pc+offset)&0xFF00)) temp++;
                                         pc+=offset;
                                 }
-                                polltime(temp-1);
-                                takeint=(interrupt && !p.i);
-                                polltime(1);
+                                branchcycles(temp);
                                 break;
 
                                 case 0x11: /*ORA (),y*/
@@ -3383,8 +3444,7 @@ void exec65c02()
                                         if ((pc&0xFF00)^((pc+offset)&0xFF00)) temp++;
                                         pc+=offset;
                                 }
-                                polltime(temp);
-                                takeint=(interrupt && !p.i);
+                                branchcycles(temp);
                                 break;
 
                                 case 0x31: /*AND (),y*/
@@ -3583,8 +3643,7 @@ void exec65c02()
                                         if ((pc&0xFF00)^((pc+offset)&0xFF00)) temp++;
                                         pc+=offset;
                                 }
-                                polltime(temp);
-                                takeint=(interrupt && !p.i);
+                                branchcycles(temp);
                                 break;
 
                                 case 0x51: /*EOR (),y*/
@@ -3780,8 +3839,7 @@ void exec65c02()
                                         if ((pc&0xFF00)^((pc+offset)&0xFF00)) temp++;
                                         pc+=offset;
                                 }
-                                polltime(temp);
-                                takeint=(interrupt && !p.i);
+                                branchcycles(temp);
                                 break;
 
                                 case 0x71: /*ADC (),y*/
@@ -3972,9 +4030,7 @@ void exec65c02()
                                         if ((pc&0xFF00)^((pc+offset)&0xFF00)) temp++;
                                         pc+=offset;
                                 }
-                                polltime(temp-1);
-                                takeint=(interrupt && !p.i);
-                                polltime(1);
+                                branchcycles(temp);
                                 break;
 
                                 case 0x91: /*STA (),y*/
@@ -4160,8 +4216,7 @@ void exec65c02()
                                         if ((pc&0xFF00)^((pc+offset)&0xFF00)) temp++;
                                         pc+=offset;
                                 }
-                                polltime(temp);
-                                takeint=(interrupt && !p.i);
+                                branchcycles(temp);
                                 break;
 
                                 case 0xB1: /*LDA (),y*/
@@ -4370,8 +4425,7 @@ void exec65c02()
                                         if ((pc&0xFF00)^((pc+offset)&0xFF00)) temp++;
                                         pc+=offset;
                                 }
-                                polltime(temp);
-                                takeint=(interrupt && !p.i);
+                                branchcycles(temp);
                                 break;
 
                                 case 0xD1: /*CMP (),y*/
@@ -4556,8 +4610,7 @@ void exec65c02()
 //                                        if (pc<0x8000) printf("%04X %02X\n",(pc&0xFF00)^((pc+offset)&0xFF00),temp);
                                         pc+=offset;
                                 }
-                                polltime(temp);
-                                takeint=(interrupt && !p.i);
+                                branchcycles(temp);
                                 break;
 
                                 case 0xF1: /*SBC (),y*/
@@ -4654,6 +4707,19 @@ void exec65c02()
                                 dumpram();
                                 exit(-1);
                 }
+/*                if (pc==0xFFF7)
+                {
+                        printf("OSCLI : ");
+                        tempw=x+(y<<8);
+                        while ((temp=readmem(tempw))!=13)
+                        {
+                                printf("%c",temp);
+                                tempw++;
+                        }
+                        printf("\n");
+                }*/
+//                if (pc==0x103C) output=1;
+//                if (pc<0x1000 || pc>0x1062) output=0;
 /*                if (pc==0x6A6) printf("A=%i %02X\n",a,a);
                 if (pc==0xAEA1)
                 {
@@ -4695,16 +4761,19 @@ void exec65c02()
                 if (pc==0x27A3) output=0;
 //                if (pc==0x2D04) output=1;
 //                if (pc<0x2D04 || pc>0x2D38) output=0;*/
-                if (output)
+//                if (pc==0x21A3) output=1;
+//                if (pc==0x21BB) output=0;
+//                if (pc==0x400) output=1;
+/*                if (output)
                 {
-                        rpclog("A=%02X X=%02X Y=%02X S=%02X PC=%04X %c%c%c%c%c%c op=%02X %02X%02X %02X%02X %02X %i %08X\n",a,x,y,s,pc,(p.n)?'N':' ',(p.v)?'V':' ',(p.d)?'D':' ',(p.i)?'I':' ',(p.z)?'Z':' ',(p.c)?'C':' ',opcode,ram[0x03],ram[0x02],ram[0x7F],ram[0x7E],ram[0x7D],mainins,memlook[pc>>8]);
-                }
-                mainins++;
-                if (timetolive)
+                        rpclog("A=%02X X=%02X Y=%02X S=%02X PC=%04X %c%c%c%c%c%c op=%02X %02X%02X %02X%02X %02X %i %08X\n",a,x,y,s,pc,(p.n)?'N':' ',(p.v)?'V':' ',(p.d)?'D':' ',(p.i)?'I':' ',(p.z)?'Z':' ',(p.c)?'C':' ',opcode,ram[0x21],ram[0x20],ram[0x7F],ram[0x7E],ram[0x7D],mainins,memlook[pc>>8]);
+                }*/
+//                mainins++;
+/*                if (timetolive)
                 {
                         timetolive--;
                         if (!timetolive) output=0;
-                }
+                }*/
                 if (takeint)
                 {
                         interrupt&=~128;
@@ -4750,6 +4819,14 @@ void exec65c02()
                                 motorspin--;
                                 if (!motorspin) fdcspindown();
                         }
+                        if (idecallback)
+                        {
+                                idecallback-=200;
+                                if (idecallback<=0)
+                                {
+                                        callbackide();
+                                }
+                        }
                 }
                 if (nmi && !oldnmi)
                 {
@@ -4771,4 +4848,31 @@ void exec65c02()
                 }
                 oldnmi=nmi;
         }
+}
+
+void save6502state(FILE *f)
+{
+        uint8_t temp;
+        putc(a,f); putc(x,f); putc(y,f);
+        temp =(p.c)?1:0;    temp|=(p.z)?2:0;
+        temp|=(p.i)?4:0;    temp|=(p.d)?8:0;
+        temp|=(p.v)?0x40:0; temp|=(p.n)?0x80:0;
+        temp|=0x30;
+        putc(temp,f);
+        putc(s,f); putc(pc&0xFF,f); putc(pc>>8,f);
+        putc(nmi,f); putc(interrupt,f);
+        putc(cycles,f); putc(cycles>>8,f); putc(cycles>>16,f); putc(cycles>>24,f);
+}
+
+void load6502state(FILE *f)
+{
+        uint8_t temp;
+        a=getc(f); x=getc(f); y=getc(f);
+        temp=getc(f);
+        p.c=temp&0x01; p.z=temp&0x02;
+        p.i=temp&0x04; p.d=temp&0x08;
+        p.v=temp&0x40; p.n=temp&0x80;
+        s=getc(f); pc=getc(f); pc|=(getc(f)<<8);
+        nmi=getc(f); interrupt=getc(f);
+        cycles=getc(f); cycles|=(getc(f)<<8); cycles|=(getc(f)<<16); cycles|=(getc(f)<<24);
 }

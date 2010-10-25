@@ -1,4 +1,4 @@
-/*B-em v2.0 by Tom Walker
+/*B-em v2.1 by Tom Walker
   Z80 emulation
   I can't remember what emulator I originally wrote this for... probably ZX82
   I think a few bugs left*/

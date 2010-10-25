@@ -1,4 +1,4 @@
-/*B-em v2.0 by Tom Walker
+/*B-em v2.1 by Tom Walker
   Windows tape catalogue window*/
 
 #ifdef WIN32
@@ -18,13 +18,13 @@ void clearcatwindow()
         int c;
         if (!catwindowopen) return;
         for (c=100;c>=0;c--)
-            SendMessage(cath,LB_DELETESTRING,c,NULL);
+            SendMessage(cath,LB_DELETESTRING,c,(LPARAM)NULL);
 }
 
 void cataddname(char *s)
 {
         if (!catwindowopen) return;
-        SendMessage(cath,LB_ADDSTRING,NULL,s);
+        SendMessage(cath,LB_ADDSTRING,(WPARAM)NULL,(LPARAM)s);
 }
 
 BOOL CALLBACK catdlgproc(HWND hdlg, UINT message, WPARAM wParam, LPARAM lParam)

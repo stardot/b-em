@@ -1,4 +1,4 @@
-/*B-em v2.0 by Tom Walker
+/*B-em v2.1 by Tom Walker
   Internal SN sound chip emulation*/
 
 #include <allegro.h>
@@ -85,7 +85,8 @@ static int8_t snperiodic2[32] =
 };
 
 
-fixed sncount[4],snlatch[4],snstat[4];
+fixed sncount[4],snstat[4];
+uint32_t snlatch[4];
 int snvols[3125<<1][4],snnoise2[3125<<1];
 fixed snlatchs[3125<<1][4];
 int snline=0,snlinec=0;
@@ -470,3 +471,22 @@ void logsound()
 }
 
 
+void savesoundstate(FILE *f)
+{
+        fwrite(snlatch,16,1,f);
+        fwrite(sncount,16,1,f);
+        fwrite(snstat,16,1,f);
+        fwrite(snvol,4,1,f);
+        putc(snnoise,f);
+        putc(snshift,f); putc(snshift>>8,f);
+}
+
+void loadsoundstate(FILE *f)
+{
+        fread(snlatch,16,1,f);
+        fread(sncount,16,1,f);
+        fread(snstat,16,1,f);
+        fread(snvol,4,1,f);
+        snnoise=getc(f);
+        snshift=getc(f); snshift|=getc(f)<<8;
+}

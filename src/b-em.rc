@@ -1,5 +1,5 @@
 #include <windows.h>
-#include <allegro/keycodes.h>
+//#include <allegro/keycodes.h>
 #include "resources.h"
 
 #define KEY_A 1
@@ -118,10 +118,16 @@ BEGIN
         POPUP "&File"
         BEGIN
                 MENUITEM "&Hard Reset",         IDM_FILE_RESET
+                MENUITEM SEPARATOR
+                MENUITEM "&Load state",         IDM_FILE_LSTATE
+                MENUITEM "&Save state",         IDM_FILE_SSTATE
+                MENUITEM SEPARATOR
                 MENUITEM "E&xit",               IDM_FILE_EXIT
         END
         POPUP "&Disc"
         BEGIN
+                MENUITEM "&Autoboot disc :0/2...",     IDM_DISC_AUTOBOOT
+                MENUITEM SEPARATOR
                 MENUITEM "Load disc :&0/2...",     IDM_DISC_LOAD_0
                 MENUITEM "Load disc :&1/3...",     IDM_DISC_LOAD_1
                 MENUITEM SEPARATOR
@@ -176,6 +182,9 @@ BEGIN
                         MENUITEM "6502", IDM_TUBE_6502
                         MENUITEM "65816",IDM_TUBE_65816
                         MENUITEM "Z80",  IDM_TUBE_Z80
+#ifdef NS32016
+                        MENUITEM "32016",IDM_TUBE_32016
+#endif
                         MENUITEM SEPARATOR
                         POPUP "6502 Tube speed"
                         BEGIN
@@ -202,6 +211,12 @@ BEGIN
                                 MENUITEM "&Full",       IDM_VIDEO_FBORDERS
                         END
                         MENUITEM "Fullscreen",          IDM_VIDEO_FULLSCR
+                        MENUITEM "Resizeable window",   IDM_VIDEO_RESIZE
+                        POPUP "&Rendering API"
+                        BEGIN
+                                MENUITEM "&DirectDraw", IDM_VIDEO_DDRAW
+                                MENUITEM "&OpenGL",     IDM_VIDEO_OPENGL
+                        END
                 END
                 POPUP "&Sound"
                 BEGIN
@@ -264,12 +279,30 @@ BEGIN
                         MENUITEM SEPARATOR
                         MENUITEM "&Map CAPS/CTRL to A/S", IDM_KEY_AS
                 END
+                POPUP "&IDE"
+                BEGIN
+                        MENUITEM "&Enable IDE hard discs", IDM_IDE_ENABLE
+                END
         END
         POPUP "&Misc"
         BEGIN
+                POPUP "&Speed"
+                BEGIN
+                        MENUITEM "10%", IDM_SPD_10
+                        MENUITEM "25%", IDM_SPD_25
+                        MENUITEM "50%", IDM_SPD_50
+                        MENUITEM "75%", IDM_SPD_75
+                        MENUITEM "100%", IDM_SPD_100
+                        MENUITEM "150%", IDM_SPD_150
+                        MENUITEM "200%", IDM_SPD_200
+                        MENUITEM "300%", IDM_SPD_300
+                        MENUITEM "400%", IDM_SPD_400
+                        MENUITEM "500%", IDM_SPD_500
+                END
                 MENUITEM "&Save screenshot",IDM_SCRSHOT
                 MENUITEM SEPARATOR
                 MENUITEM "&Debugger",       IDM_DEBUGGER
+                MENUITEM "&Break",          IDM_BREAK
         END
 END
 

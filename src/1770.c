@@ -1,4 +1,4 @@
-/*B-em v2.0 by Tom Walker
+/*B-em v2.1 by Tom Walker
   1770 FDC emulation*/
 #include <stdio.h>
 #include <stdlib.h>
@@ -77,6 +77,7 @@ void write1770(uint16_t addr, uint8_t val)
         switch (addr)
         {
                 case 0xFE80:
+//                        rpclog("Write CTRL FE80 %02X\n",val);
                 wd1770.ctrl=val;
                 if (val&2) curdrive=1;
                 else       curdrive=0;
@@ -84,7 +85,7 @@ void write1770(uint16_t addr, uint8_t val)
                 wd1770.density=!(wd1770.ctrl&8);
                 break;
                 case 0xFE24:
-                        //rpclog("Write CTRL %02X\n",val);
+//                        rpclog("Write CTRL FE24 %02X\n",val);
                 wd1770.ctrl=val;
                 if (val&2) curdrive=1;
                 else       curdrive=0;
@@ -94,7 +95,7 @@ void write1770(uint16_t addr, uint8_t val)
                 case 0xFE84:
                 case 0xFE28:
                 if (wd1770.status&1 && (val>>4)!=0xD) { rpclog("Command rejected\n"); return; }
-                rpclog("FDC command %02X %i %i %i\n",val,wd1770.curside,wd1770.track,wd1770.sector);
+//                rpclog("FDC command %02X %i %i %i\n",val,wd1770.curside,wd1770.track,wd1770.sector);
                 wd1770.command=val;
                 if ((val>>4)!=0xD)/* && !(val&8)) */spinup1770();
                 switch (val>>4)
@@ -136,6 +137,7 @@ void write1770(uint16_t addr, uint8_t val)
                         case 0x8: /*Read sector*/
                         wd1770.status=0x80|0x1;
                         disc_readsector(curdrive,wd1770.sector,wd1770.track,wd1770.curside,wd1770.density);
+                        //printf("Read sector %i %i %i %i %i\n",curdrive,wd1770.sector,wd1770.track,wd1770.curside,wd1770.density);
                         byte=0;
                         break;
                         case 0xA: /*Write sector*/
@@ -195,6 +197,7 @@ void write1770(uint16_t addr, uint8_t val)
 
 uint8_t read1770(uint16_t addr)
 {
+//        rpclog("Read 1770 %04X %04X\n",addr,pc);
         switch (addr)
         {
                 case 0xFE84:
@@ -220,7 +223,7 @@ uint8_t read1770(uint16_t addr)
 
 void callback1770()
 {
-        rpclog("FDC callback %02X\n",wd1770.command);
+//        rpclog("FDC callback %02X\n",wd1770.command);
         fdctime=0;
         switch (wd1770.command>>4)
         {
