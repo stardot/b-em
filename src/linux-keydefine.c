@@ -1,4 +1,4 @@
-/*B-em v2.1 by Tom Walker
+/*B-em v2.0 by Tom Walker
   Linux keyboard redefinition GUI*/
 
 #ifndef WIN32

@@ -168,7 +168,7 @@ void polltape()
                         dcd();
                         intone=gzgetc(uef);
                         intone|=(gzgetc(uef)<<8);
-                        intone>>=2;
+                        intone/=20;
                         if (!intone) intone=1;
 //                        printf("intone %i\n",intone);
                 }
@@ -207,23 +207,25 @@ void polltape()
                 if (!intone)
                 {
                         dcd();
-                        intone=3;
+                        intone=gzgetc(uef);
+                        intone|=(gzgetc(uef)<<8);
+                        intone/=20;
+                        if (!intone) intone=1;
                 }
                 else
                 {
-                        if (intone==4)
-                           dcd();
                         intone--;
                         if (intone==0 && inchunk==2)
                         {
                                 inchunk=0;
-                                gzgetc(uef); gzgetc(uef);
-                                gzgetc(uef); gzgetc(uef);
                         }
                         else if (!intone)
                         {
                                 inchunk=2;
-                                intone=4;
+                                intone=gzgetc(uef);
+                                intone|=(gzgetc(uef)<<8);
+                                intone/=20;
+                                if (!intone) intone=1;
                                 receiveuef(0xAA);
                         }
                 }
@@ -236,7 +238,7 @@ void polltape()
 //                        dcd();
                         intone=gzgetc(uef);
                         intone|=(gzgetc(uef)<<8);
-                        intone>>=2;
+                        intone/=20;
 //                        printf("gap intone %i\n",intone);
                         if (!intone) intone=1;
                 }

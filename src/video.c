@@ -10,6 +10,7 @@
 #include "bbctext.h"
 #include "serial.h"
 
+//#undef WIN32
 
 int opengl=0;
 uint16_t vidbank;
@@ -234,7 +235,7 @@ void writeula(uint16_t addr, uint8_t val)
                 c=bakpal[val>>4];
                 bakpal[val>>4]=val&15;
                 ulapal[val>>4]=collook[(val&7)^7];
-                if (val&8) ulapal[val>>4]=collook[val&7];
+                if (val&8 && ulactrl&1) ulapal[val>>4]=collook[val&7];
 //                ulapal[val>>4]=collook[(val>>4)&7];
 //                makelookup();
 /*                if ((val&15)!=c)
@@ -344,7 +345,7 @@ void initvideo()
 //        set_palette(beebpal);
         b=create_bitmap(1280,800);
         clear_to_color(b,collook[0]);
-        for (c=0;c<256;c++) inverttbl[c]=makecol(255-pal[c].r,255-pal[c].g,255-pal[c].b);
+        for (c=0;c<256;c++) inverttbl[c]=makecol((63-pal[c].r)<<2,(63-pal[c].g)<<2,(63-pal[c].b)<<2);
 }
 
 uint8_t mode7chars[96*160],mode7charsi[96*160],mode7graph[96*160],mode7graphi[96*160],mode7sepgraph[96*160],mode7sepgraphi[96*160],mode7tempi[96*120],mode7tempi2[96*120];
@@ -596,8 +597,13 @@ static inline void rendermode7(uint8_t dat)
                         t++;
                 }
         }
+//        if (hc==2) printf("scrx %i %i %i %i\n",scrx,vc,sc,interline);
         if ((scrx+16)<firstx) firstx=scrx+16;
-        if ((scrx+32)>lastx) lastx=scrx+32;
+        if ((scrx+32)>lastx)
+        {
+//                printf("scrx %i  %i %i %i %i %i\n",scrx,crtc[1],vc,sc,hc,interline);
+                lastx=scrx+32;
+        }
         if (holdoff)
         {
                 holdchar=0;
@@ -662,6 +668,7 @@ void pollvideo(int clocks)
                         {
                                 scry=0;
                                 doblit();
+//                                printf("Overblit\n");
                         }
                 }
 //                if (vc==7 && !sc && !hc && crtc[0]) printf("MA %04X R14 %02X R15 %02X\n",ma,crtc[14],crtc[15]);
@@ -870,6 +877,8 @@ void pollvideo(int clocks)
                         hc=interline=0;
                         lasthc0=1;
 //                        if (crtc[9]) printf("Interlace line\n");
+                        if (ulactrl&0x10) scrx=128-((crtc[3]&15)*4);
+                        else              scrx=128-((crtc[3]&15)*8);
                 }
                 else if (hc==crtc[0])
                 {
@@ -897,6 +906,7 @@ void pollvideo(int clocks)
                                 if (!vadj)
                                 {
                                         vdispen=1;
+                                        if (crtc[6]==0) vdispen=0;
                                         ma=maback=(crtc[13]|(crtc[12]<<8))&0x3FFF;
 //                                        if (crtc[9]) printf("1MA %04X\n",ma);
                                         sc=0;
@@ -921,6 +931,7 @@ void pollvideo(int clocks)
                                         vadj=crtc[5];
                                         if (!vadj) vdispen=1;
                                         if (!vadj) ma=maback=(crtc[13]|(crtc[12]<<8))&0x3FFF;
+                                        if (crtc[6]==0) vdispen=0;
 //                                        if (crtc[9] && !vadj) printf("2MA %04X\n",ma);
 
                                         frcount++;

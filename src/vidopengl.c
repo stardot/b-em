@@ -12,6 +12,8 @@ GLuint texture;
 extern int winsizex,winsizey;
 extern int dcol;
 
+#undef printf
+
 void openglinit()
 {
                 install_allegro_gl();
@@ -44,6 +46,8 @@ void openglreinit()
         allegro_gl_set(AGL_REQUIRE, AGL_COLOR_DEPTH|AGL_FULLSCREEN|AGL_WINDOWED|AGL_DOUBLEBUFFER|AGL_RENDERMETHOD);
 
 
+        if (winsizex<64) winsizex=64;
+        if (winsizey<48) winsizey=48;
                 if (fullscreen) set_gfx_mode(GFX_OPENGL_WINDOWED, 800, 600, 0, 0);
                 else            set_gfx_mode(GFX_OPENGL_WINDOWED, winsizex, winsizey, 0, 0);
 

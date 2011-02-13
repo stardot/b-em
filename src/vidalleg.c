@@ -89,9 +89,12 @@ int motor;
 void doblit()
 {
         int c;
+//        printf("%03i %03i %03i %03i\n",firstx,lastx,firsty,lasty);
 //        while (doopenglblit) sleep(1);
 //rpclog("Blit\n");
+
         startblit();
+
         if (vidchange)
         {
                 closevideo();
@@ -105,26 +108,32 @@ void doblit()
                 doopenglblit=1;
                 return;
         }*/
+//        printf("Blit\n");
         if (savescrshot)
         {
-                set_color_depth(dcol);
-                scrshotb=create_bitmap(lastx-firstx,(lasty-firsty<<1));
-                scrshotb2=create_bitmap(lastx-firstx,lasty-firsty);
-                if (interlace || linedbl)
+                savescrshot--;
+                if (!savescrshot)
                 {
-                        blit(b,scrshotb,firstx,firsty<<1,0,0,lastx-firstx,(lasty-firsty)<<1);
+                        set_color_depth(dcol);
+                        scrshotb=create_bitmap(lastx-firstx,(lasty-firsty<<1));
+                        scrshotb2=create_bitmap(lastx-firstx,lasty-firsty);
+                        if (interlace || linedbl)
+                        {
+                                blit(b,scrshotb,firstx,firsty<<1,0,0,lastx-firstx,(lasty-firsty)<<1);
+                        }
+                        else
+                        {
+                                blit(b,scrshotb2,firstx,firsty,0,0,lastx-firstx,lasty-firsty);
+                                stretch_blit(scrshotb2,scrshotb,0,0,lastx-firstx,lasty-firsty,0,0,lastx-firstx,(lasty-firsty)<<1);
+                        }
+                        save_bmp(scrshotname,scrshotb,NULL);
+                        destroy_bitmap(scrshotb2);
+                        destroy_bitmap(scrshotb);
+                        set_color_depth(8);
+                        savescrshot=0;
                 }
-                else
-                {
-                        blit(b,scrshotb2,firstx,firsty,0,0,lastx-firstx,lasty-firsty);
-                        stretch_blit(scrshotb2,scrshotb,0,0,lastx-firstx,lasty-firsty,0,0,lastx-firstx,(lasty-firsty)<<1);
-                }
-                save_bmp(scrshotname,scrshotb,NULL);
-                destroy_bitmap(scrshotb2);
-                destroy_bitmap(scrshotb);
-                set_color_depth(8);
-                savescrshot=0;
         }
+
         fskipcount++;
         if (fskipcount>=((motor && fasttape)?5:fskipmax))
         {
@@ -225,7 +234,5 @@ void doblit()
         }
         firstx=firsty=65535;
         lastx=lasty=0;
-
         endblit();
-//rpclog("Blit over\n");
 }

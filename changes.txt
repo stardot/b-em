@@ -1,4 +1,11 @@
-Version 2.1 (??/??/??)
+Version 2.1a (14/02/2011)
+- Keyboard bug fixed, Dr Who : The First Adventure now works
+- Video ULA bug, Atic Atac now has correct colours
+- Cursor inversion now works properly
+- Linux screenshots now work
+- Save states in Linux
+
+Version 2.1 (25/10/2010)
 - IDE hard disc emulation
 - OpenGL video support (mainly for Linux)
 - Fixed 360k discs in Master 512 mode

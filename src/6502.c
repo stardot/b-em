@@ -298,7 +298,7 @@ inline uint16_t getsw()
 
 /*ADC/SBC temp variables*/
 static uint16_t tempw;
-static int tempv,hc,al,ah;
+static int tempv,hc6,al,ah;
 static uint8_t tempb;
 
 #define ADC(temp)       if (!p.d)                            \
@@ -346,7 +346,7 @@ static uint8_t tempb;
                         }                                  \
                         else                               \
                         {                                  \
-                                hc=0;                               \
+                                hc6=0;                               \
                                 p.z=p.n=0;                            \
                                 if (!((a-temp)-((p.c)?0:1)))            \
                                    p.z=1;                             \
@@ -355,10 +355,10 @@ static uint8_t tempb;
                                 {                                   \
                                         al-=6;                      \
                                         al&=0xF;                    \
-                                        hc=1;                       \
+                                        hc6=1;                       \
                                 }                                   \
                                 ah=(a>>4)-(temp>>4);                \
-                                if (hc) ah--;                       \
+                                if (hc6) ah--;                       \
                                 if ((a-(temp+((p.c)?0:1)))&0x80)        \
                                    p.n=1;                             \
                                 p.v=(((a-(temp+((p.c)?0:1)))^temp)&128)&&((a^temp)&128); \
@@ -416,17 +416,17 @@ static uint8_t tempb;
                         }                                  \
                         else                               \
                         {                                  \
-                                hc=0;                               \
+                                hc6=0;                               \
                                 p.z=p.n=0;                            \
                                 al=(a&15)-(temp&15)-((p.c)?0:1);      \
                                 if (al&16)                           \
                                 {                                   \
                                         al-=6;                      \
                                         al&=0xF;                    \
-                                        hc=1;                       \
+                                        hc6=1;                       \
                                 }                                   \
                                 ah=(a>>4)-(temp>>4);                \
-                                if (hc) ah--;                       \
+                                if (hc6) ah--;                       \
                                 p.v=(((a-(temp+((p.c)?0:1)))^temp)&128)&&((a^temp)&128); \
                                 p.c=1; \
                                 if (ah&16)                           \

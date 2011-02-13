@@ -145,8 +145,12 @@ void writeIC32(uint8_t val)
 //        printf("IC32 now %02X\n",IC32);
         scrsize=((IC32&16)?2:0)|((IC32&32)?1:0);
         if (!(IC32&8)&&(oldIC32&8))
-           updatekeyboard();
-        if (!(IC32&1))
+        {
+                keyrow=(sdbval>>4)&7;
+                keycol=sdbval&0xF;
+                updatekeyboard();
+        }
+        if (!(IC32&1) && (oldIC32&1))
            writesound(sdbval);
         if ((IC32&192)!=(oldIC32&192))
         {
@@ -166,7 +170,7 @@ void writedatabus(uint8_t val)
                 updatekeyboard();
         }
         if (MASTER && !compactcmos) cmosupdate(IC32,sdbval);
-        if (!(IC32&1)) writesound(val);
+//        if (!(IC32&1)) writesound(val);
 }
 
 void writesysvia(uint16_t addr, uint8_t val)

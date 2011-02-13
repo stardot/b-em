@@ -190,20 +190,34 @@ HANDLE mainthread;
 
 int bemclose=0;
 int bempause=0,bemwaiting=0;
+int doautoboot=0;
+
 void _mainthread(PVOID pvoid)
 {
+        HMENU hmenu;
         initbbc(argc,argv);
         while (1)
         {
                 if (bempause)
                 {
                         bemwaiting=1;
-                        sleep(100);
+                        Sleep(100);
                 }
                 else
                 {
                         bemwaiting=0;
                         runbbc();
+                }
+                if (doautoboot)
+                {
+                        restartbbc();
+                        closedisc(0);
+                        loaddisc(0,discfns[0]);
+                        if (defaultwriteprot) writeprot[0]=1;
+                        hmenu=GetMenu(ghwnd);
+                        CheckMenuItem(hmenu,IDM_DISC_WPROT_0,(writeprot[0])?MF_CHECKED:MF_UNCHECKED);
+                        autoboot=150;
+                        doautoboot=0;
                 }
         }
 }
@@ -211,7 +225,7 @@ void _mainthread(PVOID pvoid)
 void waitforready()
 {
         bempause=1;
-        while (!bemwaiting) sleep(100);
+        while (!bemwaiting) Sleep(100);
 }
 
 void resumeready()
@@ -223,11 +237,13 @@ CRITICAL_SECTION cs;
 
 void startblit()
 {
+        rpclog("startblit\n");
         EnterCriticalSection(&cs);
 }
 
 void endblit()
 {
+        rpclog("endblit\n");
         LeaveCriticalSection(&cs);
 }
 
@@ -252,11 +268,11 @@ void updatewindowtitle()
 {
         if (curtube==3)
         {
-                if (!mousecapture) set_window_title("B-em v2.1 - click to capture mouse");
-                else               set_window_title("B-em v2.1 - CTRL-END to release mouse");
+                if (!mousecapture) set_window_title("B-em v2.1a - click to capture mouse");
+                else               set_window_title("B-em v2.1a - CTRL-END to release mouse");
         }
         else
-           set_window_title("B-em v2.1");
+           set_window_title("B-em v2.1a");
 }
 
 extern int doopenglblit;
@@ -309,7 +325,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         hwnd = CreateWindowEx (
            0,                   /* Extended possibilites for variation */
            szClassName,         /* Classname */
-           "B-em v2.1", /* Title Text */
+           "B-em v2.1a", /* Title Text */
            WS_OVERLAPPEDWINDOW/*&~WS_SIZEBOX&~WS_THICKFRAME&~WS_MAXIMIZEBOX*/, /* default window */
            CW_USEDEFAULT,       /* Windows decides the position */
            CW_USEDEFAULT,       /* where the window ends up on the screen */
@@ -361,7 +377,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
                         DispatchMessage(&messages);
                 }
                 else
-                   sleep(10);
+                   Sleep(10);
                 if ((key[KEY_LCONTROL] || key[KEY_RCONTROL]) && key[KEY_END] && mousecapture)
                 {
                         ClipCursor(&oldclip);
@@ -531,14 +547,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         case IDM_DISC_AUTOBOOT:
                         if (!getfile(hwnd,"Disc image (*.SSD;*.DSD;*.IMG;*.ADF;*.ADL;*.FDI)\0*.SSD;*.DSD;*.IMG;*.ADF;*.ADL;*.FDI\0All files (*.*)\0*.*\0",discfns[0]))
                         {
-                                EnterCriticalSection(&cs);
-                                restartbbc();
-                                closedisc(0);
-                                loaddisc(0,discfns[0]);
-                                if (defaultwriteprot) writeprot[0]=1;
-                                CheckMenuItem(hmenu,IDM_DISC_WPROT_0,(writeprot[0])?MF_CHECKED:MF_UNCHECKED);
-                                LeaveCriticalSection(&cs);
-                                autoboot=150;
+                                doautoboot=1;
                         }
                         break;
                         case IDM_DISC_LOAD_0:
@@ -873,12 +882,15 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                 case WM_EXITMENULOOP:
                 rpclog("ExitMenuLoop\n");
                 bempause=0;
-                //LeaveCriticalSection(&cs);
                 clearkeys();
+                for (c=0;c<128;c++) key[c]=0;
+                //LeaveCriticalSection(&cs);
                 break;
 
                 case WM_SETFOCUS:
                 rpclog("SetFocus\n");
+                clearkeys();
+                for (c=0;c<128;c++) key[c]=0;
                 bempause=0;
                 break;
 

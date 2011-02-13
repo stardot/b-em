@@ -52,12 +52,12 @@ int16_t snwaves[5][32]=
                 8,16,24,32,40,48,56,64,72,80,88,96,104,112,120,127
         },
         {
-                8,16,24,32,40,48,56,64,72,80,88,96,104,112,120,127,
-                120,112,104,96,88,80,72,64,56,48,40,32,24,16,8,0
+                16,32,48,64,80,96,112,128,112,96,80,64,48,32,16,0,
+                -16,-32,-48,-64,-80,-96,-112,-128,-112,-96,-80,-64,-48,-32,-16,0
         },
         {
-                0x00,0x19,0x31,0x4A,0x61,0x78,0x8E,0xA2,0xB5,0xC5,0xD4,0xE1,0xEC,0xF4,0xFB,0xFE,
-                0xFF,0xFE,0xFB,0xF4,0xEC,0xE1,0xD4,0xC5,0xB5,0xA2,0x8E,0x78,0x61,0x4A,0x31,0x19,
+                0,24,48,70,89,105,117,124,126,124,117,105,89,70,48,24,0,
+                -24,-48,-70,-89,-105,-117,-124,-126,-124,-117,-105,-90,-70,-48,-25,
         }
 };
 
@@ -110,10 +110,10 @@ void logvols()
         snvols[snline][1]=snvol[1];
         snvols[snline][2]=snvol[2];
         snvols[snline][3]=snvol[3];
-        snlatchs[snline][0]=snlatch[0];
-        snlatchs[snline][1]=snlatch[1];
-        snlatchs[snline][2]=snlatch[2];
-        snlatchs[snline][3]=snlatch[3];
+        snlatchs[snline][0]=(snlatch[0])?snlatch[0]:1024;
+        snlatchs[snline][1]=(snlatch[1])?snlatch[1]:1024;
+        snlatchs[snline][2]=(snlatch[2])?snlatch[2]:1024;
+        snlatchs[snline][3]=(snlatch[3])?snlatch[3]:1024;
         snnoise2[snline]=snnoise;
         fillbuf(sndbuf+(snline<<1),2);
 //        printf("Fillbuf %i\n",snline<<1);

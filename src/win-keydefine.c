@@ -72,7 +72,7 @@ void getkey(HWND parent)
                         DispatchMessage(&messages);
                 }
                 else
-                   sleep(10);
+                   Sleep(10);
         }
         khwnd=NULL;
 }

@@ -113,8 +113,8 @@ void initbbc(int argc, char *argv[])
 
         startblit();
 
-        printf("B-em v2.1\n");
-rpclog("Start\n");
+        printf("B-em v2.1a\n");
+//rpclog("Start\n");
 //      comedyblit=0;
         fskipmax=1;
 
@@ -134,13 +134,14 @@ rpclog("Start\n");
         if (curtube!=-1) tubes[curtube].reset();
         else             tubeexec=NULL;
 
+//        printf("1\n");
         disc_reset();
         ssd_reset();
         adf_reset();
         fdi_reset();
-
+//        printf("2\n");
         resetide();
-
+//        printf("3\n");
 //        loaddisc(1,"BBCMaster512-Disc2-GemApplications.adf");
 //        loaddisc(0,"dosplus.adl");
 //        loaddisc(0,"buzz.ssd");
@@ -243,10 +244,10 @@ rpclog("Start\n");
                 }
                 if (tapenext) tapenext--;
         }
-
+//        printf("4\n");
         initvideo();
         makemode7chars();
-
+//        printf("5\n");
 #ifndef WIN32
         install_keyboard();
 #endif

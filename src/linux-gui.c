@@ -24,7 +24,7 @@ extern int quited;
 extern int windx,windy;
 extern int dcol;
 
-MENU filemenu[4];
+MENU filemenu[6];
 MENU discmenu[8];
 MENU tapespdmenu[3];
 MENU tapemenu[5];
@@ -108,10 +108,49 @@ int gui_exit()
         return D_CLOSE;
 }
 
-MENU filemenu[4]=
+int gui_loadss()
+{
+        char tempname[260];
+        int ret,c;
+        int xsize=windx-32,ysize=windy-16;
+        memcpy(tempname,discfns[0],260);
+        ret=file_select_ex("Please choose a save state",tempname,"SNP",260,xsize,ysize);
+        if (ret)
+        {
+                strcpy(ssname,tempname);
+                loadstate();
+        }
+        updatelinuxgui();
+        return D_CLOSE;
+}
+
+int gui_savess()
+{
+        char tempname[260];
+        int ret,c;
+        int xsize=windx-32,ysize=windy-16;
+        if (curtube!=-1)
+        {
+                alert(NULL,"Second processor save states not supported yet.",NULL,"&OK",NULL,0,0);
+                return D_O_K;
+        }
+        memcpy(tempname,discfns[0],260);
+        ret=file_select_ex("Please choose a save state",tempname,"SNP",260,xsize,ysize);
+        if (ret)
+        {
+                strcpy(ssname,tempname);
+                savestate();
+        }
+        updatelinuxgui();
+        return D_CLOSE;
+}
+
+MENU filemenu[6]=
 {
         {"&Return",gui_return,NULL,0,NULL},
         {"&Hard reset",gui_reset,NULL,0,NULL},
+        {"&Load state",gui_loadss,NULL,0,NULL},
+        {"&Save state",gui_savess,NULL,0,NULL},
         {"&Exit",gui_exit,NULL,0,NULL},
         {NULL,NULL,NULL,0,NULL}
 };
@@ -592,9 +631,10 @@ int gui_scrshot()
         if (ret)
         {
                 memcpy(scrshotname,tempname,260);
-                savescrshot=1;
+                printf("Save scrshot\n");
+                savescrshot=2;
         }
-        return D_O_K;
+        return D_CLOSE;
 }
 
 int gui_speed()
@@ -640,7 +680,7 @@ MENU mainmenu[6]=
 
 DIALOG bemgui[]=
 {
-        {d_ctext_proc, 200, 260, 0,  0, 15,0,0,0,     0,0,"B-em v2.1"},
+        {d_ctext_proc, 200, 260, 0,  0, 15,0,0,0,     0,0,"B-em v2.1a"},
         {d_menu_proc,  0,   0,   0,  0, 15,0,0,0,     0,0,mainmenu},
         {d_yield_proc},
         {0,0,0,0,0,0,0,0,0,0,0,NULL,NULL,NULL}
@@ -648,12 +688,12 @@ DIALOG bemgui[]=
 
 BITMAP *mouse,*_mouse_sprite;
 
+BITMAP *guib;
+
 void entergui()
 {
         int x=1;
         DIALOG_PLAYER *dp;
-
-        BITMAP *guib;
 
         while (keypressed()) readkey();
         while (key[KEY_F11]) rest(100);

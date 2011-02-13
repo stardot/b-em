@@ -42,17 +42,12 @@ Features
 Differences from last version
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- IDE hard disc emulation
-- OpenGL video support (mainly for Linux)
-- Fixed 360k discs in Master 512 mode
-- Fixed some hanging bugs in Windows (mainly when resetting)
-- Resizeable window in Windows
-- Debugger improvements
-- VIA and video fixes, cassette version of Lunar Jetman now works
-- Lightpen fix, Pharaoh's Curse works
-- Some mode 7 fixes
-- Speed control
-- Savestates
+- Keyboard bug fixed, Dr Who : The First Adventure now works
+- Video ULA bug, Atic Atac now has correct colours
+- Cursor inversion now works properly
+- Linux screenshots now work
+- Save states in Linux
+
 
 
 Default keyboard mapping :
