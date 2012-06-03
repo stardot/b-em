@@ -1,9 +1,13 @@
-/*B-em v2.1 by Tom Walker
+/*B-em v2.2 by Tom Walker
   Windows tape catalogue window*/
 
 #ifdef WIN32
 #include <windows.h>
+
 #include "b-em.h"
+#include "csw.h"
+#include "uef.h"
+
 #include "resources.h"
 
 void findfilenamescsw();
@@ -29,16 +33,13 @@ void cataddname(char *s)
 
 BOOL CALLBACK catdlgproc(HWND hdlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
-        int c;
-        int cpu;
-        char s[10];
         switch (message)
         {
                 case WM_INITDIALOG:
                 cath=GetDlgItem(hdlg,ListBox1);
                 catwindowopen=1;
-                if (cswena) findfilenamescsw();
-                else        findfilenamesuef();
+                if (csw_ena) csw_findfilenames();
+                else         uef_findfilenames();
 //                SendMessage(h,LB_ADDSTRING,NULL,"test");
                 return TRUE;
                 case WM_COMMAND:

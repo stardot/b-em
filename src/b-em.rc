@@ -111,7 +111,7 @@
 #define KEY_NUMLOCK 125
 #define KEY_CAPSLOCK 126
 
-allegro_icon ICON b-em.ico
+allegro_icon ICON "b-em.ico"
 
 MainMenu MENU DISCARDABLE
 BEGIN
@@ -171,6 +171,7 @@ BEGIN
                         MENUITEM "BBC B+ 64K",                  IDM_MODEL_0+8
                         MENUITEM "BBC B+ 128K",                 IDM_MODEL_0+9
                         MENUITEM "BBC Master 128",              IDM_MODEL_0+10
+                        MENUITEM "BBC Master 128 w/MOS 3.5",    IDM_MODEL_0+15
                         MENUITEM "BBC Master 512",              IDM_MODEL_0+11
                         MENUITEM "BBC Master Turbo",            IDM_MODEL_0+12
                         MENUITEM "BBC Master Compact",          IDM_MODEL_0+13
@@ -199,10 +200,12 @@ BEGIN
                 BEGIN
                         POPUP "&Display type"
                         BEGIN
-                                MENUITEM "Software line doubling", IDM_VIDEO_SLINEDBL
-                                MENUITEM "Hardware line doubling", IDM_VIDEO_LINEDBL
-                                MENUITEM "Scanlines",         IDM_VIDEO_SCANLINES
-                                MENUITEM "Interlaced",        IDM_VIDEO_INTERLACED
+                                MENUITEM "&Software line doubling", IDM_VIDEO_SLINEDBL
+                                MENUITEM "&Hardware line doubling", IDM_VIDEO_LINEDBL
+                                MENUITEM "S&canlines",              IDM_VIDEO_SCANLINES
+                                MENUITEM "&Interlaced",             IDM_VIDEO_INTERLACED
+                                MENUITEM "&PAL",                    IDM_VIDEO_PAL
+                                MENUITEM "P&AL Interlaced",         IDM_VIDEO_PALI
                         END
                         POPUP "&Borders"
                         BEGIN
@@ -212,16 +215,12 @@ BEGIN
                         END
                         MENUITEM "Fullscreen",          IDM_VIDEO_FULLSCR
                         MENUITEM "Resizeable window",   IDM_VIDEO_RESIZE
-                        POPUP "&Rendering API"
-                        BEGIN
-                                MENUITEM "&DirectDraw", IDM_VIDEO_DDRAW
-                                MENUITEM "&OpenGL",     IDM_VIDEO_OPENGL
-                        END
                 END
                 POPUP "&Sound"
                 BEGIN
                         MENUITEM "&Internal sound chip", IDM_SOUND_INTERNAL
                         MENUITEM "&BeebSID",             IDM_SOUND_BEEBSID
+                        MENUITEM "&Printer port DAC",    IDM_SOUND_DAC
                         MENUITEM "&Disc drive noise",    IDM_SOUND_DDNOISE
                         MENUITEM "&Tape noise",          IDM_SOUND_TAPE
                         MENUITEM SEPARATOR
@@ -278,6 +277,10 @@ BEGIN
                         MENUITEM "&Redefine keys...", IDM_KEY_REDEFINE
                         MENUITEM SEPARATOR
                         MENUITEM "&Map CAPS/CTRL to A/S", IDM_KEY_AS
+                END
+                POPUP "&Mouse"
+                BEGIN
+                        MENUITEM "&AMX Mouse", IDM_MOUSE_AMX
                 END
                 POPUP "&IDE"
                 BEGIN

@@ -1,33 +1,33 @@
-/*B-em v2.1 by Tom Walker
+/*B-em v2.2 by Tom Walker
   FDI disc support
   Interfaces with fdi2raw.c*/
 
 #include <stdio.h>
 #include <stdint.h>
 #include "b-em.h"
+#include "fdi.h"
 #include "fdi2raw.h"
+#include "disc.h"
 
-FILE *fdif[2];
-FDI *fdih[2];
-uint8_t ftrackinfo[2][2][2][65536];
-uint8_t fditiming[65536];
-int fdisides[2];
-int ftracklen[2][2][2];
-int ftrackindex[2][2][2];
-int fdilasttrack[2];
-int fdids[2];
-int fdipos;
-int fdirevs;
+static FILE *fdi_f[2];
+static FDI  *fdi_h[2];
+static uint8_t fdi_trackinfo[2][2][2][65536];
+static uint8_t fdi_timing[65536];
+static int fdi_sides[2];
+static int fdi_tracklen[2][2][2];
+static int fdi_trackindex[2][2][2];
+static int fdi_lasttrack[2];
+static int fdi_ds[2];
+static int fdi_pos;
+static int fdi_revs;
 
-int fdisector,fditrack,fdiside,fdidrive,fdidensity;
-int fdiread,fdiwrite,fdireadpos,fdireadaddr;
-int fditime;
-int fdinotfound;
-int fdirsector=0;
+static int fdi_sector, fdi_track,   fdi_side,    fdi_drive, fdi_density;
+static int fdi_inread, fdi_inwrite, fdi_readpos, fdi_inreadaddr;
+static int fdi_notfound;
 
-uint16_t CRCTable[256];
+static uint16_t CRCTable[256];
 
-void setupcrc(uint16_t poly, uint16_t rvalue)
+static void fdi_setupcrc(uint16_t poly, uint16_t rvalue)
 {
         int c = 256, bc;
         uint16_t crctemp;
@@ -39,7 +39,7 @@ void setupcrc(uint16_t poly, uint16_t rvalue)
 
                 while(bc--)
                 {
-                        if(crctemp&0x8000)
+                        if(crctemp & 0x8000)
                         {
                                 crctemp = (crctemp << 1) ^ poly;
                         }
@@ -53,64 +53,64 @@ void setupcrc(uint16_t poly, uint16_t rvalue)
         }
 }
 
-void fdi_reset()
+void fdi_init()
 {
 //        printf("FDI reset\n");
-        fdif[0]=fdif[1]=0;
-        fdids[0]=fdids[1]=0;
-        fdinotfound=0;
-        setupcrc(0x1021, 0xcdb4);
+        fdi_f[0]  = fdi_f[1]  = 0;
+        fdi_ds[0] = fdi_ds[1] = 0;
+        fdi_notfound = 0;
+        fdi_setupcrc(0x1021, 0xcdb4);
 }
 
 void fdi_load(int drive, char *fn)
 {
-        writeprot[drive]=fwriteprot[drive]=1;
-        fdif[drive]=fopen(fn,"rb");
-        if (!fdif[drive]) return;
-        fdih[drive]=fdi2raw_header(fdif[drive]);
+        writeprot[drive] = fwriteprot[drive] = 1;
+        fdi_f[drive] = fopen(fn, "rb");
+        if (!fdi_f[drive]) return;
+        fdi_h[drive] = fdi2raw_header(fdi_f[drive]);
 //        if (!fdih[drive]) printf("Failed to load!\n");
-        fdilasttrack[drive]=fdi2raw_get_last_track(fdih[drive]);
-        fdisides[drive]=(fdilasttrack[drive]>83)?1:0;
+        fdi_lasttrack[drive] = fdi2raw_get_last_track(fdi_h[drive]);
+        fdi_sides[drive] = (fdi_lasttrack[drive]>83) ? 1 : 0;
 //        printf("Last track %i\n",fdilasttrack[drive]);
-        drives[drive].seek=fdi_seek;
-        drives[drive].readsector=fdi_readsector;
-        drives[drive].writesector=fdi_writesector;
-        drives[drive].readaddress=fdi_readaddress;
-        drives[drive].poll=fdi_poll;
-        drives[drive].format=fdi_format;
+        drives[drive].seek        = fdi_seek;
+        drives[drive].readsector  = fdi_readsector;
+        drives[drive].writesector = fdi_writesector;
+        drives[drive].readaddress = fdi_readaddress;
+        drives[drive].poll        = fdi_poll;
+        drives[drive].format      = fdi_format;
 }
 
 void fdi_close(int drive)
 {
-        if (fdih[drive]) fdi2raw_header_free(fdih[drive]);
-        if (fdif[drive]) fclose(fdif[drive]);
-        fdif[drive]=NULL;
+        if (fdi_h[drive]) fdi2raw_header_free(fdi_h[drive]);
+        if (fdi_f[drive]) fclose(fdi_f[drive]);
+        fdi_f[drive] = NULL;
 }
 
 void fdi_seek(int drive, int track)
 {
         int c;
-        if (!fdif[drive]) return;
+        if (!fdi_f[drive]) return;
 //        printf("Track start %i\n",track);
-        if (track<0) track=0;
-        if (track>fdilasttrack[drive]) track=fdilasttrack[drive]-1;
-        c=fdi2raw_loadtrack(fdih[drive],(uint16_t *)ftrackinfo[drive][0][0],(uint16_t *)fditiming,track<<fdisides[drive],&ftracklen[drive][0][0],&ftrackindex[drive][0][0],NULL,0);
-        if (!c) memset(ftrackinfo[drive][0][0],0,ftracklen[drive][0][0]);
-        c=fdi2raw_loadtrack(fdih[drive],(uint16_t *)ftrackinfo[drive][0][1],(uint16_t *)fditiming,track<<fdisides[drive],&ftracklen[drive][0][1],&ftrackindex[drive][0][1],NULL,1);
-        if (!c) memset(ftrackinfo[drive][0][1],0,ftracklen[drive][0][1]);
-        if (fdisides[drive])
+        if (track < 0) track = 0;
+        if (track > fdi_lasttrack[drive]) track = fdi_lasttrack[drive] - 1;
+        c = fdi2raw_loadtrack(fdi_h[drive], (uint16_t *)fdi_trackinfo[drive][0][0], (uint16_t *)fdi_timing, track << fdi_sides[drive], &fdi_tracklen[drive][0][0], &fdi_trackindex[drive][0][0], NULL, 0);
+        if (!c) memset(fdi_trackinfo[drive][0][0], 0, fdi_tracklen[drive][0][0]);
+        c = fdi2raw_loadtrack(fdi_h[drive], (uint16_t *)fdi_trackinfo[drive][0][1], (uint16_t *)fdi_timing, track << fdi_sides[drive], &fdi_tracklen[drive][0][1], &fdi_trackindex[drive][0][1], NULL, 1);
+        if (!c) memset(fdi_trackinfo[drive][0][1], 0, fdi_tracklen[drive][0][1]);
+        if (fdi_sides[drive])
         {
-                c=fdi2raw_loadtrack(fdih[drive],(uint16_t *)ftrackinfo[drive][1][0],(uint16_t *)fditiming,(track<<fdisides[drive])+1,&ftracklen[drive][1][0],&ftrackindex[drive][1][0],NULL,0);
-                if (!c) memset(ftrackinfo[drive][1][0],0,ftracklen[drive][1][0]);
-                c=fdi2raw_loadtrack(fdih[drive],(uint16_t *)ftrackinfo[drive][1][1],(uint16_t *)fditiming,(track<<fdisides[drive])+1,&ftracklen[drive][1][1],&ftrackindex[drive][1][1],NULL,1);
-                if (!c) memset(ftrackinfo[drive][1][1],0,ftracklen[drive][1][1]);
+                c = fdi2raw_loadtrack(fdi_h[drive], (uint16_t *)fdi_trackinfo[drive][1][0], (uint16_t *)fdi_timing, (track << fdi_sides[drive]) + 1, &fdi_tracklen[drive][1][0], &fdi_trackindex[drive][1][0], NULL, 0);
+                if (!c) memset(fdi_trackinfo[drive][1][0], 0, fdi_tracklen[drive][1][0]);
+                c = fdi2raw_loadtrack(fdi_h[drive], (uint16_t *)fdi_trackinfo[drive][1][1], (uint16_t *)fdi_timing, (track << fdi_sides[drive]) + 1, &fdi_tracklen[drive][1][1], &fdi_trackindex[drive][1][1], NULL, 1);
+                if (!c) memset(fdi_trackinfo[drive][1][1], 0, fdi_tracklen[drive][1][1]);
         }
         else
         {
-                memset(ftrackinfo[drive][1][0],0,65536);
-                memset(ftrackinfo[drive][1][1],0,65536);
-                ftracklen[drive][1][0]=ftracklen[drive][1][1]=10000;
-                ftrackindex[drive][1][0]=ftrackindex[drive][1][1]=100;
+                memset(fdi_trackinfo[drive][1][0], 0, 65536);
+                memset(fdi_trackinfo[drive][1][1], 0, 65536);
+                fdi_tracklen[drive][1][0]   = fdi_tracklen[drive][1][1]   = 10000;
+                fdi_trackindex[drive][1][0] = fdi_trackindex[drive][1][1] = 100;
         }
 //        printf("SD Track %i Len %i Index %i %i\n",track,ftracklen[drive][0][0],ftrackindex[drive][0][0],c);
 //        printf("DD Track %i Len %i Index %i %i\n",track,ftracklen[drive][0][1],ftrackindex[drive][0][1],c);
@@ -123,119 +123,119 @@ void fdi_writeback(int drive, int track)
 
 void fdi_readsector(int drive, int sector, int track, int side, int density)
 {
-        fdirevs=0;
-        fdisector=sector;
-        fditrack=track;
-        fdiside=side;
-        fdidrive=drive;
-        fdidensity=density;
+        fdi_revs = 0;
+        fdi_sector  = sector;
+        fdi_track   = track;
+        fdi_side    = side;
+        fdi_drive   = drive;
+        fdi_density = density;
 //        printf("Read sector %i %i %i %i\n",drive,side,track,sector);
 
-        fdiread=1;
-        fdireadpos=0;
+        fdi_inread  = 1;
+        fdi_readpos = 0;
 }
 
 void fdi_writesector(int drive, int sector, int track, int side, int density)
 {
-        fdirevs=0;
-        fdisector=sector;
-        fditrack=track;
-        fdiside=side;
-        fdidrive=drive;
+        fdi_revs = 0;
+        fdi_sector = sector;
+        fdi_track  = track;
+        fdi_side   = side;
+        fdi_drive  = drive;
 //        printf("Write sector %i %i %i %i\n",drive,side,track,sector);
 
-        if (!fdif[drive] || (side && !fdids[drive]) || density)
+        if (!fdi_f[drive] || (side && !fdi_ds[drive]) || density)
         {
-                fdinotfound=500;
+                fdi_notfound = 500;
                 return;
         }
-        fdiwrite=1;
-        fdireadpos=0;
+        fdi_inwrite = 1;
+        fdi_readpos = 0;
 }
 
 void fdi_readaddress(int drive, int track, int side, int density)
 {
-        fdirevs=0;
-        fditrack=track;
-        fdiside=side;
-        fdidensity=density;
-        fdidrive=drive;
+        fdi_revs = 0;
+        fdi_track   = track;
+        fdi_side    = side;
+        fdi_density = density;
+        fdi_drive   = drive;
 //        printf("Read address %i %i %i\n",drive,side,track);
 
-        fdireadaddr=1;
-        fdireadpos=0;
+        fdi_inreadaddr = 1;
+        fdi_readpos    = 0;
 }
 
 void fdi_format(int drive, int track, int side, int density)
 {
-        fdirevs=0;
-        fditrack=track;
-        fdiside=side;
-        fdidensity=density;
-        fdidrive=drive;
+        fdi_revs = 0;
+        fdi_track   = track;
+        fdi_side    = side;
+        fdi_density = density;
+        fdi_drive   = drive;
 //        printf("Format %i %i %i\n",drive,side,track);
 
-        fdiwrite=1;
-        fdireadpos=0;
+        fdi_inwrite = 1;
+        fdi_readpos = 0;
 }
 
-uint16_t fdibuffer;
+static uint16_t fdi_buffer;
 static int pollbytesleft=0,pollbitsleft=0;
-static int readidpoll=0,readdatapoll=0,fdinextsector=0,inreadop=0;
-uint8_t fdisectordat[1026];
-int lastfdidat[2],sectorcrc[2];
-static int sectorsize,fdcsectorsize;
+static int readidpoll=0,readdatapoll=0,fdi_nextsector=0,inreadop=0;
+static uint8_t fdi_sectordat[1026];
+static int lastfdidat[2],sectorcrc[2];
+static int sectorsize,fdc_sectorsize;
 static int ddidbitsleft=0;
 
-uint8_t decodefm(uint16_t dat)
+static uint8_t decodefm(uint16_t dat)
 {
         uint8_t temp;
-        temp=0;
-        if (dat&0x0001) temp|=1;
-        if (dat&0x0004) temp|=2;
-        if (dat&0x0010) temp|=4;
-        if (dat&0x0040) temp|=8;
-        if (dat&0x0100) temp|=16;
-        if (dat&0x0400) temp|=32;
-        if (dat&0x1000) temp|=64;
-        if (dat&0x4000) temp|=128;
+        temp = 0;
+        if (dat & 0x0001) temp |= 1;
+        if (dat & 0x0004) temp |= 2;
+        if (dat & 0x0010) temp |= 4;
+        if (dat & 0x0040) temp |= 8;
+        if (dat & 0x0100) temp |= 16;
+        if (dat & 0x0400) temp |= 32;
+        if (dat & 0x1000) temp |= 64;
+        if (dat & 0x4000) temp |= 128;
         return temp;
 }
 
 static uint16_t crc;
 
-void calccrc(uint8_t byte)
+static void calccrc(uint8_t byte)
 {
         crc = (crc << 8) ^ CRCTable[(crc >> 8)^byte];
 }
 
 void fdi_poll()
 {
-        int tempi,c;
-        if (fdipos>=ftracklen[fdidrive][fdiside][fdidensity])
+        int tempi, c;
+        if (fdi_pos >= fdi_tracklen[fdi_drive][fdi_side][fdi_density])
         {
 //                printf("Looping! %i\n",fdipos);
-                fdipos=0;
+                fdi_pos = 0;
         }
-        tempi=ftrackinfo[fdidrive][fdiside][fdidensity][((fdipos>>3)&0xFFFF)^1]&(1<<(7-(fdipos&7)));
-        fdipos++;
-        fdibuffer<<=1;
-        fdibuffer|=(tempi?1:0);
-        if (fdiwrite)
+        tempi = fdi_trackinfo[fdi_drive][fdi_side][fdi_density][((fdi_pos >> 3) & 0xFFFF) ^ 1] & (1 << (7 - (fdi_pos & 7)));
+        fdi_pos++;
+        fdi_buffer<<=1;
+        fdi_buffer|=(tempi?1:0);
+        if (fdi_inwrite)
         {
-                fdiwrite=0;
-                fdcwriteprotect();
+                fdi_inwrite=0;
+                fdc_writeprotect();
                 return;
         }
-        if (!fdiread && !fdireadaddr) return;
-        if (fdipos==ftrackindex[fdidrive][fdiside][fdidensity])
+        if (!fdi_inread && !fdi_inreadaddr) return;
+        if (fdi_pos == fdi_trackindex[fdi_drive][fdi_side][fdi_density])
         {
-                fdirevs++;
-                if (fdirevs==3)
+                fdi_revs++;
+                if (fdi_revs == 3)
                 {
 //                        printf("Not found!\n");
-                        fdcnotfound();
-                        fdiread=fdireadaddr=0;
+                        fdc_notfound();
+                        fdi_inread = fdi_inreadaddr = 0;
                         return;
                 }
         }
@@ -245,105 +245,105 @@ void fdi_poll()
                 if (!pollbitsleft)
                 {
                         pollbytesleft--;
-                        if (pollbytesleft) pollbitsleft=16; /*Set up another word if we need it*/
+                        if (pollbytesleft) pollbitsleft = 16; /*Set up another word if we need it*/
                         if (readidpoll)
                         {
-                                fdisectordat[5-pollbytesleft]=decodefm(fdibuffer);
-                                if (fdireadaddr && pollbytesleft>1) fdcdata(fdisectordat[5-pollbytesleft]);
+                                fdi_sectordat[5 - pollbytesleft] = decodefm(fdi_buffer);
+                                if (fdi_inreadaddr && pollbytesleft > 1) fdc_data(fdi_sectordat[5 - pollbytesleft]);
                                 if (!pollbytesleft)
                                 {
-                                        if ((fdisectordat[0]==fditrack && fdisectordat[2]==fdisector) || fdireadaddr)
+                                        if ((fdi_sectordat[0] == fdi_track && fdi_sectordat[2] == fdi_sector) || fdi_inreadaddr)
                                         {
-                                                crc=(fdidensity)?0xcdb4:0xffff;
+                                                crc = (fdi_density) ? 0xcdb4 : 0xffff;
                                                 calccrc(0xFE);
-                                                for (c=0;c<4;c++) calccrc(fdisectordat[c]);
-                                                if ((crc>>8)!=fdisectordat[4] || (crc&0xFF)!=fdisectordat[5])
+                                                for (c = 0; c < 4; c++) calccrc(fdi_sectordat[c]);
+                                                if ((crc >> 8) != fdi_sectordat[4] || (crc & 0xFF) != fdi_sectordat[5])
                                                 {
 //                                                        printf("Header CRC error : %02X %02X %02X %02X\n",crc>>8,crc&0xFF,fdisectordat[4],fdisectordat[5]);
 //                                                        dumpregs();
 //                                                        exit(-1);
-                                                        inreadop=0;
-                                                        if (fdireadaddr)
+                                                        inreadop = 0;
+                                                        if (fdi_inreadaddr)
                                                         {
-                                                                fdcdata(fdisector);
-                                                                fdcfinishread();
+                                                                fdc_data(fdi_sector);
+                                                                fdc_finishread();
                                                         }
-                                                        else             fdcheadercrcerror();
+                                                        else             fdc_headercrcerror();
                                                         return;
                                                 }
-                                                if (fdisectordat[0]==fditrack && fdisectordat[2]==fdisector && fdiread && !fdireadaddr)
+                                                if (fdi_sectordat[0] == fdi_track && fdi_sectordat[2] == fdi_sector && fdi_inread && !fdi_inreadaddr)
                                                 {
-                                                        fdinextsector=1;
-                                                        readidpoll=0;
-                                                        sectorsize=(1<<(fdisectordat[3]+7))+2;
-                                                        fdcsectorsize=fdisectordat[3];
+                                                        fdi_nextsector = 1;
+                                                        readidpoll = 0;
+                                                        sectorsize = (1 << (fdi_sectordat[3] + 7)) + 2;
+                                                        fdc_sectorsize = fdi_sectordat[3];
                                                 }
-                                                if (fdireadaddr)
+                                                if (fdi_inreadaddr)
                                                 {
-                                                        fdcfinishread();
-                                                        fdireadaddr=0;
+                                                        fdc_finishread();
+                                                        fdi_inreadaddr = 0;
                                                 }
                                         }
                                 }
                         }
                         if (readdatapoll)
                         {
-                                if (pollbytesleft>1)
+                                if (pollbytesleft > 1)
                                 {
-                                        calccrc(decodefm(fdibuffer));
+                                        calccrc(decodefm(fdi_buffer));
                                 }
                                 else
-                                   sectorcrc[1-pollbytesleft]=decodefm(fdibuffer);
+                                   sectorcrc[1 - pollbytesleft] = decodefm(fdi_buffer);
                                 if (!pollbytesleft)
                                 {
-                                        fdiread=0;
-                                        if ((crc>>8)!=sectorcrc[0] || (crc&0xFF)!=sectorcrc[1])// || (fditrack==79 && fdisect==4 && fdcside&1))
+                                        fdi_inread = 0;
+                                        if ((crc >> 8) != sectorcrc[0] || (crc & 0xFF) != sectorcrc[1])// || (fditrack==79 && fdisect==4 && fdc_side&1))
                                         {
 //                                                printf("Data CRC error : %02X %02X %02X %02X %i %04X %02X%02X %i\n",crc>>8,crc&0xFF,sectorcrc[0],sectorcrc[1],fdipos,crc,sectorcrc[0],sectorcrc[1],ftracklen[0][0][fdidensity]);
-                                                inreadop=0;
-                                                fdcdata(decodefm(lastfdidat[1]));
-                                                fdcfinishread();
-                                                fdcdatacrcerror();
-                                                readdatapoll=0;
+                                                inreadop = 0;
+                                                fdc_data(decodefm(lastfdidat[1]));
+                                                fdc_finishread();
+                                                fdc_datacrcerror();
+                                                readdatapoll = 0;
                                                 return;
                                         }
 //                                        printf("End of FDI read %02X %02X %02X %02X\n",crc>>8,crc&0xFF,sectorcrc[0],sectorcrc[1]);
-                                        fdcdata(decodefm(lastfdidat[1]));
-                                        fdcfinishread();
+                                        fdc_data(decodefm(lastfdidat[1]));
+                                        fdc_finishread();
                                 }
-                                else if (lastfdidat[1]!=0)
-                                   fdcdata(decodefm(lastfdidat[1]));
-                                lastfdidat[1]=lastfdidat[0];
-                                lastfdidat[0]=fdibuffer;
+                                else if (lastfdidat[1] != 0)
+                                   fdc_data(decodefm(lastfdidat[1]));
+                                lastfdidat[1] = lastfdidat[0];
+                                lastfdidat[0] = fdi_buffer;
                                 if (!pollbytesleft)
-                                   readdatapoll=0;
+                                   readdatapoll = 0;
                         }
                 }
         }
-        if (fdibuffer==0x4489 && fdidensity)
+        if (fdi_buffer == 0x4489 && fdi_density)
         {
 //                rpclog("Found sync\n");
-                ddidbitsleft=17;
+                ddidbitsleft = 17;
         }
 
-        if (fdibuffer==0xF57E && !fdidensity)
+        if (fdi_buffer == 0xF57E && !fdi_density)
         {
-                pollbytesleft=6;
-                pollbitsleft=16;
-                readidpoll=1;
+                pollbytesleft = 6;
+                pollbitsleft  = 16;
+                readidpoll    = 1;
         }
-        if ((fdibuffer==0xF56F || fdibuffer==0xF56A) && !fdidensity)
+        if ((fdi_buffer == 0xF56F || fdi_buffer == 0xF56A) && !fdi_density)
         {
-                if (fdinextsector)
+                if (fdi_nextsector)
                 {
-                        pollbytesleft=sectorsize;
-                        pollbitsleft=16;
-                        readdatapoll=1;
-                        fdinextsector=0;
-                        crc=0xffff;
-                        if (fdibuffer==0xF56A) calccrc(0xF8);
-                        else                   calccrc(0xFB);
-                        lastfdidat[0]=lastfdidat[1]=0;
+                        pollbytesleft  = sectorsize;
+                        pollbitsleft   = 16;
+                        readdatapoll   = 1;
+                        fdi_nextsector = 0;
+                        crc = 0xffff;
+                        if (fdi_buffer == 0xF56A) calccrc(0xF8);
+                        else                      calccrc(0xFB);
+                        lastfdidat[0] = lastfdidat[1] = 0;
                 }
         }
         if (ddidbitsleft)
@@ -352,26 +352,26 @@ void fdi_poll()
                 if (!ddidbitsleft)
                 {
 //                        printf("ID bits over %04X %02X %i\n",fdibuffer,decodefm(fdibuffer),fdipos);
-                        if (decodefm(fdibuffer)==0xFE)
+                        if (decodefm(fdi_buffer) == 0xFE)
                         {
 //                                printf("Sector header\n");
-                                pollbytesleft=6;
-                                pollbitsleft=16;
-                                readidpoll=1;
+                                pollbytesleft = 6;
+                                pollbitsleft  = 16;
+                                readidpoll    = 1;
                         }
-                        else if (decodefm(fdibuffer)==0xFB)
+                        else if (decodefm(fdi_buffer) == 0xFB)
                         {
 //                                printf("Data header\n");
-                                if (fdinextsector)
+                                if (fdi_nextsector)
                                 {
-                                        pollbytesleft=sectorsize;
-                                        pollbitsleft=16;
-                                        readdatapoll=1;
-                                        fdinextsector=0;
-                                        crc=0xcdb4;
-                                        if (fdibuffer==0xF56A) calccrc(0xF8);
-                                        else                   calccrc(0xFB);
-                                        lastfdidat[0]=lastfdidat[1]=0;
+                                        pollbytesleft  = sectorsize;
+                                        pollbitsleft   = 16;
+                                        readdatapoll   = 1;
+                                        fdi_nextsector = 0;
+                                        crc = 0xcdb4;
+                                        if (fdi_buffer == 0xF56A) calccrc(0xF8);
+                                        else                      calccrc(0xFB);
+                                        lastfdidat[0] = lastfdidat[1] = 0;
                                 }
                         }
                 }

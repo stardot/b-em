@@ -1,17 +1,19 @@
-/*B-em v2.1 by Tom Walker
+/*B-em v2.2 by Tom Walker
   80186 emulation
   Originally from PCem
   A few bits of 80286 emulation hanging around also*/
 #include <stdio.h>
 #include <stdint.h>
+#include <allegro.h>
 #include "b-em.h"
 #include "x86.h"
+#include "tube.h"
 
-int x86ins=0;
+static int x86ins=0;
 
 #define loadcs(seg) CS=seg; cs=seg<<4
 
-void loadseg(uint16_t val, x86seg *seg)
+static void loadseg(uint16_t val, x86seg *seg)
 {
         seg->seg=val;
         seg->base=val<<4;
@@ -24,29 +26,22 @@ void loadseg(uint16_t val, x86seg *seg)
 
 #define pc x86pc
 
-uint16_t oldflags;
-void x86dumpregs();
+static void x86dumpregs();
 
-uint32_t old8,old82,old83;
-uint16_t oldcs;
+static uint32_t old8,old82,old83;
+static uint16_t oldcs;
 
-int dlE=0;
-
-int tempc;
-uint16_t getword();
-uint8_t opcode;
-uint16_t pc2,pc3;
+static int tempc;
+static uint16_t getword();
+static uint8_t opcode;
 static int noint=0;
-static int x86output=0;
 
-uint8_t readmemblx86(uint32_t addr);
-void writememblx86(uint32_t addr, uint8_t val);
-uint16_t readmemwlx86(uint32_t seg, uint32_t addr);
-void writememwlx86(uint32_t seg, uint32_t addr, uint16_t val);
+static uint8_t readmemblx86(uint32_t addr);
+static uint16_t readmemwlx86(uint32_t seg, uint32_t addr);
 
-uint8_t *x86ram,*x86rom;
+static uint8_t *x86ram,*x86rom;
 
-int ssegs;
+static int ssegs;
 
 /*EA calculation*/
 
@@ -127,17 +122,17 @@ reg = If mod=11,  (depending on data size, 16 bits/8 bits, 32 bits=extend 16 bit
       If BP or SP are in address calc, seg is SS, else DS
 */
 
-int x86cycles=0;
+static int x86cycles=0;
 #define cycles x86cycles
 
-uint32_t easeg,eaaddr;
-int rm,reg,mod,rmdat;
+static uint32_t easeg,eaaddr;
+static int rm,reg,mod,rmdat;
 
-uint16_t zero=0;
-uint16_t *mod1add[2][8];
-uint32_t *mod1seg[8];
+static uint16_t zero=0;
+static uint16_t *mod1add[2][8];
+static uint32_t *mod1seg[8];
 
-void makemod1table()
+static void makemod1table()
 {
         mod1add[0][0]=&BX; mod1add[0][1]=&BX; mod1add[0][2]=&BP; mod1add[0][3]=&BP;
         mod1add[0][4]=&SI; mod1add[0][5]=&DI; mod1add[0][6]=&BP; mod1add[0][7]=&BX;
@@ -147,7 +142,7 @@ void makemod1table()
         mod1seg[4]=&ds; mod1seg[5]=&ds; mod1seg[6]=&ss; mod1seg[7]=&ds;
 }
 
-void fetcheal()
+static void fetcheal()
 {
                 if (!mod && rm==6) { eaaddr=getword(); easeg=ds; }
                 else
@@ -164,7 +159,7 @@ void fetcheal()
                 }
 }
 
-inline uint8_t geteab()
+static inline uint8_t geteab()
 {
         if (mod==3)
            return (rm&4)?regs[rm&3].b.h:regs[rm&3].b.l;
@@ -172,7 +167,7 @@ inline uint8_t geteab()
         return readmembl(easeg+eaaddr);
 }
 
-inline uint16_t geteaw()
+static inline uint16_t geteaw()
 {
         if (mod==3)
            return regs[rm].w;
@@ -180,7 +175,7 @@ inline uint16_t geteaw()
         return readmemwl(easeg,eaaddr);
 }
 
-inline uint16_t geteaw2()
+static inline uint16_t geteaw2()
 {
         if (mod==3)
            return regs[rm].w;
@@ -188,7 +183,7 @@ inline uint16_t geteaw2()
         return readmemwl(easeg,(eaaddr+2)&0xFFFF);
 }
 
-inline void seteab(uint8_t val)
+static inline void seteab(uint8_t val)
 {
         if (mod==3)
         {
@@ -202,7 +197,7 @@ inline void seteab(uint8_t val)
         }
 }
 
-inline void seteaw(uint16_t val)
+static inline void seteaw(uint16_t val)
 {
         if (mod==3)
            regs[rm].w=val;
@@ -220,10 +215,10 @@ inline void seteaw(uint16_t val)
 
 
 /*Flags*/
-uint8_t znptable8[256];
-uint16_t znptable16[65536];
+static uint8_t znptable8[256];
+static uint16_t znptable16[65536];
 
-void x86makeznptable()
+static void x86makeznptable()
 {
         int c,d;
         for (c=0;c<256;c++)
@@ -264,7 +259,7 @@ void x86makeznptable()
       }
 }
 
-uint8_t readmemblx86(uint32_t addr)
+static uint8_t readmemblx86(uint32_t addr)
 {
         if (addr<0xE0000) return x86ram[addr];
 //        if (addr<0xC0000) return x86ram[addr-0x40000];
@@ -272,14 +267,7 @@ uint8_t readmemblx86(uint32_t addr)
         return 0xFF;
 }
 
-
-void writememblx86(uint32_t addr, uint8_t val)
-{
-        if (addr<0xE0000) { x86ram[addr]=val; return; }
-//        if (addr<0xC0000) { x86ram[addr-0x40000]=val; return; }
-}
-
-uint16_t readmemwlx86(uint32_t seg, uint32_t addr)
+static uint16_t readmemwlx86(uint32_t seg, uint32_t addr)
 {
         uint32_t addr2=seg+addr;
         if (addr2<0xE0000) return *(uint16_t *)(&x86ram[addr2]);
@@ -288,20 +276,13 @@ uint16_t readmemwlx86(uint32_t seg, uint32_t addr)
         return 0xFFFF;
 }
 
-void writememwlx86(uint32_t seg, uint32_t addr, uint16_t val)
-{
-        uint32_t addr2=seg+addr;
-        if (addr2<0xE0000) { *(uint16_t *)(&x86ram[addr2])=val; return; }
-//        if (addr2<0xC0000) { *(uint16_t *)(&x86ram[addr2-0x40000])=val; return; }
-}
-
-uint16_t getword()
+static uint16_t getword()
 {
         pc+=2;
         return readmemwl(cs,(pc-2));
 }
 
-void x86dumpregs()
+static void x86dumpregs()
 {
         FILE *f;
         int c;
@@ -337,7 +318,7 @@ void x86dumpregs()
         }*/
 }
 
-void resetx86()
+void x86_reset()
 {
 //        return;
         pc=0;
@@ -346,14 +327,7 @@ void resetx86()
         makemod1table();
 }
 
-void softresetx86()
-{
-        pc=0;
-        loadcs(0xFFFF);
-        flags=2;
-}
-
-void initmemx86()
+void x86_init()
 {
         FILE *f;
         char fn[512];
@@ -367,20 +341,20 @@ void initmemx86()
         fclose(f);
 }
 
-void closex86()
+void x86_close()
 {
         if (x86rom) free(x86rom);
         if (x86ram) free(x86ram);
 }
 
-void setznp8(uint8_t val)
+static void setznp8(uint8_t val)
 {
         flags&=~0xC4;
         flags|=znptable8[val];
 }
 
 #define setznp168 setznp16
-void setznp16(uint16_t val)
+static void setznp16(uint16_t val)
 {
         flags&=~0xC4;
 //        flags|=((val&0x8000)?N_FLAG:((!val)?Z_FLAG:0));
@@ -394,7 +368,7 @@ void setznp16(uint16_t val)
         flags|=(znptable16[val]&0xC0)|(znptable8[val&0xFF]&4);
 }*/
 
-void setadd8(uint8_t a, uint8_t b)
+static void setadd8(uint8_t a, uint8_t b)
 {
         uint16_t c=(uint16_t)a+(uint16_t)b;
         flags&=~0x8D5;
@@ -403,7 +377,7 @@ void setadd8(uint8_t a, uint8_t b)
         if (!((a^b)&0x80)&&((a^c)&0x80)) flags|=V_FLAG;
         if (((a&0xF)+(b&0xF))&0x10)      flags|=A_FLAG;
 }
-void setadd8nc(uint8_t a, uint8_t b)
+static void setadd8nc(uint8_t a, uint8_t b)
 {
         uint16_t c=(uint16_t)a+(uint16_t)b;
         flags&=~0x8D4;
@@ -411,7 +385,7 @@ void setadd8nc(uint8_t a, uint8_t b)
         if (!((a^b)&0x80)&&((a^c)&0x80)) flags|=V_FLAG;
         if (((a&0xF)+(b&0xF))&0x10)      flags|=A_FLAG;
 }
-void setadc8(uint8_t a, uint8_t b)
+static void setadc8(uint8_t a, uint8_t b)
 {
         uint16_t c=(uint16_t)a+(uint16_t)b+tempc;
         flags&=~0x8D5;
@@ -420,7 +394,7 @@ void setadc8(uint8_t a, uint8_t b)
         if (!((a^b)&0x80)&&((a^c)&0x80)) flags|=V_FLAG;
         if (((a&0xF)+(b&0xF))&0x10)      flags|=A_FLAG;
 }
-void setadd16(uint16_t a, uint16_t b)
+static void setadd16(uint16_t a, uint16_t b)
 {
         uint32_t c=(uint32_t)a+(uint32_t)b;
         flags&=~0x8D5;
@@ -429,7 +403,7 @@ void setadd16(uint16_t a, uint16_t b)
         if (!((a^b)&0x8000)&&((a^c)&0x8000)) flags|=V_FLAG;
         if (((a&0xF)+(b&0xF))&0x10)      flags|=A_FLAG;
 }
-void setadd16nc(uint16_t a, uint16_t b)
+static void setadd16nc(uint16_t a, uint16_t b)
 {
         uint32_t c=(uint32_t)a+(uint32_t)b;
         flags&=~0x8D4;
@@ -437,7 +411,7 @@ void setadd16nc(uint16_t a, uint16_t b)
         if (!((a^b)&0x8000)&&((a^c)&0x8000)) flags|=V_FLAG;
         if (((a&0xF)+(b&0xF))&0x10)      flags|=A_FLAG;
 }
-void x86setadc16(uint16_t a, uint16_t b)
+static void x86setadc16(uint16_t a, uint16_t b)
 {
         uint32_t c=(uint32_t)a+(uint32_t)b+tempc;
         flags&=~0x8D5;
@@ -447,7 +421,7 @@ void x86setadc16(uint16_t a, uint16_t b)
         if (((a&0xF)+(b&0xF))&0x10)      flags|=A_FLAG;
 }
 
-void setsub8(uint8_t a, uint8_t b)
+static void setsub8(uint8_t a, uint8_t b)
 {
         uint16_t c=(uint16_t)a-(uint16_t)b;
         flags&=~0x8D5;
@@ -456,7 +430,7 @@ void setsub8(uint8_t a, uint8_t b)
         if ((a^b)&(a^c)&0x80) flags|=V_FLAG;
         if (((a&0xF)-(b&0xF))&0x10)      flags|=A_FLAG;
 }
-void setsub8nc(uint8_t a, uint8_t b)
+static void setsub8nc(uint8_t a, uint8_t b)
 {
         uint16_t c=(uint16_t)a-(uint16_t)b;
         flags&=~0x8D4;
@@ -464,7 +438,7 @@ void setsub8nc(uint8_t a, uint8_t b)
         if ((a^b)&(a^c)&0x80) flags|=V_FLAG;
         if (((a&0xF)-(b&0xF))&0x10)      flags|=A_FLAG;
 }
-void setsbc8(uint8_t a, uint8_t b)
+static void setsbc8(uint8_t a, uint8_t b)
 {
         uint16_t c=(uint16_t)a-(((uint16_t)b)+tempc);
         flags&=~0x8D5;
@@ -473,7 +447,7 @@ void setsbc8(uint8_t a, uint8_t b)
         if ((a^b)&(a^c)&0x80) flags|=V_FLAG;
         if (((a&0xF)-(b&0xF))&0x10)      flags|=A_FLAG;
 }
-void setsub16(uint16_t a, uint16_t b)
+static void setsub16(uint16_t a, uint16_t b)
 {
         uint32_t c=(uint32_t)a-(uint32_t)b;
         flags&=~0x8D5;
@@ -483,7 +457,7 @@ void setsub16(uint16_t a, uint16_t b)
 //        if (x86output) printf("%04X %04X %i\n",a^b,a^c,flags&V_FLAG);
         if (((a&0xF)-(b&0xF))&0x10)      flags|=A_FLAG;
 }
-void setsub16nc(uint16_t a, uint16_t b)
+static void setsub16nc(uint16_t a, uint16_t b)
 {
         uint32_t c=(uint32_t)a-(uint32_t)b;
         flags&=~0x8D4;
@@ -492,7 +466,7 @@ void setsub16nc(uint16_t a, uint16_t b)
         if ((a^b)&(a^c)&0x8000) flags|=V_FLAG;
         if (((a&0xF)-(b&0xF))&0x10)      flags|=A_FLAG;
 }
-void x86setsbc16(uint16_t a, uint16_t b)
+static void x86setsbc16(uint16_t a, uint16_t b)
 {
         uint32_t c=(uint32_t)a-(((uint32_t)b)+tempc);
         flags&=~0x8D5;
@@ -503,23 +477,21 @@ void x86setsbc16(uint16_t a, uint16_t b)
         if (((a&0xF)-(b&0xF))&0x10)      flags|=A_FLAG;
 }
 
-uint32_t x86sa,x86ss,x86src;
-uint32_t x86da,x86ds,x86dst;
-uint16_t x86ena;
-uint16_t x86imask=0;
-int tubedat;
+static uint32_t x86sa,x86ss,x86src;
+static uint32_t x86da,x86ds,x86dst;
+static uint16_t x86ena;
+static uint16_t x86imask=0;
 
-uint8_t inb(uint16_t port)
+static uint8_t inb(uint16_t port)
 {
-        uint8_t temp;
-        if ((port&~0xF)==0x80) return readtube(port>>1);
+        if ((port&~0xF)==0x80) return tube_parasite_read(port>>1);
         return 0xFF;
         printf("Bad IN port %04X %04X:%04X\n",port,cs>>4,pc);
         x86dumpregs();
         exit(-1);
 }
 
-void outb(uint16_t port, uint8_t val)
+static void outb(uint16_t port, uint8_t val)
 {
 //        port&=0xFF;
 //        printf("OUT %04X %02X %04X:%04X\n",port,val,cs>>4,pc);
@@ -540,12 +512,12 @@ void outb(uint16_t port, uint8_t val)
         if ((port&~0xF)==0x80)
         {
 //                if (port!=0x8E || val!=0) printf("Tube write %02X %02X\n",port,val);
-                writetube(port>>1,val);
+                tube_parasite_write(port>>1,val);
                 return;
         }
 }
 
-void x86dma()
+static void x86_dma()
 {
         if (!(x86ena&2)) return;
 //        printf("Src %05X %04X:%04X  Dst %05X %04X:%04X\n",x86src,x86ss,x86sa, x86dst,x86ds,x86da);
@@ -566,16 +538,16 @@ void x86dma()
         }
 }
 
-int firstrepcycle=1;
-void rep(int fv)
+static int firstrepcycle=1;
+static void rep(int fv)
 {
         uint8_t temp;
         int c=CX;
         uint8_t temp2;
-        uint16_t tempw,tempw2,tempw3;
+        uint16_t tempw,tempw2;
         uint16_t ipc=oldpc;//pc-1;
-        int changeds=0;
-        uint32_t oldds;
+        int changeds = 0;
+        uint32_t oldds = 0;
         startrep:
         temp=readmembl(cs+pc); pc++;
 //        if (firstrepcycle && temp==0xA5) printf("REP MOVSW %06X:%04X %06X:%04X\n",ds,SI,es,DI);
@@ -776,35 +748,33 @@ void rep(int fv)
         if (changeds) ds=oldds;
 }
 
-int inhlt=0;
-uint16_t lastpc,lastcs;
-int firstrepcycle;
-int skipnextprint=0;
-int x86oldnmi=0;
+static int inhlt=0;
+static uint16_t lastpc,lastcs;
+static int skipnextprint=0;
 //#if 0
-void execx86()
+void x86_exec()
 {
-        uint8_t temp,temp2;
-        uint16_t addr,tempw,tempw2,tempw3,tempw4;
+        uint8_t temp = 0, temp2;
+        uint16_t addr, tempw, tempw2, tempw3, tempw4;
         signed char offset;
         int tempws;
         uint32_t templ;
         int c,cycdiff;
         int tempi;
-        FILE *f;
 //        tubecycles+=(cycs<<2);
 //        printf("X86exec %i %i\n",tubecycles,cycs);
         while (tubecycles>0)
         {
                 cycdiff=tubecycles;
-                old83=old82;
-                old82=old8;
-                old8=pc+(CS<<16);
+//                old83=old82;
+//                old82=old8;
+//                old8=pc+(CS<<16);
                 oldcs=CS;
                 oldpc=pc;
                 opcodestart:
                 opcode=readmembl(cs+pc);
                 tempc=flags&C_FLAG;
+#if 0
                 if (x86output && /*cs<0xF0000 && */!ssegs)//opcode!=0x26 && opcode!=0x36 && opcode!=0x2E && opcode!=0x3E)
                 {
                         if ((opcode!=0xF2 && opcode!=0xF3) || firstrepcycle)
@@ -824,7 +794,7 @@ void execx86()
                                 }*/
                         }
                 }
-//#endif
+#endif
                 pc++;
                 inhlt=0;
 //                if (ins==500000) { x86dumpregs(); exit(0); }*/
@@ -3494,13 +3464,13 @@ void execx86()
                         exit(-1);
                 }*/
 
-                if (tubeirq&2)
+                if (tube_irq&2)
                 {
-                        //tubeirq&=~2;
-//                        printf("Let's do DMA! %i\n",tubeirq);
-                        x86dma();
+                        //tube_irq&=~2;
+//                        printf("Let's do DMA! %i\n",tube_irq);
+                        x86_dma();
                 }
-/*                if (tubeirq&2 && !x86oldnmi && ram[4])
+/*                if (tube_irq&2 && !x86oldnmi && ram[4])
                 {
                         if (inhlt) pc++;
                         if (AT) writememwl(ss,(SP-2)&0xFFFF,flags&~0xF000);
@@ -3514,7 +3484,7 @@ void execx86()
                         pc=readmemwl(0,addr);
                         loadcs(readmemwl(0,addr+2));
                 }
-                x86oldnmi=tubeirq&2;*/
+                x86oldnmi=tube_irq&2;*/
 
                 if (ssegs)
                 {
@@ -3526,7 +3496,7 @@ void execx86()
 
 x86ins++;
 //if (x86ins==65300000) x86output=1;
-                if ((flags&I_FLAG) && !ssegs && (tubeirq&1))
+                if ((flags&I_FLAG) && !ssegs && (tube_irq&1))
                 {
                         if (inhlt) pc++;
                         writememwl(ss,(SP-2)&0xFFFF,flags|0xF000);

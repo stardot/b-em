@@ -1,14 +1,16 @@
-/*B-em v2.1 by Tom Walker
+/*B-em v2.2 by Tom Walker
   Windows key redefinition*/
 
 #ifdef WIN32
 #include <allegro.h>
 #include <winalleg.h>
 #include "resources.h"
-#include "b-em.h"
 
-extern HINSTANCE hinstance;
-extern HWND ghwnd;
+#include "b-em.h"
+#include "keyboard.h"
+#include "model.h"
+#include "win.h"
+
 
 char szClasskey[] = "B-emKeyWnd";
 
@@ -44,7 +46,7 @@ void getkey(HWND parent)
                    return;
         }
 
-        if (khwnd) SendMessage(khwnd,WM_CLOSE,0,0);
+        if (khwnd) SendMessage(khwnd, WM_CLOSE, 0, 0);
 
         /* The class is registered, let's create the window*/
         khwnd = CreateWindowEx (
@@ -61,20 +63,20 @@ void getkey(HWND parent)
            hinstance,       /* Program Instance handler */
            NULL                 /* No Window Creation data */
            );
-        ShowWindow(khwnd,SW_SHOW);
-        keywind=0;
+        ShowWindow(khwnd, SW_SHOW);
+        keywind = 0;
         while (!keywind)
         {
-                if (PeekMessage(&messages,NULL,0,0,PM_REMOVE))
+                if (PeekMessage(&messages, NULL, 0, 0, PM_REMOVE))
                 {
-                        if (messages.message==WM_QUIT) keywind=1;
+                        if (messages.message == WM_QUIT) keywind = 1;
                         TranslateMessage(&messages);
                         DispatchMessage(&messages);
                 }
                 else
                    Sleep(10);
         }
-        khwnd=NULL;
+        khwnd = NULL;
 }
 
 char *key_names[] =
@@ -181,24 +183,23 @@ unsigned char hw_to_mycode[256] = {
 };
 LRESULT CALLBACK KeyWindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-        HWND h;
-        char s[1024],s2[1024],s3[64];
+        char s[1024], s2[1024], s3[64];
         int c;
         switch (message)
         {
                 case WM_CREATE:
-                sprintf(s,"Redefining %s",key_names[windcurkey]);
+                sprintf(s, "Redefining %s", key_names[windcurkey]);
                 hwndCtrl = CreateWindow( "STATIC", s, WS_CHILD | SS_SIMPLE | WS_VISIBLE, 4, 4, 240-10, 16, hwnd, NULL, hinstance, NULL );
                 hwndCtrl = CreateWindow( "STATIC", "Assigned to PC key(s): ", WS_CHILD | SS_SIMPLE | WS_VISIBLE, 4, 20, 240-10, 16, hwnd, NULL, hinstance, NULL );
-                s[0]=0;
-                for (c=0;c<128;c++)
+                s[0] = 0;
+                for (c = 0; c < 128; c++)
                 {
-                        if (keylookup[c]==windcurkey)
+                        if (keylookup[c] == windcurkey)
                         {
-                                if (s[0]) sprintf(s3,", %s",key_names[c]);
-                                else      sprintf(s3,"%s",key_names[c]);
-                                sprintf(s2,"%s%s",s,s3);
-                                strcpy(s,s2);
+                                if (s[0]) sprintf(s3, ", %s", key_names[c]);
+                                else      sprintf(s3, "%s",   key_names[c]);
+                                sprintf(s2, "%s%s", s, s3);
+                                strcpy(s, s2);
                         }
                 }
                 hwndCtrl = CreateWindow( "STATIC", s, WS_CHILD | SS_SIMPLE | WS_VISIBLE, 4, 36, 240-10, 16, hwnd, NULL, hinstance, NULL );
@@ -206,12 +207,12 @@ LRESULT CALLBACK KeyWindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPA
 
                 case WM_SYSKEYUP:
                 case WM_KEYUP:
-                if (LOWORD(wParam)!=255)
+                if (LOWORD(wParam) != 255)
                 {
-                        c=MapVirtualKey(LOWORD(wParam),0);
-                        c=hw_to_mycode[c];
-                        keylookup[c]=windcurkey;
-                        PostMessage(hwnd,WM_CLOSE,0,0);
+                        c = MapVirtualKey(LOWORD(wParam), 0);
+                        c = hw_to_mycode[c];
+                        keylookup[c] = windcurkey;
+                        PostMessage(hwnd, WM_CLOSE, 0, 0);
                         break;
                 }
                 break;
@@ -228,7 +229,6 @@ LRESULT CALLBACK KeyWindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPA
 
 BOOL CALLBACK redefinedlgproc(HWND hdlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
-        HWND h;
         switch (message)
         {
                 case WM_INITDIALOG:
@@ -238,12 +238,12 @@ BOOL CALLBACK redefinedlgproc(HWND hdlg, UINT message, WPARAM wParam, LPARAM lPa
                 {
                         case IDOK:
                         case IDCANCEL:
-                        EndDialog(hdlg,0);
+                        EndDialog(hdlg, 0);
                         return TRUE;
                 }
-                if (LOWORD(wParam)>=Button1 && LOWORD(wParam)<=(Button1+128) && !khwnd)
+                if (LOWORD(wParam) >= Button1 && LOWORD(wParam) <= (Button1 + 128) && !khwnd)
                 {
-                        windcurkey=LOWORD(wParam)-Button1;
+                        windcurkey = LOWORD(wParam) - Button1;
                         getkey(hdlg);
 //                        DialogBox(hinstance,TEXT("KeyDlg"),hdlg,keydlgproc);
                 }
@@ -254,7 +254,7 @@ BOOL CALLBACK redefinedlgproc(HWND hdlg, UINT message, WPARAM wParam, LPARAM lPa
 
 void redefinekeys()
 {
-        if (MASTER) DialogBox(hinstance,TEXT("RedefineM"),ghwnd,redefinedlgproc);
-        else        DialogBox(hinstance,TEXT("Redefine"),ghwnd,redefinedlgproc);
+        if (MASTER) DialogBox(hinstance, TEXT("RedefineM"), ghwnd, redefinedlgproc);
+        else        DialogBox(hinstance, TEXT("Redefine"),  ghwnd, redefinedlgproc);
 }
 #endif

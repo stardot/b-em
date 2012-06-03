@@ -1,0 +1,418 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="resid-fp\envelope.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="resid-fp\extfilt.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="resid-fp\filter.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="resid-fp\pot.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="resid-fp\sid.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="resid-fp\siddefs-fp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="resid-fp\voice.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="resid-fp\wave.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="6502.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="6502tube.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="32016.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="65816.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="acia.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="adc.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="adf.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="arm.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="bbctext.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="b-em.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cmos.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="compact_joystick.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="compactcmos.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="config.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="csw.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="daa.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ddnoise.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="debugger.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="disc.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="fdi2raw.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="fdi.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="i8271.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ide.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="keyboard.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="main.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mem.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="model.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mouse.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pal.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="resources.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="savestate.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="scan2bbc.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="serial.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sid_b-em.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sidtypes.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sn76489.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sound.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="soundopenal.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ssd.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sysvia.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="tape.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="tapenoise.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="tube.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="uef.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="uservia.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="via.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="video.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="video_render.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="wd1770.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="win.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="x86.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="x86_tube.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="z80.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="b-em.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="6502.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="6502tube.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="32016.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="65816.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="acia.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="adc.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="adf.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="arm.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="cmos.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="compact_joystick.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="compactcmos.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="config.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="csw.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ddnoise.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="debugger.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="disc.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="fdi2raw.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="fdi.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="i8271.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ide.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="keyboard.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="linux.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="linux-gui.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="linux-keydefine.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="main.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="mem.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="model.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="mouse.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="pal.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="resid.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="savestate.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="serial.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sn76489.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sound.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="soundopenal.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ssd.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sysvia.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="tape.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="tapenoise.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="tube.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="uef.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="uservia.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="via.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="vidalleg.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="video.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="wd1770.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="win.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="win-catalogue.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="win-keydefine.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="x86.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="z80.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="resid-fp\convolve.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="resid-fp\convolve-sse.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="resid-fp\envelope.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="resid-fp\extfilt.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="resid-fp\filter.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="resid-fp\pot.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="resid-fp\sid.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="resid-fp\voice.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="resid-fp\wave6581__ST.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="resid-fp\wave6581_P_T.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="resid-fp\wave6581_PS_.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="resid-fp\wave6581_PST.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="resid-fp\wave8580__ST.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="resid-fp\wave8580_P_T.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="resid-fp\wave8580_PS_.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="resid-fp\wave8580_PST.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="resid-fp\wave.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="b-em.ico">
+      <Filter>Source Files</Filter>
+    </None>
+  </ItemGroup>
+</Project>

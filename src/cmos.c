@@ -1,68 +1,95 @@
-/*B-em v2.1 by Tom Walker
+/*B-em v2.2 by Tom Walker
   Master 128 CMOS emulation*/
+
+/*Master 128 uses a HD146818
+
+  It is connected as -
+
+  System VIA PB6 - enable
+  System VIA PB7 - address strobe
+  IC32 B1        - RW
+  IC32 B2        - D
+  Slow data bus  - data*/
 #include <stdio.h>
 #include "b-em.h"
+#include "via.h"
+#include "sysvia.h"
+#include "model.h"
+#include "cmos.h"
+#include "compactcmos.h"
 
-uint8_t cmos[64];
+static uint8_t cmos[64];
 
-int cmosrw,cmosstrobe,cmosold,cmosaddr,cmosena;
+static int cmos_old, cmos_addr, cmos_ena, cmos_rw;
 
-void cmosupdate(uint8_t IC32, uint8_t sdbval)
+static uint8_t cmos_data;
+
+void cmos_update(uint8_t IC32, uint8_t sdbval)
 {
-        cmosrw=IC32&2;
-        cmosstrobe=(IC32&4)^cmosold;
-        cmosold=IC32&4;
-//        printf("CMOS update %i %i %i\n",cmosrw,cmosstrobe,cmosold);
-        if (cmosstrobe && cmosena && !cmosrw && cmosaddr>0xB) cmos[cmosaddr]=sdbval; /*printf("CMOS write %02X %02X\n",cmosaddr,sdbval);*/
-        if (cmosena && cmosrw) { sysvia.ora=cmos[cmosaddr]; /*printf("CMOS read %02X %02X\n",cmosaddr,sysvia.ora);*/ }
+        int cmos_strobe;
+        cmos_rw = IC32 & 2;
+        cmos_strobe = (IC32 & 4) ^ cmos_old;
+        cmos_old = IC32 & 4;
+//        rpclog("CMOS update %i %i %i\n",cmos_rw,cmos_strobe,cmos_old);
+        if (cmos_strobe && cmos_ena)
+        {
+                if (!cmos_rw && cmos_addr > 0xB && !(IC32 & 4)) /*Write triggered on low -> high on D*/
+                   cmos[cmos_addr] = sdbval;
+
+                if (cmos_rw && (IC32 & 4))                    /*Read data output while D high*/
+                   cmos_data = cmos[cmos_addr];
+        }
 }
 
-void cmoswriteaddr(uint8_t val)
+void cmos_writeaddr(uint8_t val)
 {
-        if (val&0x80) cmosaddr=sysvia.ora&63;
-        cmosena=val&0x40;
-//        printf("Write CMOS addr %i %02X\n",cmosaddr,val);
+        if (val&0x80) /*Latch address*/
+           cmos_addr = sdbval & 63;
+        cmos_ena = val & 0x40;
+//        rpclog("CMOS writeaddr %02X %02X %02X\n",val,sdbval,cmos_addr);
 }
 
-int cmosenabled()
+uint8_t cmos_read()
 {
-        return cmosena;
+//        rpclog("CMOS read ORAnh %02X %02X %i %02X %i\n",cmos_addr,cmos[cmos_addr],cmos_ena,IC32,cmos_rw);
+        if (cmos_ena && (IC32 & 4) && cmos_rw) return cmos_data; /*To drive bus, CMOS must be enabled,
+                                                                   D must be high, RW must be high*/
+        return 0xff;
 }
 
-uint8_t cmosread()
-{
-//        printf("CMOS read ORAnh %02X %02X\n",cmosaddr,cmos[cmosaddr]);
-        return cmos[cmosaddr];
-}
-
-void loadcmos(MODEL m)
+void cmos_load(MODEL m)
 {
         FILE *f;
         char fn[512];
         if (!m.cmos[0]) return;
-        if (m.compact) loadcompactcmos(m);
+        if (m.compact) compactcmos_load(m);
         else
         {
-                sprintf(fn,"%s%s",exedir,m.cmos);
-                rpclog("Opening %s\n",fn);
-                f=fopen(fn,"rb");
-                fread(cmos,64,1,f);
+                sprintf(fn, "%s%s", exedir, m.cmos);
+                rpclog("CMOS Opening %s\n", fn);
+                f=fopen(fn, "rb");
+                if (!f)
+                {
+                        memset(cmos, 0, 64);
+                        return;
+                }
+                fread(cmos, 64, 1, f);
                 fclose(f);
         }
 }
 
-void savecmos(MODEL m)
+void cmos_save(MODEL m)
 {
         FILE *f;
         char fn[512];
         if (!m.cmos[0]) return;
-        if (m.compact) savecompactcmos(m);
+        if (m.compact) compactcmos_save(m);
         else
         {
-                sprintf(fn,"%s%s",exedir,m.cmos);
-                rpclog("Opening %s\n",fn);
-                f=fopen(fn,"wb");
-                fwrite(cmos,64,1,f);
+                sprintf(fn, "%s%s", exedir, m.cmos);
+                rpclog("CMOS Opening %s\n", fn);
+                f=fopen(fn, "wb");
+                fwrite(cmos, 64, 1, f);
                 fclose(f);
         }
 }

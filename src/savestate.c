@@ -1,82 +1,98 @@
-/*B-em v2.1 by Tom Walker
+/*B-em v2.2 by Tom Walker
   Savestate handling*/
 #include <stdio.h>
 #include "b-em.h"
 
-int wantloadstate,wantsavestate;
-char ssname[260];
+#include "6502.h"
+#include "acia.h"
+#include "adc.h"
+#include "main.h"
+#include "mem.h"
+#include "model.h"
+#include "savestate.h"
+#include "serial.h"
+#include "sn76489.h"
+#include "via.h"
+#include "sysvia.h"
+#include "uservia.h"
+#include "video.h"
 
-void savestate()
+int savestate_wantsave, savestate_wantload;
+char savestate_name[260];
+
+void savestate_save()
 {
 //        rpclog("Save state\n");
-        wantsavestate=1;
+        savestate_wantsave = 1;
 }
 
-void loadstate()
+void savestate_load()
 {
-        wantloadstate=1;
+        savestate_wantload = 1;
 }
 
-void dosavestate()
+void savestate_dosave()
 {
         FILE *f;
-        f=fopen(ssname,"wb");
+        f = fopen(savestate_name, "wb");
 //        rpclog("DoSave state\n");
-        putc('B',f); putc('E',f); putc('M',f); putc('S',f);
-        putc('N',f); putc('A',f); putc('P',f); putc('1',f);
+        putc('B', f); putc('E', f); putc('M', f); putc('S', f);
+        putc('N', f); putc('A', f); putc('P', f); putc('1', f);
 
-        putc(curmodel,f);
+        putc(curmodel, f);
 
-        save6502state(f);
-        savememstate(f);
-        savesysviastate(f);
-        saveuserviastate(f);
-        savevideoulastate(f);
-        savecrtcstate(f);
-        savesoundstate(f);
-        saveadcstate(f);
-        saveaciastate(f);
-        saveserialulastate(f);
+        m6502_savestate(f);
+        mem_savestate(f);
+        sysvia_savestate(f);
+        uservia_savestate(f);
+        videoula_savestate(f);
+        crtc_savestate(f);
+        video_savestate(f);
+        sn_savestate(f);
+        adc_savestate(f);
+        acia_savestate(f);
+        serial_savestate(f);
 
         fclose(f);
 
-        wantsavestate=0;
+        savestate_wantsave = 0;
 }
 
-void doloadstate()
+void savestate_doload()
 {
         int c;
         char id[9];
-        FILE *f=fopen(ssname,"rb");
-        for (c=0;c<8;c++) id[c]=getc(f);
-        id[8]=0;
-        if (strcmp(id,"BEMSNAP1"))
+        FILE *f = fopen(savestate_name, "rb");
+        for (c = 0; c < 8; c++) id[c] = getc(f);
+        id[8] = 0;
+        if (strcmp(id, "BEMSNAP1"))
         {
                 fclose(f);
-                bem_error("Not a B-em v2.1 save state.");
+                bem_error("Not a B-em v2.x save state.");
                 return;
         }
 
-        curmodel=getc(f);
-        selecttube=curtube=-1;
+        curmodel = getc(f);
+        selecttube = curtube = -1;
         rpclog("Restart BBC\n");
-        restartbbc();
+        main_restart();
         rpclog("Done!\n");
 
-        load6502state(f);
-        loadmemstate(f);
-        loadsysviastate(f);
-        loaduserviastate(f);
-        loadvideoulastate(f);
-        loadcrtcstate(f);
-        loadsoundstate(f);
-        loadadcstate(f);
-        loadaciastate(f);
-        loadserialulastate(f);
+        m6502_loadstate(f);
+        mem_loadstate(f);
+        sysvia_loadstate(f);
+        uservia_loadstate(f);
+        videoula_loadstate(f);
+        crtc_loadstate(f);
+        video_loadstate(f);
+        sn_loadstate(f);
+        adc_loadstate(f);
+        acia_loadstate(f);
+        serial_loadstate(f);
 
         rpclog("Loadstate done!\n");
 
         fclose(f);
 
-        wantloadstate=0;
+        savestate_wantload = 0;
 }

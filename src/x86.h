@@ -1,18 +1,6 @@
-uint32_t old8,old82,old83;
-uint16_t oldcs;
 uint32_t oldpc;
 int oldcpl;
 
-int ssegs;
-int firstrepcycle;
-
-uint32_t easeg,eaaddr;
-int rm,reg,mod,rmdat;
-
-int skipnextprint;
-int inhlt;
-
-uint16_t lastcs,lastpc;
 int lldt;
 
 #define setznp168 setznp16
@@ -21,8 +9,6 @@ int lldt;
 
 #define setr8(r,v) if (r&4) regs[r&3].b.h=v; \
                    else     regs[r&3].b.l=v;
-
-uint8_t znptable8[256];
 
 int use32;
 int stack32;
@@ -77,7 +63,7 @@ typedef union
 } x86reg;
 
 static x86reg regs[8];
-static uint16_t flags,eflags;
+static uint16_t flags;
 static uint32_t oldds,oldss,x86pc;
 
 typedef struct

@@ -2,7 +2,9 @@
 /*Uncomment the above to enable (buggy) 32016 emulation. Currently it just aborts
   constantly, but when it didn't I couldn't get any programs to run, so you're
   just stuck at the CLI prompt. Anyone want to help?
-  You'll need the file Pandora.rom in roms/tube*/
+  You'll need the file Pandora.rom in roms/tube
+  So far no one wants to help :(
+  */
 
 #include "sidtypes.h"
 
@@ -31,13 +33,12 @@
 #define IDM_VIDEO_FBORDERS   40032
 #define IDM_VIDEO_FULLSCR    40035
 #define IDM_VIDEO_RESIZE     40036
-#define IDM_VIDEO_DDRAW      40037
-#define IDM_VIDEO_OPENGL     40038
 #define IDM_SOUND_INTERNAL   40040
 #define IDM_SOUND_BEEBSID    40041
-#define IDM_SOUND_DDNOISE    40042
-#define IDM_SOUND_TAPE       40043
-#define IDM_SOUND_FILTER     40044
+#define IDM_SOUND_DAC        40042
+#define IDM_SOUND_DDNOISE    40043
+#define IDM_SOUND_TAPE       40044
+#define IDM_SOUND_FILTER     40099
 #define IDM_WAVE_SQUARE      40045
 #define IDM_WAVE_SAW         40046
 #define IDM_WAVE_SINE        40047
@@ -47,6 +48,8 @@
 #define IDM_VIDEO_LINEDBL    40051
 #define IDM_VIDEO_SCANLINES  40052
 #define IDM_VIDEO_INTERLACED 40053
+#define IDM_VIDEO_PAL        40054
+#define IDM_VIDEO_PALI       40055
 #define IDM_KEY_REDEFINE     40060
 #define IDM_KEY_AS           40061
 #define IDM_DDV_33           40070
@@ -55,6 +58,7 @@
 #define IDM_DDT_525          40075
 #define IDM_DDT_35           40076
 #define IDM_IDE_ENABLE       40080
+#define IDM_MOUSE_AMX        40090
 #define IDM_DEBUGGER         40100
 #define IDM_BREAK            40102
 #define IDM_SCRSHOT          40101

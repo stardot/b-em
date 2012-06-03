@@ -1,4 +1,4 @@
-/*B-em v2.1 by Tom Walker
+/*B-em v2.2 by Tom Walker
   resid-fp interfacing code*/
 
 #include <stdio.h>
@@ -6,14 +6,15 @@
 #include <stdint.h>
 #include "resid-fp/sid.h"
 #include "sidtypes.h"
+#include "sid_b-em.h"
 
 int sidrunning=0;
-extern "C" void initresid();
-extern "C" void resetsid();
-extern "C" void setsidtype(int resamp, int model);
-extern "C" uint8_t readsid(uint16_t addr);
-extern "C" void writesid(uint16_t addr, uint8_t val);
-extern "C" void fillbuf(int16_t *buf, int len);
+extern "C" void sid_init();
+extern "C" void sid_reset();
+extern "C" void sid_settype(int resamp, int model);
+extern "C" uint8_t sid_read(uint16_t addr);
+extern "C" void sid_write(uint16_t addr, uint8_t val);
+extern "C" void sid_fillbuf(int16_t *buf, int len);
 
 struct sound_s
 {
@@ -25,15 +26,11 @@ typedef struct sound_s sound_t;
 
 sound_t *psid;
 
-void initresid()
+void sid_init()
 {
         int c;
         sampling_method method=SAMPLE_INTERPOLATE;
         float cycles_per_sec=1000000;
-        float speed;
-        float passband;
-
-        passband = speed * 90.0 / 200.f;
 
         psid = new sound_t;
         psid->sid = new SIDFP;
@@ -59,7 +56,7 @@ void initresid()
                                                 }
 }
 
-void resetsid()
+void sid_reset()
 {
         int c;
         psid->sid->reset();
@@ -71,7 +68,7 @@ void resetsid()
 }
 
 
-void setsidtype(int resamp, int model)
+void sid_settype(int resamp, int model)
 {
         sampling_method method=(resamp)?SAMPLE_RESAMPLE_INTERPOLATE:SAMPLE_INTERPOLATE;
         if (!psid->sid->set_sampling_parameters((float)1000000, method,(float)31250, 0.9*31250.0/2.0))
@@ -134,26 +131,26 @@ void setsidtype(int resamp, int model)
         }
 }
 
-uint8_t readsid(uint16_t addr)
+uint8_t sid_read(uint16_t addr)
 {
         return psid->sid->read(addr&0x1F);
 //        return 0xFF;
 }
 
-void writesid(uint16_t addr, uint8_t val)
+void sid_write(uint16_t addr, uint8_t val)
 {
         sidrunning=1;
         psid->sid->write(addr&0x1F,val);
 }
 
-void fillbuf2(int& count, int16_t *buf, int len)
+static void fillbuf2(int& count, int16_t *buf, int len)
 {
         int c;
         if (sidrunning) c=psid->sid->clock(count, buf, len, 1);
         else            memset(buf,0,len*2);
 //        printf("Result %i len %i\n",c,len);
 }
-void fillbuf(int16_t *buf, int len)
+void sid_fillbuf(int16_t *buf, int len)
 {
         int x=64;
 

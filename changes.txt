@@ -1,9 +1,30 @@
+Version 2.2 (03/06/2012)
+- MOS 3.50 emulation
+- Fixed CRTC bug when programmed with stupid values (MOS 3.50 startup)
+- ADFS disc corruption bug fixed (Carlo Concari)
+- Fixed ACIA bug - Pro Boxing Simulator tape version now works
+- Fixed bug which created endless blank hard disc images
+- Printer port DAC emulation
+- AMX mouse emulation
+- Master 512 mouse now works properly
+- Master Compact joystick emulation
+- IDE emulation available in non-Master models
+- UI fixes (some from Carlo Concari)
+- Improvements to VIA emulation
+- PAL video filter
+- Bugfixes in ARM and 65816 coprocessors
+- Debugger fixes
+- Tidying up of code
+- Windows version can now build on MSVC as well as GCC
+
+
 Version 2.1a (14/02/2011)
 - Keyboard bug fixed, Dr Who : The First Adventure now works
 - Video ULA bug, Atic Atac now has correct colours
 - Cursor inversion now works properly
 - Linux screenshots now work
 - Save states in Linux
+
 
 Version 2.1 (25/10/2010)
 - IDE hard disc emulation

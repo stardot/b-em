@@ -1,4 +1,4 @@
-/*B-em v2.1 by Tom Walker
+/*B-em v2.2 by Tom Walker
   Main loop + start/finish code*/
 
 #include <allegro.h>
@@ -8,149 +8,137 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include "b-em.h"
+
+#include "6502.h"
+#include "acia.h"
+#include "adc.h"
+#include "adf.h"
+#include "model.h"
+#include "cmos.h"
+#include "config.h"
+#include "csw.h"
+#include "ddnoise.h"
+#include "debugger.h"
+#include "disc.h"
+#include "fdi.h"
+#include "i8271.h"
+#include "ide.h"
+#include "keyboard.h"
+#include "main.h"
+#include "mem.h"
+#include "mouse.h"
+#ifdef WIN32
+#include "pal.h"
+#endif
+#include "savestate.h"
 #include "serial.h"
+#include "sid_b-em.h"
+#include "sn76489.h"
+#include "sound.h"
+#include "soundopenal.h"
+#include "ssd.h"
+#include "tape.h"
+#include "tapenoise.h"
+#include "tube.h"
+#include "via.h"
+#include "sysvia.h"
+#include "uef.h"
+#include "uservia.h"
+#include "video.h"
+#include "video_render.h"
+#include "wd1770.h"
+
+#include "tube.h"
+#include "32016.h"
+#include "6502tube.h"
+#include "65816.h"
+#include "arm.h"
+#include "x86_tube.h"
+#include "z80.h"
 
 #undef printf
 
-int oldmodel;
-int I8271,WD1770,BPLUS,x65c02,MASTER,MODELA,OS01,compactcmos;
-int curmodel,curtube,oldmodel;
-int samples;
-int comedyblit;
-int linedbl;
-int fasttape=0;
-int selecttube=-1;
-int cursid=0;
-int sidmethod=0;
-int sndinternal=1,sndbeebsid=1,sndddnoise=1;
 int autoboot=0;
-
 int joybutton[2];
 
-MODEL models[]=
-{
-        {"BBC A w/OS 0.1",       1,0,0,0,0,0,1,1,0,"",     "a01",  "",         romsetup_os01,         -1},
-        {"BBC B w/OS 0.1",       1,0,0,0,0,0,0,1,0,"",     "a01",  "",         romsetup_os01,         -1},
-        {"BBC A",                1,0,0,0,0,0,1,0,0,"os",   "a",    "",         NULL,                  -1},
-        {"BBC B w/8271 FDC",     1,0,0,0,0,0,0,0,0,"os",   "b",    "",         NULL,                  -1},
-        {"BBC B w/8271+SWRAM",   1,0,0,0,0,1,0,0,0,"os",   "b",    "",         NULL,                  -1},
-        {"BBC B w/1770 FDC",     0,1,0,0,0,1,0,0,0,"os",   "b1770","",         NULL,                  -1},
-        {"BBC B US",             1,0,0,0,0,0,0,0,0,"usmos","us",   "",         NULL,                  -1},
-        {"BBC B German",         1,0,0,0,0,0,0,0,0,"deos", "us",   "",         NULL,                  -1},
-        {"BBC B+ 64K",           0,1,0,1,0,0,0,0,0,"bpos", "bp",   "",         NULL,                  -1},
-        {"BBC B+ 128K",          0,1,0,1,0,0,0,0,0,"bpos", "bp",   "",         romsetup_bplus128,     -1},
-        {"BBC Master 128",       0,1,1,0,1,0,0,0,0,"","master",    "cmos.bin", romsetup_master128,    -1},
-        {"BBC Master 512",       0,1,1,0,1,0,0,0,0,"","master",    "cmos.bin", romsetup_master128,    3},
-        {"BBC Master Turbo",     0,1,1,0,1,0,0,0,0,"","master",    "cmos.bin", romsetup_master128,    0},
-        {"BBC Master Compact",   0,1,1,0,1,0,0,0,1,"","compact",   "cmosc.bin",romsetup_mastercompact,-1},
-        {"ARM Evaluation System",0,1,1,0,1,0,0,0,0,"","master",    "cmosa.bin",romsetup_master128,    1},
-        {0,0,0,0,0,0}
-};
 
-int _modelcount=0;
-char *getmodel()
-{
-        return models[_modelcount++].name;
-}
-
-typedef struct
-{
-        char name[32];
-        void (*init)();
-        void (*reset)();
-} TUBE;
-
-TUBE tubes[]=
-{
-        {"6502",tubeinit6502,tubereset6502},
-        {"ARM",tubeinitarm,resetarm},
-        {"Z80",tubeinitz80,resetz80},
-        {"80186",tubeinitx86,resetx86},
-        {"65816",tubeinit65816,reset65816},
-        {"32016",tubeinit32016,reset32016},
-        {0,0,0}
-};
-
-int frames;
 
 FILE *arclog;
 void rpclog(const char *format, ...)
 {
-   char buf[256];
+        char buf[256];
+                va_list ap;
  return;
         if (!arclog) arclog=fopen("b-emlog.txt","wt");
-   va_list ap;
-   va_start(ap, format);
-   vsprintf(buf, format, ap);
-   va_end(ap);
-   fputs(buf,arclog);
-   fflush(arclog);
+
+        va_start(ap, format);
+        vsprintf(buf, format, ap);
+        va_end(ap);
+        fputs(buf, arclog);
+        fflush(arclog);
 }
 
 int printsec;
 void secint()
 {
-        printsec=1;
+        printsec = 1;
 }
 
-int fcount=0;
+int fcount = 0;
 void int50()
 {
         fcount++;
 }
 
 char exedir[512];
-int debug=0,debugon=0;
-int ddnoiseframes=0;
+int debug = 0, debugon = 0;
+int ddnoiseframes = 0;
 
-void initbbc(int argc, char *argv[])
+void main_reset()
 {
-        char t[512],t2[512];
+        m6502_reset();
+        crtc_reset();
+        sysvia_reset();
+        uservia_reset();
+        serial_reset();
+        acia_reset();
+        wd1770_reset();
+        i8271_reset();
+        sid_reset();
+        sn_init();
+        if (curtube != -1) tubes[curtube].reset();
+        else               tube_exec = NULL;
+        tube_reset();
+
+        memset(ram, 0, 64 * 1024);
+}
+
+
+void main_init(int argc, char *argv[])
+{
+        char t[512];
         int c;
-        int tapenext=0,discnext=0;
-        char *p;
+        int tapenext = 0, discnext = 0;
 
         startblit();
 
-        printf("B-em v2.1a\n");
-//rpclog("Start\n");
-//      comedyblit=0;
-        fskipmax=1;
+        printf("B-em v2.2\n");
 
-        initalmain(argc,argv);
-//        allegro_init();
-        //install_allegro(SYSTEM_AUTODETECT, &errno, atexit);
+        vid_fskipmax = 1;
+
+        al_init_main(argc, argv);
 
 
-        append_filename(t,exedir,"roms\\tube\\ReCo6502ROM_816",511);
-        if (!file_exists(t,FA_ALL,NULL) && selecttube==4) selecttube=-1;
+        append_filename(t, exedir, "roms\\tube\\ReCo6502ROM_816", 511);
+        if (!file_exists(t,FA_ALL,NULL) && selecttube == 4) selecttube = -1;
 
-        curtube=selecttube;
-        if (models[curmodel].tube!=-1)     curtube=models[curmodel].tube;
+        curtube = selecttube;
+        if (models[curmodel].tube != -1) curtube = models[curmodel].tube;
 
-        if (curtube!=-1) tubes[curtube].init();
-        resettube();
-        if (curtube!=-1) tubes[curtube].reset();
-        else             tubeexec=NULL;
 
-//        printf("1\n");
-        disc_reset();
-        ssd_reset();
-        adf_reset();
-        fdi_reset();
-//        printf("2\n");
-        resetide();
-//        printf("3\n");
-//        loaddisc(1,"BBCMaster512-Disc2-GemApplications.adf");
-//        loaddisc(0,"dosplus.adl");
-//        loaddisc(0,"buzz.ssd");
-//        loaddisc(0,"d:/emulators/beebem381/swift/repton/repton.ssd");
-//        loaddisc(1,"D:/RETRO SOFTWARE/Repton - The Lost Realms/ReptonTLR-Full-Final.ssd");
-//        loaddisc(0,"d:/emulators/beebem381/swift/menu/menu/menux.dsd");
-//        loaddisc(0,"exile.fdi");
-//        loaddisc(1,"stuff.ssd");
-        for (c=1;c<argc;c++)
+        for (c = 1; c < argc; c++)
         {
 //                rpclog("%i : %s\n",c,argv[c]);
 /*                if (!strcasecmp(argv[c],"-1770"))
@@ -160,7 +148,7 @@ void initbbc(int argc, char *argv[])
                 }
                 else*/
 //#ifndef WIN32
-                if (!strcasecmp(argv[c],"--help"))
+                if (!strcasecmp(argv[c], "--help"))
                 {
                         printf("B-em v2.1 command line options :\n\n");
                         printf("-mx             - start as model x (see readme.txt for models)\n");
@@ -173,324 +161,243 @@ void initbbc(int argc, char *argv[])
                         printf("-s              - scanlines display mode\n");
                         printf("-i              - interlace display mode\n");
                         printf("-debug          - start debugger\n");
-                        printf("-opengl         - use OpenGL for video rendering\n");
                         printf("-allegro        - use Allegro for video rendering\n");
                         exit(-1);
                 }
                 else
 //#endif
-                if (!strcasecmp(argv[c],"-tape"))
+                if (!strcasecmp(argv[c], "-tape"))
                 {
-                        tapenext=2;
+                        tapenext = 2;
                 }
-                else if (!strcasecmp(argv[c],"-disc") || !strcasecmp(argv[c],"-disk"))
+                else if (!strcasecmp(argv[c], "-disc") || !strcasecmp(argv[c], "-disk"))
                 {
-                        discnext=1;
+                        discnext = 1;
                 }
-                else if (!strcasecmp(argv[c],"-disc1"))
+                else if (!strcasecmp(argv[c], "-disc1"))
                 {
-                        discnext=2;
+                        discnext = 2;
                 }
-                else if (argv[c][0]=='-' && (argv[c][1]=='m' || argv[c][1]=='M'))
+                else if (argv[c][0] == '-' && (argv[c][1] == 'm' || argv[c][1] == 'M'))
                 {
-                        sscanf(&argv[c][2],"%i",&curmodel);
+                        sscanf(&argv[c][2], "%i", &curmodel);
                 }
-                else if (argv[c][0]=='-' && (argv[c][1]=='t' || argv[c][1]=='T'))
+                else if (argv[c][0] == '-' && (argv[c][1] == 't' || argv[c][1] == 'T'))
                 {
-                        sscanf(&argv[c][2],"%i",&curtube);
+                        sscanf(&argv[c][2], "%i", &curtube);
                 }
-                else if (!strcasecmp(argv[c],"-fasttape"))
+                else if (!strcasecmp(argv[c], "-fasttape"))
                 {
-                        fasttape=1;
+                        fasttape = 1;
                 }
-                else if (!strcasecmp(argv[c],"-autoboot"))
+                else if (!strcasecmp(argv[c], "-autoboot"))
                 {
-                        autoboot=150;
+                        autoboot = 150;
                 }
-                else if (argv[c][0]=='-' && (argv[c][1]=='f' || argv[c][1]=='F'))
+                else if (argv[c][0] == '-' && (argv[c][1] == 'f' || argv[c][1]=='F'))
                 {
-                        sscanf(&argv[c][2],"%i",&fskipmax);
-                        if (fskipmax<1) fskipmax=1;
-                        if (fskipmax>9) fskipmax=9;
+                        sscanf(&argv[c][2], "%i", &vid_fskipmax);
+                        if (vid_fskipmax < 1) vid_fskipmax = 1;
+                        if (vid_fskipmax > 9) vid_fskipmax = 9;
                 }
-                else if (argv[c][0]=='-' && (argv[c][1]=='s' || argv[c][1]=='S'))
+                else if (argv[c][0] == '-' && (argv[c][1] == 's' || argv[c][1] == 'S'))
                 {
-                        comedyblit=1;
+                        vid_scanlines = 1;
                 }
-                else if (!strcasecmp(argv[c],"-debug"))
+                else if (!strcasecmp(argv[c], "-debug"))
                 {
-                        debug=debugon=1;
+                        debug = debugon = 1;
                 }
-                else if (argv[c][0]=='-' && (argv[c][1]=='i' || argv[c][1]=='I'))
+                else if (argv[c][0] == '-' && (argv[c][1] == 'i' || argv[c][1] == 'I'))
                 {
-                        interlace=1;
+                        vid_interlace = 1;
                 }
-#ifndef WIN32
-                else if (!strcasecmp(argv[c],"-opengl")) opengl=1;
-                else if (!strcasecmp(argv[c],"-allegro")) opengl=0;
-#endif
                 else if (tapenext)
-                   strcpy(tapefn,argv[c]);
+                   strcpy(tape_fn, argv[c]);
                 else if (discnext)
                 {
-                        strcpy(discfns[discnext-1],argv[c]);
-                        discnext=0;
+                        strcpy(discfns[discnext-1], argv[c]);
+                        discnext = 0;
                 }
                 else
                 {
-                        strcpy(discfns[0],argv[c]);
-                        discnext=0;
-                        autoboot=150;
+                        strcpy(discfns[0], argv[c]);
+                        discnext = 0;
+                        autoboot = 150;
                 }
                 if (tapenext) tapenext--;
         }
-//        printf("4\n");
-        initvideo();
-        makemode7chars();
-//        printf("5\n");
+
+        video_init();
+        mode7_makechars();
+
 #ifndef WIN32
         install_keyboard();
 #endif
         install_timer();
-//        install_mouse();
-        initmem();
-        loaddiscsamps();
-        maketapenoise();
 
-//        openuef("Nightshade (Ultimate) (B) (Tape) [side-imprint-back].hq.uef");
-//        openuef("Cosmic Battlezones (US Gold-Ultimate) (B) (Tape) [side-lab].hq.uef");
-        printf("Starting emulation as %s\n",models[curmodel].name);
-        I8271=models[curmodel].I8271;
-        WD1770=models[curmodel].WD1770;
-        BPLUS=models[curmodel].bplus;
-        x65c02=models[curmodel].x65c02;
-        MASTER=models[curmodel].master;
-        MODELA=models[curmodel].modela;
-        OS01=models[curmodel].os01;
-        compactcmos=models[curmodel].compact;
-        getcwd(t,511);
-        append_filename(t2,exedir,"roms",511);
-        chdir(t2);
-        if (models[curmodel].romsetup) models[curmodel].romsetup();
-        loadroms(models[curmodel]);
-        if (ideenable) loadiderom();
-        if (curtube!=-1) tubes[curtube].init();
-        resettube();
-        chdir(t);
-        loadcmos(models[curmodel]);
-        if (models[curmodel].swram) fillswram();
-//        trapos();
-        reset6502();
-        resetsysvia();
-        resetuservia();
-        initserial();
-        resetacia();
-        reset1770();
-        reset8271();
-//      resetcrtc();
-        initsound();
-        inital();
-        initadc();
-//        initsid();
+        mem_init();
+        ddnoise_init();
+        tapenoise_init();
 
-        initresid();
-        setsidtype(sidmethod, cursid);
-//                tubeinit6502();
-//                tubeinitarm();
-//                tubeinitz80();
-//                tubeinitx86();
+        sound_init();
+        al_init();
+        sid_init();
+        sid_settype(sidmethod, cursid);
 
-        startdebug();
+        adc_init();
+#ifdef WIN32
+        pal_init();
+#endif
+        disc_init();
+        ssd_init();
+        adf_init();
+        fdi_init();
 
-        install_int_ex(secint,MSEC_TO_TIMER(1000));
-        install_int_ex(int50,MSEC_TO_TIMER(20));
+        ide_init();
+
+        debug_start();
+
+        model_init();
+
+        main_reset();
+
+
+        install_int_ex(secint, MSEC_TO_TIMER(1000));
+        install_int_ex(int50,  MSEC_TO_TIMER(20));
 
         set_display_switch_mode(SWITCH_BACKGROUND);
 #ifdef WIN32
                 timeBeginPeriod(1);
 #endif
-        oldmodel=curmodel;
+        oldmodel = curmodel;
 
-        if (curtube==3) install_mouse();
+        if (curtube == 3 || mouse_amx) install_mouse();
 
 //printf("Disc 0 : %s\n",discfns[0]);
 //printf("Disc 1 : %s\n",discfns[1]);
-//printf("Tape   : %s\n",tapefn);
-        loaddisc(0,discfns[0]);
-        loaddisc(1,discfns[1]);
-        loadtape(tapefn);
-        if (defaultwriteprot) writeprot[0]=writeprot[1]=1;
+//printf("Tape   : %s\n",tape_fn);
+        disc_load(0, discfns[0]);
+        disc_load(1, discfns[1]);
+        tape_load(tape_fn);
+        if (defaultwriteprot) writeprot[0] = writeprot[1] = 1;
 
         endblit();
 }
 
-void restartbbc()
+void main_restart()
 {
-        char t[512],t2[512];
         startblit();
-        if (curtube==3) remove_mouse();
-        loadcmos(models[oldmodel]);
-        oldmodel=curmodel;
-//        waitforready();
-        I8271=models[curmodel].I8271;
-        WD1770=models[curmodel].WD1770;
-        BPLUS=models[curmodel].bplus;
-        x65c02=models[curmodel].x65c02;
-        MASTER=models[curmodel].master;
-        MODELA=models[curmodel].modela;
-        OS01=models[curmodel].os01;
-        compactcmos=models[curmodel].compact;
-        curtube=selecttube;
-        if (models[curmodel].tube!=-1)     curtube=models[curmodel].tube;
-        resetmem();
-        getcwd(t,511);
-        append_filename(t2,exedir,"roms",511);
-        chdir(t2);
-        if (models[curmodel].romsetup) models[curmodel].romsetup();
-        loadroms(models[curmodel]);
-        if (ideenable) loadiderom();
-        if (curtube!=-1) tubes[curtube].init();
-        resettube();
-        chdir(t);
-        loadcmos(models[curmodel]);
-        if (models[curmodel].swram) fillswram();
+        if (curtube == 3 || mouse_amx) remove_mouse();
+        cmos_save(models[oldmodel]);
+        oldmodel = curmodel;
 
-        memset(ram,0,131072);
-        reset6502();
-        reset8271();
-        reset1770();
-        if (curtube!=-1) tubes[curtube].reset();
-        else             tubeexec=NULL;
-        resettube();
-        resetsysvia();
-        resetuservia();
-        resetsid();
+        model_init();
+
+        main_reset();
+
         resumeready();
-        if (curtube==3) install_mouse();
+        if (curtube == 3 || mouse_amx) install_mouse();
         endblit();
 }
 
-int resetting=0;
-int framesrun=0;
-
-void cleardrawit()
+void main_setmouse()
 {
-        fcount=0;
+        if (curtube != 3)
+        {
+                if (mouse_amx) install_mouse();
+                else           remove_mouse();
+        }
 }
 
-void runbbc()
+int resetting = 0;
+int framesrun = 0;
+
+void main_cleardrawit()
 {
-        int c,d;
-
-                if ((fcount>0 || key[KEY_PGUP] || (motor && fasttape)))
-                {
-                        if (autoboot) autoboot--;
-                        fcount--;
-                        framesrun++;
-                        if (key[KEY_PGUP] || (motor && fasttape)) fcount=0;
-                        if (x65c02) exec65c02();
-                        else        exec6502();
-                        ddnoiseframes++;
-                        if (ddnoiseframes>=5)
-                        {
-                                ddnoiseframes=0;
-                                mixddnoise();
-                        }
-                        frames++;
-                        checkkeys();
-                        poll_joystick();
-                        for (c=0;c<2;c++)
-                        {
-                                joybutton[c]=0;
-                                for (d=0;d<joy[c].num_buttons;d++)
-                                {
-                                        if (joy[c].button[d].b) joybutton[c]=1;
-                                }
-                        }
-                if (wantloadstate) doloadstate();
-                if (wantsavestate) dosavestate();
-                        if (key[KEY_F10] && debugon) debug=1;
-                        if (key[KEY_F12] && !resetting)
-                        {
-                                reset6502();
-                                reset8271();
-                                reset1770();
-                                resetsid();
-                                resetide();
-
-//                                tubereset6502();
-//                                resetarm();
-//                                resetz80();
-//                                resetx86();
-                                if (curtube!=-1) tubes[curtube].reset();
-                                resettube();
-
-//                                if (key[KEY_LCONTROL] || key[KEY_RCONTROL])
-//                                {
-//                                        resetsysvia();
-//                                        memset(ram,0,65536);
-//                                }
-                        }
-                        resetting=key[KEY_F12];
-//                        domouse();
-                }
-                else
-                {
-                        framesrun=0;
-                        rest(1);
-                }
-                if (framesrun>10) fcount=0;
-                if (printsec)
-                {
-                        rpclog("%i fps %i samples %04X %i\n",frames,samples,pc,fdctime);
-                        frames=printsec=samples=0;
-                }
+        fcount = 0;
 }
 
-void closebbc()
+void main_run()
+{
+        int c, d;
+        if ((fcount > 0 || key[KEY_PGUP] || (motor && fasttape)))
+        {
+                if (autoboot) autoboot--;
+                fcount--;
+                framesrun++;
+                if (key[KEY_PGUP] || (motor && fasttape)) fcount=0;
+                if (x65c02) m65c02_exec();
+                else        m6502_exec();
+                ddnoiseframes++;
+                if (ddnoiseframes >= 5)
+                {
+                        ddnoiseframes = 0;
+                        ddnoise_mix();
+                }
+                key_check();
+                poll_joystick();
+                for (c = 0; c < 2; c++)
+                {
+                        joybutton[c] = 0;
+                        for (d = 0; d < joy[c].num_buttons; d++)
+                        {
+                                if (joy[c].button[d].b) joybutton[c] = 1;
+                        }
+                }
+                if (savestate_wantload) savestate_doload();
+                if (savestate_wantsave) savestate_dosave();
+                if (key[KEY_F10] && debugon) debug = 1;
+                if (key[KEY_F12] && !resetting)
+                {
+                        m6502_reset();
+                        i8271_reset();
+                        wd1770_reset();
+                        sid_reset();
+
+                        if (curtube != -1) tubes[curtube].reset();
+                        tube_reset();
+                }
+                resetting = key[KEY_F12];
+        }
+        else
+        {
+                framesrun = 0;
+                rest(1);
+        }
+        if (framesrun > 10) fcount = 0;
+}
+
+void main_close()
 {
 #ifdef WIN32
-                timeEndPeriod(1);
+        timeEndPeriod(1);
 #endif
-//rpclog("Dump regs\n");
-//        dumpregs();
-//        rpclog("Dump ram\n");
-//        x86dumpregs();
-//        tubedumpregs();
-//dump32016regs();
-//        dumpram();
 
-        saveconfig();
-        savecmos(models[curmodel]);
+        config_save();
+        cmos_save(models[curmodel]);
 
-        closemem();
-        closeuef();
-        closecsw();
-        closetube();
-        closearm();
-        closex86();
-        close65816();
-        closedisc(0);
-        closedisc(1);
-        closeddnoise();
-        closetapenoise();
+        mem_close();
+        uef_close();
+        csw_close();
+        tube_6502_close();
+        arm_close();
+        x86_close();
+        z80_close();
+        w65816_close();
+        n32016_close();
+        disc_close(0);
+        disc_close(1);
+        ide_close();
+        ddnoise_close();
+        tapenoise_close();
 
-//        rpclog("closeal\n");
-//        printf("We're quitting now!\n"); fflush(stdout);
-        closeal();
-//        rpclog("closevideo\n");
-//        printf("OpenAL gone!\n"); fflush(stdout);
-        closevideo();
-//        rpclog("allegro_exit\n");
-//        printf("Video gone!\n"); fflush(stdout);
-//        allegro_exit();
-//        rpclog("Done!\n");
-//        printf("Allegro gone\n"); fflush(stdout);
-//dumpregs65816();
+        al_close();
+        video_close();
 }
 
 void changetimerspeed(int i)
 {
         remove_int(int50);
-        install_int_ex(int50,BPS_TO_TIMER(i));
+        install_int_ex(int50, BPS_TO_TIMER(i));
 }

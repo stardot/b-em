@@ -1,9 +1,11 @@
-/*B-em v2.0 by Tom Walker
+/*B-em v2.2 by Tom Walker
   Linux keyboard redefinition GUI*/
 
 #ifndef WIN32
 #include <allegro.h>
 #include "b-em.h"
+#include "keyboard.h"
+#include "model.h"
 
 int keytemp[128];
 
@@ -60,8 +62,8 @@ int d_getkey(int msg, DIALOG *d, int cd)
                 blit(screen,b,x,y,0,0,200,72);
                 rectfill(screen,x,y,x+199,y+71,makecol(0,0,0));
                 rect(screen,x,y,x+199,y+71,makecol(255,255,255));
-                if (d->dp3) textprintf_ex(screen,font,x+8,y+8,makecol(255,255,255),makecol(0,0,0),"Redefining %s",d->dp3);
-                else        textprintf_ex(screen,font,x+8,y+8,makecol(255,255,255),makecol(0,0,0),"Redefining %s",d->dp);
+                if (d->dp3) textprintf_ex(screen,font,x+8,y+8,makecol(255,255,255),makecol(0,0,0),"Redefining %s",(char *)d->dp3);
+                else        textprintf_ex(screen,font,x+8,y+8,makecol(255,255,255),makecol(0,0,0),"Redefining %s",(char *)d->dp);
                 textprintf_ex(screen,font,x+8,y+24,makecol(255,255,255),makecol(0,0,0),"Assigned to PC key(s) :");
 
                 s[0]=0;

@@ -1,9 +1,12 @@
-/*B-em v2.1 by Tom Walker
+/*B-em v2.2 by Tom Walker
   32016 parasite processor emulation (not working yet)*/
 #include <stdio.h>
+#include <allegro.h>
 #include "b-em.h"
+#include "tube.h"
+#include "32016.h"
 
-int nsoutput=0;
+static int nsoutput=0;
 #define r ns_r
 #define pc ns_pc
 #define sp ns_sp
@@ -19,15 +22,14 @@ int nsoutput=0;
 #define readmemw ns_readmemw
 #define writememw ns_writememw
 
-uint16_t readmemw(uint32_t addr);
-void writememw(uint32_t addr, uint16_t val);
+static uint16_t readmemw(uint32_t addr);
+static void writememw(uint32_t addr, uint16_t val);
 
-uint32_t r[8];
-uint32_t pc,sp[2],fp,sb,intbase;
-uint16_t psr,mod;
-int cycles=0;
-uint32_t startpc;
-int nscfg;
+static uint32_t r[8];
+static uint32_t pc,sp[2],fp,sb,intbase;
+static uint16_t psr,mod;
+static uint32_t startpc;
+static int nscfg;
 
 #define C_FLAG 0x01
 #define T_FLAG 0x02
@@ -44,41 +46,41 @@ int nscfg;
 
 #define SP ((psr&S_FLAG)>>9)
 
-void pushw(uint16_t val)
+static void pushw(uint16_t val)
 {
         sp[SP]-=2;
         writememw(sp[SP],val);
 }
-void pushd(uint32_t val)
+static void pushd(uint32_t val)
 {
         sp[SP]-=4;
   //      if (nsoutput) printf("Push %08X to %08X\n",val,sp[SP]);
         writememw(sp[SP],val);
         writememw(sp[SP]+2,val>>16);
 }
-uint16_t popw()
+static uint16_t popw()
 {
         uint16_t temp=readmemw(sp[SP]);
         sp[SP]+=2;
         return temp;
 }
-uint32_t popd()
+static uint32_t popd()
 {
         uint32_t temp=readmemw(sp[SP])|(readmemw(sp[SP]+2)<<16);
         sp[SP]+=4;
         return temp;
 }
 
-uint8_t *ns32016rom,*ns32016ram;
+static uint8_t *ns32016rom,*ns32016ram;
 
-void reset32016()
+void n32016_reset()
 {
         pc=0;
         psr=0;
         memcpy(ns32016ram,ns32016rom,16);
 }
 
-void init32016()
+void n32016_init()
 {
         FILE *f;
         char fn[512];
@@ -91,7 +93,13 @@ void init32016()
         memset(ns32016ram,0,0x100000);
 }
 
-void dump32016regs()
+void n32016_close()
+{
+        if (ns32016rom) free(ns32016rom);
+        if (ns32016ram) free(ns32016ram);
+}
+
+static void n32016_dumpregs()
 {
         FILE *f=fopen("32016.dmp","wb");
         fwrite(ns32016ram,1024*1024,1,f);
@@ -102,7 +110,7 @@ void dump32016regs()
         printf("FP=%08X INTBASE=%08X PSR=%04X MOD=%04X\n",fp,intbase,psr,mod);
 }
 
-uint8_t readmemb(uint32_t addr)
+static uint8_t readmemb(uint32_t addr)
 {
         uint8_t temp;
         addr&=0xFFFFFF;
@@ -111,16 +119,16 @@ uint8_t readmemb(uint32_t addr)
         if (addr==0xF90000) return 0; /*What's here?*/
         if (addr>=0xFFFFF0)
         {
-                temp=readtube(addr>>1);
+                temp=tube_parasite_read(addr>>1);
 //                if (addr&2) printf("Read TUBE %08X %02X\n",addr,temp);
                 return temp;
         }
         printf("Bad readmemb %08X\n",addr);
-        dump32016regs();
+        n32016_dumpregs();
         exit(-1);
 }
 
-uint16_t readmemw(uint32_t addr)
+static uint16_t readmemw(uint32_t addr)
 {
         addr&=0xFFFFFF;
         if (addr<0x100000)
@@ -134,23 +142,23 @@ uint16_t readmemw(uint32_t addr)
                 return ns32016rom[addr&0x7FFF]|(ns32016rom[(addr+1)&0x7FFF]<<8);
         }
         printf("Bad readmemw %08X\n",addr);
-        dump32016regs();
+        n32016_dumpregs();
         exit(-1);
 }
 
-void writememb(uint32_t addr, uint8_t val)
+static void writememb(uint32_t addr, uint8_t val)
 {
         addr&=0xFFFFFF;
 //        if (addr==0xFFDC8) printf("Writeb %08X %02X %08X\n",addr,val,pc);
         if (addr<0x100000) { ns32016ram[addr]=val; return; }
         if (addr==0xF90000) return;
-        if (addr>=0xFFFFF0) { writetube(addr>>1,val); /*printf("Write tube %08X %02X %c\n",addr,val,(val<33)?'.':val);*/ /*if (nsoutput) exit(-1);*/ /*if (val=='K') { dump32016regs(); exit(-1); } */return; }
+        if (addr>=0xFFFFF0) { tube_parasite_write(addr>>1,val); /*printf("Write tube %08X %02X %c\n",addr,val,(val<33)?'.':val);*/ /*if (nsoutput) exit(-1);*/ /*if (val=='K') { n32016_dumpregs(); exit(-1); } */return; }
         printf("Bad writememb %08X %02X\n",addr,val);
-        dump32016regs();
+        n32016_dumpregs();
         exit(-1);
 }
 
-void writememw(uint32_t addr, uint16_t val)
+static void writememw(uint32_t addr, uint16_t val)
 {
         addr&=0xFFFFFF;
 //        if ((addr&~1)==0xFFDC8) printf("Writew %08X %04X %08X\n",addr,val,pc);
@@ -164,14 +172,14 @@ void writememw(uint32_t addr, uint16_t val)
         }
         if (addr<0x400000) return;
         printf("Bad writememw %08X %04X\n",addr,val);
-        dump32016regs();
+        n32016_dumpregs();
         exit(-1);
 }
 
-uint32_t genaddr[2];
-int gentype[2];
+static uint32_t genaddr[2];
+static int gentype[2];
 
-uint32_t getdisp()
+static uint32_t getdisp()
 {
         uint32_t addr=readmemb(pc); pc++;
         if (!(addr&0x80))
@@ -197,11 +205,11 @@ uint32_t getdisp()
         }
 }
 
-int isize=0;
-int ilook[4]={1,2,0,4};
+static int isize=0;
+static int ilook[4]={1,2,0,4};
 
-int genindex[2];
-void getgen1(int gen, int c)
+static int genindex[2];
+static void getgen1(int gen, int c)
 {
         if ((gen&0x1C)==0x1C)
         {
@@ -210,10 +218,10 @@ void getgen1(int gen, int c)
         }
 }
 
-int sdiff[2]={0,0};
-uint32_t nsimm[2];
+static int sdiff[2]={0,0};
+static uint32_t nsimm[2];
 
-void getgen(int gen, int c)
+static void getgen(int gen, int c)
 {
         uint32_t temp,temp2;
 //        if (nsoutput&2) printf("Gen %02X %i\n",gen&0x1F,c);
@@ -342,7 +350,7 @@ void getgen(int gen, int c)
 
                 default:
                 printf("Bad NS32016 gen mode %02X\n",gen&0x1F);
-                dump32016regs();
+                n32016_dumpregs();
                 exit(-1);
         }
 }
@@ -400,12 +408,12 @@ void getgen(int gen, int c)
                                 }
 
 
-uint16_t oldpsr;
+static uint16_t oldpsr;
 
-void exec32016()
+void n32016_exec()
 {
         uint32_t opcode;
-        uint32_t temp,temp2,temp3,temp4;
+        uint32_t temp = 0,temp2,temp3,temp4;
         uint64_t temp64;
         int c;
         while (tubecycles>0)
@@ -430,7 +438,7 @@ void exec32016()
                                 if (temp2&3)
                                 {
                                         printf("Bad NS32016 MOVS %02X %04X %01X\n",(opcode>>15)&0xF,opcode,(opcode>>15)&0xF);
-                                        dump32016regs();
+                                        n32016_dumpregs();
                                         exit(-1);
                                 }
 //                                printf("MOVSB %08X %08X %08X  %08X\n",r[1],r[2],r[0],pc);
@@ -449,7 +457,7 @@ void exec32016()
                                 if (temp2)
                                 {
                                         printf("Bad NS32016 MOVS %02X %04X %01X\n",(opcode>>15)&0xF,opcode,(opcode>>15)&0xF);
-                                        dump32016regs();
+                                        n32016_dumpregs();
                                         exit(-1);
                                 }
                                 while (r[0])
@@ -466,7 +474,7 @@ void exec32016()
 
                                 default:
                                 printf("Bad NS32016 0E opcode %02X %04X %01X\n",(opcode>>8)&0x3F,opcode,(opcode>>15)&0xF);
-                                dump32016regs();
+                                n32016_dumpregs();
                                 exit(-1);
                         }
                         break;
@@ -837,7 +845,7 @@ temp=0;
 
                                 default:
                                 printf("Bad NS32016 4E opcode %04X %01X\n",opcode,opcode&0x3F);
-                                dump32016regs();
+                                n32016_dumpregs();
                                 exit(-1);
                         }
                         break;
@@ -870,7 +878,7 @@ temp=0;
 
                                 default:
                                 printf("Bad NS32016 7C opcode %04X %01X\n",opcode,(opcode>>7)&0xF);
-                                dump32016regs();
+                                n32016_dumpregs();
                                 exit(-1);
                         }
                         break;
@@ -902,7 +910,7 @@ temp=0;
 
                                 default:
                                 printf("Bad NS32016 7D opcode %04X %01X\n",opcode,(opcode>>7)&0xF);
-                                dump32016regs();
+                                n32016_dumpregs();
                                 exit(-1);
                         }
                         break;
@@ -939,7 +947,7 @@ temp=0;
 
                                 default:
                                 printf("Bad NS32016 7F opcode %04X %01X\n",opcode,(opcode>>7)&0xF);
-                                dump32016regs();
+                                n32016_dumpregs();
                                 exit(-1);
                         }
                         break;
@@ -957,7 +965,7 @@ temp=0;
 
                                 default:
                                 printf("Bad SPR reg %01X\n",(opcode>>7)&0xF);
-                                dump32016regs();
+                                n32016_dumpregs();
                                 exit(-1);
                         }
                         break;
@@ -973,7 +981,7 @@ temp=0;
 
                                 default:
                                 printf("Bad LPRB reg %01X\n",(opcode>>7)&0xF);
-                                dump32016regs();
+                                n32016_dumpregs();
                                 exit(-1);
                         }
                         break;
@@ -988,7 +996,7 @@ temp=0;
 
                                 default:
                                 printf("Bad LPRW reg %01X\n",(opcode>>7)&0xF);
-                                dump32016regs();
+                                n32016_dumpregs();
                                 exit(-1);
                         }
                         break;
@@ -1005,7 +1013,7 @@ temp=0;
 
                                 default:
                                 printf("Bad LPRD reg %01X\n",(opcode>>7)&0xF);
-                                dump32016regs();
+                                n32016_dumpregs();
                                 exit(-1);
                         }
                         break;
@@ -1057,7 +1065,7 @@ temp=0;
                                 if (!temp)
                                 {
                                         printf("Divide by zero - DEID CE\n");
-                                        dump32016regs();
+                                        n32016_dumpregs();
                                         exit(-1);
                                 }
                                 temp3=temp64%temp;
@@ -1072,7 +1080,7 @@ temp=0;
                                 if (!temp)
                                 {
                                         printf("Divide by zero - QUOD CE\n");
-                                        dump32016regs();
+                                        n32016_dumpregs();
                                         exit(-1);
                                 }
                                 temp2/=temp;
@@ -1084,7 +1092,7 @@ temp=0;
                                 if (!temp)
                                 {
                                         printf("Divide by zero - QUOD CE\n");
-                                        dump32016regs();
+                                        n32016_dumpregs();
                                         exit(-1);
                                 }
                                 temp2%=temp;
@@ -1093,7 +1101,7 @@ temp=0;
 
                                 default:
                                 printf("Bad NS32016 CE opcode %04X %01X\n",opcode,opcode&0x3F);
-                                dump32016regs();
+                                n32016_dumpregs();
                                 exit(-1);
                         }
                         break;
@@ -1138,7 +1146,7 @@ temp=0;
 
                                 default:
                                 printf("Bad NS32016 Type 8 opcode %04X %01X %i\n",opcode,temp,(opcode>>11)&7);
-                                dump32016regs();
+                                n32016_dumpregs();
                                 exit(-1);
                         }
                         break;
@@ -1248,7 +1256,7 @@ temp=0;
 //                        printf("Push %04X\n",mod); pushw(mod);
 //                        printf("Push %08X\n",startpc); pushd(startpc);
 //                        printf("SVC!\n");
-//                        dump32016regs();
+//                        n32016_dumpregs();
 //                        exit(-1);
                         temp=readmemw(intbase+(5*4))|(readmemw(intbase+(5*4)+2)<<16);
                         mod=temp&0xFFFF;
@@ -1316,11 +1324,11 @@ temp=0;
 
                         default:
                         printf("Bad NS32016 opcode %02X\n",opcode);
-                        dump32016regs();
+                        n32016_dumpregs();
                         exit(-1);
                 }
                 tubecycles-=8;
-                if (tubeirq&2)
+                if (tube_irq&2)
                 {
                         temp=psr;
                         psr&=~0xF00;
@@ -1339,7 +1347,7 @@ temp=0;
                         pc=temp2+temp3;
 //                        printf("PC = %08X\n",pc);
                 }
-                if ((tubeirq&1) && (psr&0x800))
+                if ((tube_irq&1) && (psr&0x800))
                 {
                         temp=psr;
                         psr&=~0xF00;

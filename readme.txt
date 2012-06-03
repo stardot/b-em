@@ -6,7 +6,7 @@
              ██       ▄██          ██         ██          ██
              ██████████▀           █████████  ██          ██
 
-                                 Version 2.1
+                                 Version 2.2
                          A freeware BBC Micro emulator
 
 Introduction
@@ -37,17 +37,29 @@ Features
   palette and mode splits, etc.
 - Sideways RAM emulation
 - Joystick emulation
+- AMX Mouse emulation
 
 
 Differences from last version
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- Keyboard bug fixed, Dr Who : The First Adventure now works
-- Video ULA bug, Atic Atac now has correct colours
-- Cursor inversion now works properly
-- Linux screenshots now work
-- Save states in Linux
-
+- MOS 3.50 emulation
+- Fixed CRTC bug when programmed with stupid values (MOS 3.50 startup)
+- ADFS disc corruption bug fixed (Carlo Concari)
+- Fixed ACIA bug - Pro Boxing Simulator tape version now works
+- Fixed bug which created endless blank hard disc images
+- Printer port DAC emulation
+- AMX mouse emulation
+- Master 512 mouse now works properly
+- Master Compact joystick emulation
+- IDE emulation available in non-Master models
+- UI fixes (some from Carlo Concari)
+- Improvements to VIA emulation
+- PAL video filter
+- Bugfixes in ARM and 65816 coprocessors
+- Debugger fixes
+- Tidying up of code
+- Windows version can now build on MSVC as well as GCC
 
 
 Default keyboard mapping :
@@ -60,7 +72,7 @@ BBC key     - PC key
   +;            :;
   -=            -_
   ^~            +=
-  f0            f1 (function keys are based on keycaps rather than positioning)
+  f0            f0 (function keys are based on keycaps rather than positioning)
   3#             3
   6&             6
   7'             7
@@ -69,7 +81,7 @@ BBC key     - PC key
   0              0
 Shift lock -    ALT
 
-
+The PC key Page Up acts as a speedup key.
 
 GUI :
 ~~~~~
@@ -77,11 +89,10 @@ GUI :
 The options are :
 
 File :
-        Hard reset     - resets the emulator, clearing all memory.
-        Load savestate - loads a savestate.
-        Save savestate - saves a savestate. B-em at present does not support second processor
-                         savestates, and no disc/tape info is saved - so don't save while loading!
-        Exit           - exit to Windows.
+        Hard reset - resets the emulator, clearing all memory.
+        Load state - load a previously saved savestate.
+        Save state - save current emulation status.
+        Exit       - exit to Windows.
 
 Disc :
         Autoboot disc 0/2      - load a disc image into drives 0 and 2, and boot it.
@@ -104,21 +115,22 @@ Tape :
 
 Settings :
         Model :
-                BBC A w/OS 0.1        - emulate a model A with OS 0.1 - 1981 style.
-                BBC B w/OS 0.1        - emulate a model B with OS 0.1.
-                BBC A                 - emulate a model A.
-                BBC B w/8271 FDC      - emulate a model B with 8271 FDC.
-                BBC B w/8271+SWRAM    - emulate a model B with 8271 FDC and plenty of sideways RAM.
-                BBC B w/1770 FDC      - emulate a model B with 1770 FDC and plenty of sideways RAM.
-                BBC B US              - emulate an American model B with 8271 FDC.
-                BBC B German          - emulate an German model B with 8271 FDC.
-                BBC B+64K             - emulate a model B+ with 64k RAM.
-                BBC B+128K            - emulate a model B+ with 128k RAM.
-                BBC Master 128        - emulate a Master 128.
-                BBC Master 512        - emulate a Master 512 (Master 128 with 80186 copro).
-                BBC Master Turbo      - emulate a Master Turbo (Master 128 with 65C102 copro)
-                BBC Master Compact    - emulate a Master Compact
-                ARM Evaluation System - emulate a Master 128 with an ARM copro.
+                BBC A w/OS 0.1             - emulate a model A with OS 0.1 - 1981 style.
+                BBC B w/OS 0.1             - emulate a model B with OS 0.1.
+                BBC A                      - emulate a model A.
+                BBC B w/8271 FDC           - emulate a model B with 8271 FDC.
+                BBC B w/8271+SWRAM         - emulate a model B with 8271 FDC and plenty of sideways RAM.
+                BBC B w/1770 FDC           - emulate a model B with 1770 FDC and plenty of sideways RAM.
+                BBC B US                   - emulate an American model B with 8271 FDC.
+                BBC B German               - emulate an German model B with 8271 FDC.
+                BBC B+64K                  - emulate a model B+ with 64k RAM.
+                BBC B+128K                 - emulate a model B+ with 128k RAM.
+                BBC Master 128             - emulate a Master 128 with MOS 3.20.
+                BBC Master 128 w/ MOS 3.50 - emulate a Master 128 with MOS 3.50.
+                BBC Master 512             - emulate a Master 512 (Master 128 with 80186 copro).
+                BBC Master Turbo           - emulate a Master Turbo (Master 128 with 65C102 copro)
+                BBC Master Compact         - emulate a Master Compact
+                ARM Evaluation System      - emulate a Master 128 with an ARM copro.
         Second processor :
                 None            - disable copro emulation
                 6502            - emulate Acorn 6502 copro
@@ -133,12 +145,17 @@ Settings :
                         Scanlines     - stretch the BBC screen by blanking every other line
                         Interlaced    - emulate an interlaced display (useful for a handful of demos). Allows
                                         high resolution mode 7.
+                        PAL           - use PAL filter, with hardware line doubling. Slow!
+                        PAL interlaced - use PAL filter, with interlacing. Slow! Allows high resolution mode 7.
                 Display borders - either display all video borders or crop them slightly or totally.
                 Fullscreen - enters fullscreen mode. Use ALT-ENTER to return to windowed mode.
+                Resizeable Window - allow the window to be either resizable, or to follow the emulated screen
+                                    size.
         Sound :
-                Internal sound chip   - enable output of the normal BBC sound chip
-                BeebSID               - enable output of the SID emulation
-                Disc drive noise      - enable output of the disc drive sounds
+                Internal sound chip   - enable output of the normal BBC sound chip.
+                BeebSID               - enable output of the SID emulation.
+                Printer Port DAC      - enable output of 8-bit DAC connected to the printer port.
+                Disc drive noise      - enable output of the disc drive sounds.
                 Tape noise            - enable output of the cassette emulation.
                 Internal sound filter - enable bandpass filtering of sound. Reproduces the poor quality of
                                         the internal speaker.
@@ -154,29 +171,24 @@ Settings :
         Keyboard :
                 Redefine keys        - redefine keyboard setup.
                 Map CAPS/CTRL to A/S - remaps those 2 keys. Useful for games where CAPS/CTRL are left/right.
+        Mouse :
+                AMX mouse       - enables AMX mouse emulation.
         IDE emulation :
-                Enable IDE emulation - enables IDE hard disc emulation and forces the loading of ADFS 1.53.
+                Enable IDE emulation - enables IDE hard disc emulation.
 
 Misc :
+        Speed                - set speed of emulation, from 10% to 500%.
         Save screenshot      - saves screenshot in BMP, PCX, or TGA format.
         Debugger             - enters debugger. Type '?' to get list of commands.
+        Break                - break into debugger.
 
 
 Command line options :
 ~~~~~~~~~~~~~~~~~~~~~~
 
-b-em [discimage.ssd/dsd/adf/adl/fdi] [-disc name.*] [-disc1 name.*] [-tape name.uef/csw] [-mx] [-tx] [-i] [-s] [-fx]
-     [-autoboot] [-debug] [-opengl] [-allegro]
+b-em [discimage.ssd/dsd/adf/adl/fdi] [-u name.uef] [-mx] [-tx] [-i] [-c] [-fx]
 
-[discimage.ssd/dsd/adf/adl/fdi] - load and boot disc image
-
--disc name.* - load disc image into drives 0/2
-
--disc1 name.* - load disc image into drives 1/3
-
--tape name.* - load UEF or CSW image name.*
-
--autoboot - boot disc image
+-u name.uef - load UEF image name.uef
 
 -mx - model to emulate, where x is
 0 - BBC A with OS 0.1
@@ -190,10 +202,11 @@ b-em [discimage.ssd/dsd/adf/adl/fdi] [-disc name.*] [-disc1 name.*] [-tape name.
 8 - B+ 64K
 9 - B+ 128K
 10 - Master 128
-11 - Master 512
-12 - Master Turbo
-13 - Master Compact
-14 - ARM Evaluation System
+11 - Master 128 w/ MOS 3.50
+12 - Master 512
+13 - Master Turbo
+14 - Master Compact
+15 - ARM Evaluation System
 
 -tx - enable tube, where x is
 0 - 6502
@@ -203,12 +216,9 @@ b-em [discimage.ssd/dsd/adf/adl/fdi] [-disc name.*] [-disc1 name.*] [-tape name.
 4 - 65816 (if ROMs available)
 
 -i - enable interlace mode (only useful on a couple of demos)
--s - enables scanlines
+-c - enables scanlines
 -fx - set frameskip to x (1-9, 1=no skip)
 -fasttape - speeds up tape access
--debug - start debugger (Linux only - Windows users use the menu option)
--allegro - use Allegro for video
--opengl - use OpenGL for video. May be faster for Linux users, Windows users should normally stick to Allegro
 
 
 IDE Hard Discs
@@ -219,9 +229,6 @@ set up the default parameters for a 50 mb drive. If you want a different size pr
 size - it does not matter that this does not match the size given in the emulated hardware.
 
 Then press 'F' to format, and follow the prompts.
-
-You will probably want to stick to using a Master 128 with the hard disc, for memory reasons. You may also
-need to *UNPLUG the built-in ADFS.
 
 
 Master 512
@@ -297,7 +304,6 @@ Hardware NOT emulated
 ~~~~~~~~~~~~~~~~~~~~~
 
 serial port
-AMX mouse (Master 512 mouse is kind-of emulated though)
 Econet
 Printer
 32016 processor - though it can be enabled in the source. Doesn't actually run anything useful though.
@@ -322,8 +328,6 @@ Thomas Harte for some UEF code - I wrote my own in the end - and for the OS X po
 Dave Moore for making and hosting the B-em site
 
 Rich Talbot-Watkins and Peter Edwards (also Dave Moore) for testing
-
-J G Harston for the HDINIT program and ADFS 1.53
 
 Robert Schmidt for The BBC Lives!
 
@@ -359,5 +363,4 @@ with anymore).
 
 <plug>
 Also check out www.tommowalker.co.uk, for more emulators than is really necessary.
-And a bunch of BBC music discs!
 </plug>

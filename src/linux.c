@@ -1,20 +1,23 @@
-/*B-em v2.1 by Tom Walker
+/*B-em v2.2 by Tom Walker
   Linux main*/
 
 #ifndef WIN32
 #include <allegro.h>
-#include <alleggl.h>
 #include "b-em.h"
+#include "config.h"
+#include "linux-gui.h"
+#include "main.h"
+#include "video_render.h"
 
-int videoresize,winsizex,winsizey;
+int winsizex, winsizey;
+int videoresize = 0;
 
-int quited=0;
-extern int dcol;
-extern PALETTE pal;
+int mousecapture = 0;
+int quited = 0;
 
 void waitforready() { }
 void resumeready() { }
-int windx,windy;
+int windx, windy;
 void updatewindowsize(int x, int y)
 {
         x=(x+3)&~3; y=(y+3)&~3;
@@ -25,9 +28,7 @@ void updatewindowsize(int x, int y)
 //                printf("Update window size %i,%i\n",x,y);
                 windx=winsizex=x; windy=winsizey=y;
                 set_color_depth(dcol);
-                if (opengl) openglreinit();//set_gfx_mode(GFX_OPENGL_WINDOWED, x,y, 0, 0);
-                else        set_gfx_mode(GFX_AUTODETECT_WINDOWED,x,y,0,0);
-//                if (opengl) reinitopengl();
+                set_gfx_mode(GFX_AUTODETECT_WINDOWED,x,y,0,0);
                 set_color_depth(8);
                 set_palette(pal);
         }
@@ -56,33 +57,34 @@ void bem_error(char *s)
 //#undef printf
 int main(int argc, char *argv[])
 {
-        int oldf;
+        int oldf = 0;
         char *p;
         allegro_init();
-        get_executable_name(exedir,511);
-        p=get_filename(exedir);
-        p[0]=0;
-        loadconfig();
+        get_executable_name(exedir, 511);
+        p = get_filename(exedir);
+        p[0] = 0;
+        config_load();
 //        printf("Main\n");
-        initbbc(argc,argv);
+        main_init(argc, argv);
 //        printf("Inited\n");
         while (!quited)
         {
-                runbbc();
-                if (key[KEY_F11]) entergui();
+                main_run();
+                if (key[KEY_F11]) gui_enter();
                 if (key[KEY_ALT] && key[KEY_ENTER] && fullscreen && !oldf)
                 {
-                        fullscreen=0;
-                        leavefullscreen();
+                        fullscreen = 0;
+                        video_leavefullscreen();
                 }
                 else if (key[KEY_ALT] && key[KEY_ENTER] && !fullscreen && !oldf)
                 {
-                        fullscreen=1;
-                        enterfullscreen();
+                        fullscreen = 1;
+                        video_enterfullscreen();
                 }
-                oldf=key[KEY_ALT] && key[KEY_ENTER];
+                oldf = key[KEY_ALT] && key[KEY_ENTER];
         }
-        closebbc();
+        main_close();
+        return 0;
 }
 
 END_OF_MAIN();

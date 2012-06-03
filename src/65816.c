@@ -1,14 +1,16 @@
-/*B-em v2.1 by Tom Walker
+/*B-em v2.2 by Tom Walker
   65816 parasite CPU emulation
   Originally from Snem, with some bugfixes*/
 
 #include <stdio.h>
+#include <allegro.h>
 #include "b-em.h"
+#include "tube.h"
+#include "65816.h"
 
 #define printf rpclog
 
-extern int tuberomin;
-uint8_t *w65816ram,*w65816rom;
+static uint8_t *w65816ram,*w65816rom;
 /*Registers*/
 typedef union
 {
@@ -19,32 +21,30 @@ typedef union
         } b;
 } reg;
 
-reg w65816a,w65816x,w65816y,w65816s;
-uint32_t pbr,dbr;
-uint16_t w65816pc,dp;
+static reg w65816a,w65816x,w65816y,w65816s;
+static uint32_t pbr,dbr;
+static uint16_t w65816pc,dp;
 
-int wins=0;
+static int wins=0;
 
-struct
+static struct
 {
         int c,z,i,d,b,v,n,m,ex,e; /*X renamed to EX due to #define conflict*/
 } w65816p;
 
-int inwai;
+static int inwai;
 /*Opcode table*/
-void (*opcodes[256][5])();
+static void (*opcodes[256][5])();
 
 /*CPU modes : 0 = X1M1
               1 = X1M0
               2 = X0M1
               3 = X0M0
               4 = emulation*/
-int cpumode;
+static int cpumode;
 
 /*Current opcode*/
-uint8_t w65816opcode;
-/*Global cycles count*/
-int w65816cycles;
+static uint8_t w65816opcode;
 
 #define a w65816a
 #define x w65816x
@@ -56,18 +56,17 @@ int w65816cycles;
 #define cycles tubecycles
 #define opcode w65816opcode
 
-int def=1,divider=0,banking=0,banknum=0;
-uint32_t w65816mask=0xFFFF;
-int dtimes=0;
+static int def=1,divider=0,banking=0,banknum=0;
+static uint32_t w65816mask=0xFFFF;
 
-uint8_t readmem65816(uint32_t a)
+static uint8_t readmem65816(uint32_t a)
 {
         uint8_t temp;
         a&=w65816mask;
         cycles--;
         if ((a&~7)==0xFEF8)
         {
-                temp=readtube(a);
+                temp=tube_parasite_read(a);
 /*                if (a==0xFEFB && temp==0xD)
                 {
                         dtimes++;
@@ -82,7 +81,7 @@ uint8_t readmem65816(uint32_t a)
         return w65816ram[a];
 }
 
-uint16_t readmemw65816(uint32_t a)
+static uint16_t readmemw65816(uint32_t a)
 {
         a&=w65816mask;
         return readmem65816(a)|(readmem65816(a+1)<<8);
@@ -93,7 +92,7 @@ uint16_t readmemw65816(uint32_t a)
 }
 
 int endtimeslice;
-void writemem65816(uint32_t a, uint8_t v)
+static void writemem65816(uint32_t a, uint8_t v)
 {
         a&=w65816mask;
 //        if (a==0xFF) rpclog("Write 00FF %02X %04X %i\n",v,pc,wins);
@@ -109,14 +108,14 @@ void writemem65816(uint32_t a, uint8_t v)
                         case 6: case 7: banknum=(banknum>>1)|((v&1)<<5); /*rpclog("Banknum now %i\n",banknum);*/ break;
                 }
                 if (def || !(banking&4)) w65816mask=0xFFFF;
-                else                    w65816mask=0x7FFFF;
+                else                     w65816mask=0x7FFFF;
 //                rpclog("Mask now %08X\n",w65816mask);
                 return;
         }
         if ((a&~7)==0xFEF8)
         {
 //                rpclog("Write TUBE %04X %02X %04X\n",a,v,pc);
-                writetube(a,v);
+                tube_parasite_write(a,v);
                 endtimeslice=1;
                 return;
         }
@@ -127,7 +126,7 @@ void writemem65816(uint32_t a, uint8_t v)
         w65816ram[a]=v;
 }
 
-void writememw65816(uint32_t a, uint16_t v)
+static void writememw65816(uint32_t a, uint16_t v)
 {
         a&=w65816mask;
         writemem65816(a,v);
@@ -147,19 +146,19 @@ void writememw65816(uint32_t a, uint16_t v)
 
 #define clockspc(c)
 
-void updatecpumode();
-int inwai=0;
+static void updatecpumode();
+static int inwai=0;
 /*Temporary variables*/
-uint32_t addr;
+static uint32_t addr;
 
 /*Addressing modes*/
-uint32_t absolute()
+static uint32_t absolute()
 {
         uint32_t temp=readmemw(pbr|pc); pc+=2;
         return temp|dbr;
 }
 
-uint32_t absolutex()
+static uint32_t absolutex()
 {
         uint32_t temp=(readmemw(pbr|pc))+x.w+dbr; pc+=2;
 //        if ((temp&0xFFFF)>0x2200 && (temp&0xFFFF)<0x8000) printf("ABSX %04X %06X\n",x.w,temp);
@@ -168,20 +167,20 @@ uint32_t absolutex()
         return temp;
 }
 
-uint32_t absolutey()
+static uint32_t absolutey()
 {
         uint32_t temp=(readmemw(pbr|pc))+y.w+dbr; pc+=2;
         return temp;
 }
 
-uint32_t absolutelong()
+static uint32_t absolutelong()
 {
         uint32_t temp=readmemw(pbr|pc); pc+=2;
         temp|=(readmem(pbr|pc)<<16); pc++;
         return temp;
 }
 
-uint32_t absolutelongx()
+static uint32_t absolutelongx()
 {
         uint32_t temp=(readmemw(pbr|pc))+x.w; pc+=2;
         temp+=(readmem(pbr|pc)<<16); pc++;
@@ -189,7 +188,7 @@ uint32_t absolutelongx()
         return temp;
 }
 
-uint32_t zeropage() /*It's actually direct page, but I'm used to calling it zero page*/
+static uint32_t zeropage() /*It's actually direct page, but I'm used to calling it zero page*/
 {
         uint32_t temp=readmem(pbr|pc); pc++;
         temp+=dp;
@@ -197,7 +196,7 @@ uint32_t zeropage() /*It's actually direct page, but I'm used to calling it zero
         return temp&0xFFFF;
 }
 
-uint32_t zeropagex()
+static uint32_t zeropagex()
 {
         uint32_t temp=readmem(pbr|pc)+x.w; pc++;
         if (p.e) temp&=0xFF;
@@ -206,7 +205,7 @@ uint32_t zeropagex()
         return temp&0xFFFF;
 }
 
-uint32_t zeropagey()
+static uint32_t zeropagey()
 {
         uint32_t temp=readmem(pbr|pc)+y.w; pc++;
         if (p.e) temp&=0xFF;
@@ -215,54 +214,56 @@ uint32_t zeropagey()
         return temp&0xFFFF;
 }
 
-uint32_t stack()
+static uint32_t stack()
 {
         uint32_t temp=readmem(pbr|pc); pc++;
         temp+=s.w;
         return temp&0xFFFF;
 }
 
-uint32_t indirect()
+static uint32_t indirect()
 {
         uint32_t temp=(readmem(pbr|pc)+dp)&0xFFFF; pc++;
         return (readmemw(temp))+dbr;
 }
 
-uint32_t indirectx()
+static uint32_t indirectx()
 {
         uint32_t temp=(readmem(pbr|pc)+dp+x.w)&0xFFFF; pc++;
         return (readmemw(temp))+dbr;
 }
-uint32_t jindirectx() /*JSR (,x) uses PBR instead of DBR, and 2 byte address insted of 1 + dp*/
+static uint32_t jindirectx() /*JSR (,x) uses PBR instead of DBR, and 2 byte address insted of 1 + dp*/
 {
         uint32_t temp=(readmem(pbr|pc)+(readmem((pbr|pc)+1)<<8)+x.w)+pbr; pc+=2;
 //        printf("Temp %06X\n",temp);
         return temp;
 }
 
-uint32_t indirecty()
+static uint32_t indirecty()
 {
         uint32_t temp=(readmem(pbr|pc)+dp)&0xFFFF; pc++;
         return (readmemw(temp))+y.w+dbr;
 }
-uint32_t sindirecty()
+static uint32_t sindirecty()
 {
         uint32_t temp=(readmem(pbr|pc)+s.w)&0xFFFF; pc++;
         return (readmemw(temp))+y.w+dbr;
 }
 
-uint32_t indirectl()
+static uint32_t indirectl()
 {
-        uint32_t temp=(readmem(pbr|pc)+dp)&0xFFFF; pc++;
-        uint32_t addr=readmemw(temp)|(readmem(temp+2)<<16);
+                uint32_t temp, addr;
+        temp=(readmem(pbr|pc)+dp)&0xFFFF; pc++;
+        addr=readmemw(temp)|(readmem(temp+2)<<16);
 //        printf("IND %06X\n",addr);
         return addr;
 }
 
-uint32_t indirectly()
+static uint32_t indirectly()
 {
-        uint32_t temp=(readmem(pbr|pc)+dp)&0xFFFF; pc++;
-        uint32_t addr=(readmemw(temp)|(readmem(temp+2)<<16))+y.w;
+                uint32_t temp, addr;
+        temp=(readmem(pbr|pc)+dp)&0xFFFF; pc++;
+        addr=(readmemw(temp)|(readmem(temp+2)<<16))+y.w;
 //        if (pc==0xFDC9) printf("INDy %04X %06X\n",temp,addr);
 //        if (output) printf("INDy %06X %02X %06X\n",addr,opcode,pbr|pc);
         return addr;
@@ -386,74 +387,74 @@ uint32_t indirectly()
                 cycles--; clockspc(6);
 
 /*Instructions*/
-void inca8()
+static void inca8()
 {
         readmem(pbr|pc);
         a.b.l++;
         setzn8(a.b.l);
 }
-void inca16()
+static void inca16()
 {
         readmem(pbr|pc);
         a.w++;
         setzn16(a.w);
 }
-void inx8()
+static void inx8()
 {
         readmem(pbr|pc);
         x.b.l++;
         setzn8(x.b.l);
 }
-void inx16()
+static void inx16()
 {
         readmem(pbr|pc);
         x.w++;
         setzn16(x.w);
 }
-void iny8()
+static void iny8()
 {
         readmem(pbr|pc);
         y.b.l++;
         setzn8(y.b.l);
 }
-void iny16()
+static void iny16()
 {
         readmem(pbr|pc);
         y.w++;
         setzn16(y.w);
 }
 
-void deca8()
+static void deca8()
 {
         readmem(pbr|pc);
         a.b.l--;
         setzn8(a.b.l);
 }
-void deca16()
+static void deca16()
 {
         readmem(pbr|pc);
         a.w--;
         setzn16(a.w);
 }
-void dex8()
+static void dex8()
 {
         readmem(pbr|pc);
         x.b.l--;
         setzn8(x.b.l);
 }
-void dex16()
+static void dex16()
 {
         readmem(pbr|pc);
         x.w--;
         setzn16(x.w);
 }
-void dey8()
+static void dey8()
 {
         readmem(pbr|pc);
         y.b.l--;
         setzn8(y.b.l);
 }
-void dey16()
+static void dey16()
 {
         readmem(pbr|pc);
         y.w--;
@@ -461,7 +462,7 @@ void dey16()
 }
 
 /*INC group*/
-void incZp8()
+static void incZp8()
 {
         uint8_t temp;
         addr=zeropage();
@@ -471,7 +472,7 @@ void incZp8()
         setzn8(temp);
         writemem(addr,temp);
 }
-void incZp16()
+static void incZp16()
 {
         uint16_t temp;
         addr=zeropage();
@@ -482,7 +483,7 @@ void incZp16()
         writememw(addr,temp);
 }
 
-void incZpx8()
+static void incZpx8()
 {
         uint8_t temp;
         addr=zeropagex();
@@ -492,7 +493,7 @@ void incZpx8()
         setzn8(temp);
         writemem(addr,temp);
 }
-void incZpx16()
+static void incZpx16()
 {
         uint16_t temp;
         addr=zeropagex();
@@ -503,7 +504,7 @@ void incZpx16()
         writememw(addr,temp);
 }
 
-void incAbs8()
+static void incAbs8()
 {
         uint8_t temp;
         addr=absolute();
@@ -513,7 +514,7 @@ void incAbs8()
         setzn8(temp);
         writemem(addr,temp);
 }
-void incAbs16()
+static void incAbs16()
 {
         uint16_t temp;
         addr=absolute();
@@ -524,7 +525,7 @@ void incAbs16()
         writememw(addr,temp);
 }
 
-void incAbsx8()
+static void incAbsx8()
 {
         uint8_t temp;
         addr=absolutex();
@@ -534,7 +535,7 @@ void incAbsx8()
         setzn8(temp);
         writemem(addr,temp);
 }
-void incAbsx16()
+static void incAbsx16()
 {
         uint16_t temp;
         addr=absolutex();
@@ -546,7 +547,7 @@ void incAbsx16()
 }
 
 /*DEC group*/
-void decZp8()
+static void decZp8()
 {
         uint8_t temp;
         addr=zeropage();
@@ -557,7 +558,7 @@ void decZp8()
         writemem(addr,temp);
 //        if (output && addr==4) printf("DEC 4 %02X %i %i\n",temp,p.z,p.n);
 }
-void decZp16()
+static void decZp16()
 {
         uint16_t temp;
         addr=zeropage();
@@ -568,7 +569,7 @@ void decZp16()
         writememw(addr,temp);
 }
 
-void decZpx8()
+static void decZpx8()
 {
         uint8_t temp;
         addr=zeropagex();
@@ -578,7 +579,7 @@ void decZpx8()
         setzn8(temp);
         writemem(addr,temp);
 }
-void decZpx16()
+static void decZpx16()
 {
         uint16_t temp;
         addr=zeropagex();
@@ -589,7 +590,7 @@ void decZpx16()
         writememw(addr,temp);
 }
 
-void decAbs8()
+static void decAbs8()
 {
         uint8_t temp;
         addr=absolute();
@@ -599,7 +600,7 @@ void decAbs8()
         setzn8(temp);
         writemem(addr,temp);
 }
-void decAbs16()
+static void decAbs16()
 {
         uint16_t temp;
         addr=absolute();
@@ -610,7 +611,7 @@ void decAbs16()
         writememw(addr,temp);
 }
 
-void decAbsx8()
+static void decAbsx8()
 {
         uint8_t temp;
         addr=absolutex();
@@ -620,7 +621,7 @@ void decAbsx8()
         setzn8(temp);
         writemem(addr,temp);
 }
-void decAbsx16()
+static void decAbsx16()
 {
         uint16_t temp;
         addr=absolutex();
@@ -632,44 +633,44 @@ void decAbsx16()
 }
 
 /*Flag group*/
-void clc()
+static void clc()
 {
         readmem(pbr|pc);
         p.c=0;
 }
-void cld()
+static void cld()
 {
         readmem(pbr|pc);
         p.d=0;
 }
-void cli()
+static void cli()
 {
         readmem(pbr|pc);
         p.i=0;
 }
-void clv()
+static void clv()
 {
         readmem(pbr|pc);
         p.v=0;
 }
 
-void sec()
+static void sec()
 {
         readmem(pbr|pc);
         p.c=1;
 }
-void sed()
+static void sed()
 {
         readmem(pbr|pc);
         p.d=1;
 }
-void sei()
+static void sei()
 {
         readmem(pbr|pc);
         p.i=1;
 }
 
-void xce()
+static void xce()
 {
         int temp=p.c;
         p.c=p.e;
@@ -678,7 +679,7 @@ void xce()
         updatecpumode();
 }
 
-void sep()
+static void sep()
 {
         uint8_t temp=readmem(pbr|pc); pc++;
         if (temp&1) p.c=1;
@@ -695,7 +696,7 @@ void sep()
         }
 }
 
-void rep65816()
+static void rep65816()
 {
         uint8_t temp=readmem(pbr|pc); pc++;
         if (temp&1) p.c=0;
@@ -713,98 +714,98 @@ void rep65816()
 }
 
 /*Transfer group*/
-void tax8()
+static void tax8()
 {
         readmem(pbr|pc);
         x.b.l=a.b.l;
         setzn8(x.b.l);
 }
-void tay8()
+static void tay8()
 {
         readmem(pbr|pc);
         y.b.l=a.b.l;
         setzn8(y.b.l);
 }
-void txa8()
+static void txa8()
 {
         readmem(pbr|pc);
         a.b.l=x.b.l;
         setzn8(a.b.l);
 }
-void tya8()
+static void tya8()
 {
         readmem(pbr|pc);
         a.b.l=y.b.l;
         setzn8(a.b.l);
 }
-void tsx8()
+static void tsx8()
 {
         readmem(pbr|pc);
         x.b.l=s.b.l;
         setzn8(x.b.l);
 }
-void txs8()
+static void txs8()
 {
         readmem(pbr|pc);
         s.b.l=x.b.l;
 //        setzn8(s.b.l);
 }
-void txy8()
+static void txy8()
 {
         readmem(pbr|pc);
         y.b.l=x.b.l;
         setzn8(y.b.l);
 }
-void tyx8()
+static void tyx8()
 {
         readmem(pbr|pc);
         x.b.l=y.b.l;
         setzn8(x.b.l);
 }
 
-void tax16()
+static void tax16()
 {
         readmem(pbr|pc);
         x.w=a.w;
         setzn16(x.w);
 }
-void tay16()
+static void tay16()
 {
         readmem(pbr|pc);
         y.w=a.w;
         setzn16(y.w);
 }
-void txa16()
+static void txa16()
 {
         readmem(pbr|pc);
         a.w=x.w;
         setzn16(a.w);
 }
-void tya16()
+static void tya16()
 {
         readmem(pbr|pc);
         a.w=y.w;
         setzn16(a.w);
 }
-void tsx16()
+static void tsx16()
 {
         readmem(pbr|pc);
         x.w=s.w;
         setzn16(x.w);
 }
-void txs16()
+static void txs16()
 {
         readmem(pbr|pc);
         s.w=x.w;
 //        setzn16(s.w);
 }
-void txy16()
+static void txy16()
 {
         readmem(pbr|pc);
         y.w=x.w;
         setzn16(y.w);
 }
-void tyx16()
+static void tyx16()
 {
         readmem(pbr|pc);
         x.w=y.w;
@@ -812,60 +813,60 @@ void tyx16()
 }
 
 /*LDX group*/
-void ldxImm8()
+static void ldxImm8()
 {
         x.b.l=readmem(pbr|pc); pc++;
         setzn8(x.b.l);
 }
-void ldxZp8()
+static void ldxZp8()
 {
         addr=zeropage();
         x.b.l=readmem(addr);
         setzn8(x.b.l);
 }
-void ldxZpy8()
+static void ldxZpy8()
 {
         addr=zeropagey();
         x.b.l=readmem(addr);
         setzn8(x.b.l);
 }
-void ldxAbs8()
+static void ldxAbs8()
 {
         addr=absolute();
         x.b.l=readmem(addr);
         setzn8(x.b.l);
 }
-void ldxAbsy8()
+static void ldxAbsy8()
 {
         addr=absolutey();
         x.b.l=readmem(addr);
         setzn8(x.b.l);
 }
 
-void ldxImm16()
+static void ldxImm16()
 {
         x.w=readmemw(pbr|pc); pc+=2;
         setzn16(x.w);
 }
-void ldxZp16()
+static void ldxZp16()
 {
         addr=zeropage();
         x.w=readmemw(addr);
         setzn16(x.w);
 }
-void ldxZpy16()
+static void ldxZpy16()
 {
         addr=zeropagey();
         x.w=readmemw(addr);
         setzn16(x.w);
 }
-void ldxAbs16()
+static void ldxAbs16()
 {
         addr=absolute();
         x.w=readmemw(addr);
         setzn16(x.w);
 }
-void ldxAbsy16()
+static void ldxAbsy16()
 {
         addr=absolutey();
         x.w=readmemw(addr);
@@ -873,60 +874,60 @@ void ldxAbsy16()
 }
 
 /*LDY group*/
-void ldyImm8()
+static void ldyImm8()
 {
         y.b.l=readmem(pbr|pc); pc++;
         setzn8(y.b.l);
 }
-void ldyZp8()
+static void ldyZp8()
 {
         addr=zeropage();
         y.b.l=readmem(addr);
         setzn8(y.b.l);
 }
-void ldyZpx8()
+static void ldyZpx8()
 {
         addr=zeropagex();
         y.b.l=readmem(addr);
         setzn8(y.b.l);
 }
-void ldyAbs8()
+static void ldyAbs8()
 {
         addr=absolute();
         y.b.l=readmem(addr);
         setzn8(y.b.l);
 }
-void ldyAbsx8()
+static void ldyAbsx8()
 {
         addr=absolutex();
         y.b.l=readmem(addr);
         setzn8(y.b.l);
 }
 
-void ldyImm16()
+static void ldyImm16()
 {
         y.w=readmemw(pbr|pc); pc+=2;
         setzn16(y.w);
 }
-void ldyZp16()
+static void ldyZp16()
 {
         addr=zeropage();
         y.w=readmemw(addr);
         setzn16(y.w);
 }
-void ldyZpx16()
+static void ldyZpx16()
 {
         addr=zeropagex();
         y.w=readmemw(addr);
         setzn16(y.w);
 }
-void ldyAbs16()
+static void ldyAbs16()
 {
         addr=absolute();
         y.w=readmemw(addr);
         setzn16(y.w);
 }
-void ldyAbsx16()
+static void ldyAbsx16()
 {
         addr=absolutex();
         y.w=readmemw(addr);
@@ -934,180 +935,180 @@ void ldyAbsx16()
 }
 
 /*LDA group*/
-void ldaImm8()
+static void ldaImm8()
 {
         a.b.l=readmem(pbr|pc); pc++;
         setzn8(a.b.l);
 }
-void ldaZp8()
+static void ldaZp8()
 {
         addr=zeropage();
         a.b.l=readmem(addr);
         setzn8(a.b.l);
 }
-void ldaZpx8()
+static void ldaZpx8()
 {
         addr=zeropagex();
         a.b.l=readmem(addr);
         setzn8(a.b.l);
 }
-void ldaSp8()
+static void ldaSp8()
 {
         addr=stack();
         a.b.l=readmem(addr);
         setzn8(a.b.l);
 }
-void ldaSIndirecty8()
+static void ldaSIndirecty8()
 {
         addr=sindirecty();
         a.b.l=readmem(addr);
         setzn8(a.b.l);
 }
-void ldaAbs8()
+static void ldaAbs8()
 {
         addr=absolute();
         a.b.l=readmem(addr);
         setzn8(a.b.l);
 }
-void ldaAbsx8()
+static void ldaAbsx8()
 {
         addr=absolutex();
         a.b.l=readmem(addr);
         setzn8(a.b.l);
 }
-void ldaAbsy8()
+static void ldaAbsy8()
 {
         addr=absolutey();
         a.b.l=readmem(addr);
         setzn8(a.b.l);
 }
-void ldaLong8()
+static void ldaLong8()
 {
         addr=absolutelong();
         a.b.l=readmem(addr);
         setzn8(a.b.l);
 }
-void ldaLongx8()
+static void ldaLongx8()
 {
         addr=absolutelongx();
         a.b.l=readmem(addr);
         setzn8(a.b.l);
 }
-void ldaIndirect8()
+static void ldaIndirect8()
 {
         addr=indirect();
         a.b.l=readmem(addr);
         setzn8(a.b.l);
 }
-void ldaIndirectx8()
+static void ldaIndirectx8()
 {
         addr=indirectx();
         a.b.l=readmem(addr);
         setzn8(a.b.l);
 }
-void ldaIndirecty8()
+static void ldaIndirecty8()
 {
         addr=indirecty();
         a.b.l=readmem(addr);
         setzn8(a.b.l);
 }
-void ldaIndirectLong8()
+static void ldaIndirectLong8()
 {
         addr=indirectl();
         a.b.l=readmem(addr);
         setzn8(a.b.l);
 }
-void ldaIndirectLongy8()
+static void ldaIndirectLongy8()
 {
         addr=indirectly();
         a.b.l=readmem(addr);
         setzn8(a.b.l);
 }
 
-void ldaImm16()
+static void ldaImm16()
 {
         a.w=readmemw(pbr|pc); pc+=2;
         setzn16(a.w);
 }
-void ldaZp16()
+static void ldaZp16()
 {
         addr=zeropage();
         a.w=readmemw(addr);
         setzn16(a.w);
 }
-void ldaZpx16()
+static void ldaZpx16()
 {
         addr=zeropagex();
         a.w=readmemw(addr);
         setzn16(a.w);
 }
-void ldaSp16()
+static void ldaSp16()
 {
         addr=stack();
         a.w=readmemw(addr);
         setzn16(a.w);
 }
-void ldaSIndirecty16()
+static void ldaSIndirecty16()
 {
         addr=sindirecty();
         a.w=readmemw(addr);
         setzn16(a.w);
 }
-void ldaAbs16()
+static void ldaAbs16()
 {
         addr=absolute();
         a.w=readmemw(addr);
         setzn16(a.w);
 }
-void ldaAbsx16()
+static void ldaAbsx16()
 {
         addr=absolutex();
         a.w=readmemw(addr);
         setzn16(a.w);
 }
-void ldaAbsy16()
+static void ldaAbsy16()
 {
         addr=absolutey();
         a.w=readmemw(addr);
         setzn16(a.w);
 }
-void ldaLong16()
+static void ldaLong16()
 {
         addr=absolutelong();
         a.w=readmemw(addr);
         setzn16(a.w);
 }
-void ldaLongx16()
+static void ldaLongx16()
 {
         addr=absolutelongx();
         a.w=readmemw(addr);
         setzn16(a.w);
 }
-void ldaIndirect16()
+static void ldaIndirect16()
 {
         addr=indirect();
         a.w=readmemw(addr);
         setzn16(a.w);
 }
-void ldaIndirectx16()
+static void ldaIndirectx16()
 {
         addr=indirectx();
         a.w=readmemw(addr);
         setzn16(a.w);
 }
-void ldaIndirecty16()
+static void ldaIndirecty16()
 {
         addr=indirecty();
         a.w=readmemw(addr);
         setzn16(a.w);
 }
-void ldaIndirectLong16()
+static void ldaIndirectLong16()
 {
         addr=indirectl();
         a.w=readmemw(addr);
         setzn16(a.w);
 }
-void ldaIndirectLongy16()
+static void ldaIndirectLongy16()
 {
         addr=indirectly();
         a.w=readmemw(addr);
@@ -1115,267 +1116,267 @@ void ldaIndirectLongy16()
 }
 
 /*STA group*/
-void staZp8()
+static void staZp8()
 {
         addr=zeropage();
         writemem(addr,a.b.l);
 }
-void staZpx8()
+static void staZpx8()
 {
         addr=zeropagex();
         writemem(addr,a.b.l);
 }
-void staAbs8()
+static void staAbs8()
 {
         addr=absolute();
         writemem(addr,a.b.l);
 }
-void staAbsx8()
+static void staAbsx8()
 {
         addr=absolutex();
         writemem(addr,a.b.l);
 }
-void staAbsy8()
+static void staAbsy8()
 {
         addr=absolutey();
         writemem(addr,a.b.l);
 }
-void staLong8()
+static void staLong8()
 {
         addr=absolutelong();
         writemem(addr,a.b.l);
 }
-void staLongx8()
+static void staLongx8()
 {
         addr=absolutelongx();
 //        rpclog("Addr %06X\n",addr);
         writemem(addr,a.b.l);
 }
-void staIndirect8()
+static void staIndirect8()
 {
         addr=indirect();
         writemem(addr,a.b.l);
 }
-void staIndirectx8()
+static void staIndirectx8()
 {
         addr=indirectx();
         writemem(addr,a.b.l);
 }
-void staIndirecty8()
+static void staIndirecty8()
 {
         addr=indirecty();
         writemem(addr,a.b.l);
 }
-void staIndirectLong8()
+static void staIndirectLong8()
 {
         addr=indirectl();
         writemem(addr,a.b.l);
 }
-void staIndirectLongy8()
+static void staIndirectLongy8()
 {
         addr=indirectly();
         writemem(addr,a.b.l);
 }
-void staSp8()
+static void staSp8()
 {
         addr=stack();
         writemem(addr,a.b.l);
 }
-void staSIndirecty8()
+static void staSIndirecty8()
 {
         addr=sindirecty();
         writemem(addr,a.b.l);
 }
 
-void staZp16()
+static void staZp16()
 {
         addr=zeropage();
         writememw(addr,a.w);
 }
-void staZpx16()
+static void staZpx16()
 {
         addr=zeropagex();
         writememw(addr,a.w);
 }
-void staAbs16()
+static void staAbs16()
 {
         addr=absolute();
         writememw(addr,a.w);
 }
-void staAbsx16()
+static void staAbsx16()
 {
         addr=absolutex();
         writememw(addr,a.w);
 }
-void staAbsy16()
+static void staAbsy16()
 {
         addr=absolutey();
         writememw(addr,a.w);
 }
-void staLong16()
+static void staLong16()
 {
         addr=absolutelong();
         writememw(addr,a.w);
 }
-void staLongx16()
+static void staLongx16()
 {
         addr=absolutelongx();
         writememw(addr,a.w);
 //        printf("Written %06X %04X %04X\n",addr,a.w,readmemw(addr));
 }
-void staIndirect16()
+static void staIndirect16()
 {
         addr=indirect();
         writememw(addr,a.w);
 }
-void staIndirectx16()
+static void staIndirectx16()
 {
         addr=indirectx();
         writememw(addr,a.w);
 }
-void staIndirecty16()
+static void staIndirecty16()
 {
         addr=indirecty();
         writememw(addr,a.w);
 }
-void staIndirectLong16()
+static void staIndirectLong16()
 {
         addr=indirectl();
         writememw(addr,a.w);
 }
-void staIndirectLongy16()
+static void staIndirectLongy16()
 {
         addr=indirectly();
         writememw(addr,a.w);
 }
-void staSp16()
+static void staSp16()
 {
         addr=stack();
         writememw(addr,a.w);
 }
-void staSIndirecty16()
+static void staSIndirecty16()
 {
         addr=sindirecty();
         writememw(addr,a.w);
 }
 
 /*STX group*/
-void stxZp8()
+static void stxZp8()
 {
         addr=zeropage();
         writemem(addr,x.b.l);
 }
-void stxZpy8()
+static void stxZpy8()
 {
         addr=zeropagey();
         writemem(addr,x.b.l);
 }
-void stxAbs8()
+static void stxAbs8()
 {
         addr=absolute();
         writemem(addr,x.b.l);
 }
 
-void stxZp16()
+static void stxZp16()
 {
         addr=zeropage();
         writememw(addr,x.w);
 }
-void stxZpy16()
+static void stxZpy16()
 {
         addr=zeropagey();
         writememw(addr,x.w);
 }
-void stxAbs16()
+static void stxAbs16()
 {
         addr=absolute();
         writememw(addr,x.w);
 }
 
 /*STY group*/
-void styZp8()
+static void styZp8()
 {
         addr=zeropage();
         writemem(addr,y.b.l);
 }
-void styZpx8()
+static void styZpx8()
 {
         addr=zeropagex();
         writemem(addr,y.b.l);
 }
-void styAbs8()
+static void styAbs8()
 {
         addr=absolute();
         writemem(addr,y.b.l);
 }
 
-void styZp16()
+static void styZp16()
 {
         addr=zeropage();
         writememw(addr,y.w);
 }
-void styZpx16()
+static void styZpx16()
 {
         addr=zeropagex();
         writememw(addr,y.w);
 }
-void styAbs16()
+static void styAbs16()
 {
         addr=absolute();
         writememw(addr,y.w);
 }
 
 /*STZ group*/
-void stzZp8()
+static void stzZp8()
 {
         addr=zeropage();
         writemem(addr,0);
 }
-void stzZpx8()
+static void stzZpx8()
 {
         addr=zeropagex();
         writemem(addr,0);
 }
-void stzAbs8()
+static void stzAbs8()
 {
         addr=absolute();
         writemem(addr,0);
 }
-void stzAbsx8()
+static void stzAbsx8()
 {
         addr=absolutex();
         writemem(addr,0);
 }
 
-void stzZp16()
+static void stzZp16()
 {
         addr=zeropage();
         writememw(addr,0);
 }
-void stzZpx16()
+static void stzZpx16()
 {
         addr=zeropagex();
         writememw(addr,0);
 }
-void stzAbs16()
+static void stzAbs16()
 {
         addr=absolute();
         writememw(addr,0);
 }
-void stzAbsx16()
+static void stzAbsx16()
 {
         addr=absolutex();
         writememw(addr,0);
 }
 
 /*ADC group*/
-void adcImm8()
+static void adcImm8()
 {
         uint16_t tempw;
         uint8_t temp=readmem(pbr|pc); pc++;
         if (p.d) { ADCBCD8(); } else { ADC8(); }
 }
-void adcZp8()
+static void adcZp8()
 {
         uint16_t tempw;
         uint8_t temp;
@@ -1383,7 +1384,7 @@ void adcZp8()
         temp=readmem(addr);
         if (p.d) { ADCBCD8(); } else { ADC8(); }
 }
-void adcZpx8()
+static void adcZpx8()
 {
         uint16_t tempw;
         uint8_t temp;
@@ -1391,7 +1392,7 @@ void adcZpx8()
         temp=readmem(addr);
         if (p.d) { ADCBCD8(); } else { ADC8(); }
 }
-void adcSp8()
+static void adcSp8()
 {
         uint16_t tempw;
         uint8_t temp;
@@ -1399,7 +1400,7 @@ void adcSp8()
         temp=readmem(addr);
         if (p.d) { ADCBCD8(); } else { ADC8(); }
 }
-void adcAbs8()
+static void adcAbs8()
 {
         uint16_t tempw;
         uint8_t temp;
@@ -1407,7 +1408,7 @@ void adcAbs8()
         temp=readmem(addr);
         if (p.d) { ADCBCD8(); } else { ADC8(); }
 }
-void adcAbsx8()
+static void adcAbsx8()
 {
         uint16_t tempw;
         uint8_t temp;
@@ -1415,7 +1416,7 @@ void adcAbsx8()
         temp=readmem(addr);
         if (p.d) { ADCBCD8(); } else { ADC8(); }
 }
-void adcAbsy8()
+static void adcAbsy8()
 {
         uint16_t tempw;
         uint8_t temp;
@@ -1423,7 +1424,7 @@ void adcAbsy8()
         temp=readmem(addr);
         if (p.d) { ADCBCD8(); } else { ADC8(); }
 }
-void adcLong8()
+static void adcLong8()
 {
         uint16_t tempw;
         uint8_t temp;
@@ -1431,7 +1432,7 @@ void adcLong8()
         temp=readmem(addr);
         if (p.d) { ADCBCD8(); } else { ADC8(); }
 }
-void adcLongx8()
+static void adcLongx8()
 {
         uint16_t tempw;
         uint8_t temp;
@@ -1439,7 +1440,7 @@ void adcLongx8()
         temp=readmem(addr);
         if (p.d) { ADCBCD8(); } else { ADC8(); }
 }
-void adcIndirect8()
+static void adcIndirect8()
 {
         uint16_t tempw;
         uint8_t temp;
@@ -1447,7 +1448,7 @@ void adcIndirect8()
         temp=readmem(addr);
         if (p.d) { ADCBCD8(); } else { ADC8(); }
 }
-void adcIndirectx8()
+static void adcIndirectx8()
 {
         uint16_t tempw;
         uint8_t temp;
@@ -1455,7 +1456,7 @@ void adcIndirectx8()
         temp=readmem(addr);
         if (p.d) { ADCBCD8(); } else { ADC8(); }
 }
-void adcIndirecty8()
+static void adcIndirecty8()
 {
         uint16_t tempw;
         uint8_t temp;
@@ -1463,7 +1464,7 @@ void adcIndirecty8()
         temp=readmem(addr);
         if (p.d) { ADCBCD8(); } else { ADC8(); }
 }
-void adcsIndirecty8()
+static void adcsIndirecty8()
 {
         uint16_t tempw;
         uint8_t temp;
@@ -1471,7 +1472,7 @@ void adcsIndirecty8()
         temp=readmem(addr);
         if (p.d) { ADCBCD8(); } else { ADC8(); }
 }
-void adcIndirectLong8()
+static void adcIndirectLong8()
 {
         uint16_t tempw;
         uint8_t temp;
@@ -1479,7 +1480,7 @@ void adcIndirectLong8()
         temp=readmem(addr);
         if (p.d) { ADCBCD8(); } else { ADC8(); }
 }
-void adcIndirectLongy8()
+static void adcIndirectLongy8()
 {
         uint16_t tempw;
         uint8_t temp;
@@ -1488,14 +1489,14 @@ void adcIndirectLongy8()
         if (p.d) { ADCBCD8(); } else { ADC8(); }
 }
 
-void adcImm16()
+static void adcImm16()
 {
         uint32_t templ;
         uint16_t tempw;
         tempw=readmemw(pbr|pc); pc+=2;
         if (p.d) { ADCBCD16(); } else { ADC16(); }
 }
-void adcZp16()
+static void adcZp16()
 {
         uint32_t templ;
         uint16_t tempw;
@@ -1503,7 +1504,7 @@ void adcZp16()
         tempw=readmemw(addr);
         if (p.d) { ADCBCD16(); } else { ADC16(); }
 }
-void adcZpx16()
+static void adcZpx16()
 {
         uint32_t templ;
         uint16_t tempw;
@@ -1511,7 +1512,7 @@ void adcZpx16()
         tempw=readmemw(addr);
         if (p.d) { ADCBCD16(); } else { ADC16(); }
 }
-void adcSp16()
+static void adcSp16()
 {
         uint32_t templ;
         uint16_t tempw;
@@ -1519,7 +1520,7 @@ void adcSp16()
         tempw=readmemw(addr);
         if (p.d) { ADCBCD16(); } else { ADC16(); }
 }
-void adcAbs16()
+static void adcAbs16()
 {
         uint32_t templ;
         uint16_t tempw;
@@ -1527,7 +1528,7 @@ void adcAbs16()
         tempw=readmemw(addr);
         if (p.d) { ADCBCD16(); } else { ADC16(); }
 }
-void adcAbsx16()
+static void adcAbsx16()
 {
         uint32_t templ;
         uint16_t tempw;
@@ -1535,7 +1536,7 @@ void adcAbsx16()
         tempw=readmemw(addr);
         if (p.d) { ADCBCD16(); } else { ADC16(); }
 }
-void adcAbsy16()
+static void adcAbsy16()
 {
         uint32_t templ;
         uint16_t tempw;
@@ -1543,7 +1544,7 @@ void adcAbsy16()
         tempw=readmemw(addr);
         if (p.d) { ADCBCD16(); } else { ADC16(); }
 }
-void adcLong16()
+static void adcLong16()
 {
         uint32_t templ;
         uint16_t tempw;
@@ -1551,7 +1552,7 @@ void adcLong16()
         tempw=readmemw(addr);
         if (p.d) { ADCBCD16(); } else { ADC16(); }
 }
-void adcLongx16()
+static void adcLongx16()
 {
         uint32_t templ;
         uint16_t tempw;
@@ -1559,7 +1560,7 @@ void adcLongx16()
         tempw=readmemw(addr);
         if (p.d) { ADCBCD16(); } else { ADC16(); }
 }
-void adcIndirect16()
+static void adcIndirect16()
 {
         uint32_t templ;
         uint16_t tempw;
@@ -1567,7 +1568,7 @@ void adcIndirect16()
         tempw=readmemw(addr);
         if (p.d) { ADCBCD16(); } else { ADC16(); }
 }
-void adcIndirectx16()
+static void adcIndirectx16()
 {
         uint32_t templ;
         uint16_t tempw;
@@ -1575,7 +1576,7 @@ void adcIndirectx16()
         tempw=readmemw(addr);
         if (p.d) { ADCBCD16(); } else { ADC16(); }
 }
-void adcIndirecty16()
+static void adcIndirecty16()
 {
         uint32_t templ;
         uint16_t tempw;
@@ -1583,7 +1584,7 @@ void adcIndirecty16()
         tempw=readmemw(addr);
         if (p.d) { ADCBCD16(); } else { ADC16(); }
 }
-void adcsIndirecty16()
+static void adcsIndirecty16()
 {
         uint32_t templ;
         uint16_t tempw;
@@ -1591,7 +1592,7 @@ void adcsIndirecty16()
         tempw=readmemw(addr);
         if (p.d) { ADCBCD16(); } else { ADC16(); }
 }
-void adcIndirectLong16()
+static void adcIndirectLong16()
 {
         uint32_t templ;
         uint16_t tempw;
@@ -1599,7 +1600,7 @@ void adcIndirectLong16()
         tempw=readmemw(addr);
         if (p.d) { ADCBCD16(); } else { ADC16(); }
 }
-void adcIndirectLongy16()
+static void adcIndirectLongy16()
 {
         uint32_t templ;
         uint16_t tempw;
@@ -1609,13 +1610,13 @@ void adcIndirectLongy16()
 }
 
 /*SBC group*/
-void sbcImm8()
+static void sbcImm8()
 {
         uint16_t tempw;
         uint8_t temp=readmem(pbr|pc); pc++;
         if (p.d) { SBCBCD8(); } else { SBC8(); }
 }
-void sbcZp8()
+static void sbcZp8()
 {
         uint16_t tempw;
         uint8_t temp;
@@ -1623,7 +1624,7 @@ void sbcZp8()
         temp=readmem(addr);
         if (p.d) { SBCBCD8(); } else { SBC8(); }
 }
-void sbcZpx8()
+static void sbcZpx8()
 {
         uint16_t tempw;
         uint8_t temp;
@@ -1631,7 +1632,7 @@ void sbcZpx8()
         temp=readmem(addr);
         if (p.d) { SBCBCD8(); } else { SBC8(); }
 }
-void sbcSp8()
+static void sbcSp8()
 {
         uint16_t tempw;
         uint8_t temp;
@@ -1639,7 +1640,7 @@ void sbcSp8()
         temp=readmem(addr);
         if (p.d) { SBCBCD8(); } else { SBC8(); }
 }
-void sbcAbs8()
+static void sbcAbs8()
 {
         uint16_t tempw;
         uint8_t temp;
@@ -1647,7 +1648,7 @@ void sbcAbs8()
         temp=readmem(addr);
         if (p.d) { SBCBCD8(); } else { SBC8(); }
 }
-void sbcAbsx8()
+static void sbcAbsx8()
 {
         uint16_t tempw;
         uint8_t temp;
@@ -1655,7 +1656,7 @@ void sbcAbsx8()
         temp=readmem(addr);
         if (p.d) { SBCBCD8(); } else { SBC8(); }
 }
-void sbcAbsy8()
+static void sbcAbsy8()
 {
         uint16_t tempw;
         uint8_t temp;
@@ -1663,7 +1664,7 @@ void sbcAbsy8()
         temp=readmem(addr);
         if (p.d) { SBCBCD8(); } else { SBC8(); }
 }
-void sbcLong8()
+static void sbcLong8()
 {
         uint16_t tempw;
         uint8_t temp;
@@ -1671,7 +1672,7 @@ void sbcLong8()
         temp=readmem(addr);
         if (p.d) { SBCBCD8(); } else { SBC8(); }
 }
-void sbcLongx8()
+static void sbcLongx8()
 {
         uint16_t tempw;
         uint8_t temp;
@@ -1679,7 +1680,7 @@ void sbcLongx8()
         temp=readmem(addr);
         if (p.d) { SBCBCD8(); } else { SBC8(); }
 }
-void sbcIndirect8()
+static void sbcIndirect8()
 {
         uint16_t tempw;
         uint8_t temp;
@@ -1687,7 +1688,7 @@ void sbcIndirect8()
         temp=readmem(addr);
         if (p.d) { SBCBCD8(); } else { SBC8(); }
 }
-void sbcIndirectx8()
+static void sbcIndirectx8()
 {
         uint16_t tempw;
         uint8_t temp;
@@ -1695,7 +1696,7 @@ void sbcIndirectx8()
         temp=readmem(addr);
         if (p.d) { SBCBCD8(); } else { SBC8(); }
 }
-void sbcIndirecty8()
+static void sbcIndirecty8()
 {
         uint16_t tempw;
         uint8_t temp;
@@ -1703,7 +1704,7 @@ void sbcIndirecty8()
         temp=readmem(addr);
         if (p.d) { SBCBCD8(); } else { SBC8(); }
 }
-void sbcsIndirecty8()
+static void sbcsIndirecty8()
 {
         uint16_t tempw;
         uint8_t temp;
@@ -1711,7 +1712,7 @@ void sbcsIndirecty8()
         temp=readmem(addr);
         if (p.d) { SBCBCD8(); } else { SBC8(); }
 }
-void sbcIndirectLong8()
+static void sbcIndirectLong8()
 {
         uint16_t tempw;
         uint8_t temp;
@@ -1719,7 +1720,7 @@ void sbcIndirectLong8()
         temp=readmem(addr);
         if (p.d) { SBCBCD8(); } else { SBC8(); }
 }
-void sbcIndirectLongy8()
+static void sbcIndirectLongy8()
 {
         uint16_t tempw;
         uint8_t temp;
@@ -1728,14 +1729,14 @@ void sbcIndirectLongy8()
         if (p.d) { SBCBCD8(); } else { SBC8(); }
 }
 
-void sbcImm16()
+static void sbcImm16()
 {
         uint32_t templ;
         uint16_t tempw;
         tempw=readmemw(pbr|pc); pc+=2;
         if (p.d) { SBCBCD16(); } else { SBC16(); }
 }
-void sbcZp16()
+static void sbcZp16()
 {
         uint32_t templ;
         uint16_t tempw;
@@ -1743,7 +1744,7 @@ void sbcZp16()
         tempw=readmemw(addr);
         if (p.d) { SBCBCD16(); } else { SBC16(); }
 }
-void sbcZpx16()
+static void sbcZpx16()
 {
         uint32_t templ;
         uint16_t tempw;
@@ -1751,7 +1752,7 @@ void sbcZpx16()
         tempw=readmemw(addr);
         if (p.d) { SBCBCD16(); } else { SBC16(); }
 }
-void sbcSp16()
+static void sbcSp16()
 {
         uint32_t templ;
         uint16_t tempw;
@@ -1759,7 +1760,7 @@ void sbcSp16()
         tempw=readmemw(addr);
         if (p.d) { SBCBCD16(); } else { SBC16(); }
 }
-void sbcAbs16()
+static void sbcAbs16()
 {
         uint32_t templ;
         uint16_t tempw;
@@ -1767,7 +1768,7 @@ void sbcAbs16()
         tempw=readmemw(addr);
         if (p.d) { SBCBCD16(); } else { SBC16(); }
 }
-void sbcAbsx16()
+static void sbcAbsx16()
 {
         uint32_t templ;
         uint16_t tempw;
@@ -1775,7 +1776,7 @@ void sbcAbsx16()
         tempw=readmemw(addr);
         if (p.d) { SBCBCD16(); } else { SBC16(); }
 }
-void sbcAbsy16()
+static void sbcAbsy16()
 {
         uint32_t templ;
         uint16_t tempw;
@@ -1783,7 +1784,7 @@ void sbcAbsy16()
         tempw=readmemw(addr);
         if (p.d) { SBCBCD16(); } else { SBC16(); }
 }
-void sbcLong16()
+static void sbcLong16()
 {
         uint32_t templ;
         uint16_t tempw;
@@ -1791,7 +1792,7 @@ void sbcLong16()
         tempw=readmemw(addr);
         if (p.d) { SBCBCD16(); } else { SBC16(); }
 }
-void sbcLongx16()
+static void sbcLongx16()
 {
         uint32_t templ;
         uint16_t tempw;
@@ -1799,7 +1800,7 @@ void sbcLongx16()
         tempw=readmemw(addr);
         if (p.d) { SBCBCD16(); } else { SBC16(); }
 }
-void sbcIndirect16()
+static void sbcIndirect16()
 {
         uint32_t templ;
         uint16_t tempw;
@@ -1807,7 +1808,7 @@ void sbcIndirect16()
         tempw=readmemw(addr);
         if (p.d) { SBCBCD16(); } else { SBC16(); }
 }
-void sbcIndirectx16()
+static void sbcIndirectx16()
 {
         uint32_t templ;
         uint16_t tempw;
@@ -1815,7 +1816,7 @@ void sbcIndirectx16()
         tempw=readmemw(addr);
         if (p.d) { SBCBCD16(); } else { SBC16(); }
 }
-void sbcIndirecty16()
+static void sbcIndirecty16()
 {
         uint32_t templ;
         uint16_t tempw;
@@ -1823,7 +1824,7 @@ void sbcIndirecty16()
         tempw=readmemw(addr);
         if (p.d) { SBCBCD16(); } else { SBC16(); }
 }
-void sbcsIndirecty16()
+static void sbcsIndirecty16()
 {
         uint32_t templ;
         uint16_t tempw;
@@ -1831,7 +1832,7 @@ void sbcsIndirecty16()
         tempw=readmemw(addr);
         if (p.d) { SBCBCD16(); } else { SBC16(); }
 }
-void sbcIndirectLong16()
+static void sbcIndirectLong16()
 {
         uint32_t templ;
         uint16_t tempw;
@@ -1839,7 +1840,7 @@ void sbcIndirectLong16()
         tempw=readmemw(addr);
         if (p.d) { SBCBCD16(); } else { SBC16(); }
 }
-void sbcIndirectLongy16()
+static void sbcIndirectLongy16()
 {
         uint32_t templ;
         uint16_t tempw;
@@ -1849,180 +1850,180 @@ void sbcIndirectLongy16()
 }
 
 /*EOR group*/
-void eorImm8()
+static void eorImm8()
 {
         a.b.l^=readmem(pbr|pc); pc++;
         setzn8(a.b.l);
 }
-void eorZp8()
+static void eorZp8()
 {
         addr=zeropage();
         a.b.l^=readmem(addr);
         setzn8(a.b.l);
 }
-void eorZpx8()
+static void eorZpx8()
 {
         addr=zeropagex();
         a.b.l^=readmem(addr);
         setzn8(a.b.l);
 }
-void eorSp8()
+static void eorSp8()
 {
         addr=stack();
         a.b.l^=readmem(addr);
         setzn8(a.b.l);
 }
-void eorAbs8()
+static void eorAbs8()
 {
         addr=absolute();
         a.b.l^=readmem(addr);
         setzn8(a.b.l);
 }
-void eorAbsx8()
+static void eorAbsx8()
 {
         addr=absolutex();
         a.b.l^=readmem(addr);
         setzn8(a.b.l);
 }
-void eorAbsy8()
+static void eorAbsy8()
 {
         addr=absolutey();
         a.b.l^=readmem(addr);
         setzn8(a.b.l);
 }
-void eorLong8()
+static void eorLong8()
 {
         addr=absolutelong();
         a.b.l^=readmem(addr);
         setzn8(a.b.l);
 }
-void eorLongx8()
+static void eorLongx8()
 {
         addr=absolutelongx();
         a.b.l^=readmem(addr);
         setzn8(a.b.l);
 }
-void eorIndirect8()
+static void eorIndirect8()
 {
         addr=indirect();
         a.b.l^=readmem(addr);
         setzn8(a.b.l);
 }
-void eorIndirectx8()
+static void eorIndirectx8()
 {
         addr=indirectx();
         a.b.l^=readmem(addr);
         setzn8(a.b.l);
 }
-void eorIndirecty8()
+static void eorIndirecty8()
 {
         addr=indirecty();
         a.b.l^=readmem(addr);
         setzn8(a.b.l);
 }
-void eorsIndirecty8()
+static void eorsIndirecty8()
 {
         addr=sindirecty();
         a.b.l^=readmem(addr);
         setzn8(a.b.l);
 }
-void eorIndirectLong8()
+static void eorIndirectLong8()
 {
         addr=indirectl();
         a.b.l^=readmem(addr);
         setzn8(a.b.l);
 }
-void eorIndirectLongy8()
+static void eorIndirectLongy8()
 {
         addr=indirectly();
         a.b.l^=readmem(addr);
         setzn8(a.b.l);
 }
 
-void eorImm16()
+static void eorImm16()
 {
         a.w^=readmemw(pbr|pc); pc+=2;
         setzn16(a.w);
 }
-void eorZp16()
+static void eorZp16()
 {
         addr=zeropage();
         a.w^=readmemw(addr);
         setzn16(a.w);
 }
-void eorZpx16()
+static void eorZpx16()
 {
         addr=zeropagex();
         a.w^=readmemw(addr);
         setzn16(a.w);
 }
-void eorSp16()
+static void eorSp16()
 {
         addr=stack();
         a.w^=readmemw(addr);
         setzn16(a.w);
 }
-void eorAbs16()
+static void eorAbs16()
 {
         addr=absolute();
         a.w^=readmemw(addr);
         setzn16(a.w);
 }
-void eorAbsx16()
+static void eorAbsx16()
 {
         addr=absolutex();
         a.w^=readmemw(addr);
         setzn16(a.w);
 }
-void eorAbsy16()
+static void eorAbsy16()
 {
         addr=absolutey();
         a.w^=readmemw(addr);
         setzn16(a.w);
 }
-void eorLong16()
+static void eorLong16()
 {
         addr=absolutelong();
         a.w^=readmemw(addr);
         setzn16(a.w);
 }
-void eorLongx16()
+static void eorLongx16()
 {
         addr=absolutelongx();
         a.w^=readmemw(addr);
         setzn16(a.w);
 }
-void eorIndirect16()
+static void eorIndirect16()
 {
         addr=indirect();
         a.w^=readmemw(addr);
         setzn16(a.w);
 }
-void eorIndirectx16()
+static void eorIndirectx16()
 {
         addr=indirectx();
         a.w^=readmemw(addr);
         setzn16(a.w);
 }
-void eorIndirecty16()
+static void eorIndirecty16()
 {
         addr=indirecty();
         a.w^=readmemw(addr);
         setzn16(a.w);
 }
-void eorsIndirecty16()
+static void eorsIndirecty16()
 {
         addr=sindirecty();
         a.w^=readmemw(addr);
         setzn16(a.w);
 }
-void eorIndirectLong16()
+static void eorIndirectLong16()
 {
         addr=indirectl();
         a.w^=readmemw(addr);
         setzn16(a.w);
 }
-void eorIndirectLongy16()
+static void eorIndirectLongy16()
 {
         addr=indirectly();
         a.w^=readmemw(addr);
@@ -2030,180 +2031,180 @@ void eorIndirectLongy16()
 }
 
 /*AND group*/
-void andImm8()
+static void andImm8()
 {
         a.b.l&=readmem(pbr|pc); pc++;
         setzn8(a.b.l);
 }
-void andZp8()
+static void andZp8()
 {
         addr=zeropage();
         a.b.l&=readmem(addr);
         setzn8(a.b.l);
 }
-void andZpx8()
+static void andZpx8()
 {
         addr=zeropagex();
         a.b.l&=readmem(addr);
         setzn8(a.b.l);
 }
-void andSp8()
+static void andSp8()
 {
         addr=stack();
         a.b.l&=readmem(addr);
         setzn8(a.b.l);
 }
-void andAbs8()
+static void andAbs8()
 {
         addr=absolute();
         a.b.l&=readmem(addr);
         setzn8(a.b.l);
 }
-void andAbsx8()
+static void andAbsx8()
 {
         addr=absolutex();
         a.b.l&=readmem(addr);
         setzn8(a.b.l);
 }
-void andAbsy8()
+static void andAbsy8()
 {
         addr=absolutey();
         a.b.l&=readmem(addr);
         setzn8(a.b.l);
 }
-void andLong8()
+static void andLong8()
 {
         addr=absolutelong();
         a.b.l&=readmem(addr);
         setzn8(a.b.l);
 }
-void andLongx8()
+static void andLongx8()
 {
         addr=absolutelongx();
         a.b.l&=readmem(addr);
         setzn8(a.b.l);
 }
-void andIndirect8()
+static void andIndirect8()
 {
         addr=indirect();
         a.b.l&=readmem(addr);
         setzn8(a.b.l);
 }
-void andIndirectx8()
+static void andIndirectx8()
 {
         addr=indirectx();
         a.b.l&=readmem(addr);
         setzn8(a.b.l);
 }
-void andIndirecty8()
+static void andIndirecty8()
 {
         addr=indirecty();
         a.b.l&=readmem(addr);
         setzn8(a.b.l);
 }
-void andsIndirecty8()
+static void andsIndirecty8()
 {
         addr=sindirecty();
         a.b.l&=readmem(addr);
         setzn8(a.b.l);
 }
-void andIndirectLong8()
+static void andIndirectLong8()
 {
         addr=indirectl();
         a.b.l&=readmem(addr);
         setzn8(a.b.l);
 }
-void andIndirectLongy8()
+static void andIndirectLongy8()
 {
         addr=indirectly();
         a.b.l&=readmem(addr);
         setzn8(a.b.l);
 }
 
-void andImm16()
+static void andImm16()
 {
         a.w&=readmemw(pbr|pc); pc+=2;
         setzn16(a.w);
 }
-void andZp16()
+static void andZp16()
 {
         addr=zeropage();
         a.w&=readmemw(addr);
         setzn16(a.w);
 }
-void andZpx16()
+static void andZpx16()
 {
         addr=zeropagex();
         a.w&=readmemw(addr);
         setzn16(a.w);
 }
-void andSp16()
+static void andSp16()
 {
         addr=stack();
         a.w&=readmemw(addr);
         setzn16(a.w);
 }
-void andAbs16()
+static void andAbs16()
 {
         addr=absolute();
         a.w&=readmemw(addr);
         setzn16(a.w);
 }
-void andAbsx16()
+static void andAbsx16()
 {
         addr=absolutex();
         a.w&=readmemw(addr);
         setzn16(a.w);
 }
-void andAbsy16()
+static void andAbsy16()
 {
         addr=absolutey();
         a.w&=readmemw(addr);
         setzn16(a.w);
 }
-void andLong16()
+static void andLong16()
 {
         addr=absolutelong();
         a.w&=readmemw(addr);
         setzn16(a.w);
 }
-void andLongx16()
+static void andLongx16()
 {
         addr=absolutelongx();
         a.w&=readmemw(addr);
         setzn16(a.w);
 }
-void andIndirect16()
+static void andIndirect16()
 {
         addr=indirect();
         a.w&=readmemw(addr);
         setzn16(a.w);
 }
-void andIndirectx16()
+static void andIndirectx16()
 {
         addr=indirectx();
         a.w&=readmemw(addr);
         setzn16(a.w);
 }
-void andIndirecty16()
+static void andIndirecty16()
 {
         addr=indirecty();
         a.w&=readmemw(addr);
         setzn16(a.w);
 }
-void andsIndirecty16()
+static void andsIndirecty16()
 {
         addr=sindirecty();
         a.w&=readmemw(addr);
         setzn16(a.w);
 }
-void andIndirectLong16()
+static void andIndirectLong16()
 {
         addr=indirectl();
         a.w&=readmemw(addr);
         setzn16(a.w);
 }
-void andIndirectLongy16()
+static void andIndirectLongy16()
 {
         addr=indirectly();
         a.w&=readmemw(addr);
@@ -2211,180 +2212,180 @@ void andIndirectLongy16()
 }
 
 /*ORA group*/
-void oraImm8()
+static void oraImm8()
 {
         a.b.l|=readmem(pbr|pc); pc++;
         setzn8(a.b.l);
 }
-void oraZp8()
+static void oraZp8()
 {
         addr=zeropage();
         a.b.l|=readmem(addr);
         setzn8(a.b.l);
 }
-void oraZpx8()
+static void oraZpx8()
 {
         addr=zeropagex();
         a.b.l|=readmem(addr);
         setzn8(a.b.l);
 }
-void oraSp8()
+static void oraSp8()
 {
         addr=stack();
         a.b.l|=readmem(addr);
         setzn8(a.b.l);
 }
-void oraAbs8()
+static void oraAbs8()
 {
         addr=absolute();
         a.b.l|=readmem(addr);
         setzn8(a.b.l);
 }
-void oraAbsx8()
+static void oraAbsx8()
 {
         addr=absolutex();
         a.b.l|=readmem(addr);
         setzn8(a.b.l);
 }
-void oraAbsy8()
+static void oraAbsy8()
 {
         addr=absolutey();
         a.b.l|=readmem(addr);
         setzn8(a.b.l);
 }
-void oraLong8()
+static void oraLong8()
 {
         addr=absolutelong();
         a.b.l|=readmem(addr);
         setzn8(a.b.l);
 }
-void oraLongx8()
+static void oraLongx8()
 {
         addr=absolutelongx();
         a.b.l|=readmem(addr);
         setzn8(a.b.l);
 }
-void oraIndirect8()
+static void oraIndirect8()
 {
         addr=indirect();
         a.b.l|=readmem(addr);
         setzn8(a.b.l);
 }
-void oraIndirectx8()
+static void oraIndirectx8()
 {
         addr=indirectx();
         a.b.l|=readmem(addr);
         setzn8(a.b.l);
 }
-void oraIndirecty8()
+static void oraIndirecty8()
 {
         addr=indirecty();
         a.b.l|=readmem(addr);
         setzn8(a.b.l);
 }
-void orasIndirecty8()
+static void orasIndirecty8()
 {
         addr=sindirecty();
         a.b.l|=readmem(addr);
         setzn8(a.b.l);
 }
-void oraIndirectLong8()
+static void oraIndirectLong8()
 {
         addr=indirectl();
         a.b.l|=readmem(addr);
         setzn8(a.b.l);
 }
-void oraIndirectLongy8()
+static void oraIndirectLongy8()
 {
         addr=indirectly();
         a.b.l|=readmem(addr);
         setzn8(a.b.l);
 }
 
-void oraImm16()
+static void oraImm16()
 {
         a.w|=readmemw(pbr|pc); pc+=2;
         setzn16(a.w);
 }
-void oraZp16()
+static void oraZp16()
 {
         addr=zeropage();
         a.w|=readmemw(addr);
         setzn16(a.w);
 }
-void oraZpx16()
+static void oraZpx16()
 {
         addr=zeropagex();
         a.w|=readmemw(addr);
         setzn16(a.w);
 }
-void oraSp16()
+static void oraSp16()
 {
         addr=stack();
         a.w|=readmemw(addr);
         setzn16(a.w);
 }
-void oraAbs16()
+static void oraAbs16()
 {
         addr=absolute();
         a.w|=readmemw(addr);
         setzn16(a.w);
 }
-void oraAbsx16()
+static void oraAbsx16()
 {
         addr=absolutex();
         a.w|=readmemw(addr);
         setzn16(a.w);
 }
-void oraAbsy16()
+static void oraAbsy16()
 {
         addr=absolutey();
         a.w|=readmemw(addr);
         setzn16(a.w);
 }
-void oraLong16()
+static void oraLong16()
 {
         addr=absolutelong();
         a.w|=readmemw(addr);
         setzn16(a.w);
 }
-void oraLongx16()
+static void oraLongx16()
 {
         addr=absolutelongx();
         a.w|=readmemw(addr);
         setzn16(a.w);
 }
-void oraIndirect16()
+static void oraIndirect16()
 {
         addr=indirect();
         a.w|=readmemw(addr);
         setzn16(a.w);
 }
-void oraIndirectx16()
+static void oraIndirectx16()
 {
         addr=indirectx();
         a.w|=readmemw(addr);
         setzn16(a.w);
 }
-void oraIndirecty16()
+static void oraIndirecty16()
 {
         addr=indirecty();
         a.w|=readmemw(addr);
         setzn16(a.w);
 }
-void orasIndirecty16()
+static void orasIndirecty16()
 {
         addr=sindirecty();
         a.w|=readmem(addr);
         setzn16(a.w);
 }
-void oraIndirectLong16()
+static void oraIndirectLong16()
 {
         addr=indirectl();
         a.w|=readmemw(addr);
         setzn16(a.w);
 }
-void oraIndirectLongy16()
+static void oraIndirectLongy16()
 {
         addr=indirectly();
         a.w|=readmemw(addr);
@@ -2392,18 +2393,18 @@ void oraIndirectLongy16()
 }
 
 /*BIT group*/
-void bitImm8()
+static void bitImm8()
 {
         uint8_t temp=readmem(pbr|pc); pc++;
         p.z=!(temp&a.b.l);
 }
-void bitImm16()
+static void bitImm16()
 {
         uint16_t temp=readmemw(pbr|pc); pc+=2;
         p.z=!(temp&a.w);
 }
 
-void bitZp8()
+static void bitZp8()
 {
         uint8_t temp;
         addr=zeropage();
@@ -2412,7 +2413,7 @@ void bitZp8()
         p.v=temp&0x40;
         p.n=temp&0x80;
 }
-void bitZp16()
+static void bitZp16()
 {
         uint16_t temp;
         addr=zeropage();
@@ -2422,7 +2423,7 @@ void bitZp16()
         p.n=temp&0x8000;
 }
 
-void bitZpx8()
+static void bitZpx8()
 {
         uint8_t temp;
         addr=zeropagex();
@@ -2431,7 +2432,7 @@ void bitZpx8()
         p.v=temp&0x40;
         p.n=temp&0x80;
 }
-void bitZpx16()
+static void bitZpx16()
 {
         uint16_t temp;
         addr=zeropagex();
@@ -2441,7 +2442,7 @@ void bitZpx16()
         p.n=temp&0x8000;
 }
 
-void bitAbs8()
+static void bitAbs8()
 {
         uint8_t temp;
         addr=absolute();
@@ -2450,7 +2451,7 @@ void bitAbs8()
         p.v=temp&0x40;
         p.n=temp&0x80;
 }
-void bitAbs16()
+static void bitAbs16()
 {
         uint16_t temp;
         addr=absolute();
@@ -2460,7 +2461,7 @@ void bitAbs16()
         p.n=temp&0x8000;
 }
 
-void bitAbsx8()
+static void bitAbsx8()
 {
         uint8_t temp;
         addr=absolutex();
@@ -2469,7 +2470,7 @@ void bitAbsx8()
         p.v=temp&0x40;
         p.n=temp&0x80;
 }
-void bitAbsx16()
+static void bitAbsx16()
 {
         uint16_t temp;
         addr=absolutex();
@@ -2480,14 +2481,14 @@ void bitAbsx16()
 }
 
 /*CMP group*/
-void cmpImm8()
+static void cmpImm8()
 {
         uint8_t temp;
         temp=readmem(pbr|pc); pc++;
         setzn8(a.b.l-temp);
         p.c=(a.b.l>=temp);
 }
-void cmpZp8()
+static void cmpZp8()
 {
         uint8_t temp;
         addr=zeropage();
@@ -2495,7 +2496,7 @@ void cmpZp8()
         setzn8(a.b.l-temp);
         p.c=(a.b.l>=temp);
 }
-void cmpZpx8()
+static void cmpZpx8()
 {
         uint8_t temp;
         addr=zeropagex();
@@ -2503,7 +2504,7 @@ void cmpZpx8()
         setzn8(a.b.l-temp);
         p.c=(a.b.l>=temp);
 }
-void cmpSp8()
+static void cmpSp8()
 {
         uint8_t temp;
         addr=stack();
@@ -2511,7 +2512,7 @@ void cmpSp8()
         setzn8(a.b.l-temp);
         p.c=(a.b.l>=temp);
 }
-void cmpAbs8()
+static void cmpAbs8()
 {
         uint8_t temp;
         addr=absolute();
@@ -2519,7 +2520,7 @@ void cmpAbs8()
         setzn8(a.b.l-temp);
         p.c=(a.b.l>=temp);
 }
-void cmpAbsx8()
+static void cmpAbsx8()
 {
         uint8_t temp;
         addr=absolutex();
@@ -2527,7 +2528,7 @@ void cmpAbsx8()
         setzn8(a.b.l-temp);
         p.c=(a.b.l>=temp);
 }
-void cmpAbsy8()
+static void cmpAbsy8()
 {
         uint8_t temp;
         addr=absolutey();
@@ -2535,7 +2536,7 @@ void cmpAbsy8()
         setzn8(a.b.l-temp);
         p.c=(a.b.l>=temp);
 }
-void cmpLong8()
+static void cmpLong8()
 {
         uint8_t temp;
         addr=absolutelong();
@@ -2543,7 +2544,7 @@ void cmpLong8()
         setzn8(a.b.l-temp);
         p.c=(a.b.l>=temp);
 }
-void cmpLongx8()
+static void cmpLongx8()
 {
         uint8_t temp;
         addr=absolutelongx();
@@ -2551,7 +2552,7 @@ void cmpLongx8()
         setzn8(a.b.l-temp);
         p.c=(a.b.l>=temp);
 }
-void cmpIndirect8()
+static void cmpIndirect8()
 {
         uint8_t temp;
         addr=indirect();
@@ -2559,7 +2560,7 @@ void cmpIndirect8()
         setzn8(a.b.l-temp);
         p.c=(a.b.l>=temp);
 }
-void cmpIndirectx8()
+static void cmpIndirectx8()
 {
         uint8_t temp;
         addr=indirectx();
@@ -2567,7 +2568,7 @@ void cmpIndirectx8()
         setzn8(a.b.l-temp);
         p.c=(a.b.l>=temp);
 }
-void cmpIndirecty8()
+static void cmpIndirecty8()
 {
         uint8_t temp;
         addr=indirecty();
@@ -2575,7 +2576,7 @@ void cmpIndirecty8()
         setzn8(a.b.l-temp);
         p.c=(a.b.l>=temp);
 }
-void cmpsIndirecty8()
+static void cmpsIndirecty8()
 {
         uint8_t temp;
         addr=sindirecty();
@@ -2583,7 +2584,7 @@ void cmpsIndirecty8()
         setzn8(a.b.l-temp);
         p.c=(a.b.l>=temp);
 }
-void cmpIndirectLong8()
+static void cmpIndirectLong8()
 {
         uint8_t temp;
         addr=indirectl();
@@ -2591,7 +2592,7 @@ void cmpIndirectLong8()
         setzn8(a.b.l-temp);
         p.c=(a.b.l>=temp);
 }
-void cmpIndirectLongy8()
+static void cmpIndirectLongy8()
 {
         uint8_t temp;
         addr=indirectly();
@@ -2600,14 +2601,14 @@ void cmpIndirectLongy8()
         p.c=(a.b.l>=temp);
 }
 
-void cmpImm16()
+static void cmpImm16()
 {
         uint16_t temp;
         temp=readmemw(pbr|pc); pc+=2;
         setzn16(a.w-temp);
         p.c=(a.w>=temp);
 }
-void cmpZp16()
+static void cmpZp16()
 {
         uint16_t temp;
         addr=zeropage();
@@ -2615,7 +2616,7 @@ void cmpZp16()
         setzn16(a.w-temp);
         p.c=(a.w>=temp);
 }
-void cmpSp16()
+static void cmpSp16()
 {
         uint16_t temp;
         addr=stack();
@@ -2623,7 +2624,7 @@ void cmpSp16()
         setzn16(a.w-temp);
         p.c=(a.w>=temp);
 }
-void cmpZpx16()
+static void cmpZpx16()
 {
         uint16_t temp;
         addr=zeropagex();
@@ -2631,7 +2632,7 @@ void cmpZpx16()
         setzn16(a.w-temp);
         p.c=(a.w>=temp);
 }
-void cmpAbs16()
+static void cmpAbs16()
 {
         uint16_t temp;
         addr=absolute();
@@ -2639,7 +2640,7 @@ void cmpAbs16()
         setzn16(a.w-temp);
         p.c=(a.w>=temp);
 }
-void cmpAbsx16()
+static void cmpAbsx16()
 {
         uint16_t temp;
         addr=absolutex();
@@ -2647,7 +2648,7 @@ void cmpAbsx16()
         setzn16(a.w-temp);
         p.c=(a.w>=temp);
 }
-void cmpAbsy16()
+static void cmpAbsy16()
 {
         uint16_t temp;
         addr=absolutey();
@@ -2655,7 +2656,7 @@ void cmpAbsy16()
         setzn16(a.w-temp);
         p.c=(a.w>=temp);
 }
-void cmpLong16()
+static void cmpLong16()
 {
         uint16_t temp;
         addr=absolutelong();
@@ -2663,7 +2664,7 @@ void cmpLong16()
         setzn16(a.w-temp);
         p.c=(a.w>=temp);
 }
-void cmpLongx16()
+static void cmpLongx16()
 {
         uint16_t temp;
         addr=absolutelongx();
@@ -2671,7 +2672,7 @@ void cmpLongx16()
         setzn16(a.w-temp);
         p.c=(a.w>=temp);
 }
-void cmpIndirect16()
+static void cmpIndirect16()
 {
         uint16_t temp;
         addr=indirect();
@@ -2679,7 +2680,7 @@ void cmpIndirect16()
         setzn16(a.w-temp);
         p.c=(a.w>=temp);
 }
-void cmpIndirectx16()
+static void cmpIndirectx16()
 {
         uint16_t temp;
         addr=indirectx();
@@ -2687,7 +2688,7 @@ void cmpIndirectx16()
         setzn16(a.w-temp);
         p.c=(a.w>=temp);
 }
-void cmpIndirecty16()
+static void cmpIndirecty16()
 {
         uint16_t temp;
         addr=indirecty();
@@ -2695,7 +2696,7 @@ void cmpIndirecty16()
         setzn16(a.w-temp);
         p.c=(a.w>=temp);
 }
-void cmpsIndirecty16()
+static void cmpsIndirecty16()
 {
         uint16_t temp;
         addr=sindirecty();
@@ -2703,7 +2704,7 @@ void cmpsIndirecty16()
         setzn16(a.w-temp);
         p.c=(a.w>=temp);
 }
-void cmpIndirectLong16()
+static void cmpIndirectLong16()
 {
         uint16_t temp;
         addr=indirectl();
@@ -2711,7 +2712,7 @@ void cmpIndirectLong16()
         setzn16(a.w-temp);
         p.c=(a.w>=temp);
 }
-void cmpIndirectLongy16()
+static void cmpIndirectLongy16()
 {
         uint16_t temp;
         addr=indirectly();
@@ -2721,31 +2722,31 @@ void cmpIndirectLongy16()
 }
 
 /*Stack Group*/
-void phb()
+static void phb()
 {
         readmem(pbr|pc);
         writemem(s.w,dbr>>16); s.w--;
 //        printf("PHB %04X\n",s.w);
 }
-void phbe()
+static void phbe()
 {
         readmem(pbr|pc);
         writemem(s.w,dbr>>16); s.b.l--;
 }
 
-void phk()
+static void phk()
 {
         readmem(pbr|pc);
         writemem(s.w,pbr>>16); s.w--;
 //        printf("PHK %04X\n",s.w);
 }
-void phke()
+static void phke()
 {
         readmem(pbr|pc);
         writemem(s.w,pbr>>16); s.b.l--;
 }
 
-void pea()
+static void pea()
 {
         addr=readmemw(pbr|pc); pc+=2;
         writemem(s.w,addr>>8);   s.w--;
@@ -2753,7 +2754,7 @@ void pea()
 //        printf("PEA %04X\n",s.w);
 }
 
-void pei()
+static void pei()
 {
         addr=indirect();
         writemem(s.w,addr>>8);   s.w--;
@@ -2761,7 +2762,7 @@ void pei()
         //printf("PEI %04X\n",s.w);
 }
 
-void per()
+static void per()
 {
         addr=readmemw(pbr|pc); pc+=2;
         addr+=pc;
@@ -2770,13 +2771,13 @@ void per()
         //printf("PER %04X\n",s.w);
 }
 
-void phd()
+static void phd()
 {
         writemem(s.w,dp>>8);   s.w--;
         writemem(s.w,dp&0xFF); s.w--;
         //printf("PHD %04X\n",s.w);
 }
-void pld()
+static void pld()
 {
         readmem(pbr|pc);
         s.w++; cycles--; clockspc(6);
@@ -2785,13 +2786,13 @@ void pld()
         //printf("PLD %04X\n",s.w);
 }
 
-void pha8()
+static void pha8()
 {
         readmem(pbr|pc);
         writemem(s.w,a.b.l); s.w--;
         //printf("PHA %04X\n",s.w);
 }
-void pha16()
+static void pha16()
 {
         readmem(pbr|pc);
         writemem(s.w,a.b.h); s.w--;
@@ -2799,13 +2800,13 @@ void pha16()
         //printf("PHA %04X\n",s.w);
 }
 
-void phx8()
+static void phx8()
 {
         readmem(pbr|pc);
         writemem(s.w,x.b.l); s.w--;
         //printf("PHX %04X\n",s.w);
 }
-void phx16()
+static void phx16()
 {
         readmem(pbr|pc);
         writemem(s.w,x.b.h); s.w--;
@@ -2813,13 +2814,13 @@ void phx16()
         //printf("PHX %04X\n",s.w);
 }
 
-void phy8()
+static void phy8()
 {
         readmem(pbr|pc);
         writemem(s.w,y.b.l); s.w--;
         //printf("PHY %04X\n",s.w);
 }
-void phy16()
+static void phy16()
 {
         readmem(pbr|pc);
         writemem(s.w,y.b.h); s.w--;
@@ -2827,7 +2828,7 @@ void phy16()
         //printf("PHY %04X\n",s.w);
 }
 
-void pla8()
+static void pla8()
 {
         readmem(pbr|pc);
         s.w++; cycles--; clockspc(6);
@@ -2835,7 +2836,7 @@ void pla8()
         setzn8(a.b.l);
         //printf("PLA %04X\n",s.w);
 }
-void pla16()
+static void pla16()
 {
         readmem(pbr|pc);
         s.w++; cycles--; clockspc(6);
@@ -2845,7 +2846,7 @@ void pla16()
         //printf("PLA %04X\n",s.w);
 }
 
-void plx8()
+static void plx8()
 {
         readmem(pbr|pc);
         s.w++; cycles--; clockspc(6);
@@ -2853,7 +2854,7 @@ void plx8()
         setzn8(x.b.l);
         //printf("PLX %04X\n",s.w);
 }
-void plx16()
+static void plx16()
 {
         readmem(pbr|pc);
         s.w++; cycles--; clockspc(6);
@@ -2863,7 +2864,7 @@ void plx16()
         //printf("PLX %04X\n",s.w);
 }
 
-void ply8()
+static void ply8()
 {
         readmem(pbr|pc);
         s.w++; cycles--; clockspc(6);
@@ -2871,7 +2872,7 @@ void ply8()
         setzn8(y.b.l);
         //printf("PLY %04X\n",s.w);
 }
-void ply16()
+static void ply16()
 {
         readmem(pbr|pc);
         s.w++; cycles--; clockspc(6);
@@ -2881,21 +2882,21 @@ void ply16()
         //printf("PLY %04X\n",s.w);
 }
 
-void plb()
+static void plb()
 {
         readmem(pbr|pc);
         s.w++; cycles--; clockspc(6);
         dbr=readmem(s.w)<<16;
         //printf("PLB %04X\n",s.w);
 }
-void plbe()
+static void plbe()
 {
         readmem(pbr|pc);
         s.b.l++; cycles--; clockspc(6);
         dbr=readmem(s.w)<<16;
 }
 
-void plp()
+static void plp()
 {
         uint8_t temp=readmem(s.w+1); s.w++;
         p.c=temp&1;
@@ -2910,7 +2911,7 @@ void plp()
         updatecpumode();
         //printf("PLP %04X\n",s.w);
 }
-void plpe()
+static void plpe()
 {
         uint8_t temp;
         s.b.l++; temp=readmem(s.w);
@@ -2923,7 +2924,7 @@ void plpe()
         cycles-=2; clockspc(12);
 }
 
-void php()
+static void php()
 {
         uint8_t temp=(p.c)?1:0;
         if (p.z) temp|=2;
@@ -2937,7 +2938,7 @@ void php()
         writemem(s.w,temp); s.w--;
         //printf("PHP %04X\n",s.w);
 }
-void phpe()
+static void phpe()
 {
         uint8_t temp=(p.c)?1:0;
         if (p.z) temp|=2;
@@ -2951,20 +2952,20 @@ void phpe()
 }
 
 /*CPX group*/
-void cpxImm8()
+static void cpxImm8()
 {
         uint8_t temp=readmem(pbr|pc); pc++;
         setzn8(x.b.l-temp);
         p.c=(x.b.l>=temp);
 }
-void cpxImm16()
+static void cpxImm16()
 {
         uint16_t temp=readmemw(pbr|pc); pc+=2;
         setzn16(x.w-temp);
         p.c=(x.w>=temp);
 }
 
-void cpxZp8()
+static void cpxZp8()
 {
         uint8_t temp;
         addr=zeropage();
@@ -2972,7 +2973,7 @@ void cpxZp8()
         setzn8(x.b.l-temp);
         p.c=(x.b.l>=temp);
 }
-void cpxZp16()
+static void cpxZp16()
 {
         uint16_t temp;
         addr=zeropage();
@@ -2981,7 +2982,7 @@ void cpxZp16()
         p.c=(x.w>=temp);
 }
 
-void cpxAbs8()
+static void cpxAbs8()
 {
         uint8_t temp;
         addr=absolute();
@@ -2989,7 +2990,7 @@ void cpxAbs8()
         setzn8(x.b.l-temp);
         p.c=(x.b.l>=temp);
 }
-void cpxAbs16()
+static void cpxAbs16()
 {
         uint16_t temp;
         addr=absolute();
@@ -2999,20 +3000,20 @@ void cpxAbs16()
 }
 
 /*CPY group*/
-void cpyImm8()
+static void cpyImm8()
 {
         uint8_t temp=readmem(pbr|pc); pc++;
         setzn8(y.b.l-temp);
         p.c=(y.b.l>=temp);
 }
-void cpyImm16()
+static void cpyImm16()
 {
         uint16_t temp=readmemw(pbr|pc); pc+=2;
         setzn16(y.w-temp);
         p.c=(y.w>=temp);
 }
 
-void cpyZp8()
+static void cpyZp8()
 {
         uint8_t temp;
         addr=zeropage();
@@ -3020,7 +3021,7 @@ void cpyZp8()
         setzn8(y.b.l-temp);
         p.c=(y.b.l>=temp);
 }
-void cpyZp16()
+static void cpyZp16()
 {
         uint16_t temp;
         addr=zeropage();
@@ -3029,7 +3030,7 @@ void cpyZp16()
         p.c=(y.w>=temp);
 }
 
-void cpyAbs8()
+static void cpyAbs8()
 {
         uint8_t temp;
         addr=absolute();
@@ -3037,7 +3038,7 @@ void cpyAbs8()
         setzn8(y.b.l-temp);
         p.c=(y.b.l>=temp);
 }
-void cpyAbs16()
+static void cpyAbs16()
 {
         uint16_t temp;
         addr=absolute();
@@ -3047,7 +3048,7 @@ void cpyAbs16()
 }
 
 /*Branch group*/
-void bcc()
+static void bcc()
 {
         int8_t temp=(int8_t)readmem(pbr|pc); pc++;
         if (!p.c)
@@ -3056,7 +3057,7 @@ void bcc()
                 cycles--; clockspc(6);
         }
 }
-void bcs()
+static void bcs()
 {
         int8_t temp=(int8_t)readmem(pbr|pc); pc++;
         if (p.c)
@@ -3065,7 +3066,7 @@ void bcs()
                 cycles--; clockspc(6);
         }
 }
-void beq()
+static void beq()
 {
         int8_t temp=(int8_t)readmem(pbr|pc); pc++;
 //        if (setzf>0) p.z=0;
@@ -3077,7 +3078,7 @@ void beq()
                 cycles--; clockspc(6);
         }
 }
-void bne()
+static void bne()
 {
         int8_t temp=(int8_t)readmem(pbr|pc); pc++;
 //        if (pc==0x8D44) printf("BNE %i %i ",setzf,p.z);
@@ -3094,7 +3095,7 @@ void bne()
 //        if (skipz) //printf("%04X\n",pc);
 //        skipz=0;
 }
-void bpl()
+static void bpl()
 {
         int8_t temp=(int8_t)readmem(pbr|pc); pc++;
         if (!p.n)
@@ -3103,7 +3104,7 @@ void bpl()
                 cycles--; clockspc(6);
         }
 }
-void bmi()
+static void bmi()
 {
         int8_t temp=(int8_t)readmem(pbr|pc); pc++;
         if (p.n)
@@ -3112,7 +3113,7 @@ void bmi()
                 cycles--; clockspc(6);
         }
 }
-void bvc()
+static void bvc()
 {
         int8_t temp=(int8_t)readmem(pbr|pc); pc++;
         if (!p.v)
@@ -3121,7 +3122,7 @@ void bvc()
                 cycles--; clockspc(6);
         }
 }
-void bvs()
+static void bvs()
 {
         int8_t temp=(int8_t)readmem(pbr|pc); pc++;
         if (p.v)
@@ -3131,13 +3132,13 @@ void bvs()
         }
 }
 
-void bra()
+static void bra()
 {
         int8_t temp=(int8_t)readmem(pbr|pc); pc++;
         pc+=temp;
         cycles--; clockspc(6);
 }
-void brl()
+static void brl()
 {
         uint16_t temp=readmemw(pbr|pc); pc+=2;
         pc+=temp;
@@ -3145,20 +3146,20 @@ void brl()
 }
 
 /*Jump group*/
-void jmp()
+static void jmp()
 {
         addr=readmemw(pbr|pc);
         pc=addr;
 }
 
-void jmplong()
+static void jmplong()
 {
         addr=readmemw(pbr|pc)|(readmem((pbr|pc)+2)<<16);
         pc=addr&0xFFFF;
         pbr=addr&0xFF0000;
 }
 
-void jmpind()
+static void jmpind()
 {
         addr=readmemw(pbr|pc);
 //        rpclog("Addr %04X\n",addr);
@@ -3166,21 +3167,21 @@ void jmpind()
 //        rpclog("PC %04X\n",addr);
 }
 
-void jmpindx()
+static void jmpindx()
 {
         addr=(readmemw(pbr|pc))+x.w+pbr;
 //        //printf("Read %06X\n",addr);
         pc=readmemw(addr);
 }
 
-void jmlind()
+static void jmlind()
 {
         addr=readmemw(pbr|pc);
         pc=readmemw(addr);
         pbr=readmem(addr+2)<<16;
 }
 
-void jsr()
+static void jsr()
 {
         addr=readmemw(pbr|pc);  pc++;
         readmem(pbr|pc);
@@ -3189,7 +3190,7 @@ void jsr()
         pc=addr;
         //printf("JSR %04X\n",s.w);
 }
-void jsre()
+static void jsre()
 {
         addr=readmemw(pbr|pc);  pc++;
         readmem(pbr|pc);
@@ -3198,7 +3199,7 @@ void jsre()
         pc=addr;
 }
 
-void jsrIndx()
+static void jsrIndx()
 {
         addr=jindirectx(); pc--;
 //        //printf("Addr %06X\n",addr);
@@ -3208,7 +3209,7 @@ void jsrIndx()
         //printf("JSR %04X\n",s.w);
 //        //printf("PC %04X\n",pc);
 }
-void jsrIndxe()
+static void jsrIndxe()
 {
         addr=jindirectx(); pc--;
         writemem(s.w,pc>>8);   s.b.l--;
@@ -3216,7 +3217,7 @@ void jsrIndxe()
         pc=readmemw(addr);
 }
 
-void jsl()
+static void jsl()
 {
         uint8_t temp;
         addr=readmemw(pbr|pc);  pc+=2;
@@ -3230,7 +3231,7 @@ void jsl()
         //printf("JSL %04X\n",s.w);
 }
 
-void jsle()
+static void jsle()
 {
         uint8_t temp;
         addr=readmemw(pbr|pc);  pc+=2;
@@ -3243,7 +3244,7 @@ void jsle()
         pbr=temp<<16;
 }
 
-void rtl()
+static void rtl()
 {
         cycles-=3; clockspc(18);
         pc=readmemw(s.w+1); s.w+=2;
@@ -3252,7 +3253,7 @@ void rtl()
         pc++;
         //printf("RTL %04X\n",s.w);
 }
-void rtle()
+static void rtle()
 {
         cycles-=3; clockspc(18);
         s.b.l++; pc=readmem(s.w);
@@ -3261,14 +3262,14 @@ void rtle()
         pc++;
 }
 
-void rts()
+static void rts()
 {
         cycles-=3; clockspc(18);
         pc=readmemw(s.w+1); s.w+=2;
         pc++;
         //printf("RTS %04X\n",s.w);
 }
-void rtse()
+static void rtse()
 {
         cycles-=3; clockspc(18);
         s.b.l++; pc=readmem(s.w);
@@ -3276,7 +3277,7 @@ void rtse()
         pc++;
 }
 
-void rti()
+static void rti()
 {
         uint8_t temp;
         cycles--; s.w++; clockspc(6);
@@ -3295,7 +3296,7 @@ void rti()
         updatecpumode();
 }
 
-void rtie()
+static void rtie()
 {
         uint8_t temp;
         cycles--; s.b.l++; clockspc(6);
@@ -3313,14 +3314,14 @@ void rtie()
 }
 
 /*Shift group*/
-void asla8()
+static void asla8()
 {
         readmem(pbr|pc);
         p.c=a.b.l&0x80;
         a.b.l<<=1;
         setzn8(a.b.l);
 }
-void asla16()
+static void asla16()
 {
         readmem(pbr|pc);
         p.c=a.w&0x8000;
@@ -3328,10 +3329,9 @@ void asla16()
         setzn16(a.w);
 }
 
-void aslZp8()
+static void aslZp8()
 {
         uint8_t temp;
-        int tempc;
         addr=zeropage();
         temp=readmem(addr);
         cycles--; clockspc(6);
@@ -3340,10 +3340,9 @@ void aslZp8()
         setzn8(temp);
         writemem(addr,temp);
 }
-void aslZp16()
+static void aslZp16()
 {
         uint16_t temp;
-        int tempc;
         addr=zeropage();
         temp=readmemw(addr);
         cycles--; clockspc(6);
@@ -3353,10 +3352,9 @@ void aslZp16()
         writememw(addr,temp);
 }
 
-void aslZpx8()
+static void aslZpx8()
 {
         uint8_t temp;
-        int tempc;
         addr=zeropagex();
         temp=readmem(addr);
         cycles--; clockspc(6);
@@ -3365,10 +3363,9 @@ void aslZpx8()
         setzn8(temp);
         writemem(addr,temp);
 }
-void aslZpx16()
+static void aslZpx16()
 {
         uint16_t temp;
-        int tempc;
         addr=zeropagex();
         temp=readmemw(addr);
         cycles--; clockspc(6);
@@ -3378,10 +3375,9 @@ void aslZpx16()
         writememw(addr,temp);
 }
 
-void aslAbs8()
+static void aslAbs8()
 {
         uint8_t temp;
-        int tempc;
         addr=absolute();
         temp=readmem(addr);
         cycles--; clockspc(6);
@@ -3390,10 +3386,9 @@ void aslAbs8()
         setzn8(temp);
         writemem(addr,temp);
 }
-void aslAbs16()
+static void aslAbs16()
 {
         uint16_t temp;
-        int tempc;
         addr=absolute();
         temp=readmemw(addr);
         cycles--; clockspc(6);
@@ -3403,10 +3398,9 @@ void aslAbs16()
         writememw(addr,temp);
 }
 
-void aslAbsx8()
+static void aslAbsx8()
 {
         uint8_t temp;
-        int tempc;
         addr=absolutex();
         temp=readmem(addr);
         cycles--; clockspc(6);
@@ -3415,10 +3409,9 @@ void aslAbsx8()
         setzn8(temp);
         writemem(addr,temp);
 }
-void aslAbsx16()
+static void aslAbsx16()
 {
         uint16_t temp;
-        int tempc;
         addr=absolutex();
         temp=readmemw(addr);
         cycles--; clockspc(6);
@@ -3428,14 +3421,14 @@ void aslAbsx16()
         writememw(addr,temp);
 }
 
-void lsra8()
+static void lsra8()
 {
         readmem(pbr|pc);
         p.c=a.b.l&1;
         a.b.l>>=1;
         setzn8(a.b.l);
 }
-void lsra16()
+static void lsra16()
 {
         readmem(pbr|pc);
         p.c=a.w&1;
@@ -3443,10 +3436,9 @@ void lsra16()
         setzn16(a.w);
 }
 
-void lsrZp8()
+static void lsrZp8()
 {
         uint8_t temp;
-        int tempc;
         addr=zeropage();
         temp=readmem(addr);
         cycles--; clockspc(6);
@@ -3455,10 +3447,9 @@ void lsrZp8()
         setzn8(temp);
         writemem(addr,temp);
 }
-void lsrZp16()
+static void lsrZp16()
 {
         uint16_t temp;
-        int tempc;
         addr=zeropage();
         temp=readmemw(addr);
         cycles--; clockspc(6);
@@ -3468,10 +3459,9 @@ void lsrZp16()
         writememw(addr,temp);
 }
 
-void lsrZpx8()
+static void lsrZpx8()
 {
         uint8_t temp;
-        int tempc;
         addr=zeropagex();
         temp=readmem(addr);
         cycles--; clockspc(6);
@@ -3480,10 +3470,9 @@ void lsrZpx8()
         setzn8(temp);
         writemem(addr,temp);
 }
-void lsrZpx16()
+static void lsrZpx16()
 {
         uint16_t temp;
-        int tempc;
         addr=zeropagex();
         temp=readmemw(addr);
         cycles--; clockspc(6);
@@ -3493,10 +3482,9 @@ void lsrZpx16()
         writememw(addr,temp);
 }
 
-void lsrAbs8()
+static void lsrAbs8()
 {
         uint8_t temp;
-        int tempc;
         addr=absolute();
         temp=readmem(addr);
         cycles--; clockspc(6);
@@ -3505,10 +3493,9 @@ void lsrAbs8()
         setzn8(temp);
         writemem(addr,temp);
 }
-void lsrAbs16()
+static void lsrAbs16()
 {
         uint16_t temp;
-        int tempc;
         addr=absolute();
         temp=readmemw(addr);
         cycles--; clockspc(6);
@@ -3518,10 +3505,9 @@ void lsrAbs16()
         writememw(addr,temp);
 }
 
-void lsrAbsx8()
+static void lsrAbsx8()
 {
         uint8_t temp;
-        int tempc;
         addr=absolutex();
         temp=readmem(addr);
         cycles--; clockspc(6);
@@ -3530,10 +3516,9 @@ void lsrAbsx8()
         setzn8(temp);
         writemem(addr,temp);
 }
-void lsrAbsx16()
+static void lsrAbsx16()
 {
         uint16_t temp;
-        int tempc;
         addr=absolutex();
         temp=readmemw(addr);
         cycles--; clockspc(6);
@@ -3543,7 +3528,7 @@ void lsrAbsx16()
         writememw(addr,temp);
 }
 
-void rola8()
+static void rola8()
 {
         readmem(pbr|pc);
         addr=p.c;
@@ -3552,7 +3537,7 @@ void rola8()
         if (addr) a.b.l|=1;
         setzn8(a.b.l);
 }
-void rola16()
+static void rola16()
 {
         readmem(pbr|pc);
         addr=p.c;
@@ -3562,7 +3547,7 @@ void rola16()
         setzn16(a.w);
 }
 
-void rolZp8()
+static void rolZp8()
 {
         uint8_t temp;
         int tempc;
@@ -3576,7 +3561,7 @@ void rolZp8()
         setzn8(temp);
         writemem(addr,temp);
 }
-void rolZp16()
+static void rolZp16()
 {
         uint16_t temp;
         int tempc;
@@ -3591,7 +3576,7 @@ void rolZp16()
         writememw(addr,temp);
 }
 
-void rolZpx8()
+static void rolZpx8()
 {
         uint8_t temp;
         int tempc;
@@ -3605,7 +3590,7 @@ void rolZpx8()
         setzn8(temp);
         writemem(addr,temp);
 }
-void rolZpx16()
+static void rolZpx16()
 {
         uint16_t temp;
         int tempc;
@@ -3620,7 +3605,7 @@ void rolZpx16()
         writememw(addr,temp);
 }
 
-void rolAbs8()
+static void rolAbs8()
 {
         uint8_t temp;
         int tempc;
@@ -3634,7 +3619,7 @@ void rolAbs8()
         setzn8(temp);
         writemem(addr,temp);
 }
-void rolAbs16()
+static void rolAbs16()
 {
         uint16_t temp;
         int tempc;
@@ -3649,7 +3634,7 @@ void rolAbs16()
         writememw(addr,temp);
 }
 
-void rolAbsx8()
+static void rolAbsx8()
 {
         uint8_t temp;
         int tempc;
@@ -3663,7 +3648,7 @@ void rolAbsx8()
         setzn8(temp);
         writemem(addr,temp);
 }
-void rolAbsx16()
+static void rolAbsx16()
 {
         uint16_t temp;
         int tempc;
@@ -3678,7 +3663,7 @@ void rolAbsx16()
         writememw(addr,temp);
 }
 
-void rora8()
+static void rora8()
 {
         readmem(pbr|pc);
         addr=p.c;
@@ -3687,7 +3672,7 @@ void rora8()
         if (addr) a.b.l|=0x80;
         setzn8(a.b.l);
 }
-void rora16()
+static void rora16()
 {
         readmem(pbr|pc);
         addr=p.c;
@@ -3697,7 +3682,7 @@ void rora16()
         setzn16(a.w);
 }
 
-void rorZp8()
+static void rorZp8()
 {
         uint8_t temp;
         int tempc;
@@ -3711,7 +3696,7 @@ void rorZp8()
         setzn8(temp);
         writemem(addr,temp);
 }
-void rorZp16()
+static void rorZp16()
 {
         uint16_t temp;
         int tempc;
@@ -3726,7 +3711,7 @@ void rorZp16()
         writememw(addr,temp);
 }
 
-void rorZpx8()
+static void rorZpx8()
 {
         uint8_t temp;
         int tempc;
@@ -3740,7 +3725,7 @@ void rorZpx8()
         setzn8(temp);
         writemem(addr,temp);
 }
-void rorZpx16()
+static void rorZpx16()
 {
         uint16_t temp;
         int tempc;
@@ -3755,7 +3740,7 @@ void rorZpx16()
         writememw(addr,temp);
 }
 
-void rorAbs8()
+static void rorAbs8()
 {
         uint8_t temp;
         int tempc;
@@ -3769,7 +3754,7 @@ void rorAbs8()
         setzn8(temp);
         writemem(addr,temp);
 }
-void rorAbs16()
+static void rorAbs16()
 {
         uint16_t temp;
         int tempc;
@@ -3784,7 +3769,7 @@ void rorAbs16()
         writememw(addr,temp);
 }
 
-void rorAbsx8()
+static void rorAbsx8()
 {
         uint8_t temp;
         int tempc;
@@ -3798,7 +3783,7 @@ void rorAbsx8()
         setzn8(temp);
         writemem(addr,temp);
 }
-void rorAbsx16()
+static void rorAbsx16()
 {
         uint16_t temp;
         int tempc;
@@ -3814,45 +3799,45 @@ void rorAbsx16()
 }
 
 /*Misc group*/
-void xba()
+static void xba()
 {
         readmem(pbr|pc);
         a.w=(a.w>>8)|(a.w<<8);
         setzn8(a.b.l);
 }
-void nop()
+static void nop()
 {
         cycles--; clockspc(6);
 }
 
-void tcd()
+static void tcd()
 {
         readmem(pbr|pc);
         dp=a.w;
         setzn16(dp);
 }
 
-void tdc()
+static void tdc()
 {
         readmem(pbr|pc);
         a.w=dp;
         setzn16(a.w);
 }
 
-void tcs()
+static void tcs()
 {
         readmem(pbr|pc);
         s.w=a.w;
 }
 
-void tsc()
+static void tsc()
 {
         readmem(pbr|pc);
         a.w=s.w;
         setzn16(a.w);
 }
 
-void trbZp8()
+static void trbZp8()
 {
         uint8_t temp;
         addr=zeropage();
@@ -3862,7 +3847,7 @@ void trbZp8()
         cycles--; clockspc(6);
         writemem(addr,temp);
 }
-void trbZp16()
+static void trbZp16()
 {
         uint16_t temp;
         addr=zeropage();
@@ -3873,7 +3858,7 @@ void trbZp16()
         writememw(addr,temp);
 }
 
-void trbAbs8()
+static void trbAbs8()
 {
         uint8_t temp;
         addr=absolute();
@@ -3883,7 +3868,7 @@ void trbAbs8()
         cycles--; clockspc(6);
         writemem(addr,temp);
 }
-void trbAbs16()
+static void trbAbs16()
 {
         uint16_t temp;
         addr=absolute();
@@ -3894,7 +3879,7 @@ void trbAbs16()
         writememw(addr,temp);
 }
 
-void tsbZp8()
+static void tsbZp8()
 {
         uint8_t temp;
         addr=zeropage();
@@ -3904,7 +3889,7 @@ void tsbZp8()
         cycles--; clockspc(6);
         writemem(addr,temp);
 }
-void tsbZp16()
+static void tsbZp16()
 {
         uint16_t temp;
         addr=zeropage();
@@ -3915,7 +3900,7 @@ void tsbZp16()
         writememw(addr,temp);
 }
 
-void tsbAbs8()
+static void tsbAbs8()
 {
         uint8_t temp;
         addr=absolute();
@@ -3925,7 +3910,7 @@ void tsbAbs8()
         cycles--; clockspc(6);
         writemem(addr,temp);
 }
-void tsbAbs16()
+static void tsbAbs16()
 {
         uint16_t temp;
         addr=absolute();
@@ -3936,7 +3921,7 @@ void tsbAbs16()
         writememw(addr,temp);
 }
 
-void wai()
+static void wai()
 {
         readmem(pbr|pc);
         inwai=1;
@@ -3944,7 +3929,7 @@ void wai()
 //        printf("WAI %06X\n",pbr|pc);
 }
 
-void mvp()
+static void mvp()
 {
         uint8_t temp;
         dbr=(readmem(pbr|pc))<<16; pc++;
@@ -3958,7 +3943,7 @@ void mvp()
         cycles-=2; clockspc(12);
 }
 
-void mvn()
+static void mvn()
 {
         uint8_t temp;
         dbr=(readmem(pbr|pc))<<16; pc++;
@@ -3972,7 +3957,7 @@ void mvn()
         cycles-=2; clockspc(12);
 }
 
-void brk()
+static void op_brk()
 {
         uint8_t temp=0;
         pc++;
@@ -3994,7 +3979,7 @@ void brk()
         p.d=0;
 }
 
-void brke()
+static void brke()
 {
         uint8_t temp=0;
         pc++;
@@ -4013,7 +3998,7 @@ void brke()
         p.d=0;
 }
 
-void cop()
+static void cop()
 {
         uint8_t temp=0;
         pc++;
@@ -4035,7 +4020,7 @@ void cop()
         p.d=0;
 }
 
-void cope()
+static void cope()
 {
         uint8_t temp=0;
         pc++;
@@ -4054,24 +4039,24 @@ void cope()
         p.d=0;
 }
 
-void wdm()
+static void wdm()
 {
         readmem(pc); pc++;
 }
 
-void stp() /*No point emulating this properly as the external support circuitry isn't there*/
+static void stp() /*No point emulating this properly as the external support circuitry isn't there*/
 {
         pc--;
         cycles-=600;
 }
 
 /*Functions*/
-void reset65816()
+void w65816_reset()
 {
         def=1;
                 if (def || (banking&4)) w65816mask=0xFFFF;
                 else                    w65816mask=0x7FFFF;
-        tuberomin=1;
+//        tuberomin=1;
         pbr=dbr=0;
         s.w=0x1FF;
         cpumode=4;
@@ -4086,7 +4071,7 @@ void reset65816()
 //        exit(-1);
 }
 
-void dumpregs65816()
+/*static void w65816_dumpregs()
 {
         int c;
         FILE *f=fopen("65816.dmp","wb");
@@ -4098,9 +4083,9 @@ void dumpregs65816()
         printf("PC=%06X DBR=%02X DP=%04X\n",pc|pbr,dbr>>24,dp);
         printf("%c %c %c %i %i\n",(p.e)?'E':' ',(p.ex)?'X':' ',(p.m)?'M':' ',cpumode,wins);
         //printf("89272=%02X\n",readmem(0x89272));
-}
+}*/
 
-void badopcode()
+static void badopcode()
 {
 //        FILE *f=fopen("rom.dmp","wb");
 //        printf("Bad opcode %02X\n",opcode);
@@ -4112,7 +4097,7 @@ void badopcode()
 //        exit(-1);
 }
 
-void makeopcodetable65816()
+static void makeopcodetable65816()
 {
         int c,d;
         for (c=0;c<256;c++)
@@ -4474,10 +4459,10 @@ void makeopcodetable65816()
         opcodes[0xAB][4]=plbe;
         opcodes[0x08][0]=opcodes[0x08][1]=opcodes[0x08][2]=
                                           opcodes[0x08][3]=php;
-        opcodes[0x08][4]=php;
+        opcodes[0x08][4]=phpe;
         opcodes[0x28][0]=opcodes[0x28][1]=opcodes[0x28][2]=
                                           opcodes[0x28][3]=plp;
-        opcodes[0x28][4]=plp;
+        opcodes[0x28][4]=plpe;
         opcodes[0x48][0]=opcodes[0x48][2]=opcodes[0x48][4]=pha8;
         opcodes[0x48][1]=opcodes[0x48][3]=pha16;
         opcodes[0xDA][0]=opcodes[0xDA][1]=opcodes[0xDA][4]=phx8;
@@ -4660,7 +4645,7 @@ void makeopcodetable65816()
 
         /*Misc group*/
         opcodes[0x00][0]=opcodes[0x00][1]=opcodes[0x00][2]=
-                         opcodes[0x00][3]=brk;
+                         opcodes[0x00][3]=op_brk;
         opcodes[0x00][4]=brke;
         opcodes[0x02][0]=opcodes[0x02][1]=opcodes[0x02][2]=
                          opcodes[0x02][3]=cop;
@@ -4697,7 +4682,7 @@ void makeopcodetable65816()
                          opcodes[0xDB][3]=opcodes[0xDB][4]=stp;
 }
 
-void init65816()
+void w65816_init()
 {
         FILE *f;
         char fn[512];
@@ -4710,13 +4695,13 @@ void init65816()
         makeopcodetable65816();
 }
 
-void close65816()
+void w65816_close()
 {
         if (w65816ram) free(w65816ram);
         if (w65816rom) free(w65816rom);
 }
 
-void updatecpumode()
+static void updatecpumode()
 {
         if (p.e)
         {
@@ -4732,7 +4717,7 @@ void updatecpumode()
         }
 }
 
-void nmi65816()
+static void nmi65816()
 {
         uint8_t temp=0;
 //        printf("NMI %i %i %i\n",p.i,inwai,irqenable);
@@ -4785,8 +4770,8 @@ void nmi65816()
         }
 }
 
-int toutput=0;
-void irq65816()
+static int toutput=0;
+static void irq65816()
 {
         uint8_t temp=0;
 //        printf("IRQ %i %i %i\n",p.i,inwai,irqenable);
@@ -4842,22 +4827,21 @@ void irq65816()
         }
 }
 
-int mainins;
-int woldnmi=0;
-uint16_t toldpc;
-void exec65816()
+static int woldnmi=0;
+static uint16_t toldpc;
+void w65816_exec()
 {
         while (tubecycles>0)
         {
                 opcode=readmem(pbr|pc); pc++;
-                if (toutput) rpclog("%i %i : %02X:%04X %04X %02X %i %04X  %04X %04X %04X\n",wins,mainins,pbr,pc-1,toldpc,opcode,cycles,s.b.l,a.w,x.w,y.w);
+                if (toutput) rpclog("%i : %02X:%04X %04X %02X %i %04X  %04X %04X %04X\n",wins,pbr,pc-1,toldpc,opcode,cycles,s.b.l,a.w,x.w,y.w);
                 toldpc=pc-1;
                 opcodes[opcode][cpumode]();
 //                if (pc==0xffee) toutput=1;
                 wins++;
-                if ((tubeirq&2) && !woldnmi)  nmi65816();
-                else if ((tubeirq&1) && !p.i) irq65816();
-                woldnmi=tubeirq&2;
+                if ((tube_irq&2) && !woldnmi)  nmi65816();
+                else if ((tube_irq&1) && !p.i) irq65816();
+                woldnmi=tube_irq&2;
 //                if (pc==0x10C) toutput=1;
 /*                if (pc==0xfff7)
                 {

@@ -2,11 +2,11 @@ VPATH = . resid-fp
 CPP  = g++.exe
 CC   = gcc.exe
 WINDRES = windres.exe
-CFLAGS = -O3 -march=i686 -ffast-math -fomit-frame-pointer -falign-loops -falign-jumps -falign-functions
-OBJ = main.o 6502.o mem.o sysvia.o uservia.o video.o 6850acia.o uef.o csw.o serial.o 1770.o ssd.o 8271.o disc.o adf.o cmos.o sound.o soundopenal.o debugger.o tube.o 6502tube.o arm.o z80.o x86.o fdi.o fdi2raw.o resid.o adc.o ddnoise.o win.o 65816.o win-keydefine.o config.o win-catalogue.o tapenoise.o 32016.o i2ccmos.o ide.o savestate.o vidalleg.o vidopengl.o b-em.res
+CFLAGS = -O3
+OBJ = 6502.o 6502tube.o 32016.o 65816.o acia.o adc.o adf.o arm.o cmos.o compact_joystick.o compactcmos.o config.o csw.o ddnoise.o debugger.o disc.o fdi2raw.o fdi.o i8271.o ide.o keyboard.o main.o mem.o model.o mouse.o pal.o savestate.o serial.o sn76489.o sound.o soundopenal.o ssd.o sysvia.o tape.o tapenoise.o tube.o uef.o uservia.o via.o vidalleg.o video.o wd1770.o win.o win-catalogue.o win-keydefine.o x86.o z80.o resid.o b-em.res
 SIDOBJ = convolve.o envelope.o extfilt.o filter.o pot.o sid.o voice.o wave6581__ST.o wave6581_P_T.o wave6581_PS_.o wave6581_PST.o wave8580__ST.o wave8580_P_T.o wave8580_PS_.o wave8580_PST.o wave.o
 
-LIBS =  -mwindows -lagl -lalleg -lz -lalut -lopenal32 -lgdi32 -lwinmm -lstdc++ -lopengl32 -lglu32
+LIBS =  -mwindows -lalleg -lz -lalut -lopenal32 -lgdi32 -lwinmm -lstdc++
 
 b-em.exe: $(OBJ) $(SIDOBJ)
 	$(CC) $(OBJ) $(SIDOBJ) -o "b-em.exe" $(LIBS)

@@ -1,16 +1,26 @@
-/*B-em v2.1 by Tom Walker
+/*B-em v2.2 by Tom Walker
   ARM1 parasite CPU emulation
   Originally from Arculator*/
 
 #include <stdio.h>
 #include <stdint.h>
+#include <allegro.h>
 #include "b-em.h"
 #include "arm.h"
+#include "tube.h"
 
-uint32_t opcode2,opcode3;
-int armirq=0;
-uint32_t *armrom,*armram;
-uint8_t *armromb,*armramb;
+
+uint32_t *usrregs[16],userregs[16],superregs[16],fiqregs[16],irqregs[16];
+uint32_t armregs[16];
+
+#define PC ((armregs[15])&0x3FFFFFC)
+
+static uint32_t opcode2,opcode3;
+
+static int armirq=0;
+static int databort;
+static uint32_t *armrom,*armram;
+static uint8_t *armromb,*armramb;
 #define USER       0
 #define FIQ        1
 #define IRQ        2
@@ -51,25 +61,10 @@ uint8_t *armromb,*armramb;
                                         refillpipeline();\
                                         tubecycles--
 
-/*0=i/o, 1=all, 2=r/o, 3=os r/o, 4=super only, 5=read mem, write io*/
-/*0=user, 1=os, 2=super*/
-int modepritabler[3][6]=
-{
-        {0,1,1,0,0,1},
-        {0,1,1,1,0,1},
-        {0,1,1,1,1,1}
-};
-int modepritablew[3][6]=
-{
-        {0,1,0,0,0,0},
-        {0,1,1,0,0,0},
-        {0,1,1,1,1,0}
-};
+static int mode;
+static int osmode=0,memmode;
 
-int mode;
-int osmode=0,memmode;
-
-void updatemode(int m)
+static void updatemode(int m)
 {
         int c;
         usrregs[15]=&armregs[15];
@@ -125,14 +120,14 @@ void updatemode(int m)
         }
 }
 
-uint8_t flaglookup[16][16];
-uint32_t rotatelookup[4096];
+static uint8_t flaglookup[16][16];
+static uint32_t rotatelookup[4096];
 
-void refillpipeline2();
+static void refillpipeline2();
 
 #define countbits(c) countbitstable[c]
-int countbitstable[65536];
-void resetarm()
+static int countbitstable[65536];
+void arm_reset()
 {
         int c,d,exec,data;
         uint32_t rotval,rotamount;
@@ -187,9 +182,8 @@ void resetarm()
         refillpipeline2();
 }
 
-void dumparmregs()
+void arm_dumpregs()
 {
-        int c;
         FILE *f=fopen("armram.dmp","wb");
         fwrite(armram,0x10000,1,f);
         fclose(f);
@@ -201,9 +195,9 @@ void dumparmregs()
         rpclog("PC =%07X\n",PC);
 }
 
-uint32_t *armread[64];
-uint32_t armmask[64];
-void loadarmrom()
+static uint32_t *armread[64];
+static uint32_t armmask[64];
+void arm_init()
 {
         FILE *f;
         int c;
@@ -224,15 +218,15 @@ void loadarmrom()
         armmask[48]=0x3FFF;
 }
 
-void closearm()
+void arm_close()
 {
         if (armrom) free(armrom);
         if (armram) free(armram);
 }
 
 int endtimeslice=0;
-uint32_t readarmfl(uint32_t addr);
-uint32_t readarml(uint32_t a)
+static uint32_t readarmfl(uint32_t addr);
+static uint32_t readarml(uint32_t a)
 {
         if (armread[(a>>20)&63])
                 return armread[(a>>20)&63][(a&0xFFFFF)>>2];
@@ -240,13 +234,13 @@ uint32_t readarml(uint32_t a)
 }
 //#define readarml(a) ((armread[(a>>20)&63])?armread[(a>>20)&63][(a&0xFFFFF)>>2]:readarmfl(a))
 
-uint8_t readarmb(uint32_t addr)
+static uint8_t readarmb(uint32_t addr)
 {
         if (addr<0x400000) return armramb[addr];
         if ((addr&~0x1F)==0x1000000)
         {
                 //rpclog("Read %08X\n",addr);
-                return readtube((addr&0x1C)>>2);
+                return tube_parasite_read((addr&0x1C)>>2);
         }
         if ((addr>=0x3000000) && (addr<0x3004000)) return armromb[addr&0x3FFF];
         return 0xFF;
@@ -254,7 +248,7 @@ uint8_t readarmb(uint32_t addr)
         dumparmregs();
         exit(-1);*/
 }
-uint32_t readarmfl(uint32_t addr)
+static uint32_t readarmfl(uint32_t addr)
 {
         if (addr<0x400000) return armram[addr>>2];
         if (addr<0x400010) return 0xFFFFFFFF;
@@ -265,7 +259,7 @@ uint32_t readarmfl(uint32_t addr)
         exit(-1);*/
 }
 
-void writearmb(uint32_t addr, uint8_t val)
+static void writearmb(uint32_t addr, uint8_t val)
 {
         if (addr<0x400000)
         {
@@ -275,7 +269,7 @@ void writearmb(uint32_t addr, uint8_t val)
         if ((addr&~0x1F)==0x1000000)
         {
 //                rpclog("Write %08X %02X\n",addr,val);
-                writetube((addr&0x1C)>>2,val);
+                tube_parasite_write((addr&0x1C)>>2,val);
                 endtimeslice=1;
                 return;
         }
@@ -283,7 +277,7 @@ void writearmb(uint32_t addr, uint8_t val)
         dumparmregs();
         exit(-1);*/
 }
-void writearml(uint32_t addr, uint32_t val)
+static void writearml(uint32_t addr, uint32_t val)
 {
         if (addr<0x400000)
         {
@@ -299,7 +293,7 @@ void writearml(uint32_t addr, uint32_t val)
 #define checkneg(v) (v&0x80000000)
 #define checkpos(v) !(v&0x80000000)
 
-inline void setadd(uint32_t op1, uint32_t op2, uint32_t res)
+static inline void setadd(uint32_t op1, uint32_t op2, uint32_t res)
 {
         armregs[15]&=0xFFFFFFF;
         if ((checkneg(op1) && checkneg(op2)) ||
@@ -312,9 +306,8 @@ inline void setadd(uint32_t op1, uint32_t op2, uint32_t res)
         else if (checkneg(res))            armregs[15]|=NFLAG;
 }
 
-inline void setsub(uint32_t op1, uint32_t op2, uint32_t res)
+static inline void setsub(uint32_t op1, uint32_t op2, uint32_t res)
 {
-        char s[80];
         armregs[15]&=0xFFFFFFF;
         if ((checkneg(op1) && checkpos(op2)) ||
             (checkneg(op1) && checkpos(res)) ||
@@ -326,14 +319,40 @@ inline void setsub(uint32_t op1, uint32_t op2, uint32_t res)
             armregs[15]|=VFLAG;
 }
 
-inline void setarmzn(uint32_t op)
+static inline void setsbc(uint32_t op1, uint32_t op2, uint32_t res)
+{
+        armregs[15]&=0xFFFFFFF;
+        if (!res)                           armregs[15]|=ZFLAG;
+        else if (checkneg(res))             armregs[15]|=NFLAG;
+        if ((checkneg(op1) && checkpos(op2)) ||
+            (checkneg(op1) && checkpos(res)) ||
+            (checkpos(op2) && checkpos(res)))  armregs[15]|=CFLAG;
+        if ((checkneg(op1) && checkpos(op2) && checkpos(res)) ||
+            (checkpos(op1) && checkneg(op2) && checkneg(res)))
+            armregs[15]|=VFLAG;
+}
+
+static inline void setadc(uint32_t op1, uint32_t op2, uint32_t res)
+{
+        armregs[15]&=0xFFFFFFF;
+        if ((checkneg(op1) && checkneg(op2)) ||
+            (checkneg(op1) && checkpos(res)) ||
+            (checkneg(op2) && checkpos(res)))  armregs[15]|=CFLAG;
+        if ((checkneg(op1) && checkneg(op2) && checkpos(res)) ||
+            (checkpos(op1) && checkpos(op2) && checkneg(res)))
+            armregs[15]|=VFLAG;
+        if (!res)                          armregs[15]|=ZFLAG;
+        else if (checkneg(res))            armregs[15]|=NFLAG;
+}
+
+static inline void setarmzn(uint32_t op)
 {
         armregs[15]&=0x3FFFFFFF;
         if (!op)               armregs[15]|=ZFLAG;
         else if (checkneg(op)) armregs[15]|=NFLAG;
 }
 
-inline uint32_t shift(uint32_t opcode)
+static inline uint32_t shift(uint32_t opcode)
 {
         uint32_t shiftmode=(opcode>>5)&3;
         uint32_t shiftamount=(opcode>>7)&31;
@@ -426,9 +445,10 @@ inline uint32_t shift(uint32_t opcode)
                 }
                 return (temp>>shiftamount)|(temp<<(32-shiftamount));
         }
+        return 0; /*Should never reach here*/
 }
 
-inline unsigned shift2(unsigned opcode)
+static inline unsigned shift2(unsigned opcode)
 {
         unsigned shiftmode=(opcode>>5)&3;
         unsigned shiftamount=(opcode>>7)&31;
@@ -470,9 +490,10 @@ inline unsigned shift2(unsigned opcode)
                 if (!shiftamount)                   return temp;
                 return (temp>>shiftamount)|(temp<<(32-shiftamount));
         }
+        return 0; /*Should never reach here*/
 }
 
-inline unsigned rotate(unsigned data)
+static inline unsigned rotate(unsigned data)
 {
         uint32_t rotval;
         rotval=rotatelookup[data&4095];
@@ -486,29 +507,27 @@ inline unsigned rotate(unsigned data)
 
 #define rotate2(v) rotatelookup[v&4095]
 
-int ldrlookup[4]={0,8,16,24};
+static int ldrlookup[4]={0,8,16,24};
 
 #define ldrresult(v,a) ((v>>ldrlookup[addr&3])|(v<<(32-ldrlookup[addr&3])))
 
-void refillpipeline()
+static void refillpipeline()
 {
         opcode2=readarml(PC-4);
         opcode3=readarml(PC);
 }
 
-void refillpipeline2()
+static void refillpipeline2()
 {
         opcode2=readarml(PC-8);
         opcode3=readarml(PC-4);
 }
 
 int accc=0;
-void execarm()
+void arm_exec()
 {
         uint32_t opcode,templ,templ2,mask,addr,addr2;
-        int exec,c;
-        uint8_t temp;
-        FILE *f;
+        int c;
         while (tubecycles>0)
         {
                 opcode=opcode2;
@@ -1749,7 +1768,6 @@ void execarm()
                                 templ=readarml(addr); \
                                 if (!databort) \
                                 { \
-                                if (output) rpclog("Loading R15 with %08X\n",templ); \
                                         if (armregs[15]&3) armregs[15]=(templ+4); \
                                         else               armregs[15]=(armregs[15]&0x0C000003)|((templ+4)&0xF3FFFFFC); \
                                 } \
@@ -1939,7 +1957,7 @@ void execarm()
                                         break;
                                 }
                         }
-                        if (databort|armirq|tubeirq)
+                        if (databort|armirq|tube_irq)
                         {
                                 if (databort==1)     /*Data abort*/
                                 {
@@ -1987,7 +2005,7 @@ void execarm()
                                 }
                         }
 //                if (armregs[12]==0x1000000) rpclog("R12=1000000 %08X  %i\n",PC,armins);
-                armirq=tubeirq;
+                armirq=tube_irq;
                 if ((armregs[15]&3)!=mode) updatemode(armregs[15]&3);
                 armregs[15]+=4;
 //                rpclog("%08X : %08X %08X %08X  %08X\n",PC,armregs[0],armregs[1],armregs[2],opcode);

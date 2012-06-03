@@ -1,89 +1,90 @@
-/*B-em v2.1 by Tom Walker
+/*B-em v2.2 by Tom Walker
   ADC emulation*/
 
 #include <stdio.h>
 #include <allegro.h>
 #include "b-em.h"
+#include "adc.h"
+#include "via.h"
+#include "sysvia.h"
 
-int joy1x,joy1y,joy2x,joy2y;
+static uint8_t adc_status,adc_high,adc_low,adc_latch;
+int adc_time;
 
-uint8_t adcstatus,adchigh,adclow,adclatch;
-int adcconvert;
-
-uint8_t readadc(uint16_t addr)
+uint8_t adc_read(uint16_t addr)
 {
-        switch (addr&3)
+        switch (addr & 3)
         {
                 case 0:
-                return adcstatus;
+                return adc_status;
                 break;
                 case 1:
-                return adchigh;
+                return adc_high;
                 break;
                 case 2:
-                return adclow;
+                return adc_low;
                 break;
         }
         return 0x40;
 }
 
-void writeadc(uint16_t addr, uint8_t val)
+void adc_write(uint16_t addr, uint8_t val)
 {
-        if (!(addr&3))
+        if (!(addr & 3))
         {
-                adclatch=val;
-                adcconvert=60;
-                adcstatus=(val&0xF)|0x80; /*Busy, converting*/
+                adc_latch  = val;
+                adc_time   = 60;
+                adc_status = (val & 0xF) | 0x80; /*Busy, converting*/
+                sysvia_set_cb1(1);
 //                printf("ADC conversion - %02X\n",val);
         }
 }
 
-void polladc()
+void adc_poll()
 {
         uint32_t val;
-        joy1x=joy1y=0;
 //        printf("%i\n",joy[0].stick[0].axis[0].pos);
-        switch (adcstatus&3)
+        switch (adc_status & 3)
         {
-                case 0: val=(128-joy[0].stick[0].axis[0].pos)*256; break;
-                case 1: val=(128-joy[0].stick[0].axis[1].pos)*256; break;
-                case 2: val=(128-joy[1].stick[0].axis[0].pos)*256; break;
-                case 3: val=(128-joy[1].stick[0].axis[1].pos)*256; break;
+                case 0: val = (128 - joy[0].stick[0].axis[0].pos) * 256; break;
+                case 1: val = (128 - joy[0].stick[0].axis[1].pos) * 256; break;
+                case 2: val = (128 - joy[1].stick[0].axis[0].pos) * 256; break;
+                case 3: val = (128 - joy[1].stick[0].axis[1].pos) * 256; break;
         }
-        if (val>0xFFFF) val=0xFFFF;
-        if (val<0)      val=0;
+        if (val > 0xFFFF) val = 0xFFFF;
+        if (val < 0)      val = 0;
 //        val^=0xFFFF;
 //        val++;
 //        if (val==0x10000) val=0xFFFF;
-        adcstatus=(adcstatus&0xF)|0x40; /*Not busy, conversion complete*/
-        adcstatus|=(val&0xC000)>>10;
-        adchigh=val>>8;
-        adclow=val&0xFF;
-        syscb1();
+        adc_status =(adc_status & 0xF) | 0x40; /*Not busy, conversion complete*/
+        adc_status|=(val & 0xC000) >> 10;
+        adc_high   = val >> 8;
+        adc_low    = val & 0xFF;
+        sysvia_set_cb1(0);
 }
 
-void initadc()
+void adc_init()
 {
-        adcstatus=0x40;            /*Not busy, conversion complete*/
-        adchigh=adclow=adclatch=0;
-        adcconvert=0;
+        adc_status = 0x40;            /*Not busy, conversion complete*/
+        adc_high = adc_low = adc_latch = 0;
+        adc_time = 0;
         install_joystick(JOY_TYPE_AUTODETECT);
 }
 
-void saveadcstate(FILE *f)
+void adc_savestate(FILE *f)
 {
-        putc(adcstatus,f);
-        putc(adclow,f);
-        putc(adchigh,f);
-        putc(adclatch,f);
-        putc(adcconvert,f);
+        putc(adc_status,f);
+        putc(adc_low,f);
+        putc(adc_high,f);
+        putc(adc_latch,f);
+        putc(adc_time,f);
 }
 
-void loadadcstate(FILE *f)
+void adc_loadstate(FILE *f)
 {
-        adcstatus=getc(f);
-        adclow=getc(f);
-        adchigh=getc(f);
-        adclatch=getc(f);
-        adcconvert=getc(f);
+        adc_status = getc(f);
+        adc_low    = getc(f);
+        adc_high   = getc(f);
+        adc_latch  = getc(f);
+        adc_time   = getc(f);
 }

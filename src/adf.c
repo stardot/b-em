@@ -1,315 +1,318 @@
-/*B-em v2.1 by Tom Walker
+/*B-em v2.2 by Tom Walker
   ADFS disc support (really all double-density formats)*/
 
 #include <stdio.h>
 #include "b-em.h"
-#define printf rpclog
-FILE *adff[2];
-uint8_t trackinfoa[2][2][20*256];
-int adl[2];
-int adfsectors[2],adfsize[2],adftrackc[2];
-int adfdblstep[2];
+#include "adf.h"
+#include "disc.h"
 
-int adfsector,adftrack,adfside,adfdrive;
-int adfread,adfreadpos,adfwrite,adfreadaddr;
-int adftime;
-int adfnotfound;
-int adfrsector=0;
-int adfformat=0;
+static FILE *adf_f[2];
+static uint8_t trackinfoa[2][2][20*256];
+static int adl[2];
+static int adf_sectors[2], adf_size[2], adf_trackc[2];
+static int adf_dblstep[2];
 
-void adf_reset()
+static int adf_sector,   adf_track,   adf_side,    adf_drive;
+static int adf_inread,   adf_readpos, adf_inwrite, adf_inreadaddr;
+static int adf_time;
+static int adf_notfound;
+static int adf_rsector=0;
+static int adf_informat=0;
+
+void adf_init()
 {
-        adff[0]=adff[1]=0;
-        adl[0]=adl[1]=0;
-        adfnotfound=0;
+        adf_f[0] = adf_f[1] = 0;
+        adl[0] = adl[1] = 0;
+        adf_notfound = 0;
 }
 
 void adf_load(int drive, char *fn)
 {
-        writeprot[drive]=0;
-        adff[drive]=fopen(fn,"rb+");
-        if (!adff[drive])
+        writeprot[drive] = 0;
+        adf_f[drive] = fopen(fn, "rb+");
+        if (!adf_f[drive])
         {
-                adff[drive]=fopen(fn,"rb");
-                if (!adff[drive]) return;
-                writeprot[drive]=1;
+                adf_f[drive] = fopen(fn, "rb");
+                if (!adf_f[drive]) return;
+                writeprot[drive] = 1;
         }
-        fwriteprot[drive]=writeprot[drive];
-        fseek(adff[drive],-1,SEEK_END);
-        if (ftell(adff[drive])>700*1024)
+        fwriteprot[drive] = writeprot[drive];
+        fseek(adf_f[drive], -1, SEEK_END);
+        if (ftell(adf_f[drive]) > (700 * 1024))
         {
-                adl[drive]=1;
-                adfsectors[drive]=5;
-                adfsize[drive]=1024;
+                adl[drive] = 1;
+                adf_sectors[drive] = 5;
+                adf_size[drive] = 1024;
         }
         else
         {
-                adl[drive]=0;
-                adfsectors[drive]=16;
-                adfsize[drive]=256;
+                adl[drive] = 0;
+                adf_sectors[drive] = 16;
+                adf_size[drive] = 256;
         }
-        drives[drive].seek=adf_seek;
-        drives[drive].readsector=adf_readsector;
-        drives[drive].writesector=adf_writesector;
-        drives[drive].readaddress=adf_readaddress;
-        drives[drive].poll=adf_poll;
-        drives[drive].format=adf_format;
-        adfdblstep[drive]=0;
+        drives[drive].seek        = adf_seek;
+        drives[drive].readsector  = adf_readsector;
+        drives[drive].writesector = adf_writesector;
+        drives[drive].readaddress = adf_readaddress;
+        drives[drive].poll        = adf_poll;
+        drives[drive].format      = adf_format;
+        adf_dblstep[drive] = 0;
 }
 
 void adl_load(int drive, char *fn)
 {
-        writeprot[drive]=0;
-        adff[drive]=fopen(fn,"rb+");
-        if (!adff[drive])
+        writeprot[drive] = 0;
+        adf_f[drive] = fopen(fn, "rb+");
+        if (!adf_f[drive])
         {
-                adff[drive]=fopen(fn,"rb");
-                if (!adff[drive]) return;
-                writeprot[drive]=1;
+                adf_f[drive] = fopen(fn, "rb");
+                if (!adf_f[drive]) return;
+                writeprot[drive] = 1;
         }
-        fwriteprot[drive]=writeprot[drive];
-        adl[drive]=1;
-        drives[drive].seek=adf_seek;
-        drives[drive].readsector=adf_readsector;
-        drives[drive].writesector=adf_writesector;
-        drives[drive].readaddress=adf_readaddress;
-        drives[drive].poll=adf_poll;
-        drives[drive].format=adf_format;
-        adfsectors[drive]=16;
-        adfsize[drive]=256;
-        adfdblstep[drive]=0;
+        fwriteprot[drive] = writeprot[drive];
+        adl[drive] = 1;
+        drives[drive].seek        = adf_seek;
+        drives[drive].readsector  = adf_readsector;
+        drives[drive].writesector = adf_writesector;
+        drives[drive].readaddress = adf_readaddress;
+        drives[drive].poll        = adf_poll;
+        drives[drive].format      = adf_format;
+        adf_sectors[drive] = 16;
+        adf_size[drive] = 256;
+        adf_dblstep[drive] = 0;
 }
 
 void adl_loadex(int drive, char *fn, int sectors, int size, int dblstep)
 {
-        writeprot[drive]=0;
-        adff[drive]=fopen(fn,"rb+");
-        if (!adff[drive])
+        writeprot[drive] = 0;
+        adf_f[drive] = fopen(fn, "rb+");
+        if (!adf_f[drive])
         {
-                adff[drive]=fopen(fn,"rb");
-                if (!adff[drive]) return;
-                writeprot[drive]=1;
+                adf_f[drive] = fopen(fn, "rb");
+                if (!adf_f[drive]) return;
+                writeprot[drive] = 1;
         }
-        fwriteprot[drive]=writeprot[drive];
-        fseek(adff[drive],-1,SEEK_END);
-        adl[drive]=1;
-        drives[drive].seek=adf_seek;
-        drives[drive].readsector=adf_readsector;
-        drives[drive].writesector=adf_writesector;
-        drives[drive].readaddress=adf_readaddress;
-        drives[drive].poll=adf_poll;
-        drives[drive].format=adf_format;
-        adfsectors[drive]=sectors;
-        adfsize[drive]=size;
-        adfdblstep[drive]=dblstep;
+        fwriteprot[drive] = writeprot[drive];
+        fseek(adf_f[drive], -1, SEEK_END);
+        adl[drive] = 1;
+        drives[drive].seek        = adf_seek;
+        drives[drive].readsector  = adf_readsector;
+        drives[drive].writesector = adf_writesector;
+        drives[drive].readaddress = adf_readaddress;
+        drives[drive].poll        = adf_poll;
+        drives[drive].format      = adf_format;
+        adf_sectors[drive] = sectors;
+        adf_size[drive] = size;
+        adf_dblstep[drive] = dblstep;
 }
 
 void adf_close(int drive)
 {
-        if (adff[drive]) fclose(adff[drive]);
-        adff[drive]=NULL;
+        if (adf_f[drive]) fclose(adf_f[drive]);
+        adf_f[drive] = NULL;
 }
 
 void adf_seek(int drive, int track)
 {
-        if (!adff[drive]) return;
+        if (!adf_f[drive]) return;
 //        rpclog("Seek %i %i %i %i %i %i\n",drive,track,adfsectors[drive],adfsize[drive],adl[drive],adfsectors[drive]*adfsize[drive]);
-        if (adfdblstep[drive]) track/=2;
-        adftrackc[drive]=track;
+        if (adf_dblstep[drive]) track /= 2;
+        adf_trackc[drive] = track;
         if (adl[drive])
         {
-                fseek(adff[drive],track*adfsectors[drive]*adfsize[drive]*2,SEEK_SET);
-                fread(trackinfoa[drive][0],adfsectors[drive]*adfsize[drive],1,adff[drive]);
-                fread(trackinfoa[drive][1],adfsectors[drive]*adfsize[drive],1,adff[drive]);
+                fseek(adf_f[drive], track * adf_sectors[drive] * adf_size[drive] * 2, SEEK_SET);
+                fread(trackinfoa[drive][0], adf_sectors[drive] * adf_size[drive], 1, adf_f[drive]);
+                fread(trackinfoa[drive][1], adf_sectors[drive] * adf_size[drive], 1, adf_f[drive]);
         }
         else
         {
-                fseek(adff[drive],track*adfsectors[drive]*adfsize[drive],SEEK_SET);
-                fread(trackinfoa[drive][0],adfsectors[drive]*adfsize[drive],1,adff[drive]);
+                fseek(adf_f[drive], track * adf_sectors[drive] * adf_size[drive], SEEK_SET);
+                fread(trackinfoa[drive][0], adf_sectors[drive] * adf_size[drive], 1, adf_f[drive]);
         }
 }
 void adf_writeback(int drive, int track)
 {
-        if (!adff[drive]) return;
-        if (adfdblstep[drive]) track/=2;
+        if (!adf_f[drive]) return;
+        if (adf_dblstep[drive]) track /= 2;
         if (adl[drive])
         {
-                fseek(adff[drive],track*adfsectors[drive]*adfsize[drive]*2,SEEK_SET);
-                fwrite(trackinfoa[drive][0],adfsectors[drive]*adfsize[drive],1,adff[drive]);
-                fwrite(trackinfoa[drive][1],adfsectors[drive]*adfsize[drive],1,adff[drive]);
+                fseek(adf_f[drive], track * adf_sectors[drive] * adf_size[drive] * 2, SEEK_SET);
+                fwrite(trackinfoa[drive][0], adf_sectors[drive] * adf_size[drive], 1, adf_f[drive]);
+                fwrite(trackinfoa[drive][1], adf_sectors[drive] * adf_size[drive], 1, adf_f[drive]);
         }
         else
         {
-                fseek(adff[drive],track*adfsectors[drive]*adfsize[drive],SEEK_SET);
-                fwrite(trackinfoa[drive][0],adfsectors[drive]*adfsize[drive],1,adff[drive]);
+                fseek(adf_f[drive], track *  adf_sectors[drive] * adf_size[drive], SEEK_SET);
+                fwrite(trackinfoa[drive][0], adf_sectors[drive] * adf_size[drive], 1, adf_f[drive]);
         }
 }
 
 void adf_readsector(int drive, int sector, int track, int side, int density)
 {
-//        if (adfdblstep[drive]) track/=2;
-        adfsector=sector;
-        adftrack=track;
-        adfside=side;
-        adfdrive=drive;
-        if (adfsize[drive]!=256) adfsector--;
+        adf_sector = sector;
+        adf_track  = track;
+        adf_side   = side;
+        adf_drive  = drive;
+        if (adf_size[drive] != 256) adf_sector--;
 //        printf("ADFS Read sector %i %i %i %i   %i\n",drive,side,track,sector,adftrackc[drive]);
 
-        if (!adff[drive] || (side && !adl[drive]) || !density || (track!=adftrackc[drive]))
+        if (!adf_f[drive] || (side && !adl[drive]) || !density || (track != adf_trackc[drive]))
         {
 //                printf("Not found! %08X (%i %i) %i (%i %i)\n",adff[drive],side,adl[drive],density,track,adftrackc[drive]);
-                adfnotfound=500;
+                adf_notfound=500;
                 return;
         }
 //        printf("Found\n");
-        adfread=1;
-        adfreadpos=0;
+        adf_inread  = 1;
+        adf_readpos = 0;
 }
 
 void adf_writesector(int drive, int sector, int track, int side, int density)
 {
 //        if (adfdblstep[drive]) track/=2;
-        adfsector=sector;
-        adftrack=track;
-        adfside=side;
-        adfdrive=drive;
-        if (adfsize[drive]!=256) adfsector--;
+        adf_sector = sector;
+        adf_track  = track;
+        adf_side   = side;
+        adf_drive  = drive;
+        if (adf_size[drive] != 256) adf_sector--;
 //        printf("ADFS Write sector %i %i %i %i\n",drive,side,track,sector);
 
-        if (!adff[drive] || (side && !adl[drive]) || !density || (track!=adftrackc[drive]))
+        if (!adf_f[drive] || (side && !adl[drive]) || !density || (track != adf_trackc[drive]))
         {
-                adfnotfound=500;
+                adf_notfound = 500;
                 return;
         }
-        adfwrite=1;
-        adfreadpos=0;
+        adf_inwrite = 1;
+        adf_readpos = 0;
 }
 
 void adf_readaddress(int drive, int track, int side, int density)
 {
-        if (adfdblstep[drive]) track/=2;
-        adfdrive=drive;
-        adftrack=track;
-        adfside=side;
+        if (adf_dblstep[drive]) track /= 2;
+        adf_drive = drive;
+        adf_track = track;
+        adf_side  = side;
 //        rpclog("Read address %i %i %i\n",drive,side,track);
 
-        if (!adff[drive] || (side && !adl[drive]) || !density || (track!=adftrackc[drive]))
+        if (!adf_f[drive] || (side && !adl[drive]) || !density || (track != adf_trackc[drive]))
         {
-                adfnotfound=500;
+                adf_notfound=500;
                 return;
         }
-        adfreadaddr=1;
-        adfreadpos=0;
+        adf_inreadaddr = 1;
+        adf_readpos    = 0;
 }
 
 void adf_format(int drive, int track, int side, int density)
 {
-        if (adfdblstep[drive]) track/=2;
-        adfdrive=drive;
-        adftrack=track;
-        adfside=side;
+        if (adf_dblstep[drive]) track /= 2;
+        adf_drive = drive;
+        adf_track = track;
+        adf_side  = side;
 
-        if (!adff[drive] || (side && !adl[drive]) || !density || track!=adftrackc[drive])
+        if (!adf_f[drive] || (side && !adl[drive]) || !density || track != adf_trackc[drive])
         {
-                adfnotfound=500;
+                adf_notfound = 500;
                 return;
         }
-        adfsector=0;
-        adfreadpos=0;
-        adfformat=1;
+        adf_sector  = 0;
+        adf_readpos = 0;
+        adf_informat  = 1;
 }
 
 void adf_poll()
 {
         int c;
-        adftime++;
-        if (adftime<16) return;
-        adftime=0;
+        adf_time++;
+        if (adf_time<16) return;
+        adf_time=0;
 
-        if (adfnotfound)
+        if (adf_notfound)
         {
-                adfnotfound--;
-                if (!adfnotfound)
+                adf_notfound--;
+                if (!adf_notfound)
                 {
 //                        rpclog("Not found!\n");
-                        fdcnotfound();
+                        fdc_notfound();
                 }
         }
-        if (adfread && adff[adfdrive])
+        if (adf_inread && adf_f[adf_drive])
         {
 //                if (!adfreadpos) rpclog("%i\n",adfsector*adfsize[adfdrive]);
-                fdcdata(trackinfoa[adfdrive][adfside][(adfsector*adfsize[adfdrive])+adfreadpos]);
-                adfreadpos++;
-                if (adfreadpos==adfsize[adfdrive])
+                fdc_data(trackinfoa[adf_drive][adf_side][(adf_sector * adf_size[adf_drive]) + adf_readpos]);
+                adf_readpos++;
+                if (adf_readpos == adf_size[adf_drive])
                 {
 //                        rpclog("Read %i bytes\n",adfreadpos);
-                        adfread=0;
-                        fdcfinishread();
+                        adf_inread = 0;
+                        fdc_finishread();
                 }
         }
-        if (adfwrite && adff[adfdrive])
+        if (adf_inwrite && adf_f[adf_drive])
         {
-                if (writeprot[adfdrive])
+                if (writeprot[adf_drive])
                 {
-                        fdcwriteprotect();
-                        adfwrite=0;
+                        fdc_writeprotect();
+                        adf_inwrite = 0;
                         return;
                 }
 //                printf("Write data %i\n",adfreadpos);
-                c=fdcgetdata(adfreadpos==255);
-                if (c==-1)
+                c = fdc_getdata(adf_readpos == 255);
+                if (c == -1)
                 {
+//Carlo Concari: do not write if data not ready yet
+                          return;
 //                        printf("Data overflow!\n");
 //                        exit(-1);
                 }
-                trackinfoa[adfdrive][adfside][(adfsector*adfsize[adfdrive])+adfreadpos]=c;
-                adfreadpos++;
-                if (adfreadpos==adfsize[adfdrive])
+                trackinfoa[adf_drive][adf_side][(adf_sector * adf_size[adf_drive]) + adf_readpos] = c;
+                adf_readpos++;
+                if (adf_readpos == adf_size[adf_drive])
                 {
-                        adfwrite=0;
-                        fdcfinishread();
-                        adf_writeback(adfdrive,adftrack);
+                        adf_inwrite = 0;
+                        fdc_finishread();
+                        adf_writeback(adf_drive, adf_track);
                 }
         }
-        if (adfreadaddr && adff[adfdrive])
+        if (adf_inreadaddr && adf_f[adf_drive])
         {
-                switch (adfreadpos)
+                switch (adf_readpos)
                 {
-                        case 0: /*if (adfdblstep[adfdrive]) fdcdata(adftrack/2); else */fdcdata(adftrack); break;
-                        case 1: fdcdata(adfside); break;
-                        case 2: fdcdata(adfrsector+(adfsize[adfdrive]!=256)?1:0); break;
-                        case 3: fdcdata((adfsize[adfdrive]==256)?1:((adfsize[adfdrive]==512)?2:3)); break;
-                        case 4: fdcdata(0); break;
-                        case 5: fdcdata(0); break;
+                        case 0: fdc_data(adf_track); break;
+                        case 1: fdc_data(adf_side); break;
+                        case 2: fdc_data(adf_rsector + (adf_size[adf_drive] != 256) ? 1 : 0); break;
+                        case 3: fdc_data((adf_size[adf_drive] == 256) ? 1 : ((adf_size[adf_drive] == 512) ? 2 : 3)); break;
+                        case 4: fdc_data(0); break;
+                        case 5: fdc_data(0); break;
                         case 6:
-                        adfreadaddr=0;
-                        fdcfinishread();
+                        adf_inreadaddr = 0;
+                        fdc_finishread();
 //                        rpclog("Read addr - %i %i %i %i 1 0 0\n",adfdrive,adftrack,adfside,adfsector);
-                        adfrsector++;
-                        if (adfrsector==adfsectors[adfdrive]) adfrsector=0;
+                        adf_rsector++;
+                        if (adf_rsector == adf_sectors[adf_drive]) adf_rsector=0;
                         break;
                 }
-                adfreadpos++;
+                adf_readpos++;
         }
-        if (adfformat && adff[adfdrive])
+        if (adf_informat && adf_f[adf_drive])
         {
-                if (writeprot[adfdrive])
+                if (writeprot[adf_drive])
                 {
-                        fdcwriteprotect();
-                        adfformat=0;
+                        fdc_writeprotect();
+                        adf_informat = 0;
                         return;
                 }
-                trackinfoa[adfdrive][adfside][(adfsector*adfsize[adfdrive])+adfreadpos]=0;
-                adfreadpos++;
-                if (adfreadpos==adfsize[adfdrive])
+                trackinfoa[adf_drive][adf_side][(adf_sector * adf_size[adf_drive]) + adf_readpos] = 0;
+                adf_readpos++;
+                if (adf_readpos == adf_size[adf_drive])
                 {
-                        adfreadpos=0;
-                        adfsector++;
-                        if (adfsector==adfsectors[adfdrive])
+                        adf_readpos = 0;
+                        adf_sector++;
+                        if (adf_sector == adf_sectors[adf_drive])
                         {
-                                adfformat=0;
-                                fdcfinishread();
-                                adf_writeback(adfdrive,adftrack);
+                                adf_informat = 0;
+                                fdc_finishread();
+                                adf_writeback(adf_drive, adf_track);
                         }
                 }
         }

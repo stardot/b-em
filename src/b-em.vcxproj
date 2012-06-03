@@ -1,0 +1,225 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{28E2DE55-0A88-47FA-92DC-3F96D72608F9}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>bem</RootNamespace>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <UndefinePreprocessorDefinitions>UNICODE;_UNICODE;%(UndefinePreprocessorDefinitions)</UndefinePreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>alleg.lib;zlib.lib;OpenAL32.lib;alut.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>WIN32;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <UndefinePreprocessorDefinitions>UNICODE;_UNICODE;%(UndefinePreprocessorDefinitions)</UndefinePreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>alleg.lib;zlib.lib;OpenAL32.lib;alut.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <IgnoreSpecificDefaultLibraries>MSVCRTD.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="32016.h" />
+    <ClInclude Include="6502.h" />
+    <ClInclude Include="6502tube.h" />
+    <ClInclude Include="65816.h" />
+    <ClInclude Include="acia.h" />
+    <ClInclude Include="adc.h" />
+    <ClInclude Include="adf.h" />
+    <ClInclude Include="arm.h" />
+    <ClInclude Include="b-em.h" />
+    <ClInclude Include="bbctext.h" />
+    <ClInclude Include="cmos.h" />
+    <ClInclude Include="compactcmos.h" />
+    <ClInclude Include="compact_joystick.h" />
+    <ClInclude Include="config.h" />
+    <ClInclude Include="csw.h" />
+    <ClInclude Include="daa.h" />
+    <ClInclude Include="ddnoise.h" />
+    <ClInclude Include="debugger.h" />
+    <ClInclude Include="disc.h" />
+    <ClInclude Include="fdi.h" />
+    <ClInclude Include="fdi2raw.h" />
+    <ClInclude Include="i8271.h" />
+    <ClInclude Include="ide.h" />
+    <ClInclude Include="keyboard.h" />
+    <ClInclude Include="main.h" />
+    <ClInclude Include="mem.h" />
+    <ClInclude Include="model.h" />
+    <ClInclude Include="mouse.h" />
+    <ClInclude Include="pal.h" />
+    <ClInclude Include="resid-fp\envelope.h" />
+    <ClInclude Include="resid-fp\extfilt.h" />
+    <ClInclude Include="resid-fp\filter.h" />
+    <ClInclude Include="resid-fp\pot.h" />
+    <ClInclude Include="resid-fp\sid.h" />
+    <ClInclude Include="resid-fp\siddefs-fp.h" />
+    <ClInclude Include="resid-fp\voice.h" />
+    <ClInclude Include="resid-fp\wave.h" />
+    <ClInclude Include="resources.h" />
+    <ClInclude Include="savestate.h" />
+    <ClInclude Include="scan2bbc.h" />
+    <ClInclude Include="serial.h" />
+    <ClInclude Include="sidtypes.h" />
+    <ClInclude Include="sid_b-em.h" />
+    <ClInclude Include="sn76489.h" />
+    <ClInclude Include="sound.h" />
+    <ClInclude Include="soundopenal.h" />
+    <ClInclude Include="ssd.h" />
+    <ClInclude Include="sysvia.h" />
+    <ClInclude Include="tape.h" />
+    <ClInclude Include="tapenoise.h" />
+    <ClInclude Include="tube.h" />
+    <ClInclude Include="uef.h" />
+    <ClInclude Include="uservia.h" />
+    <ClInclude Include="via.h" />
+    <ClInclude Include="video.h" />
+    <ClInclude Include="video_render.h" />
+    <ClInclude Include="wd1770.h" />
+    <ClInclude Include="win.h" />
+    <ClInclude Include="x86.h" />
+    <ClInclude Include="x86_tube.h" />
+    <ClInclude Include="z80.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="b-em.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="32016.c" />
+    <ClCompile Include="6502.c" />
+    <ClCompile Include="6502tube.c" />
+    <ClCompile Include="65816.c" />
+    <ClCompile Include="acia.c" />
+    <ClCompile Include="adc.c" />
+    <ClCompile Include="adf.c" />
+    <ClCompile Include="arm.c" />
+    <ClCompile Include="cmos.c" />
+    <ClCompile Include="compactcmos.c" />
+    <ClCompile Include="compact_joystick.c" />
+    <ClCompile Include="config.c" />
+    <ClCompile Include="csw.c" />
+    <ClCompile Include="ddnoise.c" />
+    <ClCompile Include="debugger.c" />
+    <ClCompile Include="disc.c" />
+    <ClCompile Include="fdi.c" />
+    <ClCompile Include="fdi2raw.c" />
+    <ClCompile Include="i8271.c" />
+    <ClCompile Include="ide.c" />
+    <ClCompile Include="keyboard.c" />
+    <ClCompile Include="linux-gui.c" />
+    <ClCompile Include="linux-keydefine.c" />
+    <ClCompile Include="linux.c" />
+    <ClCompile Include="main.c" />
+    <ClCompile Include="mem.c" />
+    <ClCompile Include="model.c" />
+    <ClCompile Include="mouse.c" />
+    <ClCompile Include="pal.c" />
+    <ClCompile Include="resid-fp\convolve-sse.cc" />
+    <ClCompile Include="resid-fp\convolve.cc" />
+    <ClCompile Include="resid-fp\envelope.cc" />
+    <ClCompile Include="resid-fp\extfilt.cc" />
+    <ClCompile Include="resid-fp\filter.cc" />
+    <ClCompile Include="resid-fp\pot.cc" />
+    <ClCompile Include="resid-fp\sid.cc" />
+    <ClCompile Include="resid-fp\voice.cc" />
+    <ClCompile Include="resid-fp\wave.cc" />
+    <ClCompile Include="resid-fp\wave6581_PST.cc" />
+    <ClCompile Include="resid-fp\wave6581_PS_.cc" />
+    <ClCompile Include="resid-fp\wave6581_P_T.cc" />
+    <ClCompile Include="resid-fp\wave6581__ST.cc" />
+    <ClCompile Include="resid-fp\wave8580_PST.cc" />
+    <ClCompile Include="resid-fp\wave8580_PS_.cc" />
+    <ClCompile Include="resid-fp\wave8580_P_T.cc" />
+    <ClCompile Include="resid-fp\wave8580__ST.cc" />
+    <ClCompile Include="resid.cc" />
+    <ClCompile Include="savestate.c" />
+    <ClCompile Include="serial.c" />
+    <ClCompile Include="sn76489.c" />
+    <ClCompile Include="sound.c" />
+    <ClCompile Include="soundopenal.c" />
+    <ClCompile Include="ssd.c" />
+    <ClCompile Include="sysvia.c" />
+    <ClCompile Include="tape.c" />
+    <ClCompile Include="tapenoise.c" />
+    <ClCompile Include="tube.c" />
+    <ClCompile Include="uef.c" />
+    <ClCompile Include="uservia.c" />
+    <ClCompile Include="via.c" />
+    <ClCompile Include="vidalleg.c" />
+    <ClCompile Include="video.c" />
+    <ClCompile Include="wd1770.c" />
+    <ClCompile Include="win-catalogue.c" />
+    <ClCompile Include="win-keydefine.c" />
+    <ClCompile Include="win.c" />
+    <ClCompile Include="x86.c" />
+    <ClCompile Include="z80.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="b-em.ico" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

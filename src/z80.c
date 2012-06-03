@@ -1,4 +1,4 @@
-/*B-em v2.1 by Tom Walker
+/*B-em v2.2 by Tom Walker
   Z80 emulation
   I can't remember what emulator I originally wrote this for... probably ZX82
   I think a few bugs left*/
@@ -7,6 +7,8 @@
 #include <stdio.h>
 
 #include "b-em.h"
+#include "tube.h"
+#include "z80.h"
 #include "daa.h"
 
 #define pc z80pc
@@ -16,8 +18,6 @@
 #define cycles z80cycles
 
 #define printf rpclog
-
-int oldz80nmi;
 
 /*CPU*/
 typedef union
@@ -29,13 +29,15 @@ typedef union
         } b;
 } z80reg;
 
-z80reg af,bc,de,hl,ix,iy,ir,saf,sbc,sde,shl;
-uint16_t pc,sp;
-int iff1,iff2;
-int z80int;
-int im;
-uint8_t z80ram[0x10000];
-uint8_t z80rom[4096];
+static z80reg af,bc,de,hl,ix,iy,ir,saf,sbc,sde,shl;
+static uint16_t pc,sp;
+static int iff1,iff2;
+static int z80int;
+static int im;
+static uint8_t z80ram[0x10000];
+static uint8_t z80rom[4096];
+
+static int z80_oldnmi;
 
 #define N_FLAG 0x80
 #define Z_FLAG 0x40
@@ -45,22 +47,17 @@ uint8_t z80rom[4096];
 #define S_FLAG 0x02
 #define C_FLAG 0x01
 
-int cycles;
-int cyc=0;
-uint16_t opc,oopc;
-int tempc;
-int output=0;
-int ins=0;
-uint8_t znptable[256],znptablenv[256],znptable16[65536];
-uint8_t intreg;
+static int cycles;
+static uint16_t opc,oopc;
+static int tempc;
+static int output=0;
+static int ins=0;
+static uint8_t znptable[256],znptablenv[256],znptable16[65536];
+static uint8_t intreg;
 
-int tuberomin;
-void tubez80mapoutrom()
-{
-        tuberomin=0;
-}
+static int tuberomin;
 
-inline uint8_t z80_readmem(uint16_t a)
+static inline uint8_t z80_readmem(uint16_t a)
 {
 //        printf("Read Z80 %04X %i\n",a,tuberomin);
         if (a>=0x8000) tuberomin=0;
@@ -68,66 +65,66 @@ inline uint8_t z80_readmem(uint16_t a)
         return z80ram[a];
 }
 
-inline void z80_writemem(uint16_t a, uint8_t v)
+static inline void z80_writemem(uint16_t a, uint8_t v)
 {
 //        printf("Write Z80 %04X %02X %04X\n",a,v,pc);
         z80ram[a]=v;
 }
 
 int endtimeslice;
-void z80out(uint16_t a, uint8_t v)
+static void z80out(uint16_t a, uint8_t v)
 {
         if ((a&0xFF)<8)
         {
 //                printf("Z80 out %04X %02X\n",a,v);
-                writetube(a,v);
+                tube_parasite_write(a,v);
                 endtimeslice=1;
         }
 }
 
-uint8_t z80in(uint16_t a)
+static uint8_t z80in(uint16_t a)
 {
         if ((a&0xFF)<8)
         {
 //                printf("Z80 read tube %04X\n",a);
                 if ((a&0xFF)==2) tuberomin=1;
                 if ((a&0xFF)==6) tuberomin=0;
-                return readtube(a);
+                return tube_parasite_read(a);
         }
         return 0;
 }
 
-inline void setzn(uint8_t v)
+static inline void setzn(uint8_t v)
 {
         af.b.l=znptable[v];
 /*        af.b.l&=~(N_FLAG|Z_FLAG|V_FLAG|0x28|C_FLAG);
         af.b.l|=znptable[v];*/
 }
 
-inline void setand(uint8_t v)
+static inline void setand(uint8_t v)
 {
         af.b.l=znptable[v]|H_FLAG;
 /*        af.b.l&=~(N_FLAG|Z_FLAG|V_FLAG|0x28|C_FLAG);
         af.b.l|=znptable[v];*/
 }
 
-inline void setbit(uint8_t v)
+static inline void setbit(uint8_t v)
 {
         af.b.l=((znptable[v]|H_FLAG)&0xFE)|(af.b.l&1);
 }
 
-inline void setbit2(uint8_t v, uint8_t v2)
+static inline void setbit2(uint8_t v, uint8_t v2)
 {
         af.b.l=((znptable[v]|H_FLAG)&0xD6)|(af.b.l&1)|(v2&0x28);
 }
 
-inline void setznc(uint8_t v)
+static inline void setznc(uint8_t v)
 {
         af.b.l&=~(N_FLAG|Z_FLAG|V_FLAG|0x28);
         af.b.l|=znptable[v];
 }
 
-inline void z80_setadd(uint8_t a, uint8_t b)
+static inline void z80_setadd(uint8_t a, uint8_t b)
 {
        uint8_t r=a+b;
                                 af.b.l = (r) ? ((r & 0x80) ? N_FLAG : 0) : Z_FLAG;
@@ -135,21 +132,9 @@ inline void z80_setadd(uint8_t a, uint8_t b)
                                 if( (r & 0x0f) < (a & 0x0f) ) af.b.l |= H_FLAG;
                                 if( r < a ) af.b.l |= C_FLAG;
                                 if( (b^a^0x80) & (b^r) & 0x80 ) af.b.l |= V_FLAG;
-
-/*        uint16_t r=a+b;
-        af.b.l = znptablenv[r&0xFF] | ((r >> 8) & C_FLAG) |
-                ((a ^ r ^ b) & H_FLAG) |
-                (((b ^ a ^ 0x80) & (b ^ r) & 0x80) >> 5);*/
-/*        signed short temps;
-        af.b.l=znptable[(a+b)&0xFF];
-        af.b.l&=~(C_FLAG|V_FLAG);
-        if ((a+b)&0x100) af.b.l|=C_FLAG;
-        temps=(signed short)(signed char)a+(signed short)(signed char)b;
-        if (temps<-128 || temps>127) af.b.l|=V_FLAG;
-        if (((a&0xF)+(b&0xF))&0x10) af.b.l|=H_FLAG;*/
 }
 
-inline void setinc(uint8_t v)
+static inline void setinc(uint8_t v)
 {
         af.b.l&=~(N_FLAG|Z_FLAG|V_FLAG|0x28|H_FLAG);
         af.b.l|=znptable[(v+1)&0xFF];
@@ -158,7 +143,7 @@ inline void setinc(uint8_t v)
         if (((v&0xF)+1)&0x10) af.b.l|=H_FLAG;
 }
 
-inline void setdec(uint8_t v)
+static inline void setdec(uint8_t v)
 {
         af.b.l&=~(N_FLAG|Z_FLAG|V_FLAG|0x28|H_FLAG);
         af.b.l|=znptable[(v-1)&0xFF]|S_FLAG;
@@ -167,7 +152,7 @@ inline void setdec(uint8_t v)
         if (!(v&8) && ((v-1)&8)) af.b.l|=H_FLAG;
 }
 
-inline void setadc(uint8_t a, uint8_t b)
+static inline void setadc(uint8_t a, uint8_t b)
 {
        uint8_t r=a+b+(af.b.l&C_FLAG);
        if (af.b.l&C_FLAG)
@@ -186,20 +171,9 @@ inline void setadc(uint8_t a, uint8_t b)
                                 if( r < a ) af.b.l |= C_FLAG;
                                 if( (b^a^0x80) & (b^r) & 0x80 ) af.b.l |= V_FLAG;
        }
-/*        uint16_t r=a+b+(af.b.l&C_FLAG);
-        af.b.l = znptablenv[r & 0xff] | ((r >> 8) & C_FLAG) |
-                ((a ^ r ^ b) & H_FLAG) |
-                (((b ^ a ^ 0x80) & (b ^ r) & 0x80) >> 5);*/
-/*        signed short temps;
-        af.b.l=znptable[(a+b+tempc)&0xFF];
-        af.b.l&=~V_FLAG;
-        if ((a+b+tempc)&0x100) af.b.l|=C_FLAG;
-        temps=(signed short)(signed char)a+(signed short)(signed char)b;
-        if (temps<-128 || temps>127) af.b.l|=V_FLAG;
-        if (((a&0xF)+(b&0xF))&0x10) af.b.l|=H_FLAG;*/
 }
 
-inline void setadc16(uint16_t a, uint16_t b)
+static inline void setadc16(uint16_t a, uint16_t b)
 {
         uint32_t r=a+b+(af.b.l&1);
         af.b.l = (((a ^ r ^ b) >> 8) & H_FLAG) |
@@ -207,29 +181,17 @@ inline void setadc16(uint16_t a, uint16_t b)
                 ((r >> 8) & (N_FLAG | 0x28)) |
                 ((r & 0xffff) ? 0 : Z_FLAG) |
                 (((b ^ a ^ 0x8000) & (b ^ r) & 0x8000) >> 13);
-/*        signed long temps2;
-        af.b.l=znptable16[(a+b+tempc)&0xFFFF];
-        af.b.l&=~V_FLAG;
-        temps2=(signed short)a+(signed short)b;
-        if (temps2<-32768 || temps2>32767) af.b.l|=V_FLAG;
-        if (((a&0xFFF)+(b&0xFFF))&0x1000) af.b.l|=H_FLAG;
-        if ((a+b+tempc)&0x10000) af.b.l|=C_FLAG;*/
 }
 
-inline void z80_setadd16(uint16_t a, uint16_t b)
+static inline void z80_setadd16(uint16_t a, uint16_t b)
 {
-//        uint8_t t=af.b.l;
         uint32_t r=a+b;
         af.b.l = (af.b.l & (N_FLAG | Z_FLAG | V_FLAG)) |
                 (((a ^ r ^ b) >> 8) & H_FLAG) |
                 ((r >> 16) & C_FLAG) | ((r >> 8) & 0x28);
-/*        t&=~(C_FLAG|S_FLAG|H_FLAG);
-        if ((a+b)&0x10000) t|=C_FLAG;
-        if ((a&0x1800)==0x800 && ((a+b)&0x1800)==0x1000) t|=H_FLAG;
-        if (t!=af.b.l) printf("Mismatch - %02X %02X  %04X+%04X %05X\n",t,af.b.l,a,b,r);*/
 }
 
-inline void setsbc(uint8_t a, uint8_t b)
+static inline void setsbc(uint8_t a, uint8_t b)
 {
        uint8_t r=a-(b+(af.b.l&C_FLAG));
        if (af.b.l&C_FLAG)
@@ -248,21 +210,9 @@ inline void setsbc(uint8_t a, uint8_t b)
                                 if( r > a ) af.b.l |= C_FLAG;
                                 if( (b^a) & (a^r) & 0x80 ) af.b.l |= V_FLAG;
        }
-/*        uint16_t r=a-b-(af.b.l&C_FLAG);
-        af.b.l = znptablenv[r & 0xff] | ((r >> 8) & C_FLAG) | S_FLAG |
-                ((a ^ r ^ b) & H_FLAG) |
-                (((b ^ a) & (a ^ r) & 0x80) >> 5);*/
-/*      A = res;                                                                                                        \
-        signed short temps;
-        af.b.l=znptable[(a-(b+tempc))&0xFF]|S_FLAG;
-        af.b.l&=~V_FLAG;
-        temps=(signed short)(signed char)a-(signed short)(signed char)b;
-        if (temps<-128 || temps>127) af.b.l|=V_FLAG;
-        if (!(a&8) && ((a-b)&8)) af.b.l|=H_FLAG;
-        if (a<(b+tempc)) af.b.l|=C_FLAG;*/
 }
 
-inline void setsbc16(uint16_t a, uint16_t b)
+static inline void setsbc16(uint16_t a, uint16_t b)
 {
         uint32_t r = a - b - (af.b.l & C_FLAG);
         af.b.l = (((a ^ r ^ b) >> 8) & H_FLAG) | S_FLAG |
@@ -270,18 +220,9 @@ inline void setsbc16(uint16_t a, uint16_t b)
                 ((r >> 8) & (N_FLAG | 0x28)) |
                 ((r & 0xffff) ? 0 : Z_FLAG) |
                 (((b ^ a) & (a ^ r) &0x8000) >> 13);
-/*        signed long temps2;
-        b+=(af.b.l&C_FLAG);
-        af.b.l&=0x28;
-        af.b.l|=znptable16[(a-b)&0xFFFF]|S_FLAG;
-        af.b.l&=~V_FLAG;
-        temps2=(signed long)(signed short)a-(signed long)(signed short)b;
-        if (temps2<-32768 || temps2>32767) af.b.l|=V_FLAG;
-        if (!(a&0x800) && ((a-b)&0x800)) af.b.l|=H_FLAG;
-        if (a<b) af.b.l|=C_FLAG;*/
 }
 
-inline void setcpED(uint8_t a, uint8_t b)
+static inline void setcpED(uint8_t a, uint8_t b)
 {
        uint8_t r=a-b;
        af.b.l&=C_FLAG;
@@ -291,7 +232,7 @@ inline void setcpED(uint8_t a, uint8_t b)
                                 if( (b^a) & (a^r) & 0x80 ) af.b.l |= V_FLAG;
 }
 
-inline void setcp(uint8_t a, uint8_t b)
+static inline void setcp(uint8_t a, uint8_t b)
 {
        uint8_t r=a-b;
                                 af.b.l = S_FLAG | ((r) ? ((r & 0x80) ? N_FLAG : 0) : Z_FLAG);
@@ -299,14 +240,9 @@ inline void setcp(uint8_t a, uint8_t b)
                                 if( (r & 0x0f) > (a & 0x0f) ) af.b.l |= H_FLAG;
                                 if( r > a ) af.b.l |= C_FLAG;
                                 if( (b^a) & (a^r) & 0x80 ) af.b.l |= V_FLAG;
-/*        uint16_t r=a-b;
-        af.b.l = (znptable[r & 0xff] & (N_FLAG | Z_FLAG)) |
-                (b & 0x28) | ((r >> 8) & C_FLAG) | S_FLAG |
-                ((a ^ r ^ b) & H_FLAG) |
-                ((((b ^ a) & (a ^ r)) >> 5) & V_FLAG);*/
 }
 
-inline void z80_setsub(uint8_t a, uint8_t b)
+static inline void z80_setsub(uint8_t a, uint8_t b)
 {
        uint8_t r=a-b;
                                 af.b.l = S_FLAG | ((r) ? ((r & 0x80) ? N_FLAG : 0) : Z_FLAG);
@@ -314,21 +250,9 @@ inline void z80_setsub(uint8_t a, uint8_t b)
                                 if( (r & 0x0f) > (a & 0x0f) ) af.b.l |= H_FLAG;
                                 if( r > a ) af.b.l |= C_FLAG;
                                 if( (b^a) & (a^r) & 0x80 ) af.b.l |= V_FLAG;
-/*        uint16_t r=a-b;
-        af.b.l = znptablenv[r & 0xff] | ((r >> 8) & C_FLAG) | S_FLAG |
-                ((a ^ r ^ b) & H_FLAG) |
-                (((b ^ a) & (a ^ r) & 0x80) >> 5);*/
-/*
-        signed short temps;
-        af.b.l=znptable[(a-b)&0xFF]|S_FLAG;
-        af.b.l&=~V_FLAG;
-        temps=(signed short)(signed char)a-(signed short)(signed char)b;
-        if (temps<-128 || temps>127) af.b.l|=V_FLAG;
-        if (!(a&8) && ((a-b)&8)) af.b.l|=H_FLAG;
-        if (a<b) af.b.l|=C_FLAG;*/
 }
 
-void makeznptable()
+static void makeznptable()
 {
         int c,d,e,f,g;
         for (c=0;c<256;c++)
@@ -368,8 +292,7 @@ void makeznptable()
         znptable16[0]|=0x40;
 }
 
-char exname[512];
-void z80_loadrom()
+void z80_init()
 {
         FILE *f;
         char fn[512];
@@ -380,9 +303,12 @@ void z80_loadrom()
         makeznptable();
 }
 
+void z80_close()
+{
+}
+
 void z80_dumpregs()
 {
-        char s[1024],s2[1024];
         printf("AF =%04X BC =%04X DE =%04X HL =%04X IX=%04X IY=%04X\n",af.w,bc.w,de.w,hl.w,ix.w,iy.w);
         printf("AF'=%04X BC'=%04X DE'=%04X HL'=%04X IR=%04X\n",saf.w,sbc.w,sde.w,shl.w,ir.w);
         printf("%c%c%c%c%c%c   PC =%04X SP =%04X\n",(af.b.l&N_FLAG)?'N':' ',(af.b.l&Z_FLAG)?'Z':' ',(af.b.l&H_FLAG)?'H':' ',(af.b.l&V_FLAG)?'V':' ',(af.b.l&S_FLAG)?'S':' ',(af.b.l&C_FLAG)?'C':' ',pc,sp);
@@ -390,7 +316,7 @@ void z80_dumpregs()
 //        error(s);
 }
 
-void z80_dumpram()
+void z80_mem_dump()
 {
         FILE *f=fopen("z80ram.dmp","wb");
         fwrite(z80ram,0x10000,1,f);
@@ -398,16 +324,16 @@ void z80_dumpram()
 //        atexit(z80_dumpregs);
 }
 
-void resetz80()
+void z80_reset()
 {
         pc=0;
-//        atexit(z80_dumpram);
+//        atexit(z80_mem_dump);
         tuberomin=1;
 }
 
-uint16_t oopc,opc;
+static uint16_t oopc,opc;
 
-void execz80()
+void z80_exec()
 {
         uint8_t opcode,temp;
         uint16_t addr;
@@ -417,7 +343,7 @@ void execz80()
         {
                 oopc=opc;
                 opc=pc;
-                if ((tubeirq&1) && iff1) enterint=1;
+                if ((tube_irq&1) && iff1) enterint=1;
                 cycles=0;
                 tempc=af.b.l&C_FLAG;
                 opcode=z80_readmem(pc++);
@@ -2869,7 +2795,7 @@ void execz80()
                         break;
 //                        printf("Bad opcode %02X at %04X\n",opcode,pc);
 //                        z80_dumpregs();
-//                        z80_dumpram();
+//                        z80_mem_dump();
 //                        exit(-1);
                 }
 /*                if (pc==0)
@@ -2917,7 +2843,7 @@ void execz80()
                         z80int=enterint=0;
                         cycles+=11;
                 }
-                if (tubeirq&2 && !oldz80nmi)
+                if (tube_irq&2 && !z80_oldnmi)
                 {
 //                        printf("NMI at %04X IM %i\n",pc,im);
                         iff2=iff1;
@@ -2931,7 +2857,7 @@ void execz80()
                         cycles+=11;
 //                        output=1;
                 }
-                oldz80nmi=tubeirq&2;
+                z80_oldnmi=tube_irq&2;
 //                pollula(cycles);
                 tubecycles-=cycles;
         }

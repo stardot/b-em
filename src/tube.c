@@ -1,10 +1,17 @@
-/*B-em v2.1 by Tom Walker
+/*B-em v2.2 by Tom Walker
   Tube ULA emulation*/
 
 #include <stdio.h>
 #include "b-em.h"
-/*#include "m6502.h"
-#include "mz80.h"*/
+#include "6502.h"
+#include "tube.h"
+
+#include "32016.h"
+#include "6502tube.h"
+#include "65816.h"
+#include "arm.h"
+#include "x86_tube.h"
+#include "z80.h"
 
 #define TUBE6502  1
 #define TUBEZ80   2
@@ -13,26 +20,14 @@
 #define TUBE65816 5
 #define TUBE32016 6
 
-int tube6502speed=1;
-int tubedat=0;
+int tube_shift;
+int tube_6502_speed=1;
+int tubecycles = 0;
 
-int tubetimetolive,tubeoutput;
-int tubecycs,tubelinecycs;
-int tube;
-int tubeskipint;
-int tubenmi,tubeoldnmi,tubenmilock;
-int tubeirqx;
+int tube_irq=0;
+int tube_type=TUBEX86;
 
-int tubecycs=0,tubelinecycs;
-int tubeirq=0;
-int tubetype=TUBEX86;
-int romin=1;
-int tube=1;
-int interrupt;
-int slicereads=0;
-uint16_t pc;
-/*struct m6502context m6502;
-struct mz80context mz80;*/
+static int tube_romin=1;
 
 struct
 {
@@ -42,328 +37,304 @@ struct
         int ph1pos,ph3pos,hp3pos;
 } tubeula;
 
-uint8_t *tuberam,spareram[4096];
-
-void updatetubeints()
+void tube_updateints()
 {
-        int oldtubeirq=tubeirq;
-        tubeirq=tubeirqx=0;
-        interrupt&=~8;
-        if ((tubeula.r1stat&1) && (tubeula.hstat[3]&128)) interrupt|=8;
-        if ((tubeula.r1stat&2) && (tubeula.pstat[0]&128)) tubeirq|=1;
-        if ((tubeula.r1stat&4) && (tubeula.pstat[3]&128)) tubeirq|=1;
-        if ((tubeula.r1stat&2) && (tubeula.pstat[0]&128)) tubeirqx|=1;
-        if ((tubeula.r1stat&4) && (tubeula.pstat[3]&128)) tubeirqx|=2;
+        tube_irq = 0;
+        interrupt &= ~8;
 
-//        if ((tubeula.r1stat&8) && ((tubeula.pstat[2]&128) || !tubeula.ph3pos)) tubeirq|=2;
-        if ((tubeula.r1stat&8) && !(tubeula.r1stat&16) && ((tubeula.hp3pos>0) || (tubeula.ph3pos==0))) tubeirq|=2;
-        if ((tubeula.r1stat&8) &&  (tubeula.r1stat&16) && ((tubeula.hp3pos>1) || (tubeula.ph3pos==0))) tubeirq|=2;
-//        if (tubeirq&2) printf("NMI set - %i %i %i\n",tubeula.r1stat&16,tubeula.hp3pos,tubeula.ph3pos);
+        if ((tubeula.r1stat & 1) && (tubeula.hstat[3] & 128)) interrupt |= 8;
+
+        if ((tubeula.r1stat & 2) && (tubeula.pstat[0] & 128)) tube_irq  |= 1;
+        if ((tubeula.r1stat & 4) && (tubeula.pstat[3] & 128)) tube_irq  |= 1;
+
+        if ((tubeula.r1stat & 8) && !(tubeula.r1stat & 16) && ((tubeula.hp3pos > 0) || (tubeula.ph3pos == 0))) tube_irq|=2;
+        if ((tubeula.r1stat & 8) &&  (tubeula.r1stat & 16) && ((tubeula.hp3pos > 1) || (tubeula.ph3pos == 0))) tube_irq|=2;
 }
 
-uint8_t readtubehost(uint16_t addr)
+uint8_t tube_host_read(uint16_t addr)
 {
-        uint8_t temp=0;
+        uint8_t temp = 0;
         int c;
-        if (!tubeexec) return 0xFE;
-//        rpclog("Read HOST  %04X ",addr);
-//        exit(-1);
-        switch (addr&7)
+        if (!tube_exec) return 0xFE;
+        switch (addr & 7)
         {
                 case 0: /*Reg 1 Stat*/
-                temp=(tubeula.hstat[0]&0xC0)|tubeula.r1stat;
+                temp = (tubeula.hstat[0] & 0xC0) | tubeula.r1stat;
                 break;
                 case 1: /*Register 1*/
-                temp=tubeula.ph1[0];
-                for (c=0;c<23;c++) tubeula.ph1[c]=tubeula.ph1[c+1];
+                temp = tubeula.ph1[0];
+                for (c = 0; c < 23; c++) tubeula.ph1[c] = tubeula.ph1[c + 1];
                 tubeula.ph1pos--;
-                tubeula.pstat[0]|=0x40;
-                if (!tubeula.ph1pos) tubeula.hstat[0]&=~0x80;
+                tubeula.pstat[0] |= 0x40;
+                if (!tubeula.ph1pos) tubeula.hstat[0] &= ~0x80;
                 break;
                 case 2: /*Register 2 Stat*/
-                temp=tubeula.hstat[1];
+                temp = tubeula.hstat[1];
                 break;
                 case 3: /*Register 2*/
-                temp=tubeula.ph2;
-                if (tubeula.hstat[1]&0x80)
+                temp = tubeula.ph2;
+                if (tubeula.hstat[1] & 0x80)
                 {
-                        tubeula.hstat[1]&=~0x80;
-                        tubeula.pstat[1]|=0x40;
+                        tubeula.hstat[1] &= ~0x80;
+                        tubeula.pstat[1] |=  0x40;
                 }
                 break;
                 case 4: /*Register 3 Stat*/
-                temp=tubeula.hstat[2];
+                temp = tubeula.hstat[2];
                 break;
                 case 5: /*Register 3*/
-                temp=tubeula.ph3[0];
-                if (tubeula.ph3pos>0)
+                temp = tubeula.ph3[0];
+                if (tubeula.ph3pos > 0)
                 {
-                        tubeula.ph3[0]=tubeula.ph3[1];
+                        tubeula.ph3[0] = tubeula.ph3[1];
                         tubeula.ph3pos--;
-                        tubeula.pstat[2]|=0x40;
-                        if (!tubeula.ph3pos) tubeula.hstat[2]&=~0x80;
+                        tubeula.pstat[2] |= 0x40;
+                        if (!tubeula.ph3pos) tubeula.hstat[2] &= ~0x80;
                 }
                 break;
                 case 6: /*Register 4 Stat*/
-                temp=tubeula.hstat[3];
+                temp = tubeula.hstat[3];
                 break;
                 case 7: /*Register 4*/
-                temp=tubeula.ph4;
-                if (tubeula.hstat[3]&0x80)
+                temp = tubeula.ph4;
+                if (tubeula.hstat[3] & 0x80)
                 {
-                        tubeula.hstat[3]&=~0x80;
-                        tubeula.pstat[3]|=0x40;
+                        tubeula.hstat[3] &= ~0x80;
+                        tubeula.pstat[3] |=  0x40;
                 }
                 break;
         }
-//        rpclog("%02X\n",temp);
-        updatetubeints();
+        tube_updateints();
         return temp;
 }
 
-void writetubehost(uint16_t addr, uint8_t val)
+void tube_host_write(uint16_t addr, uint8_t val)
 {
-        if (!tubeexec) return;
-//        rpclog("Write HOST %04X %02X\n",addr,val);
-        switch (addr&7)
+        if (!tube_exec) return;
+        switch (addr & 7)
         {
                 case 0: /*Register 1 stat*/
-                if (val&0x80) tubeula.r1stat|=(val&0x3F);
-                else          tubeula.r1stat&=~(val&0x3F);
-                tubeula.hstat[0]=(tubeula.hstat[0]&0xC0)|(val&0x3F);
+                if (val & 0x80) tubeula.r1stat |=  (val&0x3F);
+                else            tubeula.r1stat &= ~(val&0x3F);
+                tubeula.hstat[0] = (tubeula.hstat[0] & 0xC0) | (val & 0x3F);
                 break;
                 case 1: /*Register 1*/
-                tubeula.hp1=val;
-                tubeula.pstat[0]|=0x80;
-                tubeula.hstat[0]&=~0x40;
+                tubeula.hp1 = val;
+                tubeula.pstat[0] |=  0x80;
+                tubeula.hstat[0] &= ~0x40;
                 break;
                 case 3: /*Register 2*/
-                tubeula.hp2=val;
-                tubeula.pstat[1]|=0x80;
-                tubeula.hstat[1]&=~0x40;
+                tubeula.hp2 = val;
+                tubeula.pstat[1] |=  0x80;
+                tubeula.hstat[1] &= ~0x40;
                 break;
                 case 5: /*Register 3*/
-                tubedat++;
-                if (tubeula.r1stat&16)
+                if (tubeula.r1stat & 16)
                 {
-                        if (tubeula.hp3pos<2)
-                           tubeula.hp3[tubeula.hp3pos++]=val;
-                        if (tubeula.hp3pos==2)
+                        if (tubeula.hp3pos < 2)
+                           tubeula.hp3[tubeula.hp3pos++] = val;
+                        if (tubeula.hp3pos == 2)
                         {
-                                tubeula.pstat[2]|=0x80;
-                                tubeula.hstat[2]&=~0x40;
+                                tubeula.pstat[2] |=  0x80;
+                                tubeula.hstat[2] &= ~0x40;
                         }
                 }
                 else
                 {
-                        tubeula.hp3[0]=val;
-                        tubeula.hp3pos=1;
-                        tubeula.pstat[2]|=0x80;
-                        tubeula.hstat[2]&=~0x40;
-                        updatetubeints();
+                        tubeula.hp3[0] = val;
+                        tubeula.hp3pos = 1;
+                        tubeula.pstat[2] |=  0x80;
+                        tubeula.hstat[2] &= ~0x40;
+                        tube_updateints();
                 }
 //                printf("Write R3 %i\n",tubeula.hp3pos);
                 break;
                 case 7: /*Register 4*/
-                tubeula.hp4=val;
-                tubeula.pstat[3]|=0x80;
-                tubeula.hstat[3]&=~0x40;
+                tubeula.hp4 = val;
+                tubeula.pstat[3] |=  0x80;
+                tubeula.hstat[3] &= ~0x40;
                 break;
         }
-        updatetubeints();
+        tube_updateints();
 }
 
-uint16_t get6502pc()
+uint8_t tube_parasite_read(uint32_t addr)
 {
-}
-
-uint8_t readtube(uint32_t addr)
-{
-        uint8_t temp=0;
-        switch (addr&7)
+        uint8_t temp = 0;
+        switch (addr & 7)
         {
                 case 0: /*Register 1 stat*/
-                if (romin)
+                if (tube_romin)
                 {
-                        if (tubetype==TUBE6502 || tubetype==TUBE65816)
-                           tube6502mapoutrom();
-                        romin=0;
+                        if (tube_type == TUBE6502 || tube_type == TUBE65816)
+                           tube_6502_mapoutrom();
+                        tube_romin = 0;
                 }
-                temp=tubeula.pstat[0]|tubeula.r1stat;
+                temp = tubeula.pstat[0] | tubeula.r1stat;
                 break;
                 case 1: /*Register 1*/
-                temp=tubeula.hp1;
-                if (tubeula.pstat[0]&0x80)
+                temp = tubeula.hp1;
+                if (tubeula.pstat[0] & 0x80)
                 {
-                        tubeula.pstat[0]&=~0x80;
-                        tubeula.hstat[0]|=0x40;
+                        tubeula.pstat[0] &= ~0x80;
+                        tubeula.hstat[0] |=  0x40;
                 }
                 break;
                 case 2: /*Register 2 stat*/
-                temp=tubeula.pstat[1];
+                temp = tubeula.pstat[1];
                 break;
                 case 3: /*Register 2*/
-                temp=tubeula.hp2;
-                if (tubeula.pstat[1]&0x80)
+                temp = tubeula.hp2;
+                if (tubeula.pstat[1] & 0x80)
                 {
-                        tubeula.pstat[1]&=~0x80;
-                        tubeula.hstat[1]|=0x40;
+                        tubeula.pstat[1] &= ~0x80;
+                        tubeula.hstat[1] |=  0x40;
                 }
                 break;
                 case 4: /*Register 3 stat*/
-                temp=tubeula.pstat[2];
+                temp = tubeula.pstat[2];
                 break;
                 case 5: /*Register 3*/
-//                printf("Read tube R3 %i\n",tubeula.hp3pos);
-                tubedat--;
-                temp=tubeula.hp3[0];
+                temp = tubeula.hp3[0];
                 if (tubeula.hp3pos>0)
                 {
-                        tubeula.hp3[0]=tubeula.hp3[1];
+                        tubeula.hp3[0] = tubeula.hp3[1];
                         tubeula.hp3pos--;
                         if (!tubeula.hp3pos)
                         {
-                                tubeula.hstat[2]|=0x40;
-                                tubeula.pstat[2]&=~0x80;
+                                tubeula.hstat[2] |=  0x40;
+                                tubeula.pstat[2] &= ~0x80;
                         }
                 }
                 break;
                 case 6: /*Register 4 stat*/
-                temp=tubeula.pstat[3];
+                temp = tubeula.pstat[3];
                 break;
                 case 7: /*Register 4*/
-                temp=tubeula.hp4;
-                if (tubeula.pstat[3]&0x80)
+                temp = tubeula.hp4;
+                if (tubeula.pstat[3] & 0x80)
                 {
-                        tubeula.pstat[3]&=~0x80;
-                        tubeula.hstat[3]|=0x40;
+                        tubeula.pstat[3] &= ~0x80;
+                        tubeula.hstat[3] |=  0x40;
                 }
                 break;
         }
-        updatetubeints();
+        tube_updateints();
         return temp;
 }
 
-void writetube(uint32_t addr, uint8_t val)
+void tube_parasite_write(uint32_t addr, uint8_t val)
 {
-        switch (addr&7)
+        switch (addr & 7)
         {
                 case 1: /*Register 1*/
-                if (tubeula.ph1pos<24)
+                if (tubeula.ph1pos < 24)
                 {
-                        tubeula.ph1[tubeula.ph1pos++]=val;
-                        tubeula.hstat[0]|=0x80;
-                        if (tubeula.ph1pos==24) tubeula.pstat[0]&=~0x40;
+                        tubeula.ph1[tubeula.ph1pos++] = val;
+                        tubeula.hstat[0] |= 0x80;
+                        if (tubeula.ph1pos == 24) tubeula.pstat[0] &= ~0x40;
                 }
                 break;
                 case 3: /*Register 2*/
-                tubeula.ph2=val;
-                tubeula.hstat[1]|=0x80;
-                tubeula.pstat[1]&=~0x40;
+                tubeula.ph2 = val;
+                tubeula.hstat[1] |=  0x80;
+                tubeula.pstat[1] &= ~0x40;
                 break;
                 case 5: /*Register 3*/
-                if (tubeula.r1stat&16)
+                if (tubeula.r1stat & 16)
                 {
-                        if (tubeula.ph3pos<2)
-                           tubeula.ph3[tubeula.ph3pos++]=val;
-                        if (tubeula.ph3pos==2)
+                        if (tubeula.ph3pos < 2)
+                           tubeula.ph3[tubeula.ph3pos++] = val;
+                        if (tubeula.ph3pos == 2)
                         {
-                                tubeula.hstat[2]|=0x80;
-                                tubeula.pstat[2]&=~0x40;
+                                tubeula.hstat[2] |=  0x80;
+                                tubeula.pstat[2] &= ~0x40;
                         }
                 }
                 else
                 {
-                        tubeula.ph3[0]=val;
-                        tubeula.ph3pos=1;
-                        tubeula.hstat[2]|=0x80;
-                        tubeula.pstat[2]&=~0x40;
+                        tubeula.ph3[0] = val;
+                        tubeula.ph3pos = 1;
+                        tubeula.hstat[2] |=  0x80;
+                        tubeula.pstat[2] &= ~0x40;
                 }
                 break;
                 case 7: /*Register 4*/
-                tubeula.ph4=val;
-                tubeula.hstat[3]|=0x80;
-                tubeula.pstat[3]&=~0x40;
+                tubeula.ph4 = val;
+                tubeula.hstat[3] |=  0x80;
+                tubeula.pstat[3] &= ~0x40;
                 break;
         }
-        updatetubeints();
+        tube_updateints();
 }
 
-void tubeinit6502()
+void tube_6502_init()
 {
-        tubetype=TUBE6502;
-        tubeinitmem();
-        tubeloadrom();
-        tubereset6502();
-        tubeexec=tubeexec65c02;
-        tubeshift=tube6502speed;//1;
+        tube_type = TUBE6502;
+        tube_6502_init_cpu();
+        tube_6502_reset();
+        tube_exec  = tube_6502_exec;
+        tube_shift = tube_6502_speed;
 }
 
-void updatetubespeed()
+void tube_updatespeed()
 {
-        if (tubetype==TUBE6502) tubeshift=tube6502speed;
+        if (tube_type == TUBE6502) tube_shift = tube_6502_speed;
 }
 
-void tubeinitarm()
+void tube_arm_init()
 {
-        tubetype=TUBEARM;
-        loadarmrom();
-        resetarm();
-        tubeexec=execarm;
-        tubeshift=1;
+        tube_type = TUBEARM;
+        arm_init();
+        arm_reset();
+        tube_exec  = arm_exec;
+        tube_shift = 1;
 }
 
-void tubeinitz80()
+void tube_z80_init()
 {
-        tubetype=TUBEZ80;
-        z80_loadrom();
-        resetz80();
-        tubeexec=execz80;
-        tubeshift=2;
+        tube_type = TUBEZ80;
+        z80_init();
+        z80_reset();
+        tube_exec  = z80_exec;
+        tube_shift = 2;
 }
 
-void tubeinitx86()
+void tube_x86_init()
 {
-        tubetype=TUBEX86;
-        initmemx86();
-        resetx86();
-        tubeexec=execx86;
-        tubeshift=2;
+        tube_type = TUBEX86;
+        x86_init();
+        x86_reset();
+        tube_exec  = x86_exec;
+        tube_shift = 2;
 }
 
-void tubeinit65816()
+void tube_65816_init()
 {
-        tubetype=TUBE65816;
-        init65816();
-        reset65816();
-        tubeexec=exec65816;
-        tubeshift=3;
+        tube_type = TUBE65816;
+        w65816_init();
+        w65816_reset();
+        tube_exec  = w65816_exec;
+        tube_shift = 3;
 }
 
-void tubeinit32016()
+void tube_32016_init()
 {
-        tubetype=TUBE32016;
-        init32016();
-        reset32016();
-        tubeexec=exec32016;
-        tubeshift=2;
+        tube_type = TUBE32016;
+        n32016_init();
+        n32016_reset();
+        tube_exec  = n32016_exec;
+        tube_shift = 2;
 }
 
-void resettube()
+void tube_reset()
 {
-        tubeula.ph1pos=tubeula.hp3pos=0;
-        tubeula.ph3pos=1;
-        tubeula.r1stat=0;
-        tubeula.hstat[0]=tubeula.hstat[1]=tubeula.hstat[3]=0x40;
-        tubeula.pstat[0]=tubeula.pstat[1]=tubeula.pstat[2]=tubeula.pstat[3]=0x40;
-        tubeula.hstat[2]=0xC0;
-        romin=1;
-}
-
-void dumptube()
-{
-        FILE *f=fopen("tuberam.dmp","wb");
-        fwrite(tuberam,65536,1,f);
-        fclose(f);
+        tubeula.ph1pos = tubeula.hp3pos = 0;
+        tubeula.ph3pos = 1;
+        tubeula.r1stat = 0;
+        tubeula.hstat[0] = tubeula.hstat[1] = tubeula.hstat[3] = 0x40;
+        tubeula.pstat[0] = tubeula.pstat[1] = tubeula.pstat[2] = tubeula.pstat[3] = 0x40;
+        tubeula.hstat[2] = 0xC0;
+        tube_romin = 1;
 }
 

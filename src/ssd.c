@@ -1,266 +1,268 @@
-/*B-em v2.1 by Tom Walker
+/*B-em v2.2 by Tom Walker
   SSD/DSD disc handling*/
 #include <stdio.h>
 #include "b-em.h"
+#include "ssd.h"
+#include "disc.h"
 
-FILE *ssdf[2];
-uint8_t trackinfo[2][2][10*256];
-int dsd[2],ssdtrackc[2];
+static FILE *ssd_f[2];
+static uint8_t trackinfo[2][2][10*256];
+static int dsd[2],ssd_trackc[2];
 int writeprot[2],fwriteprot[2];
 
-int ssdsector,ssdtrack,ssdside,ssddrive;
-int ssdread,ssdwrite,ssdreadpos,ssdreadaddr;
-int ssdtime;
-int ssdnotfound;
-int ssdrsector=0;
-int ssdformat=0;
+static int ssd_sector, ssd_track,   ssd_side,    ssd_drive;
+static int ssd_inread, ssd_inwrite, ssd_readpos, ssd_inreadaddr;
+static int ssd_time;
+static int ssd_notfound;
+static int ssd_rsector = 0;
+static int ssd_informat = 0;
 
-void ssd_reset()
+void ssd_init()
 {
-        ssdf[0]=ssdf[1]=0;
-        dsd[0]=dsd[1]=0;
-        ssdnotfound=0;
+        ssd_f[0] = ssd_f[1] = 0;
+        dsd[0] = dsd[1] = 0;
+        ssd_notfound = 0;
 }
 
 void ssd_load(int drive, char *fn)
 {
-        writeprot[drive]=0;
-        ssdf[drive]=fopen(fn,"rb+");
-        if (!ssdf[drive])
+        writeprot[drive] = 0;
+        ssd_f[drive] = fopen(fn, "rb+");
+        if (!ssd_f[drive])
         {
-                ssdf[drive]=fopen(fn,"rb");
-                if (!ssdf[drive]) return;
-                writeprot[drive]=1;
+                ssd_f[drive] = fopen(fn, "rb");
+                if (!ssd_f[drive]) return;
+                writeprot[drive] = 1;
         }
-        fwriteprot[drive]=writeprot[drive];
-        dsd[drive]=0;
-        drives[drive].seek=ssd_seek;
-        drives[drive].readsector=ssd_readsector;
-        drives[drive].writesector=ssd_writesector;
-        drives[drive].readaddress=ssd_readaddress;
-        drives[drive].poll=ssd_poll;
-        drives[drive].format=ssd_format;
+        fwriteprot[drive] = writeprot[drive];
+        dsd[drive] = 0;
+        drives[drive].seek        = ssd_seek;
+        drives[drive].readsector  = ssd_readsector;
+        drives[drive].writesector = ssd_writesector;
+        drives[drive].readaddress = ssd_readaddress;
+        drives[drive].poll        = ssd_poll;
+        drives[drive].format      = ssd_format;
 }
 
 void dsd_load(int drive, char *fn)
 {
-        writeprot[drive]=0;
-        ssdf[drive]=fopen(fn,"rb+");
-        if (!ssdf[drive])
+        writeprot[drive] = 0;
+        ssd_f[drive] = fopen(fn, "rb+");
+        if (!ssd_f[drive])
         {
-                ssdf[drive]=fopen(fn,"rb");
-                if (!ssdf[drive]) return;
-                writeprot[drive]=1;
+                ssd_f[drive] = fopen(fn, "rb");
+                if (!ssd_f[drive]) return;
+                writeprot[drive] = 1;
         }
-        fwriteprot[drive]=writeprot[drive];
-        dsd[drive]=1;
-        drives[drive].seek=ssd_seek;
-        drives[drive].readsector=ssd_readsector;
-        drives[drive].writesector=ssd_writesector;
-        drives[drive].readaddress=ssd_readaddress;
-        drives[drive].poll=ssd_poll;
-        drives[drive].format=ssd_format;
+        fwriteprot[drive] = writeprot[drive];
+        dsd[drive] = 1;
+        drives[drive].seek        = ssd_seek;
+        drives[drive].readsector  = ssd_readsector;
+        drives[drive].writesector = ssd_writesector;
+        drives[drive].readaddress = ssd_readaddress;
+        drives[drive].poll        = ssd_poll;
+        drives[drive].format      = ssd_format;
 }
 
 void ssd_close(int drive)
 {
-        if (ssdf[drive]) fclose(ssdf[drive]);
-        ssdf[drive]=NULL;
+        if (ssd_f[drive]) fclose(ssd_f[drive]);
+        ssd_f[drive] = NULL;
 }
 
 void ssd_seek(int drive, int track)
 {
-        if (!ssdf[drive]) return;
+        if (!ssd_f[drive]) return;
 //        printf("Seek :%i to %i\n",drive,track);
-        ssdtrackc[drive]=track;
+        ssd_trackc[drive] = track;
         if (dsd[drive])
         {
-                fseek(ssdf[drive],track*20*256,SEEK_SET);
-                fread(trackinfo[drive][0],10*256,1,ssdf[drive]);
-                fread(trackinfo[drive][1],10*256,1,ssdf[drive]);
+                fseek(ssd_f[drive], track * 20 * 256, SEEK_SET);
+                fread(trackinfo[drive][0],10 * 256, 1, ssd_f[drive]);
+                fread(trackinfo[drive][1],10 * 256, 1, ssd_f[drive]);
         }
         else
         {
-                fseek(ssdf[drive],track*10*256,SEEK_SET);
-                fread(trackinfo[drive][0],10*256,1,ssdf[drive]);
+                fseek(ssd_f[drive], track * 10 * 256, SEEK_SET);
+                fread(trackinfo[drive][0], 10 * 256, 1, ssd_f[drive]);
         }
 }
 
 void ssd_writeback(int drive, int track)
 {
-        if (!ssdf[drive]) return;
+        if (!ssd_f[drive]) return;
         if (dsd[drive])
         {
-                fseek(ssdf[drive],track*20*256,SEEK_SET);
-                fwrite(trackinfo[drive][0],10*256,1,ssdf[drive]);
-                fwrite(trackinfo[drive][1],10*256,1,ssdf[drive]);
+                fseek(ssd_f[drive], track * 20 * 256, SEEK_SET);
+                fwrite(trackinfo[drive][0], 10 * 256, 1, ssd_f[drive]);
+                fwrite(trackinfo[drive][1], 10 * 256, 1, ssd_f[drive]);
         }
         else
         {
-                fseek(ssdf[drive],track*10*256,SEEK_SET);
-                fwrite(trackinfo[drive][0],10*256,1,ssdf[drive]);
+                fseek(ssd_f[drive], track * 10 * 256, SEEK_SET);
+                fwrite(trackinfo[drive][0], 10 * 256, 1, ssd_f[drive]);
         }
 }
 
 void ssd_readsector(int drive, int sector, int track, int side, int density)
 {
-        ssdsector=sector;
-        ssdtrack=track;
-        ssdside=side;
-        ssddrive=drive;
+        ssd_sector = sector;
+        ssd_track  = track;
+        ssd_side   = side;
+        ssd_drive  = drive;
 //        printf("Read sector %i %i %i %i\n",drive,side,track,sector);
 
-        if (!ssdf[drive] || (side && !dsd[drive]) || density || track!=ssdtrackc[drive])
+        if (!ssd_f[drive] || (side && !dsd[drive]) || density || track != ssd_trackc[drive])
         {
-                ssdnotfound=500;
+                ssd_notfound = 500;
 ///                printf("Not found!\n");
                 return;
         }
-        ssdread=1;
-        ssdreadpos=0;
+        ssd_inread  = 1;
+        ssd_readpos = 0;
 //        printf("GO\n");
 }
 
 void ssd_writesector(int drive, int sector, int track, int side, int density)
 {
-        ssdsector=sector;
-        ssdtrack=track;
-        ssdside=side;
-        ssddrive=drive;
+        ssd_sector = sector;
+        ssd_track  = track;
+        ssd_side   = side;
+        ssd_drive  = drive;
 //        printf("Write sector %i %i %i %i\n",drive,side,track,sector);
 
-        if (!ssdf[drive] || (side && !dsd[drive]) || density || track!=ssdtrackc[drive])
+        if (!ssd_f[drive] || (side && !dsd[drive]) || density || track != ssd_trackc[drive])
         {
-                ssdnotfound=500;
+                ssd_notfound=500;
                 return;
         }
-        ssdwrite=1;
-        ssdreadpos=0;
-        ssdtime=-1000;
+        ssd_inwrite = 1;
+        ssd_readpos = 0;
+        ssd_time    = -1000;
 }
 
 void ssd_readaddress(int drive, int track, int side, int density)
 {
-        ssdtrack=track;
-        ssdside=side;
-        ssddrive=drive;
+        ssd_track = track;
+        ssd_side  = side;
+        ssd_drive = drive;
 //        printf("Read address %i %i %i %i\n",drive,track,side,density);
 
-        if (!ssdf[drive] || (side && !dsd[drive]) || density || track!=ssdtrackc[drive])
+        if (!ssd_f[drive] || (side && !dsd[drive]) || density || track != ssd_trackc[drive])
         {
-                ssdnotfound=500;
+                ssd_notfound = 500;
                 return;
         }
-        ssdrsector=0;
-        ssdreadpos=0;
-        ssdreadaddr=1;
+        ssd_rsector    = 0;
+        ssd_readpos    = 0;
+        ssd_inreadaddr = 1;
 }
 
 void ssd_format(int drive, int track, int side, int density)
 {
-        ssdtrack=track;
-        ssdside=side;
-        ssddrive=drive;
+        ssd_track = track;
+        ssd_side  = side;
+        ssd_drive = drive;
 
-        if (!ssdf[drive] || (side && !dsd[drive]) || density || track!=ssdtrackc[drive])
+        if (!ssd_f[drive] || (side && !dsd[drive]) || density || track != ssd_trackc[drive])
         {
-                ssdnotfound=500;
+                ssd_notfound = 500;
                 return;
         }
-        ssdsector=0;
-        ssdreadpos=0;
-        ssdformat=1;
+        ssd_sector   = 0;
+        ssd_readpos  = 0;
+        ssd_informat = 1;
 }
 
 void ssd_poll()
 {
         int c;
 //        printf("POLL %i\n",ssdtime);
-        ssdtime++;
-        if (ssdtime<16) return;
-        ssdtime=0;
+        ssd_time++;
+        if (ssd_time < 16) return;
+        ssd_time = 0;
 
-        if (ssdnotfound)
+        if (ssd_notfound)
         {
-                ssdnotfound--;
-                if (!ssdnotfound)
+                ssd_notfound--;
+                if (!ssd_notfound)
                 {
-                        fdcnotfound();
+                        fdc_notfound();
                 }
         }
-        if (ssdread && ssdf[ssddrive])
+        if (ssd_inread && ssd_f[ssd_drive])
         {
 //                printf("Read %i\n",ssdreadpos);
-                fdcdata(trackinfo[ssddrive][ssdside][(ssdsector<<8)+ssdreadpos]);
-                ssdreadpos++;
-                if (ssdreadpos==256)
+                fdc_data(trackinfo[ssd_drive][ssd_side][(ssd_sector << 8) + ssd_readpos]);
+                ssd_readpos++;
+                if (ssd_readpos == 256)
                 {
-                        ssdread=0;
-                        fdcfinishread();
+                        ssd_inread = 0;
+                        fdc_finishread();
                 }
         }
-        if (ssdwrite && ssdf[ssddrive])
+        if (ssd_inwrite && ssd_f[ssd_drive])
         {
-                if (writeprot[ssddrive])
+                if (writeprot[ssd_drive])
                 {
-                        fdcwriteprotect();
-                        ssdwrite=0;
+                        fdc_writeprotect();
+                        ssd_inwrite = 0;
                         return;
                 }
 //                printf("Write data %i\n",ssdreadpos);
-                c=fdcgetdata(ssdreadpos==255);
-                if (c==-1)
+                c = fdc_getdata(ssd_readpos == 255);
+                if (c == -1)
                 {
 //                        printf("Data overflow!\n");
 //                        exit(-1);
                 }
-                trackinfo[ssddrive][ssdside][(ssdsector<<8)+ssdreadpos]=c;
-                ssdreadpos++;
-                if (ssdreadpos==256)
+                trackinfo[ssd_drive][ssd_side][(ssd_sector << 8) + ssd_readpos] = c;
+                ssd_readpos++;
+                if (ssd_readpos == 256)
                 {
-                        ssdwrite=0;
-                        fdcfinishread();
-                        ssd_writeback(ssddrive,ssdtrack);
+                        ssd_inwrite = 0;
+                        fdc_finishread();
+                        ssd_writeback(ssd_drive, ssd_track);
                 }
         }
-        if (ssdreadaddr && ssdf[ssddrive])
+        if (ssd_inreadaddr && ssd_f[ssd_drive])
         {
-                switch (ssdreadpos)
+                switch (ssd_readpos)
                 {
-                        case 0: fdcdata(ssdtrack); break;
-                        case 1: fdcdata(ssdside); break;
-                        case 2: fdcdata(ssdrsector); break;
-                        case 3: fdcdata(1); break;
-                        case 4: fdcdata(0); break;
-                        case 5: fdcdata(0); break;
+                        case 0: fdc_data(ssd_track);   break;
+                        case 1: fdc_data(ssd_side);    break;
+                        case 2: fdc_data(ssd_rsector); break;
+                        case 3: fdc_data(1);           break;
+                        case 4: fdc_data(0);           break;
+                        case 5: fdc_data(0);           break;
                         case 6:
-                        ssdreadaddr=0;
-                        fdcfinishread();
-                        ssdrsector++;
-                        if (ssdrsector==10) ssdrsector=0;
+                        ssd_inreadaddr = 0;
+                        fdc_finishread();
+                        ssd_rsector++;
+                        if (ssd_rsector == 10) ssd_rsector=0;
                         break;
                 }
-                ssdreadpos++;
+                ssd_readpos++;
         }
-        if (ssdformat && ssdf[ssddrive])
+        if (ssd_informat && ssd_f[ssd_drive])
         {
-                if (writeprot[ssddrive])
+                if (writeprot[ssd_drive])
                 {
-                        fdcwriteprotect();
-                        ssdformat=0;
+                        fdc_writeprotect();
+                        ssd_informat = 0;
                         return;
                 }
-                trackinfo[ssddrive][ssdside][(ssdsector<<8)+ssdreadpos]=0;
-                ssdreadpos++;
-                if (ssdreadpos==256)
+                trackinfo[ssd_drive][ssd_side][(ssd_sector << 8) + ssd_readpos] = 0;
+                ssd_readpos++;
+                if (ssd_readpos == 256)
                 {
-                        ssdreadpos=0;
-                        ssdsector++;
-                        if (ssdsector==10)
+                        ssd_readpos = 0;
+                        ssd_sector++;
+                        if (ssd_sector == 10)
                         {
-                                ssdformat=0;
-                                fdcfinishread();
-                                ssd_writeback(ssddrive,ssdtrack);
+                                ssd_informat = 0;
+                                fdc_finishread();
+                                ssd_writeback(ssd_drive, ssd_track);
                         }
                 }
         }

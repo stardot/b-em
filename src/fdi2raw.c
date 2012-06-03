@@ -44,6 +44,8 @@
 #define xmalloc malloc
 #include "fdi2raw.h"
 
+#include "b-em.h"
+
 #undef DEBUG
 #define VERBOSE
 #undef VERBOSE
@@ -74,16 +76,8 @@ static char *datalog(uae_u8 *src, int len)
 static char *datalog(uae_u8 *src, int len) { return ""; }
 #endif
 
-#ifdef DEBUG
-#define debuglog write_log
-#else
-#define debuglog
-#endif
-#ifdef VERBOSE
-#define outlog write_log
-#else
-#define outlog
-#endif
+#define outlog rpclog
+#define debuglog rpclog
 
 static int fdi_allocated;
 #ifdef DEBUG
@@ -158,7 +152,7 @@ struct fdi {
 
 #define get_u32(x) ((((x)[0])<<24)|(((x)[1])<<16)|(((x)[2])<<8)|((x)[3]))
 #define get_u24(x) ((((x)[0])<<16)|(((x)[1])<<8)|((x)[2]))
-STATIC_INLINE put_u32 (uae_u8 *d, uae_u32 v)
+STATIC_INLINE void put_u32 (uae_u8 *d, uae_u32 v)
 {
         d[0] = v >> 24;
         d[1] = v >> 16;
@@ -333,11 +327,13 @@ static void zxx (FDI *fdi)
 //      return -1;
 }
 /* unsupported track */
+#if 0
 static void zyy (FDI *fdi)
 {
         outlog ("track %d: unsupported track type 0x%02.2X\n", fdi->current_track, fdi->track_type);
 //      return -1;
 }
+#endif
 /* empty track */
 static void track_empty (FDI *fdi)
 {
@@ -351,11 +347,13 @@ static void dxx (FDI *fdi)
         fdi->err = 1;
 }
 /* unsupported sector described type */
+#if 0
 static void dyy (FDI *fdi)
 {
         outlog ("\ntrack %d: unsupported sector described 0x%02.2X\n", fdi->current_track, fdi->track_type);
         fdi->err = 1;
 }
+#endif
 /* add position of mfm sync bit */
 static void add_mfm_sync_bit (FDI *fdi)
 {
@@ -578,7 +576,7 @@ static void s0d(FDI *fdi)
 
 /* just for testing integrity of Amiga sectors */
 
-static void rotateonebit (uae_u8 *start, uae_u8 *end, int shift)
+/*static void rotateonebit (uae_u8 *start, uae_u8 *end, int shift)
 {
         if (shift == 0)
                 return;
@@ -587,10 +585,10 @@ static void rotateonebit (uae_u8 *start, uae_u8 *end, int shift)
                 start[0] |= start[1] >> (8 - shift);
                 start++;
         }
-}
+}*/
 
-static int check_offset;
-static uae_u16 getmfmword (uae_u8 *mbuf)
+//static int check_offset;
+/*static uae_u16 getmfmword (uae_u8 *mbuf)
 {
         uae_u32 v;
 
@@ -601,14 +599,15 @@ static uae_u16 getmfmword (uae_u8 *mbuf)
         v |= mbuf[2];
         v >>= check_offset;
         return v;
-}
+}*/
 
 #define MFMMASK 0x55555555
-static uae_u32 getmfmlong (uae_u8 * mbuf)
+/*static uae_u32 getmfmlong (uae_u8 * mbuf)
 {
         return ((getmfmword (mbuf) << 16) | getmfmword (mbuf + 2)) & MFMMASK;
-}
+}*/
 
+#if 0
 static int amiga_check_track (FDI *fdi)
 {
         int i, j, secwritten = 0;
@@ -765,6 +764,7 @@ static int amiga_check_track (FDI *fdi)
         }
         return ok;
 }
+#endif
 
 static void amiga_data_raw (FDI *fdi, uae_u8 *secbuf, uae_u8 *crc, int len)
 {
@@ -966,7 +966,7 @@ static void ibm_data (FDI *fdi, uae_u8 *data, uae_u8 *crc, int len)
 {
         int i;
         uae_u8 crcbuf[2];
-        uae_u16 crcv;
+        uae_u16 crcv = 0;
 
         word_add (fdi, 0x4489);
         word_add (fdi, 0x4489);
@@ -1178,7 +1178,7 @@ static void track_amiga (struct fdi *fdi, int first_sector, int max_sector)
 }
 static void track_atari_st (struct fdi *fdi, int max_sector)
 {
-        int i, gap3;
+        int i, gap3 = 0;
         uae_u8 *p = fdi->track_src;
 
         switch (max_sector)
@@ -2022,7 +2022,7 @@ FDI *fdi2raw_header(FILE *f)
         fseek (fdi->file, 0, SEEK_SET);
         fread (fdi->header, 2048, 1, fdi->file);
         fseek (fdi->file, oldseek, SEEK_SET);
-        if (memcmp (fdiid, fdi->header, strlen (fdiid)) ) {
+        if (memcmp (fdiid, fdi->header, strlen ((char *)fdiid)) ) {
                 fdi_free(fdi);
                 return NULL;
         }
@@ -2110,7 +2110,7 @@ int fdi2raw_loadrevolution (FDI *fdi, uae_u16 *mfmbuf, uae_u16 *tracktiming, int
 int fdi2raw_loadtrack (FDI *fdi, uae_u16 *mfmbuf, uae_u16 *tracktiming, int track, int *tracklength, int *indexoffsetp, int *multirev, int mfm)
 {
         uae_u8 *p;
-        int outlen, i, indexoffset = 0;
+        int outlen, i;
         struct fdi_cache *cache = &fdi->cache[track];
 
         if (cache->lowlevel)

@@ -1,10 +1,12 @@
-/*B-em v2.1 by Tom Walker
+/*B-em v2.2 by Tom Walker
   6502 parasite CPU emulation*/
 
 #include <allegro.h>
 #include <stdio.h>
 
 #include "b-em.h"
+#include "tube.h"
+#include "6502tube.h"
 
 #define a tubea
 #define x tubex
@@ -12,10 +14,13 @@
 #define s tubesp
 #define pc tubepc
 
+static int tube_6502_skipint;
+static int tube_6502_oldnmi;
+
 /*6502 registers*/
-uint8_t a,x,y,s;
-uint16_t pc;
-struct
+static uint8_t a,x,y,s;
+static uint16_t pc;
+static struct
 {
         int c,z,i,d,v,n;
 } tubep;
@@ -23,30 +28,12 @@ struct
 /*Memory structures*/
 /*There is an extra entry to allow for stupid programs (3d grand prix) doing
   something stupid like STA $FFFF,x*/
-uint8_t *tubemem[0x101];
-int tubememstat[0x101];
-uint8_t *tuberam;
-uint8_t tuberom[0x1000];
+static uint8_t *tubemem[0x101];
+static int tubememstat[0x101];
+static uint8_t *tuberam;
+static uint8_t tuberom[0x1000];
 
-void tubeinitmem()
-{
-        int c;
-        if (!tuberam) tuberam=(uint8_t *)malloc(0x10000);
-        memset(tuberam,0,0x10000);
-        for (c=0x00;c<0x100;c++) tubemem[c]=(uint8_t *)(tuberam+(c<<8));
-        for (c=0x00;c<0x100;c++) tubememstat[c]=0;
-        for (c=0xF0;c<0x100;c++) tubememstat[c]=2;
-//        tubememstat[0xFE]=tubememstat[0xFF]=2;
-        tubemem[0x100]=tubemem[0];
-        tubememstat[0x100]=tubememstat[0x101];
-}
-
-void closetube()
-{
-        if (tuberam) free(tuberam);
-}
-
-void tubeloadrom()
+static void tube_6502_loadrom()
 {
         FILE *f;
         char fn[512];
@@ -56,8 +43,27 @@ void tubeloadrom()
         fclose(f);
 }
 
+void tube_6502_init_cpu()
+{
+        int c;
+        if (!tuberam) tuberam=(uint8_t *)malloc(0x10000);
+        memset(tuberam,0,0x10000);
+        for (c=0x00;c<0x100;c++) tubemem[c]=(uint8_t *)(tuberam+(c<<8));
+        for (c=0x00;c<0x100;c++) tubememstat[c]=0;
+        for (c=0xF0;c<0x100;c++) tubememstat[c]=2;
+//        tubememstat[0xFE]=tubememstat[0xFF]=2;
+        tubemem[0x100]=tubemem[0];
+        tubememstat[0x100]=tubememstat[0];
+        tube_6502_loadrom();
+}
+
+void tube_6502_close()
+{
+        if (tuberam) free(tuberam);
+}
+
 #undef printf
-void tubedumpregs()
+/*static void tubedumpregs()
 {
         FILE *f=fopen("tuberam.dmp","wb");
         fwrite(tuberam,65536,1,f);
@@ -65,22 +71,22 @@ void tubedumpregs()
         rpclog("Tube 65c12 registers :\n");
         rpclog("A=%02X X=%02X Y=%02X S=01%02X PC=%04X\n",a,x,y,s,pc);
         rpclog("Status : %c%c%c%c%c%c\n",(tubep.n)?'N':' ',(tubep.v)?'V':' ',(tubep.d)?'D':' ',(tubep.i)?'I':' ',(tubep.z)?'Z':' ',(tubep.c)?'C':' ');
-}
+}*/
 
-int tuberomin=1;
-void tube6502mapoutrom()
+static int tuberomin=1;
+void tube_6502_mapoutrom()
 {
         tuberomin=0;
 }
 
 #define polltime(c) { tubecycles-=c; }
 
-uint8_t tubereadmeml(uint16_t addr)
+static uint8_t tubereadmeml(uint16_t addr)
 {
         uint8_t temp;
         if ((addr&~7)==0xFEF8)
         {
-                temp=readtube(addr);
+                temp=tube_parasite_read(addr);
 //                rpclog("Read tube  %04X %02X %04X\n",addr,temp,pc);
                 return temp;
         }
@@ -89,13 +95,13 @@ uint8_t tubereadmeml(uint16_t addr)
 }
 
 int endtimeslice;
-uint8_t tubewritememl(uint16_t addr, uint8_t val)
+static void tubewritememl(uint16_t addr, uint8_t val)
 {
 //        rpclog("Tube writemem %04X %02X %04X\n",addr,val,pc);
         if ((addr&~7)==0xFEF8)
         {
 //                rpclog("Write tube %04X %02X %04X\n",addr,val,pc);
-                writetube(addr,val);
+                tube_parasite_write(addr,val);
                 endtimeslice=1;
                 return;
         }
@@ -108,16 +114,14 @@ uint8_t tubewritememl(uint16_t addr, uint8_t val)
 //if (tubememstat[(a)>>8]==0) tubemem[(a)>>8][(a)&0xFF]=b; else if (tubememstat[(a)>>8]==2) tubewritememl(a,b)
 #define getw() (readmem(pc)|(readmem(pc+1)<<8)); pc+=2
 
-void tubereset6502()
+void tube_6502_reset()
 {
         tuberomin=1;
 //memset(tuberam,0,0x10000);
         pc=readmem(0xFFFC)|(readmem(0xFFFD)<<8);
         tubep.i=1;
-        tubenmi=tubeoldnmi=tubenmilock=0;
-        tubeirq=0;
-        tubeskipint=0;
-        tubecycs=tubelinecycs=0;
+        tube_irq=0;
+        tube_6502_skipint=0;
 }
 
 #define setzn(v) tubep.z=!(v); tubep.n=(v)&0x80
@@ -126,9 +130,9 @@ void tubereset6502()
 #define pull()  tuberam[0x100+(++s)]
 
 /*ADC/SBC temp variables*/
-uint16_t tempw;
-int tempv,hc,al,ah;
-uint8_t tempb;
+static uint16_t tempw;
+static int tempv,hc,al,ah;
+static uint8_t tempb;
 
 #define ADC(temp)       if (!tubep.d)                            \
                         {                                  \
@@ -201,17 +205,15 @@ uint8_t tempb;
                                 a=(al&0xF)|((ah&0xF)<<4);                 \
                         }
 
-int interlaceline;
-uint16_t oldtpc,oldtpc2;
-int tubecycles=0;
-void tubeexec65c02()
+static uint16_t oldtpc,oldtpc2;
+
+void tube_6502_exec()
 {
         uint8_t opcode;
         uint16_t addr;
-        uint8_t temp,temp2;
+        uint8_t temp;
         int tempi;
         int8_t offset;
-        int c;
 //        tubecycles+=(tubecycs<<1);
 //        printf("Tube exec %i %04X\n",tubecycles,pc);
                 while (tubecycles>0)
@@ -623,7 +625,6 @@ void tubeexec65c02()
                                 pc=pull();
                                 pc|=(pull()<<8);
                                 polltime(6);
-                                tubenmilock=0;
                                 break;
 
                                 case 0x41: /*EOR (,x)*/
@@ -1643,7 +1644,7 @@ void tubeexec65c02()
 //                                printf("Current ROM %02X\n",currom);
 //                                exit(-1);
                         }
-                                if ((tubeirq&2) && !tubeoldnmi)// && !tubenmilock)
+                                if ((tube_irq&2) && !tube_6502_oldnmi)
                                 {
                                         push(pc>>8);
                                         push(pc&0xFF);
@@ -1655,14 +1656,12 @@ void tubeexec65c02()
                                         pc=readmem(0xFFFA)|(readmem(0xFFFB)<<8);
                                         tubep.i=1;
                                         polltime(7);
-//                                        tubenmi=0;
-//                                        tubenmilock=1;
                                 }
-                                tubeoldnmi=tubeirq&2;
-                        if (((tubeirq&1) && !tubep.i && !tubeskipint) || tubeskipint==2)
+                                tube_6502_oldnmi=tube_irq&2;
+                        if (((tube_irq&1) && !tubep.i && !tube_6502_skipint) || tube_6502_skipint==2)
                         {
 //                                if (skipint==2) printf("interrupt\n");
-                                tubeskipint=0;
+                                tube_6502_skipint=0;
                                 push(pc>>8);
                                 push(pc&0xFF);
                                 temp=0x20;
@@ -1675,9 +1674,9 @@ void tubeexec65c02()
                                 polltime(7);
 //                                printf("Interrupt line %i %i %02X %02X %02X %02X\n",interrupt,lines,sysvia.ifr&sysvia.ier,uservia.ifr&uservia.ier,uservia.ier,uservia.ifr);
                         }
-                        if ((tubeirq&1) && !tubep.i && tubeskipint)
+                        if ((tube_irq&1) && !tubep.i && tube_6502_skipint)
                         {
-                                tubeskipint=2;
+                                tube_6502_skipint=2;
 //                                printf("skipint=2\n");
                         }
                         if (endtimeslice)
