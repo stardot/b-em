@@ -745,7 +745,7 @@ void gui_enter()
 
         gui_update();
 
-        if (curtube != 3) install_mouse();
+        if (curtube != 3 && !mouse_amx) install_mouse();
 
         set_color_depth(dcol);
         show_mouse(screen);
@@ -761,7 +761,7 @@ void gui_enter()
         show_mouse(NULL);
         set_color_depth(8);
 
-        if (curtube != 3) remove_mouse();
+        if (curtube != 3 && !mouse_amx) remove_mouse();
 
         while (key[KEY_F11]) rest(100);
 

@@ -25,6 +25,8 @@ void mouse_poll()
 {
         int dx, dy;
 
+        poll_mouse();
+
         if (curtube == 3)
         {
                 if (uservia.ifr & 0x18) return;
@@ -90,6 +92,7 @@ void mouse_poll()
                 dy = (mouse_y - mouse_oy);
                 mouse_ox = mouse_x;
                 mouse_oy = mouse_y;
+//                printf("%i,%i - %i, %i\n",mouse_x,mouse_y,dx,dy);
 #endif
 
                 mx += dx;
