@@ -49,6 +49,8 @@ void tape_load(char *fn)
 void tape_close()
 {
         if (tape_loaded && tape_loader < 2)
-           loaders[tape_loader].close();
-        tape_loaded = 0;
+        {
+                tape_loaded = 0;
+                loaders[tape_loader].close();
+        }
 }

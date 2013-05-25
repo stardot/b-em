@@ -8,6 +8,8 @@
 #include "model.h"
 
 int keytemp[128];
+int xSize;
+int ySize;
 
 char *key_names[] =
 {
@@ -291,40 +293,52 @@ int gui_keydefine()
         DIALOG_PLAYER *dp;
         BITMAP *b;
         DIALOG *d=MASTER?bemdefineguim:bemdefinegui;
-        int x=0,y;
-        while (d[x].proc)
+        int xOffset,yOffset;
+        int c=0;
+
+        xSize = d[0].w;
+        ySize = d[0].h;
+
+        xOffset = (SCREEN_W>>1) - (xSize>>1);
+        yOffset = (SCREEN_H>>1) - (ySize>>1);
+
+        while (d[c].proc)
         {
-                d[x].x+=(SCREEN_W/2)-(d[0].w/2);
-                d[x].y+=(SCREEN_H/2)-(d[0].h/2);
-                d[x].fg=0xFFFFFF;
-                if (x>=1 && x<=10) d[x].bg=makecol(127,0,0);
-                if (x==25 || x==26 || x==41 || x==42 || x==72) d[x].bg=makecol(127,127,127);
-                x++;
+                d[c].x+=xOffset;
+                d[c].y+=yOffset;
+                d[c].fg=0xFFFFFF;
+                if (c>=1 && c<=10) d[c].bg=makecol(127,0,0);
+                if (c==25 || c==26 || c==41 || c==42 || c==72) d[c].bg=makecol(127,127,127);
+                c++;
         }
-        for (x=0;x<128;x++) keytemp[x]=keylookup[x];
-        x=(SCREEN_W/2)-(d[0].w/2);
-        y=(SCREEN_H/2)-(d[0].h/2);
-        b=create_bitmap(d[0].w,d[0].h);
-        blit(screen,b,x,y,0,0,d[0].w,d[0].h);
+        for (c=0;c<128;c++) keytemp[c]=keylookup[c];
+        b=create_bitmap(xSize, ySize);
+        scare_mouse();
+        blit(screen,b,xOffset,yOffset,0,0,xSize,ySize);
         dp=init_dialog(d,0);
-        while (x && !key[KEY_F11] && !(mouse_b&2) && !key[KEY_ESC])
+        unscare_mouse();
+        while (c && !key[KEY_F11] && !(mouse_b&2) && !key[KEY_ESC])
         {
-                x=update_dialog(dp);
+                c=update_dialog(dp);
         }
         shutdown_dialog(dp);
-        if (x==1)
+        if (c==1)
         {
-                for (x=0;x<128;x++) keylookup[x]=keytemp[x];
+                for (c=0;c<128;c++) keylookup[c]=keytemp[c];
         }
-        x=(SCREEN_W/2)-(d[0].w/2);
-        y=(SCREEN_H/2)-(d[0].h/2);
-        blit(b,screen,0,0,x,y,d[0].w,d[0].h);
-        x=0;
-        while (d[x].proc)
+        /*Hide mouse when blitting to avoid screen corruption*/
+        scare_mouse();
+        blit(b,screen,0,0,xOffset,yOffset,xSize,ySize);
+        unscare_mouse();
+
+        destroy_bitmap(b);
+
+        c=0;
+        while (d[c].proc)
         {
-                d[x].x-=(d[0].w/2)-(538/2);
-                d[x].y-=(d[0].h/2)-(256/2);
-                x++;
+                d[c].x-=xOffset;
+                d[c].y-=yOffset;
+                c++;
         }
         return D_O_K;
 }

@@ -24,6 +24,19 @@ static float ddnoise_spos = 0;
 static int ddnoise_sstat = -1;
 static int ddnoise_sdir = 0;
 
+SAMPLE *safe_load_wav(char *fn)
+{
+        if (file_exists(fn, FA_ALL, NULL))
+        {
+                return load_wav(fn);
+        }
+        else
+        {
+                rpclog("Failed to load sample %s",fn);
+                bem_error("Can't load sound sample - does 'ddnoise' exist?");
+                exit(-1);
+        }
+}
 void ddnoise_init()
 {
         char path[512], p2[512];
@@ -32,31 +45,31 @@ void ddnoise_init()
         else              sprintf(path, "%sddnoise/525", exedir);
 //        printf("path now %s\n",path);
         chdir(path);
-        seeksmp[0][0] = load_wav("stepo.wav");
-        if (seeksmp[0][0])
+        if (ddnoise_type)
         {
-                seeksmp[0][1] = load_wav("stepi.wav");
-                seeksmp[1][0] = load_wav("seek1o.wav");
-                seeksmp[1][1] = load_wav("seek1i.wav");
-                seeksmp[2][0] = load_wav("seek2o.wav");
-                seeksmp[2][1] = load_wav("seek2i.wav");
-                seeksmp[3][0] = load_wav("seek3o.wav");
-                seeksmp[3][1] = load_wav("seek3i.wav");
+                seeksmp[0][0] = safe_load_wav("stepo.wav");
+                seeksmp[0][1] = safe_load_wav("stepi.wav");
+                seeksmp[1][0] = safe_load_wav("seek1o.wav");
+                seeksmp[1][1] = safe_load_wav("seek1i.wav");
+                seeksmp[2][0] = safe_load_wav("seek2o.wav");
+                seeksmp[2][1] = safe_load_wav("seek2i.wav");
+                seeksmp[3][0] = safe_load_wav("seek3o.wav");
+                seeksmp[3][1] = safe_load_wav("seek3i.wav");
         }
         else
         {
-                seeksmp[0][0] = load_wav("step.wav");
-                seeksmp[0][1] = load_wav("step.wav");
-                seeksmp[1][0] = load_wav("seek.wav");
-                seeksmp[1][1] = load_wav("seek.wav");
-                seeksmp[2][0] = load_wav("seek3.wav");
-                seeksmp[2][1] = load_wav("seek3.wav");
-                seeksmp[3][0] = load_wav("seek2.wav");
-                seeksmp[3][1] = load_wav("seek2.wav");
+                seeksmp[0][0] = safe_load_wav("step.wav");
+                seeksmp[0][1] = safe_load_wav("step.wav");
+                seeksmp[1][0] = safe_load_wav("seek.wav");
+                seeksmp[1][1] = safe_load_wav("seek.wav");
+                seeksmp[2][0] = safe_load_wav("seek3.wav");
+                seeksmp[2][1] = safe_load_wav("seek3.wav");
+                seeksmp[3][0] = safe_load_wav("seek2.wav");
+                seeksmp[3][1] = safe_load_wav("seek2.wav");
         }
-        motorsmp[0] = load_wav("motoron.wav");
-        motorsmp[1] = load_wav("motor.wav");
-        motorsmp[2] = load_wav("motoroff.wav");
+        motorsmp[0] = safe_load_wav("motoron.wav");
+        motorsmp[1] = safe_load_wav("motor.wav");
+        motorsmp[2] = safe_load_wav("motoroff.wav");
         chdir(p2);
 //        printf("done!\n");
 }

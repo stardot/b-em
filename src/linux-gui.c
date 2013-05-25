@@ -293,7 +293,6 @@ int gui_loadt()
                 tape_close();
                 memcpy(tape_fn, tempname, 260);
                 tape_load(tape_fn);
-                tape_loaded = 1;
         }
         return D_O_K;
 }
@@ -725,7 +724,7 @@ MENU mainmenu[6] =
 
 DIALOG bemgui[]=
 {
-        {d_ctext_proc, 200, 260, 0,  0, 15,0,0,0,     0,0,"B-em v2.2"},
+        {d_ctext_proc, 200, 260, 0,  0, 15,0,0,0,     0,0,B_EM_VERSION},
         {d_menu_proc,  0,   0,   0,  0, 15,0,0,0,     0,0,mainmenu},
         {d_yield_proc},
         {0,0,0,0,0,0,0,0,0,0,0,NULL,NULL,NULL}
@@ -742,6 +741,8 @@ void gui_enter()
 
         while (keypressed()) readkey();
         while (key[KEY_F11]) rest(100);
+
+        set_window_title(B_EM_VERSION);
 
         gui_update();
 

@@ -29,8 +29,8 @@ void tapenoise_init()
         sprintf(path, "%sddnoise", exedir);
 //        printf("path now %s\n",path);
         chdir(path);
-        tsamples[0] = load_wav("motoron.wav");
-        tsamples[1] = load_wav("motoroff.wav");
+        tsamples[0] = safe_load_wav("motoron.wav");
+        tsamples[1] = safe_load_wav("motoroff.wav");
         chdir(p2);
         for (c = 0; c < 32; c++)
         {
