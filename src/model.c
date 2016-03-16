@@ -5,7 +5,7 @@
 #include "cmos.h"
 #include "mem.h"
 #include "tube.h"
-#include "32016.h"
+#include "NS32016/32016.h"
 #include "6502tube.h"
 #include "65816.h"
 #include "arm.h"
