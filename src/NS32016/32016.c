@@ -1231,23 +1231,47 @@ void n32016_exec()
                }
                break;
 
+               case MOVFL:
+               {
+                  OpSize.Op[0] = sz32;
+                  WriteSize =
+                  OpSize.Op[1] = sz64;
+                  getgen(opcode >> 19, 0);                                          // Source Operand
+                  getgen(opcode >> 14, 1);                                          // Destination Operand
+                  Regs[0].RegType = SinglePrecision;
+                  Regs[1].RegType = DoublePrecision;
+               }
+               break;
+
+               case MOVLF:
+               {
+                  OpSize.Op[0] = sz64;
+                  WriteSize =
+                  OpSize.Op[1] = sz32;
+                  getgen(opcode >> 19, 0);                                          // Source Operand
+                  getgen(opcode >> 14, 1);                                          // Destination Operand
+                  Regs[0].RegType = DoublePrecision;
+                  Regs[1].RegType = SinglePrecision;
+               }
+               break;
+
+               case LFSR:
+               {
+                  SET_OP_SIZE(3);
+                  getgen(opcode >> 19, 0);
+               }
+               break;
+
+               case SFSR:
+               {
+                  SET_OP_SIZE(3);
+                  getgen(opcode >> 14, 1);
+               }
+               break;
+
                default:
                {
-                  SET_OP_SIZE(opcode >> 8);
-                  if (Function != SFSR)
-                  {
-                     getgen(opcode >> 19, 0);
-                     if (Function != MOVif)
-                     {
-                        Regs[0].RegType = GET_PRECISION(opcode & BIT(8));
-                     }
-                  }
-
-                  if (Function != LFSR)
-                  {
-                     getgen(opcode >> 14, 1);
-                     Regs[0].RegType = GET_PRECISION(opcode & BIT(8));
-                  }
+                  PiWARN("Unexpected Format 9 Decode: Function = %"PRId32"\n", Function);
                }
                break;
             }
@@ -2647,10 +2671,12 @@ void n32016_exec()
                }
                break;
             }
+            SIGN_EXTEND(OpSize.Op[0], temp);  // upper bound
+            SIGN_EXTEND(OpSize.Op[0], temp2); // lower bound
 
             //PiTRACE("Reg = %u Bounds [%u - %u] Index = %u", 0, temp, temp2, temp3);
 
-            if ((temp >= temp3) && (temp3 >= temp2))
+            if (((signed int)temp >= (signed int)temp3) && ((signed int)temp3 >= (signed int)temp2))
             {
                r[(opcode >> 11) & 7] = temp3 - temp2;
                F_FLAG = 0;
@@ -3031,6 +3057,8 @@ void n32016_exec()
                goto DoTrap;
             }
          }
+      } else {
+         PiWARN("Bad write size: %d pc=%08"PRIX32" opcode=%08"PRIX32"\n", WriteSize, startpc, opcode);
       }
 
 #if 0
