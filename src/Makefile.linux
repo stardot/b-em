@@ -7,10 +7,13 @@ SIDOBJ = convolve.o convolve-sse.o envelope.o extfilt.o filter.o pot.o sid.o voi
 
 LIBS = -lalleg -lz -lalut -lopenal -lstdc++ -lm
 
+all: b-em disptrace
+
 b-em: $(OBJ) $(SIDOBJ)
 	$(CC) $(OBJ) $(SIDOBJ) -o "b-em" $(LIBS)
 
-all : b-em
+disptrace: disptrace.o
+	$(CC) $(CFLAGS) -o disptrace disptrace.o
 
 clean :
 	rm *.o

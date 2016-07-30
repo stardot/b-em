@@ -14,6 +14,9 @@
 #define s tubesp
 #define pc tubepc
 
+// define this to trace execution to a file
+// #define TRACE_TUBE
+
 static int tube_6502_skipint;
 static int tube_6502_oldnmi;
 
@@ -32,6 +35,10 @@ static uint8_t *tubemem[0x101];
 static int tubememstat[0x101];
 static uint8_t *tuberam;
 static uint8_t tuberom[0x1000];
+
+#ifdef TRACE_TUBE
+static FILE *trace_fp;
+#endif
 
 static void tube_6502_loadrom()
 {
@@ -55,10 +62,23 @@ void tube_6502_init_cpu()
         tubemem[0x100]=tubemem[0];
         tubememstat[0x100]=tubememstat[0];
         tube_6502_loadrom();
+ #ifdef TRACE_TUBE
+        if ((trace_fp = fopen("6502tube.trace", "wb"))) {
+			fwrite("6502NMOS", 8, 1, trace_fp);
+			time_t secs;
+			time(&secs);
+			fwrite(&secs, sizeof(secs), 1, trace_fp);
+			puts("tube tracing enabled\n");
+		} else
+			fprintf(stderr, "tube6502: unable to open trace file: %m\n");
+#endif
 }
 
 void tube_6502_close()
 {
+#ifdef TRACE_TUBE
+		if (trace_fp) fclose(trace_fp);
+#endif
         if (tuberam) free(tuberam);
 }
 
@@ -205,6 +225,36 @@ static uint8_t tempb;
                                 a=(al&0xF)|((ah&0xF)<<4);                 \
                         }
 
+#ifdef TRACE_TUBE
+static INLINE void tube_6502_trace(uint8_t opcode) {
+	uint8_t cyc;
+
+	if (trace_fp) {
+		flockfile(trace_fp);
+		cyc = tubecycles;
+		putc_unlocked(cyc, trace_fp);
+		putc_unlocked(pc & 0xff, trace_fp);
+		putc_unlocked(pc >> 8, trace_fp);
+		putc_unlocked(opcode, trace_fp);
+		putc_unlocked(readmem(pc), trace_fp);
+		putc_unlocked(readmem(pc+1), trace_fp);
+		putc_unlocked(a, trace_fp);
+		putc_unlocked(x, trace_fp);
+		putc_unlocked(y, trace_fp);
+		putc_unlocked(s, trace_fp);
+		uint8_t flags = 0x30;
+		if (tubep.n) flags |= 0x80;
+		if (tubep.v) flags |= 0x40;
+		if (tubep.d) flags |= 0x08;
+		if (tubep.i) flags |= 0x04;
+		if (tubep.z) flags |= 0x02;
+		if (tubep.c) flags |= 0x01;
+		putc_unlocked(flags, trace_fp);
+		funlockfile(trace_fp);
+	}
+}
+#endif
+
 static uint16_t oldtpc,oldtpc2;
 
 void tube_6502_exec()
@@ -221,6 +271,9 @@ void tube_6502_exec()
                         oldtpc2=oldtpc;
                         oldtpc=pc;
                         opcode=readmem(pc); pc++;
+#ifdef TRACE_TUBE
+                        tube_6502_trace(opcode);
+#endif
 //                        printf("Tube opcode %02X\n",opcode);
                         switch (opcode)
                         {
