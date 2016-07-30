@@ -150,7 +150,7 @@ void tube_6502_reset()
 #define pull()  tuberam[0x100+(++s)]
 
 /*ADC/SBC temp variables*/
-static uint16_t tempw;
+static int16_t tempw;
 static int tempv,hc,al,ah;
 static uint8_t tempb;
 
@@ -190,11 +190,11 @@ static uint8_t tempb;
 
 #define SBC(temp)       if (!tubep.d)                            \
                         {                                  \
-                                tempw=a-(temp+(tubep.c?0:1));    \
-                                tempv=(short)a-(short)(temp+(tubep.c?0:1));            \
-                                tubep.v=((a^(temp+(tubep.c?0:1)))&(a^(uint8_t)tempv)&0x80); \
-                                tubep.c=tempv>=0;\
-                                a=tempw&0xFF;              \
+                                tempw = a-temp-(tubep.c ? 0 : 1);    \
+                                tempv = (signed char)a-(signed char)temp - (tubep.c ? 0 : 1);        \
+                                tubep.v = ((tempw & 0x80) > 0) ^ ((tempv & 0x100) != 0);         \
+                                tubep.c = tempw >= 0;          \
+                                a = tempw & 0xFF;          \
                                 setzn(a);                  \
                         }                                  \
                         else                               \
