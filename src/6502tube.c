@@ -1523,6 +1523,14 @@ void tube_6502_exec()
                                 polltime(2);
                                 break;
 
+                                case 0xE1: /*SBC (,x)*/ /*This was missed out of every B-em version since 0.6 as it was never used!*/
+                                temp=readmem(pc)+x; pc++;
+                                addr=readmem(temp)|(readmem(temp+1)<<8);
+                                temp=readmem(addr);
+                                SBC(temp);
+                                polltime(6);
+                                break;
+
                                 case 0xE4: /*CPX zp*/
                                 addr=readmem(pc); pc++;
                                 temp=tuberam[addr];
