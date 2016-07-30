@@ -8,10 +8,13 @@ SIDOBJ = convolve.o envelope.o extfilt.o filter.o pot.o sid.o voice.o wave6581__
 
 LIBS =  -mwindows -lalleg -lz -lalut -lopenal32 -lgdi32 -lwinmm -lstdc++
 
+all : b-em.exe disptrace.exe
+
 b-em.exe: $(OBJ) $(SIDOBJ)
 	$(CC) $(OBJ) $(SIDOBJ) -o "b-em.exe" $(LIBS)
 
-all : b-em.exe
+disptrace.exe
+	$(CC) $(CFLAGS) -o disptrace.exe disptrace.o
 
 clean :
 	del *.o
