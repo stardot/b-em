@@ -302,7 +302,7 @@ static inline uint16_t getsw()
 #define pull()  readmem(0x100 + (++s))
 
 /*ADC/SBC temp variables*/
-static uint16_t tempw;
+static int16_t tempw;
 static int tempv,hc6,al,ah;
 static uint8_t tempb;
 
@@ -342,11 +342,11 @@ static uint8_t tempb;
 
 #define SBC(temp)       if (!p.d)                            \
                         {                                  \
-                                tempw = a - (temp + (p.c ? 0 : 1));    \
-                                tempv = (short)a - (short)(temp + (p.c ? 0 : 1));            \
-                                p.v = ((a ^ (temp + (p.c ? 0 : 1))) & (a ^ (uint8_t)tempv) & 0x80); \
-                                p.c = tempv >= 0;\
-                                a = tempw & 0xFF;              \
+                                tempw = a-temp-(p.c ? 0 : 1);    \
+                                tempv = (signed char)a -(signed char)temp-(p.c ? 0 : 1);        \
+                                p.v = ((tempw & 0x80) > 0) ^ ((tempv & 0x100) != 0);         \
+                                p.c = tempw >= 0;          \
+                                a = tempw & 0xFF;          \
                                 setzn(a);                  \
                         }                                  \
                         else                               \
@@ -412,11 +412,11 @@ static uint8_t tempb;
 
 #define SBCc(temp)      if (!p.d)                            \
                         {                                  \
-                                tempw = a - (temp + (p.c ? 0 : 1));    \
-                                tempv = (short)a - (short)(temp + (p.c ? 0 : 1));            \
-                                p.v = ((a ^ (temp + (p.c ? 0 : 1))) & (a ^ (uint8_t)tempv) & 0x80); \
-                                p.c = tempv >= 0;\
-                                a = tempw & 0xFF;              \
+                                tempw = a-temp-(p.c ? 0 : 1);    \
+                                tempv = (signed char)a -(signed char)temp-(p.c ? 0 : 1);        \
+                                p.v = ((tempw & 0x80) > 0) ^ ((tempv & 0x100) != 0);         \
+                                p.c = tempw >= 0;          \
+                                a = tempw & 0xFF;          \
                                 setzn(a);                  \
                         }                                  \
                         else                               \
