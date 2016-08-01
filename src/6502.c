@@ -466,7 +466,6 @@ void m6502_exec()
         uint8_t temp;
         int tempi;
         int8_t offset;
-        int c;
         cycles+=40000;
         while (cycles>0)
         {
@@ -521,7 +520,7 @@ void m6502_exec()
                                 polltime(1);
                                 writemem(addr,temp);
                                 polltime(1);
-                                c=temp&0x80;
+                                p.c=temp&0x80;
                                 temp<<=1;
                                 writemem(addr,temp);
                                 a|=temp;
@@ -557,7 +556,7 @@ void m6502_exec()
                                 case 0x07: /*Undocumented - SLO zp*/
                                 addr=readmem(pc); pc++;
                                 temp=readmem(addr);
-                                c=temp&0x80;
+                                p.c=temp&0x80;
                                 temp<<=1;
                                 writemem(addr,temp);
                                 a|=temp;
@@ -634,7 +633,7 @@ void m6502_exec()
                                 polltime(1);
                                 writemem(addr,temp);
                                 polltime(1);
-                                c=temp&0x80;
+                                p.c=temp&0x80;
                                 temp<<=1;
                                 writemem(addr,temp);
                                 a|=temp;
@@ -673,7 +672,7 @@ void m6502_exec()
                                 polltime(1);
                                 writemem(addr+y,temp);
                                 polltime(1);
-                                c=temp&0x80;
+                                p.c=temp&0x80;
                                 temp<<=1;
                                 writemem(addr+y,temp);
                                 a|=temp;
@@ -714,7 +713,7 @@ void m6502_exec()
                                 polltime(1);
                                 writemem(addr,temp);
                                 polltime(1);
-                                c=temp&0x80;
+                                p.c=temp&0x80;
                                 temp<<=1;
                                 writemem(addr,temp);
                                 a|=temp;
@@ -750,7 +749,7 @@ void m6502_exec()
                                 polltime(1);
                                 writemem(addr,temp);
                                 polltime(1);
-                                c=temp&0x80;
+                                p.c=temp&0x80;
                                 temp<<=1;
                                 writemem(addr,temp);
                                 a|=temp;
@@ -798,7 +797,7 @@ void m6502_exec()
                                 polltime(1);
                                 writemem(addr,temp);
                                 polltime(1);
-                                c=temp&0x80;
+                                p.c=temp&0x80;
                                 temp<<=1;
                                 writemem(addr,temp);
                                 a|=temp;
