@@ -9,5 +9,5 @@ void serial_savestate(FILE *f);
 void serial_loadstate(FILE *f);
 
 extern int motor;
-
+extern int acia_is_tape;
 #endif

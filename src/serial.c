@@ -8,7 +8,7 @@
 #include "tape.h"
 #include "tapenoise.h"
 
-int motor;
+int motor, acia_is_tape;
 
 static uint8_t serial_reg;
 static uint8_t serial_transmit_rate, serial_recive_rate;
@@ -31,12 +31,14 @@ void serial_write(uint16_t addr, uint8_t val)
         if (val & 0x40)
         {
                 /*RS423*/
-                acia_sr &= ~4; /*Clear acia DCD*/
+                acia_sr &= ~12; /*Clear acia DCD and CTS*/
+		acia_is_tape = 0;
         }
         else
         {
                 /*Tape*/
                 acia_sr &= ~8; /*Clear acia CTS*/
+		acia_is_tape = 1;
         }
 }
 
