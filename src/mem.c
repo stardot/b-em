@@ -82,7 +82,7 @@ void mem_loadswroms()
                 while (romused[c] && c >= 0) c--;
                 if (c >= 0)
                 {
-//                        printf("Loading %s to slot %i\n",ffblk.name,c);
+                        rpclog("Loading %s to slot %i\n",ffblk.name,c);
                         f = x_fopen(ffblk.name, "rb");
                         fread(rom + (c * 16384), 16384, 1, f);
                         fclose(f);
@@ -112,7 +112,6 @@ void mem_loadroms(char *os_name, char *romdir)
         {
                 rpclog("Reading OS file %s\n", os_name);
                 f = x_fopen(os_name, "rb");
-                if (!f) rpclog("Failed!\n");
                 fread(os, 16384, 1, f);
                 fclose(f);
         }
