@@ -66,11 +66,15 @@ void mem_loadswroms()
                 if (c >= 0)
                 {
                         rpclog("Loading %s to slot %i\n",ffblk.name,c);
-                        f = fopen(ffblk.name, "rb");
-                        fread(rom + (c * 16384), 16384, 1, f);
-                        fclose(f);
-                        romused[c] = 1;
-                        c--;
+                        if ((f = fopen(ffblk.name, "rb")))
+                        {
+                                fread(rom + (c * 16384), 16384, 1, f);
+                                fclose(f);
+                                romused[c] = 1;
+                                c--;
+                        }
+                        else
+                                bem_errorf("unable to load rom file '%s': %s\n", strerror(errno));
                 }
         } while (c >= 0 && !al_findnext(&ffblk));
         al_findclose(&ffblk);
@@ -82,12 +86,16 @@ void mem_loadswroms()
                 while (romused[c] && c >= 0) c--;
                 if (c >= 0)
                 {
-//                        printf("Loading %s to slot %i\n",ffblk.name,c);
-                        f = fopen(ffblk.name, "rb");
-                        fread(rom + (c * 16384), 16384, 1, f);
-                        fclose(f);
-                        romused[c] = 1;
-                        c--;
+                        rpclog("Loading %s to slot %i\n",ffblk.name,c);
+                        if ((f = fopen(ffblk.name, "rb")))
+                        {
+                                fread(rom + (c * 16384), 16384, 1, f);
+                                fclose(f);
+                                romused[c] = 1;
+                                c--;
+                        }
+                        else
+                                bem_errorf("unable to load rom file '%s': %s\n", strerror(errno));
                 }
         } while (c >= 0 && !al_findnext(&ffblk));
         al_findclose(&ffblk);
@@ -114,9 +122,7 @@ void mem_loadroms(char *os_name, char *romdir)
                 f = fopen(os_name, "rb");
                 if (!f)
                 {
-                        char err[80];
-                        sprintf(err, "Failed to load roms/%s\n", os_name);
-                        bem_error(err);
+                        bem_errorf("Failed to load roms/%s: %s\n", os_name, strerror(errno));
                         exit(-1);
                 }
                 fread(os, 16384, 1, f);
@@ -146,7 +152,7 @@ int mem_romsetup_os01()
         f=fopen("os01", "rb");
         if (!f)
         {
-                bem_error("Failed to load roms/os01");
+                bem_errorf("Failed to load roms/os01: %s", strerror(errno));
                 return -1;
         }
         fread(os, 16384, 1, f);
@@ -199,7 +205,7 @@ int mem_romsetup_master128()
         f=fopen("master/mos3.20", "rb");
         if (!f)
         {
-                bem_error("Failed to load roms/master/mos.320");
+                bem_errorf("Failed to load roms/master/mos.320: %s", strerror(errno));
                 return -1;
         }
         fread(os, 16384, 1, f);
@@ -224,7 +230,7 @@ int mem_romsetup_master128_35()
         f=fopen("master/mos3.50", "rb");
         if (!f)
         {
-                bem_error("Failed to load roms/master/mos.350");
+                bem_errorf("Failed to load roms/master/mos.350: %s", strerror(errno));
                 return -1;
         }
         fread(os, 16384, 1, f);
@@ -248,7 +254,7 @@ int mem_romsetup_mastercompact()
         f=fopen("compact/os51","rb");
         if (!f)
         {
-                bem_error("Failed to load roms/compact/os51");
+                bem_errorf("Failed to load roms/compact/os51: %s", strerror(errno));
                 return -1;
         }
         fread(os,16384,1,f);
@@ -256,7 +262,7 @@ int mem_romsetup_mastercompact()
         f=fopen("compact/basic48","rb");
         if (!f)
         {
-                bem_error("Failed to load roms/compact/basic48");
+                bem_errorf("Failed to load roms/compact/basic48: %s", strerror(errno));
                 return -1;
         }
         fread(rom+(14*16384),16384,1,f);
@@ -264,7 +270,7 @@ int mem_romsetup_mastercompact()
         f=fopen("compact/adfs210","rb");
         if (!f)
         {
-                bem_error("Failed to load roms/compact/adfs210");
+                bem_errorf("Failed to load roms/compact/adfs210: %s", strerror(errno));
                 return -1;
         }
         fread(rom+(13*16384),16384,1,f);
@@ -272,7 +278,7 @@ int mem_romsetup_mastercompact()
         f=fopen("compact/utils","rb");
         if (!f)
         {
-                bem_error("Failed to load roms/compact/utils");
+                bem_errorf("Failed to load roms/compact/utils: %s", strerror(errno));
                 return -1;
         }
         fread(rom+(15*16384),16384,1,f);

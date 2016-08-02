@@ -45,6 +45,7 @@ void showcatalogue();
 void redefinekeys();
 
 void bem_error(char *s);
+void bem_errorf(const char *fmt, ...);
 
 void changetimerspeed(int i);
 
