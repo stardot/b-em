@@ -1,10 +1,4 @@
-//#define NS32016
-/*Uncomment the above to enable (buggy) 32016 emulation. Currently it just aborts
-  constantly, but when it didn't I couldn't get any programs to run, so you're
-  just stuck at the CLI prompt. Anyone want to help?
-  You'll need the file Pandora.rom in roms/tube
-  So far no one wants to help :(
-  */
+#define NS32016
 
 #include "sidtypes.h"
 
