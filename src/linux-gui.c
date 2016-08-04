@@ -81,36 +81,36 @@ void gui_update()
         for (x = 0; x < 16; x++) modelmenu[x].flags = 0;
         for (x = 0; x < 16; x++)
         {
-                if (curmodel == (int)modelmenu[x].dp)
+                if (curmodel == (intptr_t)modelmenu[x].dp)
                    modelmenu[x].flags = D_SELECTED;
         }
         #ifdef NS32016
-        for (x = 0; x < 5; x++)  tubemenu[x].flags = (selecttube == (int)tubemenu[x].dp) ? D_SELECTED : 0;
+        for (x = 0; x < 5; x++)  tubemenu[x].flags = (selecttube == (intptr_t)tubemenu[x].dp) ? D_SELECTED : 0;
         #else
-        for (x = 0; x < 4; x++)  tubemenu[x].flags = (selecttube == (int)tubemenu[x].dp) ? D_SELECTED : 0;
+        for (x = 0; x < 4; x++)  tubemenu[x].flags = (selecttube == (intptr_t)tubemenu[x].dp) ? D_SELECTED : 0;
         #endif
-        for (x = 0; x < 5; x++)  tubespdmenu[x].flags = (tube_6502_speed == (int)tubespdmenu[x].dp) ? D_SELECTED : 0;
+        for (x = 0; x < 5; x++)  tubespdmenu[x].flags = (tube_6502_speed == (intptr_t)tubespdmenu[x].dp) ? D_SELECTED : 0;
         displaymenu[0].flags = (vid_linedbl)   ? D_SELECTED : 0;
         displaymenu[1].flags = (vid_scanlines) ? D_SELECTED : 0;
         displaymenu[2].flags = (vid_interlace) ? D_SELECTED : 0;
         videomenu[2].flags = (fullscreen) ? D_SELECTED : 0;
-        for (x = 0; x < 3; x++)  bordersmenu[x].flags = (vid_fullborders == (int)bordersmenu[x].dp) ? D_SELECTED : 0;
+        for (x = 0; x < 3; x++)  bordersmenu[x].flags = (vid_fullborders == (intptr_t)bordersmenu[x].dp) ? D_SELECTED : 0;
         soundmenu[0].flags = (sound_internal) ? D_SELECTED : 0;
         soundmenu[1].flags = (sound_beebsid)  ? D_SELECTED : 0;
         soundmenu[2].flags = (sound_dac)      ? D_SELECTED : 0;
         soundmenu[3].flags = (sound_ddnoise)  ? D_SELECTED : 0;
         soundmenu[4].flags = (sound_tape)     ? D_SELECTED : 0;
         soundmenu[5].flags = (sound_filter)   ? D_SELECTED : 0;
-        for (x = 0; x < 5;  x++) waveformmenu[x].flags = (curwave == (int)waveformmenu[x].dp) ? D_SELECTED : 0;
-        for (x = 0; x < 14; x++) sidtypemenu[x].flags  = (cursid  == (int)sidtypemenu[x].dp)  ? D_SELECTED : 0;
+        for (x = 0; x < 5;  x++) waveformmenu[x].flags = (curwave == (intptr_t)waveformmenu[x].dp) ? D_SELECTED : 0;
+        for (x = 0; x < 14; x++) sidtypemenu[x].flags  = (cursid  == (intptr_t)sidtypemenu[x].dp)  ? D_SELECTED : 0;
         methodmenu[0].flags = (!sidmethod)    ? D_SELECTED : 0;
         methodmenu[1].flags = (sidmethod)     ? D_SELECTED : 0;
         ddtypemenu[0].flags = (!ddnoise_type) ? D_SELECTED : 0;
         ddtypemenu[1].flags = (ddnoise_type)  ? D_SELECTED : 0;
-        for (x = 0; x < 3; x++)  ddvolmenu[x].flags = (ddnoise_vol == (int)ddvolmenu[x].dp) ? D_SELECTED : 0;
+        for (x = 0; x < 3; x++)  ddvolmenu[x].flags = (ddnoise_vol == (intptr_t)ddvolmenu[x].dp) ? D_SELECTED : 0;
         keymenu[1].flags = (keyas) ? D_SELECTED : 0;
         mousemenu[0].flags = (mouse_amx) ? D_SELECTED : 0;
-        for (x = 0; x < 10; x++) speedmenu[x].flags = (emuspeed == (int)speedmenu[x].dp) ? D_SELECTED : 0;
+        for (x = 0; x < 10; x++) speedmenu[x].flags = (emuspeed == (intptr_t)speedmenu[x].dp) ? D_SELECTED : 0;
         idemenu[0].flags = (ide_enable) ? D_SELECTED : 0;
 }
 
@@ -323,7 +323,7 @@ MENU tapemenu[]=
 int gui_model()
 {
         oldmodel = curmodel;
-        curmodel = (int)active_menu->dp;
+        curmodel = (intptr_t)active_menu->dp;
         main_restart();
         gui_update();
         return D_O_K;
@@ -352,7 +352,7 @@ MENU modelmenu[17]=
 
 int gui_tubespd()
 {
-        tube_6502_speed = (int)active_menu->dp;
+        tube_6502_speed = (intptr_t)active_menu->dp;
         tube_updatespeed();
         gui_update();
         return D_O_K;
@@ -371,7 +371,7 @@ MENU tubespdmenu[6]=
 
 int gui_tube()
 {
-        selecttube = (int)active_menu->dp;
+        selecttube = (intptr_t)active_menu->dp;
         main_restart();
         gui_update();
         return D_O_K;
@@ -426,7 +426,7 @@ MENU displaymenu[4]=
 
 int gui_borders()
 {
-        vid_fullborders = (int)active_menu->dp;
+        vid_fullborders = (intptr_t)active_menu->dp;
         gui_update();
         return D_O_K;
 }
@@ -464,7 +464,7 @@ MENU videomenu[4] =
 
 int gui_sidtype()
 {
-        cursid = (int)active_menu->dp;
+        cursid = (intptr_t)active_menu->dp;
         sid_settype(sidmethod, cursid);
         gui_update();
         return D_O_K;
@@ -491,7 +491,7 @@ MENU sidtypemenu[15] =
 
 int gui_method()
 {
-        sidmethod = (int)active_menu->dp;
+        sidmethod = (intptr_t)active_menu->dp;
         sid_settype(sidmethod, cursid);
         gui_update();
         return D_O_K;
@@ -513,7 +513,7 @@ MENU residmenu[3] =
 
 int gui_waveform()
 {
-        curwave = (int)active_menu->dp;
+        curwave = (intptr_t)active_menu->dp;
         gui_update();
         return D_O_K;
 }
@@ -530,7 +530,7 @@ MENU waveformmenu[6] =
 
 int gui_ddtype()
 {
-        ddnoise_type = (int)active_menu->dp;
+        ddnoise_type = (intptr_t)active_menu->dp;
         ddnoise_close();
         ddnoise_init();
         gui_update();
@@ -546,7 +546,7 @@ MENU ddtypemenu[3]=
 
 int gui_ddvol()
 {
-        ddnoise_vol = (int)active_menu->dp;
+        ddnoise_vol = (intptr_t)active_menu->dp;
         gui_update();
         return D_O_K;
 }
@@ -683,7 +683,7 @@ int gui_scrshot()
 
 int gui_speed()
 {
-        emuspeed = (int)active_menu->dp;
+        emuspeed = (intptr_t)active_menu->dp;
         changetimerspeed(timerspeeds[emuspeed]);
         vid_fskipmax = frameskips[emuspeed];
         gui_update();
