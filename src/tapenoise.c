@@ -5,6 +5,7 @@
 #include <allegro.h>
 #include <math.h>
 #include "b-em.h"
+#include "ddnoise.h"
 #include "tapenoise.h"
 #include "sound.h"
 
