@@ -13,6 +13,7 @@
 #include "mem32016.h"
 
 #ifdef BEEBEM
+#include "../tube.h"
 #define tubeRead tube_parasite_read
 #define tubeWrite tube_parasite_write
 #else
