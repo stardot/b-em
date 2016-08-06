@@ -33,6 +33,7 @@
 #include "pal.h"
 #endif
 #include "savestate.h"
+#include "scsi.h"
 #include "serial.h"
 #include "sid_b-em.h"
 #include "sn76489.h"
@@ -89,6 +90,7 @@ void main_reset()
         acia_reset();
         wd1770_reset();
         i8271_reset();
+        scsi_reset();
         sid_reset();
         sn_init();
         if (curtube != -1) tubes[curtube].reset();
@@ -239,6 +241,7 @@ void main_init(int argc, char *argv[])
         adf_init();
         fdi_init();
 
+        scsi_init();
         ide_init();
 
         debug_start();
@@ -373,6 +376,7 @@ void main_close()
         n32016_close();
         disc_close(0);
         disc_close(1);
+        scsi_close();
         ide_close();
         ddnoise_close();
         tapenoise_close();

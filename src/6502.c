@@ -15,6 +15,7 @@
 #include "model.h"
 #include "mouse.h"
 #include "serial.h"
+#include "scsi.h"
 #include "sid_b-em.h"
 #include "sound.h"
 #include "tape.h"
@@ -99,6 +100,8 @@ uint8_t readmem(uint16_t addr)
         case 0xFC54:
         case 0xFC58:
         case 0xFC5C:
+                if (scsi_enabled)
+                        return scsi_read(addr);
                 if (ide_enable)
                         return ide_read(addr);
                 break;
@@ -235,7 +238,10 @@ void writemem(uint16_t addr, uint8_t val)
         case 0xFC54:
         case 0xFC58:
         case 0xFC5C:
-                ide_write(addr, val);
+                if (scsi_enabled)
+                        scsi_write(addr, val);
+                else if (ide_enable)
+                        ide_write(addr, val);
                 break;
 
         case 0xFE00:
