@@ -17,6 +17,7 @@
 #include "model.h"
 #include "mouse.h"
 #include "savestate.h"
+#include "scsi.h"
 #include "sid_b-em.h"
 #include "sound.h"
 #include "sn76489.h"
@@ -64,7 +65,7 @@ MENU ddvolmenu[4];
 MENU soundmenu[11];
 MENU keymenu[3];
 MENU mousemenu[2];
-MENU idemenu[2];
+MENU hdiskmenu[4];
 MENU settingsmenu[8];
 MENU miscmenu[3];
 MENU speedmenu[11];
@@ -111,7 +112,8 @@ void gui_update()
         keymenu[1].flags = (keyas) ? D_SELECTED : 0;
         mousemenu[0].flags = (mouse_amx) ? D_SELECTED : 0;
         for (x = 0; x < 10; x++) speedmenu[x].flags = (emuspeed == (intptr_t)speedmenu[x].dp) ? D_SELECTED : 0;
-        idemenu[0].flags = (ide_enable) ? D_SELECTED : 0;
+        hdiskmenu[1].flags = (ide_enable) ? D_SELECTED : 0;
+        hdiskmenu[2].flags = (scsi_enabled) ? D_SELECTED : 0;
 }
 
 int gui_keydefine();
@@ -639,17 +641,54 @@ MENU mousemenu[2] =
 };
 
 
-int gui_ide()
+int gui_hdisk()
 {
-        ide_enable = !ide_enable;
-        main_reset();
+        intptr_t sel = (intptr_t)active_menu->dp;
+        int changed = 0;
+
+        if (ide_enable)
+        {
+                if (sel != 0)
+                {
+                        ide_enable = 0;
+                        changed = 1;
+                }
+        }
+        else
+        {
+                if (sel == 0)
+                {
+                        ide_enable = 1;
+                        changed = 1;
+                }
+        }
+        if (scsi_enabled)
+        {
+                if (sel != 1)
+                {
+                        scsi_enabled = 0;
+                        changed = 1;
+                }
+        }
+        else
+        {
+                if (sel == 1)
+                {
+                        scsi_enabled = 1;
+                        changed = 1;
+                }
+        }
+        if (changed)
+                main_reset();
         gui_update();
         return D_O_K;
 }
 
-MENU idemenu[2]=
+MENU hdiskmenu[4]=
 {
-        {"&Enable IDE hard discs", gui_ide, NULL, 0, NULL},
+        {"None",gui_hdisk,NULL,0,(void *)-1},
+        {"IDE", gui_hdisk,NULL,0,(void *)0},
+        {"SCSI", gui_hdisk,NULL,0,(void *)1},
         {NULL, NULL, NULL, 0, NULL}
 };
 
@@ -661,7 +700,7 @@ MENU settingsmenu[8]=
         {"&Sound",            NULL, soundmenu, 0, NULL},
         {"&Keyboard",         NULL, keymenu,   0, NULL},
         {"&Mouse",            NULL, mousemenu, 0, NULL},
-        {"&IDE",              NULL, idemenu,   0, NULL},
+        {"&Hard Disc",        NULL, hdiskmenu, 0, NULL},
         {NULL, NULL, NULL, 0, NULL}
 };
 

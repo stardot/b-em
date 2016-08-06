@@ -8,13 +8,16 @@ SIDOBJ = convolve.o envelope.o extfilt.o filter.o pot.o sid.o voice.o wave6581__
 
 LIBS =  -mwindows -lalleg -lz -lalut -lopenal32 -lgdi32 -lwinmm -lstdc++
 
-all : b-em.exe disptrace.exe
+all : b-em.exe disptrace.exe hdfmt.exe
 
 b-em.exe: $(OBJ) $(SIDOBJ)
 	$(CC) $(OBJ) $(SIDOBJ) -o "b-em.exe" $(LIBS)
 
 disptrace.exe
 	$(CC) $(CFLAGS) -o disptrace.exe disptrace.o
+
+hdfmt.exe
+	$(CC) $(CFLAGS) -o hdfmt.exe hdfmt.o
 
 clean :
 	del *.o
@@ -28,4 +31,4 @@ clean :
 	$(CPP) $(CFLAGS) -c $<
 
 b-em.res: b-em.rc
-	$(WINDRES) -i b-em.rc --input-format=rc -o b-em.res -O coff 
+	$(WINDRES) -i b-em.rc --input-format=rc -o b-em.res -O coff
