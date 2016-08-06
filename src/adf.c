@@ -115,7 +115,7 @@ void adf_close(int drive)
 void adf_seek(int drive, int track)
 {
         if (!adf_f[drive]) return;
-//        rpclog("Seek %i %i %i %i %i %i\n",drive,track,adfsectors[drive],adfsize[drive],adl[drive],adfsectors[drive]*adfsize[drive]);
+//        bem_debugf("Seek %i %i %i %i %i %i\n",drive,track,adfsectors[drive],adfsize[drive],adl[drive],adfsectors[drive]*adfsize[drive]);
         if (adf_dblstep[drive]) track /= 2;
         adf_trackc[drive] = track;
         if (adl[drive])
@@ -192,7 +192,7 @@ void adf_readaddress(int drive, int track, int side, int density)
         adf_drive = drive;
         adf_track = track;
         adf_side  = side;
-//        rpclog("Read address %i %i %i\n",drive,side,track);
+//        bem_debugf("Read address %i %i %i\n",drive,side,track);
 
         if (!adf_f[drive] || (side && !adl[drive]) || !density || (track != adf_trackc[drive]))
         {
@@ -232,18 +232,18 @@ void adf_poll()
                 adf_notfound--;
                 if (!adf_notfound)
                 {
-//                        rpclog("Not found!\n");
+//                        bem_debug("Not found!\n");
                         fdc_notfound();
                 }
         }
         if (adf_inread && adf_f[adf_drive])
         {
-//                if (!adfreadpos) rpclog("%i\n",adfsector*adfsize[adfdrive]);
+//                if (!adfreadpos) bem_debugf("%i\n",adfsector*adfsize[adfdrive]);
                 fdc_data(trackinfoa[adf_drive][adf_side][(adf_sector * adf_size[adf_drive]) + adf_readpos]);
                 adf_readpos++;
                 if (adf_readpos == adf_size[adf_drive])
                 {
-//                        rpclog("Read %i bytes\n",adfreadpos);
+//                        bem_debugf("Read %i bytes\n",adfreadpos);
                         adf_inread = 0;
                         fdc_finishread();
                 }
@@ -287,7 +287,7 @@ void adf_poll()
                         case 6:
                         adf_inreadaddr = 0;
                         fdc_finishread();
-//                        rpclog("Read addr - %i %i %i %i 1 0 0\n",adfdrive,adftrack,adfside,adfsector);
+//                        bem_debugf("Read addr - %i %i %i %i 1 0 0\n",adfdrive,adftrack,adfside,adfsector);
                         adf_rsector++;
                         if (adf_rsector == adf_sectors[adf_drive]) adf_rsector=0;
                         break;

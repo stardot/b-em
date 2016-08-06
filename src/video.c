@@ -40,7 +40,7 @@ void crtc_reset()
 
 void crtc_write(uint16_t addr, uint8_t val)
 {
-//        rpclog("Write CRTC %04X %02X %04X\n",addr,val,pc);
+//        bem_debugf("Write CRTC %04X %02X %04X\n",addr,val,pc);
         if (!(addr & 1)) crtc_i = val & 31;
         else
         {
@@ -97,7 +97,7 @@ static uint8_t table4bpp[4][256][16];
 void videoula_write(uint16_t addr, uint8_t val)
 {
         int c;
-//        rpclog("ULA write %04X %02X %i %i\n",addr,val,hc,vc);
+//        bem_debugf("ULA write %04X %02X %i %i\n",addr,val,hc,vc);
         if (!(addr & 1))
         {
 //        printf("ULA write %04X %02X\n",addr,val);
@@ -126,7 +126,7 @@ void videoula_write(uint16_t addr, uint8_t val)
         }
         else
         {
-//        rpclog("ULA write %04X %02X\n",addr,val);
+//        bem_debugf("ULA write %04X %02X\n",addr,val);
                 c = ula_palbak[val >> 4];
                 ula_palbak[val >> 4] = val & 15;
                 ula_pal[val >> 4] = collook[(val & 7) ^ 7];

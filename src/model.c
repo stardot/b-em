@@ -58,7 +58,7 @@ TUBE tubes[7]=
 void model_init()
 {
         char t[512],t2[512];
-        rpclog("Starting emulation as %s\n",models[curmodel].name);
+        bem_debugf("Starting emulation as %s\n",models[curmodel].name);
         I8271       = models[curmodel].I8271;
         WD1770      = models[curmodel].WD1770;
         BPLUS       = models[curmodel].bplus;

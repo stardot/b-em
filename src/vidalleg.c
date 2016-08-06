@@ -84,7 +84,7 @@ void video_doblit()
 {
         int c;
 //        printf("%03i %03i %03i %03i\n",firstx,lastx,firsty,lasty);
-//rpclog("Blit\n");
+//bem_debug("Blit\n");
 
         startblit();
 
@@ -116,18 +116,18 @@ void video_doblit()
         fskipcount++;
         if (fskipcount >= ((motor && fasttape) ? 5 : vid_fskipmax))
         {
-//                rpclog("Blit start\n");
+//                bem_debug("Blit start\n");
                 lasty++;
                 if (vid_fullborders == 1)
                 {
-//                        rpclog("%i %i %i %i  ",firstx,lastx,firsty,lasty);
+//                        bem_debugf("%i %i %i %i  ",firstx,lastx,firsty,lasty);
 /*                        c = (lastx + firstx) / 2;
                         firstx = c - 336;
                         lastx  = c + 336;
                         c = (lasty + firsty) / 2;
                         firsty = c - 136;
                         lasty  = c + 136;*/
-//                        rpclog("  %i %i %i %i\n",firstx,lastx,firsty,lasty);
+//                        bem_debugf("  %i %i %i %i\n",firstx,lastx,firsty,lasty);
 
                         firstx = 320;
                         lastx  = 992;
@@ -227,7 +227,7 @@ void video_doblit()
                         #endif
                         else if (vid_interlace || vid_linedbl)
                         {
-                                //rpclog("Blit %i,%i  %i,%i\n", firstx, firsty << 1, lastx - firstx, (lasty - firsty) << 1);
+                                //bem_debugf("Blit %i,%i  %i,%i\n", firstx, firsty << 1, lastx - firstx, (lasty - firsty) << 1);
                                 blit(b, screen, firstx, firsty << 1, 0, 0, lastx - firstx, (lasty - firsty) << 1);
                         }
                         else
@@ -243,7 +243,7 @@ void video_doblit()
                         if (fullscreen)
                            rectfill(screen, 0, 584, 799, 599, 0);
                 }
-//                rpclog("Blit end\n");
+//                bem_debug("Blit end\n");
 //                textprintf(screen,font,0,0,makecol(255,255,255),"%08X",uefpos());
         }
         firstx = firsty = 65535;

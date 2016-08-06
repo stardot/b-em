@@ -121,7 +121,7 @@ void cmos_update(uint8_t IC32, uint8_t sdbval)
         cmos_rw = IC32 & 2;
         cmos_strobe = (IC32 & 4) ^ cmos_old;
         cmos_old = IC32 & 4;
-//        rpclog("CMOS update %i %i %i\n",cmos_rw,cmos_strobe,cmos_old);
+//        bem_debugf("CMOS update %i %i %i\n",cmos_rw,cmos_strobe,cmos_old);
         if (cmos_strobe && cmos_ena)
         {
                 if (!cmos_rw && !(IC32 & 4)) /*Write triggered on low -> high on D*/
@@ -145,12 +145,12 @@ void cmos_writeaddr(uint8_t val)
         if (val&0x80) /*Latch address*/
            cmos_addr = sdbval & 63;
         cmos_ena = val & 0x40;
-//        rpclog("CMOS writeaddr %02X %02X %02X\n",val,sdbval,cmos_addr);
+//        bem_debugf("CMOS writeaddr %02X %02X %02X\n",val,sdbval,cmos_addr);
 }
 
 uint8_t cmos_read()
 {
-//        rpclog("CMOS read ORAnh %02X %02X %i %02X %i\n",cmos_addr,cmos[cmos_addr],cmos_ena,IC32,cmos_rw);
+//        bem_debugf("CMOS read ORAnh %02X %02X %i %02X %i\n",cmos_addr,cmos[cmos_addr],cmos_ena,IC32,cmos_rw);
         if (cmos_ena && (IC32 & 4) && cmos_rw) return cmos_data; /*To drive bus, CMOS must be enabled,
                                                                    D must be high, RW must be high*/
         return 0xff;
@@ -165,7 +165,7 @@ void cmos_load(MODEL m)
         else
         {
                 sprintf(fn, "%s%s", exedir, m.cmos);
-                rpclog("CMOS Opening %s\n", fn);
+                bem_debugf("CMOS Opening %s\n", fn);
                 f=fopen(fn, "rb");
                 if (!f)
                 {
@@ -188,7 +188,7 @@ void cmos_save(MODEL m)
         else
         {
                 sprintf(fn, "%s%s", exedir, m.cmos);
-                rpclog("CMOS Opening %s\n", fn);
+                bem_debugf("CMOS Opening %s\n", fn);
                 if ((f=fopen(fn, "wb")))
                 {
                         fwrite(cmos, 64, 1, f);

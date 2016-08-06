@@ -122,7 +122,7 @@ static void processcommandline()
             argbuf[i] = 0;
             i++;
          }
-         rpclog("Arg %i - %s\n",argc-1,argv[argc-1]);
+         bem_debugf("Arg %i - %s\n",argc-1,argv[argc-1]);
       }
    }
 
@@ -238,13 +238,13 @@ CRITICAL_SECTION cs;
 
 void startblit()
 {
-//        rpclog("startblit\n");
+//        bem_debug("startblit\n");
         EnterCriticalSection(&cs);
 }
 
 void endblit()
 {
-//        rpclog("endblit\n");
+//        bem_debug("endblit\n");
         LeaveCriticalSection(&cs);
 }
 
@@ -842,7 +842,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                 break;
 
                 case WM_KILLFOCUS:
-//              rpclog("KillFocus\n");
+//              bem_debug("KillFocus\n");
 //                infocus=0;
 //                spdcount=0;
                 if (mousecapture)
@@ -869,12 +869,12 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                 break;
 
                 case WM_ENTERMENULOOP:
-//              rpclog("EnterMenuLoop\n");
+//              bem_debug("EnterMenuLoop\n");
                 bempause = 1;
                 //EnterCriticalSection(&cs);
                 break;
                 case WM_EXITMENULOOP:
-//              rpclog("ExitMenuLoop\n");
+//              bem_debug("ExitMenuLoop\n");
                 bempause = 0;
                 key_clear();
                 for (c = 0; c < 128; c++) key[c] = 0;
@@ -882,7 +882,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                 break;
 
                 case WM_SETFOCUS:
-//              rpclog("SetFocus\n");
+//              bem_debug("SetFocus\n");
                 key_clear();
                 for (c = 0; c < 128; c++) key[c] = 0;
                 bempause = 0;
@@ -897,10 +897,10 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                 case WM_KEYDOWN:
                 if (LOWORD(wParam) != 255)
                 {
-                        //rpclog("Key %04X %04X\n",LOWORD(wParam),VK_LEFT);
+                        //bem_debugf("Key %04X %04X\n",LOWORD(wParam),VK_LEFT);
                         c = MapVirtualKey(LOWORD(wParam),0);
                         c = hw_to_mycode[c];
-//                        rpclog("MVK %i %i %i\n",c,hw_to_mycode[c],KEY_PGUP);
+//                        bem_debugf("MVK %i %i %i\n",c,hw_to_mycode[c],KEY_PGUP);
                         if (LOWORD(wParam) == VK_LEFT)   c = KEY_LEFT;
                         if (LOWORD(wParam) == VK_RIGHT)  c = KEY_RIGHT;
                         if (LOWORD(wParam) == VK_UP)     c = KEY_UP;
@@ -911,7 +911,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         if (LOWORD(wParam) == VK_DELETE) c = KEY_DEL;
                         if (LOWORD(wParam) == VK_PRIOR)  c = KEY_PGUP;
                         if (LOWORD(wParam) == VK_NEXT)   c = KEY_PGDN;
-                        //rpclog("MVK2 %i %i %i\n",c,hw_to_mycode[c],KEY_PGUP);
+                        //bem_debugf("MVK2 %i %i %i\n",c,hw_to_mycode[c],KEY_PGUP);
                         key[c]=1;
                 }
                 break;
@@ -919,7 +919,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                 case WM_KEYUP:
                 if (LOWORD(wParam) != 255)
                 {
-//                        rpclog("Key %04X %04X\n",LOWORD(wParam),VK_LEFT);
+//                        bem_debugf("Key %04X %04X\n",LOWORD(wParam),VK_LEFT);
                         c = MapVirtualKey(LOWORD(wParam), 0);
                         c = hw_to_mycode[c];
                         if (LOWORD(wParam) == VK_LEFT)   c = KEY_LEFT;
@@ -932,7 +932,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         if (LOWORD(wParam) == VK_DELETE) c = KEY_DEL;
                         if (LOWORD(wParam) == VK_PRIOR)  c = KEY_PGUP;
                         if (LOWORD(wParam) == VK_NEXT)   c = KEY_PGDN;
-//                        rpclog("MVK %i\n",c);
+//                        bem_debugf("MVK %i\n",c);
                         key[c] = 0;
                 }
                 break;

@@ -16,7 +16,7 @@ int swram[16]     = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 void mem_init()
 {
-        rpclog("mem_init\n");
+        bem_debug("mem_init\n");
         ram = (uint8_t *)malloc(64 * 1024);
         rom = (uint8_t *)malloc(16 * 16384);
         os  = (uint8_t *)malloc(16384);
@@ -65,7 +65,7 @@ void mem_loadswroms()
                 while (romused[c] && c >= 0) c--;
                 if (c >= 0)
                 {
-                        rpclog("Loading %s to slot %i\n",ffblk.name,c);
+                        bem_debugf("Loading %s to slot %i\n",ffblk.name,c);
                         if ((f = fopen(ffblk.name, "rb")))
                         {
                                 fread(rom + (c * 16384), 16384, 1, f);
@@ -86,7 +86,7 @@ void mem_loadswroms()
                 while (romused[c] && c >= 0) c--;
                 if (c >= 0)
                 {
-                        rpclog("Loading %s to slot %i\n",ffblk.name,c);
+                        bem_debugf("Loading %s to slot %i\n",ffblk.name,c);
                         if ((f = fopen(ffblk.name, "rb")))
                         {
                                 fread(rom + (c * 16384), 16384, 1, f);
@@ -118,7 +118,7 @@ void mem_loadroms(char *os_name, char *romdir)
 
         if (os_name[0])
         {
-                rpclog("Reading OS file %s\n", os_name);
+                bem_debugf("Reading OS file %s\n", os_name);
                 f = fopen(os_name, "rb");
                 if (!f)
                 {

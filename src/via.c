@@ -133,7 +133,7 @@ void via_write(VIA *v, uint16_t addr, uint8_t val)
                 case PCR:
                 v->pcr  = val;
 
-                rpclog("PCR write %04X %02X\n",addr,val);
+                bem_debugf("PCR write %04X %02X\n",addr,val);
 
                 if ((val & 0xE) == 0xC)
                 {

@@ -46,13 +46,12 @@
 
 #include "b-em.h"
 
-#undef DEBUG
 #define VERBOSE
 #undef VERBOSE
 
 #include <assert.h>
 
-#ifdef DEBUG
+#if 0
 static char *datalog(uae_u8 *src, int len)
 {
         static char buf[1000];
@@ -76,9 +75,6 @@ static char *datalog(uae_u8 *src, int len)
 static char *datalog(uae_u8 *src, int len) { return ""; }
 #endif
 
-#define outlog rpclog
-#define debuglog rpclog
-
 static int fdi_allocated;
 #ifdef DEBUG
 static void fdi_free (void *p)
@@ -88,7 +84,7 @@ static void fdi_free (void *p)
                 return;
         size = ((int*)p)[-1];
         fdi_allocated -= size;
-        write_log ("%d freed (%d)\n", size, fdi_allocated);
+        bem_debugf("%d freed (%d)\n", size, fdi_allocated);
         free ((int*)p - 1);
 }
 static void *fdi_malloc (int size)
@@ -96,7 +92,7 @@ static void *fdi_malloc (int size)
         void *p = xmalloc (size + sizeof (int));
         ((int*)p)[0] = size;
         fdi_allocated += size;
-        write_log ("%d allocated (%d)\n", size, fdi_allocated);
+        bem_debugf("%d allocated (%d)\n", size, fdi_allocated);
         return (int*)p + 1;
 }
 #else
@@ -323,14 +319,14 @@ static int decode_raw_track (FDI *fdi)
 /* unknown track */
 static void zxx (FDI *fdi)
 {
-        outlog ("track %d: unknown track type 0x%02.2X\n", fdi->current_track, fdi->track_type);
+        bem_debugf("track %d: unknown track type 0x%02.2X\n", fdi->current_track, fdi->track_type);
 //      return -1;
 }
 /* unsupported track */
 #if 0
 static void zyy (FDI *fdi)
 {
-        outlog ("track %d: unsupported track type 0x%02.2X\n", fdi->current_track, fdi->track_type);
+        bem_debugf("track %d: unsupported track type 0x%02.2X\n", fdi->current_track, fdi->track_type);
 //      return -1;
 }
 #endif
@@ -343,14 +339,14 @@ static void track_empty (FDI *fdi)
 /* unknown sector described type */
 static void dxx (FDI *fdi)
 {
-        outlog ("\ntrack %d: unknown sector described type 0x%02.2X\n", fdi->current_track, fdi->track_type);
+        bem_debugf("\ntrack %d: unknown sector described type 0x%02.2X\n", fdi->current_track, fdi->track_type);
         fdi->err = 1;
 }
 /* unsupported sector described type */
 #if 0
 static void dyy (FDI *fdi)
 {
-        outlog ("\ntrack %d: unsupported sector described 0x%02.2X\n", fdi->current_track, fdi->track_type);
+        bem_debugf("\ntrack %d: unsupported sector described 0x%02.2X\n", fdi->current_track, fdi->track_type);
         fdi->err = 1;
 }
 #endif
@@ -363,12 +359,12 @@ static void add_mfm_sync_bit (FDI *fdi)
         }
         fdi->mfmsync_buffer[fdi->mfmsync_offset++] = fdi->out;
         if (fdi->out == 0) {
-                outlog ("illegal position for mfm sync bit, offset=%d\n",fdi->out);
+                bem_debugf("illegal position for mfm sync bit, offset=%d\n",fdi->out);
                 fdi->err = 1;
         }
         if (fdi->mfmsync_offset >= MAX_MFM_SYNC_BUFFER) {
                 fdi->mfmsync_offset = 0;
-                outlog ("mfmsync buffer overflow\n");
+                bem_debug("mfmsync buffer overflow\n");
                 fdi->err = 1;
         }
         fdi->out++;
@@ -389,7 +385,7 @@ static void bit_add (FDI *fdi, int bit)
                 fdi->track_dst[BIT_BYTEOFFSET] |= (1 << BIT_BITOFFSET);
         fdi->out++;
         if (fdi->out >= MAX_DST_BUFFER * 8) {
-                outlog ("destination buffer overflow\n");
+                bem_debug("destination buffer overflow\n");
                 fdi->err = 1;
                 fdi->out = 1;
         }
@@ -404,13 +400,13 @@ static void bit_mfm_add (FDI *fdi, int bit)
 static void bit_drop_next (FDI *fdi)
 {
         if (fdi->nextdrop > 0) {
-                outlog("multiple bit_drop_next() called");
+                bem_debug("multiple bit_drop_next() called");
         } else if (fdi->nextdrop < 0) {
                 fdi->nextdrop = 0;
-                debuglog(":DNN:");
+                bem_debug(":DNN:");
                 return;
         }
-        debuglog(":DN:");
+        bem_debug(":DN:");
         fdi->nextdrop = 1;
 }
 
@@ -418,10 +414,10 @@ static void bit_drop_next (FDI *fdi)
 static void bit_dedrop (FDI *fdi)
 {
         if (fdi->nextdrop) {
-                outlog("bit_drop_next called before bit_dedrop");
+                bem_debug("bit_drop_next called before bit_dedrop");
         }
         fdi->nextdrop = -1;
-        debuglog(":BDD:");
+        bem_debug(":BDD:");
 }
 
 /* add one byte */
@@ -474,7 +470,7 @@ static void s08(FDI *fdi)
         int bytes = *fdi->track_src++;
         uae_u8 byte = *fdi->track_src++;
         if (bytes == 0) bytes = 256;
-        debuglog ("s08:len=%d,data=%02.2X",bytes,byte);
+        bem_debugf("s08:len=%d,data=%02.2X",bytes,byte);
         while(bytes--) byte_add (fdi, byte);
 }
 /* RLE MFM-decoded data */
@@ -484,7 +480,7 @@ static void s09(FDI *fdi)
         uae_u8 byte = *fdi->track_src++;
         if (bytes == 0) bytes = 256;
         bit_drop_next (fdi);
-        debuglog ("s09:len=%d,data=%02.2X",bytes,byte);
+        bem_debugf("s09:len=%d,data=%02.2X",bytes,byte);
         while(bytes--) byte_mfm_add (fdi, byte);
 }
 /* MFM-encoded data */
@@ -493,7 +489,7 @@ static void s0a(FDI *fdi)
         int i, bits = (fdi->track_src[0] << 8) | fdi->track_src[1];
         uae_u8 b;
         fdi->track_src += 2;
-        debuglog ("s0a:bits=%d,data=%s", bits, datalog(fdi->track_src, (bits + 7) / 8));
+        bem_debugf("s0a:bits=%d,data=%s", bits, datalog(fdi->track_src, (bits + 7) / 8));
         while (bits >= 8) {
                 byte_add (fdi, *fdi->track_src++);
                 bits -= 8;
@@ -513,7 +509,7 @@ static void s0b(FDI *fdi)
         int i, bits = ((fdi->track_src[0] << 8) | fdi->track_src[1]) + 65536;
         uae_u8 b;
         fdi->track_src += 2;
-        debuglog ("s0b:bits=%d,data=%s", bits, datalog(fdi->track_src, (bits + 7) / 8));
+        bem_debugf("s0b:bits=%d,data=%s", bits, datalog(fdi->track_src, (bits + 7) / 8));
         while (bits >= 8) {
                 byte_add (fdi, *fdi->track_src++);
                 bits -= 8;
@@ -534,7 +530,7 @@ static void s0c(FDI *fdi)
         uae_u8 b;
         fdi->track_src += 2;
         bit_drop_next (fdi);
-        debuglog ("s0c:bits=%d,data=%s", bits, datalog(fdi->track_src, (bits + 7) / 8));
+        bem_debugf("s0c:bits=%d,data=%s", bits, datalog(fdi->track_src, (bits + 7) / 8));
         while (bits >= 8) {
                 byte_mfm_add (fdi, *fdi->track_src++);
                 bits -= 8;
@@ -555,7 +551,7 @@ static void s0d(FDI *fdi)
         uae_u8 b;
         fdi->track_src += 2;
         bit_drop_next (fdi);
-        debuglog ("s0d:bits=%d,data=%s", bits, datalog(fdi->track_src, (bits + 7) / 8));
+        bem_debugf("s0d:bits=%d,data=%s", bits, datalog(fdi->track_src, (bits + 7) / 8));
         while (bits >= 8) {
                 byte_mfm_add (fdi, *fdi->track_src++);
                 bits -= 8;
@@ -687,13 +683,13 @@ static int amiga_check_track (FDI *fdi)
 
                 trackoffs = (id & 0xff00) >> 8;
                 if (trackoffs + 1 > drvsec) {
-                        outlog("illegal sector offset %d\n",trackoffs);
+                        bem_debugf("illegal sector offset %d\n",trackoffs);
                         ok = 0;
                         mbuf = mbuf2;
                         continue;
                 }
                 if ((id >> 24) != 0xff) {
-                        outlog ("sector %d format type %02.2X?\n", trackoffs, id >> 24);
+                        bem_debugf("sector %d format type %02.2X?\n", trackoffs, id >> 24);
                         ok = 0;
                 }
                 chksum = odd ^ even;
@@ -712,14 +708,14 @@ static int amiga_check_track (FDI *fdi)
                 even = getmfmlong (mbuf + 2 * 2);
                 mbuf += 4 * 2;
                 if (((odd << 1) | even) != chksum) {
-                        outlog("sector %d header crc error\n", trackoffs);
+                        bem_debugf("sector %d header crc error\n", trackoffs);
                         ok = 0;
                         mbuf = mbuf2;
                         continue;
                 }
-                outlog("sector %d header crc ok\n", trackoffs);
+                bem_debugf("sector %d header crc ok\n", trackoffs);
                 if (((id & 0x00ff0000) >> 16) != (uae_u32)fdi->current_track) {
-                        outlog("illegal track number %d <> %d\n",fdi->current_track,(id & 0x00ff0000) >> 16);
+                        bem_debugf("illegal track number %d <> %d\n",fdi->current_track,(id & 0x00ff0000) >> 16);
                         ok++;
                         mbuf = mbuf2;
                         continue;
@@ -742,14 +738,14 @@ static int amiga_check_track (FDI *fdi)
                 }
                 mbuf += 256 * 2;
                 if (chksum) {
-                        outlog("sector %d data checksum error\n",trackoffs);
+                        bem_debugf("sector %d data checksum error\n",trackoffs);
                         ok = 0;
                 } else if (sectable[trackoffs]) {
-                        outlog("sector %d already found?\n", trackoffs);
+                        bem_debugf("sector %d already found?\n", trackoffs);
                         mbuf = mbuf2;
                 } else {
-                        outlog("sector %d ok\n",trackoffs);
-                        if (slabel) outlog("(non-empty sector header)\n");
+                        bem_debugf("sector %d ok\n",trackoffs);
+                        if (slabel) bem_debug("(non-empty sector header)\n");
                         sectable[trackoffs] = 1;
                         secwritten++;
                         if (trackoffs == 9)
@@ -758,7 +754,7 @@ static int amiga_check_track (FDI *fdi)
         }
         for (i = 0; i < drvsec; i++) {
                 if (!sectable[i]) {
-                        outlog ("sector %d missing\n", i);
+                        bem_debugf("sector %d missing\n", i);
                         ok = 0;
                 }
         }
@@ -879,7 +875,7 @@ static void amiga_sector_header (FDI *fdi, uae_u8 *header, uae_u8 *data, int sec
 static void s20(FDI *fdi)
 {
         bit_drop_next (fdi);
-        debuglog ("s20:header=%s,data=%s", datalog(fdi->track_src, 4), datalog(fdi->track_src + 4, 16));
+        bem_debugf("s20:header=%s,data=%s", datalog(fdi->track_src, 4), datalog(fdi->track_src + 4, 16));
         amiga_sector_header (fdi, fdi->track_src, fdi->track_src + 4, 0, 0);
         fdi->track_src += 4 + 16;
 }
@@ -887,7 +883,7 @@ static void s20(FDI *fdi)
 static void s21(FDI *fdi)
 {
         bit_drop_next (fdi);
-        debuglog ("s21:header=%s", datalog(fdi->track_src, 4));
+        bem_debugf("s21:header=%s", datalog(fdi->track_src, 4));
         amiga_sector_header (fdi, fdi->track_src, 0, 0, 0);
         fdi->track_src += 4;
 }
@@ -895,14 +891,14 @@ static void s21(FDI *fdi)
 static void s22(FDI *fdi)
 {
         bit_drop_next (fdi);
-        debuglog("s22:sector=%d,untilgap=%d", fdi->track_src[0], fdi->track_src[1]);
+        bem_debugf("s22:sector=%d,untilgap=%d", fdi->track_src[0], fdi->track_src[1]);
         amiga_sector_header (fdi, 0, 0, fdi->track_src[0], fdi->track_src[1]);
         fdi->track_src += 2;
 }
 /* standard 512-byte, CRC-correct Amiga data */
 static void s23(FDI *fdi)
 {
-        debuglog("s23:data=%s", datalog (fdi->track_src, 512));
+        bem_debugf("s23:data=%s", datalog (fdi->track_src, 512));
         amiga_data (fdi, fdi->track_src);
         fdi->track_src += 512;
 }
@@ -910,7 +906,7 @@ static void s23(FDI *fdi)
 static void s24(FDI *fdi)
 {
         int shift = *fdi->track_src++;
-        debuglog("s24:shift=%d,data=%s", shift, datalog (fdi->track_src, 128 << shift));
+        bem_debugf("s24:shift=%d,data=%s", shift, datalog (fdi->track_src, 128 << shift));
         amiga_data_raw (fdi, fdi->track_src, 0, 128 << shift);
         fdi->track_src += 128 << shift;
 }
@@ -918,7 +914,7 @@ static void s24(FDI *fdi)
 static void s25(FDI *fdi)
 {
         int shift = *fdi->track_src++;
-        debuglog("s25:shift=%d,crc=%s,data=%s", shift, datalog (fdi->track_src, 4), datalog (fdi->track_src + 4, 128 << shift));
+        bem_debugf("s25:shift=%d,crc=%s,data=%s", shift, datalog (fdi->track_src, 4), datalog (fdi->track_src + 4, 128 << shift));
         amiga_data_raw (fdi, fdi->track_src + 4, fdi->track_src, 128 << shift);
         fdi->track_src += 4 + (128 << shift);
 }
@@ -926,7 +922,7 @@ static void s25(FDI *fdi)
 static void s26(FDI *fdi)
 {
         s21 (fdi);
-        debuglog("s26:data=%s", datalog (fdi->track_src, 512));
+        bem_debugf("s26:data=%s", datalog (fdi->track_src, 512));
         amiga_data (fdi, fdi->track_src);
         fdi->track_src += 512;
 }
@@ -934,7 +930,7 @@ static void s26(FDI *fdi)
 static void s27(FDI *fdi)
 {
         s22 (fdi);
-        debuglog("s27:data=%s", datalog (fdi->track_src, 512));
+        bem_debugf("s27:data=%s", datalog (fdi->track_src, 512));
         amiga_data (fdi, fdi->track_src);
         fdi->track_src += 512;
 }
@@ -1055,14 +1051,14 @@ static void s12(FDI *fdi)
 static void s13(FDI *fdi)
 {
         bit_drop_next (fdi);
-        debuglog ("s13:header=%s", datalog (fdi->track_src, 4));
+        bem_debugf("s13:header=%s", datalog (fdi->track_src, 4));
         ibm_sector_header (fdi, fdi->track_src, 0, -1, 1);
         fdi->track_src += 4;
 }
 /* standard mini-extended IBM sector header */
 static void s14(FDI *fdi)
 {
-        debuglog ("s14:header=%s", datalog (fdi->track_src, 4));
+        bem_debugf("s14:header=%s", datalog (fdi->track_src, 4));
         ibm_sector_header (fdi, fdi->track_src, 0, -1, 0);
         fdi->track_src += 4;
 }
@@ -1070,33 +1066,33 @@ static void s14(FDI *fdi)
 static void s15(FDI *fdi)
 {
         bit_drop_next (fdi);
-        debuglog ("s15:sector=%d", *fdi->track_src);
+        bem_debugf("s15:sector=%d", *fdi->track_src);
         ibm_sector_header (fdi, 0, 0, *fdi->track_src++, 1);
 }
 /* standard mini-short IBM sector header */
 static void s16(FDI *fdi)
 {
-        debuglog ("s16:track=%d", *fdi->track_src);
+        bem_debugf("s16:track=%d", *fdi->track_src);
         ibm_sector_header (fdi, 0, 0, *fdi->track_src++, 0);
 }
 /* standard CRC-incorrect mini-extended IBM sector header */
 static void s17(FDI *fdi)
 {
-        debuglog ("s17:header=%s,crc=%s", datalog (fdi->track_src, 4), datalog (fdi->track_src + 4, 2));
+        bem_debugf("s17:header=%s,crc=%s", datalog (fdi->track_src, 4), datalog (fdi->track_src + 4, 2));
         ibm_sector_header (fdi, fdi->track_src, fdi->track_src + 4, -1, 0);
         fdi->track_src += 4 + 2;
 }
 /* standard CRC-incorrect mini-short IBM sector header */
 static void s18(FDI *fdi)
 {
-        debuglog ("s18:sector=%d,header=%s", *fdi->track_src, datalog (fdi->track_src + 1, 4));
+        bem_debugf("s18:sector=%d,header=%s", *fdi->track_src, datalog (fdi->track_src + 1, 4));
         ibm_sector_header (fdi, 0, fdi->track_src + 1, *fdi->track_src, 0);
         fdi->track_src += 1 + 4;
 }
 /* standard 512-byte CRC-correct IBM data */
 static void s19(FDI *fdi)
 {
-        debuglog ("s19:data=%s", datalog (fdi->track_src , 512));
+        bem_debugf("s19:data=%s", datalog (fdi->track_src , 512));
         ibm_data (fdi, fdi->track_src, 0, 512);
         fdi->track_src += 512;
 }
@@ -1104,7 +1100,7 @@ static void s19(FDI *fdi)
 static void s1a(FDI *fdi)
 {
         int shift = *fdi->track_src++;
-        debuglog ("s1a:shift=%d,data=%s", shift, datalog (fdi->track_src , 128 << shift));
+        bem_debugf("s1a:shift=%d,data=%s", shift, datalog (fdi->track_src , 128 << shift));
         ibm_data (fdi, fdi->track_src, 0, 128 << shift);
         fdi->track_src += 128 << shift;
 }
@@ -1112,7 +1108,7 @@ static void s1a(FDI *fdi)
 static void s1b(FDI *fdi)
 {
         int shift = *fdi->track_src++;
-        debuglog ("s1b:shift=%d,crc=%s,data=%s", shift, datalog (fdi->track_src + (128 << shift), 2), datalog (fdi->track_src , 128 << shift));
+        bem_debugf("s1b:shift=%d,crc=%s,data=%s", shift, datalog (fdi->track_src + (128 << shift), 2), datalog (fdi->track_src , 128 << shift));
         ibm_data (fdi, fdi->track_src, fdi->track_src + (128 << shift), 128 << shift);
         fdi->track_src += (128 << shift) + 2;
 }
@@ -1318,25 +1314,25 @@ static int handle_sectors_described_track (FDI *fdi)
         fdi->index_offset = get_u32(fdi->track_src);
         fdi->index_offset >>= 8;
         fdi->track_src += 3;
-        outlog ("sectors_described, index offset: %d\n",fdi->index_offset);
+        bem_debugf("sectors_described, index offset: %d\n",fdi->index_offset);
 
         do {
                 fdi->track_type = *fdi->track_src++;
-                outlog ("%06.6X %06.6X %02.2X:",fdi->track_src - start_src + 0x200, fdi->out/8, fdi->track_type);
+                bem_debugf("%06.6X %06.6X %02.2X:",fdi->track_src - start_src + 0x200, fdi->out/8, fdi->track_type);
                 oldout = fdi->out;
                 decode_sectors_described_track[fdi->track_type](fdi);
-                outlog(" %d\n", fdi->out - oldout);
+                bem_debugf(" %d\n", fdi->out - oldout);
                 oldout = fdi->out;
                 if (fdi->out < 0 || fdi->err) {
-                        outlog ("\nin %d bytes, out %d bits\n", fdi->track_src - fdi->track_src_buffer, fdi->out);
+                        bem_debugf("\nin %d bytes, out %d bits\n", fdi->track_src - fdi->track_src_buffer, fdi->out);
                         return -1;
                 }
                 if (fdi->track_src - fdi->track_src_buffer >= fdi->track_src_len) {
-                        outlog ("source buffer overrun, previous type: %02.2X\n", fdi->track_type);
+                        bem_debugf("source buffer overrun, previous type: %02.2X\n", fdi->track_type);
                         return -1;
                 }
         } while (fdi->track_type != 0xff);
-        outlog("\n");
+        bem_debug("\n");
         fix_mfm_sync (fdi);
         return fdi->out;
 }
@@ -1440,7 +1436,7 @@ static void fdi2_decode (FDI *fdi, uint32_t totalavg, uae_u32 *avgp, uae_u32 *mi
                 || (avgp[i] < (standard_MFM_2_bit_cell_size - (standard_MFM_2_bit_cell_size / 4))) ) )
                         i++;
         if (i == pulses)  {
-                outlog ("No stable and long-enough pulse in track.\n");
+                bem_debug("No stable and long-enough pulse in track.\n");
                 return;
         }
         i--;
@@ -1568,7 +1564,7 @@ static void fdi2_decode (FDI *fdi, uint32_t totalavg, uae_u32 *avgp, uae_u32 *mi
                 || (minp[i] < (standard_MFM_2_bit_cell_size - (standard_MFM_2_bit_cell_size / 4))) ) )
                         i++;
         if (i == pulses)  {
-                outlog ("FDI: No stable and long-enough pulse in track.\n");
+                bem_debug("FDI: No stable and long-enough pulse in track.\n");
                 return;
         }
         nexti = i;
@@ -1646,12 +1642,12 @@ static void fdi2_decode (FDI *fdi, uint32_t totalavg, uae_u32 *avgp, uae_u32 *mi
                                 }
                                 avg_pulse += jitter;
                                 if ((avg_pulse < min_pulse) || (avg_pulse > max_pulse)) {
-                                        outlog ("FDI: avg_pulse outside bounds! avg=%u min=%u max=%u\n", avg_pulse, min_pulse, max_pulse);
-                                        outlog ("FDI: avgp=%u (%u) minp=%u (%u) maxp=%u (%u) jitter=%d i=%d ni=%d\n",
+                                        bem_debugf("FDI: avg_pulse outside bounds! avg=%u min=%u max=%u\n", avg_pulse, min_pulse, max_pulse);
+                                        bem_debugf("FDI: avgp=%u (%u) minp=%u (%u) maxp=%u (%u) jitter=%d i=%d ni=%d\n",
                                                 avgp[i], avgp[nexti], minp[i], minp[nexti], maxp[i], maxp[nexti], jitter, i, nexti);
                                 }
                                 if (avg_pulse < ref_pulse)
-                                        outlog ("FDI: avg_pulse < ref_pulse! (%u < %u)\n", avg_pulse, ref_pulse);
+                                        bem_debugf("FDI: avg_pulse < ref_pulse! (%u < %u)\n", avg_pulse, ref_pulse);
                                 pulse += avg_pulse - ref_pulse;
                                 ref_pulse = 0;
                                 if (i == eodat)
@@ -1925,7 +1921,7 @@ static int decode_lowlevel_track (FDI *fdi, int track, struct fdi_cache *cache)
                 idxp[i] = sum;
         }
         len = totalavg / 100000;
-        outlog("totalavg=%u index=%d (%d) maxidx=%d weakbits=%d len=%d\n",
+        bem_debugf("totalavg=%u index=%d (%d) maxidx=%d weakbits=%d len=%d\n",
                 totalavg, indexoffset, maxidx, weakbits, len);
         cache->avgp = avgp;
         cache->idxp = idxp;
@@ -1968,7 +1964,7 @@ void fdi2raw_header_free (FDI *fdi)
                         fdi_free (c->maxp);
         }
         fdi_free (fdi);
-        debuglog ("FREE: memory allocated %d\n", fdi_allocated);
+        bem_debugf("FREE: memory allocated %d\n", fdi_allocated);
 }
 
 int fdi2raw_get_last_track (FDI *fdi)
@@ -2014,7 +2010,7 @@ FDI *fdi2raw_header(FILE *f)
         uae_u8 type, size;
         FDI *fdi;
 
-        debuglog ("ALLOC: memory allocated %d\n", fdi_allocated);
+        bem_debugf("ALLOC: memory allocated %d\n", fdi_allocated);
         fdi = fdi_malloc(sizeof(FDI));
         memset (fdi, 0, sizeof (FDI));
         fdi->file = f;
@@ -2044,8 +2040,8 @@ FDI *fdi2raw_header(FILE *f)
         fdi->disk_type = fdi->header[145];
         fdi->rotation_speed = fdi->header[146] + 128;
         fdi->write_protect = fdi->header[147] & 1;
-        outlog ("FDI version %d.%d\n", fdi->header[140], fdi->header[141]);
-        outlog ("last_track=%d rotation_speed=%d\n",fdi->last_track,fdi->rotation_speed);
+        bem_debugf("FDI version %d.%d\n", fdi->header[140], fdi->header[141]);
+        bem_debugf("last_track=%d rotation_speed=%d\n",fdi->last_track,fdi->rotation_speed);
 
         offset = 512;
         i = fdi->last_track;
@@ -2085,7 +2081,7 @@ int fdi2raw_loadrevolution_2 (FDI *fdi, uae_u16 *mfmbuf, uae_u16 *tracktiming, i
                 cache->avgp, cache->minp, cache->maxp, cache->idxp,
                 cache->maxidx, &idx, cache->pulses, mfm);
         //fdi2_gcr_decode (fdi, totalavg, avgp, minp, maxp, idxp, idx_off1, idx_off2, idx_off3, maxidx, pulses);
-        outlog("track %d: nbits=%d avg len=%.2f weakbits=%d idx=%d\n",
+        bem_debugf("track %d: nbits=%d avg len=%.2f weakbits=%d idx=%d\n",
                 track, bitoffset, (double)cache->totalavg / bitoffset, cache->weakbits, cache->indexoffset);
         len = fdi->out;
         if (cache->weakbits >= 10 && multirev)
@@ -2138,7 +2134,7 @@ int fdi2raw_loadtrack (FDI *fdi, uae_u16 *mfmbuf, uae_u16 *tracktiming, int trac
         else
                 fdi->bit_rate = 250;
 
-        outlog ("track %d: srclen: %d track_type: %02.2X, bitrate: %d\n",
+        bem_debugf("track %d: srclen: %d track_type: %02.2X, bitrate: %d\n",
                 fdi->current_track, fdi->track_src_len, fdi->track_type, fdi->bit_rate);
 
         if ((fdi->track_type & 0xc0) == 0x80) {

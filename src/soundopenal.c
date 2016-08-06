@@ -158,27 +158,27 @@ void al_givebufferdd(int16_t *buf)
 //                printf("Resetting sounddd\n");
         }
         alGetSourcei(source[1], AL_BUFFERS_PROCESSED, &processed);
-//rpclog("Get source\n");
+//bem_debug("Get source\n");
         check();
-//rpclog("Got source\n");
+//bem_debug("Got source\n");
         if (processed>=1)
         {
                 ALuint buffer;
 
-//rpclog("Unqueue\n");
+//bem_debug("Unqueue\n");
                 alSourceUnqueueBuffers(source[1], 1, &buffer);
                 check();
 
                 for (c = 0; c < (4410 * 2); c++) zbuf[c] = buf[c >> 1];//^0x8000;
 
-//rpclog("BufferData\n");
+//bem_debug("BufferData\n");
                 alBufferData(buffer, AL_FORMAT_STEREO16, zbuf, 4410*4, 44100);
                 check();
 
-//rpclog("Queue\n");
+//bem_debug("Queue\n");
                 alSourceQueueBuffers(source[1], 1, &buffer);
                 check();
         }
 
-//        rpclog("DDnoise3\n");
+//        bem_debug("DDnoise3\n");
 }

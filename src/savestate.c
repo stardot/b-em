@@ -22,7 +22,7 @@ char savestate_name[260];
 
 void savestate_save()
 {
-//        rpclog("Save state\n");
+//        bem_debug("Save state\n");
         savestate_wantsave = 1;
 }
 
@@ -35,7 +35,7 @@ void savestate_dosave()
 {
         FILE *f;
         f = fopen(savestate_name, "wb");
-//        rpclog("DoSave state\n");
+//        bem_debug("DoSave state\n");
         putc('B', f); putc('E', f); putc('M', f); putc('S', f);
         putc('N', f); putc('A', f); putc('P', f); putc('1', f);
 
@@ -74,9 +74,9 @@ void savestate_doload()
 
         curmodel = getc(f);
         selecttube = curtube = -1;
-        rpclog("Restart BBC\n");
+        bem_debug("Restart BBC\n");
         main_restart();
-        rpclog("Done!\n");
+        bem_debug("Done!\n");
 
         m6502_loadstate(f);
         mem_loadstate(f);
@@ -90,7 +90,7 @@ void savestate_doload()
         acia_loadstate(f);
         serial_loadstate(f);
 
-        rpclog("Loadstate done!\n");
+        bem_debug("Loadstate done!\n");
 
         fclose(f);
 

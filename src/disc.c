@@ -65,7 +65,7 @@ void disc_load(int drive, char *fn)
         p = get_extension(fn);
         if (!p) return;
         setejecttext(drive, fn);
-        rpclog("Loading :%i %s %s\n", drive, fn,p);
+        bem_debugf("Loading :%i %s %s\n", drive, fn,p);
         while (loaders[c].ext)
         {
                 if (!strcasecmp(p, loaders[c].ext))
@@ -83,7 +83,7 @@ void disc_load(int drive, char *fn)
         fseek(f, -1, SEEK_END);
         c = ftell(f)+1;
         fclose(f);
-        rpclog("Size %i\n",c);
+        bem_debugf("Size %i\n",c);
         if (c == (800*1024)) /*800k ADFS/DOS - 80*2*5*1024*/
         {
                 driveloaders[drive] = 2;

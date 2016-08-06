@@ -62,12 +62,12 @@ static void uef_receive(uint8_t val)
         {
                 ffound = 1;
                 fdat = val;
-//                rpclog("Dat %02X %c\n",val,(val<33)?'.':val);
+//                bem_debugf("Dat %02X %c\n",val,(val<33)?'.':val);
         }
         else
         {
                 acia_receive(val);
-//                rpclog("Dat %02X\n",val);
+//                bem_debugf("Dat %02X\n",val);
         }
 }
 

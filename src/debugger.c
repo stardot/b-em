@@ -200,7 +200,7 @@ static void debug_out(char *s)
         startblit();
         WriteConsole(consf, s, strlen(s), NULL, NULL);
         endblit();
-        rpclog("%s", s);
+        bem_debugf("%s", s);
 }
 
 #else
@@ -823,7 +823,7 @@ void debugger_do()
                         {
                                 if (!params) break;
                                 sscanf(&ins[d], "%X %X", &e, &f);
-                                rpclog("WriteM %04X %04X\n", e, f);
+                                bem_debugf("WriteM %04X %04X\n", e, f);
                                 writemem(e, f);
                         }
                         break;

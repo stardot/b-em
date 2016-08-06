@@ -157,14 +157,14 @@ int autoboot;
 
 void sysvia_write(uint16_t addr, uint8_t val)
 {
-//        rpclog("SYSVIA write %04X %02X\n",addr,val);
+//        bem_debugf("SYSVIA write %04X %02X\n",addr,val);
         via_write(&sysvia, addr, val);
 }
 
 uint8_t sysvia_read(uint16_t addr)
 {
         uint8_t temp = via_read(&sysvia, addr);
-//        rpclog("SYSVIA read  %04X %02X\n",addr,temp);
+//        bem_debugf("SYSVIA read  %04X %02X\n",addr,temp);
         return temp;
 }
 

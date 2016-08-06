@@ -93,9 +93,9 @@ void tube_6502_close()
         FILE *f=fopen("tuberam.dmp","wb");
         fwrite(tuberam,65536,1,f);
         fclose(f);
-        rpclog("Tube 65c12 registers :\n");
-        rpclog("A=%02X X=%02X Y=%02X S=01%02X PC=%04X\n",a,x,y,s,pc);
-        rpclog("Status : %c%c%c%c%c%c\n",(tubep.n)?'N':' ',(tubep.v)?'V':' ',(tubep.d)?'D':' ',(tubep.i)?'I':' ',(tubep.z)?'Z':' ',(tubep.c)?'C':' ');
+        bem_debug("Tube 65c12 registers :\n");
+        bem_debugf("A=%02X X=%02X Y=%02X S=01%02X PC=%04X\n",a,x,y,s,pc);
+        bem_debugf("Status : %c%c%c%c%c%c\n",(tubep.n)?'N':' ',(tubep.v)?'V':' ',(tubep.d)?'D':' ',(tubep.i)?'I':' ',(tubep.z)?'Z':' ',(tubep.c)?'C':' ');
 }*/
 
 static int tuberomin = 1;
@@ -111,7 +111,7 @@ static uint8_t tubereadmeml(uint16_t addr)
         uint8_t temp;
         if ((addr & ~7) == 0xFEF8) {
                 temp = tube_parasite_read(addr);
-//                rpclog("Read tube  %04X %02X %04X\n",addr,temp,pc);
+//                bem_debugf("Read tube  %04X %02X %04X\n",addr,temp,pc);
                 return temp;
         }
         if ((addr & ~0xFFF) == 0xF000 && tuberomin)
@@ -122,14 +122,14 @@ static uint8_t tubereadmeml(uint16_t addr)
 int endtimeslice;
 static void tubewritememl(uint16_t addr, uint8_t val)
 {
-//        rpclog("Tube writemem %04X %02X %04X\n",addr,val,pc);
+//        bem_debugf("Tube writemem %04X %02X %04X\n",addr,val,pc);
         if ((addr & ~7) == 0xFEF8) {
-//                rpclog("Write tube %04X %02X %04X\n",addr,val,pc);
+//                bem_debugf("Write tube %04X %02X %04X\n",addr,val,pc);
                 tube_parasite_write(addr, val);
                 endtimeslice = 1;
                 return;
         }
-//        if (addr==0xF4 || addr==0xF5) rpclog("TUBE PARASITE write %04X %02X\n",addr,val);
+//        if (addr==0xF4 || addr==0xF5) bem_debugf("TUBE PARASITE write %04X %02X\n",addr,val);
         tuberam[addr] = val;
 }
 
@@ -289,7 +289,7 @@ void tube_6502_exec()
                 switch (opcode) {
                 case 0x00:
                         /*BRK*/
-//                                rpclog("Tube BRK at %04X! %04X %04X\n",pc,oldtpc,oldtpc2);
+//                                bem_debugf("Tube BRK at %04X! %04X %04X\n",pc,oldtpc,oldtpc2);
                             pc++;
                         push(pc >> 8);
                         push(pc & 0xFF);
@@ -1956,7 +1956,7 @@ void tube_6502_exec()
                         endtimeslice = 0;
                         return;
                 }
-/*                        if (tubeoutput==2) rpclog("%04X : %02X %02X %02X\n",pc,a,x,y);
+/*                        if (tubeoutput==2) bem_debugf("%04X : %02X %02X %02X\n",pc,a,x,y);
                         if (tubetimetolive)
                         {
                                 tubetimetolive--;

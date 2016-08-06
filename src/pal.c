@@ -121,7 +121,7 @@ void pal_convert(BITMAP *inb, int x1, int y1, int x2, int y2, int yoff)
         for (x = 0; x < 4; x++)
             u_filt[x] = v_filt[x] = 0;
 
-//        rpclog("PAL %i-%i %i-%i\n",x1,x2,dx1,dx2);
+//        bem_debugf("PAL %i-%i %i-%i\n",x1,x2,dx1,dx2);
 
 
         for (y = y1; y < y2; y += yoff)

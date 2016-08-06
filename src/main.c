@@ -2,10 +2,10 @@
   Main loop + start/finish code*/
 
 #include <allegro.h>
+
 #ifdef WIN32
 #include <winalleg.h>
 #endif
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -63,33 +63,6 @@
 int autoboot=0;
 int joybutton[2];
 
-FILE *arclog;
-void rpclog(const char *format, ...)
-{
-        char buf[256];
-                va_list ap;
- return;
-        if (!arclog) arclog=fopen("b-emlog.txt","wt");
-
-        va_start(ap, format);
-        vsprintf(buf, format, ap);
-        va_end(ap);
-        fputs(buf, arclog);
-        fflush(arclog);
-}
-
-void bem_errorf(const char *fmt, ...)
-{
-        char buf[256];
-        va_list ap;
-
-        va_start(ap, fmt);
-        vsnprintf(buf, sizeof buf, fmt, ap);
-        va_end(ap);
-
-        bem_error(buf);
-}
-
 int printsec;
 void secint()
 {
@@ -132,6 +105,8 @@ void main_init(int argc, char *argv[])
         int c;
         int tapenext = 0, discnext = 0;
 
+        debug_open();
+
         startblit();
 
         printf(B_EM_VERSION "\n");
@@ -150,7 +125,7 @@ void main_init(int argc, char *argv[])
 
         for (c = 1; c < argc; c++)
         {
-//                rpclog("%i : %s\n",c,argv[c]);
+//                bem_debugf("%i : %s",c,argv[c]);
 /*                if (!strcasecmp(argv[c],"-1770"))
                 {
                         I8271=0;
@@ -404,6 +379,7 @@ void main_close()
 
         al_close();
         video_close();
+        debug_close();
 }
 
 void changetimerspeed(int i)

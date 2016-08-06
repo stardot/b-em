@@ -74,7 +74,7 @@ void ide_init(void)
 void ide_write(uint16_t addr, uint8_t val)
 {
         if (!ide_enable) return;
-//        rpclog("Write IDE %04X %02X %04X\n",addr,val,pc);
+//        bem_debugf("Write IDE %04X %02X %04X\n",addr,val,pc);
         switch (addr & 0xF)
         {
                 case 0x0:
@@ -113,7 +113,7 @@ void ide_write(uint16_t addr, uint8_t val)
                 case 0x7: /*Command register*/
                 ide.command = val;
                 ide.error = 0;
-//                rpclog("IDE command %02X\n",val);
+//                bem_debugf("IDE command %02X\n",val);
                 switch (val)
                 {
                         case 0x10: /*Restore*/
@@ -151,7 +151,7 @@ void ide_write(uint16_t addr, uint8_t val)
                         ide_count = 200;
                         return;
                 }
-                rpclog("Bad IDE command %02X\n", val);
+                bem_debugf("Bad IDE command %02X\n", val);
                 exit(-1);
                 return;
         }
@@ -163,7 +163,7 @@ uint8_t ide_read(uint16_t addr)
 {
         uint8_t temp;
         if (!ide_enable) return 0xFC;
-//        rpclog("Read IDE %04X %04X %02X\n",addr,pc,ide.atastat);
+//        bem_debugf("Read IDE %04X %04X %02X\n",addr,pc,ide.atastat);
         switch (addr&0xF)
         {
                 case 0x0:
