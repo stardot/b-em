@@ -2396,7 +2396,7 @@ void x86_exec()
                         lastpc=pc;
                         lastcs=CS;
                         temp=readmembl(cs+pc); pc++;
-                        if (temp==0xE0 && CL==0x32) rpclog("XIOS call %02X %04X:%04X\n",readmembl(ds+DX),CS,pc);
+                        if (temp==0xE0 && CL==0x32) bem_debugf("XIOS call %02X %04X:%04X\n",readmembl(ds+DX),CS,pc);
 /*                        if (temp==0x45)
                         {
                                 printf("OSFILE %02X\n",AL);
@@ -3377,7 +3377,7 @@ void x86_exec()
                                 case 0x18: /*CALL far*/
 /*                                if (CS==0x6012 && pc==0x15EE)
                                 {
-                                        rpclog("Mouse trap!\n");
+                                        bem_debug("Mouse trap!\n");
                                         getmousepos(&AX,&CX,&DX);
                                 }*/
                                 tempw=readmemwl(easeg,eaaddr);
@@ -3445,10 +3445,10 @@ void x86_exec()
                         exit(-1);
                 }
                 pc&=0xFFFF;
-//                if (CS==0x1490 && pc==0x3BBA) rpclog("Here from %04X:%04X %08X %02X\n",oldcs,oldpc,old8,opcode);
-                
-//                if (CS==0x6012 && pc==3) rpclog("XIOS direct call %02X %04X %04X %04X %04X\n",AL,CX,DX,BX,SI);
-                
+//                if (CS==0x1490 && pc==0x3BBA) bem_debugf("Here from %04X:%04X %08X %02X\n",oldcs,oldpc,old8,opcode);
+
+//                if (CS==0x6012 && pc==3) bem_debugf("XIOS direct call %02X %04X %04X %04X %04X\n",AL,CX,DX,BX,SI);
+
 /*                if (!CS && !pc)
                 {
                         printf("At zero!\n");

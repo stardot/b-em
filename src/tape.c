@@ -32,7 +32,7 @@ void tape_load(char *fn)
         if (!fn) return;
         p = get_extension(fn);
         if (!p) return;
-        rpclog("Loading %s %s\n", fn, p);
+        bem_debugf("Loading %s %s\n", fn, p);
         while (loaders[c].ext)
         {
                 if (!strcasecmp(p, loaders[c].ext))

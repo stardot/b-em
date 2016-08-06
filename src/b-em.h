@@ -20,7 +20,7 @@
 
 #endif
 
-//#define printf rpclog
+//#define printf bem_debug
 
 #define VERSION_STR "B-em v-" VERSION
 
@@ -28,7 +28,24 @@ void updatewindowsize(int x, int y);
 
 void setejecttext(int drive, char *fn);
 
-void rpclog(const char *format, ...);
+extern void bem_error(char *s);
+extern void bem_errorf(const char *fmt, ...);
+extern void bem_warn(const char *s);
+extern void bem_warnf(const char *fmt, ...);
+extern void bem_debug(const char *s);
+extern void bem_debugf(const char *format, ...);
+extern void open_debug(void);
+extern void close_debug(void);
+
+// Remove debugging calls if debug not selected.
+#ifndef DEBUG
+#define bem_debug(s) {}
+#if __STDC_VERSION__ >= 199901L
+#define bem_debugf(format, ...) {}
+#endif
+#define open_debug()  {}
+#define close_debug() {}
+#endif
 
 extern char exedir[512];
 
