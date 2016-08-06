@@ -30,6 +30,9 @@ void bem_debugf(const char *fmt, ...)
                 fflush(debug_fp);
         }
 }
+
+#endif
+
 void bem_errorf(const char *fmt, ...)
 {
         char buf[256];
@@ -62,6 +65,8 @@ void bem_warnf(const char *fmt, ...)
         bem_debug(buf);
 }
 
+#ifdef DEBUG
+
 void debug_open()
 {
         if ((debug_fp = fopen(debug_fn, "wt")) == NULL)
@@ -75,6 +80,7 @@ void debug_close(void)
 }
 
 #else
+
 #undef bem_debug
 #undef bem_debugf
 #undef debug_open
@@ -83,4 +89,5 @@ void bem_debug(const char *s) {}
 void bem_debugf(const char *format, ...) {}
 void debug_open() {}
 void debug_close() {}
+
 #endif
