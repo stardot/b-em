@@ -23,6 +23,7 @@
 #include "via.h"
 #include "sysvia.h"
 #include "uservia.h"
+#include "vdfs.h"
 #include "video.h"
 #include "wd1770.h"
 
@@ -237,11 +238,14 @@ void writemem(uint16_t addr, uint8_t val)
         case 0xFC50:
         case 0xFC54:
         case 0xFC58:
-        case 0xFC5C:
                 if (scsi_enabled)
                         scsi_write(addr, val);
                 else if (ide_enable)
                         ide_write(addr, val);
+                break;
+
+        case 0xFC5C:
+                vdfs_write(addr, val);
                 break;
 
         case 0xFE00:
