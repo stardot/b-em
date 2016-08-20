@@ -186,7 +186,7 @@ static cat_ent_t *scan_file(const char *host_fn) {
         strcpy(inf_fn, host_fn);
         strcpy(inf_fn+name_len, ".inf");
         if ((fp = fopen(inf_fn, "rt"))) {
-            if (fscanf(fp, "%14s %X, %X", (char *)&new_ent->acorn_fn, &new_ent->load_addr, &new_ent->exec_addr) < 1)
+            if (fscanf(fp, "%10s %X, %X", (char *)&new_ent->acorn_fn, &new_ent->load_addr, &new_ent->exec_addr) < 1)
                 strncpy(new_ent->acorn_fn, host_fn, MAX_FILE_NAME);
             fclose(fp);
         } else
@@ -324,7 +324,7 @@ static void write_back(cat_ent_t *ent) {
     strcpy(inf_fn, ent->host_fn);
     strcpy(inf_fn+name_len, ".inf");
     if ((fp = fopen(inf_fn, "wt"))) {
-        fprintf(fp, "%-14s %08X, %08X %08X\n", ent->acorn_fn, ent->load_addr, ent->exec_addr, ent->length);
+        fprintf(fp, "%-10s %08X, %08X %08X\n", ent->acorn_fn, ent->load_addr, ent->exec_addr, ent->length);
         fclose(fp);
     } else
         bem_warnf("vdfs: unable to create INF file '%s' for '%s': %s\n", inf_fn, ent->host_fn, strerror(errno));
