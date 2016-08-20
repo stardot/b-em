@@ -63,7 +63,6 @@ struct _cat_dir {
 };
 
 static cat_ent_t  **cat_ptr; // used by the tree walk callback.
-static int level;
 
 static cat_dir_t  root_dir;
 static cat_dir_t  *cur_dir;
@@ -138,50 +137,6 @@ static void close_all() {
         close_file(channel);
 }
 
-static void acorn_dump_visit(const void *nodep, const VISIT which, const int depth) {
-    cat_ent_t *ent;
-    cat_dir_t *dir;
-
-    if (which == postorder || which == leaf) {
-        ent = *(cat_ent_t **)nodep;
-        bem_debugf("vdfs: acorn_dump: level=%d, attr=%04X, load=%08X, exec=%08X, acorn=%s, host=%s\n", level, ent->attribs, ent->load_addr, ent->exec_addr, ent->acorn_fn, ent->host_fn);
-        if ((dir = ent->dir)) {
-            ++level;
-            twalk(dir->acorn_tree, acorn_dump_visit);
-            --level;
-        }
-    }
-}
-
-static void acorn_dump_tree(const char *which) {
-    level = 0;
-    bem_debugf("vdfs: %s: begin acorn tree dump\n", which);
-    twalk(root_dir.acorn_tree, acorn_dump_visit);
-    bem_debugf("vdfs: %s: end acorn tree dump\n", which);
-}
-
-static void host_dump_visit(const void *nodep, const VISIT which, const int depth) {
-    cat_ent_t *ent;
-    cat_dir_t *dir;
-
-    if (which == postorder || which == leaf) {
-        ent = *(cat_ent_t **)nodep;
-        bem_debugf("vdfs: host_dump: level=%d, attr=%04X, load=%08X, exec=%08X, host=%s, acorn=%s\n", level, ent->attribs, ent->load_addr, ent->exec_addr, ent->host_fn, ent->acorn_fn);
-        if ((dir = ent->dir)) {
-            ++level;
-            twalk(dir->host_tree, host_dump_visit);
-            --level;
-        }
-    }
-}
-
-static void host_dump_tree(const char *which) {
-    level = 0;
-    bem_debugf("vdfs: %s: begin host tree dump\n", which);
-    twalk(root_dir.host_tree, host_dump_visit);
-    bem_debugf("vdfs: %s: end host tree dump\n", which);
-}
-
 static void free_cat_dir(cat_dir_t *cat_dir);
 
 static void free_tree_node(void *ptr) {
@@ -202,10 +157,7 @@ static void free_tree_node(void *ptr) {
 static void free_noop(void *ptr) { }
 
 static void free_cat_dir(cat_dir_t *cat_dir) {
-    acorn_dump_tree("free_cat_dir1");
-    host_dump_tree("free_cat_dir1");
     tdestroy(cat_dir->acorn_tree, free_noop);
-    host_dump_tree("free_cat_dir2");
     tdestroy(cat_dir->host_tree, free_tree_node);
     if (cat_dir->cat_tab)
         free(cat_dir->cat_tab);
