@@ -47,6 +47,7 @@
 #include "sysvia.h"
 #include "uef.h"
 #include "uservia.h"
+#include "vdfs.h"
 #include "video.h"
 #include "video_render.h"
 #include "wd1770.h"
@@ -91,6 +92,7 @@ void main_reset()
         wd1770_reset();
         i8271_reset();
         scsi_reset();
+        vdfs_reset();
         sid_reset();
         sn_init();
         if (curtube != -1) tubes[curtube].reset();
@@ -243,6 +245,7 @@ void main_init(int argc, char *argv[])
 
         scsi_init();
         ide_init();
+        vdfs_init();
 
         debug_start();
 
@@ -378,6 +381,7 @@ void main_close()
         disc_close(1);
         scsi_close();
         ide_close();
+        vdfs_close();
         ddnoise_close();
         tapenoise_close();
         
