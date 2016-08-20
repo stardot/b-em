@@ -16,16 +16,16 @@
 #define MAX_CHANNEL      96
 #define NUM_CHANNELS     (MAX_CHANNEL-MIN_CHANNEL)
 
-#define MAX_FILE_NAME    14
+#define MAX_FILE_NAME    10
 
-#define ATTR_USER_NREAD  0x001
-#define ATTR_USER_NWRITE 0x002
-#define ATTR_USER_NEXEC  0x004
-#define ATTR_USER_NDEL   0x008
-#define ATTR_OTHR_NREAD  0x010
-#define ATTR_OTHR_NWRITE 0x020
-#define ATTR_OTHR_NEXEC  0x040
-#define ATTR_OTHR_NDEL   0x080
+#define ATTR_USER_READ   0x001
+#define ATTR_USER_WRITE  0x002
+#define ATTR_USER_EXEC   0x004
+#define ATTR_USER_LOCKD  0x008
+#define ATTR_OTHR_READ   0x010
+#define ATTR_OTHR_WRITE  0x020
+#define ATTR_OTHR_EXEC   0x040
+#define ATTR_OTHR_LOCKD  0x080
 #define ATTR_IS_DIR      0x100
 
 // A catalogue entry.  This represents a single file, i.e. an
@@ -197,18 +197,18 @@ static cat_ent_t *scan_file(const char *host_fn) {
             new_ent->length = stb.st_size;
             if (S_ISDIR(stb.st_mode))
                 new_ent->attribs |= ATTR_IS_DIR;
-            if (!(stb.st_mode & S_IRUSR))
-                new_ent->attribs |= ATTR_USER_NREAD;
-            if (!(stb.st_mode & S_IWUSR))
-                new_ent->attribs |= ATTR_USER_NWRITE;
-            if (!(stb.st_mode & S_IXUSR))
-                new_ent->attribs |= ATTR_USER_NEXEC;
-            if (!(stb.st_mode & (S_IRGRP|S_IROTH)))
-                new_ent->attribs |= ATTR_OTHR_NREAD;
-            if (!(stb.st_mode & (S_IWGRP|S_IWOTH)))
-                new_ent->attribs |= ATTR_OTHR_NWRITE;
-            if (!(stb.st_mode & (S_IXGRP|S_IXOTH)))
-                new_ent->attribs |= ATTR_OTHR_NEXEC;
+            if (stb.st_mode & S_IRUSR)
+                new_ent->attribs |= ATTR_USER_READ;
+            if (stb.st_mode & S_IWUSR)
+                new_ent->attribs |= ATTR_USER_WRITE;
+            if (stb.st_mode & S_IXUSR)
+                new_ent->attribs |= ATTR_USER_EXEC;
+            if (stb.st_mode & (S_IRGRP|S_IROTH))
+                new_ent->attribs |= ATTR_OTHR_READ;
+            if (stb.st_mode & (S_IWGRP|S_IWOTH))
+                new_ent->attribs |= ATTR_OTHR_WRITE;
+            if (stb.st_mode & (S_IXGRP|S_IXOTH))
+                new_ent->attribs |= ATTR_OTHR_EXEC;
         }
         return new_ent;
     }
