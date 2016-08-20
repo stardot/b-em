@@ -29,8 +29,8 @@ extern void bem_warn(const char *s);
 extern void bem_warnf(const char *fmt, ...);
 extern void bem_debug(const char *s);
 extern void bem_debugf(const char *format, ...);
-extern void open_debug(void);
-extern void close_debug(void);
+extern void debug_open(void);
+extern void debug_close(void);
 
 // Remove debugging calls if debug not selected.
 #ifndef DEBUG
@@ -38,8 +38,8 @@ extern void close_debug(void);
 #if __STDC_VERSION__ >= 199901L
 #define bem_debugf(format, ...) {}
 #endif
-#define open_debug()  {}
-#define close_debug() {}
+#define debug_open()  {}
+#define debug_close() {}
 #endif
 
 extern char exedir[512];

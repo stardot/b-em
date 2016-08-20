@@ -4,6 +4,7 @@
 #include "6502.h"
 #include "mem.h"
 
+#include <ctype.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <dirent.h>
@@ -18,15 +19,16 @@
 
 #define MAX_FILE_NAME    10
 
-#define ATTR_USER_READ   0x001
-#define ATTR_USER_WRITE  0x002
-#define ATTR_USER_EXEC   0x004
-#define ATTR_USER_LOCKD  0x008
-#define ATTR_OTHR_READ   0x010
-#define ATTR_OTHR_WRITE  0x020
-#define ATTR_OTHR_EXEC   0x040
-#define ATTR_OTHR_LOCKD  0x080
-#define ATTR_IS_DIR      0x100
+#define ATTR_USER_READ   0x0001
+#define ATTR_USER_WRITE  0x0002
+#define ATTR_USER_EXEC   0x0004
+#define ATTR_USER_LOCKD  0x0008
+#define ATTR_OTHR_READ   0x0010
+#define ATTR_OTHR_WRITE  0x0020
+#define ATTR_OTHR_EXEC   0x0040
+#define ATTR_OTHR_LOCKD  0x0080
+#define ATTR_IS_DIR      0x4000
+#define ATTR_DELETED     0x8000
 
 // A catalogue entry.  This represents a single file, i.e. an
 // entry in a directory and contains information cache from any
@@ -43,6 +45,7 @@ typedef struct {
         unsigned  exec_addr;
         unsigned  length;
         cat_dir_t *dir;
+        time_t    inf_read;
 } cat_ent_t;
 
 // A directory, i.e. a group of the above catalogue entries.  In
@@ -51,17 +54,21 @@ typedef struct {
 // inserted.
 
 struct _cat_dir {
-        void      *cat_tree;
+        void      *acorn_tree;
+        void      *host_tree;
         cat_ent_t **cat_tab;
-        size_t     cat_size;
+        size_t    cat_size;
+        char      *host_path;
+        unsigned  scan_seq;
 };
 
 static cat_ent_t  **cat_ptr; // used by the tree walk callback.
+static int level;
 
-static const char *vdfs_root; // the root on the host.
-static cat_dir_t  *root_dir;
-//static cat_dir_t  *cur_dir;
-//static cat_dir_t  *lib_dir;
+static cat_dir_t  root_dir;
+static cat_dir_t  *cur_dir;
+static cat_dir_t  *lib_dir;
+static unsigned   scan_seq;
 
 // Open files.  An open file is an association between a host OS
 // file pointer and a catalogue entry.
@@ -131,30 +138,87 @@ static void close_all() {
         close_file(channel);
 }
 
+static void acorn_dump_visit(const void *nodep, const VISIT which, const int depth) {
+    cat_ent_t *ent;
+    cat_dir_t *dir;
+
+    if (which == postorder || which == leaf) {
+        ent = *(cat_ent_t **)nodep;
+        bem_debugf("vdfs: acorn_dump: level=%d, attr=%04X, load=%08X, exec=%08X, acorn=%s, host=%s\n", level, ent->attribs, ent->load_addr, ent->exec_addr, ent->acorn_fn, ent->host_fn);
+        if ((dir = ent->dir)) {
+            ++level;
+            twalk(dir->acorn_tree, acorn_dump_visit);
+            --level;
+        }
+    }
+}
+
+static void acorn_dump_tree(const char *which) {
+    level = 0;
+    bem_debugf("vdfs: %s: begin acorn tree dump\n", which);
+    twalk(root_dir.acorn_tree, acorn_dump_visit);
+    bem_debugf("vdfs: %s: end acorn tree dump\n", which);
+}
+
+static void host_dump_visit(const void *nodep, const VISIT which, const int depth) {
+    cat_ent_t *ent;
+    cat_dir_t *dir;
+
+    if (which == postorder || which == leaf) {
+        ent = *(cat_ent_t **)nodep;
+        bem_debugf("vdfs: host_dump: level=%d, attr=%04X, load=%08X, exec=%08X, host=%s, acorn=%s\n", level, ent->attribs, ent->load_addr, ent->exec_addr, ent->host_fn, ent->acorn_fn);
+        if ((dir = ent->dir)) {
+            ++level;
+            twalk(dir->host_tree, host_dump_visit);
+            --level;
+        }
+    }
+}
+
+static void host_dump_tree(const char *which) {
+    level = 0;
+    bem_debugf("vdfs: %s: begin host tree dump\n", which);
+    twalk(root_dir.host_tree, host_dump_visit);
+    bem_debugf("vdfs: %s: end host tree dump\n", which);
+}
+
 static void free_cat_dir(cat_dir_t *cat_dir);
 
 static void free_tree_node(void *ptr) {
-    cat_ent_t *ent = *(cat_ent_t **)ptr;
+    cat_ent_t *ent = (cat_ent_t *)ptr;
+    cat_dir_t *dir;
+    char *host_fn;
 
-    if (ent->dir)
-        free_cat_dir(ent->dir);
-    if (ent->host_fn && ent->host_fn != ent->acorn_fn)
-        free(ent->host_fn);
-    free(ptr);
+    if ((dir = ent->dir)) {
+        free_cat_dir(dir);
+        free(dir->host_path);
+        free(dir);
+    }
+    if ((host_fn = ent->host_fn) && host_fn != ent->acorn_fn)
+        free(host_fn);
+    free(ent);
 }
 
+static void free_noop(void *ptr) { }
+
 static void free_cat_dir(cat_dir_t *cat_dir) {
-    tdestroy(cat_dir->cat_tree, free_tree_node);
-    free(cat_dir->cat_tab);
-    free(cat_dir);
+    acorn_dump_tree("free_cat_dir1");
+    host_dump_tree("free_cat_dir1");
+    tdestroy(cat_dir->acorn_tree, free_noop);
+    host_dump_tree("free_cat_dir2");
+    tdestroy(cat_dir->host_tree, free_tree_node);
+    if (cat_dir->cat_tab)
+        free(cat_dir->cat_tab);
 }
 
 void vdfs_init(void) {
-    const char *root;
+    char *root;
 
     if ((root = getenv("BEM_VDFS_ROOT")) == NULL)
         root = ".";
-    vdfs_root = root;
+    root_dir.host_path = root;
+    cur_dir = lib_dir = &root_dir;
+    scan_seq = 1;
 }
 
 void vdfs_reset() {
@@ -163,59 +227,16 @@ void vdfs_reset() {
 
 void vdfs_close(void) {
     close_all();
-    if (root_dir)
-        free_cat_dir(root_dir);
+    free_cat_dir(&root_dir);
 }
 
-static cat_ent_t *scan_file(const char *host_fn) {
-    cat_ent_t *new_ent;
-    int  name_len;
-    char *inf_fn;
-    FILE *fp;
-    struct stat stb;
-
-    if ((new_ent = malloc(sizeof(cat_ent_t)))) {
-        memset(new_ent, 0, sizeof(cat_ent_t));
-        name_len = strlen(host_fn);
-        if ((new_ent->host_fn = malloc(name_len+1)) == NULL) {
-            free(new_ent);
-            return NULL;
-        }
-        strcpy(new_ent->host_fn, host_fn);
-        inf_fn = alloca(name_len+5);
-        strcpy(inf_fn, host_fn);
-        strcpy(inf_fn+name_len, ".inf");
-        if ((fp = fopen(inf_fn, "rt"))) {
-            if (fscanf(fp, "%10s %X, %X", (char *)&new_ent->acorn_fn, &new_ent->load_addr, &new_ent->exec_addr) < 1)
-                strncpy(new_ent->acorn_fn, host_fn, MAX_FILE_NAME);
-            fclose(fp);
-        } else
-            strncpy(new_ent->acorn_fn, host_fn, MAX_FILE_NAME);
-        if (stat(host_fn, &stb) == -1)
-            bem_warnf("unable to stat '%s': %s\n", host_fn, strerror(errno));
-        else {
-            new_ent->length = stb.st_size;
-            if (S_ISDIR(stb.st_mode))
-                new_ent->attribs |= ATTR_IS_DIR;
-            if (stb.st_mode & S_IRUSR)
-                new_ent->attribs |= ATTR_USER_READ;
-            if (stb.st_mode & S_IWUSR)
-                new_ent->attribs |= ATTR_USER_WRITE;
-            if (stb.st_mode & S_IXUSR)
-                new_ent->attribs |= ATTR_USER_EXEC;
-            if (stb.st_mode & (S_IRGRP|S_IROTH))
-                new_ent->attribs |= ATTR_OTHR_READ;
-            if (stb.st_mode & (S_IWGRP|S_IWOTH))
-                new_ent->attribs |= ATTR_OTHR_WRITE;
-            if (stb.st_mode & (S_IXGRP|S_IXOTH))
-                new_ent->attribs |= ATTR_OTHR_EXEC;
-        }
-        return new_ent;
-    }
-    return NULL;
+static int host_comp(const void *a, const void *b) {
+    cat_ent_t *ca = (cat_ent_t *)a;
+    cat_ent_t *cb = (cat_ent_t *)b;
+    return strcmp(ca->host_fn, cb->host_fn);
 }
 
-static int cat_comp(const void *a, const void *b) {
+static int acorn_comp(const void *a, const void *b) {
     cat_ent_t *ca = (cat_ent_t *)a;
     cat_ent_t *cb = (cat_ent_t *)b;
     int res = strcasecmp(ca->acorn_fn, cb->acorn_fn);
@@ -224,49 +245,198 @@ static int cat_comp(const void *a, const void *b) {
     return res;
 }
 
+static void get_filename(FILE *fp, char *dest) {
+    int ch;
+    char *ptr, *end;
+
+    do
+        ch = getc(fp);
+    while (isspace(ch));
+
+    ptr = dest;
+    end = dest + MAX_FILE_NAME;
+    while (ch != EOF && !isspace(ch)) {
+        if (ptr < end)
+            *ptr++ = ch;
+        ch = getc(fp);
+    }
+    if (ptr < end)
+        *ptr = '\0';
+}
+
+static unsigned get_hex(FILE *fp) {
+    int ch;
+    unsigned value = 0;
+
+    if (!feof(fp)) {
+        do
+            ch = getc(fp);
+        while (isspace(ch));
+
+        while (isxdigit(ch)) {
+            value = value << 4;
+            if (ch >= '0' && ch <= '9')
+                value += (ch - '0');
+            else if (ch >= 'A' && ch <= 'F')
+                value += 10 + (ch - 'A');
+            else
+                value += 10 + (ch - 'a');
+            ch = getc(fp);
+        }
+    }
+    return value;
+}
+
+static void scan_entry(cat_dir_t *dir, cat_ent_t *ent) {
+    int name_len, dir_len;
+    char *inf_fn, *host_dir_path, *host_file_path;
+    FILE *fp;
+    struct stat stb;
+
+    name_len = strlen(ent->host_fn);
+    inf_fn = alloca(name_len + 5);
+    strcpy(inf_fn, ent->host_fn);
+    strcpy(inf_fn+name_len, ".inf");
+    if ((fp = fopen(inf_fn, "rt"))) {
+        get_filename(fp, ent->acorn_fn);
+        ent->load_addr = get_hex(fp);
+        ent->exec_addr = get_hex(fp);
+        fclose(fp);
+    } else
+        strncpy(ent->acorn_fn, ent->host_fn, MAX_FILE_NAME);
+
+    host_dir_path = dir->host_path;
+    if (host_dir_path[0] == '.' && host_dir_path[1] == '\0')
+        host_file_path = ent->host_fn;
+    else {
+        dir_len = strlen(dir->host_path);
+        host_file_path = alloca(dir_len + strlen(ent->host_fn) + 3);
+        strcpy(host_file_path, host_dir_path);
+        host_file_path[dir_len] = '/';
+        strcpy(host_file_path + dir_len + 1, ent->host_fn);
+    }
+
+    if (stat(host_file_path, &stb) == -1)
+        bem_warnf("unable to stat '%s': %s\n", host_file_path, strerror(errno));
+    else {
+        ent->length = stb.st_size;
+        if (S_ISDIR(stb.st_mode))
+            ent->attribs |= ATTR_IS_DIR;
+        if (stb.st_mode & S_IRUSR)
+            ent->attribs |= ATTR_USER_READ;
+        if (stb.st_mode & S_IWUSR)
+            ent->attribs |= ATTR_USER_WRITE;
+        if (stb.st_mode & S_IXUSR)
+            ent->attribs |= ATTR_USER_EXEC;
+        if (stb.st_mode & (S_IRGRP|S_IROTH))
+            ent->attribs |= ATTR_OTHR_READ;
+        if (stb.st_mode & (S_IWGRP|S_IWOTH))
+            ent->attribs |= ATTR_OTHR_WRITE;
+        if (stb.st_mode & (S_IXGRP|S_IXOTH))
+            ent->attribs |= ATTR_OTHR_EXEC;
+    }
+    bem_debugf("vdfs: scan_entry: acorn=%s, host=%s, attr=%04X, load=%08X, exec=%08X\n", ent->acorn_fn, ent->host_fn, ent->attribs, ent->load_addr, ent->exec_addr);
+}
+
+static cat_ent_t *new_cat_entry(cat_dir_t *dir, const char *host_fn) {
+    cat_ent_t *ent, **ptr;
+    int name_len, seq_ch = '0';
+
+    if ((ent = malloc(sizeof(cat_ent_t)))) {
+        memset(ent, 0, sizeof(cat_ent_t));
+        if ((ent->host_fn = strdup(host_fn))) {
+
+            scan_entry(dir, ent);
+            ptr = tsearch(ent, &dir->acorn_tree, acorn_comp);
+            if (*ptr != ent) {
+                // name was already in tree - generate a unique one.
+                name_len = strlen(ent->acorn_fn);
+                if (name_len < (MAX_FILE_NAME-2)) {
+                    ent->acorn_fn[name_len] = '~';
+                    ent->acorn_fn[name_len+1] = seq_ch;
+                } else {
+                    ent->acorn_fn[MAX_FILE_NAME-2] = '~';
+                    ent->acorn_fn[MAX_FILE_NAME-1] = seq_ch;
+                }
+                ptr = tsearch(ent, &dir->acorn_tree, acorn_comp);
+                while (*ptr != ent) {
+                    if (seq_ch == '0')
+                        seq_ch = 'A';
+                    else if (seq_ch == 'Z')
+                        seq_ch = 'a';
+                    else if (seq_ch == 'z')
+                        break;
+                    else
+                        seq_ch++;
+                    if (name_len < (MAX_FILE_NAME-2))
+                        ent->acorn_fn[name_len+1] = seq_ch;
+                    else
+                        ent->acorn_fn[MAX_FILE_NAME-1] = seq_ch;
+                    ptr = tsearch(ent, &dir->acorn_tree, acorn_comp);
+                }
+            }
+            tsearch(ent, &dir->host_tree, host_comp);
+            bem_debugf("vdfs: returing new entry %p\n", ent);
+            return ent;
+        }
+        free(ent);
+    }
+    return NULL;
+}
+
 static void tree_visit(const void *nodep, const VISIT which, const int depth) {
     if (which == postorder || which == leaf)
         *cat_ptr++ = *(cat_ent_t **)nodep;
 }
 
-static cat_dir_t *scan_dir(const char *host_dir) {
-    int  count = -0;
-    DIR *dir;
-    struct dirent *dp;
-    cat_ent_t *new_ent;
-    cat_dir_t *new_dir;
+static int scan_dir(cat_dir_t *dir) {
+    int  count = 0;
+    DIR  *dp;
+    struct dirent *dep;
+    cat_ent_t **ptr, **end, *ent, key;
 
-    if ((dir = opendir(host_dir))) {
-        if (root_dir)
-            free_cat_dir(root_dir);
-        if ((new_dir = malloc(sizeof(cat_dir_t)))) {
-            memset(new_dir, 0, sizeof(cat_dir_t));
-            while ((dp = readdir(dir))) {
-                if (*(dp->d_name) != '.') {
-                    if ((new_ent = scan_file(dp->d_name))) {
-                        tsearch(new_ent, &new_dir->cat_tree, cat_comp);
-                        count++;
-                    } else {
-                        count = -1;
-                        break;
-                    }
+    if (dir->acorn_tree && dir->scan_seq < scan_seq)
+        return 0;
+
+    if ((dp = opendir(dir->host_path))) {
+        ptr = dir->cat_tab;
+        end = ptr + dir->cat_size;
+        while (ptr < end) {
+            ent = *ptr++;
+            ent->attribs |= ATTR_DELETED;
+        }
+        while ((dep = readdir(dp))) {
+            if (*(dep->d_name) != '.') {
+                key.host_fn = dep->d_name;
+                if ((ptr = tfind(&key, &dir->host_tree, host_comp))) {
+                    ent = *ptr;
+                    ent->attribs &= ~ATTR_DELETED;
+                    scan_entry(dir, ent);
+                }
+                else if ((ent = new_cat_entry(dir, dep->d_name)))
+                    count++;
+                else {
+                    count = -1;
+                    break;
                 }
             }
         }
-        closedir(dir);
+        closedir(dp);
         if (count >= 0) {
-            if ((new_dir->cat_tab = malloc(sizeof(cat_ent_t *)*count))) {
-                cat_ptr = new_dir->cat_tab;
-                twalk(new_dir->cat_tree, tree_visit);
-                new_dir->cat_size = count;
-                root_dir = new_dir;
-                return new_dir;
+            bem_debugf("count=%d\n", count);
+            if (dir->cat_tab)
+                free(dir->cat_tab);
+            if ((dir->cat_tab = malloc(sizeof(cat_ent_t *)*count))) {
+                cat_ptr = dir->cat_tab;
+                twalk(dir->acorn_tree, tree_visit);
+                dir->cat_size = count;
+                dir->scan_seq = scan_seq;
+                return 0;
             }
         }
-        tdestroy(new_dir->cat_tree, free_tree_node);
     } else
-        bem_warnf("unable to opendir '%s': %s\n", host_dir, strerror(errno));
-    return NULL;
+        bem_warnf("unable to opendir '%s': %s\n", dir->host_path, strerror(errno));
+    return 1;
 }
 
 static cat_ent_t *find_file(uint32_t fn_addr, cat_ent_t *key) {
@@ -285,7 +455,7 @@ static cat_ent_t *find_file(uint32_t fn_addr, cat_ent_t *key) {
     }
     *fn_ptr = '\0';
     bem_debugf("vdfs: find_file: looking for acorn name '%s'\n", key->acorn_fn);
-    if ((ptr = tfind(key, &root_dir->cat_tree, cat_comp))) {
+    if ((ptr = tfind(key, &cur_dir->acorn_tree, acorn_comp))) {
         ent = *ptr;
         bem_debugf("vdfs: find_file: found at %p, host_fn=%s\n", ent, ent->host_fn);
         return ent;
@@ -304,9 +474,10 @@ static cat_ent_t *add_new_file(cat_dir_t *dir, const char *name) {
             memset(new_ent, 0, sizeof(cat_ent_t));
             strncpy(new_ent->acorn_fn, name, MAX_FILE_NAME);
             new_ent->host_fn = new_ent->acorn_fn;
-            tsearch(new_ent, &dir->cat_tree, cat_comp);
+            tsearch(new_ent, &dir->acorn_tree, acorn_comp);
+            tsearch(new_ent, &dir->host_tree, host_comp);
             cat_ptr = dir->cat_tab;
-            twalk(dir->cat_tree, tree_visit);
+            twalk(dir->acorn_tree, tree_visit);
             dir->cat_size = new_size;
         }
         return new_ent;
@@ -324,7 +495,7 @@ static void write_back(cat_ent_t *ent) {
     strcpy(inf_fn, ent->host_fn);
     strcpy(inf_fn+name_len, ".inf");
     if ((fp = fopen(inf_fn, "wt"))) {
-        fprintf(fp, "%-10s %08X, %08X %08X\n", ent->acorn_fn, ent->load_addr, ent->exec_addr, ent->length);
+        fprintf(fp, "%-*s %08X, %08X %08X\n", MAX_FILE_NAME, ent->acorn_fn, ent->load_addr, ent->exec_addr, ent->length);
         fclose(fp);
     } else
         bem_warnf("vdfs: unable to create INF file '%s' for '%s': %s\n", inf_fn, ent->host_fn, strerror(errno));
@@ -359,11 +530,11 @@ static inline void osfind() {
                         mode = "rb+";
                 } else {
                     if (reg_a == 0x80) {
-                        ent = add_new_file(root_dir, key.acorn_fn);
+                        ent = add_new_file(cur_dir, key.acorn_fn);
                         mode = "wb";
                     }
                     else if (reg_a == 0xc0) {
-                        ent = add_new_file(root_dir, key.acorn_fn);
+                        ent = add_new_file(cur_dir, key.acorn_fn);
                         mode = "wb+";
                     }
                 }
@@ -380,7 +551,6 @@ static inline void osfind() {
                 bem_warnf("vdfs: osfind: unable to open file '%s' in mode '%s': %s\n", ent->host_fn, mode, strerror(errno));
         }
     }
-    a = reg_a;
 }
 
 static inline void osgbpb() {
@@ -396,23 +566,19 @@ static inline void osgbpb() {
             n = readmem(pb);
             seq_ptr = readmem32(pb+9);
             if (seq_ptr == 0) {
-                if (!root_dir) {
-                    if ((root_dir = scan_dir(".")) == NULL) {
-                        status = 1;
-                        break;
-                    }
-                }
+                if ((status = scan_dir(cur_dir)))
+                    break;
             }
-            if (seq_ptr < root_dir->cat_size) {
+            if (seq_ptr < cur_dir->cat_size) {
                 mem_ptr = readmem32(pb+1);
                 bem_debugf("vdfs: seq_ptr=%d, writing max %d entries starting %04X\n", seq_ptr, n, mem_ptr);
                 do {
-                    cat_ptr = root_dir->cat_tab[seq_ptr++];
+                    cat_ptr = cur_dir->cat_tab[seq_ptr++];
                     bem_debugf("vdfs: writing acorn name %s\n", cat_ptr->acorn_fn);
                     for (ptr = cat_ptr->acorn_fn; *ptr; )
                         writemem(mem_ptr++, *ptr++);
                     writemem(mem_ptr++, '\r');
-                } while (--n > 0 && seq_ptr < root_dir->cat_size);
+                } while (--n > 0 && seq_ptr < cur_dir->cat_size);
                 bem_debugf("vdfs: finish at %04X\n", mem_ptr);
                 writemem32(pb+9, seq_ptr);
             } else {
@@ -424,7 +590,6 @@ static inline void osgbpb() {
             bem_debugf("vdfs: osgbpb unimplemented for a=%d, x=%d, y=%d\n", reg_a, x, y);
             bem_debugf("vdfs: osgbpb pb.channel=%d, data=%04X num=%04X, ptr=%04X\n", readmem(pb), readmem32(pb+1), readmem32(pb+6), readmem32(pb+9));
     }
-    a = reg_a;
     p.c = status;
 }
 
@@ -436,7 +601,6 @@ static inline void osbput() {
     if (channel >= MIN_CHANNEL && channel < MAX_CHANNEL)
         if ((fp = vdfs_chan[channel-MIN_CHANNEL].fp))
             putc(reg_a, fp);
-    a = reg_a;
 }
 
 static inline void osbget() {
@@ -498,7 +662,6 @@ static inline void osargs() {
             bem_debugf("vdfs: osargs: closed channel y=%d", y);
     } else
         bem_debugf("vdfs: osargs: invalid channel y=%d", y);
-    a = reg_a;
 }
 
 static void osfile_save(uint32_t pb, cat_ent_t *ent) {
@@ -546,7 +709,7 @@ static inline void osfile()
     switch (reg_a) {
         case 0x00:
             if (!ent)
-                ent = add_new_file(root_dir, key.acorn_fn);
+                ent = add_new_file(cur_dir, key.acorn_fn);
             if (ent)
                 osfile_save(pb, ent);
             break;
@@ -596,55 +759,49 @@ static inline void osfile()
     a = (ent == NULL) ? 0 : (ent->attribs & ATTR_IS_DIR) ? 2 : 1;
 }
 
-static inline void srload()
-{
-        bem_debugf("vdfs: srload unimplemented for a=%d, x=%d, y=%d\n", reg_a, x, y);
+static inline void srload() {
+    bem_debugf("vdfs: srload unimplemented for a=%d, x=%d, y=%d\n", a, x, y);
 }
 
-static inline void srwrite()
-{
-        bem_debugf("vdfs: srwrite unimplemented for a=%d, x=%d, y=%d\n", reg_a, x, y);
+static inline void srwrite() {
+    bem_debugf("vdfs: srwrite unimplemented for a=%d, x=%d, y=%d\n", a, x, y);
 }
 
-static inline void drive()
-{
-        bem_debugf("vdfs: drive unimplemented for a=%d, x=%d, y=%d\n", reg_a, x, y);
+static inline void drive() {
+    bem_debugf("vdfs: drive unimplemented for a=%d, x=%d, y=%d\n", a, x, y);
 }
 
-static inline void back()
-{
-        bem_debugf("vdfs: back unimplemented for a=%d, x=%d, y=%d\n", reg_a, x, y);
+static inline void back() {
+    bem_debugf("vdfs: back unimplemented for a=%d, x=%d, y=%d\n", a, x, y);
 }
 
-static inline void mount()
-{
-        bem_debugf("vdfs: mount unimplemented for a=%d, x=%d, y=%d\n", reg_a, x, y);
+static inline void mount() {
+    bem_debugf("vdfs: mount unimplemented for a=%d, x=%d, y=%d\n", a, x, y);
 }
 
-void vdfs_write(uint16_t addr, uint8_t value)
-{
-        if (addr & 1)
-        {
-                bem_debugf("vdfs: save A as %d\n", value);
-                reg_a = value;
-        }
-        else
-        {
-                switch(value)
-                {
-                        case 0x00: osfsc();   break;
-                        case 0x01: osfind();  break;
-                        case 0x02: osgbpb();  break;
-                        case 0x03: osbput();  break;
-                        case 0x04: osbget();  break;
-                        case 0x05: osargs();  break;
-                        case 0x06: osfile();  break;
-                        case 0xd0: srload();  break;
-                        case 0xd1: srwrite(); break;
-                        case 0xd2: drive();   break;
-                        case 0xd5: back();    break;
-                        case 0xd6: mount();   break;
-                        default: bem_warnf("vdfs: function code %d not recognised\n", value);
-                }
-        }
+static inline void dispatch(uint8_t value) {
+    switch(value) {
+        case 0x00: osfsc();   break;
+        case 0x01: osfind();  break;
+        case 0x02: osgbpb();  break;
+        case 0x03: osbput();  break;
+        case 0x04: osbget();  break;
+        case 0x05: osargs();  break;
+        case 0x06: osfile();  break;
+        case 0xd0: srload();  break;
+        case 0xd1: srwrite(); break;
+        case 0xd2: drive();   break;
+        case 0xd5: back();    break;
+        case 0xd6: mount();   break;
+        default: bem_warnf("vdfs: function code %d not recognised\n", value);
+    }
+}
+
+void vdfs_write(uint16_t addr, uint8_t value) {
+    if (addr & 1)
+        reg_a = value;
+    else {
+        a = reg_a;
+        dispatch(value);
+    }
 }
