@@ -55,7 +55,7 @@ void bem_error(char *s)
         allegro_message(s);
 }
 
-void bem_quit()
+void setquit()
 {
         quited=1;
 }
@@ -71,7 +71,7 @@ int main(int argc, char *argv[])
                 exit(-1);
         }
 
-        set_close_button_callback(bem_quit);
+        set_close_button_callback(setquit);
 
         set_window_title(B_EM_VERSION);
 

@@ -35,9 +35,6 @@ int emuspeed = 4;
 void setejecttext(int d, char *s)
 {
 }
-void setquit()
-{
-}
 
 extern int quited;
 extern int windx,windy;
