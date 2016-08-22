@@ -20,7 +20,7 @@ EQUB &82:EQUB ROMCopyright-&8000
 .ROMVersion
 EQUB &04
 .ROMTitle
-EQUS "Virtual DFS":EQUB 0:EQUS "0.04 (17 Aug 2004)"
+EQUS "Virtual DFS":EQUB 0:EQUS "0.05 (20 Aug 2016)"
 .ROMCopyright
 EQUB 0:EQUS "(C)1995 MRB, 2004 JGH":EQUB 0
 EQUD 0
@@ -419,15 +419,18 @@ EQUS "COMPACT":EQUB 13:EQUW compact
 EQUS "COPY"   :EQUB 13:EQUW copy
 EQUS "DELETE" :EQUB 13:EQUW delete
 EQUS "DESTROY":EQUB 13:EQUW destroy
+EQUS "DIR"    :EQUB 13:EQUW dir
 EQUS "DRIVE"  :EQUB 13:EQUW drive
 EQUS "ENABLE" :EQUB 13:EQUW enable
 EQUS "EX"     :EQUB 13:EQUW ex
 EQUS "FORM"   :EQUB 13:EQUW form
 EQUS "FREE"   :EQUB 13:EQUW free
 EQUS "INFO"   :EQUB 13:EQUW info
+EQUS "LIB"    :EQUB 13:EQUW lib
 EQUS "MAP"    :EQUB 13:EQUW free
 EQUS "MOUNT"  :EQUB 13:EQUW mount
 EQUS "RENAME" :EQUB 13:EQUW rename
+EQUS "RESCAN" :EQUB 13:EQUW rescan
 EQUS "TITLE"  :EQUB 13:EQUW title
 EQUS "VERIFY" :EQUB 13:EQUW verify
 EQUS "WIPE"   :EQUB 13:EQUW wipe
@@ -445,14 +448,17 @@ TYA:CLC:ADC &F2:TAX:LDA &F3:ADC #0:TAY:RTS
 .copy     :RTS
 .delete   :RTS
 .destroy  :RTS
+.dir      :LDA #&D7:STA PORT_CMD:RTS :\ Pass to host and return
 .drive    :LDA #&D2:STA PORT_CMD:RTS :\ Pass to host and return
 .enable   :RTS
 .ex       :JSR F2toXY:LDA #&09:JMP CallFSCV
 .form     :RTS
 .free     :RTS
 .info     :JSR F2toXY:LDA #&0A:JMP CallFSCV
+.lib      :LDA #&D8:STA PORT_CMD:RTS :\ Pass to host and return
 .mount    :LDA #&D6:STA PORT_CMD:RTS :\ Pass to host and return
 .rename   :JSR F2toXY:LDA #&0C:JMP CallFSCV
+.rescan   :LDA #&D9:STA PORT_CMD:RTS :\ Pass to host and return
 .wipe     :RTS
 .title    :RTS
 .verify   :RTS
@@ -695,6 +701,8 @@ SAVE "VDFS5", start, end
 ; &D4 Does nothing
 ; &D5 *BACK
 ; &D6 *MOUNT
+; &D7 *DIR
+; &D8 *LIB
 :
 ; &FF Quit
 ;
