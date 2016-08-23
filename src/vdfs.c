@@ -93,35 +93,13 @@ static void writemem32(uint16_t addr, uint32_t value) {
     writemem(addr+3, (value >> 24) & 0xff);
 }
 
-static inline void flush_file(int channel) {
-    FILE *fp;
-
-    if ((fp = vdfs_chan[channel].fp))
-        fflush(fp);
-}
-
 static void flush_all() {
     int channel;
-
-    for (channel = 0; channel < NUM_CHANNELS; channel++)
-        flush_file(channel);
-}
-
-static void close_file(int channel) {
     FILE *fp;
 
-    if ((fp = vdfs_chan[channel].fp)) {
-        fclose(fp);
-        vdfs_chan[channel].fp = NULL;
-    }
-    vdfs_chan[channel].ent = NULL;
-}
-
-static void close_all() {
-    int channel;
-
     for (channel = 0; channel < NUM_CHANNELS; channel++)
-        close_file(channel);
+        if ((fp = vdfs_chan[channel].fp))
+            fflush(fp);
 }
 
 static void free_noop(void *ptr) { }
@@ -145,16 +123,6 @@ static void free_tree_node(void *ptr) {
 
 void vdfs_reset() {
         flush_all();
-}
-
-void vdfs_close(void) {
-    void *ptr;
-
-    close_all();
-    tdestroy(root_dir.acorn_tree, free_noop);
-    tdestroy(root_dir.host_tree, free_tree_node);
-    if ((ptr = root_dir.cat_tab))
-        free(ptr);
 }
 
 static int host_comp(const void *a, const void *b) {
@@ -486,17 +454,133 @@ static FILE *open_file(vdfs_ent_t *ent, const char *mode) {
     return fopen(host_file_path, mode);
 }
 
+static void close_file(int channel) {
+    vdfs_ent_t *ent;
+    FILE *fp;
+
+    if ((ent = vdfs_chan[channel].ent)) {
+        if ((fp = vdfs_chan[channel].fp)) {
+            fclose(fp);
+            vdfs_chan[channel].fp = NULL;
+        }
+        write_back(ent);
+        vdfs_chan[channel].ent = NULL;
+    }
+}
+
+static void close_all() {
+    int channel;
+
+    for (channel = 0; channel < NUM_CHANNELS; channel++)
+        close_file(channel);
+}
+
+void vdfs_close(void) {
+    void *ptr;
+
+    close_all();
+    tdestroy(root_dir.acorn_tree, free_noop);
+    tdestroy(root_dir.host_tree, free_tree_node);
+    if ((ptr = root_dir.cat_tab))
+        free(ptr);
+}
+
+// Error messages (used)
+
+static const char err_wont[]     = "\x93" "Won't";
+static const char err_access[]   = "\xbd" "Access violation";
+static const char err_nfile[]    = "\xc0" "Too many open files";
+static const char err_exists[]   = "\xc4" "Already exists";
+static const char err_discerr[]  = "\xc7" "Disc error";
+static const char err_notfound[] = "\xd6" "Not found";
+static const char err_channel[]  = "\xde" "Channel";
+
+// Other messages from ADFS user guide.
+
+//static const char err_aborted[]  = "\x92" "Aborted";
+//static const char err_badparms[] = "\x94" "Bad parms";
+//static const char err_delcsd[]   = "\x97" "Can't delete CSD";
+//static const char err_dellib[]   = "\x98" "Can't delete library";
+//static const char err_badcsum[]  = "\xaa" "Bad checksum";
+//static const char err_badren[]   = "\xb0" "Bad rename";
+//static const char err_notempty[] = "\xb4" "Dir not empty";
+//static const char err_outside[]  = "\xb7" "Outside file";
+//static const char err_nupdate[]  = "\xc1" "Not open for update";
+//static const char err_isopen[]   = "\xc2" "Already open";
+//static const char err_locked[]   = "\xc3" "Locked";
+//static const char err_full[]     = "\xc6" "Disc full";
+//static const char err_datalost[] = "\xca" "Data lost, channel";
+//static const char err_badopt[]   = "\xcb" "Bad opt";
+//static const char err_badname[]  = "\xcc" "Bad name";
+//static const char err_eof[]      = "\xdf" "EOF";
+//static const char err_wildcard[] = "\xfd" "Wild cards";
+
+static void adfs_error(const char *err) {
+    uint16_t addr = 0x100;
+    int ch;
+
+    writemem(addr++, 0);  // BRK instruction.
+    do {
+        ch = *err++;
+        writemem(addr++, ch);
+    } while (ch);
+    pc = 0x100;          // jump to BRK sequence just created.
+}
+
+static void adfs_hosterr(int errnum) {
+    const char *msg;
+
+    switch(errnum) {
+        case EACCES:
+        case EPERM:
+        case EROFS:
+            msg = err_access;
+            break;
+        case EEXIST:
+            msg = err_exists;
+            break;
+        case EISDIR:
+            msg = err_wont;
+            break;
+        case EMFILE:
+        case ENFILE:
+            msg = err_nfile;
+        case ENOENT:
+            msg = err_notfound;
+            break;
+        default:
+            msg = err_discerr;
+    }
+    adfs_error(msg);
+}
+
+static FILE *y2fp() {
+    int channel = y;
+    FILE *fp;
+
+    if (channel >= MIN_CHANNEL && channel < MAX_CHANNEL) {
+        if ((fp = vdfs_chan[channel-MIN_CHANNEL].fp))
+            return fp;
+        else
+            bem_debugf("vdfs: attempt to use closed channel %d", channel);
+    } else
+        bem_debugf("vdfs: channel %d out of range\n", channel);
+    adfs_error(err_channel);
+    return NULL;
+}
+
+
 static inline void osfsc() {
     bem_debugf("vdfs: osfsc unimplemented for a=%d, x=%d, y=%d\n", a, x, y);
 }
 
 static inline void osfind() {
-    int channel;
+    int acorn_mode, channel, chan2;
     vdfs_ent_t *ent, key;
     const char *mode;
     FILE *fp;
 
-    if (reg_a == 0) {
+    if (a == 0) {
         channel = y;
         if (channel == 0)
             close_all();
@@ -504,39 +588,46 @@ static inline void osfind() {
             close_file(channel-MIN_CHANNEL);
     } else {
         mode = NULL;
-        for (channel = 0; channel < MAX_CHANNEL; channel++) {
-            if (vdfs_chan[channel].fp == NULL) {
-                if ((ent = find_file((y << 8) | x, &key, cur_dir))) {
-                    if (ent->attribs & ATTR_IS_DIR)
-                        break;
-                    if (reg_a == 0x40)
-                        mode = "rb";
-                    else if (reg_a == 0x80)
-                        mode = "wb";
-                    else if (reg_a == 0xc0)
-                        mode = "rb+";
-                } else {
-                    if (reg_a == 0x80) {
-                        ent = add_new_file(cur_dir, key.acorn_fn);
-                        mode = "wb";
-                    }
-                    else if (reg_a == 0xc0) {
-                        ent = add_new_file(cur_dir, key.acorn_fn);
-                        mode = "wb+";
-                    }
-                }
-                break;
+        acorn_mode = a;
+        a = 0;
+        for (channel = 0; vdfs_chan[channel].ent; channel++)
+            if (channel >= NUM_CHANNELS)
+                return;
+        if ((ent = find_file((y << 8) | x, &key, cur_dir))) {
+            for (chan2 = 0; chan2 < NUM_CHANNELS; chan2++)
+                if (vdfs_chan[channel].ent == ent)
+                    return;
+            if (ent->attribs & ATTR_IS_DIR) {
+                vdfs_chan[channel].ent = ent;  // make "half-open"
+                a = MIN_CHANNEL + channel;
+                return;
             }
+            if (acorn_mode == 0x40)
+                mode = "rb";
+            else if (acorn_mode == 0x80)
+                mode = "wb";
+            else if (acorn_mode == 0xc0)
+                mode = "rb+";
+            else
+                return;
+        } else {
+            if (acorn_mode == 0x80) {
+                ent = add_new_file(cur_dir, key.acorn_fn);
+                mode = "wb";
+            }
+            else if (acorn_mode == 0xc0) {
+                ent = add_new_file(cur_dir, key.acorn_fn);
+                mode = "wb+";
+            }
+            else
+                return;
         }
-        reg_a = 0;
-        if (mode) {
-            if ((fp = open_file(ent, mode))) {
-                vdfs_chan[channel].fp = fp;
-                vdfs_chan[channel].ent = ent;
-                reg_a = MIN_CHANNEL + channel;
-            } else
-                bem_warnf("vdfs: osfind: unable to open file '%s' in mode '%s': %s\n", ent->host_fn, mode, strerror(errno));
-        }
+        if ((fp = open_file(ent, mode))) {
+            vdfs_chan[channel].fp = fp;
+            vdfs_chan[channel].ent = ent;
+            a = MIN_CHANNEL + channel;
+        } else
+            bem_warnf("vdfs: osfind: unable to open file '%s' in mode '%s': %s\n", ent->host_fn, mode, strerror(errno));
     }
 }
 
@@ -547,7 +638,7 @@ static inline void osgbpb() {
     vdfs_ent_t *cat_ptr;
     char *ptr;
 
-    switch (reg_a)
+    switch (a)
     {
         case 0x09: // list files in current directory.
             n = readmem(pb);
@@ -574,34 +665,28 @@ static inline void osgbpb() {
             }
             break;
         default:
-            bem_debugf("vdfs: osgbpb unimplemented for a=%d, x=%d, y=%d\n", reg_a, x, y);
+            bem_debugf("vdfs: osgbpb unimplemented for a=%d, x=%d, y=%d\n", a, x, y);
             bem_debugf("vdfs: osgbpb pb.channel=%d, data=%04X num=%04X, ptr=%04X\n", readmem(pb), readmem32(pb+1), readmem32(pb+6), readmem32(pb+9));
     }
     p.c = status;
 }
 
 static inline void osbput() {
-    int channel;
     FILE *fp;
 
-    channel = y;
-    if (channel >= MIN_CHANNEL && channel < MAX_CHANNEL)
-        if ((fp = vdfs_chan[channel-MIN_CHANNEL].fp))
-            putc(reg_a, fp);
+    if ((fp = y2fp()))
+        putc(a, fp);
 }
 
 static inline void osbget() {
-    int channel, ch;
+    int ch;
     FILE *fp;
 
     p.c = 1;
-    channel = y;
-    if (channel >= MIN_CHANNEL && channel < MAX_CHANNEL) {
-        if ((fp = vdfs_chan[channel-MIN_CHANNEL].fp)) {
-            if ((ch = getc(fp)) != EOF) {
-                a = ch;
-                p.c = 0;
-            }
+    if ((fp = y2fp())) {
+        if ((ch = getc(fp)) != EOF) {
+            a = ch;
+            p.c = 0;
         }
     }
 }
@@ -611,62 +696,60 @@ static inline void osargs() {
     long temp;
 
     if (y == 0) {
-        switch (reg_a)
+        switch (a)
         {
             case 0:
-                reg_a = 4; // say disc filing selected.
+                a = 4; // say disc filing selected.
                 break;
             case 0xff:
                 flush_all();
                 break;
             default:
-                bem_debugf("vdfs: osargs: y=0, a=%d not implemented", reg_a);
+                bem_debugf("vdfs: osargs: y=0, a=%d not implemented", a);
         }
-    } else if (y < MAX_CHANNEL) {
-        if ((fp = vdfs_chan[y].fp)) {
-            switch (reg_a)
-            {
-                case 0:
-                    writemem32(x, ftell(fp));
-                    break;
-                case 1:
-                    fseek(fp, readmem32(x), SEEK_SET);
-                    break;
-                case 2:
-                    temp =- ftell(fp);
-                    fseek(fp, 0, SEEK_END);
-                    writemem32(x, ftell(fp));
-                    fseek(fp, temp, SEEK_SET);
-                    break;
-                case 0xff:
-                    fflush(fp);
-                    break;
-                default:
-                    bem_debugf("vdfs: osargs: unrecognised function code a=%d for channel y=%d", reg_a, y);
-            }
+    } else if ((fp = y2fp())) {
+        switch (a)
+        {
+            case 0:
+                writemem32(x, ftell(fp));
+                break;
+            case 1:
+                fseek(fp, readmem32(x), SEEK_SET);
+                break;
+            case 2:
+                temp = ftell(fp);
+                fseek(fp, 0, SEEK_END);
+                writemem32(x, ftell(fp));
+                fseek(fp, temp, SEEK_SET);
+                break;
+            case 0xff:
+                fflush(fp);
+                break;
+            default:
+                bem_debugf("vdfs: osargs: unrecognised function code a=%d for channel y=%d", a, y);
         }
-        else
-            bem_debugf("vdfs: osargs: closed channel y=%d", y);
-    } else
-        bem_debugf("vdfs: osargs: invalid channel y=%d", y);
+    }
 }
 
 static void osfile_save(uint32_t pb, vdfs_ent_t *ent) {
     FILE *fp;
     uint32_t start_addr, end_addr, ptr;
 
-    if ((fp = open_file(ent, "wb"))) {
-        start_addr = readmem32(pb+0x0a);
-        end_addr = readmem32(pb+0x0e);
-        for (ptr = start_addr; ptr < end_addr; ptr++)
-            putc(readmem(ptr), fp);
-        fclose(fp);
-        ent->load_addr = readmem32(pb+0x02);
-        ent->exec_addr = readmem32(pb+0x06);
-        ent->length = end_addr-start_addr;
-        write_back(ent);
+    if (ent) {
+        if ((fp = open_file(ent, "wb"))) {
+            start_addr = readmem32(pb+0x0a);
+            end_addr = readmem32(pb+0x0e);
+            for (ptr = start_addr; ptr < end_addr; ptr++)
+                putc(readmem(ptr), fp);
+            fclose(fp);
+            ent->load_addr = readmem32(pb+0x02);
+            ent->exec_addr = readmem32(pb+0x06);
+            ent->length = end_addr-start_addr;
+            write_back(ent);
+        } else
+            bem_warnf("vdfs: unable to create file '%s': %s\n", ent->host_fn, strerror(errno));
     } else
-        bem_warnf("vdfs: unable to create file '%s': %s\n", ent->host_fn, strerror(errno));
+        adfs_error(err_wont);
 }
 
 static void osfile_load(uint32_t pb, vdfs_ent_t *ent) {
@@ -674,16 +757,23 @@ static void osfile_load(uint32_t pb, vdfs_ent_t *ent) {
     uint32_t addr;
     int ch;
 
-    if ((fp = open_file(ent, "rb"))) {
-        if (readmem(pb+0x06) == 0)
-            addr = readmem32(pb+0x02);
-        else
-            addr = ent->load_addr;
-        while ((ch = getc(fp)) != EOF)
-            writemem(addr++, ch);
-        fclose(fp);
+    if (ent) {
+        if (ent->attribs & ATTR_IS_DIR)
+            adfs_error(err_wont);
+        else if ((fp = open_file(ent, "rb"))) {
+            if (readmem(pb+0x06) == 0)
+                addr = readmem32(pb+0x02);
+            else
+                addr = ent->load_addr;
+            while ((ch = getc(fp)) != EOF)
+                writemem(addr++, ch);
+            fclose(fp);
+        } else {
+            bem_warnf("vdfs: unable to load file '%s': %s\n", ent->host_fn, strerror(errno));
+            adfs_hosterr(errno);
+        }
     } else
-        bem_warnf("vdfs: unable to load file '%s': %s\n", ent->host_fn, strerror(errno));
+        adfs_error(err_notfound);
 }
 
 static inline void osfile()
@@ -693,12 +783,11 @@ static inline void osfile()
 
     ent = find_file(readmem16(pb), &key, cur_dir);
 
-    switch (reg_a) {
+    switch (a) {
         case 0x00:
             if (!ent)
                 ent = add_new_file(cur_dir, key.acorn_fn);
-            if (ent)
-                osfile_save(pb, ent);
+            osfile_save(pb, ent);
             break;
 
         case 0x01:
@@ -736,8 +825,7 @@ static inline void osfile()
             break;
 
         case 0xff:
-            if (ent)
-                osfile_load(pb, ent);
+            osfile_load(pb, ent);
             break;
 
         default:
