@@ -66,7 +66,8 @@ typedef struct {
 
 static vdfs_file_t vdfs_chan[NUM_CHANNELS];
 
-static uint8_t reg_a;
+static uint8_t  reg_a;
+static uint16_t cmd_tail;
 
 static uint16_t readmem16(uint16_t addr) {
     uint32_t value;
@@ -353,7 +354,7 @@ static int scan_dir(vdfs_ent_t *dir) {
     return 1;
 }
 
-static vdfs_ent_t *find_file(uint32_t fn_addr, vdfs_ent_t *key, vdfs_ent_t *ent) {
+static vdfs_ent_t *find_file(uint16_t fn_addr, vdfs_ent_t *key, vdfs_ent_t *ent, uint16_t *tail_addr) {
     int i, ch;
     char *fn_ptr;
     vdfs_ent_t **ptr;
@@ -364,11 +365,13 @@ static vdfs_ent_t *find_file(uint32_t fn_addr, vdfs_ent_t *key, vdfs_ent_t *ent)
         fn_ptr = key->acorn_fn;
         for (i = 0; i < MAX_FILE_NAME; i++) {
             ch = readmem(fn_addr++);
-            if (ch == '\r' || ch == '.')
+            if (ch == '\r' || ch == '.' || ch == ' ')
                 break;
             *fn_ptr++ = ch;
         }
         *fn_ptr = '\0';
+        if (tail_addr)
+            *tail_addr = fn_addr;
         if (key->acorn_fn[0] == '$' && key->acorn_fn[1] == '\0')
             ent = &root_dir;
         else if (key->acorn_fn[0] == '^' && key->acorn_fn[1] == '\0')
@@ -377,7 +380,7 @@ static vdfs_ent_t *find_file(uint32_t fn_addr, vdfs_ent_t *key, vdfs_ent_t *ent)
             ent = *ptr;
         else
             return NULL; // not found
-        if (ch == '\r')
+        if (ch != '.')
             return ent;
         if (!(ent->attribs & ATTR_IS_DIR))
             return NULL; // file in pathname where dir should be
@@ -494,6 +497,7 @@ static const char err_exists[]   = "\xc4" "Already exists";
 static const char err_discerr[]  = "\xc7" "Disc error";
 static const char err_notfound[] = "\xd6" "Not found";
 static const char err_channel[]  = "\xde" "Channel";
+static const char err_badcmd[]   = "\xfe" "Bad command";
 
 // Other messages from ADFS user guide.
 
@@ -554,8 +558,7 @@ static void adfs_hosterr(int errnum) {
     adfs_error(msg);
 }
 
-static FILE *y2fp() {
-    int channel = y;
+static FILE *getfp(int channel) {
     FILE *fp;
 
     if (channel >= MIN_CHANNEL && channel < MAX_CHANNEL) {
@@ -569,9 +572,53 @@ static FILE *y2fp() {
     return NULL;
 }
 
+static void run_file(const char *err) {
+    uint16_t addr;
+    vdfs_ent_t *ent, key;
+    FILE *fp;
+    int ch;
+
+    addr = (y << 8) | x;
+    if (!(ent = find_file(addr, &key, cur_dir, &cmd_tail)))
+        ent = find_file(addr, &key, lib_dir, &cmd_tail);
+    if (ent) {
+        if (ent->attribs & ATTR_IS_DIR)
+            adfs_error(err_wont);
+        else if ((fp = open_file(ent, "rb"))) {
+            addr = ent->load_addr;
+            while ((ch = getc(fp)) != EOF)
+                writemem(addr++, ch);
+            fclose(fp);
+            pc = ent->exec_addr;
+        } else {
+            bem_warnf("vdfs: unable to load file '%s': %s\n", ent->host_fn, strerror(errno));
+            adfs_hosterr(errno);
+        }
+    } else
+        adfs_error(err);
+}
 
 static inline void osfsc() {
-    bem_debugf("vdfs: osfsc unimplemented for a=%d, x=%d, y=%d\n", a, x, y);
+    FILE *fp;
+
+    switch(a) {
+        case 0x01:
+            if ((fp = getfp(x)))
+                x = feof(fp) ? 0xff : 0x00;
+            break;
+        case 0x02:
+        case 0x04:
+            run_file(err_notfound);
+            break;
+        case 0x03:
+            run_file(err_badcmd);
+            break;
+        case 0x06:
+            close_all();
+            break;
+        default:
+            bem_debugf("vdfs: osfsc unimplemented for a=%d, x=%d, y=%d\n", a, x, y);
+    }
 }
 
 static inline void osfind() {
@@ -593,7 +640,7 @@ static inline void osfind() {
         for (channel = 0; vdfs_chan[channel].ent; channel++)
             if (channel >= NUM_CHANNELS)
                 return;
-        if ((ent = find_file((y << 8) | x, &key, cur_dir))) {
+        if ((ent = find_file((y << 8) | x, &key, cur_dir, NULL))) {
             for (chan2 = 0; chan2 < NUM_CHANNELS; chan2++)
                 if (vdfs_chan[channel].ent == ent)
                     return;
@@ -674,7 +721,7 @@ static inline void osgbpb() {
 static inline void osbput() {
     FILE *fp;
 
-    if ((fp = y2fp()))
+    if ((fp = getfp(y)))
         putc(a, fp);
 }
 
@@ -683,7 +730,7 @@ static inline void osbget() {
     FILE *fp;
 
     p.c = 1;
-    if ((fp = y2fp())) {
+    if ((fp = getfp(y))) {
         if ((ch = getc(fp)) != EOF) {
             a = ch;
             p.c = 0;
@@ -701,13 +748,16 @@ static inline void osargs() {
             case 0:
                 a = 4; // say disc filing selected.
                 break;
+            case 1:
+                writemem32(x, cmd_tail);
+                break;
             case 0xff:
                 flush_all();
                 break;
             default:
                 bem_debugf("vdfs: osargs: y=0, a=%d not implemented", a);
         }
-    } else if ((fp = y2fp())) {
+    } else if ((fp = getfp(y))) {
         switch (a)
         {
             case 0:
@@ -781,7 +831,7 @@ static inline void osfile()
     vdfs_ent_t *ent, key;
     uint32_t pb = (y << 8) | x;
 
-    ent = find_file(readmem16(pb), &key, cur_dir);
+    ent = find_file(readmem16(pb), &key, cur_dir, NULL);
 
     switch (a) {
         case 0x00:
@@ -857,7 +907,7 @@ static inline void mount() {
 static inline void cmd_dir() {
     vdfs_ent_t *ent, key;
 
-    if ((ent = find_file(readmem16(0xf2) + y, &key, cur_dir))) {
+    if ((ent = find_file(readmem16(0xf2) + y, &key, cur_dir, NULL))) {
         if (ent->attribs & ATTR_IS_DIR) {
             bem_debugf("vdfs: new cur_dir=%s\n", ent->acorn_fn);
             cur_dir = ent;
@@ -868,7 +918,7 @@ static inline void cmd_dir() {
 static inline void cmd_lib() {
     vdfs_ent_t *ent, key;
 
-    if ((ent = find_file(readmem16(0xf2) + y, &key, cur_dir))) {
+    if ((ent = find_file(readmem16(0xf2) + y, &key, cur_dir, NULL))) {
         if (ent->attribs & ATTR_IS_DIR) {
             bem_debugf("vdfs: new lib_dir=%s\n", ent->acorn_fn);
             lib_dir = ent;

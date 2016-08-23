@@ -367,6 +367,8 @@ CMP #&0A:BNE P%+5:JMP Info  :\ Info on a file
 CMP #&09:BNE P%+5:JMP Ex    :\ Examine directory
 CMP #&05:BNE P%+5:JMP Cat   :\ Catalogue directory
 CMP #&03:BNE P%+5:JMP FSCommandLookup:\ Filing system commands
+CMP #&06:BNE FSCemul:LDA #&77:JSR OSBYTE:LDA#&06
+.FSCemul
 STA PORT_A:LDA #&00:STA PORT_CMD :\ Pass to emulator and return
 .FSCDone
 RTS
