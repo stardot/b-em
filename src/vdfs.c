@@ -679,15 +679,101 @@ static inline void osfind() {
 }
 
 static inline void osgbpb() {
-    int      status = 0;
+    int      status = 0, ch;
     uint32_t pb = (y << 8) | x;
     uint32_t seq_ptr, mem_ptr, n;
     vdfs_ent_t *cat_ptr;
     char *ptr;
+    FILE *fp;
 
     switch (a)
     {
-        case 0x09: // list files in current directory.
+        case 0x01: // write multiple bytes to file.
+        case 0x02:
+            if ((fp = getfp(readmem(pb)))) {
+                if (a == 0x01)
+                    fseek(fp, readmem32(pb+9), SEEK_SET);
+                mem_ptr = readmem32(pb+1);
+                n = readmem32(pb+5);
+                while (n--)
+                    putc(readmem(mem_ptr++), fp);
+                writemem32(pb+1, mem_ptr);
+                writemem32(pb+5, 0);
+                writemem32(pb+9, ftell(fp));
+            }
+            break;
+
+        case 0x03: // read multiple bytes from file.
+        case 0x04:
+            if ((fp = getfp(readmem(pb)))) {
+                if (a == 0x03)
+                    fseek(fp, readmem32(pb+9), SEEK_SET);
+                mem_ptr = readmem32(pb+1);
+                n = readmem32(pb+5);
+                while (n--) {
+                    if ((ch = getc(fp)) == EOF) {
+                        status = 1;
+                        break;
+                    }
+                    writemem(mem_ptr++, ch);
+                }
+                writemem32(pb+1, mem_ptr);
+                writemem32(pb+5, n+1);
+                writemem32(pb+9, ftell(fp));
+            }
+            break;
+
+        case 0x05: // get current dir title etc.
+            mem_ptr = pb;
+            writemem(mem_ptr++, strlen(cur_dir->acorn_fn));
+            for (ptr = cur_dir->acorn_fn; (ch = *ptr++); )
+                writemem(mem_ptr++, ch);
+            writemem(mem_ptr++, 0); // no start-up option.
+            writemem(mem_ptr, 0);   // drive is always 0.
+            break;
+
+        case 0x06: // get durrent dir
+            mem_ptr = pb;
+            writemem(mem_ptr++, 1);   // length of drive number.
+            writemem(mem_ptr++, '0'); // drive number.
+            writemem(mem_ptr++, strlen(cur_dir->acorn_fn));
+            for (ptr = cur_dir->acorn_fn; (ch = *ptr++); )
+                writemem(mem_ptr++, ch);
+            break;
+
+        case 0x07: // get library dir.
+            mem_ptr = pb;
+            writemem(mem_ptr++, 1);   // length of drive number.
+            writemem(mem_ptr++, '0'); // drive number.
+            writemem(mem_ptr++, strlen(lib_dir->acorn_fn));
+            for (ptr = cur_dir->acorn_fn; (ch = *ptr++); )
+                writemem(mem_ptr++, ch);
+            break;
+
+        case 0x08: // list files in current directory in Acorn format.
+            seq_ptr = readmem32(pb+9);
+            if (seq_ptr == 0) {
+                if ((status = scan_dir(cur_dir)))
+                    break;
+            }
+            if (seq_ptr < cur_dir->cat_size) {
+                mem_ptr = readmem32(pb+1);
+                n = readmem32(pb+5);
+                bem_debugf("vdfs: seq_ptr=%d, writing max %d entries starting %04X\n", seq_ptr, n, mem_ptr);
+                do {
+                    cat_ptr = cur_dir->cat_tab[seq_ptr++];
+                    bem_debugf("vdfs: writing acorn name %s\n", cat_ptr->acorn_fn);
+                    writemem(mem_ptr++, strlen(cat_ptr->acorn_fn));
+                    for (ptr = cat_ptr->acorn_fn; (ch = *ptr++); )
+                        writemem(mem_ptr++, ch);
+                } while (--n > 0 && seq_ptr < cur_dir->cat_size);
+                bem_debugf("vdfs: finish at %04X\n", mem_ptr);
+                writemem32(pb+5, n);
+                writemem32(pb+9, seq_ptr);
+            }
+            break;
+
+        case 0x09: // list files in current directory in VDFS ROM format.
             n = readmem(pb);
             seq_ptr = readmem32(pb+9);
             if (seq_ptr == 0) {
@@ -700,8 +786,8 @@ static inline void osgbpb() {
                 do {
                     cat_ptr = cur_dir->cat_tab[seq_ptr++];
                     bem_debugf("vdfs: writing acorn name %s\n", cat_ptr->acorn_fn);
-                    for (ptr = cat_ptr->acorn_fn; *ptr; )
-                        writemem(mem_ptr++, *ptr++);
+                    for (ptr = cat_ptr->acorn_fn; (ch = *ptr++); )
+                        writemem(mem_ptr++, ch);
                     writemem(mem_ptr++, '\r');
                 } while (--n > 0 && seq_ptr < cur_dir->cat_size);
                 bem_debugf("vdfs: finish at %04X\n", mem_ptr);
