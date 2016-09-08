@@ -63,10 +63,18 @@ static inline uint8_t z80_readmem(uint16_t a)
         return z80ram[a];
 }
 
+uint8_t tube_z80_readmem(uint32_t addr) {
+    return z80_readmem(addr & 0xffff);
+}
+
 static inline void z80_writemem(uint16_t a, uint8_t v)
 {
 //        printf("Write Z80 %04X %02X %04X\n",a,v,pc);
         z80ram[a]=v;
+}
+
+void tube_z80_writemem(uint32_t addr, uint8_t byte) {
+    z80_writemem(addr & 0xffff, byte);
 }
 
 int endtimeslice;

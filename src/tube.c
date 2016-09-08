@@ -7,6 +7,7 @@
 #include "tube.h"
 
 #include "NS32016/32016.h"
+#include "NS32016/mem32016.h"
 #include "6502tube.h"
 #include "65816.h"
 #include "arm.h"
@@ -273,6 +274,8 @@ void tube_6502_init()
         tube_type = TUBE6502;
         tube_6502_init_cpu();
         tube_6502_reset();
+        tube_readmem = tube_6502_readmem;
+        tube_writemem = tube_6502_writemem;
         tube_exec  = tube_6502_exec;
         tube_shift = tube_6502_speed;
 }
@@ -287,6 +290,8 @@ void tube_arm_init()
         tube_type = TUBEARM;
         arm_init();
         arm_reset();
+        tube_readmem = readarmb;
+        tube_writemem = writearmb;
         tube_exec  = arm_exec;
         tube_shift = 1;
 }
@@ -296,6 +301,8 @@ void tube_z80_init()
         tube_type = TUBEZ80;
         z80_init();
         z80_reset();
+        tube_readmem = tube_z80_readmem;
+        tube_writemem = tube_z80_writemem;
         tube_exec  = z80_exec;
         tube_shift = 2;
 }
@@ -305,6 +312,8 @@ void tube_x86_init()
         tube_type = TUBEX86;
         x86_init();
         x86_reset();
+        tube_readmem = x86_readmem;
+        tube_writemem = x86_writemem;
         tube_exec  = x86_exec;
         tube_shift = 2;
 }
@@ -314,6 +323,8 @@ void tube_65816_init()
         tube_type = TUBE65816;
         w65816_init();
         w65816_reset();
+        tube_readmem = readmem65816;
+        tube_writemem = writemem65816;
         tube_exec  = w65816_exec;
         tube_shift = 3;
 }
@@ -323,6 +334,8 @@ void tube_32016_init()
         tube_type = TUBE32016;
         n32016_init();
         n32016_reset();
+        tube_readmem = read_x8;
+        tube_writemem = write_x8;
         tube_exec  = n32016_exec;
         tube_shift = 2;
 }

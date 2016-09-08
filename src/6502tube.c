@@ -119,6 +119,10 @@ static uint8_t tubereadmeml(uint16_t addr)
         return tuberam[addr];
 }
 
+uint8_t tube_6502_readmem(uint32_t addr) {
+    return tubereadmeml(addr & 0xffff);
+}
+
 int endtimeslice;
 static void tubewritememl(uint16_t addr, uint8_t val)
 {
@@ -131,6 +135,10 @@ static void tubewritememl(uint16_t addr, uint8_t val)
         }
 //        if (addr==0xF4 || addr==0xF5) bem_debugf("TUBE PARASITE write %04X %02X\n",addr,val);
         tuberam[addr] = val;
+}
+
+void tube_6502_writemem(uint32_t addr, uint8_t byte) {
+    tubewritememl(addr & 0xffff, byte);
 }
 
 #define readmem(a) ((tubememstat[(a)>>8]==2)?tubereadmeml(a):tubemem[(a)>>8][(a)&0xFF])

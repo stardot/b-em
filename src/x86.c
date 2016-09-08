@@ -43,6 +43,14 @@ static uint8_t *x86ram,*x86rom;
 
 static int ssegs;
 
+uint8_t x86_readmem(uint32_t addr) {
+    return readmembl(addr);
+}
+
+void x86_writemem(uint32_t addr, uint8_t byte) {
+    writemembl(addr, byte);
+}
+
 /*EA calculation*/
 
 /*R/M - bits 0-2 - R/M   bits 3-5 - Reg   bits 6-7 - mod
