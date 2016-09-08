@@ -6,6 +6,8 @@ void tube_x86_init();
 void tube_65816_init();
 void tube_32016_init();
 
+uint8_t (*tube_readmem)(uint32_t addr);
+void (*tube_writemem)(uint32_t addr, uint8_t byte);
 void (*tube_exec)();
 extern int tubecycles;
 

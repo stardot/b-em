@@ -11,3 +11,5 @@ void arm_init();
 void arm_reset();
 void arm_exec();
 void arm_close();
+uint8_t readarmb(uint32_t addr);
+void writearmb(uint32_t addr, uint8_t val);

@@ -59,7 +59,7 @@ static uint8_t w65816opcode;
 static int def=1,divider=0,banking=0,banknum=0;
 static uint32_t w65816mask=0xFFFF;
 
-static uint8_t readmem65816(uint32_t a)
+uint8_t readmem65816(uint32_t a)
 {
         uint8_t temp;
         a&=w65816mask;
@@ -92,7 +92,7 @@ static uint16_t readmemw65816(uint32_t a)
 }
 
 int endtimeslice;
-static void writemem65816(uint32_t a, uint8_t v)
+void writemem65816(uint32_t a, uint8_t v)
 {
         a&=w65816mask;
 //        if (a==0xFF) bem_debugf("Write 00FF %02X %04X %i\n",v,pc,wins);

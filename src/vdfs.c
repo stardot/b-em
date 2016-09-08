@@ -3,6 +3,8 @@
 #include "b-em.h"
 #include "6502.h"
 #include "mem.h"
+#include "model.h"
+#include "tube.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -695,8 +697,14 @@ static inline void osgbpb() {
                     fseek(fp, readmem32(pb+9), SEEK_SET);
                 mem_ptr = readmem32(pb+1);
                 n = readmem32(pb+5);
-                while (n--)
-                    putc(readmem(mem_ptr++), fp);
+                if (mem_ptr > 0xffff0000 || curtube == -1) {
+                    // IO processor
+                    while (n--)
+                        putc(readmem(mem_ptr++), fp);
+                } else {
+                    while (n--)
+                        putc(tube_readmem(mem_ptr++), fp);
+                }
                 writemem32(pb+1, mem_ptr);
                 writemem32(pb+5, 0);
                 writemem32(pb+9, ftell(fp));
@@ -710,12 +718,23 @@ static inline void osgbpb() {
                     fseek(fp, readmem32(pb+9), SEEK_SET);
                 mem_ptr = readmem32(pb+1);
                 n = readmem32(pb+5);
-                while (n--) {
-                    if ((ch = getc(fp)) == EOF) {
-                        status = 1;
-                        break;
+                if (mem_ptr > 0xffff0000 || curtube == -1) {
+                    // IO processor
+                    while (n--) {
+                        if ((ch = getc(fp)) == EOF) {
+                            status = 1;
+                            break;
+                        }
+                        writemem(mem_ptr++, ch);
                     }
-                    writemem(mem_ptr++, ch);
+                } else {
+                    while (n--) {
+                        if ((ch = getc(fp)) == EOF) {
+                            status = 1;
+                            break;
+                        }
+                        tube_writemem(mem_ptr++, ch);
+                    }
                 }
                 writemem32(pb+1, mem_ptr);
                 writemem32(pb+5, n+1);
@@ -875,8 +894,13 @@ static void osfile_save(uint32_t pb, vdfs_ent_t *ent) {
         if ((fp = open_file(ent, "wb"))) {
             start_addr = readmem32(pb+0x0a);
             end_addr = readmem32(pb+0x0e);
-            for (ptr = start_addr; ptr < end_addr; ptr++)
-                putc(readmem(ptr), fp);
+            if (start_addr > 0xffff0000 || curtube == -1) {
+                for (ptr = start_addr; ptr < end_addr; ptr++)
+                    putc(readmem(ptr), fp);
+            } else {
+                for (ptr = start_addr; ptr < end_addr; ptr++)
+                    putc(tube_readmem(ptr), fp);
+            }
             fclose(fp);
             ent->load_addr = readmem32(pb+0x02);
             ent->exec_addr = readmem32(pb+0x06);
@@ -901,8 +925,13 @@ static void osfile_load(uint32_t pb, vdfs_ent_t *ent) {
                 addr = readmem32(pb+0x02);
             else
                 addr = ent->load_addr;
-            while ((ch = getc(fp)) != EOF)
-                writemem(addr++, ch);
+            if (addr > 0xffff0000 || curtube == -1) {
+                while ((ch = getc(fp)) != EOF)
+                    writemem(addr++, ch);
+            } else {
+                while ((ch = getc(fp)) != EOF)
+                    tube_writemem(addr++, ch);
+            }
             fclose(fp);
         } else {
             bem_warnf("vdfs: unable to load file '%s': %s\n", ent->host_fn, strerror(errno));
