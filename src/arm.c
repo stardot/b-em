@@ -234,7 +234,7 @@ static uint32_t readarml(uint32_t a)
 }
 //#define readarml(a) ((armread[(a>>20)&63])?armread[(a>>20)&63][(a&0xFFFFF)>>2]:readarmfl(a))
 
-static uint8_t readarmb(uint32_t addr)
+uint8_t readarmb(uint32_t addr)
 {
         if (addr<0x400000) return armramb[addr];
         if ((addr&~0x1F)==0x1000000)
@@ -259,7 +259,7 @@ static uint32_t readarmfl(uint32_t addr)
         exit(-1);*/
 }
 
-static void writearmb(uint32_t addr, uint8_t val)
+void writearmb(uint32_t addr, uint8_t val)
 {
         if (addr<0x400000)
         {
