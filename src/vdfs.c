@@ -616,7 +616,6 @@ static inline void osfsc() {
             run_file(err_badcmd);
             break;
         case 0x06:
-            close_all();
             break;
         default:
             bem_debugf("vdfs: osfsc unimplemented for a=%d, x=%d, y=%d\n", a, x, y);
