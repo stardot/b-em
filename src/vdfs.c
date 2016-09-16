@@ -16,7 +16,7 @@
 #include <sys/stat.h>
 
 #define MIN_CHANNEL      32
-#define MAX_CHANNEL      96
+#define MAX_CHANNEL      64
 #define NUM_CHANNELS     (MAX_CHANNEL-MIN_CHANNEL)
 
 #define MAX_FILE_NAME    10
