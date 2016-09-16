@@ -1,3 +1,29 @@
+/*
+ * VDFS for B-EM
+ * Steve Fosdick 2016
+ *
+ * This module implements the host part of a Virtual Disk Filing
+ * System, one in which a part of filing system of the host is
+ * exposed to the guest through normal OS cals on the guest.
+ *
+ * This particular implementation comes in two parts:
+ *
+ * 1. A ROM which runs on the guest, the emulated BBC, and takes over
+ *    the filing system vectors to become the current filing system.
+ *    This rom processes some operations locally on the guest but
+ *    many options are passed on to the host by writing values to
+ *    a pair of designated ports, in this case at the end of the
+ *    address space allocated to the hard disk interface.  For this
+ *    part this uses a modified version of the VDFS ROM by J.G Harston
+ *    which was in turn based on work by sprow.
+ *
+ *    See http://mdfs.net/Apps/Filing/
+ *
+ * 2. This module which runs in the emulator and is called when
+ *    the ports concerned are written to.  This module then carries
+ *    out the filesystem opertation concerned from the host side.
+ */
+
 #define _GNU_SOURCE
 
 #include "b-em.h"
@@ -15,9 +41,16 @@
 #include <search.h>
 #include <sys/stat.h>
 
-#define MIN_CHANNEL      32
-#define MAX_CHANNEL      64
-#define NUM_CHANNELS     (MAX_CHANNEL-MIN_CHANNEL)
+/*
+ * The definition of the VDFS entry that follows is the key data
+ * structure for this module and models the association between
+ * a file/directory as seen by the BBC and as it exists on the host.
+ *
+ * In the event this is a directory rather than a file this entry
+ * will contain a pointer to the parent VDFS entry and also two
+ * binary search trees allowing the contents of the directory to be
+ * searched by either Acorn filename or host filename.
+ */
 
 #define MAX_FILE_NAME    10
 
@@ -42,6 +75,7 @@ struct _vdfs_entry {
     unsigned   exec_addr;
     unsigned   length;
     time_t     inf_read;
+    // the following only apply to a directory.
     void       *acorn_tree;
     void       *host_tree;
     vdfs_ent_t **cat_tab;
@@ -51,15 +85,25 @@ struct _vdfs_entry {
     vdfs_ent_t *parent;
 };
 
-static vdfs_ent_t **cat_ptr; // used by the tree walk callback.
+static vdfs_ent_t **cat_ptr;    // used by the tree walk callback.
 
-static vdfs_ent_t root_dir;
+static vdfs_ent_t root_dir;     // root as seen by BBC, not host.
 static vdfs_ent_t *cur_dir;
 static vdfs_ent_t *lib_dir;
 static unsigned   scan_seq;
 
-// Open files.  An open file is an association between a host OS
-// file pointer and a catalogue entry.
+/*
+ * Open files.  An open file is an association between a host OS file
+ * pointer, i.e. the host file is kept open too, and a catalogue
+ * entry.  Normally for an open file both pointers are set and for a
+ * closed file both are NULL but to emulate the OSFIND * call correctly
+ * a directory can be opened and becomes "half-open", i.e. it can be
+ * closed again but any attempt to read or write it will fail.
+ */
+
+#define MIN_CHANNEL      32
+#define MAX_CHANNEL      64
+#define NUM_CHANNELS     (MAX_CHANNEL-MIN_CHANNEL)
 
 typedef struct {
     FILE       *fp;
@@ -192,11 +236,14 @@ static inline void zap_dots(char *acorn_fn) {
     }
 }
 
+// Populate a VDFS entry from host information.
+
 static void scan_entry(vdfs_ent_t *ent) {
     char *host_dir_path, *host_file_path, *ptr;
     FILE *fp;
     struct stat stb;
 
+    // build name of .inf file
     host_dir_path = ent->parent->host_path;
     ptr = host_file_path = alloca(strlen(host_dir_path) + strlen(ent->host_fn) + 6);
     if (host_dir_path[0] != '.' || host_dir_path[1] != '\0') {
@@ -206,6 +253,7 @@ static void scan_entry(vdfs_ent_t *ent) {
     ptr = stpcpy(ptr, ent->host_fn);
     strcpy(ptr, ".inf");
 
+    // open and parse .inf file
     if ((fp = fopen(host_file_path, "rt"))) {
         get_filename(fp, ent->acorn_fn);
         ent->load_addr = get_hex(fp);
@@ -215,7 +263,8 @@ static void scan_entry(vdfs_ent_t *ent) {
         strncpy(ent->acorn_fn, ent->host_fn, MAX_FILE_NAME);
     zap_dots(ent->acorn_fn);
 
-    *ptr = '\0'; // trim .inf
+    // trim .inf to get back to host path and get attributes
+    *ptr = '\0';
     if (stat(host_file_path, &stb) == -1)
         bem_warnf("unable to stat '%s': %s\n", host_file_path, strerror(errno));
     else {
@@ -237,6 +286,8 @@ static void scan_entry(vdfs_ent_t *ent) {
     }
     bem_debugf("vdfs: scan_entry: acorn=%s, host=%s, attr=%04X, load=%08X, exec=%08X\n", ent->acorn_fn, ent->host_fn, ent->attribs, ent->load_addr, ent->exec_addr);
 }
+
+// Create VDFS entry for a new file.
 
 static vdfs_ent_t *new_entry(vdfs_ent_t *dir, const char *host_fn) {
     vdfs_ent_t *ent, **ptr;
@@ -300,6 +351,8 @@ static void tree_visit(const void *nodep, const VISIT which, const int depth) {
         *cat_ptr++ = *(vdfs_ent_t **)nodep;
 }
 
+// Given a VDFS entty reporesting a dir scan the corresponding host dir.
+
 static int scan_dir(vdfs_ent_t *dir) {
     int  count = 0;
     DIR  *dp;
@@ -307,9 +360,11 @@ static int scan_dir(vdfs_ent_t *dir) {
     vdfs_ent_t **ptr, **end, *ent, key;
 
     if (dir->acorn_tree && dir->scan_seq >= scan_seq)
-        return 0;
+        return 0; // scanned before.
 
     if ((dp = opendir(dir->host_path))) {
+        // Mark all previosly seen entries deleted but leave them
+        // in the tree.
         ptr = dir->cat_tab;
         end = ptr + dir->cat_size;
         while (ptr < end) {
@@ -317,6 +372,10 @@ static int scan_dir(vdfs_ent_t *dir) {
             ent->attribs |= ATTR_DELETED;
         }
         count = dir->cat_size;
+
+        // Go through the entries in the host dir which are not
+        // in sorted order, find each in the tree and remove the
+        // deleted atrubute, if found or create a new entry if not.
         while ((dep = readdir(dp))) {
             if (*(dep->d_name) != '.') {
                 key.host_fn = dep->d_name;
@@ -334,6 +393,8 @@ static int scan_dir(vdfs_ent_t *dir) {
         }
         closedir(dp);
         bem_debugf("count=%d\n", count);
+
+        // create an array sorted in Acorn order for *CAT.
         if (count >= 0) {
             if (dir->cat_tab) {
                 free(dir->cat_tab);
@@ -355,6 +416,8 @@ static int scan_dir(vdfs_ent_t *dir) {
         bem_warnf("unable to opendir '%s': %s\n", dir->host_path, strerror(errno));
     return 1;
 }
+
+// Given the address in BBC RAM of a filename find the VDFS entry.
 
 static vdfs_ent_t *find_file(uint16_t fn_addr, vdfs_ent_t *key, vdfs_ent_t *ent, uint16_t *tail_addr) {
     int i, ch;
@@ -413,6 +476,8 @@ static vdfs_ent_t *add_new_file(vdfs_ent_t *dir, const char *name) {
     return NULL;
 }
 
+// Write changed attributes back to the .inf file.
+
 static void write_back(vdfs_ent_t *ent) {
     char *host_dir_path, *host_file_path, *ptr;
     FILE *fp;
@@ -432,6 +497,8 @@ static void write_back(vdfs_ent_t *ent) {
     } else
         bem_warnf("vdfs: unable to create INF file '%s' for '%s': %s\n", host_file_path, ent->host_fn, strerror(errno));
 }
+
+// Initialise the VDFS module.
 
 void vdfs_init(void) {
     char *root;
@@ -490,7 +557,7 @@ void vdfs_close(void) {
         free(ptr);
 }
 
-// Error messages (used)
+// ADFS Error messages (used)
 
 static const char err_wont[]     = "\x93" "Won't";
 static const char err_access[]   = "\xbd" "Access violation";
@@ -501,25 +568,27 @@ static const char err_notfound[] = "\xd6" "Not found";
 static const char err_channel[]  = "\xde" "Channel";
 static const char err_badcmd[]   = "\xfe" "Bad command";
 
-// Other messages from ADFS user guide.
+/* Other ADFS messages not used.
 
-//static const char err_aborted[]  = "\x92" "Aborted";
-//static const char err_badparms[] = "\x94" "Bad parms";
-//static const char err_delcsd[]   = "\x97" "Can't delete CSD";
-//static const char err_dellib[]   = "\x98" "Can't delete library";
-//static const char err_badcsum[]  = "\xaa" "Bad checksum";
-//static const char err_badren[]   = "\xb0" "Bad rename";
-//static const char err_notempty[] = "\xb4" "Dir not empty";
-//static const char err_outside[]  = "\xb7" "Outside file";
-//static const char err_nupdate[]  = "\xc1" "Not open for update";
-//static const char err_isopen[]   = "\xc2" "Already open";
-//static const char err_locked[]   = "\xc3" "Locked";
-//static const char err_full[]     = "\xc6" "Disc full";
-//static const char err_datalost[] = "\xca" "Data lost, channel";
-//static const char err_badopt[]   = "\xcb" "Bad opt";
-//static const char err_badname[]  = "\xcc" "Bad name";
-//static const char err_eof[]      = "\xdf" "EOF";
-//static const char err_wildcard[] = "\xfd" "Wild cards";
+static const char err_aborted[]  = "\x92" "Aborted";
+static const char err_badparms[] = "\x94" "Bad parms";
+static const char err_delcsd[]   = "\x97" "Can't delete CSD";
+static const char err_dellib[]   = "\x98" "Can't delete library";
+static const char err_badcsum[]  = "\xaa" "Bad checksum";
+static const char err_badren[]   = "\xb0" "Bad rename";
+static const char err_notempty[] = "\xb4" "Dir not empty";
+static const char err_outside[]  = "\xb7" "Outside file";
+static const char err_nupdate[]  = "\xc1" "Not open for update";
+static const char err_isopen[]   = "\xc2" "Already open";
+static const char err_locked[]   = "\xc3" "Locked";
+static const char err_full[]     = "\xc6" "Disc full";
+static const char err_datalost[] = "\xca" "Data lost, channel";
+static const char err_badopt[]   = "\xcb" "Bad opt";
+static const char err_badname[]  = "\xcc" "Bad name";
+static const char err_eof[]      = "\xdf" "EOF";
+static const char err_wildcard[] = "\xfd" "Wild cards";
+
+*/
 
 static void adfs_error(const char *err) {
     uint16_t addr = 0x100;
@@ -604,18 +673,18 @@ static inline void osfsc() {
     FILE *fp;
 
     switch(a) {
-        case 0x01:
+        case 0x01: // check EOF
             if ((fp = getfp(x)))
                 x = feof(fp) ? 0xff : 0x00;
             break;
-        case 0x02:
-        case 0x04:
+        case 0x02: // */ command
+        case 0x04: // *RUN command
             run_file(err_notfound);
             break;
-        case 0x03:
+        case 0x03: // unrecognised OS command
             run_file(err_badcmd);
             break;
-        case 0x06:
+        case 0x06: // new filesystem taking over.
             break;
         default:
             bem_debugf("vdfs: osfsc unimplemented for a=%d, x=%d, y=%d\n", a, x, y);
@@ -628,13 +697,13 @@ static inline void osfind() {
     const char *mode;
     FILE *fp;
 
-    if (a == 0) {
+    if (a == 0) {   // close file.
         channel = y;
         if (channel == 0)
             close_all();
         else if (channel >= MIN_CHANNEL && channel < MAX_CHANNEL)
             close_file(channel-MIN_CHANNEL);
-    } else {
+    } else {        // open file.
         mode = NULL;
         acorn_mode = a;
         a = 0;
@@ -864,19 +933,19 @@ static inline void osargs() {
     } else if ((fp = getfp(y))) {
         switch (a)
         {
-            case 0:
+            case 0:     // read sequential pointer
                 writemem32(x, ftell(fp));
                 break;
-            case 1:
+            case 1:     // write sequential pointer
                 fseek(fp, readmem32(x), SEEK_SET);
                 break;
-            case 2:
+            case 2:     // read file size (extent)
                 temp = ftell(fp);
                 fseek(fp, 0, SEEK_END);
                 writemem32(x, ftell(fp));
                 fseek(fp, temp, SEEK_SET);
                 break;
-            case 0xff:
+            case 0xff:  // write any cache to media.
                 fflush(fp);
                 break;
             default:
@@ -948,13 +1017,13 @@ static inline void osfile()
     ent = find_file(readmem16(pb), &key, cur_dir, NULL);
 
     switch (a) {
-        case 0x00:
+        case 0x00:  // save file.
             if (!ent)
                 ent = add_new_file(cur_dir, key.acorn_fn);
             osfile_save(pb, ent);
             break;
 
-        case 0x01:
+        case 0x01:  // set all attributes.
             if (ent) {
                 ent->load_addr = readmem32(pb+0x02);
                 ent->exec_addr = readmem32(pb+0x06);
@@ -962,24 +1031,24 @@ static inline void osfile()
             }
             break;
 
-        case 0x02:
+        case 0x02:  // set load address only.
             if (ent) {
                 ent->load_addr = readmem32(pb+0x02);
                 write_back(ent);
             }
             break;
 
-        case 0x03:
+        case 0x03:  // set exec address only.
             if (ent) {
                 ent->exec_addr = readmem32(pb+0x06);
                 write_back(ent);
             }
             break;
 
-        case 0x04:
-            break; // attributes not written.
+        case 0x04:  // write attributes.
+            break;
 
-        case 0x05:
+        case 0x05:  // get addresses and attributes.
             if (ent) {
                 writemem32(pb+0x02, ent->load_addr);
                 writemem32(pb+0x06, ent->exec_addr);
@@ -988,7 +1057,7 @@ static inline void osfile()
             }
             break;
 
-        case 0xff:
+        case 0xff:  // load file.
             osfile_load(pb, ent);
             break;
 
