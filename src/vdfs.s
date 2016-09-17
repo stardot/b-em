@@ -217,17 +217,15 @@ EQUS "  SRLOAD <name> <address> <rom#>":EQUB 13
 EQUS "  SRWRITE <start> <end> <dest> <rom#>":EQUB 13
 EQUB 13
 EQUS "VDFS commands:":EQUB 13
-EQUS "  BACK : return to root directory":EQUB 13
-EQUS "  DRIVE : change current drive":EQUB 13
-EQUS "  MOUNT : select RISC OS ADFS drive":EQUB 13
+EQUS "  BACK : return to previous directory":EQUB 13
 EQUS "  DIR : change current directory":EQUB 13
 EQUS "  LIB : change current library":EQUB 13
 EQUS "  INFO : show info on single file":EQUB 13
 EQUS "  EX : show info on all files in CSD":EQUB 13
 EQUS "  ACCESS, BACKUP, COMPACT, COPY,":EQUB 10
-EQUS "DESTROY, ENABLE, FORM, FREE, MAP,":EQUB 13
-EQUS "  RENAME, TITLE, VERIFY, WIPE :":EQUB 10
-EQUS "trapped and ignored":EQUB 13
+EQUS "DESTROY, DRIVE, ENABLE, FORM, FREE,":EQUB 13
+EQUS "  MAP, MOUNT, RENAME, TITLE, VERIFY, ":EQUB 10
+EQUS "WIPE : trapped and ignored":EQUB 13
 EQUB 0
 \ --------------------
 \ ROM Command routines
