@@ -449,14 +449,14 @@ TYA:CLC:ADC &F2:TAX:LDA &F3:ADC #0:TAY:RTS
 .delete   :RTS
 .destroy  :RTS
 .dir      :LDA #&D7:STA PORT_CMD:RTS :\ Pass to host and return
-.drive    :LDA #&D2:STA PORT_CMD:RTS :\ Pass to host and return
+.drive    :RTS
 .enable   :RTS
 .ex       :JSR F2toXY:LDA #&09:JMP CallFSCV
 .form     :RTS
 .free     :RTS
 .info     :JSR F2toXY:LDA #&0A:JMP CallFSCV
 .lib      :LDA #&D8:STA PORT_CMD:RTS :\ Pass to host and return
-.mount    :LDA #&D6:STA PORT_CMD:RTS :\ Pass to host and return
+.mount    :RTS
 .rename   :JSR F2toXY:LDA #&0C:JMP CallFSCV
 .rescan   :LDA #&D9:STA PORT_CMD:RTS :\ Pass to host and return
 .wipe     :RTS
