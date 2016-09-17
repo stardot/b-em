@@ -245,7 +245,8 @@ void writemem(uint16_t addr, uint8_t val)
                 break;
 
         case 0xFC5C:
-                vdfs_write(addr, val);
+                if (vdfs_enabled)
+                    vdfs_write(addr, val);
                 break;
 
         case 0xFE00:

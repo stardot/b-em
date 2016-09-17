@@ -41,6 +41,8 @@
 #include <search.h>
 #include <sys/stat.h>
 
+int vdfs_enabled = 1;
+
 /*
  * The definition of the VDFS entry that follows is the key data
  * structure for this module and models the association between
@@ -507,21 +509,6 @@ static void write_back(vdfs_ent_t *ent) {
         bem_warnf("vdfs: unable to create INF file '%s' for '%s': %s\n", host_file_path, ent->host_fn, strerror(errno));
 }
 
-// Initialise the VDFS module.
-
-void vdfs_init(void) {
-    char *root;
-
-    if ((root = getenv("BEM_VDFS_ROOT")) == NULL)
-        root = ".";
-    root_dir.acorn_fn[0] = '$';
-    root_dir.host_fn = root_dir.host_path = root;
-    root_dir.parent = &root_dir;
-    scan_entry(&root_dir);
-    cur_dir = lib_dir = prev_dir = &root_dir;
-    scan_seq = 1;
-}
-
 static FILE *open_file(vdfs_ent_t *ent, const char *mode) {
     char *host_dir_path, *host_file_path, *ptr;
 
@@ -561,9 +548,49 @@ void vdfs_close(void) {
 
     close_all();
     tdestroy(root_dir.acorn_tree, free_noop);
+    root_dir.acorn_tree = NULL;
     tdestroy(root_dir.host_tree, free_tree_node);
-    if ((ptr = root_dir.cat_tab))
+    root_dir.host_tree = NULL;
+    if ((ptr = root_dir.cat_tab)) {
         free(ptr);
+        root_dir.cat_tab = NULL;
+        root_dir.cat_size = 0;
+    }
+    if ((ptr = root_dir.host_path)) {
+        free(ptr);
+        root_dir.host_path = NULL;
+    }
+}
+
+void vdfs_new_root(const char *root) {
+    root_dir.host_fn = root_dir.host_path = strdup(root);
+    scan_entry(&root_dir);
+    cur_dir = lib_dir = prev_dir = &root_dir;
+    scan_seq++;
+}
+
+void vdfs_set_root(const char *root) {
+    if (root_dir.host_path == NULL || strcmp(root_dir.host_path, root)) {
+        vdfs_close();
+        vdfs_new_root(root);
+    }
+}
+
+const char *vdfs_get_root() {
+    return root_dir.host_path;
+}
+
+// Initialise the VDFS module.
+
+void vdfs_init(void) {
+    char *root;
+
+    root_dir.acorn_fn[0] = '$';
+    root_dir.parent = &root_dir;
+    scan_seq = 0;
+    if ((root = getenv("BEM_VDFS_ROOT")) == NULL)
+        root = ".";
+    vdfs_new_root(root);
 }
 
 // ADFS Error messages (used)
