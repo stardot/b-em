@@ -1096,7 +1096,8 @@ static inline void cmd_dir() {
             prev_dir = cur_dir;
             cur_dir = ent;
         }
-    }
+    } else
+        adfs_error(err_notfound);
 }
 
 static inline void cmd_lib() {
@@ -1107,7 +1108,8 @@ static inline void cmd_lib() {
             bem_debugf("vdfs: new lib_dir=%s\n", ent->acorn_fn);
             lib_dir = ent;
         }
-    }
+    } else
+        adfs_error(err_notfound);
 }
 
 static inline void cmd_rescan() {
