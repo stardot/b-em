@@ -23,6 +23,7 @@
 #include "sn76489.h"
 #include "tape.h"
 #include "tube.h"
+#include "vdfs.h"
 #include "video_render.h"
 
 
@@ -40,7 +41,7 @@ extern int quited;
 extern int windx,windy;
 
 MENU filemenu[6];
-MENU discmenu[8];
+MENU discmenu[11];
 MENU tapespdmenu[3];
 MENU tapemenu[5];
 MENU modelmenu[17];
@@ -63,7 +64,7 @@ MENU soundmenu[11];
 MENU keymenu[3];
 MENU mousemenu[2];
 MENU hdiskmenu[4];
-MENU settingsmenu[8];
+MENU settingsmenu[7];
 MENU miscmenu[3];
 MENU speedmenu[11];
 MENU mainmenu[6];
@@ -74,6 +75,7 @@ void gui_update()
         discmenu[4].flags = (writeprot[0]) ? D_SELECTED : 0;
         discmenu[5].flags = (writeprot[1]) ? D_SELECTED : 0;
         discmenu[6].flags = (defaultwriteprot) ? D_SELECTED : 0;
+        discmenu[8].flags = (vdfs_enabled) ? D_SELECTED : 0;
         tapespdmenu[0].flags = (!fasttape) ? D_SELECTED : 0;
         tapespdmenu[1].flags = (fasttape)  ? D_SELECTED : 0;
         for (x = 0; x < 16; x++) modelmenu[x].flags = 0;
@@ -248,7 +250,77 @@ int gui_wprotd()
         return D_CLOSE;
 }
 
-MENU discmenu[8]=
+int gui_hdisk()
+{
+        intptr_t sel = (intptr_t)active_menu->dp;
+        int changed = 0;
+
+        if (ide_enable)
+        {
+                if (sel != 0)
+                {
+                        ide_enable = 0;
+                        changed = 1;
+                }
+        }
+        else
+        {
+                if (sel == 0)
+                {
+                        ide_enable = 1;
+                        changed = 1;
+                }
+        }
+        if (scsi_enabled)
+        {
+                if (sel != 1)
+                {
+                        scsi_enabled = 0;
+                        changed = 1;
+                }
+        }
+        else
+        {
+                if (sel == 1)
+                {
+                        scsi_enabled = 1;
+                        changed = 1;
+                }
+        }
+        if (changed)
+                main_reset();
+        gui_update();
+        return D_O_K;
+}
+
+MENU hdiskmenu[4]=
+{
+        {"None",gui_hdisk,NULL,0,(void *)-1},
+        {"IDE", gui_hdisk,NULL,0,(void *)0},
+        {"SCSI", gui_hdisk,NULL,0,(void *)1},
+        {NULL, NULL, NULL, 0, NULL}
+};
+
+int gui_vfs_en() {
+        vdfs_enabled = !vdfs_enabled;
+        gui_update();
+        return D_O_K;
+}
+
+int gui_vfs_root() {
+        char tempname[260];
+        int ret;
+        int xsize = windx - 32, ysize = windy - 16;
+        strncpy(tempname, vdfs_get_root(), sizeof(tempname));
+        memcpy(tempname, discfns[1], 260);
+        ret = file_select_ex("Please select VDFS root directory", tempname, NULL, 260, xsize, ysize);
+        if (ret)
+            vdfs_set_root(tempname);
+        gui_update();
+        return D_O_K;
+}
+
+MENU discmenu[11]=
 {
         {"Load disc :&0/2...",      gui_load0,  NULL, 0, NULL},
         {"Load disc :&1/3...",      gui_load1,  NULL, 0, NULL},
@@ -257,6 +329,9 @@ MENU discmenu[8]=
         {"Write protect disc :0/2", gui_wprot0, NULL, 0, NULL},
         {"Write protect disc :1/3", gui_wprot1, NULL, 0, NULL},
         {"Default write protect",   gui_wprotd, NULL, 0, NULL},
+        {"&Hard Disc",              NULL, hdiskmenu,  0, NULL},
+        {"Enable VFS",              gui_vfs_en,   NULL, 0, NULL},
+        {"Choose VFS Root",         gui_vfs_root, NULL, 0, NULL},
         {NULL, NULL, NULL, 0, NULL}
 };
 
@@ -698,7 +773,6 @@ MENU settingsmenu[8]=
         {"&Sound",            NULL, soundmenu, 0, NULL},
         {"&Keyboard",         NULL, keymenu,   0, NULL},
         {"&Mouse",            NULL, mousemenu, 0, NULL},
-        {"&Hard Disc",        NULL, hdiskmenu, 0, NULL},
         {NULL, NULL, NULL, 0, NULL}
 };
 
