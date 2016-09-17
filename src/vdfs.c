@@ -393,7 +393,7 @@ static int scan_dir(vdfs_ent_t *dir) {
             }
         }
         closedir(dp);
-        bem_debugf("count=%d\n", count);
+        bem_debugf("vdfs: scan_dir count=%d\n", count);
 
         // create an array sorted in Acorn order for *CAT.
         if (count >= 0) {
