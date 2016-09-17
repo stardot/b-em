@@ -301,13 +301,13 @@ MENU hdiskmenu[4]=
         {NULL, NULL, NULL, 0, NULL}
 };
 
-int gui_vfs_en() {
+int gui_vdfs_en() {
         vdfs_enabled = !vdfs_enabled;
         gui_update();
         return D_O_K;
 }
 
-int gui_vfs_root() {
+int gui_vdfs_root() {
         char tempname[260];
         int ret;
         int xsize = windx - 32, ysize = windy - 16;
@@ -330,8 +330,8 @@ MENU discmenu[11]=
         {"Write protect disc :1/3", gui_wprot1, NULL, 0, NULL},
         {"Default write protect",   gui_wprotd, NULL, 0, NULL},
         {"&Hard Disc",              NULL, hdiskmenu,  0, NULL},
-        {"Enable VFS",              gui_vfs_en,   NULL, 0, NULL},
-        {"Choose VFS Root",         gui_vfs_root, NULL, 0, NULL},
+        {"Enable VDFS",             gui_vdfs_en,   NULL, 0, NULL},
+        {"Choose VDFS Root",        gui_vdfs_root, NULL, 0, NULL},
         {NULL, NULL, NULL, 0, NULL}
 };
 
