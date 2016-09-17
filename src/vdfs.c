@@ -425,33 +425,36 @@ static vdfs_ent_t *find_file(uint16_t fn_addr, vdfs_ent_t *key, vdfs_ent_t *ent,
     char *fn_ptr;
     vdfs_ent_t **ptr;
 
-    memset(key, 0, sizeof(vdfs_ent_t));
-    bem_debugf("vdfs: find_file: fn_addr=%04x\n", fn_addr);
-    for (;;) {
-        fn_ptr = key->acorn_fn;
-        for (i = 0; i < MAX_FILE_NAME; i++) {
-            ch = readmem(fn_addr++);
-            if (ch == '\r' || ch == '.' || ch == ' ')
-                break;
-            *fn_ptr++ = ch;
+    if (scan_dir(ent) == 0) {
+        memset(key, 0, sizeof(vdfs_ent_t));
+        bem_debugf("vdfs: find_file: fn_addr=%04x\n", fn_addr);
+        for (;;) {
+            fn_ptr = key->acorn_fn;
+            for (i = 0; i < MAX_FILE_NAME; i++) {
+                ch = readmem(fn_addr++);
+                if (ch == '\r' || ch == '.' || ch == ' ')
+                    break;
+                *fn_ptr++ = ch;
+            }
+            *fn_ptr = '\0';
+            if (tail_addr)
+                *tail_addr = fn_addr;
+            if (key->acorn_fn[0] == '$' && key->acorn_fn[1] == '\0')
+                ent = &root_dir;
+            else if (key->acorn_fn[0] == '^' && key->acorn_fn[1] == '\0')
+                ent = ent->parent;
+            else if ((ptr = tfind(key, &ent->acorn_tree, acorn_comp)))
+                ent = *ptr;
+            else
+                return NULL; // not found
+            if (ch != '.')
+                return ent;
+            if (!(ent->attribs & ATTR_IS_DIR))
+                return NULL; // file in pathname where dir should be
+            scan_dir(ent);
         }
-        *fn_ptr = '\0';
-        if (tail_addr)
-            *tail_addr = fn_addr;
-        if (key->acorn_fn[0] == '$' && key->acorn_fn[1] == '\0')
-            ent = &root_dir;
-        else if (key->acorn_fn[0] == '^' && key->acorn_fn[1] == '\0')
-            ent = ent->parent;
-        else if ((ptr = tfind(key, &ent->acorn_tree, acorn_comp)))
-            ent = *ptr;
-        else
-            return NULL; // not found
-        if (ch != '.')
-            return ent;
-        if (!(ent->attribs & ATTR_IS_DIR))
-            return NULL; // file in pathname where dir should be
-        scan_dir(ent);
     }
+    return NULL;
 }
 
 static vdfs_ent_t *add_new_file(vdfs_ent_t *dir, const char *name) {
