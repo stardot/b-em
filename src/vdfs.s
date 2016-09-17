@@ -8,8 +8,11 @@
 ;            Added FSClaim code, fuller help, better *CAT plus *EX and *INFO
 ;            Added Osword7F veneer
 :
+
+oswpb   =   &70
+
 OS_CLI=&FFF7:OSBYTE=&FFF4:OSWORD=&FFF1:OSWRCH=&FFEE
-OSASCI=&FFE3:OSGBPB=&FFD1:OSNEWL=&FFE7:OSFILE=&FFDD
+OSASCI=&FFE3:OSGBPB=&FFD1:OSNEWL=&FFE7:OSFILE=&FFDD:OSARGS=&FFDA
 PORT_A=&FC5F:PORT_CMD=&FC5E
 :
 ORG     &8000
@@ -20,9 +23,9 @@ EQUB &82:EQUB ROMCopyright-&8000
 .ROMVersion
 EQUB &04
 .ROMTitle
-EQUS "Virtual DFS":EQUB 0:EQUS "0.05 (20 Aug 2016)"
+EQUS "Virtual DFS":EQUB 0:EQUS "0.05 (17 Sep 2016)"
 .ROMCopyright
-EQUB 0:EQUS "(C)1995 MRB, 2004 JGH":EQUB 0
+EQUB 0:EQUS "(C)1995 MRB, 2004 JGH, 2016 SJF":EQUB 0
 EQUD 0
 :
 .Service
@@ -138,6 +141,8 @@ EQUS "SHADOW" :EQUB 13:EQUW shadow
 EQUS "INSERT" :EQUB 13:EQUW insert
 \ SRAM commands
 EQUS "SRLOAD" :EQUB 13:EQUW srload
+EQUS "SRSAVE" :EQUB 13:EQUW srsave
+EQUS "SRREAD" :EQUB 13:EQUW srread
 EQUS "SRWRITE":EQUB 13:EQUW srwrite
 EQUB 0
 \ ----------------------------------
@@ -213,8 +218,15 @@ EQUS "Utility commands:":EQUB 13
 EQUS "  QUIT or DESKTOP : return to RISC OS":EQUB 13
 EQUS "  PAGE : force PAGE location":EQUB 13
 EQUS "  SHADOW : dummy command":EQUB 13
-EQUS "  SRLOAD <name> <address> <rom#>":EQUB 13
-EQUS "  SRWRITE <start> <end> <dest> <rom#>":EQUB 13
+EQUB 13
+EQUS "Sideays RAM commands:":EQUB 13
+EQUS "  SRLOAD <fsp> <address> (<r#>) (Q)":EQUB 13
+EQUS "  SRSAVE <fsp> <start> <end> (<r#>) (Q)":EQUB 13
+EQUS "  SRSAVE <fsp> <start> <+ln> (<r#>) (Q)":EQUB 13
+EQUS "  SRREAD <start> <end> <swadd> (<r#>)":EQUB 13
+EQUS "  SRREAD <start> <+len> <swadd> (<r#>)":EQUB 13
+EQUS "  SRWRITE <start> <end> <swadd> (<r#>)":EQUB 13
+EQUS "  SRWRITE <start> <+len> <swadd> (<r#>)":EQUB 13
 EQUB 13
 EQUS "VDFS commands:":EQUB 13
 EQUS "  BACK : return to previous directory":EQUB 13
@@ -238,7 +250,25 @@ LDA #&FF:STA PORT_CMD       :\ Return to host
 LDA #&00                    :\ Ignore command
 RTS
 :
-.srload :LDA #&D0:STA PORT_CMD:RTS \ Pass to host and return
+
+.srload LDA #&D0
+        BNE srfile
+.srsave LDA #&D3
+.srfile STA PORT_CMD        :\ parse command on host.
+        LDA #&00            :\ query current FS
+        TAY
+        JSR OSARGS
+        LDX #<oswpb         ;\ YX = parameter block.
+        LDY #>oswpb
+        CMP FSFlag
+        BEQ srfus           :\ FS is us so execute on host.
+        LDA #&43            :\ execute via OSWORD
+        JMP OSWORD
+.srfus  LDA #&D2            :\ .
+        STA PORT_CMD
+        RTS
+
+.srread: LDA #&D4:STA PORT_CMD:RTS \ Pass to host and return
 .srwrite:LDA #&D1:STA PORT_CMD:RTS \ Pass to host and return
 :
 :
