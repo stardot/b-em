@@ -134,6 +134,11 @@ static uint32_t readmem32(uint16_t addr) {
     return value;
 }
 
+static void writemem16(uint16_t addr, uint16_t value) {
+    writemem(addr, value & 0xff);
+    writemem(addr+1, (value >> 8) & 0xff);
+}
+
 static void writemem32(uint16_t addr, uint32_t value) {
     writemem(addr, value & 0xff);
     writemem(addr+1, (value >> 8) & 0xff);
@@ -564,6 +569,7 @@ void vdfs_close(void) {
 // ADFS Error messages (used)
 
 static const char err_wont[]     = "\x93" "Won't";
+static const char err_badparms[] = "\x94" "Bad parms";
 static const char err_access[]   = "\xbd" "Access violation";
 static const char err_nfile[]    = "\xc0" "Too many open files";
 static const char err_exists[]   = "\xc4" "Already exists";
@@ -571,11 +577,13 @@ static const char err_discerr[]  = "\xc7" "Disc error";
 static const char err_notfound[] = "\xd6" "Not found";
 static const char err_channel[]  = "\xde" "Channel";
 static const char err_badcmd[]   = "\xfe" "Bad command";
+static const char err_badaddr[]  = "\x94" "Bad parms";
+static const char err_no_swr[]   = "\x93" "No SWRAM at that address";
+static const char err_too_big[]  = "\x94" "Too big";
 
 /* Other ADFS messages not used.
 
 static const char err_aborted[]  = "\x92" "Aborted";
-static const char err_badparms[] = "\x94" "Bad parms";
 static const char err_delcsd[]   = "\x97" "Can't delete CSD";
 static const char err_dellib[]   = "\x98" "Can't delete library";
 static const char err_badcsum[]  = "\xaa" "Bad checksum";
@@ -1071,11 +1079,242 @@ static inline void osfile()
     a = (ent == NULL) ? 0 : (ent->attribs & ATTR_IS_DIR) ? 2 : 1;
 }
 
-static inline void srload() {
-    bem_debugf("vdfs: srload unimplemented for a=%d, x=%d, y=%d\n", a, x, y);
+/*
+ * The following routines parse the SRLOAD and SRSAVE commands into
+ * an OSWORD parameter block as used on the BBC Master.  Control is
+ * returned to the emulated BBC.  If VDFS is the current filing
+ * system the VDFS ROM will call back to this VDFS module for
+ * execution otherwise it will try to executethe OSWORD for another
+ * filing system to pick up.
+ */
+
+static uint16_t srp_fn(uint16_t *vptr) {
+    uint16_t addr;
+    int ch;
+
+    addr = readmem16(0xf2) + y;
+    do
+        ch = readmem(addr++);
+    while (ch == ' ' || ch == '\t');
+
+    if (ch != '\r') {
+        *vptr = addr-1;
+        do
+            ch = readmem(addr++);
+        while (ch != ' ' && ch != '\t' && ch != '\r');
+        if (ch != '\r')
+            writemem(addr-1, '\r');
+        return addr;
+    }
+    return 0;
 }
 
-static inline void srwrite() {
+static uint16_t srp_hex(int ch, uint16_t addr, uint16_t *vptr) {
+    uint16_t value = 0;
+
+    if (isxdigit(ch)) {
+        do {
+            value = value << 4;
+            if (ch >= '0' && ch <= '9')
+                value += (ch - '0');
+            else if (ch >= 'A' && ch <= 'F')
+                value += 10 + (ch - 'A');
+            else
+                value += 10 + (ch - 'a');
+            ch = readmem(addr++);
+        } while (isxdigit(ch));
+        *vptr = value;
+        return --addr;
+    }
+    return 0;
+}
+
+static uint16_t srp_start(uint16_t addr, uint16_t *start) {
+    int ch;
+
+    do
+        ch = readmem(addr++);
+    while (ch == ' ' || ch == '\t');
+    return srp_hex(ch, addr, start);
+}
+
+static uint16_t srp_length(uint16_t addr, uint16_t start, uint16_t *len) {
+    int ch;
+    uint16_t end;
+
+    do
+        ch = readmem(addr++);
+    while (ch == ' ' || ch == '\t');
+
+    if (ch == '+') {
+        do
+            ch = readmem(addr++);
+        while (ch == ' ' || ch == '\t');
+        return srp_hex(ch, addr, len);
+    } else {
+        if ((addr = srp_hex(ch, addr, &end)) == 0)
+            return 0;
+        *len = end - start;
+        return addr;
+    }
+}
+
+static void srp_tail(uint16_t addr, uint8_t flag, uint16_t fnaddr, uint16_t start, uint16_t len) {
+    int ch;
+    uint16_t romid = 0;
+
+    do
+        ch = readmem(addr++);
+    while (ch == ' ' || ch == '\t');
+
+    if (isxdigit(ch)) {
+        flag &= ~0x40;
+        addr = srp_hex(ch, addr, &romid);
+        do
+            ch = readmem(addr++);
+        while (ch == ' ' || ch == '\t');
+    }
+    writemem(0x70, flag);
+    writemem16(0x71, fnaddr);
+    writemem(0x73, romid);
+    writemem16(0x74, start);
+    writemem16(0x76, len);
+    writemem16(0x78, 0);
+    if (ch == 'Q' || ch == 'q')
+        writemem16(0x7a, 0xffff);
+    else
+        writemem16(0x7a, 0);
+}
+
+static inline void cmd_srload() {
+    uint16_t addr, fnadd, start;
+
+    if ((addr = srp_fn(&fnadd))) {
+        if ((addr = srp_start(addr, &start))) {
+            srp_tail(addr, 0xC0, fnadd, start, 0);
+            return;
+        }
+    }
+    adfs_error(err_badparms);
+}
+
+static inline void cmd_srsave() {
+    uint16_t addr, fnadd, start, len;
+
+    if ((addr = srp_fn(&fnadd))) {
+        if ((addr = srp_start(addr, &start))) {
+            if ((addr = srp_length(addr, start, &len))) {
+                srp_tail(addr, 0x40, fnadd, start, len);
+                return;
+            }
+        }
+    }
+    adfs_error(err_badparms);
+}
+
+/*
+ * This is the execution part of the sideways RAM commands which
+ * expects an OSWORD parameter block as used on the BBC Master and
+ * executes the load/save on the host.
+ */
+
+static inline void exec_sram() {
+    uint16_t pb = (y << 8) | x;
+    uint8_t flags  = readmem(pb);
+    uint16_t fname = readmem16(pb+1);
+    uint8_t  romid = readmem(pb+3);
+    uint16_t start = readmem16(pb+4);
+    uint16_t pblen = readmem16(pb+6);
+    uint32_t load_add;
+    int bank, banks, len;
+    vdfs_ent_t *ent, key;
+    FILE *fp;
+
+    bem_debugf("vdfs: exec_sram: flags=%02x, fn=%04x, romid=%02d, start=%04x, len=%04x\n", flags, fname, romid, start, pblen);
+
+    if (flags & 0x40) {
+        // Pseudo addressing.  How many banks into the ram does the
+        // address call for?
+
+        banks = start / 16384;
+        start %= 16384;
+
+        // Find the nth RAM bank.
+
+        bank = 0;
+        for (;;) {
+            if (swram[bank])
+                if (--banks == 0)
+                    break;
+            if (++bank >= 16) {
+                adfs_error(err_no_swr);
+                return;
+            }
+        }
+        bem_debugf("vdfs: exec_sram: pseudo addr bank=%02d, start=%04x\n", bank, start);
+    } else {
+        // Absolutre addressing.
+
+        if (start < 0x8000 || start >= 0xc000) {
+            adfs_error(err_badaddr);
+            return;
+        }
+        start -= 0x8000;
+
+        if (romid > 16) {
+            adfs_error(err_no_swr);
+            return;
+        }
+        bank = romid;
+        bem_debugf("vdfs: exec_sram: abs addr bank=%02d, start=%04x\n", bank, start);
+    }
+
+    ent = find_file(fname, &key, cur_dir, NULL);
+    if (flags & 0x80) {
+        len = 16384 - start;
+        if (len > 0) {
+            if (ent) {
+                if (ent->attribs & ATTR_IS_DIR)
+                    adfs_error(err_wont);
+                else if ((fp = open_file(ent, "rb"))) {
+                    fread(rom + bank * 16384 + start, len, 1, fp);
+                    fclose(fp);
+                } else {
+                    bem_warnf("vdfs: unable to load file '%s': %s\n", ent->host_fn, strerror(errno));
+                    adfs_hosterr(errno);
+                }
+            } else
+                adfs_error(err_notfound);
+        } else
+            adfs_error(err_too_big);
+    } else {
+        len = readmem16(pb+6);
+        if (len <= 16384) {
+            if (!ent)
+                ent = add_new_file(cur_dir, key.acorn_fn);
+            if (ent) {
+                if ((fp = open_file(ent, "wb"))) {
+                    fwrite(rom + bank * 16384 + start, len, 1, fp);
+                    fclose(fp);
+                    load_add = 0xff008000 | (bank << 16) | start;
+                    ent->load_addr = load_add;
+                    ent->exec_addr = load_add;
+                    ent->length = len;
+                    write_back(ent);
+                } else
+                    bem_warnf("vdfs: unable to create file '%s': %s\n", ent->host_fn, strerror(errno));
+            } else
+                adfs_error(err_wont);
+        } else
+            adfs_error(err_too_big);
+    }
+}
+
+static inline void cmd_srread() {
+    bem_debugf("vdfs: srread unimplemented for a=%d, x=%d, y=%d\n", a, x, y);
+}
+
+static inline void cmd_srwrite() {
     bem_debugf("vdfs: srwrite unimplemented for a=%d, x=%d, y=%d\n", a, x, y);
 }
 
@@ -1125,8 +1364,11 @@ static inline void dispatch(uint8_t value) {
         case 0x04: osbget();     break;
         case 0x05: osargs();     break;
         case 0x06: osfile();     break;
-        case 0xd0: srload();     break;
-        case 0xd1: srwrite();    break;
+        case 0xd0: cmd_srload(); break;
+        case 0xd1: cmd_srwrite();break;
+        case 0xd2: exec_sram();  break;
+        case 0xd3: cmd_srsave(); break;
+        case 0xd4: cmd_srread(); break;
         case 0xd5: back();       break;
         case 0xd7: cmd_dir();    break;
         case 0xd8: cmd_lib();    break;
