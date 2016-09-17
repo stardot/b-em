@@ -90,6 +90,7 @@ static vdfs_ent_t **cat_ptr;    // used by the tree walk callback.
 static vdfs_ent_t root_dir;     // root as seen by BBC, not host.
 static vdfs_ent_t *cur_dir;
 static vdfs_ent_t *lib_dir;
+static vdfs_ent_t *prev_dir;
 static unsigned   scan_seq;
 
 /*
@@ -509,7 +510,7 @@ void vdfs_init(void) {
     root_dir.host_fn = root_dir.host_path = root;
     root_dir.parent = &root_dir;
     scan_entry(&root_dir);
-    cur_dir = lib_dir = &root_dir;
+    cur_dir = lib_dir = prev_dir = &root_dir;
     scan_seq = 1;
 }
 
@@ -1075,16 +1076,12 @@ static inline void srwrite() {
     bem_debugf("vdfs: srwrite unimplemented for a=%d, x=%d, y=%d\n", a, x, y);
 }
 
-static inline void drive() {
-    bem_debugf("vdfs: drive unimplemented for a=%d, x=%d, y=%d\n", a, x, y);
-}
-
 static inline void back() {
-    bem_debugf("vdfs: back unimplemented for a=%d, x=%d, y=%d\n", a, x, y);
-}
+    vdfs_ent_t *ent;
 
-static inline void mount() {
-    bem_debugf("vdfs: mount unimplemented for a=%d, x=%d, y=%d\n", a, x, y);
+    ent = cur_dir;
+    cur_dir = prev_dir;
+    prev_dir = ent;
 }
 
 static inline void cmd_dir() {
@@ -1093,6 +1090,7 @@ static inline void cmd_dir() {
     if ((ent = find_file(readmem16(0xf2) + y, &key, cur_dir, NULL))) {
         if (ent->attribs & ATTR_IS_DIR) {
             bem_debugf("vdfs: new cur_dir=%s\n", ent->acorn_fn);
+            prev_dir = cur_dir;
             cur_dir = ent;
         }
     }
@@ -1124,9 +1122,7 @@ static inline void dispatch(uint8_t value) {
         case 0x06: osfile();     break;
         case 0xd0: srload();     break;
         case 0xd1: srwrite();    break;
-        case 0xd2: drive();      break;
         case 0xd5: back();       break;
-        case 0xd6: mount();      break;
         case 0xd7: cmd_dir();    break;
         case 0xd8: cmd_lib();    break;
         case 0xd9: cmd_rescan(); break;
