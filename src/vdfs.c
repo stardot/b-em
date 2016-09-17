@@ -1244,7 +1244,7 @@ static inline void exec_sram() {
         bank = 0;
         for (;;) {
             if (swram[bank])
-                if (--banks == 0)
+                if (--banks < 0)
                     break;
             if (++bank >= 16) {
                 adfs_error(err_no_swr);
