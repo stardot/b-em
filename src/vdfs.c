@@ -1449,6 +1449,7 @@ static inline void dispatch(uint8_t value) {
         case 0xd7: cmd_dir();    break;
         case 0xd8: cmd_lib();    break;
         case 0xd9: cmd_rescan(); break;
+        case 0xfe: a=0;          break;
         case 0xff: setquit();    break;
         default: bem_warnf("vdfs: function code %d not recognised\n", value);
     }

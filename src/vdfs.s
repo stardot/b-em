@@ -28,8 +28,17 @@ EQUS "Virtual DFS":EQUB 0:EQUS "0.05 (17 Sep 2016)"
 EQUB 0:EQUS "(C)1995 MRB, 2004 JGH, 2016 SJF":EQUB 0
 EQUD 0
 :
+\ As this ROM requires support from the emulator and that may not
+\ be enabled (or supported) check that it works before responding
+\ to any ROM calls.
+
 .Service
-PHP:PHA:TXA:PHA:TYA:PHA            :\ Save all registers
+PHP:PHA
+LDA #&FE:STA PORT_CMD:CMP #&00:BEQ ServEnabled
+PLA:PLP:RTS
+
+.ServEnabled
+TXA:PHA:TYA:PHA            :\ Save all registers
 TSX:LDA &0103,X                    :\ Get service number
 CMP #&01:BNE P%+5:JMP ServWorkspace:\ Private workspace
 CMP #&03:BNE P%+5:JMP ServFSStart  :\ FS startup
