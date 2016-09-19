@@ -7,13 +7,21 @@
 ; v0.04 JGH: Rearranged into separate ROM and Filing System code
 ;            Added FSClaim code, fuller help, better *CAT plus *EX and *INFO
 ;            Added Osword7F veneer
+; v0.05 SJF: Changes to work with VDFS module in B-EM.  Enable to run
+;            in ROM.
 :
 
+vdfsno  =   &11
 oswpb   =   &70
+
+ClaimFS     =   &FC5C       :\ *FSCLAIM ON|OFF flag
+FSFlag      =   &FC5D       :\ FS id when claimed
+PORT_CMD    =   &FC5E       :\ execute cmds on VDFS in host
+PORT_A      =   &FC5F       :\ store A ready for command.
 
 OS_CLI=&FFF7:OSBYTE=&FFF4:OSWORD=&FFF1:OSWRCH=&FFEE
 OSASCI=&FFE3:OSGBPB=&FFD1:OSNEWL=&FFE7:OSFILE=&FFDD:OSARGS=&FFDA
-PORT_A=&FC5F:PORT_CMD=&FC5E
+
 :
 ORG     &8000
 .start
@@ -62,19 +70,8 @@ LDA #0:RTS                         :\ Exit with A=0 to claim call
 \ ROM Administration Routines
 \ ===========================
 .ServWorkspace
-LDX ROMVersion:INC ROMVersion:INX  :\ Check if running in RAM
-CPX ROMVersion:BEQ ServWorkOk
-LDX #RAMWarning AND 255
-LDY #RAMWarning DIV 256
-JSR PrintText
-.ServWorkOk
-DEC ROMVersion
 PLA:CLC:ADC PageOffset:PHA         :\ Add offset to push PAGE up by
 JMP ServExit
-.RAMWarning
-EQUB 13
-EQUS "Warning: VDFS in protected memory"
-EQUB 13:EQUB 0
 .PrROMTitleNL               :\ Print NL, ROM title
 JSR OSNEWL
 .PrROMTitle                 :\ Print ROM title
@@ -285,10 +282,6 @@ RTS
 \ ======================
 \ Filing System Routines
 \ ======================
-\ Filing System Workspace
-\ -----------------------
-.ClaimFS:EQUB &FF           :\ *FSCLAIM ON|OFF flag
-.FSFlag :EQUB &04           :\ FS id when claimed
 \ --------------------------------
 \ Filing system selection commands
 \ --------------------------------
@@ -296,7 +289,7 @@ RTS
 .fadfs:.vdfs                :\ On entry, X=4,11,18,26,33
 TXA:LSR A:LSR A:LSR A:TAX   :\ X=0,1,2,3,4
 LDA FSValues,X:TAY          :\ Get filing system number
-CPY #9:BCS SelectFS         :\ Always select VDFS
+CPY #vdfsno:BEQ SelectFS    :\ Always select VDFS
 BIT ClaimFS:BPL SelectFSExit:\ If not claimed, exit with A<>0
 .SelectFS
 LDX #&12:LDA #&8F:JSR OSBYTE:\ Select filing system
@@ -305,7 +298,7 @@ LDA #&00                    :\ A=0 - claimed
 RTS
 .FSValues
 EQUB 4:EQUB 4:EQUB 8        :\ DISC, DISK, ADFS
-EQUB 8:EQUB 17              :\ FADFS, VDFS
+EQUB 8:EQUB vdfsno          :\ FADFS, VDFS
 :
 .fsclaim
 LDA (&F2),Y:AND #&DF
@@ -327,7 +320,7 @@ LDA #0:\STA FSFlag          :\ Clear FSflag, and exit
 .ServShut                   :\ Doesn't do anything
 JMP ServExit
 .ServFSSelect
-CPY #&11:BEQ FSSelect       :\ VDFS
+CPY #vdfsno:BEQ FSSelect    :\ VDFS
 BIT ClaimFS:BPL FSSelectNone:\ If not claimed, don't check for DFS or ADFS
 CPY #&04:BEQ FSSelect       :\ Select DFS
 CPY #&08:BEQ FSSelect       :\ Select ADFS

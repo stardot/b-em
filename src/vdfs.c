@@ -116,6 +116,8 @@ typedef struct {
 static vdfs_file_t vdfs_chan[NUM_CHANNELS];
 
 static uint8_t  reg_a;
+static uint8_t  claim_fs = 0xff;
+static uint8_t  fs_flag  = 0x11;
 static uint16_t cmd_tail;
 
 static uint16_t readmem16(uint16_t addr) {
@@ -1431,6 +1433,10 @@ static inline void cmd_rescan() {
     scan_seq++;
 }
 
+static inline void vdfs_check() {
+    a=0;
+}
+
 static inline void dispatch(uint8_t value) {
     switch(value) {
         case 0x00: osfsc();      break;
@@ -1449,17 +1455,38 @@ static inline void dispatch(uint8_t value) {
         case 0xd7: cmd_dir();    break;
         case 0xd8: cmd_lib();    break;
         case 0xd9: cmd_rescan(); break;
-        case 0xfe: a=0;          break;
+        case 0xfe: vdfs_check(); break;
         case 0xff: setquit();    break;
         default: bem_warnf("vdfs: function code %d not recognised\n", value);
     }
 }
 
+uint8_t vdfs_read(uint16_t addr) {
+    switch (addr & 3) {
+        case 0:
+            return claim_fs;
+            break;
+        case 1:
+            return fs_flag;
+            break;
+        default:
+            return 0xff;
+    }
+}
+
 void vdfs_write(uint16_t addr, uint8_t value) {
-    if (addr & 1)
-        reg_a = value;
-    else {
-        a = reg_a;
-        dispatch(value);
+    switch (addr & 3) {
+        case 0:
+            claim_fs = value;
+            break;
+        case 1:
+            fs_flag = value;
+            break;
+        case 2:
+            a = reg_a;
+            dispatch(value);
+            break;
+        case 3:
+            reg_a = value;
     }
 }
