@@ -36,6 +36,7 @@ static uint8_t codeconvert[128]=
 
 void key_press(int row, int col)
 {
+        bem_debugf("ley_press(%d, %d)\n", row, col);
         bbckey[col][row] = 1;
 }
 
@@ -92,6 +93,8 @@ void key_check()
         }
         if (key[keylookup[KEY_RSHIFT]] || key[keylookup[KEY_LSHIFT]] || autoboot)
            key_press(0, 0);
+        if (autoboot)
+           key_press(3, 2);
         if (key[keylookup[KEY_LCONTROL]] || key[keylookup[KEY_RCONTROL]] || (keyas && key[KEY_S]))
            key_press(0, 1);
         for (c = 0; c < 128; c++)
