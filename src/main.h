@@ -2,6 +2,7 @@
 #define __INC_MAIN_H
 
 void main_init(int argc, char *argv[]);
+void main_softreset();
 void main_reset();
 void main_restart();
 void main_run();
