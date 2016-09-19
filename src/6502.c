@@ -100,11 +100,15 @@ uint8_t readmem(uint16_t addr)
         case 0xFC50:
         case 0xFC54:
         case 0xFC58:
-        case 0xFC5C:
                 if (scsi_enabled)
                         return scsi_read(addr);
                 if (ide_enable)
                         return ide_read(addr);
+                break;
+
+        case 0xFC5C:
+                if (vdfs_enabled)
+                    return vdfs_read(addr);
                 break;
 
         case 0xFE00:
@@ -204,8 +208,12 @@ void writemem(uint16_t addr, uint8_t val)
         if (debugon)
                 debug_write(addr, val);
         writec[addr] = 31;
-        if (memstat[vis20k][addr >> 8] == 1) {
+        c = memstat[vis20k][addr >> 8];
+        if (c == 1) {
                 memlook[vis20k][addr >> 8][addr] = val;
+                return;
+        } else if (c == 2) {
+                bem_debugf("6502: attempt to write to ROM %x:%04x=%02x\n", vis20k, addr, val);
                 return;
         }
         if (addr < 0xFC00 || addr >= 0xFF00)
