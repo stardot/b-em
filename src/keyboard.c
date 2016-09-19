@@ -36,7 +36,6 @@ static uint8_t codeconvert[128]=
 
 void key_press(int row, int col)
 {
-        bem_debugf("ley_press(%d, %d)\n", row, col);
         bbckey[col][row] = 1;
 }
 
