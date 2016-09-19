@@ -41,7 +41,7 @@ extern int quited;
 extern int windx,windy;
 
 MENU filemenu[6];
-MENU discmenu[11];
+MENU discmenu[12];
 MENU tapespdmenu[3];
 MENU tapemenu[5];
 MENU modelmenu[17];
@@ -72,10 +72,10 @@ MENU mainmenu[6];
 void gui_update()
 {
         int x;
-        discmenu[4].flags = (writeprot[0]) ? D_SELECTED : 0;
-        discmenu[5].flags = (writeprot[1]) ? D_SELECTED : 0;
-        discmenu[6].flags = (defaultwriteprot) ? D_SELECTED : 0;
-        discmenu[8].flags = (vdfs_enabled) ? D_SELECTED : 0;
+        discmenu[5].flags = (writeprot[0]) ? D_SELECTED : 0;
+        discmenu[6].flags = (writeprot[1]) ? D_SELECTED : 0;
+        discmenu[7].flags = (defaultwriteprot) ? D_SELECTED : 0;
+        discmenu[9].flags = (vdfs_enabled) ? D_SELECTED : 0;
         tapespdmenu[0].flags = (!fasttape) ? D_SELECTED : 0;
         tapespdmenu[1].flags = (fasttape)  ? D_SELECTED : 0;
         for (x = 0; x < 16; x++) modelmenu[x].flags = 0;
@@ -181,38 +181,46 @@ MENU filemenu[6]=
         {NULL, NULL, NULL, 0, NULL}
 };
 
-int gui_load0()
+static int gui_load_drive(int drive, const char *prompt)
 {
         char tempname[260];
         int ret;
         int xsize = windx - 32, ysize = windy - 16;
-        memcpy(tempname, discfns[0], 260);
-        ret = file_select_ex("Please choose a disc image", tempname, "SSD;DSD;IMG;ADF;ADL;FDI", 260, xsize, ysize);
+        memcpy(tempname, discfns[drive], 260);
+        ret = file_select_ex(prompt, tempname, "SSD;DSD;IMG;ADF;ADL;FDI", 260, xsize, ysize);
         if (ret)
         {
-                disc_close(0);
-                memcpy(discfns[0], tempname, 260);
-                disc_load(0, discfns[0]);
-                if (defaultwriteprot) writeprot[0] = 1;
+                disc_close(drive);
+                memcpy(discfns[drive], tempname, 260);
+                disc_load(drive, discfns[drive]);
+                if (defaultwriteprot)
+                        writeprot[drive] = 1;
         }
         gui_update();
+        return ret;
+}
+
+int gui_autoboot()
+{
+        int ret;
+
+        if ((ret = gui_load_drive(0, "Please choose a disc image to autoboot in drive 0/2")))
+        {
+                main_reset();
+                autoboot = 150;
+        }
         return D_O_K;
 }
+
+int gui_load0()
+{
+        gui_load_drive(0, "Please choose a disc image to load in drive 0/2");
+        return D_O_K;
+}
+
 int gui_load1()
 {
-        char tempname[260];
-        int ret;
-        int xsize = windx - 32, ysize = windy - 16;
-        memcpy(tempname, discfns[1], 260);
-        ret = file_select_ex("Please choose a disc image", tempname, "SSD;DSD;IMG;ADF;ADL;FDI", 260, xsize, ysize);
-        if (ret)
-        {
-                disc_close(1);
-                memcpy(discfns[1], tempname, 260);
-                disc_load(1, discfns[1]);
-                if (defaultwriteprot) writeprot[1] = 1;
-        }
-        gui_update();
+        gui_load_drive(1, "Please choose a disc image to load in drive 1/3");
         return D_O_K;
 }
 
@@ -320,15 +328,16 @@ int gui_vdfs_root() {
         return D_O_K;
 }
 
-MENU discmenu[11]=
+MENU discmenu[12]=
 {
-        {"Load disc :&0/2...",      gui_load0,  NULL, 0, NULL},
-        {"Load disc :&1/3...",      gui_load1,  NULL, 0, NULL},
-        {"Eject disc :0/2",         gui_eject0, NULL, 0, NULL},
-        {"Eject disc :1/3",         gui_eject1, NULL, 0, NULL},
-        {"Write protect disc :0/2", gui_wprot0, NULL, 0, NULL},
-        {"Write protect disc :1/3", gui_wprot1, NULL, 0, NULL},
-        {"Default write protect",   gui_wprotd, NULL, 0, NULL},
+        {"Autoboot disc in 0/2",    gui_autoboot,  NULL, 0, NULL },
+        {"Load disc :&0/2...",      gui_load0,     NULL, 0, NULL},
+        {"Load disc :&1/3...",      gui_load1,     NULL, 0, NULL},
+        {"Eject disc :0/2",         gui_eject0,    NULL, 0, NULL},
+        {"Eject disc :1/3",         gui_eject1,    NULL, 0, NULL},
+        {"Write protect disc :0/2", gui_wprot0,    NULL, 0, NULL},
+        {"Write protect disc :1/3", gui_wprot1,    NULL, 0, NULL},
+        {"Default write protect",   gui_wprotd,    NULL, 0, NULL},
         {"&Hard Disc",              NULL, hdiskmenu,  0, NULL},
         {"Enable VDFS",             gui_vdfs_en,   NULL, 0, NULL},
         {"Choose VDFS Root",        gui_vdfs_root, NULL, 0, NULL},

@@ -138,6 +138,7 @@ static void initmenu()
         CheckMenuItem(hmenu, IDM_DISC_WPROT_0, (writeprot[0])     ? MF_CHECKED : MF_UNCHECKED);
         CheckMenuItem(hmenu, IDM_DISC_WPROT_1, (writeprot[1])     ? MF_CHECKED : MF_UNCHECKED);
         CheckMenuItem(hmenu, IDM_DISC_WPROT_D, (defaultwriteprot) ? MF_CHECKED : MF_UNCHECKED);
+        CheckMenuItem(hmenu, IDM_DISC_VDFS_ENABLE, (vdfs_enabled) ? MF_CHECKED : MF_UNCHECKED);
 
         CheckMenuItem(hmenu, IDM_TUBE_6502 + selecttube, MF_CHECKED);
         CheckMenuItem(hmenu, IDM_MODEL_0   + curmodel,   MF_CHECKED);
@@ -604,7 +605,13 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         defaultwriteprot = !defaultwriteprot;
                         CheckMenuItem(hmenu, IDM_DISC_WPROT_D, (defaultwriteprot) ? MF_CHECKED : MF_UNCHECKED);
                         break;
-
+                        case IDM_DISC_VDFS_ENABLE:
+                        vdfs_enabled = !vdfs_enabled;
+                        CheckMenuItem(hmenu, IDM_DISC_VDFS_ENABLE, (vdfs_enabled) ? MF_CHECKED : MF_UNCHECKED);
+                        break;
+                        case IDM_DISC_VDFS_ROOT:
+                        getfile(hwnd, "VDFS Root", vdfs_set_root);
+                        break;
                         case IDM_TAPE_LOAD:
                         if (!getfile(hwnd, "Tape image (*.UEF;*.CSW)\0*.UEF;*.CSW\0All files (*.*)\0*.*\0", tape_fn))
                         {
