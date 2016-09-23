@@ -236,13 +236,34 @@ static unsigned get_hex(FILE *fp) {
     return value;
 }
 
-static inline void zap_dots(char *acorn_fn) {
-    int ch;
+/*
+ * Translate non-BBC filename characters to BBC ones according to
+ * the table at http://beebwiki.mdfs.net/Filename_character_mapping
+*/
 
-    while ((ch = *acorn_fn)) {
-        if (ch == '.')
-            *acorn_fn = '-';
-        acorn_fn++;
+static const char hst_chars[] = "#$%&.?@^";
+static const char bbc_chars[] = "?<;+/#=>";
+
+static inline void hst2bbc(const char *host_fn, char *acorn_fn) {
+    int ch;
+    const char *ptr;
+    char *end = acorn_fn + MAX_FILE_NAME;
+
+    while ((ch = *host_fn++) && acorn_fn < end) {
+        if ((ptr = strchr(hst_chars, ch)))
+            ch = bbc_chars[ptr-hst_chars];
+        *acorn_fn++ = ch;
+    }
+}
+
+static inline void bbc2hst(const char *acorn_fn, char *host_fn) {
+    int ch;
+    const char *ptr;
+
+    while ((ch = *acorn_fn++)) {
+        if ((ptr = strchr(bbc_chars, ch)))
+            ch = hst_chars[ptr-bbc_chars];
+        *host_fn++ = ch;
     }
 }
 
@@ -270,8 +291,7 @@ static void scan_entry(vdfs_ent_t *ent) {
         ent->exec_addr = get_hex(fp);
         fclose(fp);
     } else if (ent->acorn_fn[0] == '\0')
-        strncpy(ent->acorn_fn, ent->host_fn, MAX_FILE_NAME);
-    zap_dots(ent->acorn_fn);
+        hst2bbc(ent->host_fn, ent->acorn_fn);
 
     // trim .inf to get back to host path and get attributes
     *ptr = '\0';
@@ -476,7 +496,11 @@ static vdfs_ent_t *add_new_file(vdfs_ent_t *dir, const char *name) {
         if ((new_ent = malloc(sizeof(vdfs_ent_t)))) {
             memset(new_ent, 0, sizeof(vdfs_ent_t));
             strncpy(new_ent->acorn_fn, name, MAX_FILE_NAME);
-            new_ent->host_fn = new_ent->acorn_fn;
+            if ((new_ent->host_fn = malloc(strlen(new_ent->acorn_fn)+1)) == NULL) {
+                free(new_ent);
+                return NULL;
+            }
+            bbc2hst(new_ent->acorn_fn, new_ent->host_fn);
             new_ent->parent = dir;
             tsearch(new_ent, &dir->acorn_tree, acorn_comp);
             tsearch(new_ent, &dir->host_tree, host_comp);
