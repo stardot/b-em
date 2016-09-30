@@ -829,8 +829,9 @@ void debugger_do()
                         break;
                         case 'q': case 'Q': 
                         setquit();
-                        while (1);
-                        break;
+                        debug = 0;
+                        indebug = 0;
+                        return;
                         case 'h': case 'H': case '?':
                         sprintf(outs, "\n    Debugger commands :\n\n");
                         debug_out(outs);
