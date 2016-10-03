@@ -401,7 +401,6 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         
         EnterCriticalSection(&cs);
         TerminateThread(mainthread, 0);
-        debug_kill();
         main_close();
         DeleteCriticalSection(&cs);
         
