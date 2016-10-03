@@ -241,6 +241,7 @@ static void debug_outf(const char *fmt, ...)
     va_start(ap, fmt);
     vprintf(fmt, ap);
     va_end(ap);
+    fflush(stdout);
 }
 
 void debug_start()
@@ -686,6 +687,10 @@ void debugger_do()
                 }
                 break;
 
+            case 'q': case 'Q':
+                setquit();
+                /* FALLTHOUGH */
+
             case 'c': case 'C':
                 debug = 0;
                 indebug = 0;
@@ -718,17 +723,15 @@ void debugger_do()
                     for (d = 0; d < 16; d++)
                     {
                         temp = debug_readmem(debug_memaddr + d);
-                        if (temp < ' ') *dptr++ = '.';
-                        else            *dptr++ = temp;
-                        debug_out(dump, dptr-dump);
+                        if (temp < ' ' || temp >= 0x7f)
+                            *dptr++ = '.';
+                        else
+                            *dptr++ = temp;
                     }
+                    *dptr++ = '\n';
+                    debug_out(dump, dptr-dump);
                     debug_memaddr += 16;
-                    debug_out("\n", 1);
                 }
-                break;
-
-            case 'q': case 'Q':
-                setquit();
                 break;
 
             case 'r': case 'R':
