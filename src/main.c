@@ -361,6 +361,8 @@ void main_run()
 
 void main_close()
 {
+        debug_kill();
+
 #ifdef WIN32
         timeEndPeriod(1);
 #endif
