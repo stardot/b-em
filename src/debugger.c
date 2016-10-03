@@ -2,10 +2,12 @@
   Debugger*/
 
 #include <stdarg.h>
+#include <stdio.h>
 
 int debug;
 int indebug=0;
 extern int fcount;
+static FILE *trace_fp = NULL;
 
 #ifdef WIN32
 #include <windows.h>
@@ -175,6 +177,10 @@ void debug_end()
 
 void debug_kill()
 {
+    if (trace_fp) {
+        fputs("Trace finished due to emulator quit\n", trace_fp);
+        fclose(trace_fp);
+    }
     TerminateThread(debugthread, 0);
     if (usdat) free(usdat);
 }
@@ -217,7 +223,6 @@ static void debug_outf(const char *fmt, ...)
 
 #else
 
-#include <stdio.h>
 #include "b-em.h"
 #include "debugger.h"
 
@@ -242,8 +247,16 @@ void debug_start()
 {
 }
 
+void debug_kill() {
+    if (trace_fp) {
+        fputs("Trace finished due to emulator quit\n", trace_fp);
+        fclose(trace_fp);
+    }
+}
+
 #endif
 
+#include <errno.h>
 #include "6502.h"
 #include "via.h"
 #include "sysvia.h"
@@ -251,6 +264,11 @@ void debug_start()
 #include "video.h"
 #include "sn76489.h"
 #include "model.h"
+
+static void trace_out(const char *s, size_t len)
+{
+    fwrite(s, len, 1, trace_fp);
+}
 
 int readc[65536], writec[65536], fetchc[65536];
 
@@ -349,7 +367,7 @@ static int dopaddrnmos[256]=
 /*F0*/  BRA,  INDY, IMP,  INDY, ZPX,  ZPX,  ZPX,  ZPX,  IMP,  ABSY, IMP,  ABSY, ABSX, ABSX, ABSX, ABSX,
 };
 
-static void debug_disassemble(void (*out)(const char *s, size_t len))
+static uint16_t debug_disassemble(uint16_t addr, void (*out)(const char *s, size_t len))
 {
     uint8_t op, p1, p2;
     uint16_t temp;
@@ -357,7 +375,7 @@ static void debug_disassemble(void (*out)(const char *s, size_t len))
     const char *op_name;
     int addr_mode;
 
-    op = debug_readmem(debug_disaddr);
+    op = debug_readmem(addr);
     if (MASTER) {
         op_name = dopname[op];
         addr_mode = dopaddr[op];
@@ -365,77 +383,78 @@ static void debug_disassemble(void (*out)(const char *s, size_t len))
         op_name = dopnamenmos[op];
         addr_mode = dopaddrnmos[op];
     }
-    sptr = s + sprintf(s, "%04X : %s ", debug_disaddr, op_name);
-    debug_disaddr++;
+    sptr = s + sprintf(s, "%04X: %02X ", addr, op);
+    addr++;
 
     switch (addr_mode)
     {
         case IMP:
-            sptr += sprintf(sptr, "        ");
+            sptr += sprintf(sptr, "      %s         ", op_name);
             break;
         case IMPA:
-            sptr += sprintf(sptr, "A       ");
+            sptr += sprintf(sptr, "      %s A       ", op_name);
             break;
         case IMM:
-            p1 = debug_readmem(debug_disaddr++);
-            sptr += sprintf(sptr, "#%02X     ", p1);
+            p1 = debug_readmem(addr++);
+            sptr += sprintf(sptr, "%02X    %s #%02X     ", p1, op_name, p1);
             break;
         case ZP:
-            p1 = debug_readmem(debug_disaddr++);
-            sptr += sprintf(sptr, "%02X      ", p1);
+            p1 = debug_readmem(addr++);
+            sptr += sprintf(sptr, "%02X    %s %02X      ", p1, op_name, p1);
             break;
         case ZPX:
-            p1 = debug_readmem(debug_disaddr++);
-            sptr += sprintf(sptr, "%02X,X    ", p1);
+            p1 = debug_readmem(addr++);
+            sptr += sprintf(sptr, "%02X    %s %02X,X    ", p1, op_name, p1);
             break;
         case ZPY:
-            p1 = debug_readmem(debug_disaddr++);
-            sptr += sprintf(sptr, "%02X,Y    ", p1);
+            p1 = debug_readmem(addr++);
+            sptr += sprintf(sptr, "%02X    %s %02X,Y    ", p1, op_name, p1);
             break;
         case IND:
-            p1 = debug_readmem(debug_disaddr++);
-            sptr += sprintf(sptr, "(%02X)    ", p1);
+            p1 = debug_readmem(addr++);
+            sptr += sprintf(sptr, "%02X    %s (%02X)    ", p1, op_name, p1);
             break;
         case INDX:
-            p1 = debug_readmem(debug_disaddr++);
-            sptr += sprintf(sptr, "(%02X,X)  ", p1);
+            p1 = debug_readmem(addr++);
+            sptr += sprintf(sptr, "%02X    %s (%02X,X)  ", p1, op_name, p1);
             break;
         case INDY:
-            p1 = debug_readmem(debug_disaddr++);
-            sptr += sprintf(sptr, "(%02X),Y  ", p1);
+            p1 = debug_readmem(addr++);
+            sptr += sprintf(sptr, "%02X    %s (%02X),Y  ", p1, op_name, p1);
             break;
         case ABS:
-            p1 = debug_readmem(debug_disaddr++);
-            p2 = debug_readmem(debug_disaddr++);
-            sptr += sprintf(sptr, "%02X%02X    ", p2, p1);
+            p1 = debug_readmem(addr++);
+            p2 = debug_readmem(addr++);
+            sptr += sprintf(sptr, "%02X %02X %s %02X%02X    ", p1, p2, op_name, p2, p1);
             break;
         case ABSX:
-            p1 = debug_readmem(debug_disaddr++);
-            p2 = debug_readmem(debug_disaddr++);
-            sptr += sprintf(sptr, "%02X%02X,X  ", p2, p1);
+            p1 = debug_readmem(addr++);
+            p2 = debug_readmem(addr++);
+            sptr += sprintf(sptr, "%02X %02X %s %02X%02X,X  ", p1, p2, op_name, p2, p1);
             break;
         case ABSY:
-            p1 = debug_readmem(debug_disaddr++);
-            p2 = debug_readmem(debug_disaddr++);
-            sptr += sprintf(sptr, "%02X%02X,Y  ", p2, p1);
+            p1 = debug_readmem(addr++);
+            p2 = debug_readmem(addr++);
+            sptr += sprintf(sptr, "%02X %02X %s %02X%02X,Y  ", p1, p2, op_name, p2, p1);
             break;
         case IND16:
-            p1 = debug_readmem(debug_disaddr++);
-            p2 = debug_readmem(debug_disaddr++);
-            sptr += sprintf(sptr, "(%02X%02X)  ", p2, p1);
+            p1 = debug_readmem(addr++);
+            p2 = debug_readmem(addr++);
+            sptr += sprintf(sptr, "%02X %02X %s (%02X%02X)  ", p1, p2, op_name, p2, p1);
             break;
         case IND1X:
-            p1 = debug_readmem(debug_disaddr++);
-            p2 = debug_readmem(debug_disaddr++);
-            sptr += sprintf(sptr, "(%02X%02X,X)", p2, p1);
+            p1 = debug_readmem(addr++);
+            p2 = debug_readmem(addr++);
+            sptr += sprintf(sptr, "%02X %02X %s (%02X%02X,X)", p1, p2, op_name, p2, p1);
             break;
         case BRA:
-            p1 = debug_readmem(debug_disaddr++);
-            temp = debug_disaddr + 2 + (signed char)p1;
-            sptr += sprintf(sptr, "%04X    ", temp);
+            p1 = debug_readmem(addr++);
+            temp = addr + (signed char)p1;
+            sptr += sprintf(sptr, "%02X    %s %04X    ", p1, op_name, temp);
             break;
     }
     out(s, sptr-s);
+    return addr;
 }
 
 static int breakpoints[8] = {-1, -1, -1, -1, -1, -1, -1, -1};
@@ -478,6 +497,13 @@ void debug_write(uint16_t addr, uint8_t val)
     }
 }
 
+void debug_reset() {
+    if (trace_fp) {
+        fputs("Processor reset!\n", trace_fp);
+        fflush(trace_fp);
+    }
+}
+
 static const char helptext[] =
     "\n    Debugger commands :\n\n"
     "    bclear n   - clear breakpoint n or breakpoint at n\n"
@@ -510,7 +536,19 @@ void debugger_do()
     int params;
     uint8_t temp;
     char dump[256], *dptr;
-    char ins[256];
+    char ins[256], *iptr;
+
+    if (trace_fp) {
+        debug_disassemble(pc, trace_out);
+        fprintf(trace_fp, " %02X %02X %02X %02X ", a, x, y, s);
+        fputc(p.n ? 'N' : ' ', trace_fp);
+        fputc(p.v ? 'V' : ' ', trace_fp);
+        fputc(p.d ? 'D' : ' ', trace_fp);
+        fputc(p.i ? 'I' : ' ', trace_fp);
+        fputc(p.z ? 'Z' : ' ', trace_fp);
+        fputc(p.c ? 'C' : ' ', trace_fp);
+        fputc('\n', trace_fp);
+    }
 
     if (!opcode)
     {
@@ -537,10 +575,7 @@ void debugger_do()
     indebug = 1;
     while (1)
     {
-        d = debug_disaddr;
-        debug_disaddr = pc;
-        debug_disassemble(debug_out);
-        debug_disaddr = d;
+        debug_disassemble(pc, debug_out);
         debug_out("  >", 3);
 #ifdef WIN32
         c = ReadConsoleA(cinf, ins, 255, (LPDWORD)&d, NULL);
@@ -548,15 +583,15 @@ void debugger_do()
 #else
         fgets(ins, 255, stdin);
 #endif
-        d = 0;
-        while (ins[d] != ' ' && ins[d] != 0xA && ins[d] != 0xD && ins[d] != 0)
-            d++;
-        while (ins[d] == 32)
-            d++;
-        if (ins[d] == 0xA || ins[d] == 0xD || ins[d] == 0) params = 0;
-        else                                               params = 1;
+        for (d = 0; ((c = ins[d])) && c != ' '; d++)
+            ;
+        if (c == ' ') {
+            do d++; while (ins[d] == ' ');
+            params = 1;
+        } else
+            params = 0;
 
-        if (ins[0] == 0xA || ins[0] == 0xD)
+        if (ins[0] == 0)
             ins[0] = debug_lastcommand;
 
         switch (ins[0])
@@ -661,7 +696,7 @@ void debugger_do()
                 for (c = 0; c < 12; c++)
                 {
                     debug_out("    ", 4);
-                    debug_disassemble(debug_out);
+                    debug_disaddr = debug_disassemble(debug_disaddr, debug_out);
                     debug_out("\n", 1);
                 }
                 break;
@@ -756,6 +791,20 @@ void debugger_do()
                 debug_lastcommand = ins[0];
                 indebug = 0;
                 return;
+
+            case 't': case 'T':
+                if (trace_fp)
+                    fclose(trace_fp);
+                if (params) {
+                    if ((iptr = strchr(&ins[d], '\n')))
+                        *iptr = '\0';
+                    if ((trace_fp = fopen(&ins[d], "a")))
+                        debug_outf("Tracing to %s\n", &ins[d]);
+                    else
+                        debug_outf("Unable to open trace file '%s' for append: %s\n", &ins[d], strerror(errno));
+                } else
+                    debug_outf("Trace file closed");
+                break;
 
             case 'w': case 'W':
                 if (!strncasecmp(ins, "watchr", 6))
