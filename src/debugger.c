@@ -464,6 +464,7 @@ static int breakw[8]      = {-1, -1, -1, -1, -1, -1, -1, -1};
 static int watchr[8]      = {-1, -1, -1, -1, -1, -1, -1, -1};
 static int watchw[8]      = {-1, -1, -1, -1, -1, -1, -1, -1};
 static int debugstep = 0;
+static int contcount = 0;
 
 void debug_read(uint16_t addr)
 {
@@ -561,8 +562,11 @@ void debugger_do()
     {
         if (breakpoints[c] == pc)
         {
-            debug = 1;
             debug_outf("    Break at %04X\n", pc);
+            if (contcount)
+                contcount--;
+            else
+                debug = 1;
         }
     }
     if (!debug) return;
@@ -692,6 +696,7 @@ void debugger_do()
                 /* FALLTHOUGH */
 
             case 'c': case 'C':
+                if (params) sscanf(&ins[d], "%d", &contcount);
                 debug = 0;
                 indebug = 0;
                 return;
