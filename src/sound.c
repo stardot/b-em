@@ -10,10 +10,11 @@
 #include "via.h"
 #include "uservia.h"
 #include "soundopenal.h"
+#include "music5000.h"
 
 #define BUFLEN 2000
 
-int sound_internal = 0, sound_beebsid = 0, sound_dac = 0, sound_ddnoise = 0, sound_tape = 0;
+int sound_internal = 0, sound_beebsid = 0, sound_dac = 0, sound_ddnoise = 0, sound_tape = 0, sound_music5000 = 0;
 int sound_filter = 0;
 
 static int sound_pos = 0;
@@ -60,10 +61,15 @@ void sound_poll()
 {
         int c;
         
-        if (!(sound_internal || sound_beebsid || sound_dac)) return;
-        
+        if (!(sound_internal || sound_beebsid || sound_dac || sound_music5000)) return;
+
+        sound_buffer[sound_pos << 1] = 0;
+        sound_buffer[(sound_pos << 1) + 1] = 0;
+
         if (sound_beebsid)  sid_fillbuf(sound_buffer + (sound_pos << 1), 2);
         if (sound_internal) sn_fillbuf( sound_buffer + (sound_pos << 1), 2);
+        if (sound_music5000) music5000_fillbuf( sound_buffer + (sound_pos << 1), 2);
+
         if (sound_dac)
         {
                 sound_buffer[(sound_pos << 1)]   += (((int)lpt_dac - 0x80) * 32);
@@ -77,6 +83,7 @@ void sound_poll()
                 {
                         if (sound_beebsid)  sid_fillbuf(sound_buffer+ (sound_pos << 1), 1);
                         if (sound_internal) sn_fillbuf( sound_buffer+ (sound_pos << 1), 1);
+                        if (sound_music5000) music5000_fillbuf( sound_buffer+ (sound_pos << 1), 1);
                         if (sound_dac) sound_buffer[(sound_pos << 1)]   += (((int)lpt_dac - 0x80) * 32);
                 }
                 

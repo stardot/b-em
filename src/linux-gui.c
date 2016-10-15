@@ -16,6 +16,7 @@
 #include "main.h"
 #include "model.h"
 #include "mouse.h"
+#include "music5000.h"
 #include "savestate.h"
 #include "scsi.h"
 #include "sid_b-em.h"
@@ -60,7 +61,7 @@ MENU residmenu[3];
 MENU waveformmenu[6];
 MENU ddtypemenu[3];
 MENU ddvolmenu[4];
-MENU soundmenu[11];
+MENU soundmenu[12];
 MENU keymenu[3];
 MENU mousemenu[2];
 MENU hdiskmenu[4];
@@ -97,10 +98,11 @@ void gui_update()
         for (x = 0; x < 3; x++)  bordersmenu[x].flags = (vid_fullborders == (intptr_t)bordersmenu[x].dp) ? D_SELECTED : 0;
         soundmenu[0].flags = (sound_internal) ? D_SELECTED : 0;
         soundmenu[1].flags = (sound_beebsid)  ? D_SELECTED : 0;
-        soundmenu[2].flags = (sound_dac)      ? D_SELECTED : 0;
-        soundmenu[3].flags = (sound_ddnoise)  ? D_SELECTED : 0;
-        soundmenu[4].flags = (sound_tape)     ? D_SELECTED : 0;
-        soundmenu[5].flags = (sound_filter)   ? D_SELECTED : 0;
+        soundmenu[2].flags = (sound_music5000)? D_SELECTED : 0;
+        soundmenu[3].flags = (sound_dac)      ? D_SELECTED : 0;
+        soundmenu[4].flags = (sound_ddnoise)  ? D_SELECTED : 0;
+        soundmenu[5].flags = (sound_tape)     ? D_SELECTED : 0;
+        soundmenu[6].flags = (sound_filter)   ? D_SELECTED : 0;
         for (x = 0; x < 5;  x++) waveformmenu[x].flags = (curwave == (intptr_t)waveformmenu[x].dp) ? D_SELECTED : 0;
         for (x = 0; x < 14; x++) sidtypemenu[x].flags  = (cursid  == (intptr_t)sidtypemenu[x].dp)  ? D_SELECTED : 0;
         methodmenu[0].flags = (!sidmethod)    ? D_SELECTED : 0;
@@ -656,6 +658,12 @@ int gui_beebsid()
         gui_update();
         return D_CLOSE;
 }
+int gui_music5000()
+{
+        sound_music5000 = !sound_music5000;
+        gui_update();
+        return D_O_K;
+}
 int gui_dac()
 {
         sound_dac = !sound_dac;
@@ -681,10 +689,11 @@ int gui_filter()
         return D_CLOSE;
 }
 
-MENU soundmenu[11]=
+MENU soundmenu[12]=
 {
         {"Internal sound chip",   gui_internalsnd, NULL,         0, NULL},
         {"BeebSID",               gui_beebsid,     NULL,         0, NULL},
+        {"Music 5000",            gui_music5000,   NULL,         0, NULL},
         {"Printer Port DAC",      gui_dac,         NULL,         0, NULL},
         {"Disc drive noise",      gui_ddnoise,     NULL,         0, NULL},
         {"Tape noise",            gui_tnoise,      NULL,         0, NULL},
