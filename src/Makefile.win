@@ -33,6 +33,7 @@ OBJ = \
     mem.o \
     model.o \
     mouse.o \
+    music5000.o \
     pal.o \
     savestate.o \
     scsi.o \

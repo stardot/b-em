@@ -29,6 +29,7 @@
 #include "main.h"
 #include "mem.h"
 #include "mouse.h"
+#include "music5000.h"
 #ifdef WIN32
 #include "pal.h"
 #endif
@@ -94,6 +95,7 @@ void main_reset()
         scsi_reset();
         vdfs_reset();
         sid_reset();
+        music5000_reset();
         sn_init();
         if (curtube != -1) tubes[curtube].reset();
         else               tube_exec = NULL;
@@ -233,6 +235,7 @@ void main_init(int argc, char *argv[])
         al_init();
         sid_init();
         sid_settype(sidmethod, cursid);
+        music5000_init();
 
 	adc_init();
 #ifdef WIN32
@@ -345,6 +348,7 @@ void main_run()
                         i8271_reset();
                         wd1770_reset();
                         sid_reset();
+                        music5000_reset();
 
                         if (curtube != -1) tubes[curtube].reset();
                         tube_reset();

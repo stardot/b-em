@@ -223,6 +223,7 @@ BEGIN
                 BEGIN
                         MENUITEM "&Internal sound chip", IDM_SOUND_INTERNAL
                         MENUITEM "&BeebSID",             IDM_SOUND_BEEBSID
+                        MENUITEM "&Music 5000",          IDM_SOUND_MUSIC5000
                         MENUITEM "&Printer port DAC",    IDM_SOUND_DAC
                         MENUITEM "&Disc drive noise",    IDM_SOUND_DDNOISE
                         MENUITEM "&Tape noise",          IDM_SOUND_TAPE

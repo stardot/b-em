@@ -7,7 +7,7 @@ CLEANFILES = $(noinst_SCRIPTS)
 ../b-em: b-em
 	cp b-em ..
 
-amrefresh:	
+amrefresh:
 
 
 b_em_CFLAGS = $(allegro_CFLAGS) -DBEM
@@ -55,6 +55,7 @@ b_em_SOURCES = \
 	mem.c \
 	model.c \
 	mouse.c \
+        music5000.c \
 	resid.cc \
 	savestate.c \
 	scsi.c \
@@ -96,3 +97,4 @@ b_em_SOURCES = \
 if NO_TSEARCH
 	b_em_SOURCES += tsesarch.c
 endif
+
