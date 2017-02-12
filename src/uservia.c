@@ -71,13 +71,13 @@ void uservia_updatetimers()
 void uservia_reset()
 {
         via_reset(&uservia);
-
+        
         uservia.read_portA = uservia_read_portA;
         uservia.read_portB = uservia_read_portB;
-
+        
         uservia.write_portA = uservia_write_portA;
         uservia.write_portB = uservia_write_portB;
-
+        
         uservia.intnum = 2;
 }
 

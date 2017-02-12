@@ -23,7 +23,7 @@
 	  6581 code path. This corresponds with assumed output impedance of
 	  the SID "amplifiers", and is separate effect to the output strip
 	  backmixing.
-
+	
 	* Retire the V24 attempt of dynamically adjusting BP distortion
 	  threshold. It doesn't really seem to work.
 
@@ -39,9 +39,9 @@
 
 	* Optimized resampling to be about 2x faster through using aliasing
 	  to increase passband width and hence reduce FIR length.
-
+	  
 	* Fixed some valgrind warnings.
-
+	
 	* Added nuke_denormals() method to periodically flush these to zero, as
 	  this can only be done for SSE registers by the FPU and we can't use
 	  any in order to support CPUs older than P3.
@@ -51,8 +51,8 @@
 	  are compiled in and the CPU can support them. We lost only very
 	  little performance, but gained compatibility to very, very old
 	  hardware.
-
-	* The old code for ST_lockup proved unnecessary, so it is now removed.
+	  
+	* The old code for ST_lockup proved unnecessary, so it is now removed. 
 
 2008-08-21  Antti S. Lankila  <alankila@bel.fi>
 
@@ -82,7 +82,7 @@
 	  required to get Fred Gray's Break Thru. This might not occur so
 	  strongly on all chips, so it should probably be added as a proper
 	  tunable. For now, I just settled for a slight effect to collect
-	  feedback.
+	  feedback. 
 
 2008-07-15  Antti S. Lankila  <alankila@bel.fi>
 
@@ -103,7 +103,7 @@
 	  to simulate a small resistor between them appears to improve SidRiders
 	  and several other songs, largerly eliminating some types of hard
 	  distortion sounds that do not occur on the chip. It also helped
-	  Mechanicus. I am trying to understand where this term comes from...
+	  Mechanicus. I am trying to understand where this term comes from... 
 
 2008-07-09  Antti S. Lankila  <alankila@bel.fi>
 
@@ -115,7 +115,7 @@
 2008-03-02  Antti S. Lankila  <alankila@bel.fi>
 
 	* Exposed the filter at sid.cc to callers through get_filter()
-	  method, and fixed a few types.
+	  method, and fixed a few types. 
 
 2008-02-19  Antti S. Lankila  <alankila@bel.fi>
 

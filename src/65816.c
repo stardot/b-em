@@ -252,7 +252,7 @@ static uint32_t sindirecty()
 
 static uint32_t indirectl()
 {
-                uint32_t temp, addr;
+		uint32_t temp, addr;
         temp=(readmem(pbr|pc)+dp)&0xFFFF; pc++;
         addr=readmemw(temp)|(readmem(temp+2)<<16);
 //        printf("IND %06X\n",addr);
@@ -261,7 +261,7 @@ static uint32_t indirectl()
 
 static uint32_t indirectly()
 {
-                uint32_t temp, addr;
+		uint32_t temp, addr;
         temp=(readmem(pbr|pc)+dp)&0xFFFF; pc++;
         addr=(readmemw(temp)|(readmem(temp+2)<<16))+y.w;
 //        if (pc==0xFDC9) printf("INDy %04X %06X\n",temp,addr);
@@ -4075,7 +4075,7 @@ void w65816_reset()
 {
         int c;
         FILE *f=fopen("65816.dmp","wb");
-
+        
         for (c=0;c<65536;c++) putc(readmem(c),f);
         fclose(f);
         printf("65816 regs :\n");

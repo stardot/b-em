@@ -52,13 +52,13 @@ r16(/r)                    AX    CX    DX    BX    SP    BP    SI    DI
 r32(/r)                    EAX   ECX   EDX   EBX   ESP   EBP   ESI   EDI
 /digit (Opcode)            0     1     2     3     4     5     6     7
 REG =                      000   001   010   011   100   101   110   111
-  â”Œâ”€â”€â”€Address
+  ÚÄÄÄAddress
 disp8 denotes an 8-bit displacement following the ModR/M byte, to be
 sign-extended and added to the index. disp16 denotes a 16-bit displacement
 following the ModR/M byte, to be added to the index. Default segment
 register is SS for the effective addresses containing a BP index, DS for
 other effective addresses.
-            â”€â”€â” â”ŒMod R/Mâ” â”Œâ”€â”€â”€â”€â”€â”€â”€â”€ModR/M Values in Hexadecimalâ”€â”€â”€â”€â”€â”€â”€â”€â”
+            ÄÄ¿ ÚMod R/M¿ ÚÄÄÄÄÄÄÄÄModR/M Values in HexadecimalÄÄÄÄÄÄÄÄ¿
 
 [BX + SI]            000   00    08    10    18    20    28    30    38
 [BX + DI]            001   01    09    11    19    21    29    31    39
@@ -1843,9 +1843,9 @@ void x86_exec()
                                 loadseg(tempw,&_ss);
                                 if (ssegs) oldss=ss;
                                 skipnextprint=1;
-                                noint=1;
+				noint=1;
 //                                printf("LOAD SS %04X %04X\n",tempw,SS);
-//                              printf("SS loaded with %04X %04X:%04X %04X %04X %04X\n",ss>>4,cs>>4,pc,CX,DX,es>>4);
+//				printf("SS loaded with %04X %04X:%04X %04X %04X %04X\n",ss>>4,cs>>4,pc,CX,DX,es>>4);
                                 break;
                         }
                         tubecycles-=((mod==3)?2:9);
@@ -3454,16 +3454,16 @@ void x86_exec()
                 }
                 pc&=0xFFFF;
 //                if (CS==0x1490 && pc==0x3BBA) rpclog("Here from %04X:%04X %08X %02X\n",oldcs,oldpc,old8,opcode);
-
+                
 //                if (CS==0x6012 && pc==3) rpclog("XIOS direct call %02X %04X %04X %04X %04X\n",AL,CX,DX,BX,SI);
-
+                
 /*                if (!CS && !pc)
                 {
                         printf("At zero!\n");
                         x86dumpregs();
                         exit(-1);
                 }*/
-
+                
                 if (tube_irq&2)
                 {
                         //tube_irq&=~2;

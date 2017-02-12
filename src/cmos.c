@@ -1,10 +1,10 @@
 /*B-em v2.2 by Tom Walker
   Master 128 CMOS emulation*/
-
+  
 /*Master 128 uses a HD146818
 
   It is connected as -
-
+  
   System VIA PB6 - enable
   System VIA PB7 - address strobe
   IC32 B1        - RW
@@ -35,7 +35,7 @@ void cmos_update(uint8_t IC32, uint8_t sdbval)
         {
                 if (!cmos_rw && cmos_addr > 0xB && !(IC32 & 4)) /*Write triggered on low -> high on D*/
                    cmos[cmos_addr] = sdbval;
-
+                   
                 if (cmos_rw && (IC32 & 4))                    /*Read data output while D high*/
                    cmos_data = cmos[cmos_addr];
         }

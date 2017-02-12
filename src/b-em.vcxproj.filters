@@ -355,7 +355,7 @@
     <ClCompile Include="x86.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="z80.c">
+    <ClCompile Include="Z80.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="resid-fp\convolve.cc">

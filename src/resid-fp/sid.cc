@@ -147,7 +147,7 @@ static int host_cpu_features(void)
 float SIDFP::kinked_dac(const int x, const float nonlinearity, const int max)
 {
     float value = 0.f;
-
+    
     int bit = 1;
     float weight = 1.f;
     const float dir = 2.0f * nonlinearity;
@@ -553,7 +553,7 @@ double SIDFP::I0(double x)
 // E.g. provided a clock frequency of ~ 1MHz, the sample frequency can not
 // be set lower than ~ 8kHz. A lower sample frequency would make the
 // resampling code overfill its 16k sample ring buffer.
-//
+// 
 // The end of passband frequency is also limited:
 //   pass_freq <= 0.9*sample_freq/2
 
@@ -583,11 +583,11 @@ bool SIDFP::set_sampling_parameters(float clock_freq, sampling_method method,
     fir = 0;
     return true;
   }
-
+  
   const int bits = 16;
 
   if (pass_freq > 20000)
-    pass_freq = 20000;
+    pass_freq = 20000;  
   if (2*pass_freq/sample_freq > 0.9)
     pass_freq = 0.9f*sample_freq/2;
 
@@ -630,7 +630,7 @@ bool SIDFP::set_sampling_parameters(float clock_freq, sampling_method method,
     /* Error is bound by 1.234 / L^2 */
     fir_RES = (int) (sqrt(1.234 * (1 << bits)) / f_cycles_per_sample + 0.5);
   }
-
+ 
   // Allocate memory for FIR tables.
   delete[] fir;
   fir = new float[fir_N*fir_RES];
@@ -733,7 +733,7 @@ void SIDFP::clock()
 //   write(dsp, buf, bufindex*2);
 //   bufindex = 0;
 // }
-//
+// 
 // ----------------------------------------------------------------------------
 int SIDFP::clock(cycle_count& delta_t, short* buf, int n, int interleave)
 {

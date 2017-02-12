@@ -69,10 +69,10 @@ FILE *arclog;
 void rpclog(const char *format, ...)
 {
         char buf[256];
-                va_list ap;
+		va_list ap;
  return;
         if (!arclog) arclog=fopen("b-emlog.txt","wt");
-
+        
         va_start(ap, format);
         vsprintf(buf, format, ap);
         va_end(ap);
@@ -111,7 +111,7 @@ void main_reset()
         if (curtube != -1) tubes[curtube].reset();
         else               tube_exec = NULL;
         tube_reset();
-
+        
         memset(ram, 0, 64 * 1024);
 }
 
@@ -123,14 +123,14 @@ void main_init(int argc, char *argv[])
         int tapenext = 0, discnext = 0;
 
         startblit();
+        
+        printf("B-em v2.2\n");
 
-        printf(B_EM_VERSION "\n");
-
-        vid_fskipmax = 1;
-
+	vid_fskipmax = 1;
+        
         al_init_main(argc, argv);
-
-
+        
+        
         append_filename(t, exedir, "roms\\tube\\ReCo6502ROM_816", 511);
         if (!file_exists(t,FA_ALL,NULL) && selecttube == 4) selecttube = -1;
 
@@ -150,7 +150,7 @@ void main_init(int argc, char *argv[])
 //#ifndef WIN32
                 if (!strcasecmp(argv[c], "--help"))
                 {
-                        printf(B_EM_VERSION " command line options :\n\n");
+                        printf("B-em v2.1 command line options :\n\n");
                         printf("-mx             - start as model x (see readme.txt for models)\n");
                         printf("-tx             - start with tube x (see readme.txt for tubes)\n");
                         printf("-disc disc.ssd  - load disc.ssd into drives :0/:2\n");
@@ -197,8 +197,8 @@ void main_init(int argc, char *argv[])
                 else if (argv[c][0] == '-' && (argv[c][1] == 'f' || argv[c][1]=='F'))
                 {
                         sscanf(&argv[c][2], "%i", &vid_fskipmax);
-                        if (vid_fskipmax < 1) vid_fskipmax = 1;
-                        if (vid_fskipmax > 9) vid_fskipmax = 9;
+			if (vid_fskipmax < 1) vid_fskipmax = 1;
+			if (vid_fskipmax > 9) vid_fskipmax = 9;
                 }
                 else if (argv[c][0] == '-' && (argv[c][1] == 's' || argv[c][1] == 'S'))
                 {
@@ -220,10 +220,10 @@ void main_init(int argc, char *argv[])
                         discnext = 0;
                 }
                 else
-                {
+                {			
                         strcpy(discfns[0], argv[c]);
                         discnext = 0;
-                        autoboot = 150;
+			autoboot = 150;
                 }
                 if (tapenext) tapenext--;
         }
@@ -239,13 +239,13 @@ void main_init(int argc, char *argv[])
         mem_init();
         ddnoise_init();
         tapenoise_init();
-
+        
         sound_init();
         al_init();
         sid_init();
         sid_settype(sidmethod, cursid);
 
-        adc_init();
+	adc_init();
 #ifdef WIN32
         pal_init();
 #endif
@@ -265,13 +265,13 @@ void main_init(int argc, char *argv[])
 
         install_int_ex(secint, MSEC_TO_TIMER(1000));
         install_int_ex(int50,  MSEC_TO_TIMER(20));
-
+        
         set_display_switch_mode(SWITCH_BACKGROUND);
-#ifdef WIN32
+#ifdef WIN32        
                 timeBeginPeriod(1);
 #endif
         oldmodel = curmodel;
-
+        
         if (curtube == 3 || mouse_amx) install_mouse();
 
 //printf("Disc 0 : %s\n",discfns[0]);
@@ -281,7 +281,7 @@ void main_init(int argc, char *argv[])
         disc_load(1, discfns[1]);
         tape_load(tape_fn);
         if (defaultwriteprot) writeprot[0] = writeprot[1] = 1;
-
+        
         endblit();
 }
 
@@ -293,7 +293,7 @@ void main_restart()
         oldmodel = curmodel;
 
         model_init();
-
+        
         main_reset();
 
         resumeready();
@@ -376,7 +376,7 @@ void main_close()
 
         config_save();
         cmos_save(models[curmodel]);
-
+        
         mem_close();
         uef_close();
         csw_close();
@@ -391,7 +391,7 @@ void main_close()
         ide_close();
         ddnoise_close();
         tapenoise_close();
-
+        
         al_close();
         video_close();
 }

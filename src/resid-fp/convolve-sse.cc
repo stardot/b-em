@@ -67,7 +67,7 @@ float convolve_sse(const float *a, const float *b, int n)
     out += out_tmp;
 
     n &= 3;
-
+    
     while (n --)
         out += (*(a ++)) * (*(b ++));
 

@@ -214,7 +214,7 @@
     <ClCompile Include="win-keydefine.c" />
     <ClCompile Include="win.c" />
     <ClCompile Include="x86.c" />
-    <ClCompile Include="z80.c" />
+    <ClCompile Include="Z80.c" />
   </ItemGroup>
   <ItemGroup>
     <None Include="b-em.ico" />

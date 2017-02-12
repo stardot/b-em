@@ -124,7 +124,7 @@ void WaveformGeneratorFP::writeCONTROL_REG(reg8 control)
   }
 
   test = test_next;
-
+  
   /* update noise anyway, just in case the above paths triggered */
   noise_output_cached = outputN___();
 }

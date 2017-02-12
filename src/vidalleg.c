@@ -87,9 +87,9 @@ void video_doblit()
 //rpclog("Blit\n");
 
         startblit();
-
+        
 //        printf("Blit\n");
-        if (vid_savescrshot)
+	if (vid_savescrshot)
         {
                 vid_savescrshot--;
                 if (!vid_savescrshot)
@@ -113,9 +113,9 @@ void video_doblit()
                 }
         }
 
-        fskipcount++;
-        if (fskipcount >= ((motor && fasttape) ? 5 : vid_fskipmax))
-        {
+	fskipcount++;
+	if (fskipcount >= ((motor && fasttape) ? 5 : vid_fskipmax))
+	{
 //                rpclog("Blit start\n");
                 lasty++;
                 if (vid_fullborders == 1)
@@ -151,33 +151,33 @@ void video_doblit()
                 }
                 if (videoresize && !fullscreen)
                 {
-                        fskipcount = 0;
-                        if (vid_scanlines)
-                        {
+        		fskipcount = 0;
+        		if (vid_scanlines)
+        		{
                                 #ifdef WIN32
                                 for (c = firsty; c < lasty; c++) blit(b, b16x, firstx, c, 0, c << 1, lastx - firstx, 1);
-                                blit(b16x, vb, 0, firsty << 1, 0, 0, lastx - firstx, (lasty - firsty) << 1);
+        			blit(b16x, vb, 0, firsty << 1, 0, 0, lastx - firstx, (lasty - firsty) << 1);
                                 stretch_blit(vb, screen, 0, 0, lastx - firstx, (lasty - firsty) << 1, 0, 0, winsizex, winsizey);
                                 #else
-                                blit(b, b16x, firstx, firsty, 0, 0, lastx - firstx, lasty - firsty);
-                                for (c = firsty; c < lasty; c++) blit(b16x, screen, 0, c - firsty, 0, (c - firsty) << 1, lastx - firstx, 1);
+        			blit(b, b16x, firstx, firsty, 0, 0, lastx - firstx, lasty - firsty);
+        			for (c = firsty; c < lasty; c++) blit(b16x, screen, 0, c - firsty, 0, (c - firsty) << 1, lastx - firstx, 1);
                                 #endif
-                        }
-                        #ifdef WIN32
-                        else if (vid_interlace && vid_pal)
-                        {
+        		}
+        		#ifdef WIN32
+        		else if (vid_interlace && vid_pal)
+        		{
                                 pal_convert(b, firstx, (firsty << 1) + (interlline ? 1 : 0), lastx, (lasty << 1) + (interlline ? 1 : 0), 2);
-                                blit(b32, vb, (firstx * 922) / 832, firsty << 1, 0,0, ((lastx - firstx) * 922) / 832, (lasty - firsty) << 1);
+      	                        blit(b32, vb, (firstx * 922) / 832, firsty << 1, 0,0, ((lastx - firstx) * 922) / 832, (lasty - firsty) << 1);
                                 stretch_blit(vb, screen, 0, 0, ((lastx - firstx) * 922) / 832, (lasty - firsty) << 1, 0, 0, winsizex, winsizey);
                         }
-                        else if (vid_pal)
-                        {
+        	        else if (vid_pal)
+        	        {
                                 pal_convert(b, firstx, firsty, lastx, lasty, 1);
-                                blit(b32, vb, (firstx * 922) / 832, firsty, 0,0, ((lastx - firstx) * 922) / 832, lasty - firsty);
+      	                        blit(b32, vb, (firstx * 922) / 832, firsty, 0,0, ((lastx - firstx) * 922) / 832, lasty - firsty);
                                 stretch_blit(vb, screen, 0, 0, ((lastx - firstx) * 922) / 832, lasty-firsty, 0, 0, winsizex, winsizey);
-                        }
+        	        }
                         #endif
-                        else if (vid_interlace || vid_linedbl)
+        	        else if (vid_interlace || vid_linedbl)
                         {
                                 #ifdef WIN32
                                 blit(b, vb, firstx, firsty << 1, 0, 0, lastx - firstx, (lasty - firsty) << 1);
@@ -186,67 +186,67 @@ void video_doblit()
                                 blit(b, screen, firstx, firsty << 1, 0, 0, lastx - firstx, (lasty - firsty) << 1);
                                 #endif
                         }
-                        else
-                        {
+        	        else
+        	        {
                                 #ifdef WIN32
-                                blit(b, vb, firstx, firsty, 0, 0, lastx - firstx, lasty - firsty);
+        	                blit(b, vb, firstx, firsty, 0, 0, lastx - firstx, lasty - firsty);
                                 stretch_blit(vb, screen, 0, 0, lastx - firstx, lasty - firsty, 0, 0, winsizex, winsizey);
                                 #else
                                 for (c = (firsty << 1); c < (lasty << 1); c++) blit(b, b16x, firstx, c >> 1, 0, c, lastx - firstx, 1);
                                 blit(b16x, screen, 0, firsty << 1, 0, 0, lastx - firstx, (lasty - firsty) << 1);
                                 #endif
-                        }
+        	        }
                 }
                 else
                 {
                         if (!fullscreen) updatewindowsize((lastx - firstx) + 2, ((lasty - firsty) << 1) + 2);
-                        fskipcount = 0;
-                        if (vid_scanlines)
-                        {
+        		fskipcount = 0;
+        		if (vid_scanlines)
+        		{
                                 #ifdef WIN32
                                 for (c = firsty; c < lasty; c++) blit(b, b16x, firstx, c, 0, c << 1, lastx - firstx, 1);
                                 blit(b16x, screen, 0, firsty << 1, 0, 0, lastx - firstx, (lasty - firsty) << 1);
                                 #else
-                                blit(b, b16x, firstx, firsty, 0, 0, lastx - firstx, lasty - firsty);
-                                for (c = firsty; c < lasty; c++) blit(b16x, screen, 0, c - firsty, 0, (c - firsty) << 1, lastx - firstx, 1);
+        			blit(b, b16x, firstx, firsty, 0, 0, lastx - firstx, lasty - firsty);
+        			for (c = firsty; c < lasty; c++) blit(b16x, screen, 0, c - firsty, 0, (c - firsty) << 1, lastx - firstx, 1);
                                 #endif
-                        }
-                        #ifdef WIN32
-                        else if (vid_interlace && vid_pal)
-                        {
+        		}
+        		#ifdef WIN32
+        		else if (vid_interlace && vid_pal)
+        		{
                                 pal_convert(b, firstx, (firsty << 1) + (interlline ? 1 : 0), lastx, (lasty << 1) + (interlline ? 1 : 0), 2);
-                                blit(b32, vb, (firstx * 922) / 832, firsty << 1, 0,0, ((lastx - firstx) * 922) / 832, (lasty - firsty) << 1);
+      	                        blit(b32, vb, (firstx * 922) / 832, firsty << 1, 0,0, ((lastx - firstx) * 922) / 832, (lasty - firsty) << 1);
                                 stretch_blit(vb, screen, 0, 0, ((lastx - firstx) * 922) / 832, (lasty - firsty) << 1, 0, 0, (lastx - firstx), (lasty - firsty) << 1);
                         }
                         else if (vid_pal)
                         {
                                 pal_convert(b, firstx, firsty, lastx, lasty, 1);
-                                blit(b32, vb, (firstx * 922) / 832, firsty, 0,0, ((lastx - firstx) * 922) / 832, lasty - firsty);
+      	                        blit(b32, vb, (firstx * 922) / 832, firsty, 0,0, ((lastx - firstx) * 922) / 832, lasty - firsty);
                                 stretch_blit(vb, screen, 0, 0, ((lastx - firstx) * 922) / 832, lasty-firsty, 0, 0, (lastx - firstx), (lasty - firsty) << 1);
                         }
                         #endif
-                        else if (vid_interlace || vid_linedbl)
+        	        else if (vid_interlace || vid_linedbl)
                         {
                                 //rpclog("Blit %i,%i  %i,%i\n", firstx, firsty << 1, lastx - firstx, (lasty - firsty) << 1);
                                 blit(b, screen, firstx, firsty << 1, 0, 0, lastx - firstx, (lasty - firsty) << 1);
                         }
-                        else
-                        {
+        	        else
+        	        {
                                 #ifdef WIN32
-                                blit(b, vb, firstx, firsty, 0, 0, lastx - firstx, lasty - firsty);
+        	                blit(b, vb, firstx, firsty, 0, 0, lastx - firstx, lasty - firsty);
                                 stretch_blit(vb, screen, 0, 0, lastx - firstx, lasty - firsty, 0, 0, lastx - firstx, (lasty - firsty) << 1);
                                 #else
                                 for (c = (firsty << 1); c < (lasty << 1); c++) blit(b, b16x, firstx, c >> 1, 0, c, lastx - firstx, 1);
                                 blit(b16x, screen, 0, firsty << 1, 0, 0, lastx - firstx, (lasty - firsty) << 1);
                                 #endif
-                        }
-                        if (fullscreen)
+        	        }
+        	        if (fullscreen)
                            rectfill(screen, 0, 584, 799, 599, 0);
                 }
 //                rpclog("Blit end\n");
 //                textprintf(screen,font,0,0,makecol(255,255,255),"%08X",uefpos());
-        }
-        firstx = firsty = 65535;
-        lastx  = lasty  = 0;
-        endblit();
+	}
+	firstx = firsty = 65535;
+	lastx  = lasty  = 0;
+	endblit();
 }

@@ -111,7 +111,7 @@ void ssd_readsector(int drive, int sector, int track, int side, int density)
         ssd_side   = side;
         ssd_drive  = drive;
 //        printf("Read sector %i %i %i %i\n",drive,side,track,sector);
-
+        
         if (!ssd_f[drive] || (side && !dsd[drive]) || density || track != ssd_trackc[drive])
         {
                 ssd_notfound = 500;
@@ -130,7 +130,7 @@ void ssd_writesector(int drive, int sector, int track, int side, int density)
         ssd_side   = side;
         ssd_drive  = drive;
 //        printf("Write sector %i %i %i %i\n",drive,side,track,sector);
-
+        
         if (!ssd_f[drive] || (side && !dsd[drive]) || density || track != ssd_trackc[drive])
         {
                 ssd_notfound=500;
@@ -181,7 +181,7 @@ void ssd_poll()
         ssd_time++;
         if (ssd_time < 16) return;
         ssd_time = 0;
-
+        
         if (ssd_notfound)
         {
                 ssd_notfound--;

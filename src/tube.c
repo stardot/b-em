@@ -1,6 +1,6 @@
 /*B-em v2.2 by Tom Walker
   Tube ULA emulation*/
-
+  
 #include <stdio.h>
 #include "b-em.h"
 #include "6502.h"
@@ -41,12 +41,12 @@ void tube_updateints()
 {
         tube_irq = 0;
         interrupt &= ~8;
-
+        
         if ((tubeula.r1stat & 1) && (tubeula.hstat[3] & 128)) interrupt |= 8;
-
+        
         if ((tubeula.r1stat & 2) && (tubeula.pstat[0] & 128)) tube_irq  |= 1;
         if ((tubeula.r1stat & 4) && (tubeula.pstat[3] & 128)) tube_irq  |= 1;
-
+        
         if ((tubeula.r1stat & 8) && !(tubeula.r1stat & 16) && ((tubeula.hp3pos > 0) || (tubeula.ph3pos == 0))) tube_irq|=2;
         if ((tubeula.r1stat & 8) &&  (tubeula.r1stat & 16) && ((tubeula.hp3pos > 1) || (tubeula.ph3pos == 0))) tube_irq|=2;
 }

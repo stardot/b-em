@@ -106,9 +106,9 @@ void pal_convert(BITMAP *inb, int x1, int y1, int x2, int y2, int yoff)
 
         int sx;
         int dx = 59139;
-
+        
         int c = (crtc[0] + 1) * ((ula_ctrl & 0x10) ? 8 : 16);
-
+        
         c = ((c * 256) * 922) / 832;
 
         if (x1 > 1535) x1 = 1535;
@@ -122,8 +122,8 @@ void pal_convert(BITMAP *inb, int x1, int y1, int x2, int y2, int yoff)
             u_filt[x] = v_filt[x] = 0;
 
 //        rpclog("PAL %i-%i %i-%i\n",x1,x2,dx1,dx2);
-
-
+        
+        
         for (y = y1; y < y2; y += yoff)
         {
                 uo[0] = u_old[y&1];
@@ -150,7 +150,7 @@ void pal_convert(BITMAP *inb, int x1, int y1, int x2, int y2, int yoff)
                 }
 
                 old_wt = wt;
-
+                
                 for (x = dx1; x < dx2; x++)
                 {
                         r = sr[x] >> 6;
@@ -197,7 +197,7 @@ void pal_convert(BITMAP *inb, int x1, int y1, int x2, int y2, int yoff)
 //                wt += (c - (256 * (dx2 - dx1)));
                 wt &= 1023;
         }
-
+        
         /*cheat*/
         wt -= (c * (312 - ((y2 - y1) / yoff)));
         if (crtc[8] & 1) wt -= (c >> 1);

@@ -71,23 +71,19 @@ void model_init()
         curtube = selecttube;
         if (models[curmodel].tube != -1) curtube = models[curmodel].tube;
 
-
+        
         getcwd(t, 511);
         append_filename(t2, exedir, "roms", 511);
         chdir(t2);
         mem_clearroms();
-        if (models[curmodel].romsetup)
-        {
-                if (models[curmodel].romsetup())
-                        exit(-1);
-        }
+        if (models[curmodel].romsetup) models[curmodel].romsetup();
 
         mem_loadroms(models[curmodel].os, models[curmodel].romdir);
 //        if (ideenable) loadiderom();
         if (curtube!=-1) tubes[curtube].init();
         tube_reset();
         chdir(t);
-
+        
         cmos_load(models[curmodel]);
         if (models[curmodel].swram) mem_fillswram();
 }

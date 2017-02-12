@@ -1,6 +1,6 @@
 /*B-em v2.2 by Tom Walker
   OpenAL interface*/
-
+  
 #include <stdio.h>
 #include <AL/al.h>
 #include <AL/alut.h>
@@ -56,10 +56,10 @@ void al_init()
 
         alGenBuffers(4, buffers);
         check();
-
+        
         alGenSources(2, source);
         check();
-
+        
         alSource3f(source[0], AL_POSITION,        0.0, 0.0, 0.0);
         alSource3f(source[0], AL_VELOCITY,        0.0, 0.0, 0.0);
         alSource3f(source[0], AL_DIRECTION,       0.0, 0.0, 0.0);
@@ -68,7 +68,7 @@ void al_init()
         check();
 
         memset(tempbuf, 0, BUFLEN);
-
+        
         for (c = 0; c < 4; c++)
             alBufferData(buffers[c], AL_FORMAT_STEREO16, tempbuf, BUFLEN, 31250);
         alSourceQueueBuffers(source[0], 4, buffers);
@@ -105,7 +105,7 @@ void al_givebuffer(int16_t *buf)
         int processed;
         int state;
         int c;
-
+        
 //return;
         alGetSourcei(source[0], AL_SOURCE_STATE, &state);
 
@@ -130,7 +130,7 @@ void al_givebuffer(int16_t *buf)
                 check();
 
                 for (c = 0; c < (BUFLEN >> 1); c++) zbuf[c] = buf[c >> 1];
-
+                
                 alBufferData(buffer, AL_FORMAT_STEREO16, zbuf, BUFLEN, 31250);
 //                printf("B ");
                 check();
@@ -138,7 +138,7 @@ void al_givebuffer(int16_t *buf)
                 alSourceQueueBuffers(source[0], 1, &buffer);
 //                printf("Q ");
                 check();
-
+                
         }
 }
 
@@ -179,6 +179,6 @@ void al_givebufferdd(int16_t *buf)
                 alSourceQueueBuffers(source[1], 1, &buffer);
                 check();
         }
-
+        
 //        rpclog("DDnoise3\n");
 }

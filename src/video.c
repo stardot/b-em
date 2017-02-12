@@ -446,10 +446,10 @@ void video_init()
         set_color_depth(32);
         b32  = create_bitmap(1536, 800);
         set_color_depth(8);
-
+        
         generate_332_palette(pal);
         set_palette(pal);
-
+        
         collook[0] = makecol(0, 0, 0);
         col0 = collook[0] | (collook[0] << 8) | (collook[0] << 16) | (collook[0] << 24);
         collook[1] = makecol(255, 0,   0);
@@ -536,7 +536,7 @@ void video_poll(int clocks)
                 vidclocks++;
                 oddclock = !oddclock;
                 if (!(ula_ctrl & 0x10) && !oddclock) continue;
-
+                
                 if (hc == crtc[1])
                 {
                         if (ula_ctrl & 2 && dispen) charsleft = 3;
@@ -823,10 +823,10 @@ void video_poll(int clocks)
                                 sc &= 31;
                                 ma = maback;
                         }
-
+                        
                         mode7_dbl = mode7_wasdbl = 0;
                         if ((sc == (crtc[10] & 31) || ((crtc[8] & 3) == 3 && sc == ((crtc[10] & 31) >> 1))) && !coff) con = 1;
-
+                        
                         if (vsynctime)
                         {
                                 vsynctime--;
@@ -836,7 +836,7 @@ void video_poll(int clocks)
                                         if (frameodd) interline = (crtc[8] & 1);
                                 }
                         }
-
+                        
                         dispen = vdispen;
                         if (dispen || vadj)
                         {

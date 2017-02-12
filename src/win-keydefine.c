@@ -46,7 +46,7 @@ void getkey(HWND parent)
                    return;
         }
 
-        if (khwnd) SendMessage(khwnd, WM_CLOSE, 0, 0);
+	if (khwnd) SendMessage(khwnd, WM_CLOSE, 0, 0);
 
         /* The class is registered, let's create the window*/
         khwnd = CreateWindowEx (
@@ -205,8 +205,8 @@ LRESULT CALLBACK KeyWindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPA
                 hwndCtrl = CreateWindow( "STATIC", s, WS_CHILD | SS_SIMPLE | WS_VISIBLE, 4, 36, 240-10, 16, hwnd, NULL, hinstance, NULL );
                 break;
 
-                case WM_SYSKEYUP:
-                case WM_KEYUP:
+        	case WM_SYSKEYUP:
+        	case WM_KEYUP:
                 if (LOWORD(wParam) != 255)
                 {
                         c = MapVirtualKey(LOWORD(wParam), 0);

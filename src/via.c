@@ -9,22 +9,22 @@
 #define INT_TIMER1 0x40
 #define INT_TIMER2 0x20
 
-#define         ORB     0x00
-#define         ORA     0x01
-#define         DDRB    0x02
-#define         DDRA    0x03
-#define         T1CL    0x04
-#define         T1CH    0x05
-#define         T1LL    0x06
-#define         T1LH    0x07
-#define         T2CL    0x08
-#define         T2CH    0x09
-#define         SR      0x0a
-#define         ACR     0x0b
-#define         PCR     0x0c
-#define         IFR     0x0d
-#define         IER     0x0e
-#define         ORAnh   0x0f
+#define		ORB     0x00
+#define		ORA	0x01
+#define		DDRB	0x02
+#define		DDRA	0x03
+#define		T1CL	0x04
+#define		T1CH	0x05
+#define		T1LL	0x06
+#define		T1LH	0x07
+#define		T2CL	0x08
+#define		T2CH	0x09
+#define		SR	0x0a
+#define		ACR	0x0b
+#define		PCR	0x0c
+#define		IFR	0x0d
+#define		IER	0x0e
+#define		ORAnh   0x0f
 
 void via_updateIFR(VIA *v)
 {
@@ -105,7 +105,7 @@ void via_write(VIA *v, uint16_t addr, uint8_t val)
 
                 v->write_portB((val & v->ddrb) | ~v->ddrb);
                 v->orb=val;
-
+                
                 if ((v->pcr & 0xE0) == 0x80) /*Handshake mode*/
                 {
                         v->set_cb2(0);
@@ -132,9 +132,9 @@ void via_write(VIA *v, uint16_t addr, uint8_t val)
                 break;
                 case PCR:
                 v->pcr  = val;
-
+                
                 rpclog("PCR write %04X %02X\n",addr,val);
-
+                
                 if ((val & 0xE) == 0xC)
                 {
                         v->set_ca2(0);
@@ -248,46 +248,46 @@ uint8_t via_read(VIA *v, uint16_t addr)
 
                 case DDRA:
                 return v->ddra;
-
+                
                 case DDRB:
                 return v->ddrb;
-
+                
                 case T1LL:
                 return (v->t1l & 0x1FE) >> 1;
-
+                
                 case T1LH:
                 return v->t1l >> 9;
-
+                
                 case T1CL:
                 v->ifr &= ~INT_TIMER1;
                 via_updateIFR(v);
                 if (v->t1c < -1) return 0xFF; /*Return 0xFF during reload*/
                 return ((v->t1c + 1) >> 1) & 0xFF;
-
+                
                 case T1CH:
                 if (v->t1c<-1) return 0xFF;   /*Return 0xFF during reload*/
                 return (v->t1c+1)>>9;
-
+                
                 case T2CL:
                 v->ifr &= ~INT_TIMER2;
                 via_updateIFR(v);
                 return ((v->t2c + 1) >> 1) & 0xFF;
-
+                
                 case T2CH:
                 return (v->t2c+1)>>9;
-
+                
                 case SR:
                 return v->sr;
-
+                
                 case ACR:
                 return v->acr;
-
+                
                 case PCR:
                 return v->pcr;
-
+                
                 case IER:
                 return v->ier | 0x80;
-
+                
                 case IFR:
                 return v->ifr;
         }
@@ -375,10 +375,10 @@ void via_reset(VIA *v)
         v->t2c   = v->t2l   = 0x1FFFE;
         v->t1hit = v->t2hit = 1;
         v->acr   = v->pcr   = 0;
-
+        
         v->read_portA  = v->read_portB  = via_read_null;
         v->write_portA = v->write_portB = via_write_null;
-
+        
         v->set_ca1 = v->set_ca2 = v->set_cb1 = v->set_cb2 = via_set_null;
 }
 

@@ -9,12 +9,12 @@ typedef struct VIA
         int      t1hit, t2hit;
         int      ca1,   ca2,   cb1,   cb2;
         int      intnum;
-
+        
         uint8_t  (*read_portA)();
         uint8_t  (*read_portB)();
         void     (*write_portA)(uint8_t val);
         void     (*write_portB)(uint8_t val);
-
+        
         void     (*set_ca1)(int level);
         void     (*set_ca2)(int level);
         void     (*set_cb1)(int level);

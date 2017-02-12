@@ -76,24 +76,24 @@ uint8_t readmem(uint16_t addr)
                 case 0xFC30: case 0xFC34: case 0xFC38: case 0xFC3C:
                 if (sound_beebsid) return sid_read(addr);
                 break;
-
+                
                 case 0xFC40: case 0xFC44: case 0xFC48: case 0xFC4C:
                 case 0xFC50: case 0xFC54: case 0xFC58: case 0xFC5C:
                 if (ide_enable) return ide_read(addr);
                 break;
-
+                
                 case 0xFE00: case 0xFE04: return crtc_read(addr);
-
+                
                 case 0xFE08: case 0xFE0C: return acia_read(addr);
-
+                
                 case 0xFE10: case 0xFE14: return serial_read(addr);
-
+                
                 case 0xFE18: if (MASTER) return adc_read(addr); break;
-
+                
                 case 0xFE24: case 0xFE28: if (MASTER) return wd1770_read(addr); break;
-
+                
                 case 0xFE34: if (MASTER) return acccon; break;
-
+                
                 case 0xFE40: case 0xFE44: case 0xFE48: case 0xFE4C:
                 case 0xFE50: case 0xFE54: case 0xFE58: case 0xFE5C:
                 return sysvia_read(addr);
@@ -110,12 +110,12 @@ uint8_t readmem(uint16_t addr)
                         return i8271_read(addr);
                 }
                 break;
-
+                
                 case 0xFEC0: case 0xFEC4: case 0xFEC8: case 0xFECC:
                 case 0xFED0: case 0xFED4: case 0xFED8: case 0xFEDC:
                 if (!MASTER) return adc_read(addr);
                 break;
-
+                
                 case 0xFEE0: case 0xFEE4: case 0xFEE8: case 0xFEEC:
                 case 0xFEF0: case 0xFEF4: case 0xFEF8: case 0xFEFC:
                 return tube_host_read(addr);
@@ -140,26 +140,26 @@ void writemem(uint16_t addr, uint8_t val)
                 case 0xFC30: case 0xFC34: case 0xFC38: case 0xFC3C:
                 if (sound_beebsid) sid_write(addr, val);
                 break;
-
+                
                 case 0xFC40: case 0xFC44: case 0xFC48: case 0xFC4C:
                 case 0xFC50: case 0xFC54: case 0xFC58: case 0xFC5C:
                 ide_write(addr, val);
                 break;
-
+                
                 case 0xFE00: case 0xFE04: crtc_write(addr, val); break;
-
+                
                 case 0xFE08: case 0xFE0C: acia_write(addr, val); break;
-
+                
                 case 0xFE10: case 0xFE14: serial_write(addr, val); break;
-
+                
                 case 0xFE18: if (MASTER) adc_write(addr, val); break;
-
+                
                 case 0xFE20: videoula_write(addr, val); break;
-
+                
                 case 0xFE24: if (MASTER) wd1770_write(addr, val); else videoula_write(addr, val); break;
-
+                
                 case 0xFE28: if (MASTER) wd1770_write(addr, val); break;
-
+                
                 case 0xFE30:
                 ram_fe30 = val;
                 for (c = 128; c < 192; c++) memlook[0][c] = memlook[1][c] = &rom[(val & 15) << 14] - 0x8000;
@@ -179,7 +179,7 @@ void writemem(uint16_t addr, uint8_t val)
                         for (c = 128; c < 176; c++) memstat[0][c] = memstat[1][c] = 1;
                 }
                 break;
-
+                
                 case 0xFE34:
                 ram_fe34 = val;
                 if (BPLUS)
@@ -210,17 +210,17 @@ void writemem(uint16_t addr, uint8_t val)
                         }
                 }
                 break;
-
+                
                 case 0xFE40: case 0xFE44: case 0xFE48: case 0xFE4C:
                 case 0xFE50: case 0xFE54: case 0xFE58: case 0xFE5C:
                 sysvia_write(addr, val);
                 break;
-
+                
                 case 0xFE60: case 0xFE64: case 0xFE68: case 0xFE6C:
                 case 0xFE70: case 0xFE74: case 0xFE78: case 0xFE7C:
                 uservia_write(addr, val);
                 break;
-
+                
                 case 0xFE80: case 0xFE84: case 0xFE88: case 0xFE8C:
                 case 0xFE90: case 0xFE94: case 0xFE98: case 0xFE9C:
                 if (!MASTER)
@@ -229,12 +229,12 @@ void writemem(uint16_t addr, uint8_t val)
                         else        i8271_write(addr, val);
                 }
                 break;
-
+                
                 case 0xFEC0: case 0xFEC4: case 0xFEC8: case 0xFECC:
                 case 0xFED0: case 0xFED4: case 0xFED8: case 0xFEDC:
                 if (!MASTER) adc_write(addr, val);
                 break;
-
+                
                 case 0xFEE0: case 0xFEE4: case 0xFEE8: case 0xFEEC:
                 case 0xFEF0: case 0xFEF4: case 0xFEF8: case 0xFEFC:
                 tube_host_write(addr, val);
@@ -266,10 +266,10 @@ void m6502_reset()
         for (c = 192; c < 256; c++) memlook[0][c] = memlook[1][c] = os  - 0xC000;
         memstat[0][0xFC] = memstat[0][0xFD] = memstat[0][0xFE] = 0;
         memstat[1][0xFC] = memstat[1][0xFD] = memstat[1][0xFE] = 0;
-
+        
         cycles = 0;
         ram4k = ram8k = ram12k = ram20k = 0;
-
+        
         pc = readmem(0xFFFC) | (readmem(0xFFFD) << 8);
         p.i = 1;
         nmi = oldnmi = 0;
@@ -604,7 +604,7 @@ void m6502_exec()
                                 polltime(4);
                                 takeint=(interrupt && !p.i);
                                 break;
-
+                                
                                 case 0x0D: /*ORA abs*/
                                 addr=getw();
                                 polltime(4);
@@ -680,14 +680,14 @@ void m6502_exec()
                                 setzn(a);
                                 takeint=(interrupt && !p.i);
                                 break;
-
+                                
                                 case 0x14: /*Undocumented - NOP zp,x*/
                                 addr=readmem(pc); pc++;
                                 readmem((addr+x)&0xFF);
                                 polltime(3);
                                 takeint=(interrupt && !p.i);
                                 break;
-
+                                
                                 case 0x15: /*ORA zp,x*/
                                 addr=readmem(pc); pc++;
                                 a|=readmem((addr+x)&0xFF);
@@ -736,7 +736,7 @@ void m6502_exec()
                                 polltime(4);
                                 takeint=(interrupt && !p.i);
                                 break;
-
+                                
                                 case 0x1A: /*Undocumented - NOP*/
                                 polltime(2);
                                 takeint=(interrupt && !p.i);
@@ -842,7 +842,7 @@ void m6502_exec()
                                 setzn(a);
                                 takeint=(interrupt && !p.i);
                                 break;
-
+                                
                                 case 0x24: /*BIT zp*/
                                 addr=readmem(pc); pc++;
                                 temp=readmem(addr);
@@ -887,7 +887,7 @@ void m6502_exec()
                                 polltime(5);
                                 takeint=(interrupt && !p.i);
                                 break;
-
+                                
                                 case 0x28: /*PLP*/
                                 temp=pull();
                                 polltime(4);
@@ -1092,7 +1092,7 @@ void m6502_exec()
                                 setzn(a);
                                 takeint=(interrupt && !p.i);
                                 break;
-
+                                
                                 case 0x3C: /*Undocumented - NOP abs,x*/
                                 addr=getw();
                                 if ((addr&0xFF00)^((addr+x)&0xFF00)) polltime(1);
@@ -1633,7 +1633,7 @@ void m6502_exec()
                                 ADC(temp);
                                 takeint=(interrupt && !p.i);
                                 break;
-
+                                
                                 case 0x70: /*BVS*/
                                 offset=(int8_t)readmem(pc); pc++;
                                 temp=2;
@@ -1734,7 +1734,7 @@ void m6502_exec()
                                 polltime(2);
                                 takeint=(interrupt && !p.i);
                                 break;
-
+                                
                                 case 0x7B: /*Undocumented - RRA abs,y*/
                                 addr=getw();
                                 if ((addr&0xFF00)^((addr+y)&0xFF00)) polltime(1);
@@ -1757,7 +1757,7 @@ void m6502_exec()
                                 polltime(4);
                                 takeint=(interrupt && !p.i);
                                 break;
-
+                                
                                 case 0x7D: /*ADC abs,x*/
                                 addr=getw();
                                 if ((addr&0xFF00)^((addr+x)&0xFF00)) polltime(1);
@@ -1874,7 +1874,7 @@ void m6502_exec()
                                 polltime(2);
                                 takeint=(interrupt && !p.i);
                                 break;
-
+                                
                                 case 0x8B: /*Undocumented - ANE*/
                                 temp=readmem(pc); pc++;
                                 a=(a|0xEE)&x&temp; /*Internal parameter always 0xEE on BBC, always 0xFF on Electron*/
@@ -1930,7 +1930,7 @@ void m6502_exec()
                                 polltime(6);
                                 takeint=(interrupt && !p.i);
                                 break;
-
+                                
                                 case 0x93: /*Undocumented - SHA (),y*/
                                 temp=readmem(pc); pc++;
                                 addr=readmem(temp)+(readmem(temp+1)<<8);
@@ -2118,7 +2118,7 @@ void m6502_exec()
                                 polltime(2);
                                 takeint=(interrupt && !p.i);
                                 break;
-
+                                
                                 case 0xAB: /*Undocumented - LAX*/
                                 temp=readmem(pc); pc++;
                                 a=x=((a|0xEE)&temp); /*WAAAAY more complicated than this, but it varies from machine to machine anyway*/
@@ -2245,7 +2245,7 @@ void m6502_exec()
                                 polltime(2);
                                 takeint=(interrupt && !p.i);
                                 break;
-
+                                
                                 case 0xBB: /*Undocumented - LAS abs,y*/
                                 addr=getw();
                                 polltime(3);
@@ -2389,7 +2389,7 @@ void m6502_exec()
                                 polltime(2);
                                 takeint=(interrupt && !p.i);
                                 break;
-
+                                
                                 case 0xCB: /*Undocumented - SBX imm*/
                                 temp=readmem(pc); pc++;
                                 setzn((a&x)-temp);
@@ -2430,7 +2430,7 @@ void m6502_exec()
                                 writemem(addr,temp);
                                 setzn(temp);
                                 break;
-
+                                
                                 case 0xCF: /*Undocumented - DCP abs*/
                                 addr=getw();
                                 temp=readmem(addr)-1;
@@ -2548,7 +2548,7 @@ void m6502_exec()
                                 p.c=(a>=temp);
                                 takeint=(interrupt && !p.i);
                                 break;
-
+                                
                                 case 0xDC: /*Undocumented - NOP abs,x*/
                                 addr=getw();
                                 if ((addr&0xFF00)^((addr+x)&0xFF00)) polltime(1);
@@ -2609,7 +2609,7 @@ void m6502_exec()
                                 polltime(6);
                                 takeint=(interrupt && !p.i);
                                 break;
-
+                                
                                 case 0xE2: /*Undocumented - NOP imm*/ /*Should sometimes lock up the machine*/
                                 readmem(pc); pc++;
                                 polltime(2);
@@ -2687,7 +2687,7 @@ void m6502_exec()
                                 polltime(2);
                                 takeint=(interrupt && !p.i);
                                 break;
-
+                                
                                 case 0xEB: /*Undocumented - SBC imm*/
                                 temp=readmem(pc); pc++;
                                 SBC(temp);
@@ -2964,7 +2964,7 @@ void m6502_exec()
                                         break;
                                 }*/
                 }
-
+                
 //                output=(pc<0x172B && pc>=0x167F);
 /*                if (pc==0x7112)
                 {
@@ -3278,7 +3278,7 @@ void m65c02_exec()
                                 writemem(addr,temp);
                                 polltime(5);
                                 break;
-
+                                
                                 case 0x15: /*ORA zp,x*/
                                 addr=readmem(pc); pc++;
                                 a|=readmem((addr+x)&0xFF);
@@ -4075,7 +4075,7 @@ void m65c02_exec()
                                 writemem(addr,a);
                                 polltime(6);
                                 break;
-
+                                
                                 case 0x94: /*STY zp,x*/
                                 addr=readmem(pc); pc++;
                                 writemem((addr+x)&0xFF,y);
@@ -4405,7 +4405,7 @@ void m65c02_exec()
                                 polltime(2);
                                 takeint=(interrupt && !p.i);
                                 break;
-
+                                
                                 case 0xCB: /*WAI*/
                                 polltime(2);
                                 takeint=(interrupt && !p.i);
@@ -4514,7 +4514,7 @@ void m65c02_exec()
                                 push(x);
                                 polltime(3);
                                 break;
-
+                                
                                 case 0xDD: /*CMP abs,x*/
                                 addr=getw();
                                 if ((addr&0xFF00)^((addr+x)&0xFF00)) polltime(1);
@@ -4729,7 +4729,7 @@ void m65c02_exec()
                                 }
                                 takeint=(interrupt && !p.i);
                                 break;
-
+                                
                                 printf("Found bad opcode %02X\n",opcode);
                                 dumpregs();
                                 mem_dump();

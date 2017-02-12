@@ -1,6 +1,6 @@
 /*B-em v2.2 by Tom Walker
   Debugger*/
-
+  
 int debug;
 int indebug=0;
 extern int fcount;
@@ -24,14 +24,14 @@ void _debugthread(PVOID pvoid)
 {
         MSG messages = {0};     /* Here messages to the application are saved */
         WNDCLASSEX wincl;        /* Data structure for the windowclass */
-
+        
         HDC hDC;
-                HDC memDC;
-                HBITMAP memBM;
-                BITMAPINFO lpbmi;
+		HDC memDC;
+		HBITMAP memBM;
+		BITMAPINFO lpbmi;
         int x;
         int c,d;
-
+        
         usdat = malloc(256 * 256 * 4);
         if (!debugstarted)
         {
@@ -82,7 +82,7 @@ void _debugthread(PVOID pvoid)
         memBM = CreateCompatibleBitmap ( hDC, 256, 256 );
         if (!memBM) printf("memBM failed!\n");
         SelectObject ( memDC, memBM );
-
+            
         lpbmi.bmiHeader.biSize         = sizeof(BITMAPINFOHEADER);
         lpbmi.bmiHeader.biWidth        = 256;
         lpbmi.bmiHeader.biHeight       = -256;
@@ -114,7 +114,7 @@ void _debugthread(PVOID pvoid)
 
                 SetDIBitsToDevice(memDC, 0, 0, 256, 256, 0, 0, 0, 256, usdat, &lpbmi, DIB_RGB_COLORS);
                 BitBlt(hDC, 0, 0, 256, 256, memDC, 0, 0, SRCCOPY);
-
+                
                 if (PeekMessage(&messages, NULL, 0, 0, PM_REMOVE))
                 {
                         /* Translate virtual-key messages into character messages */
@@ -481,7 +481,7 @@ void debugger_do()
                 debug_out(outs);
         }
         if (!opcode) debug = 1;
-
+        
         for (c = 0; c < 8; c++)
         {
                 if (breakpoints[c] == pc)
@@ -511,14 +511,14 @@ void debugger_do()
                 c = ReadConsoleA(cinf, ins, 255, (LPDWORD)&d, NULL);
                 ins[d] = 0;
 #else
-                d = (int)fgets(ins, 255, stdin);
+		d = (int)fgets(ins, 255, stdin);
 #endif
                 d = 0;
                 while (ins[d] != 32 && ins[d] != 0xA && ins[d] != 0xD && ins[d] != 0) d++;
                 while (ins[d] == 32) d++;
                 if (ins[d] == 0xA || ins[d] == 0xD || ins[d] == 0) params = 0;
                 else                                               params = 1;
-
+                
                 if (ins[0] == 0xA || ins[0] == 0xD) ins[0] = debug_lastcommand;
 //debug_out("Processing!\n");
                 switch (ins[0])
@@ -827,7 +827,7 @@ void debugger_do()
                                 writemem(e, f);
                         }
                         break;
-                        case 'q': case 'Q':
+                        case 'q': case 'Q': 
                         setquit();
                         while (1);
                         break;

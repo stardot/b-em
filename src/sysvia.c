@@ -44,7 +44,7 @@ void sysvia_via_set_cb2(int level)
 /*Slow data bus
 
   Port A is the slow data bus, and is connected to
-
+  
     Keyboard
     SN76489
     Speech chip (B/B+ only, not emulated)
@@ -86,7 +86,7 @@ static void sysvia_write_IC32(uint8_t val)
 {
         uint8_t oldIC32 = IC32;
         int temp = 0;
-
+        
         if (val & 8)
            IC32 |=  (1 << (val & 7));
         else
@@ -96,7 +96,7 @@ static void sysvia_write_IC32(uint8_t val)
 
         if (!(IC32 & 1) && (oldIC32 & 1))
            sn_write(sdbval);
-
+        
         scrsize = ((IC32 & 0x10) ? 2 : 0) | ((IC32 & 0x20) ? 1 : 0);
 
         if ((IC32 & 0xC0) != (oldIC32 & 0xC0))
@@ -130,7 +130,7 @@ void sysvia_write_portB(uint8_t val)
 uint8_t sysvia_read_portA()
 {
         sysvia_update_sdb();
-
+        
         return sdbval;
 }
 
@@ -181,9 +181,9 @@ void sysvia_reset()
 
         sysvia.write_portA = sysvia_write_portA;
         sysvia.write_portB = sysvia_write_portB;
-
+        
         sysvia.set_cb2 = sysvia_via_set_cb2; /*Lightpen*/
-
+        
         sysvia.intnum = 1;
 
         if (autoboot)
@@ -194,14 +194,14 @@ void sysvia_reset()
 void sysvia_savestate(FILE *f)
 {
         via_savestate(&sysvia, f);
-
+        
         putc(IC32,f);
 }
 
 void sysvia_loadstate(FILE *f)
 {
         via_loadstate(&sysvia, f);
-
+        
         IC32=getc(f);
         scrsize=((IC32&16)?2:0)|((IC32&32)?1:0);
 }

@@ -22,7 +22,7 @@ int csw_ena;
 void csw_load(char *fn)
 {
         int end,c;
-        uLongf destlen = 8 * 1024 * 1024;
+        uint32_t destlen = 8 * 1024 * 1024;
         uint8_t *tempin;
         if (csw_f) fclose(csw_f);
         if (csw_dat) free(csw_dat);
@@ -38,7 +38,7 @@ void csw_load(char *fn)
                 return;
         }
         fseek(csw_f, -1, SEEK_END);
-        end = ftell(csw_f) + 1;
+        end = ftell(csw_f);
         fseek(csw_f, 0, SEEK_SET);
         /*Read header*/
         fread(csw_head, 0x34, 1, csw_f);
@@ -48,7 +48,6 @@ void csw_load(char *fn)
         tempin = malloc(end);
         fread(tempin, end, 1, csw_f);
         fclose(csw_f);
-        csw_f = NULL;
 //        sprintf(csws,"Decompressing %i %i\n",destlen,end);
 //        fputs(csws,cswlog);
         /*Decompress*/
@@ -59,7 +58,7 @@ void csw_load(char *fn)
         dcd();
         tapellatch  = (1000000 / (1200 / 10)) / 64;
         tapelcount  = 0;
-        tape_loaded = 1;
+	tape_loaded = 1;
 }
 
 void csw_close()
@@ -88,13 +87,10 @@ void csw_poll()
 {
         int c;
         uint8_t dat;
-//        if (!csw_dat) return;
-
+        if (!csw_dat) return;
+        
         for (c = 0; c < 10; c++)
         {
-                /*If no tape is loaded or user managed to eject tape during this loop then give up now*/
-                if (!tape_loaded) return;
-
                 dat = csw_dat[csw_point++];
 
                 if (csw_point >= (8 * 1024 * 1024))
@@ -196,11 +192,11 @@ void csw_findfilenames()
         tempsk  = csw_skip;
         tempspd = acia_tapespeed;
         csw_point = 0;
-
+        
         csw_indat = csw_intone = csw_datbits = csw_skip = 0;
         csw_intone = 1;
         acia_tapespeed = 0;
-
+        
 //        gzseek(csw,12,SEEK_SET);
         csw_loop = 0;
         infilenames = 1;

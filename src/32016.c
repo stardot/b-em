@@ -280,7 +280,7 @@ static void getgen(int gen, int c)
                 pc+=isize;
 //                printf("PC %08X %i\n",pc,isize);
                 break;
-
+                
                 case 0x15: /*Absolute*/
                 gentype[c]=0;
                 genaddr[c]=getdisp();
@@ -310,7 +310,7 @@ static void getgen(int gen, int c)
                         sp[SP]+=isize;
                 }*/
                 break;
-
+                
                 case 0x18: /*FP relative*/
                 gentype[c]=0;
                 genaddr[c]=getdisp()+fp;
@@ -331,7 +331,7 @@ static void getgen(int gen, int c)
                 genaddr[c]=getdisp()+startpc;
 //                printf("Addr %08X %08X %08X\n",genaddr[c],pc,startpc);
                 break;
-
+                
                 case 0x1C: /*EA + Rn*/
                 getgen(genindex[c]>>3,c);
                 if (!gentype[c]) genaddr[c]+=r[genindex[c]&7];
@@ -346,7 +346,7 @@ static void getgen(int gen, int c)
 //                printf("EA + Rn*2 addr %08X\n",genaddr[c]);
                 gentype[c]=0;
                 break;
-
+                
 
                 default:
                 printf("Bad NS32016 gen mode %02X\n",gen&0x1F);
@@ -467,18 +467,18 @@ void n32016_exec()
                                         r[0]--;
                                 }
                                 break;
-
+                                
                                 case 0x0B: /*SETCFG*/
                                 nscfg=temp;
                                 break;
-
+                                
                                 default:
                                 printf("Bad NS32016 0E opcode %02X %04X %01X\n",(opcode>>8)&0x3F,opcode,(opcode>>15)&0xF);
                                 n32016_dumpregs();
                                 exit(-1);
                         }
                         break;
-
+                        
                         case 0x1C: case 0x9C: /*CMPQ byte*/
                         opcode|=(readmemb(pc)<<8); pc++;
                         getgen1(opcode>>11,0);
@@ -610,7 +610,7 @@ temp=0;
                         temp2=getdisp();
                         if (temp) pc=startpc+temp2;
                         break;
-
+                        
                         case 0x00: case 0x40: case 0x80: case 0xC0: /*ADD byte*/
                         opcode|=(readmemb(pc)<<8); pc++;
                         getgen1(opcode>>11,0);
@@ -662,7 +662,7 @@ temp=0;
                         nsoutput&=~2;
                         readgenl(0,temp);
                         readgenl(1,temp2);
-
+                        
 //                        printf("CMP %08X %08X %i %i\n",temp,temp2,temp>temp2,(((signed long)temp)>((signed long)temp2)));
                         psr&=~(Z_FLAG|N_FLAG|L_FLAG);
                         if (temp==temp2) psr|=Z_FLAG;
@@ -757,7 +757,7 @@ temp=0;
                         writegenl(1,genaddr[0]);
 //                        printf("%08X\n",sp[SP]);
                         break;
-
+                        
                         case 0x28: case 0x68: case 0xA8: case 0xE8: /*AND byte*/
                         opcode|=(readmemb(pc)<<8); pc++;
                         getgen1(opcode>>11,0);
@@ -875,7 +875,7 @@ temp=0;
                                 if (temp&0x80) temp|=0xFFFFFF00;
                                 pc=startpc+temp;
                                 break;
-
+                                
                                 default:
                                 printf("Bad NS32016 7C opcode %04X %01X\n",opcode,(opcode>>7)&0xF);
                                 n32016_dumpregs();
@@ -962,7 +962,7 @@ temp=0;
                                 case 0x9: writegenl(0,sp[SP]); break;
                                 case 0xA: writegenl(0,sb); break;
                                 case 0xF: writegenl(0,mod); /*nsoutput=1; */break;
-
+                                
                                 default:
                                 printf("Bad SPR reg %01X\n",(opcode>>7)&0xF);
                                 n32016_dumpregs();
@@ -993,7 +993,7 @@ temp=0;
                         switch ((opcode>>7)&0xF)
                         {
                                 case 15: mod=temp; break;
-
+                                
                                 default:
                                 printf("Bad LPRW reg %01X\n",(opcode>>7)&0xF);
                                 n32016_dumpregs();
@@ -1105,7 +1105,7 @@ temp=0;
                                 exit(-1);
                         }
                         break;
-
+                        
                         case 0x2E: case 0x6E: case 0xAE: case 0xEE: /*Type 8*/
                         opcode|=(readmemb(pc)<<8); pc++;
                         opcode|=(readmemb(pc)<<16); pc++;
@@ -1321,7 +1321,7 @@ temp=0;
                         case 0xEA: /*BR*/
                         pc=startpc+getdisp();
                         break;
-
+                        
                         default:
                         printf("Bad NS32016 opcode %02X\n",opcode);
                         n32016_dumpregs();

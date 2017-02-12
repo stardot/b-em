@@ -1,0 +1,293 @@
+Version 2.2 (03/06/2012)
+- MOS 3.50 emulation
+- Fixed CRTC bug when programmed with stupid values (MOS 3.50 startup)
+- ADFS disc corruption bug fixed (Carlo Concari)
+- Fixed ACIA bug - Pro Boxing Simulator tape version now works
+- Fixed bug which created endless blank hard disc images
+- Printer port DAC emulation
+- AMX mouse emulation
+- Master 512 mouse now works properly
+- Master Compact joystick emulation
+- IDE emulation available in non-Master models
+- UI fixes (some from Carlo Concari)
+- Improvements to VIA emulation
+- PAL video filter
+- Bugfixes in ARM and 65816 coprocessors
+- Debugger fixes
+- Tidying up of code
+- Windows version can now build on MSVC as well as GCC
+
+
+Version 2.1a (14/02/2011)
+- Keyboard bug fixed, Dr Who : The First Adventure now works
+- Video ULA bug, Atic Atac now has correct colours
+- Cursor inversion now works properly
+- Linux screenshots now work
+- Save states in Linux
+
+
+Version 2.1 (25/10/2010)
+- IDE hard disc emulation
+- OpenGL video support (mainly for Linux)
+- Fixed 360k discs in Master 512 mode
+- Fixed some hanging bugs in Windows (mainly when resetting)
+- Resizeable window in Windows
+- Debugger improvements
+- VIA and video fixes, cassette version of Lunar Jetman now works
+- Lightpen fix, Pharaoh's Curse works
+- Some mode 7 fixes
+- Speed control
+
+
+Version 2.0b (26/08/2010)
+- Fixed keyboard bug with Windows 7
+
+
+Version 2.0a (16/03/2010)
+- Various bugfixes
+- Linux port now available
+
+
+Version 2.0 (14/03/2010)
+- Most of the emulator re-written
+- Cycle-accurate video emulation
+- Higher quality mode 7
+- Added 80186 (Master 512) and 65816 second processors
+- BeebSID emulation (using resid-fp)
+- FDI support is back
+- Improved sound overall
+- Much more stable
+- Linux port (preliminary) - Linux 2.0 never got released
+- Debugger
+- Redefineable keyboard
+
+
+Version 1.5 (20/05/2008)
+- Acorn Z80 tube emulation
+- Various fixes to video and sound
+- New bandpass sound filter - recommended! (sounds very BBC-ish)
+- Fixed crash bug on exit
+
+
+Version 1.4a (10/06/2007)
+- Fixed problems with modes 3 and 6
+- FDI code removed due to licensing issues
+
+
+Version 1.4 (15/05/2007)
+- 65c012 tube emulation (+ Master Turbo) - from 4mhz to 64mhz
+- Fixed bug in ARM tube emulation
+- Sideways ROMs supported in Master emulation
+- Windows version now releases unneeded CPU time
+- Sound should hopefully be better
+
+Version 1.3 (13/25/2006)
+- Better sound in Windows version
+- Better CSW support
+- Bugfix in mode 7
+- Bugfix in cursor handling - Frogman works again, no more random crashes in some games
+- Periodic noise pitch now correct - see Icarus, Cute To Kill
+- Video can now use hardware scaling - should be faster
+- Removed colour errors with 2xSaI filter
+- File dialogs now work properly
+
+
+Version 1.2 (28/07/2006)
+- Preliminary CSW support
+- Improved timing, more protected games work (eg Nightshade, Tapper,
+  Beach Head etc)
+- E00 DFS now supported
+- Disc writing works properly again
+
+
+Version 1.1 (7/05/2006)
+- Can now emulate a Model B with 1770 FDC
+- Better mode 7 emulation - many programs improved, eg Granny's Garden
+- Added cursor to modes 0-6
+- Altered video timing a little
+- Added more commands to 1770 FDC - Watford DDFS now works (single density
+  mode only)
+- Some optimisations to video code
+- Update VGM logging to latest spec
+
+
+Version 1.0 (24/12/2005)
+- FDI support. Allows use of copy protected disc images. A few bugs in FDC
+  emulation remain, however about 75% of FDI images dumped so far work.
+- Improvements to timing, Joust now works, along with some Kevin Edwards
+  protected games.
+- Master Compact emulation (largely for some of the dumped FDI images).
+- Slight improvements to cassette emulation, loader on Joust now works,
+  speedup now available.
+- Faster tape loading.
+- Fixes and optimisations to ARM emulation
+
+
+Version 0.82 (11/08/2005)
+- ARM Evaluation System emulation. Beware that this is quite slow and probably
+  buggy (I don't have any software to test on it).
+- Fixed ADC/SBC BCD flags that were broken in 0.8 - Exile works again.
+- Added read ID commands to 8271 FDC - Superior Collection now works.
+- Ported to OS X
+
+
+Version 0.81b (28/07/2005) :
+- Audio buffer length now user selectable
+- Fixed bug with instructions like STA $FFFF,x - 3D Grand Prix no longer
+  crashes
+- A few other fixes
+
+
+Version 0.81a (27/07/2005) :
+- Adjusted audio a bit, less lagging in Windows port
+- Fixed VGM logging
+
+
+Version 0.81 (26/07/2005) :
+- Fixed bugs in 8271 and 1770 FDCs, all write operations should now work. The
+  Hobbit also now works correctly.
+- Fixed some crash bugs
+- Added command line options, mainly for use by frontends
+
+
+Version 0.8 (2/07/2005) :
+- Timing improvements, some stuff that encrypts via timers (eg Frogman) now
+  works
+- VIA improvements - fixed Planetoids/Super Defender/whatever, Volcano and
+  Pharoah's Curse
+- Improvements to sound accuracy, Ghouls and Killer Gorilla (and probably
+  others) have better sound
+- Cassette emulation now much more reliable
+- Save states are implemented again
+- Config file now in English
+- Added high pass sound filter and SID waveform
+
+Version 0.71b (27/07/2004) :
+- 8271 FDC now supports writing
+- FDC no longer crashes B-em in The Hobbit
+- Windows version should be more responsive
+
+
+Version 0.71a (6/07/2004) (Windows only) :
+- Fixed stupid bug relating to system resources
+
+
+Version 0.71 (5/07/2004) :
+- Big bug in Master 128 fixed - most Master stuff should work now
+- High resolution video now supported
+- 2xSaI filter
+- Bugs fixed in CRTC, Uridium and Psycastria now look better
+- Sound volume now logarithmic
+- Couple of other bug fixes
+- Win32 port can now run in a window
+
+
+Version 0.7 (5/04/2004) :
+- Master 128 emulation (buggy)
+- Better video timing, Uridium works
+- VIA interrupt bug fixed, many games better
+- Interrupt bug fixed, Empire Strikes Back now working
+- Disc write (B+ and Master 128 only)
+- Sound mixing now 16 bit
+- Low pass filter for sound
+- Improved disc drive noise
+- More reliable tape emulation
+
+
+Version 0.61 (28/01/2004) :
+- ADFS support
+- Model A support
+- Model B+ fixed a bit, Level 9 adventures now show pictures
+- Win32 version improved a bit
+- Some undocumented sound stuff emulated - Crazee Rider now has correct drums.
+- Some other misc changes
+
+
+Version 0.6 (31/07/2003) :
+- Model B+ support, along with 1770 emulation
+- Totally rewritten 6502 core - faster, more accurate
+- Fixed some VIA timing - Revs now works
+- UEF works better
+- New GUI
+- Improved sound core - now supports sample playback
+- Now emulates two disc drives
+- Win32 version now available
+
+
+Version 0.5 (23/12/2002) :
+- Totally rewritten 6502 core - faster, but some more bugs
+- Totally rewritten video - better split palette/mode emulation + R5 scrolling
+  and some rupture
+- UEF support is back
+- New GUI
+- Blurring filter
+- Switchable sound waveforms
+- Samples no longer crash B-em
+- Sideways RAM emulation actually works
+- Joystick emulation
+
+
+Version 0.4a (20/01/2002) :
+- Some 6502 bugs fixed, Exile now working properly.
+- Re-added Model A emulation.
+- Disc drive noise added.
+- Default config file no longer points to a non-existant file.
+- Can now log sound - invented new file format for this (.sn - player and
+  format description included)
+- Arrow keys and delete/copy now work again.
+- Updated documentation
+
+
+Version 0.4 (13/01/2002) :
+- Sound is *much* better
+- Speed increased 2-4 times
+- Video emulation improved. Full overscan is supported, and the colour
+  generation is the same as on a real BBC
+- New GUI
+- UEF support removed, as it were crap
+- Directories semi-supported in TFS (for Dambusters and Sorcery)
+- Setup removed (no longer needed)
+- Some 6502 bugs fixed
+- Sideways RAM emulation added, but quite buggy
+- Exile now works! (just)
+- Elite is now playable!
+
+
+Version 0.3a (14/04/2001) :
+- `clear screen' command removed, as it was using the same key as change disc.
+- Stuff held in seperate directories :
+  roms  - OS ROM and paged ROMs
+  inf   - .INF files (with the extension-less files as well)
+  uef   - .UEF files
+  discs - .SSD, .IMG, and .DSD files
+- You shouldn't get `chunk ID' errors anymore with the UEF code
+- American BBC support
+
+
+Version 0.3 (01/04/2001) (first released version!) :
+- Full 8271 FDC emulation
+- More 6502 bugfixes
+- Figured out what the vsync interrupt does (idiot!)
+- Fixed hardware scrolling
+- Optimisations
+
+
+Version 0.2 (14/10/2000) (never released) :
+- 6502 bugfixes - many more games work, plus BASIC is now usable
+- VIA bugfixes
+- Sound emulation (sounds terrible)
+- Preliminary 8271 FDC emulation - not enough to actually run anything
+
+
+Version 0.1 (03/09/2000) (never released) :
+- Graphics emulation
+- .INF file handling
+- Couple of 6502 bugfixes (not many)
+- About 3 games work
+
+
+Version 0.0 (24/07/2000) (never released) :
+- Buggy 6502 emulation
+- Basic mode 7 emulation
+- Keyboard
+- Nothing runs! BASIC is screwy

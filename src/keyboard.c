@@ -46,11 +46,11 @@ void key_release(int row, int col)
 
 static inline int TranslateKey(int index, int *row, int *col)
 {
-        unsigned int vkey = scan2bbc[index & 127];
+	unsigned int vkey = scan2bbc[index & 127];
         if (vkey == 0xaa) return -1;
-        *col = vkey & 15;
-        *row = (vkey >> 4) & 15;
-        return *row;
+	*col = vkey & 15;
+	*row = (vkey >> 4) & 15;
+	return *row;
 }
 
 static int keys2[128];

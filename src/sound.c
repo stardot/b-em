@@ -59,9 +59,9 @@ static float iir(float NewSample) {
 void sound_poll()
 {
         int c;
-
+        
         if (!(sound_internal || sound_beebsid || sound_dac)) return;
-
+        
         if (sound_beebsid)  sid_fillbuf(sound_buffer + (sound_pos << 1), 2);
         if (sound_internal) sn_fillbuf( sound_buffer + (sound_pos << 1), 2);
         if (sound_dac)
@@ -69,7 +69,7 @@ void sound_poll()
                 sound_buffer[(sound_pos << 1)]   += (((int)lpt_dac - 0x80) * 32);
                 sound_buffer[(sound_pos << 1)+1] += (((int)lpt_dac - 0x80) * 32);
         }
-
+        
         sound_pos++;
         if (sound_pos == (BUFLEN >> 1))
         {
@@ -79,16 +79,16 @@ void sound_poll()
                         if (sound_internal) sn_fillbuf( sound_buffer+ (sound_pos << 1), 1);
                         if (sound_dac) sound_buffer[(sound_pos << 1)]   += (((int)lpt_dac - 0x80) * 32);
                 }
-
+                
                 if (sound_filter)
                 {
                         for (c = 0; c < BUFLEN; c++)
                             sound_buffer[c] = (int)iir((float)sound_buffer[c]);
                 }
-
+                
                 sound_pos = 0;
                 al_givebuffer(sound_buffer);
-
+                
                 memset(sound_buffer, 0, sizeof(sound_buffer));
         }
 }

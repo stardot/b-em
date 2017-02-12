@@ -31,12 +31,12 @@ void sid_init()
         int c;
         sampling_method method=SAMPLE_INTERPOLATE;
         float cycles_per_sec=1000000;
-
+        
         psid = new sound_t;
         psid->sid = new SIDFP;
-
+        
         psid->sid->set_chip_model(MOS8580FP);
-
+        
         psid->sid->set_voice_nonlinearity(1.0f);
         psid->sid->get_filter().set_distortion_properties(0.f, 0.f, 0.f);
         psid->sid->get_filter().set_type4_properties(6.55f, 20.0f);
@@ -45,10 +45,10 @@ void sid_init()
         psid->sid->enable_external_filter(true);
 
         psid->sid->reset();
-
+        
         for (c=0;c<32;c++)
                 psid->sid->write(c,0);
-
+                
         if (!psid->sid->set_sampling_parameters((float)cycles_per_sec, method,
                                             (float)31250, 0.9*31250.0/2.0))
                                             {
@@ -63,7 +63,7 @@ void sid_reset()
 
         for (c=0;c<32;c++)
                 psid->sid->write(c,0);
-
+                
         sidrunning=0;
 }
 
@@ -153,6 +153,6 @@ static void fillbuf2(int& count, int16_t *buf, int len)
 void sid_fillbuf(int16_t *buf, int len)
 {
         int x=64;
-
+        
         fillbuf2(x,buf,len);
 }

@@ -21,7 +21,7 @@
 #define __FILTER_CC__
 #include "filter.h"
 #include "sid.h"
-
+  
 #ifndef HAVE_LOGF_PROTOTYPE
 extern float logf(float val);
 #endif
@@ -125,7 +125,7 @@ void FilterFP::calculate_helpers()
 void FilterFP::reset()
 {
   fc = 0;
-  res = filt = voice3off = hp_bp_lp = 0;
+  res = filt = voice3off = hp_bp_lp = 0; 
   vol = 0;
   volf = Vhp = Vbp = Vlp = 0;
   set_w0();

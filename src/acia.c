@@ -88,7 +88,7 @@ void acia_receive(uint8_t val) /*Called when the acia recives some data*/
         acia_dr = val;
         acia_sr |= RECIEVE | 0x80;
         acia_updateint();
-
+        
         newdat=val|0x100;
 }
 

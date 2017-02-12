@@ -25,7 +25,7 @@ void mouse_poll()
 {
         int dx, dy;
 
-        poll_mouse();
+	poll_mouse();
 
         if (curtube == 3)
         {
@@ -33,10 +33,10 @@ void mouse_poll()
 #ifdef WIN32
                 get_mouse_mickeys(&dx,&dy);
 #else
-                dx = (mouse_x - mouse_ox);
-                dy = (mouse_y - mouse_oy);
-                mouse_ox = mouse_x;
-                mouse_oy = mouse_y;
+		dx = (mouse_x - mouse_ox);
+		dy = (mouse_y - mouse_oy);
+		mouse_ox = mouse_x;
+		mouse_oy = mouse_y;
 #endif
                 mx += dx;
                 my += dy;
@@ -45,7 +45,7 @@ void mouse_poll()
                 {
                         if (mx > 0) mouse_portb |=  8;
                         else        mouse_portb &= ~8;
-
+                        
                         if (mouse_xff) mouse_portb ^= 8;
 
                         if (mx > 0) mx--;
@@ -88,16 +88,16 @@ void mouse_poll()
 #ifdef WIN32
                 get_mouse_mickeys(&dx,&dy);
 #else
-                dx = (mouse_x - mouse_ox);
-                dy = (mouse_y - mouse_oy);
-                mouse_ox = mouse_x;
-                mouse_oy = mouse_y;
-//                printf("%i,%i - %i, %i\n",mouse_x,mouse_y,dx,dy);
+		dx = (mouse_x - mouse_ox);
+		dy = (mouse_y - mouse_oy);
+		mouse_ox = mouse_x;
+		mouse_oy = mouse_y;
+		printf("%i,%i - %i, %i\n",mouse_x,mouse_y,dx,dy);
 #endif
-
+                
                 mx += dx;
                 my += dy;
-
+                
                 /*AMX mouse*/
                 if (mx)
                 {

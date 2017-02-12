@@ -79,11 +79,11 @@ void gui_update()
         tapespdmenu[0].flags = (!fasttape) ? D_SELECTED : 0;
         tapespdmenu[1].flags = (fasttape)  ? D_SELECTED : 0;
         for (x = 0; x < 16; x++) modelmenu[x].flags = 0;
-        for (x = 0; x < 16; x++)
-        {
-                if (curmodel == (int)modelmenu[x].dp)
-                   modelmenu[x].flags = D_SELECTED;
-        }
+	for (x = 0; x < 16; x++)
+	{
+		if (curmodel == (int)modelmenu[x].dp)
+		   modelmenu[x].flags = D_SELECTED;
+	}
         #ifdef NS32016
         for (x = 0; x < 5; x++)  tubemenu[x].flags = (selecttube == (int)tubemenu[x].dp) ? D_SELECTED : 0;
         #else
@@ -293,6 +293,7 @@ int gui_loadt()
                 tape_close();
                 memcpy(tape_fn, tempname, 260);
                 tape_load(tape_fn);
+                tape_loaded = 1;
         }
         return D_O_K;
 }
@@ -724,7 +725,7 @@ MENU mainmenu[6] =
 
 DIALOG bemgui[]=
 {
-        {d_ctext_proc, 200, 260, 0,  0, 15,0,0,0,     0,0,B_EM_VERSION},
+        {d_ctext_proc, 200, 260, 0,  0, 15,0,0,0,     0,0,"B-em v2.2"},
         {d_menu_proc,  0,   0,   0,  0, 15,0,0,0,     0,0,mainmenu},
         {d_yield_proc},
         {0,0,0,0,0,0,0,0,0,0,0,NULL,NULL,NULL}
@@ -737,17 +738,15 @@ BITMAP *guib;
 void gui_enter()
 {
         int x = 1;
-        DIALOG_PLAYER *dp;
-
+        DIALOG_PLAYER *dp;       
+        
         while (keypressed()) readkey();
         while (key[KEY_F11]) rest(100);
-
-        set_window_title(B_EM_VERSION);
 
         gui_update();
 
         if (curtube != 3 && !mouse_amx) install_mouse();
-
+        
         set_color_depth(dcol);
         show_mouse(screen);
         bemgui[0].x  = (windx / 2) - 36;
@@ -763,7 +762,7 @@ void gui_enter()
         set_color_depth(8);
 
         if (curtube != 3 && !mouse_amx) remove_mouse();
-
+        
         while (key[KEY_F11]) rest(100);
 
         video_clearscreen();

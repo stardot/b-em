@@ -40,7 +40,7 @@ void savestate_dosave()
         putc('N', f); putc('A', f); putc('P', f); putc('1', f);
 
         putc(curmodel, f);
-
+        
         m6502_savestate(f);
         mem_savestate(f);
         sysvia_savestate(f);
@@ -54,10 +54,10 @@ void savestate_dosave()
         serial_savestate(f);
 
         fclose(f);
-
+        
         savestate_wantsave = 0;
 }
-
+        
 void savestate_doload()
 {
         int c;
@@ -71,13 +71,13 @@ void savestate_doload()
                 bem_error("Not a B-em v2.x save state.");
                 return;
         }
-
+        
         curmodel = getc(f);
         selecttube = curtube = -1;
         rpclog("Restart BBC\n");
         main_restart();
         rpclog("Done!\n");
-
+        
         m6502_loadstate(f);
         mem_loadstate(f);
         sysvia_loadstate(f);
@@ -89,10 +89,10 @@ void savestate_doload()
         adc_loadstate(f);
         acia_loadstate(f);
         serial_loadstate(f);
-
+        
         rpclog("Loadstate done!\n");
-
+        
         fclose(f);
-
+        
         savestate_wantload = 0;
 }

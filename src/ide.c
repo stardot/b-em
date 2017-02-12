@@ -62,7 +62,7 @@ void ide_init(void)
         ide_bufferb = (uint8_t *)ide_buffer;
         ide.spt = 63;
         ide.hpc = 16;
-
+        
         ide.atastat  = 0x40;
         ide.error    = 0;
         ide.secount  = 1;
