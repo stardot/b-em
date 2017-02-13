@@ -1,3 +1,6 @@
+#ifndef __INC_VIA_H
+#define __INC_VIA_H
+
 typedef struct VIA
 {
         uint8_t  ora,   orb,   ira,   irb;
@@ -33,3 +36,5 @@ void via_set_cb2(VIA *v, int level);
 
 void via_savestate(VIA *v, FILE *f);
 void via_loadstate(VIA *v, FILE *f);
+
+#endif

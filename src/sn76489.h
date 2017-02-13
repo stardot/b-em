@@ -1,3 +1,6 @@
+#ifndef __INC_SN74689_H
+#define __INC_SN74689_H
+
 void sn_init();
 void sn_fillbuf(int16_t *buffer, int len);
 void sn_write(uint8_t data);
@@ -10,3 +13,5 @@ extern uint8_t sn_noise;
 extern uint32_t sn_latch[4];
 
 extern int curwave;
+
+#endif

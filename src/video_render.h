@@ -1,3 +1,6 @@
+#ifndef __INC_VIDEO_RENDER_H
+#define __INC_VIDEO_RENDER_H
+
 extern PALETTE pal;
 extern BITMAP *b, *b16, *b16x, *b32, *tb;
 #ifdef WIN32
@@ -30,4 +33,4 @@ void video_close();
 
 void clearscreen();
 
-
+#endif

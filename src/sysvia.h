@@ -1,3 +1,6 @@
+#ifndef __INC_SYSVIA_H
+#define __INC_SYSVIA_H
+
 extern VIA sysvia;
 
 void    sysvia_reset();
@@ -16,3 +19,5 @@ void sysvia_set_ca1(int level);
 void sysvia_set_ca2(int level);
 void sysvia_set_cb1(int level);
 void sysvia_set_cb2(int level);
+
+#endif

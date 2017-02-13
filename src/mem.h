@@ -1,3 +1,6 @@
+#ifndef __INC_MEM_H
+#define __INC_MEM_H
+
 void mem_romsetup_os01();
 void mem_romsetup_bplus128();
 void mem_romsetup_master128();
@@ -20,3 +23,4 @@ extern uint8_t ram_fe30, ram_fe34;
 extern uint8_t *ram, *rom, *os;
 extern int swram[16];
 
+#endif

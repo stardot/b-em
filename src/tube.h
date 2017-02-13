@@ -1,3 +1,6 @@
+#ifndef __INC_TUBE_H
+#define __INC_TUBE_H
+
 void tube_reset();
 void tube_6502_init();
 void tube_arm_init();
@@ -21,3 +24,5 @@ extern int tube_irq;
 
 void tube_reset();
 void tube_updatespeed();
+
+#endif

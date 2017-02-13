@@ -1,3 +1,6 @@
+#ifndef __INC_DISC_H
+#define __INC_DISC_H
+
 typedef struct
 {
         void (*seek)(int drive, int track);
@@ -42,3 +45,5 @@ extern int defaultwriteprot;
 extern char discfns[2][260];
 
 extern int writeprot[2], fwriteprot[2];
+
+#endif

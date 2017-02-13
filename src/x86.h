@@ -1,3 +1,6 @@
+#ifndef __INC_X86_H
+#define __INC_X86_H
+
 uint32_t oldpc;
 int oldcpl;
 
@@ -105,3 +108,5 @@ x86seg _cs,_ds,_es,_ss,_fs,_gs;
 #define V_FLAG  0x0800
 #define NT_FLAG 0x4000
 #define VM_FLAG 0x0002 /*In EFLAGS*/
+
+#endif

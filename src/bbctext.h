@@ -1,5 +1,8 @@
 /* Normal Character Set */
 
+#ifndef __INC_BBCTEXT_H
+#define __INC_BBCTEXT_H
+
 static uint8_t teletext_characters[96*60]={
   // 0x20 ' '
   0,0,0,0,0,0,
@@ -3276,3 +3279,5 @@ static uint8_t teletext_separated_graphics[96*60]={
   1,1,0,1,1,0,
   0,0,0,0,0,0
 };
+
+#endif

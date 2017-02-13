@@ -1,3 +1,6 @@
+#ifndef __INC_VIDEO_H
+#define __INC_VIDEO_H
+
 /*CRTC (6845)*/
 void    crtc_reset();
 void    crtc_write(uint16_t addr, uint8_t val);
@@ -33,3 +36,5 @@ extern uint16_t vidbank;
 
 void mode7_makechars();
 extern int interlline;
+
+#endif

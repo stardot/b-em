@@ -1,3 +1,6 @@
+#ifndef __INC_SIDTYPES_H
+#define __INC_SIDTYPES_H
+
 #define SID_MODEL_6581           0
 #define SID_MODEL_8580           1
 #define SID_MODEL_8580D          2
@@ -12,3 +15,5 @@
 #define SID_MODEL_8580R5_3691D  17
 #define SID_MODEL_8580R5_1489   18
 #define SID_MODEL_8580R5_1489D  19
+
+#endif

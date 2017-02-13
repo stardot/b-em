@@ -1,3 +1,6 @@
+#ifndef __INC_SCAN2BBC_H
+#define __INC_SCAN2BBC_H
+
 /*PC Scancode to BBC col+row table*/
 
 unsigned char scan2bbc[128]=              // IBM      SCAN CODE            BBC
@@ -42,3 +45,5 @@ unsigned char scan2bbc[128]=              // IBM      SCAN CODE            BBC
 			0xaa,0xaa,0xaa		 	  				//		120-127
 
 };
+
+#endif

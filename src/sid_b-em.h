@@ -1,3 +1,6 @@
+#ifndef __INC_SID_B_EM_H
+#define __INC_SID_B_EM_H
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -14,4 +17,5 @@ extern int sidmethod;
 
 #ifdef __cplusplus
 }
+#endif
 #endif

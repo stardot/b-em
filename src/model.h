@@ -1,3 +1,6 @@
+#ifndef __INC_MODEL_H
+#define __INC_MODEL_H
+
 void model_init();
 char *model_get();
 
@@ -32,3 +35,5 @@ extern TUBE tubes[7];
 
 extern int curmodel, curtube, oldmodel, selecttube;
 extern int I8271, WD1770, BPLUS, x65c02, MASTER, MODELA, OS01, compactcmos;
+
+#endif

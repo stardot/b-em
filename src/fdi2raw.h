@@ -1,5 +1,5 @@
-#ifndef __FDI2RAW_H
-#define __FDI2RAW_H
+#ifndef __INC_FDI2RAW_H
+#define __INC_FDI2RAW_H
 
 #define uae_u8 uint8_t
 #define uae_u16 uint16_t

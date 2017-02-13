@@ -1,3 +1,6 @@
+#ifndef __INC_DAA_H
+#define __INC_DAA_H
+
 static short DAATable[2048]=
 {
 68,
@@ -2049,3 +2052,5 @@ static short DAATable[2048]=
 -26485,
 -26225
 };
+
+#endif

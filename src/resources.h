@@ -1,3 +1,6 @@
+#ifndef __INC_RESOURCES_H
+#define __INC_RESOURCES_H
+
 //#define NS32016
 /*Uncomment the above to enable (buggy) 32016 emulation. Currently it just aborts
   constantly, but when it didn't I couldn't get any programs to run, so you're
@@ -89,3 +92,5 @@
 
 #define Button1 1000
 #define ListBox1 40900
+
+#endif

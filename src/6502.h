@@ -1,3 +1,6 @@
+#ifndef __INC_6502_H
+#define __INC_6502_H
+
 extern uint8_t a,x,y,s;
 extern uint16_t pc;
 extern uint16_t oldpc, oldoldpc, pc3;
@@ -26,3 +29,5 @@ void writemem(uint16_t addr, uint8_t val);
 
 void m6502_savestate(FILE *f);
 void m6502_loadstate(FILE *f);
+
+#endif
