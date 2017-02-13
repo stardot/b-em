@@ -71,7 +71,7 @@ void rpclog(const char *format, ...)
         char buf[256];
 		va_list ap;
  return;
-        if (!arclog) arclog=fopen("b-emlog.txt","wt");
+        if (!arclog) arclog=x_fopen("b-emlog.txt","wt");
         
         va_start(ap, format);
         vsprintf(buf, format, ap);

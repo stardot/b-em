@@ -29,10 +29,10 @@ void adf_init()
 void adf_load(int drive, char *fn)
 {
         writeprot[drive] = 0;
-        adf_f[drive] = fopen(fn, "rb+");
+        adf_f[drive] = x_fopen(fn, "rb+");
         if (!adf_f[drive])
         {
-                adf_f[drive] = fopen(fn, "rb");
+                adf_f[drive] = x_fopen(fn, "rb");
                 if (!adf_f[drive]) return;
                 writeprot[drive] = 1;
         }
@@ -62,10 +62,10 @@ void adf_load(int drive, char *fn)
 void adl_load(int drive, char *fn)
 {
         writeprot[drive] = 0;
-        adf_f[drive] = fopen(fn, "rb+");
+        adf_f[drive] = x_fopen(fn, "rb+");
         if (!adf_f[drive])
         {
-                adf_f[drive] = fopen(fn, "rb");
+                adf_f[drive] = x_fopen(fn, "rb");
                 if (!adf_f[drive]) return;
                 writeprot[drive] = 1;
         }
@@ -85,10 +85,10 @@ void adl_load(int drive, char *fn)
 void adl_loadex(int drive, char *fn, int sectors, int size, int dblstep)
 {
         writeprot[drive] = 0;
-        adf_f[drive] = fopen(fn, "rb+");
+        adf_f[drive] = x_fopen(fn, "rb+");
         if (!adf_f[drive])
         {
-                adf_f[drive] = fopen(fn, "rb");
+                adf_f[drive] = x_fopen(fn, "rb");
                 if (!adf_f[drive]) return;
                 writeprot[drive] = 1;
         }

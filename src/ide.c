@@ -38,25 +38,25 @@ void ide_init(void)
         if (!hdfile[0])
         {
                 sprintf(s, "%shd4.hdf", exedir);
-                hdfile[0] = fopen(s, "rb+");
+                hdfile[0] = x_fopen(s, "rb+");
                 if (!hdfile[0])
                 {
-                        hdfile[0] = fopen(s, "wb");
+                        hdfile[0] = x_fopen(s, "wb");
                         putc(0, hdfile[0]);
                         fclose(hdfile[0]);
-                        hdfile[0] = fopen(s, "rb+");
+                        hdfile[0] = x_fopen(s, "rb+");
                 }
         }
         if (!hdfile[1])
         {
                 sprintf(s, "%shd5.hdf", exedir);
-                hdfile[1] = fopen(s, "rb+");
+                hdfile[1] = x_fopen(s, "rb+");
                 if (!hdfile[1])
                 {
-                        hdfile[1] = fopen(s, "wb");
+                        hdfile[1] = x_fopen(s, "wb");
                         putc(0, hdfile[1]);
                         fclose(hdfile[1]);
-                        hdfile[1] = fopen(s, "rb+");
+                        hdfile[1] = x_fopen(s, "rb+");
                 }
         }
         ide_bufferb = (uint8_t *)ide_buffer;

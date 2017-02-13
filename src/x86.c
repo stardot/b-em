@@ -286,7 +286,7 @@ static void x86dumpregs()
 {
         FILE *f;
         int c;
-        f=fopen("x86ram.dmp","wb");
+        f=x_fopen("x86ram.dmp","wb");
         fwrite(x86ram,896*1024,1,f);
                 for (c=0xE0000;c<0x100000;c+=0x4000) fwrite(x86rom,16*1024,1,f);
         fclose(f);
@@ -336,7 +336,7 @@ void x86_init()
         x86makeznptable();
         memset(x86ram,0,0x100000);
         append_filename(fn,exedir,"roms/tube/BIOS.ROM",511);
-        f=fopen(fn,"rb");
+        f=x_fopen(fn,"rb");
         fread(x86rom,0x4000,1,f);
         fclose(f);
 }

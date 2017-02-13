@@ -27,10 +27,10 @@ void ssd_init()
 void ssd_load(int drive, char *fn)
 {
         writeprot[drive] = 0;
-        ssd_f[drive] = fopen(fn, "rb+");
+        ssd_f[drive] = x_fopen(fn, "rb+");
         if (!ssd_f[drive])
         {
-                ssd_f[drive] = fopen(fn, "rb");
+                ssd_f[drive] = x_fopen(fn, "rb");
                 if (!ssd_f[drive]) return;
                 writeprot[drive] = 1;
         }
@@ -47,10 +47,10 @@ void ssd_load(int drive, char *fn)
 void dsd_load(int drive, char *fn)
 {
         writeprot[drive] = 0;
-        ssd_f[drive] = fopen(fn, "rb+");
+        ssd_f[drive] = x_fopen(fn, "rb+");
         if (!ssd_f[drive])
         {
-                ssd_f[drive] = fopen(fn, "rb");
+                ssd_f[drive] = x_fopen(fn, "rb");
                 if (!ssd_f[drive]) return;
                 writeprot[drive] = 1;
         }

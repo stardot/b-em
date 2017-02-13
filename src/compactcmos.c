@@ -38,7 +38,7 @@ void compactcmos_load(MODEL m)
         FILE *cmosf;
         char fn[512];
         sprintf(fn, "%s%s", exedir, m.cmos);
-        cmosf = fopen(fn, "rb");
+        cmosf = x_fopen(fn, "rb");
         if (cmosf)
         {
                 fread(cmos_ram, 128, 1, cmosf);
@@ -53,7 +53,7 @@ void compactcmos_save(MODEL m)
         FILE *cmosf;
         char fn[512];
         sprintf(fn, "%s%s", exedir, m.cmos);
-        cmosf = fopen(fn, "wb");
+        cmosf = x_fopen(fn, "wb");
         fwrite(cmos_ram, 128, 1, cmosf);
         fclose(cmosf);
 }

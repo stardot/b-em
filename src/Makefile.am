@@ -20,6 +20,7 @@ b_em_LDADD = $(allegro_LIBS) -lz -lopenal -lalut
 endif
 
 b_em_SOURCES = 32016.c 6502.c 6502tube.c 65816.c acia.c adc.c \
+compat_wrappers.c \
 adf.c arm.c cmos.c compactcmos.c compact_joystick.c config.c csw.c ddnoise.c \
 debugger.c disc.c fdi.c fdi2raw.c i8271.c ide.c keyboard.c linux.c linux-gui.c \
 linux-keydefine.c main.c mem.c model.c mouse.c savestate.c serial.c sn76489.c \

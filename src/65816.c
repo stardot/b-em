@@ -4074,7 +4074,7 @@ void w65816_reset()
 /*static void w65816_dumpregs()
 {
         int c;
-        FILE *f=fopen("65816.dmp","wb");
+        FILE *f=x_fopen("65816.dmp","wb");
         
         for (c=0;c<65536;c++) putc(readmem(c),f);
         fclose(f);
@@ -4087,7 +4087,7 @@ void w65816_reset()
 
 static void badopcode()
 {
-//        FILE *f=fopen("rom.dmp","wb");
+//        FILE *f=x_fopen("rom.dmp","wb");
 //        printf("Bad opcode %02X\n",opcode);
 //        pc--;
 //        dumpregs65816();
@@ -4689,7 +4689,7 @@ void w65816_init()
         if (!w65816rom) w65816rom=malloc(0x8000);
         if (!w65816ram) w65816ram=malloc(0x80000);
                 append_filename(fn,exedir,"roms/tube/ReCo6502ROM_816",511);
-                f=fopen(fn,"rb");
+                f=x_fopen(fn,"rb");
                 fread(w65816rom,0x8000,1,f);
         fclose(f);
         makeopcodetable65816();

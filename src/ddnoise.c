@@ -97,8 +97,8 @@ void ddnoise_seek(int len)
 void ddnoise_mix()
 {
         int c;
-//        if (!f1) f1=fopen("f1.pcm","wb");
-//        if (!f2) f2=fopen("f2.pcm","wb");
+//        if (!f1) f1=x_fopen("f1.pcm","wb");
+//        if (!f2) f2=x_fopen("f2.pcm","wb");
 
         memset(ddbuffer, 0, 4410 * 2);
 //        fwrite(ddbuffer,4410*2,1,f1);

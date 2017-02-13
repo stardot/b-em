@@ -1,10 +1,15 @@
 /*B-em v2.2 by Tom Walker
   Main header file*/
 
+#ifndef __INCLUDE_B_EM_HEADER__
+#define __INCLUDE_B_EM_HEADER__
+
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "compat_wrappers.h"
 
 #ifdef _MSC_VER
 
@@ -47,3 +52,5 @@ void bem_error(char *s);
 void changetimerspeed(int i);
 
 extern int mousecapture;
+
+#endif

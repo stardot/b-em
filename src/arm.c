@@ -184,7 +184,7 @@ void arm_reset()
 
 void arm_dumpregs()
 {
-        FILE *f=fopen("armram.dmp","wb");
+        FILE *f=x_fopen("armram.dmp","wb");
         fwrite(armram,0x10000,1,f);
         fclose(f);
         rpclog("R 0=%08X R 4=%08X R 8=%08X R12=%08X\n",armregs[0],armregs[4],armregs[8],armregs[12]);
@@ -207,7 +207,7 @@ void arm_init()
         armromb=(uint8_t *)armrom;
         armramb=(uint8_t *)armram;
         append_filename(fn,exedir,"roms/tube/ARMeval_100.rom",511);
-        f=fopen(fn,"rb");
+        f=x_fopen(fn,"rb");
         fread(armromb,0x4000,1,f);
         fclose(f);
         memcpy(armramb,armromb,0x4000);
@@ -1623,7 +1623,7 @@ void arm_exec()
                                         tubecycles-=4;
 /*                                        if (RD==7)
                                         {
-                                                if (!olog) olog=fopen("armlog.txt","wt");
+                                                if (!olog) olog=x_fopen("armlog.txt","wt");
                                                 srpclog(s,"LDR R7 %08X,%07X\n",armregs[7],PC);
                                                 fputs(s,olog);
                                         }*/

@@ -38,7 +38,7 @@ static void tube_6502_loadrom()
         FILE *f;
         char fn[512];
                 append_filename(fn,exedir,"roms/tube/6502Tube.rom",511);
-                f=fopen(fn,"rb");
+                f=x_fopen(fn,"rb");
                 fread(tuberom+0x800,0x800,1,f);
         fclose(f);
 }
@@ -65,7 +65,7 @@ void tube_6502_close()
 #undef printf
 /*static void tubedumpregs()
 {
-        FILE *f=fopen("tuberam.dmp","wb");
+        FILE *f=x_fopen("tuberam.dmp","wb");
         fwrite(tuberam,65536,1,f);
         fclose(f);
         rpclog("Tube 65c12 registers :\n");

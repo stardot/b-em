@@ -78,7 +78,7 @@ void disc_load(int drive, char *fn)
         }
 //        printf("Couldn't load %s %s\n",fn,p);
         /*No extension match, so guess based on image size*/
-        f=fopen(fn, "rb");
+        f=x_fopen(fn, "rb");
         if (!f) return;
         fseek(f, -1, SEEK_END);
         c = ftell(f)+1;
@@ -131,7 +131,7 @@ void disc_new(int drive, char *fn)
         {
                 if (!strcasecmp(p, loaders[c].ext) && loaders[c].size != -1)
                 {
-                        f=fopen(fn, "wb");
+                        f=x_fopen(fn, "wb");
                         for (d = 0; d < loaders[c].size; d++) putc(0, f);
                         if (!strcasecmp(p, "ADF"))
                         {

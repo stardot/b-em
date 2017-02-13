@@ -1376,7 +1376,7 @@ static void dumpstream(int track, uae_u8 *stream, int len)
     FILE *f;
 
     sprintf (name, "track_%d.raw", track);
-    f = fopen(name, "wb");
+    f = x_fopen(name, "wb");
     fwrite (stream, 1, len * 4, f);
     fclose (f);
 #endif

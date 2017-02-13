@@ -30,7 +30,7 @@ void csw_load(char *fn)
         /*Allocate buffer*/
         csw_dat = malloc(8 * 1024 * 1024);
         /*Open file and get size*/
-        csw_f = fopen(fn,"rb");
+        csw_f = x_fopen(fn,"rb");
         if (!csw_f)
         {
                 free(csw_dat);

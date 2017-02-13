@@ -34,7 +34,7 @@ void savestate_load()
 void savestate_dosave()
 {
         FILE *f;
-        f = fopen(savestate_name, "wb");
+        f = x_fopen(savestate_name, "wb");
 //        rpclog("DoSave state\n");
         putc('B', f); putc('E', f); putc('M', f); putc('S', f);
         putc('N', f); putc('A', f); putc('P', f); putc('1', f);
@@ -62,7 +62,7 @@ void savestate_doload()
 {
         int c;
         char id[9];
-        FILE *f = fopen(savestate_name, "rb");
+        FILE *f = x_fopen(savestate_name, "rb");
         for (c = 0; c < 8; c++) id[c] = getc(f);
         id[8] = 0;
         if (strcmp(id, "BEMSNAP1"))

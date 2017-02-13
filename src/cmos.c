@@ -67,7 +67,7 @@ void cmos_load(MODEL m)
         {
                 sprintf(fn, "%s%s", exedir, m.cmos);
                 rpclog("CMOS Opening %s\n", fn);
-                f=fopen(fn, "rb");
+                f=x_fopen(fn, "rb");
                 if (!f)
                 {
                         memset(cmos, 0, 64);
@@ -88,7 +88,7 @@ void cmos_save(MODEL m)
         {
                 sprintf(fn, "%s%s", exedir, m.cmos);
                 rpclog("CMOS Opening %s\n", fn);
-                f=fopen(fn, "wb");
+                f=x_fopen(fn, "wb");
                 fwrite(cmos, 64, 1, f);
                 fclose(f);
         }

@@ -297,7 +297,7 @@ void z80_init()
         FILE *f;
         char fn[512];
         append_filename(fn,exedir,"roms/tube/Z80_120.rom",511);
-        f=fopen(fn,"rb");
+        f=x_fopen(fn,"rb");
         fread(z80rom,0x1000,1,f);
         fclose(f);
         makeznptable();
@@ -318,7 +318,7 @@ void z80_dumpregs()
 
 void z80_mem_dump()
 {
-        FILE *f=fopen("z80ram.dmp","wb");
+        FILE *f=x_fopen("z80ram.dmp","wb");
         fwrite(z80ram,0x10000,1,f);
         fclose(f);
 //        atexit(z80_dumpregs);

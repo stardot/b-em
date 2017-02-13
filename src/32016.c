@@ -2,9 +2,9 @@
   32016 parasite processor emulation (not working yet)*/
 #include <stdio.h>
 #include <allegro.h>
-#include "b-em.h"
 #include "tube.h"
 #include "32016.h"
+#include "b-em.h"
 
 static int nsoutput=0;
 #define r ns_r
@@ -87,7 +87,7 @@ void n32016_init()
         if (!ns32016rom) ns32016rom=malloc(0x8000);
         if (!ns32016ram) ns32016ram=malloc(0x100000);
         append_filename(fn,exedir,"roms/tube/Pandora.rom",511);
-        f=fopen(fn,"rb");
+        f=x_fopen(fn,"rb");
         fread(ns32016rom,0x8000,1,f);
         fclose(f);
         memset(ns32016ram,0,0x100000);
@@ -101,7 +101,7 @@ void n32016_close()
 
 static void n32016_dumpregs()
 {
-        FILE *f=fopen("32016.dmp","wb");
+        FILE *f=x_fopen("32016.dmp","wb");
         fwrite(ns32016ram,1024*1024,1,f);
         fclose(f);
         printf("R0=%08X R1=%08X R2=%08X R3=%08X\n",r[0],r[1],r[2],r[3]);
