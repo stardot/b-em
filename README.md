@@ -390,7 +390,7 @@ Thanks
 * Tom Seddon for updating Model B, indirectly motivating me to do v0.6, and for
   identifying the Empire Strikes Back bug.
 * Ken Lowe for assistance with the Level 9 adventures.
-* Richard Gellman for help with a few things.
+* Rebecca Gellman for her help with a few things (hardware-related).
 * Thomas Harte for some UEF code - I wrote my own in the end - and for the
   OS X port.
 * Dave Moore for making and hosting the B-em site
