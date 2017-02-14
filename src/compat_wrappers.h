@@ -8,6 +8,6 @@
 
 #include "b-em.h"
 
-FILE *x_fopen(const char * restrict, const char * restrict);
+FILE *x_fopen(const char *, const char *);
 
 #endif

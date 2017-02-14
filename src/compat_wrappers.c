@@ -6,7 +6,7 @@
 #include "compat_wrappers.h"
 
 FILE *
-x_fopen(const char * restrict path, const char * restrict mode)
+x_fopen(const char *path, const char *mode)
 {
 	/* Check to see if the path exists.  If it does, return the resultant
 	 * FILE * pointer, otherwise bail out.
