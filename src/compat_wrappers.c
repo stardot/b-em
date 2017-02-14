@@ -15,6 +15,9 @@ x_fopen(const char *path, const char *mode)
 	FILE	*fp = NULL;
 	char	*err;
 
+	if (path == NULL || path[0] == '\0')
+		return (NULL);
+
 	if ((fp = fopen(path, mode)) == NULL) {
 		if ((asprintf(&err, "Failed to load '%s' - %s\n", path,
 			strerror(errno))) == -1) {
