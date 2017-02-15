@@ -1,9 +1,12 @@
 # configure.ac for B-em
 
-AC_INIT(B-em, 2.2, Tom Walker <b-em@bbcmicro.com>, b-em)
+AC_INIT([B-em],
+	m4_esyscmd_s([utils/b-em-version-str.sh]),
+	[thomas@xteddy.org])
 
 AC_CONFIG_AUX_DIR(etc)
 AM_INIT_AUTOMAKE([foreign subdir-objects])
+AM_SILENT_RULES([yes])
 
 AC_CANONICAL_HOST
 
@@ -11,6 +14,9 @@ AC_CANONICAL_HOST
 AC_PROG_CC
 AC_PROG_CXX
 AM_PROG_CC_C_O
+
+# Whether this is a released build or not.
+ISRELEASED="no"
 
 AC_MSG_CHECKING([whether to enable debugging])
 AC_ARG_ENABLE(debug,
@@ -58,3 +64,7 @@ AC_CHECK_LIB(alut,
 )
 
 AC_OUTPUT([Makefile src/Makefile])
+
+echo
+echo "Configured version: $VERSION"
+echo
