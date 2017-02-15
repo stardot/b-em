@@ -124,7 +124,7 @@ int gui_return()
 int gui_reset()
 {
         main_restart();
-        return D_O_K;
+        return D_CLOSE;
 }
 
 int gui_exit()
@@ -157,7 +157,7 @@ int gui_savess()
         if (curtube != -1)
         {
                 alert(NULL, "Second processor save states not supported yet.", NULL, "&OK", NULL, 0, 0);
-                return D_O_K;
+                return D_CLOSE;
         }
         memcpy(tempname, discfns[0], 260);
         ret = file_select_ex("Please choose a save state", tempname, "SNP", 260, xsize, ysize);
@@ -195,7 +195,7 @@ int gui_load0()
                 if (defaultwriteprot) writeprot[0] = 1;
         }
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 int gui_load1()
 {
@@ -212,20 +212,20 @@ int gui_load1()
                 if (defaultwriteprot) writeprot[1] = 1;
         }
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 
 int gui_eject0()
 {
         disc_close(0);
         discfns[0][0] = 0;
-        return D_O_K;
+        return D_CLOSE;
 }
 int gui_eject1()
 {
         disc_close(1);
         discfns[1][0] = 0;
-        return D_O_K;
+        return D_CLOSE;
 }
 
 int gui_wprot0()
@@ -233,20 +233,20 @@ int gui_wprot0()
         writeprot[0] = !writeprot[0];
         if (fwriteprot[0]) fwriteprot[0] = 1;
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 int gui_wprot1()
 {
         writeprot[1] = !writeprot[1];
         if (fwriteprot[1]) fwriteprot[1] = 1;
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 int gui_wprotd()
 {
         defaultwriteprot = !defaultwriteprot;
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 
 MENU discmenu[8]=
@@ -265,13 +265,13 @@ int gui_normal()
 {
         fasttape = 0;
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 int gui_fast()
 {
         fasttape = 1;
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 
 MENU tapespdmenu[3]=
@@ -295,21 +295,21 @@ int gui_loadt()
                 tape_load(tape_fn);
                 tape_loaded = 1;
         }
-        return D_O_K;
+        return D_CLOSE;
 }
 
 int gui_rewind()
 {
         tape_close();
         tape_load(tape_fn);
-        return D_O_K;
+        return D_CLOSE;
 }
 
 int gui_ejectt()
 {
         tape_close();
         tape_loaded = 0;
-        return D_O_K;
+        return D_CLOSE;
 }
 
 MENU tapemenu[]=
@@ -327,7 +327,7 @@ int gui_model()
         curmodel = (int)active_menu->dp;
         main_restart();
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 
 MENU modelmenu[17]=
@@ -356,7 +356,7 @@ int gui_tubespd()
         tube_6502_speed = (int)active_menu->dp;
         tube_updatespeed();
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 
 MENU tubespdmenu[6]=
@@ -375,7 +375,7 @@ int gui_tube()
         selecttube = (int)active_menu->dp;
         main_restart();
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 
 #ifdef NS32016
@@ -400,21 +400,21 @@ int gui_linedbl()
         vid_linedbl = 1;
         vid_scanlines = vid_interlace = 0;
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 int gui_scanlines()
 {
         vid_scanlines = 1;
         vid_linedbl = vid_interlace = 0;
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 int gui_interlaced()
 {
         vid_interlace = 1;
         vid_linedbl = vid_scanlines = 0;
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 
 MENU displaymenu[4]=
@@ -429,7 +429,7 @@ int gui_borders()
 {
         vid_fullborders = (int)active_menu->dp;
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 
 MENU bordersmenu[4]=
@@ -468,7 +468,7 @@ int gui_sidtype()
         cursid = (int)active_menu->dp;
         sid_settype(sidmethod, cursid);
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 
 MENU sidtypemenu[15] =
@@ -495,7 +495,7 @@ int gui_method()
         sidmethod = (int)active_menu->dp;
         sid_settype(sidmethod, cursid);
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 
 MENU methodmenu[3] =
@@ -516,7 +516,7 @@ int gui_waveform()
 {
         curwave = (int)active_menu->dp;
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 
 MENU waveformmenu[6] =
@@ -535,7 +535,7 @@ int gui_ddtype()
         ddnoise_close();
         ddnoise_init();
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 
 MENU ddtypemenu[3]=
@@ -549,7 +549,7 @@ int gui_ddvol()
 {
         ddnoise_vol = (int)active_menu->dp;
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 
 MENU ddvolmenu[4]=
@@ -564,37 +564,37 @@ int gui_internalsnd()
 {
         sound_internal = !sound_internal;
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 int gui_beebsid()
 {
         sound_beebsid = !sound_beebsid;
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 int gui_dac()
 {
         sound_dac = !sound_dac;
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 int gui_ddnoise()
 {
         sound_ddnoise = !sound_ddnoise;
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 int gui_tnoise()
 {
         sound_tape = !sound_tape;
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 int gui_filter()
 {
         sound_filter = !sound_filter;
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 
 MENU soundmenu[11]=
@@ -616,7 +616,7 @@ int gui_mapas()
 {
         keyas = !keyas;
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 
 MENU keymenu[3] =
@@ -630,7 +630,7 @@ int gui_mouseamx()
 {
         mouse_amx = !mouse_amx;
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 
 MENU mousemenu[2] =
@@ -645,7 +645,7 @@ int gui_ide()
         ide_enable = !ide_enable;
         main_reset();
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 
 MENU idemenu[2]=
@@ -688,7 +688,7 @@ int gui_speed()
         changetimerspeed(timerspeeds[emuspeed]);
         vid_fskipmax = frameskips[emuspeed];
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 
 MENU speedmenu[11] =
