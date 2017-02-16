@@ -34,8 +34,9 @@ You will need the following libraries:
 
 Open a terminal window, navigate to the B-em directory then enter:
 
-./configure
-make && ./b-em
+```
+./configure && make && ./b-em
+```
 
 ### From Git Sources
 
