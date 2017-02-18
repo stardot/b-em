@@ -72,7 +72,6 @@ main()
   int allegro_major_version, allegro_minor_version, allegro_micro_version;
   int major, minor, micro;
   char *tmp_version;
-  int tmp_int_version;
 
   system("touch conf.allegrotest");
 

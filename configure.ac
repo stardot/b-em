@@ -21,12 +21,14 @@ ISRELEASED="no"
 AC_MSG_CHECKING([whether to enable debugging])
 AC_ARG_ENABLE(debug,
 	      AC_HELP_STRING([--enable-debug], [build debug executable]))
+
+CF_WARNINGS="-Werror -Wall -Wno-error=format-security"
 if test "$enable_debug" = "yes"; then
-   CFLAGS="$CFLAGS -Wall -O0 -g -D_DEBUG"
+   CFLAGS="$CFLAGS $CF_WARNINGS -O0 -g -D_DEBUG"
    LDFLAGS="$LDFLAGS -L/usr/local/lib"
    AC_MSG_RESULT([yes])
 else
-   CFLAGS="$CFLAGS -O3"
+   CFLAGS="$CFLAGS $CF_WARNINGS"
    LDFLAGS="$LDFLAGS -L/usr/local/lib"
    AC_MSG_RESULT([no])
 fi

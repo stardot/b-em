@@ -230,7 +230,7 @@ static void getgen(int gen, int c)
                 case 0: case 1: case 2: case 3:
                 case 4: case 5: case 6: case 7:
                 gentype[c]=1;
-                genaddr[c]=(uint32_t)&r[gen&7];
+                genaddr[c]=r[gen&7];
                 break;
                 case 8: case 9: case 0xA: case 0xB:
                 case 0xC: case 0xD: case 0xE: case 0xF:
@@ -272,7 +272,7 @@ static void getgen(int gen, int c)
 /*                genaddr[c]=pc;
                 gentype[c]=0;*/
                 gentype[c]=1;
-                genaddr[c]=(uint32_t)&nsimm[c];
+                genaddr[c]=nsimm[c];
                 /*Why can't they just decided on an endian and then stick to it?*/
                 if (isize==1) nsimm[c]=readmemb(pc);
                 else if (isize==2) nsimm[c]=(readmemb(pc)<<8)|readmemb(pc+1);
@@ -335,14 +335,14 @@ static void getgen(int gen, int c)
                 case 0x1C: /*EA + Rn*/
                 getgen(genindex[c]>>3,c);
                 if (!gentype[c]) genaddr[c]+=r[genindex[c]&7];
-                else             genaddr[c]=*(uint32_t *)genaddr[c]+r[genindex[c]&7];
+                else             genaddr[c]=genaddr[c]+r[genindex[c]&7];
 //                if (nsoutput&2) printf("EA + R%i addr %08X %02X\n",genindex[c]&7,genaddr[c],genindex[c]);
                 gentype[c]=0;
                 break;
                 case 0x1D: /*EA + Rn*2*/
                 getgen(genindex[c]>>3,c);
                 if (!gentype[c]) genaddr[c]+=(r[genindex[c]&7]*2);
-                else             genaddr[c]=*(uint32_t *)genaddr[c]+(r[genindex[c]&7]*2);
+                else             genaddr[c]=genaddr[c]+(r[genindex[c]&7]*2);
 //                printf("EA + Rn*2 addr %08X\n",genaddr[c]);
                 gentype[c]=0;
                 break;
@@ -355,28 +355,28 @@ static void getgen(int gen, int c)
         }
 }
 
-#define readgenb(c,temp)        if (gentype[c]) temp=*(uint8_t *)genaddr[c]; \
+#define readgenb(c,temp)        if (gentype[c]) temp=genaddr[c]; \
                                 else \
                                 { \
                                         temp=readmemb(genaddr[c]); \
                                         if (sdiff[c]) genaddr[c]=sp[SP]=sp[SP]+sdiff[c]; \
                                 }
 
-#define readgenw(c,temp)        if (gentype[c]) temp=*(uint16_t *)genaddr[c]; \
+#define readgenw(c,temp)        if (gentype[c]) temp=genaddr[c]; \
                                 else \
                                 { \
                                         temp=readmemw(genaddr[c]); \
                                         if (sdiff[c]) genaddr[c]=sp[SP]=sp[SP]+sdiff[c]; \
                                 }
 
-#define readgenl(c,temp)        if (gentype[c]) temp=*(uint32_t *)genaddr[c]; \
+#define readgenl(c,temp)        if (gentype[c]) temp=genaddr[c]; \
                                 else \
                                 { \
                                         temp=readmemw(genaddr[c])|(readmemw(genaddr[c]+2)<<16); \
                                         if (sdiff[c]) genaddr[c]=sp[SP]=sp[SP]+sdiff[c]; \
                                 }
 
-#define readgenq(c,temp)        if (gentype[c]) temp=*(uint64_t *)genaddr[c]; \
+#define readgenq(c,temp)        if (gentype[c]) temp=genaddr[c]; \
                                 else \
                                 { \
                                         temp=readmemw(genaddr[c])|(readmemw(genaddr[c]+2)<<16); \
@@ -385,21 +385,21 @@ static void getgen(int gen, int c)
                                         if (sdiff[c]) genaddr[c]=sp[SP]=sp[SP]+sdiff[c]; \
                                 }
 
-#define writegenb(c,temp)       if (gentype[c]) *(uint8_t *)genaddr[c]=temp; \
+#define writegenb(c,temp)       if (gentype[c]) genaddr[c]=temp; \
                                 else \
                                 { \
                                         if (sdiff[c]) genaddr[c]=sp[SP]=sp[SP]-sdiff[c]; \
                                         writememb(genaddr[c],temp); \
                                 }
 
-#define writegenw(c,temp)       if (gentype[c]) *(uint16_t *)genaddr[c]=temp; \
+#define writegenw(c,temp)       if (gentype[c]) genaddr[c]=temp; \
                                 else \
                                 { \
                                         if (sdiff[c]) genaddr[c]=sp[SP]=sp[SP]-sdiff[c]; \
                                         writememw(genaddr[c],temp); \
                                 }
 
-#define writegenl(c,temp)       if (gentype[c]) *(uint32_t *)genaddr[c]=temp; \
+#define writegenl(c,temp)       if (gentype[c]) genaddr[c]=temp; \
                                 else \
                                 { \
                                         if (sdiff[c]) genaddr[c]=sp[SP]=sp[SP]-sdiff[c]; \
@@ -937,7 +937,7 @@ temp=0;
 //                                printf("PC = %08X\n",pc);
                                 break;
                                 case 4: /*JUMP*/
-                                if (gentype[0]) pc=*(uint32_t *)genaddr[0];
+                                if (gentype[0]) pc=genaddr[0];
                                 else            pc=genaddr[0];
                                 break;
                                 case 0xA: /*ADJSP*/
@@ -1071,7 +1071,7 @@ temp=0;
                                 temp3=temp64%temp;
                                 writegenl(1,temp3);
                                 temp3=temp64/temp;
-                                if (gentype[1]) *(uint32_t *)(genaddr[1]+4)=temp3;
+                                if (gentype[1]) genaddr[1]=temp3;
                                 else            { writememw(genaddr[1]+4,temp3); writememw(genaddr[1]+4+2,temp3>>16); }
                                 break;
                                 case 0x33: /*QUOD*/

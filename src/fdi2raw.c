@@ -1554,7 +1554,8 @@ static void fdi2_decode (FDI *fdi, uint32_t totalavg, uae_u32 *avgp, uae_u32 *mi
 	uint32_t adjusted_pulse;
 	uint32_t standard_MFM_2_bit_cell_size = totalavg / 50000;
 	uint32_t standard_MFM_8_bit_cell_size = totalavg / 12500;
-	int real_size, i, j, nexti, eodat, outstep, randval;
+	int real_size, i, j, nexti, eodat, outstep;
+	uint32_t randval;
 	int indexoffset = *indexoffsetp;
 	uae_u8 *d = fdi->track_dst_buffer;
 	uae_u16	*pt = fdi->track_dst_buffer_timing;
@@ -1628,7 +1629,7 @@ static void fdi2_decode (FDI *fdi, uint32_t totalavg, uae_u32 *avgp, uae_u32 *mi
 				randval = rand();
 				if (randval < (RAND_MAX / 2)) {
 					if (randval > (RAND_MAX / 4)) {
-						if (randval <= (3 * RAND_MAX / 8))
+						if (randval <= (uint32_t)(3 * (uint32_t)(RAND_MAX / 8)))
 							randval = (2 * randval) - (RAND_MAX /4);
 						else
 							randval = (4 * randval) - RAND_MAX;
@@ -1637,7 +1638,7 @@ static void fdi2_decode (FDI *fdi, uint32_t totalavg, uae_u32 *avgp, uae_u32 *mi
 				} else {
 					randval -= RAND_MAX / 2;
 					if (randval > (RAND_MAX / 4)) {
-						if (randval <= (3 * RAND_MAX / 8))
+						if (randval <= (3 * (uint32_t)(RAND_MAX / 8)))
 							randval = (2 * randval) - (RAND_MAX /4);
 						else
 							randval = (4 * randval) - RAND_MAX;
@@ -1663,7 +1664,7 @@ static void fdi2_decode (FDI *fdi, uint32_t totalavg, uae_u32 *avgp, uae_u32 *mi
 				randval = rand();
 				if (randval < (RAND_MAX / 2)) {
 					if (randval > (RAND_MAX / 4)) {
-						if (randval <= (3 * RAND_MAX / 8))
+						if (randval <= (3 * (uint32_t)(RAND_MAX / 8)))
 							randval = (2 * randval) - (RAND_MAX /4);
 						else
 							randval = (4 * randval) - RAND_MAX;
@@ -1672,7 +1673,7 @@ static void fdi2_decode (FDI *fdi, uint32_t totalavg, uae_u32 *avgp, uae_u32 *mi
 				} else {
 					randval -= RAND_MAX / 2;
 					if (randval > (RAND_MAX / 4)) {
-						if (randval <= (3 * RAND_MAX / 8))
+						if (randval <= (3 * (uint32_t)(RAND_MAX / 8)))
 							randval = (2 * randval) - (RAND_MAX /4);
 						else
 							randval = (4 * randval) - RAND_MAX;
@@ -1813,16 +1814,15 @@ static void fdi2_celltiming (FDI *fdi, uint32_t totalavg, int bitoffset, uae_u16
 
 static int decode_lowlevel_track (FDI *fdi, int track, struct fdi_cache *cache)
 {
-	uae_u8 *p1, *d;
+	uae_u8 *p1;
 	uae_u32 *p2;
 	uae_u32 *avgp, *minp = 0, *maxp = 0;
 	uae_u8 *idxp = 0;
 	uae_u32 maxidx, totalavg, weakbits;
 	int i, j, len, pulses, indexoffset;
 	int avg_free, min_free = 0, max_free = 0, idx_free;
-	int idx_off1, idx_off2, idx_off3;
+	int idx_off1 = 0, idx_off2 = 0, idx_off3 = 0;
 
-	d = fdi->track_dst;
 	p1 = fdi->track_src;
 	pulses = get_u32 (p1);
 	if (!pulses)
