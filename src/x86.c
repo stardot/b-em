@@ -175,14 +175,6 @@ static inline uint16_t geteaw()
         return readmemwl(easeg,eaaddr);
 }
 
-static inline uint16_t geteaw2()
-{
-        if (mod==3)
-           return regs[rm].w;
-        cycles-=2;
-        return readmemwl(easeg,(eaaddr+2)&0xFFFF);
-}
-
 static inline void seteab(uint8_t val)
 {
         if (mod==3)

@@ -22,9 +22,9 @@ AC_MSG_CHECKING([whether to enable debugging])
 AC_ARG_ENABLE(debug,
 	      AC_HELP_STRING([--enable-debug], [build debug executable]))
 
-CF_WARNINGS="-Werror -Wall -Wno-error=format-security"
+CF_WARNINGS="-Wall -Werror -fno-strict-aliasing -Wno-format-security"
 if test "$enable_debug" = "yes"; then
-   CFLAGS="$CFLAGS $CF_WARNINGS -O0 -g -D_DEBUG"
+   CFLAGS="$CFLAGS $CF_WARNINGS -O0 -ggdb -D_DEBUG"
    LDFLAGS="$LDFLAGS -L/usr/local/lib"
    AC_MSG_RESULT([yes])
 else

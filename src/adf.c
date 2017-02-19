@@ -280,7 +280,7 @@ void adf_poll()
                 {
                         case 0: fdc_data(adf_track); break;
                         case 1: fdc_data(adf_side); break;
-                        case 2: fdc_data(adf_rsector + (adf_size[adf_drive] != 256) ? 1 : 0); break;
+                        case 2: fdc_data((adf_rsector + (adf_size[adf_drive] != 256)) ? 1 : 0); break;
                         case 3: fdc_data((adf_size[adf_drive] == 256) ? 1 : ((adf_size[adf_drive] == 512) ? 2 : 3)); break;
                         case 4: fdc_data(0); break;
                         case 5: fdc_data(0); break;

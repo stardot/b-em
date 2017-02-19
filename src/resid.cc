@@ -145,8 +145,7 @@ void sid_write(uint16_t addr, uint8_t val)
 
 static void fillbuf2(int& count, int16_t *buf, int len)
 {
-        int c;
-        if (sidrunning) c=psid->sid->clock(count, buf, len, 1);
+        if (sidrunning) psid->sid->clock(count, buf, len, 1);
         else            memset(buf,0,len*2);
 //        printf("Result %i len %i\n",c,len);
 }

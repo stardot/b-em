@@ -42,7 +42,7 @@ void adc_write(uint16_t addr, uint8_t val)
 
 void adc_poll()
 {
-        uint32_t val;
+        uint32_t val = 0;
 //        printf("%i\n",joy[0].stick[0].axis[0].pos);
         switch (adc_status & 3)
         {
@@ -52,7 +52,6 @@ void adc_poll()
                 case 3: val = (128 - joy[1].stick[0].axis[1].pos) * 256; break;
         }
         if (val > 0xFFFF) val = 0xFFFF;
-        if (val < 0)      val = 0;
 //        val^=0xFFFF;
 //        val++;
 //        if (val==0x10000) val=0xFFFF;

@@ -1213,7 +1213,7 @@ temp=0;
                         {
                                 if (temp&(1<<c))
                                 {
-                                        r[c^7]=popd(r[c]);
+                                        r[c^7]=popd();
 //                                        printf("RESTORE R%i\n",c^7);
                                 }
                         }
@@ -1240,7 +1240,7 @@ temp=0;
                         {
                                 if (temp&(1<<c))
                                 {
-                                        r[c^7]=popd(r[c]);
+                                        r[c^7]=popd();
 //                                        printf("EXIT R%i\n",c^7);
                                 }
                         }
