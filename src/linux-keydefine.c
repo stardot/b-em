@@ -55,7 +55,7 @@ int d_getkey(int msg, DIALOG *d, int cd)
         char s[1024],s2[1024],s3[64];
         if (ret==D_EXIT)
         {
-                k=*(int *)&d->dp2;
+                k=(intptr_t)d->dp2;
                 x=(SCREEN_W/2)-100;
                 y=(SCREEN_H/2)-36;
                 b=create_bitmap(200,72);
