@@ -124,7 +124,7 @@ void main_init(int argc, char *argv[])
 
         startblit();
         
-        printf("B-em %s\n", VERSION);
+        printf("%s\n", VERSION_STR);
 
 	vid_fskipmax = 1;
         
@@ -150,7 +150,7 @@ void main_init(int argc, char *argv[])
 //#ifndef WIN32
                 if (!strcasecmp(argv[c], "--help"))
                 {
-                        printf("B-em v%s command line options :\n\n", VERSION);
+                        printf("%s command line options :\n\n", VERSION_STR);
                         printf("-mx             - start as model x (see readme.txt for models)\n");
                         printf("-tx             - start with tube x (see readme.txt for tubes)\n");
                         printf("-disc disc.ssd  - load disc.ssd into drives :0/:2\n");

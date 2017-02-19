@@ -22,6 +22,8 @@
 
 //#define printf rpclog
 
+#define VERSION_STR "B-em v-" VERSION
+
 void updatewindowsize(int x, int y);
 
 void setejecttext(int drive, char *fn);

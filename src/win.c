@@ -269,11 +269,11 @@ void updatewindowtitle()
 {
         if (curtube == 3 || mouse_amx)
         {
-                if (!mousecapture) set_window_title("B-em v2.2 - click to capture mouse");
-                else               set_window_title("B-em v2.2 - CTRL-END to release mouse");
+                if (!mousecapture) set_window_title(VERSION_STR " - click to capture mouse");
+                else               set_window_title(VERSION_STR " - CTRL-END to release mouse");
         }
         else
-           set_window_title("B-em v2.2");
+           set_window_title(VERSION_STR);
 }
 
 void bem_error(char *s)
@@ -324,7 +324,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         hwnd = CreateWindowEx (
            0,                   /* Extended possibilites for variation */
            szClassName,         /* Classname */
-           "B-em v2.2",         /* Title Text */
+           VERSION_STR,         /* Title Text */
            WS_OVERLAPPEDWINDOW/*&~WS_SIZEBOX&~WS_THICKFRAME&~WS_MAXIMIZEBOX*/, /* default window */
            CW_USEDEFAULT,       /* Windows decides the position */
            CW_USEDEFAULT,       /* where the window ends up on the screen */

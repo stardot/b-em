@@ -725,7 +725,7 @@ MENU mainmenu[6] =
 
 DIALOG bemgui[]=
 {
-        {d_ctext_proc, 200, 260, 0,  0, 15,0,0,0,     0,0,"B-em v2.2"},
+        {d_ctext_proc, 200, 260, 0,  0, 15,0,0,0,     0,0, VERSION_STR},
         {d_menu_proc,  0,   0,   0,  0, 15,0,0,0,     0,0,mainmenu},
         {d_yield_proc},
         {0,0,0,0,0,0,0,0,0,0,0,NULL,NULL,NULL}
