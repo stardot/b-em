@@ -50,11 +50,52 @@ void video_close()
 
 void video_enterfullscreen()
 {
+	int alt = 0;
+	int gfx = GFX_AUTODETECT_FULLSCREEN;
+
         #ifdef WIN32
         destroy_bitmap(vb);
         #endif
         set_color_depth(dcol);
-        set_gfx_mode(GFX_AUTODETECT_FULLSCREEN, 800, 600, 0, 0);
+
+	/*
+	 * Try and set fullscreen mode here.  Under Unix, the colour depth
+	 * will vary, and it's likely the reason why fullscreen failed is that
+	 * we need to select an alternative.  8bpp doesn't have an
+	 * alternative, but other colour depths do, so we should use those.
+	 */
+        if (set_gfx_mode(gfx, 800, 600, 0, 0) != 0) {
+		switch (dcol) {
+		case 8:
+			alt = 0;
+			break;
+		case 15:
+			alt = 16;
+			break;
+		case 16:
+			alt = 15;
+			break;
+		case 24:
+			alt = 32;
+			break;
+		case 32:
+			alt = 24;
+			break;
+		default:
+			alt = 16;
+			break;
+		}
+
+		if (alt != 0) {
+			/* Try to set the alt colour depth and gfx mode. */
+			set_color_depth(alt);
+			if (set_gfx_mode(gfx, 800, 600, 0, 0) != 0) {
+				bem_error("Couldn't set GFX mode fullscreen");
+				exit (-1);
+			}
+		}
+	}
+
         #ifdef WIN32
         vb=create_video_bitmap(924, 614);
         #endif
