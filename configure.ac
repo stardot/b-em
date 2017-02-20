@@ -24,11 +24,11 @@ AC_ARG_ENABLE(debug,
 
 CF_WARNINGS="-Wall -Werror -Wno-format-security"
 if test "$enable_debug" = "yes"; then
-   CFLAGS="$CFLAGS $CF_WARNINGS -O0 -ggdb -D_DEBUG"
+   CFLAGS="$CFLAGS $CF_WARNINGS -O0 -ggdb -D_DEBUG -D_GNU_SOURCE"
    LDFLAGS="$LDFLAGS -L/usr/local/lib"
    AC_MSG_RESULT([yes])
 else
-   CFLAGS="$CFLAGS $CF_WARNINGS"
+   CFLAGS="$CFLAGS $CF_WARNINGS -D_GNU_SOURCE"
    LDFLAGS="$LDFLAGS -L/usr/local/lib"
    AC_MSG_RESULT([no])
 fi
