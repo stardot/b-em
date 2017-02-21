@@ -65,6 +65,7 @@ dnl
 #include <stdio.h>
 #include <string.h>
 #include <allegro.h>
+#include <errno.h>
 
 int 
 main()
@@ -73,7 +74,10 @@ main()
   int major, minor, micro;
   char *tmp_version;
 
-  system("touch conf.allegrotest");
+  if (system("touch conf.allegrotest") == -1) {
+  	fprintf(stderr, "system() didn't succeed: %s", strerror(errno));
+	exit (-1);
+  }
 
   /* Capture allegro-config output via autoconf/configure variables */
   /* HP/UX 9 (%@#!) writes to sscanf strings */
