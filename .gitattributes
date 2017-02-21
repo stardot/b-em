@@ -2,16 +2,25 @@
 * text=auto
 
 # Text files.
+*.am text
 *.c text
 *.cc text
 *.cpp text
 *.h text
 *.hpp text
+*.in text
 *.m text
+*.m4 text
 *.mak text
+*.md text
 *.mm text
 *.pl text
 *.txt text
+*.user text
+COPYING text
+README text
+README.* text
+configure text
 
 # Binary files.
 *.bin binary
