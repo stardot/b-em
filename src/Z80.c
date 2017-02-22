@@ -17,8 +17,6 @@
 #define cyc z80cyc
 #define cycles z80cycles
 
-#define printf rpclog
-
 /*CPU*/
 typedef union
 {
@@ -65,10 +63,18 @@ static inline uint8_t z80_readmem(uint16_t a)
         return z80ram[a];
 }
 
+uint8_t tube_z80_readmem(uint32_t addr) {
+    return z80_readmem(addr & 0xffff);
+}
+
 static inline void z80_writemem(uint16_t a, uint8_t v)
 {
 //        printf("Write Z80 %04X %02X %04X\n",a,v,pc);
         z80ram[a]=v;
+}
+
+void tube_z80_writemem(uint32_t addr, uint8_t byte) {
+    z80_writemem(addr & 0xffff, byte);
 }
 
 int endtimeslice;
@@ -309,10 +315,10 @@ void z80_close()
 
 void z80_dumpregs()
 {
-        printf("AF =%04X BC =%04X DE =%04X HL =%04X IX=%04X IY=%04X\n",af.w,bc.w,de.w,hl.w,ix.w,iy.w);
-        printf("AF'=%04X BC'=%04X DE'=%04X HL'=%04X IR=%04X\n",saf.w,sbc.w,sde.w,shl.w,ir.w);
-        printf("%c%c%c%c%c%c   PC =%04X SP =%04X\n",(af.b.l&N_FLAG)?'N':' ',(af.b.l&Z_FLAG)?'Z':' ',(af.b.l&H_FLAG)?'H':' ',(af.b.l&V_FLAG)?'V':' ',(af.b.l&S_FLAG)?'S':' ',(af.b.l&C_FLAG)?'C':' ',pc,sp);
-        printf("%i ins  IFF1=%i IFF2=%i  %04X %04X\n",ins,iff1,iff2,opc,oopc);
+        bem_debugf("AF =%04X BC =%04X DE =%04X HL =%04X IX=%04X IY=%04X\n",af.w,bc.w,de.w,hl.w,ix.w,iy.w);
+        bem_debugf("AF'=%04X BC'=%04X DE'=%04X HL'=%04X IR=%04X\n",saf.w,sbc.w,sde.w,shl.w,ir.w);
+        bem_debugf("%c%c%c%c%c%c   PC =%04X SP =%04X\n",(af.b.l&N_FLAG)?'N':' ',(af.b.l&Z_FLAG)?'Z':' ',(af.b.l&H_FLAG)?'H':' ',(af.b.l&V_FLAG)?'V':' ',(af.b.l&S_FLAG)?'S':' ',(af.b.l&C_FLAG)?'C':' ',pc,sp);
+        bem_debugf("%i ins  IFF1=%i IFF2=%i  %04X %04X\n",ins,iff1,iff2,opc,oopc);
 //        error(s);
 }
 
@@ -1988,7 +1994,7 @@ void z80_exec()
                                 break;
                                 case 0x47: /*LD I,A*/
                                 ir.b.h=af.b.h;
-                                printf("I now %02X %04X\n",ir.b.h,ir.w);
+                                bem_debugf("I now %02X %04X\n",ir.b.h,ir.w);
                                 cycles+=5;
                                 break;
                                 case 0x4A: /*ADC HL,BC*/

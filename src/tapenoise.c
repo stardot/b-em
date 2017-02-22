@@ -5,6 +5,7 @@
 #include <allegro.h>
 #include <math.h>
 #include "b-em.h"
+#include "ddnoise.h"
 #include "tapenoise.h"
 #include "sound.h"
 
@@ -48,7 +49,7 @@ void tapenoise_addhigh()
 {
         int c;
         float wavediv = (32.0f * 2400.0f) / 44100.0f;
-//        rpclog("Wavediv %f %i\n",wavediv,tmcount);
+//        bem_debugf("Wavediv %f %i\n",wavediv,tmcount);
         tmcount++;
         for (c = 0; c < 368; c++)
         {
@@ -115,7 +116,7 @@ void tapenoise_mix(int16_t *tapebuffer)
         int c;
         tpnoisep = 0;
         if (!sound_tape) return;
-//        rpclog("Mix!\n");
+//        bem_debug("Mix!\n");
 
         for (c = 0; c < 4410; c++)
         {

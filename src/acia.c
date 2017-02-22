@@ -20,7 +20,7 @@ static uint8_t acia_cr, acia_dr;
 
 void acia_updateint()
 {
-        if ((acia_sr&0x80) && (acia_cr&0x80))
+        if (((acia_sr&0x80) && (acia_cr&0x80)) || (!(acia_sr & 0x02) && ((acia_cr & 0x60) == 0x20)))
            interrupt|=4;
         else
            interrupt&=~4;
@@ -28,7 +28,7 @@ void acia_updateint()
 
 void acia_reset()
 {
-        acia_sr = (acia_sr & 8) | 4;
+        acia_sr = (acia_sr & 8) | 6;
         acia_updateint();
 }
 
@@ -44,7 +44,8 @@ uint8_t acia_read(uint16_t addr)
         }
         else
         {
-                return (acia_sr & 0x7F) | (acia_sr & acia_cr & 0x80) | 2;
+		temp = (acia_sr & 0x7F) | (acia_sr & acia_cr & 0x80);
+                return temp;
         }
 }
 
@@ -52,19 +53,22 @@ void acia_write(uint16_t addr, uint8_t val)
 {
         if (addr & 1)
         {
-                acia_sr &= 0xFD;
-                acia_updateint();
+		putchar(val);
+		// acia_sr &= 0xFD;
+                // acia_updateint();
         }
-        else
-        {
-                acia_cr = val;
-                if (val == 3)
-                   acia_reset();
-                switch (val & 3)
+        else if (val != acia_cr)
+	{
+		if (!(val & 0x40)) // interupts disabled as serial TX buffer empties.
+			fflush(stdout);
+	        acia_cr = val;
+	        if (val == 3)
+              		acia_reset();
+	        switch (val & 3)
                 {
-                        case 1: acia_tapespeed=0; break;
-                        case 2: acia_tapespeed=1; break;
-                }
+	                case 1: acia_tapespeed=0; break;
+	                case 2: acia_tapespeed=1; break;
+	        }
         }
 }
 
@@ -101,11 +105,11 @@ void acia_poll()
 //        int c;
 //        printf("Poll tape %i %i\n",motor,cswena);
         if (motor)
-        {
-                startblit();
-                if (csw_ena) csw_poll();
-                else         uef_poll();
-                endblit();
+       	{
+       	        startblit();
+               	if (csw_ena) csw_poll();
+               	else         uef_poll();
+               	endblit();
 
                 if (newdat&0x100)
                 {
@@ -114,7 +118,7 @@ void acia_poll()
                 }
                 else if (csw_toneon || uef_toneon) tapenoise_addhigh();
         }
-//           polltape();
+	//           polltape();
 }
 
 void acia_savestate(FILE *f)

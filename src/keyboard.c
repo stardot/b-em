@@ -80,7 +80,7 @@ void key_check()
 //                if (keyas && c==KEY_S) rc=KEY_LCONTROL;
                 if (key[c] && rc != KEY_F11)
                 {
-//                rpclog("%i %i\n",c,rc);
+//                bem_debugf("%i %i\n",c,rc);
                         if (TranslateKey(codeconvert[keylookup[rc]], &row, &col)>0)
                         {
                                 if (key[c])
@@ -92,6 +92,8 @@ void key_check()
         }
         if (key[keylookup[KEY_RSHIFT]] || key[keylookup[KEY_LSHIFT]] || autoboot)
            key_press(0, 0);
+        if (autoboot)
+           key_press(3, 2);
         if (key[keylookup[KEY_LCONTROL]] || key[keylookup[KEY_RCONTROL]] || (keyas && key[KEY_S]))
            key_press(0, 1);
         for (c = 0; c < 128; c++)

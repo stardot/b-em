@@ -126,7 +126,7 @@ BEGIN
         END
         POPUP "&Disc"
         BEGIN
-                MENUITEM "&Autoboot disc :0/2...",     IDM_DISC_AUTOBOOT
+                MENUITEM "&Autoboot disc :0/2...", IDM_DISC_AUTOBOOT
                 MENUITEM SEPARATOR
                 MENUITEM "Load disc :&0/2...",     IDM_DISC_LOAD_0
                 MENUITEM "Load disc :&1/3...",     IDM_DISC_LOAD_1
@@ -141,6 +141,9 @@ BEGIN
                 MENUITEM "Write protect disc :1/3",IDM_DISC_WPROT_1
                 MENUITEM SEPARATOR
                 MENUITEM "Default write protect",  IDM_DISC_WPROT_D
+                MENUITEM SEPARATOR
+                MENUITEM "Enable VDFS",            IDM_DISC_VDFS_ENABLE
+                MENUITEM "Choose VDFS Root",       IDM_DISC_VDFS_ROOT
         END
         POPUP "&Tape"
         BEGIN
