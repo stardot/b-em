@@ -18,3 +18,6 @@ install-sh
 missing
 tags
 src/Debug/
+*.opensdf
+*.sdf
+*.sln
