@@ -37,7 +37,6 @@
 #include <stdlib.h>
 #include <dirent.h>
 
-#include <alloca.h>
 #include <search.h>
 #include <sys/stat.h>
 
@@ -276,7 +275,7 @@ static void scan_entry(vdfs_ent_t *ent) {
 
     // build name of .inf file
     host_dir_path = ent->parent->host_path;
-    ptr = host_file_path = alloca(strlen(host_dir_path) + strlen(ent->host_fn) + 6);
+    ptr = host_file_path = malloc(strlen(host_dir_path) + strlen(ent->host_fn) + 6);
     if (host_dir_path[0] != '.' || host_dir_path[1] != '\0') {
         ptr = stpcpy(ptr, host_dir_path);
         *ptr++ = '/';
@@ -314,6 +313,7 @@ static void scan_entry(vdfs_ent_t *ent) {
         if (stb.st_mode & (S_IXGRP|S_IXOTH))
             ent->attribs |= ATTR_OTHR_EXEC;
     }
+    free(host_file_path);
     bem_debugf("vdfs: scan_entry: acorn=%s, host=%s, attr=%04X, load=%08X, exec=%08X\n", ent->acorn_fn, ent->host_fn, ent->attribs, ent->load_addr, ent->exec_addr);
 }
 
@@ -520,7 +520,7 @@ static void write_back(vdfs_ent_t *ent) {
     FILE *fp;
 
     host_dir_path = ent->parent->host_path;
-    ptr = host_file_path = alloca(strlen(host_dir_path) + strlen(ent->host_fn) + 6);
+    ptr = host_file_path = malloc(strlen(host_dir_path) + strlen(ent->host_fn) + 6);
     if (host_dir_path[0] != '.' || host_dir_path[1] != '\0') {
         ptr = stpcpy(ptr, host_dir_path);
         *ptr++ = '/';
@@ -533,19 +533,23 @@ static void write_back(vdfs_ent_t *ent) {
         fclose(fp);
     } else
         bem_warnf("vdfs: unable to create INF file '%s' for '%s': %s\n", host_file_path, ent->host_fn, strerror(errno));
+    free(host_file_path);
 }
 
 static FILE *open_file(vdfs_ent_t *ent, const char *mode) {
     char *host_dir_path, *host_file_path, *ptr;
+    FILE *fp;
 
     host_dir_path = ent->parent->host_path;
-    ptr = host_file_path = alloca(strlen(host_dir_path) + strlen(ent->host_fn) + 2);
+    ptr = host_file_path = malloc(strlen(host_dir_path) + strlen(ent->host_fn) + 2);
     if (host_dir_path[0] != '.' || host_dir_path[1] != '\0') {
         ptr = stpcpy(ptr, host_dir_path);
         *ptr++ = '/';
     }
     strcpy(ptr, ent->host_fn);
-    return fopen(host_file_path, mode);
+    fp = fopen(host_file_path, mode);
+    free(host_file_path);
+    return fp;
 }
 
 static void close_file(int channel) {
