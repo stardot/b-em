@@ -51,7 +51,7 @@
 
 #include <assert.h>
 
-#if 0
+#ifdef _DEBUG
 static char *datalog(uae_u8 *src, int len)
 {
 	static char buf[1000];
@@ -75,8 +75,8 @@ static char *datalog(uae_u8 *src, int len)
 static char *datalog(uae_u8 *src, int len) { return ""; }
 #endif
 
+#ifdef _DEBUG
 static int fdi_allocated;
-#ifdef DEBUG
 static void fdi_free (void *p)
 {
         int size;
@@ -89,11 +89,21 @@ static void fdi_free (void *p)
 }
 static void *fdi_malloc (int size)
 {
-        void *p = xmalloc (size + sizeof (int));
-        ((int*)p)[0] = size;
-        fdi_allocated += size;
-        bem_debugf("%d allocated (%d)\n", size, fdi_allocated);
-        return (int*)p + 1;
+	int size;
+	if (!p)
+		return;
+	size = ((int*)p)[-1];
+	fdi_allocated -= size;
+	bem_debugf("%d freed (%d)\n", size, fdi_allocated);
+	free ((int*)p - 1);
+}
+static void *fdi_malloc (int size)
+{
+	void *p = xmalloc (size + sizeof (int));
+	((int*)p)[0] = size;
+	fdi_allocated += size;
+	bem_debugf("%d allocated (%d)\n", size, fdi_allocated);
+	return (int*)p + 1;
 }
 #else
 #define fdi_free free
@@ -1308,33 +1318,36 @@ static void fix_mfm_sync (FDI *fdi)
 
 static int handle_sectors_described_track (FDI *fdi)
 {
-        int oldout;
-        uae_u8 *start_src = fdi->track_src ;
-        fdi->encoding_type = *fdi->track_src++;
-        fdi->index_offset = get_u32(fdi->track_src);
-        fdi->index_offset >>= 8;
-        fdi->track_src += 3;
-        bem_debugf("sectors_described, index offset: %d\n",fdi->index_offset);
+#ifdef _DEBUG
+	int oldout;
+	uae_u8 *start_src = fdi->track_src;
+#endif
+	fdi->encoding_type = *fdi->track_src++;
+	fdi->index_offset = get_u32(fdi->track_src);
+	fdi->index_offset >>= 8;
+	fdi->track_src += 3;
+	bem_debugf("sectors_described, index offset: %d\n",fdi->index_offset);
 
-        do {
-                fdi->track_type = *fdi->track_src++;
-                bem_debugf("%06.6X %06.6X %02.2X:",fdi->track_src - start_src + 0x200, fdi->out/8, fdi->track_type);
-                oldout = fdi->out;
-                decode_sectors_described_track[fdi->track_type](fdi);
-                bem_debugf(" %d\n", fdi->out - oldout);
-                oldout = fdi->out;
-                if (fdi->out < 0 || fdi->err) {
-                        bem_debugf("\nin %d bytes, out %d bits\n", fdi->track_src - fdi->track_src_buffer, fdi->out);
-                        return -1;
-                }
-                if (fdi->track_src - fdi->track_src_buffer >= fdi->track_src_len) {
-                        bem_debugf("source buffer overrun, previous type: %02.2X\n", fdi->track_type);
-                        return -1;
-                }
-        } while (fdi->track_type != 0xff);
-        bem_debug("\n");
-        fix_mfm_sync (fdi);
-        return fdi->out;
+	do {
+		fdi->track_type = *fdi->track_src++;
+		bem_debugf("%06.6X %06.6X %02.2X:",fdi->track_src - start_src + 0x200, fdi->out/8, fdi->track_type);
+		decode_sectors_described_track[fdi->track_type](fdi);
+#ifdef _DEBUG
+		bem_debugf(" %d\n", fdi->out - oldout);
+		oldout = fdi->out;
+#endif
+		if (fdi->out < 0 || fdi->err) {
+			bem_debugf("\nin %d bytes, out %d bits\n", fdi->track_src - fdi->track_src_buffer, fdi->out);
+			return -1;
+		}
+		if (fdi->track_src - fdi->track_src_buffer >= fdi->track_src_len) {
+			bem_debugf("source buffer overrun, previous type: %02.2X\n", fdi->track_type);
+			return -1;
+		}
+	} while (fdi->track_type != 0xff);
+	bem_debug("\n");
+	fix_mfm_sync (fdi);
+	return fdi->out;
 }
 
 static uae_u8 *fdi_decompress (int pulses, uae_u8 *sizep, uae_u8 *src, int *dofree)
