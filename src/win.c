@@ -952,4 +952,9 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
         }
         return 0;
 }
+
+FILE *x_fopen(const char * file, const char * mode)
+{
+	return fopen(file, mode);
+}
 #endif
