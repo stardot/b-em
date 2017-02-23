@@ -5,7 +5,7 @@
 #include <errno.h>
 #include <stdarg.h>
 
-#ifdef DEBUG
+#ifdef _DEBUG
 static const char debug_fn[] = "b-emlog.txt";
 FILE *debug_fp;
 
@@ -65,7 +65,7 @@ void bem_warnf(const char *fmt, ...)
         bem_debug(buf);
 }
 
-#ifdef DEBUG
+#ifdef _DEBUG
 
 void debug_open()
 {
