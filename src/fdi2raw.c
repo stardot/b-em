@@ -51,7 +51,7 @@
 
 #include <assert.h>
 
-#ifdef DEBUG
+#ifdef _DEBUG
 static char *datalog(uae_u8 *src, int len)
 {
 	static char buf[1000];
@@ -75,7 +75,7 @@ static char *datalog(uae_u8 *src, int len)
 #define datalog(src, len)
 #endif
 
-#ifdef DEBUG
+#ifdef _DEBUG
 static int fdi_allocated;
 static void fdi_free (void *p)
 {
@@ -84,7 +84,7 @@ static void fdi_free (void *p)
 		return;
 	size = ((int*)p)[-1];
 	fdi_allocated -= size;
-	write_log ("%d freed (%d)\n", size, fdi_allocated);
+	bem_debugf("%d freed (%d)\n", size, fdi_allocated);
 	free ((int*)p - 1);
 }
 static void *fdi_malloc (int size)
@@ -92,7 +92,7 @@ static void *fdi_malloc (int size)
 	void *p = xmalloc (size + sizeof (int));
 	((int*)p)[0] = size;
 	fdi_allocated += size;
-	write_log ("%d allocated (%d)\n", size, fdi_allocated);
+	bem_debugf("%d allocated (%d)\n", size, fdi_allocated);
 	return (int*)p + 1;
 }
 #else
@@ -1308,7 +1308,7 @@ static void fix_mfm_sync (FDI *fdi)
 
 static int handle_sectors_described_track (FDI *fdi)
 {
-#ifdef DEBUG
+#ifdef _DEBUG
 	int oldout;
 	uae_u8 *start_src = fdi->track_src;
 #endif
@@ -1322,7 +1322,7 @@ static int handle_sectors_described_track (FDI *fdi)
 		fdi->track_type = *fdi->track_src++;
 		bem_debugf("%06.6X %06.6X %02.2X:",fdi->track_src - start_src + 0x200, fdi->out/8, fdi->track_type);
 		decode_sectors_described_track[fdi->track_type](fdi);
-#ifdef DEBUG
+#ifdef _DEBUG
 		bem_debugf(" %d\n", fdi->out - oldout);
 		oldout = fdi->out;
 #endif

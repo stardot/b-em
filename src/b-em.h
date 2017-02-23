@@ -38,7 +38,7 @@ extern void debug_open(void);
 extern void debug_close(void);
 
 // Remove debugging calls if debug not selected.
-#ifndef DEBUG
+#ifndef _DEBUG
 #define bem_debug(s) {}
 #if __STDC_VERSION__ >= 199901L
 #define bem_debugf(format, ...) {}
