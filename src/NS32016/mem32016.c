@@ -16,8 +16,6 @@
 #include "../tube.h"
 #define tubeRead tube_parasite_read
 #define tubeWrite tube_parasite_write
-#else
-#include "../bare-metal/tube-lib.h"
 #endif
 
 #ifdef TEST_SUITE

@@ -73,7 +73,7 @@ int main(int argc, char *argv[])
 
         set_close_button_callback(setquit);
 
-        set_window_title(B_EM_VERSION);
+        set_window_title(VERSION_STR);
 
         get_executable_name(exedir, 511);
         p = get_filename(exedir);

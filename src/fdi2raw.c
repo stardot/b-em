@@ -1330,7 +1330,9 @@ static int handle_sectors_described_track (FDI *fdi)
 
 	do {
 		fdi->track_type = *fdi->track_src++;
+#ifdef _DEBUG
 		bem_debugf("%06.6X %06.6X %02.2X:",fdi->track_src - start_src + 0x200, fdi->out/8, fdi->track_type);
+#endif
 		decode_sectors_described_track[fdi->track_type](fdi);
 #ifdef _DEBUG
 		bem_debugf(" %d\n", fdi->out - oldout);
@@ -1977,7 +1979,9 @@ void fdi2raw_header_free (FDI *fdi)
                         fdi_free (c->maxp);
         }
         fdi_free (fdi);
+#ifdef _DEBUG
         bem_debugf("FREE: memory allocated %d\n", fdi_allocated);
+#endif
 }
 
 int fdi2raw_get_last_track (FDI *fdi)
@@ -2023,7 +2027,9 @@ FDI *fdi2raw_header(FILE *f)
         uae_u8 type, size;
         FDI *fdi;
 
+#ifdef _DEBUG
         bem_debugf("ALLOC: memory allocated %d\n", fdi_allocated);
+#endif
         fdi = fdi_malloc(sizeof(FDI));
         memset (fdi, 0, sizeof (FDI));
         fdi->file = f;

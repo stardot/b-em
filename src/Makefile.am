@@ -20,6 +20,12 @@ b_em_LDADD = $(allegro_LIBS) -lz -lopenal -lalut
 endif
 
 b_em_SOURCES = \
+NS32016/32016.c \
+NS32016/Decode.c \
+NS32016/NSDis.c \
+NS32016/Profile.c \
+NS32016/Trap.c \
+NS32016/mem32016.c \
 6502.c 6502tube.c 65816.c acia.c adc.c \
 compat_wrappers.c \
 adf.c arm.c cmos.c compactcmos.c compact_joystick.c config.c csw.c ddnoise.c \
@@ -33,5 +39,3 @@ resid-fp/voice.cc resid-fp/wave6581_PS_.cc resid-fp/wave6581_PST.cc \
 resid-fp/wave6581_P_T.cc resid-fp/wave6581__ST.cc resid-fp/wave8580_PS_.cc \
 resid-fp/wave8580_PST.cc resid-fp/wave8580_P_T.cc resid-fp/wave8580__ST.cc \
 resid-fp/wave.cc
-
-

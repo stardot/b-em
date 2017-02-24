@@ -33,7 +33,7 @@ void savestate_load()
 
 void savestate_dosave()
 {
-<<<<<<< HEAD
+	FILE *f;
         f = x_fopen(savestate_name, "wb");
 //        bem_debug("DoSave state\n");
         putc('B', f); putc('E', f); putc('M', f); putc('S', f);

@@ -188,7 +188,7 @@ void cmos_save(MODEL m)
         else
         {
                 sprintf(fn, "%s%s", exedir, m.cmos);
-                bem_debug("CMOS Opening %s\n", fn);
+                bem_debug("CMOS Opening\n");
                 f=x_fopen(fn, "wb");
                 fwrite(cmos, 64, 1, f);
                 fclose(f);
