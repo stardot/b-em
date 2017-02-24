@@ -65,6 +65,12 @@ AC_CHECK_LIB(alut,
 	     AC_MSG_ERROR("You need to install the ALUT library.")
 )
 
+# Check for asprintf -- if it's not defined, use our version.
+AC_CHECK_FUNC(asprintf, found_asprintf=yes, found_asprintf=no)
+if test "x$found_asprintf" = xyes; then
+	AC_DEFINE(HAVE_ASPRINTF)
+fi
+
 AC_OUTPUT([Makefile src/Makefile])
 
 echo
