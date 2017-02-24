@@ -33,6 +33,8 @@ else
    AC_MSG_RESULT([no])
 fi
 
+AC_CHECK_FUNCS(tdestroy)
+
 # Check if the platform is anything other than Windows, as we want to check
 # for Allegro if not.
 

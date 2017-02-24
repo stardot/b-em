@@ -36,6 +36,9 @@
 #include <dirent.h>
 
 #include <search.h>
+#ifndef HAVE_TDESTROY
+extern void tdestroy (void *vroot, void (*free_cb)(void *ptr));
+#endif
 #include <sys/stat.h>
 
 int vdfs_enabled = 1;
