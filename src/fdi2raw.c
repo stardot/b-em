@@ -61,7 +61,7 @@ static char *datalog(uae_u8 *src, int len)
 	offset2 = offset;
 	buf[offset++]='\'';
 	while(len--) {
-		sprintf (buf + offset, "%02.2X", src[i]);
+		sprintf (buf + offset, "%2.2X", src[i]);
 		offset += 2;
 		i++;
 		if (i > 10) break;
@@ -72,11 +72,12 @@ static char *datalog(uae_u8 *src, int len)
 	return buf + offset2;
 }
 #else
-static char *datalog(uae_u8 *src, int len) { return ""; }
+static inline char *datalog(uae_u8 *src, int len) {return "";}
 #endif
 
-#ifdef _DEBUG
 static int fdi_allocated;
+
+#ifdef _DEBUG
 static void fdi_free (void *p)
 {
         int size;
@@ -329,8 +330,8 @@ static int decode_raw_track (FDI *fdi)
 /* unknown track */
 static void zxx (FDI *fdi)
 {
-        bem_debugf("track %d: unknown track type 0x%02.2X\n", fdi->current_track, fdi->track_type);
-//      return -1;
+	bem_debugf("track %d: unknown track type 0x%2.2X\n", fdi->current_track, fdi->track_type);
+//	return -1;
 }
 /* unsupported track */
 #if 0
@@ -349,8 +350,8 @@ static void track_empty (FDI *fdi)
 /* unknown sector described type */
 static void dxx (FDI *fdi)
 {
-        bem_debugf("\ntrack %d: unknown sector described type 0x%02.2X\n", fdi->current_track, fdi->track_type);
-        fdi->err = 1;
+	bem_debugf("\ntrack %d: unknown sector described type 0x%2.2X\n", fdi->current_track, fdi->track_type);
+	fdi->err = 1;
 }
 /* unsupported sector described type */
 #if 0
@@ -477,21 +478,21 @@ static void s04(FDI *fdi) { add_mfm_sync_bit (fdi); }
 /* RLE MFM-encoded data */
 static void s08(FDI *fdi)
 {
-        int bytes = *fdi->track_src++;
-        uae_u8 byte = *fdi->track_src++;
-        if (bytes == 0) bytes = 256;
-        bem_debugf("s08:len=%d,data=%02.2X",bytes,byte);
-        while(bytes--) byte_add (fdi, byte);
+	int bytes = *fdi->track_src++;
+	uae_u8 byte = *fdi->track_src++;
+	if (bytes == 0) bytes = 256;
+	bem_debugf ("s08:len=%d,data=%2.2X",bytes,byte);
+	while(bytes--) byte_add (fdi, byte);
 }
 /* RLE MFM-decoded data */
 static void s09(FDI *fdi)
 {
-        int bytes = *fdi->track_src++;
-        uae_u8 byte = *fdi->track_src++;
-        if (bytes == 0) bytes = 256;
-        bit_drop_next (fdi);
-        bem_debugf("s09:len=%d,data=%02.2X",bytes,byte);
-        while(bytes--) byte_mfm_add (fdi, byte);
+	int bytes = *fdi->track_src++;
+	uae_u8 byte = *fdi->track_src++;
+	if (bytes == 0) bytes = 256;
+	bit_drop_next (fdi);
+	bem_debugf ("s09:len=%d,data=%2.2X",bytes,byte);
+	while(bytes--) byte_mfm_add (fdi, byte);
 }
 /* MFM-encoded data */
 static void s0a(FDI *fdi)
@@ -1318,9 +1319,9 @@ static void fix_mfm_sync (FDI *fdi)
 
 static int handle_sectors_described_track (FDI *fdi)
 {
+	uae_u8 *start_src = fdi->track_src;
 #ifdef _DEBUG
 	int oldout;
-	uae_u8 *start_src = fdi->track_src;
 #endif
 	fdi->encoding_type = *fdi->track_src++;
 	fdi->index_offset = get_u32(fdi->track_src);
@@ -1330,20 +1331,18 @@ static int handle_sectors_described_track (FDI *fdi)
 
 	do {
 		fdi->track_type = *fdi->track_src++;
-#ifdef _DEBUG
-		bem_debugf("%06.6X %06.6X %02.2X:",fdi->track_src - start_src + 0x200, fdi->out/8, fdi->track_type);
-#endif
+		bem_debugf("%6.6X %6.6X %2.2X:",(unsigned)(fdi->track_src - start_src + 0x200), (fdi->out/8), fdi->track_type);
 		decode_sectors_described_track[fdi->track_type](fdi);
 #ifdef _DEBUG
 		bem_debugf(" %d\n", fdi->out - oldout);
 		oldout = fdi->out;
 #endif
 		if (fdi->out < 0 || fdi->err) {
-			bem_debugf("\nin %d bytes, out %d bits\n", fdi->track_src - fdi->track_src_buffer, fdi->out);
+			bem_debugf("\nin %ld bytes, out %d bits\n", fdi->track_src - fdi->track_src_buffer, fdi->out);
 			return -1;
 		}
 		if (fdi->track_src - fdi->track_src_buffer >= fdi->track_src_len) {
-			bem_debugf("source buffer overrun, previous type: %02.2X\n", fdi->track_type);
+			bem_debugf("source buffer overrun, previous type: %2.2X\n", fdi->track_type);
 			return -1;
 		}
 	} while (fdi->track_type != 0xff);
@@ -1561,244 +1560,245 @@ static void fdi2_decode (FDI *fdi, uint32_t totalavg, uae_u32 *avgp, uae_u32 *mi
 
 static void fdi2_decode (FDI *fdi, uint32_t totalavg, uae_u32 *avgp, uae_u32 *minp, uae_u32 *maxp, uae_u8 *idx, int maxidx, int *indexoffsetp, int pulses, int mfm)
 {
-        uint32_t adjust;
-        uint32_t adjusted_pulse;
-        uint32_t standard_MFM_2_bit_cell_size = totalavg / 50000;
-        uint32_t standard_MFM_8_bit_cell_size = totalavg / 12500;
-        int real_size, i, j, nexti, eodat, outstep, randval;
-        int indexoffset = *indexoffsetp;
-        uae_u8 *d = fdi->track_dst_buffer;
-        uae_u16 *pt = fdi->track_dst_buffer_timing;
-        uae_u32 ref_pulse, pulse;
-        long jitter;
+	uint32_t adjust;
+	uint32_t adjusted_pulse;
+	uint32_t standard_MFM_2_bit_cell_size = totalavg / 50000;
+	uint32_t standard_MFM_8_bit_cell_size = totalavg / 12500;
+	int real_size, i, j, nexti, eodat, outstep;
+	uint32_t randval;
+	int indexoffset = *indexoffsetp;
+	uae_u8 *d = fdi->track_dst_buffer;
+	uae_u16	*pt = fdi->track_dst_buffer_timing;
+	uae_u32 ref_pulse, pulse;
+	long jitter;
 
-        /* detects a long-enough stable pulse coming just after another stable pulse */
-        i = 1;
-        while ( (i < pulses) && ( (idx[i] < maxidx)
-                || (idx[i - 1] < maxidx)
-                || (minp[i] < (standard_MFM_2_bit_cell_size - (standard_MFM_2_bit_cell_size / 4))) ) )
-                        i++;
-        if (i == pulses)  {
-                bem_debug("FDI: No stable and long-enough pulse in track.\n");
-                return;
-        }
-        nexti = i;
-        eodat = i;
-        i--;
-        adjust = 0;
-        total = 0;
-        totaldiv = 0;
-        init_array(standard_MFM_2_bit_cell_size, 1 + mfm);
-        bitoffset = 0;
-        ref_pulse = 0;
-        jitter = 0;
-        outstep = -1;
-        while (outstep < 2) {
+	/* detects a long-enough stable pulse coming just after another stable pulse */
+	i = 1;
+	while ( (i < pulses) && ( (idx[i] < maxidx)
+		|| (idx[i - 1] < maxidx)
+		|| (minp[i] < (standard_MFM_2_bit_cell_size - (standard_MFM_2_bit_cell_size / 4))) ) )
+			i++;
+	if (i == pulses)  {
+		bem_debug("FDI: No stable and long-enough pulse in track.\n");
+		return;
+	}
+	nexti = i;
+	eodat = i;
+	i--;
+	adjust = 0;
+	total = 0;
+	totaldiv = 0;
+	init_array(standard_MFM_2_bit_cell_size, 1 + mfm);
+	bitoffset = 0;
+	ref_pulse = 0;
+	jitter = 0;
+	outstep = -1;
+	while (outstep < 2) {
 
-                /* calculates the current average bitrate from previous decoded data */
-                uae_u32 avg_size = (total << (2 + mfm)) / totaldiv; /* this is the new average size for one MFM bit */
-                /* uae_u32 avg_size = (uae_u32)((((float)total)*((float)(mfm+1))*4.0) / ((float)totaldiv)); */
-                /* you can try tighter ranges than 25%, or wider ranges. I would probably go for tighter... */
-                if ((avg_size < (standard_MFM_8_bit_cell_size - (pulse_limitval * standard_MFM_8_bit_cell_size / 100))) ||
-                        (avg_size > (standard_MFM_8_bit_cell_size + (pulse_limitval * standard_MFM_8_bit_cell_size / 100)))) {
-                                //init_array(standard_MFM_2_bit_cell_size, mfm + 1);
-                                avg_size = standard_MFM_8_bit_cell_size;
-                }
-                /* this is to prevent the average value from going too far
-                * from the theoretical value, otherwise it could progressively go to (2 *
-                * real value), or (real value / 2), etc. */
+		/* calculates the current average bitrate from previous decoded data */
+		uae_u32 avg_size = (total << (2 + mfm)) / totaldiv; /* this is the new average size for one MFM bit */
+		/* uae_u32 avg_size = (uae_u32)((((float)total)*((float)(mfm+1))*4.0) / ((float)totaldiv)); */
+		/* you can try tighter ranges than 25%, or wider ranges. I would probably go for tighter... */
+		if ((avg_size < (standard_MFM_8_bit_cell_size - (pulse_limitval * standard_MFM_8_bit_cell_size / 100))) ||
+			(avg_size > (standard_MFM_8_bit_cell_size + (pulse_limitval * standard_MFM_8_bit_cell_size / 100)))) {
+				//init_array(standard_MFM_2_bit_cell_size, mfm + 1);
+				avg_size = standard_MFM_8_bit_cell_size;
+		}
+		/* this	is to prevent the average value from going too far
+		* from the theoretical value, otherwise it could progressively go to (2 *
+		* real value), or (real value / 2), etc. */
 
-                /* gets the next long-enough pulse (this may require more than one pulse) */
-                pulse = 0;
-                while (pulse < ((avg_size / 4) - (avg_size / 16))) {
-                        uae_u32 avg_pulse, min_pulse, max_pulse;
-                        i++;
-                        if (i >= pulses)
-                                i = 0;
-                        if (i == nexti) {
-                                do {
-                                        nexti++;
-                                        if (nexti >= pulses)
-                                                nexti = 0;
-                                } while (idx[nexti] < maxidx);
-                        }
-                        if (idx[i] >= maxidx) { /* stable pulse */
-                                avg_pulse = avgp[i] - jitter;
-                                min_pulse = minp[i];
-                                max_pulse = maxp[i];
-                                if (jitter >= 0)
-                                        max_pulse -= jitter;
-                                else
-                                        min_pulse -= jitter;
-                                if ((maxp[nexti] - avgp[nexti]) < (avg_pulse - min_pulse))
-                                        min_pulse = avg_pulse - (maxp[nexti] - avgp[nexti]);
-                                if ((avgp[nexti] - minp[nexti]) < (max_pulse - avg_pulse))
-                                        max_pulse = avg_pulse + (avgp[nexti] - minp[nexti]);
-                                if (min_pulse < ref_pulse)
-                                        min_pulse = ref_pulse;
-                                randval = rand();
-                                if (randval < (RAND_MAX / 2)) {
-                                        if (randval > (RAND_MAX / 4)) {
-                                                if (randval <= (3 * RAND_MAX / 8))
-                                                        randval = (2 * randval) - (RAND_MAX /4);
-                                                else
-                                                        randval = (4 * randval) - RAND_MAX;
-                                        }
-                                        jitter = 0 - (randval * (avg_pulse - min_pulse)) / RAND_MAX;
-                                } else {
-                                        randval -= RAND_MAX / 2;
-                                        if (randval > (RAND_MAX / 4)) {
-                                                if (randval <= (3 * RAND_MAX / 8))
-                                                        randval = (2 * randval) - (RAND_MAX /4);
-                                                else
-                                                        randval = (4 * randval) - RAND_MAX;
-                                        }
-                                        jitter = (randval * (max_pulse - avg_pulse)) / RAND_MAX;
-                                }
-                                avg_pulse += jitter;
-                                if ((avg_pulse < min_pulse) || (avg_pulse > max_pulse)) {
-                                        bem_debugf("FDI: avg_pulse outside bounds! avg=%u min=%u max=%u\n", avg_pulse, min_pulse, max_pulse);
-                                        bem_debugf("FDI: avgp=%u (%u) minp=%u (%u) maxp=%u (%u) jitter=%d i=%d ni=%d\n",
-                                                avgp[i], avgp[nexti], minp[i], minp[nexti], maxp[i], maxp[nexti], jitter, i, nexti);
-                                }
-                                if (avg_pulse < ref_pulse)
-                                        bem_debugf("FDI: avg_pulse < ref_pulse! (%u < %u)\n", avg_pulse, ref_pulse);
-                                pulse += avg_pulse - ref_pulse;
-                                ref_pulse = 0;
-                                if (i == eodat)
-                                        outstep++;
-                        } else if (rand() <= ((idx[i] * RAND_MAX) / maxidx)) {
-                                avg_pulse = avgp[i];
-                                min_pulse = minp[i];
-                                max_pulse = maxp[i];
-                                randval = rand();
-                                if (randval < (RAND_MAX / 2)) {
-                                        if (randval > (RAND_MAX / 4)) {
-                                                if (randval <= (3 * RAND_MAX / 8))
-                                                        randval = (2 * randval) - (RAND_MAX /4);
-                                                else
-                                                        randval = (4 * randval) - RAND_MAX;
-                                        }
-                                        avg_pulse -= (randval * (avg_pulse - min_pulse)) / RAND_MAX;
-                                } else {
-                                        randval -= RAND_MAX / 2;
-                                        if (randval > (RAND_MAX / 4)) {
-                                                if (randval <= (3 * RAND_MAX / 8))
-                                                        randval = (2 * randval) - (RAND_MAX /4);
-                                                else
-                                                        randval = (4 * randval) - RAND_MAX;
-                                        }
-                                        avg_pulse += (randval * (max_pulse - avg_pulse)) / RAND_MAX;
-                                }
-                                if ((avg_pulse > ref_pulse) && (avg_pulse < (avgp[nexti] - jitter))) {
-                                        pulse += avg_pulse - ref_pulse;
-                                        ref_pulse = avg_pulse;
-                                }
-                        }
-                        if (outstep == 1 && indexoffset == i)
-                            *indexoffsetp = bitoffset;
-                }
+		/* gets the next long-enough pulse (this may require more than one pulse) */
+		pulse = 0;
+		while (pulse < ((avg_size / 4) - (avg_size / 16))) {
+			uae_u32 avg_pulse, min_pulse, max_pulse;
+			i++;
+			if (i >= pulses)
+				i = 0;
+			if (i == nexti) {
+				do {
+					nexti++;
+					if (nexti >= pulses)
+						nexti = 0;
+				} while (idx[nexti] < maxidx);
+			}
+			if (idx[i] >= maxidx) { /* stable pulse */
+				avg_pulse = avgp[i] - jitter;
+				min_pulse = minp[i];
+				max_pulse = maxp[i];
+				if (jitter >= 0)
+					max_pulse -= jitter;
+				else
+					min_pulse -= jitter;
+				if ((maxp[nexti] - avgp[nexti]) < (avg_pulse - min_pulse))
+					min_pulse = avg_pulse - (maxp[nexti] - avgp[nexti]);
+				if ((avgp[nexti] - minp[nexti]) < (max_pulse - avg_pulse))
+					max_pulse = avg_pulse + (avgp[nexti] - minp[nexti]);
+				if (min_pulse < ref_pulse)
+					min_pulse = ref_pulse;
+				randval = rand();
+				if (randval < (RAND_MAX / 2)) {
+					if (randval > (RAND_MAX / 4)) {
+						if (randval <= (uint32_t)(3 * (uint32_t)(RAND_MAX / 8)))
+							randval = (2 * randval) - (RAND_MAX /4);
+						else
+							randval = (4 * randval) - RAND_MAX;
+					}
+					jitter = 0 - (randval * (avg_pulse - min_pulse)) / RAND_MAX;
+				} else {
+					randval -= RAND_MAX / 2;
+					if (randval > (RAND_MAX / 4)) {
+						if (randval <= (3 * (uint32_t)(RAND_MAX / 8)))
+							randval = (2 * randval) - (RAND_MAX /4);
+						else
+							randval = (4 * randval) - RAND_MAX;
+					}
+					jitter = (randval * (max_pulse - avg_pulse)) / RAND_MAX;
+				}
+				avg_pulse += jitter;
+				if ((avg_pulse < min_pulse) || (avg_pulse > max_pulse)) {
+					bem_debugf("FDI: avg_pulse outside bounds! avg=%u min=%u max=%u\n", avg_pulse, min_pulse, max_pulse);
+					bem_debugf("FDI: avgp=%u (%u) minp=%u (%u) maxp=%u (%u) jitter=%ld i=%d ni=%d\n",
+						avgp[i], avgp[nexti], minp[i], minp[nexti], maxp[i], maxp[nexti], jitter, i, nexti);
+				}
+				if (avg_pulse < ref_pulse)
+					bem_debugf("FDI: avg_pulse < ref_pulse! (%u < %u)\n", avg_pulse, ref_pulse);
+				pulse += avg_pulse - ref_pulse;
+				ref_pulse = 0;
+				if (i == eodat)
+					outstep++;
+			} else if (rand() <= ((idx[i] * RAND_MAX) / maxidx)) {
+				avg_pulse = avgp[i];
+				min_pulse = minp[i];
+				max_pulse = maxp[i];
+				randval = rand();
+				if (randval < (RAND_MAX / 2)) {
+					if (randval > (RAND_MAX / 4)) {
+						if (randval <= (3 * (uint32_t)(RAND_MAX / 8)))
+							randval = (2 * randval) - (RAND_MAX /4);
+						else
+							randval = (4 * randval) - RAND_MAX;
+					}
+					avg_pulse -= (randval * (avg_pulse - min_pulse)) / RAND_MAX;
+				} else {
+					randval -= RAND_MAX / 2;
+					if (randval > (RAND_MAX / 4)) {
+						if (randval <= (3 * (uint32_t)(RAND_MAX / 8)))
+							randval = (2 * randval) - (RAND_MAX /4);
+						else
+							randval = (4 * randval) - RAND_MAX;
+					}
+					avg_pulse += (randval * (max_pulse - avg_pulse)) / RAND_MAX;
+				}
+				if ((avg_pulse > ref_pulse) && (avg_pulse < (avgp[nexti] - jitter))) {
+					pulse += avg_pulse - ref_pulse;
+					ref_pulse = avg_pulse;
+				}
+			}
+			if (outstep == 1 && indexoffset == i)
+			    *indexoffsetp = bitoffset;
+		}
 
-                /* gets the size in bits from the pulse width, considering the current average bitrate */
-                adjusted_pulse = pulse;
-                real_size = 0;
-                if (mfm) {
-                    while (adjusted_pulse >= avg_size) {
-                            real_size += 4;
-                            adjusted_pulse -= avg_size / 2;
-                    }
-                    adjusted_pulse <<= 3;
-                    while (adjusted_pulse >= ((avg_size * 4) + (avg_size / 4))) {
-                            real_size += 2;
-                            adjusted_pulse -= avg_size * 2;
-                    }
-                    if (adjusted_pulse >= ((avg_size * 3) + (avg_size / 4))) {
-                            if (adjusted_pulse <= ((avg_size * 4) - (avg_size / 4))) {
-                                    if ((2 * ((adjusted_pulse >> 2) - adjust)) <= ((2 * avg_size) - (avg_size / 4)))
-                                            real_size += 3;
-                                    else
-                                            real_size += 4;
-                            } else
-                                    real_size += 4;
-                    } else {
-                            if (adjusted_pulse > ((avg_size * 3) - (avg_size / 4))) {
-                                    real_size += 3;
-                            } else {
-                                    if (adjusted_pulse >= ((avg_size * 2) + (avg_size / 4))) {
-                                            if ((2 * ((adjusted_pulse >> 2) - adjust)) < (avg_size + (avg_size / 4)))
-                                                    real_size += 2;
-                                            else
-                                                    real_size += 3;
-                                    } else
-                                            real_size += 2;
-                            }
-                    }
-                } else {
-                    while (adjusted_pulse >= (2*avg_size))
-                    {
-                            real_size+=4;
-                            adjusted_pulse-=avg_size;
-                    }
-                    adjusted_pulse<<=2;
-                    while (adjusted_pulse >= ((avg_size*3)+(avg_size/4)))
-                    {
-                            real_size+=2;
-                            adjusted_pulse-=avg_size*2;
-                    }
-                    if (adjusted_pulse >= ((avg_size*2)+(avg_size/4)))
-                    {
-                            if (adjusted_pulse <= ((avg_size*3)-(avg_size/4)))
-                            {
-                                    if (((adjusted_pulse>>1)-adjust) < (avg_size+(avg_size/4)))
-                                            real_size+=2;
-                                    else
-                                            real_size+=3;
-                            }
-                            else
-                                    real_size+=3;
-                    }
-                    else
-                    {
-                            if (adjusted_pulse > ((avg_size*2)-(avg_size/4)))
-                                    real_size+=2;
-                            else
-                            {
-                                    if (adjusted_pulse >= (avg_size+(avg_size/4)))
-                                    {
-                                            if (((adjusted_pulse>>1)-adjust) <= (avg_size-(avg_size/4)))
-                                                    real_size++;
-                                            else
-                                                    real_size+=2;
-                                    }
-                                    else
-                                            real_size++;
-                            }
-                    }
-                }
+		/* gets the size in bits from the pulse width, considering the current average bitrate */
+		adjusted_pulse = pulse;
+		real_size = 0;
+		if (mfm) {
+		    while (adjusted_pulse >= avg_size) {
+			    real_size += 4;
+			    adjusted_pulse -= avg_size / 2;
+		    }
+		    adjusted_pulse <<= 3;
+		    while (adjusted_pulse >= ((avg_size * 4) + (avg_size / 4))) {
+			    real_size += 2;
+			    adjusted_pulse -= avg_size * 2;
+		    }
+		    if (adjusted_pulse >= ((avg_size * 3) + (avg_size / 4))) {
+			    if (adjusted_pulse <= ((avg_size * 4) - (avg_size / 4))) {
+				    if ((2 * ((adjusted_pulse >> 2) - adjust)) <= ((2 * avg_size) - (avg_size / 4)))
+					    real_size += 3;
+				    else
+					    real_size += 4;
+			    } else
+				    real_size += 4;
+		    } else {
+			    if (adjusted_pulse > ((avg_size * 3) - (avg_size / 4))) {
+				    real_size += 3;
+			    } else {
+				    if (adjusted_pulse >= ((avg_size * 2) + (avg_size / 4))) {
+					    if ((2 * ((adjusted_pulse >> 2) - adjust)) < (avg_size + (avg_size / 4)))
+						    real_size += 2;
+					    else
+						    real_size += 3;
+				    } else
+					    real_size += 2;
+			    }
+		    }
+		} else {
+		    while (adjusted_pulse >= (2*avg_size))
+		    {
+			    real_size+=4;
+			    adjusted_pulse-=avg_size;
+		    }
+		    adjusted_pulse<<=2;
+		    while (adjusted_pulse >= ((avg_size*3)+(avg_size/4)))
+		    {
+			    real_size+=2;
+			    adjusted_pulse-=avg_size*2;
+		    }
+		    if (adjusted_pulse >= ((avg_size*2)+(avg_size/4)))
+		    {
+			    if (adjusted_pulse <= ((avg_size*3)-(avg_size/4)))
+			    {
+				    if (((adjusted_pulse>>1)-adjust) < (avg_size+(avg_size/4)))
+					    real_size+=2;
+				    else
+					    real_size+=3;
+			    }
+			    else
+				    real_size+=3;
+		    }
+		    else
+		    {
+			    if (adjusted_pulse > ((avg_size*2)-(avg_size/4)))
+				    real_size+=2;
+			    else
+			    {
+				    if (adjusted_pulse >= (avg_size+(avg_size/4)))
+				    {
+					    if (((adjusted_pulse>>1)-adjust) <= (avg_size-(avg_size/4)))
+						    real_size++;
+					    else
+						    real_size+=2;
+				    }
+				    else
+					    real_size++;
+			    }
+		    }
+		}
 
-                /* after one pass to correctly initialize the average bitrate, outputs the bits */
-                if (outstep == 1) {
-                        for (j = real_size; j > 1; j--)
-                                addbit (d, 0);
-                        addbit (d, 1);
-                        for (j = 0; j < real_size; j++)
-                                *pt++ = (uae_u16)(pulse / real_size);
-                }
+		/* after one pass to correctly initialize the average bitrate, outputs the bits */
+		if (outstep == 1) {
+			for (j = real_size; j > 1; j--)
+				addbit (d, 0);
+			addbit (d, 1);
+			for (j = 0; j < real_size; j++)
+				*pt++ = (uae_u16)(pulse / real_size);
+		}
 
-                /* prepares for the next pulse */
-                adjust = ((real_size * avg_size) / (4 << mfm)) - pulse;
-                total -= psarray[array_index].size;
-                totaldiv -= psarray[array_index].number_of_bits;
-                psarray[array_index].size = pulse;
-                psarray[array_index].number_of_bits = real_size;
-                total += pulse;
-                totaldiv += real_size;
-                array_index++;
-                if (array_index >= FDI_MAX_ARRAY)
-                        array_index = 0;
-        }
+		/* prepares for the next pulse */
+		adjust = ((real_size * avg_size) / (4 << mfm)) - pulse;
+		total -= psarray[array_index].size;
+		totaldiv -= psarray[array_index].number_of_bits;
+		psarray[array_index].size = pulse;
+		psarray[array_index].number_of_bits = real_size;
+		total += pulse;
+		totaldiv += real_size;
+		array_index++;
+		if (array_index >= FDI_MAX_ARRAY)
+			array_index = 0;
+	}
 
-        fdi->out = bitoffset;
+	fdi->out = bitoffset;
 }
 
 #endif
@@ -1824,136 +1824,135 @@ static void fdi2_celltiming (FDI *fdi, uint32_t totalavg, int bitoffset, uae_u16
 
 static int decode_lowlevel_track (FDI *fdi, int track, struct fdi_cache *cache)
 {
-        uae_u8 *p1, *d;
-        uae_u32 *p2;
-        uae_u32 *avgp, *minp = 0, *maxp = 0;
-        uae_u8 *idxp = 0;
-        uae_u32 maxidx, totalavg, weakbits;
-        int i, j, len, pulses, indexoffset;
-        int avg_free, min_free = 0, max_free = 0, idx_free;
-        int idx_off1, idx_off2, idx_off3;
+	uae_u8 *p1;
+	uae_u32 *p2;
+	uae_u32 *avgp, *minp = 0, *maxp = 0;
+	uae_u8 *idxp = 0;
+	uae_u32 maxidx, totalavg, weakbits;
+	int i, j, len, pulses, indexoffset;
+	int avg_free, min_free = 0, max_free = 0, idx_free;
+	int idx_off1 = 0, idx_off2 = 0, idx_off3 = 0;
 
-        d = fdi->track_dst;
-        p1 = fdi->track_src;
-        pulses = get_u32 (p1);
-        if (!pulses)
-                return -1;
-        p1 += 4;
-        len = 12;
-        avgp = (uae_u32*)fdi_decompress (pulses, p1 + 0, p1 + len, &avg_free);
-        dumpstream(track, (uae_u8*)avgp, pulses);
-        len += get_u24 (p1 + 0) & 0x3fffff;
-        if (!avgp)
-                return -1;
-        if (get_u24 (p1 + 3) && get_u24 (p1 + 6)) {
-                minp = (uae_u32*)fdi_decompress (pulses, p1 + 3, p1 + len, &min_free);
-                len += get_u24 (p1 + 3) & 0x3fffff;
-                maxp = (uae_u32*)fdi_decompress (pulses, p1 + 6, p1 + len, &max_free);
-                len += get_u24 (p1 + 6) & 0x3fffff;
-                /* Computes the real min and max values */
-                for (i = 0; i < pulses; i++) {
-                        maxp[i] = avgp[i] + minp[i] - maxp[i];
-                        minp[i] = avgp[i] - minp[i];
-                }
-        } else {
-                minp = avgp;
-                maxp = avgp;
-        }
-        if (get_u24 (p1 + 9)) {
-                idx_off1 = 0;
-                idx_off2 = 1;
-                idx_off3 = 2;
-                idxp = fdi_decompress (pulses, p1 + 9, p1 + len, &idx_free);
-                if (idx_free) {
-                        if (idxp[0] == 0 && idxp[1] == 0) {
-                                idx_off1 = 2;
-                                idx_off2 = 3;
-                        } else {
-                                idx_off1 = 1;
-                                idx_off2 = 0;
-                        }
-                        idx_off3 = 4;
-                }
-        } else {
-                idxp = fdi_malloc (pulses * 2);
-                idx_free = 1;
-                for (i = 0; i < pulses; i++) {
-                        idxp[i * 2 + 0] = 2;
-                        idxp[i * 2 + 1] = 0;
-                }
-                idxp[0] = 1;
-                idxp[1] = 1;
-        }
+	p1 = fdi->track_src;
+	pulses = get_u32 (p1);
+	if (!pulses)
+		return -1;
+	p1 += 4;
+	len = 12;
+	avgp = (uae_u32*)fdi_decompress (pulses, p1 + 0, p1 + len, &avg_free);
+	dumpstream(track, (uae_u8*)avgp, pulses);
+	len += get_u24 (p1 + 0) & 0x3fffff;
+	if (!avgp)
+		return -1;
+	if (get_u24 (p1 + 3) && get_u24 (p1 + 6)) {
+		minp = (uae_u32*)fdi_decompress (pulses, p1 + 3, p1 + len, &min_free);
+		len += get_u24 (p1 + 3) & 0x3fffff;
+		maxp = (uae_u32*)fdi_decompress (pulses, p1 + 6, p1 + len, &max_free);
+		len += get_u24 (p1 + 6) & 0x3fffff;
+		/* Computes the real min and max values */
+		for (i = 0; i < pulses; i++) {
+			maxp[i] = avgp[i] + minp[i] - maxp[i];
+			minp[i] = avgp[i] - minp[i];
+		}
+	} else {
+		minp = avgp;
+		maxp = avgp;
+	}
+	if (get_u24 (p1 + 9)) {
+		idx_off1 = 0;
+		idx_off2 = 1;
+		idx_off3 = 2;
+		idxp = fdi_decompress (pulses, p1 + 9, p1 + len, &idx_free);
+		if (idx_free) {
+			if (idxp[0] == 0 && idxp[1] == 0) {
+				idx_off1 = 2;
+				idx_off2 = 3;
+			} else {
+				idx_off1 = 1;
+				idx_off2 = 0;
+			}
+			idx_off3 = 4;
+		}
+	} else {
+		idxp = fdi_malloc (pulses * 2);
+		idx_free = 1;
+		for (i = 0; i < pulses; i++) {
+			idxp[i * 2 + 0] = 2;
+			idxp[i * 2 + 1] = 0;
+		}
+		idxp[0] = 1;
+		idxp[1] = 1;
+	}
 
-        maxidx = 0;
-        indexoffset = 0;
-        p1 = idxp;
-        for (i = 0; i < pulses; i++) {
-                if (p1[idx_off1] + p1[idx_off2] > maxidx)
-                        maxidx = p1[idx_off1] + p1[idx_off2];
-                p1 += idx_off3;
-        }
-        p1 = idxp;
-        for (i = 0; (i < pulses) && (p1[idx_off2] != 0); i++) /* falling edge, replace with idx_off1 for rising edge */
-                p1 += idx_off3;
-        if (i < pulses) {
-                j = i;
-                do {
-                        i++;
-                        p1 += idx_off3;
-                        if (i >= pulses) {
-                                i = 0;
-                                p1 = idxp;
-                        }
-                } while ((i != j) && (p1[idx_off2] == 0)); /* falling edge, replace with idx_off1 for rising edge */
-                if (i != j) /* index pulse detected */
-                {
-                        while ((i != j) && (p1[idx_off1] > p1[idx_off2])) { /* falling edge, replace with "<" for rising edge */
-                                i++;
-                                p1 += idx_off3;
-                                if (i >= pulses) {
-                                        i = 0;
-                                        p1 = idxp;
-                                }
-                        }
-                        if (i != j)
-                                indexoffset = i; /* index position detected */
-                }
-        }
-        p1 = idxp;
-        p2 = avgp;
-        totalavg = 0;
-        weakbits = 0;
-        for (i = 0; i < pulses; i++) {
-                int sum = p1[idx_off1] + p1[idx_off2];
-                if (sum >= maxidx) {
-                        totalavg += *p2;
-                } else {
-                        weakbits++;
-                }
-                p2++;
-                p1 += idx_off3;
-                idxp[i] = sum;
-        }
-        len = totalavg / 100000;
-        bem_debugf("totalavg=%u index=%d (%d) maxidx=%d weakbits=%d len=%d\n",
-                totalavg, indexoffset, maxidx, weakbits, len);
-        cache->avgp = avgp;
-        cache->idxp = idxp;
-        cache->minp = minp;
-        cache->maxp = maxp;
-        cache->avg_free = avg_free;
-        cache->idx_free = idx_free;
-        cache->min_free = min_free;
-        cache->max_free = max_free;
-        cache->totalavg = totalavg;
-        cache->pulses = pulses;
-        cache->maxidx = maxidx;
-        cache->indexoffset = indexoffset;
-        cache->weakbits = weakbits;
-        cache->lowlevel = 1;
+	maxidx = 0;
+	indexoffset = 0;
+	p1 = idxp;
+	for (i = 0; i < pulses; i++) {
+		if (p1[idx_off1] + p1[idx_off2] > maxidx)
+			maxidx = p1[idx_off1] + p1[idx_off2];
+		p1 += idx_off3;
+	}
+	p1 = idxp;
+	for (i = 0; (i < pulses) && (p1[idx_off2] != 0); i++) /* falling edge, replace with idx_off1 for rising edge */
+		p1 += idx_off3;
+	if (i < pulses) {
+		j = i;
+		do {
+			i++;
+			p1 += idx_off3;
+			if (i >= pulses) {
+				i = 0;
+				p1 = idxp;
+			}
+		} while ((i != j) && (p1[idx_off2] == 0)); /* falling edge, replace with idx_off1 for rising edge */
+		if (i != j) /* index pulse detected */
+		{
+			while ((i != j) && (p1[idx_off1] > p1[idx_off2])) { /* falling edge, replace with "<" for rising edge */
+				i++;
+				p1 += idx_off3;
+				if (i >= pulses) {
+					i = 0;
+					p1 = idxp;
+				}
+			}
+			if (i != j)
+				indexoffset = i; /* index position detected */
+		}
+	}
+	p1 = idxp;
+	p2 = avgp;
+	totalavg = 0;
+	weakbits = 0;
+	for (i = 0; i < pulses; i++) {
+		int sum = p1[idx_off1] + p1[idx_off2];
+		if (sum >= maxidx) {
+			totalavg += *p2;
+		} else {
+			weakbits++;
+		}
+		p2++;
+		p1 += idx_off3;
+		idxp[i] = sum;
+	}
+	len = totalavg / 100000;
+	bem_debugf("totalavg=%u index=%d maxidx=%d weakbits=%d len=%d\n",
+		totalavg, indexoffset, maxidx, weakbits, len);
+	cache->avgp = avgp;
+	cache->idxp = idxp;
+	cache->minp = minp;
+	cache->maxp = maxp;
+	cache->avg_free = avg_free;
+	cache->idx_free = idx_free;
+	cache->min_free = min_free;
+	cache->max_free = max_free;
+	cache->totalavg = totalavg;
+	cache->pulses = pulses;
+	cache->maxidx = maxidx;
+	cache->indexoffset = indexoffset;
+	cache->weakbits = weakbits;
+	cache->lowlevel = 1;
 
-        return 1;
+	return 1;
 }
 
 static unsigned char fdiid[]={"Formatted Disk Image file"};
@@ -2153,8 +2152,8 @@ int fdi2raw_loadtrack (FDI *fdi, uae_u16 *mfmbuf, uae_u16 *tracktiming, int trac
 	else
 		fdi->bit_rate = 250;
 
-        bem_debugf("track %d: srclen: %d track_type: %02.2X, bitrate: %d\n",
-                fdi->current_track, fdi->track_src_len, fdi->track_type, fdi->bit_rate);
+	bem_debugf("track %d: srclen: %d track_type: %2.2X, bitrate: %d\n",
+		fdi->current_track, fdi->track_src_len, fdi->track_type, fdi->bit_rate);
 
 	if ((fdi->track_type & 0xc0) == 0x80) {
 
