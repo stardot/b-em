@@ -58,7 +58,7 @@ void mem_loadswroms()
         int c = 15;
         struct al_ffblk ffblk;
 //        memset(rom,0,16*16384);
-        
+
         if (al_findfirst("*.rom", &ffblk, FA_ALL) != 0) return;
         do
         {
@@ -66,6 +66,7 @@ void mem_loadswroms()
                 if (c >= 0)
                 {
                         bem_debugf("Loading %s to slot %i\n",ffblk.name,c);
+
                         f = x_fopen(ffblk.name, "rb");
 			fread(rom + (c * 16384), 16384, 1, f);
 			fclose(f);
@@ -83,6 +84,7 @@ void mem_loadswroms()
                 if (c >= 0)
                 {
                         bem_debugf("Loading %s to slot %i\n",ffblk.name,c);
+
                         f= x_fopen(ffblk.name, "rb");
 			fread(rom + (c * 16384), 16384, 1, f);
 			fclose(f);
@@ -139,7 +141,7 @@ void mem_romsetup_os01()
         f=x_fopen("os01", "rb");
         fread(os, 16384, 1, f);
         fclose(f);
-        
+
         chdir("a01");
         if (!al_findfirst("*.rom", &ffblk, FA_ALL))
         {
