@@ -58,7 +58,7 @@ void mem_loadswroms()
         int c = 15;
         struct al_ffblk ffblk;
 //        memset(rom,0,16*16384);
-        
+
         if (al_findfirst("*.rom", &ffblk, FA_ALL) != 0) return;
         do
         {
@@ -74,7 +74,7 @@ void mem_loadswroms()
                                 c--;
                         }
                         else
-                                bem_errorf("unable to load rom file '%s': %s\n", strerror(errno));
+                                bem_errorf("unable to load rom file '%s': %s\n", ffblk.name, strerror(errno));
                 }
         } while (c >= 0 && !al_findnext(&ffblk));
         al_findclose(&ffblk);
@@ -95,7 +95,7 @@ void mem_loadswroms()
                                 c--;
                         }
                         else
-                                bem_errorf("unable to load rom file '%s': %s\n", strerror(errno));
+                                bem_errorf("unable to load rom file '%s': %s\n", ffblk.name, strerror(errno));
                 }
         } while (c >= 0 && !al_findnext(&ffblk));
         al_findclose(&ffblk);
@@ -157,7 +157,7 @@ int mem_romsetup_os01()
         }
         fread(os, 16384, 1, f);
         fclose(f);
-        
+
         chdir("a01");
         if (!al_findfirst("*.rom", &ffblk, FA_ALL))
         {

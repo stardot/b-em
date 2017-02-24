@@ -70,7 +70,7 @@ void bem_warnf(const char *fmt, ...)
 void debug_open()
 {
         if ((debug_fp = fopen(debug_fn, "wt")) == NULL)
-                bem_warnf("unable to open debug log %s: %s", strerror(errno));
+                bem_warnf("unable to open debug log %s: %s", debug_fn, strerror(errno));
 }
 
 void debug_close(void)
@@ -78,16 +78,5 @@ void debug_close(void)
         if (debug_fp)
                 fclose(debug_fp);
 }
-
-#else
-
-#undef bem_debug
-#undef bem_debugf
-#undef debug_open
-#undef debug_close
-void bem_debug(const char *s) {}
-void bem_debugf(const char *format, ...) {}
-void debug_open() {}
-void debug_close() {}
 
 #endif

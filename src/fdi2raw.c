@@ -61,7 +61,7 @@ static char *datalog(uae_u8 *src, int len)
 	offset2 = offset;
 	buf[offset++]='\'';
 	while(len--) {
-		sprintf (buf + offset, "%02.2X", src[i]);
+		sprintf (buf + offset, "%2.2X", src[i]);
 		offset += 2;
 		i++;
 		if (i > 10) break;
@@ -72,11 +72,12 @@ static char *datalog(uae_u8 *src, int len)
 	return buf + offset2;
 }
 #else
-#define datalog(src, len)
+static inline char *datalog(uae_u8 *src, int len) {return "";}
 #endif
 
-#ifdef _DEBUG
 static int fdi_allocated;
+
+#ifdef _DEBUG
 static void fdi_free (void *p)
 {
 	int size;
@@ -319,7 +320,7 @@ static int decode_raw_track (FDI *fdi)
 /* unknown track */
 static void zxx (FDI *fdi)
 {
-	bem_debugf("track %d: unknown track type 0x%02.2X\n", fdi->current_track, fdi->track_type);
+	bem_debugf("track %d: unknown track type 0x%2.2X\n", fdi->current_track, fdi->track_type);
 //	return -1;
 }
 /* unsupported track */
@@ -339,7 +340,7 @@ static void track_empty (FDI *fdi)
 /* unknown sector described type */
 static void dxx (FDI *fdi)
 {
-	bem_debugf("\ntrack %d: unknown sector described type 0x%02.2X\n", fdi->current_track, fdi->track_type);
+	bem_debugf("\ntrack %d: unknown sector described type 0x%2.2X\n", fdi->current_track, fdi->track_type);
 	fdi->err = 1;
 }
 /* unsupported sector described type */
@@ -470,7 +471,7 @@ static void s08(FDI *fdi)
 	int bytes = *fdi->track_src++;
 	uae_u8 byte = *fdi->track_src++;
 	if (bytes == 0) bytes = 256;
-	bem_debugf ("s08:len=%d,data=%02.2X",bytes,byte);
+	bem_debugf ("s08:len=%d,data=%2.2X",bytes,byte);
 	while(bytes--) byte_add (fdi, byte);
 }
 /* RLE MFM-decoded data */
@@ -480,7 +481,7 @@ static void s09(FDI *fdi)
 	uae_u8 byte = *fdi->track_src++;
 	if (bytes == 0) bytes = 256;
 	bit_drop_next (fdi);
-	bem_debugf ("s09:len=%d,data=%02.2X",bytes,byte);
+	bem_debugf ("s09:len=%d,data=%2.2X",bytes,byte);
 	while(bytes--) byte_mfm_add (fdi, byte);
 }
 /* MFM-encoded data */
@@ -1308,9 +1309,9 @@ static void fix_mfm_sync (FDI *fdi)
 
 static int handle_sectors_described_track (FDI *fdi)
 {
+	uae_u8 *start_src = fdi->track_src;
 #ifdef _DEBUG
 	int oldout;
-	uae_u8 *start_src = fdi->track_src;
 #endif
 	fdi->encoding_type = *fdi->track_src++;
 	fdi->index_offset = get_u32(fdi->track_src);
@@ -1320,18 +1321,18 @@ static int handle_sectors_described_track (FDI *fdi)
 
 	do {
 		fdi->track_type = *fdi->track_src++;
-		bem_debugf("%06.6X %06.6X %02.2X:",fdi->track_src - start_src + 0x200, fdi->out/8, fdi->track_type);
+		bem_debugf("%6.6X %6.6X %2.2X:",(unsigned)(fdi->track_src - start_src + 0x200), (fdi->out/8), fdi->track_type);
 		decode_sectors_described_track[fdi->track_type](fdi);
 #ifdef _DEBUG
 		bem_debugf(" %d\n", fdi->out - oldout);
 		oldout = fdi->out;
 #endif
 		if (fdi->out < 0 || fdi->err) {
-			bem_debugf("\nin %d bytes, out %d bits\n", fdi->track_src - fdi->track_src_buffer, fdi->out);
+			bem_debugf("\nin %ld bytes, out %d bits\n", fdi->track_src - fdi->track_src_buffer, fdi->out);
 			return -1;
 		}
 		if (fdi->track_src - fdi->track_src_buffer >= fdi->track_src_len) {
-			bem_debugf("source buffer overrun, previous type: %02.2X\n", fdi->track_type);
+			bem_debugf("source buffer overrun, previous type: %2.2X\n", fdi->track_type);
 			return -1;
 		}
 	} while (fdi->track_type != 0xff);
@@ -1647,7 +1648,7 @@ static void fdi2_decode (FDI *fdi, uint32_t totalavg, uae_u32 *avgp, uae_u32 *mi
 				avg_pulse += jitter;
 				if ((avg_pulse < min_pulse) || (avg_pulse > max_pulse)) {
 					bem_debugf("FDI: avg_pulse outside bounds! avg=%u min=%u max=%u\n", avg_pulse, min_pulse, max_pulse);
-					bem_debugf("FDI: avgp=%u (%u) minp=%u (%u) maxp=%u (%u) jitter=%d i=%d ni=%d\n",
+					bem_debugf("FDI: avgp=%u (%u) minp=%u (%u) maxp=%u (%u) jitter=%ld i=%d ni=%d\n",
 						avgp[i], avgp[nexti], minp[i], minp[nexti], maxp[i], maxp[nexti], jitter, i, nexti);
 				}
 				if (avg_pulse < ref_pulse)
@@ -1924,7 +1925,7 @@ static int decode_lowlevel_track (FDI *fdi, int track, struct fdi_cache *cache)
 		idxp[i] = sum;
 	}
 	len = totalavg / 100000;
-	bem_debugf("totalavg=%u index=%d (%d) maxidx=%d weakbits=%d len=%d\n",
+	bem_debugf("totalavg=%u index=%d maxidx=%d weakbits=%d len=%d\n",
 		totalavg, indexoffset, maxidx, weakbits, len);
 	cache->avgp = avgp;
 	cache->idxp = idxp;
@@ -2137,7 +2138,7 @@ int fdi2raw_loadtrack (FDI *fdi, uae_u16 *mfmbuf, uae_u16 *tracktiming, int trac
 	else
 		fdi->bit_rate = 250;
 
-	bem_debugf("track %d: srclen: %d track_type: %02.2X, bitrate: %d\n",
+	bem_debugf("track %d: srclen: %d track_type: %2.2X, bitrate: %d\n",
 		fdi->current_track, fdi->track_src_len, fdi->track_type, fdi->bit_rate);
 
 	if ((fdi->track_type & 0xc0) == 0x80) {
