@@ -65,6 +65,7 @@ vasprintf(char **ret, const char *fmt, va_list ap)
 
 	if ((*ret = malloc(n + 1)) == NULL) {
 		fprintf(stderr, "malloc failed: %s\n", strerror(errno));
+		exit(1);
 	}
 
 	if ((n = vsnprintf(*ret, n + 1, fmt, ap2)) < 0) {
