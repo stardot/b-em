@@ -64,7 +64,7 @@ MENU soundmenu[11];
 MENU keymenu[3];
 MENU mousemenu[2];
 MENU hdiskmenu[4];
-MENU settingsmenu[7];
+MENU settingsmenu[8];
 MENU miscmenu[3];
 MENU speedmenu[11];
 MENU mainmenu[6];
@@ -223,7 +223,6 @@ int gui_load1()
 {
         gui_load_drive(1, "Please choose a disc image to load in drive 1/3");
         return D_O_K;
->>>>>>> cdc29af... Better consistency between Windows and Linux GUIs.  This includes adding
 }
 
 int gui_eject0()
@@ -724,57 +723,6 @@ MENU mousemenu[2] =
         {NULL, NULL, NULL, 0, NULL}
 };
 
-
-int gui_hdisk()
-{
-        intptr_t sel = (intptr_t)active_menu->dp;
-        int changed = 0;
-
-        if (ide_enable)
-        {
-                if (sel != 0)
-                {
-                        ide_enable = 0;
-                        changed = 1;
-                }
-        }
-        else
-        {
-                if (sel == 0)
-                {
-                        ide_enable = 1;
-                        changed = 1;
-                }
-        }
-        if (scsi_enabled)
-        {
-                if (sel != 1)
-                {
-                        scsi_enabled = 0;
-                        changed = 1;
-                }
-        }
-        else
-        {
-                if (sel == 1)
-                {
-                        scsi_enabled = 1;
-                        changed = 1;
-                }
-        }
-        if (changed)
-                main_reset();
-        gui_update();
-        return D_CLOSE;
-}
-
-MENU hdiskmenu[4]=
-{
-        {"None",gui_hdisk,NULL,0,(void *)-1},
-        {"IDE", gui_hdisk,NULL,0,(void *)0},
-        {"SCSI", gui_hdisk,NULL,0,(void *)1},
-        {NULL, NULL, NULL, 0, NULL}
-};
 
 MENU settingsmenu[8]=
 {

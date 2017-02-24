@@ -83,7 +83,7 @@ void mem_loadswroms()
                 if (c >= 0)
                 {
                         bem_debugf("Loading %s to slot %i\n",ffblk.name,c);
-                        f= x_fopen(ffblk.name, "rb")))
+                        f= x_fopen(ffblk.name, "rb");
 			fread(rom + (c * 16384), 16384, 1, f);
 			fclose(f);
 			romused[c] = 1;
