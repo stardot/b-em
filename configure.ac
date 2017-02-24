@@ -22,7 +22,7 @@ AC_MSG_CHECKING([whether to enable debugging])
 AC_ARG_ENABLE(debug,
 	      AC_HELP_STRING([--enable-debug], [build debug executable]))
 
-CF_WARNINGS="-Wall -Werror -Wno-format-security"
+CF_WARNINGS="-Wall -Wno-format-security -Werror"
 if test "$enable_debug" = "yes"; then
    CFLAGS="$CFLAGS $CF_WARNINGS -O0 -ggdb -D_DEBUG -D_GNU_SOURCE"
    LDFLAGS="$LDFLAGS -L/usr/local/lib"
@@ -32,6 +32,8 @@ else
    LDFLAGS="$LDFLAGS -L/usr/local/lib"
    AC_MSG_RESULT([no])
 fi
+
+AC_CHECK_FUNCS(tdestroy)
 
 # Check if the platform is anything other than Windows, as we want to check
 # for Allegro if not.

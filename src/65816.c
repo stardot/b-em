@@ -8,7 +8,7 @@
 #include "tube.h"
 #include "65816.h"
 
-#define printf rpclog
+#define printf bem_debug
 
 static uint8_t *w65816ram,*w65816rom;
 /*Registers*/
@@ -59,7 +59,7 @@ static uint8_t w65816opcode;
 static int def=1,divider=0,banking=0,banknum=0;
 static uint32_t w65816mask=0xFFFF;
 
-static uint8_t readmem65816(uint32_t a)
+uint8_t readmem65816(uint32_t a)
 {
         uint8_t temp;
         a&=w65816mask;
@@ -72,7 +72,7 @@ static uint8_t readmem65816(uint32_t a)
                         dtimes++;
                         if (dtimes==2) toutput=1;
                 }*/
-                //rpclog("Read TUBE  %04X %02X %04X\n",a,temp,pc);
+                //bem_debugf("Read TUBE  %04X %02X %04X\n",a,temp,pc);
                 return temp;
         }
         if ((a&0x78000)==0x8000 && (def || (banking&8))) return w65816rom[a&0x7FFF];
@@ -86,42 +86,42 @@ static uint16_t readmemw65816(uint32_t a)
         a&=w65816mask;
         return readmem65816(a)|(readmem65816(a+1)<<8);
 //        cycles-=2;
-//        rpclog("Reading %08X %i %08X %08X\n",a,tuberomin,w65816rom,w65816ram);
+//        bem_debugf("Reading %08X %i %08X %08X\n",a,tuberomin,w65816rom,w65816ram);
 //        if ((a&~0xFFF)==0xF000 && tuberomin) return w65816rom[a&0xFFF]|(w65816rom[(a+1)&0xFFF]<<8);
 //        if (a<0x10000) return w65816ram[a]|(w65816ram[a+1]<<8);
 }
 
 int endtimeslice;
-static void writemem65816(uint32_t a, uint8_t v)
+void writemem65816(uint32_t a, uint8_t v)
 {
         a&=w65816mask;
-//        if (a==0xFF) rpclog("Write 00FF %02X %04X %i\n",v,pc,wins);
+//        if (a==0xFF) bem_debugf("Write 00FF %02X %04X %i\n",v,pc,wins);
         cycles--;
         if ((a&~7)==0xFEF0)
         {
 //                printf("Write control %04X %02X\n",a,v);
                 switch (v&7)
                 {
-                        case 0: case 1: def=v&1; /*rpclog("Default now %i\n",def); */break;
-                        case 2: case 3: divider=(divider>>1)|((v&1)<<3); /*rpclog("Divider now %i\n",divider);*/ break;
-                        case 4: case 5: banking=(banking>>1)|((v&1)<<3); /*rpclog("Banking now %i\n",banking);*/ break;
-                        case 6: case 7: banknum=(banknum>>1)|((v&1)<<5); /*rpclog("Banknum now %i\n",banknum);*/ break;
+                        case 0: case 1: def=v&1; /*bem_debugf("Default now %i\n",def); */break;
+                        case 2: case 3: divider=(divider>>1)|((v&1)<<3); /*bem_debugf("Divider now %i\n",divider);*/ break;
+                        case 4: case 5: banking=(banking>>1)|((v&1)<<3); /*bem_debugf("Banking now %i\n",banking);*/ break;
+                        case 6: case 7: banknum=(banknum>>1)|((v&1)<<5); /*bem_debugf("Banknum now %i\n",banknum);*/ break;
                 }
                 if (def || !(banking&4)) w65816mask=0xFFFF;
                 else                     w65816mask=0x7FFFF;
-//                rpclog("Mask now %08X\n",w65816mask);
+//                bem_debugf("Mask now %08X\n",w65816mask);
                 return;
         }
         if ((a&~7)==0xFEF8)
         {
-//                rpclog("Write TUBE %04X %02X %04X\n",a,v,pc);
+//                bem_debugf("Write TUBE %04X %02X %04X\n",a,v,pc);
                 tube_parasite_write(a,v);
                 endtimeslice=1;
                 return;
         }
         if ((a&0x78000)==0x4000 && !def && (banking&1)) { w65816ram[(a&0x3FFF)|((banknum&7)<<14)]=v; return; }
         if ((a&0x78000)==0x8000 && !def && (banking&2)) { w65816ram[(a&0x3FFF)|(((banknum>>3)&7)<<14)]=v; return; }
-//        if (a>0xF000) rpclog("Write %04X %02X %04X\n",a,v,pc);
+//        if (a>0xF000) bem_debugf("Write %04X %02X %04X\n",a,v,pc);
 //        if (a==0xF7FF && v==0xFF) toutput=1;
         w65816ram[a]=v;
 }
@@ -1149,7 +1149,7 @@ static void staLong8()
 static void staLongx8()
 {
         addr=absolutelongx();
-//        rpclog("Addr %06X\n",addr);
+//        bem_debugf("Addr %06X\n",addr);
         writemem(addr,a.b.l);
 }
 static void staIndirect8()
@@ -3162,9 +3162,9 @@ static void jmplong()
 static void jmpind()
 {
         addr=readmemw(pbr|pc);
-//        rpclog("Addr %04X\n",addr);
+//        bem_debugf("Addr %04X\n",addr);
         pc=readmemw(addr);
-//        rpclog("PC %04X\n",addr);
+//        bem_debugf("PC %04X\n",addr);
 }
 
 static void jmpindx()
@@ -3225,7 +3225,7 @@ static void jsl()
         writemem(s.w,pbr>>16); s.w--;
         writemem(s.w,pc>>8);   s.w--;
         writemem(s.w,pc&0xFF); s.w--;
-//        rpclog("JSL %06X\n",pbr|pc);
+//        bem_debugf("JSL %06X\n",pbr|pc);
         pc=addr;
         pbr=temp<<16;
         //printf("JSL %04X\n",s.w);
@@ -3239,7 +3239,7 @@ static void jsle()
         writemem(s.w,pbr>>16); s.b.l--;
         writemem(s.w,pc>>8);   s.b.l--;
         writemem(s.w,pc&0xFF); s.b.l--;
-//        rpclog("JSLe %06X\n",pbr|pc);
+//        bem_debugf("JSLe %06X\n",pbr|pc);
         pc=addr;
         pbr=temp<<16;
 }
@@ -3249,7 +3249,7 @@ static void rtl()
         cycles-=3; clockspc(18);
         pc=readmemw(s.w+1); s.w+=2;
         pbr=readmem(s.w+1)<<16; s.w++;
-//        rpclog("RTL %06X\n",pbr|pc);
+//        bem_debugf("RTL %06X\n",pbr|pc);
         pc++;
         //printf("RTL %04X\n",s.w);
 }
@@ -4820,7 +4820,7 @@ static void irq65816()
                 pbr=0;
                 p.i=1;
                 p.d=0;
-//                rpclog("Emulation mode IRQ %04X\n",pc);
+//                bem_debugf("Emulation mode IRQ %04X\n",pc);
 //                toutput=1;
 //                dumpregs();
 //                exit(-1);
@@ -4834,7 +4834,7 @@ void w65816_exec()
         while (tubecycles>0)
         {
                 opcode=readmem(pbr|pc); pc++;
-                if (toutput) rpclog("%i : %02X:%04X %04X %02X %i %04X  %04X %04X %04X\n",wins,pbr,pc-1,toldpc,opcode,cycles,s.b.l,a.w,x.w,y.w);
+                if (toutput) bem_debugf("%i : %02X:%04X %04X %02X %i %04X  %04X %04X %04X\n",wins,pbr,pc-1,toldpc,opcode,cycles,s.b.l,a.w,x.w,y.w);
                 toldpc=pc-1;
                 opcodes[opcode][cpumode]();
 //                if (pc==0xffee) toutput=1;

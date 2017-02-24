@@ -54,12 +54,28 @@ void bem_error(char *s)
 {
         allegro_message(s);
 }
+
+void setquit()
+{
+        quited=1;
+}
+
 //#undef printf
 int main(int argc, char *argv[])
 {
         int oldf = 0;
         char *p;
-        allegro_init();
+
+        if (allegro_init())
+        {
+                printf("Failed to initialise Allegro!");
+                exit(-1);
+        }
+
+        set_close_button_callback(setquit);
+
+        set_window_title(VERSION_STR);
+
         get_executable_name(exedir, 511);
         p = get_filename(exedir);
         p[0] = 0;

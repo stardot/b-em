@@ -20,7 +20,7 @@
 
 #endif
 
-//#define printf rpclog
+//#define printf bem_debug
 
 #define VERSION_STR "B-em v-" VERSION
 
@@ -28,7 +28,34 @@ void updatewindowsize(int x, int y);
 
 void setejecttext(int drive, char *fn);
 
-void rpclog(const char *format, ...);
+#if __GNUC__
+#define printflike __attribute__((format (printf, 1, 2)))
+#else
+#define printflike
+#endif
+
+extern void bem_error(char *s);
+extern void bem_errorf(const char *fmt, ...) printflike;
+extern void bem_warn(const char *s);
+extern void bem_warnf(const char *fmt, ...) printflike;
+
+// If debugging is enabled a real pair of functions will be available
+// to log debug messages.  if debug is disabled we use a static inline
+// empty function to make the debug calls disappear but in a way that
+// doesn't look syntactically different to the compiler.
+
+#ifdef _DEBUG
+extern void bem_debug(const char *s);
+extern void bem_debugf(const char *format, ...) printflike;
+extern void debug_open(void);
+extern void debug_close(void);
+#else
+static inline void bem_debug(const char *s) {}
+static inline void bem_debugf(const char *format, ...) printflike;
+static inline void bem_debugf(const char *format, ...) {}
+static inline void debug_open(void) {}
+static inline void debug_close(void) {}
+#endif
 
 extern char exedir[512];
 
@@ -48,8 +75,6 @@ void cataddname(char *s);
 void showcatalogue();
 
 void redefinekeys();
-
-void bem_error(char *s);
 
 void changetimerspeed(int i);
 

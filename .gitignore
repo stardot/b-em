@@ -17,3 +17,4 @@ etc/
 install-sh
 missing
 tags
+.dirstamp

@@ -5,7 +5,7 @@
 #include "cmos.h"
 #include "mem.h"
 #include "tube.h"
-#include "32016.h"
+#include "NS32016/32016.h"
 #include "6502tube.h"
 #include "65816.h"
 #include "arm.h"
@@ -58,7 +58,7 @@ TUBE tubes[7]=
 void model_init()
 {
         char t[512],t2[512];
-        rpclog("Starting emulation as %s\n",models[curmodel].name);
+        bem_debugf("Starting emulation as %s\n",models[curmodel].name);
         I8271       = models[curmodel].I8271;
         WD1770      = models[curmodel].WD1770;
         BPLUS       = models[curmodel].bplus;
@@ -76,7 +76,11 @@ void model_init()
         append_filename(t2, exedir, "roms", 511);
         chdir(t2);
         mem_clearroms();
-        if (models[curmodel].romsetup) models[curmodel].romsetup();
+        if (models[curmodel].romsetup)
+        {
+                if (models[curmodel].romsetup())
+                        exit(-1);
+        }
 
         mem_loadroms(models[curmodel].os, models[curmodel].romdir);
 //        if (ideenable) loadiderom();
