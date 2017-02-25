@@ -24,6 +24,7 @@
 #include "sn76489.h"
 #include "tape.h"
 #include "tube.h"
+#include "vdfs.h"
 #include "video_render.h"
 #include "win.h"
 
