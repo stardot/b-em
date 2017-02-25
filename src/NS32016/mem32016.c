@@ -1,5 +1,5 @@
 // B-em v2.2 by Tom Walker
-#define BEEBEM
+//32016 parasite processor emulation (not working yet)
 
 // 32106 CoProcessor Memory Subsystem
 // By Simon R. Ellwood
@@ -12,12 +12,10 @@
 #include "32016.h"
 #include "mem32016.h"
 
-#ifdef BEEBEM
+#ifdef BEM
 #include "../tube.h"
-#define tubeRead tube_parasite_read
-#define tubeWrite tube_parasite_write
 #else
-#include "../bare-metal/tube-lib.h"
+#include "../tube-ula.h"
 #endif
 
 #ifdef TEST_SUITE
@@ -75,26 +73,26 @@ void dump_ram(void)
 
 uint8_t read_x8(uint32_t addr)
 {
-   //addr &= MEM_MASK;
+   addr &= 0xFFFFFF;
 
    if (addr < IO_BASE)
    {
       return ns32016ram[addr];
    }
 
-   if ((addr & 0x01) == 0)
+   if ((addr & 0xFFFFF1) == 0xFFFFF0)
    {
-      return tubeRead(addr >> 1);
+      return tube_parasite_read(addr >> 1);
    }
 
-   //PiTRACE("Bad read_x8 @ %06"PRIX32"\n", addr);
+   PiWARN("Bad Read @ %06" PRIX32 "\n", addr);
 
    return 0;
 }
 
 uint16_t read_x16(uint32_t addr)
 {
-   //addr &= MEM_MASK;
+   addr &= 0xFFFFFF;
 
 #ifdef NS_FAST_RAM
    if (addr < IO_BASE)
@@ -108,7 +106,7 @@ uint16_t read_x16(uint32_t addr)
 
 uint32_t read_x32(uint32_t addr)
 {
-   //addr &= MEM_MASK;
+   addr &= 0xFFFFFF;
 
 #ifdef NS_FAST_RAM
    if (addr < IO_BASE)
@@ -122,15 +120,19 @@ uint32_t read_x32(uint32_t addr)
 
 uint64_t read_x64(uint32_t addr)
 {
-   // ARM doesn't support unalizged 64-bit loads, so the following
+   addr &= 0xFFFFFF;
+   // ARM doesn't support unaligned 64-bit loads, so the following
    // results in a Data Abort exception:
    // return *((uint64_t*) (ns32016ram + addr))
    return (((uint64_t) read_x32(addr + 4)) << 32) + read_x32(addr);
 }
 
+
+// As this function returns uint32_t it *should* only be used for size 1, 2 or 4
 uint32_t read_n(uint32_t addr, uint32_t Size)
 {
-   if (Size <= sizeof(uint64_t))
+   addr &= 0xFFFFFF;
+   if (Size <= sizeof(uint32_t))
    {
       if ((addr + Size) <= IO_BASE)
       {
@@ -138,15 +140,17 @@ uint32_t read_n(uint32_t addr, uint32_t Size)
          memcpy(&Result, ns32016ram + addr, Size);
          return Result;
       }
+      PiWARN("Bad read_n() addr @ %06" PRIX32 " size %" PRIX32 "\n", addr, Size);
+   } else {
+      PiWARN("Bad read_n() size @ %06" PRIX32 " size %" PRIX32 "\n", addr, Size);
    }
 
-   PiTRACE("Bad Read @ %06" PRIu32 "\n", addr);
    return 0;
 }
 
 void write_x8(uint32_t addr, uint8_t val)
-{ 
-  //addr &= MEM_MASK;
+{
+   addr &= 0xFFFFFF;
 
 #ifdef TRACE_WRITEs
    PiTRACE(" @%06"PRIX32" = %02"PRIX8"\n", addr, val);
@@ -158,9 +162,9 @@ void write_x8(uint32_t addr, uint8_t val)
       return;
    }
 
-   if ((addr >= IO_BASE) && ((addr & 0x01) == 0))
+   if ((addr & 0xFFFFF1) == 0xFFFFF0)
    {
-      tubeWrite(addr >> 1, val);
+      tube_parasite_write(addr >> 1, val);
       return;
    }
 
@@ -176,11 +180,17 @@ void write_x8(uint32_t addr, uint8_t val)
       return;
    }
 
-   PiTRACE("Writing outside of RAM @%06"PRIX32" %02"PRIX8"\n", addr, val);
+   // Silently ignore writing one word beyond end of RAM
+   // as Pandora RAM test does this
+   if (addr >= RAM_SIZE + 4) {
+      PiWARN("Writing outside of RAM @%06"PRIX32" %02"PRIX8"\n", addr, val);
+   }
 }
 
 void write_x16(uint32_t addr, uint16_t val)
 {
+   addr &= 0xFFFFFF;
+
 #ifdef TRACE_WRITEs
    PiTRACE(" @%06"PRIX32" = %04"PRIX16"\n", addr, val);
 #endif
@@ -199,8 +209,10 @@ void write_x16(uint32_t addr, uint16_t val)
 
 void write_x32(uint32_t addr, uint32_t val)
 {
+   addr &= 0xFFFFFF;
+
 #ifdef TRACE_WRITEs
-   PiTRACE(" @%06"PRIX32" = %08"PRIX32"\n", addr, val);
+   PiTRACE(" @%06"PRIX32" = %06"PRIX32"\n", addr, val);
 #endif
 
 #ifdef NS_FAST_RAM
@@ -219,6 +231,8 @@ void write_x32(uint32_t addr, uint32_t val)
 
 void write_x64(uint32_t addr, uint64_t val)
 {
+   addr &= 0xFFFFFF;
+
 #ifdef TRACE_WRITEs
    PiTRACE(" @%06"PRIX32" = %016"PRIX64"\n", addr, val);
 #endif
@@ -226,7 +240,11 @@ void write_x64(uint32_t addr, uint64_t val)
 #ifdef NS_FAST_RAM
    if (addr <= (RAM_SIZE - sizeof(uint64_t)))
    {
-      *((uint64_t*) (ns32016ram + addr)) = val;
+      // ARM doesn't support unaligned 64-bit stores, so the following
+      // results in a Data Abort exception:
+      // *((uint64_t*) (ns32016ram + addr)) = val;
+      write_x32(addr, (uint32_t) val);
+      write_x32(addr + 4, (uint32_t) (val >> 32));
       return;
    }
 #endif
@@ -243,6 +261,8 @@ void write_x64(uint32_t addr, uint64_t val)
 
 void write_Arbitary(uint32_t addr, void* pData, uint32_t Size)
 {
+   addr &= 0xFFFFFF;
+
 #ifdef TRACE_WRITEs
    uint32_t Index;
    register uint8_t* pV = (uint8_t*) pData;
@@ -288,7 +308,7 @@ uint32_t LoadBinary(const char *pFileName, uint32_t Location)
       rewind(pFile);
 
       if ((Location + FileSize) < MEG16)
-      { 
+      {
          End = fread(ns32016ram + Location, sizeof(uint8_t), FileSize, pFile) + Location;
       }
 
