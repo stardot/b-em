@@ -139,6 +139,7 @@ static void initmenu()
         CheckMenuItem(hmenu, IDM_DISC_WPROT_1, (writeprot[1])     ? MF_CHECKED : MF_UNCHECKED);
         CheckMenuItem(hmenu, IDM_DISC_WPROT_D, (defaultwriteprot) ? MF_CHECKED : MF_UNCHECKED);
         CheckMenuItem(hmenu, IDM_DISC_VDFS_ENABLE, (vdfs_enabled) ? MF_CHECKED : MF_UNCHECKED);
+
         CheckMenuItem(hmenu, IDM_TUBE_6502 + selecttube, MF_CHECKED);
         CheckMenuItem(hmenu, IDM_MODEL_0   + curmodel,   MF_CHECKED);
 

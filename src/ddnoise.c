@@ -37,7 +37,6 @@ SAMPLE *safe_load_wav(char *fn)
                 exit(-1);
         }
 }
-
 void ddnoise_init()
 {
         char path[512], p2[512];

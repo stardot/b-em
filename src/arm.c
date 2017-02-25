@@ -1623,7 +1623,7 @@ void arm_exec()
                                         tubecycles-=4;
 /*                                        if (RD==7)
                                         {
-                                                if (!olog) olog=fopen("armlog.txt","wt");
+                                                if (!olog) olog=x_fopen("armlog.txt","wt");
                                                 sbem_debugf(s,"LDR R7 %08X,%07X\n",armregs[7],PC);
                                                 fputs(s,olog);
                                         }*/

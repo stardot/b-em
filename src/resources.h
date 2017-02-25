@@ -1,6 +1,5 @@
 #ifndef __INC_RESOURCES_H
 #define __INC_RESOURCES_H
-
 #define NS32016
 
 #include "sidtypes.h"

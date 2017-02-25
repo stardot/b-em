@@ -179,5 +179,6 @@ void al_givebufferdd(int16_t *buf)
                 alSourceQueueBuffers(source[1], 1, &buffer);
                 check();
         }
+
 //        bem_debug("DDnoise3\n");
 }

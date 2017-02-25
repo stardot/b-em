@@ -33,7 +33,7 @@ void savestate_load()
 
 void savestate_dosave()
 {
-        FILE *f;
+	FILE *f;
         f = x_fopen(savestate_name, "wb");
 //        bem_debug("DoSave state\n");
         putc('B', f); putc('E', f); putc('M', f); putc('S', f);
@@ -77,6 +77,7 @@ void savestate_doload()
         bem_debug("Restart BBC\n");
         main_restart();
         bem_debug("Done!\n");
+
         m6502_loadstate(f);
         mem_loadstate(f);
         sysvia_loadstate(f);
@@ -88,7 +89,9 @@ void savestate_doload()
         adc_loadstate(f);
         acia_loadstate(f);
         serial_loadstate(f);
+
         bem_debug("Loadstate done!\n");
+
         fclose(f);
         
         savestate_wantload = 0;

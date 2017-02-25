@@ -59,7 +59,6 @@ void setquit()
 {
         quited=1;
 }
-
 //#undef printf
 int main(int argc, char *argv[])
 {

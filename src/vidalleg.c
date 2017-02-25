@@ -157,6 +157,7 @@ void video_doblit()
         fskipcount++;
         if (fskipcount >= ((motor && fasttape) ? 5 : vid_fskipmax))
         {
+//                bem_debug("Blit start\n");
                 lasty++;
                 if (vid_fullborders == 1)
                 {

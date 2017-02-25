@@ -119,12 +119,7 @@ void mem_loadroms(char *os_name, char *romdir)
         if (os_name[0])
         {
                 bem_debugf("Reading OS file %s\n", os_name);
-                f = fopen(os_name, "rb");
-                if (!f)
-                {
-                        bem_errorf("Failed to load roms/%s: %s\n", os_name, strerror(errno));
-                        exit(-1);
-                }
+                f = x_fopen(os_name, "rb");
                 fread(os, 16384, 1, f);
                 fclose(f);
         }

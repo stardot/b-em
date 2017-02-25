@@ -64,7 +64,7 @@ MENU soundmenu[11];
 MENU keymenu[3];
 MENU mousemenu[2];
 MENU hdiskmenu[4];
-MENU settingsmenu[7];
+MENU settingsmenu[8];
 MENU miscmenu[3];
 MENU speedmenu[11];
 MENU mainmenu[6];
@@ -210,6 +210,7 @@ int gui_autoboot()
                 main_reset();
                 autoboot = 150;
         }
+        gui_update();
         return D_O_K;
 }
 
@@ -313,7 +314,7 @@ MENU hdiskmenu[4]=
 int gui_vdfs_en() {
         vdfs_enabled = !vdfs_enabled;
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 
 int gui_vdfs_root() {
@@ -326,7 +327,7 @@ int gui_vdfs_root() {
         if (ret)
             vdfs_set_root(tempname);
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 
 MENU discmenu[12]=
@@ -724,7 +725,7 @@ MENU mousemenu[2] =
 };
 
 
-MENU settingsmenu[7]=
+MENU settingsmenu[8]=
 {
         {"&Model",            NULL, modelmenu, 0, NULL},
         {"&Second processor", NULL, tubemenu,  0, NULL},

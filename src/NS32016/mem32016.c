@@ -1,5 +1,5 @@
 // B-em v2.2 by Tom Walker
-//32016 parasite processor emulation (not working yet)
+#define BEEBEM
 
 // 32106 CoProcessor Memory Subsystem
 // By Simon R. Ellwood

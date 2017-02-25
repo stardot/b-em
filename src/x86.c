@@ -3456,6 +3456,7 @@ void x86_exec()
 //                if (CS==0x1490 && pc==0x3BBA) bem_debugf("Here from %04X:%04X %08X %02X\n",oldcs,oldpc,old8,opcode);
 
 //                if (CS==0x6012 && pc==3) bem_debugf("XIOS direct call %02X %04X %04X %04X %04X\n",AL,CX,DX,BX,SI);
+
 /*                if (!CS && !pc)
                 {
                         printf("At zero!\n");

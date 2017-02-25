@@ -10,4 +10,12 @@
 
 FILE *x_fopen(const char *, const char *);
 
+#ifndef HAVE_ASPRINTF
+int asprintf(char **, const char *, ...);
+#endif
+
+#ifndef HAVE_TDESTROY
+void tdestroy(void *, void (*)(void *));
+#endif
+
 #endif

@@ -36,12 +36,9 @@
 #include <dirent.h>
 
 #include <search.h>
-#ifndef HAVE_TDESTROY
-extern void tdestroy (void *vroot, void (*free_cb)(void *ptr));
-#endif
 #include <sys/stat.h>
 
-int vdfs_enabled = 1;
+int vdfs_enabled = 0;
 
 /*
  * The definition of the VDFS entry that follows is the key data
@@ -1325,15 +1322,13 @@ static inline void exec_swr_fs() {
     uint16_t fname = readmem16(pb+1);
     int8_t   romid = readmem(pb+3);
     uint32_t start = readmem16(pb+4);
+    uint16_t pblen = readmem16(pb+6);
     uint32_t load_add;
     int len;
     vdfs_ent_t *ent, key;
     FILE *fp;
 
-#ifdef _DEBUG
-    uint16_t pblen = readmem16(pb+6);
     bem_debugf("vdfs: exec_swr_fs: flags=%02x, fn=%04x, romid=%02d, start=%04x, len=%04x\n", flags, fname, romid, start, pblen);
-#endif
     if ((romid = swr_calc_addr(flags, &start, romid)) >= 0) {
         ent = find_file(fname, &key, cur_dir, NULL);
         if (flags & 0x80) {
