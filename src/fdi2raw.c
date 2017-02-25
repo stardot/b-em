@@ -90,16 +90,6 @@ static void fdi_free (void *p)
 }
 static void *fdi_malloc (int size)
 {
-	int size;
-	if (!p)
-		return;
-	size = ((int*)p)[-1];
-	fdi_allocated -= size;
-	bem_debugf("%d freed (%d)\n", size, fdi_allocated);
-	free ((int*)p - 1);
-}
-static void *fdi_malloc (int size)
-{
 	void *p = xmalloc (size + sizeof (int));
 	((int*)p)[0] = size;
 	fdi_allocated += size;
