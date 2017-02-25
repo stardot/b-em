@@ -38,7 +38,7 @@
 #include <search.h>
 #include <sys/stat.h>
 
-int vdfs_enabled = 1;
+int vdfs_enabled = 0;
 
 /*
  * The definition of the VDFS entry that follows is the key data
