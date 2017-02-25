@@ -24,8 +24,6 @@
  *    out the filesystem opertation concerned from the host side.
  */
 
-#define _GNU_SOURCE
-
 #include "b-em.h"
 #include "6502.h"
 #include "mem.h"
@@ -1333,6 +1331,7 @@ static inline void exec_swr_fs() {
 #ifdef _DEBUG
     uint16_t pblen = readmem16(pb+6);
     bem_debugf("vdfs: exec_swr_fs: flags=%02x, fn=%04x, romid=%02d, start=%04x, len=%04x\n", flags, fname, romid, start, pblen);
+#endif
     if ((romid = swr_calc_addr(flags, &start, romid)) >= 0) {
         ent = find_file(fname, &key, cur_dir, NULL);
         if (flags & 0x80) {

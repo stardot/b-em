@@ -71,11 +71,11 @@ static char *datalog(uae_u8 *src, int len)
 	if (offset >= 900) offset = 0;
 	return buf + offset2;
 }
+static int fdi_allocated;
 #else
 static inline char *datalog(uae_u8 *src, int len) {return "";}
 #endif
 
-static int fdi_allocated;
 
 #ifdef _DEBUG
 static void fdi_free (void *p)
