@@ -313,7 +313,7 @@ MENU hdiskmenu[4]=
 int gui_vdfs_en() {
         vdfs_enabled = !vdfs_enabled;
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 
 int gui_vdfs_root() {
@@ -326,7 +326,7 @@ int gui_vdfs_root() {
         if (ret)
             vdfs_set_root(tempname);
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 
 MENU discmenu[12]=
