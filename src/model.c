@@ -76,11 +76,7 @@ void model_init()
         append_filename(t2, exedir, "roms", 511);
         chdir(t2);
         mem_clearroms();
-        if (models[curmodel].romsetup)
-        {
-                if (models[curmodel].romsetup())
-                        exit(-1);
-        }
+        if (models[curmodel].romsetup) models[curmodel].romsetup();
 
         mem_loadroms(models[curmodel].os, models[curmodel].romdir);
 //        if (ideenable) loadiderom();

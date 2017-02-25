@@ -18,7 +18,7 @@ typedef struct
         char os[32];
         char romdir[32];
         char cmos[32];
-        int (*romsetup)();
+        void (*romsetup)();
         int tube;
 } MODEL;
 

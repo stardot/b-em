@@ -1,11 +1,11 @@
 #ifndef __INC_MEM_H
 #define __INC_MEM_H
 
-int mem_romsetup_os01();
-int mem_romsetup_bplus128();
-int mem_romsetup_master128();
-int mem_romsetup_master128_35();
-int mem_romsetup_mastercompact();
+void mem_romsetup_os01();
+void mem_romsetup_bplus128();
+void mem_romsetup_master128();
+void mem_romsetup_master128_35();
+void mem_romsetup_mastercompact();
 void mem_fillswram();
 void mem_clearroms();
 

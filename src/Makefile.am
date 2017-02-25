@@ -31,7 +31,7 @@ compat_wrappers.c \ scsi.c vdfs.c logging.c \
 adf.c arm.c cmos.c compactcmos.c compact_joystick.c config.c csw.c ddnoise.c \
 debugger.c disc.c fdi.c fdi2raw.c i8271.c ide.c keyboard.c linux.c linux-gui.c \
 linux-keydefine.c main.c mem.c model.c mouse.c savestate.c serial.c sn76489.c \
-sound.c soundopenal.c ssd.c sysvia.c tape.c tapenoise.c tube.c uef.c uservia.c \
+sound.c soundopenal.c ssd.c sysvia.c tape.c tapenoise.c tsearch.c tube.c uef.c uservia.c \
 via.c vidalleg.c video.c wd1770.c x86.c Z80.c resid.cc \
 resid-fp/convolve.cc resid-fp/convolve-sse.cc resid-fp/envelope.cc \
 resid-fp/extfilt.cc resid-fp/filter.cc resid-fp/pot.cc resid-fp/sid.cc \

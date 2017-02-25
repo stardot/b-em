@@ -1,5 +1,4 @@
 // B-em v2.2 by Tom Walker
-#define BEEBEM
 
 // 32106 CoProcessor Memory Subsystem
 // By Simon R. Ellwood
