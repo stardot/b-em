@@ -8,6 +8,13 @@ It is presently available for Win32 and Linux/UNIX.
 
 B-em is licensed under the GPL, see COPYING for more details.
 
+DEVELOPMENT
+===========
+
+Development is active!  If you want to know how to work with us, then please
+make sure [you have a look at the SUBMITTING\_PATCHES.md
+file](SUBMITTING\_PATCHES.md)
+
 TODO File
 =========
 
