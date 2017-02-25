@@ -332,6 +332,7 @@ extern void n32016_reset_addr(uint32_t StartAddress);
 extern void n32016_exec();
 extern void n32016_close();
 extern void n32016_build_matrix();
+extern uint32_t n32016_get_pc();
 extern void BreakPoint(uint32_t pc, uint32_t opcode);
 extern int32_t GetDisplacement(uint32_t* pPC);
 
@@ -373,7 +374,7 @@ extern FILE *pTraceFile;
 static inline void PiTRACE(const char *fmt, ...) {}
 #endif
 
-#define PiWARN(...)  { printf("pc=%08"PRIX32": ",pc); printf(__VA_ARGS__); }
+#define PiWARN(...)  { printf("pc=%08"PRIX32": ",n32016_get_pc()); printf(__VA_ARGS__); }
 
 extern int tubecycles;
 extern int tube_irq;

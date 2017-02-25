@@ -10,7 +10,7 @@ CLEANFILES = $(noinst_SCRIPTS)
 amrefresh:	
 
 
-b_em_CFLAGS = $(allegro_CFLAGS)
+b_em_CFLAGS = $(allegro_CFLAGS) -DBEM
 
 # workaround for Win32 Allegro, which has `allegro-config' missing
 if OS_WIN
