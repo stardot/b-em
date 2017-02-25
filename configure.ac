@@ -77,6 +77,11 @@ if test "x$found_tdestroy" = xyes; then
 	AC_DEFINE(HAVE_TDESTROY)
 fi
 
+AC_CHECK_FUNC(stpcpy, found_stpcpy=yes, found_stpcpy=no)
+if test "x$found_stpcpy" = xyes; then
+	AC_DEFINE(HAVE_STPCPY)
+fi
+
 AC_OUTPUT([Makefile src/Makefile])
 
 echo

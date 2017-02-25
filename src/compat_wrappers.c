@@ -82,3 +82,15 @@ error:
 	return (-1);
 }
 #endif
+
+#ifndef HAVE_STPCPY
+char *stpcpy(char *dest, const char *src)
+{
+    int c;
+
+    while ((c = *src++))
+	*dest++ = c;
+    *dest = 0;
+    return dest;
+}
+#endif

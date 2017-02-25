@@ -18,4 +18,8 @@ int asprintf(char **, const char *, ...);
 void tdestroy(void *, void (*)(void *));
 #endif
 
+#ifndef HAVE_STPCPY
+extern char *stpcpy(char *dest, const char *src);
+#endif
+
 #endif
