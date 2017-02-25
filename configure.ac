@@ -71,6 +71,12 @@ if test "x$found_asprintf" = xyes; then
 	AC_DEFINE(HAVE_ASPRINTF)
 fi
 
+# Check tsearch for tdestroy and include that for non-GNU systems.
+AC_CHECK_FUNC(tdestroy, found_tdestroy=yes, found_tdestroy=no)
+if test "x$found_tdestroy" = xyes; then
+	AC_DEFINE(HAVE_TDESTROY)
+fi
+
 AC_OUTPUT([Makefile src/Makefile])
 
 echo
