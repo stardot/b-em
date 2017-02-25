@@ -47,7 +47,7 @@ Offset  Description                 Access
 
 #define SCSI_INT_NUM 16
 
-char scsi_enabled = 1;
+char scsi_enabled = 0;
 
 typedef enum {
 	busfree,
