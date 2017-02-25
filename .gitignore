@@ -9,6 +9,7 @@ Makefile.in
 aclocal.m4
 autom4te.cache/
 b-em
+b-em.exe
 b-em.cfg
 b-em.res
 config.log
