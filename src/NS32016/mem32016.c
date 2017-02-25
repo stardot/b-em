@@ -1,5 +1,5 @@
 // B-em v2.2 by Tom Walker
-//32016 parasite processor emulation (not working yet)
+#define BEEBEM
 
 // 32106 CoProcessor Memory Subsystem
 // By Simon R. Ellwood
@@ -16,6 +16,8 @@
 #include "../tube.h"
 #define tubeRead tube_parasite_read
 #define tubeWrite tube_parasite_write
+#else
+#include "../bare-metal/tube-lib.h"
 #endif
 
 #ifdef TEST_SUITE
@@ -29,9 +31,6 @@
 #else
 #include "pandora/PandoraV2_00.h"
 #endif
-
-#define tubeRead
-#define tubeWrite
 
 uint8_t ns32016ram[MEG16];
 
