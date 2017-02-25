@@ -28,6 +28,8 @@
 #include "video_render.h"
 #include "win.h"
 
+char tempname[1000];
+
 RECT oldclip, newclip;
 int mousecapture = 0;
 int videoresize  = 0;
@@ -610,7 +612,14 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         CheckMenuItem(hmenu, IDM_DISC_VDFS_ENABLE, (vdfs_enabled) ? MF_CHECKED : MF_UNCHECKED);
                         break;
                         case IDM_DISC_VDFS_ROOT:
-                        getfile(hwnd, "VDFS Root", vdfs_set_root);
+                        // TODO: for some reason setting tempname to vdfs_get_root() stops the dialog coming up
+                        // strcpy(tempname, vdfs_get_root());
+                        strcpy(tempname, "vdfs_get_root");
+                        // TODO: getfile() uses GetOpenFileName() which cannot select a folder
+                        if (!getfile(hwnd, "VDFS Root", tempname))
+                        {
+                                vdfs_set_root(tempname);
+                        }
                         break;
                         case IDM_TAPE_LOAD:
                         if (!getfile(hwnd, "Tape image (*.UEF;*.CSW)\0*.UEF;*.CSW\0All files (*.*)\0*.*\0", tape_fn))
