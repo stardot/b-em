@@ -44,7 +44,7 @@ that feature.  Additionally, you can also post to
 
 Those wishing to submit code/bug-fixes should:
 
-* [Fork the b-em-repository](https://github.com/stardot/b-emfork-destination-box)
+* [Fork the b-em-repository](https://github.com/stardot/b-em#fork-destination-box)
 * If not already done so, clone that repository locally.
 * Add the [b-em-repo](https://github.com/stardot/b-em.git) as an upstream
   remote:
