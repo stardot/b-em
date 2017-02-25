@@ -298,6 +298,14 @@ static void scan_entry(vdfs_ent_t *ent) {
         ent->length = stb.st_size;
         if (S_ISDIR(stb.st_mode))
             ent->attribs |= ATTR_IS_DIR;
+#ifdef WIN32
+        if (stb.st_mode & S_IRUSR)
+            ent->attribs |= ATTR_USER_READ|ATTR_OTHR_READ;
+        if (stb.st_mode & S_IWUSR)
+            ent->attribs |= ATTR_USER_WRITE|ATTR_OTHR_WRITE;
+        if (stb.st_mode & S_IXUSR)
+            ent->attribs |= ATTR_USER_EXEC|ATTR_OTHR_EXEC;
+#else
         if (stb.st_mode & S_IRUSR)
             ent->attribs |= ATTR_USER_READ;
         if (stb.st_mode & S_IWUSR)
@@ -310,6 +318,7 @@ static void scan_entry(vdfs_ent_t *ent) {
             ent->attribs |= ATTR_OTHR_WRITE;
         if (stb.st_mode & (S_IXGRP|S_IXOTH))
             ent->attribs |= ATTR_OTHR_EXEC;
+#endif
     }
     free(host_file_path);
     bem_debugf("vdfs: scan_entry: acorn=%s, host=%s, attr=%04X, load=%08X, exec=%08X\n", ent->acorn_fn, ent->host_fn, ent->attribs, ent->load_addr, ent->exec_addr);
