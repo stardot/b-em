@@ -30,6 +30,9 @@
 #include "pandora/PandoraV2_00.h"
 #endif
 
+#define tubeRead
+#define tubeWrite
+
 uint8_t ns32016ram[MEG16];
 
 void init_ram(void)
