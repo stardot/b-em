@@ -2,6 +2,6 @@
 #define __INC_WIN_H
 
 extern HINSTANCE hinstance;
-extern HWND ghwnd;
+extern HWND     ghwnd;
 
 #endif

@@ -24,9 +24,9 @@
 
 #define VERSION_STR "B-em v-" VERSION
 
-void updatewindowsize(int x, int y);
+void            updatewindowsize(int x, int y);
 
-void setejecttext(int drive, char *fn);
+void            setejecttext(int drive, char *fn);
 
 #if __GNUC__
 #define printflike __attribute__((format (printf, 1, 2)))
@@ -34,10 +34,10 @@ void setejecttext(int drive, char *fn);
 #define printflike
 #endif
 
-extern void bem_error(char *s);
+extern void     bem_error(char *s);
 extern void bem_errorf(const char *fmt, ...) printflike;
-extern void bem_warn(const char *s);
-extern void bem_warnf(const char *fmt, ...) printflike;
+	extern void bem_warn(const char *s);
+	extern void bem_warnf(const char *fmt, ...) printflike;
 
 // If debugging is enabled a real pair of functions will be available
 // to log debug messages.  if debug is disabled we use a static inline
@@ -45,39 +45,50 @@ extern void bem_warnf(const char *fmt, ...) printflike;
 // doesn't look syntactically different to the compiler.
 
 #ifdef _DEBUG
-extern void bem_debug(const char *s);
-extern void bem_debugf(const char *format, ...) printflike;
-extern void debug_open(void);
-extern void debug_close(void);
+	extern void bem_debug(const char *s);
+	extern void bem_debugf(const char *format, ...) printflike;
+	extern void debug_open(void);
+	extern void debug_close(void);
 #else
-static inline void bem_debug(const char *s) {}
+	static inline void bem_debug(const char *s)
+{
+}
+
 static inline void bem_debugf(const char *format, ...) printflike;
-static inline void bem_debugf(const char *format, ...) {}
-static inline void debug_open(void) {}
-static inline void debug_close(void) {}
+	static inline void bem_debugf(const char *format, ...)
+{
+}
+
+static inline void debug_open(void)
+{
+}
+
+static inline void debug_close(void)
+{
+}
 #endif
 
-extern char exedir[512];
+extern char     exedir[512];
 
-extern int joybutton[2];
+extern int      joybutton[2];
 
-void waitforready();
-void resumeready();
+void            waitforready();
+void            resumeready();
 
-void setquit();
+void            setquit();
 
-void startblit();
-void endblit();
+void            startblit();
+void            endblit();
 
-extern int autoboot;
+extern int      autoboot;
 
-void cataddname(char *s);
-void showcatalogue();
+void            cataddname(char *s);
+void            showcatalogue();
 
-void redefinekeys();
+void            redefinekeys();
 
-void changetimerspeed(int i);
+void            changetimerspeed(int i);
 
-extern int mousecapture;
+extern int      mousecapture;
 
 #endif
