@@ -210,19 +210,19 @@ int gui_autoboot()
                 autoboot = 150;
         }
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 
 int gui_load0()
 {
         gui_load_drive(0, "Please choose a disc image to load in drive 0/2");
-        return D_O_K;
+        return D_CLOSE;
 }
 
 int gui_load1()
 {
         gui_load_drive(1, "Please choose a disc image to load in drive 1/3");
-        return D_O_K;
+        return D_CLOSE;
 }
 
 int gui_eject0()
@@ -299,7 +299,7 @@ int gui_hdisk()
         if (changed)
                 main_reset();
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 
 MENU hdiskmenu[4]=
