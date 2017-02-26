@@ -5,22 +5,21 @@
 
 #include "compat_wrappers.h"
 
-FILE *
-x_fopen(const char *path, const char *mode)
+FILE           *x_fopen(const char *path, const char *mode)
 {
 	/* Check to see if the path exists.  If it does, return the resultant
 	 * FILE * pointer, otherwise bail out.
 	 */
 
-	FILE	*fp = NULL;
-	char	*err;
+	FILE           *fp = NULL;
+	char           *err;
 
 	if (path == NULL || path[0] == '\0')
 		return (NULL);
 
 	if ((fp = fopen(path, mode)) == NULL) {
 		if ((asprintf(&err, "Failed to load '%s' - %s\n", path,
-			strerror(errno))) == -1) {
+			    strerror(errno))) == -1) {
 
 			exit(-1);
 		}
@@ -39,11 +38,10 @@ x_fopen(const char *path, const char *mode)
 #include <stdint.h>
 #include <errno.h>
 
-int
-asprintf(char **ret, const char *fmt, ...)
+int asprintf(char **ret, const char *fmt, ...)
 {
-	va_list	ap;
-	int	n;
+	va_list         ap;
+	int             n;
 
 	va_start(ap, fmt);
 	n = vasprintf(ret, fmt, ap);
@@ -52,11 +50,10 @@ asprintf(char **ret, const char *fmt, ...)
 	return (n);
 }
 
-int
-vasprintf(char **ret, const char *fmt, va_list ap)
+int vasprintf(char **ret, const char *fmt, va_list ap)
 {
-	int	 n;
-	va_list  ap2;
+	int             n;
+	va_list         ap2;
 
 	va_copy(ap2, ap);
 
@@ -76,7 +73,7 @@ vasprintf(char **ret, const char *fmt, va_list ap)
 
 	return (n);
 
-error:
+ error:
 	va_end(ap2);
 	*ret = NULL;
 	return (-1);
@@ -90,8 +87,8 @@ error:
 #include <stdlib.h>
 
 typedef struct node {
-	char         *key;
-	struct node  *llink, *rlink;
+	char           *key;
+	struct node    *llink, *rlink;
 } node_t;
 
 /*
@@ -105,8 +102,7 @@ typedef struct node {
  */
 
 /* Walk the nodes of a tree */
-static void
-tdestroy_recurse(node_t* root, void (*free_action)(void *))
+static void tdestroy_recurse(node_t * root, void (*free_action) (void *))
 {
 	if (root->llink != NULL)
 		tdestroy_recurse(root->llink, free_action);
@@ -116,10 +112,9 @@ tdestroy_recurse(node_t* root, void (*free_action)(void *))
 	free(root);
 }
 
-void
-tdestroy(void *vrootp, void (*freefct)(void *))
+void tdestroy(void *vrootp, void (*freefct) (void *))
 {
-	node_t *root = (node_t *) vrootp;
+	node_t         *root = (node_t *) vrootp;
 
 	if (root != NULL)
 		tdestroy_recurse(root, freefct);

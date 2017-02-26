@@ -1,10 +1,11 @@
 #ifndef __INC_SOUND_H
 #define __INC_SOUND_H
 
-extern int sound_internal, sound_beebsid, sound_dac, sound_ddnoise, sound_tape;
-extern int sound_filter;
+extern int      sound_internal, sound_beebsid, sound_dac, sound_ddnoise,
+    sound_tape;
+extern int      sound_filter;
 
-void sound_init();
-void sound_poll();
+void            sound_init();
+void            sound_poll();
 
 #endif

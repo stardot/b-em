@@ -24,13 +24,13 @@ Boston, MA  02110-1301, USA.
 #ifndef SCSI_HEADER
 #define SCSI_HEADER
 
-extern char scsi_enabled;
+extern char     scsi_enabled;
 
-void scsi_init(void);
-void scsi_close(void);
-void scsi_reset(void);
+void            scsi_init(void);
+void            scsi_close(void);
+void            scsi_reset(void);
 
-uint8_t scsi_read(uint16_t addr);
-void scsi_write(uint16_t addr, uint8_t value);
+uint8_t         scsi_read(uint16_t addr);
+void            scsi_write(uint16_t addr, uint8_t value);
 
 #endif

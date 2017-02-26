@@ -17,82 +17,88 @@
 #include "uservia.h"
 #include "video.h"
 
-int savestate_wantsave, savestate_wantload;
-char savestate_name[260];
+int             savestate_wantsave, savestate_wantload;
+char            savestate_name[260];
 
 void savestate_save()
 {
 //        bem_debug("Save state\n");
-        savestate_wantsave = 1;
+	savestate_wantsave = 1;
 }
 
 void savestate_load()
 {
-        savestate_wantload = 1;
+	savestate_wantload = 1;
 }
 
 void savestate_dosave()
 {
-	FILE *f;
-        f = x_fopen(savestate_name, "wb");
+	FILE           *f;
+	f = x_fopen(savestate_name, "wb");
 //        bem_debug("DoSave state\n");
-        putc('B', f); putc('E', f); putc('M', f); putc('S', f);
-        putc('N', f); putc('A', f); putc('P', f); putc('1', f);
+	putc('B', f);
+	putc('E', f);
+	putc('M', f);
+	putc('S', f);
+	putc('N', f);
+	putc('A', f);
+	putc('P', f);
+	putc('1', f);
 
-        putc(curmodel, f);
-        
-        m6502_savestate(f);
-        mem_savestate(f);
-        sysvia_savestate(f);
-        uservia_savestate(f);
-        videoula_savestate(f);
-        crtc_savestate(f);
-        video_savestate(f);
-        sn_savestate(f);
-        adc_savestate(f);
-        acia_savestate(f);
-        serial_savestate(f);
+	putc(curmodel, f);
 
-        fclose(f);
-        
-        savestate_wantsave = 0;
+	m6502_savestate(f);
+	mem_savestate(f);
+	sysvia_savestate(f);
+	uservia_savestate(f);
+	videoula_savestate(f);
+	crtc_savestate(f);
+	video_savestate(f);
+	sn_savestate(f);
+	adc_savestate(f);
+	acia_savestate(f);
+	serial_savestate(f);
+
+	fclose(f);
+
+	savestate_wantsave = 0;
 }
-        
+
 void savestate_doload()
 {
-        int c;
-        char id[9];
-        FILE *f = x_fopen(savestate_name, "rb");
-        for (c = 0; c < 8; c++) id[c] = getc(f);
-        id[8] = 0;
-        if (strcmp(id, "BEMSNAP1"))
-        {
-                fclose(f);
-                bem_error("Not a B-em v2.x save state.");
-                return;
-        }
-        
-        curmodel = getc(f);
-        selecttube = curtube = -1;
-        bem_debug("Restart BBC\n");
-        main_restart();
-        bem_debug("Done!\n");
+	int             c;
+	char            id[9];
+	FILE           *f = x_fopen(savestate_name, "rb");
+	for (c = 0; c < 8; c++)
+		id[c] = getc(f);
+	id[8] = 0;
+	if (strcmp(id, "BEMSNAP1")) {
+		fclose(f);
+		bem_error("Not a B-em v2.x save state.");
+		return;
+	}
 
-        m6502_loadstate(f);
-        mem_loadstate(f);
-        sysvia_loadstate(f);
-        uservia_loadstate(f);
-        videoula_loadstate(f);
-        crtc_loadstate(f);
-        video_loadstate(f);
-        sn_loadstate(f);
-        adc_loadstate(f);
-        acia_loadstate(f);
-        serial_loadstate(f);
+	curmodel = getc(f);
+	selecttube = curtube = -1;
+	bem_debug("Restart BBC\n");
+	main_restart();
+	bem_debug("Done!\n");
 
-        bem_debug("Loadstate done!\n");
+	m6502_loadstate(f);
+	mem_loadstate(f);
+	sysvia_loadstate(f);
+	uservia_loadstate(f);
+	videoula_loadstate(f);
+	crtc_loadstate(f);
+	video_loadstate(f);
+	sn_loadstate(f);
+	adc_loadstate(f);
+	acia_loadstate(f);
+	serial_loadstate(f);
 
-        fclose(f);
-        
-        savestate_wantload = 0;
+	bem_debug("Loadstate done!\n");
+
+	fclose(f);
+
+	savestate_wantload = 0;
 }

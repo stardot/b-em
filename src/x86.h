@@ -1,10 +1,10 @@
 #ifndef __INC_X86_H
 #define __INC_X86_H
 
-uint32_t oldpc;
-int oldcpl;
+uint32_t        oldpc;
+int             oldcpl;
 
-int lldt;
+int             lldt;
 
 #define setznp168 setznp16
 
@@ -13,8 +13,8 @@ int lldt;
 #define setr8(r,v) if (r&4) regs[r&3].b.h=v; \
                    else     regs[r&3].b.l=v;
 
-int use32;
-int stack32;
+int             use32;
+int             stack32;
 
 #define fetchea()   { rmdat=readmembl(cs+pc); pc++;  \
                     reg=(rmdat>>3)&7;             \
@@ -23,12 +23,12 @@ int stack32;
                     if (mod!=3) fetcheal(); }
 
 
-int optype;
+int             optype;
 #define JMP 1
 #define CALL 2
 #define IRET 3
 
-uint32_t oxpc;
+uint32_t        oxpc;
 
 #define EAX regs[0].l
 #define ECX regs[1].l
@@ -55,30 +55,27 @@ uint32_t oxpc;
 #define BL regs[3].b.l
 #define BH regs[3].b.h
 
-typedef union
-{
-        uint32_t l;
-        uint16_t w;
-        struct
-        {
-                uint8_t l,h;
-        } b;
+typedef union {
+	uint32_t        l;
+	uint16_t        w;
+	struct {
+		uint8_t         l, h;
+	} b;
 } x86reg;
 
-static x86reg regs[8];
+static x86reg   regs[8];
 static uint16_t flags;
-static uint32_t oldds,oldss,x86pc;
+static uint32_t oldds, oldss, x86pc;
 
-typedef struct
-{
-        uint32_t base;
-        uint16_t limit;
-        uint8_t access;
-        uint16_t seg;
+typedef struct {
+	uint32_t        base;
+	uint16_t        limit;
+	uint8_t         access;
+	uint16_t        seg;
 } x86seg;
 
-x86seg gdt,ldt,idt,tr;
-x86seg _cs,_ds,_es,_ss,_fs,_gs;
+x86seg          gdt, ldt, idt, tr;
+x86seg          _cs, _ds, _es, _ss, _fs, _gs;
 
 /*Segments -
   _cs,_ds,_es,_ss are the segment structures
@@ -107,6 +104,6 @@ x86seg _cs,_ds,_es,_ss,_fs,_gs;
 #define D_FLAG  0x0400
 #define V_FLAG  0x0800
 #define NT_FLAG 0x4000
-#define VM_FLAG 0x0002 /*In EFLAGS*/
+#define VM_FLAG 0x0002		/*In EFLAGS */
 
 #endif

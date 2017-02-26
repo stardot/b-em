@@ -7,76 +7,75 @@
 
 #ifdef _DEBUG
 static const char debug_fn[] = "b-emlog.txt";
-FILE *debug_fp;
+FILE           *debug_fp;
 
 void bem_debug(const char *s)
 {
-        if (debug_fp)
-        {
-                fputs(s, debug_fp);
-                fflush(debug_fp);
-        }
+	if (debug_fp) {
+		fputs(s, debug_fp);
+		fflush(debug_fp);
+	}
 }
 
 void bem_debugf(const char *fmt, ...)
 {
-        va_list ap;
+	va_list         ap;
 
-        if (debug_fp)
-        {
-                va_start(ap, fmt);
-                vfprintf(debug_fp, fmt, ap);
-                va_end(ap);
-                fflush(debug_fp);
-        }
+	if (debug_fp) {
+		va_start(ap, fmt);
+		vfprintf(debug_fp, fmt, ap);
+		va_end(ap);
+		fflush(debug_fp);
+	}
 }
 
 #endif
 
 void bem_errorf(const char *fmt, ...)
 {
-        char buf[256];
-        va_list ap;
+	char            buf[256];
+	va_list         ap;
 
-        va_start(ap, fmt);
-        vsnprintf(buf, sizeof buf, fmt, ap);
-        va_end(ap);
+	va_start(ap, fmt);
+	vsnprintf(buf, sizeof buf, fmt, ap);
+	va_end(ap);
 
-        bem_error(buf);
-        bem_debug(buf);
+	bem_error(buf);
+	bem_debug(buf);
 }
 
 void bem_warn(const char *s)
 {
-        fputs(s, stderr);
-        fputc('\n', stderr);
+	fputs(s, stderr);
+	fputc('\n', stderr);
 }
 
 void bem_warnf(const char *fmt, ...)
 {
-        char buf[256];
-        va_list ap;
+	char            buf[256];
+	va_list         ap;
 
-        va_start(ap, fmt);
-        vsnprintf(buf, sizeof buf, fmt, ap);
-        va_end(ap);
+	va_start(ap, fmt);
+	vsnprintf(buf, sizeof buf, fmt, ap);
+	va_end(ap);
 
-        bem_warn(buf);
-        bem_debug(buf);
+	bem_warn(buf);
+	bem_debug(buf);
 }
 
 #ifdef _DEBUG
 
 void debug_open()
 {
-        if ((debug_fp = fopen(debug_fn, "wt")) == NULL)
-                bem_warnf("unable to open debug log %s: %s", debug_fn, strerror(errno));
+	if ((debug_fp = fopen(debug_fn, "wt")) == NULL)
+		bem_warnf("unable to open debug log %s: %s", debug_fn,
+		    strerror(errno));
 }
 
 void debug_close(void)
 {
-        if (debug_fp)
-                fclose(debug_fp);
+	if (debug_fp)
+		fclose(debug_fp);
 }
 
 #endif

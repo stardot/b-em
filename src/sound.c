@@ -13,87 +13,96 @@
 
 #define BUFLEN 2000
 
-int sound_internal = 0, sound_beebsid = 0, sound_dac = 0, sound_ddnoise = 0, sound_tape = 0;
-int sound_filter = 0;
+int             sound_internal = 0, sound_beebsid = 0, sound_dac =
+    0, sound_ddnoise = 0, sound_tape = 0;
+int             sound_filter = 0;
 
-static int sound_pos = 0;
-static short sound_buffer[BUFLEN];
+static int      sound_pos = 0;
+static short    sound_buffer[BUFLEN];
 
 #define NCoef 4
-static float iir(float NewSample) {
-    float ACoef[NCoef+1] = {
-        0.30631912757971225000,
-        0.00000000000000000000,
-        -0.61263825515942449000,
-        0.00000000000000000000,
-        0.30631912757971225000
-    };
+static float iir(float NewSample)
+{
+	float           ACoef[NCoef + 1] = {
+		0.30631912757971225000,
+		0.00000000000000000000,
+		-0.61263825515942449000,
+		0.00000000000000000000,
+		0.30631912757971225000
+	};
 
-    float BCoef[NCoef+1] = {
-        1.00000000000000000000,
-        -1.86772356053227330000,
-        1.08459167506874430000,
-        -0.37711292573951394000,
-        0.17253125052500490000
-    };
+	float           BCoef[NCoef + 1] = {
+		1.00000000000000000000,
+		-1.86772356053227330000,
+		1.08459167506874430000,
+		-0.37711292573951394000,
+		0.17253125052500490000
+	};
 
-    static float y[NCoef+1]; //output samples
-    static float x[NCoef+1]; //input samples
-    int n;
+	static float    y[NCoef + 1];	//output samples
+	static float    x[NCoef + 1];	//input samples
+	int             n;
 
-    //shift the old samples
-    for(n=NCoef; n>0; n--) {
-       x[n] = x[n-1];
-       y[n] = y[n-1];
-    }
+	//shift the old samples
+	for (n = NCoef; n > 0; n--) {
+		x[n] = x[n - 1];
+		y[n] = y[n - 1];
+	}
 
-    //Calculate the new output
-    x[0] = NewSample;
-    y[0] = ACoef[0] * x[0];
-    for(n=1; n<=NCoef; n++)
-        y[0] += ACoef[n] * x[n] - BCoef[n] * y[n];
+	//Calculate the new output
+	x[0] = NewSample;
+	y[0] = ACoef[0] * x[0];
+	for (n = 1; n <= NCoef; n++)
+		y[0] += ACoef[n] * x[n] - BCoef[n] * y[n];
 
-    return y[0];
+	return y[0];
 }
 
 void sound_poll()
 {
-        int c;
-        
-        if (!(sound_internal || sound_beebsid || sound_dac)) return;
-        
-        if (sound_beebsid)  sid_fillbuf(sound_buffer + (sound_pos << 1), 2);
-        if (sound_internal) sn_fillbuf( sound_buffer + (sound_pos << 1), 2);
-        if (sound_dac)
-        {
-                sound_buffer[(sound_pos << 1)]   += (((int)lpt_dac - 0x80) * 32);
-                sound_buffer[(sound_pos << 1)+1] += (((int)lpt_dac - 0x80) * 32);
-        }
-        
-        sound_pos++;
-        if (sound_pos == (BUFLEN >> 1))
-        {
-                if (BUFLEN & 1)
-                {
-                        if (sound_beebsid)  sid_fillbuf(sound_buffer+ (sound_pos << 1), 1);
-                        if (sound_internal) sn_fillbuf( sound_buffer+ (sound_pos << 1), 1);
-                        if (sound_dac) sound_buffer[(sound_pos << 1)]   += (((int)lpt_dac - 0x80) * 32);
-                }
-                
-                if (sound_filter)
-                {
-                        for (c = 0; c < BUFLEN; c++)
-                            sound_buffer[c] = (int)iir((float)sound_buffer[c]);
-                }
-                
-                sound_pos = 0;
-                al_givebuffer(sound_buffer);
-                
-                memset(sound_buffer, 0, sizeof(sound_buffer));
-        }
+	int             c;
+
+	if (!(sound_internal || sound_beebsid || sound_dac))
+		return;
+
+	if (sound_beebsid)
+		sid_fillbuf(sound_buffer + (sound_pos << 1), 2);
+	if (sound_internal)
+		sn_fillbuf(sound_buffer + (sound_pos << 1), 2);
+	if (sound_dac) {
+		sound_buffer[(sound_pos << 1)] +=
+		    (((int) lpt_dac - 0x80) * 32);
+		sound_buffer[(sound_pos << 1) + 1] +=
+		    (((int) lpt_dac - 0x80) * 32);
+	}
+
+	sound_pos++;
+	if (sound_pos == (BUFLEN >> 1)) {
+		if (BUFLEN & 1) {
+			if (sound_beebsid)
+				sid_fillbuf(sound_buffer + (sound_pos << 1),
+				    1);
+			if (sound_internal)
+				sn_fillbuf(sound_buffer + (sound_pos << 1),
+				    1);
+			if (sound_dac)
+				sound_buffer[(sound_pos << 1)] +=
+				    (((int) lpt_dac - 0x80) * 32);
+		}
+
+		if (sound_filter) {
+			for (c = 0; c < BUFLEN; c++)
+				sound_buffer[c] =
+				    (int) iir((float) sound_buffer[c]);
+		}
+
+		sound_pos = 0;
+		al_givebuffer(sound_buffer);
+
+		memset(sound_buffer, 0, sizeof(sound_buffer));
+	}
 }
 
 void sound_init()
 {
 }
-
