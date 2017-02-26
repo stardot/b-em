@@ -7,4 +7,7 @@ Here's a rough list of future ideas for B-em.  Not in any particular order.
 * [ ] Write to a FAT disc image for Master 512 emulation.
 * [ ] Better timing for 32016 emulation.
 * [ ] Support to other ROM configuration, e.g. Torch Co-Pro.
-* [ ] Transition to SDL
+* [ ] Transition to GLFW
+* [ ] String-handling audiot
+* [ ] `tree.h` as standard?
+* [ ] gindent(1)
