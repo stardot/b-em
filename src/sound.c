@@ -14,7 +14,7 @@
 
 // TODO: Refactor and use definitions in soundopenal.[ch]
 #define BUFLEN 2000
-#define BUFLENM5 3000
+#define BUFLENM5 6000
 
 int sound_internal = 0, sound_beebsid = 0, sound_dac = 0, sound_ddnoise = 0, sound_tape = 0, sound_music5000 = 0;
 int sound_filter = 0;
@@ -75,7 +75,7 @@ void sound_poll()
 
         if (sound_beebsid)  sid_fillbuf(sound_buffer + (sound_pos << 1), 2);
         if (sound_internal) sn_fillbuf( sound_buffer + (sound_pos << 1), 2);
-        if (sound_music5000) music5000_fillbuf( m5_buffer + m5_pos * 3, 3);
+        if (sound_music5000) music5000_fillbuf( m5_buffer + m5_pos * 6, 3);
 
         if (sound_dac)
         {
@@ -107,7 +107,7 @@ void sound_poll()
         }
 
         m5_pos++;
-        if (m5_pos * 3 == BUFLENM5)
+        if (m5_pos * 6 == BUFLENM5)
         {
                 m5_pos = 0;
                 al_givebufferm5(m5_buffer);

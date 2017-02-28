@@ -236,10 +236,10 @@ void al_givebufferm5(int16_t *buf)
                 alSourceUnqueueBuffers(source[2], 1, &buffer);
                 check();
 
-                for (c = 0; c < (BUFLENM5 >> 1); c++) zbuf[c] = buf[c >> 1];//^0x8000;
+//                for (c = 0; c < (BUFLENM5 >> 1); c++) zbuf[c] = buf[c >> 1];//^0x8000;
 
 //bem_debug("BufferData\n");
-                alBufferData(buffer, AL_FORMAT_STEREO16, zbuf, BUFLENM5, FREQM5);
+                alBufferData(buffer, AL_FORMAT_STEREO16, buf, BUFLENM5, FREQM5);
                 check();
 
 //bem_debug("Queue\n");
