@@ -231,7 +231,8 @@ void music5000_fillbuf(int16_t *buffer, int len) {
          music5000_update_6MHz();
       }
       music5000_get_sample(&left, &right);
-      *buffer++ = (int16_t) (left + right) / 2;
+      *buffer++ = (int16_t) (left / 2);
+      *buffer++ = (int16_t) (right / 2);
    }
 }
 
