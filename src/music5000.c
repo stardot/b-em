@@ -183,6 +183,7 @@ void music5000_get_sample(int *left, int *right)
 	*right = sr;
 }
 
+#if 0
 // Music 5000 runs at a sample rate of 6MHz / 128 = 46875
 // openal is configured to run at 31250
 // 46875 / 31250 = 3 / 2
@@ -217,3 +218,20 @@ void music5000_fillbuf(int16_t *buffer, int len) {
    *buffer++ += (int16_t) sample;
 
 }
+#endif
+
+// Music 5000 runs at a sample rate of 6MHz / 128 = 46875
+void music5000_fillbuf(int16_t *buffer, int len) {
+   int i;
+   int sample;
+   int left;
+   int right;
+   for (sample = 0; sample < len; sample++) {
+      for (i = 0; i < 128; i++) {
+         music5000_update_6MHz();
+      }
+      music5000_get_sample(&left, &right);
+      *buffer++ = (int16_t) (left + right) / 2;
+   }
+}
+
