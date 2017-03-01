@@ -92,11 +92,18 @@
 
 #include <assert.h>
 #include <stdint.h>
-#include <stdalign.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 #include <search.h>
+
+#ifdef WIN32
+// Needed on Windows for definition of alloca()
+#include <malloc.h>
+#else
+// Not present on Windows
+#include <stdalign.h>
+#endif
 
 /* Assume malloc returns naturally aligned (alignof (max_align_t))
    pointers so we can use the low bits to store some extra info.  This
@@ -322,7 +329,7 @@ tsearch (const void *key, void **vrootp, __compar_fn_t compar)
   node *nextp;
   int r = 0, p_r = 0, gp_r = 0; /* No they might not, Mr Compiler.  */
 
-#ifdef USE_MALLOC_LOW_BIT
+#if defined(USE_MALLOC_LOW_BIT) && !defined(WIN32)
   static_assert (alignof (max_align_t) > 1, "malloc must return aligned ptrs");
 #endif
 
