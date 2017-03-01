@@ -34,7 +34,31 @@ the branch is about fixing warnings from Clang.
 Sometimes, if more than one person is collaborating on a branch, the initials
 prefix might not be needed.
 
+### Keeping your fork in sync
+
+When you fork a repository -- you effectively have a snapshot of the forked
+repository at the time you created it.  That's perfectly fine -- and it is up
+to you to keep your clone up to date with any changes made to it.  Tyically,
+this will involve the `master` branch.  As with the rest of this document,
+it's advisable to NOT make commits directly to your copy of the `master`
+branch.  This branch is sacred in terms of aggregating changes from other
+people.  If you were to base all of your work off it, you'd have to
+continually rebase your copy of it on top of the forked version, leading to a
+world of pain.  In such cases, you can think of the `master` branch as nothign
+more than a tracking branch -- a branch where you pull in changes from
+upstream before submitting a pull-request.  That way, your changes are
+guaranteed to be current.  If they're not---or the review process means
+changes are necesssary---then they should be reflected locally on your
+topic-branch before pushing those changes out.  For example, see:
+
+https://help.github.com/articles/syncing-a-fork/
+
+For the purposes of this document, we've assumed a remote of `upstream` points
+to the main `stardot/b-em` repository.
+
 ### Submitting Pull-requests
+
+See the section on "Keeing your fork in sync" first of all.
 
 External contributions are always welcomed and encouraged.  If you're thinking
 of writing a new feature, it is worthwhile opening an issue against b-em
