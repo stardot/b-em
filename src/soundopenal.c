@@ -159,10 +159,12 @@ void al_givebuffer(int16_t *buf)
 
 void al_givebufferdd(int16_t *buf)
 {
+        if (!sound_ddnoise && !sound_tape) return;
         al_givebuffer_generic(buf, SOURCE_DD, DATA_MONO);
 }
 
 void al_givebufferm5(int16_t *buf)
 {
+        if (!sound_music5000) return;
         al_givebuffer_generic(buf, SOURCE_M5, DATA_STEREO);
 }
