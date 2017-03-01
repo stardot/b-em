@@ -1,17 +1,98 @@
 VPATH = . resid-fp NS32016
+
 CPP  = g++.exe
 CC   = gcc.exe
 WINDRES = windres.exe
+
 CFLAGS = -O3 -DBEM -DVERSION=\"Win32\"
-OBJ = compat_wrappers.o 6502.o 6502tube.o 32016.o Decode.o mem32016.o Trap.o Profile.o NSDis.o 65816.o acia.o adc.o adf.o arm.o cmos.o compact_joystick.o compactcmos.o config.o csw.o ddnoise.o debugger.o disc.o fdi2raw.o fdi.o i8271.o ide.o keyboard.o logging.o main.o mem.o model.o mouse.o pal.o savestate.o scsi.o serial.o sn76489.o sound.o soundopenal.o ssd.o sysvia.o tape.o tapenoise.o tsearch.o tube.o uef.o uservia.o vdfs.o via.o vidalleg.o video.o wd1770.o win.o win-catalogue.o win-keydefine.o x86.o z80.o resid.o b-em.res
-SIDOBJ = convolve.o envelope.o extfilt.o filter.o pot.o sid.o voice.o wave6581__ST.o wave6581_P_T.o wave6581_PS_.o wave6581_PST.o wave8580__ST.o wave8580_P_T.o wave8580_PS_.o wave8580_PST.o wave.o
+
+OBJ = \
+    6502.o \
+    6502tube.o \
+    65816.o \
+    acia.o \
+    adc.o \
+    adf.o \
+    arm.o \
+    cmos.o \
+    compact_joystick.o \
+    compactcmos.o \
+    compat_wrappers.o \
+    config.o \
+    csw.o \
+    ddnoise.o \
+    debugger.o \
+    disc.o \
+    fdi2raw.o \
+    fdi.o \
+    i8271.o \
+    ide.o \
+    keyboard.o \
+    logging.o \
+    main.o \
+    mem.o \
+    model.o \
+    mouse.o \
+    pal.o \
+    savestate.o \
+    scsi.o \
+    serial.o \
+    sn76489.o \
+    sound.o \
+    soundopenal.o \
+    ssd.o \
+    sysvia.o \
+    tape.o \
+    tapenoise.o \
+    tsearch.o \
+    tube.o \
+    uef.o \
+    uservia.o \
+    vdfs.o \
+    via.o \
+    vidalleg.o \
+    video.o \
+    wd1770.o \
+    win.o \
+    win-catalogue.o \
+    win-keydefine.o \
+    x86.o \
+    z80.o \
+    resid.o \
+    b-em.res
+
+NS32KOBJ = \
+    32016.o \
+    Decode.o \
+    mem32016.o \
+    Trap.o \
+    Profile.o \
+    NSDis.o
+
+SIDOBJ = \
+    convolve.o \
+    envelope.o \
+    extfilt.o \
+    filter.o \
+    pot.o \
+    sid.o \
+    voice.o \
+    wave6581__ST.o \
+    wave6581_P_T.o \
+    wave6581_PS_.o \
+    wave6581_PST.o \
+    wave8580__ST.o \
+    wave8580_P_T.o \
+    wave8580_PS_.o \
+    wave8580_PST.o \
+    wave.o
 
 LIBS =  -mwindows -lalleg -lz -lalut -lopenal32 -lgdi32 -lwinmm -lstdc++
 
 all : b-em.exe
 
-b-em.exe: $(OBJ) $(SIDOBJ)
-	$(CC) $(OBJ) $(SIDOBJ) -o "b-em.exe" $(LIBS)
+b-em.exe: $(OBJ) $(SIDOBJ) $(NS32KOBJ)
+	$(CC) $(OBJ) $(SIDOBJ) $(NS32KOBJ) -o "b-em.exe" $(LIBS)
 
 clean :
 	del *.o *.exe *.res
@@ -23,4 +104,4 @@ clean :
 	$(CPP) $(CFLAGS) -c $<
 
 b-em.res: b-em.rc
-	$(WINDRES) -i b-em.rc --input-format=rc -o b-em.res -O coff 
+	$(WINDRES) -i b-em.rc --input-format=rc -o b-em.res -O coff
