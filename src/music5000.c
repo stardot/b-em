@@ -47,7 +47,7 @@
 
 static ushort antilogtable[128];
 static byte RAM[2048];
-static int phaseRAM[32];
+static int phaseRAM[16];
 
 static short sleft[16], sright[16];
 
@@ -61,7 +61,7 @@ static short sam;
 void music5000_reset()
 {
 	memset(RAM, 0, 2048);
-	memset(phaseRAM, 0, 32 * sizeof(int));
+	memset(phaseRAM, 0, 16 * sizeof(int));
 	memset(sleft, 0, 16 * sizeof(short));
 	memset(sright, 0, 16 * sizeof(short));
 	pc = 0;
@@ -107,20 +107,20 @@ void music5000_write(uint16_t addr, uint8_t val)
 
 void music5000_update_6MHz()
 {
-	int c = channel + (modulate ? 1 : 0);
+	int c = (channel << 1) + (modulate ? 1 : 0);
 	switch (pc) {
 	case 0:
 		disable = DISABLE(c);
 		break;
 	case 1:	break;
 	case 2:
-		phaseRAM[c] = (phaseRAM[c] + FREQ(c)) & 0xffffff;
+		phaseRAM[channel] = (phaseRAM[channel] + FREQ(c)) & 0xffffff;
 		break;
 	case 3:	break;
 	case 4:	break;
 	case 5:
 	{
-		byte ramp = phaseRAM[c] >> 17;
+		byte ramp = phaseRAM[channel] >> 17;
 		byte ws = WAVESEL(c);
 		ushort iwf = I_WAVEFORM(ws) + ramp;
 		sam = RAM[iwf];
@@ -164,10 +164,8 @@ void music5000_update_6MHz()
 	pc++;
 	if (pc == 8) {
 		pc = 0;
-		channel += 2;
-		if (channel == 32) {
-			channel = 0;
-		}
+		channel ++;
+		channel &= 15;
 	}
 }
 
