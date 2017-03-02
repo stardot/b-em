@@ -55,6 +55,7 @@ static int channel,pc;
 static int modulate;
 static int disable;
 static short sam;
+static byte sign;
 
 
 
@@ -128,22 +129,53 @@ void music5000_update_6MHz()
 	}
 	case 6:
 	{
+		// The amplitude operates in the log domain
+		// - sam holds the wave table output which is 1 bit sign and 7 bit magnitude
+		// - amp holds the amplitude which is 1 bit sign and 8 bit magnitude (0x00 being quite, 0x7f being loud)
+		// The real hardware combites these in a single 8 bit adder, as we do here
+		// 
+		// Consider a positive wav value (sign bit = 1)
+		//		 wav: (0x80 -> 0xFF) + amp: (0x00 -> 0x7F) => (0x80 -> 0x7E)
+		// values in the range 0x80...0xff are very small are clamped to zero
+		//
+		// Consider a negative wav vale (sign bit = 0)
+		//		 wav: (0x00 -> 0x7F) + amp: (0x00 -> 0x7F) => (0x00 -> 0xFE)
+		// values in the range 0x00...0x7f are very small are clamped to zero
+		//
+		// In both cases:
+		// - zero clamping happens when the sign bit stays the same
+		// - the 7-bit result is in bits 0..6
+		//
+		// Note:
+		// - this only works if the amp < 0x80
+		// - amp >= 0x80 causes clamping at the high points of the waveform
+		// - this behaviour matches the FPGA implematation, and we think the original hardware
 		byte amp = AMP(c);
-		sam = (sam & 0x80) | (short)(((sam & 0x7f)*amp) / 0x80);
+		sign = sam & 0x80;
+		sam += amp;
+		if ((sign ^ sam) & 0x80) {
+			// sign bits being different is the normal case
+			sam &= 0x7f;
+		} else {
+			// sign bits being the same indicates underflow so clamp to zero
+			sam = 0;
+		}
 		break;
 	}
 	case 7:
 	{
 		if (INVERT(c)) {
-			sam ^= 0x80;
+			sign ^= 0x80;
 		}
-		modulate = MODULATE(c) && !!(sam & 0x80);
+		modulate = MODULATE(c) && !!(sign);
 		//sam is now an 8-bit log value
-		if (sam & 0x80) {
-			sam = -antilogtable[sam & 0x7f];
+		if (sign) {
+			// sign being 1 is positive
+			sam = antilogtable[sam];
 		}
 		else {
-			sam = antilogtable[sam];
+			// sign being zero is negative
+			sam = -antilogtable[sam];
 		}
 		//sam is now a 12-bit linear sample
 		byte pan = 0;
@@ -156,8 +188,8 @@ void music5000_update_6MHz()
 		case 15: pan = 1;	break;
 		}
 		//apply panning
-		sleft[c / 2] = disable ? 0 : ((sam*pan) / 6);
-		sright[c / 2] = disable ? 0 : ((sam*(6 - pan)) / 6);
+		sleft[channel] = disable ? 0 : ((sam*pan) / 6);
+		sright[channel] = disable ? 0 : ((sam*(6 - pan)) / 6);
 		break;
 	}
 	}
