@@ -22,6 +22,7 @@
 
 #include <stdio.h>
 #include <inttypes.h>
+#include <limits.h>
 #include <math.h>
 #include <string.h>
 
@@ -201,68 +202,31 @@ void music5000_update_6MHz()
 	}
 }
 
-void music5000_get_sample(int *left, int *right)
+void music5000_get_sample(int16_t *left, int16_t *right)
 {
-   int t;
+	// sleft/right is (-8191..8191) i.e. 13 bits
+	// summing 16 gives a 17 bit output
+	int t;
 	int sl = 0, sr = 0;
 	for (t = 0; t < 16; t++) {
-		sl += sleft[t] / 2;
-		sr += sright[t] / 2;
+		sl += sleft[t];
+		sr += sright[t];
 	}
-	*left = sl;
-	*right = sr;
+	// divide by 2 to get a 16 bit output
+	*left = (int16_t) (sl / 2);
+	*right = (int16_t) (sr / 2);
 }
-
-#if 0
-// Music 5000 runs at a sample rate of 6MHz / 128 = 46875
-// openal is configured to run at 31250
-// 46875 / 31250 = 3 / 2
-// So 3 music 5000 samples need to be interpolated down to 2 openal samples
-// Or we need to tweak the Music 5000 frequencies somehow
-
-// This code is called by sound_poll() which asks for 2 samples (i.e. len = 2)
-void music5000_fillbuf(int16_t *buffer, int len) {
-   int i;
-   int sample;
-   int lefts[3], rights[3];
-
-   if (len != 2) {
-      printf("music5000_fillbuf must be called with len=2!\r\n");
-      return;
-   }
-
-   for (sample = 0; sample < 3; sample++) {
-      for (i = 0; i < 128; i++) {
-         music5000_update_6MHz();
-      }
-      music5000_get_sample(&lefts[sample], &rights[sample]);
-   }
-   // Crude 3:2 interpolation, will probably sound awful!
-   // 000011112222333344445555
-   //   AAAA  BBBB  CCCC  DDDD
-
-   sample = (lefts[0] + lefts[1] + rights[0] + rights[1]) / 4;
-   *buffer++ += (int16_t) sample;
-
-   sample = (lefts[2] + rights[2]) / 2 ;
-   *buffer++ += (int16_t) sample;
-
-}
-#endif
 
 // Music 5000 runs at a sample rate of 6MHz / 128 = 46875
 void music5000_fillbuf(int16_t *buffer, int len) {
-   int i;
-   int sample;
-   int left;
-   int right;
-   for (sample = 0; sample < len; sample++) {
-      for (i = 0; i < 128; i++) {
-         music5000_update_6MHz();
-      }
-      music5000_get_sample(&left, &right);
-      *buffer++ = (int16_t) (left / 2);
-      *buffer++ = (int16_t) (right / 2);
-   }
+	int i;
+	int sample;
+	for (sample = 0; sample < len; sample++) {
+		for (i = 0; i < 128; i++) {
+			music5000_update_6MHz();
+		}
+		music5000_get_sample(buffer, buffer + 1);
+		buffer += 2;
+	}
 }
 
