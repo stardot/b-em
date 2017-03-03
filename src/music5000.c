@@ -28,6 +28,10 @@
 
 // #define LOG_LEVELS
 
+#ifdef LOG_LEVELS
+#include "soundopenal.h"
+#endif
+
 #define I_WAVEFORM(n) ((n)*128)
 #define I_WFTOP (14*128)
 
@@ -217,8 +221,8 @@ void music5000_get_sample(int16_t *left, int16_t *right)
 	static int window = FREQ_M5 * 30;
 #endif
 
-	// sleft/right is (-8191..8191) i.e. 13 bits
-	// summing 16 gives a 17 bit output
+	// the range of sleft/right is (-8191..8191) i.e. 14 bits
+	// so summing 16 channels gives an 18 bit output
 	int t;
 	int sl = 0, sr = 0;
 	for (t = 0; t < 16; t++) {
@@ -254,9 +258,19 @@ void music5000_get_sample(int16_t *left, int16_t *right)
 		count = 0;
 	}
 #endif
-	// divide by 2 to get a 16 bit output
-	*left = (int16_t) (sl / 2);
-	*right = (int16_t) (sr / 2);
+	// Divide by 4 to get 18 bits down to 16 bits.
+	//
+	// It's tempting to wing it and just divide by two for improved
+	// dynamic range, but loud tracks like In Concert by Pilgrim Beat
+	// use quite high levels:
+	//
+	//   L:-25086..26572 (rms  3626) R:-23347..21677 (rms  3529)
+	//   L:-25795..31677 (rms  3854) R:-22592..21373 (rms  3667)
+	//   L:-20894..20989 (rms  1788) R:-22221..17949 (rms  1367)
+	//
+	// the above shows dividing by 2 would be very close to clipping
+	*left = (int16_t) (sl >> 2);
+	*right = (int16_t) (sr >> 2);
 }
 
 // Music 5000 runs at a sample rate of 6MHz / 128 = 46875
