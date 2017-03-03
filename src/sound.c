@@ -12,18 +12,14 @@
 #include "soundopenal.h"
 #include "music5000.h"
 
-// TODO: Refactor and use definitions in soundopenal.[ch]
-#define BUFLEN 2000
-#define BUFLENM5 6000
-
 int sound_internal = 0, sound_beebsid = 0, sound_dac = 0, sound_ddnoise = 0, sound_tape = 0, sound_music5000 = 0;
 int sound_filter = 0;
 
 static int sound_pos = 0;
-static short sound_buffer[BUFLEN];
+static short sound_buffer[BUFLEN_SO];
 
 static int m5_pos = 0;
-static short m5_buffer[BUFLENM5];
+static short m5_buffer[BUFLEN_M5 * 2];
 
 #define NCoef 4
 static float iir(float NewSample) {
@@ -66,54 +62,47 @@ void sound_poll()
 {
         int c;
 
-        if (!(sound_internal || sound_beebsid || sound_dac || sound_music5000)) return;
+        if (sound_music5000) {
+                // every 64us Music 5000 must provide 3 stereo samples (46.875KHz)
+                music5000_fillbuf( m5_buffer + m5_pos, 3);
+                // skip forward 3 stereo samples
+                m5_pos += 6;
+                // BUFLEN_M5 is in units of samples, not integers
+                if ((m5_pos >> 1) == BUFLEN_M5)
+                {
+                        m5_pos = 0;
+                        al_givebufferm5(m5_buffer);
+                }
+        }
 
-#if 0
-        sound_buffer[sound_pos << 1] = 0;
-        sound_buffer[(sound_pos << 1) + 1] = 0;
-#endif
+        // every 64us the sound emulation must provide 2 mono samples (31.25KHz)
+        if (!(sound_internal || sound_beebsid || sound_dac)) return;
 
-        if (sound_beebsid)  sid_fillbuf(sound_buffer + (sound_pos << 1), 2);
-        if (sound_internal) sn_fillbuf( sound_buffer + (sound_pos << 1), 2);
-        if (sound_music5000) music5000_fillbuf( m5_buffer + m5_pos * 6, 3);
+        if (sound_beebsid)  sid_fillbuf(sound_buffer + sound_pos, 2);
+
+        if (sound_internal) sn_fillbuf( sound_buffer + sound_pos, 2);
 
         if (sound_dac)
         {
-                sound_buffer[(sound_pos << 1)]   += (((int)lpt_dac - 0x80) * 32);
-                sound_buffer[(sound_pos << 1)+1] += (((int)lpt_dac - 0x80) * 32);
+                sound_buffer[sound_pos]     += (((int)lpt_dac - 0x80) * 32);
+                sound_buffer[sound_pos + 1] += (((int)lpt_dac - 0x80) * 32);
         }
 
-        sound_pos++;
-        if (sound_pos == (BUFLEN >> 1))
+        // skip forward 2 mono samples
+        sound_pos += 2;
+        if (sound_pos == BUFLEN_SO)
         {
-#if 0
-                if (BUFLEN & 1)
-                {
-                        if (sound_beebsid)  sid_fillbuf(sound_buffer+ (sound_pos << 1), 1);
-                        if (sound_internal) sn_fillbuf( sound_buffer+ (sound_pos << 1), 1);
-                        if (sound_dac) sound_buffer[(sound_pos << 1)]   += (((int)lpt_dac - 0x80) * 32);
-                }
-#endif
-
                 if (sound_filter)
                 {
-                        for (c = 0; c < BUFLEN; c++)
+                        for (c = 0; c < BUFLEN_SO; c++)
                             sound_buffer[c] = (int)iir((float)sound_buffer[c]);
                 }
 
                 sound_pos = 0;
                 al_givebuffer(sound_buffer);
+                // Clear the buffer, so the next set of samples can just be added in
                 memset(sound_buffer, 0, sizeof(sound_buffer));
         }
-
-        m5_pos++;
-        if (m5_pos * 6 == BUFLENM5)
-        {
-                m5_pos = 0;
-                al_givebufferm5(m5_buffer);
-                // memset(m5_buffer, 0, sizeof(m5_buffer));
-        }
-
 }
 
 void sound_init()

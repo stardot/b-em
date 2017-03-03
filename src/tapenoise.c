@@ -8,10 +8,11 @@
 #include "ddnoise.h"
 #include "tapenoise.h"
 #include "sound.h"
+#include "soundopenal.h"
 
 static int tpnoisep = 0;
 static int tmcount = 0;
-static int16_t tapenoise[4410];
+static int16_t tapenoise[BUFLEN_DD];
 
 static float swavepos = 0;
 
@@ -48,12 +49,12 @@ void tapenoise_close()
 void tapenoise_addhigh()
 {
         int c;
-        float wavediv = (32.0f * 2400.0f) / 44100.0f;
+        float wavediv = (32.0f * 2400.0f) / (float) FREQ_DD;
 //        bem_debugf("Wavediv %f %i\n",wavediv,tmcount);
         tmcount++;
         for (c = 0; c < 368; c++)
         {
-                if (tpnoisep >= 4410) return;
+                if (tpnoisep >= BUFLEN_DD) return;
                 tapenoise[tpnoisep++] = sinewave[((int)swavepos) & 0x1F] * 64;
                 swavepos += wavediv;
         }
@@ -62,11 +63,11 @@ void tapenoise_addhigh()
 void tapenoise_adddat(uint8_t dat)
 {
         int c, d,e = 0;
-        float wavediv = (32.0f * 2400.0f) / 44100.0f;
+        float wavediv = (32.0f * 2400.0f) / (float) FREQ_DD;
 //        swavepos=0;
         for (c = 0; c < 30; c++) /*Start bit*/
         {
-                if (tpnoisep >= 4410) return;
+                if (tpnoisep >= BUFLEN_DD) return;
                 tapenoise[tpnoisep++] = sinewave[((int)swavepos) & 0x1F] * 64;
                 e++;
                 swavepos += (wavediv / 2);
@@ -74,7 +75,7 @@ void tapenoise_adddat(uint8_t dat)
         swavepos = fmod(swavepos, 32.0);
         while (swavepos < 32.0)
         {
-                if (tpnoisep >= 4410) return;
+                if (tpnoisep >= BUFLEN_DD) return;
                 tapenoise[tpnoisep++] = sinewave[((int)swavepos) & 0x1F] * 64;
                 swavepos += (wavediv / 2);
                 e++;
@@ -84,7 +85,7 @@ void tapenoise_adddat(uint8_t dat)
                 swavepos = fmod(swavepos, 32.0);
                 while (swavepos < 32.0)
                 {
-                        if (tpnoisep >= 4410) return;
+                        if (tpnoisep >= BUFLEN_DD) return;
                         tapenoise[tpnoisep++] = sinewave[((int)swavepos) & 0x1F] * ((dat & 1) ? 50 : 64);
                         if (dat & 1) swavepos += wavediv;
                         else         swavepos += (wavediv / 2);
@@ -95,7 +96,7 @@ void tapenoise_adddat(uint8_t dat)
 //        swavepos=0;
         for ( ;e < 368; e++) /*Stop bit*/
         {
-                if (tpnoisep >= 4410) return;
+                if (tpnoisep >= BUFLEN_DD) return;
                 tapenoise[tpnoisep++] = sinewave[((int)swavepos) & 0x1F] * 64;
                 swavepos += (wavediv / 2);
         }
@@ -118,13 +119,13 @@ void tapenoise_mix(int16_t *tapebuffer)
         if (!sound_tape) return;
 //        bem_debug("Mix!\n");
 
-        for (c = 0; c < 4410; c++)
+        for (c = 0; c < BUFLEN_DD; c++)
         {
                 tapebuffer[c] += tapenoise[c];
                 tapenoise[c] = 0;
         }
 
-        for (c = 0; c < 4410; c++)
+        for (c = 0; c < BUFLEN_DD; c++)
         {
                 if (tnoise_sstat >= 0)
                 {
@@ -136,7 +137,7 @@ void tapenoise_mix(int16_t *tapebuffer)
                         else
                         {
                                 tapebuffer[c] += ((int16_t)((((int16_t *)tsamples[tnoise_sstat]->data)[(int)tnoise_spos]) ^ 0x8000) / 4);
-                                tnoise_spos += ((float)tsamples[tnoise_sstat]->freq / 44100.0);
+                                tnoise_spos += ((float)tsamples[tnoise_sstat]->freq / (float) FREQ_DD);
                         }
                 }
         }

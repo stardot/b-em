@@ -7,6 +7,7 @@
 #include "resid-fp/sid.h"
 #include "sidtypes.h"
 #include "sid_b-em.h"
+#include "soundopenal.h"
 
 int sidrunning=0;
 extern "C" void sid_init();
@@ -50,7 +51,7 @@ void sid_init()
                 psid->sid->write(c,0);
                 
         if (!psid->sid->set_sampling_parameters((float)cycles_per_sec, method,
-                                            (float)31250, 0.9*31250.0/2.0))
+                                                (float) FREQ_SO, 0.9*((float) FREQ_SO)/2.0))
                                             {
   //                                                      printf("reSID failed!\n");
                                                 }
@@ -71,7 +72,7 @@ void sid_reset()
 void sid_settype(int resamp, int model)
 {
         sampling_method method=(resamp)?SAMPLE_RESAMPLE_INTERPOLATE:SAMPLE_INTERPOLATE;
-        if (!psid->sid->set_sampling_parameters((float)1000000, method,(float)31250, 0.9*31250.0/2.0))
+        if (!psid->sid->set_sampling_parameters((float)1000000, method,(float) FREQ_SO, 0.9*((float) FREQ_SO)/2.0))
         {
 //                rpclog("Change failed\n");
         }

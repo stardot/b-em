@@ -23,24 +23,22 @@
 static ALuint source[NUM_AL_SOURCES];     // audio source
 
 static int source_freq[NUM_AL_SOURCES] = {
-       31250, // normal sound
-       44100, // disc drive noise
-       46875  // music 5000
+       FREQ_SO, // normal sound
+       FREQ_DD, // disc drive noise
+       FREQ_M5  // music 5000
 };
 
 // lengths in bytes (buffer holds stereo int16_t samples)
 
-#define MAXBUFLEN (4410<<2)
-
 static int source_buflen[NUM_AL_SOURCES] = {
-       2000<<2, // normal sound
-       4410<<2, // disc drive noise
-       3000<<2  // music 5000
+       BUFLEN_SO<<2, // normal sound
+       BUFLEN_DD<<2, // disc drive noise
+       BUFLEN_M5<<2  // music 5000
 };
 
 static ALuint buffers[NUM_AL_SOURCES][NUM_AL_BUFFERS];
 
-static int16_t tempbuf[MAXBUFLEN>>1];
+static int16_t tempbuf[BUFLEN_MAX * 2]; // stereo: two int16_t per sample
 
 static void check()
 {
