@@ -90,7 +90,7 @@ void ddnoise_close()
         }
 }
 
-static int16_t ddbuffer[4410];
+static int16_t ddbuffer[BUFLEN_DD];
 
 void ddnoise_seek(int len)
 {
@@ -113,8 +113,8 @@ void ddnoise_mix()
 //        if (!f1) f1=x_fopen("f1.pcm","wb");
 //        if (!f2) f2=x_fopen("f2.pcm","wb");
 
-        memset(ddbuffer, 0, 4410 * 2);
-//        fwrite(ddbuffer,4410*2,1,f1);
+        memset(ddbuffer, 0, BUFLEN_DD * 2);
+//        fwrite(ddbuffer,BUFLEN_DD*2,1,f1);
         if (motoron && !oldmotoron)
         {
                 ddnoise_mstat = 0;
@@ -128,7 +128,7 @@ void ddnoise_mix()
         
         if (sound_ddnoise)
         {
-                for (c = 0; c < 4410; c++)
+                for (c = 0; c < BUFLEN_DD; c++)
                 {
                         ddbuffer[c] = 0;
                         if (ddnoise_mstat >= 0)
@@ -142,12 +142,12 @@ void ddnoise_mix()
                                 if (ddnoise_mstat != -1)
                                 {
                                         ddbuffer[c] += ((int16_t)((((int16_t *)motorsmp[ddnoise_mstat]->data)[(int)ddnoise_mpos]) ^ 0x8000) / 2);
-                                        ddnoise_mpos += ((float)motorsmp[ddnoise_mstat]->freq / 44100.0);
+                                        ddnoise_mpos += ((float)motorsmp[ddnoise_mstat]->freq / (float) FREQ_DD);
                                 }
                         }
                 }
 
-                for (c = 0; c < 4410; c++)
+                for (c = 0; c < BUFLEN_DD; c++)
                 {
                         if (ddnoise_sstat >= 0)
                         {
@@ -161,7 +161,7 @@ void ddnoise_mix()
                                 else
                                 {
                                         ddbuffer[c] += ((int16_t)((((int16_t *)seeksmp[ddnoise_sstat][ddnoise_sdir]->data)[(int)ddnoise_spos]) ^ 0x8000) / 2);
-                                        ddnoise_spos += ((float)seeksmp[ddnoise_sstat][ddnoise_sdir]->freq / 44100.0);
+                                        ddnoise_spos += ((float)seeksmp[ddnoise_sstat][ddnoise_sdir]->freq / (float) FREQ_DD);
                                 }
                         }
                         ddbuffer[c] = (ddbuffer[c] / 3) * ddnoise_vol;
@@ -169,7 +169,7 @@ void ddnoise_mix()
         }
         
         tapenoise_mix(ddbuffer);
-//        fwrite(ddbuffer,4410*2,1,f2);
+//        fwrite(ddbuffer,BUFLEN_DD*2,1,f2);
 //bem_debugf("Give buffer... %i %i\n",ddnoise_mstat,ddnoise_sstat);
         al_givebufferdd(ddbuffer);
         

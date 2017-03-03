@@ -214,7 +214,7 @@ void music5000_get_sample(int16_t *left, int16_t *right)
 	static int max_r = INT_MIN;
 	static double sum_squares_l = 0.0;
 	static double sum_squares_r = 0.0;
-	static int window = 31250 * 30;
+	static int window = FREQ_M5 * 30;
 #endif
 
 	// sleft/right is (-8191..8191) i.e. 13 bits
