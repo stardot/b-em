@@ -26,6 +26,8 @@
 #include <math.h>
 #include <string.h>
 
+// #define LOG_LEVELS
+
 #define I_WAVEFORM(n) ((n)*128)
 #define I_WFTOP (14*128)
 
@@ -204,6 +206,17 @@ void music5000_update_6MHz()
 
 void music5000_get_sample(int16_t *left, int16_t *right)
 {
+#ifdef LOG_LEVELS
+	static int count = 0;
+	static int min_l = INT_MAX;
+	static int max_l = INT_MIN;
+	static int min_r = INT_MAX;
+	static int max_r = INT_MIN;
+	static double sum_squares_l = 0.0;
+	static double sum_squares_r = 0.0;
+	static int window = 31250 * 30;
+#endif
+
 	// sleft/right is (-8191..8191) i.e. 13 bits
 	// summing 16 gives a 17 bit output
 	int t;
@@ -212,6 +225,35 @@ void music5000_get_sample(int16_t *left, int16_t *right)
 		sl += sleft[t];
 		sr += sright[t];
 	}
+#ifdef LOG_LEVELS
+	if (sl < min_l) {
+		min_l = sl;
+	}
+	if (sl > max_l) {
+		max_l = sl;
+	}
+	if (sr < min_r) {
+		min_r = sr;
+	}
+	if (sr > max_r) {
+		max_r = sr;
+	}
+	sum_squares_l += sl * sl;
+	sum_squares_r += sr * sr;
+	count++;
+	if (count == window) {
+		int rms_l = (int) (sqrt(sum_squares_l / window));
+		int rms_r = (int) (sqrt(sum_squares_r / window));
+		printf("Music 5000: L:%6d..%5d (rms %5d) R:%6d..%5d (rms %5d)\n", min_l, max_l, rms_l, min_r, max_r, rms_r);
+		min_l = INT_MAX;
+		max_l = INT_MIN;
+		min_r = INT_MAX;
+		max_r = INT_MIN;
+		sum_squares_l = 0;
+		sum_squares_r = 0;
+		count = 0;
+	}
+#endif
 	// divide by 2 to get a 16 bit output
 	*left = (int16_t) (sl / 2);
 	*right = (int16_t) (sr / 2);
