@@ -26,6 +26,8 @@
 #include <math.h>
 #include <string.h>
 
+#include "b-em.h"
+
 // #define LOG_LEVELS
 
 #ifdef LOG_LEVELS
@@ -210,6 +212,9 @@ void music5000_update_6MHz()
 
 void music5000_get_sample(int16_t *left, int16_t *right)
 {
+	int clip;
+	static int divisor = 1;
+
 #ifdef LOG_LEVELS
 	static int count = 0;
 	static int min_l = INT_MAX;
@@ -258,19 +263,44 @@ void music5000_get_sample(int16_t *left, int16_t *right)
 		count = 0;
 	}
 #endif
-	// Divide by 4 to get 18 bits down to 16 bits.
+
+	// Worst case we should divide by 4 to get 18 bits down to 16 bits.
+	// But this does loose dynamic range.
 	//
-	// It's tempting to wing it and just divide by two for improved
-	// dynamic range, but loud tracks like In Concert by Pilgrim Beat
-	// use quite high levels:
+	// Even loud tracks like In Concert by Pilgrim Beat rarely use
+	// the full 18 bits:
 	//
 	//   L:-25086..26572 (rms  3626) R:-23347..21677 (rms  3529)
 	//   L:-25795..31677 (rms  3854) R:-22592..21373 (rms  3667)
 	//   L:-20894..20989 (rms  1788) R:-22221..17949 (rms  1367)
 	//
-	// the above shows dividing by 2 would be very close to clipping
-	*left = (int16_t) (sl >> 2);
-	*right = (int16_t) (sr >> 2);
+	// So lets try a crude adaptive clipping system, and see what feedback we get!
+	sl /= divisor;
+	sr /= divisor;
+	clip = 0;
+	if (sl < SHRT_MIN) {
+		sl = SHRT_MIN;
+		clip = 1;
+	}
+	if (sl > SHRT_MAX) {
+		sl = SHRT_MAX;
+		clip = 1;
+	}
+	if (sr < SHRT_MIN) {
+		sr = SHRT_MIN;
+		clip = 1;
+	}
+	if (sr > SHRT_MAX) {
+		sr = SHRT_MAX;
+		clip = 1;
+	}
+	if (clip) {
+		divisor /= 2;
+		bem_warnf("Music 5000 clipped, reducing gain by 3dB (divisor now %d)", divisor);
+	}
+
+	*left = (int16_t) sl;
+	*right = (int16_t) sr;
 }
 
 // Music 5000 runs at a sample rate of 6MHz / 128 = 46875
