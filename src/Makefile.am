@@ -94,5 +94,5 @@ b_em_SOURCES = \
 	resid-fp/wave8580__ST.cc
 
 if NO_TSEARCH
-	b_em_SOURCES += tsesarch.c
+b_em_SOURCES += tsearch.c
 endif
