@@ -128,7 +128,7 @@ typedef void (*__action_fn_t) (const void *__nodep, VISIT __value, int __level);
 typedef void (*__free_fn_t) (void *__nodep);
 
 #ifndef max_align_t
-typedef long double max_align_t;
+typedef __max_align_t max_align_t;
 #endif
 
 #ifndef USE_MALLOC_LOW_BIT
