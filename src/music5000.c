@@ -66,9 +66,7 @@ static int disable;
 static short sam;
 static byte sign;
 
-
-
-void music5000_reset()
+void music5000_reset(void)
 {
 	memset(RAM, 0, 2048);
 	memset(phaseRAM, 0, 16 * sizeof(int));
@@ -81,9 +79,10 @@ void music5000_reset()
 	sam = 0;
 }
 
-void music5000_init()
+void music5000_init(void)
 {
-   int n;
+	int n;
+
 	for (n = 0; n < 128; n++) {
 		//12-bit antilog as per AM6070 datasheet
 		int S = n & 15, C = n >> 4;
@@ -95,11 +94,11 @@ void music5000_init()
 
 void music5000_write(uint16_t addr, uint8_t val)
 {
-   static uint8_t page = 0;
-   if (addr == 0xfcff) {
-      page = val;
-   } else if (((page & 0xf0) == 0x30) && ((addr & 0xff00) == 0xfd00)) {
-      addr = (page << 8) | (addr & 0xFF);
+	static uint8_t page = 0;
+	if (addr == 0xfcff) {
+		page = val;
+	} else if (((page & 0xf0) == 0x30) && ((addr & 0xff00) == 0xfd00)) {
+		addr = (page << 8) | (addr & 0xFF);
 		if ((addr & 0x0f00) == 0x0e00) {
 			//control RAM
 			RAM[I_WFTOP + (addr & 0xff)] = val;
@@ -115,7 +114,7 @@ void music5000_write(uint16_t addr, uint8_t val)
 	}
 }
 
-void music5000_update_6MHz()
+void music5000_update_6MHz(void)
 {
 	int c = (channel << 1) + (modulate ? 1 : 0);
 	switch (pc) {

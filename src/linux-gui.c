@@ -662,7 +662,7 @@ int gui_music5000()
 {
         sound_music5000 = !sound_music5000;
         gui_update();
-        return D_O_K;
+        return D_CLOSE;
 }
 int gui_dac()
 {

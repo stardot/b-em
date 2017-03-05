@@ -326,6 +326,6 @@ int gui_keydefine()
                 d[x].y-=(d[0].h/2)-(256/2);
                 x++;
         }
-        return D_O_K;
+        return D_CLOSE;
 }
 #endif
