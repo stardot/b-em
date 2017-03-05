@@ -11,6 +11,7 @@
 # Intended to be called from configure.ac (via autogen.sh)
 B_EM_VERSION=2.2
 
+[ -d ".git" ] || { echo "$B_EM_VERSION" ; exit ; }
 
 if grep -q -i '^ISRELEASED="yes"' ./configure.ac; then
 	# A release build.  Strip the git information off the tag name.
