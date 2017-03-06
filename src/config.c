@@ -10,10 +10,12 @@
 #include "keyboard.h"
 #include "mouse.h"
 #include "ide.h"
+#include "scsi.h"
 #include "sn76489.h"
 #include "sound.h"
 #include "tape.h"
 #include "tube.h"
+#include "vdfs.h"
 #include "video_render.h"
 
 int curmodel;
@@ -74,7 +76,9 @@ void config_load()
         
         fasttape        = get_config_int(NULL, "fasttape",      0);
 
+	scsi_enabled    = get_config_int(NULL, "scsienable", 0);
         ide_enable      = get_config_int(NULL, "ideenable",     0);
+	vdfs_enabled    = get_config_int(NULL, "vdfsenable", 0);
         
         keyas           = get_config_int(NULL, "key_as",        0);
 
@@ -125,7 +129,9 @@ void config_save()
 
         set_config_int(NULL, "fasttape", fasttape);
 
+	set_config_int(NULL, "scsienable", scsi_enabled);
         set_config_int(NULL, "ideenable", ide_enable);
+	set_config_int(NULL, "vdfsenable", vdfs_enabled);
         
         set_config_int(NULL, "key_as", keyas);
         
