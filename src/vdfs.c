@@ -98,7 +98,9 @@ static unsigned   scan_seq;
  * entry.  Normally for an open file both pointers are set and for a
  * closed file both are NULL but to emulate the OSFIND * call correctly
  * a directory can be opened and becomes "half-open", i.e. it can be
- * closed again but any attempt to read or write it will fail.
+ * closed again but any attempt to read or write it will fail.  That
+ * case is marked by the vdfs_ent_t pointer being set but the host
+ * FILE pointer being NULL.
  */
 
 #define MIN_CHANNEL      32
@@ -190,6 +192,10 @@ static int acorn_comp(const void *a, const void *b) {
     vdfs_ent_t *cb = (vdfs_ent_t *)b;
     return strcasecmp(ca->acorn_fn, cb->acorn_fn);
 }
+
+/*
+ * Functions used to parse values from the INF file on the host
+ */
 
 static void get_filename(FILE *fp, char *dest) {
     int ch;
@@ -388,7 +394,7 @@ static void tree_visit(const void *nodep, const VISIT which, const int depth) {
         *cat_ptr++ = *(vdfs_ent_t **)nodep;
 }
 
-// Given a VDFS entty reporesting a dir scan the corresponding host dir.
+// Given a VDFS entry representing a dir scan the corresponding host dir.
 
 static int scan_dir(vdfs_ent_t *dir) {
     int  count = 0;
