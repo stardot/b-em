@@ -286,8 +286,9 @@ BEGIN
                 BEGIN
                         MENUITEM "&AMX Mouse", IDM_MOUSE_AMX
                 END
-                POPUP "&IDE"
+                POPUP "&Hard Discs"
                 BEGIN
+                        MENUITEM "&Enable SCSI hard discs", IDM_SCSI_ENABLE
                         MENUITEM "&Enable IDE hard discs", IDM_IDE_ENABLE
                 END
         END
