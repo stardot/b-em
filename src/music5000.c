@@ -65,6 +65,7 @@ static int modulate;
 static int disable;
 static short sam;
 static byte sign;
+static byte c4d;
 
 void music5000_reset(void)
 {
@@ -127,8 +128,12 @@ void music5000_update_6MHz(void)
 		// phase accumulator to zero.
 		if (disable) {
 			phaseRAM[channel] = 0;
+			c4d = 0;
 		} else {
-			phaseRAM[channel] = (phaseRAM[channel] + FREQ(c)) & 0xffffff;
+			unsigned int sum = phaseRAM[channel] + FREQ(c);
+			phaseRAM[channel] = sum & 0xffffff;
+			// c4d is used for "Synchronization" e.g. the "Wha" instrument
+			c4d = sum >> 24;
 		}
 		break;
 	case 3:	break;
@@ -178,7 +183,7 @@ void music5000_update_6MHz(void)
 	}
 	case 7:
 	{
-		modulate = MODULATE(c) && !!(sign);
+		modulate = MODULATE(c) && (!!(sign) || !!(c4d));
 		// in the real hardware, inversion does not affect modulation
 		if (INVERT(c)) {
 			sign ^= 0x80;
