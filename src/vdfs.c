@@ -257,6 +257,7 @@ static inline void hst2bbc(const char *host_fn, char *acorn_fn) {
             ch = bbc_chars[ptr-hst_chars];
         *acorn_fn++ = ch;
     }
+    *acorn_fn = '\0';
 }
 
 static inline void bbc2hst(const char *acorn_fn, char *host_fn) {
@@ -268,6 +269,7 @@ static inline void bbc2hst(const char *acorn_fn, char *host_fn) {
             ch = hst_chars[ptr-bbc_chars];
         *host_fn++ = ch;
     }
+    *host_fn = '\0';
 }
 
 // Populate a VDFS entry from host information.
