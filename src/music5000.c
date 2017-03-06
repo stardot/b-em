@@ -123,7 +123,13 @@ void music5000_update_6MHz(void)
 		break;
 	case 1:	break;
 	case 2:
-		phaseRAM[channel] = (phaseRAM[channel] + FREQ(c)) & 0xffffff;
+		// In the real hardware the disable bit works by forcing the
+		// phase accumulator to zero.
+		if (disable) {
+			phaseRAM[channel] = 0;
+		} else {
+			phaseRAM[channel] = (phaseRAM[channel] + FREQ(c)) & 0xffffff;
+		}
 		break;
 	case 3:	break;
 	case 4:	break;
@@ -172,10 +178,11 @@ void music5000_update_6MHz(void)
 	}
 	case 7:
 	{
+		modulate = MODULATE(c) && !!(sign);
+		// in the real hardware, inversion does not affect modulation
 		if (INVERT(c)) {
 			sign ^= 0x80;
 		}
-		modulate = MODULATE(c) && !!(sign);
 		//sam is now an 8-bit log value
 		if (sign) {
 			// sign being 1 is positive
@@ -195,7 +202,8 @@ void music5000_update_6MHz(void)
 		case 14: pan = 2;	break;
 		case 15: pan = 1;	break;
 		}
-		//apply panning
+		// Apply panning. In the real hardware, a disabled channel is not actually
+		// forced to zero, but this seems harmless so leave in for now.
 		sleft[channel] = disable ? 0 : ((sam*pan) / 6);
 		sright[channel] = disable ? 0 : ((sam*(6 - pan)) / 6);
 		break;
