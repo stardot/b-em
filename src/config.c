@@ -27,7 +27,7 @@ void config_load()
         int c;
         char s[256];
         char *p;
-        sprintf(s, "%sb-em.cfg", exedir);
+        snprintf(s, sizeof(s), "%sb-em.cfg", exedir);
         //printf("%s\n",s);
         set_config_file(s);
         
@@ -42,7 +42,7 @@ void config_load()
         /*else   */tape_fn[0] = 0;
 
         defaultwriteprot = get_config_int(NULL, "defaultwriteprotect", 1);
-        
+
         curmodel        = get_config_int(NULL, "model",         3);
         selecttube      = get_config_int(NULL, "tube",         -1);
         tube_6502_speed = get_config_int(NULL, "tube6502speed", 1);
@@ -91,7 +91,7 @@ void config_save()
 {
         int c;
         char s[256];
-        sprintf(s, "%sb-em.cfg", exedir);
+        snprintf(s, sizeof s, "%sb-em.cfg", exedir);
         set_config_file(s);
         set_config_string(NULL, "disc0", discfns[0]);
         set_config_string(NULL, "disc1", discfns[1]);
@@ -124,7 +124,7 @@ void config_save()
         set_config_int(NULL, "video_resize", videoresize);
 
         set_config_int(NULL, "fasttape", fasttape);
-        
+
         set_config_int(NULL, "ideenable", ide_enable);
         
         set_config_int(NULL, "key_as", keyas);
