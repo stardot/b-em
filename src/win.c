@@ -20,6 +20,7 @@
 #include "mouse.h"
 #include "savestate.h"
 #include "sid_b-em.h"
+#include "scsi.h"
 #include "sound.h"
 #include "sn76489.h"
 #include "tape.h"
@@ -180,6 +181,7 @@ static void initmenu()
         
         if (mouse_amx) CheckMenuItem(hmenu, IDM_MOUSE_AMX, MF_CHECKED);
 
+        CheckMenuItem(hmenu, IDM_SCSI_ENABLE, ide_enabled ? MF_CHECKED : MF_UNCHECKED);
         CheckMenuItem(hmenu, IDM_IDE_ENABLE, ide_enable ? MF_CHECKED : MF_UNCHECKED);
         
         CheckMenuItem(hmenu, IDM_VIDEO_RESIZE, (videoresize) ? MF_CHECKED : MF_UNCHECKED);
@@ -810,6 +812,14 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         break;
 
                         case IDM_IDE_ENABLE:
+                        EnterCriticalSection(&cs);
+                        CheckMenuItem(hmenu, IDM_SCSI_ENABLE, (!scsi_enabled) ? MF_CHECKED : MF_UNCHECKED);
+                        scsi_enabled = !scsi_enabled;
+                        main_restart();
+                        LeaveCriticalSection(&cs);
+                        break;
+
+		        case IDM_IDE_ENABLE:
                         EnterCriticalSection(&cs);
                         CheckMenuItem(hmenu, IDM_IDE_ENABLE, (!ide_enable) ? MF_CHECKED : MF_UNCHECKED);
                         ide_enable = !ide_enable;

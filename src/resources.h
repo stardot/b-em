@@ -57,6 +57,7 @@
 #define IDM_DDT_525          40075
 #define IDM_DDT_35           40076
 #define IDM_IDE_ENABLE       40080
+#define IDM_SCSI_ENABLE      40081
 #define IDM_MOUSE_AMX        40090
 #define IDM_DEBUGGER         40100
 #define IDM_BREAK            40102
