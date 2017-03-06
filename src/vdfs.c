@@ -403,6 +403,7 @@ static int scan_dir(vdfs_ent_t *dir) {
     DIR  *dp;
     struct dirent *dep;
     vdfs_ent_t **ptr, **end, *ent, key;
+    const char *ext;
 
     if (dir->acorn_tree && dir->scan_seq >= scan_seq)
         return 0; // scanned before.
@@ -423,16 +424,18 @@ static int scan_dir(vdfs_ent_t *dir) {
         // deleted atrubute, if found or create a new entry if not.
         while ((dep = readdir(dp))) {
             if (*(dep->d_name) != '.') {
-                key.host_fn = dep->d_name;
-                if ((ptr = tfind(&key, &dir->host_tree, host_comp))) {
-                    ent = *ptr;
-                    ent->attribs &= ~ATTR_DELETED;
-                    scan_entry(ent);
-                } else if ((ent = new_entry(dir, dep->d_name)))
-                    count++;
-                else {
-                    count = -1;
-                    break;
+		if (!(ext = strrchr(dep->d_name, '.')) || strcasecmp(ext, ".inf")) {
+		    key.host_fn = dep->d_name;
+		    if ((ptr = tfind(&key, &dir->host_tree, host_comp))) {
+			ent = *ptr;
+			ent->attribs &= ~ATTR_DELETED;
+			scan_entry(ent);
+		    } else if ((ent = new_entry(dir, dep->d_name)))
+			count++;
+		    else {
+			count = -1;
+			break;
+		    }
                 }
             }
         }
