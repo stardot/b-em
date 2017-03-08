@@ -1311,7 +1311,7 @@ static int handle_sectors_described_track (FDI *fdi)
 {
 	uae_u8 *start_src = fdi->track_src;
 #ifdef _DEBUG
-	int oldout;
+	int oldout = 0;
 #endif
 	fdi->encoding_type = *fdi->track_src++;
 	fdi->index_offset = get_u32(fdi->track_src);
