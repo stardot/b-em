@@ -60,23 +60,36 @@ static void log_common(unsigned dest, const char *level, const char *msg, size_t
     }
 }
 
+static void log_plain(unsigned mask, unsigned shift, const char *level, const char *msg)
+{
+    unsigned opt = log_options & mask;
+
+    if (opt)
+	log_common(opt >> shift, level, msg, strlen(msg));
+}
+
 static const char msg_malloc[] = "log_format: out of space - following message truncated";
 
-static void log_format(unsigned dest, const char *level, const char *fmt, va_list ap)
+static void log_format(unsigned mask, unsigned shift, const char *level, const char *fmt, va_list ap)
 {
+    unsigned opt, dest;
     char   abuf[200], *mbuf;
     size_t len;
 
-    len = vsnprintf(abuf, sizeof abuf, fmt, ap);
-    if (len <= sizeof abuf)
-	log_common(dest, level, abuf, len);
-    else if ((mbuf = malloc(len + 1))) {
-	vsnprintf(mbuf, len, fmt, ap);
-	log_common(dest, level, mbuf, len);
-	free(mbuf);
-    } else {
-	log_common(dest, level, msg_malloc, sizeof msg_malloc);
-	log_common(dest, level, abuf, len);
+    if ((opt = log_options & mask))
+    {
+	dest = opt >> shift;
+	len = vsnprintf(abuf, sizeof abuf, fmt, ap);
+	if (len <= sizeof abuf)
+	    log_common(dest, level, abuf, len);
+	else if ((mbuf = malloc(len + 1))) {
+	    vsnprintf(mbuf, len, fmt, ap);
+	    log_common(dest, level, mbuf, len);
+	    free(mbuf);
+	} else {
+	    log_common(dest, level, msg_malloc, sizeof msg_malloc);
+	    log_common(dest, level, abuf, len);
+	}
     }
 }
 
@@ -84,70 +97,49 @@ static void log_format(unsigned dest, const char *level, const char *fmt, va_lis
 
 void bem_debug(const char *s)
 {
-    unsigned opt = log_options & LOG_DEBUG_MASK;
-
-    if (opt)
-	log_common(opt >> LOG_DEBUG_SHIFT, "DEBUG", s, strlen(s));
+    log_plain(LOG_DEBUG_MASK, LOG_DEBUG_SHIFT, "DEBUG", s);
 }
 
 void bem_debugf(const char *fmt, ...)
 {
-    unsigned opt = log_options & LOG_DEBUG_MASK;
     va_list ap;
 
-    if (opt)
-    {
-	va_start(ap, fmt);
-	log_format(opt >> LOG_DEBUG_SHIFT, "DEBUG", fmt, ap);
-	va_end(ap);
-    }
+    va_start(ap, fmt);
+    log_format(LOG_DEBUG_MASK, LOG_DEBUG_SHIFT, "DEBUG", fmt, ap);
+    va_end(ap);
 }
 
 #endif
 
 void bem_warn(const char *s)
 {
-    unsigned opt = log_options & LOG_WARN_MASK;
-
-    if (opt)
-	log_common(opt >> LOG_WARN_SHIFT, "WARNING", s, strlen(s));
+    log_plain(LOG_WARN_MASK, LOG_WARN_SHIFT, "WARNING", s);
 }
 
 void bem_warnf(const char *fmt, ...)
 {
-    unsigned opt = log_options & LOG_WARN_MASK;
     va_list ap;
 
-    if (opt)
-    {
-	va_start(ap, fmt);
-	log_format(opt >> LOG_WARN_SHIFT, "WARNING", fmt, ap);
-	va_end(ap);
-    }
+    va_start(ap, fmt);
+    log_format(LOG_WARN_MASK, LOG_WARN_SHIFT, "WARNING", fmt, ap);
+    va_end(ap);
 }
 
 void bem_error(const char *s)
 {
-    unsigned opt = log_options & LOG_ERROR_MASK;
-
-    if (opt)
-	log_common(opt >> LOG_ERROR_SHIFT, "ERROR", s, strlen(s));
+    log_plain(LOG_ERROR_MASK, LOG_ERROR_SHIFT, "ERROR", s);
 }
 
 void bem_errorf(const char *fmt, ...)
 {
-    unsigned opt = log_options & LOG_ERROR_MASK;
     va_list ap;
 
-    if (opt)
-    {
-	va_start(ap, fmt);
-	log_format(opt >> LOG_ERROR_SHIFT, "ERROR", fmt, ap);
-	va_end(ap);
-    }
+    va_start(ap, fmt);
+    log_format(LOG_ERROR_MASK, LOG_ERROR_SHIFT, "ERROR", fmt, ap);
+    va_end(ap);
 }
 
-void log_open()
+void log_open(void)
 {
     log_options = get_config_int(NULL, "logging", log_options);
     if ((log_fp = fopen(log_fn, "at")) == NULL)
