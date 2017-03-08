@@ -22,10 +22,15 @@ int  i8271_getdata(int last);
 int byte;
 int i8271_verify = 0;
 
+// Output Port bit definitions in i8271.drvout
+#define SIDESEL   0x20
+#define DRIVESEL0 0x40
+#define DRIVESEL1 0x80
+#define DRIVESEL (DRIVESEL0 | DRIVESEL1)
+
 struct
 {
         uint8_t command, params[5];
-        int drivesel;
         int paramnum, paramreq;
         uint8_t status;
         uint8_t result;
@@ -35,7 +40,7 @@ struct
         uint8_t data;
         int phase;
         int written;
-        
+
         uint8_t drvout;
 } i8271;
 
@@ -83,6 +88,7 @@ void i8271_spinup()
 void i8271_spindown()
 {
         motoron = 0;
+        i8271.drvout &= ~DRIVESEL;
 }
 
 void i8271_setspindown()
@@ -153,7 +159,13 @@ void i8271_write(uint16_t addr, uint8_t val)
                 i8271.command = val & 0x3F;
                 if (i8271.command == 0x17) i8271.command = 0x13;
 //                printf("8271 command %02X!\n",i8271.command);
-                i8271.drivesel = val >> 6;
+                // Only commands < ReadDriveStatus actually change the drive select signals
+                // We use this later to generate RDY in the ReadDriveStatus command
+                if (i8271.command < 0x2C)
+                {
+                        i8271.drvout &= ~DRIVESEL;
+                        i8271.drvout |= val & DRIVESEL;
+                }
                 curdrive = (val & 0x80) ? 1 : 0;
                 i8271.paramnum = 0;
                 i8271.paramreq = i8271_getparams();
@@ -165,8 +177,8 @@ void i8271_write(uint16_t addr, uint8_t val)
                                 case 0x2C: /*Read drive status*/
                                 i8271.status = 0x10;
                                 i8271.result = 0x80 | 8 | track0;
-                                if (i8271.drivesel & 1) i8271.result |= 0x04;
-                                if (i8271.drivesel & 2) i8271.result |= 0x40;
+                                if (i8271.drvout & DRIVESEL0) i8271.result |= 0x04;
+                                if (i8271.drvout & DRIVESEL1) i8271.result |= 0x40;
 //                                printf("Status %02X\n",i8271.result);
                                 break;
                                 
@@ -314,7 +326,7 @@ void i8271_callback()
                 if (!i8271.phase)
                 {
                         i8271.curtrack[curdrive] = i8271.params[0];
-                        disc_writesector(curdrive, i8271.cursector, i8271.params[0], (i8271.drvout & 0x20) ? 1 : 0, 0);
+                        disc_writesector(curdrive, i8271.cursector, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, 0);
                         i8271.phase = 1;
                         
                         i8271.status = 0x8C;
@@ -333,7 +345,7 @@ void i8271_callback()
                         return;
                 }
                 i8271.cursector++;
-                disc_writesector(curdrive, i8271.cursector, i8271.params[0], (i8271.drvout & 0x20) ? 1 : 0, 0);
+                disc_writesector(curdrive, i8271.cursector, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, 0);
                 byte = 0;
                 i8271.status = 0x8C;
                 i8271.result = 0;
@@ -349,7 +361,7 @@ void i8271_callback()
 //                        i8271.realtrack+=diff;
 //                        disc_seek(0,i8271.realtrack);
 //                        printf("Re-seeking - track now %i %i\n",i8271.curtrack,i8271.realtrack);
-                        disc_readsector(curdrive, i8271.cursector, i8271.params[0], (i8271.drvout & 0x20) ? 1 : 0, 0);
+                        disc_readsector(curdrive, i8271.cursector, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, 0);
                         i8271.phase = 1;
                         return;
                 }
@@ -364,7 +376,7 @@ void i8271_callback()
                         return;
                 }
                 i8271.cursector++;
-                disc_readsector(curdrive, i8271.cursector, i8271.params[0], (i8271.drvout & 0x20) ? 1 : 0, 0);
+                disc_readsector(curdrive, i8271.cursector, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, 0);
                 byte = 0;
                 break;
                 
@@ -375,7 +387,7 @@ void i8271_callback()
                         i8271.curtrack[curdrive] = i8271.params[0];
 //                        i8271.realtrack+=diff;
 //                        disc_seek(0,i8271.realtrack);
-                        disc_readaddress(curdrive, i8271.params[0], (i8271.drvout & 0x20) ? 1 : 0, 0);
+                        disc_readaddress(curdrive, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, 0);
                         i8271.phase = 1;
                         return;
                 }
@@ -391,7 +403,7 @@ void i8271_callback()
                         return;
                 }
                 i8271.cursector++;
-                disc_readaddress(curdrive, i8271.params[0], (i8271.drvout & 0x20) ? 1 : 0, 0);
+                disc_readaddress(curdrive, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, 0);
                 byte = 0;
                 break;
 
@@ -399,7 +411,7 @@ void i8271_callback()
                 if (!i8271.phase)
                 {
                         i8271.curtrack[curdrive] = i8271.params[0];
-                        disc_writesector(curdrive, i8271.cursector, i8271.params[0], (i8271.drvout & 0x20) ? 1 : 0, 0);
+                        disc_writesector(curdrive, i8271.cursector, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, 0);
                         i8271.phase = 1;
 
                         i8271.status = 0x8C;
@@ -416,7 +428,7 @@ void i8271_callback()
                         i8271_verify=0;
                         return;
                 }
-                disc_format(curdrive, i8271.params[0], (i8271.drvout & 0x20) ? 1 : 0, 0);
+                disc_format(curdrive, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, 0);
                 i8271.phase = 2;
                 break;
 
