@@ -131,7 +131,7 @@ void bem_error(const char *s)
     unsigned opt = log_options & LOG_ERROR_MASK;
 
     if (opt)
-	log_common(opt >> LOG_DEBUG_SHIFT, "ERROR", s, strlen(s));
+	log_common(opt >> LOG_ERROR_SHIFT, "ERROR", s, strlen(s));
 }
 
 void bem_errorf(const char *fmt, ...)
