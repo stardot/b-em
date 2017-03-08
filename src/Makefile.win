@@ -4,7 +4,7 @@ CPP  = g++.exe
 CC   = gcc.exe
 WINDRES = windres.exe
 
-CFLAGS = -O3 -DBEM -DVERSION=\"Win32\"
+CFLAGS = -O3 -Wall -DBEM -DVERSION=\"Win32\"
 
 OBJ = \
     6502.o \
