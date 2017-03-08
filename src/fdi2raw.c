@@ -1328,7 +1328,7 @@ static int handle_sectors_described_track (FDI *fdi)
 		oldout = fdi->out;
 #endif
 		if (fdi->out < 0 || fdi->err) {
-			bem_debugf("\nin %ld bytes, out %d bits\n", fdi->track_src - fdi->track_src_buffer, fdi->out);
+		        bem_debugf("\nin %ld bytes, out %d bits\n", (long)(fdi->track_src - fdi->track_src_buffer), fdi->out);
 			return -1;
 		}
 		if (fdi->track_src - fdi->track_src_buffer >= fdi->track_src_len) {

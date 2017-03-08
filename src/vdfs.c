@@ -1219,6 +1219,7 @@ static uint16_t srp_hex(int ch, uint16_t addr, uint16_t *vptr) {
         *vptr = value;
         return --addr;
     }
+    *vptr = 0;
     return 0;
 }
 
