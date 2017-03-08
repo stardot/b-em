@@ -282,11 +282,11 @@ static void scan_entry(vdfs_ent_t *ent) {
     // build name of .inf file
     host_dir_path = ent->parent->host_path;
     ptr = host_file_path = malloc(strlen(host_dir_path) + strlen(ent->host_fn) + 6);
-    if (host_dir_path[0] != '.' || host_dir_path[1] != '\0') {
-        ptr = stpcpy(ptr, host_dir_path);
-        *ptr++ = '/';
+    ptr = stpcpy(ptr, host_dir_path);
+    if (ent->host_fn[0] != '.' || ent->host_fn[1] != '\0') {
+	*ptr++ = '/';
+	ptr = stpcpy(ptr, ent->host_fn);
     }
-    ptr = stpcpy(ptr, ent->host_fn);
     strcpy(ptr, ".inf");
 
     // open and parse .inf file
@@ -611,17 +611,35 @@ void vdfs_close(void) {
 }
 
 void vdfs_new_root(const char *root) {
-    root_dir.host_fn = root_dir.host_path = strdup(root);
-    scan_entry(&root_dir);
-    cur_dir = lib_dir = prev_dir = &root_dir;
-    scan_seq++;
+    size_t len;
+    char   *path;
+    int    ch;
+
+    len = strlen(root);
+    while (len > 0 && ((ch = root[--len]) == '/' || ch == '\\'))
+	;
+    if (++len > 0) {
+	if ((path = malloc(len + 1))) {
+	    memcpy(path, root, len);
+	    path[len] = '\0';
+	    root_dir.host_path = path;
+	    root_dir.host_fn = ".";
+	    scan_entry(&root_dir);
+	    cur_dir = lib_dir = prev_dir = &root_dir;
+	    scan_seq++;
+	} else {
+	    bem_warn("vdfs: unable to set root as unable to allocate path.  VDFS disabled");
+	    vdfs_enabled = 0;
+	}
+    } else {
+	bem_warn("vdfs: unable to set root as path is empty.  VDFS disabled");
+	vdfs_enabled = 0;
+    }
 }
 
 void vdfs_set_root(const char *root) {
-    if (root_dir.host_path == NULL || strcmp(root_dir.host_path, root)) {
-        vdfs_close();
-        vdfs_new_root(root);
-    }
+    vdfs_close();
+    vdfs_new_root(root);
 }
 
 const char *vdfs_get_root() {
