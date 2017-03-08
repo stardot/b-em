@@ -283,9 +283,12 @@ void updatewindowtitle()
            set_window_title(VERSION_STR);
 }
 
-void bem_error(char *s)
+void win_log_msgbox(const char *level, const char *s)
 {
-        MessageBox(ghwnd, s, "B-em error", MB_OK | MB_ICONEXCLAMATION);
+    char title[14];
+
+    snprintf(title, sizeof title, "B-Em: %s", level);
+    MessageBox(ghwnd, s, title, MB_OK | MB_ICONEXCLAMATION);
 }
 
 int WINAPI WinMain (HINSTANCE hThisInstance,

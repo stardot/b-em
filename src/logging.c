@@ -2,81 +2,161 @@
 
 #include "b-em.h"
 
+#include <allegro.h>
 #include <errno.h>
 #include <stdarg.h>
+#include <time.h>
+
+#define LOG_DEST_FILE   0x01
+#define LOG_DEST_STDERR 0x02
+#define LOG_DEST_MSGBOX 0x04
+
+#define LOG_DEBUG_MASK  0x000f
+#define LOG_DEBUG_SHIFT 0
+#define LOG_WARN_MASK   0x00f0
+#define LOG_WARN_SHIFT  4
+#define LOG_ERROR_MASK  0x0f00
+#define LOG_ERROR_SHIFT 8
+
+static unsigned log_options =
+    (LOG_DEST_FILE << LOG_DEBUG_SHIFT) |
+    ((LOG_DEST_FILE|LOG_DEST_STDERR) << LOG_WARN_SHIFT) |
+    ((LOG_DEST_FILE|LOG_DEST_MSGBOX) << LOG_ERROR_SHIFT);
+
+static const char log_fn[] = "b-emlog.txt";
+FILE *log_fp;
+
+static char   tmstr[20];
+static time_t last = 0;
+
+static void log_common(unsigned dest, const char *level, const char *msg, size_t len)
+{
+    time_t now;
+
+    while (msg[len-1] == '\n')
+	len--;
+    if ((dest & LOG_DEST_FILE) && log_fp) {
+	time(&now);
+	if (now != last)
+	{
+	    strftime(tmstr, sizeof(tmstr), "%d/%m/%Y %H:%M:%S", localtime(&now));
+	    last = now;
+	}
+	fprintf(log_fp, "%s %s ", tmstr, level); 
+	fwrite(msg, len, 1, log_fp);
+	putc('\n', log_fp);
+	fflush(log_fp);
+    }
+    if (dest & LOG_DEST_STDERR) {
+	fwrite(msg, len, 1, stderr);
+	putc('\n', stderr);
+    }
+    if (dest & LOG_DEST_MSGBOX) {
+#ifdef WIN32
+	win_log_msgbox(level, msg);
+#else
+	alert(level, msg, "", "&OK", NULL, 'a', 0);
+#endif
+    }
+}
+
+static const char msg_malloc[] = "log_format: out of space - following message truncated";
+
+static void log_format(unsigned dest, const char *level, const char *fmt, va_list ap)
+{
+    char   abuf[200], *mbuf;
+    size_t len;
+
+    len = vsnprintf(abuf, sizeof abuf, fmt, ap);
+    if (len <= sizeof abuf)
+	log_common(dest, level, abuf, len);
+    else if ((mbuf = malloc(len + 1))) {
+	vsnprintf(mbuf, len, fmt, ap);
+	log_common(dest, level, mbuf, len);
+	free(mbuf);
+    } else {
+	log_common(dest, level, msg_malloc, sizeof msg_malloc);
+	log_common(dest, level, abuf, len);
+    }
+}
 
 #ifdef _DEBUG
-static const char debug_fn[] = "b-emlog.txt";
-FILE *debug_fp;
 
 void bem_debug(const char *s)
 {
-        if (debug_fp)
-        {
-                fputs(s, debug_fp);
-                fflush(debug_fp);
-        }
+    unsigned opt = log_options & LOG_DEBUG_MASK;
+
+    if (opt)
+	log_common(opt >> LOG_DEBUG_SHIFT, "DEBUG", s, strlen(s));
 }
 
 void bem_debugf(const char *fmt, ...)
 {
-        va_list ap;
+    unsigned opt = log_options & LOG_DEBUG_MASK;
+    va_list ap;
 
-        if (debug_fp)
-        {
-                va_start(ap, fmt);
-                vfprintf(debug_fp, fmt, ap);
-                va_end(ap);
-                fflush(debug_fp);
-        }
+    if (opt)
+    {
+	va_start(ap, fmt);
+	log_format(opt >> LOG_DEBUG_SHIFT, "DEBUG", fmt, ap);
+	va_end(ap);
+    }
 }
 
 #endif
 
-void bem_errorf(const char *fmt, ...)
-{
-        char buf[256];
-        va_list ap;
-
-        va_start(ap, fmt);
-        vsnprintf(buf, sizeof buf, fmt, ap);
-        va_end(ap);
-
-        bem_error(buf);
-        bem_debug(buf);
-}
-
 void bem_warn(const char *s)
 {
-        fputs(s, stderr);
-        fputc('\n', stderr);
+    unsigned opt = log_options & LOG_WARN_MASK;
+
+    if (opt)
+	log_common(opt >> LOG_WARN_SHIFT, "WARNING", s, strlen(s));
 }
 
 void bem_warnf(const char *fmt, ...)
 {
-        char buf[256];
-        va_list ap;
+    unsigned opt = log_options & LOG_WARN_MASK;
+    va_list ap;
 
-        va_start(ap, fmt);
-        vsnprintf(buf, sizeof buf, fmt, ap);
-        va_end(ap);
-
-        bem_warn(buf);
-        bem_debug(buf);
+    if (opt)
+    {
+	va_start(ap, fmt);
+	log_format(opt >> LOG_WARN_SHIFT, "WARNING", fmt, ap);
+	va_end(ap);
+    }
 }
 
-#ifdef _DEBUG
-
-void debug_open()
+void bem_error(const char *s)
 {
-        if ((debug_fp = fopen(debug_fn, "wt")) == NULL)
-                bem_warnf("unable to open debug log %s: %s", debug_fn, strerror(errno));
+    unsigned opt = log_options & LOG_ERROR_MASK;
+
+    if (opt)
+	log_common(opt >> LOG_DEBUG_SHIFT, "ERROR", s, strlen(s));
 }
 
-void debug_close(void)
+void bem_errorf(const char *fmt, ...)
 {
-        if (debug_fp)
-                fclose(debug_fp);
+    unsigned opt = log_options & LOG_ERROR_MASK;
+    va_list ap;
+
+    if (opt)
+    {
+	va_start(ap, fmt);
+	log_format(opt >> LOG_ERROR_SHIFT, "ERROR", fmt, ap);
+	va_end(ap);
+    }
 }
 
-#endif
+void log_open()
+{
+    log_options = get_config_int(NULL, "logging", log_options);
+    if ((log_fp = fopen(log_fn, "at")) == NULL)
+	bem_warnf("log_open: unable to open log %s: %s", log_fn, strerror(errno));
+    bem_debugf("log_open: log options=%d", log_options);
+}
+
+void log_close(void)
+{
+    if (log_fp)
+	fclose(log_fp);
+}
