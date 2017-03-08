@@ -34,10 +34,13 @@ void setejecttext(int drive, char *fn);
 #define printflike
 #endif
 
-extern void bem_error(char *s);
+extern void log_open(void);
+extern void log_close(void);
+extern void bem_error(const char *s);
 extern void bem_errorf(const char *fmt, ...) printflike;
 extern void bem_warn(const char *s);
 extern void bem_warnf(const char *fmt, ...) printflike;
+extern void win_log_msgbox(const char *level, const char *s);
 
 // If debugging is enabled a real pair of functions will be available
 // to log debug messages.  if debug is disabled we use a static inline
@@ -47,14 +50,10 @@ extern void bem_warnf(const char *fmt, ...) printflike;
 #ifdef _DEBUG
 extern void bem_debug(const char *s);
 extern void bem_debugf(const char *format, ...) printflike;
-extern void debug_open(void);
-extern void debug_close(void);
 #else
 static inline void bem_debug(const char *s) {}
 static inline void bem_debugf(const char *format, ...) printflike;
 static inline void bem_debugf(const char *format, ...) {}
-static inline void debug_open(void) {}
-static inline void debug_close(void) {}
 #endif
 
 extern char exedir[512];
