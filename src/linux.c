@@ -50,11 +50,6 @@ void updatewindow()
 {
 }
 
-void bem_error(char *s)
-{
-        allegro_message(s);
-}
-
 void setquit()
 {
         quited=1;
@@ -67,7 +62,7 @@ int main(int argc, char *argv[])
 
         if (allegro_init())
         {
-                printf("Failed to initialise Allegro!");
+	        fputs("Failed to initialise Allegro!\n", stderr);
                 exit(-1);
         }
 
