@@ -112,6 +112,7 @@ void main_init(int argc, char *argv[])
         int tapenext = 0, discnext = 0;
 
         log_open();
+	bem_infof("main: starting %s", VERSION_STR);
 
         startblit();
         
@@ -267,9 +268,6 @@ void main_init(int argc, char *argv[])
         
         if (curtube == 3 || mouse_amx) install_mouse();
 
-//printf("Disc 0 : %s\n",discfns[0]);
-//printf("Disc 1 : %s\n",discfns[1]);
-//printf("Tape   : %s\n",tape_fn);
         disc_load(0, discfns[0]);
         disc_load(1, discfns[1]);
         tape_load(tape_fn);

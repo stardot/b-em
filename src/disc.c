@@ -63,9 +63,9 @@ void disc_load(int drive, char *fn)
         setejecttext(drive, "");
         if (!fn) return;
         p = get_extension(fn);
-        if (!p) return;
+        if (!p || !*p) return;
         setejecttext(drive, fn);
-        bem_debugf("Loading :%i %s %s\n", drive, fn,p);
+        bem_infof("disc: Loading %i %s %s\n", drive, fn, p);
         while (loaders[c].ext)
         {
                 if (!strcasecmp(p, loaders[c].ext))
