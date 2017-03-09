@@ -40,6 +40,8 @@ extern void bem_error(const char *s);
 extern void bem_errorf(const char *fmt, ...) printflike;
 extern void bem_warn(const char *s);
 extern void bem_warnf(const char *fmt, ...) printflike;
+extern void bem_info(const char *s);
+extern void bem_infof(const char *fmt, ...) printflike;
 extern void win_log_msgbox(const char *level, const char *s);
 
 // If debugging is enabled a real pair of functions will be available

@@ -13,13 +13,16 @@
 
 #define LOG_DEBUG_MASK  0x000f
 #define LOG_DEBUG_SHIFT 0
-#define LOG_WARN_MASK   0x00f0
-#define LOG_WARN_SHIFT  4
-#define LOG_ERROR_MASK  0x0f00
-#define LOG_ERROR_SHIFT 8
+#define LOG_INFO_MASK   0x00f0
+#define LOG_INFO_SHIFT  4
+#define LOG_WARN_MASK   0x0f00
+#define LOG_WARN_SHIFT  8
+#define LOG_ERROR_MASK  0xf000
+#define LOG_ERROR_SHIFT 12
 
 static unsigned log_options =
     (LOG_DEST_FILE << LOG_DEBUG_SHIFT) |
+    (LOG_DEST_FILE << LOG_INFO_SHIFT)  |
     ((LOG_DEST_FILE|LOG_DEST_STDERR) << LOG_WARN_SHIFT) |
     ((LOG_DEST_FILE|LOG_DEST_MSGBOX) << LOG_ERROR_SHIFT);
 
@@ -110,6 +113,20 @@ void bem_debugf(const char *fmt, ...)
 }
 
 #endif
+
+void bem_info(const char *s)
+{
+    log_plain(LOG_INFO_MASK, LOG_INFO_SHIFT, "INFO", s);
+}
+
+void bem_infof(const char *fmt, ...)
+{
+    va_list ap;
+
+    va_start(ap, fmt);
+    log_format(LOG_INFO_MASK, LOG_INFO_SHIFT, "INFO", fmt, ap);
+    va_end(ap);
+}
 
 void bem_warn(const char *s)
 {
