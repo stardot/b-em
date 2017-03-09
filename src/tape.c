@@ -31,8 +31,8 @@ void tape_load(char *fn)
 
         if (!fn) return;
         p = get_extension(fn);
-        if (!p) return;
-        bem_debugf("Loading %s %s\n", fn, p);
+        if (!p || !*p) return;
+        bem_infof("tape: Loading %s %s", fn, p);
         while (loaders[c].ext)
         {
                 if (!strcasecmp(p, loaders[c].ext))
