@@ -470,6 +470,7 @@ void i8271_finishread()
 
 void i8271_notfound()
 {
+        i8271_spindown();
         i8271.result = 0x18;
         i8271.status = 0x18;
         i8271_NMI();
