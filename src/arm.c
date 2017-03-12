@@ -187,12 +187,12 @@ void arm_dumpregs()
         FILE *f=x_fopen("armram.dmp","wb");
         fwrite(armram,0x10000,1,f);
         fclose(f);
-        bem_debugf("R 0=%08X R 4=%08X R 8=%08X R12=%08X\n",armregs[0],armregs[4],armregs[8],armregs[12]);
-        bem_debugf("R 1=%08X R 5=%08X R 9=%08X R13=%08X\n",armregs[1],armregs[5],armregs[9],armregs[13]);
-        bem_debugf("R 2=%08X R 6=%08X R10=%08X R14=%08X\n",armregs[2],armregs[6],armregs[10],armregs[14]);
-        bem_debugf("R 3=%08X R 7=%08X R11=%08X R15=%08X\n",armregs[3],armregs[7],armregs[11],armregs[15]);
-        bem_debugf("f12=%08X  ",fiqregs[12]);
-        bem_debugf("PC =%07X\n",PC);
+        bem_log(LOG_DEBUG, "R 0=%08X R 4=%08X R 8=%08X R12=%08X",armregs[0],armregs[4],armregs[8],armregs[12]);
+        bem_log(LOG_DEBUG, "R 1=%08X R 5=%08X R 9=%08X R13=%08X",armregs[1],armregs[5],armregs[9],armregs[13]);
+        bem_log(LOG_DEBUG, "R 2=%08X R 6=%08X R10=%08X R14=%08X",armregs[2],armregs[6],armregs[10],armregs[14]);
+        bem_log(LOG_DEBUG, "R 3=%08X R 7=%08X R11=%08X R15=%08X",armregs[3],armregs[7],armregs[11],armregs[15]);
+        bem_log(LOG_DEBUG, "f12=%08X  ",fiqregs[12]);
+        bem_log(LOG_DEBUG, "PC =%07X",PC);
 }
 
 static uint32_t *armread[64];
@@ -239,12 +239,12 @@ uint8_t readarmb(uint32_t addr)
         if (addr<0x400000) return armramb[addr];
         if ((addr&~0x1F)==0x1000000)
         {
-                //bem_debugf("Read %08X\n",addr);
+                //bem_log(LOG_DEBUG, "Read %08X\n",addr);
                 return tube_parasite_read((addr&0x1C)>>2);
         }
         if ((addr>=0x3000000) && (addr<0x3004000)) return armromb[addr&0x3FFF];
         return 0xFF;
-/*        bem_debugf("Bad ARM read byte %08X\n",addr);
+/*        bem_log(LOG_DEBUG, "Bad ARM read byte %08X\n",addr);
         dumparmregs();
         exit(-1);*/
 }
@@ -254,7 +254,7 @@ static uint32_t readarmfl(uint32_t addr)
         if (addr<0x400010) return 0xFFFFFFFF;
         if ((addr>=0x3000000) && (addr<0x3004000)) return armrom[(addr&0x3FFC)>>2];
         return 0xFFFFFFFF;
-/*        bem_debugf("Bad ARM read long %08X\n",addr);
+/*        bem_log(LOG_DEBUG, "Bad ARM read long %08X\n",addr);
         dumparmregs();
         exit(-1);*/
 }
@@ -268,12 +268,12 @@ void writearmb(uint32_t addr, uint8_t val)
         }
         if ((addr&~0x1F)==0x1000000)
         {
-//                bem_debugf("Write %08X %02X\n",addr,val);
+//                bem_log(LOG_DEBUG, "Write %08X %02X\n",addr,val);
                 tube_parasite_write((addr&0x1C)>>2,val);
                 endtimeslice=1;
                 return;
         }
-/*        bem_debugf("Bad ARM write byte %08X %02X\n",addr,val);
+/*        bem_log(LOG_DEBUG, "Bad ARM write byte %08X %02X\n",addr,val);
         dumparmregs();
         exit(-1);*/
 }
@@ -285,7 +285,7 @@ static void writearml(uint32_t addr, uint32_t val)
                 return;
         }
 /*        if (addr<0x400010) return;
-        bem_debugf("Bad ARM write long %08X %08X\n",addr,val);
+        bem_log(LOG_DEBUG, "Bad ARM write long %08X %08X",addr,val);
         dumparmregs();
         exit(-1);*/
 }
@@ -1307,7 +1307,7 @@ void arm_exec()
                                         else
                                         {
                                                 setarmzn(GETADDR(RN)^rotate(opcode));
-//                                                bem_debugf("TEQ %08X %08X\n",GETADDR(RN),rotate(opcode));
+//                                                bem_log(LOG_DEBUG, "TEQ %08X %08X\n",GETADDR(RN),rotate(opcode));
                                         }
                                         tubecycles--;
                                         break;
@@ -1624,7 +1624,7 @@ void arm_exec()
 /*                                        if (RD==7)
                                         {
                                                 if (!olog) olog=x_fopen("armlog.txt","wt");
-                                                sbem_debugf(s,"LDR R7 %08X,%07X\n",armregs[7],PC);
+                                                sbem_log(LOG_DEBUG, s,"LDR R7 %08X,%07X\n",armregs[7],PC);
                                                 fputs(s,olog);
                                         }*/
                                         break;
@@ -1839,7 +1839,7 @@ void arm_exec()
                                         case 0x91: /*LDMDB*/
                                         case 0x93: /*LDMDB !*/
                                         addr=armregs[RN]-countbits(opcode&0xFFFF);
-//                                        bem_debugf("LDMDB %08X\n",addr);
+//                                        bem_log(LOG_DEBUG, "LDMDB %08X\n",addr);
                                         if (!(opcode&0x1000000)) addr+=4;
                                         if (opcode&0x200000) armregs[RN]-=countbits(opcode&0xFFFF);
                                         LDMall();
@@ -1990,7 +1990,7 @@ void arm_exec()
                                         armregs[15]&=0xFC000001;
                                         armregs[15]|=0x0C000020;
                                         refillpipeline();
-//                                        bem_debug("FIQ\n");
+//                                        bem_log(LOG_DEBUG, "FIQ\n");
                                 }
                                 else if ((armirq&1) && !(armregs[15]&0x8000000)) /*IRQ*/
                                 {
@@ -2001,17 +2001,17 @@ void arm_exec()
                                         armregs[15]&=0xFC000002;
                                         armregs[15]|=0x0800001C;
                                         refillpipeline();
-//                                        bem_debug("IRQ\n");
+//                                        bem_log(LOG_DEBUG, "IRQ\n");
                                 }
                         }
-//                if (armregs[12]==0x1000000) bem_debugf("R12=1000000 %08X  %i\n",PC,armins);
+//                if (armregs[12]==0x1000000) bem_log(LOG_DEBUG, "R12=1000000 %08X  %i\n",PC,armins);
                 armirq=tube_irq;
                 if ((armregs[15]&3)!=mode) updatemode(armregs[15]&3);
                 armregs[15]+=4;
-//                bem_debugf("%08X : %08X %08X %08X  %08X\n",PC,armregs[0],armregs[1],armregs[2],opcode);
+//                bem_log(LOG_DEBUG, "%08X : %08X %08X %08X  %08X\n",PC,armregs[0],armregs[1],armregs[2],opcode);
 /*                if (!PC)
                 {
-                        bem_debug("Branch through zero\n");
+                        bem_log(LOG_DEBUG, "Branch through zero");
                         dumpregs();
                         exit(-1);
                 }*/
@@ -2020,6 +2020,6 @@ void arm_exec()
                         endtimeslice=0;
                         return;
                 }
-//                if (output && !(*armregs[15]&0x8000000) && PC<0x2000000) bem_debugf("%07X : %08X %08X %08X %08X %08X %08X %08X %08X\n%08i: %08X %08X %08X %08X %08X %08X %08X %08X\n",PC,*armregs[0],*armregs[1],*armregs[2],*armregs[3],*armregs[4],*armregs[5],*armregs[6],*armregs[7],inscount,*armregs[8],*armregs[9],*armregs[10],*armregs[11],*armregs[12],*armregs[13],*armregs[14],*armregs[15]);
+//                if (output && !(*armregs[15]&0x8000000) && PC<0x2000000) bem_log(LOG_DEBUG, "%07X : %08X %08X %08X %08X %08X %08X %08X %08X\n%08i: %08X %08X %08X %08X %08X %08X %08X %08X\n",PC,*armregs[0],*armregs[1],*armregs[2],*armregs[3],*armregs[4],*armregs[5],*armregs[6],*armregs[7],inscount,*armregs[8],*armregs[9],*armregs[10],*armregs[11],*armregs[12],*armregs[13],*armregs[14],*armregs[15]);
         }
 }

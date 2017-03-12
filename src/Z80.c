@@ -315,10 +315,10 @@ void z80_close()
 
 void z80_dumpregs()
 {
-        bem_debugf("AF =%04X BC =%04X DE =%04X HL =%04X IX=%04X IY=%04X\n",af.w,bc.w,de.w,hl.w,ix.w,iy.w);
-        bem_debugf("AF'=%04X BC'=%04X DE'=%04X HL'=%04X IR=%04X\n",saf.w,sbc.w,sde.w,shl.w,ir.w);
-        bem_debugf("%c%c%c%c%c%c   PC =%04X SP =%04X\n",(af.b.l&N_FLAG)?'N':' ',(af.b.l&Z_FLAG)?'Z':' ',(af.b.l&H_FLAG)?'H':' ',(af.b.l&V_FLAG)?'V':' ',(af.b.l&S_FLAG)?'S':' ',(af.b.l&C_FLAG)?'C':' ',pc,sp);
-        bem_debugf("%i ins  IFF1=%i IFF2=%i  %04X %04X\n",ins,iff1,iff2,opc,oopc);
+        bem_log(LOG_DEBUG, "AF =%04X BC =%04X DE =%04X HL =%04X IX=%04X IY=%04X",af.w,bc.w,de.w,hl.w,ix.w,iy.w);
+        bem_log(LOG_DEBUG, "AF'=%04X BC'=%04X DE'=%04X HL'=%04X IR=%04X",saf.w,sbc.w,sde.w,shl.w,ir.w);
+        bem_log(LOG_DEBUG, "%c%c%c%c%c%c   PC =%04X SP =%04X",(af.b.l&N_FLAG)?'N':' ',(af.b.l&Z_FLAG)?'Z':' ',(af.b.l&H_FLAG)?'H':' ',(af.b.l&V_FLAG)?'V':' ',(af.b.l&S_FLAG)?'S':' ',(af.b.l&C_FLAG)?'C':' ',pc,sp);
+        bem_log(LOG_DEBUG, "%i ins  IFF1=%i IFF2=%i  %04X %04X",ins,iff1,iff2,opc,oopc);
 //        error(s);
 }
 
@@ -1994,7 +1994,7 @@ void z80_exec()
                                 break;
                                 case 0x47: /*LD I,A*/
                                 ir.b.h=af.b.h;
-                                bem_debugf("I now %02X %04X\n",ir.b.h,ir.w);
+                                bem_log(LOG_DEBUG, "I now %02X %04X",ir.b.h,ir.w);
                                 cycles+=5;
                                 break;
                                 case 0x4A: /*ADC HL,BC*/

@@ -322,7 +322,7 @@ void fdi_poll()
         }
         if (fdi_buffer == 0x4489 && fdi_density)
         {
-//                bem_debug("Found sync\n");
+//                bem_log(LOG_DEBUG, "Found sync\n");
                 ddidbitsleft = 17;
         }
 

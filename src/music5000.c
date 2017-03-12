@@ -308,7 +308,8 @@ void music5000_get_sample(int16_t *left, int16_t *right)
 	}
 	if (clip) {
 		divisor *= 2;
-		bem_warnf("Music 5000 clipped, reducing gain by 3dB (divisor now %d)", divisor);
+		bem_log(LOG_WARN, "Music 5000 clipped, reducing gain by 3dB "
+		    "(divisor now %d)", divisor);
 	}
 
 	*left = (int16_t) sl;

@@ -50,7 +50,7 @@ void tapenoise_addhigh()
 {
         int c;
         float wavediv = (32.0f * 2400.0f) / (float) FREQ_DD;
-//        bem_debugf("Wavediv %f %i\n",wavediv,tmcount);
+//        bem_log(LOG_DEBUG, "Wavediv %f %i\n",wavediv,tmcount);
         tmcount++;
         for (c = 0; c < 368; c++)
         {
@@ -117,7 +117,7 @@ void tapenoise_mix(int16_t *tapebuffer)
         int c;
         tpnoisep = 0;
         if (!sound_tape) return;
-//        bem_debug("Mix!\n");
+//        bem_log(LOG_DEBUG, "Mix!\n");
 
         for (c = 0; c < BUFLEN_DD; c++)
         {

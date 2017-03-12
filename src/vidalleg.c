@@ -90,7 +90,7 @@ void video_enterfullscreen()
 			/* Try to set the alt colour depth and gfx mode. */
 			set_color_depth(alt);
 			if (set_gfx_mode(gfx, 800, 600, 0, 0) != 0) {
-				bem_error("Couldn't set GFX mode fullscreen");
+				bem_log(LOG_ERROR, "Couldn't set GFX mode fullscreen");
 				exit (-1);
 			}
 		}
@@ -125,7 +125,7 @@ void video_doblit()
 {
         int c;
 //        printf("%03i %03i %03i %03i\n",firstx,lastx,firsty,lasty);
-//bem_debug("Blit\n");
+//bem_log(LOG_DEBUG, "Blit\n");
 
         startblit();
         
@@ -157,18 +157,18 @@ void video_doblit()
         fskipcount++;
         if (fskipcount >= ((motor && fasttape) ? 5 : vid_fskipmax))
         {
-//                bem_debug("Blit start\n");
+//                bem_log(LOG_DEBUG, "Blit start\n");
                 lasty++;
                 if (vid_fullborders == 1)
                 {
-//                        bem_debugf("%i %i %i %i  ",firstx,lastx,firsty,lasty);
+//                        bem_log(LOG_DEBUG, "%i %i %i %i  ",firstx,lastx,firsty,lasty);
 /*                        c = (lastx + firstx) / 2;
                         firstx = c - 336;
                         lastx  = c + 336;
                         c = (lasty + firsty) / 2;
                         firsty = c - 136;
                         lasty  = c + 136;*/
-//                        bem_debugf("  %i %i %i %i\n",firstx,lastx,firsty,lasty);
+//                        bem_log(LOG_DEBUG, "  %i %i %i %i\n",firstx,lastx,firsty,lasty);
 
                         firstx = 320;
                         lastx  = 992;
@@ -268,7 +268,7 @@ void video_doblit()
                         #endif
         	        else if (vid_interlace || vid_linedbl)
                         {
-                                //bem_debugf("Blit %i,%i  %i,%i\n", firstx, firsty << 1, lastx - firstx, (lasty - firsty) << 1);
+                                //bem_log(LOG_DEBUG, "Blit %i,%i  %i,%i\n", firstx, firsty << 1, lastx - firstx, (lasty - firsty) << 1);
                                 blit(b, screen, firstx, firsty << 1, 0, 0, lastx - firstx, (lasty - firsty) << 1);
                         }
         	        else
@@ -284,7 +284,7 @@ void video_doblit()
         	        if (fullscreen)
                            rectfill(screen, 0, 584, 799, 599, 0);
                 }
-//                bem_debug("Blit end\n");
+//                bem_log(LOG_DEBUG, "Blit end\n");
 //                textprintf(screen,font,0,0,makecol(255,255,255),"%08X",uefpos());
 	}
 	firstx = firsty = 65535;

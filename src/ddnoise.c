@@ -32,8 +32,7 @@ SAMPLE *safe_load_wav(char *fn)
         }
         else
         {
-                bem_debugf("Failed to load sample %s",fn);
-                bem_error("Can't load sound sample - does 'ddnoise' exist?");
+                bem_log(LOG_ERROR, "Can't load sound sample - does 'ddnoise' exist?");
                 exit(-1);
         }
 }
@@ -104,7 +103,7 @@ void ddnoise_seek(int len)
         else if (len < 30)   ddnoise_sstat = 2;
         else                 ddnoise_sstat = 3;
         if (!sound_ddnoise) fdc_time = 200;
-//        bem_debug("Start seek!\n");
+//        bem_log(LOG_DEBUG, "Start seek!\n");
 }
 
 void ddnoise_mix()
@@ -170,7 +169,7 @@ void ddnoise_mix()
         
         tapenoise_mix(ddbuffer);
 //        fwrite(ddbuffer,BUFLEN_DD*2,1,f2);
-//bem_debugf("Give buffer... %i %i\n",ddnoise_mstat,ddnoise_sstat);
+//bem_log(LOG_DEBUG, "Give buffer... %i %i\n",ddnoise_mstat,ddnoise_sstat);
         al_givebufferdd(ddbuffer);
         
         oldmotoron=motoron;

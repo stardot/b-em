@@ -19,12 +19,12 @@ x_fopen(const char *path, const char *mode)
 		return (NULL);
 
 	if ((fp = fopen(path, mode)) == NULL) {
-		if ((asprintf(&err, "Failed to load '%s' - %s\n", path,
+		if ((asprintf(&err, "Failed to load '%s' - %s", path,
 			strerror(errno))) == -1) {
 
 			exit(-1);
 		}
-		bem_error(err);
+		bem_log(LOG_ERROR, err);
 		free(err);
 		exit(-1);
 	}

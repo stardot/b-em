@@ -25,7 +25,6 @@
 #define VERSION_STR "B-em v-" VERSION
 
 void updatewindowsize(int x, int y);
-
 void setejecttext(int drive, char *fn);
 
 #if __GNUC__
@@ -34,15 +33,16 @@ void setejecttext(int drive, char *fn);
 #define printflike
 #endif
 
-extern void log_open(void);
-extern void log_close(void);
-extern void bem_error(const char *s);
-extern void bem_errorf(const char *fmt, ...) printflike;
-extern void bem_warn(const char *s);
-extern void bem_warnf(const char *fmt, ...) printflike;
-extern void bem_info(const char *s);
-extern void bem_infof(const char *fmt, ...) printflike;
-extern void win_log_msgbox(const char *level, const char *s);
+enum log_level {
+	LOG_INFO = 0,
+	LOG_WARN,
+	LOG_ERROR,
+	LOG_DEBUG
+};
+
+void log_open(void);
+void log_close(void);
+void bem_log(enum log_level, const char *, ...);
 
 // If debugging is enabled a real pair of functions will be available
 // to log debug messages.  if debug is disabled we use a static inline

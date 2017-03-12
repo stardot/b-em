@@ -214,7 +214,8 @@ void writemem(uint16_t addr, uint8_t val)
                 memlook[vis20k][addr >> 8][addr] = val;
                 return;
         } else if (c == 2) {
-                bem_debugf("6502: attempt to write to ROM %x:%04x=%02x\n", vis20k, addr, val);
+                bem_log(LOG_DEBUG, "6502: attempt to write to ROM %x:%04x=%02x",
+		    vis20k, addr, val);
                 return;
         }
         if (addr < 0xFC00 || addr >= 0xFF00)
@@ -466,17 +467,17 @@ void m6502_reset()
         nmi = oldnmi = 0;
         output = 0;
         tubecycle = tubecycles = 0;
-        bem_debugf("PC : %04X\n", pc);
+        bem_log(LOG_DEBUG, "PC : %04X", pc);
 }
 
 void dumpregs()
 {
-        bem_debug("6502 registers :\n");
-        bem_debugf("A=%02X X=%02X Y=%02X S=01%02X PC=%04X\n", a, x, y, s, pc);
-        bem_debugf("Status : %c%c%c%c%c%c\n", (p.n) ? 'N' : ' ', (p.v) ? 'V' : ' ',
+        bem_log(LOG_DEBUG, "6502 registers :");
+        bem_log(LOG_DEBUG, "A=%02X X=%02X Y=%02X S=01%02X PC=%04X", a, x, y, s, pc);
+        bem_log(LOG_DEBUG, "Status : %c%c%c%c%c%c", (p.n) ? 'N' : ' ', (p.v) ? 'V' : ' ',
                (p.d) ? 'D' : ' ', (p.i) ? 'I' : ' ', (p.z) ? 'Z' : ' ',
                (p.c) ? 'C' : ' ');
-        bem_debugf("ROMSEL %02X\n", romsel >> 14);
+        bem_log(LOG_DEBUG, "ROMSEL %02X", romsel >> 14);
 }
 
 static inline uint16_t getsw()
@@ -3411,7 +3412,7 @@ void m6502_exec()
                 }*/
 //                if (pc==0xCD7A) printf("CD7A from %04X\n",oldpc);
 //                if (pc==0xC565) printf("C565 from %04X\n",oldpc);
-//if (pc>=0x2078 && pc<0x20CA){  output=1; bem_debugf("%04X\n",pc); }
+//if (pc>=0x2078 && pc<0x20CA){  output=1; bem_log(LOG_DEBUG, "%04X\n",pc); }
 //if (pc==0x2770) output=1;
 //if (pc==0x277C) output=0;
 
@@ -3433,7 +3434,7 @@ void m6502_exec()
 /*                if (output)
                 {
 //                        #undef printf
-                        bem_debugf("A=%02X X=%02X Y=%02X S=%02X PC=%04X %c%c%c%c%c%c op=%02X %02X%02X\n",a,x,y,s,pc,(p.n)?'N':' ',(p.v)?'V':' ',(p.d)?'D':' ',(p.i)?'I':' ',(p.z)?'Z':' ',(p.c)?'C':' ',opcode,ram[0x29],uservia.ifr);
+                        bem_log(LOG_DEBUG, "A=%02X X=%02X Y=%02X S=%02X PC=%04X %c%c%c%c%c%c op=%02X %02X%02X",a,x,y,s,pc,(p.n)?'N':' ',(p.v)?'V':' ',(p.d)?'D':' ',(p.i)?'I':' ',(p.z)?'Z':' ',(p.c)?'C':' ',opcode,ram[0x29],uservia.ifr);
                 }*/
 //                if (pc==0x400) output=1;
                 if (timetolive) {
@@ -3465,7 +3466,7 @@ void m6502_exec()
                         pc = readmem(0xFFFE) | (readmem(0xFFFF) << 8);
                         p.i = 1;
                         polltime(7);
-//                        bem_debug("INT\n");
+//                        bem_log(LOG_DEBUG, "INT\n");
                 }
                 interrupt &= ~128;
 
@@ -3539,11 +3540,11 @@ void m65c02_exec()
         int tempi;
         int8_t offset;
         cycles += 40000;
-//        bem_debugf("PC = %04X\n",pc);
-//        bem_debugf("Exec cycles %i\n",cycles);
+//        bem_log(LOG_DEBUG, "PC = %04X\n",pc);
+//        bem_log(LOG_DEBUG, "Exec cycles %i\n",cycles);
         while (cycles > 0) {
-//                if (pc==0x806F) bem_debugf("806F from %04X %04X\n",oldpc,oldoldpc);
-//                if (pc>0xDFF && pc<0x8000) bem_debugf("EXEC %04X\n",pc);
+//                if (pc==0x806F) bem_log(LOG_DEBUG, "806F from %04X %04X\n",oldpc,oldoldpc);
+//                if (pc>0xDFF && pc<0x8000) bem_log(LOG_DEBUG, "EXEC %04X\n",pc);
                 pc3 = oldoldpc;
                 oldoldpc = oldpc;
                 oldpc = pc;
@@ -3559,7 +3560,7 @@ void m65c02_exec()
 //                                printf("BRK! %04X\n",pc);
 //                                if (output==2)
 //                                {
-//                                        bem_debugf("BRK! %04X %04X %04X %04X\n",pc,oldpc,oldoldpc,pc3);
+//                                        bem_log(LOG_DEBUG, "BRK! %04X %04X %04X %04X\n",pc,oldpc,oldoldpc,pc3);
 //                                        dumpregs();
 //                                        if (output) exit(-1);
 //                                        exit(-1);
@@ -5361,7 +5362,7 @@ void m65c02_exec()
                 }
 /*                if (output | 1)
                 {
-                        bem_debugf("A=%02X X=%02X Y=%02X S=%02X PC=%04X %c%c%c%c%c%c op=%02X %02X%02X %02X%02X %02X  %08X\n",a,x,y,s,pc,(p.n)?'N':' ',(p.v)?'V':' ',(p.d)?'D':' ',(p.i)?'I':' ',(p.z)?'Z':' ',(p.c)?'C':' ',opcode,ram[0x21],ram[0x20],ram[0x7F],ram[0x7E],ram[0x7D],memlook[pc>>8]);
+                        bem_log(LOG_DEBUG, "A=%02X X=%02X Y=%02X S=%02X PC=%04X %c%c%c%c%c%c op=%02X %02X%02X %02X%02X %02X  %08X",a,x,y,s,pc,(p.n)?'N':' ',(p.v)?'V':' ',(p.d)?'D':' ',(p.i)?'I':' ',(p.z)?'Z':' ',(p.c)?'C':' ',opcode,ram[0x21],ram[0x20],ram[0x7F],ram[0x7E],ram[0x7D],memlook[pc>>8]);
                 }*/
 /*                if (timetolive)
                 {
@@ -5392,13 +5393,13 @@ void m65c02_exec()
                         p.i = 1;
                         p.d = 0;
                         polltime(7);
-//                        bem_debug("INT\n");
+//                        bem_log(LOG_DEBUG, "INT\n");
 //                        printf("Interrupt - %02X %02X\n",sysvia.ifr&sysvia.ier,uservia.ifr&uservia.ier);
 //                        printf("INT\n");
                 }
                 interrupt &= ~128;
                 if (tube_exec && tubecycle) {
-//                        bem_debugf("tubeexec %i %i %i\n",tubecycles,tubecycle,tube_shift);
+//                        bem_log(LOG_DEBUG, "tubeexec %i %i %i\n",tubecycles,tubecycle,tube_shift);
                         tubecycles += (tubecycle << tube_shift);
                         if (tubecycles > 3)
                                 tube_exec();
@@ -5458,7 +5459,7 @@ void m65c02_exec()
                         polltime(7);
                         nmi = 0;
                         p.d = 0;
-//                        bem_debug("NMI\n");
+//                        bem_log(LOG_DEBUG, "NMI\n");
 //                        printf("NMI\n");
                 }
                 oldnmi = nmi;

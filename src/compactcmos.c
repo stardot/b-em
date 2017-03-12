@@ -71,12 +71,12 @@ static void cmos_nextbyte()
 
 static void cmos_write(uint8_t byte)
 {
-//        bem_debugf("CMOS write - %02X %i %02X\n",byte,cmos_state,cmos_addr&0x7F);
+//        bem_log(LOG_DEBUG, "CMOS write - %02X %i %02X\n",byte,cmos_state,cmos_addr&0x7F);
         switch (cmos_state)
         {
                 case CMOS_IDLE:
                 cmos_rw = byte&1;
-//                bem_debugf("cmos_rw %i\n",cmos_rw);
+//                bem_log(LOG_DEBUG, "cmos_rw %i\n",cmos_rw);
                 if (cmos_rw)
                 {
                         cmos_state = CMOS_SENDDATA;
@@ -92,7 +92,7 @@ static void cmos_write(uint8_t byte)
 
                 case CMOS_RECIEVEADDR:
                 cmos_addr = byte;
-//                bem_debugf("Set CMOS addr %02X %i\n",byte,cmos_rw);
+//                bem_log(LOG_DEBUG, "Set CMOS addr %02X %i\n",byte,cmos_rw);
                 if (cmos_rw)
                    cmos_state = CMOS_SENDDATA;
                 else
@@ -100,7 +100,7 @@ static void cmos_write(uint8_t byte)
                 break;
 
                 case CMOS_RECIEVEDATA:
-//        bem_debugf("Rec byte - %02X\n",cmos_ram[(cmos_addr)&0x7F]);
+//        bem_log(LOG_DEBUG, "Rec byte - %02X\n",cmos_ram[(cmos_addr)&0x7F]);
                 cmos_ram[(cmos_addr++) & 0x7F] = byte;
                 break;
 
@@ -115,7 +115,7 @@ static void cmos_write(uint8_t byte)
 
 void compactcmos_i2cchange(int nuclock, int nudata)
 {
-//                bem_debugf("cmos_rw %i\n",cmos_rw);
+//                bem_log(LOG_DEBUG, "cmos_rw %i\n",cmos_rw);
 //        printf("I2C %i %i %i %i  %i\n",i2c_clock,nuclock,i2c_data,nudata,i2c_state);
 //        log("I2C update clock %i %i data %i %i state %i\n",i2c_clock,nuclock,i2c_data,nudata,i2c_state);
         switch (i2c_state)
@@ -126,7 +126,7 @@ void compactcmos_i2cchange(int nuclock, int nudata)
                         if (lastdata && !nudata) /*Start bit*/
                         {
 //                                printf("Start bit\n");
-//                                bem_debug("Start bit recieved\n");
+//                                bem_log(LOG_DEBUG, "Start bit recieved\n");
                                 i2c_state = I2C_RECIEVE;
                                 i2c_pos = 0;
                         }
@@ -152,13 +152,13 @@ void compactcmos_i2cchange(int nuclock, int nudata)
                 }
                 else if (i2c_clock && nuclock && nudata && !lastdata) /*Stop bit*/
                 {
-//                        bem_debug("Stop bit recieved\n");
+//                        bem_log(LOG_DEBUG, "Stop bit recieved\n");
                         i2c_state = I2C_IDLE;
                         cmos_stop();
                 }
                 else if (i2c_clock && nuclock && !nudata && lastdata) /*Start bit*/
                 {
-//                        bem_debug("Start bit recieved\n");
+//                        bem_log(LOG_DEBUG, "Start bit recieved\n");
                         i2c_pos = 0;
                         cmos_state = CMOS_IDLE;
                 }
@@ -167,7 +167,7 @@ void compactcmos_i2cchange(int nuclock, int nudata)
                 case I2C_ACKNOWLEDGE:
                 if (!i2c_clock && nuclock)
                 {
-//                        bem_debug("Acknowledging transfer\n");
+//                        bem_log(LOG_DEBUG, "Acknowledging transfer\n");
                         nudata = 0;
                         i2c_pos = 0;
                         if (i2c_transmit == ARM)
@@ -182,7 +182,7 @@ void compactcmos_i2cchange(int nuclock, int nudata)
                 {
                         if (nudata) /*It's not acknowledged - must be end of transfer*/
                         {
-//                                bem_debug("End of transfer\n");
+//                                bem_log(LOG_DEBUG, "End of transfer\n");
                                 i2c_state = I2C_IDLE;
                                 cmos_stop();
                         }
@@ -191,7 +191,7 @@ void compactcmos_i2cchange(int nuclock, int nudata)
                                 i2c_state = I2C_TRANSMIT;
                                 cmos_nextbyte();
                                 i2c_pos = 0;
-//                                bem_debugf("Next byte - %02X %02X\n",i2c_byte,cmos_addr);
+//                                bem_log(LOG_DEBUG, "Next byte - %02X %02X\n",i2c_byte,cmos_addr);
                         }
                 }
                 break;
@@ -202,11 +202,11 @@ void compactcmos_i2cchange(int nuclock, int nudata)
                         i2c_data = nudata = i2c_byte & 128;
                         i2c_byte <<= 1;
                         i2c_pos++;
-//                        if (output) bem_debugf("Transfering bit at %07X %i %02X\n",(*armregs[15]-8)&0x3FFFFFC,i2c_pos,cmos_addr);
+//                        if (output) bem_log(LOG_DEBUG, "Transfering bit at %07X %i %02X\n",(*armregs[15]-8)&0x3FFFFFC,i2c_pos,cmos_addr);
                         if (i2c_pos == 8)
                         {
                                 i2c_state = I2C_TRANSACKNOWLEDGE;
-//                                bem_debug("Acknowledge mode\n");
+//                                bem_log(LOG_DEBUG, "Acknowledge mode\n");
                         }
                         i2c_clock = nuclock;
                         return;

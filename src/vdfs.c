@@ -301,7 +301,7 @@ static void scan_entry(vdfs_ent_t *ent) {
     // trim .inf to get back to host path and get attributes
     *ptr = '\0';
     if (stat(host_file_path, &stb) == -1)
-        bem_warnf("unable to stat '%s': %s\n", host_file_path, strerror(errno));
+        bem_log(LOG_WARN, "unable to stat '%s': %s", host_file_path, strerror(errno));
     else {
         ent->length = stb.st_size;
         if (S_ISDIR(stb.st_mode))
@@ -329,7 +329,9 @@ static void scan_entry(vdfs_ent_t *ent) {
 #endif
     }
     free(host_file_path);
-    bem_debugf("vdfs: scan_entry: acorn=%s, host=%s, attr=%04X, load=%08X, exec=%08X\n", ent->acorn_fn, ent->host_fn, ent->attribs, ent->load_addr, ent->exec_addr);
+    bem_log(LOG_DEBUG, "vdfs: scan_entry: acorn=%s, host=%s, attr=%04X, "
+        "load=%08X, exec=%08X", ent->acorn_fn, ent->host_fn, ent->attribs,
+	ent->load_addr, ent->exec_addr);
 }
 
 // Create VDFS entry for a new file.
@@ -371,7 +373,7 @@ static vdfs_ent_t *new_entry(vdfs_ent_t *dir, const char *host_fn) {
                         ent->acorn_fn[MAX_FILE_NAME-1] = seq_ch;
                     ptr = tsearch(ent, &dir->acorn_tree, acorn_comp);
                 }
-                bem_debugf("vdfs: new_entry: unique name %s used\n", ent->acorn_fn);
+                bem_log(LOG_DEBUG, "vdfs: new_entry: unique name %s used", ent->acorn_fn);
             }
             tsearch(ent, &dir->host_tree, host_comp);
             if (ent->attribs & ATTR_IS_DIR) {
@@ -383,7 +385,7 @@ static vdfs_ent_t *new_entry(vdfs_ent_t *dir, const char *host_fn) {
                 strcpy(host_path + dir_len + 1, ent->host_fn);
                 ent->host_path = host_path;
             }
-            bem_debugf("vdfs: new_entry: returing new entry %p\n", ent);
+            bem_log(LOG_DEBUG, "vdfs: new_entry: returing new entry %p", ent);
             return ent;
         }
         free(ent);
@@ -440,7 +442,7 @@ static int scan_dir(vdfs_ent_t *dir) {
             }
         }
         closedir(dp);
-        bem_debugf("vdfs: scan_dir count=%d\n", count);
+        bem_log(LOG_DEBUG, "vdfs: scan_dir count=%d", count);
 
         // create an array sorted in Acorn order for *CAT.
         if (count >= 0) {
@@ -461,7 +463,7 @@ static int scan_dir(vdfs_ent_t *dir) {
             }
         }
     } else
-        bem_warnf("unable to opendir '%s': %s\n", dir->host_path, strerror(errno));
+        bem_log(LOG_WARN, "unable to opendir '%s': %s", dir->host_path, strerror(errno));
     return 1;
 }
 
@@ -474,7 +476,7 @@ static vdfs_ent_t *find_file(uint16_t fn_addr, vdfs_ent_t *key, vdfs_ent_t *ent,
 
     if (scan_dir(ent) == 0) {
         memset(key, 0, sizeof(vdfs_ent_t));
-        bem_debugf("vdfs: find_file: fn_addr=%04x\n", fn_addr);
+        bem_log(LOG_DEBUG, "vdfs: find_file: fn_addr=%04x", fn_addr);
         for (;;) {
             fn_ptr = key->acorn_fn;
             for (i = 0; i < MAX_FILE_NAME; i++) {
@@ -550,7 +552,7 @@ static void write_back(vdfs_ent_t *ent) {
         fprintf(fp, "%-*s %08X %08X %08X\n", MAX_FILE_NAME, ent->acorn_fn, ent->load_addr, ent->exec_addr, ent->length);
         fclose(fp);
     } else
-        bem_warnf("vdfs: unable to create INF file '%s' for '%s': %s\n", host_file_path, ent->host_fn, strerror(errno));
+        bem_log(LOG_DEBUG, "vdfs: unable to create INF file '%s' for '%s': %s", host_file_path, ent->host_fn, strerror(errno));
     free(host_file_path);
 }
 
@@ -628,11 +630,11 @@ void vdfs_new_root(const char *root) {
 	    cur_dir = lib_dir = prev_dir = &root_dir;
 	    scan_seq++;
 	} else {
-	    bem_warn("vdfs: unable to set root as unable to allocate path.  VDFS disabled");
+	    bem_log(LOG_WARN, "vdfs: unable to set root as unable to allocate path.  VDFS disabled");
 	    vdfs_enabled = 0;
 	}
     } else {
-	bem_warn("vdfs: unable to set root as path is empty.  VDFS disabled");
+	bem_log(LOG_WARN, "vdfs: unable to set root as path is empty.  VDFS disabled");
 	vdfs_enabled = 0;
     }
 }
@@ -741,9 +743,9 @@ static FILE *getfp(int channel) {
         if ((fp = vdfs_chan[channel-MIN_CHANNEL].fp))
             return fp;
         else
-            bem_debugf("vdfs: attempt to use closed channel %d", channel);
+            bem_log(LOG_DEBUG, "vdfs: attempt to use closed channel %d", channel);
     } else
-        bem_debugf("vdfs: channel %d out of range\n", channel);
+        bem_log(LOG_DEBUG, "vdfs: channel %d out of range", channel);
     adfs_error(err_channel);
     return NULL;
 }
@@ -767,7 +769,7 @@ static void run_file(const char *err) {
             fclose(fp);
             pc = ent->exec_addr;
         } else {
-            bem_warnf("vdfs: unable to load file '%s': %s\n", ent->host_fn, strerror(errno));
+            bem_log(LOG_WARN, "vdfs: unable to load file '%s': %s", ent->host_fn, strerror(errno));
             adfs_hosterr(errno);
         }
     } else
@@ -792,7 +794,7 @@ static inline void osfsc() {
         case 0x06: // new filesystem taking over.
             break;
         default:
-            bem_debugf("vdfs: osfsc unimplemented for a=%d, x=%d, y=%d\n", a, x, y);
+            bem_log(LOG_DEBUG, "vdfs: osfsc unimplemented for a=%d, x=%d, y=%d", a, x, y);
     }
 }
 
@@ -849,7 +851,7 @@ static inline void osfind() {
             vdfs_chan[channel].ent = ent;
             a = MIN_CHANNEL + channel;
         } else
-            bem_warnf("vdfs: osfind: unable to open file '%s' in mode '%s': %s\n", ent->host_fn, mode, strerror(errno));
+            bem_log(LOG_WARN, "vdfs: osfind: unable to open file '%s' in mode '%s': %s", ent->host_fn, mode, strerror(errno));
     }
 }
 
@@ -951,15 +953,15 @@ static inline void osgbpb() {
             if (seq_ptr < cur_dir->cat_size) {
                 mem_ptr = readmem32(pb+1);
                 n = readmem32(pb+5);
-                bem_debugf("vdfs: seq_ptr=%d, writing max %d entries starting %04X\n", seq_ptr, n, mem_ptr);
+                bem_log(LOG_DEBUG, "vdfs: seq_ptr=%d, writing max %d entries starting %04X", seq_ptr, n, mem_ptr);
                 do {
                     cat_ptr = cur_dir->cat_tab[seq_ptr++];
-                    bem_debugf("vdfs: writing acorn name %s\n", cat_ptr->acorn_fn);
+                    bem_log(LOG_DEBUG, "vdfs: writing acorn name %s", cat_ptr->acorn_fn);
                     writemem(mem_ptr++, strlen(cat_ptr->acorn_fn));
                     for (ptr = cat_ptr->acorn_fn; (ch = *ptr++); )
                         writemem(mem_ptr++, ch);
                 } while (--n > 0 && seq_ptr < cur_dir->cat_size);
-                bem_debugf("vdfs: finish at %04X\n", mem_ptr);
+                bem_log(LOG_DEBUG, "vdfs: finish at %04X", mem_ptr);
                 writemem32(pb+5, n);
                 writemem32(pb+9, seq_ptr);
             }
@@ -974,15 +976,15 @@ static inline void osgbpb() {
             }
             if (seq_ptr < cur_dir->cat_size) {
                 mem_ptr = readmem32(pb+1);
-                bem_debugf("vdfs: seq_ptr=%d, writing max %d entries starting %04X\n", seq_ptr, n, mem_ptr);
+                bem_log(LOG_DEBUG, "vdfs: seq_ptr=%d, writing max %d entries starting %04X", seq_ptr, n, mem_ptr);
                 do {
                     cat_ptr = cur_dir->cat_tab[seq_ptr++];
-                    bem_debugf("vdfs: writing acorn name %s\n", cat_ptr->acorn_fn);
+                    bem_log(LOG_DEBUG, "vdfs: writing acorn name %s", cat_ptr->acorn_fn);
                     for (ptr = cat_ptr->acorn_fn; (ch = *ptr++); )
                         writemem(mem_ptr++, ch);
                     writemem(mem_ptr++, '\r');
                 } while (--n > 0 && seq_ptr < cur_dir->cat_size);
-                bem_debugf("vdfs: finish at %04X\n", mem_ptr);
+                bem_log(LOG_DEBUG, "vdfs: finish at %04X", mem_ptr);
                 writemem32(pb+9, seq_ptr);
             } else {
                 status = 1; // no more filenames;
@@ -990,8 +992,8 @@ static inline void osgbpb() {
             }
             break;
         default:
-            bem_debugf("vdfs: osgbpb unimplemented for a=%d, x=%d, y=%d\n", a, x, y);
-            bem_debugf("vdfs: osgbpb pb.channel=%d, data=%04X num=%04X, ptr=%04X\n", readmem(pb), readmem32(pb+1), readmem32(pb+6), readmem32(pb+9));
+            bem_log(LOG_DEBUG, "vdfs: osgbpb unimplemented for a=%d, x=%d, y=%d", a, x, y);
+            bem_log(LOG_DEBUG, "vdfs: osgbpb pb.channel=%d, data=%04X num=%04X, ptr=%04X", readmem(pb), readmem32(pb+1), readmem32(pb+6), readmem32(pb+9));
     }
     p.c = status;
 }
@@ -1033,7 +1035,7 @@ static inline void osargs() {
                 flush_all();
                 break;
             default:
-                bem_debugf("vdfs: osargs: y=0, a=%d not implemented", a);
+                bem_log(LOG_DEBUG, "vdfs: osargs: y=0, a=%d not implemented", a);
         }
     } else if ((fp = getfp(y))) {
         switch (a)
@@ -1054,7 +1056,7 @@ static inline void osargs() {
                 fflush(fp);
                 break;
             default:
-                bem_debugf("vdfs: osargs: unrecognised function code a=%d for channel y=%d", a, y);
+                bem_log(LOG_DEBUG, "vdfs: osargs: unrecognised function code a=%d for channel y=%d", a, y);
         }
     }
 }
@@ -1080,7 +1082,7 @@ static void osfile_save(uint32_t pb, vdfs_ent_t *ent) {
             ent->length = end_addr-start_addr;
             write_back(ent);
         } else
-            bem_warnf("vdfs: unable to create file '%s': %s\n", ent->host_fn, strerror(errno));
+            bem_log(LOG_WARN, "vdfs: unable to create file '%s': %s", ent->host_fn, strerror(errno));
     } else
         adfs_error(err_wont);
 }
@@ -1107,7 +1109,7 @@ static void osfile_load(uint32_t pb, vdfs_ent_t *ent) {
             }
             fclose(fp);
         } else {
-            bem_warnf("vdfs: unable to load file '%s': %s\n", ent->host_fn, strerror(errno));
+            bem_log(LOG_WARN, "vdfs: unable to load file '%s': %s", ent->host_fn, strerror(errno));
             adfs_hosterr(errno);
         }
     } else
@@ -1167,7 +1169,7 @@ static inline void osfile()
             break;
 
         default:
-            bem_debugf("vdfs: osfile unimplemented for a=%d, x=%d, y=%d\n", a, x, y);
+            bem_log(LOG_DEBUG, "vdfs: osfile unimplemented for a=%d, x=%d, y=%d", a, x, y);
     }
     a = (ent == NULL) ? 0 : (ent->attribs & ATTR_IS_DIR) ? 2 : 1;
 }
@@ -1335,7 +1337,7 @@ static int16_t swr_calc_addr(uint8_t flags, uint32_t *st_ptr, uint16_t romid) {
                 return -1;
             }
         }
-        bem_debugf("vdfs: swr_calc_addr: pseudo addr bank=%02d, start=%04x\n", romid, start);
+        bem_log(LOG_DEBUG, "vdfs: swr_calc_addr: pseudo addr bank=%02d, start=%04x", romid, start);
     } else {
         // Absolutre addressing.
 
@@ -1348,7 +1350,7 @@ static int16_t swr_calc_addr(uint8_t flags, uint32_t *st_ptr, uint16_t romid) {
             adfs_error(err_no_swr);
             return -1;
         }
-        bem_debugf("vdfs: exec_sram: abs addr bank=%02d, start=%04x\n", romid, start);
+        bem_log(LOG_DEBUG, "vdfs: exec_sram: abs addr bank=%02d, start=%04x", romid, start);
         start -= 0x8000;
     }
     *st_ptr = start;
@@ -1367,7 +1369,7 @@ static inline void exec_swr_fs() {
     vdfs_ent_t *ent, key;
     FILE *fp;
 
-    bem_debugf("vdfs: exec_swr_fs: flags=%02x, fn=%04x, romid=%02d, start=%04x, len=%04x\n", flags, fname, romid, start, pblen);
+    bem_log(LOG_DEBUG, "vdfs: exec_swr_fs: flags=%02x, fn=%04x, romid=%02d, start=%04x, len=%04x", flags, fname, romid, start, pblen);
     if ((romid = swr_calc_addr(flags, &start, romid)) >= 0) {
         ent = find_file(fname, &key, cur_dir, NULL);
         if (flags & 0x80) {
@@ -1380,7 +1382,7 @@ static inline void exec_swr_fs() {
                         fread(rom + romid * 0x4000 + start, len, 1, fp);
                         fclose(fp);
                     } else {
-                        bem_warnf("vdfs: unable to load file '%s': %s\n", ent->host_fn, strerror(errno));
+                        bem_log(LOG_WARN, "vdfs: unable to load file '%s': %s", ent->host_fn, strerror(errno));
                         adfs_hosterr(errno);
                     }
                 } else
@@ -1402,7 +1404,7 @@ static inline void exec_swr_fs() {
                         ent->length = len;
                         write_back(ent);
                     } else
-                        bem_warnf("vdfs: unable to create file '%s': %s\n", ent->host_fn, strerror(errno));
+                        bem_log(LOG_WARN, "vdfs: unable to create file '%s': %s", ent->host_fn, strerror(errno));
                 } else
                     adfs_error(err_wont);
             } else
@@ -1414,7 +1416,7 @@ static inline void exec_swr_fs() {
 static void exec_swr_ram(uint8_t flags, uint16_t ram_start, uint16_t len, uint32_t sw_start, uint8_t romid) {
     uint8_t *rom_ptr;
 
-    bem_debugf("vdfs: exec_swr_ram: flags=%02x, ram_start=%04x, len=%04x, sw_start=%04x, romid=%02d\n", flags, ram_start, len, sw_start, romid);
+    bem_log(LOG_DEBUG, "vdfs: exec_swr_ram: flags=%02x, ram_start=%04x, len=%04x, sw_start=%04x, romid=%02d", flags, ram_start, len, sw_start, romid);
     if ((romid = swr_calc_addr(flags, &sw_start, romid)) >= 0) {
         rom_ptr = rom + romid * 0x4000 + sw_start;
         if (flags & 0x80)
@@ -1474,7 +1476,7 @@ static inline void cmd_dir() {
 
     if ((ent = find_file(readmem16(0xf2) + y, &key, cur_dir, NULL))) {
         if (ent->attribs & ATTR_IS_DIR) {
-            bem_debugf("vdfs: new cur_dir=%s\n", ent->acorn_fn);
+            bem_log(LOG_DEBUG, "vdfs: new cur_dir=%s", ent->acorn_fn);
             prev_dir = cur_dir;
             cur_dir = ent;
         }
@@ -1487,7 +1489,7 @@ static inline void cmd_lib() {
 
     if ((ent = find_file(readmem16(0xf2) + y, &key, cur_dir, NULL))) {
         if (ent->attribs & ATTR_IS_DIR) {
-            bem_debugf("vdfs: new lib_dir=%s\n", ent->acorn_fn);
+            bem_log(LOG_DEBUG, "vdfs: new lib_dir=%s", ent->acorn_fn);
             lib_dir = ent;
         }
     } else
@@ -1522,7 +1524,7 @@ static inline void dispatch(uint8_t value) {
         case 0xd9: cmd_rescan(); break;
         case 0xfe: vdfs_check(); break;
         case 0xff: setquit();    break;
-        default: bem_warnf("vdfs: function code %d not recognised\n", value);
+        default: bem_log(LOG_WARN, "vdfs: function code %d not recognised\n", value);
     }
 }
 

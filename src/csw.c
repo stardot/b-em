@@ -202,14 +202,14 @@ void csw_findfilenames()
         infilenames = 1;
         while (!csw_loop)
         {
-//                bem_debug("Start\n");
+//                bem_log(LOG_DEBUG, "Start\n");
                 ffound = 0;
                 while (!ffound && !csw_loop)
                 {
                         csw_poll();
                 }
                 if (csw_loop) break;
-//                bem_debugf("FDAT %02X csw_toneon %i\n",fdat,csw_toneon);
+//                bem_log(LOG_DEBUG, "FDAT %02X csw_toneon %i\n",fdat,csw_toneon);
                 if (fdat == 0x2A && csw_toneon == 1)
                 {
                         c = 0;
@@ -259,7 +259,7 @@ void csw_findfilenames()
                                 getcswbyte();
                                 status = fdat;
 
-//bem_debugf("Got block - %08X %08X %02X\n",load,run,status);
+//bem_log(LOG_DEBUG, "Got block - %08X %08X %02X\n",load,run,status);
                         if (status & 0x80)
                         {
                                 sprintf(s, "%s Size %04X Load %08X Run %08X", ffilename, fsize, load, run);

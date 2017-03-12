@@ -876,7 +876,7 @@ void debugger_do()
                 {
                     if (!params) break;
                     sscanf(&ins[d], "%X %X", &e, &f);
-                    bem_debugf("WriteM %04X %04X\n", e, f);
+                    bem_log(LOG_DEBUG, "WriteM %04X %04X", e, f);
                     writemem(e, f);
                 }
                 break;
