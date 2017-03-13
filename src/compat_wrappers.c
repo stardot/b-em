@@ -39,6 +39,21 @@ x_fopen(const char *path, const char *mode)
 #include <stdint.h>
 #include <errno.h>
 
+int vasprintf(char **, const char *, va_list);
+
+int
+asprintf(char **ret, const char *fmt, ...)
+{
+	va_list	ap;
+	int	n;
+
+	va_start(ap, fmt);
+	n = vasprintf(ret, fmt, ap);
+	va_end(ap);
+
+	return (n);
+}
+
 int
 vasprintf(char **ret, const char *fmt, va_list ap)
 {
@@ -67,19 +82,6 @@ error:
 	va_end(ap2);
 	*ret = NULL;
 	return (-1);
-}
-
-int
-asprintf(char **ret, const char *fmt, ...)
-{
-	va_list	ap;
-	int	n;
-
-	va_start(ap, fmt);
-	n = vasprintf(ret, fmt, ap);
-	va_end(ap);
-
-	return (n);
 }
 
 #endif
