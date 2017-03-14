@@ -283,7 +283,7 @@ void updatewindowtitle()
            set_window_title(VERSION_STR);
 }
 
-void log_win_msgbox(const char *level, const char *s)
+void log_msgbox(const char *level, char *s)
 {
     char title[14];
 

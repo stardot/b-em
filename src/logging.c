@@ -42,7 +42,7 @@ static FILE *log_fp;
 static char   tmstr[20];
 static time_t last = 0;
 
-static void log_common(unsigned dest, const char *level, const char *msg, size_t len)
+static void log_common(unsigned dest, const char *level, char *msg, size_t len)
 {
     time_t now;
 
@@ -64,16 +64,11 @@ static void log_common(unsigned dest, const char *level, const char *msg, size_t
 	fwrite(msg, len, 1, stderr);
 	putc('\n', stderr);
     }
-    if (dest & LOG_DEST_MSGBOX) {
-#ifdef WIN32
-	log_win_msgbox(level, msg);
-#else
-	alert(level, msg, "", "&OK", NULL, 'a', 0);
-#endif
-    }
+    if (dest & LOG_DEST_MSGBOX)
+	log_msgbox(level, msg);
 }
 
-static const char msg_malloc[] = "log_format: out of space - following message truncated";
+static char msg_malloc[] = "log_format: out of space - following message truncated";
 
 static void log_format(const log_level_t *ll, const char *fmt, va_list ap)
 {
