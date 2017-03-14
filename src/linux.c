@@ -97,5 +97,29 @@ int main(int argc, char *argv[])
 	return 0;
 }
 
+void log_msgbox(const char *level, char *msg)
+{
+    const int max_len = 80;
+    char *max_ptr, *new_split, *cur_split;
+
+    if (strlen(msg) < max_len)
+	alert(level, msg, "", "&OK", NULL, 'a', 0);
+    else
+    {
+	max_ptr = msg + max_len;
+	cur_split = msg;
+	while ((new_split = strchr(cur_split+1, ' ')) && new_split < max_ptr)
+	    cur_split = new_split;
+	if (cur_split > msg)
+	{
+	    *cur_split = '\0';
+	    alert(level, msg, cur_split+1, "&OK", NULL, 'a', 0);
+	    *cur_split = ' ';
+	}
+	else
+	    alert(level, msg, "", "&OK", NULL, 'a', 0);
+    }
+}
+
 END_OF_MAIN();
 #endif

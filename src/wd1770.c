@@ -37,7 +37,7 @@ void wd1770_reset()
         nmi = 0;
         wd1770.status = 0;
         motorspin = 0;
-//        bem_debug("Reset 1770\n");
+//        log_debug("Reset 1770\n");
         fdc_time = 0;
         if (WD1770)
         {
@@ -76,18 +76,18 @@ void wd1770_setspindown()
 
 void wd1770_write(uint16_t addr, uint8_t val)
 {
-//        bem_debugf("Write 1770 %04X %02X\n",addr,val);
+//        log_debug("Write 1770 %04X %02X\n",addr,val);
         switch (addr)
         {
                 case 0xFE80:
-//                        bem_debugf("Write CTRL FE80 %02X\n",val);
+//                        log_debug("Write CTRL FE80 %02X\n",val);
                 wd1770.ctrl = val;
                 curdrive = (val & 2) ? 1 : 0;
                 wd1770.curside =  (wd1770.ctrl & 4) ? 1 : 0;
                 wd1770.density = !(wd1770.ctrl & 8);
                 break;
                 case 0xFE24:
-//                        bem_debugf("Write CTRL FE24 %02X\n",val);
+//                        log_debug("Write CTRL FE24 %02X\n",val);
                 wd1770.ctrl = val;
                 curdrive = (val & 2) ? 1 : 0;
                 wd1770.curside =  (wd1770.ctrl & 16) ? 1 : 0;
@@ -95,8 +95,8 @@ void wd1770_write(uint16_t addr, uint8_t val)
                 break;
                 case 0xFE84:
                 case 0xFE28:
-                if (wd1770.status & 1 && (val >> 4) != 0xD) { bem_debug("Command rejected\n"); return; }
-//                bem_debugf("FDC command %02X %i %i %i\n",val,wd1770.curside,wd1770.track,wd1770.sector);
+                if (wd1770.status & 1 && (val >> 4) != 0xD) { log_debug("Command rejected\n"); return; }
+//                log_debug("FDC command %02X %i %i %i\n",val,wd1770.curside,wd1770.track,wd1770.sector);
                 wd1770.command = val;
                 if ((val >> 4) != 0xD)/* && !(val&8)) */wd1770_spinup();
                 switch (val >> 4)
@@ -157,7 +157,7 @@ void wd1770_write(uint16_t addr, uint8_t val)
                         byte = 0;
                         break;
                         case 0xD: /*Force interrupt*/
-//                        bem_debug("Force interrupt\n");
+//                        log_debug("Force interrupt\n");
                         fdc_time = 0;
                         wd1770.status = 0x80 | track0;
                         nmi = (val & 8) ? 1 : 0;
@@ -169,13 +169,13 @@ void wd1770_write(uint16_t addr, uint8_t val)
                         break;
                         
                         default:
-//                                bem_debugf("Bad 1770 command %02X\n",val);
+//                                log_debug("Bad 1770 command %02X\n",val);
                         fdc_time = 0;
                         nmi = 1;
                         wd1770.status = 0x90;
                         wd1770_spindown();
                         break;
-/*                        bem_debugf("Bad 1770 command %02X\n", val);
+/*                        log_debug("Bad 1770 command %02X\n", val);
                         dumpregs();
                         mem_dump();
                         exit(-1);*/
@@ -201,13 +201,13 @@ void wd1770_write(uint16_t addr, uint8_t val)
 
 uint8_t wd1770_read(uint16_t addr)
 {
-//        bem_debugf("Read 1770 %04X %04X\n",addr,pc);
+//        log_debug("Read 1770 %04X %04X\n",addr,pc);
         switch (addr)
         {
                 case 0xFE84:
                 case 0xFE28:
                 nmi &= ~1;
-//                bem_debugf("Status %02X\n",wd1770.status);
+//                log_debug("Status %02X\n",wd1770.status);
                 return wd1770.status;
                 case 0xFE85:
                 case 0xFE29:
@@ -219,7 +219,7 @@ uint8_t wd1770_read(uint16_t addr)
                 case 0xFE2B:
                 nmi &= ~2;
                 wd1770.status &= ~2;
-//                bem_debugf("Read data %02X %04X\n",wd1770.data,pc);
+//                log_debug("Read data %02X %04X\n",wd1770.data,pc);
                 return wd1770.data;
         }
         return 0xFE;
@@ -227,7 +227,7 @@ uint8_t wd1770_read(uint16_t addr)
 
 void wd1770_callback()
 {
-//        bem_debugf("FDC callback %02X\n",wd1770.command);
+//        log_debug("FDC callback %02X\n",wd1770.command);
         fdc_time = 0;
         switch (wd1770.command >> 4)
         {
@@ -295,7 +295,7 @@ void wd1770_finishread()
 
 void wd1770_notfound()
 {
-//        bem_debug("Not found\n");
+//        log_debug("Not found\n");
         fdc_time = 0;
         nmi = 1;
         wd1770.status = 0x90;
@@ -304,7 +304,7 @@ void wd1770_notfound()
 
 void wd1770_datacrcerror()
 {
-//        bem_debug("Data CRC\n");
+//        log_debug("Data CRC\n");
         fdc_time = 0;
         nmi = 1;
         wd1770.status = 0x88;
@@ -313,7 +313,7 @@ void wd1770_datacrcerror()
 
 void wd1770_headercrcerror()
 {
-//        bem_debug("Header CRC\n");
+//        log_debug("Header CRC\n");
         fdc_time = 0;
         nmi = 1;
         wd1770.status = 0x98;
@@ -322,7 +322,7 @@ void wd1770_headercrcerror()
 
 int wd1770_getdata(int last)
 {
-//        bem_debug("Disc get data\n");
+//        log_debug("Disc get data\n");
         if (!wd1770.written) return -1;
         if (!last)
         {

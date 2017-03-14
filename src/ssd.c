@@ -27,11 +27,15 @@ void ssd_init()
 void ssd_load(int drive, char *fn)
 {
         writeprot[drive] = 0;
-        ssd_f[drive] = x_fopen(fn, "rb+");
+        ssd_f[drive] = fopen(fn, "rb+");
         if (!ssd_f[drive])
         {
-                ssd_f[drive] = x_fopen(fn, "rb");
-                if (!ssd_f[drive]) return;
+                ssd_f[drive] = fopen(fn, "rb");
+                if (!ssd_f[drive])
+		{
+		    log_warn("ssd: unable to open SSD disc image '%s': %s", fn, strerror(errno));
+		    return;
+		}
                 writeprot[drive] = 1;
         }
         fwriteprot[drive] = writeprot[drive];
@@ -47,11 +51,15 @@ void ssd_load(int drive, char *fn)
 void dsd_load(int drive, char *fn)
 {
         writeprot[drive] = 0;
-        ssd_f[drive] = x_fopen(fn, "rb+");
+        ssd_f[drive] = fopen(fn, "rb+");
         if (!ssd_f[drive])
         {
-                ssd_f[drive] = x_fopen(fn, "rb");
-                if (!ssd_f[drive]) return;
+                ssd_f[drive] = fopen(fn, "rb");
+                if (!ssd_f[drive])
+		{
+		    log_warn("ssd: unable to open DSD disc image '%s': %s", fn, strerror(errno));
+		    return;
+		}
                 writeprot[drive] = 1;
         }
         fwriteprot[drive] = writeprot[drive];

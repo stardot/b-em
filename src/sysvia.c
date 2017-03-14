@@ -154,14 +154,14 @@ uint8_t sysvia_read_portB()
 
 void sysvia_write(uint16_t addr, uint8_t val)
 {
-//        bem_debugf("SYSVIA write %04X %02X\n",addr,val);
+//        log_debug("SYSVIA write %04X %02X\n",addr,val);
         via_write(&sysvia, addr, val);
 }
 
 uint8_t sysvia_read(uint16_t addr)
 {
         uint8_t temp = via_read(&sysvia, addr);
-//        bem_debugf("SYSVIA read  %04X %02X\n",addr,temp);
+//        log_debug("SYSVIA read  %04X %02X\n",addr,temp);
         return temp;
 }
 

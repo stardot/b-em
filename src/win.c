@@ -126,7 +126,7 @@ static void processcommandline()
             argbuf[i] = 0;
             i++;
          }
-         bem_debugf("Arg %i - %s\n",argc-1,argv[argc-1]);
+         log_debug("Arg %i - %s\n",argc-1,argv[argc-1]);
       }
    }
 
@@ -245,13 +245,13 @@ CRITICAL_SECTION cs;
 
 void startblit()
 {
-//        bem_debug("startblit\n");
+//        log_debug("startblit\n");
         EnterCriticalSection(&cs);
 }
 
 void endblit()
 {
-//        bem_debug("endblit\n");
+//        log_debug("endblit\n");
         LeaveCriticalSection(&cs);
 }
 
@@ -283,7 +283,7 @@ void updatewindowtitle()
            set_window_title(VERSION_STR);
 }
 
-void win_log_msgbox(const char *level, const char *s)
+void log_msgbox(const char *level, char *s)
 {
     char title[14];
 
@@ -531,7 +531,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         EnterCriticalSection(&cs);
                         if (curtube != -1)
                         {
-                                bem_error("Second processor save states not supported yet.");
+                                log_error("Second processor save states not supported yet.");
                         }
                         else
                         {
@@ -876,7 +876,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                 break;
                 
                 case WM_KILLFOCUS:
-//              bem_debug("KillFocus\n");
+//              log_debug("KillFocus\n");
 //                infocus=0;
 //                spdcount=0;
                 if (mousecapture)
@@ -903,12 +903,12 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                 break;
                 
                 case WM_ENTERMENULOOP:
-//              bem_debug("EnterMenuLoop\n");
+//              log_debug("EnterMenuLoop\n");
                 bempause = 1;
                 //EnterCriticalSection(&cs);
                 break;
                 case WM_EXITMENULOOP:
-//              bem_debug("ExitMenuLoop\n");
+//              log_debug("ExitMenuLoop\n");
                 bempause = 0;
                 key_clear();
                 for (c = 0; c < 128; c++) key[c] = 0;
@@ -916,7 +916,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                 break;
 
                 case WM_SETFOCUS:
-//              bem_debug("SetFocus\n");
+//              log_debug("SetFocus\n");
                 key_clear();
                 for (c = 0; c < 128; c++) key[c] = 0;
 		bempause = 0;
@@ -931,10 +931,10 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
         	case WM_KEYDOWN:
                 if (LOWORD(wParam) != 255)
                 {
-                        //bem_debugf("Key %04X %04X\n",LOWORD(wParam),VK_LEFT);
+                        //log_debug("Key %04X %04X\n",LOWORD(wParam),VK_LEFT);
                         c = MapVirtualKey(LOWORD(wParam),0);
                         c = hw_to_mycode[c];
-//                        bem_debugf("MVK %i %i %i\n",c,hw_to_mycode[c],KEY_PGUP);
+//                        log_debug("MVK %i %i %i\n",c,hw_to_mycode[c],KEY_PGUP);
                         if (LOWORD(wParam) == VK_LEFT)   c = KEY_LEFT;
                         if (LOWORD(wParam) == VK_RIGHT)  c = KEY_RIGHT;
                         if (LOWORD(wParam) == VK_UP)     c = KEY_UP;
@@ -945,7 +945,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         if (LOWORD(wParam) == VK_DELETE) c = KEY_DEL;
                         if (LOWORD(wParam) == VK_PRIOR)  c = KEY_PGUP;
                         if (LOWORD(wParam) == VK_NEXT)   c = KEY_PGDN;
-                        //bem_debugf("MVK2 %i %i %i\n",c,hw_to_mycode[c],KEY_PGUP);
+                        //log_debug("MVK2 %i %i %i\n",c,hw_to_mycode[c],KEY_PGUP);
                         key[c]=1;
                 }
                 break;
@@ -953,7 +953,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
         	case WM_KEYUP:
                 if (LOWORD(wParam) != 255)
                 {
-//                        bem_debugf("Key %04X %04X\n",LOWORD(wParam),VK_LEFT);
+//                        log_debug("Key %04X %04X\n",LOWORD(wParam),VK_LEFT);
                         c = MapVirtualKey(LOWORD(wParam), 0);
                         c = hw_to_mycode[c];
                         if (LOWORD(wParam) == VK_LEFT)   c = KEY_LEFT;
@@ -966,7 +966,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         if (LOWORD(wParam) == VK_DELETE) c = KEY_DEL;
                         if (LOWORD(wParam) == VK_PRIOR)  c = KEY_PGUP;
                         if (LOWORD(wParam) == VK_NEXT)   c = KEY_PGDN;
-//                        bem_debugf("MVK %i\n",c);
+//                        log_debug("MVK %i\n",c);
                         key[c] = 0;
                 }
                 break;

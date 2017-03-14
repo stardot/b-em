@@ -30,11 +30,12 @@ void csw_load(char *fn)
         /*Allocate buffer*/
         csw_dat = malloc(8 * 1024 * 1024);
         /*Open file and get size*/
-        csw_f = x_fopen(fn,"rb");
+        csw_f = fopen(fn,"rb");
         if (!csw_f)
         {
                 free(csw_dat);
                 csw_dat = NULL;
+		log_warn("csw: uanble to open CSW file '%s': %s", fn, strerror(errno));
                 return;
         }
         fseek(csw_f, -1, SEEK_END);
@@ -202,14 +203,14 @@ void csw_findfilenames()
         infilenames = 1;
         while (!csw_loop)
         {
-//                bem_debug("Start\n");
+//                log_debug("Start\n");
                 ffound = 0;
                 while (!ffound && !csw_loop)
                 {
                         csw_poll();
                 }
                 if (csw_loop) break;
-//                bem_debugf("FDAT %02X csw_toneon %i\n",fdat,csw_toneon);
+//                log_debug("FDAT %02X csw_toneon %i\n",fdat,csw_toneon);
                 if (fdat == 0x2A && csw_toneon == 1)
                 {
                         c = 0;
@@ -259,7 +260,7 @@ void csw_findfilenames()
                                 getcswbyte();
                                 status = fdat;
 
-//bem_debugf("Got block - %08X %08X %02X\n",load,run,status);
+//log_debug("Got block - %08X %08X %02X\n",load,run,status);
                         if (status & 0x80)
                         {
                                 sprintf(s, "%s Size %04X Load %08X Run %08X", ffilename, fsize, load, run);

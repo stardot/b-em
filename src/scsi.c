@@ -141,7 +141,7 @@ static void Status(void)
 
 static bool DiscTestUnitReady(unsigned char *buf)
 {
-        bem_debugf("scsi lun %d: test unit ready\n", scsi.lun);
+        log_debug("scsi lun %d: test unit ready\n", scsi.lun);
 	if (SCSIDisc[scsi.lun] == NULL) return false;
 	return true;
 }
@@ -184,7 +184,7 @@ static int DiscRequestSense(unsigned char *cdb, unsigned char *buf)
 			break;
 	}
 
-        bem_debugf("scsi: request sense returning %d for sector %d\n", size, scsi.sector);
+        log_debug("scsi: request sense returning %d for sector %d\n", size, scsi.sector);
 	scsi.code = 0x00;
 	scsi.sector = 0x00;
 
@@ -220,7 +220,7 @@ static bool DiscFormat(unsigned char *buf)
         char name[50];
         FILE *dat;
 
-        bem_debugf("scsi lun %d: format\n", scsi.lun);
+        log_debug("scsi lun %d: format\n", scsi.lun);
         snprintf(name, sizeof(name), "scsi/scsi%d.dat", scsi.lun);
         if ((dat = fopen(name, "wb+")))
         {
@@ -231,7 +231,7 @@ static bool DiscFormat(unsigned char *buf)
         }
         else
         {
-                bem_warnf("scsi lun %d: unable to open/truncate data file %s: %s", scsi.lun, name, strerror(errno));
+                log_warn("scsi lun %d: unable to open/truncate data file %s: %s", scsi.lun, name, strerror(errno));
                 return false;
         }
 }
@@ -253,7 +253,7 @@ static void Format(void)
 
 static int ReadSector(unsigned char *buf, int block)
 {
-        bem_debugf("scsi lun %d: read sector %d\n", scsi.lun, block);
+        log_debug("scsi lun %d: read sector %d\n", scsi.lun, block);
 	if (SCSIDisc[scsi.lun] == NULL) return 0;
 
         fseek(SCSIDisc[scsi.lun], block * 256, SEEK_SET);
@@ -273,11 +273,11 @@ static void Read6(void)
 	record <<= 8;
 	record |= scsi.cmd[3];
 	scsi.blocks = scsi.cmd[4];
-        bem_debugf("read6: record=%d, blocks=%d\n", record, scsi.blocks);
+        log_debug("read6: record=%d, blocks=%d\n", record, scsi.blocks);
 	if (scsi.blocks == 0)
 		scsi.blocks = 0x100;
 	scsi.length = ReadSector(scsi.buffer, record);
-        bem_debugf("read6: length=%d\n", scsi.length);
+        log_debug("read6: length=%d\n", scsi.length);
 
 	if (scsi.length <= 0) {
 		scsi.status = (scsi.lun << 5) | 0x02;
@@ -301,7 +301,7 @@ static void Read6(void)
 
 static bool WriteSector(unsigned char *buf, int block)
 {
-        bem_debugf("scsi lun %d: write sector %d\n", scsi.lun, block);
+        log_debug("scsi lun %d: write sector %d\n", scsi.lun, block);
 	if (SCSIDisc[scsi.lun] == NULL) return false;
 
         fseek(SCSIDisc[scsi.lun], block * 256, SEEK_SET);
@@ -390,12 +390,12 @@ static bool DiscStartStop(unsigned char *buf)
         FILE *f;
 
 	if (buf[4] & 0x02) {
-                bem_debugf("scsi lun %d: eject\n", scsi.lun);
+                log_debug("scsi lun %d: eject\n", scsi.lun);
 // Eject Disc
                 if ((f = SCSIDisc[scsi.lun]))
                         fflush(f);
 	} else
-                bem_debugf("scsi lun %d: start\n", scsi.lun);
+                log_debug("scsi lun %d: start\n", scsi.lun);
 	return true;
 }
 
@@ -443,7 +443,7 @@ static int DiscModeSense(unsigned char *cdb, unsigned char *buf)
 // lz    = buf[20];
 
 	fclose(f);
-        bem_debugf("scsi lun %d: mode sense, returning %d\n", scsi.lun, size);
+        log_debug("scsi lun %d: mode sense, returning %d\n", scsi.lun, size);
 	return size;
 }
 
@@ -476,7 +476,7 @@ static bool DiscVerify(unsigned char *buf)
 {
 	int sector;
 
-        bem_debugf("scsi lun %d: verify\n", scsi.lun);
+        log_debug("scsi lun %d: verify\n", scsi.lun);
 
         sector = scsi.cmd[1] & 0x1f;
 	sector <<= 8;
@@ -515,10 +515,10 @@ static void Execute(void)
 	scsi.lun = (scsi.cmd[1]) >> 5;
 
 	if (scsi.cmd[0] <= 0x1f) {
-		bem_debugf("scsi lun %d: Execute 0x%02x, Param 1=0x%02x, Param 2=0x%02x, Param 3=0x%02x, Param 4=0x%02x, Param 5=0x%02x, Phase = %d, PC = 0x%04x\n",
+		log_debug("scsi lun %d: Execute 0x%02x, Param 1=0x%02x, Param 2=0x%02x, Param 3=0x%02x, Param 4=0x%02x, Param 5=0x%02x, Phase = %d, PC = 0x%04x\n",
 				scsi.lun, scsi.cmd[0], scsi.cmd[1], scsi.cmd[2], scsi.cmd[3], scsi.cmd[4], scsi.cmd[5], scsi.phase, pc);
 	} else {
-		bem_debugf("scsi lun %d: Execute 0x%02x, Param 1=0x%02x, Param 2=0x%02x, Param 3=0x%02x, Param 4=0x%02x, Param 5=0x%02x, Param 6=0x%02x, Param 7=0x%02x, Param 8=0x%02x, Param 9=0x%02x, Phase = %d, PC = 0x%04x\n",
+		log_debug("scsi lun %d: Execute 0x%02x, Param 1=0x%02x, Param 2=0x%02x, Param 3=0x%02x, Param 4=0x%02x, Param 5=0x%02x, Param 6=0x%02x, Param 7=0x%02x, Param 8=0x%02x, Param 9=0x%02x, Phase = %d, PC = 0x%04x\n",
 				scsi.lun, scsi.cmd[0], scsi.cmd[1], scsi.cmd[2], scsi.cmd[3], scsi.cmd[4], scsi.cmd[5], scsi.cmd[6], scsi.cmd[7], scsi.cmd[8], scsi.cmd[9], scsi.phase, pc);
 	}
 
@@ -670,14 +670,14 @@ static void WriteData(int data)
 			scsi.offset = 0;
 			return;
                 default:
-                        bem_warnf("scsi: invalid phase %d in WriteData", scsi.phase);
+                        log_warn("scsi: invalid phase %d in WriteData", scsi.phase);
 	}
 	BusFree();
 }
 
 void scsi_write(uint16_t addr, uint8_t value)
 {
-        //bem_debugf("scsi_write: addr=%02x, value=%02X, phase=%d\n", addr, value, scsi.phase);
+        //log_debug("scsi_write: addr=%02x, value=%02X, phase=%d\n", addr, value, scsi.phase);
 
         switch (addr & 0x03)
         {
@@ -696,14 +696,14 @@ void scsi_write(uint16_t addr, uint8_t value)
 			scsi.sel = true;
                         if (value == 0xff)
                         {
-                                bem_debug("set interrupt\n");
+                                log_debug("set interrupt\n");
                                 scsi.irq = true;
                                 interrupt |= 1 << (SCSI_INT_NUM);
                                 scsi.status = 0x00;
                         }
                         else
                         {
-                                bem_debug("clear interrupt\n");
+                                log_debug("clear interrupt\n");
                                 scsi.irq = false;
                                 interrupt &= ~(1 << (SCSI_INT_NUM));
                         }
@@ -764,7 +764,7 @@ static int ReadData(void)
                 case selection:
 			break;
                 default:
-                        bem_warnf("scsi: invalid phase %d in ReadData", scsi.phase);
+                        log_warn("scsi: invalid phase %d in ReadData", scsi.phase);
 	}
 
 	if (scsi.phase == busfree)
@@ -799,7 +799,7 @@ uint8_t scsi_read(uint16_t addr)
                         break;
         }
 
-	//bem_debugf("scsi_read: addr=%02x, value=%02X, phase=%d\n", addr, data, scsi.phase);
+	//log_debug("scsi_read: addr=%02x, value=%02X, phase=%d\n", addr, data, scsi.phase);
 
         return data;
 }
@@ -833,11 +833,11 @@ static void scsi_init_lun(int lun)
                                 SCSISize[lun] = geom[15] * (geom[13] * 256 + geom[14]) * 33;
                         }
                         else
-                                bem_errorf("scsi lun %d: corrupt dsc file %s", lun, name);
+                                log_error("scsi lun %d: corrupt dsc file %s", lun, name);
                         fclose(dsc);
                 }
                 else
-                        bem_warnf("scsi lun %d: unable to open dsc file %s: %s", lun, name, strerror(errno));
+                        log_warn("scsi lun %d: unable to open dsc file %s: %s", lun, name, strerror(errno));
                 if (SCSISize[lun] == 0)
                 {
                         SCSISize[lun] = size = fseek(dat, 0, SEEK_END);
@@ -848,14 +848,14 @@ static void scsi_init_lun(int lun)
                                 geom[14] = cyl / 256;
                                 geom[15] = 255;
                                 if (fwrite(geom, sizeof geom, 1, dsc) != 1)
-                                        bem_warnf("scsi lun %d: unable to write to dsc file %s: %s", lun, name, strerror(errno));
+                                        log_warn("scsi lun %d: unable to write to dsc file %s: %s", lun, name, strerror(errno));
                                 fclose(dsc);
                         }
                 }
                 SCSIDisc[lun] = dat;
         }
         else
-                bem_warnf("scsi lun %d: unable to open data file %s: %s", lun, name, strerror(errno));
+                log_warn("scsi lun %d: unable to open data file %s: %s", lun, name, strerror(errno));
 }
 
 void scsi_init(void)
