@@ -78,12 +78,16 @@ void disc_load(int drive, char *fn)
         }
 //        printf("Couldn't load %s %s\n",fn,p);
         /*No extension match, so guess based on image size*/
-        f=x_fopen(fn, "rb");
-        if (!f) return;
+        f=fopen(fn, "rb");
+        if (!f)
+	{
+	    log_warn("disc: unable to open disc image '%s': %s", fn, strerror(errno));
+	    return;
+	}
         fseek(f, -1, SEEK_END);
         c = ftell(f)+1;
         fclose(f);
-        log_debug("Size %i\n",c);
+        log_debug("disc: Size %i\n",c);
         if (c == (800*1024)) /*800k ADFS/DOS - 80*2*5*1024*/
         {
                 driveloaders[drive] = 2;

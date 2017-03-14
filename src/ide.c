@@ -29,36 +29,37 @@ void ide_close()
         if (hdfile[1]) fclose(hdfile[1]);
 }
 
-void ide_init(void)
+static void ide_open_hd(int i, const char *name_fmt)
 {
         char s[256];
+
+        if (!hdfile[i])
+        {
+                snprintf(s, sizeof s, name_fmt, exedir);
+                hdfile[i] = fopen(s, "rb+");
+                if (!hdfile[i])
+                {
+                        if ((hdfile[i] = fopen(s, "wb")))
+			{
+				putc(0, hdfile[i]);
+				fclose(hdfile[i]);
+				hdfile[i] = fopen(s, "rb+");
+			}
+			if (!hdfile[i])
+				log_warn("ide: unable to open IDE hard disc '%s': %s", s, strerror(errno));
+                }
+        }
+}
+
+void ide_init(void)
+{
         ide.pos2 = 1;
         ide.atastat = 0x40;
         ide_count = 0;
-        if (!hdfile[0])
-        {
-                sprintf(s, "%shd4.hdf", exedir);
-                hdfile[0] = x_fopen(s, "rb+");
-                if (!hdfile[0])
-                {
-                        hdfile[0] = x_fopen(s, "wb");
-                        putc(0, hdfile[0]);
-                        fclose(hdfile[0]);
-                        hdfile[0] = x_fopen(s, "rb+");
-                }
-        }
-        if (!hdfile[1])
-        {
-                sprintf(s, "%shd5.hdf", exedir);
-                hdfile[1] = x_fopen(s, "rb+");
-                if (!hdfile[1])
-                {
-                        hdfile[1] = x_fopen(s, "wb");
-                        putc(0, hdfile[1]);
-                        fclose(hdfile[1]);
-                        hdfile[1] = x_fopen(s, "rb+");
-                }
-        }
+
+        ide_open_hd(0, "%shd4.hdf");
+        ide_open_hd(1, "%shd5.hdf");
+
         ide_bufferb = (uint8_t *)ide_buffer;
         ide.spt = 63;
         ide.hpc = 16;

@@ -65,8 +65,12 @@ void fdi_init()
 void fdi_load(int drive, char *fn)
 {
         writeprot[drive] = fwriteprot[drive] = 1;
-        fdi_f[drive] = x_fopen(fn, "rb");
-        if (!fdi_f[drive]) return;
+        fdi_f[drive] = fopen(fn, "rb");
+        if (!fdi_f[drive])
+	{
+		log_warn("fdi: unable to open FDI disc image '%s': %s", fn, strerror(errno));
+		return;
+	}
         fdi_h[drive] = fdi2raw_header(fdi_f[drive]);
 //        if (!fdih[drive]) printf("Failed to load!\n");
         fdi_lasttrack[drive] = fdi2raw_get_last_track(fdi_h[drive]);

@@ -29,11 +29,15 @@ void adf_init()
 void adf_load(int drive, char *fn)
 {
         writeprot[drive] = 0;
-        adf_f[drive] = x_fopen(fn, "rb+");
+        adf_f[drive] = fopen(fn, "rb+");
         if (!adf_f[drive])
         {
-                adf_f[drive] = x_fopen(fn, "rb");
-                if (!adf_f[drive]) return;
+		adf_f[drive] = fopen(fn, "rb");
+                if (!adf_f[drive])
+		{
+			log_warn("adf: unable to open ADF disc image '%s': %s", fn, strerror(errno));
+			return;
+		}
                 writeprot[drive] = 1;
         }
         fwriteprot[drive] = writeprot[drive];
@@ -62,11 +66,15 @@ void adf_load(int drive, char *fn)
 void adl_load(int drive, char *fn)
 {
         writeprot[drive] = 0;
-        adf_f[drive] = x_fopen(fn, "rb+");
+        adf_f[drive] = fopen(fn, "rb+");
         if (!adf_f[drive])
         {
-                adf_f[drive] = x_fopen(fn, "rb");
-                if (!adf_f[drive]) return;
+                adf_f[drive] = fopen(fn, "rb");
+                if (!adf_f[drive])
+		{
+			log_warn("adf: unable to open ADL disc image '%s': %s", fn, strerror(errno));
+			return;
+		}
                 writeprot[drive] = 1;
         }
         fwriteprot[drive] = writeprot[drive];
@@ -85,11 +93,15 @@ void adl_load(int drive, char *fn)
 void adl_loadex(int drive, char *fn, int sectors, int size, int dblstep)
 {
         writeprot[drive] = 0;
-        adf_f[drive] = x_fopen(fn, "rb+");
+        adf_f[drive] = fopen(fn, "rb+");
         if (!adf_f[drive])
         {
-                adf_f[drive] = x_fopen(fn, "rb");
-                if (!adf_f[drive]) return;
+                adf_f[drive] = fopen(fn, "rb");
+                if (!adf_f[drive])
+		{
+			log_warn("adf: unable to open ADF/EX disc image '%s': %s", fn, strerror(errno));
+			return;
+		}
                 writeprot[drive] = 1;
         }
         fwriteprot[drive] = writeprot[drive];

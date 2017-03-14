@@ -164,9 +164,9 @@ void cmos_load(MODEL m)
         if (m.compact) compactcmos_load(m);
         else
         {
-                sprintf(fn, "%s%s", exedir, m.cmos);
+		snprintf(fn, sizeof fn, "%s%s", exedir, m.cmos);
                 log_debug("CMOS Opening %s\n", fn);
-                f=x_fopen(fn, "rb");
+                f=fopen(fn, "rb");
                 if (!f)
                 {
                         log_error("unable to load CMOS file %s: %s", fn, strerror(errno));
@@ -187,10 +187,14 @@ void cmos_save(MODEL m)
         if (m.compact) compactcmos_save(m);
         else
         {
-                sprintf(fn, "%s%s", exedir, m.cmos);
+                snprintf(fn, sizeof fn, "%s%s", exedir, m.cmos);
                 log_debug("CMOS Opening\n");
-                f=x_fopen(fn, "wb");
-                fwrite(cmos, 64, 1, f);
-                fclose(f);
+                if ((f=fopen(fn, "wb")))
+		{
+			fwrite(cmos, 64, 1, f);
+			fclose(f);
+		}
+		else
+                        log_error("unable to save CMOS file %s: %s", fn, strerror(errno));
         }
 }

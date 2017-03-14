@@ -30,11 +30,12 @@ void csw_load(char *fn)
         /*Allocate buffer*/
         csw_dat = malloc(8 * 1024 * 1024);
         /*Open file and get size*/
-        csw_f = x_fopen(fn,"rb");
+        csw_f = fopen(fn,"rb");
         if (!csw_f)
         {
                 free(csw_dat);
                 csw_dat = NULL;
+		log_warn("csw: uanble to open CSW file '%s': %s", fn, strerror(errno));
                 return;
         }
         fseek(csw_f, -1, SEEK_END);

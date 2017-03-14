@@ -41,58 +41,68 @@ void mem_close()
 
 void mem_dump()
 {
-        FILE *f=x_fopen("ram.dmp","wb");
-        fwrite(ram,64*1024,1,f);
-        fclose(f);
-        f=x_fopen("swram.dmp","wb");
-        fwrite(&rom[4*16384],16384,1,f);
-        fwrite(&rom[5*16384],16384,1,f);
-        fwrite(&rom[6*16384],16384,1,f);
-        fwrite(&rom[7*16384],16384,1,f);
-        fclose(f);
+	FILE *f;
+
+	if ((f=fopen("ram.dmp","wb")))
+	{
+		fwrite(ram,64*1024,1,f);
+		fclose(f);
+	}
+	else
+		log_error("mem: unable to open ram dump file: %s", strerror(errno));
+	
+        if ((f=fopen("swram.dmp","wb")))
+	{
+		fwrite(&rom[4*16384],16384,1,f);
+		fwrite(&rom[5*16384],16384,1,f);
+		fwrite(&rom[6*16384],16384,1,f);
+		fwrite(&rom[7*16384],16384,1,f);
+		fclose(f);
+	}
+	else
+		log_error("mem: unable to open swram dump file: %s", strerror(errno));
+}
+
+static int load_sw_rom(const char *name, int slot)
+{
+	FILE *f;
+	
+	log_debug("Loading %s to slot %i\n", name, slot);
+	if ((f = fopen(name, "rb")))
+	{
+		fread(rom + (slot * 16384), 16384, 1, f);
+		fclose(f);
+		return 1;
+	}
+	else
+	{
+		log_error("mem: unable to open rom file '%s': %s", name, strerror(errno));
+		return 0;
+	}
+}
+
+static int load_dir_roms(const char *pat, int c)
+{
+        struct al_ffblk ffblk;
+	
+        if (al_findfirst("*.rom", &ffblk, FA_ALL) != 0) return c;
+        do
+        {
+                while (romused[c] && c >= 0) c--;
+                if (c >= 0)
+			if (load_sw_rom(ffblk.name, c))
+				c--;
+        } while (c >= 0 && !al_findnext(&ffblk));
+        al_findclose(&ffblk);
+	return c;
 }
 
 void mem_loadswroms()
 {
-        FILE *f;
-        int c = 15;
-        struct al_ffblk ffblk;
-//        memset(rom,0,16*16384);
-
-        if (al_findfirst("*.rom", &ffblk, FA_ALL) != 0) return;
-        do
-        {
-                while (romused[c] && c >= 0) c--;
-                if (c >= 0)
-                {
-                        log_debug("Loading %s to slot %i\n",ffblk.name,c);
-
-                        f = x_fopen(ffblk.name, "rb");
-			fread(rom + (c * 16384), 16384, 1, f);
-			fclose(f);
-			romused[c] = 1;
-			c--;
-                }
-        } while (c >= 0 && !al_findnext(&ffblk));
-        al_findclose(&ffblk);
-
-#ifndef WIN32
-        if (al_findfirst("*.ROM", &ffblk, FA_ALL) != 0) return;
-        do
-        {
-                while (romused[c] && c >= 0) c--;
-                if (c >= 0)
-                {
-                        log_debug("Loading %s to slot %i\n",ffblk.name,c);
-
-                        f= x_fopen(ffblk.name, "rb");
-			fread(rom + (c * 16384), 16384, 1, f);
-			fclose(f);
-			romused[c] = 1;
-                        c--;
-                }
-        } while (c >= 0 && !al_findnext(&ffblk));
-        al_findclose(&ffblk);
+#ifdef WIN32
+	load_dir_roms("*.rom", 15);
+#else
+	load_dir_roms("*.ROM", load_dir_roms("*.rom", 15));
 #endif
 }
 
@@ -105,18 +115,27 @@ void mem_fillswram()
         }
 }
 
+static void load_os_rom(const char *os_name)
+{
+	FILE *f;
+
+	log_debug("Reading OS file %s", os_name);
+	if ((f = fopen(os_name, "rb")) == NULL)
+	{
+		log_fatal("mem: unable to load OS ROM %s: %s", os_name, strerror(errno));
+		exit(1);
+	}
+	fread(os, 16384, 1, f);
+	fclose(f);
+}
+
 void mem_loadroms(char *os_name, char *romdir)
 {
         char path[512], p2[512];
-        FILE *f;
 
         if (os_name[0])
-        {
-                log_debug("Reading OS file %s\n", os_name);
-                f = x_fopen(os_name, "rb");
-                fread(os, 16384, 1, f);
-                fclose(f);
-        }
+		load_os_rom(os_name);
+
         getcwd(p2, 511);
         sprintf(path, "%sroms/%s", exedir, romdir);
         chdir(path);
@@ -135,24 +154,21 @@ void mem_clearroms()
 void mem_romsetup_os01()
 {
         int c;
-        FILE *f;
         struct al_ffblk ffblk;
-        
-        f=x_fopen("os01", "rb");
-        fread(os, 16384, 1, f);
-        fclose(f);
+
+	load_os_rom("os01");
 
         chdir("a01");
         if (!al_findfirst("*.rom", &ffblk, FA_ALL))
         {
-                f=x_fopen(ffblk.name, "rb");
-                fread(rom, 16384, 1, f);
-                fclose(f);
+		if (load_sw_rom(ffblk.name, 1))
+		{
+			memcpy(rom + 16384,  rom, 16384);
+			memcpy(rom + 32768,  rom, 32768);
+			memcpy(rom + 65536,  rom, 65536);
+			memcpy(rom + 131072, rom, 131072);
+		}
                 al_findclose(&ffblk);
-                memcpy(rom + 16384,  rom, 16384);
-                memcpy(rom + 32768,  rom, 32768);
-                memcpy(rom + 65536,  rom, 65536);
-                memcpy(rom + 131072, rom, 131072);
         }
 
         chdir("..");
@@ -168,10 +184,23 @@ void mem_romsetup_bplus128()
         romused[0]  = romused[1]  = 1;
 }
 
+static void load_os_master(const char *os_name)
+{
+	FILE *f;
+
+	log_debug("Reading OS file %s", os_name);
+	if ((f = fopen(os_name, "rb")) == NULL)
+	{
+		log_fatal("mem: unable to load OS ROM %s: %s", os_name, strerror(errno));
+		exit(1);
+	}
+        fread(os, 16384, 1, f);
+        fread(rom + (9 * 16384), 7 * 16384, 1, f);
+	fclose(f);
+}
+
 void mem_romsetup_master128()
 {
-        FILE *f;
-//        printf("ROM setup Master 128\n");
         memset(rom, 0, 16 * 16384);
         swram[0]  = swram[1]  = swram[2]  = swram[3]  = 0;
         swram[4]  = swram[5]  = swram[6]  = swram[7]  = 1;
@@ -181,16 +210,11 @@ void mem_romsetup_master128()
         romused[4]  = romused[5]  = romused[6]  = romused[7]  = 1;
         romused[9]  = romused[10] = romused[11] = 1;
         romused[12] = romused[13] = romused[14] = romused[15] = 1;
-        f=x_fopen("master/mos3.20", "rb");
-        fread(os, 16384, 1, f);
-        fread(rom + (9 * 16384), 7 * 16384, 1, f);
-        fclose(f);
+	load_os_master("master/mos3.20");
 }
 
 void mem_romsetup_master128_35()
 {
-        FILE *f;
-//        printf("ROM setup Master 128\n");
         memset(rom, 0, 16 * 16384);
         swram[0]  = swram[1]  = swram[2]  = swram[3]  = 0;
         swram[4]  = swram[5]  = swram[6]  = swram[7]  = 1;
@@ -200,15 +224,11 @@ void mem_romsetup_master128_35()
         romused[4]  = romused[5]  = romused[6]  = romused[7]  = 1;
         romused[9]  = romused[10] = romused[11] = 1;
         romused[12] = romused[13] = romused[14] = romused[15] = 1;
-        f=x_fopen("master/mos3.50", "rb");
-        fread(os, 16384, 1, f);
-        fread(rom + (9 * 16384), 7 * 16384, 1, f);
-        fclose(f);
+	load_os_master("master/mos3.50");
 }
 
 void mem_romsetup_mastercompact()
 {
-        FILE *f;
         swram[0]  = swram[1]  = swram[2]  = swram[3]  = 0;
         swram[4]  = swram[5]  = swram[6]  = swram[7]  = 1;
         swram[8]  = swram[9]  = swram[10] = swram[11] = 0;
@@ -217,19 +237,10 @@ void mem_romsetup_mastercompact()
         romused[4]  = romused[5]  = romused[6]  = romused[7]  = 1;
         romused[8]  = romused[9]  = romused[10] = romused[11] = 0;
         romused[12] = romused[13] = romused[14] = romused[15] = 1;
-//        printf("Master compact init\n");
-        f=x_fopen("compact/os51","rb");
-        fread(os,16384,1,f);
-        fclose(f);
-        f=x_fopen("compact/basic48","rb");
-        fread(rom+(14*16384),16384,1,f);
-        fclose(f);
-        f=x_fopen("compact/adfs210","rb");
-        fread(rom+(13*16384),16384,1,f);
-        fclose(f);
-        f=x_fopen("compact/utils","rb");
-        fread(rom+(15*16384),16384,1,f);
-        fclose(f);
+	load_os_rom("compact/os51");
+	load_sw_rom("compact/basic48", 14);
+	load_sw_rom("compact/adfs210", 13);
+        load_sw_rom("compact/utils", 15);
 }
 
 void mem_savestate(FILE *f)

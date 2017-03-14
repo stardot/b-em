@@ -38,14 +38,17 @@ void compactcmos_load(MODEL m)
         FILE *cmosf;
         char fn[512];
         sprintf(fn, "%s%s", exedir, m.cmos);
-        cmosf = x_fopen(fn, "rb");
+        cmosf = fopen(fn, "rb");
         if (cmosf)
         {
                 fread(cmos_ram, 128, 1, cmosf);
                 fclose(cmosf);
         }
         else
-           memset(cmos_ram, 0, 128);
+	{
+		log_error("compactcmos: unable to load CMOS file '%s': %s", fn, strerror(errno));
+		memset(cmos_ram, 0, 128);
+	}
 }
 
 void compactcmos_save(MODEL m)
@@ -53,9 +56,13 @@ void compactcmos_save(MODEL m)
         FILE *cmosf;
         char fn[512];
         sprintf(fn, "%s%s", exedir, m.cmos);
-        cmosf = x_fopen(fn, "wb");
-        fwrite(cmos_ram, 128, 1, cmosf);
-        fclose(cmosf);
+        if ((cmosf = fopen(fn, "wb")))
+	{
+		fwrite(cmos_ram, 128, 1, cmosf);
+		fclose(cmosf);
+	}
+	else
+		log_error("compactcmos: unable to save CMOS file '%s': %s", fn, strerror(errno));
 }
 
 static void cmos_stop()
