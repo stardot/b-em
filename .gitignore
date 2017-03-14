@@ -21,3 +21,10 @@ etc/
 install-sh
 missing
 tags
+
+# Windows Visual Studio Files
+src/Debug/
+src/Release/
+*.opensdf
+*.sdf
+*.sln
