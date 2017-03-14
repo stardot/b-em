@@ -22,7 +22,7 @@ char savestate_name[260];
 
 void savestate_save()
 {
-//        bem_debug("Save state\n");
+//        log_debug("Save state\n");
         savestate_wantsave = 1;
 }
 
@@ -35,7 +35,7 @@ void savestate_dosave()
 {
 	FILE *f;
         f = x_fopen(savestate_name, "wb");
-//        bem_debug("DoSave state\n");
+//        log_debug("DoSave state\n");
         putc('B', f); putc('E', f); putc('M', f); putc('S', f);
         putc('N', f); putc('A', f); putc('P', f); putc('1', f);
 
@@ -68,15 +68,15 @@ void savestate_doload()
         if (strcmp(id, "BEMSNAP1"))
         {
                 fclose(f);
-                bem_error("Not a B-em v2.x save state.");
+                log_error("Not a B-em v2.x save state.");
                 return;
         }
         
         curmodel = getc(f);
         selecttube = curtube = -1;
-        bem_debug("Restart BBC\n");
+        log_debug("Restart BBC\n");
         main_restart();
-        bem_debug("Done!\n");
+        log_debug("Done!\n");
 
         m6502_loadstate(f);
         mem_loadstate(f);
@@ -90,7 +90,7 @@ void savestate_doload()
         acia_loadstate(f);
         serial_loadstate(f);
 
-        bem_debug("Loadstate done!\n");
+        log_debug("Loadstate done!\n");
 
         fclose(f);
         

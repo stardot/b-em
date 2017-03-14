@@ -20,43 +20,13 @@
 
 #endif
 
-//#define printf bem_debug
+#include "logging.h"
 
 #define VERSION_STR "B-em v-" VERSION
 
 void updatewindowsize(int x, int y);
 
 void setejecttext(int drive, char *fn);
-
-#if __GNUC__
-#define printflike __attribute__((format (printf, 1, 2)))
-#else
-#define printflike
-#endif
-
-extern void log_open(void);
-extern void log_close(void);
-extern void bem_error(const char *s);
-extern void bem_errorf(const char *fmt, ...) printflike;
-extern void bem_warn(const char *s);
-extern void bem_warnf(const char *fmt, ...) printflike;
-extern void bem_info(const char *s);
-extern void bem_infof(const char *fmt, ...) printflike;
-extern void win_log_msgbox(const char *level, const char *s);
-
-// If debugging is enabled a real pair of functions will be available
-// to log debug messages.  if debug is disabled we use a static inline
-// empty function to make the debug calls disappear but in a way that
-// doesn't look syntactically different to the compiler.
-
-#ifdef _DEBUG
-extern void bem_debug(const char *s);
-extern void bem_debugf(const char *format, ...) printflike;
-#else
-static inline void bem_debug(const char *s) {}
-static inline void bem_debugf(const char *format, ...) printflike;
-static inline void bem_debugf(const char *format, ...) {}
-#endif
 
 extern char exedir[512];
 

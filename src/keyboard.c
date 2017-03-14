@@ -80,7 +80,7 @@ void key_check()
 //                if (keyas && c==KEY_S) rc=KEY_LCONTROL;
                 if (key[c] && rc != KEY_F11)
                 {
-//                bem_debugf("%i %i\n",c,rc);
+//                log_debug("%i %i\n",c,rc);
                         if (TranslateKey(codeconvert[keylookup[rc]], &row, &col)>0)
                         {
                                 if (key[c])

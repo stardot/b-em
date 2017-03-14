@@ -19,12 +19,15 @@
 #define LOG_WARN_SHIFT  8
 #define LOG_ERROR_MASK  0xf000
 #define LOG_ERROR_SHIFT 12
+#define LOG_FATAL_MASK  0xf0000
+#define LOG_FATAL_SHIFT 16
 
 static unsigned log_options =
     (LOG_DEST_FILE << LOG_DEBUG_SHIFT) |
     (LOG_DEST_FILE << LOG_INFO_SHIFT)  |
-    ((LOG_DEST_FILE|LOG_DEST_STDERR) << LOG_WARN_SHIFT) |
-    ((LOG_DEST_FILE|LOG_DEST_MSGBOX) << LOG_ERROR_SHIFT);
+    ((LOG_DEST_FILE|LOG_DEST_STDERR) << LOG_WARN_SHIFT)  |
+    ((LOG_DEST_FILE|LOG_DEST_MSGBOX) << LOG_ERROR_SHIFT) |
+    ((LOG_DEST_FILE|LOG_DEST_MSGBOX) << LOG_FATAL_SHIFT);
 
 static const char log_fn[] = "b-emlog.txt";
 FILE *log_fp;
@@ -56,19 +59,11 @@ static void log_common(unsigned dest, const char *level, const char *msg, size_t
     }
     if (dest & LOG_DEST_MSGBOX) {
 #ifdef WIN32
-	win_log_msgbox(level, msg);
+	log_win_msgbox(level, msg);
 #else
 	alert(level, msg, "", "&OK", NULL, 'a', 0);
 #endif
     }
-}
-
-static void log_plain(unsigned mask, unsigned shift, const char *level, const char *msg)
-{
-    unsigned opt = log_options & mask;
-
-    if (opt)
-	log_common(opt >> shift, level, msg, strlen(msg));
 }
 
 static const char msg_malloc[] = "log_format: out of space - following message truncated";
@@ -98,12 +93,7 @@ static void log_format(unsigned mask, unsigned shift, const char *level, const c
 
 #ifdef _DEBUG
 
-void bem_debug(const char *s)
-{
-    log_plain(LOG_DEBUG_MASK, LOG_DEBUG_SHIFT, "DEBUG", s);
-}
-
-void bem_debugf(const char *fmt, ...)
+void log_debug(const char *fmt, ...)
 {
     va_list ap;
 
@@ -114,12 +104,7 @@ void bem_debugf(const char *fmt, ...)
 
 #endif
 
-void bem_info(const char *s)
-{
-    log_plain(LOG_INFO_MASK, LOG_INFO_SHIFT, "INFO", s);
-}
-
-void bem_infof(const char *fmt, ...)
+void log_info(const char *fmt, ...)
 {
     va_list ap;
 
@@ -128,12 +113,7 @@ void bem_infof(const char *fmt, ...)
     va_end(ap);
 }
 
-void bem_warn(const char *s)
-{
-    log_plain(LOG_WARN_MASK, LOG_WARN_SHIFT, "WARNING", s);
-}
-
-void bem_warnf(const char *fmt, ...)
+void log_warn(const char *fmt, ...)
 {
     va_list ap;
 
@@ -142,12 +122,7 @@ void bem_warnf(const char *fmt, ...)
     va_end(ap);
 }
 
-void bem_error(const char *s)
-{
-    log_plain(LOG_ERROR_MASK, LOG_ERROR_SHIFT, "ERROR", s);
-}
-
-void bem_errorf(const char *fmt, ...)
+void log_error(const char *fmt, ...)
 {
     va_list ap;
 
@@ -156,12 +131,21 @@ void bem_errorf(const char *fmt, ...)
     va_end(ap);
 }
 
+void log_fatal(const char *fmt, ...)
+{
+    va_list ap;
+
+    va_start(ap, fmt);
+    log_format(LOG_FATAL_MASK, LOG_FATAL_SHIFT, "FATAL", fmt, ap);
+    va_end(ap);
+}
+
 void log_open(void)
 {
     log_options = get_config_int(NULL, "logging", log_options);
     if ((log_fp = fopen(log_fn, "at")) == NULL)
-	bem_warnf("log_open: unable to open log %s: %s", log_fn, strerror(errno));
-    bem_debugf("log_open: log options=%d", log_options);
+	log_warn("log_open: unable to open log %s: %s", log_fn, strerror(errno));
+    log_debug("log_open: log options=%d", log_options);
 }
 
 void log_close(void)

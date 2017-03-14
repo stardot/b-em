@@ -112,7 +112,7 @@ void main_init(int argc, char *argv[])
         int tapenext = 0, discnext = 0;
 
         log_open();
-	bem_infof("main: starting %s", VERSION_STR);
+	log_info("main: starting %s", VERSION_STR);
 
         startblit();
         
@@ -131,7 +131,7 @@ void main_init(int argc, char *argv[])
 
         for (c = 1; c < argc; c++)
         {
-//                bem_debugf("%i : %s",c,argv[c]);
+//                log_debug("%i : %s",c,argv[c]);
 /*                if (!strcasecmp(argv[c],"-1770"))
                 {
                         I8271=0;

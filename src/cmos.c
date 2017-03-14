@@ -121,7 +121,7 @@ void cmos_update(uint8_t IC32, uint8_t sdbval)
         cmos_rw = IC32 & 2;
         cmos_strobe = (IC32 & 4) ^ cmos_old;
         cmos_old = IC32 & 4;
-//        bem_debugf("CMOS update %i %i %i\n",cmos_rw,cmos_strobe,cmos_old);
+//        log_debug("CMOS update %i %i %i\n",cmos_rw,cmos_strobe,cmos_old);
         if (cmos_strobe && cmos_ena)
         {
                 if (!cmos_rw && !(IC32 & 4)) /*Write triggered on low -> high on D*/
@@ -145,12 +145,12 @@ void cmos_writeaddr(uint8_t val)
         if (val&0x80) /*Latch address*/
            cmos_addr = sdbval & 63;
         cmos_ena = val & 0x40;
-//        bem_debugf("CMOS writeaddr %02X %02X %02X\n",val,sdbval,cmos_addr);
+//        log_debug("CMOS writeaddr %02X %02X %02X\n",val,sdbval,cmos_addr);
 }
 
 uint8_t cmos_read()
 {
-//        bem_debugf("CMOS read ORAnh %02X %02X %i %02X %i\n",cmos_addr,cmos[cmos_addr],cmos_ena,IC32,cmos_rw);
+//        log_debug("CMOS read ORAnh %02X %02X %i %02X %i\n",cmos_addr,cmos[cmos_addr],cmos_ena,IC32,cmos_rw);
         if (cmos_ena && (IC32 & 4) && cmos_rw) return cmos_data; /*To drive bus, CMOS must be enabled,
                                                                    D must be high, RW must be high*/
         return 0xff;
@@ -165,11 +165,11 @@ void cmos_load(MODEL m)
         else
         {
                 sprintf(fn, "%s%s", exedir, m.cmos);
-                bem_debugf("CMOS Opening %s\n", fn);
+                log_debug("CMOS Opening %s\n", fn);
                 f=x_fopen(fn, "rb");
                 if (!f)
                 {
-                        bem_errorf("unable to load CMOS file %s: %s", fn, strerror(errno));
+                        log_error("unable to load CMOS file %s: %s", fn, strerror(errno));
                         memset(cmos, 0, 64);
                         return;
                 }
@@ -188,7 +188,7 @@ void cmos_save(MODEL m)
         else
         {
                 sprintf(fn, "%s%s", exedir, m.cmos);
-                bem_debug("CMOS Opening\n");
+                log_debug("CMOS Opening\n");
                 f=x_fopen(fn, "wb");
                 fwrite(cmos, 64, 1, f);
                 fclose(f);
