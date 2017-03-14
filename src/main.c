@@ -111,12 +111,10 @@ void main_init(int argc, char *argv[])
         int c;
         int tapenext = 0, discnext = 0;
 
-        log_open();
-	log_info("main: starting %s", VERSION_STR);
-
         startblit();
         
-        printf("%s\n", VERSION_STR);
+        log_open();
+	log_info("main: starting %s", VERSION_STR);
 
 	vid_fskipmax = 1;
         
