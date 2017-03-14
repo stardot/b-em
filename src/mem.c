@@ -219,7 +219,7 @@ void mem_romsetup_os01()
         chdir("a01");
         if (!al_findfirst("*.rom", &ffblk, FA_ALL))
         {
-		if (load_sw_rom(ffblk.name, 1))
+		if (load_sw_rom(ffblk.name, 0))
 		{
 			memcpy(rom + ROM_SIZE,  rom, ROM_SIZE);
 			memcpy(rom + 32768,  rom, 32768);
