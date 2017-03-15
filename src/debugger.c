@@ -318,7 +318,7 @@ static void print_registers(cpu_debug_t *cpu) {
     int r;
 
     for (r = 0, np = cpu->reg_names; (name = *np++); ) {
-	debug_outf("%s=", name);
+	debug_outf(" %s=", name);
 	len = cpu->reg_print(r++, buf, sizeof buf);
 	debug_out(buf, len);
     }
@@ -691,11 +691,11 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
     if (trace_fp) {
 	cpu->disassemble(addr, buf, sizeof buf);
 	fputs(buf, trace_fp);
-	putc(' ', trace_fp);
+	*buf = ' ';
 
 	for (r = 0, np = cpu->reg_names; (name = *np++); ) {
-	    len = cpu->reg_print(r++, buf, sizeof buf);
-	    fwrite(buf, len, 1, trace_fp);
+	    len = cpu->reg_print(r++, buf+1, sizeof buf-1);
+	    fwrite(buf, len+1, 1, trace_fp);
 	}
 	putc('\n', trace_fp);
     }

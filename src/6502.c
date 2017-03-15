@@ -107,10 +107,10 @@ static size_t dbg_reg_print(int which, char *buf, size_t bufsize) {
 	return dbg6502_print_flags(&p, buf, bufsize);
 	break;
     case REG_PC:
-	return snprintf(buf, bufsize, "%04x", pc);
+	return snprintf(buf, bufsize, "%04X", pc);
 	break;
     default:
-	return snprintf(buf, bufsize, "%02x", dbg_reg_get(which));
+	return snprintf(buf, bufsize, "%02X", dbg_reg_get(which));
     }
 }
 

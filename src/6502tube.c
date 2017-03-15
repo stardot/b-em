@@ -162,10 +162,10 @@ static size_t dbg_reg_print(int which, char *buf, size_t bufsize) {
 	return dbg6502_print_flags(&tubep, buf, bufsize);
 	break;
     case REG_PC:
-	return snprintf(buf, bufsize, "%04x", tubepc);
+	return snprintf(buf, bufsize, "%04X", tubepc);
 	break;
     default:
-	return snprintf(buf, bufsize, "%02x", dbg_reg_get(which));
+	return snprintf(buf, bufsize, "%02X", dbg_reg_get(which));
     }
 }
 
