@@ -21,6 +21,7 @@ endif
 
 b_em_SOURCES = \
 	6502.c \
+	6502debug.c \
 	6502tube.c \
 	65816.c \
 	NS32016/32016.c \

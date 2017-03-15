@@ -1,16 +1,13 @@
 #ifndef __INC_6502_H
 #define __INC_6502_H
 
+#include "6502debug.h"
+
 extern uint8_t a,x,y,s;
 extern uint16_t pc;
 extern uint16_t oldpc, oldoldpc, pc3;
-typedef struct PREG
-{
-        int c,z,i,d,v,n;
-} PREG;
 
 extern PREG p;
-
 
 extern int output;
 extern int timetolive;

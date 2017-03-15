@@ -79,7 +79,8 @@ void int50()
 }
 
 char exedir[512];
-int debug = 0, debugon = 0;
+int debug = 0;
+int debugon = 0;
 int ddnoiseframes = 0;
 
 void main_reset()
@@ -195,7 +196,7 @@ void main_init(int argc, char *argv[])
                 }
                 else if (!strcasecmp(argv[c], "-debug"))
                 {
-                        debug = debugon = 1;
+                        debug = 1;
                 }
                 else if (argv[c][0] == '-' && (argv[c][1] == 'i' || argv[c][1] == 'I'))
                 {

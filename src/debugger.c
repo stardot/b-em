@@ -4,6 +4,8 @@
 #include <stdarg.h>
 #include <stdio.h>
 
+#define NUM_BREAKPOINTS 8
+
 int debug;
 int indebug=0;
 extern int fcount;
@@ -244,10 +246,6 @@ static void debug_outf(const char *fmt, ...)
     fflush(stdout);
 }
 
-void debug_start()
-{
-}
-
 void debug_kill() {
     if (trace_fp) {
         fputs("Trace finished due to emulator quit\n", trace_fp);
@@ -266,197 +264,11 @@ void debug_kill() {
 #include "sn76489.h"
 #include "model.h"
 
-static void trace_out(const char *s, size_t len)
-{
-    fwrite(s, len, 1, trace_fp);
-}
-
 int readc[65536], writec[65536], fetchc[65536];
 
-static uint16_t debug_memaddr=0;
-static uint16_t debug_disaddr=0;
+static uint32_t debug_memaddr=0;
+static uint32_t debug_disaddr=0;
 static uint8_t  debug_lastcommand=0;
-
-static uint8_t debug_readmem(uint16_t addr)
-{
-    if (addr >= 0xFC00 && addr < 0xFF00) return 0xFF;
-        return readmem(addr);
-}
-
-enum
-{
-    IMP,IMPA,IMM,ZP,ZPX,ZPY,INDX,INDY,IND,ABS,ABSX,ABSY,IND16,IND1X,BRA
-};
-
-static char dopname[256][6]=
-{
-/*00*/  "BRK","ORA","---","---","TSB","ORA","ASL","---","PHP","ORA","ASL","---","TSB","ORA","ASL","---",
-/*10*/  "BPL","ORA","ORA","---","TRB","ORA","ASL","---","CLC","ORA","INC","---","TRB","ORA","ASL","---",
-/*20*/  "JSR","AND","---","---","BIT","AND","ROL","---","PLP","AND","ROL","---","BIT","AND","ROL","---",
-/*30*/  "BMI","AND","AND","---","BIT","AND","ROL","---","SEC","AND","DEC","---","BIT","AND","ROL","---",
-/*40*/  "RTI","EOR","---","---","---","EOR","LSR","---","PHA","EOR","LSR","---","JMP","EOR","LSR","---",
-/*50*/  "BVC","EOR","EOR","---","---","EOR","LSR","---","CLI","EOR","PHY","---","---","EOR","LSR","---",
-/*60*/  "RTS","ADC","---","---","STZ","ADC","ROR","---","PLA","ADC","ROR","---","JMP","ADC","ROR","---",
-/*70*/  "BVS","ADC","ADC","---","STZ","ADC","ROR","---","SEI","ADC","PLY","---","JMP","ADC","ROR","---",
-/*80*/  "BRA","STA","---","---","STY","STA","STX","---","DEY","BIT","TXA","---","STY","STA","STX","---",
-/*90*/  "BCC","STA","STA","---","STY","STA","STX","---","TYA","STA","TXS","---","STZ","STA","STZ","---",
-/*A0*/  "LDY","LDA","LDX","---","LDY","LDA","LDX","---","TAY","LDA","TAX","---","LDY","LDA","LDX","---",
-/*B0*/  "BCS","LDA","LDA","---","LDY","LDA","LDX","---","CLV","LDA","TSX","---","LDY","LDA","LDX","---",
-/*C0*/  "CPY","CMP","---","---","CPY","CMP","DEC","---","INY","CMP","DEX","WAI","CPY","CMP","DEC","---",
-/*D0*/  "BNE","CMP","CMP","---","---","CMP","DEC","---","CLD","CMP","PHX","STP","---","CMP","DEC","---",
-/*E0*/  "CPX","SBC","---","---","CPX","SBC","INC","---","INX","SBC","NOP","---","CPX","SBC","INC","---",
-/*F0*/  "BEQ","SBC","SBC","---","---","SBC","INC","---","SED","SBC","PLX","---","---","SBC","INC","---",
-};
-
-static int dopaddr[256]=
-{
-/*00*/  IMP,  INDX, IMP,  IMP,  ZP,   ZP,   ZP,   IMP,  IMP,  IMM,  IMPA, IMP,  ABS,  ABS,  ABS,  IMP,
-/*10*/  BRA,  INDY, IND,  IMP,  ZP,   ZPX,  ZPX,  IMP,  IMP,  ABSY, IMPA, IMP,  ABS,  ABSX, ABSX, IMP,
-/*20*/  ABS,  INDX, IMP,  IMP,  ZP,   ZP,   ZP,   IMP,  IMP,  IMM,  IMPA, IMP,  ABS,  ABS,  ABS,  IMP,
-/*30*/  BRA,  INDY, IND,  IMP,  ZPX,  ZPX,  ZPX,  IMP,  IMP,  ABSY, IMPA, IMP,  ABSX, ABSX, ABSX, IMP,
-/*40*/  IMP,  INDX, IMP,  IMP,  ZP,   ZP,   ZP,   IMP,  IMP,  IMM,  IMPA, IMP,  ABS,  ABS,  ABS,  IMP,
-/*50*/  BRA,  INDY, IND,  IMP,  ZP,   ZPX,  ZPX,  IMP,  IMP,  ABSY, IMP,  IMP,  ABS,  ABSX, ABSX, IMP,
-/*60*/  IMP,  INDX, IMP,  IMP,  ZP,   ZP,   ZP,   IMP,  IMP,  IMM,  IMPA, IMP,  IND16,ABS,  ABS,  IMP,
-/*70*/  BRA,  INDY, IND,  IMP,  ZPX,  ZPX,  ZPX,  IMP,  IMP,  ABSY, IMP,  IMP,  IND1X,ABSX, ABSX, IMP,
-/*80*/  BRA,  INDX, IMP,  IMP,  ZP,   ZP,   ZP,   IMP,  IMP,  IMM,  IMP,  IMP,  ABS,  ABS,  ABS,  IMP,
-/*90*/  BRA,  INDY, IND,  IMP,  ZPX,  ZPX,  ZPY,  IMP,  IMP,  ABSY, IMP,  IMP,  ABS,  ABSX, ABSX, IMP,
-/*A0*/  IMM,  INDX, IMM,  IMP,  ZP,   ZP,   ZP,   IMP,  IMP,  IMM,  IMP,  IMP,  ABS,  ABS,  ABS,  IMP,
-/*B0*/  BRA,  INDY, IND,  IMP,  ZPX,  ZPX,  ZPY,  IMP,  IMP,  ABSY, IMP,  IMP,  ABSX, ABSX, ABSY, IMP,
-/*C0*/  IMM,  INDX, IMP,  IMP,  ZP,   ZP,   ZP,   IMP,  IMP,  IMM,  IMP,  IMP,  ABS,  ABS,  ABS,  IMP,
-/*D0*/  BRA,  INDY, IND,  IMP,  ZP,   ZPX,  ZPX,  IMP,  IMP,  ABSY, IMP,  IMP,  ABS,  ABSX, ABSX, IMP,
-/*E0*/  IMM,  INDX, IMP,  IMP,  ZP,   ZP,   ZP,   IMP,  IMP,  IMM,  IMP,  IMP,  ABS,  ABS,  ABS,  IMP,
-/*F0*/  BRA,  INDY, IND,  IMP,  ZP,   ZPX,  ZPX,  IMP,  IMP,  ABSY, IMP,  IMP,  ABS,  ABSX, ABSX, IMP,
-};
-
-static char dopnamenmos[256][6]=
-{
-/*00*/  "BRK","ORA","HLT","SLO","NOP","ORA","ASL","SLO","PHP","ORA","ASL","ANC","NOP","ORA","ASL","SLO",
-/*10*/  "BPL","ORA","HLT","SLO","NOP","ORA","ASL","SLO","CLC","ORA","NOP","SLO","NOP","ORA","ASL","SLO",
-/*20*/  "JSR","AND","HLT","RLA","NOP","AND","ROL","RLA","PLP","AND","ROL","ANC","BIT","AND","ROL","RLA",
-/*30*/  "BMI","AND","HLT","RLA","NOP","AND","ROL","RLA","SEC","AND","NOP","RLA","NOP","AND","ROL","RLA",
-/*40*/  "RTI","EOR","HLT","SRE","NOP","EOR","LSR","SRE","PHA","EOR","LSR","ASR","JMP","EOR","LSR","SRE",
-/*50*/  "BVC","EOR","HLT","SRE","NOP","EOR","LSR","SRE","CLI","EOR","NOP","SRE","NOP","EOR","LSR","SRE",
-/*60*/  "RTS","ADC","HLT","RRA","NOP","ADC","ROR","RRA","PLA","ADC","ROR","ARR","JMP","ADC","ROR","RRA",
-/*70*/  "BVS","ADC","HLT","RRA","NOP","ADC","ROR","RRA","SEI","ADC","NOP","RRA","NOP","ADC","ROR","RRA",
-/*80*/  "BRA","STA","NOP","SAX","STY","STA","STX","SAX","DEY","NOP","TXA","ANE","STY","STA","STX","SAX",
-/*90*/  "BCC","STA","HLT","SHA","STY","STA","STX","SAX","TYA","STA","TXS","SHS","SHY","STA","SHX","SHA",
-/*A0*/  "LDY","LDA","LDX","LAX","LDY","LDA","LDX","LAX","TAY","LDA","TAX","LXA","LDY","LDA","LDX","LAX",
-/*B0*/  "BCS","LDA","HLT","LAX","LDY","LDA","LDX","LAX","CLV","LDA","TSX","LAS","LDY","LDA","LDX","LAX",
-/*C0*/  "CPY","CMP","NOP","DCP","CPY","CMP","DEC","DCP","INY","CMP","DEX","SBX","CPY","CMP","DEC","DCP",
-/*D0*/  "BNE","CMP","HLT","DCP","NOP","CMP","DEC","DCP","CLD","CMP","NOP","DCP","NOP","CMP","DEC","DCP",
-/*E0*/  "CPX","SBC","NOP","ISB","CPX","SBC","INC","ISB","INX","SBC","NOP","SBC","CPX","SBC","INC","ISB",
-/*F0*/  "BEQ","SBC","HLT","ISB","NOP","SBC","INC","ISB","SED","SBC","NOP","ISB","NOP","SBC","INC","ISB",
-};
-
-static int dopaddrnmos[256]=
-{
-/*00*/  IMP,  INDX, IMP,  INDX, ZP,   ZP,   ZP,   ZP,   IMP,  IMM,  IMPA, IMM,  ABS,  ABS,  ABS,  ABS,
-/*10*/  BRA,  INDY, IMP,  INDY, ZPX,  ZPX,  ZPX,  ZPX,  IMP,  ABSY, IMP,  ABSY, ABSX, ABSX, ABSX, ABSX,
-/*20*/  ABS,  INDX, IMP,  INDX, ZP,   ZP,   ZP,   ZP,   IMP,  IMM,  IMPA, IMM,  ABS,  ABS,  ABS,  ABS,
-/*30*/  BRA,  INDY, IMP,  INDY, ZPX,  ZPX,  ZPX,  ZPX,  IMP,  ABSY, IMP,  ABSY, ABSX, ABSX, ABSX, ABSX,
-/*40*/  IMP,  INDX, IMP,  INDX, ZP,   ZP,   ZP,   ZP,   IMP,  IMM,  IMPA, IMM,  ABS,  ABS,  ABS,  ABS,
-/*50*/  BRA,  INDY, IMP,  INDY, ZPX,  ZPX,  ZPX,  ZPX,  IMP,  ABSY, IMP,  ABSY, ABSX, ABSX, ABSX, ABSX,
-/*60*/  IMP,  INDX, IMP,  INDX, ZP,   ZP,   ZP,   ZP,   IMP,  IMM,  IMPA, IMM,  IND16,ABS,  ABS,  ABS,
-/*70*/  BRA,  INDY, IMP,  INDY, ZPX,  ZPX,  ZPX,  ZPX,  IMP,  ABSY, IMP,  ABSY, ABSX, ABSX, ABSX, ABSX,
-/*80*/  BRA,  INDX, IMM,  INDX, ZP,   ZP,   ZP,   ZP,   IMP,  IMM,  IMP,  IMM,  ABS,  ABS,  ABS,  ABS,
-/*90*/  BRA,  INDY, IMP,  INDY, ZPX,  ZPX,  ZPY,  ZPY,  IMP,  ABSY, IMP,  ABSY, ABSX, ABSX, ABSX, ABSX,
-/*A0*/  IMM,  INDX, IMM,  INDX, ZP,   ZP,   ZP,   ZP,   IMP,  IMM,  IMP,  IMM,  ABS,  ABS,  ABS,  ABS,
-/*B0*/  BRA,  INDY, IMP,  INDY, ZPX,  ZPX,  ZPY,  ZPY,  IMP,  ABSY, IMP,  ABSY, ABSX, ABSX, ABSY, ABSX,
-/*C0*/  IMM,  INDX, IMM,  INDX, ZP,   ZP,   ZP,   ZP,   IMP,  IMM,  IMP,  IMM,  ABS,  ABS,  ABS,  ABS,
-/*D0*/  BRA,  INDY, IMP,  INDY, ZPX,  ZPX,  ZPX,  ZPX,  IMP,  ABSY, IMP,  ABSY, ABSX, ABSX, ABSX, ABSX,
-/*E0*/  IMM,  INDX, IMM,  INDX, ZP,   ZP,   ZP,   ZP,   IMP,  IMM,  IMP,  IMM,  ABS,  ABS,  ABS,  ABS,
-/*F0*/  BRA,  INDY, IMP,  INDY, ZPX,  ZPX,  ZPX,  ZPX,  IMP,  ABSY, IMP,  ABSY, ABSX, ABSX, ABSX, ABSX,
-};
-
-static uint16_t debug_disassemble(uint16_t addr, void (*out)(const char *s, size_t len))
-{
-    uint8_t op, p1, p2;
-    uint16_t temp;
-    char s[256], *sptr;
-    const char *op_name;
-    int addr_mode;
-
-    op = debug_readmem(addr);
-    if (MASTER) {
-        op_name = dopname[op];
-        addr_mode = dopaddr[op];
-    } else {
-        op_name = dopnamenmos[op];
-        addr_mode = dopaddrnmos[op];
-    }
-    sptr = s + sprintf(s, "%04X: %02X ", addr, op);
-    addr++;
-
-    switch (addr_mode)
-    {
-        case IMP:
-            sptr += sprintf(sptr, "      %s         ", op_name);
-            break;
-        case IMPA:
-            sptr += sprintf(sptr, "      %s A       ", op_name);
-            break;
-        case IMM:
-            p1 = debug_readmem(addr++);
-            sptr += sprintf(sptr, "%02X    %s #%02X     ", p1, op_name, p1);
-            break;
-        case ZP:
-            p1 = debug_readmem(addr++);
-            sptr += sprintf(sptr, "%02X    %s %02X      ", p1, op_name, p1);
-            break;
-        case ZPX:
-            p1 = debug_readmem(addr++);
-            sptr += sprintf(sptr, "%02X    %s %02X,X    ", p1, op_name, p1);
-            break;
-        case ZPY:
-            p1 = debug_readmem(addr++);
-            sptr += sprintf(sptr, "%02X    %s %02X,Y    ", p1, op_name, p1);
-            break;
-        case IND:
-            p1 = debug_readmem(addr++);
-            sptr += sprintf(sptr, "%02X    %s (%02X)    ", p1, op_name, p1);
-            break;
-        case INDX:
-            p1 = debug_readmem(addr++);
-            sptr += sprintf(sptr, "%02X    %s (%02X,X)  ", p1, op_name, p1);
-            break;
-        case INDY:
-            p1 = debug_readmem(addr++);
-            sptr += sprintf(sptr, "%02X    %s (%02X),Y  ", p1, op_name, p1);
-            break;
-        case ABS:
-            p1 = debug_readmem(addr++);
-            p2 = debug_readmem(addr++);
-            sptr += sprintf(sptr, "%02X %02X %s %02X%02X    ", p1, p2, op_name, p2, p1);
-            break;
-        case ABSX:
-            p1 = debug_readmem(addr++);
-            p2 = debug_readmem(addr++);
-            sptr += sprintf(sptr, "%02X %02X %s %02X%02X,X  ", p1, p2, op_name, p2, p1);
-            break;
-        case ABSY:
-            p1 = debug_readmem(addr++);
-            p2 = debug_readmem(addr++);
-            sptr += sprintf(sptr, "%02X %02X %s %02X%02X,Y  ", p1, p2, op_name, p2, p1);
-            break;
-        case IND16:
-            p1 = debug_readmem(addr++);
-            p2 = debug_readmem(addr++);
-            sptr += sprintf(sptr, "%02X %02X %s (%02X%02X)  ", p1, p2, op_name, p2, p1);
-            break;
-        case IND1X:
-            p1 = debug_readmem(addr++);
-            p2 = debug_readmem(addr++);
-            sptr += sprintf(sptr, "%02X %02X %s (%02X%02X,X)", p1, p2, op_name, p2, p1);
-            break;
-        case BRA:
-            p1 = debug_readmem(addr++);
-            temp = addr + (signed char)p1;
-            sptr += sprintf(sptr, "%02X    %s %04X    ", p1, op_name, temp);
-            break;
-    }
-    out(s, sptr-s);
-    return addr;
-}
 
 static int breakpoints[8] = {-1, -1, -1, -1, -1, -1, -1, -1};
 static int breakr[8]      = {-1, -1, -1, -1, -1, -1, -1, -1};
@@ -465,39 +277,6 @@ static int watchr[8]      = {-1, -1, -1, -1, -1, -1, -1, -1};
 static int watchw[8]      = {-1, -1, -1, -1, -1, -1, -1, -1};
 static int debugstep = 0;
 static int contcount = 0;
-
-void debug_read(uint16_t addr)
-{
-    int c;
-
-    for (c = 0; c < 8; c++)
-    {
-        if (breakr[c] == addr)
-        {
-            debug = 1;
-            debug_outf("    Break on read from %04X\n", addr);
-            return;
-        }
-        if (watchr[c] == addr)
-            debug_outf("    Read from %04X - A=%02X X=%02X Y=%02X PC=%04X\n", addr, a, x, y, pc);
-    }
-}
-void debug_write(uint16_t addr, uint8_t val)
-{
-    int c;
-
-    for (c = 0; c < 8; c++)
-    {
-        if (breakw[c] == addr)
-        {
-            debug = 1;
-            debug_outf("    Break on write to %04X - val %02X\n", addr, val);
-            return;
-        }
-        if (watchw[c] == addr)
-            debug_outf("    Write %02X to %04X - A=%02X X=%02X Y=%02X PC=%04X\n", val, addr, a, x, y, pc);
-    }
-}
 
 void debug_reset() {
     if (trace_fp) {
@@ -532,7 +311,20 @@ static const char helptext[] =
     "    wclearw n  - clear write watchpoint n or write watchpoint at n\n"
     "    writem a v - write to memory, a = address, v = value\n";
 
-void debugger_do()
+static void print_registers(cpu_debug_t *cpu) {
+    const char **np, *name;
+    char buf[50];
+    size_t len;
+    int r;
+
+    for (r = 0, np = cpu->reg_names; (name = *np++); ) {
+	debug_outf("%s=", name);
+	len = cpu->reg_print(r++, buf, sizeof buf);
+	debug_out(buf, len);
+    }
+}
+
+void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 {
     int c, d, e, f;
     int params;
@@ -540,47 +332,12 @@ void debugger_do()
     char dump[256], *dptr;
     char ins[256], *iptr;
 
-    if (trace_fp) {
-        debug_disassemble(pc, trace_out);
-        fprintf(trace_fp, " %02X %02X %02X %02X ", a, x, y, s);
-        fputc(p.n ? 'N' : ' ', trace_fp);
-        fputc(p.v ? 'V' : ' ', trace_fp);
-        fputc(p.d ? 'D' : ' ', trace_fp);
-        fputc(p.i ? 'I' : ' ', trace_fp);
-        fputc(p.z ? 'Z' : ' ', trace_fp);
-        fputc(p.c ? 'C' : ' ', trace_fp);
-        fputc('\n', trace_fp);
-    }
-
-    if (!opcode)
-    {
-        debug_outf("BRK %04X! %04X %04X\n", pc, oldpc, oldoldpc);
-        debug = 1;
-    }
-
-    for (c = 0; c < 8; c++)
-    {
-        if (breakpoints[c] == pc)
-        {
-            debug_outf("    Break at %04X\n", pc);
-            if (contcount)
-                contcount--;
-            else
-                debug = 1;
-        }
-    }
-    if (!debug) return;
-
-    if (debugstep)
-    {
-        debugstep--;
-        if (debugstep) return;
-    }
-
     indebug = 1;
+    cpu->disassemble(addr, ins, sizeof ins);
+    debug_out(ins, strlen(ins));
+
     while (1)
     {
-        debug_disassemble(pc, debug_out);
         debug_out("  >", 3);
 #ifdef WIN32
         c = ReadConsoleA(cinf, ins, 255, (LPDWORD)&d, NULL);
@@ -706,7 +463,8 @@ void debugger_do()
                 for (c = 0; c < 12; c++)
                 {
                     debug_out("    ", 4);
-                    debug_disaddr = debug_disassemble(debug_disaddr, debug_out);
+                    debug_disaddr = cpu->disassemble(debug_disaddr, ins, sizeof ins);
+		    debug_out(ins, strlen(ins));
                     debug_out("\n", 1);
                 }
                 break;
@@ -722,12 +480,12 @@ void debugger_do()
                 {
                     debug_outf("    %04X : ", debug_memaddr);
                     for (d = 0; d < 16; d++)
-                        debug_outf("%02X ", debug_readmem(debug_memaddr + d));
+                        debug_outf("%02X ", cpu->memread(debug_memaddr + d));
                     debug_out("  ", 2);
                     dptr = dump;
                     for (d = 0; d < 16; d++)
                     {
-                        temp = debug_readmem(debug_memaddr + d);
+                        temp = cpu->memread(debug_memaddr + d);
                         if (temp < ' ' || temp >= 0x7f)
                             *dptr++ = '.';
                         else
@@ -787,9 +545,8 @@ void debugger_do()
                 }
                 else
                 {
-                    debug_outf("    6502 registers :\n");
-                    debug_outf("    A=%02X X=%02X Y=%02X S=01%02X PC=%04X\n", a, x, y, s, pc);
-                    debug_outf("    Status : %c%c%c%c%c%c\n", (p.n) ? 'N' : ' ', (p.v) ? 'V' : ' ', (p.d) ? 'D' : ' ', (p.i) ? 'I' : ' ', (p.z) ? 'Z' : ' ', (p.c) ? 'C' : ' ');
+                    debug_outf("    registers for %s\n", cpu->cpu_name);
+		    print_registers(cpu);
                 }
                 break;
 
@@ -885,4 +642,114 @@ void debugger_do()
     }
     fcount = 0;
     indebug = 0;
+}
+
+void debug_memread (cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t size) {
+    int c;
+    uint32_t iaddr;
+
+    for (c = 0; c < NUM_BREAKPOINTS; c++)
+    {
+        if (breakr[c] == addr)
+        {
+	    iaddr = cpu->get_instr_addr();
+            debug_outf("cpu %s: %04x: break on read from %04X, value=%X\n", iaddr, cpu->cpu_name, addr, value);
+	    debugger_do(cpu, iaddr);
+        }
+        if (watchr[c] == addr) {
+	    iaddr = cpu->get_instr_addr();
+            debug_outf("cpu %s: %04x: read from %04X, value=%X\n", cpu->cpu_name, iaddr, addr, value);
+	}
+    }
+}
+
+void debug_memwrite(cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t size) {
+    int c;
+    uint32_t iaddr;
+
+    for (c = 0; c < NUM_BREAKPOINTS; c++)
+    {
+        if (breakw[c] == addr)
+        {
+	    iaddr = cpu->get_instr_addr();
+            debug_outf("cpu %s: %04x: break on write to %04X, value=%X\n", cpu->cpu_name, iaddr, addr, value);
+	    debugger_do(cpu, cpu->get_instr_addr());
+        }
+        if (watchw[c] == addr) {
+	    iaddr = cpu->get_instr_addr();
+	    debug_outf("cpu %s: %04x: write to %04X, value=%X\n", cpu->cpu_name, iaddr, value, addr);
+	}
+    }
+}
+
+void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
+    char buf[256];
+    size_t len;
+    int c, r, enter = 0;
+    const char **np, *name;
+    
+    if (trace_fp) {
+	cpu->disassemble(addr, buf, sizeof buf);
+	fputs(buf, trace_fp);
+	putc(' ', trace_fp);
+
+	for (r = 0, np = cpu->reg_names; (name = *np++); ) {
+	    len = cpu->reg_print(r++, buf, sizeof buf);
+	    fwrite(buf, len, 1, trace_fp);
+	}
+	putc('\n', trace_fp);
+    }
+
+    for (c = 0; c < NUM_BREAKPOINTS; c++)
+    {
+        if (breakpoints[c] == addr)
+        {
+            debug_outf("cpu %s: Break at %04X\n", cpu->cpu_name, addr);
+            if (contcount) {
+                contcount--;
+		return;
+	    }
+	    enter = 1;
+        }
+    }
+    if (debugstep)
+    {
+        debugstep--;
+        if (debugstep) return;
+	enter = 1;
+    }
+    if (enter)
+	debugger_do(cpu, addr);
+}
+
+extern cpu_debug_t core6502_cpu_debug;
+extern cpu_debug_t tube6502_cpu_debug;
+
+static cpu_debug_t *debuggables[] = {
+    &core6502_cpu_debug,
+    &tube6502_cpu_debug
+};
+
+void debug_start()
+{
+    cpu_debug_t **end, **cp, *c;
+    int i = 0;
+    char buf[80];
+    
+    if (debug) {
+	debug_outf("\nDebuggable CPUSs are as follows:\n");
+	end = debuggables + sizeof(debuggables)/sizeof(cpu_debug_t *);
+	for (cp = debuggables; cp < end; cp++) {
+	    c = *cp;
+	    debug_outf("  %d: %s\n", ++i, c->cpu_name);
+	}
+	do {
+	    debug_outf("Debug which CPU? ");
+	    if (fgets(buf, sizeof buf, stdin) == NULL)
+		return;
+	    i = atoi(buf);
+	} while (i == 0 || i > sizeof(debuggables)/sizeof(cpu_debug_t *));
+	debuggables[i-1]->debug_enable(1);
+	debugstep = 1;
+    }
 }

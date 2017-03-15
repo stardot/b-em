@@ -7,6 +7,7 @@
 #include "b-em.h"
 #include "tube.h"
 #include "6502tube.h"
+#include "6502debug.h"
 
 #define a tubea
 #define x tubex
@@ -23,9 +24,7 @@ static int tube_6502_oldnmi;
 /*6502 registers*/
 static uint8_t a, x, y, s;
 static uint16_t pc;
-static struct {
-        int c, z, i, d, v, n;
-} tubep;
+static PREG tubep;
 
 /*Memory structures*/
 /*There is an extra entry to allow for stupid programs (3d grand prix) doing
@@ -87,6 +86,122 @@ void tube_6502_close()
                 free(tuberam);
 }
 
+static int dbg_tube6502 = 0;
+
+static int dbg_debug_enable(int newvalue) {
+    int oldvalue = dbg_tube6502;
+    dbg_tube6502 = newvalue;
+    return oldvalue;
+};
+
+static inline uint8_t pack_flags(uint8_t flags) {
+    if (tubep.c)
+	flags |= 1;
+    if (tubep.z)
+	flags |= 2;
+    if (tubep.i)
+	flags |= 4;
+    if (tubep.d)
+	flags |= 8;
+    if (tubep.v)
+	flags |= 0x40;
+    if (tubep.n)
+	flags |= 0x80;
+    return flags;
+}
+
+static inline void unpack_flags(uint8_t flags) {
+    tubep.c = flags & 1;
+    tubep.z = flags & 2;
+    tubep.i = flags & 4;
+    tubep.d = flags & 8;
+    tubep.v = flags & 0x40;
+    tubep.n = flags & 0x80;
+}
+
+static uint32_t dbg_reg_get(int which) {
+    switch (which) {
+    case REG_A:
+	return tubea;
+    case REG_X:
+	return tubex;
+    case REG_Y:
+	return tubey;
+    case REG_S:
+	return tubesp;
+    case REG_P:
+	return pack_flags(0x30);
+    case REG_PC:
+	return tubepc;
+    default:
+	log_warn("6502tube: attempt to read non-existent register");
+	return 0;
+    }
+}
+
+static void dbg_reg_set(int which, uint32_t value) {
+    switch (which) {
+    case REG_A:
+	tubea = value;
+    case REG_X:
+	tubex = value;
+    case REG_Y:
+	tubey = value;
+    case REG_S:
+	tubesp = value;
+    case REG_P:
+	unpack_flags(value);
+    case REG_PC:
+	tubepc = value;
+    }
+}
+
+static size_t dbg_reg_print(int which, char *buf, size_t bufsize) {
+    switch (which) {
+    case REG_P:
+	return dbg6502_print_flags(&tubep, buf, bufsize);
+	break;
+    case REG_PC:
+	return snprintf(buf, bufsize, "%04x", tubepc);
+	break;
+    default:
+	return snprintf(buf, bufsize, "%02x", dbg_reg_get(which));
+    }
+}
+
+static void dbg_reg_parse(int which, char *str) {
+    uint32_t value = strtol(str, NULL, 16);
+    dbg_reg_set(which, value);
+}
+
+static uint32_t do_readmem(uint32_t addr);
+static void     do_writemem(uint32_t addr, uint32_t value);
+static uint32_t dbg_disassemble(uint32_t addr, char *buf, size_t bufsize);
+
+static uint16_t oldtpc, oldtpc2;
+
+static uint32_t dbg_get_instr_addr() {
+    return oldtpc;
+}
+
+cpu_debug_t tube6502_cpu_debug = {
+    .cpu_name       = "tube6502",
+    .debug_enable   = dbg_debug_enable,
+    .memread        = do_readmem,
+    .memwrite       = do_writemem,
+    .disassemble    = dbg_disassemble,
+    .reg_names      = dbg6502_reg_names,
+    .reg_get        = dbg_reg_get,
+    .reg_set        = dbg_reg_set,
+    .reg_print      = dbg_reg_print,
+    .reg_parse      = dbg_reg_parse,
+    .get_instr_addr = dbg_get_instr_addr
+};
+
+static uint32_t dbg_disassemble(uint32_t addr, char *buf, size_t bufsize) {
+    return dbg6502_disassemble(&tube6502_cpu_debug, addr, buf, bufsize, 0);
+}
+
 #undef printf
 /*static void tubedumpregs()
 {
@@ -120,7 +235,13 @@ static uint8_t tubereadmeml(uint16_t addr)
 }
 
 uint8_t tube_6502_readmem(uint32_t addr) {
-    return tubereadmeml(addr & 0xffff);
+    uint8_t hi = addr >> 8;
+    return (tubememstat[hi]==2)?tubereadmeml(addr):tubemem[hi][addr&0xFF];
+}
+
+static uint32_t do_readmem(uint32_t addr) {
+    uint8_t hi = addr >> 8;
+    return (tubememstat[hi]==2)?tubereadmeml(addr):tubemem[hi][addr&0xFF];
 }
 
 int endtimeslice;
@@ -138,12 +259,26 @@ static void tubewritememl(uint16_t addr, uint8_t val)
 }
 
 void tube_6502_writemem(uint32_t addr, uint8_t byte) {
-    tubewritememl(addr & 0xffff, byte);
+    tubewritememl(addr, byte);
 }
 
-#define readmem(a) ((tubememstat[(a)>>8]==2)?tubereadmeml(a):tubemem[(a)>>8][(a)&0xFF])
-#define writemem(a,b) tubewritememl(a,b)
-//if (tubememstat[(a)>>8]==0) tubemem[(a)>>8][(a)&0xFF]=b; else if (tubememstat[(a)>>8]==2) tubewritememl(a,b)
+static void do_writemem(uint32_t addr, uint32_t value) {
+    tubewritememl(addr, value);
+}
+
+static uint8_t readmem(uint32_t addr) {
+    uint32_t val = do_readmem(addr);
+    if (dbg_tube6502)
+	debug_memread(&tube6502_cpu_debug, addr, val, 8);
+    return val;
+}
+
+static void writemem(uint32_t addr, uint32_t value) {
+    if (dbg_tube6502)
+	debug_memwrite(&tube6502_cpu_debug, addr, value, 8);
+    do_writemem(addr, value);
+}
+
 #define getw() (readmem(pc)|(readmem(pc+1)<<8)); pc+=2
 
 void tube_6502_reset()
@@ -274,8 +409,6 @@ static INLINE void tube_6502_trace(uint8_t opcode)
 }
 #endif
 
-static uint16_t oldtpc, oldtpc2;
-
 void tube_6502_exec()
 {
         uint8_t opcode;
@@ -288,7 +421,9 @@ void tube_6502_exec()
         while (tubecycles > 0) {
                 oldtpc2 = oldtpc;
                 oldtpc = pc;
-                opcode = readmem(pc);
+		if (dbg_tube6502)
+		    debug_preexec(&tube6502_cpu_debug, pc);
+		opcode = readmem(pc);
                 pc++;
 #ifdef TRACE_TUBE
                 tube_6502_trace(opcode);
@@ -357,19 +492,7 @@ void tube_6502_exec()
                         break;
 
                 case 0x08:
-                        /*PHP*/ temp = 0x30;
-                        if (tubep.c)
-                                temp |= 1;
-                        if (tubep.z)
-                                temp |= 2;
-                        if (tubep.i)
-                                temp |= 4;
-                        if (tubep.d)
-                                temp |= 8;
-                        if (tubep.v)
-                                temp |= 0x40;
-                        if (tubep.n)
-                                temp |= 0x80;
+		        /*PHP*/ temp = pack_flags(0x30);
                         push(temp);
                         polltime(3);
                         break;
@@ -583,12 +706,7 @@ void tube_6502_exec()
 
                 case 0x28:
                         /*PLP*/ temp = pull();
-                        tubep.c = temp & 1;
-                        tubep.z = temp & 2;
-                        tubep.i = temp & 4;
-                        tubep.d = temp & 8;
-                        tubep.v = temp & 0x40;
-                        tubep.n = temp & 0x80;
+		        unpack_flags(temp);
                         polltime(4);
                         break;
 

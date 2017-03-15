@@ -7,7 +7,6 @@
 #include "6502.h"
 #include "acia.h"
 #include "adc.h"
-#include "debugger.h"
 #include "disc.h"
 #include "i8271.h"
 #include "ide.h"
@@ -27,6 +26,124 @@
 #include "vdfs.h"
 #include "video.h"
 #include "wd1770.h"
+
+static int dbg_core6502 = 0;
+
+static int dbg_debug_enable(int newvalue) {
+    int oldvalue = dbg_core6502;
+    dbg_core6502 = newvalue;
+    return oldvalue;
+};
+
+uint8_t a, x, y, s;
+uint16_t pc;
+PREG p;
+
+static inline uint8_t pack_flags(uint8_t flags) {
+    if (p.c)
+	flags |= 1;
+    if (p.z)
+	flags |= 2;
+    if (p.i)
+	flags |= 4;
+    if (p.d)
+	flags |= 8;
+    if (p.v)
+	flags |= 0x40;
+    if (p.n)
+	flags |= 0x80;
+    return flags;
+}
+
+static inline void unpack_flags(uint8_t flags) {
+    p.c = flags & 1;
+    p.z = flags & 2;
+    p.i = flags & 4;
+    p.d = flags & 8;
+    p.v = flags & 0x40;
+    p.n = flags & 0x80;
+}
+
+static uint32_t dbg_reg_get(int which) {
+    switch (which) {
+    case REG_A:
+	return a;
+    case REG_X:
+	return x;
+    case REG_Y:
+	return y;
+    case REG_S:
+	return s;
+    case REG_P:
+	return pack_flags(0x30);
+    case REG_PC:
+	return pc;
+    default:
+	log_warn("6502: attempt to read non-existent register");
+	return 0;
+    }
+}
+
+static void dbg_reg_set(int which, uint32_t value) {
+    switch (which) {
+    case REG_A:
+	a = value;
+    case REG_X:
+	x = value;
+    case REG_Y:
+	y = value;
+    case REG_S:
+	s = value;
+    case REG_P:
+	unpack_flags(value);
+    case REG_PC:
+	pc = value;
+    }
+}
+
+static size_t dbg_reg_print(int which, char *buf, size_t bufsize) {
+    switch (which) {
+    case REG_P:
+	return dbg6502_print_flags(&p, buf, bufsize);
+	break;
+    case REG_PC:
+	return snprintf(buf, bufsize, "%04x", pc);
+	break;
+    default:
+	return snprintf(buf, bufsize, "%02x", dbg_reg_get(which));
+    }
+}
+
+static void dbg_reg_parse(int which, char *str) {
+    uint32_t value = strtol(str, NULL, 16);
+    dbg_reg_set(which, value);
+}
+
+static uint32_t do_readmem(uint32_t addr);
+static void     do_writemem(uint32_t addr, uint32_t val);
+static uint32_t dbg_disassemble(uint32_t addr, char *buf, size_t bufsize);
+
+static uint32_t dbg_get_instr_addr() {
+    return oldpc;
+}
+
+cpu_debug_t core6502_cpu_debug = {
+    .cpu_name       = "core6502",
+    .debug_enable   = dbg_debug_enable,
+    .memread        = do_readmem,
+    .memwrite       = do_writemem,
+    .disassemble    = dbg_disassemble,
+    .reg_names      = dbg6502_reg_names,
+    .reg_get        = dbg_reg_get,
+    .reg_set        = dbg_reg_set,
+    .reg_print      = dbg_reg_print,
+    .reg_parse      = dbg_reg_parse,
+    .get_instr_addr = dbg_get_instr_addr
+};
+
+static uint32_t dbg_disassemble(uint32_t addr, char *buf, size_t bufsize) {
+    return dbg6502_disassemble(&core6502_cpu_debug, addr, buf, bufsize, MASTER);
+}
 
 int tubecycle;
 
@@ -60,11 +177,9 @@ static int vis20k = 0;
 
 static uint8_t acccon;
 
-uint8_t readmem(uint16_t addr)
+static uint32_t do_readmem(uint32_t addr)
 {
 
-        if (debugon)
-                debug_read(addr);
         if (pc == addr)
                 fetchc[addr] = 31;
         else
@@ -202,12 +317,18 @@ uint8_t readmem(uint16_t addr)
         return addr >> 8;
 }
 
-void writemem(uint16_t addr, uint8_t val)
+uint8_t readmem(uint16_t addr)
+{
+    uint32_t value = do_readmem(addr);
+    if (dbg_core6502)
+	debug_memread(&core6502_cpu_debug, addr, value, 8);
+    return value;
+}
+
+static void do_writemem(uint32_t addr, uint32_t val)
 {
         int c;
 
-        if (debugon)
-                debug_write(addr, val);
         writec[addr] = 31;
         c = memstat[vis20k][addr >> 8];
         if (c == 1) {
@@ -426,9 +547,13 @@ void writemem(uint16_t addr, uint8_t val)
         }
 }
 
-uint8_t a, x, y, s;
-uint16_t pc;
-PREG p;
+void writemem(uint16_t addr, uint8_t val)
+{
+    if (dbg_core6502)
+	debug_memwrite(&core6502_cpu_debug, addr, val, 8);
+    do_writemem(addr, val);
+}
+
 int nmi, oldnmi, interrupt, takeint;
 
 uint16_t pc3, oldpc, oldoldpc;
@@ -667,9 +792,9 @@ void m6502_exec()
 //                if (pc==0x2853) output=1;
 //                if (skipint==1) skipint=0;
                 vis20k = RAMbank[pc >> 12];
+                if (dbg_core6502)
+		    debug_preexec(&core6502_cpu_debug, pc);
                 opcode = readmem(pc);
-                if (debugon)
-                        debugger_do();
                 pc++;
                 switch (opcode) {
                 case 0x00:
@@ -685,18 +810,7 @@ void m6502_exec()
                             pc++;
                         push(pc >> 8);
                         push(pc & 0xFF);
-                        temp = 0x30;
-                        if (p.c)
-                                temp |= 1;
-                        if (p.z)
-                                temp |= 2;
-                        if (p.d)
-                                temp |= 8;
-                        if (p.v)
-                                temp |= 0x40;
-                        if (p.n)
-                                temp |= 0x80;
-                        push(temp);
+			push(pack_flags(0x30));
                         pc = readmem(0xFFFE) | (readmem(0xFFFF) << 8);
                         p.i = 1;
                         polltime(7);
@@ -772,19 +886,8 @@ void m6502_exec()
                         break;
 
                 case 0x08:
-                        /*PHP*/ temp = 0x30;
-                        if (p.c)
-                                temp |= 1;
-                        if (p.z)
-                                temp |= 2;
-                        if (p.i)
-                                temp |= 4;
-                        if (p.d)
-                                temp |= 8;
-                        if (p.v)
-                                temp |= 0x40;
-                        if (p.n)
-                                temp |= 0x80;
+                        /*PHP*/
+		        temp = pack_flags(0x30);
                         push(temp);
                         polltime(3);
                         takeint = (interrupt && !p.i);
@@ -1132,12 +1235,7 @@ void m6502_exec()
                         /*PLP*/ temp = pull();
                         polltime(4);
                         takeint = (interrupt && !p.i);
-                        p.c = temp & 1;
-                        p.z = temp & 2;
-                        p.i = temp & 4;
-                        p.d = temp & 8;
-                        p.v = temp & 0x40;
-                        p.n = temp & 0x80;
+			unpack_flags(temp);
                         break;
 
                 case 0x29:
@@ -1418,12 +1516,7 @@ void m6502_exec()
                 case 0x40:
                         /*RTI*/ output = 0;
                         temp = pull();
-                        p.c = temp & 1;
-                        p.z = temp & 2;
-                        p.i = temp & 4;
-                        p.d = temp & 8;
-                        p.v = temp & 0x40;
-                        p.n = temp & 0x80;
+			unpack_flags(temp);
                         pc = pull();
                         pc |= (pull() << 8);
                         polltime(6);
@@ -3448,20 +3541,7 @@ void m6502_exec()
 //                        skipint=0;
                         push(pc >> 8);
                         push(pc & 0xFF);
-                        temp = 0x20;
-                        if (p.c)
-                                temp |= 1;
-                        if (p.z)
-                                temp |= 2;
-                        if (p.i)
-                                temp |= 4;
-                        if (p.d)
-                                temp |= 8;
-                        if (p.v)
-                                temp |= 0x40;
-                        if (p.n)
-                                temp |= 0x80;
-                        push(temp);
+			push(pack_flags(0x20));
                         pc = readmem(0xFFFE) | (readmem(0xFFFF) << 8);
                         p.i = 1;
                         polltime(7);
@@ -3509,20 +3589,7 @@ void m6502_exec()
                 if (nmi && !oldnmi) {
                         push(pc >> 8);
                         push(pc & 0xFF);
-                        temp = 0x20;
-                        if (p.c)
-                                temp |= 1;
-                        if (p.z)
-                                temp |= 2;
-                        if (p.i)
-                                temp |= 4;
-                        if (p.d)
-                                temp |= 8;
-                        if (p.v)
-                                temp |= 0x40;
-                        if (p.n)
-                                temp |= 0x80;
-                        push(temp);
+			push(pack_flags(0x20));
                         pc = readmem(0xFFFA) | (readmem(0xFFFB) << 8);
                         p.i = 1;
                         polltime(7);
@@ -3549,9 +3616,9 @@ void m65c02_exec()
                 oldpc = pc;
 //                if (skipint==1) skipint=0;
                 vis20k = RAMbank[pc >> 12];
+                if (dbg_core6502)
+		    debug_preexec(&core6502_cpu_debug, pc);
                 opcode = readmem(pc);
-                if (debugon)
-                        debugger_do();
                 pc++;
                 switch (opcode) {
                 case 0x00:
@@ -3628,19 +3695,8 @@ void m65c02_exec()
                         break;
 
                 case 0x08:
-                        /*PHP*/ temp = 0x30;
-                        if (p.c)
-                                temp |= 1;
-                        if (p.z)
-                                temp |= 2;
-                        if (p.i)
-                                temp |= 4;
-                        if (p.d)
-                                temp |= 8;
-                        if (p.v)
-                                temp |= 0x40;
-                        if (p.n)
-                                temp |= 0x80;
+                        /*PHP*/
+		        temp = pack_flags(0x30);
                         push(temp);
                         polltime(3);
                         takeint = (interrupt && !p.i);
@@ -3885,12 +3941,7 @@ void m65c02_exec()
                         /*PLP*/ temp = pull();
                         polltime(4);
                         takeint = (interrupt && !p.i);
-                        p.c = temp & 1;
-                        p.z = temp & 2;
-                        p.i = temp & 4;
-                        p.d = temp & 8;
-                        p.v = temp & 0x40;
-                        p.n = temp & 0x80;
+			unpack_flags(temp);
                         break;
 
                 case 0x29:
@@ -4072,12 +4123,7 @@ void m65c02_exec()
 
                 case 0x40:
                         /*RTI*/ temp = pull();
-                        p.c = temp & 1;
-                        p.z = temp & 2;
-                        p.i = temp & 4;
-                        p.d = temp & 8;
-                        p.v = temp & 0x40;
-                        p.n = temp & 0x80;
+		        unpack_flags(temp);
                         pc = pull();
                         pc |= (pull() << 8);
                         polltime(6);
@@ -5439,19 +5485,7 @@ void m65c02_exec()
                 if (nmi && !oldnmi) {
                         push(pc >> 8);
                         push(pc & 0xFF);
-                        temp = 0x20;
-                        if (p.c)
-                                temp |= 1;
-                        if (p.z)
-                                temp |= 2;
-                        if (p.i)
-                                temp |= 4;
-                        if (p.d)
-                                temp |= 8;
-                        if (p.v)
-                                temp |= 0x40;
-                        if (p.n)
-                                temp |= 0x80;
+                        temp = pack_flags(0x20);
                         push(temp);
                         pc = readmem(0xFFFA) | (readmem(0xFFFB) << 8);
                         p.i = 1;
@@ -5471,13 +5505,7 @@ void m6502_savestate(FILE * f)
         putc(a, f);
         putc(x, f);
         putc(y, f);
-        temp = (p.c) ? 1 : 0;
-        temp |= (p.z) ? 2 : 0;
-        temp |= (p.i) ? 4 : 0;
-        temp |= (p.d) ? 8 : 0;
-        temp |= (p.v) ? 0x40 : 0;
-        temp |= (p.n) ? 0x80 : 0;
-        temp |= 0x30;
+        temp = pack_flags(0x30);
         putc(temp, f);
         putc(s, f);
         putc(pc & 0xFF, f);
@@ -5497,12 +5525,7 @@ void m6502_loadstate(FILE * f)
         x = getc(f);
         y = getc(f);
         temp = getc(f);
-        p.c = temp & 0x01;
-        p.z = temp & 0x02;
-        p.i = temp & 0x04;
-        p.d = temp & 0x08;
-        p.v = temp & 0x40;
-        p.n = temp & 0x80;
+	unpack_flags(temp);
         s = getc(f);
         pc = getc(f);
         pc |= (getc(f) << 8);

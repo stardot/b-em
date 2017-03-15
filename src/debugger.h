@@ -13,3 +13,4 @@ extern int readc[65536], writec[65536], fetchc[65536];
 extern int debug,debugon;
 
 #endif
+
