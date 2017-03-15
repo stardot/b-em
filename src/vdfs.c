@@ -484,6 +484,7 @@ static vdfs_ent_t *find_file(uint16_t fn_addr, vdfs_ent_t *key, vdfs_ent_t *ent,
                 *fn_ptr++ = ch;
             }
             *fn_ptr = '\0';
+	    log_debug("vdfs: find_file: looking for acron name=%s", key->acorn_fn);
             if (tail_addr)
                 *tail_addr = fn_addr;
             if (key->acorn_fn[0] == '$' && key->acorn_fn[1] == '\0')
@@ -1024,7 +1025,7 @@ static inline void osargs() {
         switch (a)
         {
             case 0:
-                a = 4; // say disc filing selected.
+                a = fs_flag; // say this filing selected.
                 break;
             case 1:
                 writemem32(x, cmd_tail);
@@ -1348,7 +1349,7 @@ static int16_t swr_calc_addr(uint8_t flags, uint32_t *st_ptr, uint16_t romid) {
             adfs_error(err_no_swr);
             return -1;
         }
-        log_debug("vdfs: exec_sram: abs addr bank=%02d, start=%04x\n", romid, start);
+        log_debug("vdfs: swr_calc_addr: abs addr bank=%02d, start=%04x\n", romid, start);
         start -= 0x8000;
     }
     *st_ptr = start;
@@ -1529,9 +1530,11 @@ static inline void dispatch(uint8_t value) {
 uint8_t vdfs_read(uint16_t addr) {
     switch (addr & 3) {
         case 0:
+	    log_debug("vdfs: get claim_fs=%02x", claim_fs);
             return claim_fs;
             break;
         case 1:
+	    log_debug("vdfs: get fs_flag=%02x", fs_flag);
             return fs_flag;
             break;
         default:
@@ -1543,9 +1546,11 @@ void vdfs_write(uint16_t addr, uint8_t value) {
     switch (addr & 3) {
         case 0:
             claim_fs = value;
+	    log_debug("vdfs: set claim_fs=%02x", value);
             break;
         case 1:
             fs_flag = value;
+	    log_debug("vdfs: set fs_flag=%02x", value);
             break;
         case 2:
             a = reg_a;
