@@ -9,6 +9,7 @@
 #include "b-em.h"
 #include "tube.h"
 #include "z80.h"
+#include "z80dis.h"
 #include "daa.h"
 
 #define pc z80pc
@@ -54,27 +55,50 @@ static uint8_t znptable[256],znptablenv[256],znptable16[65536];
 static uint8_t intreg;
 
 static int tuberomin;
+static int dbg_tube_z80 = 0;
+
+static inline uint8_t z80_do_readmem(uint16_t a)
+{
+    if (a>=0x8000) tuberomin=0;
+    if (tuberomin && a<0x1000) return z80rom[a&0xFFF];
+    return z80ram[a];
+}
+
+cpu_debug_t tubez80_cpu_debug;
 
 static inline uint8_t z80_readmem(uint16_t a)
 {
-//        printf("Read Z80 %04X %i\n",a,tuberomin);
-        if (a>=0x8000) tuberomin=0;
-        if (tuberomin && a<0x1000) return z80rom[a&0xFFF];
-        return z80ram[a];
+    uint8_t v = z80_do_readmem(a);
+    if (dbg_tube_z80)
+	debug_memread(&tubez80_cpu_debug, a, v, 8);
+    return v;
 }
 
 uint8_t tube_z80_readmem(uint32_t addr) {
     return z80_readmem(addr & 0xffff);
 }
 
-static inline void z80_writemem(uint16_t a, uint8_t v)
+static uint32_t dbg_z80_readmem(uint32_t addr) {
+    return z80_do_readmem(addr & 0xffff);
+}
+
+static inline void z80_do_writemem(uint16_t a, uint8_t v)
 {
-//        printf("Write Z80 %04X %02X %04X\n",a,v,pc);
-        z80ram[a]=v;
+    z80ram[a]=v;
+}
+
+static inline void z80_writemem(uint16_t a, uint8_t v) {
+    if (dbg_tube_z80)
+	debug_memwrite(&tubez80_cpu_debug, a, v, 8);
+    z80_do_writemem(a, v);
 }
 
 void tube_z80_writemem(uint32_t addr, uint8_t byte) {
     z80_writemem(addr & 0xffff, byte);
+}
+
+static void dbg_z80_writemem(uint32_t addr, uint32_t value) {
+    z80_writemem(addr & 0xffff, value);
 }
 
 int endtimeslice;
@@ -298,6 +322,113 @@ static void makeznptable()
         znptable16[0]|=0x40;
 }
 
+static int dbg_debug_enable(int newvalue) {
+    int oldvalue = dbg_tube_z80;
+    dbg_tube_z80 = newvalue;
+    return oldvalue;
+};
+
+static const char *dbg_z80_reg_names[] = { "A", "F", "BC", "DE", "HL", "IX", "IY", "SP", "PC" };
+
+enum { REG_A, REG_F, REG_BC, REG_DE, REG_HL, REG_IX, REG_IY, REG_SP, REG_PC } reg_num;
+
+static uint32_t dbg_z80_reg_get(int which) {
+    switch(which) {
+        case REG_A:
+	    return af.b.h;
+	    break;
+        case REG_F:
+	    return af.b.l;
+	    break;
+        case REG_BC:
+	    return bc.w;
+	    break;
+        case REG_DE:
+	    return de.w;
+	    break;
+        case REG_HL:
+	    return hl.w;
+	    break;
+        case REG_IX:
+	    return ix.w;
+	    break;
+        case REG_IY:
+	    return iy.w;
+	    break;
+        case REG_SP:
+	    return sp;
+	    break;
+        case REG_PC:
+	    return pc;
+	    break;
+        default:
+	    log_warn("z80: attempt to read non-existent register");
+	    return 0;
+    }
+}
+
+static void dbg_z80_reg_set(int which, uint32_t value) {
+    switch(which) {
+        case REG_A:
+	    af.b.h = value;
+	    break;
+        case REG_F:
+	    af.b.l = value;
+	    break;
+        case REG_BC:
+	    bc.w = value;
+	    break;
+        case REG_DE:
+	    de.w = value;
+	    break;
+        case REG_HL:
+	    hl.w = value;
+	    break;
+        case REG_IX:
+	    ix.w = value;
+	    break;
+        case REG_IY:
+	    iy.w = value;
+	    break;
+        case REG_SP:
+	    sp = value;
+	    break;
+        case REG_PC:
+	    pc = value;
+	    break;
+        default:
+	    log_warn("z80: attempt to write non-existent register");
+    }
+}
+
+static size_t dbg_z80_reg_print(int which, char *buf, size_t bufsize) {
+    uint32_t value = dbg_z80_reg_get(which);
+    return snprintf(buf, bufsize, which <= REG_F ? "%02X" : "%04X", value);;
+}
+
+static void dbg_z80_reg_parse(int which, char *str) {
+    uint32_t value = strtol(str, NULL, 16);
+    dbg_z80_reg_set(which, value);
+}
+
+static uint32_t dbg_z80_get_instr_addr() {
+    return opc;
+}
+
+cpu_debug_t tubez80_cpu_debug = {
+    .cpu_name       = "Z80",
+    .debug_enable   = dbg_debug_enable,
+    .memread        = dbg_z80_readmem,
+    .memwrite       = dbg_z80_writemem,
+    .disassemble    = z80_disassemble,
+    .reg_names      = dbg_z80_reg_names,
+    .reg_get        = dbg_z80_reg_get,
+    .reg_set        = dbg_z80_reg_set,
+    .reg_print      = dbg_z80_reg_print,
+    .reg_parse      = dbg_z80_reg_parse,
+    .get_instr_addr = dbg_z80_get_instr_addr
+};
+
 void z80_init()
 {
         FILE *f;
@@ -351,7 +482,9 @@ void z80_exec()
                 opc=pc;
                 if ((tube_irq&1) && iff1) enterint=1;
                 cycles=0;
-                tempc=af.b.l&C_FLAG;
+		if (dbg_tube_z80)
+		    debug_preexec(&tubez80_cpu_debug, pc);
+		tempc=af.b.l&C_FLAG;
                 opcode=z80_readmem(pc++);
                 ir.b.l=((ir.b.l+1)&0x7F)|(ir.b.l&0x80);
                 switch (opcode)

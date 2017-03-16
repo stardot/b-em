@@ -724,10 +724,12 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
 
 extern cpu_debug_t core6502_cpu_debug;
 extern cpu_debug_t tube6502_cpu_debug;
+extern cpu_debug_t tubez80_cpu_debug;
 
 static cpu_debug_t *debuggables[] = {
     &core6502_cpu_debug,
-    &tube6502_cpu_debug
+    &tube6502_cpu_debug,
+    &tubez80_cpu_debug
 };
 
 void debug_start()
