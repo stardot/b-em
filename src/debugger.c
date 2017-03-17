@@ -33,6 +33,96 @@ static cpu_debug_t *debuggables[] = {
 #include <wingdi.h>
 #include <process.h>
 
+static HANDLE cinf, consf;
+
+static inline void debug_in(char *buf, size_t bufsize)
+{
+    int c;
+    DWORD len;
+
+    c = ReadConsoleA(cinf, buf, bufsize, &len, NULL);
+    buf[len] = 0;
+    log_debug("read console, c=%d, len=%d, s=%s", c, (int)len, buf);
+}
+
+static void debug_out(const char *s, size_t len)
+{
+    startblit();
+    WriteConsole(consf, s, len, NULL, NULL);
+    endblit();
+}
+
+static void debug_outf(const char *fmt, ...)
+{
+    va_list ap;
+    char s[256];
+    size_t len;
+
+    va_start(ap, fmt);
+    len = vsnprintf(s, sizeof s, fmt, ap);
+    va_end(ap);
+    startblit();
+    WriteConsole(consf, s, len, NULL, NULL);
+    endblit();
+}
+
+#else
+
+static inline void debug_in(char *buf, size_t bufsize)
+{
+    fgets(buf, bufsize, stdin);
+}
+
+static void debug_out(const char *s, size_t len)
+{
+    fwrite(s, len, 1, stdout);
+    fflush(stdout);
+}
+
+static void debug_outf(const char *fmt, ...)
+{
+    va_list ap;
+
+    va_start(ap, fmt);
+    vprintf(fmt, ap);
+    va_end(ap);
+    fflush(stdout);
+}
+
+#endif
+
+static void choose_cpu() {
+    cpu_debug_t **end, **cp, *c;
+    int i = 0;
+    char buf[80];
+
+    debug_outf("\nDebuggable CPUSs are as follows:\n");
+    end = debuggables + sizeof(debuggables)/sizeof(cpu_debug_t *);
+    for (cp = debuggables; cp < end; cp++) {
+        c = *cp;
+        debug_outf("  %d: %s\n", ++i, c->cpu_name);
+    }
+    do {
+        debug_outf("Debug which CPU? ");
+        debug_in(buf, sizeof buf);
+        i = atoi(buf);
+    } while (i == 0 || i > sizeof(debuggables)/sizeof(cpu_debug_t *));
+    log_debug("cpu#%d chosen", i);
+    debuggables[i-1]->debug_enable(1);
+    debugstep = 1;
+    debugon = 1;
+}
+
+static void close_trace()
+{
+    if (trace_fp) {
+        fputs("Trace finished due to emulator quit\n", trace_fp);
+        fclose(trace_fp);
+    }
+}
+
+#ifdef WIN32
+
 static HANDLE debugthread;
 static HWND dhwnd;
 static int debugstarted = 0;
@@ -146,8 +236,6 @@ void _debugthread(PVOID pvoid)
     free(usdat);
 }
 
-static HANDLE consf, cinf;
-
 BOOL CtrlHandler(DWORD fdwCtrlType)
 {
     setquit();
@@ -183,6 +271,7 @@ void debug_start()
         SetConsoleCtrlHandler((PHANDLER_ROUTINE)CtrlHandler, TRUE);
         consf = GetStdHandle(STD_OUTPUT_HANDLE);
         cinf  = GetStdHandle(STD_INPUT_HANDLE);
+        choose_cpu();
     }
 }
 
@@ -194,10 +283,7 @@ void debug_end()
 
 void debug_kill()
 {
-    if (trace_fp) {
-        fputs("Trace finished due to emulator quit\n", trace_fp);
-        fclose(trace_fp);
-    }
+    close_trace();
     TerminateThread(debugthread, 0);
     if (usdat) free(usdat);
 }
@@ -217,76 +303,19 @@ LRESULT CALLBACK DebugWindowProcedure (HWND hwnd, UINT message, WPARAM wParam, L
     return 0;
 }
 
-static void debug_out(const char *s, size_t len)
-{
-    startblit();
-    WriteConsole(consf, s, len, NULL, NULL);
-    endblit();
-}
-
-static void debug_outf(const char *fmt, ...)
-{
-    va_list ap;
-    char s[256];
-    size_t len;
-
-    va_start(ap, fmt);
-    len = vsnprintf(s, sizeof s, fmt, ap);
-    va_end(ap);
-    startblit();
-    WriteConsole(consf, s, len, NULL, NULL);
-    endblit();
-}
-
 #else
 
 #undef printf
 
-static void debug_out(const char *s, size_t len)
+void debug_kill()
 {
-    fwrite(s, len, 1, stdout);
-    fflush(stdout);
-}
-
-static void debug_outf(const char *fmt, ...)
-{
-    va_list ap;
-
-    va_start(ap, fmt);
-    vprintf(fmt, ap);
-    va_end(ap);
-    fflush(stdout);
-}
-
-void debug_kill() {
-    if (trace_fp) {
-        fputs("Trace finished due to emulator quit\n", trace_fp);
-        fclose(trace_fp);
-    }
+    close_trace();
 }
 
 void debug_start()
 {
-    cpu_debug_t **end, **cp, *c;
-    int i = 0;
-    char buf[80];
-
-    if (debug) {
-        debug_outf("\nDebuggable CPUSs are as follows:\n");
-        end = debuggables + sizeof(debuggables)/sizeof(cpu_debug_t *);
-        for (cp = debuggables; cp < end; cp++) {
-            c = *cp;
-            debug_outf("  %d: %s\n", ++i, c->cpu_name);
-        }
-        do {
-            debug_outf("Debug which CPU? ");
-            if (fgets(buf, sizeof buf, stdin) == NULL)
-                return;
-            i = atoi(buf);
-        } while (i == 0 || i > sizeof(debuggables)/sizeof(cpu_debug_t *));
-        debuggables[i-1]->debug_enable(1);
-        debugstep = 1;
-    }
+    if (debug)
+        choose_cpu();
 }
 
 #endif
@@ -353,10 +382,11 @@ static void print_registers(cpu_debug_t *cpu) {
     int r;
 
     for (r = 0, np = cpu->reg_names; (name = *np++); ) {
-	debug_outf(" %s=", name);
-	len = cpu->reg_print(r++, buf, sizeof buf);
-	debug_out(buf, len);
+        debug_outf(" %s=", name);
+        len = cpu->reg_print(r++, buf, sizeof buf);
+        debug_out(buf, len);
     }
+    debug_out("\n", 1);
 }
 
 void debugger_do(cpu_debug_t *cpu, uint32_t addr)
@@ -374,12 +404,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
     while (1)
     {
         debug_out("  >", 3);
-#ifdef WIN32
-        c = ReadConsoleA(cinf, ins, 255, (LPDWORD)&d, NULL);
-        ins[d] = 0;
-#else
-        fgets(ins, 255, stdin);
-#endif
+        debug_in(ins, 255);
         for (d = 0; ((c = ins[d])) && c != ' '; d++)
             ;
         if (c == ' ') {
@@ -687,14 +712,15 @@ void debug_memread (cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t siz
     {
         if (breakr[c] == addr)
         {
-	    iaddr = cpu->get_instr_addr();
+            iaddr = cpu->get_instr_addr();
             debug_outf("cpu %s: %04x: break on read from %04X, value=%X\n", iaddr, cpu->cpu_name, addr, value);
-	    debugger_do(cpu, iaddr);
+            debugger_do(cpu, iaddr);
         }
-        if (watchr[c] == addr) {
-	    iaddr = cpu->get_instr_addr();
+        if (watchr[c] == addr)
+        {
+            iaddr = cpu->get_instr_addr();
             debug_outf("cpu %s: %04x: read from %04X, value=%X\n", cpu->cpu_name, iaddr, addr, value);
-	}
+        }
     }
 }
 
@@ -706,14 +732,15 @@ void debug_memwrite(cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t siz
     {
         if (breakw[c] == addr)
         {
-	    iaddr = cpu->get_instr_addr();
+            iaddr = cpu->get_instr_addr();
             debug_outf("cpu %s: %04x: break on write to %04X, value=%X\n", cpu->cpu_name, iaddr, addr, value);
-	    debugger_do(cpu, cpu->get_instr_addr());
+            debugger_do(cpu, cpu->get_instr_addr());
         }
-        if (watchw[c] == addr) {
-	    iaddr = cpu->get_instr_addr();
-	    debug_outf("cpu %s: %04x: write to %04X, value=%X\n", cpu->cpu_name, iaddr, value, addr);
-	}
+        if (watchw[c] == addr)
+        {
+            iaddr = cpu->get_instr_addr();
+            debug_outf("cpu %s: %04x: write to %04X, value=%X\n", cpu->cpu_name, iaddr, value, addr);
+        }
     }
 }
 
@@ -723,16 +750,18 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
     int c, r, enter = 0;
     const char **np, *name;
 
-    if (trace_fp) {
-	cpu->disassemble(addr, buf, sizeof buf);
-	fputs(buf, trace_fp);
-	*buf = ' ';
+    log_debug("debugger: debug_preexec(%s, %04x)", cpu->cpu_name, addr);
 
-	for (r = 0, np = cpu->reg_names; (name = *np++); ) {
-	    len = cpu->reg_print(r++, buf+1, sizeof buf-1);
-	    fwrite(buf, len+1, 1, trace_fp);
-	}
-	putc('\n', trace_fp);
+    if (trace_fp) {
+        cpu->disassemble(addr, buf, sizeof buf);
+        fputs(buf, trace_fp);
+        *buf = ' ';
+
+        for (r = 0, np = cpu->reg_names; (name = *np++); ) {
+            len = cpu->reg_print(r++, buf+1, sizeof buf-1);
+            fwrite(buf, len+1, 1, trace_fp);
+        }
+        putc('\n', trace_fp);
     }
 
     for (c = 0; c < NUM_BREAKPOINTS; c++)
@@ -742,19 +771,19 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
             debug_outf("cpu %s: Break at %04X\n", cpu->cpu_name, addr);
             if (contcount) {
                 contcount--;
-		return;
-	    }
-	    enter = 1;
+                return;
+            }
+            enter = 1;
         }
     }
     if (debugstep)
     {
         debugstep--;
         if (debugstep) return;
-	enter = 1;
+        enter = 1;
     }
     if (enter)
-	debugger_do(cpu, addr);
+        debugger_do(cpu, addr);
 }
 
 

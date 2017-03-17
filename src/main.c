@@ -101,7 +101,7 @@ void main_reset()
         if (curtube != -1) tubes[curtube].reset();
         else               tube_exec = NULL;
         tube_reset();
-        
+
         memset(ram, 0, 64 * 1024);
 }
 
@@ -113,14 +113,14 @@ void main_init(int argc, char *argv[])
         int tapenext = 0, discnext = 0;
 
         startblit();
-        
-        log_open();
-	log_info("main: starting %s", VERSION_STR);
 
-	vid_fskipmax = 1;
-        
+        log_open();
+        log_info("main: starting %s", VERSION_STR);
+
+        vid_fskipmax = 1;
+
         al_init_main(argc, argv);
-        
+
         append_filename(t, exedir, "roms\\tube\\ReCo6502ROM_816", 511);
         if (!file_exists(t,FA_ALL,NULL) && selecttube == 4) selecttube = -1;
 
@@ -210,7 +210,7 @@ void main_init(int argc, char *argv[])
                         discnext = 0;
                 }
                 else
-                {			
+                {
                         strcpy(discfns[0], argv[c]);
                         discnext = 0;
 			autoboot = 150;
@@ -229,7 +229,7 @@ void main_init(int argc, char *argv[])
         mem_init();
         ddnoise_init();
         tapenoise_init();
-        
+
         sound_init();
         al_init();
         sid_init();
@@ -249,30 +249,29 @@ void main_init(int argc, char *argv[])
         ide_init();
         vdfs_init();
 
-        debug_start();
-
         model_init();
 
         main_reset();
 
-
         install_int_ex(secint, MSEC_TO_TIMER(1000));
         install_int_ex(int50,  MSEC_TO_TIMER(20));
-        
+
         set_display_switch_mode(SWITCH_BACKGROUND);
-#ifdef WIN32        
+#ifdef WIN32
                 timeBeginPeriod(1);
 #endif
         oldmodel = curmodel;
-        
+
         if (curtube == 3 || mouse_amx) install_mouse();
 
         disc_load(0, discfns[0]);
         disc_load(1, discfns[1]);
         tape_load(tape_fn);
         if (defaultwriteprot) writeprot[0] = writeprot[1] = 1;
-        
+
         endblit();
+
+        debug_start();
 }
 
 void main_restart()
@@ -283,7 +282,7 @@ void main_restart()
         oldmodel = curmodel;
 
         model_init();
-        
+
         main_reset();
 
         resumeready();
@@ -369,7 +368,7 @@ void main_close()
 
         config_save();
         cmos_save(models[curmodel]);
-        
+
         mem_close();
         uef_close();
         csw_close();
@@ -386,7 +385,7 @@ void main_close()
         vdfs_close();
         ddnoise_close();
         tapenoise_close();
-        
+
         al_close();
         video_close();
         log_close();
