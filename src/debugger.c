@@ -253,6 +253,42 @@ void debug_kill() {
     }
 }
 
+void debug_start()
+{
+    cpu_debug_t **end, **cp, *c;
+    int i = 0;
+    char buf[80];
+
+    if (debug) {
+	debug_outf("\nDebuggable CPUSs are as follows:\n");
+	end = debuggables + sizeof(debuggables)/sizeof(cpu_debug_t *);
+	for (cp = debuggables; cp < end; cp++) {
+	    c = *cp;
+	    debug_outf("  %d: %s\n", ++i, c->cpu_name);
+	}
+	do {
+	    debug_outf("Debug which CPU? ");
+	    if (fgets(buf, sizeof buf, stdin) == NULL)
+		return;
+	    i = atoi(buf);
+	} while (i == 0 || i > sizeof(debuggables)/sizeof(cpu_debug_t *));
+	debuggables[i-1]->debug_enable(1);
+	debugstep = 1;
+    }
+}
+
+extern cpu_debug_t core6502_cpu_debug;
+extern cpu_debug_t tube6502_cpu_debug;
+extern cpu_debug_t tubez80_cpu_debug;
+extern cpu_debug_t n32016_cpu_debug;
+
+static cpu_debug_t *debuggables[] = {
+    &core6502_cpu_debug,
+    &tube6502_cpu_debug,
+    &tubez80_cpu_debug,
+    &n32016_cpu_debug,
+};
+
 #endif
 
 #include <errno.h>
@@ -722,38 +758,4 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
 	debugger_do(cpu, addr);
 }
 
-extern cpu_debug_t core6502_cpu_debug;
-extern cpu_debug_t tube6502_cpu_debug;
-extern cpu_debug_t tubez80_cpu_debug;
-extern cpu_debug_t n32016_cpu_debug;
 
-static cpu_debug_t *debuggables[] = {
-    &core6502_cpu_debug,
-    &tube6502_cpu_debug,
-    &tubez80_cpu_debug,
-    &n32016_cpu_debug,
-};
-
-void debug_start()
-{
-    cpu_debug_t **end, **cp, *c;
-    int i = 0;
-    char buf[80];
-    
-    if (debug) {
-	debug_outf("\nDebuggable CPUSs are as follows:\n");
-	end = debuggables + sizeof(debuggables)/sizeof(cpu_debug_t *);
-	for (cp = debuggables; cp < end; cp++) {
-	    c = *cp;
-	    debug_outf("  %d: %s\n", ++i, c->cpu_name);
-	}
-	do {
-	    debug_outf("Debug which CPU? ");
-	    if (fgets(buf, sizeof buf, stdin) == NULL)
-		return;
-	    i = atoi(buf);
-	} while (i == 0 || i > sizeof(debuggables)/sizeof(cpu_debug_t *));
-	debuggables[i-1]->debug_enable(1);
-	debugstep = 1;
-    }
-}
