@@ -9,8 +9,12 @@ CLEANFILES = $(noinst_SCRIPTS)
 
 amrefresh:
 
+# The following flags are used by PiTubeDirect Co Pros:
+#                BEM - fixes for compilation in B-Em envorinment
+#   INCLUDE_DEBUGGER - include the cpu_debug implementation
+# USE_MEMORY_POINTER - do not assume Co Pro memory starts at address 0
 
-b_em_CFLAGS = $(allegro_CFLAGS) -DBEM
+b_em_CFLAGS = $(allegro_CFLAGS) -DBEM -DINCLUDE_DEBUGGER -DUSE_MEMORY_POINTER
 
 # workaround for Win32 Allegro, which has `allegro-config' missing
 if OS_WIN
@@ -25,6 +29,7 @@ b_em_SOURCES = \
 	6502tube.c \
 	65816.c \
 	NS32016/32016.c \
+	NS32016/32016_debug.c \
 	NS32016/Decode.c \
 	NS32016/NSDis.c \
 	NS32016/Profile.c \

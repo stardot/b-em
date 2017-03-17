@@ -21,3 +21,7 @@ etc/
 install-sh
 missing
 tags
+b-emlog.txt
+not_in_git/
+
+
