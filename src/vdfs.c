@@ -178,7 +178,7 @@ static void free_tree_node(void *ptr) {
 }
 
 void vdfs_reset() {
-        flush_all();
+    flush_all();
 }
 
 static int host_comp(const void *a, const void *b) {
@@ -284,8 +284,8 @@ static void scan_entry(vdfs_ent_t *ent) {
     ptr = host_file_path = malloc(strlen(host_dir_path) + strlen(ent->host_fn) + 6);
     ptr = stpcpy(ptr, host_dir_path);
     if (ent->host_fn[0] != '.' || ent->host_fn[1] != '\0') {
-	*ptr++ = '/';
-	ptr = stpcpy(ptr, ent->host_fn);
+        *ptr++ = '/';
+        ptr = stpcpy(ptr, ent->host_fn);
     }
     strcpy(ptr, ".inf");
 
@@ -424,18 +424,18 @@ static int scan_dir(vdfs_ent_t *dir) {
         // deleted atrubute, if found or create a new entry if not.
         while ((dep = readdir(dp))) {
             if (*(dep->d_name) != '.') {
-		if (!(ext = strrchr(dep->d_name, '.')) || strcasecmp(ext, ".inf")) {
-		    key.host_fn = dep->d_name;
-		    if ((ptr = tfind(&key, &dir->host_tree, host_comp))) {
-			ent = *ptr;
-			ent->attribs &= ~ATTR_DELETED;
-			scan_entry(ent);
-		    } else if ((ent = new_entry(dir, dep->d_name)))
-			count++;
-		    else {
-			count = -1;
-			break;
-		    }
+                if (!(ext = strrchr(dep->d_name, '.')) || strcasecmp(ext, ".inf")) {
+                    key.host_fn = dep->d_name;
+                    if ((ptr = tfind(&key, &dir->host_tree, host_comp))) {
+                        ent = *ptr;
+                        ent->attribs &= ~ATTR_DELETED;
+                        scan_entry(ent);
+                    } else if ((ent = new_entry(dir, dep->d_name)))
+                        count++;
+                    else {
+                        count = -1;
+                        break;
+                    }
                 }
             }
         }
@@ -484,7 +484,7 @@ static vdfs_ent_t *find_file(uint16_t fn_addr, vdfs_ent_t *key, vdfs_ent_t *ent,
                 *fn_ptr++ = ch;
             }
             *fn_ptr = '\0';
-	    log_debug("vdfs: find_file: looking for acron name=%s", key->acorn_fn);
+            log_debug("vdfs: find_file: looking for acron name=%s", key->acorn_fn);
             if (tail_addr)
                 *tail_addr = fn_addr;
             if (key->acorn_fn[0] == '$' && key->acorn_fn[1] == '\0')
@@ -618,23 +618,23 @@ void vdfs_new_root(const char *root) {
 
     len = strlen(root);
     while (len > 0 && ((ch = root[--len]) == '/' || ch == '\\'))
-	;
+        ;
     if (++len > 0) {
-	if ((path = malloc(len + 1))) {
-	    memcpy(path, root, len);
-	    path[len] = '\0';
-	    root_dir.host_path = path;
-	    root_dir.host_fn = ".";
-	    scan_entry(&root_dir);
-	    cur_dir = lib_dir = prev_dir = &root_dir;
-	    scan_seq++;
-	} else {
-	    log_warn("vdfs: unable to set root as unable to allocate path.  VDFS disabled");
-	    vdfs_enabled = 0;
-	}
+        if ((path = malloc(len + 1))) {
+            memcpy(path, root, len);
+            path[len] = '\0';
+            root_dir.host_path = path;
+            root_dir.host_fn = ".";
+            scan_entry(&root_dir);
+            cur_dir = lib_dir = prev_dir = &root_dir;
+            scan_seq++;
+        } else {
+            log_warn("vdfs: unable to set root as unable to allocate path.  VDFS disabled");
+            vdfs_enabled = 0;
+        }
     } else {
-	log_warn("vdfs: unable to set root as path is empty.  VDFS disabled");
-	vdfs_enabled = 0;
+        log_warn("vdfs: unable to set root as path is empty.  VDFS disabled");
+        vdfs_enabled = 0;
     }
 }
 
@@ -1530,11 +1530,11 @@ static inline void dispatch(uint8_t value) {
 uint8_t vdfs_read(uint16_t addr) {
     switch (addr & 3) {
         case 0:
-	    log_debug("vdfs: get claim_fs=%02x", claim_fs);
+            log_debug("vdfs: get claim_fs=%02x", claim_fs);
             return claim_fs;
             break;
         case 1:
-	    log_debug("vdfs: get fs_flag=%02x", fs_flag);
+            log_debug("vdfs: get fs_flag=%02x", fs_flag);
             return fs_flag;
             break;
         default:
@@ -1546,11 +1546,11 @@ void vdfs_write(uint16_t addr, uint8_t value) {
     switch (addr & 3) {
         case 0:
             claim_fs = value;
-	    log_debug("vdfs: set claim_fs=%02x", value);
+            log_debug("vdfs: set claim_fs=%02x", value);
             break;
         case 1:
             fs_flag = value;
-	    log_debug("vdfs: set fs_flag=%02x", value);
+            log_debug("vdfs: set fs_flag=%02x", value);
             break;
         case 2:
             a = reg_a;
