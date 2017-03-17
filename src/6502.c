@@ -41,17 +41,17 @@ PREG p;
 
 static inline uint8_t pack_flags(uint8_t flags) {
     if (p.c)
-	flags |= 1;
+        flags |= 1;
     if (p.z)
-	flags |= 2;
+        flags |= 2;
     if (p.i)
-	flags |= 4;
+        flags |= 4;
     if (p.d)
-	flags |= 8;
+        flags |= 8;
     if (p.v)
-	flags |= 0x40;
+        flags |= 0x40;
     if (p.n)
-	flags |= 0x80;
+        flags |= 0x80;
     return flags;
 }
 
@@ -65,52 +65,60 @@ static inline void unpack_flags(uint8_t flags) {
 }
 
 static uint32_t dbg_reg_get(int which) {
-    switch (which) {
+    switch (which)
+    {
     case REG_A:
-	return a;
+        return a;
     case REG_X:
-	return x;
+        return x;
     case REG_Y:
-	return y;
+        return y;
     case REG_S:
-	return s;
+        return s;
     case REG_P:
-	return pack_flags(0x30);
+        return pack_flags(0x30);
     case REG_PC:
-	return pc;
+        return pc;
     default:
-	log_warn("6502: attempt to read non-existent register");
-	return 0;
+        log_warn("6502: attempt to read non-existent register");
+        return 0;
     }
 }
 
 static void dbg_reg_set(int which, uint32_t value) {
-    switch (which) {
+    switch (which)
+    {
     case REG_A:
-	a = value;
+        a = value;
+        break;
     case REG_X:
-	x = value;
+        x = value;
+        break;
     case REG_Y:
-	y = value;
+        y = value;
+        break;
     case REG_S:
-	s = value;
+        s = value;
+        break;
     case REG_P:
-	unpack_flags(value);
+        unpack_flags(value);
+        break;
     case REG_PC:
-	pc = value;
+        pc = value;
     }
 }
 
 static size_t dbg_reg_print(int which, char *buf, size_t bufsize) {
-    switch (which) {
+    switch (which)
+    {
     case REG_P:
-	return dbg6502_print_flags(&p, buf, bufsize);
-	break;
+        return dbg6502_print_flags(&p, buf, bufsize);
+        break;
     case REG_PC:
-	return snprintf(buf, bufsize, "%04X", pc);
-	break;
+        return snprintf(buf, bufsize, "%04X", pc);
+        break;
     default:
-	return snprintf(buf, bufsize, "%02X", dbg_reg_get(which));
+        return snprintf(buf, bufsize, "%02X", dbg_reg_get(which));
     }
 }
 
@@ -582,10 +590,10 @@ void m6502_reset()
                 memlook[0][c] = memlook[1][c] = os - 0xC000;
         memstat[0][0xFC] = memstat[0][0xFD] = memstat[0][0xFE] = 0;
         memstat[1][0xFC] = memstat[1][0xFD] = memstat[1][0xFE] = 0;
-        
+
         cycles = 0;
         ram4k = ram8k = ram12k = ram20k = 0;
-        
+
         pc = readmem(0xFFFC) | (readmem(0xFFFD) << 8);
         p.i = 1;
         nmi = oldnmi = 0;
@@ -793,7 +801,7 @@ void m6502_exec()
 //                if (skipint==1) skipint=0;
                 vis20k = RAMbank[pc >> 12];
                 if (dbg_core6502)
-		    debug_preexec(&core6502_cpu_debug, pc);
+                    debug_preexec(&core6502_cpu_debug, pc);
                 opcode = readmem(pc);
                 pc++;
                 switch (opcode) {
@@ -810,7 +818,7 @@ void m6502_exec()
                             pc++;
                         push(pc >> 8);
                         push(pc & 0xFF);
-			push(pack_flags(0x30));
+                        push(pack_flags(0x30));
                         pc = readmem(0xFFFE) | (readmem(0xFFFF) << 8);
                         p.i = 1;
                         polltime(7);
@@ -887,7 +895,7 @@ void m6502_exec()
 
                 case 0x08:
                         /*PHP*/
-		        temp = pack_flags(0x30);
+                        temp = pack_flags(0x30);
                         push(temp);
                         polltime(3);
                         takeint = (interrupt && !p.i);
@@ -1235,7 +1243,7 @@ void m6502_exec()
                         /*PLP*/ temp = pull();
                         polltime(4);
                         takeint = (interrupt && !p.i);
-			unpack_flags(temp);
+                        unpack_flags(temp);
                         break;
 
                 case 0x29:
@@ -1516,7 +1524,7 @@ void m6502_exec()
                 case 0x40:
                         /*RTI*/ output = 0;
                         temp = pull();
-			unpack_flags(temp);
+                        unpack_flags(temp);
                         pc = pull();
                         pc |= (pull() << 8);
                         polltime(6);
@@ -3541,7 +3549,7 @@ void m6502_exec()
 //                        skipint=0;
                         push(pc >> 8);
                         push(pc & 0xFF);
-			push(pack_flags(0x20));
+                        push(pack_flags(0x20));
                         pc = readmem(0xFFFE) | (readmem(0xFFFF) << 8);
                         p.i = 1;
                         polltime(7);
@@ -3589,7 +3597,7 @@ void m6502_exec()
                 if (nmi && !oldnmi) {
                         push(pc >> 8);
                         push(pc & 0xFF);
-			push(pack_flags(0x20));
+                        push(pack_flags(0x20));
                         pc = readmem(0xFFFA) | (readmem(0xFFFB) << 8);
                         p.i = 1;
                         polltime(7);
@@ -3617,7 +3625,7 @@ void m65c02_exec()
 //                if (skipint==1) skipint=0;
                 vis20k = RAMbank[pc >> 12];
                 if (dbg_core6502)
-		    debug_preexec(&core6502_cpu_debug, pc);
+                    debug_preexec(&core6502_cpu_debug, pc);
                 opcode = readmem(pc);
                 pc++;
                 switch (opcode) {
@@ -3696,7 +3704,7 @@ void m65c02_exec()
 
                 case 0x08:
                         /*PHP*/
-		        temp = pack_flags(0x30);
+                        temp = pack_flags(0x30);
                         push(temp);
                         polltime(3);
                         takeint = (interrupt && !p.i);
@@ -3941,7 +3949,7 @@ void m65c02_exec()
                         /*PLP*/ temp = pull();
                         polltime(4);
                         takeint = (interrupt && !p.i);
-			unpack_flags(temp);
+                        unpack_flags(temp);
                         break;
 
                 case 0x29:
@@ -4123,7 +4131,7 @@ void m65c02_exec()
 
                 case 0x40:
                         /*RTI*/ temp = pull();
-		        unpack_flags(temp);
+                        unpack_flags(temp);
                         pc = pull();
                         pc |= (pull() << 8);
                         polltime(6);
@@ -5525,7 +5533,7 @@ void m6502_loadstate(FILE * f)
         x = getc(f);
         y = getc(f);
         temp = getc(f);
-	unpack_flags(temp);
+        unpack_flags(temp);
         s = getc(f);
         pc = getc(f);
         pc |= (getc(f) << 8);
