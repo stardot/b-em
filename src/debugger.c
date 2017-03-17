@@ -4,19 +4,34 @@
 #include <stdarg.h>
 #include <stdio.h>
 
+#include "cpu_debug.h"
+#include "debugger.h"
+#include "b-em.h"
+
 #define NUM_BREAKPOINTS 8
 
 int debug;
 int indebug=0;
 extern int fcount;
+static int debugstep = 0;
 static FILE *trace_fp = NULL;
+
+extern cpu_debug_t core6502_cpu_debug;
+extern cpu_debug_t tube6502_cpu_debug;
+extern cpu_debug_t tubez80_cpu_debug;
+extern cpu_debug_t n32016_cpu_debug;
+
+static cpu_debug_t *debuggables[] = {
+    &core6502_cpu_debug,
+    &tube6502_cpu_debug,
+    &tubez80_cpu_debug,
+    &n32016_cpu_debug,
+};
 
 #ifdef WIN32
 #include <windows.h>
 #include <wingdi.h>
 #include <process.h>
-#include "b-em.h"
-#include "debugger.h"
 
 static HANDLE debugthread;
 static HWND dhwnd;
@@ -225,9 +240,6 @@ static void debug_outf(const char *fmt, ...)
 
 #else
 
-#include "b-em.h"
-#include "debugger.h"
-
 #undef printf
 
 static void debug_out(const char *s, size_t len)
@@ -260,34 +272,22 @@ void debug_start()
     char buf[80];
 
     if (debug) {
-	debug_outf("\nDebuggable CPUSs are as follows:\n");
-	end = debuggables + sizeof(debuggables)/sizeof(cpu_debug_t *);
-	for (cp = debuggables; cp < end; cp++) {
-	    c = *cp;
-	    debug_outf("  %d: %s\n", ++i, c->cpu_name);
-	}
-	do {
-	    debug_outf("Debug which CPU? ");
-	    if (fgets(buf, sizeof buf, stdin) == NULL)
-		return;
-	    i = atoi(buf);
-	} while (i == 0 || i > sizeof(debuggables)/sizeof(cpu_debug_t *));
-	debuggables[i-1]->debug_enable(1);
-	debugstep = 1;
+        debug_outf("\nDebuggable CPUSs are as follows:\n");
+        end = debuggables + sizeof(debuggables)/sizeof(cpu_debug_t *);
+        for (cp = debuggables; cp < end; cp++) {
+            c = *cp;
+            debug_outf("  %d: %s\n", ++i, c->cpu_name);
+        }
+        do {
+            debug_outf("Debug which CPU? ");
+            if (fgets(buf, sizeof buf, stdin) == NULL)
+                return;
+            i = atoi(buf);
+        } while (i == 0 || i > sizeof(debuggables)/sizeof(cpu_debug_t *));
+        debuggables[i-1]->debug_enable(1);
+        debugstep = 1;
     }
 }
-
-extern cpu_debug_t core6502_cpu_debug;
-extern cpu_debug_t tube6502_cpu_debug;
-extern cpu_debug_t tubez80_cpu_debug;
-extern cpu_debug_t n32016_cpu_debug;
-
-static cpu_debug_t *debuggables[] = {
-    &core6502_cpu_debug,
-    &tube6502_cpu_debug,
-    &tubez80_cpu_debug,
-    &n32016_cpu_debug,
-};
 
 #endif
 
@@ -311,7 +311,6 @@ static int breakr[8]      = {-1, -1, -1, -1, -1, -1, -1, -1};
 static int breakw[8]      = {-1, -1, -1, -1, -1, -1, -1, -1};
 static int watchr[8]      = {-1, -1, -1, -1, -1, -1, -1, -1};
 static int watchw[8]      = {-1, -1, -1, -1, -1, -1, -1, -1};
-static int debugstep = 0;
 static int contcount = 0;
 
 void debug_reset() {
@@ -723,7 +722,7 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
     size_t len;
     int c, r, enter = 0;
     const char **np, *name;
-    
+
     if (trace_fp) {
 	cpu->disassemble(addr, buf, sizeof buf);
 	fputs(buf, trace_fp);
