@@ -71,7 +71,7 @@ OBJ = \
 
 NS32KOBJ = \
     32016.o \
-    debug.o \
+    32016_debug.o \
     Decode.o \
     mem32016.o \
     Trap.o \
