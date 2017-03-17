@@ -10,7 +10,7 @@ CLEANFILES = $(noinst_SCRIPTS)
 amrefresh:
 
 
-b_em_CFLAGS = $(allegro_CFLAGS) -DBEM
+b_em_CFLAGS = $(allegro_CFLAGS) -g -DBEM -DINCLUDE_DEBUGGER -DUSE_MEMORY_POINTER
 
 # workaround for Win32 Allegro, which has `allegro-config' missing
 if OS_WIN
@@ -30,6 +30,7 @@ b_em_SOURCES = \
 	NS32016/Profile.c \
 	NS32016/Trap.c \
 	NS32016/mem32016.c \
+	NS32016/debug.c \
 	Z80.c \
 	z80dis.c \
 	acia.c \

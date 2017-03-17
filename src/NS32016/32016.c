@@ -18,6 +18,11 @@
 #include "Profile.h"
 #endif
 
+#ifdef INCLUDE_DEBUGGER
+#include "debug.h"
+#include "../cpu_debug.h"
+#endif
+
 #define CXP_UNUSED_WORD 0xAAAA
 
 ProcessorRegisters PR;
@@ -111,6 +116,16 @@ void n32016_reset_addr(uint32_t StartAddress)
 uint32_t n32016_get_pc()
 {
    return pc;
+}
+
+uint32_t n32016_get_startpc()
+{
+   return startpc;
+}
+
+void n32016_set_pc(uint32_t value)
+{
+   pc = value;
 }
 
 static void pushd(uint32_t val)
@@ -994,6 +1009,14 @@ void n32016_exec()
       Regs[1].Whole  = 0xFFFF;
 
       startpc  = pc;
+
+#ifdef INCLUDE_DEBUGGER
+      if (n32016_debug_enabled)
+      {
+         debug_preexec(&n32016_cpu_debug, pc);
+      }
+#endif
+
       opcode = read_x32(pc);
 
       if (pc == PR.BPC)
@@ -1255,9 +1278,8 @@ void n32016_exec()
       }
 
 #ifdef PC_SIMULATION
-      FredSize = OpSize;                     // Temporary hack :(
       uint32_t Temp = pc;
-      ShowInstruction(startpc, &Temp, opcode, Function, OpSize.Op[0]);
+      n32016_show_instruction(startpc, &Temp, opcode, Function, &OpSize);
 #endif
 
       GetGenPhase2(Regs[0], 0);
