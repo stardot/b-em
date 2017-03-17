@@ -4,10 +4,16 @@ CPP  = g++.exe
 CC   = gcc.exe
 WINDRES = windres.exe
 
-CFLAGS = -O3 -Wall -DBEM -DVERSION=\"Win32\"
+# The following flags are used by PiTubeDirect Co Pros:
+#                BEM - fixes for compilation in B-Em envorinment
+#   INCLUDE_DEBUGGER - include the cpu_debug implementation
+# USE_MEMORY_POINTER - do not assume Co Pro memory starts at address 0
+
+CFLAGS = -O3 -Wall -DBEM -DVERSION=\"Win32\" -DINCLUDE_DEBUGGER -DUSE_MEMORY_POINTER
 
 OBJ = \
     6502.o \
+    6502debug.o \
     6502tube.o \
     65816.o \
     acia.o \
@@ -59,11 +65,13 @@ OBJ = \
     win-keydefine.o \
     x86.o \
     z80.o \
+    z80dis.o \
     resid.o \
     b-em.res
 
 NS32KOBJ = \
     32016.o \
+    debug.o \
     Decode.o \
     mem32016.o \
     Trap.o \
