@@ -27,10 +27,10 @@ extern uint8_t ula_palbak[16];
 
 void video_init();
 void video_reset();
+void video_startthread();
 void video_poll(int clocks);
 void video_savestate(FILE *f);
 void video_loadstate(FILE *f);
-
 
 extern uint16_t vidbank;
 

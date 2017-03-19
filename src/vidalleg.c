@@ -121,14 +121,20 @@ void video_leavefullscreen()
         updatewindowsize(640, 480);
 }
 
+#ifdef WIN32
+void video_startthread(void) {}
+
 void video_doblit()
+#else
+static void video_realblit()
+#endif
 {
         int c;
 //        printf("%03i %03i %03i %03i\n",firstx,lastx,firsty,lasty);
 //log_debug("Blit\n");
 
         startblit();
-        
+
 //        printf("Blit\n");
 	if (vid_savescrshot)
         {
@@ -291,3 +297,54 @@ void video_doblit()
 	lastx  = lasty  = 0;
 	endblit();
 }
+
+#ifndef WIN32
+#include <pthread.h>
+
+pthread_mutex_t video_mutex;
+pthread_cond_t  video_cond;
+pthread_t       video_thread;
+extern int      quited;
+
+static void *blitloop(void *ptr)
+{
+    int err;
+
+    while (!quited)
+    {
+        if ((err = pthread_mutex_lock(&video_mutex)))
+        {
+            log_error("vidalleg: unable to lock mutex in video blit thread: %m");
+            return NULL;
+        }
+        if ((err = pthread_cond_wait(&video_cond, &video_mutex)))
+        {
+            log_error("vidalleg: error waiting for condition in video blit thread: %m");
+            return NULL;
+        }
+        if ((err = pthread_mutex_unlock(&video_mutex)))
+        {
+            log_error("vidalleg: unable to unlock mutex in video blit thread: %m");
+            return NULL;
+        }
+        video_realblit();
+    }
+    return NULL;
+}
+
+void video_startthread(void)
+{
+    int err;
+
+    pthread_mutex_init(&video_mutex, NULL);
+    pthread_cond_init(&video_cond, NULL);
+    if ((err = pthread_create(&video_thread, NULL, blitloop, NULL)))
+        log_error("vidalleg: unable to start video thread: %m");
+}
+
+void video_doblit()
+{
+    pthread_cond_broadcast(&video_cond);
+}
+
+#endif

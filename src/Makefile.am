@@ -16,7 +16,7 @@ b_em_CFLAGS = $(allegro_CFLAGS) -DBEM
 if OS_WIN
 b_em_LDADD = -lalleg -lz -lopenal -lalut
 else
-b_em_LDADD = $(allegro_LIBS) -lz -lopenal -lalut
+b_em_LDADD = $(allegro_LIBS) -lz -lopenal -lalut -lpthread
 endif
 
 b_em_SOURCES = \
