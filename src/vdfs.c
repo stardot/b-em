@@ -392,8 +392,13 @@ static vdfs_ent_t *new_entry(vdfs_ent_t *dir, const char *host_fn) {
 }
 
 static void tree_visit(const void *nodep, const VISIT which, const int depth) {
-    if (which == postorder || which == leaf)
-        *cat_ptr++ = *(vdfs_ent_t **)nodep;
+    vdfs_ent_t *ent;
+
+    if (which == postorder || which == leaf) {
+        ent = *(vdfs_ent_t **)nodep;
+        if (!(ent->attribs & ATTR_DELETED))
+            *cat_ptr++ = ent;
+    }
 }
 
 // Given a VDFS entry representing a dir scan the corresponding host dir.
@@ -417,11 +422,11 @@ static int scan_dir(vdfs_ent_t *dir) {
             ent = *ptr++;
             ent->attribs |= ATTR_DELETED;
         }
-        count = dir->cat_size;
 
         // Go through the entries in the host dir which are not
         // in sorted order, find each in the tree and remove the
         // deleted atrubute, if found or create a new entry if not.
+        count = 0;
         while ((dep = readdir(dp))) {
             if (*(dep->d_name) != '.') {
                 if (!(ext = strrchr(dep->d_name, '.')) || strcasecmp(ext, ".inf")) {
@@ -430,6 +435,7 @@ static int scan_dir(vdfs_ent_t *dir) {
                         ent = *ptr;
                         ent->attribs &= ~ATTR_DELETED;
                         scan_entry(ent);
+                        count++;
                     } else if ((ent = new_entry(dir, dep->d_name)))
                         count++;
                     else {
