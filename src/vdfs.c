@@ -490,7 +490,7 @@ static vdfs_ent_t *find_file(uint16_t fn_addr, vdfs_ent_t *key, vdfs_ent_t *ent,
                 *fn_ptr++ = ch;
             }
             *fn_ptr = '\0';
-            log_debug("vdfs: find_file: looking for acron name=%s", key->acorn_fn);
+            log_debug("vdfs: find_file: looking for acorn name=%s", key->acorn_fn);
             if (tail_addr)
                 *tail_addr = fn_addr;
             if (key->acorn_fn[0] == '$' && key->acorn_fn[1] == '\0')
