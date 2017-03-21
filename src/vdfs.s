@@ -19,10 +19,9 @@ FSFlag      =   &FC5D       :\ FS id when claimed
 PORT_CMD    =   &FC5E       :\ execute cmds on VDFS in host
 PORT_A      =   &FC5F       :\ store A ready for command.
 
-OS_CLI=&FFF7:OSBYTE=&FFF4:OSWORD=&FFF1:OSWRCH=&FFEE
-OSASCI=&FFE3:OSGBPB=&FFD1:OSNEWL=&FFE7:OSFILE=&FFDD:OSARGS=&FFDA
+OS_CLI=&FFF7:OSBYTE=&FFF4:OSWORD=&FFF1:OSWRCH=&FFEE:OSNEWL=&FFE7:OSASCI=&FFE3
+OSFILE=&FFDD:OSARGS=&FFDA:OSBGET=&FFD7:OSBPUT=&FFD4:OSGBPB=&FFD1:OSFIND=&FFCE
 
-:
 ORG     &8000
 .start
 EQUS "MRB"                         :\ No language entry
@@ -358,10 +357,18 @@ PLA:JMP ServExit            :\ Exit
 JSR PrROMTitle              :\ Print filing system name
 JSR OSNEWL:JSR OSNEWL
 LDY FSFlag:JSR SelectFS     :\ Select filing system
-PLA:BNE P%+5:JSR HostBoot   :\ If booting, get !Boot from host
+PLA:BNE P%+5:JSR AutoBoot   :\ If booting, get !Boot from host
 JMP ServClaim               :\ Exit, claimed
-.HostBoot
-EQUB &03:EQUB &D3           :\ Do !Boot
+.BootName
+EQUS "!BOOT",&0D
+.AutoBoot
+LDA #&40:LDX #<BootName:LDY #>BootName
+JSR OSFIND
+CMP #&00:BNE BootFound
+RTS
+.BootFound
+TAX:LDY #&00:LDA #&C6:JMP OSBYTE
+
 .ServFSInfo
 LDX #&00
 .FSInfoLp
