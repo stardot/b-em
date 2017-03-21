@@ -301,7 +301,7 @@ static void scan_entry(vdfs_ent_t *ent) {
     // trim .inf to get back to host path and get attributes
     *ptr = '\0';
     if (stat(host_file_path, &stb) == -1)
-        log_warn("unable to stat '%s': %s\n", host_file_path, strerror(errno));
+        log_warn("vdfs: unable to stat '%s': %s\n", host_file_path, strerror(errno));
     else {
         ent->length = stb.st_size;
         if (S_ISDIR(stb.st_mode))
@@ -467,7 +467,7 @@ static int scan_dir(vdfs_ent_t *dir) {
             }
         }
     } else
-        log_warn("unable to opendir '%s': %s\n", dir->host_path, strerror(errno));
+        log_warn("vdfs: unable to opendir '%s': %s\n", dir->host_path, strerror(errno));
     return 1;
 }
 
