@@ -28,7 +28,7 @@ if test "$enable_debug" = "yes"; then
    LDFLAGS="$LDFLAGS -L/usr/local/lib"
    AC_MSG_RESULT([yes])
 else
-   CFLAGS="$CFLAGS $CF_WARNINGS -D_GNU_SOURCE"
+   CFLAGS="$CFLAGS $CF_WARNINGS -O3 -D_GNU_SOURCE"
    LDFLAGS="$LDFLAGS -L/usr/local/lib"
    AC_MSG_RESULT([no])
 fi
