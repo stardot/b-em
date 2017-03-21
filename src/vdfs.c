@@ -81,6 +81,7 @@ struct _vdfs_entry {
     size_t     cat_size;
     char       *host_path;
     unsigned   scan_seq;
+    time_t     scan_mtime;
     vdfs_ent_t *parent;
 };
 
@@ -406,12 +407,19 @@ static void tree_visit(const void *nodep, const VISIT which, const int depth) {
 static int scan_dir(vdfs_ent_t *dir) {
     int  count = 0;
     DIR  *dp;
+    struct stat stb;
     struct dirent *dep;
     vdfs_ent_t **ptr, **end, *ent, key;
     const char *ext;
 
-    if (dir->acorn_tree && dir->scan_seq >= scan_seq)
-        return 0; // scanned before.
+    // Has this been scanned sufficiently recently already?
+
+    if (stat(dir->host_path, &stb) == -1)
+        log_warn("vdfs: unable to stat directory '%s': %s", dir->host_path, strerror(errno));
+    else if (scan_seq <= dir->scan_seq && stb.st_mtime <= dir->scan_mtime) {
+        log_debug("vdfs: using cached dir info for %s", dir->host_path);
+        return 0;
+    }
 
     if ((dp = opendir(dir->host_path))) {
         // Mark all previosly seen entries deleted but leave them
@@ -456,6 +464,7 @@ static int scan_dir(vdfs_ent_t *dir) {
             }
             if (count == 0) {
                 dir->scan_seq = scan_seq;
+                dir->scan_mtime = stb.st_mtime;
                 return 0;
             }
             if ((dir->cat_tab = malloc(sizeof(vdfs_ent_t *)*count))) {
@@ -463,8 +472,11 @@ static int scan_dir(vdfs_ent_t *dir) {
                 twalk(dir->acorn_tree, tree_visit);
                 dir->cat_size = count;
                 dir->scan_seq = scan_seq;
+                dir->scan_mtime = stb.st_mtime;
                 return 0;
-            }
+            } else
+                log_warn("vdfs: out of memory scanning directory");
+                
         }
     } else
         log_warn("vdfs: unable to opendir '%s': %s\n", dir->host_path, strerror(errno));
