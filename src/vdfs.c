@@ -1432,9 +1432,10 @@ static inline void exec_swr_fs() {
 
 static void exec_swr_ram(uint8_t flags, uint16_t ram_start, uint16_t len, uint32_t sw_start, uint8_t romid) {
     uint8_t *rom_ptr;
+    int16_t nromid;
 
     log_debug("vdfs: exec_swr_ram: flags=%02x, ram_start=%04x, len=%04x, sw_start=%04x, romid=%02d\n", flags, ram_start, len, sw_start, romid);
-    if ((romid = swr_calc_addr(flags, &sw_start, romid)) >= 0) {
+    if ((nromid = swr_calc_addr(flags, &sw_start, romid)) >= 0) {
         rom_ptr = rom + romid * 0x4000 + sw_start;
         if (flags & 0x80)
             while (len--)
