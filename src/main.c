@@ -121,7 +121,7 @@ void main_init(int argc, char *argv[])
 
         al_init_main(argc, argv);
 
-        append_filename(t, exedir, "roms\\tube\\ReCo6502ROM_816", 511);
+        append_filename(t, exedir, "roms/tube/ReCo6502ROM_816", 511);
         if (!file_exists(t,FA_ALL,NULL) && selecttube == 4) selecttube = -1;
 
         curtube = selecttube;
