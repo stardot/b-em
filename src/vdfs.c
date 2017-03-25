@@ -81,6 +81,7 @@ struct _vdfs_entry {
     size_t     cat_size;
     char       *host_path;
     unsigned   scan_seq;
+    time_t     scan_mtime;
     vdfs_ent_t *parent;
 };
 
@@ -178,7 +179,7 @@ static void free_tree_node(void *ptr) {
 }
 
 void vdfs_reset() {
-        flush_all();
+    flush_all();
 }
 
 static int host_comp(const void *a, const void *b) {
@@ -284,8 +285,8 @@ static void scan_entry(vdfs_ent_t *ent) {
     ptr = host_file_path = malloc(strlen(host_dir_path) + strlen(ent->host_fn) + 6);
     ptr = stpcpy(ptr, host_dir_path);
     if (ent->host_fn[0] != '.' || ent->host_fn[1] != '\0') {
-	*ptr++ = '/';
-	ptr = stpcpy(ptr, ent->host_fn);
+        *ptr++ = '/';
+        ptr = stpcpy(ptr, ent->host_fn);
     }
     strcpy(ptr, ".inf");
 
@@ -301,7 +302,7 @@ static void scan_entry(vdfs_ent_t *ent) {
     // trim .inf to get back to host path and get attributes
     *ptr = '\0';
     if (stat(host_file_path, &stb) == -1)
-        log_warn("unable to stat '%s': %s\n", host_file_path, strerror(errno));
+        log_warn("vdfs: unable to stat '%s': %s\n", host_file_path, strerror(errno));
     else {
         ent->length = stb.st_size;
         if (S_ISDIR(stb.st_mode))
@@ -392,8 +393,13 @@ static vdfs_ent_t *new_entry(vdfs_ent_t *dir, const char *host_fn) {
 }
 
 static void tree_visit(const void *nodep, const VISIT which, const int depth) {
-    if (which == postorder || which == leaf)
-        *cat_ptr++ = *(vdfs_ent_t **)nodep;
+    vdfs_ent_t *ent;
+
+    if (which == postorder || which == leaf) {
+        ent = *(vdfs_ent_t **)nodep;
+        if (!(ent->attribs & ATTR_DELETED))
+            *cat_ptr++ = ent;
+    }
 }
 
 // Given a VDFS entry representing a dir scan the corresponding host dir.
@@ -401,12 +407,19 @@ static void tree_visit(const void *nodep, const VISIT which, const int depth) {
 static int scan_dir(vdfs_ent_t *dir) {
     int  count = 0;
     DIR  *dp;
+    struct stat stb;
     struct dirent *dep;
     vdfs_ent_t **ptr, **end, *ent, key;
     const char *ext;
 
-    if (dir->acorn_tree && dir->scan_seq >= scan_seq)
-        return 0; // scanned before.
+    // Has this been scanned sufficiently recently already?
+
+    if (stat(dir->host_path, &stb) == -1)
+        log_warn("vdfs: unable to stat directory '%s': %s", dir->host_path, strerror(errno));
+    else if (scan_seq <= dir->scan_seq && stb.st_mtime <= dir->scan_mtime) {
+        log_debug("vdfs: using cached dir info for %s", dir->host_path);
+        return 0;
+    }
 
     if ((dp = opendir(dir->host_path))) {
         // Mark all previosly seen entries deleted but leave them
@@ -417,25 +430,26 @@ static int scan_dir(vdfs_ent_t *dir) {
             ent = *ptr++;
             ent->attribs |= ATTR_DELETED;
         }
-        count = dir->cat_size;
 
         // Go through the entries in the host dir which are not
         // in sorted order, find each in the tree and remove the
         // deleted atrubute, if found or create a new entry if not.
+        count = 0;
         while ((dep = readdir(dp))) {
             if (*(dep->d_name) != '.') {
-		if (!(ext = strrchr(dep->d_name, '.')) || strcasecmp(ext, ".inf")) {
-		    key.host_fn = dep->d_name;
-		    if ((ptr = tfind(&key, &dir->host_tree, host_comp))) {
-			ent = *ptr;
-			ent->attribs &= ~ATTR_DELETED;
-			scan_entry(ent);
-		    } else if ((ent = new_entry(dir, dep->d_name)))
-			count++;
-		    else {
-			count = -1;
-			break;
-		    }
+                if (!(ext = strrchr(dep->d_name, '.')) || strcasecmp(ext, ".inf")) {
+                    key.host_fn = dep->d_name;
+                    if ((ptr = tfind(&key, &dir->host_tree, host_comp))) {
+                        ent = *ptr;
+                        ent->attribs &= ~ATTR_DELETED;
+                        scan_entry(ent);
+                        count++;
+                    } else if ((ent = new_entry(dir, dep->d_name)))
+                        count++;
+                    else {
+                        count = -1;
+                        break;
+                    }
                 }
             }
         }
@@ -450,6 +464,7 @@ static int scan_dir(vdfs_ent_t *dir) {
             }
             if (count == 0) {
                 dir->scan_seq = scan_seq;
+                dir->scan_mtime = stb.st_mtime;
                 return 0;
             }
             if ((dir->cat_tab = malloc(sizeof(vdfs_ent_t *)*count))) {
@@ -457,11 +472,14 @@ static int scan_dir(vdfs_ent_t *dir) {
                 twalk(dir->acorn_tree, tree_visit);
                 dir->cat_size = count;
                 dir->scan_seq = scan_seq;
+                dir->scan_mtime = stb.st_mtime;
                 return 0;
-            }
+            } else
+                log_warn("vdfs: out of memory scanning directory");
+                
         }
     } else
-        log_warn("unable to opendir '%s': %s\n", dir->host_path, strerror(errno));
+        log_warn("vdfs: unable to opendir '%s': %s\n", dir->host_path, strerror(errno));
     return 1;
 }
 
@@ -484,6 +502,7 @@ static vdfs_ent_t *find_file(uint16_t fn_addr, vdfs_ent_t *key, vdfs_ent_t *ent,
                 *fn_ptr++ = ch;
             }
             *fn_ptr = '\0';
+            log_debug("vdfs: find_file: looking for acorn name=%s", key->acorn_fn);
             if (tail_addr)
                 *tail_addr = fn_addr;
             if (key->acorn_fn[0] == '$' && key->acorn_fn[1] == '\0')
@@ -617,23 +636,23 @@ void vdfs_new_root(const char *root) {
 
     len = strlen(root);
     while (len > 0 && ((ch = root[--len]) == '/' || ch == '\\'))
-	;
+        ;
     if (++len > 0) {
-	if ((path = malloc(len + 1))) {
-	    memcpy(path, root, len);
-	    path[len] = '\0';
-	    root_dir.host_path = path;
-	    root_dir.host_fn = ".";
-	    scan_entry(&root_dir);
-	    cur_dir = lib_dir = prev_dir = &root_dir;
-	    scan_seq++;
-	} else {
-	    log_warn("vdfs: unable to set root as unable to allocate path.  VDFS disabled");
-	    vdfs_enabled = 0;
-	}
+        if ((path = malloc(len + 1))) {
+            memcpy(path, root, len);
+            path[len] = '\0';
+            root_dir.host_path = path;
+            root_dir.host_fn = ".";
+            scan_entry(&root_dir);
+            cur_dir = lib_dir = prev_dir = &root_dir;
+            scan_seq++;
+        } else {
+            log_warn("vdfs: unable to set root as unable to allocate path.  VDFS disabled");
+            vdfs_enabled = 0;
+        }
     } else {
-	log_warn("vdfs: unable to set root as path is empty.  VDFS disabled");
-	vdfs_enabled = 0;
+        log_warn("vdfs: unable to set root as path is empty.  VDFS disabled");
+        vdfs_enabled = 0;
     }
 }
 
@@ -1024,7 +1043,7 @@ static inline void osargs() {
         switch (a)
         {
             case 0:
-                a = 4; // say disc filing selected.
+                a = fs_flag; // say this filing selected.
                 break;
             case 1:
                 writemem32(x, cmd_tail);
@@ -1348,7 +1367,7 @@ static int16_t swr_calc_addr(uint8_t flags, uint32_t *st_ptr, uint16_t romid) {
             adfs_error(err_no_swr);
             return -1;
         }
-        log_debug("vdfs: exec_sram: abs addr bank=%02d, start=%04x\n", romid, start);
+        log_debug("vdfs: swr_calc_addr: abs addr bank=%02d, start=%04x\n", romid, start);
         start -= 0x8000;
     }
     *st_ptr = start;
@@ -1413,9 +1432,10 @@ static inline void exec_swr_fs() {
 
 static void exec_swr_ram(uint8_t flags, uint16_t ram_start, uint16_t len, uint32_t sw_start, uint8_t romid) {
     uint8_t *rom_ptr;
+    int16_t nromid;
 
     log_debug("vdfs: exec_swr_ram: flags=%02x, ram_start=%04x, len=%04x, sw_start=%04x, romid=%02d\n", flags, ram_start, len, sw_start, romid);
-    if ((romid = swr_calc_addr(flags, &sw_start, romid)) >= 0) {
+    if ((nromid = swr_calc_addr(flags, &sw_start, romid)) >= 0) {
         rom_ptr = rom + romid * 0x4000 + sw_start;
         if (flags & 0x80)
             while (len--)
@@ -1529,9 +1549,11 @@ static inline void dispatch(uint8_t value) {
 uint8_t vdfs_read(uint16_t addr) {
     switch (addr & 3) {
         case 0:
+            log_debug("vdfs: get claim_fs=%02x", claim_fs);
             return claim_fs;
             break;
         case 1:
+            log_debug("vdfs: get fs_flag=%02x", fs_flag);
             return fs_flag;
             break;
         default:
@@ -1543,9 +1565,11 @@ void vdfs_write(uint16_t addr, uint8_t value) {
     switch (addr & 3) {
         case 0:
             claim_fs = value;
+            log_debug("vdfs: set claim_fs=%02x", value);
             break;
         case 1:
             fs_flag = value;
+            log_debug("vdfs: set fs_flag=%02x", value);
             break;
         case 2:
             a = reg_a;

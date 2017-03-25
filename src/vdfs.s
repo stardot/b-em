@@ -19,10 +19,9 @@ FSFlag      =   &FC5D       :\ FS id when claimed
 PORT_CMD    =   &FC5E       :\ execute cmds on VDFS in host
 PORT_A      =   &FC5F       :\ store A ready for command.
 
-OS_CLI=&FFF7:OSBYTE=&FFF4:OSWORD=&FFF1:OSWRCH=&FFEE
-OSASCI=&FFE3:OSGBPB=&FFD1:OSNEWL=&FFE7:OSFILE=&FFDD:OSARGS=&FFDA
+OS_CLI=&FFF7:OSBYTE=&FFF4:OSWORD=&FFF1:OSWRCH=&FFEE:OSNEWL=&FFE7:OSASCI=&FFE3
+OSFILE=&FFDD:OSARGS=&FFDA:OSBGET=&FFD7:OSBPUT=&FFD4:OSGBPB=&FFD1:OSFIND=&FFCE
 
-:
 ORG     &8000
 .start
 EQUS "MRB"                         :\ No language entry
@@ -35,7 +34,7 @@ EQUS "Virtual DFS":EQUB 0:EQUS "0.05 (17 Sep 2016)"
 .ROMCopyright
 EQUB 0:EQUS "(C)1995 MRB, 2004 JGH, 2016 SJF":EQUB 0
 EQUD 0
-:
+
 \ As this ROM requires support from the emulator and that may not
 \ be enabled (or supported) check that it works before responding
 \ to any ROM calls.
@@ -46,9 +45,8 @@ LDA #&FE:STA PORT_CMD:CMP #&00:BEQ ServEnabled
 PLA:PLP:RTS
 
 .ServEnabled
-TXA:PHA:TYA:PHA            :\ Save all registers
+TXA:PHA:TYA:PHA                    :\ Save all registers
 TSX:LDA &0103,X                    :\ Get service number
-CMP #&01:BNE P%+5:JMP ServWorkspace:\ Private workspace
 CMP #&03:BNE P%+5:JMP ServFSStart  :\ FS startup
 CMP #&04:BNE P%+5:JMP ServCommand  :\ *command
 CMP #&08:BNE P%+5:JMP ServOsword   :\ OSWORD
@@ -69,9 +67,6 @@ LDA #0:RTS                         :\ Exit with A=0 to claim call
 \ ===========================
 \ ROM Administration Routines
 \ ===========================
-.ServWorkspace
-PLA:CLC:ADC PageOffset:PHA         :\ Add offset to push PAGE up by
-JMP ServExit
 .PrROMTitleNL               :\ Print NL, ROM title
 JSR OSNEWL
 .PrROMTitle                 :\ Print ROM title
@@ -257,16 +252,20 @@ LDA #&00                    :\ Ignore command
 RTS
 :
 
-.srload LDA #&D0
-        BNE srfile
-.srsave LDA #&D3
-.srfile STA PORT_CMD        :\ parse command on host.
+.CheckFsIsUs
         LDA #&00            :\ query current FS
         TAY
         JSR OSARGS
         LDX #<oswpb         ;\ YX = parameter block.
         LDY #>oswpb
         CMP FSFlag
+	RTS
+	
+.srload LDA #&D0
+        BNE srfile
+.srsave LDA #&D3
+.srfile STA PORT_CMD        :\ parse command on host.
+        JSR CheckFsIsUs
         BEQ srfus           :\ FS is us so execute on host.
         LDA #&43            :\ execute via OSWORD
         JMP OSWORD
@@ -278,7 +277,6 @@ RTS
 .srwrite:LDA #&D1:STA PORT_CMD:RTS \ Pass to host and return
 :
 :
-.PageOffset:EQUB &00        :\ Amount to raise PAGE by
 \ ======================
 \ Filing System Routines
 \ ======================
@@ -359,10 +357,18 @@ PLA:JMP ServExit            :\ Exit
 JSR PrROMTitle              :\ Print filing system name
 JSR OSNEWL:JSR OSNEWL
 LDY FSFlag:JSR SelectFS     :\ Select filing system
-PLA:BNE P%+5:JSR HostBoot   :\ If booting, get !Boot from host
+PLA:BNE P%+5:JSR AutoBoot   :\ If booting, get !Boot from host
 JMP ServClaim               :\ Exit, claimed
-.HostBoot
-EQUB &03:EQUB &D3           :\ Do !Boot
+.BootName
+EQUS "!BOOT",&0D
+.AutoBoot
+LDA #&40:LDX #<BootName:LDY #>BootName
+JSR OSFIND
+CMP #&00:BNE BootFound
+RTS
+.BootFound
+TAX:LDY #&00:LDA #&C6:JMP OSBYTE
+
 .ServFSInfo
 LDX #&00
 .FSInfoLp
@@ -636,10 +642,13 @@ LDA &EF:CMP #127            :\ Check OSWORD number
 BNE P%+5:JSR Osword7F       :\ If FM disk access, play with memory
 PLA:TAY:PLA:TAX:PLA:PLP     :\ Restore registers
 STA PORT_A:LDA #&40:STA PORT_CMD :\Pass OSWORD call to emulator and return
+RTS	
 \ -------------------------------------------------------------
 \ Corrupt bits of memory to simulate effects of real OSWORD &7F
 \ -------------------------------------------------------------
 .Osword7F
+JSR CheckFsIsUs
+BNE SkipOSW7F
 LDA &B0:PHA:LDA &B1:PHA     :\ Code calling Osword7F may be using &B0/1
 JSR fdcFetchAddr
 JSR fdcFetchPtr
@@ -649,6 +658,7 @@ EOR &1000,X:ROL A:EOR #&23:STA &1000,X
 INY:BNE Osw7FLp
 .Osw7FDone
 PLA:STA &B1:PLA:STA &B0     :\ A,X,Y preserved outside here
+.SkipOSW7F
 RTS
 :
 .Osw7FAddr
