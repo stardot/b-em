@@ -134,7 +134,7 @@ static uint32_t dbg_reg_get(int which) {
     case REG_PC:
 	return tubepc;
     default:
-	log_warn("6502tube: attempt to read non-existent register");
+	log_warn("6502tube: attempt to get non-existent register");
 	return 0;
     }
 }
@@ -153,6 +153,8 @@ static void dbg_reg_set(int which, uint32_t value) {
 	unpack_flags(value);
     case REG_PC:
 	tubepc = value;
+    default:
+	log_warn("6502tube: attempt to set non-existent register");
     }
 }
 
@@ -199,7 +201,7 @@ cpu_debug_t tube6502_cpu_debug = {
 };
 
 static uint32_t dbg_disassemble(uint32_t addr, char *buf, size_t bufsize) {
-    return dbg6502_disassemble(&tube6502_cpu_debug, addr, buf, bufsize, 0);
+    return dbg6502_disassemble(&tube6502_cpu_debug, addr, buf, bufsize, M6502);
 }
 
 #undef printf

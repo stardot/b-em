@@ -58,8 +58,197 @@ static uint8_t w65816opcode;
 
 static int def=1,divider=0,banking=0,banknum=0;
 static uint32_t w65816mask=0xFFFF;
+static uint16_t toldpc;
 
-uint8_t readmem65816(uint32_t a)
+static const char *dbg65816_reg_names[] = { "AB", "X", "Y", "S", "P", "PC", "DP", "DB", "PB", NULL };
+
+static int dbg_w65816 = 0;
+
+static int dbg_debug_enable(int newvalue) {
+    int oldvalue = dbg_w65816;
+    dbg_w65816 = newvalue;
+    return oldvalue;
+};
+
+static inline uint8_t pack_flags() {
+    uint8_t flags = 0;
+
+    if (p.c)
+	flags |= 0x01;
+    if (p.z)
+	flags |= 0x02;
+    if (p.i)
+	flags |= 0x04;
+    if (p.d)
+	flags |= 0x08;
+    if (p.ex)
+	flags |= 0x10;
+    if (p.m)
+	flags |= 0x20;
+    if (p.v)
+	flags |= 0x40;
+    if (p.n)
+	flags |= 0x80;
+    return flags;
+}
+
+static inline uint8_t pack_flags_em(uint8_t flags) {
+
+    if (p.c)
+	flags |= 0x01;
+    if (p.z)
+	flags |= 0x02;
+    if (p.i)
+	flags |= 0x4;
+    if (p.d)
+	flags |= 0x08;
+    if (p.v)
+	flags |= 0x40;
+    if (p.n)
+	flags |= 0x80;
+    return flags;
+}
+
+static inline void unpack_flags(uint8_t flags) {
+    p.c  = flags & 0x01;
+    p.z  = flags & 0x02;
+    p.i  = flags & 0x04;
+    p.d  = flags & 0x08;
+    p.ex = flags & 0x10;
+    p.m  = flags & 0x20;
+    p.v  = flags & 0x40;
+    p.n  = flags & 0x80;
+}
+
+static inline void unpack_flags_em(uint8_t flags) {
+    p.c = flags & 0x01;
+    p.z = flags & 0x02;
+    p.i = flags & 0x04;
+    p.d = flags & 0x08;
+    p.ex = p.m=0;
+    p.v = flags & 0x40;
+    p.n = flags & 0x80;
+}
+
+static uint32_t dbg_reg_get(int which) {
+    switch (which)
+    {
+    case REG_A:
+        return w65816a.w;
+    case REG_X:
+        return w65816x.w;
+    case REG_Y:
+        return w65816y.w;
+    case REG_S:
+        return w65816s.w;
+    case REG_P:
+        return pack_flags();
+    case REG_PC:
+        return pc;
+    case REG_DP:
+	return dp;
+    case REG_DB:
+	return dbr;
+    case REG_PB:
+	return pbr;
+    default:
+        log_warn("65816: attempt to get non-existent register");
+        return 0;
+    }
+}
+
+static void dbg_reg_set(int which, uint32_t value) {
+    switch (which)
+    {
+    case REG_A:
+        w65816a.w = value;
+        break;
+    case REG_X:
+        w65816x.w = value;
+        break;
+    case REG_Y:
+        w65816y.w = value;
+        break;
+    case REG_S:
+        w65816s.w = value;
+        break;
+    case REG_P:
+        unpack_flags(value);
+        break;
+    case REG_PC:
+        pc = value;
+    case REG_DP:
+	dp = value;
+    case REG_DB:
+	dbr = value;
+    case REG_PB:
+	pbr = value;
+    default:
+        log_warn("65816: attempt to set non-existent register");
+    }
+}
+
+size_t dbg65816_print_flags(char *buf, size_t bufsize) {
+    if (bufsize >= 8) {
+	*buf++ = p.n  ? 'N' : ' ';
+	*buf++ = p.v  ? 'V' : ' ';
+	*buf++ = p.m  ? 'M' : ' ';
+	*buf++ = p.ex ? 'E' : ' ';
+	*buf++ = p.d  ? 'D' : ' ';
+	*buf++ = p.i  ? 'I' : ' ';
+	*buf++ = p.z  ? 'Z' : ' ';
+	*buf++ = p.c  ? 'C' : ' ';
+	return 6;
+    }
+    return 0;
+}
+
+static size_t dbg_reg_print(int which, char *buf, size_t bufsize) {
+    switch (which)
+    {
+    case REG_P:
+        return dbg65816_print_flags(buf, bufsize);
+        break;
+    case REG_PC:
+        return snprintf(buf, bufsize, "%04X", pc);
+        break;
+    default:
+        return snprintf(buf, bufsize, "%02X", dbg_reg_get(which));
+    }
+}
+
+static void dbg_reg_parse(int which, char *str) {
+    uint32_t value = strtol(str, NULL, 16);
+    dbg_reg_set(which, value);
+}
+
+static uint32_t do_readmem65816(uint32_t addr);
+static void     do_writemem65816(uint32_t addr, uint32_t val);
+static uint32_t dbg_disassemble(uint32_t addr, char *buf, size_t bufsize);
+
+static uint32_t dbg_get_instr_addr() {
+    return toldpc;
+}
+
+cpu_debug_t tube65816_cpu_debug = {
+    .cpu_name       = "65816",
+    .debug_enable   = dbg_debug_enable,
+    .memread        = do_readmem65816,
+    .memwrite       = do_writemem65816,
+    .disassemble    = dbg_disassemble,
+    .reg_names      = dbg65816_reg_names,
+    .reg_get        = dbg_reg_get,
+    .reg_set        = dbg_reg_set,
+    .reg_print      = dbg_reg_print,
+    .reg_parse      = dbg_reg_parse,
+    .get_instr_addr = dbg_get_instr_addr
+};
+
+static uint32_t dbg_disassemble(uint32_t addr, char *buf, size_t bufsize) {
+    return dbg6502_disassemble(&tube65816_cpu_debug, addr, buf, bufsize, W65816);
+}
+
+static uint32_t do_readmem65816(uint32_t a)
 {
         uint8_t temp;
         a&=w65816mask;
@@ -81,18 +270,29 @@ uint8_t readmem65816(uint32_t a)
         return w65816ram[a];
 }
 
+uint8_t readmem65816(uint32_t addr)
+{
+    uint32_t value = do_readmem65816(addr);
+    if (dbg_w65816)
+	debug_memread(&tube65816_cpu_debug, addr, value, 8);
+    return value;
+}
+
 static uint16_t readmemw65816(uint32_t a)
 {
-        a&=w65816mask;
-        return readmem65816(a)|(readmem65816(a+1)<<8);
+    uint16_t value;
+    
+    a&=w65816mask;
+    value = do_readmem65816(a) | (do_readmem65816(a+1)<<8);
+    if (dbg_w65816)
+	debug_memread(&tube65816_cpu_debug, a, value, 16);
 //        cycles-=2;
-//        log_debug("Reading %08X %i %08X %08X\n",a,tuberomin,w65816rom,w65816ram);
-//        if ((a&~0xFFF)==0xF000 && tuberomin) return w65816rom[a&0xFFF]|(w65816rom[(a+1)&0xFFF]<<8);
-//        if (a<0x10000) return w65816ram[a]|(w65816ram[a+1]<<8);
+    return value;
 }
 
 int endtimeslice;
-void writemem65816(uint32_t a, uint8_t v)
+
+void do_writemem65816(uint32_t a, uint32_t v)
 {
         a&=w65816mask;
 //        if (a==0xFF) log_debug("Write 00FF %02X %04X %i\n",v,pc,wins);
@@ -126,11 +326,20 @@ void writemem65816(uint32_t a, uint8_t v)
         w65816ram[a]=v;
 }
 
+void writemem65816(uint32_t addr, uint8_t val)
+{
+    if (dbg_w65816)
+	debug_memwrite(&tube65816_cpu_debug, addr, val, 8);
+    do_writemem65816(addr, val);
+}
+
 static void writememw65816(uint32_t a, uint16_t v)
 {
-        a&=w65816mask;
-        writemem65816(a,v);
-        writemem65816(a+1,v>>8);
+    if (dbg_w65816)
+	debug_memwrite(&tube65816_cpu_debug, a, v, 16);
+    a&=w65816mask;
+    do_writemem65816(a,v);
+    do_writemem65816(a+1,v>>8);
 //        cycles-=2;
 //        if (a<0x10000)
 //        {
@@ -2898,57 +3107,30 @@ static void plbe()
 
 static void plp()
 {
-        uint8_t temp=readmem(s.w+1); s.w++;
-        p.c=temp&1;
-        p.z=temp&2;
-        p.i=temp&4;
-        p.d=temp&8;
-        p.ex=temp&0x10;
-        p.m=temp&0x20;
-        p.v=temp&0x40;
-        p.n=temp&0x80;
+        unpack_flags(readmem(s.w+1)); s.w++;
         cycles-=2; clockspc(12);
         updatecpumode();
         //printf("PLP %04X\n",s.w);
 }
 static void plpe()
 {
-        uint8_t temp;
-        s.b.l++; temp=readmem(s.w);
-        p.c=temp&1;
-        p.z=temp&2;
-        p.i=temp&4;
-        p.d=temp&8;
-        p.v=temp&0x40;
-        p.n=temp&0x80;
+        s.b.l++;
+	unpack_flags_em(readmem(s.w));
         cycles-=2; clockspc(12);
 }
 
 static void php()
 {
-        uint8_t temp=(p.c)?1:0;
-        if (p.z) temp|=2;
-        if (p.i) temp|=4;
-        if (p.d) temp|=8;
-        if (p.v) temp|=0x40;
-        if (p.n) temp|=0x80;
-        if (p.ex) temp|=0x10;
-        if (p.m) temp|=0x20;
-        readmem(pbr|pc);
-        writemem(s.w,temp); s.w--;
+    uint8_t flags = pack_flags();
+    readmem(pbr|pc);
+    writemem(s.w,flags); s.w--;
         //printf("PHP %04X\n",s.w);
 }
+
 static void phpe()
 {
-        uint8_t temp=(p.c)?1:0;
-        if (p.z) temp|=2;
-        if (p.i) temp|=4;
-        if (p.d) temp|=8;
-        if (p.v) temp|=0x40;
-        if (p.n) temp|=0x80;
-        temp|=0x30;
         readmem(pbr|pc);
-        writemem(s.w,temp); s.b.l--;
+        writemem(s.w,pack_flags_em(0x30)); s.b.l--;
 }
 
 /*CPX group*/
@@ -3279,17 +3461,8 @@ static void rtse()
 
 static void rti()
 {
-        uint8_t temp;
         cycles--; s.w++; clockspc(6);
-        temp=readmem(s.w);
-        p.c=temp&1;
-        p.z=temp&2;
-        p.i=temp&4;
-        p.d=temp&8;
-        p.ex=temp&0x10;
-        p.m=temp&0x20;
-        p.v=temp&0x40;
-        p.n=temp&0x80;
+        unpack_flags(readmem(s.w));
         s.w++; pc=readmem(s.w);       //  //printf("%04X -> %02X\n",s.w,pc);
         s.w++; pc|=(readmem(s.w)<<8);  // //printf("%04X -> %02X\n",s.w,pc>>8);
         s.w++; pbr=readmem(s.w)<<16;    ////printf("%04X -> %02X\n",s.w,pbr>>16);
@@ -3298,16 +3471,8 @@ static void rti()
 
 static void rtie()
 {
-        uint8_t temp;
         cycles--; s.b.l++; clockspc(6);
-        temp=readmem(s.w);
-        p.c=temp&1;
-        p.z=temp&2;
-        p.i=temp&4;
-        p.d=temp&8;
-        p.ex=p.m=0;
-        p.v=temp&0x40;
-        p.n=temp&0x80;
+        unpack_flags_em(readmem(s.w));
         s.b.l++; pc=readmem(s.w);       //  //printf("%04X -> %02X\n",s.w,pc);
         s.b.l++; pc|=(readmem(s.w)<<8);  // //printf("%04X -> %02X\n",s.w,pc>>8);
         updatecpumode();
@@ -3959,20 +4124,11 @@ static void mvn()
 
 static void op_brk()
 {
-        uint8_t temp=0;
         pc++;
         writemem(s.w,pbr>>16); s.w--;
         writemem(s.w,pc>>8);   s.w--;
         writemem(s.w,pc&0xFF);  s.w--;
-        if (p.c) temp|=1;
-        if (p.z) temp|=2;
-        if (p.i) temp|=4;
-        if (p.d) temp|=8;
-        if (p.ex) temp|=0x10;
-        if (p.m) temp|=0x20;
-        if (p.v) temp|=0x40;
-        if (p.n) temp|=0x80;
-        writemem(s.w,temp);    s.w--;
+        writemem(s.w,pack_flags());    s.w--;
         pc=readmemw(0xFFE6);
         pbr=0;
         p.i=1;
@@ -3981,17 +4137,10 @@ static void op_brk()
 
 static void brke()
 {
-        uint8_t temp=0;
         pc++;
         writemem(s.w,pc>>8);   s.w--;
         writemem(s.w,pc&0xFF);  s.w--;
-        if (p.c) temp|=1;
-        if (p.z) temp|=2;
-        if (p.i) temp|=4;
-        if (p.d) temp|=8;
-        if (p.v) temp|=0x40;
-        if (p.n) temp|=0x80;
-        writemem(s.w,temp|0x30);    s.w--;
+        writemem(s.w,pack_flags_em(0x30));    s.w--;
         pc=readmemw(0xFFFE);
         pbr=0;
         p.i=1;
@@ -4000,20 +4149,11 @@ static void brke()
 
 static void cop()
 {
-        uint8_t temp=0;
         pc++;
         writemem(s.w,pbr>>16); s.w--;
         writemem(s.w,pc>>8);   s.w--;
         writemem(s.w,pc&0xFF);  s.w--;
-        if (p.c) temp|=1;
-        if (p.z) temp|=2;
-        if (p.i) temp|=4;
-        if (p.d) temp|=8;
-        if (p.ex) temp|=0x10;
-        if (p.m) temp|=0x20;
-        if (p.v) temp|=0x40;
-        if (p.n) temp|=0x80;
-        writemem(s.w,temp);    s.w--;
+        writemem(s.w,pack_flags());    s.w--;
         pc=readmemw(0xFFE4);
         pbr=0;
         p.i=1;
@@ -4022,17 +4162,10 @@ static void cop()
 
 static void cope()
 {
-        uint8_t temp=0;
         pc++;
         writemem(s.w,pc>>8);   s.w--;
         writemem(s.w,pc&0xFF);  s.w--;
-        if (p.c) temp|=1;
-        if (p.z) temp|=2;
-        if (p.i) temp|=4;
-        if (p.d) temp|=8;
-        if (p.v) temp|=0x40;
-        if (p.n) temp|=0x80;
-        writemem(s.w,temp);    s.w--;
+        writemem(s.w,pack_flags_em(0));    s.w--;
         pc=readmemw(0xFFF4);
         pbr=0;
         p.i=1;
@@ -4719,7 +4852,6 @@ static void updatecpumode()
 
 static void nmi65816()
 {
-        uint8_t temp=0;
 //        printf("NMI %i %i %i\n",p.i,inwai,irqenable);
         readmem(pbr|pc);
         cycles--; clockspc(6);
@@ -4733,16 +4865,7 @@ static void nmi65816()
                 writemem(s.w,pc>>8);   s.w--;
 //                //printf("%02X -> %04X\n",pc&0xFF,s.w);
                 writemem(s.w,pc&0xFF);  s.w--;
-                if (p.c) temp|=1;
-                if (p.z) temp|=2;
-                if (p.i) temp|=4;
-                if (p.d) temp|=8;
-                if (p.ex) temp|=0x10;
-                if (p.m) temp|=0x20;
-                if (p.v) temp|=0x40;
-                if (p.n) temp|=0x80;
-//                //printf("%02X -> %04X\n",temp,s.w);
-                writemem(s.w,temp);    s.w--;
+                writemem(s.w,pack_flags());    s.w--;
                 pc=readmemw(0xFFEA);
                 pbr=0;
                 p.i=1;
@@ -4753,13 +4876,7 @@ static void nmi65816()
         {
                 writemem(s.w,pc>>8);   s.b.l--;
                 writemem(s.w,pc&0xFF);  s.b.l--;
-                if (p.c) temp|=1;
-                if (p.z) temp|=2;
-                if (p.i) temp|=4;
-                if (p.d) temp|=8;
-                if (p.v) temp|=0x40;
-                if (p.n) temp|=0x80;
-                writemem(s.w,temp|0x30);    s.b.l--;
+                writemem(s.w,pack_flags_em(0x30)); s.b.l--;
                 pc=readmemw(0xFFFA);
                 pbr=0;
                 p.i=1;
@@ -4773,7 +4890,6 @@ static void nmi65816()
 static int toutput=0;
 static void irq65816()
 {
-        uint8_t temp=0;
 //        printf("IRQ %i %i %i\n",p.i,inwai,irqenable);
         readmem(pbr|pc);
         cycles--; clockspc(6);
@@ -4790,15 +4906,7 @@ static void irq65816()
                 writemem(s.w,pbr>>16); s.w--;
                 writemem(s.w,pc>>8);   s.w--;
                 writemem(s.w,pc&0xFF);  s.w--;
-                if (p.c) temp|=1;
-                if (p.z) temp|=2;
-                if (p.i) temp|=4;
-                if (p.d) temp|=8;
-                if (p.ex) temp|=0x10;
-                if (p.m) temp|=0x20;
-                if (p.v) temp|=0x40;
-                if (p.n) temp|=0x80;
-                writemem(s.w,temp);    s.w--;
+                writemem(s.w,pack_flags());    s.w--;
                 pc=readmemw(0xFFEE);
                 pbr=0;
                 p.i=1;
@@ -4809,13 +4917,7 @@ static void irq65816()
         {
                 writemem(s.w,pc>>8);     s.b.l--;
                 writemem(s.w,pc&0xFF);   s.b.l--;
-                if (p.c) temp|=1;
-                if (p.z) temp|=2;
-                if (p.i) temp|=4;
-                if (p.d) temp|=8;
-                if (p.v) temp|=0x40;
-                if (p.n) temp|=0x80;
-                writemem(s.w,temp|0x20); s.b.l--;
+                writemem(s.w,pack_flags_em(0x20)); s.b.l--;
                 pc=readmemw(0xFFFE);
                 pbr=0;
                 p.i=1;
@@ -4828,12 +4930,16 @@ static void irq65816()
 }
 
 static int woldnmi=0;
-static uint16_t toldpc;
 void w65816_exec()
 {
+        uint32_t ia;
+
         while (tubecycles>0)
         {
-                opcode=readmem(pbr|pc); pc++;
+	        ia = pbr|pc;
+                if (dbg_w65816)
+                    debug_preexec(&tube65816_cpu_debug, ia);
+                opcode=readmem(ia); pc++;
                 if (toutput) log_debug("%i : %02X:%04X %04X %02X %i %04X  %04X %04X %04X\n",wins,pbr,pc-1,toldpc,opcode,cycles,s.b.l,a.w,x.w,y.w);
                 toldpc=pc-1;
                 opcodes[opcode][cpumode]();

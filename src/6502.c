@@ -80,7 +80,7 @@ static uint32_t dbg_reg_get(int which) {
     case REG_PC:
         return pc;
     default:
-        log_warn("6502: attempt to read non-existent register");
+        log_warn("6502: attempt to get non-existent register");
         return 0;
     }
 }
@@ -105,6 +105,8 @@ static void dbg_reg_set(int which, uint32_t value) {
         break;
     case REG_PC:
         pc = value;
+    default:
+        log_warn("6502: attempt to get non-existent register");
     }
 }
 
@@ -150,7 +152,7 @@ cpu_debug_t core6502_cpu_debug = {
 };
 
 static uint32_t dbg_disassemble(uint32_t addr, char *buf, size_t bufsize) {
-    return dbg6502_disassemble(&core6502_cpu_debug, addr, buf, bufsize, MASTER);
+  return dbg6502_disassemble(&core6502_cpu_debug, addr, buf, bufsize, MASTER ? M65C02 : M6502);
 }
 
 int tubecycle;

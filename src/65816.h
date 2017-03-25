@@ -1,6 +1,8 @@
 #ifndef __INC_65816_H
 #define __INC_65816_H
 
+#include "6502debug.h"
+
 void w65816_init();
 void w65816_reset();
 void w65816_exec();
