@@ -3,13 +3,16 @@
 #include "b-em.h"
 #include "6502debug.h"
 #include "6502.h"
+#include "65816.h"
 
 const char *dbg6502_reg_names[] = { "A", "X", "Y", "S", "P", "PC", NULL };
 
 typedef enum {
     IMP,    // Implied.
     IMPA,   // Implied with A as the implied operand.
-    IMM,    // Immediate
+    IMM,    // Immediate, 8 bit
+    IMV,    // Immediate, 8 or 16 bit depending accumulator mode.
+    IMX,    // Immediate, 8 or 16 bit depending on index register mode.
     ZP,     // Zero page, known as Direct Page on the 65816.
     ZPX,    // Zero (direct) page indexed by X.
     ZPY,    // Zero (direct) page indexed by Y (for LDX).
@@ -21,7 +24,7 @@ typedef enum {
     ABS,    // Absolute.
     ABSL,   // Absolute long, 24 bit (65816 only)
     ABSX,   // Absolute indexed by X
-    ABSXL,  // Absolute indexed by X
+    ABSXL,  // Absolute indexed by X, long
     ABSY,   // Absolute indexed by Y
     IND16,  // Indirect 16bit (for JMP).
     IND1X,  // Indexed (by X) indirect (for JMP)
@@ -29,7 +32,7 @@ typedef enum {
     PCRL,   // PC-relative.  16bit signed offset from PC.
     SR,     // Stack relative (65816 only)
     SRY,    // Stack relative indirect indexed (by Y).
-    BM      // Block moves (65816 only)
+    BM,     // Block moves (65816 only)
 } addr_mode_t;
 
 typedef enum {
@@ -83,21 +86,21 @@ static int8_t op_cmos[256] =
 static uint8_t am_cmos[256]=
 {
 /*00*/  IMP,  INDX, IMP,  IMP,  ZP,   ZP,   ZP,   IMP,  IMP,  IMM,  IMPA, IMP,  ABS,  ABS,  ABS,  IMP,
-/*10*/  BRA,  INDY, IND,  IMP,  ZP,   ZPX,  ZPX,  IMP,  IMP,  ABSY, IMPA, IMP,  ABS,  ABSX, ABSX, IMP,
+/*10*/  PCR,  INDY, IND,  IMP,  ZP,   ZPX,  ZPX,  IMP,  IMP,  ABSY, IMPA, IMP,  ABS,  ABSX, ABSX, IMP,
 /*20*/  ABS,  INDX, IMP,  IMP,  ZP,   ZP,   ZP,   IMP,  IMP,  IMM,  IMPA, IMP,  ABS,  ABS,  ABS,  IMP,
-/*30*/  BRA,  INDY, IND,  IMP,  ZPX,  ZPX,  ZPX,  IMP,  IMP,  ABSY, IMPA, IMP,  ABSX, ABSX, ABSX, IMP,
+/*30*/  PCR,  INDY, IND,  IMP,  ZPX,  ZPX,  ZPX,  IMP,  IMP,  ABSY, IMPA, IMP,  ABSX, ABSX, ABSX, IMP,
 /*40*/  IMP,  INDX, IMP,  IMP,  ZP,   ZP,   ZP,   IMP,  IMP,  IMM,  IMPA, IMP,  ABS,  ABS,  ABS,  IMP,
-/*50*/  BRA,  INDY, IND,  IMP,  ZP,   ZPX,  ZPX,  IMP,  IMP,  ABSY, IMP,  IMP,  ABS,  ABSX, ABSX, IMP,
+/*50*/  PCR,  INDY, IND,  IMP,  ZP,   ZPX,  ZPX,  IMP,  IMP,  ABSY, IMP,  IMP,  ABS,  ABSX, ABSX, IMP,
 /*60*/  IMP,  INDX, IMP,  IMP,  ZP,   ZP,   ZP,   IMP,  IMP,  IMM,  IMPA, IMP,  IND16,ABS,  ABS,  IMP,
-/*70*/  BRA,  INDY, IND,  IMP,  ZPX,  ZPX,  ZPX,  IMP,  IMP,  ABSY, IMP,  IMP,  IND1X,ABSX, ABSX, IMP,
-/*80*/  BRA,  INDX, IMP,  IMP,  ZP,   ZP,   ZP,   IMP,  IMP,  IMM,  IMP,  IMP,  ABS,  ABS,  ABS,  IMP,
-/*90*/  BRA,  INDY, IND,  IMP,  ZPX,  ZPX,  ZPY,  IMP,  IMP,  ABSY, IMP,  IMP,  ABS,  ABSX, ABSX, IMP,
+/*70*/  PCR,  INDY, IND,  IMP,  ZPX,  ZPX,  ZPX,  IMP,  IMP,  ABSY, IMP,  IMP,  IND1X,ABSX, ABSX, IMP,
+/*80*/  PCR,  INDX, IMP,  IMP,  ZP,   ZP,   ZP,   IMP,  IMP,  IMM,  IMP,  IMP,  ABS,  ABS,  ABS,  IMP,
+/*90*/  PCR,  INDY, IND,  IMP,  ZPX,  ZPX,  ZPY,  IMP,  IMP,  ABSY, IMP,  IMP,  ABS,  ABSX, ABSX, IMP,
 /*A0*/  IMM,  INDX, IMM,  IMP,  ZP,   ZP,   ZP,   IMP,  IMP,  IMM,  IMP,  IMP,  ABS,  ABS,  ABS,  IMP,
-/*B0*/  BRA,  INDY, IND,  IMP,  ZPX,  ZPX,  ZPY,  IMP,  IMP,  ABSY, IMP,  IMP,  ABSX, ABSX, ABSY, IMP,
+/*B0*/  PCR,  INDY, IND,  IMP,  ZPX,  ZPX,  ZPY,  IMP,  IMP,  ABSY, IMP,  IMP,  ABSX, ABSX, ABSY, IMP,
 /*C0*/  IMM,  INDX, IMP,  IMP,  ZP,   ZP,   ZP,   IMP,  IMP,  IMM,  IMP,  IMP,  ABS,  ABS,  ABS,  IMP,
-/*D0*/  BRA,  INDY, IND,  IMP,  ZP,   ZPX,  ZPX,  IMP,  IMP,  ABSY, IMP,  IMP,  ABS,  ABSX, ABSX, IMP,
+/*D0*/  PCR,  INDY, IND,  IMP,  ZP,   ZPX,  ZPX,  IMP,  IMP,  ABSY, IMP,  IMP,  ABS,  ABSX, ABSX, IMP,
 /*E0*/  IMM,  INDX, IMP,  IMP,  ZP,   ZP,   ZP,   IMP,  IMP,  IMM,  IMP,  IMP,  ABS,  ABS,  ABS,  IMP,
-/*F0*/  BRA,  INDY, IND,  IMP,  ZP,   ZPX,  ZPX,  IMP,  IMP,  ABSY, IMP,  IMP,  ABS,  ABSX, ABSX, IMP,
+/*F0*/  PCR,  INDY, IND,  IMP,  ZP,   ZPX,  ZPX,  IMP,  IMP,  ABSY, IMP,  IMP,  ABS,  ABSX, ABSX, IMP,
 };
 
 static int8_t op_nmos[256] =
@@ -123,21 +126,21 @@ static int8_t op_nmos[256] =
 static int8_t am_nmos[256] =
 {
 /*00*/  IMP,  INDX, IMP,  INDX, ZP,   ZP,   ZP,   ZP,   IMP,  IMM,  IMPA, IMM,  ABS,  ABS,  ABS,  ABS,
-/*10*/  BRA,  INDY, IMP,  INDY, ZPX,  ZPX,  ZPX,  ZPX,  IMP,  ABSY, IMP,  ABSY, ABSX, ABSX, ABSX, ABSX,
+/*10*/  PCR,  INDY, IMP,  INDY, ZPX,  ZPX,  ZPX,  ZPX,  IMP,  ABSY, IMP,  ABSY, ABSX, ABSX, ABSX, ABSX,
 /*20*/  ABS,  INDX, IMP,  INDX, ZP,   ZP,   ZP,   ZP,   IMP,  IMM,  IMPA, IMM,  ABS,  ABS,  ABS,  ABS,
-/*30*/  BRA,  INDY, IMP,  INDY, ZPX,  ZPX,  ZPX,  ZPX,  IMP,  ABSY, IMP,  ABSY, ABSX, ABSX, ABSX, ABSX,
+/*30*/  PCR,  INDY, IMP,  INDY, ZPX,  ZPX,  ZPX,  ZPX,  IMP,  ABSY, IMP,  ABSY, ABSX, ABSX, ABSX, ABSX,
 /*40*/  IMP,  INDX, IMP,  INDX, ZP,   ZP,   ZP,   ZP,   IMP,  IMM,  IMPA, IMM,  ABS,  ABS,  ABS,  ABS,
-/*50*/  BRA,  INDY, IMP,  INDY, ZPX,  ZPX,  ZPX,  ZPX,  IMP,  ABSY, IMP,  ABSY, ABSX, ABSX, ABSX, ABSX,
+/*50*/  PCR,  INDY, IMP,  INDY, ZPX,  ZPX,  ZPX,  ZPX,  IMP,  ABSY, IMP,  ABSY, ABSX, ABSX, ABSX, ABSX,
 /*60*/  IMP,  INDX, IMP,  INDX, ZP,   ZP,   ZP,   ZP,   IMP,  IMM,  IMPA, IMM,  IND16,ABS,  ABS,  ABS,
-/*70*/  BRA,  INDY, IMP,  INDY, ZPX,  ZPX,  ZPX,  ZPX,  IMP,  ABSY, IMP,  ABSY, ABSX, ABSX, ABSX, ABSX,
-/*80*/  BRA,  INDX, IMM,  INDX, ZP,   ZP,   ZP,   ZP,   IMP,  IMM,  IMP,  IMM,  ABS,  ABS,  ABS,  ABS,
-/*90*/  BRA,  INDY, IMP,  INDY, ZPX,  ZPX,  ZPY,  ZPY,  IMP,  ABSY, IMP,  ABSY, ABSX, ABSX, ABSX, ABSX,
+/*70*/  PCR,  INDY, IMP,  INDY, ZPX,  ZPX,  ZPX,  ZPX,  IMP,  ABSY, IMP,  ABSY, ABSX, ABSX, ABSX, ABSX,
+/*80*/  PCR,  INDX, IMM,  INDX, ZP,   ZP,   ZP,   ZP,   IMP,  IMM,  IMP,  IMM,  ABS,  ABS,  ABS,  ABS,
+/*90*/  PCR,  INDY, IMP,  INDY, ZPX,  ZPX,  ZPY,  ZPY,  IMP,  ABSY, IMP,  ABSY, ABSX, ABSX, ABSX, ABSX,
 /*A0*/  IMM,  INDX, IMM,  INDX, ZP,   ZP,   ZP,   ZP,   IMP,  IMM,  IMP,  IMM,  ABS,  ABS,  ABS,  ABS,
-/*B0*/  BRA,  INDY, IMP,  INDY, ZPX,  ZPX,  ZPY,  ZPY,  IMP,  ABSY, IMP,  ABSY, ABSX, ABSX, ABSY, ABSX,
+/*B0*/  PCR,  INDY, IMP,  INDY, ZPX,  ZPX,  ZPY,  ZPY,  IMP,  ABSY, IMP,  ABSY, ABSX, ABSX, ABSY, ABSX,
 /*C0*/  IMM,  INDX, IMM,  INDX, ZP,   ZP,   ZP,   ZP,   IMP,  IMM,  IMP,  IMM,  ABS,  ABS,  ABS,  ABS,
-/*D0*/  BRA,  INDY, IMP,  INDY, ZPX,  ZPX,  ZPX,  ZPX,  IMP,  ABSY, IMP,  ABSY, ABSX, ABSX, ABSX, ABSX,
+/*D0*/  PCR,  INDY, IMP,  INDY, ZPX,  ZPX,  ZPX,  ZPX,  IMP,  ABSY, IMP,  ABSY, ABSX, ABSX, ABSX, ABSX,
 /*E0*/  IMM,  INDX, IMM,  INDX, ZP,   ZP,   ZP,   ZP,   IMP,  IMM,  IMP,  IMM,  ABS,  ABS,  ABS,  ABS,
-/*F0*/  BRA,  INDY, IMP,  INDY, ZPX,  ZPX,  ZPX,  ZPX,  IMP,  ABSY, IMP,  ABSY, ABSX, ABSX, ABSX, ABSX,
+/*F0*/  PCR,  INDY, IMP,  INDY, ZPX,  ZPX,  ZPX,  ZPX,  IMP,  ABSY, IMP,  ABSY, ABSX, ABSX, ABSX, ABSX,
 };
 
 static int8_t op_816[256] =
@@ -162,22 +165,22 @@ static int8_t op_816[256] =
 
 static uint8_t am_816[256]=
 {
-/*00*/  IMP,  INDX, IMM,  SR,   ZP,   ZP,   ZP,   INDL, IMP,  IMM,  IMPA, IMP,  ABS,  ABS,  ABS,  ABSL,
-/*10*/  BRA,  INDY, IND,  SRY,  ZP,   ZPX,  ZPX,  INDYL,IMP,  ABSY, IMPA, IMP,  ABS,  ABSX, ABSX, ABSXL,
-/*20*/  ABS,  INDX, ABSL, SR,   ZP,   ZP,   ZP,   INDL, IMP,  IMM,  IMPA, IMP,  ABS,  ABS,  ABS,  ABSL,
-/*30*/  BRA,  INDY, IND,  SRY,  ZPX,  ZPX,  ZPX,  INDYL,IMP,  ABSY, IMPA, IMP,  ABSX, ABSX, ABSX, ABSXL,
-/*40*/  IMP,  INDX, PCRL, SR,   BM,   ZP,   ZP,   INDL, IMP,  IMM,  IMPA, IMP,  ABS,  ABS,  ABS,  ABSL,
-/*50*/  BRA,  INDY, IND,  SRY,  BM,   ZPX,  ZPX,  INDYL,IMP,  ABSY, IMP,  IMP,  ABSL, ABSX, ABSX, ABSXL,
-/*60*/  IMP,  INDX, PCRL, SR,   ZP,   ZP,   ZP,   INDL, IMP,  IMM,  IMPA, IMP,  IND16,ABS,  ABS,  ABSL,
-/*70*/  BRA,  INDY, IND,  SRY,  ZPX,  ZPX,  ZPX,  INDYL,IMP,  ABSY, IMP,  IMP,  IND1X,ABSX, ABSX, ABSXL,
-/*80*/  BRA,  INDX, IMP,  SR,   ZP,   ZP,   ZP,   INDL, IMP,  IMM,  IMP,  IMP,  ABS,  ABS,  ABS,  ABSL,
-/*90*/  BRA,  INDY, IND,  SRY,  ZPX,  ZPX,  ZPY,  INDYL,IMP,  ABSY, IMP,  IMP,  ABS,  ABSX, ABSX, ABSXL,
-/*A0*/  IMM,  INDX, IMM,  SR,   ZP,   ZP,   ZP,   INDL, IMP,  IMM,  IMP,  IMP,  ABS,  ABS,  ABS,  ABSL,
-/*B0*/  BRA,  INDY, IND,  SRY,  ZPX,  ZPX,  ZPY,  INDYL,IMP,  ABSY, IMP,  IMP,  ABSX, ABSX, ABSY, ABSXL,
-/*C0*/  IMM,  INDX, IMM,  SR,   ZP,   ZP,   ZP,   INDL, IMP,  IMM,  IMP,  IMP,  ABS,  ABS,  ABS,  ABSL,
-/*D0*/  BRA,  INDY, IND,  SRY,  ABS,  ZPX,  ZPX,  INDYL,IMP,  ABSY, IMP,  IMP,  ABSL, ABSX, ABSX, ABSXL,
-/*E0*/  IMM,  INDX, IMM,  SR,   ZP,   ZP,   ZP,   INDL, IMP,  IMM,  IMP,  IMP,  ABS,  ABS,  ABS,  ABSL,
-/*F0*/  BRA,  INDY, IND,  SRY,  IND,  ZPX,  ZPX,  INDYL,IMP,  ABSY, IMP,  IMP,  ABSX, ABSX, ABSX, ABSXL
+/*00*/  IMP,  INDX, IMM,  SR,   ZP,   ZP,   ZP,   INDL, IMP,  IMV,  IMPA, IMP,  ABS,  ABS,  ABS,  ABSL,
+/*10*/  PCR,  INDY, IND,  SRY,  ZP,   ZPX,  ZPX,  INDYL,IMP,  ABSY, IMPA, IMP,  ABS,  ABSX, ABSX, ABSXL,
+/*20*/  ABS,  INDX, ABSL, SR,   ZP,   ZP,   ZP,   INDL, IMP,  IMV,  IMPA, IMP,  ABS,  ABS,  ABS,  ABSL,
+/*30*/  PCR,  INDY, IND,  SRY,  ZPX,  ZPX,  ZPX,  INDYL,IMP,  ABSY, IMPA, IMP,  ABSX, ABSX, ABSX, ABSXL,
+/*40*/  IMP,  INDX, IMP,  SR,   BM,   ZP,   ZP,   INDL, IMP,  IMV,  IMPA, IMP,  ABS,  ABS,  ABS,  ABSL,
+/*50*/  PCR,  INDY, IND,  SRY,  BM,   ZPX,  ZPX,  INDYL,IMP,  ABSY, IMP,  IMP,  ABSL, ABSX, ABSX, ABSXL,
+/*60*/  IMP,  INDX, PCRL, SR,   ZP,   ZP,   ZP,   INDL, IMP,  IMV,  IMPA, IMP,  IND16,ABS,  ABS,  ABSL,
+/*70*/  PCR,  INDY, IND,  SRY,  ZPX,  ZPX,  ZPX,  INDYL,IMP,  ABSY, IMP,  IMP,  IND1X,ABSX, ABSX, ABSXL,
+/*80*/  PCR,  INDX, PCRL, SR,   ZP,   ZP,   ZP,   INDL, IMP,  IMV,  IMP,  IMP,  ABS,  ABS,  ABS,  ABSL,
+/*90*/  PCR,  INDY, IND,  SRY,  ZPX,  ZPX,  ZPY,  INDYL,IMP,  ABSY, IMP,  IMP,  ABS,  ABSX, ABSX, ABSXL,
+/*A0*/  IMX,  INDX, IMX,  SR,   ZP,   ZP,   ZP,   INDL, IMP,  IMV,  IMP,  IMP,  ABS,  ABS,  ABS,  ABSL,
+/*B0*/  PCR,  INDY, IND,  SRY,  ZPX,  ZPX,  ZPY,  INDYL,IMP,  ABSY, IMP,  IMP,  ABSX, ABSX, ABSY, ABSXL,
+/*C0*/  IMX,  INDX, IMV,  SR,   ZP,   ZP,   ZP,   INDL, IMP,  IMV,  IMP,  IMP,  ABS,  ABS,  ABS,  ABSL,
+/*D0*/  PCR,  INDY, IND,  SRY,  IMP,  ZPX,  ZPX,  INDYL,IMP,  ABSY, IMP,  IMP,  ABSL, IND16,ABSX, ABSXL,
+/*E0*/  IMX,  INDX, IMV,  SR,   ZP,   ZP,   ZP,   INDL, IMP,  IMV,  IMP,  IMP,  ABS,  ABS,  ABS,  ABSL,
+/*F0*/  PCR,  INDY, IND,  SRY,  IMP,  ZPX,  ZPX,  INDYL,IMP,  ABSY, IMP,  IMP,  ABSX, ABSX, ABSX, ABSXL
 };
 
 uint32_t dbg6502_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t bufsize, m6502_t model)
@@ -225,6 +228,24 @@ uint32_t dbg6502_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
         case IMM:
             p1 = cpu->memread(addr++);
             snprintf(buf, bufsize, "%02X       %s #%02X     ", p1, op_name, p1);
+            break;
+        case IMV:
+            p1 = cpu->memread(addr++);
+            if (w65816p.m)
+                snprintf(buf, bufsize, "%02X       %s #%02X     ", p1, op_name, p1);
+            else {
+                p2 = cpu->memread(addr++);
+                snprintf(buf, bufsize, "%02X %02X     %s #%02X%02X     ", p1, p2, op_name, p1, p2);
+            }
+            break;
+        case IMX:
+            p1 = cpu->memread(addr++);
+            if (w65816p.ex)
+                snprintf(buf, bufsize, "%02X       %s #%02X     ", p1, op_name, p1);
+            else {
+                p2 = cpu->memread(addr++);
+                snprintf(buf, bufsize, "%02X %02X     %s #%02X%02X     ", p1, p2, op_name, p1, p2);
+            }
             break;
         case ZP:
             p1 = cpu->memread(addr++);

@@ -27,10 +27,7 @@ static uint16_t w65816pc,dp;
 
 static int wins=0;
 
-static struct
-{
-        int c,z,i,d,b,v,n,m,ex,e; /*X renamed to EX due to #define conflict*/
-} w65816p;
+w65816p_t w65816p;
 
 static int inwai;
 /*Opcode table*/
@@ -193,7 +190,7 @@ size_t dbg65816_print_flags(char *buf, size_t bufsize) {
 	*buf++ = p.n  ? 'N' : ' ';
 	*buf++ = p.v  ? 'V' : ' ';
 	*buf++ = p.m  ? 'M' : ' ';
-	*buf++ = p.ex ? 'E' : ' ';
+	*buf++ = p.ex ? 'X' : ' ';
 	*buf++ = p.d  ? 'D' : ' ';
 	*buf++ = p.i  ? 'I' : ' ';
 	*buf++ = p.z  ? 'Z' : ' ';
@@ -208,12 +205,8 @@ static size_t dbg_reg_print(int which, char *buf, size_t bufsize) {
     {
     case REG_P:
         return dbg65816_print_flags(buf, bufsize);
-        break;
-    case REG_PC:
-        return snprintf(buf, bufsize, "%04X", pc);
-        break;
     default:
-        return snprintf(buf, bufsize, "%02X", dbg_reg_get(which));
+        return snprintf(buf, bufsize, "%04X", dbg_reg_get(which));
     }
 }
 
