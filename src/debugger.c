@@ -380,7 +380,8 @@ static const char helptext[] =
     "    r crtc     - print CRTC registers\n"
     "    r vidproc  - print VIDPROC registers\n"
     "    r sound    - print Sound registers\n"
-    "    s [n]      - step n instructions (or 1 if no parameter)\n\n"
+    "    s [n]      - step n instructions (or 1 if no parameter)\n"
+    "    trace fn   - trace disassembly/registers to file, close file if no fn\n"
     "    watchr n   - watch reads from address n\n"
     "    watchw n   - watch writes to address n\n"
     "    watchi n   - watch inputs from port n\n"
@@ -468,7 +469,6 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
         while (c && !isspace(c))
             c = *++iptr;
         *iptr = '\0';
-        debug_outf("cmd='%s'\n", cmd);
         while (c && isspace(c))
             c = *++iptr;
 
