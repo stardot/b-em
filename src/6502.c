@@ -810,7 +810,7 @@ void m6502_exec()
                 opcode = readmem(pc);
                 pc++;
                 switch (opcode) {
-                case 0x00:
+                case 0x00:      /* BRK */
                         if (dbg_core6502)
                             debug_trap(&core6502_cpu_debug, oldpc, 0);
                         pc++;
@@ -3627,24 +3627,13 @@ void m65c02_exec()
                 opcode = readmem(pc);
                 pc++;
                 switch (opcode) {
-                case 0x00:
+                case 0x00:      /* BRK */
                         if (dbg_core6502)
                             debug_trap(&core6502_cpu_debug, oldpc, 0);
                         pc++;
                         push(pc >> 8);
                         push(pc & 0xFF);
-                        temp = 0x30;
-                        if (p.c)
-                                temp |= 1;
-                        if (p.z)
-                                temp |= 2;
-                        if (p.d)
-                                temp |= 8;
-                        if (p.v)
-                                temp |= 0x40;
-                        if (p.n)
-                                temp |= 0x80;
-                        push(temp);
+                        push(pack_flags(0x30));
                         pc = readmem(0xFFFE) | (readmem(0xFFFF) << 8);
                         p.i = 1;
                         p.d = 0;
