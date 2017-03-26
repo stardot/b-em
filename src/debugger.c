@@ -338,6 +338,7 @@ static uint32_t debug_memaddr=0;
 static uint32_t debug_disaddr=0;
 static uint8_t  debug_lastcommand=0;
 
+static int tbreak = -1;
 static int breakpoints[NUM_BREAKPOINTS] = {-1, -1, -1, -1, -1, -1, -1, -1};
 static int breakr[NUM_BREAKPOINTS]      = {-1, -1, -1, -1, -1, -1, -1, -1};
 static int breakw[NUM_BREAKPOINTS]      = {-1, -1, -1, -1, -1, -1, -1, -1};
@@ -372,6 +373,7 @@ static const char helptext[] =
     "    breako n   - break on output to I/O port\n"
     "    c          - continue running indefinitely\n"
     "    d [n]      - disassemble from address n\n"
+    "    n          - step, but treat a called subroutine as one step\n"
     "    m [n]      - memory dump from address n\n"
     "    q          - force emulator exit\n"
     "    r          - print 6502 registers\n"
@@ -452,11 +454,12 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 {
     int c, d, e, f;
     uint8_t temp;
+    uint32_t next_addr;
     char dump[256], *dptr;
     char ins[256], *iptr, *cmd, *eptr;
 
     indebug = 1;
-    cpu->disassemble(addr, ins, sizeof ins);
+    next_addr = cpu->disassemble(addr, ins, sizeof ins);
     debug_out(ins, strlen(ins));
 
     while (1) {
@@ -561,6 +564,12 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 }
                 break;
 
+            case 'n':
+            case 'N':
+                tbreak = next_addr;
+                indebug = 0;
+                return;
+
             case 'r':
             case 'R':
                 if (*iptr) {
@@ -607,7 +616,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 
             case 's':
             case 'S':
-                if (iptr)
+                if (*iptr)
                     sscanf(iptr, "%i", &debugstep);
                 else
                     debugstep = 1;
@@ -722,21 +731,26 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
         putc('\n', trace_fp);
     }
 
-    for (c = 0; c < NUM_BREAKPOINTS; c++) {
-        if (breakpoints[c] == addr) {
-            debug_outf("cpu %s: Break at %04X\n", cpu->cpu_name, addr);
-            if (contcount) {
-                contcount--;
-                return;
+    if (addr == tbreak) {
+        tbreak = -1;
+        enter = 1;
+    } else {
+        for (c = 0; c < NUM_BREAKPOINTS; c++) {
+            if (breakpoints[c] == addr) {
+                debug_outf("cpu %s: Break at %04X\n", cpu->cpu_name, addr);
+                if (contcount) {
+                    contcount--;
+                    return;
+                }
+                enter = 1;
             }
+        }
+        if (debugstep) {
+            debugstep--;
+            if (debugstep)
+                return;
             enter = 1;
         }
-    }
-    if (debugstep) {
-        debugstep--;
-        if (debugstep)
-            return;
-        enter = 1;
     }
     if (enter)
         debugger_do(cpu, addr);
