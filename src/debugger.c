@@ -464,13 +464,17 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
         debug_in(ins, 255);
         if (!*ins)
             *ins = debug_lastcommand;
+        // Skip past any leading spaces.
         for (iptr = ins; (c = *iptr) && isspace(c); iptr++);
         cmd = iptr;
+        // Find the first space and terminate command name.
         while (c && !isspace(c))
             c = *++iptr;
         *iptr = '\0';
+        // Skip past any separating spaces.
         while (c && isspace(c))
             c = *++iptr;
+        // iptr now points to the parameter.
 
         switch (*cmd) {
             case 'b':
