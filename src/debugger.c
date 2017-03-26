@@ -756,4 +756,11 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
         debugger_do(cpu, addr);
 }
 
+void debug_trap(cpu_debug_t *cpu, uint32_t addr, int reason)
+{
+    const char *desc = cpu->trap_names[reason];
+    debug_outf("cpu %s: %s at %04X\n", cpu->cpu_name, desc, addr);
+    debugger_do(cpu, addr);
+}
+
 

@@ -137,6 +137,8 @@ static uint32_t dbg_get_instr_addr() {
     return oldpc;
 }
 
+static const char *trap_names[] = { "BRK", NULL };
+
 cpu_debug_t core6502_cpu_debug = {
     .cpu_name       = "core6502",
     .debug_enable   = dbg_debug_enable,
@@ -148,7 +150,8 @@ cpu_debug_t core6502_cpu_debug = {
     .reg_set        = dbg_reg_set,
     .reg_print      = dbg_reg_print,
     .reg_parse      = dbg_reg_parse,
-    .get_instr_addr = dbg_get_instr_addr
+    .get_instr_addr = dbg_get_instr_addr,
+    .trap_names     = trap_names
 };
 
 static uint32_t dbg_disassemble(uint32_t addr, char *buf, size_t bufsize) {
@@ -808,16 +811,9 @@ void m6502_exec()
                 pc++;
                 switch (opcode) {
                 case 0x00:
-                        /*BRK*/
-//                                if (output)
-//                                {
-                            //printf("BRK! at %04X\n",pc);
-//                                        output=1;
-//                                        dumpregs();
-//                                        mem_dump();
-//                                        exit(-1);
-//                                }
-                            pc++;
+                        if (dbg_core6502)
+                            debug_trap(&core6502_cpu_debug, oldpc, 0);
+                        pc++;
                         push(pc >> 8);
                         push(pc & 0xFF);
                         push(pack_flags(0x30));
@@ -3632,16 +3628,9 @@ void m65c02_exec()
                 pc++;
                 switch (opcode) {
                 case 0x00:
-                        /*BRK*/
-//                                printf("BRK! %04X\n",pc);
-//                                if (output==2)
-//                                {
-//                                        log_debug("BRK! %04X %04X %04X %04X\n",pc,oldpc,oldoldpc,pc3);
-//                                        dumpregs();
-//                                        if (output) exit(-1);
-//                                        exit(-1);
-//                                }
-                            pc++;
+                        if (dbg_core6502)
+                            debug_trap(&core6502_cpu_debug, oldpc, 0);
+                        pc++;
                         push(pc >> 8);
                         push(pc & 0xFF);
                         temp = 0x30;

@@ -20,6 +20,7 @@ typedef struct {
   size_t   (*reg_print)(int which, char *buf, size_t bufsize);        // Print register value in CPU standard form.
   void     (*reg_parse)(int which, char *strval);                     // Parse a value into a register.
   uint32_t (*get_instr_addr)();                                       // Returns the base address of the currently executing instruction
+  const char **trap_names;                                            // Null terminated list of other reasons a CPU may trap to the debugger.
 
 } cpu_debug_t;
 
@@ -28,5 +29,6 @@ extern void debug_memwrite(cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint
 extern void debug_ioread  (cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t size);
 extern void debug_iowrite (cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t size);
 extern void debug_preexec (cpu_debug_t *cpu, uint32_t addr);
+extern void debug_trap    (cpu_debug_t *cpu, uint32_t addr, int reason);
 
 #endif
