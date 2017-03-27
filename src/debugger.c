@@ -680,7 +680,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
     indebug = 0;
 }
 
-static inline void check_points(cpu_debug_t *cpu, uint32_t addr, uint32_t value, int *break_tab, int *watch_tab, const char *desc)
+static inline void check_points(cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t size, int *break_tab, int *watch_tab, const char *desc)
 {
     int c;
     uint32_t iaddr;
@@ -693,25 +693,25 @@ static inline void check_points(cpu_debug_t *cpu, uint32_t addr, uint32_t value,
         }
         if (watch_tab[c] == addr) {
             iaddr = cpu->get_instr_addr();
-            debug_outf("cpu %s: %04X: %s %04X, value=%X\n", cpu->cpu_name, iaddr, desc, addr, value);
+            debug_outf("cpu %s: %04X: %s %04X, value=%0*X\n", cpu->cpu_name, iaddr, desc, addr, size*2, value);
         }
     }
 }
 
 void debug_memread (cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t size) {
-    check_points(cpu, addr, value, breakr, watchr, "read from");
+    check_points(cpu, addr, value, size, breakr, watchr, "read from");
 }
 
 void debug_memwrite(cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t size) {
-    check_points(cpu, addr, value, breakw, watchw, "write to");
+    check_points(cpu, addr, value, size, breakw, watchw, "write to");
 }
 
 void debug_ioread (cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t size) {
-    check_points(cpu, addr, value, breaki, watchi, "input from");
+    check_points(cpu, addr, value, size, breaki, watchi, "input from");
 }
 
 void debug_iowrite(cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t size) {
-    check_points(cpu, addr, value, breako, watcho, "output to");
+    check_points(cpu, addr, value, size, breako, watcho, "output to");
 }
 
 void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
@@ -765,5 +765,3 @@ void debug_trap(cpu_debug_t *cpu, uint32_t addr, int reason)
     debug_outf("cpu %s: %s at %04X\n", cpu->cpu_name, desc, addr);
     debugger_do(cpu, addr);
 }
-
-
