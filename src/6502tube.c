@@ -271,13 +271,13 @@ static void do_writemem(uint32_t addr, uint32_t value) {
 static uint8_t readmem(uint32_t addr) {
     uint32_t val = do_readmem(addr);
     if (dbg_tube6502)
-	debug_memread(&tube6502_cpu_debug, addr, val, 8);
+	debug_memread(&tube6502_cpu_debug, addr, val, 1);
     return val;
 }
 
 static void writemem(uint32_t addr, uint32_t value) {
     if (dbg_tube6502)
-	debug_memwrite(&tube6502_cpu_debug, addr, value, 8);
+	debug_memwrite(&tube6502_cpu_debug, addr, value, 1);
     do_writemem(addr, value);
 }
 

@@ -70,7 +70,7 @@ static inline uint8_t z80_readmem(uint16_t a)
 {
     uint8_t v = z80_do_readmem(a);
     if (dbg_tube_z80)
-	debug_memread(&tubez80_cpu_debug, a, v, 8);
+	debug_memread(&tubez80_cpu_debug, a, v, 1);
     return v;
 }
 
@@ -89,7 +89,7 @@ static inline void z80_do_writemem(uint16_t a, uint8_t v)
 
 static inline void z80_writemem(uint16_t a, uint8_t v) {
     if (dbg_tube_z80)
-	debug_memwrite(&tubez80_cpu_debug, a, v, 8);
+	debug_memwrite(&tubez80_cpu_debug, a, v, 1);
     z80_do_writemem(a, v);
 }
 
