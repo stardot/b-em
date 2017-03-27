@@ -35,6 +35,8 @@ void mouse_poll()
 #else
 		dx = (mouse_x - mouse_ox);
 		dy = (mouse_y - mouse_oy);
+                if (dx > 0 || dy > 0)
+                    log_debug("mouse: tube, dx=%d, dy=%d", dx, dy);
 		mouse_ox = mouse_x;
 		mouse_oy = mouse_y;
 #endif
@@ -55,7 +57,7 @@ void mouse_poll()
                         mouse_xff = !mouse_xff;
                 }
 
-                if (mouse_y != my)
+                if (my)
                 {
                         if (my > 0) mouse_portb &= ~0x10;
                         else        mouse_portb |=  0x10;
