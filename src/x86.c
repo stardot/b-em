@@ -8,8 +8,10 @@
 #include "b-em.h"
 #include "x86.h"
 #include "tube.h"
+#include "cpu_debug.h"
 
 static int x86ins=0;
+static int dbg_x86 = 0;
 
 #define loadcs(seg) CS=seg; cs=seg<<4
 
@@ -19,10 +21,337 @@ static void loadseg(uint16_t val, x86seg *seg)
         seg->base=val<<4;
 }
 
-#define readmembl(a)    (((a)<0xE0000)?x86ram[(a)]:readmemblx86(a))
-#define writemembl(a,b) x86ram[(a)&0xFFFFF]=b;
-#define readmemwl(s,a) ((((s)+(a))<0xE0000)?*(uint16_t *)(&x86ram[(s)+(a)]):readmemwlx86(s,a))
-#define writememwl(s,a,b) *(uint16_t *)(&x86ram[((s)+(a))&0xFFFFF])=b;
+static uint8_t *x86ram,*x86rom;
+
+static inline uint8_t readmemblx86(uint32_t addr)
+{
+        if (addr<0xE0000) return x86ram[addr];
+//        if (addr<0xC0000) return x86ram[addr-0x40000];
+        if (addr>0xF0000) return x86rom[addr&0x3FFF];
+        return 0xFF;
+}
+
+extern cpu_debug_t tubex86_cpu_debug;
+
+static inline uint8_t readmembl(uint32_t addr)
+{
+    uint8_t byte = readmemblx86(addr);
+    if (dbg_x86)
+        debug_memread(&tubex86_cpu_debug, addr, byte, 1);
+    return byte;
+}
+
+static inline uint16_t readmemwlx86(uint32_t addr)
+{
+        if (addr<0xE0000) return *(uint16_t *)(&x86ram[addr]);
+//        if (addr<0xC0000) return *(uint16_t *)(&x86ram[addr-0x40000]);
+        if (addr>0xF0000) return *(uint16_t *)(&x86rom[addr&0x3FFF]);
+        return 0xFFFF;
+}
+
+static inline uint16_t readmemwl(uint32_t seg, uint32_t addr)
+{
+    uint32_t ea = seg + addr;
+    uint16_t word = readmemwlx86(ea);
+    if (dbg_x86)
+        debug_memread(&tubex86_cpu_debug, ea, word, 2);
+    return word;
+}
+
+static inline void writememblx86(uint32_t addr, uint8_t byte)
+{
+    x86ram[addr & 0xFFFFF] = byte;
+}
+
+static inline void writemembl(uint32_t addr, uint8_t byte)
+{
+    if (dbg_x86)
+        debug_memwrite(&tubex86_cpu_debug, addr, byte, 1);
+    writememblx86(addr, byte);
+}
+
+static inline void writememwlx86(uint32_t addr, uint16_t word)
+{
+    *(uint16_t *)(&x86ram[addr & 0xFFFFF]) = word;
+}
+
+static inline void writememwl(uint32_t seg, uint32_t addr, uint16_t word)
+{
+    uint32_t ea = seg + addr;
+    if (dbg_x86)
+        debug_memwrite(&tubex86_cpu_debug, ea, word, 2);
+    writememwlx86(ea, word);
+}
+
+static uint32_t x86sa,x86ss,x86src;
+static uint32_t x86da,x86ds,x86dst;
+static uint16_t x86ena;
+static uint16_t x86imask=0;
+
+static inline uint8_t in_port(uint16_t port)
+{
+    if ((port & ~0xF) == 0x80)
+        return tube_parasite_read(port>>1);
+    return 0xFF;
+}
+
+static inline void out_port(uint16_t port, uint8_t val)
+{
+    switch (port)
+    {
+        case 0xFF28: x86imask=val; return;
+        case 0xFFC0: x86sa=(x86sa&0xFF00)|val;    x86src=x86sa+((x86ss&0xF)<<16); return;
+        case 0xFFC1: x86sa=(x86sa&0xFF)|(val<<8); x86src=x86sa+((x86ss&0xF)<<16); return;//printf("SRC now %05X %04X:%04X\n",x86src,CS,pc); return;
+        case 0xFFC2: x86ss=(x86ss&0xFF00)|val;    x86src=x86sa+((x86ss&0xF)<<16); return;
+        case 0xFFC3: x86ss=(x86ss&0xFF)|(val<<8); x86src=x86sa+((x86ss&0xF)<<16); return;//printf("SRC now %05X %04X:%04X\n",x86src,CS,pc); return;
+        case 0xFFC4: x86da=(x86da&0xFF00)|val;    x86dst=x86da+((x86ds&0xF)<<16); return;
+        case 0xFFC5: x86da=(x86da&0xFF)|(val<<8); x86dst=x86da+((x86ds&0xF)<<16); return;//printf("DST now %05X %04X:%04X\n",x86dst,CS,pc); return;
+        case 0xFFC6: x86ds=(x86ds&0xFF00)|val;    x86dst=x86da+((x86ds&0xF)<<16); return;
+        case 0xFFC7: x86ds=(x86ds&0xFF)|(val<<8); x86dst=x86da+((x86ds&0xF)<<16); return;//printf("DST now %05X %04X:%04X\n",x86dst,CS,pc); return;
+        case 0xFFCA: x86ena=(x86ena&0xFF00)|val; return;
+        case 0xFFCB: x86ena=(x86ena&0xFF)|(val<<8); return;
+    }
+    if ((port & ~0xF) == 0x80)
+        tube_parasite_write(port>>1,val);
+}
+
+/*****************************************************
+ * CPU Debug Interface
+ *****************************************************/
+
+enum register_numbers {
+    i_IP,
+    i_FLAGS,
+    i_AX,
+    i_BX,
+    i_CX,
+    i_DX,
+    i_DI,
+    i_SI,
+    i_BP,
+    i_SP,
+    i_CS,
+    i_DS,
+    i_ES,
+    i_SS
+};
+
+// NULL pointer terminated list of register names.
+static const char *x86_dbg_reg_names[] = {
+    "IP",
+    "FLAGS",
+    "AX",
+    "BX",
+    "CX",
+    "DX",
+    "DI",
+    "SI",
+    "BP",
+    "SP",
+    "CS",
+    "DS",
+    "ES",
+    "SS",
+    NULL
+};
+
+// enable/disable debugging on this CPU, returns previous value.
+static int x86_dbg_debug_enable(int newvalue) {
+    int oldvalue = dbg_x86;
+    dbg_x86 = newvalue;
+    return oldvalue;
+};
+
+// CPU's usual memory read function for data.
+static uint32_t x86_dbg_memread(uint32_t addr) {
+    return readmemblx86(addr);
+};
+
+// CPU's usual memory write function.
+static void x86_dbg_memwrite(uint32_t addr, uint32_t value) {
+    writememblx86(addr, value);
+};
+
+// CPU's usual IO read function for data.
+static uint32_t x86_dbg_ioread(uint32_t addr) {
+    return in_port(addr);
+};
+
+// CPU's usual IO write function.
+static void x86_dbg_iowrite(uint32_t addr, uint32_t value) {
+    out_port(addr, value);
+};
+
+#define MAXOPLEN 6
+int i386_dasm_one(char *buffer, uint32_t eip, int addr_size, int op_size);
+
+static uint32_t x86_dbg_disassemble(uint32_t addr, char *buf, size_t bufsize) {
+   char instr[100];
+   log_debug("x86: bdg_disassemble, addr=%04X, buf=%p, bufsize=%ld", addr, buf, bufsize);
+   int oplen = i386_dasm_one(instr, addr, 0, 0) & 0xffff;
+   log_debug("x86: bdg_disassemble, oplen=%d", oplen);
+   int len = snprintf(buf, bufsize, "%06"PRIx32" ", addr);
+   buf += len;
+   bufsize -= len;
+   for (int i = 0; i < MAXOPLEN; i++) {
+      if (i < oplen) {
+         len = snprintf(buf, bufsize, "%02x ", readmemblx86(addr + i));
+      } else {
+         len = snprintf(buf, bufsize, "   ");
+      }
+      buf += len;
+      bufsize -= len;
+   }
+   strncpy(buf, instr, bufsize);
+   return addr + oplen;
+}
+
+// Get a register - which is the index into the names above
+static uint32_t x86_dbg_reg_get(int which) {
+    switch (which) {
+    case i_IP:
+        return x86pc;
+    case i_FLAGS:
+        return flags;
+    case i_AX:
+        return AX;
+    case i_BX:
+        return BX;
+    case i_CX:
+        return CX;
+    case i_DX:
+        return DX;
+    case i_DI:
+        return DI;
+    case i_SI:
+        return SI;
+    case i_BP:
+        return BP;
+    case i_SP:
+        return SP;
+    case i_CS:
+        return CS;
+    case i_DS:
+        return DS;
+    case i_ES:
+        return ES;
+    case i_SS:
+        return SS;
+    }
+    return 0;
+};
+
+// Set a register.
+static void  x86_dbg_reg_set(int which, uint32_t value) {
+    switch (which) {
+    case i_IP:
+        x86pc = value;
+        break;
+    case i_FLAGS:
+        flags = value;
+        break;
+    case i_AX:
+        AX = value;
+        break;
+    case i_BX:
+        BX = value;
+        break;
+    case i_CX:
+        CX = value;
+        break;
+    case i_DX:
+        DX = value;
+        break;
+    case i_DI:
+        DI = value;
+        break;
+    case i_SI:
+        SI = value;
+        break;
+    case i_BP:
+        BP = value;
+        break;
+    case i_SP:
+        SP = value;
+        break;
+    case i_CS:
+        CS = value;
+        break;
+    case i_DS:
+        DS = value;
+        break;
+    case i_ES:
+        ES = value;
+        break;
+    case i_SS:
+        SS = value;
+        break;
+    }
+};
+
+static const char* flagname = "O D I T S Z * A * P * C ";
+
+// Print register value in CPU standard form.
+static size_t x86_dbg_reg_print(int which, char *buf, size_t bufsize) {
+   if (which == i_FLAGS) {
+      int i;
+      int bit;
+      char c;
+      const char *flagnameptr = flagname;
+      int psr = x86_dbg_reg_get(which);
+
+      if (bufsize < 40) {
+         strncpy(buf, "buffer too small!!!", bufsize);
+      }
+
+      bit = 0x800;
+      for (i = 0; i < 12; i++) {
+         if (psr & bit) {
+            c = '1';
+         } else {
+            c = '0';
+         }
+         do {
+            *buf++ = *flagnameptr++;
+         } while (*flagnameptr != ' ');
+         flagnameptr++;
+         *buf++ = ':';
+         *buf++ = c;
+         *buf++ = ' ';
+         bit >>= 1;
+      }
+      return strlen(buf);
+   } else {
+      return snprintf(buf, bufsize, "%04"PRIx32, x86_dbg_reg_get(which));
+   }
+};
+
+// Parse a value into a register.
+static void x86_dbg_reg_parse(int which, char *strval) {
+   uint32_t val = 0;
+   sscanf(strval, "%"SCNx32, &val);
+   x86_dbg_reg_set(which, val);
+};
+
+static uint32_t x86_dbg_get_instr_addr() {
+   return oldpc;
+}
+
+cpu_debug_t tubex86_cpu_debug = {
+   .cpu_name       = "80x86",
+   .debug_enable   = x86_dbg_debug_enable,
+   .memread        = x86_dbg_memread,
+   .memwrite       = x86_dbg_memwrite,
+   .ioread         = x86_dbg_ioread,
+   .iowrite        = x86_dbg_iowrite,
+   .disassemble    = x86_dbg_disassemble,
+   .reg_names      = x86_dbg_reg_names,
+   .reg_get        = x86_dbg_reg_get,
+   .reg_set        = x86_dbg_reg_set,
+   .reg_print      = x86_dbg_reg_print,
+   .reg_parse      = x86_dbg_reg_parse,
+   .get_instr_addr = x86_dbg_get_instr_addr
+};
 
 #define pc x86pc
 
@@ -35,11 +364,6 @@ static int tempc;
 static uint16_t getword();
 static uint8_t opcode;
 static int noint=0;
-
-static uint8_t readmemblx86(uint32_t addr);
-static uint16_t readmemwlx86(uint32_t seg, uint32_t addr);
-
-static uint8_t *x86ram,*x86rom;
 
 static int ssegs;
 
@@ -259,23 +583,6 @@ static void x86makeznptable()
       }
 }
 
-static uint8_t readmemblx86(uint32_t addr)
-{
-        if (addr<0xE0000) return x86ram[addr];
-//        if (addr<0xC0000) return x86ram[addr-0x40000];
-        if (addr>0xF0000) return x86rom[addr&0x3FFF];
-        return 0xFF;
-}
-
-static uint16_t readmemwlx86(uint32_t seg, uint32_t addr)
-{
-        uint32_t addr2=seg+addr;
-        if (addr2<0xE0000) return *(uint16_t *)(&x86ram[addr2]);
-//        if (addr2<0xC0000) return *(uint16_t *)(&x86ram[addr2-0x40000]);
-        if (addr2>0xF0000) return *(uint16_t *)(&x86rom[addr2&0x3FFF]);
-        return 0xFFFF;
-}
-
 static uint16_t getword()
 {
         pc+=2;
@@ -477,44 +784,19 @@ static void x86setsbc16(uint16_t a, uint16_t b)
         if (((a&0xF)-(b&0xF))&0x10)      flags|=A_FLAG;
 }
 
-static uint32_t x86sa,x86ss,x86src;
-static uint32_t x86da,x86ds,x86dst;
-static uint16_t x86ena;
-static uint16_t x86imask=0;
-
 static uint8_t inb(uint16_t port)
 {
-        if ((port&~0xF)==0x80) return tube_parasite_read(port>>1);
-        return 0xFF;
-        printf("Bad IN port %04X %04X:%04X\n",port,cs>>4,pc);
-        x86dumpregs();
-        exit(-1);
+        uint8_t byte = in_port(port);
+        if (dbg_x86)
+            debug_ioread(&tubex86_cpu_debug, port, byte, 1);
+        return byte;
 }
 
 static void outb(uint16_t port, uint8_t val)
 {
-//        port&=0xFF;
-//        printf("OUT %04X %02X %04X:%04X\n",port,val,cs>>4,pc);
-        switch (port)
-        {
-                case 0xFF28: x86imask=val; return;
-                case 0xFFC0: x86sa=(x86sa&0xFF00)|val;    x86src=x86sa+((x86ss&0xF)<<16); return;
-                case 0xFFC1: x86sa=(x86sa&0xFF)|(val<<8); x86src=x86sa+((x86ss&0xF)<<16); return;//printf("SRC now %05X %04X:%04X\n",x86src,CS,pc); return;
-                case 0xFFC2: x86ss=(x86ss&0xFF00)|val;    x86src=x86sa+((x86ss&0xF)<<16); return;
-                case 0xFFC3: x86ss=(x86ss&0xFF)|(val<<8); x86src=x86sa+((x86ss&0xF)<<16); return;//printf("SRC now %05X %04X:%04X\n",x86src,CS,pc); return;
-                case 0xFFC4: x86da=(x86da&0xFF00)|val;    x86dst=x86da+((x86ds&0xF)<<16); return;
-                case 0xFFC5: x86da=(x86da&0xFF)|(val<<8); x86dst=x86da+((x86ds&0xF)<<16); return;//printf("DST now %05X %04X:%04X\n",x86dst,CS,pc); return;
-                case 0xFFC6: x86ds=(x86ds&0xFF00)|val;    x86dst=x86da+((x86ds&0xF)<<16); return;
-                case 0xFFC7: x86ds=(x86ds&0xFF)|(val<<8); x86dst=x86da+((x86ds&0xF)<<16); return;//printf("DST now %05X %04X:%04X\n",x86dst,CS,pc); return;
-                case 0xFFCA: x86ena=(x86ena&0xFF00)|val; return;
-                case 0xFFCB: x86ena=(x86ena&0xFF)|(val<<8); return;
-        }
-        if ((port&~0xF)==0x80)
-        {
-//                if (port!=0x8E || val!=0) printf("Tube write %02X %02X\n",port,val);
-                tube_parasite_write(port>>1,val);
-                return;
-        }
+        if (dbg_x86)
+            debug_iowrite(&tubex86_cpu_debug, port, val, 1);
+        out_port(port, val);
 }
 
 static void x86_dma()
@@ -758,7 +1040,7 @@ void x86_exec()
         uint16_t addr, tempw, tempw2, tempw3, tempw4;
         signed char offset;
         int tempws;
-        uint32_t templ;
+        uint32_t ea, templ;
         int c,cycdiff;
         int tempi;
 //        tubecycles+=(cycs<<2);
@@ -772,7 +1054,10 @@ void x86_exec()
                 oldcs=CS;
                 oldpc=pc;
                 opcodestart:
-                opcode=readmembl(cs+pc);
+                ea = cs+pc;
+                if (dbg_x86)
+                    debug_preexec(&tubex86_cpu_debug, ea);
+                opcode=readmembl(ea);
                 tempc=flags&C_FLAG;
 #if 0
                 if (x86output && /*cs<0xF0000 && */!ssegs)//opcode!=0x26 && opcode!=0x36 && opcode!=0x2E && opcode!=0x3E)

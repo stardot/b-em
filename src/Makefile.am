@@ -83,6 +83,7 @@ b_em_SOURCES = \
 	video.c \
 	wd1770.c \
 	x86.c \
+	x86dasm.c \
 	resid-fp/convolve-sse.cc \
 	resid-fp/convolve.cc \
 	resid-fp/envelope.cc \
