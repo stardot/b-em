@@ -8,7 +8,10 @@
 #include "b-em.h"
 #include "arm.h"
 #include "tube.h"
+#include "cpu_debug.h"
+#include "darm/darm.h"
 
+static int arm_debug_enabled = 0;
 
 uint32_t *usrregs[16],userregs[16],superregs[16],fiqregs[16],irqregs[16];
 uint32_t armregs[16];
@@ -225,16 +228,37 @@ void arm_close()
 }
 
 int endtimeslice=0;
-static uint32_t readarmfl(uint32_t addr);
+
+static inline uint32_t readarmfl(uint32_t addr)
+{
+        if (addr<0x400000) return armram[addr>>2];
+        if (addr<0x400010) return 0xFFFFFFFF;
+        if ((addr>=0x3000000) && (addr<0x3004000)) return armrom[(addr&0x3FFC)>>2];
+        return 0xFFFFFFFF;
+/*        log_debug("Bad ARM read long %08X\n",addr);
+        dumparmregs();
+        exit(-1);*/
+}
+
+extern cpu_debug_t tubearm_cpu_debug;
+
+static inline uint32_t do_readarml(uint32_t a)
+{
+    if (armread[(a>>20)&63])
+        return armread[(a>>20)&63][(a&0xFFFFF)>>2];
+    return readarmfl(a);
+}
+
 static uint32_t readarml(uint32_t a)
 {
-        if (armread[(a>>20)&63])
-                return armread[(a>>20)&63][(a&0xFFFFF)>>2];
-        return readarmfl(a);
-}
-//#define readarml(a) ((armread[(a>>20)&63])?armread[(a>>20)&63][(a&0xFFFFF)>>2]:readarmfl(a))
+    uint32_t v = do_readarml(a);
 
-uint8_t readarmb(uint32_t addr)
+    if (arm_debug_enabled)
+        debug_memread(&tubearm_cpu_debug, a, v, 4);
+    return v;
+}
+
+static inline uint8_t do_readarmb(uint32_t addr)
 {
         if (addr<0x400000) return armramb[addr];
         if ((addr&~0x1F)==0x1000000)
@@ -248,18 +272,17 @@ uint8_t readarmb(uint32_t addr)
         dumparmregs();
         exit(-1);*/
 }
-static uint32_t readarmfl(uint32_t addr)
-{
-        if (addr<0x400000) return armram[addr>>2];
-        if (addr<0x400010) return 0xFFFFFFFF;
-        if ((addr>=0x3000000) && (addr<0x3004000)) return armrom[(addr&0x3FFC)>>2];
-        return 0xFFFFFFFF;
-/*        log_debug("Bad ARM read long %08X\n",addr);
-        dumparmregs();
-        exit(-1);*/
-}
 
-void writearmb(uint32_t addr, uint8_t val)
+uint8_t readarmb(uint32_t addr)
+{
+    uint8_t v = do_readarmb(addr);
+    if (arm_debug_enabled)
+        debug_memread(&tubearm_cpu_debug, addr, v, 1);
+    return v;
+}
+    
+
+static inline void do_writearmb(uint32_t addr, uint8_t val)
 {
         if (addr<0x400000)
         {
@@ -277,8 +300,18 @@ void writearmb(uint32_t addr, uint8_t val)
         dumparmregs();
         exit(-1);*/
 }
+
+void writearmb(uint32_t addr, uint8_t val)
+{
+    if (arm_debug_enabled)
+        debug_memwrite(&tubearm_cpu_debug, addr, val, 1);
+    do_writearmb(addr, val);
+}
+
 static void writearml(uint32_t addr, uint32_t val)
 {
+        if (arm_debug_enabled)
+                debug_memwrite(&tubearm_cpu_debug, addr, val, 4);
         if (addr<0x400000)
         {
                 armram[addr>>2]=val;
@@ -289,6 +322,231 @@ static void writearml(uint32_t addr, uint32_t val)
         dumparmregs();
         exit(-1);*/
 }
+
+/*****************************************************
+ * CPU Debug Interface
+ *****************************************************/
+
+#define ADDRESS_MASK    ((uint32_t) 0x03fffffcu)
+
+static darm_t dis;
+static darm_str_t dis_str;
+
+enum register_numbers {
+    i_R0,
+    i_R1,
+    i_R2,
+    i_R3,
+    i_R4,
+    i_R5,
+    i_R6,
+    i_R7,
+    i_R8,
+    i_R9,
+    i_R10,
+    i_R11,
+    i_R12,
+    i_SP,
+    i_LR,
+    i_PC,
+    i_R8_fiq,
+    i_R9_fiq,
+    i_R10_fiq,
+    i_R11_fiq,
+    i_R12_fiq,
+    i_SP_fiq,
+    i_LR_fiq,
+    i_SP_irq,
+    i_LR_irq,
+    i_SP_svc,
+    i_LR_svc,
+    i_PSR
+};
+
+// NULL pointer terminated list of register names.
+static const char *arm_dbg_reg_names[] = {
+    "R0",
+    "R1",
+    "R2",
+    "R3",
+    "R4",
+    "R5",
+    "R6",
+    "R7",
+    "R8",
+    "R9",
+    "R10",
+    "R11",
+    "R12",
+    "SP",
+    "LR",
+    "PC",
+    "R8_fiq",
+    "R9_fiq",
+    "R10_fiq",
+    "R11_fiq",
+    "R12_fiq",
+    "SP_fiq",
+    "LR_fiq",
+    "SP_irq",
+    "LR_irq",
+    "SP_svc",
+    "LR_svc",
+    "PSR",
+    NULL
+};
+
+static int arm_dbg_debug_enable(int newvalue) {
+    int oldvalue = arm_debug_enabled;
+    arm_debug_enabled = newvalue;
+    return oldvalue;
+};
+
+static uint32_t arm_dbg_memread(uint32_t addr)
+{
+    return do_readarmb(addr);
+}
+
+static void arm_dbg_memwrite(uint32_t addr, uint32_t val)
+{
+    do_writearmb(addr, val);
+}
+
+static uint32_t arm_dbg_disassemble(uint32_t addr, char *buf, size_t bufsize) {
+   uint32_t instr = do_readarml(addr);
+   int len = snprintf(buf, bufsize, "%08"PRIx32" %08"PRIx32" ", addr, instr);
+   buf += len;
+   bufsize -= len;
+   int ok = 0;
+   if (darm_armv7_disasm(&dis, instr) == 0) {
+      dis.addr = addr;
+      dis.addr_mask = ADDRESS_MASK;
+      if (darm_str2(&dis, &dis_str, 1) == 0) {
+         strncpy(buf, dis_str.total, bufsize);
+         ok = 1;
+      }
+   }
+   if (!ok) {
+      strncpy(buf, "???", bufsize);
+   }
+   return addr + 4;
+};
+
+static uint32_t arm_dbg_reg_get(int which) {
+   if (which == i_PC) {
+       return PC;
+   } else if (which <= i_LR) {
+       return armregs[which];
+   } else if (which == i_PSR) {
+      return ((armregs[i_PC] >> 24) & 0xFC) | (armregs[i_PC] & 0x03);
+   } else if (which >= i_R8_fiq && which <= i_LR_fiq) {
+       return fiqregs[8+(which-i_R8_fiq)];
+   } else if ( which >= i_SP_irq && which <= i_LR_irq) {
+       return irqregs[13+(which-i_SP_irq)];
+   } else {
+       log_warn("arm: unrecognised register %d", which);
+       return 0;
+   }
+};
+
+// Set a register.
+static void  arm_dbg_reg_set(int which, uint32_t value) {
+   if (which == i_PC) {
+       armregs[i_PC] &= ~ADDRESS_MASK;
+       armregs[i_PC] |= (value & ADDRESS_MASK);
+   } else if (which <= i_LR) {
+       armregs[which] = value;
+   } else if (which == i_PSR) {
+       armregs[i_PC] &= ADDRESS_MASK;
+       armregs[i_PC] |= ((value & 0xFC) << 24) | (value & 0x03);
+   } else if (which >= i_R8_fiq && which <= i_LR_fiq) {
+       fiqregs[8+(which-i_R8_fiq)] = value;
+   } else if ( which >= i_SP_irq && which <= i_LR_irq) {
+       irqregs[13+(which-i_SP_irq)] = value;
+   } else {
+       log_warn("arm: unrecognised register %d", which);
+   }
+}
+
+static const char* flagname = "N Z C V I F M1 M0 ";
+
+// Print register value in CPU standard form.
+static size_t arm_dbg_reg_print(int which, char *buf, size_t bufsize) {
+    if (which == i_PSR) {
+        int i;
+        int bit;
+        char c;
+        const char *flagnameptr = flagname;
+        int psr = arm_dbg_reg_get(i_PSR);
+        
+        if (bufsize < 40) {
+            strncpy(buf, "buffer too small!!!", bufsize);
+        }
+
+        bit = 0x80;
+        for (i = 0; i < 8; i++) {
+            if (psr & bit) {
+                c = '1';
+            } else {
+                c = '0';
+            }
+            do {
+                *buf++ = *flagnameptr++;
+            } while (*flagnameptr != ' ');
+            flagnameptr++;
+            *buf++ = ':';
+            *buf++ = c;
+            *buf++ = ' ';
+            bit >>= 1;
+        }
+        switch (psr & 3) {
+        case 0:
+            sprintf(buf, "(USR)");
+            break;
+        case 1:
+            sprintf(buf, "(FIQ)");
+            break;
+        case 2:
+            sprintf(buf, "(IRQ)");
+            break;
+        case 3:
+            sprintf(buf, "(SVC)");
+            break;
+        }
+        return strlen(buf);
+    } else {
+        return snprintf(buf, bufsize, "%08"PRIx32, arm_dbg_reg_get(which));
+    }
+};
+
+// Parse a value into a register.
+static void arm_dbg_reg_parse(int which, char *strval) {
+   uint32_t val = 0;
+   sscanf(strval, "%"SCNx32, &val);
+   arm_dbg_reg_set(which, val);
+};
+
+static uint32_t arm_dbg_get_instr_addr() {
+    return PC;
+}
+
+cpu_debug_t tubearm_cpu_debug = {
+   .cpu_name       = "ARM",
+   .debug_enable   = arm_dbg_debug_enable,
+   .memread        = arm_dbg_memread,
+   .memwrite       = arm_dbg_memwrite,
+   .disassemble    = arm_dbg_disassemble,
+   .reg_names      = arm_dbg_reg_names,
+   .reg_get        = arm_dbg_reg_get,
+   .reg_set        = arm_dbg_reg_set,
+   .reg_print      = arm_dbg_reg_print,
+   .reg_parse      = arm_dbg_reg_parse,
+   .get_instr_addr = arm_dbg_get_instr_addr
+};
+
+/*****************************************************
+ * CPU Implementation
+ *****************************************************/
 
 #define checkneg(v) (v&0x80000000)
 #define checkpos(v) !(v&0x80000000)
@@ -533,7 +791,9 @@ void arm_exec()
                 opcode=opcode2;
                 opcode2=opcode3;
                 opcode3=readarml(PC);
-                        if (flaglookup[opcode>>28][armregs[15]>>28])
+                if (arm_debug_enabled)
+                    debug_preexec(&tubearm_cpu_debug, PC);
+                if (flaglookup[opcode>>28][armregs[15]>>28])
                         {
                                 switch ((opcode>>20)&0xFF)
                                 {

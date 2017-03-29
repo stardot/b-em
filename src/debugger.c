@@ -23,6 +23,7 @@ extern cpu_debug_t tube65816_cpu_debug;
 extern cpu_debug_t tubez80_cpu_debug;
 extern cpu_debug_t n32016_cpu_debug;
 extern cpu_debug_t tubex86_cpu_debug;
+extern cpu_debug_t tubearm_cpu_debug;
 
 static cpu_debug_t *debuggables[] = {
     &core6502_cpu_debug,
@@ -30,7 +31,8 @@ static cpu_debug_t *debuggables[] = {
     &tubez80_cpu_debug,
     &tube65816_cpu_debug,
     &n32016_cpu_debug,
-    &tubex86_cpu_debug
+    &tubex86_cpu_debug,
+    &tubearm_cpu_debug
 };
 
 #ifdef WIN32

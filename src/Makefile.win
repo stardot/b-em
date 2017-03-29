@@ -22,6 +22,15 @@ OBJ = \
     adc.o \
     adf.o \
     arm.o \
+    darm.o \
+    darm-tbl.o \
+    armv7.o \
+    armv7-tbl.o \
+    thumb.o \
+    thumb-tbl.o \
+    thumb2.o \
+    thumb2-decoder.o \
+    thumb2-tbl.o \
     cmos.o \
     compact_joystick.o \
     compactcmos.o \

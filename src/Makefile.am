@@ -18,9 +18,9 @@ b_em_CFLAGS = $(allegro_CFLAGS) -DBEM -DINCLUDE_DEBUGGER -DUSE_MEMORY_POINTER
 
 # workaround for Win32 Allegro, which has `allegro-config' missing
 if OS_WIN
-b_em_LDADD = -lalleg -lz -lopenal -lalut
+b_em_LDADD = -lalleg -lz -lopenal -lalut -lm
 else
-b_em_LDADD = $(allegro_LIBS) -lz -lopenal -lalut
+b_em_LDADD = $(allegro_LIBS) -lz -lopenal -lalut -lm
 endif
 
 b_em_SOURCES = \
@@ -41,6 +41,15 @@ b_em_SOURCES = \
 	adc.c \
 	adf.c \
 	arm.c \
+	darm/darm.c \
+	darm/darm-tbl.c \
+	darm/armv7.c \
+	darm/armv7-tbl.c \
+	darm/thumb.c \
+	darm/thumb-tbl.c \
+	darm/thumb2.c \
+	darm/thumb2-decoder.c \
+	darm/thumb2-tbl.c \
 	cmos.c \
 	compact_joystick.c \
 	compactcmos.c \
@@ -62,7 +71,7 @@ b_em_SOURCES = \
 	mem.c \
 	model.c \
 	mouse.c \
-        music5000.c \
+	music5000.c \
 	resid.cc \
 	savestate.c \
 	scsi.c \
