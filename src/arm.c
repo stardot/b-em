@@ -530,6 +530,8 @@ static uint32_t arm_dbg_get_instr_addr() {
     return PC;
 }
 
+static const char *arm_trap_names[] = { NULL };
+
 cpu_debug_t tubearm_cpu_debug = {
    .cpu_name       = "ARM",
    .debug_enable   = arm_dbg_debug_enable,
@@ -541,7 +543,8 @@ cpu_debug_t tubearm_cpu_debug = {
    .reg_set        = arm_dbg_reg_set,
    .reg_print      = arm_dbg_reg_print,
    .reg_parse      = arm_dbg_reg_parse,
-   .get_instr_addr = arm_dbg_get_instr_addr
+   .get_instr_addr = arm_dbg_get_instr_addr,
+   .trap_names     = arm_trap_names
 };
 
 /*****************************************************
