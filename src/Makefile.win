@@ -9,7 +9,9 @@ WINDRES = windres.exe
 #   INCLUDE_DEBUGGER - include the cpu_debug implementation
 # USE_MEMORY_POINTER - do not assume Co Pro memory starts at address 0
 
-CFLAGS = -O3 -Wall -DBEM -DVERSION=\"Win32\" -DINCLUDE_DEBUGGER -DUSE_MEMORY_POINTER
+COMMON_FLAGS = -O3 -Wall -DBEM -DVERSION=\"Win32\" -DINCLUDE_DEBUGGER -DUSE_MEMORY_POINTER
+CFLAGS       = -std=gnu99 $(COMMON_FLAGS)
+CXXFLAGS     = $(COMMON_FLAGS)
 
 OBJ = \
     6502.o \
@@ -64,6 +66,7 @@ OBJ = \
     win-catalogue.o \
     win-keydefine.o \
     x86.o \
+    x86dasm.o \
     z80.o \
     z80dis.o \
     resid.o \
@@ -110,7 +113,7 @@ clean :
 	$(CC) $(CFLAGS) -c $<
 
 %.o : %.cc
-	$(CPP) $(CFLAGS) -c $<
+	$(CPP) $(CXXFLAGS) -c $<
 
 b-em.res: b-em.rc
 	$(WINDRES) -i b-em.rc --input-format=rc -o b-em.res -O coff

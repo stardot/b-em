@@ -187,7 +187,7 @@ int i386_dasm_one(char *buffer, uint32_t eip, int addr_size, int op_size);
 
 static uint32_t x86_dbg_disassemble(uint32_t addr, char *buf, size_t bufsize) {
    char instr[100];
-   log_debug("x86: bdg_disassemble, addr=%04X, buf=%p, bufsize=%ld", addr, buf, bufsize);
+
    int oplen = i386_dasm_one(instr, addr, 0, 0) & 0xffff;
    log_debug("x86: bdg_disassemble, oplen=%d", oplen);
    int len = snprintf(buf, bufsize, "%06"PRIx32" ", addr);
