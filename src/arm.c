@@ -433,39 +433,61 @@ static uint32_t arm_dbg_disassemble(uint32_t addr, char *buf, size_t bufsize) {
 };
 
 static uint32_t arm_dbg_reg_get(int which) {
-   if (which == i_PC) {
-       return PC;
-   } else if (which <= i_LR) {
-       return armregs[which];
-   } else if (which == i_PSR) {
-      return ((armregs[i_PC] >> 24) & 0xFC) | (armregs[i_PC] & 0x03);
-   } else if (which >= i_R8_fiq && which <= i_LR_fiq) {
-       return fiqregs[8+(which-i_R8_fiq)];
-   } else if ( which >= i_SP_irq && which <= i_LR_irq) {
-       return irqregs[13+(which-i_SP_irq)];
-   } else {
-       log_warn("arm: unrecognised register %d", which);
-       return 0;
-   }
+    if (which <= i_LR) {
+        return *(usrregs[which]);
+    } else if (which == i_PC) {
+        return PC;
+    } else if (which == i_PSR) {
+        return ((armregs[i_PC] >> 24) & 0xFC) | (armregs[i_PC] & 0x03);
+    } else if (which <= i_LR_fiq) {
+        if (mode == FIQ)
+            return armregs[8+(which-i_R8_fiq)];
+        else
+            return fiqregs[8+(which-i_R8_fiq)];
+    } else if (which <= i_LR_irq) {
+        if (mode == IRQ)
+            return armregs[13+(which-i_LR_irq)];
+        else
+            return fiqregs[13+(which-i_LR_irq)];
+    } else if (which <= i_LR_svc) {
+        if (mode == SUPERVISOR)
+            return armregs[13+(which-i_LR_svc)];
+        else
+            return superregs[13+(which-i_LR_svc)];
+    } else {
+        log_warn("arm: unrecognised register %d", which);
+        return 0;
+    }
 };
 
 // Set a register.
 static void  arm_dbg_reg_set(int which, uint32_t value) {
-   if (which == i_PC) {
-       armregs[i_PC] &= ~ADDRESS_MASK;
-       armregs[i_PC] |= (value & ADDRESS_MASK);
-   } else if (which <= i_LR) {
-       armregs[which] = value;
-   } else if (which == i_PSR) {
-       armregs[i_PC] &= ADDRESS_MASK;
-       armregs[i_PC] |= ((value & 0xFC) << 24) | (value & 0x03);
-   } else if (which >= i_R8_fiq && which <= i_LR_fiq) {
-       fiqregs[8+(which-i_R8_fiq)] = value;
-   } else if ( which >= i_SP_irq && which <= i_LR_irq) {
-       irqregs[13+(which-i_SP_irq)] = value;
-   } else {
-       log_warn("arm: unrecognised register %d", which);
-   }
+    if (which <= i_LR) {
+        *(usrregs[which]) = value;
+    } else if (which == i_PC) {
+        armregs[i_PC] &= ~ADDRESS_MASK;
+        armregs[i_PC] |= (value & ADDRESS_MASK);
+    } else if (which == i_PSR) {
+        armregs[i_PC] &= ADDRESS_MASK;
+        armregs[i_PC] |= ((value & 0xFC) << 24) | (value & 0x03);
+    } else if (which <= i_LR_fiq) {
+        if (mode == FIQ)
+            armregs[8+(which-i_R8_fiq)] = value;
+        else
+            fiqregs[8+(which-i_R8_fiq)] = value;
+    } else if (which <= i_LR_irq) {
+        if (mode == IRQ)
+            armregs[13+(which-i_LR_irq)] = value;
+        else
+            fiqregs[13+(which-i_LR_irq)] = value;
+    } else if (which <= i_LR_svc) {
+        if (mode == SUPERVISOR)
+            armregs[13+(which-i_LR_svc)] = value;
+        else
+            superregs[13+(which-i_LR_svc)] = value;
+    } else {
+        log_warn("arm: unrecognised register %d", which);
+    }
 }
 
 static const char* flagname = "N Z C V I F M1 M0 ";
