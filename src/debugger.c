@@ -8,6 +8,8 @@
 #include "cpu_debug.h"
 #include "debugger.h"
 #include "b-em.h"
+#include "model.h"
+#include "6502.h"
 
 #define NUM_BREAKPOINTS 8
 
@@ -16,24 +18,6 @@ int indebug = 0;
 extern int fcount;
 static int debugstep = 0;
 static FILE *trace_fp = NULL;
-
-extern cpu_debug_t core6502_cpu_debug;
-extern cpu_debug_t tube6502_cpu_debug;
-extern cpu_debug_t tube65816_cpu_debug;
-extern cpu_debug_t tubez80_cpu_debug;
-extern cpu_debug_t n32016_cpu_debug;
-extern cpu_debug_t tubex86_cpu_debug;
-extern cpu_debug_t tubearm_cpu_debug;
-
-static cpu_debug_t *debuggables[] = {
-    &core6502_cpu_debug,
-    &tube6502_cpu_debug,
-    &tubez80_cpu_debug,
-    &tube65816_cpu_debug,
-    &n32016_cpu_debug,
-    &tubex86_cpu_debug,
-    &tubearm_cpu_debug
-};
 
 #ifdef WIN32
 #include <windows.h>
@@ -99,6 +83,12 @@ static void debug_outf(const char *fmt, ...)
 #endif
 
 static void choose_cpu() {
+    if (debug)
+        core6502_cpu_debug.debug_enable(1);
+    log_info("debug_tube=%d, curtube=%d", debug_tube, curtube);
+    if (debug_tube && curtube != -1)
+        tubes[curtube].debug->debug_enable(1);
+#if 0
     cpu_debug_t **end, **cp, *c;
     int i = 0;
     char buf[80];
@@ -116,6 +106,7 @@ static void choose_cpu() {
     } while (i == 0 || i > sizeof(debuggables)/sizeof(cpu_debug_t *));
     log_debug("cpu#%d chosen", i);
     debuggables[i-1]->debug_enable(1);
+#endif
     debugstep = 1;
     debugon = 1;
 }
@@ -268,7 +259,7 @@ BOOL CtrlHandler(DWORD fdwCtrlType)
 
 void debug_start()
 {
-    if (debug)
+    if (debug || debug_tube)
     {
         hinst = GetModuleHandle(NULL);
         debugthread = (HANDLE)_beginthread(_debugthread, 0, NULL);
@@ -321,7 +312,7 @@ void debug_kill()
 
 void debug_start()
 {
-    if (debug)
+    if (debug || debug_tube)
         choose_cpu();
 }
 

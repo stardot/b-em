@@ -27,4 +27,6 @@ void writemem(uint16_t addr, uint8_t val);
 void m6502_savestate(FILE *f);
 void m6502_loadstate(FILE *f);
 
+extern cpu_debug_t core6502_cpu_debug;
+
 #endif

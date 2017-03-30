@@ -44,14 +44,16 @@ char *model_get()
         return models[_modelcount++].name;
 }
 
+extern cpu_debug_t n32016_cpu_debug;
+
 TUBE tubes[7]=
 {
-        {"6502", tube_6502_init,  tube_6502_reset},
-        {"ARM",  tube_arm_init,   arm_reset},
-        {"Z80",  tube_z80_init,   z80_reset},
-        {"80186",tube_x86_init,   x86_reset},
-        {"65816",tube_65816_init, w65816_reset},
-        {"32016",tube_32016_init, n32016_reset},
+        {"6502", tube_6502_init,  tube_6502_reset, &tube6502_cpu_debug  },
+        {"ARM",  tube_arm_init,   arm_reset,       &tubearm_cpu_debug   },
+        {"Z80",  tube_z80_init,   z80_reset,       &tubez80_cpu_debug   }, 
+        {"80186",tube_x86_init,   x86_reset,       &tubex86_cpu_debug   },
+        {"65816",tube_65816_init, w65816_reset,    &tube65816_cpu_debug },
+        {"32016",tube_32016_init, n32016_reset,    &n32016_cpu_debug    },
         {"",0,0}
 };
 
@@ -80,7 +82,8 @@ void model_init()
 
         mem_loadroms(models[curmodel].os, models[curmodel].romdir);
 //        if (ideenable) loadiderom();
-        if (curtube!=-1) tubes[curtube].init();
+        if (curtube!=-1)
+            tubes[curtube].init();
         tube_reset();
         chdir(t);
         

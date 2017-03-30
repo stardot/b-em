@@ -10,7 +10,7 @@ extern void debugger_do();
 
 extern int readc[65536], writec[65536], fetchc[65536];
 
-extern int debug,debugon;
+extern int debug,debug_tube,debugon;
 
 #endif
 

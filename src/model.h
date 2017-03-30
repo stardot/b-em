@@ -1,6 +1,8 @@
 #ifndef __INC_MODEL_H
 #define __INC_MODEL_H
 
+#include "cpu_debug.h"
+
 void model_init();
 char *model_get();
 
@@ -29,6 +31,7 @@ typedef struct
         char name[32];
         void (*init)();
         void (*reset)();
+        cpu_debug_t *debug;
 } TUBE;
 
 extern TUBE tubes[7];
