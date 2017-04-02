@@ -199,6 +199,7 @@ static uint8_t tempb;
                                         ah&=0xF;                                 \
                                 }                                                \
                                 a=(al&0xF)|(ah<<4);                              \
+                                setzn(a);                  \
                         }
 
 #define SBC(temp)       if (!tubep.d)                            \
@@ -212,31 +213,19 @@ static uint8_t tempb;
                         }                                  \
                         else                               \
                         {                                  \
-                                hc=0;                               \
-                                tubep.z=tubep.n=0;                            \
-                                tempb = a - temp - ((tubep.c) ? 0 : 1); 	      \
-                                if (!(tempb))                                 \
-                                   tubep.z=1;                             \
-                                al=(a&15)-(temp&15)-((tubep.c)?0:1);      \
-                                if (al&16)                           \
-                                {                                   \
-                                        al-=6;                      \
-                                        al&=0xF;                    \
-                                        hc=1;                       \
-                                }                                   \
-                                ah=(a>>4)-(temp>>4);                \
-                                if (hc) ah--;                       \
-                                if ((a-(temp+((tubep.c)?0:1)))&0x80)        \
-                                   tubep.n=1;                             \
-                                tubep.v = ((a ^ temp) & 0x80) && ((a ^ tempb) & 0x80); \
-                                tubep.c=1; \
-                                if (ah&16)                           \
-                                {                                   \
-                                        tubep.c=0; \
-                                        ah-=6;                      \
-                                        ah&=0xF;                    \
-                                }                                   \
-                                a=(al&0xF)|((ah&0xF)<<4);                 \
+                                al = (a & 15) - (temp & 15) - (tubep.c ? 0 : 1); \
+                                tempw = a-temp-(tubep.c ? 0 : 1);       \
+                                tempv = (signed char)a -(signed char)temp-(tubep.c ? 0 : 1); \
+                                tubep.v = ((tempw & 0x80) > 0) ^ ((tempv & 0x100) != 0); \
+                                tubep.c = tempw >= 0;                   \
+                                if (tempw < 0) {                        \
+                                   tempw -= 0x60;                       \
+                                }                                       \
+                                if (al < 0) {                           \
+                                   tempw -= 0x06;                       \
+                                }                                       \
+                                a = tempw & 0xFF;                       \
+                                setzn(a);                               \
                         }
 
 #ifdef TRACE_TUBE

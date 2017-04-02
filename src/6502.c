@@ -619,29 +619,21 @@ static uint8_t tempb;
                         }                                  \
                         else                               \
                         {                                  \
-                                hc6 = 0;                               \
-                                p.z = p.n = 0;                            \
-                                al = (a & 15) - (temp & 15) - ((p.c) ? 0 : 1);      \
-                                if (al & 16)                           \
-                                {                                   \
-                                        al -= 6;                      \
-                                        al &= 0xF;                    \
-                                        hc6 = 1;                       \
-                                }                                   \
-                                ah = (a >> 4) - (temp >> 4);                \
-                                if (hc6) ah--;                       \
-                                p.v = (((a - (temp + (p.c ? 0 : 1))) ^ temp) & 0x80) && ((a ^ temp) & 0x80); \
-                                p.c = 1; \
-                                if (ah & 16)                           \
-                                {                                   \
-                                        p.c = 0; \
-                                        ah -= 6;                      \
-                                        ah &= 0xF;                    \
-                                }                                   \
-                                a = (al & 0xF) | ((ah & 0xF) << 4);                 \
-                                setzn(a); \
-                                polltime(1); \
-                        }
+                                al = (a & 15) - (temp & 15) - (p.c ? 0 : 1); \
+                                tempw = a-temp-(p.c ? 0 : 1);           \
+                                tempv = (signed char)a -(signed char)temp-(p.c ? 0 : 1); \
+                                p.v = ((tempw & 0x80) > 0) ^ ((tempv & 0x100) != 0); \
+                                p.c = tempw >= 0;                       \
+                                if (tempw < 0) {                        \
+                                   tempw -= 0x60;                       \
+                                }                                       \
+                                if (al < 0) {                           \
+                                   tempw -= 0x06;                       \
+                                }                                       \
+                                a = tempw & 0xFF;                       \
+                                setzn(a);                               \
+                                polltime(1);                            \
+}
 
 static void branchcycles(int temp)
 {
@@ -5140,7 +5132,7 @@ void m65c02_exec()
                         pc++;
                         addr = readmem(temp) | (readmem(temp + 1) << 8);
                         temp = readmem(addr);
-                        SBC(temp);
+                        SBCc(temp);
                         polltime(6);
                         takeint = (interrupt && !p.i);
                         break;
