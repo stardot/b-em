@@ -60,6 +60,8 @@ static int vis20k = 0;
 
 static uint8_t acccon;
 
+#define read_zp_indirect(zp) (readmem(zp & 0xff) + (readmem((zp + 1) & 0xff) << 8))
+
 uint8_t readmem(uint16_t addr)
 {
 
@@ -700,7 +702,7 @@ void m6502_exec()
                 case 0x01:      /*ORA (,x) */
                         temp = readmem(pc) + x;
                         pc++;
-                        addr = readmem(temp) | (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         polltime(6);
                         takeint = (interrupt && !p.i);
                         a |= readmem(addr);
@@ -710,7 +712,7 @@ void m6502_exec()
                 case 0x03:      /*Undocumented - SLO (,x) */
                         temp = readmem(pc) + x;
                         pc++;
-                        addr = readmem(temp) | (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         polltime(5);
                         temp = readmem(addr);
                         polltime(1);
@@ -868,7 +870,7 @@ void m6502_exec()
                 case 0x11:      /*ORA (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         a |= readmem(addr + y);
@@ -880,7 +882,7 @@ void m6502_exec()
                 case 0x13:      /*Undocumented - SLO (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) | (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         polltime(5);
@@ -1044,7 +1046,7 @@ void m6502_exec()
                 case 0x21:      /*AND (,x) */
                         temp = readmem(pc) + x;
                         pc++;
-                        addr = readmem(temp) | (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         a &= readmem(addr);
                         setzn(a);
                         polltime(6);
@@ -1054,7 +1056,7 @@ void m6502_exec()
                 case 0x23:      /*Undocumented - RLA (,x) */
                         temp = readmem(pc) + x;
                         pc++;
-                        addr = readmem(temp) | (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         polltime(5);
                         temp = readmem(addr);
                         polltime(1);
@@ -1230,7 +1232,7 @@ void m6502_exec()
                 case 0x31:      /*AND (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         a &= readmem(addr + y);
@@ -1242,7 +1244,7 @@ void m6502_exec()
                 case 0x33:      /*Undocumented - RLA (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         polltime(5);
@@ -1427,7 +1429,7 @@ void m6502_exec()
                 case 0x41:      /*EOR (,x) */
                         temp = readmem(pc) + x;
                         pc++;
-                        addr = readmem(temp) | (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         a ^= readmem(addr);
                         setzn(a);
                         polltime(6);
@@ -1437,7 +1439,7 @@ void m6502_exec()
                 case 0x43:      /*Undocumented - SRE (,x) */
                         temp = readmem(pc) + x;
                         pc++;
-                        addr = readmem(temp) | (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         polltime(5);
                         temp = readmem(addr);
                         polltime(1);
@@ -1590,7 +1592,7 @@ void m6502_exec()
                 case 0x51:      /*EOR (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         a ^= readmem(addr + y);
@@ -1602,7 +1604,7 @@ void m6502_exec()
                 case 0x53:      /*Undocumented - SRE (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         polltime(5);
@@ -1768,7 +1770,7 @@ void m6502_exec()
                 case 0x61:      /*ADC (,x) */
                         temp = readmem(pc) + x;
                         pc++;
-                        addr = readmem(temp) | (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         temp = readmem(addr);
                         ADC(temp);
                         polltime(6);
@@ -1778,7 +1780,7 @@ void m6502_exec()
                 case 0x63:      /*Undocumented - RRA (,x) */
                         temp = readmem(pc) + x;
                         pc++;
-                        addr = readmem(temp) | (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         polltime(5);
                         temp = readmem(addr);
                         polltime(1);
@@ -1966,7 +1968,7 @@ void m6502_exec()
                 case 0x71:      /*ADC (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         temp = readmem(addr + y);
@@ -1978,7 +1980,7 @@ void m6502_exec()
                 case 0x73:      /*Undocumented - RRA (,y) */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         polltime(5);
@@ -2146,7 +2148,7 @@ void m6502_exec()
                 case 0x81:      /*STA (,x) */
                         temp = readmem(pc) + x;
                         pc++;
-                        addr = readmem(temp) | (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         writemem(addr, a);
                         polltime(6);
                         takeint = (interrupt && !p.i);
@@ -2162,7 +2164,7 @@ void m6502_exec()
                 case 0x83:      /*Undocumented - SAX (,x) */
                         temp = readmem(pc) + x;
                         pc++;
-                        addr = readmem(temp) | (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         writemem(addr, a & x);
                         polltime(6);
                         takeint = (interrupt && !p.i);
@@ -2274,7 +2276,7 @@ void m6502_exec()
                 case 0x91:      /*STA (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8) + y;
+                        addr = read_zp_indirect(temp) + y;
                         writemem(addr, a);
                         polltime(6);
                         takeint = (interrupt && !p.i);
@@ -2283,7 +2285,7 @@ void m6502_exec()
                 case 0x93:      /*Undocumented - SHA (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         writemem(addr + y, a & x & ((addr >> 8) + 1));
                         polltime(6);
                         takeint = (interrupt && !p.i);
@@ -2398,7 +2400,7 @@ void m6502_exec()
                 case 0xA1:      /*LDA (,x) */
                         temp = readmem(pc) + x;
                         pc++;
-                        addr = readmem(temp) | (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         a = readmem(addr);
                         setzn(a);
                         polltime(6);
@@ -2416,7 +2418,7 @@ void m6502_exec()
                 case 0xA3:      /*Undocumented - LAX (,y) */
                         temp = readmem(pc) + x;
                         pc++;
-                        addr = readmem(temp) | (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         a = x = readmem(addr);
                         setzn(a);
                         polltime(6);
@@ -2539,7 +2541,7 @@ void m6502_exec()
                 case 0xB1:      /*LDA (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         a = readmem(addr + y);
@@ -2551,7 +2553,7 @@ void m6502_exec()
                 case 0xB3:      /*LAX (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         a = x = readmem(addr + y);
@@ -2683,7 +2685,7 @@ void m6502_exec()
                 case 0xC1:      /*CMP (,x) */
                         temp = readmem(pc) + x;
                         pc++;
-                        addr = readmem(temp) | (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         temp = readmem(addr);
                         setzn(a - temp);
                         p.c = (a >= temp);
@@ -2701,7 +2703,7 @@ void m6502_exec()
                 case 0xC3:      /*Undocumented - DCP (,x) */
                         temp = readmem(pc) + x;
                         pc++;
-                        addr = readmem(temp) | (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         polltime(5);
                         temp = readmem(addr);
                         polltime(1);
@@ -2847,7 +2849,7 @@ void m6502_exec()
                 case 0xD1:      /*CMP (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         temp = readmem(addr + y);
@@ -2860,7 +2862,7 @@ void m6502_exec()
                 case 0xD3:      /*Undocumented - DCP (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         polltime(5);
@@ -3009,7 +3011,7 @@ void m6502_exec()
                 case 0xE1:      /*SBC (,x) *//*This was missed out of every B-em version since 0.6 as it was never used! */
                         temp = readmem(pc) + x;
                         pc++;
-                        addr = readmem(temp) | (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         temp = readmem(addr);
                         SBC(temp);
                         polltime(6);
@@ -3026,7 +3028,7 @@ void m6502_exec()
                 case 0xE3:      /*Undocumented - ISB (,x) */
                         temp = readmem(pc) + x;
                         pc++;
-                        addr = readmem(temp) | (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         polltime(5);
                         temp = readmem(addr);
                         polltime(1);
@@ -3171,7 +3173,7 @@ void m6502_exec()
                 case 0xF1:      /*SBC (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         temp = readmem(addr + y);
@@ -3183,7 +3185,7 @@ void m6502_exec()
                 case 0xF3:      /*Undocumented - ISB (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         polltime(5);
@@ -3583,7 +3585,7 @@ void m65c02_exec()
                 case 0x01:      /*ORA (,x) */
                         temp = readmem(pc) + x;
                         pc++;
-                        addr = readmem(temp) | (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         polltime(6);
                         takeint = (interrupt && !p.i);
                         a |= readmem(addr);
@@ -3703,7 +3705,7 @@ void m65c02_exec()
                 case 0x11:      /*ORA (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         a |= readmem(addr + y);
@@ -3715,7 +3717,7 @@ void m65c02_exec()
                 case 0x12:      /*ORA () */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         a |= readmem(addr);
                         setzn(a);
                         polltime(5);
@@ -3824,7 +3826,7 @@ void m65c02_exec()
                 case 0x21:      /*AND (,x) */
                         temp = readmem(pc) + x;
                         pc++;
-                        addr = readmem(temp) | (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         a &= readmem(addr);
                         setzn(a);
                         polltime(6);
@@ -3949,7 +3951,7 @@ void m65c02_exec()
                 case 0x31:      /*AND (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         a &= readmem(addr + y);
@@ -3961,7 +3963,7 @@ void m65c02_exec()
                 case 0x32:      /*AND () */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         a &= readmem(addr);
                         setzn(a);
                         polltime(5);
@@ -4082,7 +4084,7 @@ void m65c02_exec()
                 case 0x41:      /*EOR (,x) */
                         temp = readmem(pc) + x;
                         pc++;
-                        addr = readmem(temp) | (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         a ^= readmem(addr);
                         setzn(a);
                         polltime(6);
@@ -4177,7 +4179,7 @@ void m65c02_exec()
                 case 0x51:      /*EOR (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         a ^= readmem(addr + y);
@@ -4189,7 +4191,7 @@ void m65c02_exec()
                 case 0x52:      /*EOR () */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         a ^= readmem(addr);
                         setzn(a);
                         polltime(5);
@@ -4278,7 +4280,7 @@ void m65c02_exec()
                 case 0x61:      /*ADC (,x) */
                         temp = readmem(pc) + x;
                         pc++;
-                        addr = readmem(temp) | (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         temp = readmem(addr);
                         ADCc(temp);
                         polltime(6);
@@ -4394,7 +4396,7 @@ void m65c02_exec()
                 case 0x71:      /*ADC (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         temp = readmem(addr + y);
@@ -4406,7 +4408,7 @@ void m65c02_exec()
                 case 0x72:      /*ADC () */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         temp = readmem(addr);
                         ADCc(temp);
                         polltime(5);
@@ -4517,7 +4519,7 @@ void m65c02_exec()
                 case 0x81:      /*STA (,x) */
                         temp = readmem(pc) + x;
                         pc++;
-                        addr = readmem(temp) | (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         writemem(addr, a);
                         polltime(6);
                         takeint = (interrupt && !p.i);
@@ -4606,7 +4608,7 @@ void m65c02_exec()
                 case 0x91:      /*STA (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8) + y;
+                        addr = read_zp_indirect(temp) + y;
                         writemem(addr, a);
                         polltime(6);
                         takeint = (interrupt && !p.i);
@@ -4615,7 +4617,7 @@ void m65c02_exec()
                 case 0x92:      /*STA () */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         writemem(addr, a);
                         polltime(6);
                         break;
@@ -4701,7 +4703,7 @@ void m65c02_exec()
                 case 0xA1:      /*LDA (,x) */
                         temp = readmem(pc) + x;
                         pc++;
-                        addr = readmem(temp) | (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         a = readmem(addr);
                         setzn(a);
                         polltime(6);
@@ -4806,7 +4808,7 @@ void m65c02_exec()
                 case 0xB1:      /*LDA (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         a = readmem(addr + y);
@@ -4818,7 +4820,7 @@ void m65c02_exec()
                 case 0xB2:      /*LDA () */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         a = readmem(addr);
                         setzn(a);
                         polltime(5);
@@ -4917,7 +4919,7 @@ void m65c02_exec()
                 case 0xC1:      /*CMP (,x) */
                         temp = readmem(pc) + x;
                         pc++;
-                        addr = readmem(temp) | (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         temp = readmem(addr);
                         setzn(a - temp);
                         p.c = (a >= temp);
@@ -5035,7 +5037,7 @@ void m65c02_exec()
                 case 0xD1:      /*CMP (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         temp = readmem(addr + y);
@@ -5048,7 +5050,7 @@ void m65c02_exec()
                 case 0xD2:      /*CMP () */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         temp = readmem(addr);
                         setzn(a - temp);
                         p.c = (a >= temp);
@@ -5132,7 +5134,7 @@ void m65c02_exec()
                 case 0xE1:      /*SBC (,x) */
                         temp = readmem(pc) + x;
                         pc++;
-                        addr = readmem(temp) | (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         temp = readmem(addr);
                         SBCc(temp);
                         polltime(6);
@@ -5234,7 +5236,7 @@ void m65c02_exec()
                 case 0xF1:      /*SBC (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         temp = readmem(addr + y);
@@ -5246,7 +5248,7 @@ void m65c02_exec()
                 case 0xF2:      /*SBC () */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         temp = readmem(addr);
                         SBCc(temp);
                         polltime(5);
