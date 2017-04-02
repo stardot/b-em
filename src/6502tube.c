@@ -177,7 +177,8 @@ static uint8_t tempb;
                         else                               \
                         {                                  \
                                 ah=0;        \
-                                tempb=a+temp+(tubep.c?1:0);                            \
+                                tubep.z = tubep.n = 0;     \
+                                tempb=a+temp+(tubep.c?1:0);             \
                                 if (!tempb)                                      \
                                    tubep.z=1;                                          \
                                 al=(a&0xF)+(temp&0xF)+(tubep.c?1:0);                            \
@@ -213,7 +214,8 @@ static uint8_t tempb;
                         {                                  \
                                 hc=0;                               \
                                 tubep.z=tubep.n=0;                            \
-                                if (!((a-temp)-((tubep.c)?0:1)))            \
+                                tempb = a - temp - ((tubep.c) ? 0 : 1); 	      \
+                                if (!(tempb))                                 \
                                    tubep.z=1;                             \
                                 al=(a&15)-(temp&15)-((tubep.c)?0:1);      \
                                 if (al&16)                           \
@@ -226,7 +228,7 @@ static uint8_t tempb;
                                 if (hc) ah--;                       \
                                 if ((a-(temp+((tubep.c)?0:1)))&0x80)        \
                                    tubep.n=1;                             \
-                                tubep.v=(((a-(temp+((tubep.c)?0:1)))^temp)&128)&&((a^temp)&128); \
+                                tubep.v = ((a ^ temp) & 0x80) && ((a ^ tempb) & 0x80); \
                                 tubep.c=1; \
                                 if (ah&16)                           \
                                 {                                   \

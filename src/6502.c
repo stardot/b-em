@@ -513,6 +513,7 @@ static uint8_t tempb;
                         else                               \
                         {                                  \
                                 ah = 0;        \
+                                p.z = p.n = 0; \
                                 tempb = a + temp + (p.c ? 1:0);                            \
                                 if (!tempb)                                      \
                                    p.z = 1;                                          \
@@ -549,7 +550,8 @@ static uint8_t tempb;
                         {                                  \
                                 hc6 = 0;                               \
                                 p.z = p.n = 0;                            \
-                                if (!((a - temp) - (p.c ? 0 : 1)))            \
+                                tempb = a - temp - ((p.c) ? 0 : 1); \
+                                if (!(tempb))                       \
                                    p.z = 1;                             \
                                 al = (a & 15) - (temp & 15) - (p.c ? 0 : 1);      \
                                 if (al & 16)                           \
@@ -562,7 +564,7 @@ static uint8_t tempb;
                                 if (hc6) ah--;                       \
                                 if ((a - (temp + (p.c ? 0 : 1))) & 0x80)        \
                                    p.n = 1;                             \
-                                p.v = (((a - (temp + (p.c ? 0 : 1))) ^ temp) & 0x80) && ((a ^ temp) & 0x80); \
+                                p.v = ((a ^ temp) & 0x80) && ((a ^ tempb) & 0x80); \
                                 p.c = 1; \
                                 if (ah & 16)                           \
                                 {                                   \
