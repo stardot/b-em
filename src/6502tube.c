@@ -1855,65 +1855,19 @@ void tube_6502_exec()
                         polltime(6);
                         break;
 
-                case 0x02:
-                case 0x22:
-                case 0x42:
-                case 0x62:
-                case 0x82:
-                case 0xC2:
-                case 0xE2:
-                case 0x03:
-                case 0x13:
-                case 0x23:
-                case 0x33:
-                case 0x43:
-                case 0x53:
-                case 0x63:
-                case 0x73:
-                case 0x83:
-                case 0x93:
-                case 0xA3:
-                case 0xB3:
-                case 0xC3:
-                case 0xD3:
-                case 0xE3:
-                case 0xF3:
-                case 0x0B:
-                case 0x1B:
-                case 0x2B:
-                case 0x3B:
-                case 0x4B:
-                case 0x5B:
-                case 0x6B:
-                case 0x7B:
-                case 0x8B:
-                case 0x9B:
-                case 0xAB:
-                case 0xBB:
-                case 0xEB:
-                case 0xFB:
-                case 0x44:
-                case 0x54:
-                case 0xD4:
-                case 0xF4:
-                case 0x5C:
-                case 0xDC:
-                case 0xFC:
+                default:
                         switch (opcode & 0xF) {
+                        case 0x3:
+                        case 0x7:
+                        case 0xB:
+                        case 0xF:
                         case 0xA:
                                 break;
-                        case 0x0:
                         case 0x2:
-                        case 0x3:
                         case 0x4:
-                        case 0x7:
-                        case 0x9:
-                        case 0xB:
                                 pc++;
                                 break;
                         case 0xC:
-                        case 0xE:
-                        case 0xF:
                                 pc += 2;
                                 break;
                         }
