@@ -657,6 +657,25 @@ void tube_6502_exec()
                         polltime(5);
                         break;
 
+                case 0x32:      /*AND () */
+                        temp = readmem(pc);
+                        pc++;
+                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        a &= readmem(addr);
+                        setzn(a);
+                        polltime(5);
+                        break;
+
+                case 0x34:      /*BIT zp,x */
+                        addr = readmem(pc);
+                        pc++;
+                        temp = readmem((addr + x) & 0xFF);
+                        tubep.z = !(a & temp);
+                        tubep.v = temp & 0x40;
+                        tubep.n = temp & 0x80;
+                        polltime(4);
+                        break;
+
                 case 0x35:      /*AND zp,x */
                         addr = readmem(pc);
                         pc++;
@@ -1174,8 +1193,6 @@ void tube_6502_exec()
                         temp = readmem(pc);
                         pc++;
                         tubep.z = !(a & temp);
-                        tubep.v = temp & 0x40;
-                        tubep.n = temp & 0x80;
                         polltime(2);
                         break;
 
@@ -1771,6 +1788,15 @@ void tube_6502_exec()
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         temp = readmem(addr + y);
+                        SBC(temp);
+                        polltime(5);
+                        break;
+
+                case 0xF2:      /*SBC () */
+                        temp = readmem(pc);
+                        pc++;
+                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        temp = readmem(addr);
                         SBC(temp);
                         polltime(5);
                         break;
