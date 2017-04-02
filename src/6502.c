@@ -3656,15 +3656,6 @@ void m65c02_exec()
                         takeint = (interrupt && !p.i);
                         break;
 
-                case 0x0B:      /*ANC imm */
-                        a &= readmem(pc);
-                        pc++;
-                        setzn(a);
-                        p.c = p.n;
-                        polltime(2);
-                        takeint = (interrupt && !p.i);
-                        break;
-
                 case 0x0C:      /*TSB abs */
                         addr = getw();
                         temp = readmem(addr);
@@ -4986,13 +4977,14 @@ void m65c02_exec()
                         polltime(2);
                         takeint = (interrupt && !p.i);
                         break;
-
+#if 0
                 case 0xCB:
                         /*WAI*/ polltime(2);
                         takeint = (interrupt && !p.i);
                         if (!takeint)
                                 pc--;
                         break;
+#endif
 
                 case 0xCC:      /*CPY abs */
                         addr = getw();
@@ -5330,7 +5322,9 @@ void m65c02_exec()
                                 polltime(2);
                                 break;
                         case 3:
+                        case 7:
                         case 0xB:
+                        case 0xF:                           
                                 polltime(1);
                                 break;
                         case 4:
@@ -5344,15 +5338,10 @@ void m65c02_exec()
                         case 0xC:
                                 pc += 2;
                                 if (opcode == 0x5C) {
-                                        polltime(8);
+                                        polltime(7);
                                 } else {
                                         polltime(4);
                                 }
-                                break;
-                        case 7:
-                        case 0xF:
-                                pc++;
-                                polltime(2);
                                 break;
                         }
                         takeint = (interrupt && !p.i);
