@@ -146,6 +146,8 @@ void tube_6502_writemem(uint32_t addr, uint8_t byte) {
 //if (tubememstat[(a)>>8]==0) tubemem[(a)>>8][(a)&0xFF]=b; else if (tubememstat[(a)>>8]==2) tubewritememl(a,b)
 #define getw() (readmem(pc)|(readmem(pc+1)<<8)); pc+=2
 
+#define read_zp_indirect(zp) (readmem(zp & 0xff) + (readmem((zp + 1) & 0xff) << 8))
+
 void tube_6502_reset()
 {
         tuberomin = 1;
@@ -312,7 +314,7 @@ void tube_6502_exec()
                 case 0x01:      /*ORA (,x) */
                         temp = readmem(pc) + x;
                         pc++;
-                        addr = readmem(temp) | (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         a |= readmem(addr);
                         setzn(a);
                         polltime(6);
@@ -426,7 +428,7 @@ void tube_6502_exec()
                 case 0x11:      /*ORA (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         a |= readmem(addr + y);
@@ -437,7 +439,7 @@ void tube_6502_exec()
                 case 0x12:      /*ORA () */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         a |= readmem(addr);
                         setzn(a);
                         polltime(5);
@@ -534,7 +536,7 @@ void tube_6502_exec()
                 case 0x21:      /*AND (,x) */
                         temp = readmem(pc) + x;
                         pc++;
-                        addr = readmem(temp) | (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         a &= readmem(addr);
                         setzn(a);
                         polltime(6);
@@ -649,7 +651,7 @@ void tube_6502_exec()
                 case 0x31:      /*AND (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         a &= readmem(addr + y);
@@ -660,7 +662,7 @@ void tube_6502_exec()
                 case 0x32:      /*AND () */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         a &= readmem(addr);
                         setzn(a);
                         polltime(5);
@@ -770,7 +772,7 @@ void tube_6502_exec()
                 case 0x41:      /*EOR (,x) */
                         temp = readmem(pc) + x;
                         pc++;
-                        addr = readmem(temp) | (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         a ^= readmem(addr);
                         setzn(a);
                         polltime(6);
@@ -857,7 +859,7 @@ void tube_6502_exec()
                 case 0x51:      /*EOR (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         a ^= readmem(addr + y);
@@ -868,7 +870,7 @@ void tube_6502_exec()
                 case 0x52:      /*EOR () */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         a ^= readmem(addr);
                         setzn(a);
                         polltime(5);
@@ -942,7 +944,7 @@ void tube_6502_exec()
                 case 0x61:      /*ADC (,x) */
                         temp = readmem(pc) + x;
                         pc++;
-                        addr = readmem(temp) | (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         temp = readmem(addr);
                         ADC(temp);
                         polltime(6);
@@ -1045,7 +1047,7 @@ void tube_6502_exec()
                 case 0x71:      /*ADC (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         temp = readmem(addr + y);
@@ -1056,7 +1058,7 @@ void tube_6502_exec()
                 case 0x72:      /*ADC () */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         temp = readmem(addr);
                         ADC(temp);
                         polltime(5);
@@ -1157,7 +1159,7 @@ void tube_6502_exec()
                 case 0x81:      /*STA (,x) */
                         temp = readmem(pc) + x;
                         pc++;
-                        addr = readmem(temp) | (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         writemem(addr, a);
                         polltime(6);
                         break;
@@ -1236,7 +1238,7 @@ void tube_6502_exec()
                 case 0x91:      /*STA (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8) + y;
+                        addr = read_zp_indirect(temp) + y;
                         writemem(addr, a);
                         polltime(6);
                         break;
@@ -1244,7 +1246,7 @@ void tube_6502_exec()
                 case 0x92:      /*STA () */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         writemem(addr, a);
                         polltime(6);
                         break;
@@ -1320,7 +1322,7 @@ void tube_6502_exec()
                 case 0xA1:      /*LDA (,x) */
                         temp = readmem(pc) + x;
                         pc++;
-                        addr = readmem(temp) | (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         a = readmem(addr);
                         setzn(a);
                         polltime(6);
@@ -1412,7 +1414,7 @@ void tube_6502_exec()
                 case 0xB1:      /*LDA (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         a = readmem(addr + y);
@@ -1423,7 +1425,7 @@ void tube_6502_exec()
                 case 0xB2:      /*LDA () */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         a = readmem(addr);
                         setzn(a);
                         polltime(5);
@@ -1512,7 +1514,7 @@ void tube_6502_exec()
                 case 0xC1:      /*CMP (,x) */
                         temp = readmem(pc) + x;
                         pc++;
-                        addr = readmem(temp) | (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         temp = readmem(addr);
                         setzn(a - temp);
                         tubep.c = (a >= temp);
@@ -1608,7 +1610,7 @@ void tube_6502_exec()
                 case 0xD1:      /*CMP (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         temp = readmem(addr + y);
@@ -1620,7 +1622,7 @@ void tube_6502_exec()
                 case 0xD2:      /*CMP () */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         temp = readmem(addr);
                         setzn(a - temp);
                         tubep.c = (a >= temp);
@@ -1694,7 +1696,7 @@ void tube_6502_exec()
                 case 0xE1:      /*SBC (,x) *//*This was missed out of every B-em version since 0.6 as it was never used! */
                         temp = readmem(pc) + x;
                         pc++;
-                        addr = readmem(temp) | (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         temp = readmem(addr);
                         SBC(temp);
                         polltime(6);
@@ -1784,7 +1786,7 @@ void tube_6502_exec()
                 case 0xF1:      /*SBC (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         temp = readmem(addr + y);
@@ -1795,7 +1797,7 @@ void tube_6502_exec()
                 case 0xF2:      /*SBC () */
                         temp = readmem(pc);
                         pc++;
-                        addr = readmem(temp) + (readmem(temp + 1) << 8);
+                        addr = read_zp_indirect(temp);
                         temp = readmem(addr);
                         SBC(temp);
                         polltime(5);
