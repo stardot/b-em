@@ -163,7 +163,7 @@ void tube_6502_reset()
 
 /*ADC/SBC temp variables*/
 static int16_t tempw;
-static int tempv, hc, al, ah;
+static int tempv, al, ah;
 static uint8_t tempb;
 
 #define ADC(temp)       if (!tubep.d)                            \
