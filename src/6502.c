@@ -3976,6 +3976,16 @@ void m65c02_exec()
                         polltime(5);
                         break;
 
+                case 0x34:      /*BIT zp,x */
+                        addr = readmem(pc);
+                        pc++;
+                        temp = readmem((addr + x) & 0xFF);
+                        p.z = !(a & temp);
+                        p.v = temp & 0x40;
+                        p.n = temp & 0x80;
+                        polltime(4);
+                        break;
+
                 case 0x35:      /*AND zp,x */
                         addr = readmem(pc);
                         pc++;
