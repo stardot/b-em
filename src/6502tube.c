@@ -230,6 +230,38 @@ static uint8_t tempb;
                                 setzn(a);                               \
                         }
 
+static inline void rmb(uint8_t mask)
+{
+    uint8_t ea = readmem(pc); pc++;
+    writemem(ea, readmem(ea) & ~mask);
+    polltime(5);
+}
+
+static inline void smb(uint8_t mask)
+{
+    uint8_t ea = readmem(pc); pc++;
+    writemem(ea, readmem(ea) | mask);
+    polltime(5);
+}
+
+static inline void bbr(uint8_t mask)
+{
+    uint8_t ea = readmem(pc); pc++;
+    uint8_t offset = readmem(pc); pc++;
+    if (!(readmem(ea) & mask))
+        pc += offset;
+    polltime(5);
+}
+
+static inline void bbs(uint8_t mask)
+{
+    uint8_t ea = readmem(pc); pc++;
+    uint8_t offset = readmem(pc); pc++;
+    if (readmem(ea) & mask)
+        pc += offset;
+    polltime(5);
+}
+
 #ifdef TRACE_TUBE
 static INLINE void tube_6502_trace(uint8_t opcode)
 {
@@ -349,6 +381,10 @@ void tube_6502_exec()
                         polltime(5);
                         break;
 
+                case 0x07:
+                        rmb(0x01);
+                        break;
+
                 case 0x08:
                         /*PHP*/ temp = 0x30;
                         if (tubep.c)
@@ -410,6 +446,10 @@ void tube_6502_exec()
                         setzn(temp);
                         writemem(addr, temp);
                         polltime(6);
+                        break;
+
+                case 0x0F:
+                        bbr(0x01);
                         break;
 
                 case 0x10:
@@ -474,6 +514,10 @@ void tube_6502_exec()
                         polltime(5);
                         break;
 
+                case 0x17:
+                        rmb(0x02);
+                        break;
+
                 case 0x18:
                         /*CLC*/ tubep.c = 0;
                         polltime(2);
@@ -524,6 +568,10 @@ void tube_6502_exec()
                         polltime(7);
                         break;
 
+                case 0x1F:
+                        bbr(0x02);
+                        break;
+
                 case 0x20:
                         /*JSR*/ addr = getw();
                         pc--;
@@ -572,6 +620,10 @@ void tube_6502_exec()
                         setzn(temp);
                         tuberam[addr] = temp;
                         polltime(5);
+                        break;
+
+                case 0x27:
+                        rmb(0x04);
                         break;
 
                 case 0x28:
@@ -633,6 +685,10 @@ void tube_6502_exec()
                                 temp |= 1;
                         writemem(addr, temp);
                         setzn(temp);
+                        break;
+
+                case 0x2F:
+                        bbr(0x04);
                         break;
 
                 case 0x30:
@@ -702,6 +758,10 @@ void tube_6502_exec()
                         polltime(5);
                         break;
 
+                case 0x37:
+                        rmb(0x08);
+                        break;
+
                 case 0x38:
                         /*SEC*/ tubep.c = 1;
                         polltime(2);
@@ -756,6 +816,10 @@ void tube_6502_exec()
                         polltime(7);
                         break;
 
+                case 0x3F:
+                        bbr(0x08);
+                        break;
+
                 case 0x40:
                         /*RTI*/ temp = pull();
                         tubep.c = temp & 1;
@@ -795,6 +859,10 @@ void tube_6502_exec()
                         setzn(temp);
                         tuberam[addr] = temp;
                         polltime(5);
+                        break;
+
+                case 0x47:
+                        rmb(0x10);
                         break;
 
                 case 0x48:
@@ -841,6 +909,10 @@ void tube_6502_exec()
                         setzn(temp);
                         writemem(addr, temp);
                         polltime(6);
+                        break;
+
+                case 0x4F:
+                        bbr(0x10);
                         break;
 
                 case 0x50:
@@ -895,6 +967,10 @@ void tube_6502_exec()
                         polltime(5);
                         break;
 
+                case 0x57:
+                        rmb(0x20);
+                        break;
+
                 case 0x58:
                         /*CLI*/ tubep.i = 0;
                         polltime(2);
@@ -932,6 +1008,10 @@ void tube_6502_exec()
                         writemem(addr, temp);
                         setzn(temp);
                         polltime(7);
+                        break;
+
+                case 0x5F:
+                        bbr(0x20);
                         break;
 
                 case 0x60:
@@ -977,6 +1057,10 @@ void tube_6502_exec()
                         setzn(temp);
                         tuberam[addr] = temp;
                         polltime(5);
+                        break;
+
+                case 0x67:
+                        rmb(0x40);
                         break;
 
                 case 0x68:
@@ -1029,6 +1113,10 @@ void tube_6502_exec()
                                 temp |= 0x80;
                         setzn(temp);
                         writemem(addr, temp);
+                        break;
+
+                case 0x6F:
+                        bbr(0x40);
                         break;
 
                 case 0x70:
@@ -1095,6 +1183,10 @@ void tube_6502_exec()
                         polltime(5);
                         break;
 
+                case 0x77:
+                        rmb(0x80);
+                        break;
+
                 case 0x78:
                         /*SEI*/ tubep.i = 1;
                         polltime(2);
@@ -1146,6 +1238,10 @@ void tube_6502_exec()
                         polltime(7);
                         break;
 
+                case 0x7F:
+                        bbr(0x80);
+                        break;
+
                 case 0x80:
                         /*BRA*/ offset = (int8_t) readmem(pc);
                         pc++;
@@ -1185,6 +1281,10 @@ void tube_6502_exec()
                         polltime(3);
                         break;
 
+                case 0x87:
+                        smb(0x01);
+                        break;
+
                 case 0x88:
                         /*DEY*/ y--;
                         setzn(y);
@@ -1220,6 +1320,10 @@ void tube_6502_exec()
                         addr = getw();
                         polltime(4);
                         writemem(addr, x);
+                        break;
+
+                case 0x8F:
+                        bbs(0x01);
                         break;
 
                 case 0x90:
@@ -1272,6 +1376,10 @@ void tube_6502_exec()
                         polltime(4);
                         break;
 
+                case 0x97:
+                        smb(0x02);
+                        break;
+
                 case 0x98:
                         /*TYA*/ a = y;
                         setzn(a);
@@ -1310,6 +1418,10 @@ void tube_6502_exec()
                         polltime(4);
                         writemem(addr, 0);
                         polltime(1);
+                        break;
+
+                case 0x9F:
+                        bbs(0x02);
                         break;
 
                 case 0xA0:      /*LDY imm */
@@ -1359,6 +1471,10 @@ void tube_6502_exec()
                         polltime(3);
                         break;
 
+                case 0xA7:
+                        smb(0x04);
+                        break;
+
                 case 0xA8:
                         /*TAY*/ y = a;
                         setzn(y);
@@ -1396,6 +1512,10 @@ void tube_6502_exec()
                         polltime(4);
                         x = readmem(addr);
                         setzn(x);
+                        break;
+
+                case 0xAF:
+                        bbs(0x04);
                         break;
 
                 case 0xB0:
@@ -1455,6 +1575,10 @@ void tube_6502_exec()
                         polltime(3);
                         break;
 
+                case 0xB7:
+                        smb(0x08);
+                        break;
+
                 case 0xB8:
                         /*CLV*/ tubep.v = 0;
                         polltime(2);
@@ -1503,6 +1627,10 @@ void tube_6502_exec()
                         polltime(4);
                         break;
 
+                case 0xBF:
+                        bbs(0x08);
+                        break;
+
                 case 0xC0:      /*CPY imm */
                         temp = readmem(pc);
                         pc++;
@@ -1545,6 +1673,10 @@ void tube_6502_exec()
                         tuberam[addr]--;
                         setzn(tuberam[addr]);
                         polltime(5);
+                        break;
+
+                case 0xC7:
+                        smb(0x10);
                         break;
 
                 case 0xC8:
@@ -1592,6 +1724,10 @@ void tube_6502_exec()
                         polltime(1);
                         writemem(addr, temp);
                         setzn(temp);
+                        break;
+
+                case 0xCF:
+                        bbs(0x10);
                         break;
 
                 case 0xD0:
@@ -1646,6 +1782,10 @@ void tube_6502_exec()
                         polltime(5);
                         break;
 
+                case 0xD7:
+                        smb(0x20);
+                        break;
+
                 case 0xD8:
                         /*CLD*/ tubep.d = 0;
                         polltime(2);
@@ -1683,6 +1823,10 @@ void tube_6502_exec()
                         writemem(addr, temp);
                         setzn(temp);
                         polltime(6);
+                        break;
+
+                case 0xDF:
+                        bbs(0x20);
                         break;
 
                 case 0xE0:      /*CPX imm */
@@ -1727,6 +1871,10 @@ void tube_6502_exec()
                         polltime(5);
                         break;
 
+                case 0xE7:
+                        smb(0x40);
+                        break;
+
                 case 0xE8:
                         /*INX*/ x++;
                         setzn(x);
@@ -1768,6 +1916,10 @@ void tube_6502_exec()
                         polltime(1);
                         writemem(addr, temp);
                         setzn(temp);
+                        break;
+
+                case 0xEF:
+                        bbs(0x40);
                         break;
 
                 case 0xF0:
@@ -1819,6 +1971,10 @@ void tube_6502_exec()
                         polltime(5);
                         break;
 
+                case 0xF7:
+                        smb(0x80);
+                        break;
+
                 case 0xF8:
                         /*SED*/ tubep.d = 1;
                         polltime(2);
@@ -1855,6 +2011,10 @@ void tube_6502_exec()
                         writemem(addr, temp);
                         setzn(temp);
                         polltime(6);
+                        break;
+
+                case 0xFF:
+                        bbs(0x80);
                         break;
 
                 default:
