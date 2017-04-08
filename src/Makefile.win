@@ -1,4 +1,4 @@
-VPATH = . resid-fp NS32016
+VPATH = . resid-fp NS32016 darm
 
 CPP  = g++.exe
 CC   = gcc.exe
