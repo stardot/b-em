@@ -310,6 +310,7 @@ BEGIN
                 MENUITEM "&Save screenshot",IDM_SCRSHOT
                 MENUITEM SEPARATOR
                 MENUITEM "&Debugger",       IDM_DEBUGGER
+                MENUITEM "Debug &Tube",     IDM_DEBUG_TUBE
                 MENUITEM "&Break",          IDM_BREAK
         END
 END

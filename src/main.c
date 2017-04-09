@@ -79,9 +79,6 @@ void int50()
 }
 
 char exedir[512];
-int debug = 0;
-int debug_tube = 0;
-int debugon = 0;
 int ddnoiseframes = 0;
 
 void main_reset()
@@ -197,7 +194,7 @@ void main_init(int argc, char *argv[])
                 }
                 else if (!strcasecmp(argv[c], "-debug"))
                 {
-                        debug = 1;
+                        debug_core = 1;
                 }
                 else if (!strcasecmp(argv[c], "-debugtube"))
                 {
@@ -341,7 +338,7 @@ void main_run()
                 }
                 if (savestate_wantload) savestate_doload();
                 if (savestate_wantsave) savestate_dosave();
-                if (key[KEY_F10] && debugon) debug = 1;
+                if (key[KEY_F10] && (debug_core || debug_tube)) debug_step = 1;
                 if (key[KEY_F12] && !resetting)
                 {
                         m6502_reset();

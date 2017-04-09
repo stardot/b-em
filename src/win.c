@@ -769,26 +769,23 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         ddnoise_init();
                         break;
 
-                        case IDM_DEBUGGER:
+                case IDM_DEBUGGER:
                         EnterCriticalSection(&cs);
                         rest(200);
-                        if (!debugon)
-                        {
-                                debug = debugon = 1;
-                                debug_start();
-//                                EnableMenuItem(hmenu,IDM_BREAK,MF_ENABLED);
-                        }
-                        else
-                        {
-                                debug ^= 1;
-                                debug_end();
-//                                EnableMenuItem(hmenu,IDM_BREAK,MF_GRAYED);
-                        }
-                        CheckMenuItem(hmenu, IDM_DEBUGGER, (debug) ? MF_CHECKED: MF_UNCHECKED);
+                        debug_toggle_core();
+                        CheckMenuItem(hmenu, IDM_DEBUGGER, (debug_core) ? MF_CHECKED: MF_UNCHECKED);
                         LeaveCriticalSection(&cs);
                         break;
-                        case IDM_BREAK:
-                        debug = 1;
+                case IDM_DEBUG_TUBE:
+                        EnterCriticalSection(&cs);
+                        rest(200);
+                        debug_toggle_tube();
+                        CheckMenuItem(hmenu, IDM_DEBUG_TUBE, (debug_tube) ? MF_CHECKED: MF_UNCHECKED);
+                        LeaveCriticalSection(&cs);
+                        break;
+
+                case IDM_BREAK:
+                        debug_step = 1;
                         break;
                         
                         case IDM_SCRSHOT:

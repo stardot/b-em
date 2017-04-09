@@ -60,6 +60,7 @@
 #define IDM_SCSI_ENABLE      40081
 #define IDM_MOUSE_AMX        40090
 #define IDM_DEBUGGER         40100
+#define IDM_DEBUG_TUBE       40103
 #define IDM_BREAK            40102
 #define IDM_SCRSHOT          40101
 #define IDM_MODEL_0          41000

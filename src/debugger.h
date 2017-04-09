@@ -4,13 +4,12 @@
 extern void debug_start();
 extern void debug_kill();
 extern void debug_end();
-extern void debug_read(uint16_t addr);
-extern void debug_write(uint16_t addr, uint8_t val);
-extern void debugger_do();
+extern void debug_toggle_core(void);
+extern void debug_toggle_tube(void);
 
 extern int readc[65536], writec[65536], fetchc[65536];
 
-extern int debug,debug_tube,debugon;
+extern int debug_core,debug_tube,debug_step;
 
 #endif
 

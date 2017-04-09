@@ -13,18 +13,28 @@
 
 #define NUM_BREAKPOINTS 8
 
-int debug;
+int debug_core = 0;
+int debug_tube = 0;
+int debug_step = 0;
 int indebug = 0;
 extern int fcount;
-static int debugstep = 0;
 static int vrefresh = 1;
 static FILE *trace_fp = NULL;
+
+static void close_trace()
+{
+    if (trace_fp) {
+        fputs("Trace finished due to emulator quit\n", trace_fp);
+        fclose(trace_fp);
+    }
+}
 
 #ifdef WIN32
 #include <windows.h>
 #include <wingdi.h>
 #include <process.h>
 
+static int debug_cons = 0;
 static HANDLE cinf, consf;
 
 static inline void debug_in(char *buf, size_t bufsize)
@@ -57,70 +67,6 @@ static void debug_outf(const char *fmt, ...)
     WriteConsole(consf, s, len, NULL, NULL);
     endblit();
 }
-
-#else
-
-static inline void debug_in(char *buf, size_t bufsize)
-{
-    fgets(buf, bufsize, stdin);
-}
-
-static void debug_out(const char *s, size_t len)
-{
-    fwrite(s, len, 1, stdout);
-    fflush(stdout);
-}
-
-static void debug_outf(const char *fmt, ...)
-{
-    va_list ap;
-
-    va_start(ap, fmt);
-    vprintf(fmt, ap);
-    va_end(ap);
-    fflush(stdout);
-}
-
-#endif
-
-static void choose_cpu() {
-    if (debug)
-        core6502_cpu_debug.debug_enable(1);
-    log_info("debug_tube=%d, curtube=%d", debug_tube, curtube);
-    if (debug_tube && curtube != -1)
-        tubes[curtube].debug->debug_enable(1);
-#if 0
-    cpu_debug_t **end, **cp, *c;
-    int i = 0;
-    char buf[80];
-
-    debug_outf("\nDebuggable CPUSs are as follows:\n");
-    end = debuggables + sizeof(debuggables)/sizeof(cpu_debug_t *);
-    for (cp = debuggables; cp < end; cp++) {
-        c = *cp;
-        debug_outf("  %d: %s\n", ++i, c->cpu_name);
-    }
-    do {
-        debug_outf("Debug which CPU? ");
-        debug_in(buf, sizeof buf);
-        i = atoi(buf);
-    } while (i == 0 || i > sizeof(debuggables)/sizeof(cpu_debug_t *));
-    log_debug("cpu#%d chosen", i);
-    debuggables[i-1]->debug_enable(1);
-#endif
-    debugstep = 1;
-    debugon = 1;
-}
-
-static void close_trace()
-{
-    if (trace_fp) {
-        fputs("Trace finished due to emulator quit\n", trace_fp);
-        fclose(trace_fp);
-    }
-}
-
-#ifdef WIN32
 
 static HANDLE debugthread;
 static HWND dhwnd;
@@ -204,7 +150,7 @@ void _debugthread(PVOID pvoid)
     lpbmi.bmiHeader.biClrImportant = 0;
 
     debugstarted = 1;
-    while (debugon)
+    while (debug_core)
     {
         Sleep(20);
         c += 16;
@@ -258,9 +204,9 @@ BOOL CtrlHandler(DWORD fdwCtrlType)
     }
 }*/
 
-void debug_start()
+static void debug_cons_open(void)
 {
-    if (debug || debug_tube)
+    if (debug_cons++ == 0)
     {
         hinst = GetModuleHandle(NULL);
         debugthread = (HANDLE)_beginthread(_debugthread, 0, NULL);
@@ -270,20 +216,22 @@ void debug_start()
         SetConsoleCtrlHandler((PHANDLER_ROUTINE)CtrlHandler, TRUE);
         consf = GetStdHandle(STD_OUTPUT_HANDLE);
         cinf  = GetStdHandle(STD_INPUT_HANDLE);
-        choose_cpu();
     }
 }
 
-void debug_end()
+static void debug_cons_close(void)
 {
-    FreeConsole();
-    debug = debugon = 0;
+    if (--debug_cons == 0)
+    {
+        TerminateThread(debugthread, 0);
+        FreeConsole();
+    }
 }
 
 void debug_kill()
 {
     close_trace();
-    TerminateThread(debugthread, 0);
+    debug_cons_close();
     if (usdat) free(usdat);
 }
 
@@ -304,18 +252,34 @@ LRESULT CALLBACK DebugWindowProcedure (HWND hwnd, UINT message, WPARAM wParam, L
 
 #else
 
-#undef printf
+static inline void debug_in(char *buf, size_t bufsize)
+{
+    fgets(buf, bufsize, stdin);
+}
+
+static void debug_out(const char *s, size_t len)
+{
+    fwrite(s, len, 1, stdout);
+    fflush(stdout);
+}
+
+static void debug_outf(const char *fmt, ...)
+{
+    va_list ap;
+
+    va_start(ap, fmt);
+    vprintf(fmt, ap);
+    va_end(ap);
+    fflush(stdout);
+}
 
 void debug_kill()
 {
     close_trace();
 }
 
-void debug_start()
-{
-    if (debug || debug_tube)
-        choose_cpu();
-}
+static inline void debug_cons_open(void) {}
+static inline void debug_cons_close(void) {}
 
 #endif
 
@@ -327,6 +291,78 @@ void debug_start()
 #include "video.h"
 #include "sn76489.h"
 #include "model.h"
+
+static void enable_core_debug(void)
+{
+    debug_cons_open();
+    debug_step = 1;
+    debug_core = 1;
+    log_info("debugger: debugging of core 6502 enabled");
+    core6502_cpu_debug.debug_enable(1);
+}
+
+static void enable_tube_debug(void)
+{
+    if (curtube != -1)
+    {
+        debug_cons_open();
+        debug_step = 1;
+        debug_tube = 1;
+        log_info("debugger: debugging of tube CPU enabled");
+        tubes[curtube].debug->debug_enable(1);
+    }
+}
+
+static void disable_core_debug(void)
+{
+    core6502_cpu_debug.debug_enable(0);
+    log_info("debugger: debugging of core 6502 disabled");
+    debug_cons_close();
+    debug_core = 0;
+}
+
+static void disable_tube_debug(void)
+{
+    if (curtube != -1)
+    {
+        tubes[curtube].debug->debug_enable(0);
+        log_info("debugger: debugging of tube CPU disabled");
+        debug_cons_close();
+        debug_tube = 0;
+    }
+}
+
+void debug_start(void)
+{
+    if (debug_core)
+        enable_core_debug();
+    if (debug_tube)
+        enable_tube_debug();
+}
+
+void debug_end(void)
+{
+    if (debug_tube)
+        disable_tube_debug();
+    if (debug_core)
+        disable_core_debug();
+}
+
+void debug_toggle_core(void)
+{
+    if (debug_core)
+        disable_core_debug();
+    else
+        enable_core_debug();
+}
+
+void debug_toggle_tube(void)
+{
+    if (debug_tube)
+        disable_tube_debug();
+    else
+        enable_tube_debug();
+}
 
 int readc[65536], writec[65536], fetchc[65536];
 
@@ -519,7 +555,6 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
             case 'C':
                 if (*iptr)
                     sscanf(iptr, "%d", &contcount);
-                debug = 0;
                 indebug = 0;
                 return;
 
@@ -617,9 +652,9 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
             case 's':
             case 'S':
                 if (*iptr)
-                    sscanf(iptr, "%i", &debugstep);
+                    sscanf(iptr, "%i", &debug_step);
                 else
-                    debugstep = 1;
+                    debug_step = 1;
                 indebug = 0;
                 return;
 
@@ -747,10 +782,9 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
         putc('\n', trace_fp);
     }
 
-    if (addr == tbreak) {
-        tbreak = -1;
+    if (addr == tbreak)
         enter = 1;
-    } else {
+    else {
         for (c = 0; c < NUM_BREAKPOINTS; c++) {
             if (breakpoints[c] == addr) {
                 debug_outf("cpu %s: Break at %04X\n", cpu->cpu_name, addr);
@@ -761,15 +795,17 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
                 enter = 1;
             }
         }
-        if (debugstep) {
-            debugstep--;
-            if (debugstep)
+        if (debug_step) {
+            debug_step--;
+            if (debug_step)
                 return;
             enter = 1;
         }
     }
-    if (enter)
+    if (enter) {
+        tbreak = -1;
         debugger_do(cpu, addr);
+    }
 }
 
 void debug_trap(cpu_debug_t *cpu, uint32_t addr, int reason)
