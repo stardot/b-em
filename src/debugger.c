@@ -403,7 +403,8 @@ static const char helptext[] =
     "    breakw n   - break on writes to address n\n"
     "    breaki n   - break on input from I/O port\n"
     "    breako n   - break on output to I/O port\n"
-    "    c          - continue running indefinitely\n"
+    "    c          - continue running until breakpoint\n"
+    "    c n        - continue until the nth breakpoint\n"
     "    d [n]      - disassemble from address n\n"
     "    n          - step, but treat a called subroutine as one step\n"
     "    m [n]      - memory dump from address n\n"
@@ -425,6 +426,7 @@ static const char helptext[] =
     "    wclearw n  - clear write watchpoint n or write watchpoint at n\n"
     "    wcleari n  - clear input watchpoint n or input watchpoint at n\n"
     "    wclearo n  - clear output watchpoint n or output watchpoint at n\n"
+    "    wlist      - list watchpoints\n"
     "    writem a v - write to memory, a = address, v = value\n";
 
 static void print_registers(cpu_debug_t *cpu) {
