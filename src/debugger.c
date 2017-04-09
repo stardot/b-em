@@ -775,8 +775,6 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
     int c, r, enter = 0;
     const char **np, *name;
 
-    log_debug("debugger: debug_preexec(%s, %04x)", cpu->cpu_name, addr);
-
     if (trace_fp) {
         cpu->disassemble(addr, buf, sizeof buf);
         fputs(buf, trace_fp);
@@ -789,8 +787,10 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
         putc('\n', trace_fp);
     }
 
-    if (addr == tbreak)
+    if (addr == tbreak) {
+        log_debug("debugger; enter for CPU %s on tbreak at %04X", cpu->cpu_name, addr);
         enter = 1;
+    }
     else {
         for (c = 0; c < NUM_BREAKPOINTS; c++) {
             if (breakpoints[c] == addr) {
@@ -799,6 +799,7 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
                     contcount--;
                     return;
                 }
+                log_debug("debugger; enter for CPU %s on breakpoint at %04X", cpu->cpu_name, addr);
                 enter = 1;
             }
         }
@@ -806,6 +807,7 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
             debug_step--;
             if (debug_step)
                 return;
+            log_debug("debugger; enter for CPU %s on single-step at %04X", cpu->cpu_name, addr);
             enter = 1;
         }
     }
