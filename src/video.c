@@ -525,7 +525,7 @@ void video_reset()
         charsleft = 0;
 }
 
-void video_poll(int clocks)
+void video_poll(int clocks, int timer_enable)
 {
         int c, oldvc;
         uint16_t addr;
@@ -713,8 +713,8 @@ void video_poll(int clocks)
                 if (hvblcount)
                 {
                         hvblcount--;
-                        if (!hvblcount)
-                           sysvia_set_ca1(0);
+                        if (!hvblcount && timer_enable)
+                            sysvia_set_ca1(0);
                 }
 
                 if (interline && hc == (crtc[0] >> 1))
@@ -802,7 +802,8 @@ void video_poll(int clocks)
                                         ccount++;
                                         if (ccount == 10 || ((!motor || !fasttape) && !key[KEY_PGUP])) ccount = 0;
                                         scry = 0;
-                                        sysvia_set_ca1(1);
+                                        if (timer_enable)
+                                            sysvia_set_ca1(1);
 
                                         vsynctime = (crtc[3] >> 4) + 1;
                                         if (!(crtc[3] >> 4)) vsynctime = 17;

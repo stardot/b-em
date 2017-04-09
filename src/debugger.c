@@ -498,7 +498,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
     next_addr = cpu->disassemble(addr, ins, sizeof ins);
     debug_out(ins, strlen(ins));
     if (vrefresh)
-        video_poll(CLOCKS_PER_FRAME);
+        video_poll(CLOCKS_PER_FRAME, 0);
 
     while (1) {
         debug_out("  >", 3);
@@ -690,7 +690,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                         if (!strncasecmp(iptr, "on", 2)) {
                             debug_outf("Extra video refresh enabled\n");
                             vrefresh = 1;
-                            video_poll(CLOCKS_PER_FRAME);
+                            video_poll(CLOCKS_PER_FRAME, 0);
                         } else if (!strncasecmp(iptr, "off", 3)) {
                             debug_outf("Extra video refresh disabled\n");
                             vrefresh = 0;
