@@ -66,7 +66,7 @@ MENU keymenu[3];
 MENU mousemenu[2];
 MENU hdiskmenu[4];
 MENU settingsmenu[8];
-MENU miscmenu[3];
+MENU miscmenu[6];
 MENU speedmenu[11];
 MENU mainmenu[6];
 
@@ -784,10 +784,31 @@ MENU speedmenu[11] =
         {NULL, NULL, NULL, 0, NULL}
 };
 
-MENU miscmenu[3] =
+static int gui_debug_core()
 {
-        {"&Speed", NULL, speedmenu, 0, NULL},
-        {"Save screenshot", gui_scrshot, NULL, 0, NULL},
+    debug_toggle_core();
+    return D_CLOSE;
+}
+
+static int gui_debug_tube()
+{
+    debug_toggle_tube();
+    return D_CLOSE;
+}
+
+static int gui_debug_break()
+{
+    debug_step = 1;
+    return D_CLOSE;
+}
+
+MENU miscmenu[6] =
+{
+        {"&Speed", NULL,    speedmenu,             0, NULL},
+        {"Save screenshot", gui_scrshot,     NULL, 0, NULL},
+        {"&Debugger",       gui_debug_core,  NULL, 0, NULL},
+        {"Debug &Tube",     gui_debug_tube,  NULL, 0, NULL},
+        {"&Break",          gui_debug_break, NULL, 0, NULL},
         {NULL, NULL, NULL, 0, NULL}
 };
 
