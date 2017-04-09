@@ -726,8 +726,10 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 else if (!strcasecmp(cmd, "writem")) {
                     if (*iptr) {
                         sscanf(iptr, "%X %X", &e, &f);
-                        log_debug("WriteM %04X %04X\n", e, f);
-                        writemem(e, f);
+                        log_debug("debugger: writem %04X %04X\n", e, f);
+                        cpu->memwrite(e, f);
+                        if (cpu == &core6502_cpu_debug && vrefresh)
+                            video_poll(CLOCKS_PER_FRAME, 0);
                     }
                 }
                 break;
