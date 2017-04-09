@@ -501,20 +501,23 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
     while (1) {
         debug_out("  >", 3);
         debug_in(ins, 255);
-        if (!*ins)
-            *ins = debug_lastcommand;
         // Skip past any leading spaces.
         for (iptr = ins; (c = *iptr) && isspace(c); iptr++);
-        cmd = iptr;
-        // Find the first space and terminate command name.
-        while (c && !isspace(c))
-            c = *++iptr;
-        *iptr = '\0';
-        // Skip past any separating spaces.
-        while (c && isspace(c))
-            c = *++iptr;
-        // iptr now points to the parameter.
-
+        if (c) {
+            cmd = iptr;
+            // Find the first space and terminate command name.
+            while (c && !isspace(c))
+                c = *++iptr;
+            *iptr = '\0';
+            // Skip past any separating spaces.
+            while (c && isspace(c))
+                c = *++iptr;
+            // iptr now points to the parameter.
+        } else {
+            cmd = iptr = ins;
+            *iptr++ = debug_lastcommand;
+            *iptr = '\0';
+        }
         switch (*cmd) {
             case 'b':
             case 'B':
@@ -555,6 +558,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
             case 'C':
                 if (*iptr)
                     sscanf(iptr, "%d", &contcount);
+                debug_lastcommand = 'c';
                 indebug = 0;
                 return;
 
@@ -568,6 +572,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                     debug_out(ins, strlen(ins));
                     debug_out("\n", 1);
                 }
+                debug_lastcommand = 'd';
                 break;
 
             case 'h':
@@ -597,11 +602,13 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                     debug_out(dump, dptr - dump);
                     debug_memaddr += 16;
                 }
+                debug_lastcommand = 'm';
                 break;
 
             case 'n':
             case 'N':
                 tbreak = next_addr;
+                debug_lastcommand = 'n';
                 indebug = 0;
                 return;
 
@@ -655,6 +662,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                     sscanf(iptr, "%i", &debug_step);
                 else
                     debug_step = 1;
+                debug_lastcommand = 's';
                 indebug = 0;
                 return;
 
@@ -722,7 +730,6 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 }
                 break;
         }
-        debug_lastcommand = ins[0];
     }
     fcount = 0;
     indebug = 0;
