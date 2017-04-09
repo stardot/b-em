@@ -17,6 +17,7 @@ int debug;
 int indebug = 0;
 extern int fcount;
 static int debugstep = 0;
+static int vrefresh = 1;
 static FILE *trace_fp = NULL;
 
 #ifdef WIN32
@@ -379,6 +380,7 @@ static const char helptext[] =
     "    r sound    - print Sound registers\n"
     "    s [n]      - step n instructions (or 1 if no parameter)\n"
     "    trace fn   - trace disassembly/registers to file, close file if no fn\n"
+    "    vrefresh t - extra video refresh on entering debugger.  t=on or off\n"
     "    watchr n   - watch reads from address n\n"
     "    watchw n   - watch writes to address n\n"
     "    watchi n   - watch inputs from port n\n"
@@ -457,6 +459,8 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
     log_debug("debugger: about to call disassembler, addr=%04X", addr);
     next_addr = cpu->disassemble(addr, ins, sizeof ins);
     debug_out(ins, strlen(ins));
+    if (vrefresh)
+        video_poll(CLOCKS_PER_FRAME);
 
     while (1) {
         debug_out("  >", 3);
@@ -632,6 +636,22 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                         debug_outf("Unable to open trace file '%s' for append: %s\n", iptr, strerror(errno));
                 } else
                     debug_outf("Trace file closed");
+                break;
+
+            case 'v':
+            case 'V':
+                if (!strcasecmp(cmd, "vrefresh")) {
+                    if (*iptr) {
+                        if (!strncasecmp(iptr, "on", 2)) {
+                            debug_outf("Extra video refresh enabled\n");
+                            vrefresh = 1;
+                            video_poll(40);
+                        } else if (!strncasecmp(iptr, "off", 3)) {
+                            debug_outf("Extra video refresh enabled\n");
+                            vrefresh = 0;
+                        }
+                    }
+                }
                 break;
 
             case 'w':

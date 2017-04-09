@@ -1,6 +1,8 @@
 #ifndef __INC_VIDEO_H
 #define __INC_VIDEO_H
 
+#define CLOCKS_PER_FRAME 80000
+
 /*CRTC (6845)*/
 void    crtc_reset();
 void    crtc_write(uint16_t addr, uint8_t val);
