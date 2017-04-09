@@ -645,7 +645,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                         if (!strncasecmp(iptr, "on", 2)) {
                             debug_outf("Extra video refresh enabled\n");
                             vrefresh = 1;
-                            video_poll(40);
+                            video_poll(CLOCKS_PER_FRAME);
                         } else if (!strncasecmp(iptr, "off", 3)) {
                             debug_outf("Extra video refresh enabled\n");
                             vrefresh = 0;
