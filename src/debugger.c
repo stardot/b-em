@@ -501,7 +501,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
         video_poll(CLOCKS_PER_FRAME, 0);
 
     while (1) {
-        debug_out("  >", 3);
+        debug_out(">", 1);
         debug_in(ins, 255);
         // Skip past any leading spaces.
         for (iptr = ins; (c = *iptr) && isspace(c); iptr++);
