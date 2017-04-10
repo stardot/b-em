@@ -65,6 +65,7 @@ static const char op_names[113][4] = {
 
 static int8_t op_cmos[256] =
 {
+/*       0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F */
 /*00*/  BRK,  ORA,  UND,  UND,  TSB,  ORA,  ASL,  UND,  PHP,  ORA,  ASL,  UND,  TSB,  ORA,  ASL,  UND,
 /*10*/  BPL,  ORA,  ORA,  UND,  TRB,  ORA,  ASL,  UND,  CLC,  ORA,  INC,  UND,  TRB,  ORA,  ASL,  UND,
 /*20*/  JSR,  AND,  UND,  UND,  BIT,  AND,  ROL,  UND,  PLP,  AND,  ROL,  UND,  BIT,  AND,  ROL,  UND,
@@ -85,6 +86,7 @@ static int8_t op_cmos[256] =
 
 static uint8_t am_cmos[256]=
 {
+/*       0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F */
 /*00*/  IMP,  INDX, IMP,  IMP,  ZP,   ZP,   ZP,   IMP,  IMP,  IMM,  IMPA, IMP,  ABS,  ABS,  ABS,  IMP,
 /*10*/  PCR,  INDY, IND,  IMP,  ZP,   ZPX,  ZPX,  IMP,  IMP,  ABSY, IMPA, IMP,  ABS,  ABSX, ABSX, IMP,
 /*20*/  ABS,  INDX, IMP,  IMP,  ZP,   ZP,   ZP,   IMP,  IMP,  IMM,  IMPA, IMP,  ABS,  ABS,  ABS,  IMP,
@@ -105,9 +107,10 @@ static uint8_t am_cmos[256]=
 
 static int8_t op_nmos[256] =
 {
+/*       0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F */    
 /*00*/  BRK,  ORA,  HLT,  SLO,  NOP,  ORA,  ASL,  SLO,  PHP,  ORA,  ASL,  ANC,  NOP,  ORA,  ASL,  SLO,
 /*10*/  BPL,  ORA,  HLT,  SLO,  NOP,  ORA,  ASL,  SLO,  CLC,  ORA,  NOP,  SLO,  NOP,  ORA,  ASL,  SLO,
-/*20*/  JSR,  AND,  HLT,  RLA,  NOP,  AND,  ROL,  RLA,  PLP,  AND,  ROL,  ANC,  BIT,  AND,  ROL,  RLA,
+/*20*/  JSR,  AND,  HLT,  RLA,  BIT,  AND,  ROL,  RLA,  PLP,  AND,  ROL,  ANC,  BIT,  AND,  ROL,  RLA,
 /*30*/  BMI,  AND,  HLT,  RLA,  NOP,  AND,  ROL,  RLA,  SEC,  AND,  NOP,  RLA,  NOP,  AND,  ROL,  RLA,
 /*40*/  RTI,  EOR,  HLT,  SRE,  NOP,  EOR,  LSR,  SRE,  PHA,  EOR,  LSR,  ASR,  JMP,  EOR,  LSR,  SRE,
 /*50*/  BVC,  EOR,  HLT,  SRE,  NOP,  EOR,  LSR,  SRE,  CLI,  EOR,  NOP,  SRE,  NOP,  EOR,  LSR,  SRE,
@@ -125,6 +128,7 @@ static int8_t op_nmos[256] =
 
 static int8_t am_nmos[256] =
 {
+/*       0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F */
 /*00*/  IMP,  INDX, IMP,  INDX, ZP,   ZP,   ZP,   ZP,   IMP,  IMM,  IMPA, IMM,  ABS,  ABS,  ABS,  ABS,
 /*10*/  PCR,  INDY, IMP,  INDY, ZPX,  ZPX,  ZPX,  ZPX,  IMP,  ABSY, IMP,  ABSY, ABSX, ABSX, ABSX, ABSX,
 /*20*/  ABS,  INDX, IMP,  INDX, ZP,   ZP,   ZP,   ZP,   IMP,  IMM,  IMPA, IMM,  ABS,  ABS,  ABS,  ABS,
@@ -145,6 +149,7 @@ static int8_t am_nmos[256] =
 
 static int8_t op_816[256] =
 {
+/*       0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F */
 /*00*/  BRK,  ORA,  COP,  ORA,  TSB,  ORA,  ASL,  ORA,  PHP,  ORA,  ASL,  PHD,  TSB,  ORA,  ASL,  ORA,
 /*10*/  BPL,  ORA,  ORA,  ORA,  TRB,  ORA,  ASL,  ORA,  CLC,  ORA,  INC,  TCS,  TRB,  ORA,  ASL,  ORA,
 /*20*/  JSR,  AND,  JSL,  AND,  BIT,  AND,  ROL,  AND,  PLP,  AND,  ROL,  PLD,  BIT,  AND,  ROL,  AND,
@@ -165,6 +170,7 @@ static int8_t op_816[256] =
 
 static uint8_t am_816[256]=
 {
+/*       0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F */
 /*00*/  IMP,  INDX, IMM,  SR,   ZP,   ZP,   ZP,   INDL, IMP,  IMV,  IMPA, IMP,  ABS,  ABS,  ABS,  ABSL,
 /*10*/  PCR,  INDY, IND,  SRY,  ZP,   ZPX,  ZPX,  INDYL,IMP,  ABSY, IMPA, IMP,  ABS,  ABSX, ABSX, ABSXL,
 /*20*/  ABS,  INDX, ABSL, SR,   ZP,   ZP,   ZP,   INDL, IMP,  IMV,  IMPA, IMP,  ABS,  ABS,  ABS,  ABSL,
