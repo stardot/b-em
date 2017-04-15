@@ -37,7 +37,7 @@ void wd1770_reset()
     nmi = 0;
     wd1770.status = 0;
     motorspin = 0;
-//    log_debug("Reset 1770\n");
+    log_debug("wd1770: reset 1770");
     fdc_time = 0;
     if (WD1770)
     {
@@ -74,49 +74,37 @@ void wd1770_setspindown()
 
 #define track0 (wd1770.curtrack ? 4 : 0)
 
-void wd1770_write(uint16_t addr, uint8_t val)
+static void write_1770(uint16_t addr, uint8_t val)
 {
-//    log_debug("Write 1770 %04X %02X\n",addr,val);
-    switch (addr)
+    switch (addr & 0x03)
     {
-    case 0xFE80:
-//        log_debug("Write CTRL FE80 %02X\n",val);
-        wd1770.ctrl = val;
-        curdrive = (val & 2) ? 1 : 0;
-        wd1770.curside =  (wd1770.ctrl & 4) ? 1 : 0;
-        wd1770.density = !(wd1770.ctrl & 8);
-        break;
-    case 0xFE24:
-//        log_debug("Write CTRL FE24 %02X\n",val);
-        wd1770.ctrl = val;
-        curdrive = (val & 2) ? 1 : 0;
-        wd1770.curside =  (wd1770.ctrl & 16) ? 1 : 0;
-        wd1770.density = !(wd1770.ctrl & 0x20);
-        break;
-    case 0xFE84:
-    case 0xFE28:
+    case 0:
         if (wd1770.status & 1 && (val >> 4) != 0xD) {
-            log_debug("Command rejected\n");
+            log_debug("wd1770: command %02X rejected", val);
             return;
         }
-//        log_debug("FDC command %02X %i %i %i\n",val,wd1770.curside,wd1770.track,wd1770.sector);
         wd1770.command = val;
         if ((val >> 4) != 0xD)/* && !(val&8)) */
             wd1770_spinup();
         switch (val >> 4)
         {
         case 0x0: /*Restore*/
+            log_debug("wd1770: restore");
+            wd1770.curtrack = 0;
             wd1770.status = 0x80 | 0x21 | track0;
             disc_seek(curdrive, 0);
             break;
-                        
+
         case 0x1: /*Seek*/
+            log_debug("wd1770: seek track=%02d\n", wd1770.track);
+            wd1770.curtrack = wd1770.data;
             wd1770.status = 0x80 | 0x21 | track0;
-            disc_seek(curdrive, wd1770.data);
+            disc_seek(curdrive, wd1770.curtrack);
             break;
-                        
+
         case 0x2:
         case 0x3: /*Step*/
+            log_debug("wd1770: step");
             wd1770.status = 0x80 | 0x21 | track0;
             wd1770.curtrack += wd1770.stepdir;
             if (wd1770.curtrack < 0)
@@ -126,14 +114,16 @@ void wd1770_write(uint16_t addr, uint8_t val)
 
         case 0x4:
         case 0x5: /*Step in*/
+            log_debug("wd1770: step in");
             wd1770.status = 0x80 | 0x21 | track0;
             wd1770.curtrack++;
             disc_seek(curdrive, wd1770.curtrack);
             wd1770.stepdir = 1;
             break;
-            
+
         case 0x6:
         case 0x7: /*Step out*/
+            log_debug("wd1770: step out");
             wd1770.status = 0x80 | 0x21 | track0;
             wd1770.curtrack--;
             if (wd1770.curtrack < 0)
@@ -143,13 +133,14 @@ void wd1770_write(uint16_t addr, uint8_t val)
             break;
 
         case 0x8: /*Read sector*/
+            log_debug("wd1770: read sector drive=%d side=%d track=%d sector=%d dens=%d", curdrive, wd1770.curside, wd1770.track, wd1770.sector, wd1770.density);
             wd1770.status = 0x80 | 0x1;
             disc_readsector(curdrive, wd1770.sector, wd1770.track, wd1770.curside, wd1770.density);
-            //log_debug("wd1770: Read sector %i %i %i %i %i\n",curdrive,wd1770.sector,wd1770.track,wd1770.curside,wd1770.density);
             byte = 0;
             break;
-            
+
         case 0xA: /*Write sector*/
+            log_debug("wd1770: write sector drive=%d side=%d track=%d sector=%d dens=%d", curdrive, wd1770.curside, wd1770.track, wd1770.sector, wd1770.density);
             wd1770.status = 0x80 | 0x1;
             disc_writesector(curdrive, wd1770.sector, wd1770.track, wd1770.curside, wd1770.density);
             byte = 0;
@@ -158,48 +149,53 @@ void wd1770_write(uint16_t addr, uint8_t val)
             //Carlo Concari: wait for first data byte before starting sector write
             wd1770.written = 0;
             break;
-            
+
         case 0xC: /*Read address*/
+            log_debug("wd1770: read address side=%d track=%d dens=%d", wd1770.curside, wd1770.track, wd1770.density);
             wd1770.status = 0x80 | 0x1;
             disc_readaddress(curdrive, wd1770.track, wd1770.curside, wd1770.density);
             byte = 0;
             break;
-            
+
         case 0xD: /*Force interrupt*/
-            log_debug("wd1770: Force interrupt\n");
+            log_debug("wd1770: force interrupt");
             fdc_time = 0;
-            wd1770.status = 0x80 | track0;
-            nmi = (val & 8) ? 1 : 0;
-            wd1770_spindown();
+            if (wd1770.status & 0x01)
+                wd1770.status &= ~1;
+            else
+                wd1770.status = 0x80 | track0;
+            nmi = (val & 8) && (WD1770 == WD1770_ACORN || WD1770 == WD1770_MASTER) ? 1 : 0;
+            wd1770_setspindown();
             break;
-            
+
         case 0xF: /*Write track*/
+            log_debug("wd1770: write track side=%d track=%d dens=%d", wd1770.curside, wd1770.track, wd1770.density);
             wd1770.status = 0x80 | 0x1;
             disc_format(curdrive, wd1770.track, wd1770.curside, wd1770.density);
             break;
-                        
+
         default:
-            log_debug("Bad 1770 command %02X\n",val);
+            log_debug("wd1770: bad WD1770 command %02X",val);
             fdc_time = 0;
-            nmi = 1;
+            if (WD1770 == WD1770_ACORN || WD1770 == WD1770_MASTER)
+                nmi = 1;
             wd1770.status = 0x90;
             wd1770_spindown();
             break;
         }
         break;
-        
-    case 0xFE85:
-    case 0xFE29:
+
+    case 1: // Track register
+        log_debug("wd1770: write track register, track=%02x", val);
         wd1770.track = val;
         break;
-        
-    case 0xFE86:
-    case 0xFE2A:
+
+    case 2: // Sector register
+        log_debug("wd1770: write sector register, sector=%02x", val);
         wd1770.sector = val;
         break;
-        
-    case 0xFE87:
-    case 0xFE2B:
+
+    case 3: // Data register
         nmi &= ~2;
         wd1770.status &= ~2;
         wd1770.data = val;
@@ -208,54 +204,115 @@ void wd1770_write(uint16_t addr, uint8_t val)
     }
 }
 
-uint8_t wd1770_read(uint16_t addr)
+static void write_ctrl_acorn(uint8_t val)
 {
-//    log_debug("Read 1770 %04X %04X\n",addr,pc);
-    switch (addr)
+    log_debug("wd1770: write acorn-style ctrl %02X", val);
+    if (val & 0x20)
+        wd1770_reset();
+    wd1770.ctrl = val;
+    curdrive = (val & 0x02) ? 1 : 0;
+    wd1770.curside =  (wd1770.ctrl & 0x04) ? 1 : 0;
+    wd1770.density = !(wd1770.ctrl & 0x08);
+}
+
+static void write_ctrl_master(uint8_t val)
+{
+    log_debug("wd1770: write master-style ctrl %02X", val);
+    if (val & 0x04)
+        wd1770_reset();
+    wd1770.ctrl = val;
+    curdrive = (val & 2) ? 1 : 0;
+    wd1770.curside =  (wd1770.ctrl & 0x10) ? 1 : 0;
+    wd1770.density = !(wd1770.ctrl & 0x20);
+}
+
+static void write_ctrl_stl(uint8_t val)
+{
+    log_debug("wd1770: write solidisk-style ctrl %02X", val);
+    wd1770.ctrl = val;
+    curdrive = (val & 0x01);
+    wd1770.curside =  (wd1770.ctrl & 0x02) ? 1 : 0;
+    wd1770.density = !(wd1770.ctrl & 0x04);
+}
+
+void wd1770_write(uint16_t addr, uint8_t val)
+{
+    switch (WD1770)
     {
-    case 0xFE84:
-    case 0xFE28:
+    case WD1770_ACORN:
+        if (addr & 0x0004)
+            write_1770(addr, val);
+        else
+            write_ctrl_acorn(val);
+        break;
+    case WD1770_MASTER:
+        if (addr & 0x0008)
+            write_1770(addr, val);
+        else
+            write_ctrl_master(val);
+        break;
+    case WD1770_STL:
+        if (addr & 0x0004)
+            write_ctrl_stl(val);
+        else
+            write_1770(addr, val);
+        break;
+    default:
+        log_warn("wd1770: unrecognised WD1770 board %d", WD1770);
+    }
+}
+
+static uint8_t read_1770(uint16_t addr)
+{
+    switch (addr & 0x03)
+    {
+    case 0: // Status register.
         nmi &= ~1;
-//        log_debug("Status %02X\n",wd1770.status);
+        log_debug("wd1770: status %02X", wd1770.status);
         return wd1770.status;
-    case 0xFE85:
-    case 0xFE29:
+
+    case 1: // Track register.
         return wd1770.track;
-    case 0xFE86:
-    case 0xFE2A:
+
+    case 2: // Sector register
         return wd1770.sector;
-    case 0xFE87:
-    case 0xFE2B:
+
+    case 3: // Data register.
         nmi &= ~2;
         wd1770.status &= ~2;
-//        log_debug("Read data %02X %04X\n",wd1770.data,pc);
+//        log_debug("wd1770: read data %02X %04X\n",wd1770.data,pc);
         return wd1770.data;
+    }
+    log_debug("wd1770: returning unmapped status");
+    return 0xFE;
+}
+
+uint8_t wd1770_read(uint16_t addr)
+{
+    switch (WD1770)
+    {
+    case WD1770_ACORN:
+        if (addr & 0x0004)
+            return read_1770(addr);
+        break;
+    case WD1770_MASTER:
+        if (addr & 0x0008)
+            return read_1770(addr);
+        break;
+    case WD1770_STL:
+        return read_1770(addr);
     }
     return 0xFE;
 }
 
 void wd1770_callback()
 {
-//    log_debug("FDC callback %02X\n",wd1770.command);
+    log_debug("wd1770: fdc callback %02X",wd1770.command);
     fdc_time = 0;
     switch (wd1770.command >> 4)
     {
     case 0: /*Restore*/
-        wd1770.curtrack = wd1770.track = 0;
-        wd1770.status = 0x80;
-        wd1770_setspindown();
-        nmi |= 1;
-//        disc_seek(curdrive,0);
-        break;
-        
     case 1: /*Seek*/
-        wd1770.curtrack = wd1770.track = wd1770.data;
-        wd1770.status = 0x80 | track0;
-        wd1770_setspindown();
-        nmi |= 1;
-//        disc_seek(curdrive,wd1770.curtrack);
-        break;
-        
     case 3: /*Step*/
     case 5: /*Step in*/
     case 7: /*Step out*/
@@ -265,78 +322,83 @@ void wd1770_callback()
     case 6: /*Step out*/
         wd1770.status = 0x80 | track0;
         wd1770_setspindown();
-        nmi |= 1;
+        if (WD1770 == WD1770_ACORN || WD1770 == WD1770_MASTER)
+            nmi |= 1;
         break;
 
     case 8: /*Read sector*/
         wd1770.status = 0x80;
         wd1770_setspindown();
-        nmi |= 1;
+        if (WD1770 == WD1770_ACORN || WD1770 == WD1770_MASTER)
+            nmi |= 1;
         break;
-        
+
     case 0xA: /*Write sector*/
         wd1770.status = 0x80;
         wd1770_setspindown();
-        nmi |= 1;
+        if (WD1770 == WD1770_ACORN || WD1770 == WD1770_MASTER)
+            nmi |= 1;
         break;
-        
+
     case 0xC: /*Read address*/
         wd1770.status = 0x80;
         wd1770_setspindown();
-        nmi |= 1;
+        if (WD1770 == WD1770_ACORN || WD1770 == WD1770_MASTER)
+            nmi |= 1;
         wd1770.sector = wd1770.track;
         break;
-        
+
     case 0xF: /*Write tracl*/
         wd1770.status = 0x80;
         wd1770_setspindown();
-        nmi |= 1;
+        if (WD1770 == WD1770_ACORN || WD1770 == WD1770_MASTER)
+            nmi |= 1;
         break;
     }
 }
 
 void wd1770_data(uint8_t dat)
 {
-        wd1770.data = dat;
-        wd1770.status |= 2;
-        nmi |= 2;
+    wd1770.data = dat;
+    wd1770.status |= 2;
+    nmi |= 2;
 }
 
 void wd1770_finishread()
 {
-        fdc_time = 200;
+    fdc_time = 200;
 }
 
 void wd1770_notfound()
 {
-//    log_debug("Not found\n");
+    log_debug("wd1770: not found");
     fdc_time = 0;
-    nmi = 1;
+    nmi = (WD1770 == WD1770_ACORN || WD1770 == WD1770_MASTER) ? 1 : 0;
     wd1770.status = 0x90;
     wd1770_spindown();
 }
 
 void wd1770_datacrcerror()
 {
-//    log_debug("Data CRC\n");
+    log_debug("wd1770: data CRC error");
     fdc_time = 0;
-    nmi = 1;
+    nmi = (WD1770 == WD1770_ACORN || WD1770 == WD1770_MASTER) ? 1 : 0;
     wd1770.status = 0x88;
     wd1770_spindown();
 }
 
 void wd1770_headercrcerror()
 {
-//    log_debug("Header CRC\n");
+    log_debug("wd1770: header CRC error");
     fdc_time = 0;
-    nmi = 1;
+    nmi = (WD1770 == WD1770_ACORN || WD1770 == WD1770_MASTER) ? 1 : 0;
     wd1770.status = 0x98;
     wd1770_spindown();
 }
 
 int wd1770_getdata(int last)
 {
-//    log_debug("Disc get data\n");
+    //log_debug("wd1770: disc get data");
     if (!wd1770.written) return -1;
     if (!last)
     {
