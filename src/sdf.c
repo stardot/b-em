@@ -425,6 +425,7 @@ static void sdf_poll() {
             break;
 
         case ST_READ_ADDR6:
+            state = ST_IDLE;
             fdc_finishread();
             sdf_sector++;
             if (sdf_sector == geometry[sdf_drive]->sectors_per_track)
