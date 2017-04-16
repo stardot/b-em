@@ -83,9 +83,12 @@ void wd1770_setspindown()
 
 #define track0 (wd1770.curtrack ? 0 : 4)
 
+static int data_count = 0;
+
 static void begin_read_sector(const char *variant)
 {
     log_debug("wd1770: %s read sector drive=%d side=%d track=%d sector=%d dens=%d", variant, curdrive, wd1770.curside, wd1770.track, wd1770.sector, wd1770.density);
+    data_count = 0;
     wd1770.status = 0x80 | 0x1;
     disc_readsector(curdrive, wd1770.sector, wd1770.track, wd1770.curside, wd1770.density);
     byte = 0;
@@ -186,17 +189,18 @@ static void write_1770(uint16_t addr, uint8_t val)
 
         case 0xD: /*Force interrupt*/
             log_debug("wd1770: force interrupt");
-            fdc_time = 0;
+            disc_abort(curdrive);
+            fdc_time = 1000;
             if (wd1770.status & 0x01)
                 wd1770.status &= ~1;
             else
                 wd1770.status = 0x80 | 0x20 | track0;
-            nmi = (val & 0xc) && nmi_on_completion[WD1770] ? 1 : 0;
+            nmi = nmi_on_completion[WD1770] ? 1 : 0;
             wd1770_setspindown();
             break;
 
         case 0xF: /*Write track*/
-            log_debug("wd1770: write track side=%d track=%d dens=%d", wd1770.curside, wd1770.track, wd1770.density);
+            log_debug("wd1770: rite track side=%d track=%d dens=%d, ctrl=%d\n", wd1770.curside, wd1770.track, wd1770.density, wd1770.ctrl);
             wd1770.status = 0x80 | 0x1;
             disc_format(curdrive, wd1770.track, wd1770.curside, wd1770.density);
             break;
@@ -274,13 +278,12 @@ static void write_ctrl_stl(uint8_t val)
 static void write_ctrl_watford(uint8_t val)
 {
     log_debug("wd1770: write watford-style ctrl %02X", val);
-    wd1770.ctrl = val;
-    //curdrive = (val & 0x01);
-    curdrive = 0;
-    //wd1770.curside =  (wd1770.ctrl & 0x02) ? 1 : 0;
-    wd1770.curside = 0;
-    //wd1770.density = (wd1770.ctrl & 0x80) ? 1 : 0;
-    wd1770.density = 0;
+    if (val & 0x08)
+        wd1770_reset();
+    curdrive = (val & 0x04) ? 1 : 0;
+    wd1770.curside =  (wd1770.ctrl & 0x02) ? 1 : 0;
+    wd1770.density = !(val & 0x01);
+    log_debug("wd1770: watford residual=%02X\n", val & ~(0x07));
 }
 
 void wd1770_write(uint16_t addr, uint8_t val)
@@ -425,6 +428,10 @@ void wd1770_callback()
         if (nmi_on_completion[WD1770])
             nmi |= 1;
         wd1770.sector = wd1770.track;
+        break;
+
+    case 0xD: /* force interrupt */
+        nmi = nmi_on_completion[WD1770] ? 1 : 0;
         break;
 
     case 0xF: /*Write tracl*/

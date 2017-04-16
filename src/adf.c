@@ -226,6 +226,11 @@ static void adf_poll()
         }
 }
 
+static void adf_abort()
+{
+    adf_inread = adf_inwrite = adf_inreadaddr = adf_informat = 0;
+}
+
 void adf_init()
 {
         adf_f[0] = adf_f[1] = 0;
@@ -267,6 +272,7 @@ void adf_load(int drive, char *fn)
         drives[drive].readaddress = adf_readaddress;
         drives[drive].poll        = adf_poll;
         drives[drive].format      = adf_format;
+        drives[drive].abort       = adf_abort;
         adf_dblstep[drive] = 0;
 }
 
@@ -292,6 +298,7 @@ void adl_load(int drive, char *fn)
         drives[drive].readaddress = adf_readaddress;
         drives[drive].poll        = adf_poll;
         drives[drive].format      = adf_format;
+        drives[drive].abort       = adf_abort;
         adf_sectors[drive] = 16;
         adf_size[drive] = 256;
         adf_dblstep[drive] = 0;
@@ -320,6 +327,7 @@ void adl_loadex(int drive, char *fn, int sectors, int size, int dblstep)
         drives[drive].readaddress = adf_readaddress;
         drives[drive].poll        = adf_poll;
         drives[drive].format      = adf_format;
+        drives[drive].abort       = adf_abort;
         adf_sectors[drive] = sectors;
         adf_size[drive] = size;
         adf_dblstep[drive] = dblstep;

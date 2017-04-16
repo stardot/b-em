@@ -215,6 +215,11 @@ static void ssd_poll()
         }
 }
 
+static void ssd_abort()
+{
+    ssd_inread = ssd_inwrite = ssd_inreadaddr = ssd_informat = 0;
+}
+
 void ssd_init()
 {
         ssd_f[0] = ssd_f[1] = 0;
@@ -244,6 +249,7 @@ void ssd_load(int drive, char *fn)
         drives[drive].readaddress = ssd_readaddress;
         drives[drive].poll        = ssd_poll;
         drives[drive].format      = ssd_format;
+        drives[drive].abort       = ssd_abort;
 }
 
 void dsd_load(int drive, char *fn)
@@ -268,6 +274,7 @@ void dsd_load(int drive, char *fn)
         drives[drive].readaddress = ssd_readaddress;
         drives[drive].poll        = ssd_poll;
         drives[drive].format      = ssd_format;
+        drives[drive].abort       = ssd_abort;
 }
 
 void ssd_close(int drive)

@@ -9,6 +9,7 @@ typedef struct
         void (*readaddress)(int drive, int track, int side, int density);
         void (*format)(int drive, int track, int side, int density);
         void (*poll)();
+        void (*abort)(int drive);
 } DRIVE;
 
 extern DRIVE drives[2];
@@ -25,6 +26,8 @@ void disc_readsector(int drive, int sector, int track, int side, int density);
 void disc_writesector(int drive, int sector, int track, int side, int density);
 void disc_readaddress(int drive, int track, int side, int density);
 void disc_format(int drive, int track, int side, int density);
+void disc_abort(int drive);
+
 extern int disc_time;
 
 extern void (*fdc_callback)();

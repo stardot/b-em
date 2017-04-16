@@ -82,11 +82,6 @@ static void fdi_seek(int drive, int track)
 //        printf("DD Track %i Len %i Index %i %i\n",track,ftracklen[drive][0][1],ftrackindex[drive][0][1],c);
 }
 
-static void fdi_writeback(int drive, int track)
-{
-        return;
-}
-
 static void fdi_readsector(int drive, int sector, int track, int side, int density)
 {
         fdi_revs = 0;
@@ -344,6 +339,11 @@ static void fdi_poll()
         }
 }
 
+static void fdi_abort()
+{
+    fdi_inread = fdi_inwrite = fdi_inreadaddr = 0;
+}
+
 void fdi_init()
 {
 //        printf("FDI reset\n");
@@ -373,6 +373,7 @@ void fdi_load(int drive, char *fn)
         drives[drive].readaddress = fdi_readaddress;
         drives[drive].poll        = fdi_poll;
         drives[drive].format      = fdi_format;
+        drives[drive].abort       = fdi_abort;
 }
 
 void fdi_close(int drive)
