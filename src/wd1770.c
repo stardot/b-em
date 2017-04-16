@@ -74,6 +74,26 @@ void wd1770_setspindown()
 
 #define track0 (wd1770.curtrack ? 4 : 0)
 
+static void begin_read_sector(const char *variant)
+{
+    log_debug("wd1770: %s read sector drive=%d side=%d track=%d sector=%d dens=%d", variant, curdrive, wd1770.curside, wd1770.track, wd1770.sector, wd1770.density);
+    wd1770.status = 0x80 | 0x1;
+    disc_readsector(curdrive, wd1770.sector, wd1770.track, wd1770.curside, wd1770.density);
+    byte = 0;
+}
+
+static void begin_write_sector(const char *variant)
+{
+    log_debug("wd1770: %s write sector drive=%d side=%d track=%d sector=%d dens=%d", variant, curdrive, wd1770.curside, wd1770.track, wd1770.sector, wd1770.density);
+    wd1770.status = 0x80 | 0x1;
+    disc_writesector(curdrive, wd1770.sector, wd1770.track, wd1770.curside, wd1770.density);
+    byte = 0;
+    nmi |= 2;
+    wd1770.status |= 2;
+    //Carlo Concari: wait for first data byte before starting sector write
+    wd1770.written = 0;
+}
+
 static void write_1770(uint16_t addr, uint8_t val)
 {
     switch (addr & 0x03)
@@ -133,21 +153,19 @@ static void write_1770(uint16_t addr, uint8_t val)
             break;
 
         case 0x8: /*Read sector*/
-            log_debug("wd1770: read sector drive=%d side=%d track=%d sector=%d dens=%d", curdrive, wd1770.curside, wd1770.track, wd1770.sector, wd1770.density);
-            wd1770.status = 0x80 | 0x1;
-            disc_readsector(curdrive, wd1770.sector, wd1770.track, wd1770.curside, wd1770.density);
-            byte = 0;
+            begin_read_sector("start single");
+            break;
+
+        case 0x9:
+            begin_read_sector("start multiple");
             break;
 
         case 0xA: /*Write sector*/
-            log_debug("wd1770: write sector drive=%d side=%d track=%d sector=%d dens=%d", curdrive, wd1770.curside, wd1770.track, wd1770.sector, wd1770.density);
-            wd1770.status = 0x80 | 0x1;
-            disc_writesector(curdrive, wd1770.sector, wd1770.track, wd1770.curside, wd1770.density);
-            byte = 0;
-            nmi |= 2;
-            wd1770.status |= 2;
-            //Carlo Concari: wait for first data byte before starting sector write
-            wd1770.written = 0;
+            begin_write_sector("start single");
+            break;
+
+        case 0xB:
+            begin_write_sector("start multiple");
             break;
 
         case 0xC: /*Read address*/
@@ -226,6 +244,15 @@ static void write_ctrl_master(uint8_t val)
     wd1770.density = !(wd1770.ctrl & 0x20);
 }
 
+static void write_ctrl_opus(uint8_t val)
+{
+    log_debug("wd1770: write opus-style ctrl %02X", val);
+    wd1770.ctrl = val;
+    curdrive = (val & 0x01);
+    wd1770.curside =  (wd1770.ctrl & 0x02) ? 1 : 0;
+    wd1770.density = (wd1770.ctrl & 0x40);
+}
+
 static void write_ctrl_stl(uint8_t val)
 {
     log_debug("wd1770: write solidisk-style ctrl %02X", val);
@@ -250,6 +277,12 @@ void wd1770_write(uint16_t addr, uint8_t val)
             write_1770(addr, val);
         else
             write_ctrl_master(val);
+        break;
+    case WD1770_OPUS:
+        if (addr & 0x0004)
+            write_ctrl_opus(val);
+        else
+            write_1770(addr, val);
         break;
     case WD1770_STL:
         if (addr & 0x0004)
@@ -299,8 +332,14 @@ uint8_t wd1770_read(uint16_t addr)
         if (addr & 0x0008)
             return read_1770(addr);
         break;
+    case WD1770_OPUS:
+        if (!(addr & 0x0004))
+            return read_1770(addr);
+        break;
     case WD1770_STL:
         return read_1770(addr);
+    default:
+        log_warn("wd1770: unrecognised WD1770 board %d", WD1770);
     }
     return 0xFE;
 }
@@ -333,11 +372,21 @@ void wd1770_callback()
             nmi |= 1;
         break;
 
+    case 9:
+        wd1770.sector++;
+        begin_read_sector("continue multiple");
+        break;
+
     case 0xA: /*Write sector*/
         wd1770.status = 0x80;
         wd1770_setspindown();
         if (WD1770 == WD1770_ACORN || WD1770 == WD1770_MASTER)
             nmi |= 1;
+        break;
+
+    case 0xB:
+        wd1770.sector++;
+        begin_write_sector("continue multiple");
         break;
 
     case 0xC: /*Read address*/
