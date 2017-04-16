@@ -40,16 +40,15 @@ static struct
 {
         char *ext;
         void (*load)(int drive, char *fn);
-        void (*close)(int drive);
         int size;
 }
 loaders[]=
 {
-        {"SSD", ssd_load, ssd_close,   80*10*256},
-        {"DSD", dsd_load, ssd_close, 2*80*10*256},
-        {"ADF", adf_load, adf_close,   80*16*256},
-        {"ADL", adl_load, adf_close, 2*80*16*256},
-        {"FDI", fdi_load, fdi_close, -1},
+        {"SSD", ssd_load, 80*10*256},
+        {"DSD", dsd_load, 2*80*10*256},
+        {"ADF", adf_load, 80*16*256},
+        {"ADL", adl_load, 2*80*16*256},
+        {"FDI", fdi_load, -1},
         {0,0,0}
 };
 
@@ -179,7 +178,7 @@ void disc_new(int drive, char *fn)
 
 void disc_close(int drive)
 {
-        if (loaders[driveloaders[drive]].close) loaders[driveloaders[drive]].close(drive);
+        if (drives[0].close) drives[0].close(drive);
         // Force the drive to spin down (i.e. become not-ready) when the disk is unloaded
         // This prevents the file system (e.g DFS) caching the old disk catalogue
         fdc_spindown();

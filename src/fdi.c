@@ -344,6 +344,13 @@ static void fdi_abort()
     fdi_inread = fdi_inwrite = fdi_inreadaddr = 0;
 }
 
+static void fdi_close(int drive)
+{
+        if (fdi_h[drive]) fdi2raw_header_free(fdi_h[drive]);
+        if (fdi_f[drive]) fclose(fdi_f[drive]);
+        fdi_f[drive] = NULL;
+}
+
 void fdi_init()
 {
 //        printf("FDI reset\n");
@@ -367,6 +374,7 @@ void fdi_load(int drive, char *fn)
         fdi_lasttrack[drive] = fdi2raw_get_last_track(fdi_h[drive]);
         fdi_sides[drive] = (fdi_lasttrack[drive]>83) ? 1 : 0;
 //        printf("Last track %i\n",fdilasttrack[drive]);
+        drives[drive].close       = fdi_close;
         drives[drive].seek        = fdi_seek;
         drives[drive].readsector  = fdi_readsector;
         drives[drive].writesector = fdi_writesector;
@@ -376,9 +384,3 @@ void fdi_load(int drive, char *fn)
         drives[drive].abort       = fdi_abort;
 }
 
-void fdi_close(int drive)
-{
-        if (fdi_h[drive]) fdi2raw_header_free(fdi_h[drive]);
-        if (fdi_f[drive]) fclose(fdi_f[drive]);
-        fdi_f[drive] = NULL;
-}

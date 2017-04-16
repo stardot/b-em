@@ -235,6 +235,12 @@ static void adf_abort()
     adf_inread = adf_inwrite = adf_inreadaddr = adf_informat = 0;
 }
 
+static void adf_close(int drive)
+{
+        if (adf_f[drive]) fclose(adf_f[drive]);
+        adf_f[drive] = NULL;
+}
+
 void adf_init()
 {
         adf_f[0] = adf_f[1] = 0;
@@ -270,6 +276,7 @@ void adf_load(int drive, char *fn)
                 adf_sectors[drive] = 16;
                 adf_size[drive] = 256;
         }
+        drives[drive].close       = adf_close;
         drives[drive].seek        = adf_seek;
         drives[drive].readsector  = adf_readsector;
         drives[drive].writesector = adf_writesector;
@@ -296,6 +303,7 @@ void adl_load(int drive, char *fn)
         }
         fwriteprot[drive] = writeprot[drive];
         adl[drive] = 1;
+        drives[drive].close       = adf_close;
         drives[drive].seek        = adf_seek;
         drives[drive].readsector  = adf_readsector;
         drives[drive].writesector = adf_writesector;
@@ -325,6 +333,7 @@ void adl_loadex(int drive, char *fn, int sectors, int size, int dblstep)
         fwriteprot[drive] = writeprot[drive];
         fseek(adf_f[drive], -1, SEEK_END);
         adl[drive] = 1;
+        drives[drive].close       = adf_close;
         drives[drive].seek        = adf_seek;
         drives[drive].readsector  = adf_readsector;
         drives[drive].writesector = adf_writesector;
@@ -335,10 +344,4 @@ void adl_loadex(int drive, char *fn, int sectors, int size, int dblstep)
         adf_sectors[drive] = sectors;
         adf_size[drive] = size;
         adf_dblstep[drive] = dblstep;
-}
-
-void adf_close(int drive)
-{
-        if (adf_f[drive]) fclose(adf_f[drive]);
-        adf_f[drive] = NULL;
 }
