@@ -408,16 +408,16 @@ void wd1770_callback()
             nmi |= 1;
         break;
 
-        case 9:
-	    if (wd1770.in_gap) {
-		wd1770.sector++;
-		begin_read_sector("continue multiple");
-	    } else {
-		log_debug("wd1770: multi-sector read, inter-sector gap");
-		wd1770.in_gap = 1;
-		fdc_time = 500;
-	    }
-	    break;
+    case 9:
+        if (wd1770.in_gap) {
+            wd1770.sector++;
+            begin_read_sector("continue multiple");
+        } else {
+            log_debug("wd1770: multi-sector read, inter-sector gap");
+            wd1770.in_gap = 1;
+            fdc_time = 500;
+        }
+        break;
     case 0xA: /*Write sector*/
         wd1770.status = 0x80;
         wd1770_setspindown();
