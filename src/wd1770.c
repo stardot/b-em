@@ -28,6 +28,7 @@ struct
     int density;
     int written;
     int stepdir;
+    uint8_t in_gap;
 } wd1770;
 
 static uint8_t nmi_on_completion[6] = {
@@ -90,6 +91,7 @@ static void begin_read_sector(const char *variant)
     log_debug("wd1770: %s read sector drive=%d side=%d track=%d sector=%d dens=%d", variant, curdrive, wd1770.curside, wd1770.track, wd1770.sector, wd1770.density);
     data_count = 0;
     wd1770.status = 0x80 | 0x1;
+    wd1770.in_gap = 0;
     disc_readsector(curdrive, wd1770.sector, wd1770.track, wd1770.curside, wd1770.density);
     byte = 0;
 }
@@ -168,7 +170,7 @@ static void write_1770(uint16_t addr, uint8_t val)
             begin_read_sector("start single");
             break;
 
-        case 0x9:
+        case 0x9: /* read multiple sectors*/
             begin_read_sector("start multiple");
             break;
 
@@ -176,7 +178,7 @@ static void write_1770(uint16_t addr, uint8_t val)
             begin_write_sector("start single");
             break;
 
-        case 0xB:
+        case 0xB: /*write multiple sectors */
             begin_write_sector("start multiple");
             break;
 
@@ -195,7 +197,7 @@ static void write_1770(uint16_t addr, uint8_t val)
                 wd1770.status &= ~1;
             else
                 wd1770.status = 0x80 | 0x20 | track0;
-            nmi = nmi_on_completion[WD1770] ? 1 : 0;
+            nmi = (val & 0xc) && nmi_on_completion[WD1770] ? 1 : 0;
             wd1770_setspindown();
             break;
 
@@ -280,6 +282,7 @@ static void write_ctrl_watford(uint8_t val)
     log_debug("wd1770: write watford-style ctrl %02X", val);
     if (val & 0x08)
         wd1770_reset();
+    wd1770.ctrl = val;
     curdrive = (val & 0x04) ? 1 : 0;
     wd1770.curside =  (wd1770.ctrl & 0x02) ? 1 : 0;
     wd1770.density = !(val & 0x01);
@@ -487,7 +490,10 @@ void wd1770_headercrcerror()
 int wd1770_getdata(int last)
 {
     //log_debug("wd1770: disc get data");
-    if (!wd1770.written) return -1;
+    if (!wd1770.written) {
+        log_debug("wd1770: getdata: no data in register");
+        return -1;
+    }
     if (!last)
     {
         nmi |= 2;
