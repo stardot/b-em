@@ -39,7 +39,6 @@ b_em_SOURCES = \
 	z80dis.c \
 	acia.c \
 	adc.c \
-	adf.c \
 	arm.c \
 	darm/darm.c \
 	darm/darm-tbl.c \
@@ -75,11 +74,11 @@ b_em_SOURCES = \
 	resid.cc \
 	savestate.c \
 	scsi.c \
+	sdf.c \
 	serial.c \
 	sn76489.c \
 	sound.c \
 	soundopenal.c \
-	ssd.c \
 	sysvia.c \
 	tape.c \
 	tapenoise.c \

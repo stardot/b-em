@@ -20,7 +20,6 @@ OBJ = \
     65816.o \
     acia.o \
     adc.o \
-    adf.o \
     arm.o \
     darm.o \
     darm-tbl.o \
@@ -54,11 +53,11 @@ OBJ = \
     pal.o \
     savestate.o \
     scsi.o \
+    sdf.o \
     serial.o \
     sn76489.o \
     sound.o \
     soundopenal.o \
-    ssd.o \
     sysvia.o \
     tape.o \
     tapenoise.o \
