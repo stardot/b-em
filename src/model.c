@@ -17,27 +17,28 @@ int I8271, WD1770, BPLUS, x65c02, MASTER, MODELA, OS01, compactcmos;
 int curtube;
 int oldmodel;
 
-MODEL models[19] =
+MODEL models[20] =
 {
-/*       Name                        8271  1770           65c02  B+  Master  SWRAM  A  OS 0.1  Compact  OS      ROM dir   CMOS           ROM setup function         Second processor*/
-        {"BBC A w/OS 0.1",            1,    WD1770_NONE,   0,     0,  0,      0,     1, 1,      0,       "",     "a01",    "",            mem_romsetup_os01,         -1},
-        {"BBC B w/OS 0.1",            1,    WD1770_NONE,   0,     0,  0,      0,     0, 1,      0,       "",     "a01",    "",            mem_romsetup_os01,         -1},
-        {"BBC A",                     1,    WD1770_NONE,   0,     0,  0,      0,     1, 0,      0,       "os",   "a",      "",            NULL,                      -1},
-        {"BBC B w/8271 FDC",          1,    WD1770_NONE,   0,     0,  0,      0,     0, 0,      0,       "os",   "b",      "",            NULL,                      -1},
-        {"BBC B w/8271+SWRAM",        1,    WD1770_NONE,   0,     0,  0,      1,     0, 0,      0,       "os",   "b",      "",            NULL,                      -1},
-        {"BBC B w/1770 FDC",          0,    WD1770_ACORN,  0,     0,  0,      1,     0, 0,      0,       "os",   "b1770",  "",            NULL,                      -1},
-        {"BBC B US",                  1,    WD1770_NONE,   0,     0,  0,      0,     0, 0,      0,       "usmos","us",     "",            NULL,                      -1},
-        {"BBC B German",              1,    WD1770_NONE,   0,     0,  0,      0,     0, 0,      0,       "deos", "us",     "",            NULL,                      -1},
-        {"BBC B+ 64K",                0,    WD1770_ACORN,  0,     1,  0,      0,     0, 0,      0,       "bpos", "bp",     "",            NULL,                      -1},
-        {"BBC B+ 128K",               0,    WD1770_ACORN,  0,     1,  0,      0,     0, 0,      0,       "bpos", "bp",     "",            mem_romsetup_bplus128,     -1},
-        {"BBC Master 128",            0,    WD1770_MASTER, 1,     0,  1,      0,     0, 0,      0,       "",     "master", "cmos.bin",    mem_romsetup_master128,    -1},
-        {"BBC Master 512",            0,    WD1770_MASTER, 1,     0,  1,      0,     0, 0,      0,       "",     "master", "cmos.bin",    mem_romsetup_master128,     3},
-        {"BBC Master Turbo",          0,    WD1770_MASTER, 1,     0,  1,      0,     0, 0,      0,       "",     "master", "cmos.bin",    mem_romsetup_master128,     0},
-        {"BBC Master Compact",        0,    WD1770_MASTER, 1,     0,  1,      0,     0, 0,      1,       "",     "compact","cmosc.bin",   mem_romsetup_mastercompact,-1},
-        {"ARM Evaluation System",     0,    WD1770_MASTER, 1,     0,  1,      0,     0, 0,      0,       "",     "master", "cmosa.bin",   mem_romsetup_master128,     1},
-        {"BBC Master 128 w/MOS 3.5",  0,    WD1770_MASTER, 1,     0,  1,      0,     0, 0,      0,       "",     "master", "cmos350.bin", mem_romsetup_master128_35, -1},
-        {"BBC B w/Solidisk 1770 FDC", 0,    WD1770_STL,    0,     0,  0,      1,     0, 0,      0,       "os",   "stl",    "",            NULL,                      -1},
-        {"BBC B w/Opus 1770 FDC",     0,    WD1770_OPUS,   0,     0,  0,      1,     0, 0,      0,       "os",   "opus",   "",            NULL,                      -1},
+/*       Name                        8271  1770             65c02  B+  Master  SWRAM  A  OS 0.1  Compact  OS      ROM dir   CMOS           ROM setup function         Second processor*/
+        {"BBC A w/OS 0.1",            1,    WD1770_NONE,    0,     0,  0,      0,     1, 1,      0,       "",     "a01",    "",            mem_romsetup_os01,         -1},
+        {"BBC B w/OS 0.1",            1,    WD1770_NONE,    0,     0,  0,      0,     0, 1,      0,       "",     "a01",    "",            mem_romsetup_os01,         -1},
+        {"BBC A",                     1,    WD1770_NONE,    0,     0,  0,      0,     1, 0,      0,       "os",   "a",      "",            NULL,                      -1},
+        {"BBC B w/8271 FDC",          1,    WD1770_NONE,    0,     0,  0,      0,     0, 0,      0,       "os",   "b",      "",            NULL,                      -1},
+        {"BBC B w/8271+SWRAM",        1,    WD1770_NONE,    0,     0,  0,      1,     0, 0,      0,       "os",   "b",      "",            NULL,                      -1},
+        {"BBC B w/1770 FDC",          0,    WD1770_ACORN,   0,     0,  0,      1,     0, 0,      0,       "os",   "b1770",  "",            NULL,                      -1},
+        {"BBC B US",                  1,    WD1770_NONE,    0,     0,  0,      0,     0, 0,      0,       "usmos","us",     "",            NULL,                      -1},
+        {"BBC B German",              1,    WD1770_NONE,    0,     0,  0,      0,     0, 0,      0,       "deos", "us",     "",            NULL,                      -1},
+        {"BBC B+ 64K",                0,    WD1770_ACORN,   0,     1,  0,      0,     0, 0,      0,       "bpos", "bp",     "",            NULL,                      -1},
+        {"BBC B+ 128K",               0,    WD1770_ACORN,   0,     1,  0,      0,     0, 0,      0,       "bpos", "bp",     "",            mem_romsetup_bplus128,     -1},
+        {"BBC Master 128",            0,    WD1770_MASTER,  1,     0,  1,      0,     0, 0,      0,       "",     "master", "cmos.bin",    mem_romsetup_master128,    -1},
+        {"BBC Master 512",            0,    WD1770_MASTER,  1,     0,  1,      0,     0, 0,      0,       "",     "master", "cmos.bin",    mem_romsetup_master128,     3},
+        {"BBC Master Turbo",          0,    WD1770_MASTER,  1,     0,  1,      0,     0, 0,      0,       "",     "master", "cmos.bin",    mem_romsetup_master128,     0},
+        {"BBC Master Compact",        0,    WD1770_MASTER,  1,     0,  1,      0,     0, 0,      1,       "",     "compact","cmosc.bin",   mem_romsetup_mastercompact,-1},
+        {"ARM Evaluation System",     0,    WD1770_MASTER,  1,     0,  1,      0,     0, 0,      0,       "",     "master", "cmosa.bin",   mem_romsetup_master128,     1},
+        {"BBC Master 128 w/MOS 3.5",  0,    WD1770_MASTER,  1,     0,  1,      0,     0, 0,      0,       "",     "master", "cmos350.bin", mem_romsetup_master128_35, -1},
+        {"BBC B w/Solidisk 1770 FDC", 0,    WD1770_STL,     0,     0,  0,      1,     0, 0,      0,       "os",   "stl",    "",            NULL,                      -1},
+        {"BBC B w/Opus 1770 FDC",     0,    WD1770_OPUS,    0,     0,  0,      1,     0, 0,      0,       "os",   "opus",   "",            NULL,                      -1},
+        {"BBC B w/Watford 1770 FDC",  0,    WD1770_WATFORD, 0,     0,  0,      1,     0, 0,      0,       "os",   "watford","",            NULL,                      -1},
         {"",0,0,0,0,0,0,0,0,0,"","","",0,0}
 };
 
