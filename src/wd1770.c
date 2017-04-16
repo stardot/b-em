@@ -117,7 +117,6 @@ static void write_1770(uint16_t addr, uint8_t val)
             log_debug("wd1770: command %02X rejected", val);
             return;
         }
-        wd1770.command = val;
         if ((val >> 4) != 0xD)/* && !(val&8)) */
             wd1770_spinup();
         switch (val >> 4)
@@ -197,7 +196,8 @@ static void write_1770(uint16_t addr, uint8_t val)
                 wd1770.status &= ~1;
             else
                 wd1770.status = 0x80 | 0x20 | track0;
-            nmi = (val & 0xc) && nmi_on_completion[WD1770] ? 1 : 0;
+            if (((val & 0xc) || (wd1770.command >> 4) == 0xB) && nmi_on_completion[WD1770])
+                nmi = 1;
             wd1770_setspindown();
             break;
 
@@ -216,6 +216,7 @@ static void write_1770(uint16_t addr, uint8_t val)
             wd1770_spindown();
             break;
         }
+        wd1770.command = val;
         break;
 
     case 1: // Track register
@@ -335,7 +336,7 @@ static uint8_t read_1770(uint16_t addr)
     {
     case 0: // Status register.
         nmi &= ~1;
-        log_debug("wd1770: status %02X", wd1770.status);
+        //log_debug("wd1770: status %02X", wd1770.status);
         return wd1770.status;
 
     case 1: // Track register.
@@ -415,7 +416,7 @@ void wd1770_callback()
         } else {
             log_debug("wd1770: multi-sector read, inter-sector gap");
             wd1770.in_gap = 1;
-            fdc_time = 500;
+            fdc_time = 5000;
         }
         break;
     case 0xA: /*Write sector*/
@@ -426,8 +427,14 @@ void wd1770_callback()
         break;
 
     case 0xB:
-        wd1770.sector++;
-        begin_write_sector("continue multiple");
+        if (wd1770.in_gap) {
+            wd1770.sector++;
+            begin_write_sector("continue multiple");
+        } else {
+            log_debug("wd1770: multi-sector write, inter-sector gap");
+            wd1770.in_gap = 1;
+            fdc_time = 5000;
+        }
         break;
 
     case 0xC: /*Read address*/
@@ -461,7 +468,7 @@ void wd1770_data(uint8_t dat)
 
 void wd1770_finishread()
 {
-    log_debug("wd1770: data read finished");
+    log_debug("wd1770: data i/o finished");
     fdc_time = 200;
 }
 
