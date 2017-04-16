@@ -39,7 +39,7 @@ int  (*fdc_getdata)(int last);
 static struct
 {
         char *ext;
-        void (*load)(int drive, char *fn);
+        void (*load)(int drive, const char *fn);
         int size;
 }
 loaders[]=

@@ -2,6 +2,6 @@
 #define __INC_FDI_H
 
 void fdi_init();
-void fdi_load(int drive, char *fn);
+void fdi_load(int drive, const char *fn);
 
 #endif

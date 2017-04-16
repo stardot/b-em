@@ -360,7 +360,7 @@ void fdi_init()
         fdi_setupcrc(0x1021, 0xcdb4);
 }
 
-void fdi_load(int drive, char *fn)
+void fdi_load(int drive, const char *fn)
 {
         writeprot[drive] = fwriteprot[drive] = 1;
         fdi_f[drive] = fopen(fn, "rb");

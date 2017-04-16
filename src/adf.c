@@ -248,7 +248,7 @@ void adf_init()
         adf_notfound = 0;
 }
 
-void adf_load(int drive, char *fn)
+void adf_load(int drive, const char *fn)
 {
         writeprot[drive] = 0;
         adf_f[drive] = fopen(fn, "rb+");
@@ -287,7 +287,7 @@ void adf_load(int drive, char *fn)
         adf_dblstep[drive] = 0;
 }
 
-void adl_load(int drive, char *fn)
+void adl_load(int drive, const char *fn)
 {
         writeprot[drive] = 0;
         adf_f[drive] = fopen(fn, "rb+");
@@ -316,7 +316,7 @@ void adl_load(int drive, char *fn)
         adf_dblstep[drive] = 0;
 }
 
-void adl_loadex(int drive, char *fn, int sectors, int size, int dblstep)
+void adl_loadex(int drive, const char *fn, int sectors, int size, int dblstep)
 {
         writeprot[drive] = 0;
         adf_f[drive] = fopen(fn, "rb+");

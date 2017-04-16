@@ -237,7 +237,7 @@ void ssd_init()
         ssd_notfound = 0;
 }
 
-void ssd_load(int drive, char *fn)
+void ssd_load(int drive, const char *fn)
 {
         writeprot[drive] = 0;
         ssd_f[drive] = fopen(fn, "rb+");
@@ -263,7 +263,7 @@ void ssd_load(int drive, char *fn)
         drives[drive].abort       = ssd_abort;
 }
 
-void dsd_load(int drive, char *fn)
+void dsd_load(int drive, const char *fn)
 {
         writeprot[drive] = 0;
         ssd_f[drive] = fopen(fn, "rb+");
