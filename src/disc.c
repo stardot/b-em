@@ -138,7 +138,7 @@ int oldtrack[2] = {0, 0};
 void disc_seek(int drive, int track)
 {
         if (drives[drive].seek)
-           drives[drive].seek(drive, track);
+            drives[drive].seek(drive, track);
         ddnoise_seek(track - oldtrack[drive]);
         oldtrack[drive] = track;
 }
@@ -181,4 +181,12 @@ void disc_abort(int drive)
            drives[drive].abort(drive);
         else
            disc_notfound = 10000;
+}
+
+int disc_verify(int drive, int track, int density)
+{
+        if (drives[drive].verify)
+            return drives[drive].verify(drive, track, density);
+        else
+            return 1;
 }

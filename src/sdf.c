@@ -126,7 +126,8 @@ static const geometry_t *try_dfs(FILE *fp) {
     const geometry_t *ptr;
 
     fseek(fp, 0x106, SEEK_SET);
-    sects0 = ((getc(fp) & 3) << 8) + getc(fp);
+    sects0 = (getc(fp) & 7) << 8;
+    sects0 |= getc(fp);
     for (ptr = dfs_formats; ptr->name; ptr++) {
         if (sects0 == ptr->size_in_sectors) {
             if (ptr->sides == SIDES_SINGLE)
@@ -153,7 +154,7 @@ static void info_msg(int drive, const char *fn, const geometry_t *geo) {
             sides = "single-sided";
             break;
         case SIDES_SEQUENTIAL:
-            sides = "doubled-sides, sequential";
+            sides = "doubled-sided, sequential";
             break;
         case SIDES_INTERLEAVED:
             sides = "double-sided, interleaved";
@@ -174,7 +175,7 @@ static void info_msg(int drive, const char *fn, const geometry_t *geo) {
         default:
             dens = "unknown";
     }
-    log_debug("Loaded drive %d with %s, format %s, %s, %d tracks, %s, %d %d byte sectors/track",
+    log_debug("Loaded drive %d with %s, format %s, %s, %d tracks, %s-density, %d %d byte sectors/track",
                drive, fn, geo->name, sides, geo->tracks, dens, geo->sectors_per_track, geo->sector_size);
 }
 
@@ -220,6 +221,17 @@ static void sdf_close(int drive) {
 static void sdf_seek(int drive, int track) {
     if (drive < NUM_DRIVES)
         current_track[drive] = track;
+}
+
+static int sdf_verify(int drive, int track, int density) {
+    const geometry_t *geo;
+
+    if (drive < NUM_DRIVES)
+        if ((geo = geometry[drive]))
+            if (track >= 0 && track < geo->tracks)
+                if ((!density && geo->density == DENS_SINGLE) || (density && geo->density == DENS_DOUBLE))
+                    return 1;
+    return 0;
 }
 
 static void io_seek(const geometry_t *geo, uint8_t drive, uint8_t sector, uint8_t track, uint8_t side) {
@@ -477,6 +489,7 @@ void sdf_load(int drive, const char *fn) {
     geometry[drive] = geo;
     drives[drive].close       = sdf_close;
     drives[drive].seek        = sdf_seek;
+    drives[drive].verify      = sdf_verify;
     drives[drive].readsector  = sdf_readsector;
     drives[drive].writesector = sdf_writesector;
     drives[drive].readaddress = sdf_readaddress;

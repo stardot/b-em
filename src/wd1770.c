@@ -113,6 +113,7 @@ static void write_1770(uint16_t addr, uint8_t val)
     switch (addr & 0x03)
     {
     case 0:
+        nmi &= ~1;
         if (wd1770.status & 1 && (val >> 4) != 0xD) {
             log_debug("wd1770: command %02X rejected", val);
             return;
@@ -281,13 +282,12 @@ static void write_ctrl_stl(uint8_t val)
 static void write_ctrl_watford(uint8_t val)
 {
     log_debug("wd1770: write watford-style ctrl %02X", val);
-    if (val & 0x08)
+    if (val & 0x80)
         wd1770_reset();
     wd1770.ctrl = val;
     curdrive = (val & 0x04) ? 1 : 0;
     wd1770.curside =  (wd1770.ctrl & 0x02) ? 1 : 0;
     wd1770.density = !(val & 0x01);
-    log_debug("wd1770: watford residual=%02X\n", val & ~(0x07));
 }
 
 void wd1770_write(uint16_t addr, uint8_t val)
@@ -396,7 +396,10 @@ void wd1770_callback()
     case 2: /*Step*/
     case 4: /*Step in*/
     case 6: /*Step out*/
-        wd1770.status = 0x80 | track0;
+        if (wd1770.command & 0x04 && !disc_verify(curdrive, wd1770.curtrack, wd1770.density))
+            wd1770.status = 0x90 | track0;
+        else
+            wd1770.status = 0x80 | track0;
         wd1770_setspindown();
         if (nmi_on_completion[WD1770])
             nmi |= 1;
@@ -476,7 +479,7 @@ void wd1770_notfound()
 {
     log_debug("wd1770: not found");
     fdc_time = 0;
-    nmi = nmi_on_completion[WD1770] ? 1 : 0;
+    nmi |= nmi_on_completion[WD1770];
     wd1770.status = 0x90;
     wd1770_spindown();
 }
