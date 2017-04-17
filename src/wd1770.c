@@ -192,7 +192,6 @@ static void write_1770(uint16_t addr, uint8_t val)
         case 0xD: /*Force interrupt*/
             log_debug("wd1770: force interrupt");
             disc_abort(curdrive);
-            fdc_time = 1000;
             if (wd1770.status & 0x01)
                 wd1770.status &= ~1;
             else
@@ -203,7 +202,7 @@ static void write_1770(uint16_t addr, uint8_t val)
             break;
 
         case 0xF: /*Write track*/
-            log_debug("wd1770: rite track side=%d track=%d dens=%d, ctrl=%d\n", wd1770.curside, wd1770.track, wd1770.density, wd1770.ctrl);
+            log_debug("wd1770: write track side=%d track=%d dens=%d, ctrl=%d\n", wd1770.curside, wd1770.track, wd1770.density, wd1770.ctrl);
             wd1770.status = 0x80 | 0x1;
             disc_format(curdrive, wd1770.track, wd1770.curside, wd1770.density);
             break;

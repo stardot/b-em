@@ -121,11 +121,11 @@ static const geometry_t *try_adfs_old(FILE *fp) {
     return NULL;
 }
 
-static const geometry_t *try_dfs(FILE *fp) {
+static const geometry_t *try_dfs(FILE *fp, uint32_t offset) {
     uint32_t sects0, sects2, side2_off, track_bytes;
     const geometry_t *ptr;
 
-    fseek(fp, 0x106, SEEK_SET);
+    fseek(fp, offset, SEEK_SET);
     sects0 = (getc(fp) & 7) << 8;
     sects0 |= getc(fp);
     for (ptr = dfs_formats; ptr->name; ptr++) {
@@ -135,7 +135,7 @@ static const geometry_t *try_dfs(FILE *fp) {
             side2_off = track_bytes = ptr->sectors_per_track * ptr->sector_size;
             if (ptr->sides == SIDES_SEQUENTIAL)
                 side2_off = ptr->tracks * track_bytes;
-            if (fseek(fp, side2_off+0x106, SEEK_SET) == 0) {
+            if (fseek(fp, side2_off+offset, SEEK_SET) == 0) {
                 sects2 = ((getc(fp) & 3) << 8) + getc(fp);
                 if (sects2 == sects0)
                     return ptr;
@@ -175,8 +175,8 @@ static void info_msg(int drive, const char *fn, const geometry_t *geo) {
         default:
             dens = "unknown";
     }
-    log_debug("Loaded drive %d with %s, format %s, %s, %d tracks, %s-density, %d %d byte sectors/track",
-               drive, fn, geo->name, sides, geo->tracks, dens, geo->sectors_per_track, geo->sector_size);
+    log_info("Loaded drive %d with %s, format %s, %s, %d tracks, %s-density, %d %d byte sectors/track",
+             drive, fn, geo->name, sides, geo->tracks, dens, geo->sectors_per_track, geo->sector_size);
 }
 
 static const geometry_t *geometry[NUM_DRIVES];
@@ -318,14 +318,12 @@ static void sdf_readaddress(int drive, int track, int side, int density) {
         if (drive < NUM_DRIVES) {
             if ((geo = geometry[drive])) {
                 if ((!density && geo->density == DENS_SINGLE) || (density && geo->density == DENS_DOUBLE)) {
-                    if (track == current_track[drive] && track >= 0 && track < geo->tracks) {
-                        if (side == 0 || geo->sides != SIDES_SINGLE) {
-                            sdf_drive = drive;
-                            sdf_side = side;
-                            sdf_track = track;
-                            state = ST_READ_ADDR0;
-                            return;
-                        }
+                    if (side == 0 || geo->sides != SIDES_SINGLE) {
+                        sdf_drive = drive;
+                        sdf_side = side;
+                        sdf_track = track;
+                        state = ST_READ_ADDR0;
+                        return;
                     }
                 }
             }
@@ -349,7 +347,9 @@ static void sdf_format(int drive, int track, int side, int density) {
                             sdf_side = side;
                             sdf_track = track;
                             sdf_sector = 0;
+                            count = 500;
                             state = ST_FORMAT;
+                            return;
                         }
                     }
                 }
@@ -451,10 +451,17 @@ static void sdf_poll() {
                 state = ST_IDLE;
                 break;
             }
-            if (--count == 0)
-                if (++sdf_sector >= geometry[sdf_drive]->sectors_per_track)
+            log_debug("sdf: format: count=%d, sdf_sector=%d", count, sdf_sector);
+            if (--count == 0) {
+                putc(0, sdf_fp[sdf_drive]);
+                if (++sdf_sector >= geometry[sdf_drive]->sectors_per_track) {
+                    state = ST_IDLE;
+                    fdc_finishread();
                     break;
-            putc(0, sdf_fp[sdf_drive]);
+                }
+                io_seek(geometry[sdf_drive], sdf_drive, sdf_sector, sdf_track, sdf_side);
+                count = 500;
+            }
             break;
     }
 }
@@ -477,10 +484,12 @@ void sdf_load(int drive, const char *fn) {
     }
     if ((geo = try_adfs_new(fp)) == NULL) {
         if ((geo = try_adfs_old(fp)) == NULL) {
-            if ((geo = try_dfs(fp)) == NULL) {
-                log_error("Unable to determine geometry for %s", fn);
-                fclose(fp);
-                return;
+            if ((geo = try_dfs(fp, 0x106)) == NULL) {
+                if ((geo = try_dfs(fp, 0x1001)) == NULL) {
+                    log_error("Unable to determine geometry for %s", fn);
+                    fclose(fp);
+                    return;
+                }
             }
         }
     }
