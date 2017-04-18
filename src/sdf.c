@@ -136,7 +136,8 @@ static const geometry_t *try_dfs(FILE *fp, uint32_t offset) {
             if (ptr->sides == SIDES_SEQUENTIAL)
                 side2_off = ptr->tracks * track_bytes;
             if (fseek(fp, side2_off+offset, SEEK_SET) == 0) {
-                sects2 = ((getc(fp) & 3) << 8) + getc(fp);
+                sects2 = (getc(fp) & 7) << 8;
+                sects2 |= getc(fp);
                 if (sects2 == sects0)
                     return ptr;
             }
@@ -451,7 +452,6 @@ static void sdf_poll() {
                 state = ST_IDLE;
                 break;
             }
-            log_debug("sdf: format: count=%d, sdf_sector=%d", count, sdf_sector);
             if (--count == 0) {
                 putc(0, sdf_fp[sdf_drive]);
                 if (++sdf_sector >= geometry[sdf_drive]->sectors_per_track) {
