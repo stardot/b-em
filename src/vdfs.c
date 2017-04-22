@@ -796,6 +796,8 @@ static void run_file(const char *err) {
 static inline void osfsc() {
     FILE *fp;
 
+    log_debug("vdfs: osfsc(A=%02X, X=%02X, Y=%02X", a, x, y);
+
     switch(a) {
         case 0x01: // check EOF
             if ((fp = getfp(x)))
@@ -820,6 +822,8 @@ static inline void osfind() {
     vdfs_ent_t *ent, key;
     const char *mode;
     FILE *fp;
+
+    log_debug("vdfs: osfind(A=%02X, X=%02X, Y=%02X", a, x, y);
 
     if (a == 0) {   // close file.
         channel = y;
@@ -879,6 +883,8 @@ static inline void osgbpb() {
     vdfs_ent_t *cat_ptr;
     char *ptr;
     FILE *fp;
+
+    log_debug("vdfs: osgbpb(A=%02X, X=%02X, Y=%02X", a, x, y);
 
     switch (a)
     {
@@ -1018,6 +1024,8 @@ static inline void osgbpb() {
 static inline void osbput() {
     FILE *fp;
 
+    log_debug("vdfs: osbput(A=%02X, X=%02X, Y=%02X", a, x, y);
+    
     if ((fp = getfp(y)))
         putc(a, fp);
 }
@@ -1026,6 +1034,8 @@ static inline void osbget() {
     int ch;
     FILE *fp;
 
+    log_debug("vdfs: osbget(A=%02X, X=%02X, Y=%02X", a, x, y);
+    
     p.c = 1;
     if ((fp = getfp(y))) {
         if ((ch = getc(fp)) != EOF) {
@@ -1038,6 +1048,8 @@ static inline void osbget() {
 static inline void osargs() {
     FILE *fp;
     long temp;
+
+    log_debug("vdfs: osargs(A=%02X, X=%02X, Y=%02X", a, x, y);
 
     if (y == 0) {
         switch (a)
@@ -1138,6 +1150,7 @@ static inline void osfile()
     vdfs_ent_t *ent, key;
     uint32_t pb = (y << 8) | x;
 
+    log_debug("vdfs: osfile(A=%02X, X=%02X, Y=%02X", a, x, y);
     ent = find_file(readmem16(pb), &key, cur_dir, NULL);
 
     switch (a) {
