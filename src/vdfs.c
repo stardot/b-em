@@ -1119,6 +1119,7 @@ static void osfile_save(uint32_t pb, vdfs_ent_t *ent) {
 static void osfile_load(uint32_t pb, vdfs_ent_t *ent) {
     FILE *fp;
     uint32_t addr;
+    uint32_t size;
     int ch;
 
     if (ent) {
@@ -1129,14 +1130,22 @@ static void osfile_load(uint32_t pb, vdfs_ent_t *ent) {
                 addr = readmem32(pb+0x02);
             else
                 addr = ent->load_addr;
+            size = 0;
             if (addr > 0xffff0000 || curtube == -1) {
-                while ((ch = getc(fp)) != EOF)
+                while ((ch = getc(fp)) != EOF) {
                     writemem(addr++, ch);
+                    size++;
+                }
             } else {
-                while ((ch = getc(fp)) != EOF)
+                while ((ch = getc(fp)) != EOF) {
                     tube_writemem(addr++, ch);
+                    size++;
+                }
             }
             fclose(fp);
+            writemem32(pb+0x02, ent->load_addr);
+            writemem32(pb+0x06, ent->exec_addr);
+            writemem32(pb+0x0A, size);
         } else {
             log_warn("vdfs: unable to load file '%s': %s\n", ent->host_fn, strerror(errno));
             adfs_hosterr(errno);
