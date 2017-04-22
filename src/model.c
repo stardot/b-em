@@ -66,7 +66,7 @@ void model_check(void) {
     }
     if (models[curmodel].tube != -1)
         curtube = models[curmodel].tube;
-    if (curtube < 0 || curtube >= NUM_TUBES) {
+    if (curtube < -1 || curtube >= NUM_TUBES) {
         log_warn("No tube #%d, running with no tube instead", curtube);
         curtube = -1;
     }
