@@ -123,8 +123,7 @@ void main_init(int argc, char *argv[])
         if (!file_exists(t,FA_ALL,NULL) && selecttube == 4) selecttube = -1;
 
         curtube = selecttube;
-        if (models[curmodel].tube != -1) curtube = models[curmodel].tube;
-
+        model_check();
 
         for (c = 1; c < argc; c++)
         {

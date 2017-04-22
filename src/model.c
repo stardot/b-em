@@ -57,6 +57,21 @@ TUBE tubes[7]=
         {"",0,0}
 };
 
+void model_check(void) {
+    const int defmodel = 3;
+    
+    if (curmodel < 0 || curmodel >= NUM_MODELS) {
+        log_warn("No model #%d, using #%d (%s) instead", curmodel, defmodel, models[defmodel].name);
+        curmodel = defmodel;
+    }
+    if (models[curmodel].tube != -1)
+        curtube = models[curmodel].tube;
+    if (curtube < 0 || curtube >= NUM_TUBES) {
+        log_warn("No tube #%d, running with no tube instead", curtube);
+        curtube = -1;
+    }
+}
+
 void model_init()
 {
         char t[512],t2[512];
@@ -70,9 +85,7 @@ void model_init()
         OS01        = models[curmodel].os01;
         compactcmos = models[curmodel].compact;
 
-        curtube = selecttube;
-        if (models[curmodel].tube != -1) curtube = models[curmodel].tube;
-
+        model_check();
         
         getcwd(t, 511);
         append_filename(t2, exedir, "roms", 511);
