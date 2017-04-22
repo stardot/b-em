@@ -16,7 +16,7 @@ int I8271, WD1770, BPLUS, x65c02, MASTER, MODELA, OS01, compactcmos;
 int curtube;
 int oldmodel;
 
-MODEL models[17] =
+MODEL models[NUM_MODELS] =
 {
 /*       Name                        8271  1770  65c02  B+  Master  SWRAM  A  OS 0.1  Compact  OS      ROM dir   CMOS           ROM setup function         Second processor*/
         {"BBC A w/OS 0.1",           1,    0,    0,     0,  0,      0,     1, 1,      0,       "",     "a01",    "",            mem_romsetup_os01,         -1},
@@ -46,7 +46,7 @@ char *model_get()
 
 extern cpu_debug_t n32016_cpu_debug;
 
-TUBE tubes[7]=
+TUBE tubes[NUM_TUBES]=
 {
         {"6502", tube_6502_init,  tube_6502_reset, &tube6502_cpu_debug  },
         {"ARM",  tube_arm_init,   arm_reset,       &tubearm_cpu_debug   },
