@@ -25,6 +25,15 @@ void videoula_loadstate(FILE *f);
 
 extern uint8_t ula_ctrl;
 extern uint8_t ula_palbak[16];
+extern int nula_collook[16];
+extern uint8_t nula_flash[8];
+
+extern uint8_t nula_palette_mode;
+extern uint8_t nula_horizontal_offset;
+extern uint8_t nula_left_blank;
+extern uint8_t nula_disable;
+extern uint8_t nula_attribute_mode;
+extern uint8_t nula_attribute_text;
 
 
 void video_init();
