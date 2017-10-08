@@ -745,6 +745,7 @@ static void adfs_hosterr(int errnum) {
         case EMFILE:
         case ENFILE:
             msg = err_nfile;
+            break;
         case ENOENT:
             msg = err_notfound;
             break;
