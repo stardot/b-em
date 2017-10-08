@@ -463,6 +463,7 @@ static int scan_dir(vdfs_ent_t *dir) {
                 dir->cat_tab = NULL;
             }
             if (count == 0) {
+                dir->cat_size = 0;
                 dir->scan_seq = scan_seq;
                 dir->scan_mtime = stb.st_mtime;
                 return 0;
