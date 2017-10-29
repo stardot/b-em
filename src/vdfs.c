@@ -425,7 +425,7 @@ static void tree_visit(const void *nodep, const VISIT which, const int depth) {
 // Given a VDFS entry representing a dir scan the corresponding host dir.
 
 static int scan_dir(vdfs_ent_t *dir) {
-    int  count = 0;
+    int  count = 0, nelem;
     DIR  *dp;
     struct stat stb;
     struct dirent *dep;
@@ -448,7 +448,10 @@ static int scan_dir(vdfs_ent_t *dir) {
         end = ptr + dir->cat_size;
         while (ptr < end) {
             ent = *ptr++;
-            ent->attribs |= ATTR_DELETED;
+            if (ent)
+                ent->attribs |= ATTR_DELETED;
+            else
+                log_warn("vdfs: null pointer in cat_tab for %s, entry#%ld", dir->host_fn, ptr-dir->cat_tab);
         }
 
         // Go through the entries in the host dir which are not
@@ -491,13 +494,15 @@ static int scan_dir(vdfs_ent_t *dir) {
             if ((dir->cat_tab = malloc(sizeof(vdfs_ent_t *)*count))) {
                 cat_ptr = dir->cat_tab;
                 twalk(dir->acorn_tree, tree_visit);
+                nelem = cat_ptr - dir->cat_tab;
+                if (nelem != count)
+                    log_warn("vdfs: count/nelem mismatch for cat_tab for %s, nelem=%d, count=%d", dir->host_fn, nelem, count);
                 dir->cat_size = count;
                 dir->scan_seq = scan_seq;
                 dir->scan_mtime = stb.st_mtime;
                 return 0;
             } else
                 log_warn("vdfs: out of memory scanning directory");
-                
         }
     } else
         log_warn("vdfs: unable to opendir '%s': %s\n", dir->host_path, strerror(errno));
@@ -823,12 +828,22 @@ static void run_file(const char *err) {
                 adfs_error(err_wont);
             else if ((fp = open_file(ent, "rb"))) {
                 addr = ent->load_addr;
-                while ((ch = getc(fp)) != EOF)
-                    writemem(addr++, ch);
-                fclose(fp);
-                pc = ent->exec_addr;
+		if (addr > 0xffff0000 || curtube == -1) {
+		    log_debug("vdfs: run_file: writing to I/O proc memory");
+		    while ((ch = getc(fp)) != EOF)
+			writemem(addr++, ch);
+		    pc = ent->exec_addr;
+		} else {
+		    log_debug("vdfs: run_file: writing to tube proc memory");
+		    writemem32(0xc0, ent->exec_addr); // set up for tube execution.
+		    while ((ch = getc(fp)) != EOF)
+			tube_writemem(addr++, ch);
+		    p.c = 1; // carry set means execute in tube to VDFS ROM.
+		    log_debug("vdfs: run_file: write complete");
+		}
+		fclose(fp);
             } else {
-                log_warn("vdfs: unable to load file '%s': %s\n", ent->host_fn, strerror(errno));
+                log_warn("vdfs: unable to run file '%s': %s\n", ent->host_fn, strerror(errno));
                 adfs_hosterr(errno);
             }
         } else
@@ -841,6 +856,7 @@ static inline void osfsc() {
 
     log_debug("vdfs: osfsc(A=%02X, X=%02X, Y=%02X)", a, x, y);
 
+    p.c = 0;
     switch(a) {
         case 0x01: // check EOF
             if ((fp = getfp(x)))

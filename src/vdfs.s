@@ -405,9 +405,18 @@ CMP #&05:BNE P%+5:JMP Cat   :\ Catalogue directory
 CMP #&03:BNE P%+5:JMP FSCommandLookup:\ Filing system commands
 CMP #&06:BNE FSCemul:LDA #&77:JSR OSBYTE:LDA#&06
 .FSCemul
-STA PORT_A:LDA #&00:STA PORT_CMD :\ Pass to emulator and return
+STA PORT_A:LDA #&00:STA PORT_CMD :\ Pass to emulator.
+BCS FSCtube                 :\ start execution in tube?	
 .FSCDone
 RTS
+.FSCtube		:\ claim the tube.
+LDA #&D1
+JSR &0406
+BCC FSCtube
+LDA #&04		:\ start execution at the 32 bit address in
+LDX #&c0		:\ &C0 which is set by the VDFS host code.
+LDY #&00
+JMP &0406
 :
 \ ----------------------
 \ Filing System Commands
