@@ -24,6 +24,10 @@
 
 #define VERSION_STR "B-em v-" VERSION
 
+#ifndef __unused
+#define __unused __attribute__ ((__unused__))
+#endif
+
 void updatewindowsize(int x, int y);
 
 void setejecttext(int drive, char *fn);

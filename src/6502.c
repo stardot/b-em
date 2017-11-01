@@ -105,6 +105,7 @@ static void dbg_reg_set(int which, uint32_t value) {
         break;
     case REG_PC:
         pc = value;
+	break;
     default:
         log_warn("6502: attempt to get non-existent register");
     }

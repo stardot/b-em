@@ -29,7 +29,7 @@ extern void log_msgbox(const char *level, char *s);
 extern void log_debug(const char *format, ...) printflike;
 #else
 static inline void log_debug(const char *format, ...) printflike;
-static inline void log_debug(const char *format, ...) {}
+static inline void log_debug(const char __unused *format, ...) {}
 #endif
 
 #endif

@@ -22,7 +22,7 @@ AC_MSG_CHECKING([whether to enable debugging])
 AC_ARG_ENABLE(debug,
 	      AC_HELP_STRING([--enable-debug], [build debug executable]))
 
-CF_WARNINGS="-Wall -Wno-format-security"
+CF_WARNINGS="-Wall -Wextra -Wno-format-security"
 CFLAGS="$CFLAGS $CF_WARNINGS -std=gnu99 -D_GNU_SOURCE"
 if test "$enable_debug" = "yes"; then
    CFLAGS="$CFLAGS -O0 -ggdb -D_DEBUG"

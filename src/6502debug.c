@@ -351,7 +351,7 @@ uint32_t dbg6502_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
     return addr;
 }
 
-size_t dbg6502_print_flags(PREG *pp, char *buf, size_t bufsize) {
+size_t dbg6502_print_flags(__unused PREG *pp, char *buf, size_t bufsize) {
     if (bufsize >= 6) {
 	*buf++ = p.n ? 'N' : ' ';
 	*buf++ = p.v ? 'V' : ' ';
