@@ -34,6 +34,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <dirent.h>
+#include <unistd.h>
 
 #include <search.h>
 #include <sys/stat.h>
@@ -273,66 +274,160 @@ static inline void bbc2hst(const char *acorn_fn, char *host_fn) {
     *host_fn = '\0';
 }
 
+// ADFS Error messages (used)
+
+static const char err_wont[]     = "\x93" "Won't";
+static const char err_badparms[] = "\x94" "Bad parms";
+static const char err_access[]   = "\xbd" "Access violation";
+static const char err_nfile[]    = "\xc0" "Too many open files";
+static const char err_exists[]   = "\xc4" "Already exists";
+static const char err_discerr[]  = "\xc7" "Disc error";
+static const char err_notfound[] = "\xd6" "Not found";
+static const char err_channel[]  = "\xde" "Channel";
+static const char err_badcmd[]   = "\xfe" "Bad command";
+static const char err_badaddr[]  = "\x94" "Bad parms";
+static const char err_no_swr[]   = "\x93" "No SWRAM at that address";
+static const char err_too_big[]  = "\x94" "Too big";
+
+// Error messages unique to VDFS
+
+static const char err_baddir[]  = "\xc7" "Bad directory";
+
+/* Other ADFS messages not used.
+
+static const char err_aborted[]  = "\x92" "Aborted";
+static const char err_delcsd[]   = "\x97" "Can't delete CSD";
+static const char err_dellib[]   = "\x98" "Can't delete library";
+static const char err_badcsum[]  = "\xaa" "Bad checksum";
+static const char err_badren[]   = "\xb0" "Bad rename";
+static const char err_notempty[] = "\xb4" "Dir not empty";
+static const char err_outside[]  = "\xb7" "Outside file";
+static const char err_nupdate[]  = "\xc1" "Not open for update";
+static const char err_isopen[]   = "\xc2" "Already open";
+static const char err_locked[]   = "\xc3" "Locked";
+static const char err_full[]     = "\xc6" "Disc full";
+static const char err_datalost[] = "\xca" "Data lost, channel";
+static const char err_badopt[]   = "\xcb" "Bad opt";
+static const char err_badname[]  = "\xcc" "Bad name";
+static const char err_eof[]      = "\xdf" "EOF";
+static const char err_wildcard[] = "\xfd" "Wild cards";
+
+*/
+
+static void adfs_error(const char *err) {
+    uint16_t addr = 0x100;
+    int ch;
+
+    writemem(addr++, 0);  // BRK instruction.
+    do {
+        ch = *err++;
+        writemem(addr++, ch);
+    } while (ch);
+    pc = 0x100;          // jump to BRK sequence just created.
+}
+
+static void adfs_hosterr(int errnum) {
+    const char *msg;
+
+    switch(errnum) {
+        case EACCES:
+        case EPERM:
+        case EROFS:
+            msg = err_access;
+            break;
+        case EEXIST:
+            msg = err_exists;
+            break;
+        case EISDIR:
+            msg = err_wont;
+            break;
+        case EMFILE:
+        case ENFILE:
+            msg = err_nfile;
+            break;
+        case ENOENT:
+            msg = err_notfound;
+            break;
+        default:
+            msg = err_discerr;
+    }
+    adfs_error(msg);
+}
+
+static char *make_host_path(vdfs_ent_t *ent, char **inf_ext) {
+    char *host_dir_path, *host_file_path, *ptr;
+    size_t len;
+    
+    host_dir_path = ent->parent->host_path;
+    len = strlen(host_dir_path) + strlen(ent->host_fn) + 6;
+    if ((host_file_path = malloc(len))) {
+        ptr = stpcpy(host_file_path, host_dir_path);
+        if (ent->host_fn[0] != '.' || ent->host_fn[1] != '\0') {
+            *ptr++ = '/';
+            ptr = stpcpy(ptr, ent->host_fn);
+        }
+        strcpy(ptr, ".inf");
+        *inf_ext = ptr;
+        return host_file_path;
+    } else {
+        adfs_hosterr(ENOSPC);
+        return NULL;
+    }
+}
+
 // Populate a VDFS entry from host information.
 
 static void scan_entry(vdfs_ent_t *ent) {
-    char *host_dir_path, *host_file_path, *ptr;
+    char *host_file_path, *inf_ext;
     FILE *fp;
     struct stat stb;
 
     // build name of .inf file
-    host_dir_path = ent->parent->host_path;
-    ptr = host_file_path = malloc(strlen(host_dir_path) + strlen(ent->host_fn) + 6);
-    ptr = stpcpy(ptr, host_dir_path);
-    if (ent->host_fn[0] != '.' || ent->host_fn[1] != '\0') {
-        *ptr++ = '/';
-        ptr = stpcpy(ptr, ent->host_fn);
-    }
-    strcpy(ptr, ".inf");
+    if ((host_file_path = make_host_path(ent, &inf_ext))) {
+        // open and parse .inf file
+        if ((fp = fopen(host_file_path, "rt"))) {
+            get_filename(fp, ent->acorn_fn);
+            ent->load_addr = get_hex(fp);
+            ent->exec_addr = get_hex(fp);
+            fclose(fp);
+        } else if (ent->acorn_fn[0] == '\0')
+            hst2bbc(ent->host_fn, ent->acorn_fn);
 
-    // open and parse .inf file
-    if ((fp = fopen(host_file_path, "rt"))) {
-        get_filename(fp, ent->acorn_fn);
-        ent->load_addr = get_hex(fp);
-        ent->exec_addr = get_hex(fp);
-        fclose(fp);
-    } else if (ent->acorn_fn[0] == '\0')
-        hst2bbc(ent->host_fn, ent->acorn_fn);
-
-    // trim .inf to get back to host path and get attributes
-    *ptr = '\0';
-    if (stat(host_file_path, &stb) == -1) {
-        log_warn("vdfs: unable to stat '%s': %s\n", host_file_path, strerror(errno));
-        ent->attribs = ATTR_DELETED;
-    }
-    else {
-        ent->length = stb.st_size;
-        if (S_ISDIR(stb.st_mode))
-            ent->attribs |= ATTR_IS_DIR;
+        // trim .inf to get back to host path and get attributes
+        *inf_ext = '\0';
+        if (stat(host_file_path, &stb) == -1) {
+            log_warn("vdfs: unable to stat '%s': %s\n", host_file_path, strerror(errno));
+            ent->attribs = ATTR_DELETED;
+        }
+        else {
+            ent->length = stb.st_size;
+            if (S_ISDIR(stb.st_mode))
+                ent->attribs |= ATTR_IS_DIR;
 #ifdef WIN32
-        if (stb.st_mode & S_IRUSR)
-            ent->attribs |= ATTR_USER_READ|ATTR_OTHR_READ;
-        if (stb.st_mode & S_IWUSR)
-            ent->attribs |= ATTR_USER_WRITE|ATTR_OTHR_WRITE;
-        if (stb.st_mode & S_IXUSR)
-            ent->attribs |= ATTR_USER_EXEC|ATTR_OTHR_EXEC;
+            if (stb.st_mode & S_IRUSR)
+                ent->attribs |= ATTR_USER_READ|ATTR_OTHR_READ;
+            if (stb.st_mode & S_IWUSR)
+                ent->attribs |= ATTR_USER_WRITE|ATTR_OTHR_WRITE;
+            if (stb.st_mode & S_IXUSR)
+                ent->attribs |= ATTR_USER_EXEC|ATTR_OTHR_EXEC;
 #else
-        if (stb.st_mode & S_IRUSR)
-            ent->attribs |= ATTR_USER_READ;
-        if (stb.st_mode & S_IWUSR)
-            ent->attribs |= ATTR_USER_WRITE;
-        if (stb.st_mode & S_IXUSR)
-            ent->attribs |= ATTR_USER_EXEC;
-        if (stb.st_mode & (S_IRGRP|S_IROTH))
-            ent->attribs |= ATTR_OTHR_READ;
-        if (stb.st_mode & (S_IWGRP|S_IWOTH))
-            ent->attribs |= ATTR_OTHR_WRITE;
-        if (stb.st_mode & (S_IXGRP|S_IXOTH))
-            ent->attribs |= ATTR_OTHR_EXEC;
+            if (stb.st_mode & S_IRUSR)
+                ent->attribs |= ATTR_USER_READ;
+            if (stb.st_mode & S_IWUSR)
+                ent->attribs |= ATTR_USER_WRITE;
+            if (stb.st_mode & S_IXUSR)
+                ent->attribs |= ATTR_USER_EXEC;
+            if (stb.st_mode & (S_IRGRP|S_IROTH))
+                ent->attribs |= ATTR_OTHR_READ;
+            if (stb.st_mode & (S_IWGRP|S_IWOTH))
+                ent->attribs |= ATTR_OTHR_WRITE;
+            if (stb.st_mode & (S_IXGRP|S_IXOTH))
+                ent->attribs |= ATTR_OTHR_EXEC;
 #endif
+        }
+        free(host_file_path);
+        log_debug("vdfs: scan_entry: acorn=%s, host=%s, attr=%04X, load=%08X, exec=%08X\n", ent->acorn_fn, ent->host_fn, ent->attribs, ent->load_addr, ent->exec_addr);
     }
-    free(host_file_path);
-    log_debug("vdfs: scan_entry: acorn=%s, host=%s, attr=%04X, load=%08X, exec=%08X\n", ent->acorn_fn, ent->host_fn, ent->attribs, ent->load_addr, ent->exec_addr);
 }
 
 static void init_entry(vdfs_ent_t *ent) {
@@ -601,18 +696,25 @@ static void write_back(vdfs_ent_t *ent) {
 
 static FILE *open_file(vdfs_ent_t *ent, const char *mode) {
     char *host_dir_path, *host_file_path, *ptr;
+    size_t len;
     FILE *fp;
 
     host_dir_path = ent->parent->host_path;
-    ptr = host_file_path = malloc(strlen(host_dir_path) + strlen(ent->host_fn) + 2);
-    if (host_dir_path[0] != '.' || host_dir_path[1] != '\0') {
-        ptr = stpcpy(ptr, host_dir_path);
-        *ptr++ = '/';
+    len = strlen(host_dir_path) + strlen(ent->host_fn) + 6;
+    if ((host_file_path = malloc(len))) {
+        ptr = host_file_path;
+        if (host_dir_path[0] != '.' || host_dir_path[1] != '\0') {
+            ptr = stpcpy(ptr, host_dir_path);
+            *ptr++ = '/';
+        }
+        strcpy(ptr, ent->host_fn);
+        fp = fopen(host_file_path, mode);
+        free(host_file_path);
+        return fp;
+    } else {
+        adfs_hosterr(ENOSPC);
+        return NULL;
     }
-    strcpy(ptr, ent->host_fn);
-    fp = fopen(host_file_path, mode);
-    free(host_file_path);
-    return fp;
 }
 
 static void close_file(int channel) {
@@ -709,86 +811,6 @@ void vdfs_init(void) {
     vdfs_new_root(root, &root_dir);
     root_dir.parent = cur_dir = lib_dir = prev_dir = &root_dir;
     scan_seq++;
-}
-
-// ADFS Error messages (used)
-
-static const char err_wont[]     = "\x93" "Won't";
-static const char err_badparms[] = "\x94" "Bad parms";
-static const char err_access[]   = "\xbd" "Access violation";
-static const char err_nfile[]    = "\xc0" "Too many open files";
-static const char err_exists[]   = "\xc4" "Already exists";
-static const char err_discerr[]  = "\xc7" "Disc error";
-static const char err_notfound[] = "\xd6" "Not found";
-static const char err_channel[]  = "\xde" "Channel";
-static const char err_badcmd[]   = "\xfe" "Bad command";
-static const char err_badaddr[]  = "\x94" "Bad parms";
-static const char err_no_swr[]   = "\x93" "No SWRAM at that address";
-static const char err_too_big[]  = "\x94" "Too big";
-
-// Error messages unique to VDFS
-
-static const char err_baddir[]  = "\xc7" "Bad directory";
-
-/* Other ADFS messages not used.
-
-static const char err_aborted[]  = "\x92" "Aborted";
-static const char err_delcsd[]   = "\x97" "Can't delete CSD";
-static const char err_dellib[]   = "\x98" "Can't delete library";
-static const char err_badcsum[]  = "\xaa" "Bad checksum";
-static const char err_badren[]   = "\xb0" "Bad rename";
-static const char err_notempty[] = "\xb4" "Dir not empty";
-static const char err_outside[]  = "\xb7" "Outside file";
-static const char err_nupdate[]  = "\xc1" "Not open for update";
-static const char err_isopen[]   = "\xc2" "Already open";
-static const char err_locked[]   = "\xc3" "Locked";
-static const char err_full[]     = "\xc6" "Disc full";
-static const char err_datalost[] = "\xca" "Data lost, channel";
-static const char err_badopt[]   = "\xcb" "Bad opt";
-static const char err_badname[]  = "\xcc" "Bad name";
-static const char err_eof[]      = "\xdf" "EOF";
-static const char err_wildcard[] = "\xfd" "Wild cards";
-
-*/
-
-static void adfs_error(const char *err) {
-    uint16_t addr = 0x100;
-    int ch;
-
-    writemem(addr++, 0);  // BRK instruction.
-    do {
-        ch = *err++;
-        writemem(addr++, ch);
-    } while (ch);
-    pc = 0x100;          // jump to BRK sequence just created.
-}
-
-static void adfs_hosterr(int errnum) {
-    const char *msg;
-
-    switch(errnum) {
-        case EACCES:
-        case EPERM:
-        case EROFS:
-            msg = err_access;
-            break;
-        case EEXIST:
-            msg = err_exists;
-            break;
-        case EISDIR:
-            msg = err_wont;
-            break;
-        case EMFILE:
-        case ENFILE:
-            msg = err_nfile;
-            break;
-        case ENOENT:
-            msg = err_notfound;
-            break;
-        default:
-            msg = err_discerr;
-    }
-    adfs_error(msg);
 }
 
 static int check_valid_dir(vdfs_ent_t *ent, const char *which) {
@@ -1223,6 +1245,32 @@ static void osfile_load(uint32_t pb, vdfs_ent_t *ent) {
         adfs_error(err_notfound);
 }
 
+static void osfile_delete(vdfs_ent_t *ent) {
+    char *host_file_path, *inf_ext;
+
+    if (ent) {
+	if (ent->attribs & ATTR_IS_DIR) {
+            if (rmdir(ent->host_path) == 0) {
+                if (ent->parent)
+                    scan_dir(ent->parent);
+            } else
+                adfs_hosterr(errno);
+        } else if ((host_file_path = make_host_path(ent, &inf_ext))) {
+            *inf_ext = '\0';
+            if (unlink(host_file_path) == 0) {
+                *inf_ext = '.';
+                if (unlink(host_file_path) != 0)
+                    log_warn("vdfs: unable to delete '%s': %s\n", host_file_path, strerror(errno));
+                if (ent->parent)
+                    scan_dir(ent->parent);
+            } else
+                adfs_hosterr(errno);
+            free(host_file_path);
+        }
+    } else
+        a = 0;
+}
+
 static inline void osfile()
 {
     vdfs_ent_t *ent, key;
@@ -1272,6 +1320,10 @@ static inline void osfile()
                     writemem32(pb+0x0e, ent->attribs);
                 }
                 break;
+
+            case 0x06:
+                osfile_delete(ent);
+	      break;
 
             case 0xff:  // load file.
                 osfile_load(pb, ent);
