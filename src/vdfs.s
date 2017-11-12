@@ -493,7 +493,7 @@ TYA:CLC:ADC &F2:TAX:LDA &F3:ADC #0:TAY:RTS
 .backup   :RTS
 .compact  :RTS
 .copy     :RTS
-.delete   :RTS
+.delete   :JSR F2toXY:STX &B0:STY &B1:LDX #&B0:LDY #&00:LDA #&06:JMP OSFILE
 .destroy  :RTS
 .dir      :LDA #&D7:STA PORT_CMD:RTS :\ Pass to host and return
 .drive    :RTS
