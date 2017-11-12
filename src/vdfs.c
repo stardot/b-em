@@ -278,6 +278,9 @@ static inline void bbc2hst(const char *acorn_fn, char *host_fn) {
 
 static const char err_wont[]     = "\x93" "Won't";
 static const char err_badparms[] = "\x94" "Bad parms";
+static const char err_delcsd[]   = "\x97" "Can't delete CSD";
+static const char err_dellib[]   = "\x98" "Can't delete library";
+static const char err_notempty[] = "\xb4" "Dir not empty";
 static const char err_access[]   = "\xbd" "Access violation";
 static const char err_nfile[]    = "\xc0" "Too many open files";
 static const char err_exists[]   = "\xc4" "Already exists";
@@ -296,11 +299,8 @@ static const char err_baddir[]  = "\xc7" "Bad directory";
 /* Other ADFS messages not used.
 
 static const char err_aborted[]  = "\x92" "Aborted";
-static const char err_delcsd[]   = "\x97" "Can't delete CSD";
-static const char err_dellib[]   = "\x98" "Can't delete library";
 static const char err_badcsum[]  = "\xaa" "Bad checksum";
 static const char err_badren[]   = "\xb0" "Bad rename";
-static const char err_notempty[] = "\xb4" "Dir not empty";
 static const char err_outside[]  = "\xb7" "Outside file";
 static const char err_nupdate[]  = "\xc1" "Not open for update";
 static const char err_isopen[]   = "\xc2" "Already open";
@@ -347,6 +347,9 @@ static void adfs_hosterr(int errnum) {
             break;
         case ENOENT:
             msg = err_notfound;
+            break;
+        case ENOTEMPTY:
+            msg = err_notempty;
             break;
         default:
             msg = err_discerr;
@@ -1250,7 +1253,13 @@ static void osfile_delete(vdfs_ent_t *ent) {
 
     if (ent) {
 	if (ent->attribs & ATTR_IS_DIR) {
-            if (rmdir(ent->host_path) == 0) {
+            if (ent == cur_dir)
+                adfs_error(err_delcsd);
+            else if (ent == lib_dir)
+                adfs_error(err_dellib);
+            else if (rmdir(ent->host_path) == 0) {
+                if (ent == prev_dir)
+                    prev_dir = ent->parent ? ent->parent : cur_dir;
                 if (ent->parent)
                     scan_dir(ent->parent);
             } else
@@ -1259,7 +1268,7 @@ static void osfile_delete(vdfs_ent_t *ent) {
             *inf_ext = '\0';
             if (unlink(host_file_path) == 0) {
                 *inf_ext = '.';
-                if (unlink(host_file_path) != 0)
+                if (unlink(host_file_path) != 0 && errno != ENOENT)
                     log_warn("vdfs: unable to delete '%s': %s\n", host_file_path, strerror(errno));
                 if (ent->parent)
                     scan_dir(ent->parent);
