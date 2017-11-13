@@ -1259,9 +1259,10 @@ static void osfile_delete(vdfs_ent_t *ent) {
                 adfs_error(err_dellib);
             else if (rmdir(ent->host_path) == 0) {
                 if (ent == prev_dir)
-                    prev_dir = ent->parent ? ent->parent : cur_dir;
+                    prev_dir = cur_dir;
                 if (ent->parent)
                     scan_dir(ent->parent);
+                a = 0x02;
             } else
                 adfs_hosterr(errno);
         } else if ((host_file_path = make_host_path(ent, &inf_ext))) {
@@ -1272,6 +1273,7 @@ static void osfile_delete(vdfs_ent_t *ent) {
                     log_warn("vdfs: unable to delete '%s': %s\n", host_file_path, strerror(errno));
                 if (ent->parent)
                     scan_dir(ent->parent);
+                a = 0x01;
             } else
                 adfs_hosterr(errno);
             free(host_file_path);
