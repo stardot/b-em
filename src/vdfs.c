@@ -46,10 +46,17 @@ int vdfs_enabled = 0;
  * structure for this module and models the association between
  * a file/directory as seen by the BBC and as it exists on the host.
  *
+ * The pointers host_path, host_fn and host_ext all point into a
+ * single chunk of memory obtained from malloc with host_path
+ * containing the start address as well as pointing to the full
+ * path name.  The host_fn pointer points to the last element within
+ * that pathname, i.e. the filename.  The host_inf pointer points to
+ * the .inf extension which can be made part of the path name by
+ * writing a dot at this pointer and removed again by writing a NUL.
+ * 
  * In the event this is a directory rather than a file this entry
- * will contain a pointer to the parent VDFS entry and also two
- * binary search trees allowing the contents of the directory to be
- * searched by either Acorn filename or host filename.
+ * will contain two binary search trees allowing the contents of the
+ * directory to be searched by either Acorn filename or host filename.
  */
 
 #define MAX_FILE_NAME    10
@@ -63,7 +70,7 @@ int vdfs_enabled = 0;
 #define ATTR_OTHR_EXEC   0x0040
 #define ATTR_OTHR_LOCKD  0x0080
 #define ATTR_IS_DIR      0x4000
-#define ATTR_DELETED     0x8000
+#define ATTR_EXISTS      0x8000
 
 typedef struct _vdfs_entry vdfs_ent_t;
 
@@ -99,7 +106,7 @@ static unsigned   scan_seq;
  * Open files.  An open file is an association between a host OS file
  * pointer, i.e. the host file is kept open too, and a catalogue
  * entry.  Normally for an open file both pointers are set and for a
- * closed file both are NULL but to emulate the OSFIND * call correctly
+ * closed file both are NULL but to emulate the OSFIND call correctly
  * a directory can be opened and becomes "half-open", i.e. it can be
  * closed again but any attempt to read or write it will fail.  That
  * case is marked by the vdfs_ent_t pointer being set but the host
@@ -402,12 +409,11 @@ static void scan_entry(vdfs_ent_t *ent) {
         hst2bbc(ent->host_fn, ent->acorn_fn);
 
     // stat the real file.
-    if (stat(ent->host_path, &stb) == -1) {
+    if (stat(ent->host_path, &stb) == -1)
         log_warn("vdfs: unable to stat '%s': %s\n", ent->host_path, strerror(errno));
-        ent->attribs = ATTR_DELETED;
-    }
     else {
         ent->length = stb.st_size;
+        ent->attribs = ATTR_EXISTS;
         if (S_ISDIR(stb.st_mode))
             ent->attribs |= ATTR_IS_DIR;
 #ifdef WIN32
@@ -510,7 +516,7 @@ static void tree_visit_del(const void *nodep, const VISIT which, const int depth
 
     if (which == postorder || which == leaf) {
         ent = *(vdfs_ent_t **)nodep;
-        ent->attribs |= ATTR_DELETED;
+        ent->attribs = 0;
     }
 }
 
@@ -545,7 +551,6 @@ static int scan_dir(vdfs_ent_t *dir) {
                     key.host_fn = dep->d_name;
                     if ((ptr = tfind(&key, &dir->host_tree, host_comp))) {
                         ent = *ptr;
-                        ent->attribs &= ~ATTR_DELETED;
                         scan_entry(ent);
                         count++;
                     } else if ((ent = new_entry(dir, dep->d_name)))
@@ -577,7 +582,7 @@ static void tree_visit_cat(const void *nodep, const VISIT which, const int depth
 
     if (which == postorder || which == leaf) {
         ent = *(vdfs_ent_t **)nodep;
-        if (!(ent->attribs & ATTR_DELETED))
+        if (ent->attribs & ATTR_EXISTS)
             *cat_ptr++ = ent;
     }
 }
@@ -653,7 +658,6 @@ static vdfs_ent_t *add_new_file(vdfs_ent_t *dir, const char *name) {
         if (make_host_path(new_ent, host_fn)) {
             tsearch(new_ent, &dir->acorn_tree, acorn_comp);
             tsearch(new_ent, &dir->host_tree, host_comp);
-            new_ent->attribs |= ATTR_DELETED;
             dir->cat_size++;
             return new_ent;
         }
@@ -747,7 +751,6 @@ static int vdfs_new_root(const char *root, vdfs_ent_t *ent) {
             log_error("vdfs: unable to set root as unable to allocate path");
     } else
         log_warn("vdfs: unable to set root as path is empty");
-    ent->attribs = ATTR_DELETED;
     return 0;
 }
 
@@ -810,9 +813,9 @@ static void run_file(const char *err) {
     if (check_valid_dir(cur_dir, "current")) {
         addr = (y << 8) | x;
         ent = find_entry(addr, &key, cur_dir, &cmd_tail);
-        if (!ent || ent->attribs & ATTR_DELETED)
+        if (!(ent && ent->attribs & ATTR_EXISTS))
             ent = find_entry(addr, &key, lib_dir, &cmd_tail);        
-        if (ent && !(ent->attribs & ATTR_DELETED)) {
+        if (ent && ent->attribs & ATTR_EXISTS) {
             if (ent->attribs & ATTR_IS_DIR)
                 adfs_error(err_wont);
             else if ((fp = fopen(ent->host_path, "rb"))) {
@@ -890,12 +893,7 @@ static inline void osfind() {
             for (chan2 = 0; chan2 < NUM_CHANNELS; chan2++)
                 if (vdfs_chan[channel].ent == ent)
                     return;
-            if (ent->attribs & ATTR_DELETED) {
-                if (acorn_mode == 0x80)
-                    mode = "wb";
-                else if (acorn_mode == 0xc0)
-                    mode = "wb+";
-            } else {
+            if (ent->attribs & ATTR_EXISTS) {
                 if (ent->attribs & ATTR_IS_DIR) {
                     vdfs_chan[channel].ent = ent;  // make "half-open"
                     a = MIN_CHANNEL + channel;
@@ -907,6 +905,11 @@ static inline void osfind() {
                     mode = "wb";
                 else if (acorn_mode == 0xc0)
                     mode = "rb+";
+            } else {
+                if (acorn_mode == 0x80)
+                    mode = "wb";
+                else if (acorn_mode == 0xc0)
+                    mode = "wb+";
             }
         } else {
             if (acorn_mode == 0x80) {
@@ -920,7 +923,7 @@ static inline void osfind() {
         }
         if (mode && ent) {
             if ((fp = fopen(ent->host_path, mode))) {
-                ent->attribs &= ~ATTR_DELETED; // file now exists.
+                ent->attribs |= ATTR_EXISTS; // file now exists.
                 vdfs_chan[channel].fp = fp;
                 vdfs_chan[channel].ent = ent;
                 a = MIN_CHANNEL + channel;
@@ -1170,7 +1173,7 @@ static void osfile_save(uint32_t pb, vdfs_ent_t *ent) {
         ent->load_addr = readmem32(pb+0x02);
         ent->exec_addr = readmem32(pb+0x06);
         ent->length = end_addr-start_addr;
-        ent->attribs &= ~ATTR_DELETED;
+        ent->attribs |= ATTR_EXISTS;
         write_back(ent);
     } else
         log_warn("vdfs: unable to create file '%s': %s\n", ent->host_fn, strerror(errno));
@@ -1225,7 +1228,7 @@ static void osfile_delete(vdfs_ent_t *ent) {
             else if (rmdir(ent->host_path) == 0) {
                 if (ent == prev_dir)
                     prev_dir = cur_dir;
-                ent->attribs |= ATTR_DELETED;
+                ent->attribs &= ATTR_EXISTS;
             } else
                 adfs_hosterr(errno);
         } else {
@@ -1234,7 +1237,7 @@ static void osfile_delete(vdfs_ent_t *ent) {
                 if (unlink(ent->host_path) != 0 && errno != ENOENT)
                     log_warn("vdfs: unable to delete '%s': %s\n", ent->host_path, strerror(errno));
                 *ent->host_inf = '\0';
-                ent->attribs |= ATTR_DELETED;
+                ent->attribs &= ATTR_EXISTS;
             } else
                 adfs_hosterr(errno);
         }
@@ -1250,14 +1253,7 @@ static inline void osfile()
     log_debug("vdfs: osfile(A=%02X, X=%02X, Y=%02X)", a, x, y);
     if (check_valid_dir(cur_dir, "current")) {
         if ((ent = find_entry(readmem16(pb), &key, cur_dir, NULL))) {
-            if (ent->attribs & ATTR_DELETED) {
-                log_debug("vdfs: osfile found deleted entry '%s'", ent->acorn_fn);
-                if (a == 0x00) {
-                    osfile_save(pb, ent);
-                    a = (ent->attribs & ATTR_IS_DIR) ? 2 : 1;
-                } else
-                    a = 0; // not found.
-            } else {
+            if (ent->attribs & ATTR_EXISTS) {
                 log_debug("vdfs: osfile found live entry '%s'", ent->acorn_fn);
                 switch (a) {
                     case 0x00:  // save file.
@@ -1302,6 +1298,13 @@ static inline void osfile()
                         log_debug("vdfs: osfile unimplemented for a=%d", a);
                 }
                 a = (ent->attribs & ATTR_IS_DIR) ? 2 : 1;
+            } else {
+                log_debug("vdfs: osfile found deleted entry '%s'", ent->acorn_fn);
+                if (a == 0x00) {
+                    osfile_save(pb, ent);
+                    a = (ent->attribs & ATTR_IS_DIR) ? 2 : 1;
+                } else
+                    a = 0; // not found.
             }
         } else {
             log_debug("vdfs: osfile: entry not found '%s'", key.acorn_fn);
@@ -1518,7 +1521,7 @@ static inline void exec_swr_fs() {
             if (flags & 0x80) {
                 len = 0x4000 - start;
                 if (len > 0) {
-                    if (ent && !(ent->attribs & ATTR_DELETED)) {
+                    if (ent && ent->attribs & ATTR_EXISTS) {
                         if (ent->attribs & ATTR_IS_DIR)
                             adfs_error(err_wont);
                         else if ((fp = fopen(ent->host_path, "rb"))) {
@@ -1545,7 +1548,7 @@ static inline void exec_swr_fs() {
                             ent->load_addr = load_add;
                             ent->exec_addr = load_add;
                             ent->length = len;
-                            ent->attribs &= ~ATTR_DELETED;
+                            ent->attribs |= ATTR_EXISTS;
                             write_back(ent);
                         } else
                             log_warn("vdfs: unable to create file '%s': %s\n", ent->host_fn, strerror(errno));
@@ -1621,7 +1624,7 @@ static void change_dir(vdfs_ent_t **dir, const char *which) {
     vdfs_ent_t *ent, key;
 
     ent = find_entry(readmem16(0xf2) + y, &key, cur_dir, NULL);
-    if (ent && !(ent->attribs & ATTR_DELETED)) {
+    if (ent && ent->attribs & ATTR_EXISTS) {
         if (ent->attribs & ATTR_IS_DIR) {
             log_debug("vdfs: new %s dir=%s\n", which, ent->acorn_fn);
             prev_dir = *dir;
