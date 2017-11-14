@@ -1228,7 +1228,7 @@ static void osfile_delete(vdfs_ent_t *ent) {
             else if (rmdir(ent->host_path) == 0) {
                 if (ent == prev_dir)
                     prev_dir = cur_dir;
-                ent->attribs &= ATTR_EXISTS;
+                ent->attribs &= ~ATTR_EXISTS;
             } else
                 adfs_hosterr(errno);
         } else {
@@ -1237,7 +1237,7 @@ static void osfile_delete(vdfs_ent_t *ent) {
                 if (unlink(ent->host_path) != 0 && errno != ENOENT)
                     log_warn("vdfs: unable to delete '%s': %s\n", ent->host_path, strerror(errno));
                 *ent->host_inf = '\0';
-                ent->attribs &= ATTR_EXISTS;
+                ent->attribs &= ~ATTR_EXISTS;
             } else
                 adfs_hosterr(errno);
         }
@@ -1324,7 +1324,7 @@ static inline void osfile()
  * an OSWORD parameter block as used on the BBC Master.  Control is
  * returned to the emulated BBC.  If VDFS is the current filing
  * system the VDFS ROM will call back to this VDFS module for
- * execution otherwise it will try to executethe OSWORD for another
+ * execution otherwise it will try to execute the OSWORD for another
  * filing system to pick up.
  */
 
