@@ -284,23 +284,25 @@ static char *make_host_path(vdfs_ent_t *ent, const char *host_fn) {
     char *host_dir_path, *host_file_path, *ptr;
     size_t len;
 
+    len = strlen(host_fn) + 6;
     host_dir_path = ent->parent->host_path;
-    len = strlen(host_dir_path) + strlen(host_fn) + 6;
+    if (host_dir_path[0] != '.' || host_dir_path[1])
+        len += strlen(host_dir_path);
     if ((host_file_path = malloc(len))) {
-        ptr = stpcpy(host_file_path, host_dir_path);
-        ent->host_fn = ptr;
-        if (host_fn[0] != '.' || host_fn[1] != '\0') {
+        ent->host_path = ptr = host_file_path;
+        if (host_dir_path[0] != '.' || host_dir_path[1]) {
+            ptr = stpcpy(ptr, host_dir_path);
             *ptr++ = '/';
-            ent->host_fn = ptr;
-            ptr = stpcpy(ptr, host_fn);
         }
+        ent->host_fn = ptr;
+        ptr = stpcpy(ptr, host_fn);
         ent->host_inf = ptr;
         *ptr++ = '\0';
         *ptr++ = 'i';
         *ptr++ = 'n';
         *ptr++ = 'f';
         *ptr = '\0';
-        ent->host_path = host_file_path;
+        log_debug("vdfs: make_host_path returns '%s' for '%s'", host_file_path, host_fn);
         return host_file_path;
     }
     log_warn("vdfs: out of memory allocaing host path");
@@ -634,13 +636,17 @@ static vdfs_ent_t *find_entry(uint16_t fn_addr, vdfs_ent_t *key, vdfs_ent_t *ent
                 ent = ent->parent;
             else if ((ptr = tfind(key, &ent->acorn_tree, acorn_comp)))
                 ent = *ptr;
-            else
+            else {
+                key->parent = ent;
                 return NULL; // not found
+            }
             if (ch != '.')
                 return ent;
             if (!(ent->attribs & ATTR_IS_DIR))
                 return NULL; // file in pathname where dir should be
-            scan_dir(ent);
+            key->parent = ent;
+            if (scan_dir(ent))
+                return NULL;
         }
     }
     return NULL;
@@ -843,6 +849,48 @@ static void run_file(const char *err) {
     }
 }
 
+static void delete_inf(vdfs_ent_t *ent) {
+    *ent->host_inf = '.';
+    if (unlink(ent->host_path) != 0 && errno != ENOENT)
+        log_warn("vdfs: failed to delete 'INF file %s': %s", ent->host_path, strerror(errno));
+    *ent->host_inf = '\0';
+}
+
+static void osfsc_rename() {
+    vdfs_ent_t *old_ent, old_key, *new_ent, new_key;
+    uint16_t new_name;
+    
+    if ((old_ent = find_entry((y << 8) | x, &old_key, cur_dir, &new_name))) {
+        if ((new_ent = find_entry(new_name, &new_key, cur_dir, NULL))) {
+            log_debug("vdfs: new file '%s' for rename already exists", new_key.acorn_fn);
+            adfs_error(err_exists);
+        } else if (new_key.parent && (new_ent = add_new_file(new_key.parent, new_key.acorn_fn))) {
+            if (rename(old_ent->host_path, new_ent->host_path) == 0) {
+                log_debug("vdfs: '%s' renamed to '%s'", old_ent->host_path, new_ent->host_path);
+                new_ent->attribs |= ATTR_EXISTS;
+                old_ent->attribs &= ~ATTR_EXISTS;
+                new_ent->load_addr  = old_ent->load_addr; 
+                new_ent->exec_addr  = old_ent->exec_addr; 
+                new_ent->length     = old_ent->length; 
+                new_ent->acorn_tree = old_ent->acorn_tree;
+                new_ent->host_tree  = old_ent->host_tree;
+                new_ent->cat_tab    = old_ent->cat_tab;
+                new_ent->cat_size   = old_ent->cat_size;
+                new_ent->scan_seq   = old_ent->scan_seq;
+                new_ent->scan_mtime = old_ent->scan_mtime;
+                delete_inf(old_ent);
+                write_back(new_ent);
+            } else {
+                adfs_hosterr(errno);
+                log_debug("vdfs: failed to rename '%s' to '%s': %s", old_ent->host_path, new_ent->host_path, strerror(errno));
+            }
+        }
+    } else {
+        log_debug("vdfs: old file '%s' for rename not found", old_key.acorn_fn);
+        adfs_error(err_notfound);
+    }
+}
+
 static inline void osfsc() {
     FILE *fp;
 
@@ -862,6 +910,9 @@ static inline void osfsc() {
             run_file(err_badcmd);
             break;
         case 0x06: // new filesystem taking over.
+            break;
+        case 0x0c:
+            osfsc_rename();
             break;
         default:
             log_debug("vdfs: osfsc unimplemented for a=%d", a);
@@ -1233,10 +1284,7 @@ static void osfile_delete(vdfs_ent_t *ent) {
                 adfs_hosterr(errno);
         } else {
             if (unlink(ent->host_path) == 0) {
-                *ent->host_inf = '.';
-                if (unlink(ent->host_path) != 0 && errno != ENOENT)
-                    log_warn("vdfs: unable to delete '%s': %s\n", ent->host_path, strerror(errno));
-                *ent->host_inf = '\0';
+                delete_inf(ent);
                 ent->attribs &= ~ATTR_EXISTS;
             } else
                 adfs_hosterr(errno);
