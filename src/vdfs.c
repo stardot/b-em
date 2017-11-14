@@ -856,35 +856,46 @@ static void delete_inf(vdfs_ent_t *ent) {
     *ent->host_inf = '\0';
 }
 
+static void rename_tail(vdfs_ent_t *old_ent, vdfs_ent_t *new_ent) {
+    if (rename(old_ent->host_path, new_ent->host_path) == 0) {
+        log_debug("vdfs: '%s' renamed to '%s'", old_ent->host_path, new_ent->host_path);
+        new_ent->attribs |= ATTR_EXISTS;
+        old_ent->attribs &= ~ATTR_EXISTS;
+        new_ent->load_addr  = old_ent->load_addr; 
+        new_ent->exec_addr  = old_ent->exec_addr; 
+        new_ent->length     = old_ent->length; 
+        new_ent->acorn_tree = old_ent->acorn_tree;
+        new_ent->host_tree  = old_ent->host_tree;
+        new_ent->cat_tab    = old_ent->cat_tab;
+        new_ent->cat_size   = old_ent->cat_size;
+        new_ent->scan_seq   = old_ent->scan_seq;
+        new_ent->scan_mtime = old_ent->scan_mtime;
+        delete_inf(old_ent);
+        write_back(new_ent);
+    } else {
+        adfs_hosterr(errno);
+        log_debug("vdfs: failed to rename '%s' to '%s': %s", old_ent->host_path, new_ent->host_path, strerror(errno));
+    }
+}
+
 static void osfsc_rename() {
     vdfs_ent_t *old_ent, old_key, *new_ent, new_key;
     uint16_t new_name;
     
     if ((old_ent = find_entry((y << 8) | x, &old_key, cur_dir, &new_name))) {
         if ((new_ent = find_entry(new_name, &new_key, cur_dir, NULL))) {
-            log_debug("vdfs: new file '%s' for rename already exists", new_key.acorn_fn);
-            adfs_error(err_exists);
-        } else if (new_key.parent && (new_ent = add_new_file(new_key.parent, new_key.acorn_fn))) {
-            if (rename(old_ent->host_path, new_ent->host_path) == 0) {
-                log_debug("vdfs: '%s' renamed to '%s'", old_ent->host_path, new_ent->host_path);
-                new_ent->attribs |= ATTR_EXISTS;
-                old_ent->attribs &= ~ATTR_EXISTS;
-                new_ent->load_addr  = old_ent->load_addr; 
-                new_ent->exec_addr  = old_ent->exec_addr; 
-                new_ent->length     = old_ent->length; 
-                new_ent->acorn_tree = old_ent->acorn_tree;
-                new_ent->host_tree  = old_ent->host_tree;
-                new_ent->cat_tab    = old_ent->cat_tab;
-                new_ent->cat_size   = old_ent->cat_size;
-                new_ent->scan_seq   = old_ent->scan_seq;
-                new_ent->scan_mtime = old_ent->scan_mtime;
-                delete_inf(old_ent);
-                write_back(new_ent);
-            } else {
-                adfs_hosterr(errno);
-                log_debug("vdfs: failed to rename '%s' to '%s': %s", old_ent->host_path, new_ent->host_path, strerror(errno));
-            }
-        }
+            if (new_ent->attribs & ATTR_EXISTS) {
+                if (new_ent->attribs & ATTR_IS_DIR) {
+                    if ((new_ent = add_new_file(new_ent, old_ent->acorn_fn)))
+                        rename_tail(old_ent, new_ent);
+                } else {
+                    log_debug("vdfs: new file '%s' for rename already exists", new_key.acorn_fn);
+                    adfs_error(err_exists);
+                }
+            } else
+                rename_tail(old_ent, new_ent);
+        } else if (new_key.parent && (new_ent = add_new_file(new_key.parent, new_key.acorn_fn)))
+            rename_tail(old_ent, new_ent);
     } else {
         log_debug("vdfs: old file '%s' for rename not found", old_key.acorn_fn);
         adfs_error(err_notfound);
