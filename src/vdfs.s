@@ -261,7 +261,7 @@ RTS
         LDX #<oswpb         ;\ YX = parameter block.
         LDY #>oswpb
         CMP FSFlag
-	RTS
+        RTS
 	
 .srload LDA #&D0
         BNE srfile
@@ -491,17 +491,13 @@ EQUB 0
 \ ------------------------------
 .F2toXY
 TYA:CLC:ADC &F2:TAX:LDA &F3:ADC #0:TAY:RTS
-.F2toB0
-TYA:CLC:ADC &F2:STA &B0
-LDA &F3:ADC #00:STA &B1
-LDX #&B0:LDY #&00:RTS
 .access   :RTS
 .back     :LDA #&D5:STA PORT_CMD:RTS :\ Pass to host and return
 .backup   :RTS
-.cdir     :JSR F2toB0:LDA #&08:JMP OSFILE
+.cdir     :LDX #&08:JMP FileCmd
 .compact  :RTS
 .copy     :RTS
-.delete   :JSR F2toB0:LDA #&06:JMP OSFILE
+.delete   :LDX #&06:JMP FileCmd
 .destroy  :RTS
 .dir      :LDA #&D7:STA PORT_CMD:RTS :\ Pass to host and return
 .drive    :RTS
@@ -518,7 +514,29 @@ LDX #&B0:LDY #&00:RTS
 .title    :RTS
 .verify   :RTS
 :
+.FileCmd
+TYA:CLC:ADC &F2:STA &B0
+LDA &F3:ADC #00:STA &B1
+TXA:LDX #&B0:LDY #&00:JSR OSFILE
+CMP #&00:BEQ FileCmdNf:RTS
+.FileCmdNf
+JSR errmsg
+EQUB &D6:EQUS "Not found":EQUB &00
 
+.errmsg
+{
+        pla
+        sta     &b0
+        pla
+        sta     &b1
+        ldy     #$00
+.loop   iny
+        lda     (&b0),y
+        sta     &0100,y
+        bne     loop
+        sta     &0100
+        jmp     &0100
+}
 
 \ ---------------------------
 \ Functions performed locally
