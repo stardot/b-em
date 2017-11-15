@@ -491,13 +491,17 @@ EQUB 0
 \ ------------------------------
 .F2toXY
 TYA:CLC:ADC &F2:TAX:LDA &F3:ADC #0:TAY:RTS
+.F2toB0
+TYA:CLC:ADC &F2:STA &B0
+LDA &F3:ADC #00:STA &B1
+LDX #&B0:LDY #&00:RTS
 .access   :RTS
 .back     :LDA #&D5:STA PORT_CMD:RTS :\ Pass to host and return
 .backup   :RTS
-.cdir     :LDA #&DA:STA PORT_CMD:RTS :\ Pass to host and return
+.cdir     :JSR F2toB0:LDA #&08:JMP OSFILE
 .compact  :RTS
 .copy     :RTS
-.delete   :JSR F2toXY:STX &B0:STY &B1:LDX #&B0:LDY #&00:LDA #&06:JMP OSFILE
+.delete   :JSR F2toB0:LDA #&06:JMP OSFILE
 .destroy  :RTS
 .dir      :LDA #&D7:STA PORT_CMD:RTS :\ Pass to host and return
 .drive    :RTS
@@ -514,6 +518,8 @@ TYA:CLC:ADC &F2:TAX:LDA &F3:ADC #0:TAY:RTS
 .title    :RTS
 .verify   :RTS
 :
+
+
 \ ---------------------------
 \ Functions performed locally
 \ ---------------------------
