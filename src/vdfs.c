@@ -1,6 +1,6 @@
 /*
  * VDFS for B-EM
- * Steve Fosdick 2016
+ * Steve Fosdick 2016,2017
  *
  * This module implements the host part of a Virtual Disk Filing
  * System, one in which a part of filing system of the host is
@@ -458,7 +458,6 @@ static void init_entry(vdfs_ent_t *ent) {
     ent->host_path = NULL;
     ent->scan_seq = 0;
     ent->scan_mtime = 0;
-    ent->parent = ent;
 }
 
 // Create VDFS entry for a new file.
@@ -617,6 +616,7 @@ static vdfs_ent_t *find_entry(uint16_t fn_addr, vdfs_ent_t *key, vdfs_ent_t *ent
 
     if (scan_dir(ent) == 0) {
         init_entry(key);
+        key->parent = NULL;
         log_debug("vdfs: find_entry: fn_addr=%04x\n", fn_addr);
         for (;;) {
             fn_ptr = key->acorn_fn;
@@ -637,14 +637,14 @@ static vdfs_ent_t *find_entry(uint16_t fn_addr, vdfs_ent_t *key, vdfs_ent_t *ent
             else if ((ptr = tfind(key, &ent->acorn_tree, acorn_comp)))
                 ent = *ptr;
             else {
-                key->parent = ent;
+                if (ch != '.')
+                    key->parent = ent;
                 return NULL; // not found
             }
             if (ch != '.')
                 return ent;
             if (!(ent->attribs & ATTR_IS_DIR))
                 return NULL; // file in pathname where dir should be
-            key->parent = ent;
             if (scan_dir(ent))
                 return NULL;
         }
@@ -733,6 +733,7 @@ static int vdfs_new_root(const char *root, vdfs_ent_t *ent) {
     int    ch;
 
     init_entry(ent);
+    ent->parent = ent;
     len = strlen(root);
     while (len > 0 && ((ch = root[--len]) == '/' || ch == '\\'))
         ;
@@ -1304,6 +1305,17 @@ static void osfile_delete(vdfs_ent_t *ent) {
         a = 0;
 }
 
+static void osfile_cdir(vdfs_ent_t *ent) {
+    if (mkdir(ent->host_path, 0777) == 0) {
+        ent->attribs |= (ATTR_EXISTS|ATTR_IS_DIR);
+        a = 2;
+    }
+    else {
+        adfs_hosterr(errno);
+        log_debug("vdfs: unable to mkdir '%s': %s", ent->host_path, strerror(errno));
+    }    
+}
+
 static inline void osfile()
 {
     vdfs_ent_t *ent, key;
@@ -1348,7 +1360,11 @@ static inline void osfile()
                     case 0x06:
                         osfile_delete(ent);
                         break;
-        
+
+                    case 0x08:
+                        log_debug("vdfs: new dir '%s' for cdir already exists", key.acorn_fn);
+                        break;
+
                     case 0xff:  // load file.
                         osfile_load(pb, ent);
                         break;
@@ -1359,21 +1375,39 @@ static inline void osfile()
                 a = (ent->attribs & ATTR_IS_DIR) ? 2 : 1;
             } else {
                 log_debug("vdfs: osfile found deleted entry '%s'", ent->acorn_fn);
-                if (a == 0x00) {
-                    osfile_save(pb, ent);
-                    a = (ent->attribs & ATTR_IS_DIR) ? 2 : 1;
-                } else
-                    a = 0; // not found.
+                switch(a) {
+                    case 0x00: // save file.
+                        osfile_save(pb, ent);
+                        a = (ent->attribs & ATTR_IS_DIR) ? 2 : 1;
+                        break;
+                    case 0x08:
+                        osfile_cdir(ent);
+                        break;
+                    default:
+                        a = 0; // not found.
+                }
             }
         } else {
             log_debug("vdfs: osfile: entry not found '%s'", key.acorn_fn);
-            if (a == 0x00) {
-                if ((ent = add_new_file(cur_dir, key.acorn_fn))) {
-                    osfile_save(pb, ent);
-                    a = 1;
-                }
-            } else
-                a = 0;
+            switch(a) {
+                case 0x00: // save file.
+                    if ((ent = add_new_file(cur_dir, key.acorn_fn))) {
+                        osfile_save(pb, ent);
+                        a = 1;
+                    }
+                    break;
+                case 0x08:
+                    if (key.parent) {
+                        if ((ent = add_new_file(key.parent, key.acorn_fn)))
+                            osfile_cdir(ent);
+                    } else {
+                        log_debug("vdfs: attempt to create dir %s in non-existent directory", key.acorn_fn);
+                        a = 0;
+                    }
+                    break;
+                default:
+                    a = 0; // not found.
+            }
         }
     }
 }
