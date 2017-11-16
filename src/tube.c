@@ -89,7 +89,7 @@ uint8_t tube_host_read(uint16_t addr)
                 {
                         tubeula.ph3[0] = tubeula.ph3[1];
                         tubeula.ph3pos--;
-                        tubeula.pstat[2] |= 0x40;
+                        tubeula.pstat[2] |= 0xc0;
                         if (!tubeula.ph3pos) tubeula.hstat[2] &= ~0x80;
                 }
                 break;
@@ -257,7 +257,7 @@ void tube_parasite_write(uint32_t addr, uint8_t val)
                         tubeula.ph3[0] = val;
                         tubeula.ph3pos = 1;
                         tubeula.hstat[2] |=  0x80;
-                        tubeula.pstat[2] &= ~0x40;
+                        tubeula.pstat[2] &= ~0xc0;
                 }
                 break;
                 case 7: /*Register 4*/
