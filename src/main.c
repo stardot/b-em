@@ -202,6 +202,7 @@ void main_init(int argc, char *argv[])
                 else if (argv[c][0] == '-' && (argv[c][1] == 'i' || argv[c][1] == 'I'))
                 {
                         vid_interlace = 1;
+			vid_linedbl = vid_scanlines = 0;
                 }
                 else if (tapenext)
                    strcpy(tape_fn, argv[c]);
