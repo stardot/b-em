@@ -33,7 +33,7 @@ void video_clearscreen()
         clear(b16x);
         clear(b32);
         clear(screen);
-        set_color_depth(8);
+        set_color_depth(32);
         clear_to_color(b, 0);
 }
 
@@ -99,8 +99,8 @@ void video_enterfullscreen()
         #ifdef WIN32
         vb=create_video_bitmap(924, 614);
         #endif
-        set_color_depth(8);
-        set_palette(pal);
+        set_color_depth(32);
+//      set_palette(pal);
 }
 void video_leavefullscreen()
 {
@@ -116,8 +116,8 @@ void video_leavefullscreen()
         #ifdef WIN32
         vb=create_video_bitmap(924, 614);
         #endif
-        set_color_depth(8);
-        set_palette(pal);
+        set_color_depth(32);
+//      set_palette(pal);
         updatewindowsize(640, 480);
 }
 
@@ -150,7 +150,7 @@ void video_doblit()
                         save_bmp(vid_scrshotname, scrshotb, NULL);
                         destroy_bitmap(scrshotb2);
                         destroy_bitmap(scrshotb);
-                        set_color_depth(8);
+                        set_color_depth(32);
                 }
         }
 

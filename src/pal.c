@@ -134,17 +134,19 @@ void pal_convert(BITMAP *inb, int x1, int y1, int x2, int y2, int yoff)
                 sx = x1 << 16;
                 for (x = dx1; x < dx2; x++)
                 {
-                        pixel = inb->line[y][sx >> 16];
+                        //pixel = inb->line[y][sx >> 16];
+                        pixel = getpixel(inb, sx >> 16, y);
                         col = (0x10000 - (sx & 0xFFFF)) >> 8;
-                        sr[x] = pal[pixel].r * col;
-                        sg[x] = pal[pixel].g * col;
-                        sb[x] = pal[pixel].b * col;
+                        sr[x] = getr32(pixel) * col;
+                        sg[x] = getg32(pixel) * col;
+                        sb[x] = getb32(pixel) * col;
 
-                        pixel = inb->line[y][(sx >> 16) + 1];
+                        //pixel = inb->line[y][(sx >> 16) + 1];
+ 				        pixel = getpixel(inb, (sx >> 16) + 1, y);
                         col = (sx & 0xFFFF) >> 8;
-                        sr[x] += pal[pixel].r * col;
-                        sg[x] += pal[pixel].g * col;
-                        sb[x] += pal[pixel].b * col;
+                        sr[x] += getr32(pixel) * col;
+                        sg[x] += getg32(pixel) * col;
+                        sb[x] += getb32(pixel) * col;
 
                         sx += dx;
                 }
