@@ -1306,7 +1306,13 @@ static void osfile_delete(vdfs_ent_t *ent) {
 }
 
 static void osfile_cdir(vdfs_ent_t *ent) {
-    if (mkdir(ent->host_path, 0777) == 0) {
+    int res;
+#ifdef WIN32
+    res = mkdir(ent->host_path);
+#else
+    res = mkdir(ent->host_path, 0777);
+#endif
+    if (res == 0) {
         ent->attribs |= (ATTR_EXISTS|ATTR_IS_DIR);
         a = 2;
     }
