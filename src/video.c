@@ -127,7 +127,7 @@ void videoula_write(uint16_t addr, uint8_t val)
                         {
                                 for (c = 0; c < 16; c++)
                                 {
-                                        if ((ula_palbak[c] & 8) && nula_flash[c-8]) ula_pal[c] = nula_collook[ula_palbak[c] & 15];
+                                        if ((ula_palbak[c] & 8) && nula_flash[c&7]) ula_pal[c] = nula_collook[ula_palbak[c] & 15];
                                         else                 ula_pal[c] = nula_collook[(ula_palbak[c] & 15) ^ 7];
                                 }
                         }
