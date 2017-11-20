@@ -218,6 +218,7 @@ BEGIN
                         END
                         MENUITEM "Fullscreen",          IDM_VIDEO_FULLSCR
                         MENUITEM "Resizeable window",   IDM_VIDEO_RESIZE
+                        MENUITEM "NuLA",                IDM_VIDEO_NULA
                 END
                 POPUP "&Sound"
                 BEGIN

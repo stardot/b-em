@@ -49,6 +49,7 @@
 #define IDM_VIDEO_INTERLACED 40053
 #define IDM_VIDEO_PAL        40054
 #define IDM_VIDEO_PALI       40055
+#define IDM_VIDEO_NULA       40056
 #define IDM_KEY_REDEFINE     40060
 #define IDM_KEY_AS           40061
 #define IDM_DDV_33           40070
