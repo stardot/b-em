@@ -26,7 +26,6 @@ int interlline = 0;
 int colblack;
 int colwhite;
 
-
 /*6845 CRTC*/
 uint8_t crtc[32];
 static uint8_t crtc_mask[32]={0xFF,0xFF,0xFF,0xFF,0x7F,0x1F,0x7F,0x7F,0xF3,0x1F,0x7F,0x1F,0x3F,0xFF,0x3F,0xFF,0x3F,0xFF};
@@ -785,6 +784,7 @@ void video_poll(int clocks, int timer_enable)
                         {
                                 if ((crtc[8] & 0x30) == 0x30 || ((sc & 8) && !(ula_ctrl & 2)))
                                 {
+                                        // Gaps between lines in modes 3 & 6.
                                         for (c = 0; c < ((ula_ctrl & 0x10) ? 8 : 16); c+=4)
                                         {
                                                 //        ((uint32_t *)b->line[scry])[(scrx + c) >> 2]=col0;
