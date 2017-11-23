@@ -110,7 +110,12 @@ uint8_t nula_attribute_text;
 static int nula_left_cut;
 static int nula_left_edge;
 
-static void nula_putpixel(BITMAP *bmp, int x, int y, int colour)
+static inline void putpixel(BITMAP *bmp, int x, int y, int colour) {
+    uint32_t *l = (uint32_t *)(bmp->line[y]);
+    l[x] = colour;
+}
+
+static inline void nula_putpixel(BITMAP *bmp, int x, int y, int colour)
 {
     if (crtc_mode && (nula_horizontal_offset || nula_left_blank) && (x < nula_left_cut || x >= nula_left_edge + (crtc[1] * crtc_mode * 8)))
     {
@@ -121,7 +126,6 @@ static void nula_putpixel(BITMAP *bmp, int x, int y, int colour)
         putpixel(bmp, x, y, colour);
     }
 }
-
 
 void videoula_write(uint16_t addr, uint8_t val)
 {
@@ -736,6 +740,7 @@ void video_poll(int clocks, int timer_enable)
         int c, oldvc;
         uint16_t addr;
         uint8_t dat;
+
         while (clocks--)
         {
                 scrx += 8;
