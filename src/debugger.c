@@ -8,6 +8,7 @@
 #include "cpu_debug.h"
 #include "debugger.h"
 #include "b-em.h"
+#include "main.h"
 #include "model.h"
 #include "6502.h"
 
@@ -415,6 +416,7 @@ static const char helptext[] =
     "    r crtc     - print CRTC registers\n"
     "    r vidproc  - print VIDPROC registers\n"
     "    r sound    - print Sound registers\n"
+    "    reset      - reset emulated machine\n"
     "    s [n]      - step n instructions (or 1 if no parameter)\n"
     "    trace fn   - trace disassembly/registers to file, close file if no fn\n"
     "    vrefresh t - extra video refresh on entering debugger.  t=on or off\n"
@@ -616,7 +618,10 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 
             case 'r':
             case 'R':
-                if (*iptr) {
+                if (!strcasecmp(cmd, "reset")) {
+                    main_reset();
+                    debug_outf("Emulator reset\n");
+                } else if (*iptr) {
                     if (!strncasecmp(iptr, "sysvia", 6)) {
                         debug_outf("    System VIA registers :\n");
                         debug_outf("    ORA  %02X ORB  %02X IRA %02X IRB %02X\n", sysvia.ora, sysvia.orb, sysvia.ira, sysvia.irb);
