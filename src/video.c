@@ -733,6 +733,11 @@ void video_reset()
         con = cdraw = 0;
         cursoron  = 0;
         charsleft = 0;
+        
+        nula_left_cut = 0;
+        nula_left_edge = 0;
+        nula_left_blank = 0;
+        nula_horizontal_offset = 0;
 }
 
 void video_poll(int clocks, int timer_enable)
