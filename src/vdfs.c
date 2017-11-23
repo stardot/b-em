@@ -113,8 +113,8 @@ static unsigned   scan_seq;
  * FILE pointer being NULL.
  */
 
-#define MIN_CHANNEL      32
-#define MAX_CHANNEL      64
+#define MIN_CHANNEL      128
+#define MAX_CHANNEL      255
 #define NUM_CHANNELS     (MAX_CHANNEL-MIN_CHANNEL)
 
 typedef struct {
