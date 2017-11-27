@@ -546,13 +546,16 @@ STX &B0:STY &B1:LDY #0
 .InfoLp
 LDA (&B0),Y:STA &0D20,Y:INY
 CPY #&20:BCC InfoLp
-LDA #&01:BNE CatExInfo
+LDA #&01:PHA:BNE CatExInfo
 .Ex
-LDA #&FF:BNE CatExInfo
+LDA #&FF:BNE CatEx
 .Cat
 LDA #&80
-.CatExInfo                  :\ b7=multiple files, b0=full info
+.CatEx
 PHA
+LDA #&10
+STA PORT_CMD
+.CatExInfo                  :\ b7=multiple files, b0=full info
 \ &D01 = GBPB block
 \ &D0E = FILE block
 \ &D20 = pathname

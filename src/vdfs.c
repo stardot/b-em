@@ -100,6 +100,7 @@ static vdfs_ent_t root_dir;     // root as seen by BBC, not host.
 static vdfs_ent_t *cur_dir;
 static vdfs_ent_t *lib_dir;
 static vdfs_ent_t *prev_dir;
+static vdfs_ent_t *cat_dir;
 static unsigned   scan_seq;
 
 /*
@@ -588,7 +589,7 @@ static void tree_visit_cat(const void *nodep, const VISIT which, const int depth
     }
 }
 
-static int cat_dir(vdfs_ent_t *dir) {
+static int gen_cat_tab(vdfs_ent_t *dir) {
     int result;
     vdfs_ent_t **new_tab;
     
@@ -766,7 +767,7 @@ void vdfs_set_root(const char *root) {
     if (vdfs_new_root(root, &new_root)) {
         vdfs_close();
         root_dir = new_root;
-        root_dir.parent = cur_dir = lib_dir = prev_dir = &root_dir;
+        root_dir.parent = cur_dir = lib_dir = prev_dir = cat_dir = &root_dir;
         scan_seq++;
     } else if (new_root.host_path)
         free(new_root.host_path);
@@ -1097,7 +1098,7 @@ static inline void osgbpb() {
             if (check_valid_dir(cur_dir, "current")) {
                 seq_ptr = readmem32(pb+9);
                 if (seq_ptr == 0)
-                    if ((status = cat_dir(cur_dir)))
+                    if ((status = gen_cat_tab(cur_dir)))
                         break;
                 if (seq_ptr < cur_dir->cat_size) {
                     mem_ptr = readmem32(pb+1);
@@ -1117,23 +1118,23 @@ static inline void osgbpb() {
             }
             break;
 
-        case 0x09: // list files in current directory in VDFS ROM format.
-            if (check_valid_dir(cur_dir, "current")) {
+        case 0x09: // list files in catalogue directory in VDFS ROM format.
+            if (check_valid_dir(cat_dir, "catalogue")) {
                 n = readmem(pb);
                 seq_ptr = readmem32(pb+9);
                 if (seq_ptr == 0)
-                    if ((status = cat_dir(cur_dir)))
+                    if ((status = gen_cat_tab(cat_dir)))
                         break;
-                if (seq_ptr < cur_dir->cat_size) {
+                if (seq_ptr < cat_dir->cat_size) {
                     mem_ptr = readmem32(pb+1);
                     log_debug("vdfs: seq_ptr=%d, writing max %d entries starting %04X\n", seq_ptr, n, mem_ptr);
                     do {
-                        cat_ptr = cur_dir->cat_tab[seq_ptr++];
+                        cat_ptr = cat_dir->cat_tab[seq_ptr++];
                         log_debug("vdfs: writing acorn name %s\n", cat_ptr->acorn_fn);
                         for (ptr = cat_ptr->acorn_fn; (ch = *ptr++); )
                             writemem(mem_ptr++, ch);
                         writemem(mem_ptr++, '\r');
-                    } while (--n > 0 && seq_ptr < cur_dir->cat_size);
+                    } while (--n > 0 && seq_ptr < cat_dir->cat_size);
                     log_debug("vdfs: finish at %04X\n", mem_ptr);
                     writemem32(pb+9, seq_ptr);
                 } else {
@@ -1722,16 +1723,18 @@ static inline void back() {
 static void change_dir(vdfs_ent_t **dir, const char *which) {
     vdfs_ent_t *ent, key;
 
-    ent = find_entry(readmem16(0xf2) + y, &key, cur_dir, NULL);
-    if (ent && ent->attribs & ATTR_EXISTS) {
-        if (ent->attribs & ATTR_IS_DIR) {
-            log_debug("vdfs: new %s dir=%s\n", which, ent->acorn_fn);
-            prev_dir = *dir;
-            *dir = ent;
+    if (check_valid_dir(cur_dir, "current")) {
+        ent = find_entry(readmem16(0xf2) + y, &key, cur_dir, NULL);
+        if (ent && ent->attribs & ATTR_EXISTS) {
+            if (ent->attribs & ATTR_IS_DIR) {
+                log_debug("vdfs: new %s dir=%s\n", which, ent->acorn_fn);
+                prev_dir = *dir;
+                *dir = ent;
+            } else
+                adfs_error(err_baddir);
         } else
-            adfs_error(err_baddir);
-    } else
-        adfs_error(err_notfound);
+            adfs_error(err_notfound);
+    }
 }
 
 static inline void cmd_dir() {
@@ -1740,6 +1743,28 @@ static inline void cmd_dir() {
 
 static inline void cmd_lib() {
     change_dir(&lib_dir, "library");
+}
+
+static void cat_prep() {
+    uint32_t addr;
+    int ch;
+    vdfs_ent_t *ent, key;
+
+    if (check_valid_dir(cur_dir, "current")) {
+        addr = x + (y << 8);
+        if ((ch = readmem(addr)) == ' ' || ch == '\r')
+            cat_dir = cur_dir;
+        else {
+            ent = find_entry(addr, &key, cur_dir, NULL);
+            if (ent && ent->attribs & ATTR_EXISTS) {
+                if (ent->attribs & ATTR_IS_DIR) {
+                    cat_dir = ent;
+                } else
+                    adfs_error(err_baddir);
+            } else
+                adfs_error(err_notfound);
+        }
+    }
 }
 
 static inline void cmd_rescan() {
@@ -1759,6 +1784,7 @@ static inline void dispatch(uint8_t value) {
         case 0x04: osbget();     break;
         case 0x05: osargs();     break;
         case 0x06: osfile();     break;
+        case 0x10: cat_prep();   break;
         case 0xd0: cmd_srload(); break;
         case 0xd1: cmd_srwrite();break;
         case 0xd2: exec_swr_fs();break;
