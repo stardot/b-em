@@ -1420,6 +1420,135 @@ static inline void osfile()
 }
 
 /*
+ * This is the execution part of the sideways RAM commands which
+ * expects an OSWORD parameter block as used on the BBC Master and
+ * executes the load/save on the host.
+ */
+
+static int16_t swr_calc_addr(uint8_t flags, uint32_t *st_ptr, uint16_t romid) {
+    uint16_t start = *st_ptr;
+    int banks;
+
+    if (flags & 0x40) {
+        // Pseudo addressing.  How many banks into the ram does the
+        // address call for?
+
+        banks = start / 16384;
+        start %= 16384;
+
+        // Find the nth RAM bank.
+
+        romid = 0;
+        for (;;) {
+            if (swram[romid])
+                if (--banks < 0)
+                    break;
+            if (++romid >= 16) {
+                adfs_error(err_no_swr);
+                return -1;
+            }
+        }
+        log_debug("vdfs: swr_calc_addr: pseudo addr bank=%02d, start=%04x\n", romid, start);
+    } else {
+        // Absolutre addressing.
+
+        if (start < 0x8000 || start >= 0xc000) {
+            adfs_error(err_badaddr);
+            return -1;
+        }
+
+        if (romid > 16) {
+            adfs_error(err_no_swr);
+            return -1;
+        }
+        log_debug("vdfs: swr_calc_addr: abs addr bank=%02d, start=%04x\n", romid, start);
+        start -= 0x8000;
+    }
+    *st_ptr = start;
+    return romid;
+}
+
+static inline void exec_swr_intern(uint8_t flags, uint16_t fname, int8_t romid, uint32_t start, uint16_t pblen) {
+    uint32_t load_add;
+    int len;
+    vdfs_ent_t *ent, key;
+    FILE *fp;
+
+    log_debug("vdfs: exec_swr_fs: flags=%02x, fn=%04x, romid=%02d, start=%04x, len=%04x\n", flags, fname, romid, start, pblen);
+    if (check_valid_dir(cur_dir, "current")) {
+        if ((romid = swr_calc_addr(flags, &start, romid)) >= 0) {
+            ent = find_entry(fname, &key, cur_dir, NULL);
+            if (flags & 0x80) {
+                len = 0x4000 - start;
+                if (len > 0) {
+                    if (ent && ent->attribs & ATTR_EXISTS) {
+                        if (ent->attribs & ATTR_IS_DIR)
+                            adfs_error(err_wont);
+                        else if ((fp = fopen(ent->host_path, "rb"))) {
+                            fread(rom + romid * 0x4000 + start, len, 1, fp);
+                            fclose(fp);
+                        } else {
+                            log_warn("vdfs: unable to load file '%s': %s\n", ent->host_fn, strerror(errno));
+                            adfs_hosterr(errno);
+                        }
+                    } else
+                        adfs_error(err_notfound);
+                } else
+                    adfs_error(err_too_big);
+            } else {
+                len = pblen;
+                if (len <= 16384) {
+                    if (!ent)
+                        ent = add_new_file(cur_dir, key.acorn_fn);
+                    if (ent) {
+                        if ((fp = fopen(ent->host_path, "wb"))) {
+                            fwrite(rom + romid * 0x4000 + start, len, 1, fp);
+                            fclose(fp);
+                            load_add = 0xff008000 | (romid << 16) | start;
+                            ent->load_addr = load_add;
+                            ent->exec_addr = load_add;
+                            ent->length = len;
+                            ent->attribs |= ATTR_EXISTS;
+                            write_back(ent);
+                        } else
+                            log_warn("vdfs: unable to create file '%s': %s\n", ent->host_fn, strerror(errno));
+                    } else
+                        adfs_error(err_wont);
+                } else
+                    adfs_error(err_too_big);
+            }
+        }
+    }
+}
+
+static inline void exec_swr_fs() {
+    uint16_t pb = (y << 8) | x;
+    uint8_t flags  = readmem(pb);
+    uint16_t fname = readmem16(pb+1);
+    int8_t   romid = readmem(pb+3);
+    uint32_t start = readmem16(pb+4);
+    uint16_t pblen = readmem16(pb+6);
+    
+    exec_swr_intern(flags, fname, romid, start, pblen);
+}
+
+static void exec_swr_ram(uint8_t flags, uint16_t ram_start, uint16_t len, uint32_t sw_start, uint8_t romid) {
+    uint8_t *rom_ptr;
+    int16_t nromid;
+
+    log_debug("vdfs: exec_swr_ram: flags=%02x, ram_start=%04x, len=%04x, sw_start=%04x, romid=%02d\n", flags, ram_start, len, sw_start, romid);
+    if ((nromid = swr_calc_addr(flags, &sw_start, romid)) >= 0) {
+        rom_ptr = rom + romid * 0x4000 + sw_start;
+        if (flags & 0x80)
+            while (len--)
+                *rom_ptr++ = readmem(ram_start++);
+        else
+            while (len--)
+                writemem(ram_start++, *rom_ptr++);
+    }
+}
+
+/*
  * The following routines parse the SRLOAD and SRSAVE commands into
  * an OSWORD parameter block as used on the BBC Master.  Control is
  * returned to the emulated BBC.  If VDFS is the current filing
@@ -1515,16 +1644,22 @@ static void srp_tail(uint16_t addr, uint8_t flag, uint16_t fnaddr, uint16_t star
             ch = readmem(addr++);
         while (ch == ' ' || ch == '\t');
     }
-    writemem(0x70, flag);
-    writemem16(0x71, fnaddr);
-    writemem(0x73, romid);
-    writemem16(0x74, start);
-    writemem16(0x76, len);
-    writemem16(0x78, 0);
-    if (ch == 'Q' || ch == 'q')
-        writemem16(0x7a, 0xffff);
-    else
-        writemem16(0x7a, 0);
+    if (fs_flag) {
+        exec_swr_intern(flag, fnaddr, romid, start, len);
+        p.c = 0;
+    } else {
+        p.c = 1;
+        writemem(0x70, flag);
+        writemem16(0x71, fnaddr);
+        writemem(0x73, romid);
+        writemem16(0x74, start);
+        writemem16(0x76, len);
+        writemem16(0x78, 0);
+        if (ch == 'Q' || ch == 'q')
+            writemem16(0x7a, 0xffff);
+        else
+            writemem16(0x7a, 0);
+    }
 }
 
 static inline void cmd_srload() {
@@ -1551,130 +1686,6 @@ static inline void cmd_srsave() {
         }
     }
     adfs_error(err_badparms);
-}
-
-/*
- * This is the execution part of the sideways RAM commands which
- * expects an OSWORD parameter block as used on the BBC Master and
- * executes the load/save on the host.
- */
-
-static int16_t swr_calc_addr(uint8_t flags, uint32_t *st_ptr, uint16_t romid) {
-    uint16_t start = *st_ptr;
-    int banks;
-
-    if (flags & 0x40) {
-        // Pseudo addressing.  How many banks into the ram does the
-        // address call for?
-
-        banks = start / 16384;
-        start %= 16384;
-
-        // Find the nth RAM bank.
-
-        romid = 0;
-        for (;;) {
-            if (swram[romid])
-                if (--banks < 0)
-                    break;
-            if (++romid >= 16) {
-                adfs_error(err_no_swr);
-                return -1;
-            }
-        }
-        log_debug("vdfs: swr_calc_addr: pseudo addr bank=%02d, start=%04x\n", romid, start);
-    } else {
-        // Absolutre addressing.
-
-        if (start < 0x8000 || start >= 0xc000) {
-            adfs_error(err_badaddr);
-            return -1;
-        }
-
-        if (romid > 16) {
-            adfs_error(err_no_swr);
-            return -1;
-        }
-        log_debug("vdfs: swr_calc_addr: abs addr bank=%02d, start=%04x\n", romid, start);
-        start -= 0x8000;
-    }
-    *st_ptr = start;
-    return romid;
-}
-
-static inline void exec_swr_fs() {
-    uint16_t pb = (y << 8) | x;
-    uint8_t flags  = readmem(pb);
-    uint16_t fname = readmem16(pb+1);
-    int8_t   romid = readmem(pb+3);
-    uint32_t start = readmem16(pb+4);
-    uint16_t pblen = readmem16(pb+6);
-    uint32_t load_add;
-    int len;
-    vdfs_ent_t *ent, key;
-    FILE *fp;
-
-    log_debug("vdfs: exec_swr_fs: flags=%02x, fn=%04x, romid=%02d, start=%04x, len=%04x\n", flags, fname, romid, start, pblen);
-    if (check_valid_dir(cur_dir, "current")) {
-        if ((romid = swr_calc_addr(flags, &start, romid)) >= 0) {
-            ent = find_entry(fname, &key, cur_dir, NULL);
-            if (flags & 0x80) {
-                len = 0x4000 - start;
-                if (len > 0) {
-                    if (ent && ent->attribs & ATTR_EXISTS) {
-                        if (ent->attribs & ATTR_IS_DIR)
-                            adfs_error(err_wont);
-                        else if ((fp = fopen(ent->host_path, "rb"))) {
-                            fread(rom + romid * 0x4000 + start, len, 1, fp);
-                            fclose(fp);
-                        } else {
-                            log_warn("vdfs: unable to load file '%s': %s\n", ent->host_fn, strerror(errno));
-                            adfs_hosterr(errno);
-                        }
-                    } else
-                        adfs_error(err_notfound);
-                } else
-                    adfs_error(err_too_big);
-            } else {
-                len = readmem16(pb+6);
-                if (len <= 16384) {
-                    if (!ent)
-                        ent = add_new_file(cur_dir, key.acorn_fn);
-                    if (ent) {
-                        if ((fp = fopen(ent->host_path, "wb"))) {
-                            fwrite(rom + romid * 0x4000 + start, len, 1, fp);
-                            fclose(fp);
-                            load_add = 0xff008000 | (romid << 16) | start;
-                            ent->load_addr = load_add;
-                            ent->exec_addr = load_add;
-                            ent->length = len;
-                            ent->attribs |= ATTR_EXISTS;
-                            write_back(ent);
-                        } else
-                            log_warn("vdfs: unable to create file '%s': %s\n", ent->host_fn, strerror(errno));
-                    } else
-                        adfs_error(err_wont);
-                } else
-                    adfs_error(err_too_big);
-            }
-        }
-    }
-}
-
-static void exec_swr_ram(uint8_t flags, uint16_t ram_start, uint16_t len, uint32_t sw_start, uint8_t romid) {
-    uint8_t *rom_ptr;
-    int16_t nromid;
-
-    log_debug("vdfs: exec_swr_ram: flags=%02x, ram_start=%04x, len=%04x, sw_start=%04x, romid=%02d\n", flags, ram_start, len, sw_start, romid);
-    if ((nromid = swr_calc_addr(flags, &sw_start, romid)) >= 0) {
-        rom_ptr = rom + romid * 0x4000 + sw_start;
-        if (flags & 0x80)
-            while (len--)
-                *rom_ptr++ = readmem(ram_start++);
-        else
-            while (len--)
-                writemem(ram_start++, *rom_ptr++);
-    }
 }
 
 static void srcopy(uint8_t flags) {

@@ -144,7 +144,7 @@ EQUS "INSERT" :EQUB 13:EQUW insert
 EQUS "SRLOAD" :EQUB 13:EQUW srload
 EQUS "SRSAVE" :EQUB 13:EQUW srsave
 EQUS "SRREAD" :EQUB 13:EQUW srread
-EQUS "SRWRITE":EQUB 13:EQUW srwrite
+EQUS "SRWRITE":EQUB 13:EQUW srwrit
 EQUB 0
 \ ----------------------------------
 \ Detailed help routine
@@ -254,31 +254,28 @@ LDA #&00                    :\ Ignore command
 RTS
 :
 
-.CheckFsIsUs
-        LDA #&00            :\ query current FS
-        TAY
-        JSR OSARGS
-        LDX #<oswpb         ;\ YX = parameter block.
-        LDY #>oswpb
-        CMP FSFlag
-        RTS
-	
 .srload LDA #&D0
         BNE srfile
 .srsave LDA #&D3
-.srfile STA PORT_CMD        :\ parse command on host.
-        JSR CheckFsIsUs
-        BEQ srfus           :\ FS is us so execute on host.
-        LDA #&43            :\ execute via OSWORD
-        JMP OSWORD
-.srfus  LDA #&D2            :\ .
-        STA PORT_CMD
+.srfile STA PORT_CMD        :\ send command to host to parse (always)
+        BCS sroswd          ;\ and execute (only if it is current FS)
+        LDA #&00
         RTS
+.sroswd LDA #&43            :\ host was not current FS and did not
+        LDX #<oswpb         :\ execute so execute on current FS
+        LDY #>oswpb         :\ via OSWORD.
+        JMP OSWORD
 
-.srread: LDA #&D4:STA PORT_CMD:RTS \ Pass to host and return
-.srwrite:LDA #&D1:STA PORT_CMD:RTS \ Pass to host and return
-:
-:
+.srread LDA #&D4            :\ Pass to host and return
+        STA PORT_CMD
+        LDA #&00
+        RTS
+        
+.srwrit LDA #&D1            :\ Pass to host and return
+        STA PORT_CMD
+        LDA #&00
+        RTS 
+
 \ ======================
 \ Filing System Routines
 \ ======================
@@ -687,7 +684,10 @@ RTS
 \ Corrupt bits of memory to simulate effects of real OSWORD &7F
 \ -------------------------------------------------------------
 .Osword7F
-JSR CheckFsIsUs
+LDA #&00            :\ query current FS
+TAY
+JSR OSARGS
+CMP FSFlag
 BNE SkipOSW7F
 LDA &B0:PHA:LDA &B1:PHA     :\ Code calling Osword7F may be using &B0/1
 JSR fdcFetchAddr
