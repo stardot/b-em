@@ -38,6 +38,7 @@ void uservia_write_portA(uint8_t val)
 
 void uservia_write_portB(uint8_t val)
 {
+    log_debug("uservia_write_portB: %02X", val);
         /*User port - nothing emulated*/
 }
 
@@ -48,6 +49,7 @@ uint8_t uservia_read_portA()
 }
 uint8_t uservia_read_portB()
 {
+    log_debug("uservia_read_portB");
         if (curtube == 3 || mouse_amx) return mouse_portb;
         if (compactcmos) return compact_joystick_read();
         return 0xff; /*User port - nothing emulated*/
@@ -55,17 +57,16 @@ uint8_t uservia_read_portB()
 
 void uservia_write(uint16_t addr, uint8_t val)
 {
+    log_debug("uservia: write %04X=%02X", addr, val);
         via_write(&uservia, addr, val);
 }
 
 uint8_t uservia_read(uint16_t addr)
 {
-        return via_read(&uservia, addr);
-}
-
-void uservia_updatetimers()
-{
-        via_updatetimers(&uservia);
+    uint8_t value = via_read(&uservia, addr);
+    log_debug("uservia: read %04X=%02X", addr, value);
+    return value;
+    //return via_read(&uservia, addr);
 }
 
 void uservia_reset()

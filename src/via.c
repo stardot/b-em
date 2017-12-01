@@ -159,6 +159,8 @@ void via_write(VIA *v, uint16_t addr, uint8_t val)
                 break;
                 case SR:
                 v->sr   = val;
+                v->sr_count = 8;
+                v->ifr &= ~0x04;
                 break;
                 case T1LL:
                 case T1CL:

@@ -6,7 +6,6 @@ extern VIA sysvia;
 void    sysvia_reset();
 void    sysvia_write(uint16_t addr, uint8_t val);
 uint8_t sysvia_read(uint16_t addr);
-void    sysvia_updatetimers();
 
 void    sysvia_savestate(FILE *f);
 void    sysvia_loadstate(FILE *f);

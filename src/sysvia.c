@@ -165,10 +165,6 @@ uint8_t sysvia_read(uint16_t addr)
         return temp;
 }
 
-void sysvia_updatetimers()
-{
-        via_updatetimers(&sysvia);
-}
 void sysvia_reset()
 {
         via_reset(&sysvia);

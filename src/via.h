@@ -12,6 +12,7 @@ typedef struct VIA
         int      t1hit, t2hit;
         int      ca1,   ca2,   cb1,   cb2;
         int      intnum;
+        int      sr_count;
         
         uint8_t  (*read_portA)();
         uint8_t  (*read_portB)();
@@ -36,5 +37,13 @@ void via_set_cb2(VIA *v, int level);
 
 void via_savestate(VIA *v, FILE *f);
 void via_loadstate(VIA *v, FILE *f);
+
+static inline void via_poll(VIA *v, int cycles) {
+    v->t1c -= cycles;
+    if (!(v->acr & 0x20))
+        v->t2c -= cycles;
+    if (v->t1c < -3 || v->t2c < -3)
+        via_updatetimers(v);
+}
 
 #endif

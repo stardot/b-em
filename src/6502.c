@@ -164,8 +164,8 @@ int output = 0;
 int timetolive = 0;
 
 #define polltime(c) { cycles -= (c); \
-                      sysvia.t1c  -= (c);  if (!(sysvia.acr  & 0x20))  sysvia.t2c  -= (c);  if (sysvia.t1c  < -3 || sysvia.t2c  < -3)  sysvia_updatetimers();  \
-                      uservia.t1c -= (c);  if (!(uservia.acr & 0x20))  uservia.t2c -= (c);  if (uservia.t1c < -3 || uservia.t2c < -3)  uservia_updatetimers(); \
+                      via_poll(&sysvia, (c)); \
+                      via_poll(&uservia, (c)); \
                       video_poll(c, 1);                                   \
                       otherstuffcount -= (c); \
                       if (motoron) \
