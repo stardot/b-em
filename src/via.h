@@ -29,6 +29,7 @@ uint8_t via_read(VIA *v, uint16_t addr);
 void    via_write(VIA *v, uint16_t addr, uint8_t val);
 void    via_reset(VIA *v);
 void    via_updatetimers(VIA *v);
+void    via_shift(VIA *v, int cycles);
 
 void via_set_ca1(VIA *v, int level);
 void via_set_ca2(VIA *v, int level);
@@ -44,6 +45,8 @@ static inline void via_poll(VIA *v, int cycles) {
         v->t2c -= cycles;
     if (v->t1c < -3 || v->t2c < -3)
         via_updatetimers(v);
+    if (v->acr & 0x1c)
+        via_shift(v, cycles);
 }
 
 #endif
