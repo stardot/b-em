@@ -21,7 +21,26 @@ void m4000_shift(int value) {
 }
 
 uint8_t m4000_read(void) {
-    uint8_t value = 0x77;
+    uint8_t value = 0xff;
+    if (block == 0) {
+        if (key[KEY_1_PAD])
+            value &= ~0x01;
+        if (key[KEY_2_PAD])
+            value &= ~0x02;
+        if (key[KEY_3_PAD])
+            value &= ~0x04;
+        if (key[KEY_4_PAD])
+            value &= ~0x08;
+        if (key[KEY_5_PAD])
+            value &= ~0x10;
+        if (key[KEY_6_PAD])
+            value &= ~0x20;
+        if (key[KEY_7_PAD])
+            value &= ~0x40;
+        if (key[KEY_8_PAD])
+            value &= ~0x80;
+    }
+        
     //uint8_t value;
     // = matrix[block];
     /*if (count1++ > 1000) {
