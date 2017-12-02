@@ -71,6 +71,7 @@ b_em_SOURCES = \
 	mem.c \
 	model.c \
 	mouse.c \
+	music4000.c \
 	music5000.c \
 	resid.cc \
 	savestate.c \
