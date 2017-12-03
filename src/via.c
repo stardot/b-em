@@ -357,19 +357,22 @@ void via_set_cb2(VIA *v, int level)
 void via_shift(VIA *v, int cycles) {
     int cb1, bit;
 
-    if ((v->acr & 0x1c) == 0x18 && v->sr_count > 0) {
+    if ((v->acr & 0x1c) == 0x18) {
         while (cycles--) {
-            cb1 = !(v->sr_count-- & 0x01);
-            if (cb1) {
-                bit = v->sr >> 7;
-                v->set_cb2(bit);
-                v->sr = (v->sr << 1) | bit;
+            if (v->sr_count > 0) {
+                cb1 = !(v->sr_count-- & 0x01);
+                if (cb1) {
+                    bit = v->sr >> 7;
+                    v->set_cb2(bit);
+                    //v->sr = (v->sr << 1) | bit;
+                    v->sr = (v->sr << 1);
+                }
+                v->set_cb1(cb1);
             }
-            v->set_cb1(cb1);
-        }
-        if (v->sr_count <= 0) {
-            v->ifr |= 0x04;
-            via_updateIFR(v);
+            if (v->sr_count <= 0) {
+                v->ifr |= 0x04;
+                via_updateIFR(v);
+            }
         }
     }
 }
