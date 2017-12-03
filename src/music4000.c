@@ -151,6 +151,7 @@ void music4000_init(void) {
 #include <jack/jack.h>
 #include <jack/midiport.h>
 
+static pthread_t jack_midi_thread;
 static jack_client_t *jack_client;
 static jack_port_t *jack_port;
 
@@ -178,7 +179,7 @@ static int process(jack_nframes_t nframes, void *arg) {
     return 0;
 }
 
-void music4000_init(void) {
+void *jack_midi_run(void *arg) {
     jack_status_t status;
     int err;
     
@@ -190,7 +191,8 @@ void music4000_init(void) {
                 log_debug("m4000: jack midi port open");
                 if ((err = jack_activate(jack_client)) == 0) {
                     log_debug("m4000: jack active");
-                    return;
+                    for (;;)
+                        pause();
                 }
                 else
                     log_error("m4000: unable to activate jack client: %d", err);
@@ -203,6 +205,17 @@ void music4000_init(void) {
             
     } else
         log_error("m4000: unable to register as jack client, status=%x", status);
+    return NULL;
+}
+
+void music4000_init(void) {
+    int err;
+
+    if (sound_music5000) {
+        if ((err = pthread_create(&jack_midi_thread, NULL, jack_midi_run, NULL)) != 0) {
+            log_error("m4000: unable to create MIDI thread: %s", strerror(err));
+        }
+    }
 }
 
 #endif
