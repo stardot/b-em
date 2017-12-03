@@ -51,13 +51,12 @@ uint8_t uservia_read_portA()
 
 uint8_t uservia_read_portB()
 {
-    log_debug("uservia_read_portB");
     if (curtube == 3 || mouse_amx)
         return mouse_portb;
     if (compactcmos)
         return compact_joystick_read();
     if (sound_music5000)
-        return m4000_read();
+        return music4000_read();
     return 0xff; /*User port - nothing emulated*/
 }
 
@@ -81,7 +80,7 @@ void uservia_reset()
         uservia.write_portA = uservia_write_portA;
         uservia.write_portB = uservia_write_portB;
         
-        uservia.set_cb2 = m4000_shift;
+        uservia.set_cb2 = music4000_shift;
 
         uservia.intnum = 2;
 }
