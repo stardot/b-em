@@ -362,9 +362,7 @@ void via_shift(VIA *v, int cycles) {
             if (v->sr_count > 0) {
                 cb1 = !(v->sr_count-- & 0x01);
                 if (cb1) {
-                    bit = v->sr >> 7;
-                    v->set_cb2(bit);
-                    //v->sr = (v->sr << 1) | bit;
+                    v->set_cb2(v->sr >> 7);
                     v->sr = (v->sr << 1);
                 }
                 v->set_cb1(cb1);
