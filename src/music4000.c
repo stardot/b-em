@@ -64,7 +64,7 @@ uint8_t music4000_read(void) {
     return value;
 }
 
-void music4000_note(int note, int onoff, int vel) {
+static void do_note(int note, int vel, int onoff) {
     uint8_t key_num, key_block, key_mask;
 
     if (note >= 36 && note < 98) {
@@ -80,6 +80,14 @@ void music4000_note(int note, int onoff, int vel) {
             matrix[key_block] |= key_mask;
     } else
         log_debug("m4000: note %d off keyboard", note);
+}
+
+void music4000_note_on(int note, int vel) {
+    do_note(note, vel, 1);
+}
+
+void music4000_note_off(int note, int vel) {
+    do_note(note, vel, 0);
 }
 
 #ifdef WIN32
@@ -121,11 +129,11 @@ static void *midi_run(void *arg) {
                     switch(ev->type) {
                         case SND_SEQ_EVENT_NOTEON:
                             log_debug("m4000: note on, tick=%d, note=%d, vel=%d", ev->time.tick, ev->data.note.note, ev->data.note.velocity); 
-                            music4000_note(ev->data.note.note, 1, ev->data.note.velocity);
+                            music4000_note_on(ev->data.note.note, ev->data.note.velocity);
                             break;
                         case SND_SEQ_EVENT_NOTEOFF:
                             log_debug("m4000: note off, tick=%d, note=%d, evl=%d", ev->time.tick, ev->data.note.note, ev->data.note.velocity); 
-                            music4000_note(ev->data.note.note, 0, ev->data.note.velocity);
+                            music4000_note_off(ev->data.note.note, ev->data.note.velocity);
                     }
                 }
             }
@@ -168,11 +176,11 @@ static int process(jack_nframes_t nframes, void *arg) {
         switch(midi_status & 0xf0) {
             case 0x80:
                 log_debug("m4000: jack midi note off, note=%d, vel=%d", md[1], md[2]);
-                music4000_note(md[1], 0, md[2]);
+                music4000_note_off(md[1], md[2]);
                 break;
             case 0x90:
                 log_debug("m4000: jack midi note on, note=%d, vel=%d", md[1], md[2]);
-                music4000_note(md[1], 1, md[2]);
+                music4000_note_on(md[1], md[2]);
                 break;
         }
     }
