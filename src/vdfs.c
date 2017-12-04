@@ -786,7 +786,7 @@ void vdfs_init(void) {
     if ((root = getenv("BEM_VDFS_ROOT")) == NULL)
         root = ".";
     vdfs_new_root(root, &root_dir);
-    root_dir.parent = cur_dir = lib_dir = prev_dir = &root_dir;
+    root_dir.parent = cur_dir = lib_dir = cat_dir = prev_dir = &root_dir;
     scan_seq++;
 }
 
