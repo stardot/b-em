@@ -29,6 +29,7 @@
 #include "main.h"
 #include "mem.h"
 #include "mouse.h"
+#include "midi.h"
 #include "music4000.h"
 #include "music5000.h"
 #ifdef WIN32
@@ -255,7 +256,7 @@ void main_init(int argc, char *argv[])
 
         model_init();
 
-        music4000_init();
+        midi_init();
         main_reset();
 
         install_int_ex(secint, MSEC_TO_TIMER(1000));
