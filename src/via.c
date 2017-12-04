@@ -355,7 +355,7 @@ void via_set_cb2(VIA *v, int level)
 }
 
 void via_shift(VIA *v, int cycles) {
-    int cb1, bit;
+    int cb1;
 
     if ((v->acr & 0x1c) == 0x18) {
         while (cycles--) {
