@@ -5,14 +5,12 @@
 #include <pthread.h>
 #include <unistd.h>
 
-#define MIDI_ALSA_SEQ
-#define MIDI_ALSA_RAW
-
 #ifdef HAVE_JACK_JACK_H
 
 #include <jack/jack.h>
 #include <jack/midiport.h>
 
+static int jack_started = 0;
 static pthread_t jack_thread;
 static jack_client_t *jack_client;
 static jack_port_t *jack_port;
@@ -44,7 +42,7 @@ static int midi_jack_process(jack_nframes_t nframes, void *arg) {
 void *jack_midi_run(void *arg) {
     jack_status_t status;
     int err;
-    
+
     if ((jack_client = jack_client_open("B-Em", JackNullOption, &status))) {
         log_debug("midi-linux: jack client open");
         if ((err = jack_set_process_callback(jack_client, midi_jack_process, NULL)) == 0) {
@@ -53,6 +51,7 @@ void *jack_midi_run(void *arg) {
                 log_debug("midi-linux: jack midi port open");
                 if ((err = jack_activate(jack_client)) == 0) {
                     log_debug("midi-linux: jack active");
+                    jack_started = 1;
                     for (;;)
                         pause();
                 }
@@ -64,7 +63,7 @@ void *jack_midi_run(void *arg) {
         } else
             log_error("midi-linux: unable to set jack callback, err=%d", err);
         jack_client_close(jack_client);
-            
+
     } else
         log_warn("midi-linux: m4000: unable to register as jack client, status=%x", status);
     return NULL;
@@ -78,8 +77,16 @@ static inline void midi_jack_init(void) {
             log_error("midi-linux: unable to create Jack MIDI thread: %s", strerror(err));
 }
 
+static inline void midi_jack_close(void) {
+    if (jack_started) {
+        pthread_cancel(jack_thread);
+        jack_client_close(jack_client);
+    }
+}
+
 #else
 #define midi_jack_init()
+#define midi_jack_close()
 #endif
 
 #ifdef HAVE_ALSA_ASOUNDLIB_H
@@ -87,14 +94,14 @@ static inline void midi_jack_init(void) {
 extern int quited;
 #include <alsa/asoundlib.h>
 
-static int alsa_seq_port = -1;
 static pthread_t alsa_seq_thread;
 
 static void *alsa_seq_midi_run(void *arg) {
     int status;
     snd_seq_t *midi_seq = NULL;
+    int alsa_seq_port = -1;
     snd_seq_event_t *ev;
-    
+
     if ((status = snd_seq_open(&midi_seq, "default", SND_SEQ_OPEN_INPUT, 0)) < 0)
         log_warn("midi-linux: unable to open ALSA MIDI sequencer: %s", snd_strerror(status));
     else {
@@ -111,11 +118,11 @@ static void *alsa_seq_midi_run(void *arg) {
                     log_debug("midi-linux: got ALSA MIDI sequencer event");
                     switch(ev->type) {
                         case SND_SEQ_EVENT_NOTEON:
-                            log_debug("midi-linux: ALSA sequencer note on, tick=%d, note=%d, vel=%d", ev->time.tick, ev->data.note.note, ev->data.note.velocity); 
+                            log_debug("midi-linux: ALSA sequencer note on, tick=%d, note=%d, vel=%d", ev->time.tick, ev->data.note.note, ev->data.note.velocity);
                             music4000_note_on(ev->data.note.note, ev->data.note.velocity);
                             break;
                         case SND_SEQ_EVENT_NOTEOFF:
-                            log_debug("midi-linux: ALSA sequencer note off, tick=%d, note=%d, evl=%d", ev->time.tick, ev->data.note.note, ev->data.note.velocity); 
+                            log_debug("midi-linux: ALSA sequencer note off, tick=%d, note=%d, evl=%d", ev->time.tick, ev->data.note.note, ev->data.note.velocity);
                             music4000_note_off(ev->data.note.note, ev->data.note.velocity);
                     }
                 }
@@ -141,6 +148,8 @@ typedef enum {
     MS_GOT_NOTE
 } midi_state_t;
 
+static pthread_t alsa_raw_thread;
+
 static void *alsa_raw_midi_run(void *arg) {
     int status;
     const char *device;
@@ -149,7 +158,7 @@ static void *alsa_raw_midi_run(void *arg) {
     midi_state_t midi_state = MS_GROUND;
     void (*note_func)(int note, int vel);
 
-    device = get_config_string("midi", "alsa_raw_device", "default");    
+    device = get_config_string("midi", "alsa_raw_device", "default");
     if ((status = snd_rawmidi_open(&midiin, NULL, device, 0)) < 0)
         log_warn("midi-linux: unable to open ALSA raw MIDI port: %s", snd_strerror(status));
     else {
@@ -203,7 +212,7 @@ static inline void midi_alsa_raw_init(void) {
     int err;
 
     if (get_config_int("midi", "alsa_raw_enabled", 1))
-        if ((err = pthread_create(&alsa_seq_thread, NULL, alsa_raw_midi_run, NULL)) != 0)
+        if ((err = pthread_create(&alsa_raw_thread, NULL, alsa_raw_midi_run, NULL)) != 0)
             log_error("midi-linux: unable to create ALSA raw MIDI thread: %s", strerror(err));
 }
 
@@ -219,3 +228,8 @@ void midi_init(void) {
         midi_alsa_raw_init();
     }
 }
+
+void midi_close(void) {
+    midi_jack_close();
+}
+

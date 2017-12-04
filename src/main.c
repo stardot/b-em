@@ -187,8 +187,8 @@ void main_init(int argc, char *argv[])
                 else if (argv[c][0] == '-' && (argv[c][1] == 'f' || argv[c][1]=='F'))
                 {
                         sscanf(&argv[c][2], "%i", &vid_fskipmax);
-			if (vid_fskipmax < 1) vid_fskipmax = 1;
-			if (vid_fskipmax > 9) vid_fskipmax = 9;
+            if (vid_fskipmax < 1) vid_fskipmax = 1;
+            if (vid_fskipmax > 9) vid_fskipmax = 9;
                 }
                 else if (argv[c][0] == '-' && (argv[c][1] == 's' || argv[c][1] == 'S'))
                 {
@@ -205,7 +205,7 @@ void main_init(int argc, char *argv[])
                 else if (argv[c][0] == '-' && (argv[c][1] == 'i' || argv[c][1] == 'I'))
                 {
                         vid_interlace = 1;
-			vid_linedbl = vid_scanlines = 0;
+            vid_linedbl = vid_scanlines = 0;
                 }
                 else if (tapenext)
                    strcpy(tape_fn, argv[c]);
@@ -218,7 +218,7 @@ void main_init(int argc, char *argv[])
                 {
                         strcpy(discfns[0], argv[c]);
                         discnext = 0;
-			autoboot = 150;
+            autoboot = 150;
                 }
                 if (tapenext) tapenext--;
         }
@@ -241,7 +241,7 @@ void main_init(int argc, char *argv[])
         sid_settype(sidmethod, cursid);
         music5000_init();
 
-	adc_init();
+    adc_init();
 #ifdef WIN32
         pal_init();
 #endif
@@ -375,6 +375,7 @@ void main_close()
         config_save();
         cmos_save(models[curmodel]);
 
+        midi_close();
         mem_close();
         uef_close();
         csw_close();
