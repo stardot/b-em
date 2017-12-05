@@ -7,6 +7,7 @@ void mem_romsetup_master128();
 void mem_romsetup_master128_35();
 void mem_romsetup_mastercompact();
 void mem_fillswram();
+extern int mem_findswram(int n);
 void mem_clearroms();
 
 void mem_init();

@@ -53,7 +53,7 @@ int vdfs_enabled = 0;
  * that pathname, i.e. the filename.  The host_inf pointer points to
  * the .inf extension which can be made part of the path name by
  * writing a dot at this pointer and removed again by writing a NUL.
- * 
+ *
  * In the event this is a directory rather than a file this entry
  * will contain two binary search trees allowing the contents of the
  * directory to be searched by either Acorn filename or host filename.
@@ -592,7 +592,7 @@ static void tree_visit_cat(const void *nodep, const VISIT which, const int depth
 static int gen_cat_tab(vdfs_ent_t *dir) {
     int result;
     vdfs_ent_t **new_tab;
-    
+
     if ((result = scan_dir(dir)) == 0 && dir->cat_size > 0) {
         if ((new_tab = malloc(dir->cat_size * (sizeof(vdfs_ent_t *))))) {
             cat_ptr = new_tab;
@@ -822,7 +822,7 @@ static void run_file(const char *err) {
         addr = (y << 8) | x;
         ent = find_entry(addr, &key, cur_dir, &cmd_tail);
         if (!(ent && ent->attribs & ATTR_EXISTS))
-            ent = find_entry(addr, &key, lib_dir, &cmd_tail);        
+            ent = find_entry(addr, &key, lib_dir, &cmd_tail);
         if (ent && ent->attribs & ATTR_EXISTS) {
             if (ent->attribs & ATTR_IS_DIR)
                 adfs_error(err_wont);
@@ -863,9 +863,9 @@ static void rename_tail(vdfs_ent_t *old_ent, vdfs_ent_t *new_ent) {
         log_debug("vdfs: '%s' renamed to '%s'", old_ent->host_path, new_ent->host_path);
         new_ent->attribs |= ATTR_EXISTS;
         old_ent->attribs &= ~ATTR_EXISTS;
-        new_ent->load_addr  = old_ent->load_addr; 
-        new_ent->exec_addr  = old_ent->exec_addr; 
-        new_ent->length     = old_ent->length; 
+        new_ent->load_addr  = old_ent->load_addr;
+        new_ent->exec_addr  = old_ent->exec_addr;
+        new_ent->length     = old_ent->length;
         new_ent->acorn_tree = old_ent->acorn_tree;
         new_ent->host_tree  = old_ent->host_tree;
         new_ent->cat_tab    = old_ent->cat_tab;
@@ -883,7 +883,7 @@ static void rename_tail(vdfs_ent_t *old_ent, vdfs_ent_t *new_ent) {
 static void osfsc_rename() {
     vdfs_ent_t *old_ent, old_key, *new_ent, new_key;
     uint16_t new_name;
-    
+
     if ((old_ent = find_entry((y << 8) | x, &old_key, cur_dir, &new_name))) {
         if ((new_ent = find_entry(new_name, &new_key, cur_dir, NULL))) {
             if (new_ent->attribs & ATTR_EXISTS) {
@@ -1154,7 +1154,7 @@ static inline void osbput() {
     FILE *fp;
 
     log_debug("vdfs: osbput(A=%02X, X=%02X, Y=%02X)", a, x, y);
-    
+
     if ((fp = getfp(y)))
         putc(a, fp);
 }
@@ -1164,7 +1164,7 @@ static inline void osbget() {
     FILE *fp;
 
     log_debug("vdfs: osbget(A=%02X, X=%02X, Y=%02X)", a, x, y);
-    
+
     p.c = 1;
     if ((fp = getfp(y))) {
         if ((ch = getc(fp)) != EOF) {
@@ -1320,7 +1320,7 @@ static void osfile_cdir(vdfs_ent_t *ent) {
     else {
         adfs_hosterr(errno);
         log_debug("vdfs: unable to mkdir '%s': %s", ent->host_path, strerror(errno));
-    }    
+    }
 }
 
 static inline void osfile()
@@ -1337,33 +1337,33 @@ static inline void osfile()
                     case 0x00:  // save file.
                         osfile_save(pb, ent);
                         break;
-        
+
                     case 0x01:  // set all attributes.
                         ent->load_addr = readmem32(pb+0x02);
                         ent->exec_addr = readmem32(pb+0x06);
                         write_back(ent);
                         break;
-        
+
                     case 0x02:  // set load address only.
                         ent->load_addr = readmem32(pb+0x02);
                         write_back(ent);
                         break;
-        
+
                     case 0x03:  // set exec address only.
                         ent->exec_addr = readmem32(pb+0x06);
                         write_back(ent);
                         break;
-        
+
                     case 0x04:  // write attributes.
                         break;
-        
+
                     case 0x05:  // get addresses and attributes.
                         writemem32(pb+0x02, ent->load_addr);
                         writemem32(pb+0x06, ent->exec_addr);
                         writemem32(pb+0x0a, ent->length);
                         writemem32(pb+0x0e, ent->attribs);
                         break;
-        
+
                     case 0x06:
                         osfile_delete(ent);
                         break;
@@ -1375,7 +1375,7 @@ static inline void osfile()
                     case 0xff:  // load file.
                         osfile_load(pb, ent);
                         break;
-        
+
                     default:
                         log_debug("vdfs: osfile unimplemented for a=%d", a);
                 }
@@ -1425,7 +1425,7 @@ static inline void osfile()
  * executes the load/save on the host.
  */
 
-static int16_t swr_calc_addr(uint8_t flags, uint32_t *st_ptr, uint16_t romid) {
+static int16_t swr_calc_addr(uint8_t flags, uint32_t *st_ptr, int16_t romid) {
     uint16_t start = *st_ptr;
     int banks;
 
@@ -1438,15 +1438,9 @@ static int16_t swr_calc_addr(uint8_t flags, uint32_t *st_ptr, uint16_t romid) {
 
         // Find the nth RAM bank.
 
-        romid = 0;
-        for (;;) {
-            if (swram[romid])
-                if (--banks < 0)
-                    break;
-            if (++romid >= 16) {
-                adfs_error(err_no_swr);
-                return -1;
-            }
+        if ((romid = mem_findswram(banks)) < 0)  {
+            adfs_error(err_no_swr);
+            return -1;
         }
         log_debug("vdfs: swr_calc_addr: pseudo addr bank=%02d, start=%04x\n", romid, start);
     } else {
@@ -1457,7 +1451,7 @@ static int16_t swr_calc_addr(uint8_t flags, uint32_t *st_ptr, uint16_t romid) {
             return -1;
         }
 
-        if (romid > 16) {
+        if ((romid > 16) | !swram[romid]) {
             adfs_error(err_no_swr);
             return -1;
         }
@@ -1528,7 +1522,7 @@ static inline void exec_swr_fs() {
     int8_t   romid = readmem(pb+3);
     uint32_t start = readmem16(pb+4);
     uint16_t pblen = readmem16(pb+6);
-    
+
     exec_swr_intern(flags, fname, romid, start, pblen);
 }
 
@@ -1629,21 +1623,31 @@ static uint16_t srp_length(uint16_t addr, uint16_t start, uint16_t *len) {
     }
 }
 
-static void srp_tail(uint16_t addr, uint8_t flag, uint16_t fnaddr, uint16_t start, uint16_t len) {
+static uint16_t srp_romid(uint16_t addr, int16_t *romid) {
     int ch;
-    uint16_t romid = 0;
 
     do
         ch = readmem(addr++);
     while (ch == ' ' || ch == '\t');
 
-    if (isxdigit(ch)) {
+    if (isxdigit(ch))
+        return srp_hex(ch, addr, (uint16_t*)romid);
+    if (ch >= 'W' && ch <= 'Z')
+        *romid = mem_findswram(ch - 'W');
+    else if (ch >= 'w' && ch <= 'z')
+        *romid = mem_findswram(ch - 'w');
+    else
+        *romid = -1;
+    return --addr;
+}
+
+static void srp_tail(uint16_t addr, uint8_t flag, uint16_t fnaddr, uint16_t start, uint16_t len) {
+    int ch;
+    int16_t romid;
+
+    addr = srp_romid(addr, &romid);
+    if (romid >= 0)
         flag &= ~0x40;
-        addr = srp_hex(ch, addr, &romid);
-        do
-            ch = readmem(addr++);
-        while (ch == ' ' || ch == '\t');
-    }
     if (fs_flag) {
         exec_swr_intern(flag, fnaddr, romid, start, len);
         p.c = 0;
@@ -1655,6 +1659,9 @@ static void srp_tail(uint16_t addr, uint8_t flag, uint16_t fnaddr, uint16_t star
         writemem16(0x74, start);
         writemem16(0x76, len);
         writemem16(0x78, 0);
+        do
+            ch = readmem(addr++);
+        while (ch == ' ' || ch == '\t');
         if (ch == 'Q' || ch == 'q')
             writemem16(0x7a, 0xffff);
         else
@@ -1690,25 +1697,21 @@ static inline void cmd_srsave() {
 
 static void srcopy(uint8_t flags) {
     uint16_t addr, ram_start, len, sw_start;
-    uint16_t romid;
-    int ch;
+    int16_t romid;
 
     addr = readmem16(0xf2) + y;
     if ((addr = srp_start(addr, &ram_start))) {
         if ((addr = srp_length(addr, ram_start, &len))) {
             if ((addr = srp_start(addr, &sw_start))) {
-                do
-                    ch = readmem(addr++);
-                while (ch == ' ' || ch == '\t');
-
-                if (isxdigit(ch)) {
+                addr = srp_romid(addr, &romid);
+                if (romid >= 0)
                     flags &= ~0x40;
-                    addr = srp_hex(ch, addr, &romid);
-                } else {
+                else {
                     flags |= 0x40;
                     romid = 0;
                 }
                 exec_swr_ram(flags, ram_start, len, sw_start, romid);
+                return;
             }
         }
     }
