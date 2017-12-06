@@ -176,7 +176,7 @@ void mem_fillswram()
 int mem_findswram(int n) {
     int c;
 
-    for (c = 0; c <= ROM_SLOTS; c++)
+    for (c = 0; c < ROM_SLOTS; c++)
         if (swram[c])
             if (n-- <= 0)
                 return c;
