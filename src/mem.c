@@ -55,7 +55,7 @@ void mem_dump()
 	}
 	else
 		log_error("mem: unable to open ram dump file: %s", strerror(errno));
-	
+
         if ((f=fopen("swram.dmp","wb")))
 	{
 		fwrite(&rom[4*ROM_SIZE],ROM_SIZE,1,f);
@@ -71,7 +71,7 @@ void mem_dump()
 static int load_sw_rom(const char *name, int slot)
 {
 	FILE *f;
-	
+
 	log_debug("Loading %s to slot %i\n", name, slot);
 	if ((f = fopen(name, "rb")))
 	{
@@ -94,7 +94,7 @@ static int scan_rom_dir(const char *pat, char **files, int file_cnt)
         if (al_findfirst(pat, &ffblk, FA_ALL) == 0)
 	{
 		do {
-			log_debug("mem: found ROM file '%s'", ffblk.name); 
+			log_debug("mem: found ROM file '%s'", ffblk.name);
 			files[file_cnt++] = strdup(ffblk.name);
 			if (file_cnt == ROM_SLOTS)
 			{
@@ -171,6 +171,16 @@ void mem_fillswram()
         {
                 if (!romused[c]) swram[c] = 1;
         }
+}
+
+int mem_findswram(int n) {
+    int c;
+
+    for (c = 0; c < ROM_SLOTS; c++)
+        if (swram[c])
+            if (n-- <= 0)
+                return c;
+    return -1;
 }
 
 static void load_os_rom(const char *os_name)
