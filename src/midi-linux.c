@@ -154,13 +154,13 @@ static void *alsa_raw_midi_run(void *arg) {
     int status;
     const char *device;
     snd_rawmidi_t *midiin;
-    uint8_t buffer[16], *ptr, byte, note;
+    uint8_t buffer[16], *ptr, byte, note = 0;
     midi_state_t midi_state = MS_GROUND;
-    void (*note_func)(int note, int vel);
+    void (*note_func)(int note, int vel) = music4000_note_off;
 
     device = get_config_string("midi", "alsa_raw_device", "default");
     if ((status = snd_rawmidi_open(&midiin, NULL, device, 0)) < 0)
-        log_warn("midi-linux: unable to open ALSA raw MIDI port: %s", snd_strerror(status));
+        log_warn("midi-linux: unable to open ALSA raw MIDI port '%s': %s", device, snd_strerror(status));
     else {
         while (!quited) {
             log_debug("midi-linux: waiting to read ALSA raw MIDI port");
@@ -173,19 +173,21 @@ static void *alsa_raw_midi_run(void *arg) {
                     log_debug("midi-linux: ALSA raw MIDI read byte %02X", byte);
                     if (byte & 0x80) {
                         log_debug("midi-linux: ALSA raw MIDI byte is 'status'");
-                        switch(byte & 0xf0) {
-                            case 0x80:
+                        switch(byte >> 4) {
+                            case 0x8:
                                 log_debug("midi-linux: ALSA raw MIDI note off");
                                 note_func = music4000_note_off;
                                 midi_state = MS_GOT_CMD;
                                 break;
-                            case 0x90:
+                            case 0x9:
                                 log_debug("midi-linux: ALSA raw MIDI note on");
                                 note_func = music4000_note_on;
                                 midi_state = MS_GOT_CMD;
                                 break;
-                            default:
-                                midi_state = MS_GROUND;
+                            case 0xf:
+                                if (byte < 0xf8) // system common messages
+                                    midi_state = MS_GROUND;
+                            default:;
                         }
                     } else {
                         log_debug("midi-linux: ALSA raw MIDI byte is data, state=%d", midi_state);
@@ -196,6 +198,8 @@ static void *alsa_raw_midi_run(void *arg) {
                                 break;
                             case MS_GOT_NOTE:
                                 note_func(note, byte);
+                                midi_state = MS_GOT_CMD;
+                                break;
                             default:
                                 midi_state = MS_GROUND;
                         }
