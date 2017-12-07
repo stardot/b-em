@@ -11,7 +11,7 @@
 
 #define BUFLEN_SO 2000   //  64ms @ 31.25KHz  (must be multiple of 2)
 #define BUFLEN_DD 4410   // 100ms @ 44.1KHz
-#define BUFLEN_M5 3000   //  64ms @ 46.875KHz (must be multiple of 3)
+#define BUFLEN_M5  750   //  64ms @ 46.875KHz (must be multiple of 3)
 
 /* Should be the same or larger than the maximum of the above */
 
