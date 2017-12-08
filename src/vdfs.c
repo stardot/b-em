@@ -1734,29 +1734,36 @@ static inline void back() {
     prev_dir = ent;
 }
 
-static void change_dir(vdfs_ent_t **dir, const char *which) {
+static vdfs_ent_t *lookup_dir(void) {
     vdfs_ent_t *ent, key;
 
     if (check_valid_dir(cur_dir, "current")) {
         ent = find_entry(readmem16(0xf2) + y, &key, cur_dir, NULL);
         if (ent && ent->attribs & ATTR_EXISTS) {
-            if (ent->attribs & ATTR_IS_DIR) {
-                log_debug("vdfs: new %s dir=%s\n", which, ent->acorn_fn);
-                prev_dir = *dir;
-                *dir = ent;
-            } else
+            if (ent->attribs & ATTR_IS_DIR)
+                return ent;
+            else
                 adfs_error(err_baddir);
         } else
             adfs_error(err_notfound);
     }
+    return NULL;
 }
 
 static inline void cmd_dir() {
-    change_dir(&cur_dir, "current");
+    vdfs_ent_t *ent;
+
+    if ((ent = lookup_dir())) {
+        prev_dir = cur_dir;
+        cur_dir = ent;
+    }
 }
 
 static inline void cmd_lib() {
-    change_dir(&lib_dir, "library");
+    vdfs_ent_t *ent;
+
+    if ((ent = lookup_dir()))
+        lib_dir = ent;
 }
 
 static void cat_prep() {
