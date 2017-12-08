@@ -57,6 +57,7 @@ void i8271_reset()
                 fdc_headercrcerror = i8271_headercrcerror;
                 fdc_writeprotect   = i8271_writeprotect;
                 fdc_getdata        = i8271_getdata;
+                motorspin = 45000;
         }
         i8271.paramnum = i8271.paramreq = 0;
         i8271.status = 0;
@@ -65,7 +66,6 @@ void i8271_reset()
         i8271.curtrack[0] = i8271.curtrack[1] = 0;
         i8271.command = 0xFF;
         i8271.realtrack[0] = i8271.realtrack[1] = 0;
-        motorspin = 45000;
 }
 
 static void i8271_NMI()
@@ -181,7 +181,7 @@ void i8271_write(uint16_t addr, uint8_t val)
                                 if (i8271.drvout & DRIVESEL1) i8271.result |= 0x40;
 //                                printf("Status %02X\n",i8271.result);
                                 break;
-                                
+
                                 default:
                                 i8271.result = 0x18;
                                 i8271.status = 0x18;
@@ -328,7 +328,7 @@ void i8271_callback()
                         i8271.curtrack[curdrive] = i8271.params[0];
                         disc_writesector(curdrive, i8271.cursector, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, 0);
                         i8271.phase = 1;
-                        
+
                         i8271.status = 0x8C;
                         i8271.result = 0;
                         i8271_NMI();
@@ -379,7 +379,7 @@ void i8271_callback()
                 disc_readsector(curdrive, i8271.cursector, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, 0);
                 byte = 0;
                 break;
-                
+
                 case 0x1B: /*Read ID*/
 //                printf("Read ID callback %i\n",i8271.phase);
                 if (!i8271.phase)
@@ -442,9 +442,9 @@ void i8271_callback()
 //                printf("Seek done!\n");
                 i8271_setspindown();
                 break;
-                
+
                 case 0xFF: break;
-                
+
                 default: break;
                 printf("Unknown 8271 command %02X 3\n", i8271.command);
                 dumpregs();
