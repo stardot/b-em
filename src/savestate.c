@@ -79,9 +79,7 @@ void savestate_doload()
 	     {
 		 curmodel = getc(f);
 		 selecttube = curtube = -1;
-		 log_debug("Restart BBC\n");
 		 main_restart();
-		 log_debug("Done!\n");
 
 		 m6502_loadstate(f);
 		 mem_loadstate(f);
@@ -94,6 +92,7 @@ void savestate_doload()
 		 adc_loadstate(f);
 		 acia_loadstate(f);
 		 serial_loadstate(f);
+         vdfs_loadstate(f);
 
 		 log_debug("Loadstate done!\n");
 	     }

@@ -790,6 +790,115 @@ void vdfs_init(void) {
     scan_seq++;
 }
 
+static size_t ss_load_var(FILE *f) {
+    size_t len;
+    int    ch;
+
+    len = 0;
+    while ((ch = getc(f)) != EOF) {
+        len = (len << 7) | (ch & 0x7f);
+        if (!(ch & 0x80))
+            break;
+    }
+    return len;
+}
+
+static vdfs_ent_t *ss_lookup_dir(const char *name, size_t len, vdfs_ent_t *dir, vdfs_ent_t *key, const char *path) {
+    vdfs_ent_t *ent, **ptr;
+
+    if (len > MAX_FILE_NAME) {
+        log_error("vdfs: filename element from save state file is too long");
+        return NULL;
+    }
+    memcpy(key->acorn_fn, name, len);
+    key->acorn_fn[len] = 0;
+    if ((ptr = tfind(key, &dir->acorn_tree, acorn_comp)) == NULL) {
+        log_error("vdfs: directory '%s' from '%s' in saved state not found", key->acorn_fn, path);
+        return NULL;
+    }
+    ent = *ptr;
+    if (!(ent->attribs & ATTR_IS_DIR)) {
+        log_error("vdfs: '%s' from '%s' in saved state is not a directory", key->acorn_fn, path);
+        return NULL;
+    }
+    return ent;
+}
+
+static vdfs_ent_t *ss_lookup_path(const char *path) {
+    size_t len;
+    const char *ptr, *dot;
+    vdfs_ent_t key, *ent;
+
+    key.parent = NULL;
+    ent = &root_dir;
+    for (ptr = path; ; ptr = dot+1) {
+        if (scan_dir(ent))
+            return NULL;
+        if (!(dot = strchr(ptr, '.')))
+            break;
+        len = dot - ptr;
+        if ((ent = ss_lookup_dir(ptr, len, ent, &key, path)) == NULL)
+            return NULL;
+    }
+    len = strlen(ptr);
+    return ss_lookup_dir(ptr, len, ent, &key, path);
+}
+
+static vdfs_ent_t *ss_spec_path(FILE *f, const char *which) {
+    size_t len;
+    char *path;
+    vdfs_ent_t *ent;
+
+    if ((len = ss_load_var(f)) <= 0)
+        return NULL;
+    if ((path = malloc(len+1)) == NULL) {
+        log_error("vdfs: out of memory reading savestate file");
+        return NULL;
+    }
+    if (fread(path, len, 1, f) != 1) {
+        log_error("vdfs: read error on savestate file: %s", strerror(errno));
+        ent = NULL;
+    } else {
+        path[len] = '\0';
+        log_debug("vdfs: loadstate setting %s directory to $.%s", which, path);
+        ent = ss_lookup_path(path);
+        free(path);
+    }
+    return ent;
+}
+
+static vdfs_ent_t *ss_load_dir(vdfs_ent_t *dir, FILE *f, const char *which) {
+    vdfs_ent_t *ent;
+    int ch;
+
+    if ((ch = getc(f)) != EOF) {
+        if (ch == 'R') {
+            dir = &root_dir;
+            log_debug("vdfs: loadstate %s directory set to root", which);
+        } else if (ch == 'C') {
+            dir = cur_dir;
+            log_debug("vdfs: loadstate %s directory set to current", which);
+        } else if (ch == 'S' && ((ent = ss_spec_path(f, which))))
+            dir = ent;
+    }
+    return dir;
+}
+
+void vdfs_loadstate(FILE *f) {
+    int ch;
+
+    if ((ch = getc(f)) != EOF) {
+        if (ch == 'V')
+            vdfs_enabled = 1;
+        else if (ch == 'v')
+            vdfs_enabled = 0;
+        cur_dir = ss_load_dir(cur_dir, f, "current");
+        lib_dir = ss_load_dir(lib_dir, f, "library");
+        prev_dir = ss_load_dir(prev_dir, f, "previous");
+        cat_dir = ss_load_dir(cat_dir, f, "catalogue");
+    }
+}
+
 static size_t ss_calc_len(vdfs_ent_t *ent) {
     vdfs_ent_t *parent = ent->parent;
     size_t len = strlen(ent->acorn_fn);
