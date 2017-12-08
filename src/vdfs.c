@@ -790,6 +790,69 @@ void vdfs_init(void) {
     scan_seq++;
 }
 
+static size_t ss_calc_len(vdfs_ent_t *ent) {
+    vdfs_ent_t *parent = ent->parent;
+    size_t len = strlen(ent->acorn_fn);
+
+    if (parent->parent != parent)
+        len += ss_calc_len(ent->parent) + 1;
+    return len;
+}
+
+static void ss_save_var(size_t len, FILE *f) {
+    uint8_t byte;
+
+    for (;;) {
+        byte = len & 0x7f;
+        len >>= 7;
+        if (len == 0)
+            break;
+        putc(byte | 0x80, f);
+    }
+    putc(byte, f);
+}
+
+static void ss_save_ent(vdfs_ent_t *ent, FILE *f) {
+    vdfs_ent_t *parent = ent->parent;
+
+    if (parent->parent == parent)
+        fputs(ent->acorn_fn, f);
+    else {
+        ss_save_ent(ent->parent, f);
+        putc('.', f);
+        fputs(ent->acorn_fn, f);
+    }
+}
+
+static void ss_save_dir1(vdfs_ent_t *ent, FILE *f) {
+    size_t len;
+
+    if (ent == &root_dir)
+        putc('R', f);
+    else {
+        putc('S', f);
+        len = ss_calc_len(ent);
+        ss_save_var(len, f);
+        ss_save_ent(ent, f);
+    }
+}
+
+static void ss_save_dir2(vdfs_ent_t *ent, FILE *f) {
+    if (ent == cur_dir)
+        putc('C', f);
+    else
+        ss_save_dir1(ent, f);
+}
+
+void vdfs_savestate(FILE *f) {
+
+    putc(vdfs_enabled ? 'V' : 'v', f);
+    ss_save_dir1(cur_dir, f);
+    ss_save_dir2(lib_dir, f);
+    ss_save_dir2(prev_dir, f);
+    ss_save_dir2(cat_dir, f);
+}
+
 static int check_valid_dir(vdfs_ent_t *ent, const char *which) {
     if (ent->attribs & ATTR_IS_DIR)
         return 1;
