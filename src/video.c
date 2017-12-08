@@ -1194,5 +1194,6 @@ void video_loadstate(FILE *f)
 {
         scrx=getc(f); scrx|=getc(f)<<8;
         scry=getc(f); scry|=getc(f)<<8;
+        oddclock=getc(f);
         vidclocks=getc(f); vidclocks=getc(f)<<8; vidclocks=getc(f)<<16; vidclocks=getc(f)<<24;
 }
