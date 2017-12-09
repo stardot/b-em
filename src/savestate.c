@@ -16,6 +16,7 @@
 #include "sysvia.h"
 #include "uservia.h"
 #include "video.h"
+#include "vdfs.h"
 
 int savestate_wantsave, savestate_wantload;
 char savestate_name[260];
@@ -42,7 +43,7 @@ void savestate_dosave()
 	    putc('N', f); putc('A', f); putc('P', f); putc('1', f);
 
 	    putc(curmodel, f);
-        
+
 	    m6502_savestate(f);
 	    mem_savestate(f);
 	    sysvia_savestate(f);
@@ -54,7 +55,8 @@ void savestate_dosave()
 	    adc_savestate(f);
 	    acia_savestate(f);
 	    serial_savestate(f);
-	    
+        vdfs_savestate(f);
+
 	    fclose(f);
 	}
 	else
@@ -62,7 +64,7 @@ void savestate_dosave()
 
         savestate_wantsave = 0;
 }
-        
+
 void savestate_doload()
 {
         int c;
@@ -77,9 +79,7 @@ void savestate_doload()
 	     {
 		 curmodel = getc(f);
 		 selecttube = curtube = -1;
-		 log_debug("Restart BBC\n");
 		 main_restart();
-		 log_debug("Done!\n");
 
 		 m6502_loadstate(f);
 		 mem_loadstate(f);
@@ -92,6 +92,7 @@ void savestate_doload()
 		 adc_loadstate(f);
 		 acia_loadstate(f);
 		 serial_loadstate(f);
+         vdfs_loadstate(f);
 
 		 log_debug("Loadstate done!\n");
 	     }
