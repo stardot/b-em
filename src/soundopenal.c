@@ -75,9 +75,13 @@ void al_init()
 {
         int c;
         int i;
-        size_t buflen;
+        size_t buflen, remain;
 
         buflen = get_config_int("sound", "buflen_music5000", BUFLEN_M5);
+        if ((remain = buflen % 3) != 0) {
+            buflen += 3 - remain;
+            log_warn("soundopenal: Music 5000 sound buffer size increased to %lu to make it a multiple of 3", buflen);
+        }
         if (buflen > BUFLEN_M5) {
             log_warn("soundopenal: Music 5000 sound buffer size %lu too large, reducing to %d", buflen, BUFLEN_M5);
             buflen = BUFLEN_M5;
