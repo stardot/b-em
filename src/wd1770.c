@@ -50,8 +50,8 @@ void wd1770_reset()
                 fdc_headercrcerror = wd1770_headercrcerror;
                 fdc_writeprotect   = wd1770_writeprotect;
                 fdc_getdata        = wd1770_getdata;
+                motorspin = 45000;
         }
-        motorspin = 45000;
 }
 
 void wd1770_spinup()
@@ -105,12 +105,12 @@ void wd1770_write(uint16_t addr, uint8_t val)
                         wd1770.status = 0x80 | 0x21 | track0;
                         disc_seek(curdrive, 0);
                         break;
-                        
+
                         case 0x1: /*Seek*/
                         wd1770.status = 0x80 | 0x21 | track0;
                         disc_seek(curdrive, wd1770.data);
                         break;
-                        
+
                         case 0x2:
                         case 0x3: /*Step*/
                         wd1770.status = 0x80 | 0x21 | track0;
@@ -167,7 +167,7 @@ void wd1770_write(uint16_t addr, uint8_t val)
                         wd1770.status = 0x80 | 0x1;
                         disc_format(curdrive, wd1770.track, wd1770.curside, wd1770.density);
                         break;
-                        
+
                         default:
 //                                log_debug("Bad 1770 command %02X\n",val);
                         fdc_time = 0;
