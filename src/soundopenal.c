@@ -1,6 +1,7 @@
 /*B-em v2.2 by Tom Walker
   OpenAL interface*/
 
+#include <allegro.h>
 #include <stdio.h>
 #include <AL/al.h>
 #include <AL/alut.h>
@@ -30,10 +31,12 @@ static int source_freq[NUM_AL_SOURCES] = {
 
 // lengths in bytes (buffer holds stereo int16_t samples)
 
-static int source_buflen[NUM_AL_SOURCES] = {
+size_t buflen_m5 = BUFLEN_M5;
+
+static size_t source_buflen[NUM_AL_SOURCES] = {
        BUFLEN_SO<<2, // normal sound
        BUFLEN_DD<<2, // disc drive noise
-       BUFLEN_M5<<2  // music 5000
+       BUFLEN_M5<<2  // music 5000 - adjusted later.
 };
 
 static ALuint buffers[NUM_AL_SOURCES][NUM_AL_BUFFERS];
@@ -72,6 +75,16 @@ void al_init()
 {
         int c;
         int i;
+        size_t buflen;
+
+        buflen = get_config_int("sound", "buflen_music5000", BUFLEN_M5);
+        if (buflen > BUFLEN_M5) {
+            log_warn("soundopenal: Music 5000 sound buffer size %lu too large, reducing to %d", buflen, BUFLEN_M5);
+            buflen = BUFLEN_M5;
+        }
+        log_debug("soundopenal: using music 5000 buffer of %lu", buflen);
+        buflen_m5 = buflen;
+        source_buflen[SOUND_M5] = buflen << 2;
 
         check();
 
