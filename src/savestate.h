@@ -9,4 +9,7 @@ void savestate_load();
 void savestate_dosave();
 void savestate_doload();
 
+extern void savestate_save_var(unsigned var, FILE *f);
+extern unsigned savestate_load_var(FILE *f);
+
 #endif

@@ -29,6 +29,7 @@
 #include "mem.h"
 #include "model.h"
 #include "tube.h"
+#include "savestate.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -790,19 +791,6 @@ void vdfs_init(void) {
     scan_seq++;
 }
 
-static size_t ss_load_var(FILE *f) {
-    size_t len;
-    int    ch;
-
-    len = 0;
-    while ((ch = getc(f)) != EOF) {
-        len = (len << 7) | (ch & 0x7f);
-        if (!(ch & 0x80))
-            break;
-    }
-    return len;
-}
-
 static vdfs_ent_t *ss_lookup_dir(const char *name, size_t len, vdfs_ent_t *dir, vdfs_ent_t *key, const char *path) {
     vdfs_ent_t *ent, **ptr;
 
@@ -849,7 +837,7 @@ static vdfs_ent_t *ss_spec_path(FILE *f, const char *which) {
     char *path;
     vdfs_ent_t *ent;
 
-    if ((len = ss_load_var(f)) <= 0)
+    if ((len = savestate_load_var(f)) <= 0)
         return NULL;
     if ((path = malloc(len+1)) == NULL) {
         log_error("vdfs: out of memory reading savestate file");
@@ -908,19 +896,6 @@ static size_t ss_calc_len(vdfs_ent_t *ent) {
     return len;
 }
 
-static void ss_save_var(size_t len, FILE *f) {
-    uint8_t byte;
-
-    for (;;) {
-        byte = len & 0x7f;
-        len >>= 7;
-        if (len == 0)
-            break;
-        putc(byte | 0x80, f);
-    }
-    putc(byte, f);
-}
-
 static void ss_save_ent(vdfs_ent_t *ent, FILE *f) {
     vdfs_ent_t *parent = ent->parent;
 
@@ -941,7 +916,7 @@ static void ss_save_dir1(vdfs_ent_t *ent, FILE *f) {
     else {
         putc('S', f);
         len = ss_calc_len(ent);
-        ss_save_var(len, f);
+        savestate_save_var(len, f);
         ss_save_ent(ent, f);
     }
 }

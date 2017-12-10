@@ -9,6 +9,7 @@
 #include "main.h"
 #include "mem.h"
 #include "model.h"
+#include "music5000.h"
 #include "savestate.h"
 #include "serial.h"
 #include "sn76489.h"
@@ -56,6 +57,7 @@ void savestate_dosave()
 	    acia_savestate(f);
 	    serial_savestate(f);
         vdfs_savestate(f);
+        music5000_savestate(f);
 
 	    fclose(f);
 	}
@@ -93,6 +95,7 @@ void savestate_doload()
 		 acia_loadstate(f);
 		 serial_loadstate(f);
          vdfs_loadstate(f);
+         music5000_loadstate(f);
 
 		 log_debug("Loadstate done!\n");
 	     }
@@ -104,4 +107,31 @@ void savestate_doload()
 	    log_error("savestate: unable to load from state file '%s': %s", savestate_name, strerror(errno));
 
         savestate_wantload = 0;
+}
+
+void savestate_save_var(unsigned var, FILE *f) {
+    uint8_t byte;
+
+    for (;;) {
+        byte = var & 0x7f;
+        var >>= 7;
+        if (var == 0)
+            break;
+        putc(byte, f);
+    }
+    putc(byte | 0x80, f);
+}
+
+unsigned savestate_load_var(FILE *f) {
+    unsigned var, lshift;
+    int      ch;
+
+    var = lshift = 0;
+    while ((ch = getc(f)) != EOF) {
+        if (ch & 0x80)
+            return var | ((ch & 0x7f) << lshift);
+        var |= ch << lshift;
+        lshift += 7;
+    }
+    return var;
 }
