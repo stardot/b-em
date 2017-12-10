@@ -105,3 +105,30 @@ void savestate_doload()
 
         savestate_wantload = 0;
 }
+
+void savestate_save_var(unsigned var, FILE *f) {
+    uint8_t byte;
+
+    for (;;) {
+        byte = var & 0x7f;
+        var >>= 7;
+        if (var == 0)
+            break;
+        putc(byte, f);
+    }
+    putc(byte | 0x80, f);
+}
+
+unsigned savestate_load_var(FILE *f) {
+    unsigned var, lshift;
+    int      ch;
+
+    var = lshift = 0;
+    while ((ch = getc(f)) != EOF) {
+        if (ch & 0x80)
+            return var | ((ch & 0x7f) << lshift);
+        var |= ch << lshift;
+        lshift += 7;
+    }
+    return var;
+}
