@@ -107,7 +107,7 @@ uint8_t nula_left_blank;
 uint8_t nula_disable;
 uint8_t nula_attribute_mode;
 uint8_t nula_attribute_text;
-
+static int mode7_need_new_lookup;
 
 void videoula_write(uint16_t addr, uint8_t val)
 {
@@ -206,6 +206,7 @@ void videoula_write(uint16_t addr, uint8_t val)
                         {
                                 nula_flash[c] = 1;
                         }
+                        mode7_need_new_lookup = 1;
                         break;
 
                 case 5:
@@ -259,6 +260,7 @@ void videoula_write(uint16_t addr, uint8_t val)
                                 ula_pal[c] = nula_collook[(ula_palbak[c] & 15) ^ 7];
                                 if ((ula_palbak[c] & 8) && (ula_ctrl & 1) && nula_flash[ula_palbak[c] - 8]) ula_pal[c] = nula_collook[ula_palbak[c] & 15];
                         }
+                        mode7_need_new_lookup = 1;
                 }
                 else
                 {
@@ -432,6 +434,32 @@ void mode7_makechars()
         }
 }
 
+static void mode7_gen_nula_lookup(void) {
+    int fg_ix, fg_col, fg_red, fg_grn, fg_blu;
+    int bg_ix, bg_col, bg_red, bg_grn, bg_blu;
+    int weight, lu_red, lu_grn, lu_blu;
+
+    for (fg_ix = 0; fg_ix < 8; fg_ix++) {
+        fg_col = nula_collook[fg_ix];
+        fg_red = getr(fg_col);
+        fg_grn = getg(fg_col);
+        fg_blu = getb(fg_col);
+        for (bg_ix = 0; bg_ix < 8; bg_ix++) {
+            bg_col = nula_collook[bg_ix];
+            bg_red = getr(bg_col);
+            bg_grn = getg(bg_col);
+            bg_blu = getb(bg_col);
+            for (weight = 0; weight < 16; weight++) {
+                lu_red = bg_red + (((fg_red - bg_red) * weight) >> 4);
+                lu_grn = bg_grn + (((fg_grn - bg_grn) * weight) >> 4);
+                lu_blu = bg_blu + (((fg_blu - bg_blu) * weight) >> 4);
+                mode7_lookup[fg_ix][bg_ix][weight] = makecol(lu_red, lu_grn, lu_blu);
+            }
+        }
+    }
+    mode7_need_new_lookup = 0;
+}
+
 static inline void mode7_render(uint8_t dat)
 {
         int t, c;
@@ -441,6 +469,9 @@ static inline void mode7_render(uint8_t dat)
         uint8_t *mode7_px[2];
         int mode7_flashx = mode7_flash, mode7_dblx = mode7_dbl;
         int *on;
+
+        if (mode7_need_new_lookup)
+            mode7_gen_nula_lookup();
 
         t = mode7_buf[0];
         mode7_buf[0] = mode7_buf[1];
@@ -662,6 +693,7 @@ void video_init()
                                                                              ((((d & 4) >> 2) * c) * 255) / 15 + ((((d & 32) >> 5) * (15 - c)) * 255) / 15);
                 }
         }
+        mode7_need_new_lookup = 0;
         for (temp = 0; temp < 256; temp++)
         {
                 temp2 = temp;
