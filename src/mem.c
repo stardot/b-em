@@ -83,9 +83,9 @@ static void cfg_load_rom(int slot, const char *sect, const char *def) {
     FILE *f;
     char path[PATH_MAX];
 
-    snprintf(key, sizeof key, "%x", slot);
+    snprintf(key, sizeof key, "rom%x", slot);
     name = get_config_string(sect, key, def);
-    if (strcasecmp(name, "ram") == 0) {
+    if (*name == '\0' || strcasecmp(name, "ram") == 0) {
         log_debug("mem: ROM slot %02d set as sideways RAM", slot);
         swram[slot] = 1;
     } else if (strcasecmp(name, "empty") == 0) {
@@ -140,13 +140,26 @@ void mem_romsetup_swram(void) {
     mem_romsetup_common("ram");
 }
 
+void mem_romsetup_bp128(const char *rest) {
+    const char *sect = models[curmodel].cfgsect;
+    int slot;
+
+    load_os_rom(sect);
+    cfg_load_rom(15, sect, models[curmodel].basic);
+    cfg_load_rom(14, sect, "vdfs");
+    cfg_load_rom(13, sect, "ram");
+    cfg_load_rom(12, sect, "ram");
+    cfg_load_rom(11, sect, models[curmodel].dfs);
+    for (slot = 10; slot >= 0; slot--)
+        cfg_load_rom(slot, sect, "ram");
+}
+
 void mem_romsetup_master(void) {
     const char *sect = models[curmodel].cfgsect;
     const char *osname;
 	FILE *f;
     char path[PATH_MAX];
     int slot;
-
 
     osname = get_config_string(sect, "os", models[curmodel].os);
     if (!find_dat_file(path, sizeof path, "roms", osname, "rom")) {

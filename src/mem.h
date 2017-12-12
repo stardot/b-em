@@ -8,6 +8,7 @@
 extern void mem_romsetup_os01();
 extern void mem_romsetup_std();
 extern void mem_romsetup_swram();
+extern void mem_romsetup_bp128();
 extern void mem_romsetup_master();
 extern void mem_romsetup_compact();
 extern void mem_fillswram();
