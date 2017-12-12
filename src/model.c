@@ -34,7 +34,8 @@ MODEL models[NUM_MODELS] =
         {"BBC Master Turbo",         0,    1,    1,     0,  1,      0, 0,      0,       "master_turbo",   "mos320",  "",        "",         "cmos",    mem_romsetup_master,   0},
         {"BBC Master Compact",       0,    1,    1,     0,  1,      0, 0,      1,       "master_compact", "os51",    "basic48", "adfs210",  "cmosc",   mem_romsetup_compact, -1},
         {"ARM Evaluation System",    0,    1,    1,     0,  1,      0, 0,      0,       "master_arm",     "mos320",  "",        "",         "cmosa",   mem_romsetup_master,   1},
-        {"BBC Master 128 w/MOS 3.5", 0,    1,    1,     0,  1,      0, 0,      0,       "master_os350",   "mos350",  "",        "",         "cmos350", mem_romsetup_master,  -1}
+        {"BBC Master 128 w/MOS 3.5", 0,    1,    1,     0,  1,      0, 0,      0,       "master_os350",   "mos350",  "",        "",         "cmos350", mem_romsetup_master,  -1},
+        {"BBC B w/o FDC, w/SWRAM",   0,    0,    0,     0,  0,      0, 0,      0,       "bbc_b_nofdc",    "os12",    "basic2",  "ram",      "",        mem_romsetup_swram,   -1},
 };
 
 static int _modelcount = 0;

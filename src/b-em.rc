@@ -169,6 +169,7 @@ BEGIN
                         MENUITEM "BBC B w/8271 FDC",            IDM_MODEL_0+3
                         MENUITEM "BBC B w/8271+SWRAM",          IDM_MODEL_0+4
                         MENUITEM "BBC B w/1770 FDC",            IDM_MODEL_0+5
+                        MENUITEM "BBC B w/o FDC w/SWRAM",       IDM_MODEL_0+16
                         MENUITEM "BBC B US",                    IDM_MODEL_0+6
                         MENUITEM "BBC B German",                IDM_MODEL_0+7
                         MENUITEM "BBC B+ 64K",                  IDM_MODEL_0+8
