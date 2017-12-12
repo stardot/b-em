@@ -1,10 +1,10 @@
 /*B-em v2.2 by Tom Walker
   Master 128 CMOS emulation*/
-  
+
 /*Master 128 uses a HD146818
 
   It is connected as -
-  
+
   System VIA PB6 - enable
   System VIA PB7 - address strobe
   IC32 B1        - RW
@@ -156,45 +156,48 @@ uint8_t cmos_read()
         return 0xff;
 }
 
-void cmos_load(MODEL m)
-{
-        FILE *f;
-        char fn[512];
-        if (!m.cmos[0]) return;
-        if (m.compact) compactcmos_load(m);
-        else
-        {
-		snprintf(fn, sizeof fn, "%s%s", exedir, m.cmos);
-                log_debug("CMOS Opening %s\n", fn);
-                f=fopen(fn, "rb");
-                if (!f)
-                {
-                        log_error("unable to load CMOS file %s: %s", fn, strerror(errno));
-                        memset(cmos, 0, 64);
-                        return;
-                }
+void cmos_load(MODEL m) {
+    FILE *f;
+    char fn[PATH_MAX];
+    const char *msg;
+
+    if (!m.cmos[0]) return;
+    if (m.compact) compactcmos_load(m);
+    else {
+        rtc_epoc_ref = rtc_epoc_adj = 0;
+        if (!find_cfg_file(fn, sizeof fn, m.cmos, "bin")) {
+            if ((f = fopen(fn, "rb"))) {
                 fread(cmos, 64, 1, f);
                 fclose(f);
-        }
-        rtc_epoc_ref = rtc_epoc_adj = 0;
+                log_debug("cmos: loaded from %s", fn);
+                return;
+            } else
+                msg = strerror(errno);
+        } else
+            msg = "file not found";
+        log_warn("cmos: unable to load CMOS file %s: %s", fn, msg);
+        memset(cmos, 0, 64);
+    }
 }
 
-void cmos_save(MODEL m)
-{
-        FILE *f;
-        char fn[512];
-        if (!m.cmos[0]) return;
-        if (m.compact) compactcmos_save(m);
-        else
-        {
-                snprintf(fn, sizeof fn, "%s%s", exedir, m.cmos);
-                log_debug("CMOS Opening\n");
-                if ((f=fopen(fn, "wb")))
-		{
-			fwrite(cmos, 64, 1, f);
-			fclose(f);
-		}
-		else
-                        log_error("unable to save CMOS file %s: %s", fn, strerror(errno));
-        }
+void cmos_save(MODEL m) {
+    FILE *f;
+    char fn[PATH_MAX];
+    const char *msg;
+
+    if (!m.cmos[0]) return;
+    if (m.compact) compactcmos_save(m);
+    else {
+        if (!find_cfg_dest(fn, sizeof fn, m.cmos, "bin")) {
+            if ((f = fopen(fn, "wb"))) {
+                log_debug("cmos: saving to %s", fn);
+                fwrite(cmos, 64, 1, f);
+                fclose(f);
+                return;
+            } else
+                msg = strerror(errno);
+        } else
+            msg = "no suitable destination";
+        log_error("unable to save CMOS file %s: %s", fn, msg);
+    }
 }

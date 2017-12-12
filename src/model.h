@@ -14,13 +14,14 @@ typedef struct
         int x65c02;
         int bplus;
         int master;
-        int swram;
         int modela;
         int os01;
         int compact;
-        char os[32];
-        char romdir[32];
-        char cmos[32];
+        char cfgsect[16];
+        char os[16];
+        char basic[16];
+        char dfs[16];
+        char cmos[16];
         void (*romsetup)();
         int tube;
 } MODEL;

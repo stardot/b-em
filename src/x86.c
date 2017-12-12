@@ -637,15 +637,19 @@ void x86_reset()
 void x86_init()
 {
         FILE *f;
-        char fn[512];
+        char fn[PATH_MAX];
         if (!x86ram) x86ram=malloc(0x100000);
         if (!x86rom) x86rom=malloc(0x4000);
         x86makeznptable();
         memset(x86ram,0,0x100000);
-        append_filename(fn,exedir,"roms/tube/BIOS.ROM",511);
-        f=x_fopen(fn,"rb");
-        fread(x86rom,0x4000,1,f);
-        fclose(f);
+        if (!find_dat_file(fn, sizeof fn, "tube", "BIOS", "rom")) {
+            f=x_fopen(fn,"rb");
+            fread(x86rom,0x4000,1,f);
+            fclose(f);
+        } else {
+            log_fatal("x86: BIOS ROM not found");
+            exit(1);
+        }
 }
 
 void x86_close()
@@ -3748,7 +3752,7 @@ void x86_exec()
                         x86dumpregs();
                         exit(-1);
                 }*/
-                
+
                 if (tube_irq&2)
                 {
                         //tube_irq&=~2;

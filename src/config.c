@@ -27,11 +27,12 @@ int sidmethod = 0;
 void config_load()
 {
         int c;
-        char s[256];
+        char s[PATH_MAX];
         char *p;
-        snprintf(s, sizeof(s), "%sb-em.cfg", exedir);
-        //printf("%s\n",s);
-        set_config_file(s);
+        if (!find_cfg_file(s, sizeof s, "b-em", "cfg"))
+            set_config_file(s);
+        else
+            log_warn("config: not config file found, using defaults");
 
         p = (char *)get_config_string(NULL, "disc0", NULL);
         if (p) strcpy(discfns[0], p);
@@ -95,9 +96,10 @@ void config_load()
 
 void config_save()
 {
-        int c;
-        char s[256];
-        snprintf(s, sizeof s, "%sb-em.cfg", exedir);
+    int c;
+    char s[PATH_MAX];
+
+    if (!find_cfg_dest(s, sizeof s, "b-em", "cfg")) {
         set_config_file(s);
         set_config_string(NULL, "disc0", discfns[0]);
         set_config_string(NULL, "disc1", discfns[1]);
@@ -131,9 +133,9 @@ void config_save()
 
         set_config_int(NULL, "fasttape", fasttape);
 
-	set_config_int(NULL, "scsienable", scsi_enabled);
+        set_config_int(NULL, "scsienable", scsi_enabled);
         set_config_int(NULL, "ideenable", ide_enable);
-	set_config_int(NULL, "vdfsenable", vdfs_enabled);
+        set_config_int(NULL, "vdfsenable", vdfs_enabled);
 
         set_config_int(NULL, "key_as", keyas);
 
@@ -141,7 +143,9 @@ void config_save()
 
         for (c = 0; c < 128; c++)
         {
-                sprintf(s, "key_define_%03i", c);
-                set_config_int("user_keyboard", s, keylookup[c]);
+            sprintf(s, "key_define_%03i", c);
+            set_config_int("user_keyboard", s, keylookup[c]);
         }
+    } else
+        log_error("config: no suitable destination for config file- config will not be saved");
 }

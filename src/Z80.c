@@ -233,7 +233,7 @@ static inline void setsbc(uint8_t a, uint8_t b)
 				if( (b^a) & (a^r) & 0x80 ) af.b.l |= V_FLAG;
        }
        else
-       {                         
+       {
 				af.b.l = S_FLAG | ((r) ? ((r & 0x80) ? N_FLAG : 0) : Z_FLAG);
 				af.b.l |= (r & 0x28);	/* undocumented flag bits 5+3 */
 				if( (r & 0x0f) > (a & 0x0f) ) af.b.l |= H_FLAG;
@@ -433,11 +433,15 @@ void z80_init()
 {
         FILE *f;
         char fn[512];
-        append_filename(fn,exedir,"roms/tube/Z80_120.rom",511);
-        f=x_fopen(fn,"rb");
-        fread(z80rom,0x1000,1,f);
-        fclose(f);
-        makeznptable();
+        if (!find_dat_file(fn, sizeof fn, "tube", "Z80_120", "rom")) {
+            f=x_fopen(fn,"rb");
+            fread(z80rom,0x1000,1,f);
+            fclose(f);
+            makeznptable();
+        } else {
+            log_fatal("z80: unable to find tube ROM");
+            exit(1);
+        }
 }
 
 void z80_close()
@@ -628,7 +632,7 @@ void z80_exec()
                         cycles+=8;
                         break;
                         case 0x19: /*ADD HL,DE*/
-                        intreg=hl.b.h;                        
+                        intreg=hl.b.h;
                         z80_setadd16(hl.w,de.w);
                         hl.w+=de.w;
                         cycles+=11;
@@ -726,7 +730,7 @@ void z80_exec()
                            cycles+=3;
                         break;
                         case 0x29: /*ADD HL,HL*/
-                        intreg=hl.b.h;                        
+                        intreg=hl.b.h;
                         z80_setadd16(hl.w,hl.w);
                         hl.w+=hl.w;
                         cycles+=11;
@@ -820,7 +824,7 @@ void z80_exec()
                            cycles+=3;
                         break;
                         case 0x39: /*ADD HL,SP*/
-                        intreg=hl.b.h;                        
+                        intreg=hl.b.h;
                         z80_setadd16(hl.w,sp);
                         hl.w+=sp;
                         cycles+=11;
@@ -1667,19 +1671,19 @@ void z80_exec()
 
                                 case 0x46: /*LD B,(IX+nn)*/
                                 addr=z80_readmem(pc++); if (addr&0x80) addr|=0xFF00;
-                                intreg=(ix.w+addr)>>8;                                                                
+                                intreg=(ix.w+addr)>>8;
                                 cycles+=7; bc.b.h=z80_readmem(ix.w+addr);
                                 cycles+=8;
                                 break;
                                 case 0x4E: /*LD C,(IX+nn)*/
                                 addr=z80_readmem(pc++); if (addr&0x80) addr|=0xFF00;
-                                intreg=(ix.w+addr)>>8;                                                                
+                                intreg=(ix.w+addr)>>8;
                                 cycles+=7; bc.b.l=z80_readmem(ix.w+addr);
                                 cycles+=8;
                                 break;
                                 case 0x56: /*LD D,(IX+nn)*/
                                 addr=z80_readmem(pc++); if (addr&0x80) addr|=0xFF00;
-                                intreg=(ix.w+addr)>>8;                                                                
+                                intreg=(ix.w+addr)>>8;
                                 cycles+=7; de.b.h=z80_readmem(ix.w+addr);
                                 cycles+=8;
                                 break;
@@ -1691,19 +1695,19 @@ void z80_exec()
                                 case 0x5D: de.b.l=ix.b.l; cycles+=3; break; /*LD E,IXl*/
                                 case 0x5E: /*LD E,(IX+nn)*/
                                 addr=z80_readmem(pc++); if (addr&0x80) addr|=0xFF00;
-                                intreg=(ix.w+addr)>>8;                                
+                                intreg=(ix.w+addr)>>8;
                                 cycles+=7; de.b.l=z80_readmem(ix.w+addr);
                                 cycles+=8;
                                 break;
                                 case 0x66: /*LD H,(IX+nn)*/
                                 addr=z80_readmem(pc++); if (addr&0x80) addr|=0xFF00;
-                                intreg=(ix.w+addr)>>8;                                                                
+                                intreg=(ix.w+addr)>>8;
                                 cycles+=7; hl.b.h=z80_readmem(ix.w+addr);
                                 cycles+=8;
                                 break;
                                 case 0x6E: /*LD L,(IX+nn)*/
                                 addr=z80_readmem(pc++); if (addr&0x80) addr|=0xFF00;
-                                intreg=(ix.w+addr)>>8;                                                                
+                                intreg=(ix.w+addr)>>8;
                                 cycles+=7; hl.b.l=z80_readmem(ix.w+addr);
                                 cycles+=8;
                                 break;
@@ -1780,7 +1784,7 @@ void z80_exec()
                                 case 0xB5: setzn(af.b.h|ix.b.l);  af.b.h|=ix.b.l; cycles+=3; break;         /*OR  IXl*/
                                 case 0xBC: setcp(af.b.h,ix.b.h); cycles+=3; break;                          /*CP  IXh*/
                                 case 0xBD: setcp(af.b.h,ix.b.l); cycles+=3; break;                          /*CP  IXl*/
-                               
+
                                 case 0x86: /*ADD (IX+nn)*/
                                 cycles+=4; addr=z80_readmem(pc++); if (addr&0x80) addr|=0xFF00;
                                 cycles+=3; temp=z80_readmem(ix.w+addr);
@@ -2510,7 +2514,7 @@ void z80_exec()
                                 case 0x3A:
                                 pc--;
                                 break;
-                                        
+
                                 case 0x09: /*ADD IY,BC*/
                                 z80_setadd16(iy.w,bc.w);
                                 iy.w+=bc.w;
@@ -2627,31 +2631,31 @@ void z80_exec()
                                 break;
                                 case 0x4E: /*LD C,(IY+nn)*/
                                 addr=z80_readmem(pc++); if (addr&0x80) addr|=0xFF00;
-                                intreg=(iy.w+addr)>>8;                                
+                                intreg=(iy.w+addr)>>8;
                                 cycles+=7; bc.b.l=z80_readmem(iy.w+addr);
                                 cycles+=8;
                                 break;
                                 case 0x56: /*LD D,(IY+nn)*/
                                 addr=z80_readmem(pc++); if (addr&0x80) addr|=0xFF00;
-                                intreg=(iy.w+addr)>>8;                                
+                                intreg=(iy.w+addr)>>8;
                                 cycles+=7; de.b.h=z80_readmem(iy.w+addr);
                                 cycles+=8;
                                 break;
                                 case 0x5E: /*LD E,(IY+nn)*/
                                 addr=z80_readmem(pc++); if (addr&0x80) addr|=0xFF00;
-                                intreg=(iy.w+addr)>>8;                                
+                                intreg=(iy.w+addr)>>8;
                                 cycles+=7; de.b.l=z80_readmem(iy.w+addr);
                                 cycles+=8;
                                 break;
                                 case 0x66: /*LD H,(IY+nn)*/
                                 addr=z80_readmem(pc++); if (addr&0x80) addr|=0xFF00;
-                                intreg=(iy.w+addr)>>8;                                
+                                intreg=(iy.w+addr)>>8;
                                 cycles+=7; hl.b.h=z80_readmem(iy.w+addr);
                                 cycles+=8;
                                 break;
                                 case 0x6E: /*LD L,(IY+nn)*/
                                 addr=z80_readmem(pc++); if (addr&0x80) addr|=0xFF00;
-                                intreg=(iy.w+addr)>>8;                                
+                                intreg=(iy.w+addr)>>8;
                                 cycles+=7; hl.b.l=z80_readmem(iy.w+addr);
                                 cycles+=8;
                                 break;

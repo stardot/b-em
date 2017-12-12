@@ -38,14 +38,18 @@ static uint8_t tuberom[0x1000];
 static FILE *trace_fp;
 #endif
 
-static void tube_6502_loadrom()
-{
-        FILE *f;
-        char fn[512];
-        append_filename(fn,exedir,"roms/tube/6502Tube.rom",511);
-        f=x_fopen(fn,"rb");
+static void tube_6502_loadrom() {
+    FILE *f;
+    char path[PATH_MAX];
+
+    if (!find_dat_file(path, sizeof path, "tube", "6502Tube", "rom")) {
+        f = x_fopen(path, "rb");
         fread(tuberom+0x800,0x800,1,f);
         fclose(f);
+    } else {
+        log_fatal("6502tube: tube ROM not found");
+        exit(1);
+    }
 }
 
 void tube_6502_init_cpu()

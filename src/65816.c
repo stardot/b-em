@@ -274,7 +274,7 @@ uint8_t readmem65816(uint32_t addr)
 static uint16_t readmemw65816(uint32_t a)
 {
     uint16_t value;
-    
+
     a&=w65816mask;
     value = do_readmem65816(a) | (do_readmem65816(a+1)<<8);
     if (dbg_w65816)
@@ -4201,7 +4201,7 @@ void w65816_reset()
 {
         int c;
         FILE *f=x_fopen("65816.dmp","wb");
-        
+
         for (c=0;c<65536;c++) putc(readmem(c),f);
         fclose(f);
         printf("65816 regs :\n");
@@ -4814,11 +4814,15 @@ void w65816_init()
         char fn[512];
         if (!w65816rom) w65816rom=malloc(0x8000);
         if (!w65816ram) w65816ram=malloc(0x80000);
-                append_filename(fn,exedir,"roms/tube/ReCo6502ROM_816",511);
-                f=x_fopen(fn,"rb");
-                fread(w65816rom,0x8000,1,f);
-        fclose(f);
-        makeopcodetable65816();
+        if (!find_dat_file(fn, sizeof fn, "tube", "ReCo6502ROM_816", "rom")) {
+            f=x_fopen(fn,"rb");
+            fread(w65816rom,0x8000,1,f);
+            fclose(f);
+            makeopcodetable65816();
+        } else {
+            log_fatal("65816: unable to find tube ROM");
+            exit(1);
+        }
 }
 
 void w65816_close()

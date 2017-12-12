@@ -1,6 +1,6 @@
 /*B-em v2.2 by Tom Walker
   Disc support*/
-  
+
 #include <allegro.h>
 #include <stdio.h>
 #include "b-em.h"
@@ -182,7 +182,8 @@ void disc_close(int drive)
         if (loaders[driveloaders[drive]].close) loaders[driveloaders[drive]].close(drive);
         // Force the drive to spin down (i.e. become not-ready) when the disk is unloaded
         // This prevents the file system (e.g DFS) caching the old disk catalogue
-        fdc_spindown();
+        if (fdc_spindown)
+            fdc_spindown();
 }
 
 int disc_notfound=0;

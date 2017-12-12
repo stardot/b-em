@@ -204,21 +204,25 @@ void arm_init()
 {
         FILE *f;
         int c;
-        char fn[256];
+        char path[PATH_MAX];
         if (!armrom) armrom=(uint32_t *)malloc(0x4000);
         if (!armram) armram=(uint32_t *)malloc(0x400000);
         armromb=(uint8_t *)armrom;
         armramb=(uint8_t *)armram;
-        append_filename(fn,exedir,"roms/tube/ARMeval_100.rom",511);
-        f=x_fopen(fn,"rb");
-        fread(armromb,0x4000,1,f);
-        fclose(f);
-        memcpy(armramb,armromb,0x4000);
-        for (c=0;c<64;c++) armread[c]=0;
-        for (c=0;c<4;c++) armread[c]=&armram[c*0x40000];
-        armread[48]=armrom;
-        for (c=0;c<64;c++) armmask[c]=0xFFFFF;
-        armmask[48]=0x3FFF;
+        if (!find_dat_file(path, sizeof path, "tube", "ARMeval_100", "rom")) {
+            f = x_fopen(path, "rb");
+            fread(armromb,0x4000,1,f);
+            fclose(f);
+            memcpy(armramb,armromb,0x4000);
+            for (c=0;c<64;c++) armread[c]=0;
+            for (c=0;c<4;c++) armread[c]=&armram[c*0x40000];
+            armread[48]=armrom;
+            for (c=0;c<64;c++) armmask[c]=0xFFFFF;
+            armmask[48]=0x3FFF;
+        } else {
+            log_fatal("arm: ARM tube ROM not found");
+            exit(1);
+        }
 }
 
 void arm_close()
@@ -280,7 +284,7 @@ uint8_t readarmb(uint32_t addr)
         debug_memread(&tubearm_cpu_debug, addr, v, 1);
     return v;
 }
-    
+
 
 static inline void do_writearmb(uint32_t addr, uint8_t val)
 {
@@ -500,7 +504,7 @@ static size_t arm_dbg_reg_print(int which, char *buf, size_t bufsize) {
         char c;
         const char *flagnameptr = flagname;
         int psr = arm_dbg_reg_get(i_PSR);
-        
+
         if (bufsize < 40) {
             strncpy(buf, "buffer too small!!!", bufsize);
         }

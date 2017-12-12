@@ -24,16 +24,10 @@ static SAMPLE *tsamples[2];
 
 void tapenoise_init()
 {
-        char path[512], p2[512];
         int c;
 
-        getcwd(p2, 511);
-        sprintf(path, "%sddnoise", exedir);
-//        printf("path now %s\n",path);
-        chdir(path);
-        tsamples[0] = load_wav("motoron.wav");
-        tsamples[1] = load_wav("motoroff.wav");
-        chdir(p2);
+        tsamples[0] = find_load_wav("ddnoise", "motoron");
+        tsamples[1] = find_load_wav("ddnoise", "motoroff");
         for (c = 0; c < 32; c++)
         {
                 sinewave[c] = (int)(sin((float)c * ((2.0 * PI) / 32.0)) * 128.0);

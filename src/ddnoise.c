@@ -24,54 +24,46 @@ static float ddnoise_spos = 0;
 static int ddnoise_sstat = -1;
 static int ddnoise_sdir = 0;
 
-SAMPLE *safe_load_wav(char *fn)
-{
-        if (file_exists(fn, FA_ALL, NULL))
-        {
-                return load_wav(fn);
-        }
-        else
-        {
-                log_debug("Failed to load sample %s",fn);
-                log_error("Can't load sound sample - does 'ddnoise' exist?");
-                exit(-1);
-        }
+SAMPLE *find_load_wav(const char *subdir, const char *name) {
+    char path[PATH_MAX];
+
+    if (find_dat_file(path, sizeof path, subdir, name, "wav") == 0) {
+        log_debug("ddnoise: loading sample %s from %s", name, path);
+        return load_wav(path);
+    }
+    return NULL;
 }
+
 void ddnoise_init()
 {
-        char path[512], p2[512];
-        getcwd(p2, 511);
-        if (ddnoise_type) sprintf(path, "%sddnoise/35",  exedir);
-        else              sprintf(path, "%sddnoise/525", exedir);
-//        printf("path now %s\n",path);
-        chdir(path);
-        seeksmp[0][0] = load_wav("stepo.wav");
-        if (seeksmp[0][0])
-        {
-                seeksmp[0][1] = load_wav("stepi.wav");
-                seeksmp[1][0] = load_wav("seek1o.wav");
-                seeksmp[1][1] = load_wav("seek1i.wav");
-                seeksmp[2][0] = load_wav("seek2o.wav");
-                seeksmp[2][1] = load_wav("seek2i.wav");
-                seeksmp[3][0] = load_wav("seek3o.wav");
-                seeksmp[3][1] = load_wav("seek3i.wav");
-        }
-        else
-        {
-                seeksmp[0][0] = load_wav("step.wav");
-                seeksmp[0][1] = load_wav("step.wav");
-                seeksmp[1][0] = load_wav("seek.wav");
-                seeksmp[1][1] = load_wav("seek.wav");
-                seeksmp[2][0] = load_wav("seek3.wav");
-                seeksmp[2][1] = load_wav("seek3.wav");
-                seeksmp[3][0] = load_wav("seek2.wav");
-                seeksmp[3][1] = load_wav("seek2.wav");
-        }
-        motorsmp[0] = load_wav("motoron.wav");
-        motorsmp[1] = load_wav("motor.wav");
-        motorsmp[2] = load_wav("motoroff.wav");
-        chdir(p2);
-//        printf("done!\n");
+    const char *subdir;
+
+    if (ddnoise_type) subdir = "ddnoise/35";
+    else              subdir = "ddnoise/525";
+    seeksmp[0][0] = find_load_wav(subdir, "stepo");
+    if (seeksmp[0][0]) {
+        seeksmp[0][1] = find_load_wav(subdir, "stepi");
+        seeksmp[1][0] = find_load_wav(subdir, "seek1o");
+        seeksmp[1][1] = find_load_wav(subdir, "seek1i");
+        seeksmp[2][0] = find_load_wav(subdir, "seek2o");
+        seeksmp[2][1] = find_load_wav(subdir, "seek2i");
+        seeksmp[3][0] = find_load_wav(subdir, "seek3o");
+        seeksmp[3][1] = find_load_wav(subdir, "seek3i");
+    }
+    else
+    {
+        seeksmp[0][0] = find_load_wav(subdir, "step");
+        seeksmp[0][1] = find_load_wav(subdir, "step");
+        seeksmp[1][0] = find_load_wav(subdir, "seek");
+        seeksmp[1][1] = find_load_wav(subdir, "seek");
+        seeksmp[2][0] = find_load_wav(subdir, "seek3");
+        seeksmp[2][1] = find_load_wav(subdir, "seek3");
+        seeksmp[3][0] = find_load_wav(subdir, "seek2");
+        seeksmp[3][1] = find_load_wav(subdir, "seek2");
+    }
+    motorsmp[0] = find_load_wav(subdir, "motoron");
+    motorsmp[1] = find_load_wav(subdir, "motor");
+    motorsmp[2] = find_load_wav(subdir, "motoroff");
 }
 
 void ddnoise_close()
@@ -125,7 +117,7 @@ void ddnoise_mix()
                 ddnoise_mstat = 2;
                 ddnoise_mpos = 0;
         }
-        
+
         if (sound_ddnoise)
         {
                 for (c = 0; c < BUFLEN_DD; c++)
@@ -167,11 +159,11 @@ void ddnoise_mix()
                         ddbuffer[c] = (ddbuffer[c] / 3) * ddnoise_vol;
                 }
         }
-        
+
         tapenoise_mix(ddbuffer);
 //        fwrite(ddbuffer,BUFLEN_DD*2,1,f2);
 //log_debug("Give buffer... %i %i\n",ddnoise_mstat,ddnoise_sstat);
         al_givebufferdd(ddbuffer);
-        
+
         oldmotoron=motoron;
 }

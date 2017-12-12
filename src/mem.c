@@ -9,168 +9,183 @@
 #include "b-em.h"
 #include "6502.h"
 #include "mem.h"
+#include "model.h"
+
+#ifndef PATH_MAX
+#define PATH_MAX 512
+#endif
 
 uint8_t *ram, *rom, *os;
 uint8_t ram_fe30, ram_fe34;
 
-#define ROM_SLOTS 16
-#define ROM_SIZE  16384
-
 int romused[ROM_SLOTS] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 int swram[ROM_SLOTS]   = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
-void mem_init()
-{
-        log_debug("mem_init\n");
-        ram = (uint8_t *)malloc(64 * 1024);
-        rom = (uint8_t *)malloc(ROM_SLOTS * ROM_SIZE);
-        os  = (uint8_t *)malloc(ROM_SIZE);
-        memset(ram, 0, 64 * 1024);
+void mem_init() {
+    log_debug("mem_init\n");
+    ram = (uint8_t *)malloc(RAM_SIZE);
+    rom = (uint8_t *)malloc(ROM_SLOTS * ROM_SIZE);
+    os  = (uint8_t *)malloc(ROM_SIZE);
+    memset(ram, 0, RAM_SIZE);
 }
 
-void mem_reset()
-{
-        memset(romused,0, sizeof(romused));
-        memset(swram,  0, sizeof(swram));
-        memset(ram,    0, 64 * 1024);
-        memset(rom,    0, ROM_SLOTS * ROM_SIZE);
-        memset(os,     0, ROM_SIZE);
+void mem_reset() {
+    memset(romused,0, sizeof(romused));
+    memset(swram,  0, sizeof(swram));
+    memset(ram,    0, RAM_SIZE);
+    memset(rom,    0, ROM_SLOTS * ROM_SIZE);
+    memset(os,     0, ROM_SIZE);
 }
 
-void mem_close()
-{
-        if (ram) free(ram);
-        if (rom) free(rom);
-        if (os)  free(os);
+void mem_close() {
+    if (ram) free(ram);
+    if (rom) free(rom);
+    if (os)  free(os);
 }
 
-void mem_dump()
-{
+static void dump_mem(void *start, size_t size, const char *which, const char *file) {
 	FILE *f;
 
-	if ((f=fopen("ram.dmp","wb")))
-	{
-		fwrite(ram,64*1024,1,f);
-		fclose(f);
-	}
-	else
-		log_error("mem: unable to open ram dump file: %s", strerror(errno));
-
-        if ((f=fopen("swram.dmp","wb")))
-	{
-		fwrite(&rom[4*ROM_SIZE],ROM_SIZE,1,f);
-		fwrite(&rom[5*ROM_SIZE],ROM_SIZE,1,f);
-		fwrite(&rom[6*ROM_SIZE],ROM_SIZE,1,f);
-		fwrite(&rom[7*ROM_SIZE],ROM_SIZE,1,f);
-		fclose(f);
-	}
-	else
-		log_error("mem: unable to open swram dump file: %s", strerror(errno));
+    if ((f = fopen(file, "wb"))) {
+        fwrite(start, size, 1, f);
+        fclose(f);
+    } else
+        log_error("mem: unable to open %s dump file %s: %s", which, file, strerror(errno));
 }
 
-static int load_sw_rom(const char *name, int slot)
-{
+void mem_dump(void) {
+    dump_mem(ram, 64*1024, "RAM", "ram.dmp");
+    dump_mem(rom, ROM_SLOTS*ROM_SIZE, "ROM", "rom.dmp");
+}
+
+static void load_os_rom(const char *sect) {
+    const char *osname;
 	FILE *f;
+    char path[PATH_MAX];
 
-	log_debug("Loading %s to slot %i\n", name, slot);
-	if ((f = fopen(name, "rb")))
-	{
-		fread(rom + (slot * ROM_SIZE), ROM_SIZE, 1, f);
-		fclose(f);
-		romused[slot] = 1;
-		return 1;
-	}
-	else
-	{
-		log_error("mem: unable to open rom file '%s': %s", name, strerror(errno));
-		return 0;
-	}
+    osname = get_config_string(sect, "os", models[curmodel].os);
+    if (!find_dat_file(path, sizeof path, "roms", osname, "rom")) {
+        if ((f = fopen(path, "rb"))) {
+            fread(os, ROM_SIZE, 1, f);
+            fclose(f);
+            log_debug("mem: OS %s loaded from %s", osname, path);
+            return;
+        } else
+            log_fatal("mem: unable to load OS %s, unable to open %s: %s", osname, path, strerror(errno));
+    } else
+        log_fatal("mem: unable to find OS %s", osname);
+    exit(1);
 }
 
-static int scan_rom_dir(const char *pat, char **files, int file_cnt)
-{
-        struct al_ffblk ffblk;
+static void cfg_load_rom(int slot, const char *sect, const char *def) {
+    const char *name;
+    char key[6];
+    FILE *f;
+    char path[PATH_MAX];
 
-        if (al_findfirst(pat, &ffblk, FA_ALL) == 0)
-	{
-		do {
-			log_debug("mem: found ROM file '%s'", ffblk.name);
-			files[file_cnt++] = strdup(ffblk.name);
-			if (file_cnt == ROM_SLOTS)
-			{
-				log_warn("mem: too many ROM files");
-				break;
-			}
-		} while (!al_findnext(&ffblk));
-		al_findclose(&ffblk);
-	}
-	return file_cnt;
+    snprintf(key, sizeof key, "%x", slot);
+    name = get_config_string(sect, key, def);
+    if (strcasecmp(name, "ram") == 0) {
+        log_debug("mem: ROM slot %02d set as sideways RAM", slot);
+        swram[slot] = 1;
+    } else if (strcasecmp(name, "empty") == 0) {
+        log_debug("mem: ROM slot %02d set as empty", slot);
+        romused[slot] = 1;
+    }
+    else if (!find_dat_file(path, sizeof path, "roms", name, "rom")) {
+        if ((f = fopen(path, "rb"))) {
+            fread(rom + (slot * ROM_SIZE), ROM_SIZE, 1, f);
+            fclose(f);
+            log_debug("mem: ROM slot %02d loaded with %s from %s", slot, name, path);
+            romused[slot] = 1;
+        } else
+            log_warn("mem: unable to load ROM slot %02d with %s, uanble to open %s: %s", slot, name, path, strerror(errno));
+    } else
+        log_warn("mem: unable to load ROM slot %02d with %s, ROM file not found", slot, name);
 }
 
-void mem_loadswroms()
-{
-        char *file, *rom_files[ROM_SLOTS];
-	int file_cnt, file_no, slot_no;
+void mem_romsetup_os01() {
+    const char *sect = models[curmodel].cfgsect;
+    int c;
 
-	// Build an array of all ROM files.
-
-	file_cnt = scan_rom_dir("*.rom", rom_files, 0);
-#ifndef WIN32
-	if (file_cnt < ROM_SLOTS)
-		file_cnt = scan_rom_dir("*.ROM", rom_files, file_cnt);
-#endif
-	// Next process files which start with a slot number.
-
-	for (file_no = 0; file_no < file_cnt; file_no++)
-	{
-		file = rom_files[file_no];
-		if (isdigit(*file))
-		{
-			log_debug("mem: numbered ROM %s", file);
-			slot_no = atoi(file);
-			if (slot_no < ROM_SLOTS)
-			{
-				if (romused[slot_no])
-					log_warn("mem: slot %d is already used - unable to load %s into it", slot_no, file);
-				else
-				{
-					load_sw_rom(file, slot_no);
-					free(file);
-					rom_files[file_no] = NULL; // mark done.
-				}
-			}
-			else
-				log_warn("mem: slot %d is out of range for %s", slot_no, file);
-		}
-	}
-
-	// Go back and process the rest.
-
-	slot_no = 15;
-	for (file_no = 0; file_no < file_cnt; file_no++)
-	{
-		if ((file = rom_files[file_no]))
-		{
-			log_debug("mem: anywhere ROM %s", file);
-			while (romused[slot_no])
-			{
-				if (slot_no == 0)
-					return; // should never happen.
-				slot_no--;
-			}
-			load_sw_rom(file, slot_no);
-			free(file);
-		}
-	}
+	load_os_rom(sect);
+    cfg_load_rom(15, sect, models[curmodel].basic);
+    memcpy(rom + 14 * ROM_SIZE, rom + 15 * ROM_SIZE, ROM_SIZE);
+    memcpy(rom + 12 * ROM_SIZE, rom + 14 * ROM_SIZE, ROM_SIZE * 2);
+    memcpy(rom + 8 * ROM_SIZE, rom + 12 * ROM_SIZE, ROM_SIZE * 4);
+    memcpy(rom, rom + 8 * ROM_SIZE, ROM_SIZE * 8);
+    for (c = 0; c < ROM_SLOTS; c++)
+        romused[c] = 1;
+    for (c = 0; c < ROM_SLOTS; c++)
+        swram[c] = 0;
 }
 
-void mem_fillswram()
-{
-        int c;
-        for (c = 0; c < ROM_SLOTS; c++)
-        {
-                if (!romused[c]) swram[c] = 1;
-        }
+void mem_romsetup_common(const char *rest) {
+    const char *sect = models[curmodel].cfgsect;
+    int slot;
+
+    load_os_rom(sect);
+    cfg_load_rom(15, sect, models[curmodel].basic);
+    cfg_load_rom(14, sect, "vdfs");
+    cfg_load_rom(13, sect, models[curmodel].dfs);
+    for (slot = 12; slot >= 0; slot--)
+        cfg_load_rom(slot, sect, rest);
+}
+
+void mem_romsetup_std(void) {
+    mem_romsetup_common("empty");
+}
+
+void mem_romsetup_swram(void) {
+    mem_romsetup_common("ram");
+}
+
+void mem_romsetup_master(void) {
+    const char *sect = models[curmodel].cfgsect;
+    const char *osname;
+	FILE *f;
+    char path[PATH_MAX];
+    int slot;
+
+
+    osname = get_config_string(sect, "os", models[curmodel].os);
+    if (!find_dat_file(path, sizeof path, "roms", osname, "rom")) {
+        if ((f = fopen(path, "rb"))) {
+            if (fread(os, ROM_SIZE, 1, f) == 1) {
+                if (fread(rom + (9 * ROM_SIZE), 7 * ROM_SIZE, 1, f) == 1) {
+                    fclose(f);
+                    for (slot = ROM_SLOTS-1; slot >= 9; slot--) {
+                        romused[slot] = 1;
+                        swram[slot] = 0;
+                    }
+                    cfg_load_rom(8, sect, "vdfs");
+                    for (slot = 7; slot >= 4; slot--)
+                        cfg_load_rom(slot, sect, "ram");
+                    for (; slot >= 0; slot--)
+                        cfg_load_rom(slot, sect, "empty");
+                    return;
+                }
+            }
+            log_fatal("mem: unable to read complete OS ROM %s: %s", osname, strerror(errno));
+            fclose(f);
+        } else
+            log_fatal("mem: unable to load OS %s, unable to open %s: %s", osname, path, strerror(errno));
+    } else
+        log_fatal("mem: unable to find OS %s", osname);
+    exit(1);
+}
+
+void mem_romsetup_compact(void) {
+    const char *sect = models[curmodel].cfgsect;
+    int slot;
+
+	load_os_rom(sect);
+    cfg_load_rom(15, sect, "utils");
+    cfg_load_rom(14, sect, models[curmodel].basic);
+    cfg_load_rom(13, sect, models[curmodel].dfs);
+    cfg_load_rom(12, sect, "vdfs");
+    for (slot = 11; slot >= 0; slot--)
+        cfg_load_rom(slot, sect, "ram");
 }
 
 int mem_findswram(int n) {
@@ -183,146 +198,26 @@ int mem_findswram(int n) {
     return -1;
 }
 
-static void load_os_rom(const char *os_name)
-{
-	FILE *f;
+void mem_clearroms() {
+    int c;
 
-	log_debug("Reading OS file %s", os_name);
-	if ((f = fopen(os_name, "rb")) == NULL)
-	{
-		log_fatal("mem: unable to load OS ROM %s: %s", os_name, strerror(errno));
-		exit(1);
-	}
-	fread(os, ROM_SIZE, 1, f);
-	fclose(f);
+    memset(rom, 0, ROM_SLOTS * ROM_SIZE);
+    for (c = 0; c < ROM_SLOTS; c++)
+        romused[c] = 0;
+    for (c = 0; c < ROM_SLOTS; c++)
+        swram[c] = 0;
 }
 
-void mem_loadroms(char *os_name, char *romdir)
-{
-        char path[512], p2[512];
-
-        if (os_name[0])
-		load_os_rom(os_name);
-
-        getcwd(p2, 511);
-        sprintf(path, "%sroms/%s", exedir, romdir);
-        chdir(path);
-        mem_loadswroms();
-        chdir(p2);
+void mem_savestate(FILE *f) {
+    putc(ram_fe30, f);
+    putc(ram_fe34, f);
+    fwrite(ram, RAM_SIZE, 1, f);
+    fwrite(rom, ROM_SIZE*ROM_SLOTS, 1, f);
 }
 
-void mem_clearroms()
-{
-        int c;
-        memset(rom, 0, ROM_SLOTS * ROM_SIZE);
-        for (c = 0; c < ROM_SLOTS; c++) romused[c] = 0;
-        for (c = 0; c < ROM_SLOTS; c++) swram[c] = 0;
-}
-
-void mem_romsetup_os01()
-{
-        int c;
-        struct al_ffblk ffblk;
-
-	load_os_rom("os01");
-
-        chdir("a01");
-        if (!al_findfirst("*.rom", &ffblk, FA_ALL))
-        {
-		if (load_sw_rom(ffblk.name, 0))
-		{
-			memcpy(rom + ROM_SIZE,  rom, ROM_SIZE);
-			memcpy(rom + 32768,  rom, 32768);
-			memcpy(rom + 65536,  rom, 65536);
-			memcpy(rom + 131072, rom, 131072);
-		}
-                al_findclose(&ffblk);
-        }
-
-        chdir("..");
-        for (c = 0; c < ROM_SLOTS; c++) romused[c] = 1;
-        for (c = 0; c < ROM_SLOTS; c++) swram[c] = 0;
-}
-
-void mem_romsetup_bplus128()
-{
-        swram[12] = swram[13] = 1;
-        swram[0]  = swram[1]  = 1;
-        romused[12] = romused[13] = 1;
-        romused[0]  = romused[1]  = 1;
-}
-
-static void load_os_master(const char *os_name)
-{
-	FILE *f;
-
-	log_debug("Reading OS file %s", os_name);
-	if ((f = fopen(os_name, "rb")) == NULL)
-	{
-		log_fatal("mem: unable to load OS ROM %s: %s", os_name, strerror(errno));
-		exit(1);
-	}
-        fread(os, ROM_SIZE, 1, f);
-        fread(rom + (9 * ROM_SIZE), 7 * ROM_SIZE, 1, f);
-	fclose(f);
-}
-
-void mem_romsetup_master128()
-{
-        memset(rom, 0, ROM_SLOTS * ROM_SIZE);
-        swram[0]  = swram[1]  = swram[2]  = swram[3]  = 0;
-        swram[4]  = swram[5]  = swram[6]  = swram[7]  = 1;
-        swram[8]  = swram[9]  = swram[10] = swram[11] = 0;
-        swram[12] = swram[13] = swram[14] = swram[15] = 0;
-        romused[0]  = romused[1]  = romused[2]  = romused[3]  = romused[8] = 0;
-        romused[4]  = romused[5]  = romused[6]  = romused[7]  = 1;
-        romused[9]  = romused[10] = romused[11] = 1;
-        romused[12] = romused[13] = romused[14] = romused[15] = 1;
-	load_os_master("master/mos3.20");
-}
-
-void mem_romsetup_master128_35()
-{
-        memset(rom, 0, ROM_SLOTS * ROM_SIZE);
-        swram[0]  = swram[1]  = swram[2]  = swram[3]  = 0;
-        swram[4]  = swram[5]  = swram[6]  = swram[7]  = 1;
-        swram[8]  = swram[9]  = swram[10] = swram[11] = 0;
-        swram[12] = swram[13] = swram[14] = swram[15] = 0;
-        romused[0]  = romused[1]  = romused[2]  = romused[3]  = romused[8] = 0;
-        romused[4]  = romused[5]  = romused[6]  = romused[7]  = 1;
-        romused[9]  = romused[10] = romused[11] = 1;
-        romused[12] = romused[13] = romused[14] = romused[15] = 1;
-	load_os_master("master/mos3.50");
-}
-
-void mem_romsetup_mastercompact()
-{
-        swram[0]  = swram[1]  = swram[2]  = swram[3]  = 0;
-        swram[4]  = swram[5]  = swram[6]  = swram[7]  = 1;
-        swram[8]  = swram[9]  = swram[10] = swram[11] = 0;
-        swram[12] = swram[13] = swram[14] = swram[15] = 0;
-        romused[0]  = romused[1]  = romused[2]  = romused[3]  = 0;
-        romused[4]  = romused[5]  = romused[6]  = romused[7]  = 1;
-        romused[8]  = romused[9]  = romused[10] = romused[11] = 0;
-        romused[12] = romused[13] = romused[14] = romused[15] = 1;
-	load_os_rom("compact/os51");
-	load_sw_rom("compact/basic48", 14);
-	load_sw_rom("compact/adfs210", 13);
-        load_sw_rom("compact/utils", 15);
-}
-
-void mem_savestate(FILE *f)
-{
-        putc(ram_fe30, f);
-        putc(ram_fe34, f);
-        fwrite(ram, 64  * 1024, 1, f);
-        fwrite(rom, 256 * 1024, 1, f);
-}
-
-void mem_loadstate(FILE *f)
-{
-        writemem(0xFE30, getc(f));
-        writemem(0xFE34, getc(f));
-        fread(ram, 64  * 1024, 1, f);
-        fread(rom, 256 * 1024, 1, f);
+void mem_loadstate(FILE *f) {
+    writemem(0xFE30, getc(f));
+    writemem(0xFE34, getc(f));
+    fread(ram, RAM_SIZE, 1, f);
+    fread(rom, ROM_SIZE*ROM_SLOTS, 1, f);
 }

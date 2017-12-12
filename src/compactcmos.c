@@ -33,36 +33,41 @@ static int cmos_rw;
 static uint8_t cmos_addr = 0;
 static uint8_t cmos_ram[256];
 
-void compactcmos_load(MODEL m)
-{
-        FILE *cmosf;
-        char fn[512];
-        sprintf(fn, "%s%s", exedir, m.cmos);
-        cmosf = fopen(fn, "rb");
-        if (cmosf)
-        {
-                fread(cmos_ram, 128, 1, cmosf);
-                fclose(cmosf);
-        }
-        else
-	{
-		log_error("compactcmos: unable to load CMOS file '%s': %s", fn, strerror(errno));
-		memset(cmos_ram, 0, 128);
-	}
+void compactcmos_load(MODEL m) {
+    FILE *cmosf;
+    char fn[PATH_MAX];
+    const char *msg;
+
+    if (!find_cfg_file(fn, sizeof fn, m.cmos, "bin")) {
+        if ((cmosf = fopen(fn, "rb"))) {
+            fread(cmos_ram, 128, 1, cmosf);
+            fclose(cmosf);
+            log_debug("compactcmos: loaded from %s", fn);
+            return;
+        } else
+            msg = strerror(errno);
+    } else
+        msg = "file not found";
+    log_error("compactcmos: unable to load CMOS file '%s': %s", fn, msg);
+    memset(cmos_ram, 0, 128);
 }
 
-void compactcmos_save(MODEL m)
-{
-        FILE *cmosf;
-        char fn[512];
-        sprintf(fn, "%s%s", exedir, m.cmos);
-        if ((cmosf = fopen(fn, "wb")))
-	{
-		fwrite(cmos_ram, 128, 1, cmosf);
-		fclose(cmosf);
-	}
-	else
-		log_error("compactcmos: unable to save CMOS file '%s': %s", fn, strerror(errno));
+void compactcmos_save(MODEL m) {
+    FILE *cmosf;
+    char fn[PATH_MAX];
+    const char *msg;
+
+    if (!find_cfg_dest(fn, sizeof fn, m.cmos, "bin")) {
+        if ((cmosf = fopen(fn, "rb"))) {
+            log_debug("compactcmos: saving to from %s", fn);
+            fwrite(cmos_ram, 128, 1, cmosf);
+            fclose(cmosf);
+            return;
+        } else
+            msg = strerror(errno);
+    } else
+        msg = "no suitable destination";
+    log_error("compactcmos: unable to save CMOS file '%s': %s", fn, msg);
 }
 
 static void cmos_stop()
