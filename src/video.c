@@ -450,9 +450,9 @@ static void mode7_gen_nula_lookup(void) {
             bg_grn = getg(bg_col);
             bg_blu = getb(bg_col);
             for (weight = 0; weight < 16; weight++) {
-                lu_red = bg_red + (((fg_red - bg_red) * weight) >> 4);
-                lu_grn = bg_grn + (((fg_grn - bg_grn) * weight) >> 4);
-                lu_blu = bg_blu + (((fg_blu - bg_blu) * weight) >> 4);
+                lu_red = bg_red + (((fg_red - bg_red) * weight) / 15);
+                lu_grn = bg_grn + (((fg_grn - bg_grn) * weight) / 15);
+                lu_blu = bg_blu + (((fg_blu - bg_blu) * weight) / 15);
                 mode7_lookup[fg_ix][bg_ix][weight] = makecol(lu_red, lu_grn, lu_blu);
             }
         }
