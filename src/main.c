@@ -72,10 +72,18 @@ void secint()
         printsec = 1;
 }
 
-int fcount = 0;
+int bempause = 0;
+static int bemstep = 0;
+static int old_key_pgdn = 0;
+static int old_key_right = 0;
+static int fcount = 0;
+
 void int50()
 {
+    if (!bempause || bemstep) {
         fcount++;
+        bemstep = 0;
+    }
 }
 
 char exedir[512];
@@ -278,6 +286,7 @@ void main_init(int argc, char *argv[])
 
 void main_restart()
 {
+        bempause = 1;
         startblit();
         if (curtube == 3 || mouse_amx) remove_mouse();
         cmos_save(models[oldmodel]);
@@ -287,9 +296,9 @@ void main_restart()
 
         main_reset();
 
-        resumeready();
         if (curtube == 3 || mouse_amx) install_mouse();
         endblit();
+        bempause = 0;
 }
 
 void main_setmouse()
@@ -357,6 +366,12 @@ void main_run()
                 framesrun = 0;
                 rest(1);
         }
+        if (key[KEY_PGDN] && !old_key_pgdn)
+            bempause ^= 1;
+        old_key_pgdn = key[KEY_PGDN];
+        if (key[KEY_RIGHT] && !old_key_right && bempause)
+            bemstep = 1;
+        old_key_right = key[KEY_RIGHT];
         if (framesrun > 10) fcount = 0;
 }
 

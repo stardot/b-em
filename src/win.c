@@ -138,7 +138,7 @@ static void initmenu()
 {
         char t[512];
         HMENU hmenu = GetMenu(ghwnd);
-        
+
         CheckMenuItem(hmenu, IDM_DISC_WPROT_0, (writeprot[0])     ? MF_CHECKED : MF_UNCHECKED);
         CheckMenuItem(hmenu, IDM_DISC_WPROT_1, (writeprot[1])     ? MF_CHECKED : MF_UNCHECKED);
         CheckMenuItem(hmenu, IDM_DISC_WPROT_D, (defaultwriteprot) ? MF_CHECKED : MF_UNCHECKED);
@@ -158,7 +158,7 @@ static void initmenu()
         if (sound_music5000) CheckMenuItem(hmenu, IDM_SOUND_MUSIC5000, MF_CHECKED);
         if (sound_ddnoise)  CheckMenuItem(hmenu, IDM_SOUND_DDNOISE,  MF_CHECKED);
         if (sound_tape)     CheckMenuItem(hmenu, IDM_SOUND_TAPE,     MF_CHECKED);
-        
+
         CheckMenuItem(hmenu, IDM_SOUND_FILTER, (sound_filter) ? MF_CHECKED : MF_UNCHECKED);
         CheckMenuItem(hmenu, IDM_WAVE_SQUARE + curwave, MF_CHECKED);
 
@@ -167,23 +167,23 @@ static void initmenu()
 
         CheckMenuItem(hmenu, IDM_DDT_525 + ddnoise_type,     MF_CHECKED);
         CheckMenuItem(hmenu, (IDM_DDV_33 + ddnoise_vol) - 1, MF_CHECKED);
-        
+
         CheckMenuItem(hmenu, IDM_TAPES_NORMAL + fasttape, MF_CHECKED);
-        
+
         CheckMenuItem(hmenu, IDM_TUBES_4 + (tube_6502_speed - 1), MF_CHECKED);
-        
+
         CheckMenuItem(hmenu, IDM_VIDEO_NOBORDERS + vid_fullborders, MF_CHECKED);
-        
+
         append_filename(t, exedir, "roms\\tube\\ReCo6502ROM_816", 511);
         if (!file_exists(t, FA_ALL, NULL)) EnableMenuItem(hmenu, IDM_TUBE_65816, MF_GRAYED);
-        
+
         if (keyas)     CheckMenuItem(hmenu, IDM_KEY_AS, MF_CHECKED);
-        
+
         if (mouse_amx) CheckMenuItem(hmenu, IDM_MOUSE_AMX, MF_CHECKED);
 
         CheckMenuItem(hmenu, IDM_SCSI_ENABLE, scsi_enabled ? MF_CHECKED : MF_UNCHECKED);
         CheckMenuItem(hmenu, IDM_IDE_ENABLE, ide_enable ? MF_CHECKED : MF_UNCHECKED);
-        
+
         CheckMenuItem(hmenu, IDM_VIDEO_RESIZE, (videoresize) ? MF_CHECKED : MF_UNCHECKED);
 
         CheckMenuItem(hmenu, IDM_SPD_100, MF_CHECKED);
@@ -191,7 +191,6 @@ static void initmenu()
 
 static HANDLE mainthread;
 
-static int bempause = 0, bemwaiting = 0;
 static int doautoboot = 0;
 
 void _mainthread(PVOID pvoid)
@@ -206,39 +205,19 @@ void _mainthread(PVOID pvoid)
 
         while (1)
         {
-                if (bempause)
-                {
-                        bemwaiting = 1;
-                        Sleep(100);
-                }
-                else
-                {
-                        bemwaiting = 0;
-                        main_run();
-                }
+                main_run();
                 if (doautoboot)
                 {
                         main_reset();
                         disc_close(0);
                         disc_load(0, discfns[0]);
                         if (defaultwriteprot) writeprot[0] = 1;
-                	hmenu = GetMenu(ghwnd);
+                        hmenu = GetMenu(ghwnd);
                         CheckMenuItem(hmenu, IDM_DISC_WPROT_0, (writeprot[0]) ? MF_CHECKED : MF_UNCHECKED);
                         autoboot = 150;
                         doautoboot = 0;
                 }
         }
-}
-
-void waitforready()
-{
-        bempause = 1;
-        while (!bemwaiting) Sleep(100);
-}
-
-void resumeready()
-{
-        bempause = 0;
 }
 
 CRITICAL_SECTION cs;
@@ -303,9 +282,9 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         int c;
         int oldf = 0;
         char *p;
-        
+
         for (c = 0; c < 128; c++) keylookup[c] = c;
-        
+
         processcommandline();
 
         hinstance = hThisInstance;
@@ -347,7 +326,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
            );
 
         ghwnd = hwnd;
-        
+
         win_set_window(hwnd);
 
         allegro_init();
@@ -359,16 +338,16 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         config_load();
 
         InitializeCriticalSection(&cs);
-        
+
         /* Make the window visible on the screen */
         ShowWindow (hwnd, nFunsterStil);
-        
+
         initmenu();
-        
+
         mainthread = (HANDLE)_beginthread(_mainthread, 0, NULL);
-        
+
         updatewindowtitle();
-        
+
 
         /* Run the message loop. It will run until GetMessage() returns 0 */
         while (!quited)
@@ -407,12 +386,12 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
                 }
                 oldf = key[KEY_ALT] && key[KEY_ENTER];
         }
-        
+
         EnterCriticalSection(&cs);
         TerminateThread(mainthread, 0);
         main_close();
         DeleteCriticalSection(&cs);
-        
+
         return messages.wParam;
 }
 
@@ -501,7 +480,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
         RECT rect;
         int c;
 	LRESULT r;
-        
+
         switch (message)
         {
                 case WM_COMMAND:
@@ -639,7 +618,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         tape_close();
                         tape_loaded = 0;
                         break;
-                        
+
                         case IDM_TAPE_REWIND:
                         tape_close();
                         tape_load(tape_fn);
@@ -647,7 +626,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         case IDM_TAPE_CAT:
                         showcatalogue(hinstance, ghwnd);
                         break;
-                        
+
                         case IDM_TAPES_NORMAL: case IDM_TAPES_FAST:
                         fasttape = LOWORD(wParam) - IDM_TAPES_NORMAL;
                         CheckMenuItem(hmenu, IDM_TAPES_NORMAL, MF_UNCHECKED);
@@ -674,7 +653,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         GetWindowRect(hwnd, &rect);
                         SetWindowPos(hwnd, 0, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, SWP_NOZORDER | SWP_FRAMECHANGED);
                         break;
-                        
+
                         case IDM_VIDEO_SLINEDBL: case IDM_VIDEO_LINEDBL: case IDM_VIDEO_SCANLINES: case IDM_VIDEO_INTERLACED: case IDM_VIDEO_PAL: case IDM_VIDEO_PALI:
                         CheckMenuItem(hmenu, IDM_VIDEO_SLINEDBL,   MF_UNCHECKED);
                         CheckMenuItem(hmenu, IDM_VIDEO_LINEDBL,    MF_UNCHECKED);
@@ -711,7 +690,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         tube_6502_speed = (LOWORD(wParam) - IDM_TUBES_4) + 1;
                         tube_updatespeed();
                         break;
-                        
+
                         case IDM_SOUND_INTERNAL:
                         sound_internal = !sound_internal;
                         CheckMenuItem(hmenu, IDM_SOUND_INTERNAL, (sound_internal) ? MF_CHECKED : MF_UNCHECKED);
@@ -740,7 +719,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         sound_filter = !sound_filter;
                         CheckMenuItem(hmenu, IDM_SOUND_FILTER, (sound_filter) ? MF_CHECKED : MF_UNCHECKED);
                         break;
-                        
+
                         case IDM_WAVE_SQUARE: case IDM_WAVE_SAW: case IDM_WAVE_SINE: case IDM_WAVE_TRI: case IDM_WAVE_SID:
                         CheckMenuItem(hmenu, IDM_WAVE_SQUARE + curwave, MF_UNCHECKED);
                         curwave = LOWORD(wParam) - IDM_WAVE_SQUARE;
@@ -754,7 +733,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         sidmethod = LOWORD(wParam) - IDM_SID_INTERP;
                         sid_settype(sidmethod, cursid);
                         break;
-                        
+
                         case IDM_DDV_33: case IDM_DDV_66: case IDM_DDV_100:
                         CheckMenuItem(hmenu, (IDM_DDV_33 + ddnoise_vol) - 1, MF_UNCHECKED);
                         ddnoise_vol = (LOWORD(wParam) - IDM_DDV_33) + 1;
@@ -787,7 +766,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                 case IDM_BREAK:
                         debug_step = 1;
                         break;
-                        
+
                         case IDM_SCRSHOT:
                         if (!getsfile(hwnd, "Bitmap file (*.BMP)\0*.BMP\0All files (*.*)\0*.*\0", vid_scrshotname, "BMP"))
                         {
@@ -803,7 +782,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         keyas = !keyas;
                         CheckMenuItem(hmenu, IDM_KEY_AS, (keyas) ? MF_CHECKED : MF_UNCHECKED);
                         break;
-                        
+
                         case IDM_MOUSE_AMX:
                         mouse_amx = !mouse_amx;
                         CheckMenuItem(hmenu, IDM_MOUSE_AMX, (mouse_amx) ? MF_CHECKED : MF_UNCHECKED);
@@ -826,7 +805,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         main_restart();
                         LeaveCriticalSection(&cs);
                         break;
-                        
+
                         case IDM_SPD_10: case IDM_SPD_25: case IDM_SPD_50: case IDM_SPD_75: case IDM_SPD_100:
                         case IDM_SPD_150: case IDM_SPD_200: case IDM_SPD_300: case IDM_SPD_400: case IDM_SPD_500:
                         CheckMenuItem(hmenu, IDM_SPD_10 + emuspeed, MF_UNCHECKED);
@@ -853,14 +832,14 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         sid_settype(sidmethod, cursid);
                 }
                 return 0;
-                
+
                 case WM_USER:
                 if (videoresize) SetWindowLong(hwnd, GWL_STYLE,  WS_OVERLAPPEDWINDOW | WS_VISIBLE);
                 else             SetWindowLong(hwnd, GWL_STYLE, (WS_OVERLAPPEDWINDOW & ~WS_SIZEBOX & ~WS_THICKFRAME & ~WS_MAXIMIZEBOX) | WS_VISIBLE);
                 GetWindowRect(hwnd, &rect);
                 SetWindowPos(hwnd, 0, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, SWP_NOZORDER | SWP_FRAMECHANGED);
                 break;
-                
+
                 case WM_USER+1:
                 if (videoresize) SetWindowLong(hwnd, GWL_STYLE,  WS_OVERLAPPEDWINDOW & ~WS_VISIBLE);
                 else             SetWindowLong(hwnd, GWL_STYLE, (WS_OVERLAPPEDWINDOW & ~WS_SIZEBOX & ~WS_THICKFRAME & ~WS_MAXIMIZEBOX) & ~WS_VISIBLE);
@@ -871,7 +850,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                 case WM_DESTROY:
                 PostQuitMessage (0);       /* send a WM_QUIT to the message queue */
                 break;
-                
+
                 case WM_KILLFOCUS:
 //              log_debug("KillFocus\n");
 //                infocus=0;
@@ -898,7 +877,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         updatewindowtitle();
                 }
                 break;
-                
+
                 case WM_ENTERMENULOOP:
 //              log_debug("EnterMenuLoop\n");
                 bempause = 1;
@@ -918,7 +897,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                 for (c = 0; c < 128; c++) key[c] = 0;
 		bempause = 0;
 		break;
-                
+
                 case WM_SIZE:
                 winsizex = lParam & 0xFFFF;
                 winsizey = lParam >> 16;
