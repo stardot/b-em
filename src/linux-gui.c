@@ -25,6 +25,7 @@
 #include "tape.h"
 #include "tube.h"
 #include "vdfs.h"
+#include "video.h"
 #include "video_render.h"
 
 
@@ -54,7 +55,7 @@ MENU tubemenu[6];
 #endif
 MENU displaymenu[4];
 MENU bordersmenu[4];
-MENU videomenu[4];
+MENU videomenu[5];
 MENU sidtypemenu[15];
 MENU methodmenu[3];
 MENU residmenu[3];
@@ -95,6 +96,7 @@ void gui_update()
         displaymenu[1].flags = (vid_scanlines) ? D_SELECTED : 0;
         displaymenu[2].flags = (vid_interlace) ? D_SELECTED : 0;
         videomenu[2].flags = (fullscreen) ? D_SELECTED : 0;
+        videomenu[3].flags = (nula_disable) ? 0 : D_SELECTED;
         for (x = 0; x < 3; x++)  bordersmenu[x].flags = (vid_fullborders == (intptr_t)bordersmenu[x].dp) ? D_SELECTED : 0;
         soundmenu[0].flags = (sound_internal) ? D_SELECTED : 0;
         soundmenu[1].flags = (sound_beebsid)  ? D_SELECTED : 0;
@@ -541,11 +543,21 @@ int gui_fullscreen()
         return D_EXIT;
 }
 
-MENU videomenu[4] =
+static int gui_video_nula()
+{
+    if (nula_disable)
+        nula_disable = 0;
+    else
+        nula_disable = 1;
+    return D_EXIT;
+}
+
+MENU videomenu[5] =
 {
         {"Display type", NULL,           displaymenu, 0, NULL},
         {"Borders",      NULL,           bordersmenu, 0, NULL},
         {"Fullscreen",   gui_fullscreen, NULL,        0, NULL},
+        {"NuLA",         gui_video_nula, NULL,        0, NULL},
         {NULL, NULL, NULL, 0, NULL}
 };
 

@@ -14,6 +14,7 @@ void    crtc_loadstate(FILE *f);
 extern uint8_t crtc[32];
 extern int crtc_i;
 
+extern int scrx, scry;
 extern int hc, vc, sc, vadj;
 extern uint16_t ma, maback;
 
