@@ -448,6 +448,7 @@ static void scan_entry(vdfs_ent_t *ent) {
 static void init_entry(vdfs_ent_t *ent) {
     ent->host_fn = ".";
     ent->acorn_fn[0] = '\0';
+    ent->acorn_fn[MAX_FILE_NAME] = '\0';
     ent->attribs = 0;
     ent->load_addr = 0;;
     ent->exec_addr = 0;
@@ -682,7 +683,7 @@ static void write_back(vdfs_ent_t *ent) {
 
     *ent->host_inf = '.'; // select .inf file.
     if ((fp = fopen(ent->host_path, "wt"))) {
-        fprintf(fp, "%-*s %08X %08X %08X\n", MAX_FILE_NAME, ent->acorn_fn, ent->load_addr, ent->exec_addr, ent->length);
+        fprintf(fp, "%s %08X %08X %08X\n", ent->acorn_fn, ent->load_addr, ent->exec_addr, ent->length);
         fclose(fp);
     } else
         log_warn("vdfs: unable to create INF file '%s': %s\n", ent->host_path, strerror(errno));
