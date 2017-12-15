@@ -617,40 +617,36 @@ static vdfs_ent_t *find_entry(uint16_t fn_addr, vdfs_ent_t *key, vdfs_ent_t *ent
     char *fn_ptr;
     vdfs_ent_t **ptr;
 
-    if (scan_dir(ent) == 0) {
-        init_entry(key);
-        key->parent = NULL;
-        log_debug("vdfs: find_entry: fn_addr=%04x\n", fn_addr);
-        for (;;) {
-            fn_ptr = key->acorn_fn;
-            for (i = 0; i < MAX_FILE_NAME; i++) {
-                ch = readmem(fn_addr++);
-                if (ch == '\r' || ch == '.' || ch == ' ')
-                    break;
-                *fn_ptr++ = ch;
-            }
-            *fn_ptr = '\0';
-            log_debug("vdfs: find_entry: looking for acorn name=%s", key->acorn_fn);
-            if (tail_addr)
-                *tail_addr = fn_addr;
-            if (key->acorn_fn[0] == '$' && key->acorn_fn[1] == '\0')
-                ent = &root_dir;
-            else if (key->acorn_fn[0] == '^' && key->acorn_fn[1] == '\0')
-                ent = ent->parent;
-            else if ((ptr = tfind(key, &ent->acorn_tree, acorn_comp)))
-                ent = *ptr;
-            else {
-                if (ch != '.')
-                    key->parent = ent;
-                return NULL; // not found
-            }
-            if (ch != '.')
-                return ent;
-            if (!(ent->attribs & ATTR_IS_DIR))
-                return NULL; // file in pathname where dir should be
-            if (scan_dir(ent))
-                return NULL;
+    init_entry(key);
+    key->parent = NULL;
+    log_debug("vdfs: find_entry: fn_addr=%04x\n", fn_addr);
+    for (;;) {
+        fn_ptr = key->acorn_fn;
+        for (i = 0; i < MAX_FILE_NAME; i++) {
+            ch = readmem(fn_addr++);
+            if (ch == '\r' || ch == '.' || ch == ' ')
+                break;
+            *fn_ptr++ = ch;
         }
+        *fn_ptr = '\0';
+        log_debug("vdfs: find_entry: looking for acorn name=%s", key->acorn_fn);
+        if (tail_addr)
+            *tail_addr = fn_addr;
+        if (key->acorn_fn[0] == '$' && key->acorn_fn[1] == '\0')
+            ent = &root_dir;
+        else if (key->acorn_fn[0] == '^' && key->acorn_fn[1] == '\0')
+            ent = ent->parent;
+        else if (!scan_dir(ent) && (ptr = tfind(key, &ent->acorn_tree, acorn_comp)))
+            ent = *ptr;
+        else {
+            if (ch != '.')
+                key->parent = ent;
+            return NULL; // not found
+        }
+        if (ch != '.')
+            return ent;
+        if (!(ent->attribs & ATTR_IS_DIR))
+            return NULL; // file in pathname where dir should be
     }
     return NULL;
 }
@@ -1245,9 +1241,12 @@ static inline void osgbpb() {
         case 0x08: // list files in current directory in Acorn format.
             if (check_valid_dir(cur_dir, "current")) {
                 seq_ptr = readmem32(pb+9);
-                if (seq_ptr == 0)
-                    if ((status = gen_cat_tab(cur_dir)))
+                if (seq_ptr == 0) {
+                    if ((status = gen_cat_tab(cur_dir))) {
+                        adfs_error(err_notfound);
                         break;
+                    }
+                }
                 if (seq_ptr < cur_dir->cat_size) {
                     mem_ptr = readmem32(pb+1);
                     n = readmem32(pb+5);
@@ -1270,9 +1269,12 @@ static inline void osgbpb() {
             if (check_valid_dir(cat_dir, "catalogue")) {
                 n = readmem(pb);
                 seq_ptr = readmem32(pb+9);
-                if (seq_ptr == 0)
-                    if ((status = gen_cat_tab(cat_dir)))
+                if (seq_ptr == 0) {
+                    if ((status = gen_cat_tab(cat_dir))) {
+                        adfs_error(err_notfound);
                         break;
+                    }
+                }
                 if (seq_ptr < cat_dir->cat_size) {
                     mem_ptr = readmem32(pb+1);
                     log_debug("vdfs: seq_ptr=%d, writing max %d entries starting %04X\n", seq_ptr, n, mem_ptr);
