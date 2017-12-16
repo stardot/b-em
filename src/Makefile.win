@@ -48,8 +48,10 @@ OBJ = \
     logging.o \
     main.o \
     mem.o \
+    midi-windows.o \
     model.o \
     mouse.o \
+    music4000.o \
     music5000.o \
     pal.o \
     savestate.o \
