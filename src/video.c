@@ -452,24 +452,39 @@ void mode7_makechars()
 }
 
 static void mode7_gen_nula_lookup(void) {
+    int bl_col, bl_red, bl_grn, bl_blu;
     int fg_ix, fg_col, fg_red, fg_grn, fg_blu;
     int bg_ix, bg_col, bg_red, bg_grn, bg_blu;
     int weight, lu_red, lu_grn, lu_blu;
+
+    // get the R,G,B values black has been mapped to as these need to
+    // be subtracted from the other colors.
+
+    bl_col = nula_collook[0];
+    bl_red = getr(bl_col);
+    bl_grn = getg(bl_col);
+    bl_blu = getb(bl_col);
+
+    // Loop through each possible forground colour.
 
     for (fg_ix = 0; fg_ix < 8; fg_ix++) {
         fg_col = nula_collook[fg_ix];
         fg_red = getr(fg_col);
         fg_grn = getg(fg_col);
         fg_blu = getb(fg_col);
+
+        // Loop throug each possible background colour so inside this
+        // loop is looking at one pair of foreground/background.
+
         for (bg_ix = 0; bg_ix < 8; bg_ix++) {
             bg_col = nula_collook[bg_ix];
             bg_red = getr(bg_col);
             bg_grn = getg(bg_col);
             bg_blu = getb(bg_col);
             for (weight = 0; weight < 16; weight++) {
-                lu_red = bg_red + (((fg_red - bg_red) * weight) / 15);
-                lu_grn = bg_grn + (((fg_grn - bg_grn) * weight) / 15);
-                lu_blu = bg_blu + (((fg_blu - bg_blu) * weight) / 15);
+                lu_red = bg_red + (((fg_red - bg_red) * weight) / 15) - bl_red;
+                lu_grn = bg_grn + (((fg_grn - bg_grn) * weight) / 15) - bl_grn;
+                lu_blu = bg_blu + (((fg_blu - bg_blu) * weight) / 15) - bl_blu;
                 mode7_lookup[fg_ix][bg_ix][weight] = makecol(lu_red, lu_grn, lu_blu);
             }
         }
@@ -766,7 +781,7 @@ void video_reset()
         con = cdraw = 0;
         cursoron  = 0;
         charsleft = 0;
-        
+
         nula_left_cut = 0;
         nula_left_edge = 0;
         nula_left_blank = 0;
@@ -1126,7 +1141,7 @@ void video_poll(int clocks, int timer_enable)
                         {
                             // NULA left edge
                             nula_left_edge = scrx + crtc_mode * 8;
- 
+
                             // NULA left cut
                             nula_left_cut = nula_left_edge + nula_left_blank * crtc_mode * 8;
 
