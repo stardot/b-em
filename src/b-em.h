@@ -32,8 +32,7 @@ extern char exedir[512];
 
 extern int joybutton[2];
 
-void waitforready();
-void resumeready();
+extern int bempause;
 
 void setquit();
 
