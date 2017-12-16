@@ -451,6 +451,15 @@ void mode7_makechars()
         }
 }
 
+static inline int mode7_calc_nula_col(int fg, int bg, int weight, int black) {
+    int result = bg + (((fg - bg) * weight) / 15) - black;
+    if (result < 0)
+        result = 0;
+    else if (result > 255)
+        result = 255;
+    return result;
+}
+
 static void mode7_gen_nula_lookup(void) {
     int bl_col, bl_red, bl_grn, bl_blu;
     int fg_ix, fg_col, fg_red, fg_grn, fg_blu;
@@ -482,9 +491,9 @@ static void mode7_gen_nula_lookup(void) {
             bg_grn = getg(bg_col);
             bg_blu = getb(bg_col);
             for (weight = 0; weight < 16; weight++) {
-                lu_red = bg_red + (((fg_red - bg_red) * weight) / 15) - bl_red;
-                lu_grn = bg_grn + (((fg_grn - bg_grn) * weight) / 15) - bl_grn;
-                lu_blu = bg_blu + (((fg_blu - bg_blu) * weight) / 15) - bl_blu;
+                lu_red = mode7_calc_nula_col(fg_red, bg_red, weight, bl_red);
+                lu_grn = mode7_calc_nula_col(fg_grn, bg_grn, weight, bl_grn);
+                lu_blu = mode7_calc_nula_col(fg_blu, bg_blu, weight, bl_blu);
                 mode7_lookup[fg_ix][bg_ix][weight] = makecol(lu_red, lu_grn, lu_blu);
             }
         }
