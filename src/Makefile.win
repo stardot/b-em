@@ -61,6 +61,7 @@ OBJ = \
     sound.o \
     soundopenal.o \
     ssd.o \
+    sysacia.o \
     sysvia.o \
     tape.o \
     tapenoise.o \

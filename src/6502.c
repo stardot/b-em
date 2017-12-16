@@ -5,7 +5,6 @@
 #include "b-em.h"
 
 #include "6502.h"
-#include "acia.h"
 #include "adc.h"
 #include "disc.h"
 #include "i8271.h"
@@ -18,6 +17,7 @@
 #include "scsi.h"
 #include "sid_b-em.h"
 #include "sound.h"
+#include "sysacia.h"
 #include "tape.h"
 #include "tube.h"
 #include "via.h"
@@ -248,7 +248,7 @@ static uint32_t do_readmem(uint32_t addr)
 
         case 0xFE08:
         case 0xFE0C:
-                return acia_read(addr);
+                return acia_read(&sysacia, addr);
 
         case 0xFE10:
         case 0xFE14:
@@ -408,7 +408,7 @@ static void do_writemem(uint32_t addr, uint32_t val)
 
         case 0xFE08:
         case 0xFE0C:
-                acia_write(addr, val);
+                acia_write(&sysacia, addr, val);
                 break;
 
         case 0xFE10:
@@ -3555,7 +3555,7 @@ void m6502_exec()
                         otherstuffcount += 128;
                         sound_poll();
                         if (!tapelcount) {
-                                acia_poll();
+                                sysacia_poll();
                                 tapelcount = tapellatch;
                         }
                         tapelcount--;
@@ -5439,7 +5439,7 @@ void m65c02_exec()
 //                        sidline();
                         sound_poll();
                         if (!tapelcount) {
-                                acia_poll();
+                                sysacia_poll();
                                 tapelcount = tapellatch;
                         }
                         tapelcount--;

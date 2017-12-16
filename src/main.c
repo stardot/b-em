@@ -12,7 +12,6 @@
 #include "b-em.h"
 
 #include "6502.h"
-#include "acia.h"
 #include "adc.h"
 #include "adf.h"
 #include "model.h"
@@ -43,6 +42,7 @@
 #include "sound.h"
 #include "soundopenal.h"
 #include "ssd.h"
+#include "sysacia.h"
 #include "tape.h"
 #include "tapenoise.h"
 #include "tube.h"
@@ -90,7 +90,7 @@ void main_reset()
         sysvia_reset();
         uservia_reset();
         serial_reset();
-        acia_reset();
+        acia_reset(&sysacia);
         wd1770_reset();
         i8271_reset();
         scsi_reset();

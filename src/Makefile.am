@@ -82,6 +82,7 @@ b_em_SOURCES = \
 	sound.c \
 	soundopenal.c \
 	ssd.c \
+	sysacia.c \
 	sysvia.c \
 	tape.c \
 	tapenoise.c \
