@@ -5,6 +5,7 @@
 #include <allegro/config.h>
 #include <windows.h>
 
+static const char *szMidiDevName;
 static HMIDIIN hMidiDevice = NULL;
 
 void CALLBACK MidiInProc(HMIDIIN hMidiIn, UINT wMsg, DWORD dwInstance, DWORD dwParam1, DWORD dwParam2) {
@@ -26,6 +27,7 @@ static void MidiOpenInternal(UINT nMidiDevice, const char *szName) {
 
     if ((rv = midiInOpen(&hMidiDevice, nMidiDevice, (DWORD)(void*)MidiInProc, 0, CALLBACK_FUNCTION)) == MMSYSERR_NOERROR) {
         log_info("midi-windows: starting MIDI device #%d, %s", nMidiDevice, szName);
+        szMidiDevName = szName;
         midiInStart(hMidiDevice);
     }
     else
@@ -75,3 +77,11 @@ void midi_close(void) {
     if (hMidiDevice != NULL)
         midiInClose(hMidiDevice);
 }
+
+void midi_load_config(void) {};
+
+void midi_save_config(void) {
+    if (szMidiDevName)
+        set_config_string("midi", "midi_device_name", szMidiDevName);
+}
+    
