@@ -1942,6 +1942,13 @@ static inline void cmd_rescan() {
     scan_seq++;
 }
 
+static inline void check_ram(void) {
+    p.c = 0;
+    if (y >= 0 && y <= 15)
+        if (swram[y])
+            p.c = 1;
+}
+
 static inline void vdfs_check() {
     a=0;
 }
@@ -1965,6 +1972,7 @@ static inline void dispatch(uint8_t value) {
         case 0xd7: cmd_dir();    break;
         case 0xd8: cmd_lib();    break;
         case 0xd9: cmd_rescan(); break;
+        case 0xfd: check_ram();  break;
         case 0xfe: vdfs_check(); break;
         case 0xff: setquit();    break;
         default: log_warn("vdfs: function code %d not recognised\n", value);

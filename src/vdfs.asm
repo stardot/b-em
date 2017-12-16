@@ -36,10 +36,13 @@ EQUB &82:EQUB ROMCopyright-&8000
 .ROMVersion
 EQUB &05
 .ROMTitle
-EQUS "Virtual DFS":EQUB 0:EQUS "0.05 (17 Sep 2016)"
+EQUS "B-Em VDFS":EQUB 0
+include "version.asm"
 .ROMCopyright
 EQUB 0:EQUS "(C)1995 MRB, 2004 JGH, 2016 SJF":EQUB 0
 EQUD 0
+.banner
+EQUS "Virtual DFS":EQUB 0
 
 \ As this ROM requires support from the emulator and that may not
 \ be enabled (or supported) check that it works before responding
@@ -78,7 +81,7 @@ JSR OSNEWL
 .PrROMTitle                 :\ Print ROM title
 LDX #0
 .PrRTLp
-LDA ROMTitle,X:BEQ PrRTDone
+LDA banner,X:BEQ PrRTDone
 JSR OSWRCH:INX:BNE PrRTLp
 .PrRTDone
 RTS
