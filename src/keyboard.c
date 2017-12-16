@@ -8,8 +8,8 @@
 int keylookup[128];
 int keyas = 0;
 
-int keycol, keyrow;
-int bbckey[16][16];
+static int keycol, keyrow;
+static int bbckey[16][16];
 
 /*Keyboard*/
 #include "scan2bbc.h"
@@ -34,12 +34,12 @@ static uint8_t codeconvert[128]=
         0,0,0,0,0,113,58,0,          //120
 };
 
-void key_press(int row, int col)
+static inline void key_press(int row, int col)
 {
         bbckey[col][row] = 1;
 }
 
-void key_release(int row, int col)
+static inline void key_release(int row, int col)
 {
         bbckey[col][row] = 0;
 }
@@ -53,17 +53,38 @@ static inline int TranslateKey(int index, int *row, int *col)
 	return *row;
 }
 
-static int keys2[128];
-
 void key_clear()
 {
         int c;
         int row, col;
         for (c = 0; c < 128; c++)
-        {
-                keys2[c] = 0;
                 if (TranslateKey(codeconvert[keylookup[c]], &row, &col) > 0) key_release(row,col);
+}
+
+static void key_update()
+{
+    int c,d;
+    if (IC32 & 8) {
+        for (d = 0; d < ((MASTER) ? 13 : 10); d++) {
+            for (c = 1; c < 8; c++) {
+                if (bbckey[d][c]) {
+                    sysvia_set_ca2(1);
+                    return;
+                }
+            }
         }
+    }
+    else {
+        if (keycol < ((MASTER) ? 13 : 10)) {
+            for (c = 1; c < 8; c++) {
+                if (bbckey[keycol][c]) {
+                    sysvia_set_ca2(1);
+                    return;
+                }
+            }
+        }
+    }
+    sysvia_set_ca2(0);
 }
 
 void key_check()
@@ -96,54 +117,18 @@ void key_check()
            key_press(3, 2); removed to allow the current FS to autoboot rather than DFS*/
         if (key[keylookup[KEY_LCONTROL]] || key[keylookup[KEY_RCONTROL]] || (keyas && key[KEY_S]))
            key_press(0, 1);
-        for (c = 0; c < 128; c++)
-            keys2[c] = key[c];
         key_update();
 }
 
-void key_update()
-{
-        int c,d;
-        if (IC32 & 8)
-        {
-                for (d = 0; d < ((MASTER) ? 13 : 10); d++)
-                {
-                        for (c = 1; c < 8; c++)
-                        {
-                                if (bbckey[d][c])
-                                {
-                                        sysvia_set_ca2(1);
-                                        return;
-                                }
-                        }
-                }
-        }
-        else
-        {
-                if (keycol < ((MASTER) ? 13 : 10))
-                {
-                        for (c = 1; c < 8; c++)
-                        {
-                                if (bbckey[keycol][c])
-                                {
-                                        sysvia_set_ca2(1);
-                                        return;
-                                }
-                        }
-                }
-        }
-        sysvia_set_ca2(0);
+void key_scan(int row, int col) {
+    keyrow = row;
+    keycol = col;
+    key_update();
 }
 
-void key_set_DIPS(uint8_t dips)
-{
-        int c;
-        for (c = 9; c >= 2; c--)
-        {
-                if (dips & 1)
-                   key_press(0, c);
-                else
-                   key_release(0, c);
-                dips >>= 1;
-        }
+int key_is_down(void) {
+    if (keyrow == 0 && keycol >= 2 && keycol <= 9)
+        return kbdips & (1 << (9 - keycol));
+    else
+        return bbckey[keycol][keyrow];
 }
