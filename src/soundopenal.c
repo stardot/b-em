@@ -79,13 +79,13 @@ void al_init()
 
         if ((remain = buflen_m5 % 3) != 0) {
             buflen_m5 += 3 - remain;
-            log_warn("soundopenal: Music 5000 sound buffer size increased to %lu to make it a multiple of 3", buflen_m5);
+            log_warn("soundopenal: Music 5000 sound buffer size increased to %u to make it a multiple of 3", (unsigned)buflen_m5);
         }
         if (buflen_m5 > BUFLEN_M5) {
-            log_warn("soundopenal: Music 5000 sound buffer size %lu too large, reducing to %d", buflen_m5, BUFLEN_M5);
+            log_warn("soundopenal: Music 5000 sound buffer size %u too large, reducing to %d", (unsigned)buflen_m5, BUFLEN_M5);
             buflen_m5 = BUFLEN_M5;
         }
-        log_debug("soundopenal: using music 5000 buffer of %lu", buflen_m5);
+        log_debug("soundopenal: using music 5000 buffer of %u", (unsigned)buflen_m5);
         source_buflen[SOUND_M5] = buflen_m5 << 2;
 
         check();
