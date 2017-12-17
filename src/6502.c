@@ -639,6 +639,44 @@ static inline uint16_t getsw()
         return temp;
 }
 
+static int other_poll_odd;
+
+static void otherstuff_poll(void) {
+    otherstuffcount += 64;
+    acia_poll(&sysacia);
+    if (sound_music5000)
+        music2000_poll();
+    other_poll_odd = !other_poll_odd;
+    if (other_poll_odd) {
+        sound_poll();
+        if (!tapelcount) {
+            tape_poll();
+            tapelcount = tapellatch;
+        }
+        tapelcount--;
+        if (motorspin) {
+            motorspin--;
+            if (!motorspin)
+                fdc_spindown();
+        }
+        if (ide_count) {
+            ide_count -= 200;
+            if (ide_count <= 0)
+                ide_callback();
+        }
+        if (adc_time) {
+            adc_time--;
+            if (!adc_time)
+                adc_poll();
+        }
+        mcount--;
+        if (!mcount) {
+            mcount = 6;
+            mouse_poll();
+        }
+    }
+}
+
 #define getw() getsw()
 
 //#define getw() (readmem(pc)|(readmem(pc+1)<<8)); pc+=2
@@ -3562,36 +3600,8 @@ void m6502_exec()
                 }
                 interrupt &= ~128;
 
-                if (otherstuffcount <= 0) {
-                        otherstuffcount += 128;
-                        sound_poll();
-                        if (!tapelcount) {
-                                sysacia_poll();
-                                tapelcount = tapellatch;
-                        }
-                        tapelcount--;
-                        if (motorspin) {
-                                motorspin--;
-                                if (!motorspin)
-                                        fdc_spindown();
-                        }
-                        if (ide_count) {
-                                ide_count -= 200;
-                                if (ide_count <= 0) {
-                                        ide_callback();
-                                }
-                        }
-                        if (adc_time) {
-                                adc_time--;
-                                if (!adc_time)
-                                        adc_poll();
-                        }
-                        mcount--;
-                        if (!mcount) {
-                                mcount = 6;
-                                mouse_poll();
-                        }
-                }
+                if (otherstuffcount <= 0)
+                    otherstuff_poll();
                 if (tube_exec && tubecycle) {
                         tubecycles += (tubecycle << tube_shift);
                         if (tubecycles > 3)
@@ -5445,37 +5455,8 @@ void m65c02_exec()
                         tubecycle = 0;
                 }
 
-                if (otherstuffcount <= 0) {
-                        otherstuffcount += 128;
-//                        sidline();
-                        sound_poll();
-                        if (!tapelcount) {
-                                sysacia_poll();
-                                tapelcount = tapellatch;
-                        }
-                        tapelcount--;
-                        if (motorspin) {
-                                motorspin--;
-                                if (!motorspin)
-                                        fdc_spindown();
-                        }
-                        if (ide_count) {
-                                ide_count -= 200;
-                                if (ide_count <= 0) {
-                                        ide_callback();
-                                }
-                        }
-                        if (adc_time) {
-                                adc_time--;
-                                if (!adc_time)
-                                        adc_poll();
-                        }
-                        mcount--;
-                        if (!mcount) {
-                                mcount = 6;
-                                mouse_poll();
-                        }
-                }
+                if (otherstuffcount <= 0)
+                    otherstuff_poll();
                 if (nmi && !oldnmi) {
                         push(pc >> 8);
                         push(pc & 0xFF);

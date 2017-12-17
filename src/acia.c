@@ -59,9 +59,10 @@ void acia_write(ACIA *acia, uint16_t addr, uint8_t val) {
         acia->tx_data_reg = val;
         if (acia->tx_hook)
             acia->tx_hook(acia, val);
+        acia->status_reg &= ~TXD_REG_EMP;
     }
     else if (val != acia->control_reg) {
-        if (!(val & 0x40)) // interupts disabled as serial TX buffer empties.
+        if ((val & 0x60) != 0x20) // interupt being turned off
             if (acia->tx_end)
                 acia->tx_end(acia);
         acia->control_reg = val;
@@ -82,6 +83,13 @@ void acia_dcdhigh(ACIA *acia) {
 void acia_dcdlow(ACIA *acia) {
     acia->status_reg &= ~DCD;
     acia_updateint(acia);
+}
+
+void acia_poll(ACIA *acia) {
+    if (!(acia->status_reg & TXD_REG_EMP)) {
+        acia->status_reg |= TXD_REG_EMP;
+        acia_updateint(acia);
+    }
 }
 
 void acia_receive(ACIA *acia, uint8_t val) { /*Called when the acia recives some data*/

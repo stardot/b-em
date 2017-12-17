@@ -9,19 +9,19 @@ static void send_data(ACIA *acia, uint8_t data) {
     log_debug("music2000: send to %s: %02X", (char *)acia->udata, data);
 }
 
-ACIA music2000_acia1 = {
+static ACIA music2000_acia1 = {
     .set_params = set_params,
     .tx_hook = send_data,
     .udata   = "Music 2000 1"
 };
 
-ACIA music2000_acia2 = {
+static ACIA music2000_acia2 = {
     .set_params = set_params,
     .tx_hook = send_data,
     .udata   = "Music 2000 2"
 };
 
-ACIA music2000_acia3 = {
+static ACIA music2000_acia3 = {
     .set_params = set_params,
     .tx_hook = send_data,
     .udata   = "Music 2000 3"
@@ -64,4 +64,10 @@ void music2000_write(uint32_t addr, uint8_t val) {
             acia_write(&music2000_acia3, addr, val);
             break;
     }
+}
+
+void music2000_poll(void) {
+    acia_poll(&music2000_acia1);
+    acia_poll(&music2000_acia2);
+    acia_poll(&music2000_acia3);
 }
