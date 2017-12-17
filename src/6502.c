@@ -639,41 +639,36 @@ static inline uint16_t getsw()
         return temp;
 }
 
-static int other_poll_odd;
-
 static void otherstuff_poll(void) {
-    otherstuffcount += 64;
+    otherstuffcount += 128;
     acia_poll(&sysacia);
     if (sound_music5000)
         music2000_poll();
-    other_poll_odd = !other_poll_odd;
-    if (other_poll_odd) {
-        sound_poll();
-        if (!tapelcount) {
-            tape_poll();
-            tapelcount = tapellatch;
-        }
-        tapelcount--;
-        if (motorspin) {
-            motorspin--;
-            if (!motorspin)
-                fdc_spindown();
-        }
-        if (ide_count) {
-            ide_count -= 200;
-            if (ide_count <= 0)
-                ide_callback();
-        }
-        if (adc_time) {
-            adc_time--;
-            if (!adc_time)
-                adc_poll();
-        }
-        mcount--;
-        if (!mcount) {
-            mcount = 6;
-            mouse_poll();
-        }
+    sound_poll();
+    if (!tapelcount) {
+        tape_poll();
+        tapelcount = tapellatch;
+    }
+    tapelcount--;
+    if (motorspin) {
+        motorspin--;
+        if (!motorspin)
+            fdc_spindown();
+    }
+    if (ide_count) {
+        ide_count -= 200;
+        if (ide_count <= 0)
+            ide_callback();
+    }
+    if (adc_time) {
+        adc_time--;
+        if (!adc_time)
+            adc_poll();
+    }
+    mcount--;
+    if (!mcount) {
+        mcount = 6;
+        mouse_poll();
     }
 }
 
