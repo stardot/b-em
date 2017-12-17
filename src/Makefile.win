@@ -51,6 +51,7 @@ OBJ = \
     midi-windows.o \
     model.o \
     mouse.o \
+    music2000.o \
     music4000.o \
     music5000.o \
     pal.o \

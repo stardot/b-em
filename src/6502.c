@@ -12,6 +12,7 @@
 #include "mem.h"
 #include "model.h"
 #include "mouse.h"
+#include "music2000.h"
 #include "music5000.h"
 #include "serial.h"
 #include "scsi.h"
@@ -212,6 +213,11 @@ static uint32_t do_readmem(uint32_t addr)
         }
 
         switch (addr & ~3) {
+            case 0xFC08:
+            case 0xFC0C:
+                if (sound_music5000)
+                    return music2000_read(addr);
+                break;
         case 0xFC20:
         case 0xFC24:
         case 0xFC28:
@@ -371,6 +377,11 @@ static void do_writemem(uint32_t addr, uint32_t val)
         }
 
         switch (addr & ~3) {
+            case 0xFC08:
+            case 0xFC0C:
+                if (sound_music5000)
+                    music2000_write(addr, val);
+                break;
         case 0xFC20:
         case 0xFC24:
         case 0xFC28:

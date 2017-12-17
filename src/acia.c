@@ -17,15 +17,23 @@
 #define PARITY_ERR  0x40
 #define INTERUPT    0x80
 
-void acia_updateint(ACIA *acia) {
-    if (((acia->status_reg & INTERUPT) && (acia->control_reg & INTERUPT)) || (!(acia->status_reg & TXD_REG_EMP) && ((acia->control_reg & (PARITY_ERR|RX_OVERRUN)) == RX_OVERRUN)))
+static inline int rx_int(ACIA *acia) {
+    return (acia->status_reg & INTERUPT) && (acia->control_reg & INTERUPT);
+}
+
+static inline int tx_int(ACIA *acia) {
+    return (acia->status_reg & TXD_REG_EMP) && ((acia->control_reg & 0x60) == 0x20);
+}    
+
+static void acia_updateint(ACIA *acia) {
+    if (rx_int(acia) || tx_int(acia))
        interrupt|=4;
     else
        interrupt&=~4;
 }
 
 void acia_reset(ACIA *acia) {
-    acia->status_reg = (acia->status_reg & CTS) | DCD | TXD_REG_EMP;
+    acia->status_reg = (acia->status_reg & (CTS|DCD)) | TXD_REG_EMP;
     acia_updateint(acia);
 }
 
@@ -38,8 +46,12 @@ uint8_t acia_read(ACIA *acia, uint16_t addr) {
         acia_updateint(acia);
         return temp;
     }
-    else
-        return (acia->status_reg & ~INTERUPT) | (acia->status_reg & acia->control_reg & INTERUPT);
+    else {
+        temp = acia->status_reg & ~INTERUPT;
+        if (rx_int(acia) || tx_int(acia))
+            temp |= INTERUPT;
+        return temp;
+    }
 }
 
 void acia_write(ACIA *acia, uint16_t addr, uint8_t val) {
@@ -56,6 +68,7 @@ void acia_write(ACIA *acia, uint16_t addr, uint8_t val) {
         if (val == 3)
             acia_reset(acia);
         acia->set_params(acia, val);
+        acia_updateint(acia);
     }
 }
 
