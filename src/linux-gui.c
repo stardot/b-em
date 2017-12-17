@@ -14,7 +14,7 @@
 #include "keyboard.h"
 #include "linux-gui.h"
 #include "main.h"
-#include "midi.h"
+#include "midi-linux.h"
 #include "model.h"
 #include "mouse.h"
 #include "music5000.h"
@@ -79,44 +79,44 @@ MENU mainmenu[6];
 static void gui_m4000_update(void) {
     int i = 0;
 #ifdef HAVE_JACK_JACK_H
-    m4000menu[i++].flags = (midi_m4000_jack_enabled) ? D_SELECTED : 0;
+    m4000menu[i++].flags = (midi_music4000.jack_enabled) ? D_SELECTED : 0;
 #endif
 #ifdef HAVE_ALSA_ASOUNDLIB_H
-    m4000menu[i++].flags = (midi_m4000_alsa_seq_enabled) ? D_SELECTED : 0;
-    m4000menu[i++].flags = (midi_m4000_alsa_raw_enabled) ? D_SELECTED : 0;
+    m4000menu[i++].flags = (midi_music4000.alsa_seq_enabled) ? D_SELECTED : 0;
+    m4000menu[i++].flags = (midi_music4000.alsa_raw_enabled) ? D_SELECTED : 0;
 #endif
 }
 
 static void gui_m2000_out1_update(void) {
     int i = 0;
 #ifdef HAVE_JACK_JACK_H
-    m2000out1menu[i++].flags = (midi_m2000_out1_jack_enabled) ? D_SELECTED : 0;
+    m2000out1menu[i++].flags = (midi_music2000_out1.jack_enabled) ? D_SELECTED : 0;
 #endif
 #ifdef HAVE_ALSA_ASOUNDLIB_H
-    m2000out1menu[i++].flags = (midi_m2000_out1_alsa_seq_enabled) ? D_SELECTED : 0;
-    m2000out1menu[i++].flags = (midi_m2000_out1_alsa_raw_enabled) ? D_SELECTED : 0;
+    m2000out1menu[i++].flags = (midi_music2000_out1.alsa_seq_enabled) ? D_SELECTED : 0;
+    m2000out1menu[i++].flags = (midi_music2000_out1.alsa_raw_enabled) ? D_SELECTED : 0;
 #endif
 }
 
 static void gui_m2000_out2_update(void) {
     int i = 0;
 #ifdef HAVE_JACK_JACK_H
-    m2000out2menu[i++].flags = (midi_m2000_out2_jack_enabled) ? D_SELECTED : 0;
+    m2000out2menu[i++].flags = (midi_music2000_out2.jack_enabled) ? D_SELECTED : 0;
 #endif
 #ifdef HAVE_ALSA_ASOUNDLIB_H
-    m2000out2menu[i++].flags = (midi_m2000_out2_alsa_seq_enabled) ? D_SELECTED : 0;
-    m2000out2menu[i++].flags = (midi_m2000_out2_alsa_raw_enabled) ? D_SELECTED : 0;
+    m2000out2menu[i++].flags = (midi_music2000_out2.alsa_seq_enabled) ? D_SELECTED : 0;
+    m2000out2menu[i++].flags = (midi_music2000_out2.alsa_raw_enabled) ? D_SELECTED : 0;
 #endif
 }
 
 static void gui_m2000_out3_update(void) {
     int i = 0;
 #ifdef HAVE_JACK_JACK_H
-    m2000out3menu[i++].flags = (midi_m2000_out3_jack_enabled) ? D_SELECTED : 0;
+    m2000out3menu[i++].flags = (midi_music2000_out3.jack_enabled) ? D_SELECTED : 0;
 #endif
 #ifdef HAVE_ALSA_ASOUNDLIB_H
-    m2000out3menu[i++].flags = (midi_m2000_out3_alsa_seq_enabled) ? D_SELECTED : 0;
-    m2000out3menu[i++].flags = (midi_m2000_out3_alsa_raw_enabled) ? D_SELECTED : 0;
+    m2000out3menu[i++].flags = (midi_music2000_out3.alsa_seq_enabled) ? D_SELECTED : 0;
+    m2000out3menu[i++].flags = (midi_music2000_out3.alsa_raw_enabled) ? D_SELECTED : 0;
 #endif
 }
 
@@ -763,25 +763,25 @@ MENU soundmenu[12]=
 #ifdef HAVE_JACK_JACK_H
 
 static int gui_m4000_jack(void) {
-    midi_m4000_jack_enabled = !midi_m4000_jack_enabled;
+    midi_music4000.jack_enabled = !midi_music4000.jack_enabled;
     gui_m4000_update();
     return D_CLOSE;
 }
 
 static int gui_m2000_out1_jack(void) {
-    midi_m2000_out1_jack_enabled = !midi_m2000_out1_jack_enabled;
+    midi_music2000_out1.jack_enabled = !midi_music2000_out1.jack_enabled;
     gui_m2000_out1_update();
     return D_CLOSE;
 }
 
 static int gui_m2000_out2_jack(void) {
-    midi_m2000_out2_jack_enabled = !midi_m2000_out2_jack_enabled;
+    midi_music2000_out2.jack_enabled = !midi_music2000_out2.jack_enabled;
     gui_m2000_out2_update();
     return D_CLOSE;
 }
 
 static int gui_m2000_out3_jack(void) {
-    midi_m2000_out3_jack_enabled = !midi_m2000_out3_jack_enabled;
+    midi_music2000_out3.jack_enabled = !midi_music2000_out3.jack_enabled;
     gui_m2000_out3_update();
     return D_CLOSE;
 }
@@ -791,49 +791,49 @@ static int gui_m2000_out3_jack(void) {
 #ifdef HAVE_ALSA_ASOUNDLIB_H
 
 static int gui_m4000_alsa_seq(void) {
-    midi_m4000_alsa_seq_enabled = !midi_m4000_alsa_seq_enabled;
+    midi_music4000.alsa_seq_enabled = !midi_music4000.alsa_seq_enabled;
     gui_m4000_update();
     return D_CLOSE;
 }
 
 static int gui_m2000_out1_alsa_seq(void) {
-    midi_m2000_out1_alsa_seq_enabled = !midi_m2000_out1_alsa_seq_enabled;
+    midi_music2000_out1.alsa_seq_enabled = !midi_music2000_out1.alsa_seq_enabled;
     gui_m2000_out1_update();
     return D_CLOSE;
 }
 
 static int gui_m2000_out2_alsa_seq(void) {
-    midi_m2000_out2_alsa_seq_enabled = !midi_m2000_out2_alsa_seq_enabled;
+    midi_music2000_out2.alsa_seq_enabled = !midi_music2000_out2.alsa_seq_enabled;
     gui_m2000_out2_update();
     return D_CLOSE;
 }
 
 static int gui_m2000_out3_alsa_seq(void) {
-    midi_m2000_out3_alsa_seq_enabled = !midi_m2000_out3_alsa_seq_enabled;
+    midi_music2000_out3.alsa_seq_enabled = !midi_music2000_out3.alsa_seq_enabled;
     gui_m2000_out3_update();
     return D_CLOSE;
 }
 
 static int gui_m4000_alsa_raw(void) {
-    midi_m4000_alsa_raw_enabled = !midi_m4000_alsa_raw_enabled;
+    midi_music4000.alsa_raw_enabled = !midi_music4000.alsa_raw_enabled;
     gui_m4000_update();
     return D_CLOSE;
 }
 
 static int gui_m2000_out1_alsa_raw(void) {
-    midi_m2000_out1_alsa_raw_enabled = !midi_m2000_out1_alsa_raw_enabled;
+    midi_music2000_out1.alsa_raw_enabled = !midi_music2000_out1.alsa_raw_enabled;
     gui_m2000_out1_update();
     return D_CLOSE;
 }
 
 static int gui_m2000_out2_alsa_raw(void) {
-    midi_m2000_out2_alsa_raw_enabled = !midi_m2000_out2_alsa_raw_enabled;
+    midi_music2000_out2.alsa_raw_enabled = !midi_music2000_out2.alsa_raw_enabled;
     gui_m2000_out2_update();
     return D_CLOSE;
 }
 
 static int gui_m2000_out3_alsa_raw(void) {
-    midi_m2000_out3_alsa_raw_enabled = !midi_m2000_out3_alsa_raw_enabled;
+    midi_music2000_out3.alsa_raw_enabled = !midi_music2000_out3.alsa_raw_enabled;
     gui_m2000_out3_update();
     return D_CLOSE;
 }
