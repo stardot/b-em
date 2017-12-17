@@ -1,4 +1,5 @@
 #include "b-em.h"
+#include "music2000.h"
 #include "music4000.h"
 #include "midi-linux.h"
 #include "sound.h"
@@ -224,34 +225,57 @@ static void *alsa_raw_midi_run(void *arg) {
     return NULL;
 }
 
+static void m2000_raw_init(midi_dev_t *midi) {
+    int status;
+
+    if (midi->alsa_raw_enabled) {
+        if ((status = snd_rawmidi_open(NULL, &midi->alsa_raw_port, midi->alsa_raw_device, 0)) < 0) {
+            log_warn("midi-linux: unable to open ALSA raw MIDI port '%s': %s", midi->alsa_raw_device, snd_strerror(status));
+            midi->alsa_raw_port = NULL;
+        }
+    }
+}
+
 static inline void midi_alsa_raw_init(void) {
     int err;
 
     if (midi_music4000.alsa_raw_enabled)
         if ((err = pthread_create(&alsa_raw_thread, NULL, alsa_raw_midi_run, NULL)) != 0)
             log_error("midi-linux: unable to create ALSA raw MIDI thread: %s", strerror(err));
+
+    m2000_raw_init(&midi_music2000_out1);
+    m2000_raw_init(&midi_music2000_out2);
+    m2000_raw_init(&midi_music2000_out3);
 }
 
 static inline void midi_alsa_load_config(void) {
-    midi_music4000.alsa_seq_enabled = get_config_int("midi", "m4000_alsa_seq_enabled", 1);
-    midi_music4000.alsa_raw_enabled = get_config_int("midi", "m4000_alsa_raw_enabled", 1);
+    midi_music4000.alsa_seq_enabled = get_config_int("midi", "music4000_alsa_seq_enabled", 1);
+    midi_music4000.alsa_raw_enabled = get_config_int("midi", "music4000_alsa_raw_enabled", 1);
+    midi_music4000.alsa_raw_device  = get_config_string("midi", "music4000_alsa_raw_device", "default");
     midi_music2000_out1.alsa_seq_enabled = get_config_int("midi", "music2000_out1_alsa_seq_enabled", 0);
     midi_music2000_out2.alsa_seq_enabled = get_config_int("midi", "music2000_out2_alsa_seq_enabled", 0);
     midi_music2000_out3.alsa_seq_enabled = get_config_int("midi", "music2000_out3_alsa_seq_enabled", 0);
     midi_music2000_out1.alsa_raw_enabled = get_config_int("midi", "music2000_out1_alsa_raw_enabled", 1);
     midi_music2000_out2.alsa_raw_enabled = get_config_int("midi", "music2000_out2_alsa_raw_enabled", 0);
     midi_music2000_out3.alsa_raw_enabled = get_config_int("midi", "music2000_out3_alsa_raw_enabled", 0);
+    midi_music2000_out1.alsa_raw_device  = get_config_string("midi", "music2000_out1_alsa_raw_device", "default");
+    midi_music2000_out2.alsa_raw_device  = get_config_string("midi", "music2000_out2_alsa_raw_device", "default");
+    midi_music2000_out3.alsa_raw_device  = get_config_string("midi", "music2000_out3_alsa_raw_device", "default");
 }
 
 static inline void midi_alsa_save_config(void) {
-    set_config_int("midi", "m4000_alsa_seq_enabled", midi_music4000.alsa_seq_enabled);
-    set_config_int("midi", "m4000_alsa_raw_enabled", midi_music4000.alsa_raw_enabled);
+    set_config_int("midi", "music4000_alsa_seq_enabled", midi_music4000.alsa_seq_enabled);
+    set_config_int("midi", "music4000_alsa_raw_enabled", midi_music4000.alsa_raw_enabled);
+    set_config_string("midi", "music4000_alsa_raw_device", midi_music4000.alsa_raw_device);
     set_config_int("midi", "music2000_out1_alsa_seq_enabled", midi_music2000_out1.alsa_seq_enabled);
     set_config_int("midi", "music2000_out2_alsa_seq_enabled", midi_music2000_out2.alsa_seq_enabled);
     set_config_int("midi", "music2000_out3_alsa_seq_enabled", midi_music2000_out3.alsa_seq_enabled);
     set_config_int("midi", "music2000_out1_alsa_raw_enabled", midi_music2000_out1.alsa_raw_enabled);
     set_config_int("midi", "music2000_out2_alsa_raw_enabled", midi_music2000_out2.alsa_raw_enabled);
     set_config_int("midi", "music2000_out3_alsa_raw_enabled", midi_music2000_out3.alsa_raw_enabled);
+    set_config_string("midi", "music2000_out1_alsa_raw_device", midi_music2000_out1.alsa_raw_device);
+    set_config_string("midi", "music2000_out2_alsa_raw_device", midi_music2000_out2.alsa_raw_device);
+    set_config_string("midi", "music2000_out3_alsa_raw_device", midi_music2000_out3.alsa_raw_device);
 }
 
 #else
@@ -266,6 +290,7 @@ void midi_init(void) {
         midi_jack_init();
         midi_alsa_seq_init();
         midi_alsa_raw_init();
+        music2000_init(&midi_music2000_out1, &midi_music2000_out2, &midi_music2000_out3);
     }
 }
 
@@ -281,4 +306,12 @@ void midi_load_config(void) {
 void midi_save_config(void) {
     midi_jack_save_config();
     midi_alsa_save_config();
+}
+
+void midi_send_byte(midi_dev_t *midi, uint8_t byte) {
+#ifdef HAVE_ALSA_ASOUNDLIB_H
+    if (midi->alsa_raw_enabled && midi->alsa_raw_port)
+        if (snd_rawmidi_write(midi->alsa_raw_port, &byte, 1) != 1)
+            log_warn("midi-linux: unable to send MIDI byte");
+#endif
 }

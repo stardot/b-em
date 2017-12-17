@@ -12,7 +12,7 @@
 #include <alsa/asoundlib.h>
 #endif
 
-typedef struct {
+struct _midi_dev {
 #ifdef HAVE_JACK_JACK_H
     int           jack_enabled;
     jack_port_t   *jack_port;
@@ -22,8 +22,9 @@ typedef struct {
     int           alsa_raw_enabled;
     int           alsa_seq_port;
     snd_rawmidi_t *alsa_raw_port;
+    const char    *alsa_raw_device;
 #endif
-} midi_dev_t;
+};
 
 extern midi_dev_t midi_music4000;
 extern midi_dev_t midi_music2000_out1;

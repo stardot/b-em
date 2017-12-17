@@ -1,66 +1,45 @@
 #include "music2000.h"
 #include "acia.h"
 
-static void set_params(ACIA *acia, uint8_t val) {
-    log_debug("music2000: set params: %s to %02X", (char *)acia->udata, val);
-}
-
 static void send_data(ACIA *acia, uint8_t data) {
-    log_debug("music2000: send to %s: %02X", (char *)acia->udata, data);
+    log_debug("music2000: send byte %02X", data);
+    midi_send_byte(acia->udata, data);
 }
 
 static ACIA music2000_acia1 = {
-    .set_params = set_params,
     .tx_hook = send_data,
-    .udata   = "Music 2000 1"
 };
 
 static ACIA music2000_acia2 = {
-    .set_params = set_params,
     .tx_hook = send_data,
-    .udata   = "Music 2000 2"
 };
 
 static ACIA music2000_acia3 = {
-    .set_params = set_params,
     .tx_hook = send_data,
-    .udata   = "Music 2000 3"
 };
 
 uint8_t music2000_read(uint32_t addr) {
-    uint8_t val;
-
     switch(addr & 0xe) {
         case 0x8:
-            val = acia_read(&music2000_acia1, addr);
-            //log_debug("music2000: read Music 2000 1: %04X, %02X", addr, val);
-            break;
+            return acia_read(&music2000_acia1, addr);
         case 0xA:
-            val = acia_read(&music2000_acia2, addr);
-            //log_debug("music2000: read Music 2000 2: %04X, %02X", addr, val);
-            break;
+            return acia_read(&music2000_acia2, addr);
         case 0xC:
-            val = acia_read(&music2000_acia3, addr);
-            //log_debug("music2000: read Music 2000 3: %04X, %02X", addr, val);
-            break;
+            return acia_read(&music2000_acia3, addr);
         default:
-            val = 0xff;
+            return 0xff;
     }
-    return val;
 }
 
 void music2000_write(uint32_t addr, uint8_t val) {
     switch(addr & 0xe) {
         case 0x8:
-            log_debug("music2000: write Music 2000 1: %04X, %02X", addr, val);
             acia_write(&music2000_acia1, addr, val);
             break;
         case 0xA:
-            log_debug("music2000: write Music 2000 2: %04X, %02X", addr, val);
             acia_write(&music2000_acia2, addr, val);
             break;
         case 0xC:
-            log_debug("music2000: write Music 2000 3: %04X, %02X", addr, val);
             acia_write(&music2000_acia3, addr, val);
             break;
     }
@@ -71,3 +50,9 @@ void music2000_poll(void) {
     acia_poll(&music2000_acia2);
     acia_poll(&music2000_acia3);
 }
+
+void music2000_init(midi_dev_t *out1, midi_dev_t *out2, midi_dev_t *out3) {
+    music2000_acia1.udata = out1;
+    music2000_acia2.udata = out2;
+    music2000_acia3.udata = out3;
+}    

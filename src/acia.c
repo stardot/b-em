@@ -68,7 +68,8 @@ void acia_write(ACIA *acia, uint16_t addr, uint8_t val) {
         acia->control_reg = val;
         if (val == 3)
             acia_reset(acia);
-        acia->set_params(acia, val);
+        if (acia->set_params)
+            acia->set_params(acia, val);
         acia_updateint(acia);
     }
 }
