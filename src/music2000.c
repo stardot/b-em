@@ -72,7 +72,7 @@ static void acia_tx(ACIA *acia, uint8_t data) {
                 break;
             case MS_ONE_OF_ONE:
                 m2000->buffer[1] = data;
-                midi_send_msg(m2000->dev, &m2000->rtmsg, 2);
+                midi_send_msg(m2000->dev, m2000->buffer, 2);
                 break;
             case MS_ONE_OF_TWO:
                 m2000->buffer[1] = data;
@@ -80,7 +80,7 @@ static void acia_tx(ACIA *acia, uint8_t data) {
                 break;
             case MS_TWO_OF_TWO:
                 m2000->buffer[2] = data;
-                midi_send_msg(m2000->dev, &m2000->rtmsg, 3);
+                midi_send_msg(m2000->dev, m2000->buffer, 3);
                 m2000->state = MS_ONE_OF_TWO;
         }
     }
