@@ -114,51 +114,183 @@ static inline void midi_jack_save_config(void) {
 extern int quited;
 
 static pthread_t alsa_seq_thread;
+static snd_seq_t *midi_seq = NULL;
 
 static void *alsa_seq_midi_run(void *arg) {
-    int status;
-    snd_seq_t *midi_seq = NULL;
-    int alsa_seq_port = -1;
     snd_seq_event_t *ev;
 
-    if ((status = snd_seq_open(&midi_seq, "default", SND_SEQ_OPEN_INPUT, 0)) < 0)
-        log_warn("midi-linux: unable to open ALSA MIDI sequencer: %s", snd_strerror(status));
-    else {
-        snd_seq_set_client_name(midi_seq, "B-Em");
-        log_debug("midi-linux: ALSA MIDI sequencer client created");
-        alsa_seq_port = snd_seq_create_simple_port(midi_seq, "b-em:in", SND_SEQ_PORT_CAP_WRITE|SND_SEQ_PORT_CAP_SUBS_WRITE, SND_SEQ_PORT_TYPE_SOFTWARE|SND_SEQ_PORT_TYPE_SYNTHESIZER);
-        if (alsa_seq_port < 0)
-            log_error("midi-linux: unable to create ALSA MIDI sequencer port: %s", strerror(errno));
-        else {
-            log_debug("midi-linux: ALSA MIDI sequencer port created");
-            while (!quited) {
-                log_debug("midi-linux: waiting for ALSA MIDI sequencer event");
-                if (snd_seq_event_input(midi_seq, &ev) >= 0) {
-                    log_debug("midi-linux: got ALSA MIDI sequencer event");
-                    switch(ev->type) {
-                        case SND_SEQ_EVENT_NOTEON:
-                            log_debug("midi-linux: ALSA sequencer note on, tick=%d, note=%d, vel=%d", ev->time.tick, ev->data.note.note, ev->data.note.velocity);
-                            music4000_note_on(ev->data.note.note, ev->data.note.velocity);
-                            break;
-                        case SND_SEQ_EVENT_NOTEOFF:
-                            log_debug("midi-linux: ALSA sequencer note off, tick=%d, note=%d, evl=%d", ev->time.tick, ev->data.note.note, ev->data.note.velocity);
-                            music4000_note_off(ev->data.note.note, ev->data.note.velocity);
-                    }
-                }
+    while (!quited) {
+        log_debug("midi-linux: waiting for ALSA MIDI sequencer event");
+        if (snd_seq_event_input(midi_seq, &ev) >= 0) {
+            log_debug("midi-linux: got ALSA MIDI sequencer event");
+            switch(ev->type) {
+                case SND_SEQ_EVENT_NOTEON:
+                    log_debug("midi-linux: ALSA sequencer note on, tick=%d, note=%d, vel=%d", ev->time.tick, ev->data.note.note, ev->data.note.velocity);
+                    music4000_note_on(ev->data.note.note, ev->data.note.velocity);
+                    break;
+                case SND_SEQ_EVENT_NOTEOFF:
+                    log_debug("midi-linux: ALSA sequencer note off, tick=%d, note=%d, evl=%d", ev->time.tick, ev->data.note.note, ev->data.note.velocity);
+                    music4000_note_off(ev->data.note.note, ev->data.note.velocity);
             }
-            log_debug("midi-linux: ALSA sequencer thread finishing");
         }
-        snd_seq_close(midi_seq);
     }
+    log_debug("midi-linux: ALSA sequencer thread finishing");
     return NULL;
 }
 
-static inline void midi_alsa_seq_init(void) {
-    int err;
+static void m4000_seq_init(void) {
+    int port, err;
 
-    if (midi_music4000.alsa_seq_enabled)
-        if ((err = pthread_create(&alsa_seq_thread, NULL, alsa_seq_midi_run, NULL)) != 0)
-            log_error("midi-linux: unable to create ALSA sequencer thread: %s", strerror(err));
+    if (midi_music4000.alsa_seq_enabled) {
+        port = snd_seq_create_simple_port(midi_seq, "b-em:in", SND_SEQ_PORT_CAP_WRITE|SND_SEQ_PORT_CAP_SUBS_WRITE, SND_SEQ_PORT_TYPE_SOFTWARE|SND_SEQ_PORT_TYPE_APPLICATION);
+        if (port < 0)
+            log_error("midi-linux: unable to create ALSA sequencer port b-em:in: %s", strerror(errno));
+        else {
+            midi_music4000.alsa_seq_port = port;
+            log_debug("midi-linux: created ALSA sequencer port b-em:in %d", port);
+            if ((err = pthread_create(&alsa_seq_thread, NULL, alsa_seq_midi_run, NULL)) != 0)
+                log_error("midi-linux: unable to create ALSA sequencer thread: %s", strerror(err));
+        }
+    }
+}
+
+static void m2000_seq_init(midi_dev_t *midi, const char *pname) {
+    int port;
+
+    if (midi->alsa_seq_enabled) {
+        port = snd_seq_create_simple_port(midi_seq, pname, SND_SEQ_PORT_CAP_READ|SND_SEQ_PORT_CAP_SUBS_READ, SND_SEQ_PORT_TYPE_SOFTWARE);
+        if (port < 0)
+            log_error("midi-linux: unable to create ALSA MIDI sequencer port %s: %s", pname, strerror(errno));
+        else {
+            midi->alsa_seq_port = port;
+            log_debug("midi-linux: created ALSA sequencer port %s %d", pname, port);
+        }
+    }
+}
+
+static inline void midi_alsa_seq_init(void) {
+    int status, mode;
+
+    if (midi_music2000_out1.alsa_seq_enabled || midi_music2000_out2.alsa_seq_enabled || midi_music2000_out3.alsa_seq_enabled) {
+        if (midi_music4000.alsa_seq_enabled) {
+            mode = SND_SEQ_OPEN_DUPLEX;
+            log_debug("linux-midi: opening sequencer duplex");
+        }
+        else {
+            mode = SND_SEQ_OPEN_OUTPUT;
+            log_debug("linux-midi: opening sequencer for output");
+        }
+    } else {
+        if (midi_music4000.alsa_seq_enabled) {
+            mode = SND_SEQ_OPEN_INPUT;
+            log_debug("linux-midi: opening sequencer for intput");
+        }
+        else
+            mode = 0;
+    }
+    if (mode) {
+        if ((status = snd_seq_open(&midi_seq, "default", mode, 0)) < 0)
+            log_warn("midi-linux: unable to open ALSA MIDI sequencer: %s", snd_strerror(status));
+        else {
+            snd_seq_set_client_name(midi_seq, "B-Em");
+            log_debug("midi-linux: ALSA MIDI sequencer client created");
+            m4000_seq_init();
+            m2000_seq_init(&midi_music2000_out1, "b-em:out1");
+            m2000_seq_init(&midi_music2000_out2, "b-em:out2");
+            m2000_seq_init(&midi_music2000_out3, "b-em:out3");
+        }
+    }
+}
+
+static inline void alsa_seq_ctrl(snd_seq_event_t *ev, uint8_t *buffer) {
+    ev->data.control.channel = buffer[0] & 0x0f;
+    ev->data.control.param = buffer[1];
+    ev->data.control.value = buffer[2];
+}
+
+static void midi_alsa_seq_send_msg(midi_dev_t *midi, uint8_t *buffer, size_t size) {
+    snd_seq_event_t ev;
+    int res;
+
+    if (midi->alsa_seq_enabled && midi->alsa_seq_port) {
+        snd_seq_ev_clear(&ev);
+        
+        switch(buffer[0] >> 4) {
+            case 0x8:
+                snd_seq_ev_set_noteoff(&ev, buffer[0] & 0x0f, buffer[1], buffer[2]);
+                break;
+            case 0x9:
+                snd_seq_ev_set_noteon(&ev, buffer[0] & 0x0f, buffer[1], buffer[2]);
+                break;
+            case 0xA:
+                snd_seq_ev_set_keypress(&ev, buffer[0] & 0x0f, buffer[1], buffer[2]);
+                break;
+            case 0xB:
+                ev.type = SND_SEQ_EVENT_CONTROLLER;
+                alsa_seq_ctrl(&ev, buffer);
+                break;
+            case 0xC:
+                snd_seq_ev_set_pgmchange(&ev, buffer[0] & 0x0f, buffer[1]);
+                break;
+            case 0xD:
+                ev.type = SND_SEQ_EVENT_CHANPRESS;
+                alsa_seq_ctrl(&ev, buffer);
+                break;
+            case 0xE:
+                snd_seq_ev_set_pitchbend(&ev, buffer[0] & 0x0f, buffer[1]);
+                break;
+            case 0xF:
+                switch (buffer[0] & 0x0f) {
+                    case 0x1:
+                        ev.type = SND_SEQ_EVENT_QFRAME;
+                        ev.data.control.value = buffer[1];
+                        break;
+                    case 0x2:
+                        ev.type = SND_SEQ_EVENT_SONGPOS;
+                        ev.data.control.value = buffer[1] | (buffer[2] << 7);
+                        break;
+                    case 0x3:
+                        ev.type = SND_SEQ_EVENT_SONGSEL;
+                        ev.data.control.value = buffer[1];
+                        break;
+                    case 0x4:
+                    case 0x5:
+                    case 0x9:
+                    case 0xD:
+                    case 0xE:
+                        ev.type = SND_SEQ_EVENT_NONE;
+                        break;
+                    case 0x6:
+                        ev.type = SND_SEQ_EVENT_TUNE_REQUEST;
+                        break;
+                    case 0x8:
+                        ev.type = SND_SEQ_EVENT_TICK;
+                        break;
+                    case 0xA:
+                        ev.type = SND_SEQ_EVENT_START;
+                        break;
+                    case 0xB:
+                        ev.type = SND_SEQ_EVENT_CONTINUE;
+                        break;
+                    case 0xC:
+                        ev.type = SND_SEQ_EVENT_STOP;
+                        break;
+                    case 0xf:
+                        ev.type = SND_SEQ_EVENT_RESET;
+                }
+        }
+        if (ev.type != SND_SEQ_EVENT_NONE) {
+            snd_seq_ev_set_fixed(&ev);
+            snd_seq_ev_set_source(&ev, midi->alsa_seq_port);
+            snd_seq_ev_set_subs(&ev);
+            snd_seq_ev_set_direct(&ev);
+            log_debug("midi-linux: ALSA seq event, type=%d, flags=%02X, tag=%02X, queue=%02X", ev.type, ev.flags, ev.tag, ev.queue);
+            if ((res = snd_seq_event_output(midi_seq, &ev)) < 0)
+                log_warn("midi-linux: unable to send to sequencer: %s", snd_strerror(res));
+            else
+                snd_seq_drain_output(midi_seq);
+        }
+    }
 }
 
 typedef enum {
@@ -284,11 +416,20 @@ static inline void midi_alsa_save_config(void) {
     set_config_string("midi", "music2000_out3_alsa_raw_device", midi_music2000_out3.alsa_raw_device);
 }
 
+static inline void midi_alsa_raw_send_msg(midi_dev_t *midi, uint8_t *buffer, size_t size) {
+    if (midi->alsa_raw_enabled && midi->alsa_raw_port) {
+        log_debug("midi-linux: sending to ALSA raw: status=%02X, len=%d", buffer[0], (int)size);
+        if (snd_rawmidi_write(midi->alsa_raw_port, buffer, size) <= 0)
+            log_warn("midi-linux: unable to send MIDI byte to ALSA raw");
+    }
+}
+
 #else
 #define midi_alsa_seq_init()
 #define midi_alsa_raw_init()
 #define midi_alsa_load_config()
 #define midi_alsa_save_config()
+#define midi_alsa_send_msg()
 #endif
 
 void midi_init(void) {
@@ -315,9 +456,6 @@ void midi_save_config(void) {
 }
 
 void midi_send_msg(midi_dev_t *midi, uint8_t *buffer, size_t size) {
-#ifdef HAVE_ALSA_ASOUNDLIB_H
-    if (midi->alsa_raw_enabled && midi->alsa_raw_port)
-        if (snd_rawmidi_write(midi->alsa_raw_port, buffer, size) <= 0)
-            log_warn("midi-linux: unable to send MIDI byte");
-#endif
+    midi_alsa_seq_send_msg(midi, buffer, size);
+    midi_alsa_raw_send_msg(midi, buffer, size);
 }
