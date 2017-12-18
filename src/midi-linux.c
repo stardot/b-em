@@ -159,7 +159,7 @@ typedef enum {
     MS_GROUND,
     MS_GOT_CMD,
     MS_GOT_NOTE
-} midi_state_t;
+} linux_midi_state_t;
 
 static pthread_t alsa_raw_thread;
 
@@ -168,7 +168,7 @@ static void *alsa_raw_midi_run(void *arg) {
     const char *device;
     snd_rawmidi_t *midiin;
     uint8_t buffer[16], *ptr, byte, note = 0;
-    midi_state_t midi_state = MS_GROUND;
+    linux_midi_state_t midi_state = MS_GROUND;
     void (*note_func)(int note, int vel) = music4000_note_off;
 
     device = get_config_string("midi", "alsa_raw_device", "default");
@@ -308,10 +308,10 @@ void midi_save_config(void) {
     midi_alsa_save_config();
 }
 
-void midi_send_byte(midi_dev_t *midi, uint8_t byte) {
+void midi_send_msg(midi_dev_t *midi, uint8_t *buffer, size_t size) {
 #ifdef HAVE_ALSA_ASOUNDLIB_H
     if (midi->alsa_raw_enabled && midi->alsa_raw_port)
-        if (snd_rawmidi_write(midi->alsa_raw_port, &byte, 1) != 1)
+        if (snd_rawmidi_write(midi->alsa_raw_port, buffer, size) <= 0)
             log_warn("midi-linux: unable to send MIDI byte");
 #endif
 }
