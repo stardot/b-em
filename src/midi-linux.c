@@ -257,7 +257,7 @@ static inline void midi_alsa_raw_init(void) {
 static inline void midi_alsa_load_config(void) {
     midi_music4000.alsa_seq_enabled = get_config_int("midi", "music4000_alsa_seq_enabled", 1);
     midi_music4000.alsa_raw_enabled = get_config_int("midi", "music4000_alsa_raw_enabled", 1);
-    midi_music4000.alsa_raw_device  = get_config_string("midi", "music4000_alsa_raw_device", "default");
+    midi_music4000.alsa_raw_device  = strdup(get_config_string("midi", "music4000_alsa_raw_device", "default"));
     midi_music2000_out1.alsa_seq_enabled = get_config_int("midi", "music2000_out1_alsa_seq_enabled", 0);
     midi_music2000_out2.alsa_seq_enabled = get_config_int("midi", "music2000_out2_alsa_seq_enabled", 0);
     midi_music2000_out3.alsa_seq_enabled = get_config_int("midi", "music2000_out3_alsa_seq_enabled", 0);
