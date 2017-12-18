@@ -258,9 +258,9 @@ static inline void midi_alsa_load_config(void) {
     midi_music2000_out1.alsa_raw_enabled = get_config_int("midi", "music2000_out1_alsa_raw_enabled", 1);
     midi_music2000_out2.alsa_raw_enabled = get_config_int("midi", "music2000_out2_alsa_raw_enabled", 0);
     midi_music2000_out3.alsa_raw_enabled = get_config_int("midi", "music2000_out3_alsa_raw_enabled", 0);
-    midi_music2000_out1.alsa_raw_device  = get_config_string("midi", "music2000_out1_alsa_raw_device", "default");
-    midi_music2000_out2.alsa_raw_device  = get_config_string("midi", "music2000_out2_alsa_raw_device", "default");
-    midi_music2000_out3.alsa_raw_device  = get_config_string("midi", "music2000_out3_alsa_raw_device", "default");
+    midi_music2000_out1.alsa_raw_device  = strdup(get_config_string("midi", "music2000_out1_alsa_raw_device", "default"));
+    midi_music2000_out2.alsa_raw_device  = strdup(get_config_string("midi", "music2000_out2_alsa_raw_device", "default"));
+    midi_music2000_out3.alsa_raw_device  = strdup(get_config_string("midi", "music2000_out3_alsa_raw_device", "default"));
 }
 
 static inline void midi_alsa_save_config(void) {
