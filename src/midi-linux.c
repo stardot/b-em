@@ -90,10 +90,16 @@ static inline void midi_jack_close(void) {
 
 static inline void midi_jack_load_config(void) {
     midi_music4000.jack_enabled = get_config_int("midi", "music4000_jack_enabled", 0);
+    midi_music2000_out1.jack_enabled = get_config_int("midi", "music2000_out1_jack_enabled", 0);
+    midi_music2000_out2.jack_enabled = get_config_int("midi", "music2000_out2_jack_enabled", 0);
+    midi_music2000_out3.jack_enabled = get_config_int("midi", "music2000_out3_jack_enabled", 0);
 }
 
 static inline void midi_jack_save_config(void) {
     set_config_int("midi", "music4000_jack_enabled", midi_music4000.jack_enabled);
+    set_config_int("midi", "music2000_out1_jack_enabled", midi_music2000_out1.jack_enabled);
+    set_config_int("midi", "music2000_out2_jack_enabled", midi_music2000_out2.jack_enabled);
+    set_config_int("midi", "music2000_out3_jack_enabled", midi_music2000_out3.jack_enabled);
 }
 
 #else
