@@ -1,6 +1,7 @@
 #include "b-em.h"
 #include "midi.h"
 #include "sound.h"
+#include "music2000.h"
 #include "music4000.h"
 
 #include <allegro/config.h>
@@ -10,14 +11,14 @@ static const char *szMusic4000InDevName;
 static HMIDIIN hMusic4000MidiIn;
 
 struct _midi_dev {
+    const char *szDesc;
     const char *szName;
     HMIDIOUT hMidiOut;
 };
 
-midi_dev_t Music4000In;
-midi_dev_t Music2000Out1;
-midi_dev_t Music2000Out2;
-midi_dev_t Music2000Out3;
+midi_dev_t Music2000Out1 = { .szDesc = "Music 2000 Out 1" };
+midi_dev_t Music2000Out2 = { .szDesc = "Music 2000 Out 2" };
+midi_dev_t Music2000Out3 = { .szDesc = "Music 2000 Out 3" };
 
 void CALLBACK MidiInProc(HMIDIIN hMidiIn, UINT wMsg, DWORD dwInstance, DWORD dwParam1, DWORD dwParam2) {
 
@@ -66,18 +67,13 @@ static void MidiOpenM400Dev(void) {
         log_warn("midi-windows: no MIDI input devices available for M4000");
 }
 
-static HMIDIOUT MidiOpenOutInternal(UINT nMidiDevice, const char *szName) {
+static void MidiOpenOutInternal(UINT nMidiDevice, midi_dev_t *dev) {
     MMRESULT rv;
-    HMIDIOUT hMidiDevice;
 
-    if ((rv = midiOutOpen(&hMidiDevice, nMidiDevice, 0, 0, CALLBACK_NULL)) == MMSYSERR_NOERROR) {
-        log_info("midi-windows: opened MIDI out device #%d, %s", nMidiDevice, szName);
-        return hMidiDevice;
-    }
-    else {
-        log_error("midi-windows: unable to open MIDI device #%d, %s, rv=%d", nMidiDevice, szName, rv);
-        return NULL;
-    }
+    if ((rv = midiOutOpen(&dev->hMidiOut, nMidiDevice, 0, 0, CALLBACK_NULL)) == MMSYSERR_NOERROR)
+        log_info("midi-windows: opened MIDI out device #%d, %s for %s", nMidiDevice, dev->szName, dev->szDesc);
+    else
+        log_warn("midi-windows: unable to open MIDI device #%d, %s for %s, rv=%d", nMidiDevice, dev->szName, dev->szDesc, rv);
 }
 
 static void MidiOpenM2000Devs(void) {
@@ -89,11 +85,11 @@ static void MidiOpenM2000Devs(void) {
             for (i = 0; i < nMidiDevices; i++) {
                 midiOutGetDevCaps(i, &caps, sizeof(MIDIOUTCAPS));
                 if (Music2000Out1.szName && !Music2000Out1.hMidiOut && strcmp(caps.szPname, Music2000Out1.szName) == 0)
-                    Music2000Out1.hMidiOut = MidiOpenOutInternal(i, Music2000Out1.szName);
+                    MidiOpenOutInternal(i, &Music2000Out1);
                 else if (Music2000Out2.szName && !Music2000Out2.hMidiOut && strcmp(caps.szPname, Music2000Out2.szName) == 0)
-                    Music2000Out2.hMidiOut = MidiOpenOutInternal(i, Music2000Out2.szName);
+                    MidiOpenOutInternal(i, &Music2000Out2);
                 else if (Music2000Out3.szName && !Music2000Out3.hMidiOut && strcmp(caps.szPname, Music2000Out3.szName) == 0)
-                    Music2000Out3.hMidiOut = MidiOpenOutInternal(i, Music2000Out3.szName);
+                    MidiOpenOutInternal(i, &Music2000Out3);
             }
         }
         if (!Music2000Out1.hMidiOut || !Music2000Out2.hMidiOut || !Music2000Out3.hMidiOut) {
@@ -101,13 +97,13 @@ static void MidiOpenM2000Devs(void) {
                 midiOutGetDevCaps(i, &caps, sizeof(MIDIOUTCAPS));
                 if (!Music2000Out1.hMidiOut) {
                     Music2000Out1.szName = strdup(caps.szPname);
-                    Music2000Out1.hMidiOut = MidiOpenOutInternal(i, Music2000Out1.szName);
+                    MidiOpenOutInternal(i, &Music2000Out1);
                 } else if (!Music2000Out2.hMidiOut) {
                     Music2000Out2.szName = strdup(caps.szPname);
-                    Music2000Out2.hMidiOut = MidiOpenOutInternal(i, Music2000Out2.szName);
+                    MidiOpenOutInternal(i, &Music2000Out2);
                 } else if (!Music2000Out3.hMidiOut) {
                     Music2000Out3.szName = strdup(caps.szPname);
-                    Music2000Out3.hMidiOut = MidiOpenOutInternal(i, Music2000Out3.szName);
+                    MidiOpenOutInternal(i, &Music2000Out3);
                 } else
                     break;
             }
@@ -119,6 +115,7 @@ static void MidiOpenM2000Devs(void) {
 void midi_init(void) {
     MidiOpenM400Dev();
     MidiOpenM2000Devs();
+    music2000_init(&Music2000Out1, &Music2000Out2, &Music2000Out3);
 }
 
 void midi_close(void) {
@@ -154,6 +151,7 @@ void midi_send_msg(midi_dev_t *dev, uint8_t *msg, size_t size) {
     DWORD value = msg[0] | (msg[1] << 8) | (msg[2] << 16);
     MMRESULT res;
 
+    log_debug("midi-windows: midi_send_msg(%s, %.*s, %d)", dev->szDesc, size, msg, size);
     if ((res = midiOutShortMsg(dev->hMidiOut, value)) != MMSYSERR_NOERROR)
         log_error("midi-windows: unable to send MIDI event on %s: %d", dev->szName, res);
 }
