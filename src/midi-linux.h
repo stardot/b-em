@@ -6,6 +6,7 @@
 #ifdef HAVE_JACK_JACK_H
 #include <jack/jack.h>
 #include <jack/midiport.h>
+#include <jack/ringbuffer.h>
 #endif
 
 #ifdef HAVE_ALSA_ASOUNDLIB_H
@@ -16,6 +17,7 @@ struct _midi_dev {
 #ifdef HAVE_JACK_JACK_H
     int           jack_enabled;
     jack_port_t   *jack_port;
+    jack_ringbuffer_t *ring_buf;
 #endif
 #ifdef HAVE_ALSA_ASOUNDLIB_H
     int           alsa_seq_enabled;

@@ -14,78 +14,121 @@ midi_dev_t midi_music2000_out3;
 
 #ifdef HAVE_JACK_JACK_H
 
-static int jack_started = 0;
-static pthread_t jack_thread;
-static jack_client_t *jack_client;
-static jack_port_t *jack_port;
+#define JACK_RINGBUF_SIZE 1024
 
-static int midi_jack_process(jack_nframes_t nframes, void *arg) {
+static int jack_started = 0;
+static jack_client_t *jack_client;
+
+static void midi_jack_m4000_proc(jack_nframes_t nframes) {
     void *port_buf;
     jack_midi_event_t ev;
     jack_midi_data_t *md;
     int i, midi_status;
 
-    port_buf = jack_port_get_buffer(jack_port, nframes);
-    for (i = 0; jack_midi_event_get(&ev, port_buf, i) == 0; i++) {
-        md = ev.buffer;
-        midi_status = md[0];
-        switch(midi_status & 0xf0) {
-            case 0x80:
-                log_debug("midi-linux: jack midi note off, note=%d, vel=%d", md[1], md[2]);
-                music4000_note_off(md[1], md[2]);
-                break;
-            case 0x90:
-                log_debug("midi-linux: jack midi note on, note=%d, vel=%d", md[1], md[2]);
-                music4000_note_on(md[1], md[2]);
-                break;
+    if (midi_music4000.jack_enabled) {
+        port_buf = jack_port_get_buffer(midi_music4000.jack_port, nframes);
+        for (i = 0; jack_midi_event_get(&ev, port_buf, i) == 0; i++) {
+            md = ev.buffer;
+            midi_status = md[0];
+            switch(midi_status & 0xf0) {
+                case 0x80:
+                    log_debug("midi-linux: jack midi note off, note=%d, vel=%d", md[1], md[2]);
+                    music4000_note_off(md[1], md[2]);
+                    break;
+                case 0x90:
+                    log_debug("midi-linux: jack midi note on, note=%d, vel=%d", md[1], md[2]);
+                    music4000_note_on(md[1], md[2]);
+                    break;
+            }
         }
     }
+}
+
+static void midi_jack_m2000_proc(midi_dev_t *midi, jack_nframes_t nframes, jack_nframes_t *frame_time) {
+    void *port_buf;
+    size_t bytes;
+    jack_midi_data_t md[4], *dest;
+
+    if (midi->jack_enabled || midi->jack_port) {
+        port_buf = jack_port_get_buffer(midi->jack_port, nframes);
+        jack_midi_clear_buffer(port_buf);
+        while ((bytes = jack_ringbuffer_read(midi->ring_buf, (char *)md, sizeof md)) > 0) {
+            if ((dest = jack_midi_event_reserve(port_buf, (*frame_time)++, bytes)))
+                memcpy(dest, md, bytes);
+            else {
+                log_debug("midi-linux: jack failed to provide buffer");
+                break;
+            }
+        }
+    }
+}
+
+static int midi_jack_process(jack_nframes_t nframes, void *arg) {
+    jack_nframes_t frame_time;
+
+    midi_jack_m4000_proc(nframes);
+    frame_time = 0;
+    midi_jack_m2000_proc(&midi_music2000_out1, nframes, &frame_time);
+    midi_jack_m2000_proc(&midi_music2000_out2, nframes, &frame_time);
+    midi_jack_m2000_proc(&midi_music2000_out3, nframes, &frame_time);
     return 0;
 }
 
-void *jack_midi_run(void *arg) {
-    jack_status_t status;
-    int err;
+static inline void m4000_jack_init(void) {
+    if (midi_music4000.jack_enabled) {
+        if ((midi_music4000.jack_port = jack_port_register(jack_client, "midi-in", JACK_DEFAULT_MIDI_TYPE, JackPortIsInput|JackPortIsTerminal, 0)))
+            log_debug("midi-linux: M4000 jack midi port open");
+        else
+            log_error("midi-linux: unable to register jack midi-in port");
+    }
+}
 
-    if ((jack_client = jack_client_open("B-Em", JackNullOption, &status))) {
-        log_debug("midi-linux: jack client open");
-        if ((err = jack_set_process_callback(jack_client, midi_jack_process, NULL)) == 0) {
-            log_debug("midi-linux: jack process callback set");
-            if ((jack_port = jack_port_register(jack_client, "midi-in", JACK_DEFAULT_MIDI_TYPE, JackPortIsInput|JackPortIsTerminal, 0))) {
-                log_debug("midi-linux: jack midi port open");
-                if ((err = jack_activate(jack_client)) == 0) {
-                    log_debug("midi-linux: jack active");
-                    jack_started = 1;
-                    for (;;)
-                        pause();
-                }
-                else
-                    log_error("midi-linux: unable to activate jack client: %d", err);
-                jack_port_unregister(jack_client, jack_port);
-            } else
-                log_error("midi-linux: unable to register jack midi port: %d", err);
-        } else
-            log_error("midi-linux: unable to set jack callback, err=%d", err);
-        jack_client_close(jack_client);
-
-    } else
-        log_warn("midi-linux: m4000: unable to register as jack client, status=%x", status);
-    return NULL;
+static inline void m2000_jack_init(midi_dev_t *midi, const char *pname) {
+    if (midi->jack_enabled) {
+        if ((midi->jack_port = jack_port_register(jack_client, pname, JACK_DEFAULT_MIDI_TYPE, JackPortIsOutput, 0))) {
+            log_debug("midi-linux: M2000 jack midi port %s open", pname);
+            if (!(midi->ring_buf = jack_ringbuffer_create(JACK_RINGBUF_SIZE))) {
+                log_error("midi-linux: unable to create ring buffer for jack %s port", pname);
+                jack_port_unregister(jack_client, midi->jack_port);
+                midi->jack_port = NULL;
+            }
+        }
+        else
+            log_error("midi-linux: unable to register jack %s port", pname);
+    }
 }
 
 static inline void midi_jack_init(void) {
+    jack_status_t status;
     int err;
 
-    if (midi_music4000.jack_enabled)
-        if ((err = pthread_create(&jack_thread, NULL, jack_midi_run, NULL)) != 0)
-            log_error("midi-linux: unable to create Jack MIDI thread: %s", strerror(err));
+    if (midi_music4000.jack_enabled || midi_music2000_out1.jack_enabled || midi_music2000_out2.jack_enabled || midi_music2000_out3.jack_enabled) {
+        if ((jack_client = jack_client_open("B-Em", JackNullOption, &status))) {
+            log_debug("midi-linux: jack client open");
+            if ((err = jack_set_process_callback(jack_client, midi_jack_process, NULL)) == 0) {
+                log_debug("midi-linux: jack process callback set");
+                m4000_jack_init();
+                m2000_jack_init(&midi_music2000_out1, "midi-out1");
+                m2000_jack_init(&midi_music2000_out2, "midi-out2");
+                m2000_jack_init(&midi_music2000_out3, "midi-out3");
+                if ((err = jack_activate(jack_client)) == 0) {
+                    log_debug("midi-linux: jack active");
+                    jack_started = 1;
+                    return;
+                }
+                else
+                    log_error("midi-linux: unable to activate jack client: %d", err);
+            } else
+                log_error("midi-linux: unable to set jack callback, err=%d", err);
+            jack_client_close(jack_client);
+        } else
+            log_warn("midi-linux: m4000: unable to register as jack client, status=%x", status);
+    }
 }
 
 static inline void midi_jack_close(void) {
-    if (jack_started) {
-        pthread_cancel(jack_thread);
+    if (jack_started)
         jack_client_close(jack_client);
-    }
 }
 
 static inline void midi_jack_load_config(void) {
@@ -100,6 +143,11 @@ static inline void midi_jack_save_config(void) {
     set_config_int("midi", "music2000_out1_jack_enabled", midi_music2000_out1.jack_enabled);
     set_config_int("midi", "music2000_out2_jack_enabled", midi_music2000_out2.jack_enabled);
     set_config_int("midi", "music2000_out3_jack_enabled", midi_music2000_out3.jack_enabled);
+}
+
+static inline void midi_jack_send_msg(midi_dev_t *midi, uint8_t *buffer, size_t size) {
+    if (midi->jack_enabled && midi->jack_port)
+         jack_ringbuffer_write(midi->ring_buf, (char *)buffer, size);
 }
 
 #else
@@ -456,6 +504,7 @@ void midi_save_config(void) {
 }
 
 void midi_send_msg(midi_dev_t *midi, uint8_t *buffer, size_t size) {
+    midi_jack_send_msg(midi, buffer, size);
     midi_alsa_seq_send_msg(midi, buffer, size);
     midi_alsa_raw_send_msg(midi, buffer, size);
 }
