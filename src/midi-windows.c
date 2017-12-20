@@ -61,7 +61,7 @@ static void MidiOpenM400Dev(void) {
             log_error("midi-windows: no MIDI device with name '%s'", szMusic4000InDevName);
         }
         midiInGetDevCaps(0, &caps, sizeof(MIDIINCAPS));
-        szMusic4000InDevName = caps.szPname;
+        szMusic4000InDevName = strdup(caps.szPname);
         MidiOpenInInternal(0);
     } else
         log_warn("midi-windows: no MIDI input devices available for M4000");
@@ -146,10 +146,16 @@ void midi_close(void) {
 }
 
 void midi_load_config(void) {
-    szMusic4000InDevName = get_config_string("midi", "music4000_in_device",   NULL);
-    Music2000Out1.szName = get_config_string("midi", "music2000_out1_device", NULL);
-    Music2000Out2.szName = get_config_string("midi", "music2000_out2_device", NULL);
-    Music2000Out3.szName = get_config_string("midi", "music2000_out3_device", NULL);
+    const char *ptr;
+
+    if ((ptr = get_config_string("midi", "music4000_in_device",   NULL)))
+        szMusic4000InDevName = strdup(ptr);
+    if ((ptr = get_config_string("midi", "music2000_out1_device", NULL)))
+        Music2000Out1.szName = strdup(ptr);
+    if ((ptr = get_config_string("midi", "music2000_out2_device", NULL)))
+        Music2000Out2.szName = strdup(ptr);
+    if ((ptr = get_config_string("midi", "music2000_out3_device", NULL)))
+        Music2000Out3.szName = strdup(ptr);
 };
 
 void midi_save_config(void) {
