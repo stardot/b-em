@@ -81,31 +81,47 @@ static void MidiOpenM2000Devs(void) {
     MIDIOUTCAPS caps;
 
     if ((nMidiDevices = midiOutGetNumDevs()) > 0) {
+        log_debug("midi-windows: found %d midi out devices", nMidiDevices);
         if (Music2000Out1.szName || Music2000Out2.szName || Music2000Out3.szName) {
             for (i = 0; i < nMidiDevices; i++) {
                 midiOutGetDevCaps(i, &caps, sizeof(MIDIOUTCAPS));
-                if (Music2000Out1.szName && !Music2000Out1.hMidiOut && strcmp(caps.szPname, Music2000Out1.szName) == 0)
+                log_debug("midi-windows: device #%d has name %s", i, caps.szPname);
+                if (Music2000Out1.szName && !Music2000Out1.hMidiOut && strcmp(caps.szPname, Music2000Out1.szName) == 0) {
                     MidiOpenOutInternal(i, &Music2000Out1);
-                else if (Music2000Out2.szName && !Music2000Out2.hMidiOut && strcmp(caps.szPname, Music2000Out2.szName) == 0)
+                    log_debug("midi-windows: assigned #%d to out1 on name", i);
+                }
+                else if (Music2000Out2.szName && !Music2000Out2.hMidiOut && strcmp(caps.szPname, Music2000Out2.szName) == 0) {
                     MidiOpenOutInternal(i, &Music2000Out2);
-                else if (Music2000Out3.szName && !Music2000Out3.hMidiOut && strcmp(caps.szPname, Music2000Out3.szName) == 0)
+                    log_debug("midi-windows: assigned #%d to out2 on name", i);
+                }
+                else if (Music2000Out3.szName && !Music2000Out3.hMidiOut && strcmp(caps.szPname, Music2000Out3.szName) == 0) {
                     MidiOpenOutInternal(i, &Music2000Out3);
+                    log_debug("midi-windows: assigned #%d to out3 on name", i);
+                }
             }
         }
         if (!Music2000Out1.hMidiOut || !Music2000Out2.hMidiOut || !Music2000Out3.hMidiOut) {
             for (i = 0; i < nMidiDevices; i++) {
                 midiOutGetDevCaps(i, &caps, sizeof(MIDIOUTCAPS));
-                if (!Music2000Out1.hMidiOut) {
-                    Music2000Out1.szName = strdup(caps.szPname);
-                    MidiOpenOutInternal(i, &Music2000Out1);
-                } else if (!Music2000Out2.hMidiOut) {
-                    Music2000Out2.szName = strdup(caps.szPname);
-                    MidiOpenOutInternal(i, &Music2000Out2);
-                } else if (!Music2000Out3.hMidiOut) {
-                    Music2000Out3.szName = strdup(caps.szPname);
-                    MidiOpenOutInternal(i, &Music2000Out3);
-                } else
-                    break;
+                if (!(Music2000Out1.szName && strcmp(caps.szPname, Music2000Out1.szName) == 0) &&
+                    !(Music2000Out2.szName && strcmp(caps.szPname, Music2000Out2.szName) == 0) &&
+                    !(Music2000Out3.szName && strcmp(caps.szPname, Music2000Out3.szName) == 0))
+                {
+                    if (!Music2000Out1.hMidiOut) {
+                        Music2000Out1.szName = strdup(caps.szPname);
+                        MidiOpenOutInternal(i, &Music2000Out1);
+                        log_debug("midi-windows: assigned #%d to out1 by number", i);
+                    } else if (!Music2000Out2.hMidiOut) {
+                        Music2000Out2.szName = strdup(caps.szPname);
+                        MidiOpenOutInternal(i, &Music2000Out2);
+                        log_debug("midi-windows: assigned #%d to out2 by number", i);
+                    } else if (!Music2000Out3.hMidiOut) {
+                        Music2000Out3.szName = strdup(caps.szPname);
+                        log_debug("midi-windows: assigned #%d to out3 by number", i);
+                        MidiOpenOutInternal(i, &Music2000Out3);
+                    } else
+                        break;
+                }
             }
         }
     } else
