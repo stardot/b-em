@@ -110,7 +110,9 @@ void disc_close(int drive)
         if (drives[0].close) drives[0].close(drive);
         // Force the drive to spin down (i.e. become not-ready) when the disk is unloaded
         // This prevents the file system (e.g DFS) caching the old disk catalogue
-        fdc_spindown();
+        
+        if (fdc_spindown)
+            fdc_spindown();
 }
 
 int disc_notfound=0;

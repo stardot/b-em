@@ -60,8 +60,8 @@ void wd1770_reset()
         fdc_headercrcerror = wd1770_headercrcerror;
         fdc_writeprotect   = wd1770_writeprotect;
         fdc_getdata        = wd1770_getdata;
+        motorspin = 45000;
     }
-    motorspin = 45000;
 }
 
 void wd1770_spinup()
@@ -200,7 +200,7 @@ static void write_1770(uint16_t addr, uint8_t val)
                 nmi = 1;
             wd1770_setspindown();
             break;
-
+n
         case 0xF: /*Write track*/
             log_debug("wd1770: write track side=%d track=%d dens=%d, ctrl=%d\n", wd1770.curside, wd1770.track, wd1770.density, wd1770.ctrl);
             wd1770.status = 0x80 | 0x1;

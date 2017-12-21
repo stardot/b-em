@@ -16,6 +16,7 @@
 #include "sysvia.h"
 #include "uservia.h"
 #include "video.h"
+#include "vdfs.h"
 
 int savestate_wantsave, savestate_wantload;
 char savestate_name[260];
@@ -42,7 +43,7 @@ void savestate_dosave()
 	    putc('N', f); putc('A', f); putc('P', f); putc('1', f);
 
 	    putc(curmodel, f);
-        
+
 	    m6502_savestate(f);
 	    mem_savestate(f);
 	    sysvia_savestate(f);
@@ -54,7 +55,8 @@ void savestate_dosave()
 	    adc_savestate(f);
 	    acia_savestate(f);
 	    serial_savestate(f);
-	    
+        vdfs_savestate(f);
+
 	    fclose(f);
 	}
 	else
@@ -62,7 +64,7 @@ void savestate_dosave()
 
         savestate_wantsave = 0;
 }
-        
+
 void savestate_doload()
 {
         int c;
@@ -77,9 +79,7 @@ void savestate_doload()
 	     {
 		 curmodel = getc(f);
 		 selecttube = curtube = -1;
-		 log_debug("Restart BBC\n");
 		 main_restart();
-		 log_debug("Done!\n");
 
 		 m6502_loadstate(f);
 		 mem_loadstate(f);
@@ -92,6 +92,7 @@ void savestate_doload()
 		 adc_loadstate(f);
 		 acia_loadstate(f);
 		 serial_loadstate(f);
+         vdfs_loadstate(f);
 
 		 log_debug("Loadstate done!\n");
 	     }
@@ -103,4 +104,31 @@ void savestate_doload()
 	    log_error("savestate: unable to load from state file '%s': %s", savestate_name, strerror(errno));
 
         savestate_wantload = 0;
+}
+
+void savestate_save_var(unsigned var, FILE *f) {
+    uint8_t byte;
+
+    for (;;) {
+        byte = var & 0x7f;
+        var >>= 7;
+        if (var == 0)
+            break;
+        putc(byte, f);
+    }
+    putc(byte | 0x80, f);
+}
+
+unsigned savestate_load_var(FILE *f) {
+    unsigned var, lshift;
+    int      ch;
+
+    var = lshift = 0;
+    while ((ch = getc(f)) != EOF) {
+        if (ch & 0x80)
+            return var | ((ch & 0x7f) << lshift);
+        var |= ch << lshift;
+        lshift += 7;
+    }
+    return var;
 }

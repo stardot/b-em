@@ -14,6 +14,11 @@
 vdfsno  =   &11
 oswpb   =   &70
 
+        ORG     &A8
+.romtab equw    &0000
+.romid  equb    &00
+.copywr equb    &00
+        
 ClaimFS     =   &FC5C       :\ *FSCLAIM ON|OFF flag
 FSFlag      =   &FC5D       :\ FS id when claimed
 PORT_CMD    =   &FC5E       :\ execute cmds on VDFS in host
@@ -21,6 +26,7 @@ PORT_A      =   &FC5F       :\ store A ready for command.
 
 OS_CLI=&FFF7:OSBYTE=&FFF4:OSWORD=&FFF1:OSWRCH=&FFEE:OSNEWL=&FFE7:OSASCI=&FFE3
 OSFILE=&FFDD:OSARGS=&FFDA:OSBGET=&FFD7:OSBPUT=&FFD4:OSGBPB=&FFD1:OSFIND=&FFCE
+OSRDRM=&FFB9        
 
 ORG     &8000
 .start
@@ -28,12 +34,15 @@ EQUS "MRB"                         :\ No language entry
 JMP Service                        :\ Service entry
 EQUB &82:EQUB ROMCopyright-&8000
 .ROMVersion
-EQUB &04
+EQUB &05
 .ROMTitle
-EQUS "Virtual DFS":EQUB 0:EQUS "0.05 (17 Sep 2016)"
+EQUS "B-Em VDFS":EQUB 0
+include "version.asm"
 .ROMCopyright
 EQUB 0:EQUS "(C)1995 MRB, 2004 JGH, 2016 SJF":EQUB 0
 EQUD 0
+.banner
+EQUS "Virtual DFS":EQUB 0
 
 \ As this ROM requires support from the emulator and that may not
 \ be enabled (or supported) check that it works before responding
@@ -72,7 +81,7 @@ JSR OSNEWL
 .PrROMTitle                 :\ Print ROM title
 LDX #0
 .PrRTLp
-LDA ROMTitle,X:BEQ PrRTDone
+LDA banner,X:BEQ PrRTDone
 JSR OSWRCH:INX:BNE PrRTLp
 .PrRTDone
 RTS
@@ -141,10 +150,11 @@ EQUS "PAGE"   :EQUB 13:EQUW page
 EQUS "SHADOW" :EQUB 13:EQUW shadow
 EQUS "INSERT" :EQUB 13:EQUW insert
 \ SRAM commands
+EQUS "ROMS"   :EQUB 13:EQUW roms
 EQUS "SRLOAD" :EQUB 13:EQUW srload
 EQUS "SRSAVE" :EQUB 13:EQUW srsave
 EQUS "SRREAD" :EQUB 13:EQUW srread
-EQUS "SRWRITE":EQUB 13:EQUW srwrite
+EQUS "SRWRITE":EQUB 13:EQUW srwrit
 EQUB 0
 \ ----------------------------------
 \ Detailed help routine
@@ -210,13 +220,13 @@ EQUS "Filing system selection:":EQUB 13
 EQUS "  DISK, DISC, ADFS, FADFS :":EQUB 10
 EQUS "Select VDFS if claimed":EQUB 13
 EQUS "  VDFS : Select VDFS":EQUB 13
-EQUS "  FSCLAIM ON : Claim DISC, ADFS":EQUB 13
-EQUS "  FSCLAIM OFF : Release DISC, ADFS":EQUB 13
+EQUS "  FSCLAIM ON : Claim DISC, ADFS, FADFS":EQUB 13
+EQUS "  FSCLAIM OFF : Release DISC, ADFS, FADFS":EQUB 13
 EQUS "  OSW7F (NONE)(<ver>) :":EQUB 10
 EQUS "Emulate Osword &7F memory corruption":EQUB 13
 EQUB 13
 EQUS "Utility commands:":EQUB 13
-EQUS "  QUIT or DESKTOP : return to RISC OS":EQUB 13
+EQUS "  QUIT or DESKTOP : terminate emulator":EQUB 13
 EQUS "  PAGE : force PAGE location":EQUB 13
 EQUS "  SHADOW : dummy command":EQUB 13
 EQUB 13
@@ -231,13 +241,15 @@ EQUS "  SRWRITE <start> <+len> <swadd> (<r#>)":EQUB 13
 EQUB 13
 EQUS "VDFS commands:":EQUB 13
 EQUS "  BACK : return to previous directory":EQUB 13
+EQUS "  DELETE : delete file or empty dir":EQUB 13
+EQUS "  CDIR : create a new directory":EQUB 13
 EQUS "  DIR : change current directory":EQUB 13
 EQUS "  LIB : change current library":EQUB 13
 EQUS "  INFO : show info on single file":EQUB 13
 EQUS "  EX : show info on all files in CSD":EQUB 13
 EQUS "  ACCESS, BACKUP, COMPACT, COPY,":EQUB 10
-EQUS "DESTROY, DRIVE, ENABLE, FORM, FREE,":EQUB 13
-EQUS "  MAP, MOUNT, RENAME, TITLE, VERIFY, ":EQUB 10
+EQUS "DESTROY, DRIVE, ENABLE, FORM,":EQUB 13
+EQUS "  FREE, MAP, MOUNT, TITLE, VERIFY,":EQUB 10
 EQUS "WIPE : trapped and ignored":EQUB 13
 EQUB 0
 \ --------------------
@@ -252,31 +264,206 @@ LDA #&00                    :\ Ignore command
 RTS
 :
 
-.CheckFsIsUs
-        LDA #&00            :\ query current FS
-        TAY
-        JSR OSARGS
-        LDX #<oswpb         ;\ YX = parameter block.
-        LDY #>oswpb
-        CMP FSFlag
-	RTS
-	
 .srload LDA #&D0
         BNE srfile
 .srsave LDA #&D3
-.srfile STA PORT_CMD        :\ parse command on host.
-        JSR CheckFsIsUs
-        BEQ srfus           :\ FS is us so execute on host.
-        LDA #&43            :\ execute via OSWORD
+.srfile STA PORT_CMD        :\ send command to host to parse (always)
+        BCS sroswd          ;\ and execute (only if it is current FS)
+        LDA #&00
+        RTS
+.sroswd LDA #&43            :\ host was not current FS and did not
+        LDX #<oswpb         :\ execute so execute on current FS
+        LDY #>oswpb         :\ via OSWORD.
         JMP OSWORD
-.srfus  LDA #&D2            :\ .
+
+.srread LDA #&D4            :\ Pass to host and return
         STA PORT_CMD
+        LDA #&00
+        RTS
+        
+.srwrit LDA #&D1            :\ Pass to host and return
+        STA PORT_CMD
+        LDA #&00
         RTS
 
-.srread: LDA #&D4:STA PORT_CMD:RTS \ Pass to host and return
-.srwrite:LDA #&D1:STA PORT_CMD:RTS \ Pass to host and return
-:
-:
+        MACRO  page_rom_x
+        STX    &F4
+        STX    &FE30
+        ENDMACRO
+
+.roms
+{        
+        LDA     #&aa
+        LDX     #&00
+        LDY     #&ff
+        JSR     OSBYTE
+        STX     romtab
+        STY     romtab+1
+        JSR     OSNEWL
+        LDY     #&0f
+.rmloop STY     romid
+        LDA     #&FD
+        STA     PORT_CMD
+        BCS     gotram
+        LDY     romid
+        LDA     (romtab),y
+        BNE     gotrom
+.next   DEY
+        BPL     rmloop
+        JSR     OSNEWL
+        LDA     #&00
+        RTS
+.gotrom TAX
+        JSR     prinfo
+        JSR     space
+        JSR     cparen
+        JSR     rdcpyr
+        JSR     prtitl
+        LDY     romid
+        JMP     next
+.gotram JSR     rdcpyr
+        STA     &f6
+        LDY     romid
+        JSR     OSRDRM
+        CMP     #&00
+        BNE     empty
+        INC     &f6
+        LDY     romid
+        JSR     OSRDRM
+        CMP     #'('
+        BNE     empty
+        INC     &f6
+        LDY     romid
+        JSR     OSRDRM
+        CMP     #'C'
+        BNE     empty
+        INC     &f6
+        LDY     romid
+        JSR     OSRDRM
+        CMP     #')'
+        BNE     empty
+        LDA     #&06
+        STA     &f6
+        LDY     romid
+        JSR     OSRDRM
+        TAX
+        JSR     prinfo
+        JSR     rparen
+        JSR     prtitl
+        LDY     romid
+        JMP     next
+.empty  LDX     #&00
+        JSR     prinfo
+        JSR     rparen
+        JSR     OSNEWL
+        LDY     romid
+        JMP     next
+
+.rdcpyr LDA     #&07
+        STA     &f6
+        LDA     #&80
+        STA     &f7
+        LDY     romid
+        JSR     OSRDRM
+        STA     copywr
+        RTS
+
+.prinfo LDA     #'R'
+        JSR     OSWRCH
+        LDA     #'o'
+        JSR     OSWRCH
+        LDA     #'m'
+        JSR     OSWRCH
+        JSR     space
+        LDA     romid
+        CMP     #&0A
+        BCS     geten
+        LDA     #'0'
+        JSR     OSWRCH
+        LDA     romid
+        JMP     both
+.geten  LDA     #'1'
+        JSR     OSWRCH
+        LDA     romid
+        SEC
+        SBC     #&0a
+.both   AND     #&0f
+        CLC
+        ADC     #'0'
+        JSR     OSWRCH
+        JSR     space
+        LDA     #':'
+        JSR     OSWRCH
+        JSR     space
+        LDA     #'('
+        JSR     OSWRCH
+        TXA
+        AND     #&80
+        BEQ     notsrv
+        LDA     #'S'
+        BNE     issrv
+.notsrv LDA     #' '
+.issrv  JSR     OSWRCH
+        TXA
+        AND     #&40
+        BEQ     space
+        LDA     #'L'
+        BNE     islng
+.space  LDA     #' '
+.islng  JMP     OSWRCH
+
+.prtitl JSR     space
+        LDA     #&09
+        STA     &f6
+        LDA     #&80
+        STA     &f7
+.tloop  LDY     romid
+        JSR     OSRDRM
+        CMP     #&00
+        BNE     notnul
+        LDA     #' '
+.notnul JSR     OSWRCH
+        INC     &f6
+        LDA     &f6
+        CMP     copywr
+        BNE     tloop
+        JMP     OSNEWL
+
+.romchk LDA     copywr
+        STA     &f6
+        LDY     romid
+        JSR     OSRDRM
+        CMP     #&00
+        BNE     chkfai
+        INC     &f6
+        LDY     romid
+        JSR     OSRDRM
+        CMP     #'('
+        BNE     chkfai
+        INC     &f6
+        LDY     romid
+        JSR     OSRDRM
+        CMP     #'C'
+        BNE     chkfai
+        INC     &f6
+        LDY     romid
+        JSR     OSRDRM
+        CMP     #')'
+        BNE     chkfai
+        CLC
+        RTS
+.chkfai SEC
+        RTS
+.copyst EQUS    ")C("
+        EQUB    &00
+
+.rparen LDA     #'R'
+        JSR     OSWRCH
+.cparen LDA     #')'
+        jmp     OSWRCH
+}
+
+
 \ ======================
 \ Filing System Routines
 \ ======================
@@ -405,9 +592,18 @@ CMP #&05:BNE P%+5:JMP Cat   :\ Catalogue directory
 CMP #&03:BNE P%+5:JMP FSCommandLookup:\ Filing system commands
 CMP #&06:BNE FSCemul:LDA #&77:JSR OSBYTE:LDA#&06
 .FSCemul
-STA PORT_A:LDA #&00:STA PORT_CMD :\ Pass to emulator and return
+STA PORT_A:LDA #&00:STA PORT_CMD :\ Pass to emulator.
+BCS FSCtube                 :\ start execution in tube?	
 .FSCDone
 RTS
+.FSCtube		:\ claim the tube.
+LDA #&D1
+JSR &0406
+BCC FSCtube
+LDA #&04		:\ start execution at the 32 bit address in
+LDX #&c0		:\ &C0 which is set by the VDFS host code.
+LDY #&00
+JMP &0406
 :
 \ ----------------------
 \ Filing System Commands
@@ -453,6 +649,7 @@ RTS                         :\ And return
 EQUS "ACCESS" :EQUB 13:EQUW access
 EQUS "BACK"   :EQUB 13:EQUW back
 EQUS "BACKUP" :EQUB 13:EQUW backup
+EQUS "CDIR"   :EQUB 13:EQUW cdir
 EQUS "COMPACT":EQUB 13:EQUW compact
 EQUS "COPY"   :EQUB 13:EQUW copy
 EQUS "DELETE" :EQUB 13:EQUW delete
@@ -482,9 +679,10 @@ TYA:CLC:ADC &F2:TAX:LDA &F3:ADC #0:TAY:RTS
 .access   :RTS
 .back     :LDA #&D5:STA PORT_CMD:RTS :\ Pass to host and return
 .backup   :RTS
+.cdir     :LDX #&08:JMP FileCmd
 .compact  :RTS
 .copy     :RTS
-.delete   :RTS
+.delete   :LDX #&06:JMP FileCmd
 .destroy  :RTS
 .dir      :LDA #&D7:STA PORT_CMD:RTS :\ Pass to host and return
 .drive    :RTS
@@ -501,6 +699,30 @@ TYA:CLC:ADC &F2:TAX:LDA &F3:ADC #0:TAY:RTS
 .title    :RTS
 .verify   :RTS
 :
+.FileCmd
+TYA:CLC:ADC &F2:STA &B0
+LDA &F3:ADC #00:STA &B1
+TXA:LDX #&B0:LDY #&00:JSR OSFILE
+CMP #&00:BEQ FileCmdNf:RTS
+.FileCmdNf
+JSR errmsg
+EQUB &D6:EQUS "Not found":EQUB &00
+
+.errmsg
+{
+        pla
+        sta     &b0
+        pla
+        sta     &b1
+        ldy     #$00
+.loop   iny
+        lda     (&b0),y
+        sta     &0100,y
+        bne     loop
+        sta     &0100
+        jmp     &0100
+}
+
 \ ---------------------------
 \ Functions performed locally
 \ ---------------------------
@@ -509,13 +731,16 @@ STX &B0:STY &B1:LDY #0
 .InfoLp
 LDA (&B0),Y:STA &0D20,Y:INY
 CPY #&20:BCC InfoLp
-LDA #&01:BNE CatExInfo
+LDA #&01:PHA:BNE CatExInfo
 .Ex
-LDA #&FF:BNE CatExInfo
+LDA #&FF:BNE CatEx
 .Cat
 LDA #&80
-.CatExInfo                  :\ b7=multiple files, b0=full info
+.CatEx
 PHA
+LDA #&10
+STA PORT_CMD
+.CatExInfo                  :\ b7=multiple files, b0=full info
 \ &D01 = GBPB block
 \ &D0E = FILE block
 \ &D20 = pathname
@@ -647,7 +872,10 @@ RTS
 \ Corrupt bits of memory to simulate effects of real OSWORD &7F
 \ -------------------------------------------------------------
 .Osword7F
-JSR CheckFsIsUs
+LDA #&00            :\ query current FS
+TAY
+JSR OSARGS
+CMP FSFlag
 BNE SkipOSW7F
 LDA &B0:PHA:LDA &B1:PHA     :\ Code calling Osword7F may be using &B0/1
 JSR fdcFetchAddr

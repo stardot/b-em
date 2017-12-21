@@ -17,11 +17,11 @@ int I8271, WD1770, BPLUS, x65c02, MASTER, MODELA, OS01, compactcmos;
 int curtube;
 int oldmodel;
 
-MODEL models[20] =
+MODEL models[NUM_MODELS] =
 {
 /*       Name                        8271  1770             65c02  B+  Master  SWRAM  A  OS 0.1  Compact  OS      ROM dir   CMOS           ROM setup function         Second processor*/
-        {"BBC A w/OS 0.1",            1,    WD1770_NONE,    0,     0,  0,      0,     1, 1,      0,       "",     "a01",    "",            mem_romsetup_os01,         -1},
-        {"BBC B w/OS 0.1",            1,    WD1770_NONE,    0,     0,  0,      0,     0, 1,      0,       "",     "a01",    "",            mem_romsetup_os01,         -1},
+        {"BBC A w/OS 0.1",            0,    WD1770_NONE,    0,     0,  0,      0,     1, 1,      0,       "",     "a01",    "",            mem_romsetup_os01,         -1},
+        {"BBC B w/OS 0.1",            0,    WD1770_NONE,    0,     0,  0,      0,     0, 1,      0,       "",     "a01",    "",            mem_romsetup_os01,         -1},
         {"BBC A",                     1,    WD1770_NONE,    0,     0,  0,      0,     1, 0,      0,       "os",   "a",      "",            NULL,                      -1},
         {"BBC B w/8271 FDC",          1,    WD1770_NONE,    0,     0,  0,      0,     0, 0,      0,       "os",   "b",      "",            NULL,                      -1},
         {"BBC B w/8271+SWRAM",        1,    WD1770_NONE,    0,     0,  0,      1,     0, 0,      0,       "os",   "b",      "",            NULL,                      -1},
@@ -36,6 +36,7 @@ MODEL models[20] =
         {"BBC Master Compact",        0,    WD1770_MASTER,  1,     0,  1,      0,     0, 0,      1,       "",     "compact","cmosc.bin",   mem_romsetup_mastercompact,-1},
         {"ARM Evaluation System",     0,    WD1770_MASTER,  1,     0,  1,      0,     0, 0,      0,       "",     "master", "cmosa.bin",   mem_romsetup_master128,     1},
         {"BBC Master 128 w/MOS 3.5",  0,    WD1770_MASTER,  1,     0,  1,      0,     0, 0,      0,       "",     "master", "cmos350.bin", mem_romsetup_master128_35, -1},
+        {"BBC B wo/FDC w/SWRAM",      0,    WD177_NONE,     0,     0,  0,      1,     0, 0,      0,       "os",   "bswram", "",            NULL,                      -1},
         {"BBC B w/Solidisk 1770 FDC", 0,    WD1770_STL,     0,     0,  0,      1,     0, 0,      0,       "os",   "stl",    "",            NULL,                      -1},
         {"BBC B w/Opus 1770 FDC",     0,    WD1770_OPUS,    0,     0,  0,      1,     0, 0,      0,       "os",   "opus",   "",            NULL,                      -1},
         {"BBC B w/Watford 1770 FDC",  0,    WD1770_WATFORD, 0,     0,  0,      1,     0, 0,      0,       "os",   "watford","",            NULL,                      -1},
@@ -50,7 +51,7 @@ char *model_get()
 
 extern cpu_debug_t n32016_cpu_debug;
 
-TUBE tubes[7]=
+TUBE tubes[NUM_TUBES]=
 {
         {"6502", tube_6502_init,  tube_6502_reset, &tube6502_cpu_debug  },
         {"ARM",  tube_arm_init,   arm_reset,       &tubearm_cpu_debug   },
@@ -60,6 +61,21 @@ TUBE tubes[7]=
         {"32016",tube_32016_init, n32016_reset,    &n32016_cpu_debug    },
         {"",0,0}
 };
+
+void model_check(void) {
+    const int defmodel = 3;
+    
+    if (curmodel < 0 || curmodel >= NUM_MODELS) {
+        log_warn("No model #%d, using #%d (%s) instead", curmodel, defmodel, models[defmodel].name);
+        curmodel = defmodel;
+    }
+    if (models[curmodel].tube != -1)
+        curtube = models[curmodel].tube;
+    if (curtube < -1 || curtube >= NUM_TUBES) {
+        log_warn("No tube #%d, running with no tube instead", curtube);
+        curtube = -1;
+    }
+}
 
 void model_init()
 {
@@ -74,9 +90,7 @@ void model_init()
         OS01        = models[curmodel].os01;
         compactcmos = models[curmodel].compact;
 
-        curtube = selecttube;
-        if (models[curmodel].tube != -1) curtube = models[curmodel].tube;
-
+        model_check();
         
         getcwd(t, 511);
         append_filename(t2, exedir, "roms", 511);

@@ -3,6 +3,7 @@
 
 #include "cpu_debug.h"
 
+void model_check(void);
 void model_init();
 char *model_get();
 
@@ -24,7 +25,8 @@ typedef struct
         int tube;
 } MODEL;
 
-extern MODEL models[20];
+#define NUM_MODELS 20
+extern MODEL models[NUM_MODELS];
 
 typedef struct
 {
@@ -34,7 +36,8 @@ typedef struct
         cpu_debug_t *debug;
 } TUBE;
 
-extern TUBE tubes[7];
+#define NUM_TUBES 7
+extern TUBE tubes[NUM_TUBES];
 
 extern int curmodel, curtube, oldmodel, selecttube;
 extern int I8271, WD1770, BPLUS, x65c02, MASTER, MODELA, OS01, compactcmos;

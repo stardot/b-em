@@ -8,6 +8,7 @@
 #include "cpu_debug.h"
 #include "debugger.h"
 #include "b-em.h"
+#include "main.h"
 #include "model.h"
 #include "6502.h"
 
@@ -415,6 +416,7 @@ static const char helptext[] =
     "    r crtc     - print CRTC registers\n"
     "    r vidproc  - print VIDPROC registers\n"
     "    r sound    - print Sound registers\n"
+    "    reset      - reset emulated machine\n"
     "    s [n]      - step n instructions (or 1 if no parameter)\n"
     "    trace fn   - trace disassembly/registers to file, close file if no fn\n"
     "    vrefresh t - extra video refresh on entering debugger.  t=on or off\n"
@@ -616,7 +618,10 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 
             case 'r':
             case 'R':
-                if (*iptr) {
+                if (!strcasecmp(cmd, "reset")) {
+                    main_reset();
+                    debug_outf("Emulator reset\n");
+                } else if (*iptr) {
                     if (!strncasecmp(iptr, "sysvia", 6)) {
                         debug_outf("    System VIA registers :\n");
                         debug_outf("    ORA  %02X ORB  %02X IRA %02X IRB %02X\n", sysvia.ora, sysvia.orb, sysvia.ira, sysvia.irb);
@@ -644,6 +649,13 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                         debug_outf("    Palette entries :\n");
                         debug_outf("     0=%01X   1=%01X   2=%01X   3=%01X   4=%01X   5=%01X   6=%01X   7=%01X\n", ula_palbak[0], ula_palbak[1], ula_palbak[2], ula_palbak[3], ula_palbak[4], ula_palbak[5], ula_palbak[6], ula_palbak[7]);
                         debug_outf("     8=%01X   9=%01X  10=%01X  11=%01X  12=%01X  13=%01X  14=%01X  15=%01X\n", ula_palbak[8], ula_palbak[9], ula_palbak[10], ula_palbak[11], ula_palbak[12], ula_palbak[13], ula_palbak[14], ula_palbak[15]);
+                        debug_outf("    NULA palette :\n");
+                        debug_outf("     0=%06X   1=%06X   2=%06X   3=%06X   4=%06X   5=%06X   6=%06X   7=%06X\n", nula_collook[0], nula_collook[1], nula_collook[2], nula_collook[3], nula_collook[4], nula_collook[5], nula_collook[6], nula_collook[7]);
+                        debug_outf("     8=%06X   9=%06X  10=%06X  11=%06X  12=%06X  13=%06X  14=%06X  15=%06X\n", nula_collook[8], nula_collook[9], nula_collook[10], nula_collook[11], nula_collook[12], nula_collook[13], nula_collook[14], nula_collook[15]);
+                        debug_outf("    NULA flash :\n");
+                        debug_outf("     %01X%01X%01X%01X%01X%01X%01X%01X\n", nula_flash[0], nula_flash[1], nula_flash[2], nula_flash[3], nula_flash[4], nula_flash[5], nula_flash[6], nula_flash[7]);
+                        debug_outf("    NULA registers :\n");
+                        debug_outf("     Palette Mode=%01X  Horizontal Offset=%01X  Left Blank Size=%01X  Disable=%01X  Attribute Mode=%01X  Attribute Text=%01X\n", nula_palette_mode, nula_horizontal_offset, nula_left_blank, nula_disable, nula_attribute_mode, nula_attribute_text);
                     }
                     if (!strncasecmp(iptr, "sound", 5)) {
                         debug_outf("    Sound registers :\n");

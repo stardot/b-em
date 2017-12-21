@@ -29,8 +29,8 @@ void updatewindowsize(int x, int y)
                 windx=winsizex=x; windy=winsizey=y;
                 set_color_depth(dcol);
                 set_gfx_mode(GFX_AUTODETECT_WINDOWED,x,y,0,0);
-                set_color_depth(8);
-                set_palette(pal);
+                set_color_depth(32);
+                //set_palette(pal);
         }
 }
 
