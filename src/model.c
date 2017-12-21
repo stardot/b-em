@@ -36,11 +36,10 @@ MODEL models[NUM_MODELS] =
         {"BBC Master Compact",        0,    WD1770_MASTER,  1,     0,  1,      0,     0, 0,      1,       "",     "compact","cmosc.bin",   mem_romsetup_mastercompact,-1},
         {"ARM Evaluation System",     0,    WD1770_MASTER,  1,     0,  1,      0,     0, 0,      0,       "",     "master", "cmosa.bin",   mem_romsetup_master128,     1},
         {"BBC Master 128 w/MOS 3.5",  0,    WD1770_MASTER,  1,     0,  1,      0,     0, 0,      0,       "",     "master", "cmos350.bin", mem_romsetup_master128_35, -1},
-        {"BBC B wo/FDC w/SWRAM",      0,    WD177_NONE,     0,     0,  0,      1,     0, 0,      0,       "os",   "bswram", "",            NULL,                      -1},
+        {"BBC B wo/FDC w/SWRAM",      0,    WD1770_NONE,    0,     0,  0,      1,     0, 0,      0,       "os",   "bswram", "",            NULL,                      -1},
         {"BBC B w/Solidisk 1770 FDC", 0,    WD1770_STL,     0,     0,  0,      1,     0, 0,      0,       "os",   "stl",    "",            NULL,                      -1},
         {"BBC B w/Opus 1770 FDC",     0,    WD1770_OPUS,    0,     0,  0,      1,     0, 0,      0,       "os",   "opus",   "",            NULL,                      -1},
         {"BBC B w/Watford 1770 FDC",  0,    WD1770_WATFORD, 0,     0,  0,      1,     0, 0,      0,       "os",   "watford","",            NULL,                      -1},
-        {"",0,0,0,0,0,0,0,0,0,"","","",0,0}
 };
 
 static int _modelcount = 0;
