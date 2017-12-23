@@ -5,130 +5,108 @@
 #include "b-em.h"
 #include "6502.h"
 #include "acia.h"
-#include "serial.h"
-#include "csw.h"
-#include "uef.h"
-#include "tapenoise.h"
 
-#define DCD     4
-#define RECIEVE 1
+/* Status register flags */
 
-int acia_tapespeed=0;
+#define RXD_REG_FUL 0x01
+#define TXD_REG_EMP 0x02
+#define DCD         0x04
+#define CTS         0x08
+#define FRAME_ERR   0x10
+#define RX_OVERRUN  0x20
+#define PARITY_ERR  0x40
+#define INTERUPT    0x80
 
-uint8_t acia_sr;
-static uint8_t acia_cr, acia_dr;
-
-void acia_updateint()
-{
-        if (((acia_sr&0x80) && (acia_cr&0x80)) || (!(acia_sr & 0x02) && ((acia_cr & 0x60) == 0x20)))
-           interrupt|=4;
-        else
-           interrupt&=~4;
+static inline int rx_int(ACIA *acia) {
+    return (acia->status_reg & INTERUPT) && (acia->control_reg & INTERUPT);
 }
 
-void acia_reset()
-{
-        acia_sr = (acia_sr & 8) | 6;
-        acia_updateint();
+static inline int tx_int(ACIA *acia) {
+    return (acia->status_reg & TXD_REG_EMP) && ((acia->control_reg & 0x60) == 0x20);
+}    
+
+static void acia_updateint(ACIA *acia) {
+    if (rx_int(acia) || tx_int(acia))
+       interrupt|=4;
+    else
+       interrupt&=~4;
 }
 
-uint8_t acia_read(uint16_t addr)
-{
-        uint8_t temp;
-        if (addr & 1)
-        {
-                temp = acia_dr;
-                acia_sr &= ~0x81;
-                acia_updateint();
-                return temp;
-        }
-        else
-        {
-		temp = (acia_sr & 0x7F) | (acia_sr & acia_cr & 0x80);
-                return temp;
-        }
+void acia_reset(ACIA *acia) {
+    acia->status_reg = (acia->status_reg & (CTS|DCD)) | TXD_REG_EMP;
+    acia_updateint(acia);
 }
 
-void acia_write(uint16_t addr, uint8_t val)
-{
-        if (addr & 1)
-        {
-		putchar(val);
-		// acia_sr &= 0xFD;
-                // acia_updateint();
-        }
-        else if (val != acia_cr)
-	{
-		if (!(val & 0x40)) // interupts disabled as serial TX buffer empties.
-			fflush(stdout);
-	        acia_cr = val;
-	        if (val == 3)
-              		acia_reset();
-	        switch (val & 3)
-                {
-	                case 1: acia_tapespeed=0; break;
-	                case 2: acia_tapespeed=1; break;
-	        }
-        }
+uint8_t acia_read(ACIA *acia, uint16_t addr) {
+    uint8_t temp;
+
+    if (addr & 1) {
+        temp = acia->rx_data_reg;
+        acia->status_reg &= ~(INTERUPT | RXD_REG_FUL);
+        acia_updateint(acia);
+        return temp;
+    }
+    else {
+        temp = acia->status_reg & ~INTERUPT;
+        if (rx_int(acia) || tx_int(acia))
+            temp |= INTERUPT;
+        return temp;
+    }
 }
 
-void dcd()
-{
-        if (acia_sr & DCD) return;
-        acia_sr |= DCD | 0x80;
-        acia_updateint();
+void acia_write(ACIA *acia, uint16_t addr, uint8_t val) {
+    if (addr & 1) {
+        acia->tx_data_reg = val;
+        if (acia->tx_hook)
+            acia->tx_hook(acia, val);
+        acia->status_reg &= ~TXD_REG_EMP;
+    }
+    else if (val != acia->control_reg) {
+        if ((val & 0x60) != 0x20) // interupt being turned off
+            if (acia->tx_end)
+                acia->tx_end(acia);
+        acia->control_reg = val;
+        if (val == 3)
+            acia_reset(acia);
+        if (acia->set_params)
+            acia->set_params(acia, val);
+        acia_updateint(acia);
+    }
 }
 
-void dcdlow()
-{
-        acia_sr &= ~DCD;
-        acia_updateint();
+void acia_dcdhigh(ACIA *acia) {
+    if (acia->status_reg & DCD)
+        return;
+    acia->status_reg |= DCD | INTERUPT;
+    acia_updateint(acia);
 }
 
-static uint16_t newdat;
-
-void acia_receive(uint8_t val) /*Called when the acia recives some data*/
-{
-        acia_dr = val;
-        acia_sr |= RECIEVE | 0x80;
-        acia_updateint();
-        
-        newdat=val|0x100;
+void acia_dcdlow(ACIA *acia) {
+    acia->status_reg &= ~DCD;
+    acia_updateint(acia);
 }
 
-/*Every 128 clocks, ie 15.625khz*/
-/*Div by 13 gives roughly 1200hz*/
-
-extern int ueftoneon,cswtoneon;
-void acia_poll()
-{
-//        int c;
-//        printf("Poll tape %i %i\n",motor,cswena);
-        if (motor)
-       	{
-       	        startblit();
-               	if (csw_ena) csw_poll();
-               	else         uef_poll();
-               	endblit();
-
-                if (newdat&0x100)
-                {
-                        newdat&=0xFF;
-                        tapenoise_adddat(newdat);
-                }
-                else if (csw_toneon || uef_toneon) tapenoise_addhigh();
-        }
-	//           polltape();
+void acia_poll(ACIA *acia) {
+    if (!(acia->status_reg & TXD_REG_EMP)) {
+        acia->status_reg |= TXD_REG_EMP;
+        acia_updateint(acia);
+    }
 }
 
-void acia_savestate(FILE *f)
-{
-        putc(acia_cr,f);
-        putc(acia_sr,f);
+void acia_receive(ACIA *acia, uint8_t val) { /*Called when the acia recives some data*/
+    acia->rx_data_reg = val;
+    acia->status_reg |= RXD_REG_FUL | INTERUPT;
+    if (acia->rx_hook)
+        acia->rx_hook(acia, val);
+    acia_updateint(acia);
 }
 
-void acia_loadstate(FILE *f)
-{
-        acia_cr=getc(f);
-        acia_sr=getc(f);
+void acia_savestate(ACIA *acia, FILE *f) {
+    putc(acia->control_reg, f);
+    putc(acia->status_reg, f);
+}
+
+void acia_loadstate(ACIA *acia, FILE *f) {
+    acia->control_reg = getc(f);
+    acia->status_reg = getc(f);
 }

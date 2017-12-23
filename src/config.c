@@ -10,9 +10,11 @@
 #include "keyboard.h"
 #include "mouse.h"
 #include "ide.h"
+#include "midi.h"
 #include "scsi.h"
 #include "sn76489.h"
 #include "sound.h"
+#include "soundopenal.h"
 #include "tape.h"
 #include "tube.h"
 #include "vdfs.h"
@@ -92,6 +94,8 @@ void config_load()
                 sprintf(s, "key_define_%03i", c);
                 keylookup[c] = get_config_int("user_keyboard", s, c);
         }
+        buflen_m5 = get_config_int("sound", "buflen_music5000", BUFLEN_M5);
+        midi_load_config();
 }
 
 void config_save()
@@ -146,6 +150,8 @@ void config_save()
             sprintf(s, "key_define_%03i", c);
             set_config_int("user_keyboard", s, keylookup[c]);
         }
+        set_config_int("sound", "buflen_music5000", buflen_m5);
+        midi_save_config();
     } else
         log_error("config: no suitable destination for config file- config will not be saved");
 }

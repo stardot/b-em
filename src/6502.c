@@ -5,7 +5,6 @@
 #include "b-em.h"
 
 #include "6502.h"
-#include "acia.h"
 #include "adc.h"
 #include "disc.h"
 #include "i8271.h"
@@ -13,11 +12,13 @@
 #include "mem.h"
 #include "model.h"
 #include "mouse.h"
+#include "music2000.h"
 #include "music5000.h"
 #include "serial.h"
 #include "scsi.h"
 #include "sid_b-em.h"
 #include "sound.h"
+#include "sysacia.h"
 #include "tape.h"
 #include "tube.h"
 #include "via.h"
@@ -164,8 +165,8 @@ int output = 0;
 int timetolive = 0;
 
 #define polltime(c) { cycles -= (c); \
-                      sysvia.t1c  -= (c);  if (!(sysvia.acr  & 0x20))  sysvia.t2c  -= (c);  if (sysvia.t1c  < -3 || sysvia.t2c  < -3)  sysvia_updatetimers();  \
-                      uservia.t1c -= (c);  if (!(uservia.acr & 0x20))  uservia.t2c -= (c);  if (uservia.t1c < -3 || uservia.t2c < -3)  uservia_updatetimers(); \
+                      via_poll(&sysvia, (c)); \
+                      via_poll(&uservia, (c)); \
                       video_poll(c, 1);                                   \
                       otherstuffcount -= (c); \
                       if (motoron) \
@@ -212,6 +213,11 @@ static uint32_t do_readmem(uint32_t addr)
         }
 
         switch (addr & ~3) {
+            case 0xFC08:
+            case 0xFC0C:
+                if (sound_music5000)
+                    return music2000_read(addr);
+                break;
         case 0xFC20:
         case 0xFC24:
         case 0xFC28:
@@ -248,7 +254,7 @@ static uint32_t do_readmem(uint32_t addr)
 
         case 0xFE08:
         case 0xFE0C:
-                return acia_read(addr);
+                return acia_read(&sysacia, addr);
 
         case 0xFE10:
         case 0xFE14:
@@ -371,6 +377,11 @@ static void do_writemem(uint32_t addr, uint32_t val)
         }
 
         switch (addr & ~3) {
+            case 0xFC08:
+            case 0xFC0C:
+                if (sound_music5000)
+                    music2000_write(addr, val);
+                break;
         case 0xFC20:
         case 0xFC24:
         case 0xFC28:
@@ -408,7 +419,7 @@ static void do_writemem(uint32_t addr, uint32_t val)
 
         case 0xFE08:
         case 0xFE0C:
-                acia_write(addr, val);
+                acia_write(&sysacia, addr, val);
                 break;
 
         case 0xFE10:
@@ -626,6 +637,39 @@ static inline uint16_t getsw()
         temp |= (readmem(pc) << 8);
         pc++;
         return temp;
+}
+
+static void otherstuff_poll(void) {
+    otherstuffcount += 128;
+    acia_poll(&sysacia);
+    if (sound_music5000)
+        music2000_poll();
+    sound_poll();
+    if (!tapelcount) {
+        tape_poll();
+        tapelcount = tapellatch;
+    }
+    tapelcount--;
+    if (motorspin) {
+        motorspin--;
+        if (!motorspin)
+            fdc_spindown();
+    }
+    if (ide_count) {
+        ide_count -= 200;
+        if (ide_count <= 0)
+            ide_callback();
+    }
+    if (adc_time) {
+        adc_time--;
+        if (!adc_time)
+            adc_poll();
+    }
+    mcount--;
+    if (!mcount) {
+        mcount = 6;
+        mouse_poll();
+    }
 }
 
 #define getw() getsw()
@@ -3551,36 +3595,8 @@ void m6502_exec()
                 }
                 interrupt &= ~128;
 
-                if (otherstuffcount <= 0) {
-                        otherstuffcount += 128;
-                        sound_poll();
-                        if (!tapelcount) {
-                                acia_poll();
-                                tapelcount = tapellatch;
-                        }
-                        tapelcount--;
-                        if (motorspin) {
-                                motorspin--;
-                                if (!motorspin)
-                                        fdc_spindown();
-                        }
-                        if (ide_count) {
-                                ide_count -= 200;
-                                if (ide_count <= 0) {
-                                        ide_callback();
-                                }
-                        }
-                        if (adc_time) {
-                                adc_time--;
-                                if (!adc_time)
-                                        adc_poll();
-                        }
-                        mcount--;
-                        if (!mcount) {
-                                mcount = 6;
-                                mouse_poll();
-                        }
-                }
+                if (otherstuffcount <= 0)
+                    otherstuff_poll();
                 if (tube_exec && tubecycle) {
                         tubecycles += (tubecycle << tube_shift);
                         if (tubecycles > 3)
@@ -5434,37 +5450,8 @@ void m65c02_exec()
                         tubecycle = 0;
                 }
 
-                if (otherstuffcount <= 0) {
-                        otherstuffcount += 128;
-//                        sidline();
-                        sound_poll();
-                        if (!tapelcount) {
-                                acia_poll();
-                                tapelcount = tapellatch;
-                        }
-                        tapelcount--;
-                        if (motorspin) {
-                                motorspin--;
-                                if (!motorspin)
-                                        fdc_spindown();
-                        }
-                        if (ide_count) {
-                                ide_count -= 200;
-                                if (ide_count <= 0) {
-                                        ide_callback();
-                                }
-                        }
-                        if (adc_time) {
-                                adc_time--;
-                                if (!adc_time)
-                                        adc_poll();
-                        }
-                        mcount--;
-                        if (!mcount) {
-                                mcount = 6;
-                                mouse_poll();
-                        }
-                }
+                if (otherstuffcount <= 0)
+                    otherstuff_poll();
                 if (nmi && !oldnmi) {
                         push(pc >> 8);
                         push(pc & 0xFF);

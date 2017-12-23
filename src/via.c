@@ -26,7 +26,7 @@
 #define		IER	0x0e
 #define		ORAnh   0x0f
 
-void via_updateIFR(VIA *v)
+static void via_updateIFR(VIA *v)
 {
         if ((v->ifr & 0x7F) & (v->ier & 0x7F))
         {
@@ -159,6 +159,8 @@ void via_write(VIA *v, uint16_t addr, uint8_t val)
                 break;
                 case SR:
                 v->sr   = val;
+                v->sr_count = 16;
+                v->ifr &= ~0x04;
                 break;
                 case T1LL:
                 case T1CL:
@@ -352,17 +354,37 @@ void via_set_cb2(VIA *v, int level)
         v->cb2 = level;
 }
 
+void via_shift(VIA *v, int cycles) {
+    int cb1;
 
-uint8_t via_read_null()
+    if ((v->acr & 0x1c) == 0x18) {
+        while (cycles--) {
+            if (v->sr_count > 0) {
+                cb1 = !(v->sr_count-- & 0x01);
+                if (cb1) {
+                    v->set_cb2(v->sr >> 7);
+                    v->sr = (v->sr << 1);
+                }
+                v->set_cb1(cb1);
+            }
+            if (v->sr_count <= 0) {
+                v->ifr |= 0x04;
+                via_updateIFR(v);
+            }
+        }
+    }
+}
+
+static uint8_t via_read_null()
 {
         return 0xFF;
 }
 
-void via_write_null(uint8_t val)
+static void via_write_null(uint8_t val)
 {
 }
 
-void via_set_null(int level)
+static void via_set_null(int level)
 {
 }
 

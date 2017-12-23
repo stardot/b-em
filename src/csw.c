@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <zlib.h>
 #include "b-em.h"
-#include "acia.h"
+#include "sysacia.h"
 #include "csw.h"
 #include "tape.h"
 
@@ -56,7 +56,7 @@ void csw_load(char *fn)
         free(tempin);
         /*Reset data pointer*/
         csw_point = 0;
-        dcd();
+        acia_dcdhigh(&sysacia);
         tapellatch  = (1000000 / (1200 / 10)) / 64;
         tapelcount  = 0;
 	tape_loaded = 1;
@@ -81,7 +81,7 @@ static void csw_receive(uint8_t val)
                 fdat = val;
         }
         else
-           acia_receive(val);
+           acia_receive(&sysacia, val);
 }
 
 void csw_poll()
@@ -104,24 +104,24 @@ void csw_poll()
                 else if (csw_intone && dat > 0xD) /*Not in tone any more - data start bit*/
                 {
                         csw_point++; /*Skip next half of wave*/
-                        if (acia_tapespeed) csw_skip = 6;
+                        if (sysacia_tapespeed) csw_skip = 6;
                         csw_intone = 0;
                         csw_indat = 1;
 
                         csw_datbits = csw_enddat = 0;
-                        dcdlow();
+                        acia_dcdlow(&sysacia);
                         return;
                 }
                 else if (csw_indat && csw_datbits != -1 && csw_datbits != -2)
                 {
                         csw_point++; /*Skip next half of wave*/
-                        if (acia_tapespeed) csw_skip = 6;
+                        if (sysacia_tapespeed) csw_skip = 6;
                         csw_enddat >>= 1;
 
                         if (dat <= 0xD)
                         {
                                 csw_point += 2;
-                                if (acia_tapespeed) csw_skip += 6;
+                                if (sysacia_tapespeed) csw_skip += 6;
                                 csw_enddat |= 0x80;
                         }
                         csw_datbits++;
@@ -136,11 +136,11 @@ void csw_poll()
                 else if (csw_indat && csw_datbits == -2) /*Deal with stop bit*/
                 {
                         csw_point++;
-                        if (acia_tapespeed) csw_skip = 6;
+                        if (sysacia_tapespeed) csw_skip = 6;
                         if (dat <= 0xD)
                         {
                                 csw_point += 2;
-                                if (acia_tapespeed) csw_skip += 6;
+                                if (sysacia_tapespeed) csw_skip += 6;
                         }
                         csw_datbits = -1;
                 }
@@ -148,7 +148,7 @@ void csw_poll()
                 {
                         if (dat <= 0xD) /*Back in tone again*/
                         {
-                                dcd();
+                                acia_dcdhigh(&sysacia);
                                 csw_toneon  = 2;
                                 csw_indat   = 0;
                                 csw_intone  = 1;
@@ -158,7 +158,7 @@ void csw_poll()
                         else /*Start bit*/
                         {
                                 csw_point++; /*Skip next half of wave*/
-                                if (acia_tapespeed) csw_skip += 6;
+                                if (sysacia_tapespeed) csw_skip += 6;
                                 csw_datbits = 0;
                                 csw_enddat  = 0;
                         }
@@ -191,12 +191,12 @@ void csw_findfilenames()
         tempi   = csw_intone;
         tempd   = csw_datbits;
         tempsk  = csw_skip;
-        tempspd = acia_tapespeed;
+        tempspd = sysacia_tapespeed;
         csw_point = 0;
         
         csw_indat = csw_intone = csw_datbits = csw_skip = 0;
         csw_intone = 1;
-        acia_tapespeed = 0;
+        sysacia_tapespeed = 0;
         
 //        gzseek(csw,12,SEEK_SET);
         csw_loop = 0;
@@ -278,7 +278,7 @@ void csw_findfilenames()
         csw_intone  = tempi;
         csw_datbits = tempd;
         csw_skip    = tempsk;
-        acia_tapespeed = tempspd;
+        sysacia_tapespeed = tempspd;
         csw_point   = temp;
         csw_loop = 0;
         endblit();

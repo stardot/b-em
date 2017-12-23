@@ -5,6 +5,8 @@
 #include <allegro.h>
 #include <winalleg.h>
 #include <process.h>
+#include <windows.h>
+#include <shlobj.h>
 #include "resources.h"
 
 #include "b-em.h"
@@ -26,6 +28,7 @@
 #include "tape.h"
 #include "tube.h"
 #include "vdfs.h"
+#include "video.h"
 #include "video_render.h"
 #include "win.h"
 
@@ -186,13 +189,13 @@ static void initmenu()
         CheckMenuItem(hmenu, IDM_IDE_ENABLE, ide_enable ? MF_CHECKED : MF_UNCHECKED);
 
         CheckMenuItem(hmenu, IDM_VIDEO_RESIZE, (videoresize) ? MF_CHECKED : MF_UNCHECKED);
+        CheckMenuItem(hmenu, IDM_VIDEO_NULA, (nula_disable) ? MF_UNCHECKED : MF_CHECKED);
 
         CheckMenuItem(hmenu, IDM_SPD_100, MF_CHECKED);
 }
 
 static HANDLE mainthread;
 
-static int bempause = 0, bemwaiting = 0;
 static int doautoboot = 0;
 
 void _mainthread(PVOID pvoid)
@@ -207,39 +210,19 @@ void _mainthread(PVOID pvoid)
 
         while (1)
         {
-                if (bempause)
-                {
-                        bemwaiting = 1;
-                        Sleep(100);
-                }
-                else
-                {
-                        bemwaiting = 0;
-                        main_run();
-                }
+                main_run();
                 if (doautoboot)
                 {
                         main_reset();
                         disc_close(0);
                         disc_load(0, discfns[0]);
                         if (defaultwriteprot) writeprot[0] = 1;
-                	hmenu = GetMenu(ghwnd);
+                        hmenu = GetMenu(ghwnd);
                         CheckMenuItem(hmenu, IDM_DISC_WPROT_0, (writeprot[0]) ? MF_CHECKED : MF_UNCHECKED);
                         autoboot = 150;
                         doautoboot = 0;
                 }
         }
-}
-
-void waitforready()
-{
-        bempause = 1;
-        while (!bemwaiting) Sleep(100);
-}
-
-void resumeready()
-{
-        bempause = 0;
 }
 
 CRITICAL_SECTION cs;
@@ -439,7 +422,8 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         return messages.wParam;
 }
 
-static char openfilestring[260];
+static char openfilestring[MAX_PATH];
+
 static int getfile(HWND hwnd, char *f, char *fn)
 {
         OPENFILENAME ofn;       // common dialog box structure
@@ -510,6 +494,31 @@ static int getsfile(HWND hwnd, char *f, char *fn, char *de)
         }
         LeaveCriticalSection(&cs);
         return 1;
+}
+
+static int getDir(HWND hwnd, const char *title) {
+    BROWSEINFO bi;
+    void *pidl;
+
+    log_debug("win: initialise dirBrowser");
+    bi.hwndOwner = hwnd;
+    bi.pidlRoot = NULL;
+    bi.pszDisplayName = openfilestring;
+    bi.lpszTitle = title;
+    bi.ulFlags = BIF_RETURNONLYFSDIRS; //|BIF_EDITBOX|BIF_NEWDIALOGSTYLE;
+    bi.lpfn = NULL;
+    bi.lParam = 0;
+    bi.iImage = 0;
+    log_debug("win: about to call SHBrowseForFolder");
+    if ((pidl = SHBrowseForFolder(&bi))) {
+        log_debug("win: pidl=%p, %s chosen for %s", pidl, openfilestring, title);
+        SHGetPathFromIDList(pidl, openfilestring);
+        log_debug("win: SHGetPathFromIDList returns");
+        return 0;
+    } else {
+        log_debug("win: null return");
+        return 1;
+    }
 }
 
 extern unsigned char hw_to_mycode[256];
@@ -641,15 +650,10 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         CheckMenuItem(hmenu, IDM_DISC_VDFS_ENABLE, (vdfs_enabled) ? MF_CHECKED : MF_UNCHECKED);
                         break;
                         case IDM_DISC_VDFS_ROOT:
-                        // TODO: for some reason setting tempname to vdfs_get_root() stops the dialog coming up
-                        // strcpy(tempname, vdfs_get_root());
-                        strcpy(tempname, "vdfs_get_root");
-                        // TODO: getfile() uses GetOpenFileName() which cannot select a folder
-                        if (!getfile(hwnd, "VDFS Root", tempname))
-                        {
-                                vdfs_set_root(tempname);
-                        }
-                        break;
+                            strncpy(openfilestring, vdfs_get_root(), MAX_PATH);
+                            if (!getDir(hwnd, "VDFS Root"))
+                                vdfs_set_root(openfilestring);
+                            break;
                         case IDM_TAPE_LOAD:
                         if (!getfile(hwnd, "Tape image (*.UEF;*.CSW)\0*.UEF;*.CSW\0All files (*.*)\0*.*\0", tape_fn))
                         {
@@ -688,6 +692,12 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         EnterCriticalSection(&cs);
                         video_enterfullscreen();
                         LeaveCriticalSection(&cs);
+                        break;
+                    case IDM_VIDEO_NULA:
+                        if (nula_disable)
+                            nula_disable = 0;
+                        else
+                            nula_disable = 1;
                         break;
                         case IDM_VIDEO_RESIZE:
                         videoresize = !videoresize;

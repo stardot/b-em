@@ -14,6 +14,13 @@
 vdfsno  =   &11
 oswpb   =   &70
 
+        ORG     &A8
+.romtab equw    &0000
+.romid  equb    &00
+.copywr equb    &00
+.dmpadd equw    &0000
+.dmpcnt equb    &00
+        
 ClaimFS     =   &FC5C       :\ *FSCLAIM ON|OFF flag
 FSFlag      =   &FC5D       :\ FS id when claimed
 PORT_CMD    =   &FC5E       :\ execute cmds on VDFS in host
@@ -21,6 +28,7 @@ PORT_A      =   &FC5F       :\ store A ready for command.
 
 OS_CLI=&FFF7:OSBYTE=&FFF4:OSWORD=&FFF1:OSWRCH=&FFEE:OSNEWL=&FFE7:OSASCI=&FFE3
 OSFILE=&FFDD:OSARGS=&FFDA:OSBGET=&FFD7:OSBPUT=&FFD4:OSGBPB=&FFD1:OSFIND=&FFCE
+OSRDRM=&FFB9        
 
 ORG     &8000
 .start
@@ -28,12 +36,15 @@ EQUS "MRB"                         :\ No language entry
 JMP Service                        :\ Service entry
 EQUB &82:EQUB ROMCopyright-&8000
 .ROMVersion
-EQUB &04
+EQUB &05
 .ROMTitle
-EQUS "Virtual DFS":EQUB 0:EQUS "0.05 (17 Sep 2016)"
+EQUS "B-Em VDFS":EQUB 0
+include "version.asm"
 .ROMCopyright
 EQUB 0:EQUS "(C)1995 MRB, 2004 JGH, 2016 SJF":EQUB 0
 EQUD 0
+.banner
+EQUS "Virtual DFS":EQUB 0
 
 \ As this ROM requires support from the emulator and that may not
 \ be enabled (or supported) check that it works before responding
@@ -72,7 +83,7 @@ JSR OSNEWL
 .PrROMTitle                 :\ Print ROM title
 LDX #0
 .PrRTLp
-LDA ROMTitle,X:BEQ PrRTDone
+LDA banner,X:BEQ PrRTDone
 JSR OSWRCH:INX:BNE PrRTLp
 .PrRTDone
 RTS
@@ -137,10 +148,12 @@ EQUS "OSW7F"  :EQUB 13:EQUW fdc
 EQUS "PAGE"   :EQUB 13:EQUW page
 EQUS "QUIT"   :EQUB 13:EQUW quit
 EQUS "DESKTOP":EQUB 13:EQUW quit
+EQUS "DUMP"   :EQUB 13:EQUW dump
 EQUS "PAGE"   :EQUB 13:EQUW page
 EQUS "SHADOW" :EQUB 13:EQUW shadow
 EQUS "INSERT" :EQUB 13:EQUW insert
 \ SRAM commands
+EQUS "ROMS"   :EQUB 13:EQUW roms
 EQUS "SRLOAD" :EQUB 13:EQUW srload
 EQUS "SRSAVE" :EQUB 13:EQUW srsave
 EQUS "SRREAD" :EQUB 13:EQUW srread
@@ -217,10 +230,12 @@ EQUS "Emulate Osword &7F memory corruption":EQUB 13
 EQUB 13
 EQUS "Utility commands:":EQUB 13
 EQUS "  QUIT or DESKTOP : terminate emulator":EQUB 13
+EQUS "  DUMP : dump a file in hex and ASCII":EQUB 13
 EQUS "  PAGE : force PAGE location":EQUB 13
 EQUS "  SHADOW : dummy command":EQUB 13
 EQUB 13
 EQUS "Sideays RAM commands:":EQUB 13
+EQUS "  ROMS":EQUB 13
 EQUS "  SRLOAD <fsp> <address> (<r#>) (Q)":EQUB 13
 EQUS "  SRSAVE <fsp> <start> <end> (<r#>) (Q)":EQUB 13
 EQUS "  SRSAVE <fsp> <start> <+ln> (<r#>) (Q)":EQUB 13
@@ -274,7 +289,267 @@ RTS
 .srwrit LDA #&D1            :\ Pass to host and return
         STA PORT_CMD
         LDA #&00
-        RTS 
+        RTS
+
+        MACRO  page_rom_x
+        STX    &F4
+        STX    &FE30
+        ENDMACRO
+
+.roms
+{        
+        LDA     #&aa
+        LDX     #&00
+        LDY     #&ff
+        JSR     OSBYTE
+        STX     romtab
+        STY     romtab+1
+        JSR     OSNEWL
+        LDY     #&0f
+.rmloop STY     romid
+        LDA     #&FD
+        STA     PORT_CMD
+        BCS     gotram
+        LDY     romid
+        LDA     (romtab),y
+        BNE     gotrom
+.next   DEY
+        BPL     rmloop
+        JSR     OSNEWL
+        LDA     #&00
+        RTS
+.gotrom TAX
+        JSR     prinfo
+        JSR     space
+        JSR     cparen
+        JSR     rdcpyr
+        JSR     prtitl
+        LDY     romid
+        JMP     next
+.gotram JSR     rdcpyr
+        STA     &f6
+        LDY     romid
+        JSR     OSRDRM
+        CMP     #&00
+        BNE     empty
+        INC     &f6
+        LDY     romid
+        JSR     OSRDRM
+        CMP     #'('
+        BNE     empty
+        INC     &f6
+        LDY     romid
+        JSR     OSRDRM
+        CMP     #'C'
+        BNE     empty
+        INC     &f6
+        LDY     romid
+        JSR     OSRDRM
+        CMP     #')'
+        BNE     empty
+        LDA     #&06
+        STA     &f6
+        LDY     romid
+        JSR     OSRDRM
+        TAX
+        JSR     prinfo
+        JSR     rparen
+        JSR     prtitl
+        LDY     romid
+        JMP     next
+.empty  LDX     #&00
+        JSR     prinfo
+        JSR     rparen
+        JSR     OSNEWL
+        LDY     romid
+        JMP     next
+
+.rdcpyr LDA     #&07
+        STA     &f6
+        LDA     #&80
+        STA     &f7
+        LDY     romid
+        JSR     OSRDRM
+        STA     copywr
+        RTS
+
+.prinfo LDA     #'R'
+        JSR     OSWRCH
+        LDA     #'o'
+        JSR     OSWRCH
+        LDA     #'m'
+        JSR     OSWRCH
+        JSR     space
+        LDA     romid
+        CMP     #&0A
+        BCS     geten
+        LDA     #'0'
+        JSR     OSWRCH
+        LDA     romid
+        JMP     both
+.geten  LDA     #'1'
+        JSR     OSWRCH
+        LDA     romid
+        SEC
+        SBC     #&0a
+.both   AND     #&0f
+        CLC
+        ADC     #'0'
+        JSR     OSWRCH
+        JSR     space
+        LDA     #':'
+        JSR     OSWRCH
+        JSR     space
+        LDA     #'('
+        JSR     OSWRCH
+        TXA
+        AND     #&80
+        BEQ     notsrv
+        LDA     #'S'
+        BNE     issrv
+.notsrv LDA     #' '
+.issrv  JSR     OSWRCH
+        TXA
+        AND     #&40
+        BEQ     space
+        LDA     #'L'
+        BNE     islng
+.space  LDA     #' '
+.islng  JMP     OSWRCH
+
+.prtitl JSR     space
+        LDA     #&09
+        STA     &f6
+        LDA     #&80
+        STA     &f7
+.tloop  LDY     romid
+        JSR     OSRDRM
+        CMP     #&00
+        BNE     notnul
+        LDA     #' '
+.notnul JSR     OSWRCH
+        INC     &f6
+        LDA     &f6
+        CMP     copywr
+        BNE     tloop
+        JMP     OSNEWL
+
+.romchk LDA     copywr
+        STA     &f6
+        LDY     romid
+        JSR     OSRDRM
+        CMP     #&00
+        BNE     chkfai
+        INC     &f6
+        LDY     romid
+        JSR     OSRDRM
+        CMP     #'('
+        BNE     chkfai
+        INC     &f6
+        LDY     romid
+        JSR     OSRDRM
+        CMP     #'C'
+        BNE     chkfai
+        INC     &f6
+        LDY     romid
+        JSR     OSRDRM
+        CMP     #')'
+        BNE     chkfai
+        CLC
+        RTS
+.chkfai SEC
+        RTS
+.copyst EQUS    ")C("
+        EQUB    &00
+
+.rparen LDA     #'R'
+        JSR     OSWRCH
+.cparen LDA     #')'
+        JMP     OSWRCH
+}
+
+.hexbyt PHA
+        LSR     A
+        LSR     A
+        LSR     A
+        LSR     A
+        JSR     hexnyb
+        PLA
+        AND     #&0f
+.hexnyb CLC
+        ADC     #'0'
+        CMP     #'9'
+        BCC     ddig
+        ADC     #&06
+.ddig   JMP     OSWRCH
+
+.dump
+{
+        JSR     F2toXY
+        LDA     #&40
+        JSR     OSFIND
+        TAY
+        BNE     found
+        JMP     FileCmdNf
+.found  LDA     #&00
+        STA     dmpadd
+        STA     dmpadd+1
+        BIT     &FF
+        BMI     gotesc
+.linlp  LDA     dmpadd+1
+        JSR     hexbyt
+        LDA     dmpadd
+        JSR     hexbyt
+        LDA     #' '
+        JSR     OSWRCH
+        LDX     #&08
+.getlp  JSR     OSBGET
+        BCS     skip
+        STA     &0100,X
+        JSR     hexbyt
+        LDA     #' '
+        JSR     OSWRCH
+        DEX
+        BNE     getlp
+        CLC
+.skip   PHP
+        BCC     ascii
+.endlp  LDA     #'*'
+        JSR     OSWRCH
+        JSR     OSWRCH
+        LDA     #' '
+        JSR     OSWRCH
+        LDA     #&00
+        STA     &0100,X
+        DEX
+        BNE     endlp
+.ascii  LDX     #&08
+.asclp  LDA     &0100,X
+        AND     #&7F
+        CMP     #&7F
+        BEQ     nonprt
+        CMP     #&20
+        BCS     print
+.nonprt LDA     #'.'
+.print  JSR     OSWRCH
+        DEX
+        BNE     asclp
+        JSR     OSNEWL
+        PLP
+        BCS     eof
+        LDA     #&08
+        CLC
+        ADC     dmpadd
+        STA     dmpadd
+        BCC     noinc
+        INC     dmpadd+1
+.noinc  BIT     &FF
+        BPL     linlp
+.gotesc LDA     #&7E
+        JSR     OSWRCH
+.eof    LDA     #&00
+        JMP     OSFIND
+}
 
 \ ======================
 \ Filing System Routines

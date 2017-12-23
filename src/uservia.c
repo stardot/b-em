@@ -9,6 +9,8 @@
 #include "model.h"
 #include "compact_joystick.h"
 #include "mouse.h"
+#include "music4000.h"
+#include "sound.h"
 
 VIA uservia;
 
@@ -38,34 +40,34 @@ void uservia_write_portA(uint8_t val)
 
 void uservia_write_portB(uint8_t val)
 {
-        /*User port - nothing emulated*/
+    /*User port - nothing emulated*/
+    log_debug("uservia_write_portB: %02X", val);
 }
-
 
 uint8_t uservia_read_portA()
 {
         return 0xff; /*Printer port - read only*/
 }
+
 uint8_t uservia_read_portB()
 {
-        if (curtube == 3 || mouse_amx) return mouse_portb;
-        if (compactcmos) return compact_joystick_read();
-        return 0xff; /*User port - nothing emulated*/
+    if (curtube == 3 || mouse_amx)
+        return mouse_portb;
+    if (compactcmos)
+        return compact_joystick_read();
+    if (sound_music5000)
+        return music4000_read();
+    return 0xff; /*User port - nothing emulated*/
 }
 
 void uservia_write(uint16_t addr, uint8_t val)
 {
-        via_write(&uservia, addr, val);
+    via_write(&uservia, addr, val);
 }
 
 uint8_t uservia_read(uint16_t addr)
 {
-        return via_read(&uservia, addr);
-}
-
-void uservia_updatetimers()
-{
-        via_updatetimers(&uservia);
+    return via_read(&uservia, addr);
 }
 
 void uservia_reset()
@@ -78,6 +80,8 @@ void uservia_reset()
         uservia.write_portA = uservia_write_portA;
         uservia.write_portB = uservia_write_portB;
         
+        uservia.set_cb2 = music4000_shift;
+
         uservia.intnum = 2;
 }
 
