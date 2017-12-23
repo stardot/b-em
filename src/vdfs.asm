@@ -18,6 +18,8 @@ oswpb   =   &70
 .romtab equw    &0000
 .romid  equb    &00
 .copywr equb    &00
+.dmpadd equw    &0000
+.dmpcnt equb    &00
         
 ClaimFS     =   &FC5C       :\ *FSCLAIM ON|OFF flag
 FSFlag      =   &FC5D       :\ FS id when claimed
@@ -146,6 +148,7 @@ EQUS "OSW7F"  :EQUB 13:EQUW fdc
 EQUS "PAGE"   :EQUB 13:EQUW page
 EQUS "QUIT"   :EQUB 13:EQUW quit
 EQUS "DESKTOP":EQUB 13:EQUW quit
+EQUS "DUMP"   :EQUB 13:EQUW dump
 EQUS "PAGE"   :EQUB 13:EQUW page
 EQUS "SHADOW" :EQUB 13:EQUW shadow
 EQUS "INSERT" :EQUB 13:EQUW insert
@@ -227,10 +230,12 @@ EQUS "Emulate Osword &7F memory corruption":EQUB 13
 EQUB 13
 EQUS "Utility commands:":EQUB 13
 EQUS "  QUIT or DESKTOP : terminate emulator":EQUB 13
+EQUS "  DUMP : dump a file in hex and ASCII":EQUB 13
 EQUS "  PAGE : force PAGE location":EQUB 13
 EQUS "  SHADOW : dummy command":EQUB 13
 EQUB 13
 EQUS "Sideays RAM commands:":EQUB 13
+EQUS "  ROMS":EQUB 13
 EQUS "  SRLOAD <fsp> <address> (<r#>) (Q)":EQUB 13
 EQUS "  SRSAVE <fsp> <start> <end> (<r#>) (Q)":EQUB 13
 EQUS "  SRSAVE <fsp> <start> <+ln> (<r#>) (Q)":EQUB 13
@@ -460,9 +465,91 @@ RTS
 .rparen LDA     #'R'
         JSR     OSWRCH
 .cparen LDA     #')'
-        jmp     OSWRCH
+        JMP     OSWRCH
 }
 
+.hexbyt PHA
+        LSR     A
+        LSR     A
+        LSR     A
+        LSR     A
+        JSR     hexnyb
+        PLA
+        AND     #&0f
+.hexnyb CLC
+        ADC     #'0'
+        CMP     #'9'
+        BCC     ddig
+        ADC     #&06
+.ddig   JMP     OSWRCH
+
+.dump
+{
+        JSR     F2toXY
+        LDA     #&40
+        JSR     OSFIND
+        TAY
+        BNE     found
+        JMP     FileCmdNf
+.found  LDA     #&00
+        STA     dmpadd
+        STA     dmpadd+1
+        BIT     &FF
+        BMI     gotesc
+.linlp  LDA     dmpadd+1
+        JSR     hexbyt
+        LDA     dmpadd
+        JSR     hexbyt
+        LDA     #' '
+        JSR     OSWRCH
+        LDX     #&08
+.getlp  JSR     OSBGET
+        BCS     skip
+        STA     &0100,X
+        JSR     hexbyt
+        LDA     #' '
+        JSR     OSWRCH
+        DEX
+        BNE     getlp
+        CLC
+.skip   PHP
+        BCC     ascii
+.endlp  LDA     #'*'
+        JSR     OSWRCH
+        JSR     OSWRCH
+        LDA     #' '
+        JSR     OSWRCH
+        LDA     #&00
+        STA     &0100,X
+        DEX
+        BNE     endlp
+.ascii  LDX     #&08
+.asclp  LDA     &0100,X
+        AND     #&7F
+        CMP     #&7F
+        BEQ     nonprt
+        CMP     #&20
+        BCS     print
+.nonprt LDA     #'.'
+.print  JSR     OSWRCH
+        DEX
+        BNE     asclp
+        JSR     OSNEWL
+        PLP
+        BCS     eof
+        LDA     #&08
+        CLC
+        ADC     dmpadd
+        STA     dmpadd
+        BCC     noinc
+        INC     dmpadd+1
+.noinc  BIT     &FF
+        BPL     linlp
+.gotesc LDA     #&7E
+        JSR     OSWRCH
+.eof    LDA     #&00
+        JMP     OSFIND
+}
 
 \ ======================
 \ Filing System Routines
