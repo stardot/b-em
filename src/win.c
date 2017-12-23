@@ -5,6 +5,8 @@
 #include <allegro.h>
 #include <winalleg.h>
 #include <process.h>
+#include <windows.h>
+#include <shlobj.h>
 #include "resources.h"
 
 #include "b-em.h"
@@ -395,7 +397,8 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         return messages.wParam;
 }
 
-static char openfilestring[260];
+static char openfilestring[MAX_PATH];
+
 static int getfile(HWND hwnd, char *f, char *fn)
 {
         OPENFILENAME ofn;       // common dialog box structure
@@ -466,6 +469,31 @@ static int getsfile(HWND hwnd, char *f, char *fn, char *de)
         }
         LeaveCriticalSection(&cs);
         return 1;
+}
+
+static int getDir(HWND hwnd, const char *title) {
+    BROWSEINFO bi;
+    void *pidl;
+
+    log_debug("win: initialise dirBrowser");
+    bi.hwndOwner = hwnd;
+    bi.pidlRoot = NULL;
+    bi.pszDisplayName = openfilestring;
+    bi.lpszTitle = title;
+    bi.ulFlags = BIF_RETURNONLYFSDIRS; //|BIF_EDITBOX|BIF_NEWDIALOGSTYLE;
+    bi.lpfn = NULL;
+    bi.lParam = 0;
+    bi.iImage = 0;
+    log_debug("win: about to call SHBrowseForFolder");
+    if ((pidl = SHBrowseForFolder(&bi))) {
+        log_debug("win: pidl=%p, %s chosen for %s", pidl, openfilestring, title);
+        SHGetPathFromIDList(pidl, openfilestring);
+        log_debug("win: SHGetPathFromIDList returns");
+        return 0;
+    } else {
+        log_debug("win: null return");
+        return 1;
+    }
 }
 
 extern unsigned char hw_to_mycode[256];
@@ -597,15 +625,10 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         CheckMenuItem(hmenu, IDM_DISC_VDFS_ENABLE, (vdfs_enabled) ? MF_CHECKED : MF_UNCHECKED);
                         break;
                         case IDM_DISC_VDFS_ROOT:
-                        // TODO: for some reason setting tempname to vdfs_get_root() stops the dialog coming up
-                        // strcpy(tempname, vdfs_get_root());
-                        strcpy(tempname, "vdfs_get_root");
-                        // TODO: getfile() uses GetOpenFileName() which cannot select a folder
-                        if (!getfile(hwnd, "VDFS Root", tempname))
-                        {
-                                vdfs_set_root(tempname);
-                        }
-                        break;
+                            strncpy(openfilestring, vdfs_get_root(), MAX_PATH);
+                            if (!getDir(hwnd, "VDFS Root"))
+                                vdfs_set_root(openfilestring);
+                            break;
                         case IDM_TAPE_LOAD:
                         if (!getfile(hwnd, "Tape image (*.UEF;*.CSW)\0*.UEF;*.CSW\0All files (*.*)\0*.*\0", tape_fn))
                         {
