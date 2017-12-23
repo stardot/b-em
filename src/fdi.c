@@ -53,45 +53,7 @@ static void fdi_setupcrc(uint16_t poly, uint16_t rvalue)
 	}
 }
 
-void fdi_init()
-{
-//        printf("FDI reset\n");
-        fdi_f[0]  = fdi_f[1]  = 0;
-        fdi_ds[0] = fdi_ds[1] = 0;
-        fdi_notfound = 0;
-        fdi_setupcrc(0x1021, 0xcdb4);
-}
-
-void fdi_load(int drive, char *fn)
-{
-        writeprot[drive] = fwriteprot[drive] = 1;
-        fdi_f[drive] = fopen(fn, "rb");
-        if (!fdi_f[drive])
-	{
-		log_warn("fdi: unable to open FDI disc image '%s': %s", fn, strerror(errno));
-		return;
-	}
-        fdi_h[drive] = fdi2raw_header(fdi_f[drive]);
-//        if (!fdih[drive]) printf("Failed to load!\n");
-        fdi_lasttrack[drive] = fdi2raw_get_last_track(fdi_h[drive]);
-        fdi_sides[drive] = (fdi_lasttrack[drive]>83) ? 1 : 0;
-//        printf("Last track %i\n",fdilasttrack[drive]);
-        drives[drive].seek        = fdi_seek;
-        drives[drive].readsector  = fdi_readsector;
-        drives[drive].writesector = fdi_writesector;
-        drives[drive].readaddress = fdi_readaddress;
-        drives[drive].poll        = fdi_poll;
-        drives[drive].format      = fdi_format;
-}
-
-void fdi_close(int drive)
-{
-        if (fdi_h[drive]) fdi2raw_header_free(fdi_h[drive]);
-        if (fdi_f[drive]) fclose(fdi_f[drive]);
-        fdi_f[drive] = NULL;
-}
-
-void fdi_seek(int drive, int track)
+static void fdi_seek(int drive, int track)
 {
         int c;
         if (!fdi_f[drive]) return;
@@ -120,12 +82,7 @@ void fdi_seek(int drive, int track)
 //        printf("DD Track %i Len %i Index %i %i\n",track,ftracklen[drive][0][1],ftrackindex[drive][0][1],c);
 }
 
-void fdi_writeback(int drive, int track)
-{
-        return;
-}
-
-void fdi_readsector(int drive, int sector, int track, int side, int density)
+static void fdi_readsector(int drive, int sector, int track, int side, int density)
 {
         fdi_revs = 0;
         fdi_sector  = sector;
@@ -139,7 +96,7 @@ void fdi_readsector(int drive, int sector, int track, int side, int density)
         fdi_readpos = 0;
 }
 
-void fdi_writesector(int drive, int sector, int track, int side, int density)
+static void fdi_writesector(int drive, int sector, int track, int side, int density)
 {
         fdi_revs = 0;
         fdi_sector = sector;
@@ -157,7 +114,7 @@ void fdi_writesector(int drive, int sector, int track, int side, int density)
         fdi_readpos = 0;
 }
 
-void fdi_readaddress(int drive, int track, int side, int density)
+static void fdi_readaddress(int drive, int track, int side, int density)
 {
         fdi_revs = 0;
         fdi_track   = track;
@@ -170,7 +127,7 @@ void fdi_readaddress(int drive, int track, int side, int density)
         fdi_readpos    = 0;
 }
 
-void fdi_format(int drive, int track, int side, int density)
+static void fdi_format(int drive, int track, int side, int density)
 {
         fdi_revs = 0;
         fdi_track   = track;
@@ -213,7 +170,7 @@ static void calccrc(uint8_t byte)
 	crc = (crc << 8) ^ CRCTable[(crc >> 8)^byte];
 }
 
-void fdi_poll()
+static void fdi_poll()
 {
         int tempi, c;
         if (fdi_pos >= fdi_tracklen[fdi_drive][fdi_side][fdi_density])
@@ -381,3 +338,49 @@ void fdi_poll()
                 }
         }
 }
+
+static void fdi_abort()
+{
+    fdi_inread = fdi_inwrite = fdi_inreadaddr = 0;
+}
+
+static void fdi_close(int drive)
+{
+        if (fdi_h[drive]) fdi2raw_header_free(fdi_h[drive]);
+        if (fdi_f[drive]) fclose(fdi_f[drive]);
+        fdi_f[drive] = NULL;
+}
+
+void fdi_init()
+{
+//        printf("FDI reset\n");
+        fdi_f[0]  = fdi_f[1]  = 0;
+        fdi_ds[0] = fdi_ds[1] = 0;
+        fdi_notfound = 0;
+        fdi_setupcrc(0x1021, 0xcdb4);
+}
+
+void fdi_load(int drive, const char *fn)
+{
+        writeprot[drive] = fwriteprot[drive] = 1;
+        fdi_f[drive] = fopen(fn, "rb");
+        if (!fdi_f[drive])
+	{
+		log_warn("fdi: unable to open FDI disc image '%s': %s", fn, strerror(errno));
+		return;
+	}
+        fdi_h[drive] = fdi2raw_header(fdi_f[drive]);
+//        if (!fdih[drive]) printf("Failed to load!\n");
+        fdi_lasttrack[drive] = fdi2raw_get_last_track(fdi_h[drive]);
+        fdi_sides[drive] = (fdi_lasttrack[drive]>83) ? 1 : 0;
+//        printf("Last track %i\n",fdilasttrack[drive]);
+        drives[drive].close       = fdi_close;
+        drives[drive].seek        = fdi_seek;
+        drives[drive].readsector  = fdi_readsector;
+        drives[drive].writesector = fdi_writesector;
+        drives[drive].readaddress = fdi_readaddress;
+        drives[drive].poll        = fdi_poll;
+        drives[drive].format      = fdi_format;
+        drives[drive].abort       = fdi_abort;
+}
+

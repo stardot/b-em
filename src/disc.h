@@ -1,17 +1,22 @@
 #ifndef __INC_DISC_H
 #define __INC_DISC_H
 
+#define NUM_DRIVES 2
+
 typedef struct
 {
+        void (*close)(int drive);
         void (*seek)(int drive, int track);
         void (*readsector)(int drive, int sector, int track, int side, int density);
         void (*writesector)(int drive, int sector, int track, int side, int density);
         void (*readaddress)(int drive, int track, int side, int density);
         void (*format)(int drive, int track, int side, int density);
         void (*poll)();
+        void (*abort)(int drive);
+        int (*verify)(int drive, int track, int density);
 } DRIVE;
 
-extern DRIVE drives[2];
+extern DRIVE drives[NUM_DRIVES];
 
 extern int curdrive;
 
@@ -25,6 +30,9 @@ void disc_readsector(int drive, int sector, int track, int side, int density);
 void disc_writesector(int drive, int sector, int track, int side, int density);
 void disc_readaddress(int drive, int track, int side, int density);
 void disc_format(int drive, int track, int side, int density);
+void disc_abort(int drive);
+int disc_verify(int drive, int track, int density);
+
 extern int disc_time;
 
 extern void (*fdc_callback)();
@@ -42,8 +50,8 @@ extern int motorspin;
 extern int motoron;
 
 extern int defaultwriteprot;
-extern char discfns[2][260];
+extern char discfns[NUM_DRIVES][260];
 
-extern int writeprot[2], fwriteprot[2];
+extern int writeprot[NUM_DRIVES], fwriteprot[NUM_DRIVES];
 
 #endif

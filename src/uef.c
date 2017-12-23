@@ -5,7 +5,7 @@
 #include <zlib.h>
 #include <stdio.h>
 #include "b-em.h"
-#include "acia.h"
+#include "sysacia.h"
 #include "csw.h"
 #include "uef.h"
 #include "tape.h"
@@ -66,7 +66,7 @@ static void uef_receive(uint8_t val)
         }
         else
         {
-                acia_receive(val);
+                acia_receive(&sysacia, val);
 //                log_debug("Dat %02X\n",val);
         }
 }
@@ -115,7 +115,7 @@ void uef_poll()
                 case 0x100: /*Raw data*/
                 if (uef_startchunk)
                 {
-                        dcdlow();
+                        acia_dcdlow(&sysacia);
                         uef_startchunk = 0;
                 }
                 uef_chunklen--;
@@ -151,7 +151,7 @@ void uef_poll()
                 uef_toneon = 2;
                 if (!uef_intone)
                 {
-                        dcd();
+                        acia_dcdhigh(&sysacia);
                         uef_intone = gzgetc(uef_f);
                         uef_intone |= (gzgetc(uef_f) << 8);
                         uef_intone /= 20;
@@ -172,7 +172,7 @@ void uef_poll()
                 uef_toneon = 2;
                 if (!uef_intone)
                 {
-                        dcd();
+                        acia_dcdhigh(&sysacia);
                         uef_intone = gzgetc(uef_f);
                         uef_intone |= (gzgetc(uef_f)<<8);
                         uef_intone /= 20;
@@ -201,7 +201,7 @@ void uef_poll()
                 uef_toneon = 0;
                 if (!uef_intone)
                 {
-//                        dcd();
+//                        acia_dcdhigh(&sysacia);
                         uef_intone = gzgetc(uef_f);
                         uef_intone |= (gzgetc(uef_f) << 8);
                         uef_intone /= 20;

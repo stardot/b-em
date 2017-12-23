@@ -28,6 +28,7 @@
 #include "tape.h"
 #include "tube.h"
 #include "vdfs.h"
+#include "video.h"
 #include "video_render.h"
 #include "win.h"
 
@@ -187,6 +188,7 @@ static void initmenu()
         CheckMenuItem(hmenu, IDM_IDE_ENABLE, ide_enable ? MF_CHECKED : MF_UNCHECKED);
 
         CheckMenuItem(hmenu, IDM_VIDEO_RESIZE, (videoresize) ? MF_CHECKED : MF_UNCHECKED);
+        CheckMenuItem(hmenu, IDM_VIDEO_NULA, (nula_disable) ? MF_UNCHECKED : MF_CHECKED);
 
         CheckMenuItem(hmenu, IDM_SPD_100, MF_CHECKED);
 }
@@ -667,6 +669,12 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         EnterCriticalSection(&cs);
                         video_enterfullscreen();
                         LeaveCriticalSection(&cs);
+                        break;
+                    case IDM_VIDEO_NULA:
+                        if (nula_disable)
+                            nula_disable = 0;
+                        else
+                            nula_disable = 1;
                         break;
                         case IDM_VIDEO_RESIZE:
                         videoresize = !videoresize;

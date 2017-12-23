@@ -12,9 +12,7 @@
 #include "b-em.h"
 
 #include "6502.h"
-#include "acia.h"
 #include "adc.h"
-#include "adf.h"
 #include "model.h"
 #include "cmos.h"
 #include "config.h"
@@ -29,6 +27,8 @@
 #include "main.h"
 #include "mem.h"
 #include "mouse.h"
+#include "midi.h"
+#include "music4000.h"
 #include "music5000.h"
 #ifdef WIN32
 #include "pal.h"
@@ -40,7 +40,7 @@
 #include "sn76489.h"
 #include "sound.h"
 #include "soundopenal.h"
-#include "ssd.h"
+#include "sysacia.h"
 #include "tape.h"
 #include "tapenoise.h"
 #include "tube.h"
@@ -93,15 +93,17 @@ void main_reset()
 {
         m6502_reset();
         crtc_reset();
+        video_reset();
         sysvia_reset();
         uservia_reset();
         serial_reset();
-        acia_reset();
+        acia_reset(&sysacia);
         wd1770_reset();
         i8271_reset();
         scsi_reset();
         vdfs_reset();
         sid_reset();
+        music4000_reset();
         music5000_reset();
         sn_init();
         if (curtube != -1) tubes[curtube].reset();
@@ -192,8 +194,8 @@ void main_init(int argc, char *argv[])
                 else if (argv[c][0] == '-' && (argv[c][1] == 'f' || argv[c][1]=='F'))
                 {
                         sscanf(&argv[c][2], "%i", &vid_fskipmax);
-			if (vid_fskipmax < 1) vid_fskipmax = 1;
-			if (vid_fskipmax > 9) vid_fskipmax = 9;
+            if (vid_fskipmax < 1) vid_fskipmax = 1;
+            if (vid_fskipmax > 9) vid_fskipmax = 9;
                 }
                 else if (argv[c][0] == '-' && (argv[c][1] == 's' || argv[c][1] == 'S'))
                 {
@@ -210,7 +212,7 @@ void main_init(int argc, char *argv[])
                 else if (argv[c][0] == '-' && (argv[c][1] == 'i' || argv[c][1] == 'I'))
                 {
                         vid_interlace = 1;
-			vid_linedbl = vid_scanlines = 0;
+            vid_linedbl = vid_scanlines = 0;
                 }
                 else if (tapenext)
                    strcpy(tape_fn, argv[c]);
@@ -223,7 +225,7 @@ void main_init(int argc, char *argv[])
                 {
                         strcpy(discfns[0], argv[c]);
                         discnext = 0;
-			autoboot = 150;
+            autoboot = 150;
                 }
                 if (tapenext) tapenext--;
         }
@@ -246,13 +248,11 @@ void main_init(int argc, char *argv[])
         sid_settype(sidmethod, cursid);
         music5000_init();
 
-	adc_init();
+    adc_init();
 #ifdef WIN32
         pal_init();
 #endif
         disc_init();
-        ssd_init();
-        adf_init();
         fdi_init();
 
         scsi_init();
@@ -261,6 +261,7 @@ void main_init(int argc, char *argv[])
 
         model_init();
 
+        midi_init();
         main_reset();
 
         install_int_ex(secint, MSEC_TO_TIMER(1000));
@@ -351,6 +352,7 @@ void main_run()
                 if (key[KEY_F12] && !resetting)
                 {
                         m6502_reset();
+                        video_reset();
                         i8271_reset();
                         wd1770_reset();
                         sid_reset();
@@ -386,6 +388,7 @@ void main_close()
         config_save();
         cmos_save(models[curmodel]);
 
+        midi_close();
         mem_close();
         uef_close();
         csw_close();

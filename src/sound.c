@@ -67,8 +67,8 @@ void sound_poll()
                 music5000_fillbuf( m5_buffer + m5_pos, 3);
                 // skip forward 3 stereo samples
                 m5_pos += 6;
-                // BUFLEN_M5 is in units of samples, not integers
-                if ((m5_pos >> 1) == BUFLEN_M5)
+                // buflen_m5 is in units of samples, not integers
+                if ((m5_pos >> 1) == buflen_m5)
                 {
                         m5_pos = 0;
                         al_givebufferm5(m5_buffer);

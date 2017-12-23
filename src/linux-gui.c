@@ -14,6 +14,7 @@
 #include "keyboard.h"
 #include "linux-gui.h"
 #include "main.h"
+#include "midi-linux.h"
 #include "model.h"
 #include "mouse.h"
 #include "music5000.h"
@@ -25,6 +26,7 @@
 #include "tape.h"
 #include "tube.h"
 #include "vdfs.h"
+#include "video.h"
 #include "video_render.h"
 
 
@@ -54,7 +56,7 @@ MENU tubemenu[6];
 #endif
 MENU displaymenu[4];
 MENU bordersmenu[4];
-MENU videomenu[4];
+MENU videomenu[5];
 MENU sidtypemenu[15];
 MENU methodmenu[3];
 MENU residmenu[3];
@@ -63,12 +65,61 @@ MENU ddtypemenu[3];
 MENU ddvolmenu[4];
 MENU soundmenu[12];
 MENU keymenu[3];
+static MENU m4000menu[4];
+static MENU m2000out1menu[4];
+static MENU m2000out2menu[4];
+static MENU m2000out3menu[4];
+static MENU midimenu[5];
 MENU mousemenu[2];
 MENU hdiskmenu[4];
-MENU settingsmenu[8];
+MENU settingsmenu[9];
 MENU miscmenu[6];
 MENU speedmenu[11];
 MENU mainmenu[6];
+
+static void gui_m4000_update(void) {
+    int i = 0;
+#ifdef HAVE_JACK_JACK_H
+    m4000menu[i++].flags = (midi_music4000.jack_enabled) ? D_SELECTED : 0;
+#endif
+#ifdef HAVE_ALSA_ASOUNDLIB_H
+    m4000menu[i++].flags = (midi_music4000.alsa_seq_enabled) ? D_SELECTED : 0;
+    m4000menu[i++].flags = (midi_music4000.alsa_raw_enabled) ? D_SELECTED : 0;
+#endif
+}
+
+static void gui_m2000_out1_update(void) {
+    int i = 0;
+#ifdef HAVE_JACK_JACK_H
+    m2000out1menu[i++].flags = (midi_music2000_out1.jack_enabled) ? D_SELECTED : 0;
+#endif
+#ifdef HAVE_ALSA_ASOUNDLIB_H
+    m2000out1menu[i++].flags = (midi_music2000_out1.alsa_seq_enabled) ? D_SELECTED : 0;
+    m2000out1menu[i++].flags = (midi_music2000_out1.alsa_raw_enabled) ? D_SELECTED : 0;
+#endif
+}
+
+static void gui_m2000_out2_update(void) {
+    int i = 0;
+#ifdef HAVE_JACK_JACK_H
+    m2000out2menu[i++].flags = (midi_music2000_out2.jack_enabled) ? D_SELECTED : 0;
+#endif
+#ifdef HAVE_ALSA_ASOUNDLIB_H
+    m2000out2menu[i++].flags = (midi_music2000_out2.alsa_seq_enabled) ? D_SELECTED : 0;
+    m2000out2menu[i++].flags = (midi_music2000_out2.alsa_raw_enabled) ? D_SELECTED : 0;
+#endif
+}
+
+static void gui_m2000_out3_update(void) {
+    int i = 0;
+#ifdef HAVE_JACK_JACK_H
+    m2000out3menu[i++].flags = (midi_music2000_out3.jack_enabled) ? D_SELECTED : 0;
+#endif
+#ifdef HAVE_ALSA_ASOUNDLIB_H
+    m2000out3menu[i++].flags = (midi_music2000_out3.alsa_seq_enabled) ? D_SELECTED : 0;
+    m2000out3menu[i++].flags = (midi_music2000_out3.alsa_raw_enabled) ? D_SELECTED : 0;
+#endif
+}
 
 void gui_update()
 {
@@ -95,6 +146,7 @@ void gui_update()
         displaymenu[1].flags = (vid_scanlines) ? D_SELECTED : 0;
         displaymenu[2].flags = (vid_interlace) ? D_SELECTED : 0;
         videomenu[2].flags = (fullscreen) ? D_SELECTED : 0;
+        videomenu[3].flags = (nula_disable) ? 0 : D_SELECTED;
         for (x = 0; x < 3; x++)  bordersmenu[x].flags = (vid_fullborders == (intptr_t)bordersmenu[x].dp) ? D_SELECTED : 0;
         soundmenu[0].flags = (sound_internal) ? D_SELECTED : 0;
         soundmenu[1].flags = (sound_beebsid)  ? D_SELECTED : 0;
@@ -110,6 +162,10 @@ void gui_update()
         ddtypemenu[0].flags = (!ddnoise_type) ? D_SELECTED : 0;
         ddtypemenu[1].flags = (ddnoise_type)  ? D_SELECTED : 0;
         for (x = 0; x < 3; x++)  ddvolmenu[x].flags = (ddnoise_vol == (intptr_t)ddvolmenu[x].dp) ? D_SELECTED : 0;
+        gui_m4000_update();
+        gui_m2000_out1_update();
+        gui_m2000_out2_update();
+        gui_m2000_out3_update();
         keymenu[1].flags = (keyas) ? D_SELECTED : 0;
         mousemenu[0].flags = (mouse_amx) ? D_SELECTED : 0;
         for (x = 0; x < 10; x++) speedmenu[x].flags = (emuspeed == (intptr_t)speedmenu[x].dp) ? D_SELECTED : 0;
@@ -423,8 +479,11 @@ MENU modelmenu[NUM_MODELS+1]=
         {"BBC A",                     gui_model, NULL, 0, (void *)2},
         {"BBC B w/8271 FDC",          gui_model, NULL, 0, (void *)3},
         {"BBC B w/8271+SWRAM",        gui_model, NULL, 0, (void *)4},
-        {"BBC B w/1770 FDC",          gui_model, NULL, 0, (void *)5},
         {"BBC B wo/FDC w/SWRAM",      gui_model, NULL, 0, (void *)16},
+        {"BBC B w/Acorn 1770 FDC",    gui_model, NULL, 0, (void *)5},
+        {"BBC B w/Opus 1770 FDC",     gui_model, NULL, 0, (void *)18},
+        {"BBC B w/Solidisk 1770 FDC", gui_model, NULL, 0, (void *)17},
+        {"BBC B w/Watford 1770 FDC",  gui_model, NULL, 0, (void *)19},
         {"BBC B US",                  gui_model, NULL, 0, (void *)6},
         {"BBC B German",              gui_model, NULL, 0, (void *)7},
         {"BBC B+ 64K",                gui_model, NULL, 0, (void *)8},
@@ -542,11 +601,21 @@ int gui_fullscreen()
         return D_EXIT;
 }
 
-MENU videomenu[4] =
+static int gui_video_nula()
+{
+    if (nula_disable)
+        nula_disable = 0;
+    else
+        nula_disable = 1;
+    return D_EXIT;
+}
+
+MENU videomenu[5] =
 {
         {"Display type", NULL,           displaymenu, 0, NULL},
         {"Borders",      NULL,           bordersmenu, 0, NULL},
         {"Fullscreen",   gui_fullscreen, NULL,        0, NULL},
+        {"NuLA",         gui_video_nula, NULL,        0, NULL},
         {NULL, NULL, NULL, 0, NULL}
 };
 
@@ -706,6 +775,143 @@ MENU soundmenu[12]=
         {NULL, NULL, NULL, 0, NULL}
 };
 
+#ifdef HAVE_JACK_JACK_H
+
+static int gui_m4000_jack(void) {
+    midi_music4000.jack_enabled = !midi_music4000.jack_enabled;
+    gui_m4000_update();
+    return D_CLOSE;
+}
+
+static int gui_m2000_out1_jack(void) {
+    midi_music2000_out1.jack_enabled = !midi_music2000_out1.jack_enabled;
+    gui_m2000_out1_update();
+    return D_CLOSE;
+}
+
+static int gui_m2000_out2_jack(void) {
+    midi_music2000_out2.jack_enabled = !midi_music2000_out2.jack_enabled;
+    gui_m2000_out2_update();
+    return D_CLOSE;
+}
+
+static int gui_m2000_out3_jack(void) {
+    midi_music2000_out3.jack_enabled = !midi_music2000_out3.jack_enabled;
+    gui_m2000_out3_update();
+    return D_CLOSE;
+}
+
+#endif
+
+#ifdef HAVE_ALSA_ASOUNDLIB_H
+
+static int gui_m4000_alsa_seq(void) {
+    midi_music4000.alsa_seq_enabled = !midi_music4000.alsa_seq_enabled;
+    gui_m4000_update();
+    return D_CLOSE;
+}
+
+static int gui_m2000_out1_alsa_seq(void) {
+    midi_music2000_out1.alsa_seq_enabled = !midi_music2000_out1.alsa_seq_enabled;
+    gui_m2000_out1_update();
+    return D_CLOSE;
+}
+
+static int gui_m2000_out2_alsa_seq(void) {
+    midi_music2000_out2.alsa_seq_enabled = !midi_music2000_out2.alsa_seq_enabled;
+    gui_m2000_out2_update();
+    return D_CLOSE;
+}
+
+static int gui_m2000_out3_alsa_seq(void) {
+    midi_music2000_out3.alsa_seq_enabled = !midi_music2000_out3.alsa_seq_enabled;
+    gui_m2000_out3_update();
+    return D_CLOSE;
+}
+
+static int gui_m4000_alsa_raw(void) {
+    midi_music4000.alsa_raw_enabled = !midi_music4000.alsa_raw_enabled;
+    gui_m4000_update();
+    return D_CLOSE;
+}
+
+static int gui_m2000_out1_alsa_raw(void) {
+    midi_music2000_out1.alsa_raw_enabled = !midi_music2000_out1.alsa_raw_enabled;
+    gui_m2000_out1_update();
+    return D_CLOSE;
+}
+
+static int gui_m2000_out2_alsa_raw(void) {
+    midi_music2000_out2.alsa_raw_enabled = !midi_music2000_out2.alsa_raw_enabled;
+    gui_m2000_out2_update();
+    return D_CLOSE;
+}
+
+static int gui_m2000_out3_alsa_raw(void) {
+    midi_music2000_out3.alsa_raw_enabled = !midi_music2000_out3.alsa_raw_enabled;
+    gui_m2000_out3_update();
+    return D_CLOSE;
+}
+
+#endif
+
+static MENU m4000menu[4]=
+{
+#ifdef HAVE_JACK_JACK_H
+    {"JACK MIDI",      gui_m4000_jack,          NULL, 0, NULL},
+#endif
+#ifdef HAVE_ALSA_ASOUNDLIB_H
+    {"ALSA Sequencer", gui_m4000_alsa_seq,      NULL, 0, NULL},
+    {"ALSA Raw MIDI",  gui_m4000_alsa_raw,      NULL, 0, NULL},
+#endif
+        {NULL, NULL, NULL, 0, NULL}
+};
+
+static MENU m2000out1menu[4]=
+{
+#ifdef HAVE_JACK_JACK_H
+    {"JACK MIDI",      gui_m2000_out1_jack,     NULL, 0, NULL},
+#endif
+#ifdef HAVE_ALSA_ASOUNDLIB_H
+    {"ALSA Sequencer", gui_m2000_out1_alsa_seq, NULL, 0, NULL},
+    {"ALSA Raw MIDI",  gui_m2000_out1_alsa_raw, NULL, 0, NULL},
+#endif
+        {NULL, NULL, NULL, 0, NULL}
+};
+
+static MENU m2000out2menu[4]=
+{
+#ifdef HAVE_JACK_JACK_H
+    {"JACK MIDI",      gui_m2000_out2_jack,     NULL, 0, NULL},
+#endif
+#ifdef HAVE_ALSA_ASOUNDLIB_H
+    {"ALSA Sequencer", gui_m2000_out2_alsa_seq, NULL, 0, NULL},
+    {"ALSA Raw MIDI",  gui_m2000_out2_alsa_raw, NULL, 0, NULL},
+#endif
+        {NULL, NULL, NULL, 0, NULL}
+};
+
+static MENU m2000out3menu[4]=
+{
+#ifdef HAVE_JACK_JACK_H
+    {"JACK MIDI",      gui_m2000_out3_jack,     NULL, 0, NULL},
+#endif
+#ifdef HAVE_ALSA_ASOUNDLIB_H
+    {"ALSA Sequencer", gui_m2000_out3_alsa_seq, NULL, 0, NULL},
+    {"ALSA Raw MIDI",  gui_m2000_out3_alsa_raw, NULL, 0, NULL},
+#endif
+        {NULL, NULL, NULL, 0, NULL}
+};
+
+static MENU midimenu[5]=
+{
+    {"Music 4000 Keyboard",  NULL, m4000menu,     0, NULL },
+    {"Music 2000 I/F Out 1", NULL, m2000out1menu, 0, NULL },
+    {"Music 2000 I/F Out 2", NULL, m2000out2menu, 0, NULL },
+    {"Music 2000 I/F Out 3", NULL, m2000out3menu, 0, NULL },
+    {NULL, NULL, NULL, 0, NULL}
+};
+
 int gui_mapas()
 {
         keyas = !keyas;
@@ -734,12 +940,13 @@ MENU mousemenu[2] =
 };
 
 
-MENU settingsmenu[8]=
+MENU settingsmenu[9]=
 {
         {"&Model",            NULL, modelmenu, 0, NULL},
         {"&Second processor", NULL, tubemenu,  0, NULL},
         {"&Video",            NULL, videomenu, 0, NULL},
         {"&Sound",            NULL, soundmenu, 0, NULL},
+        {"M&idi",             NULL, midimenu,  0, NULL},
         {"&Keyboard",         NULL, keymenu,   0, NULL},
         {"&Mouse",            NULL, mousemenu, 0, NULL},
         {NULL, NULL, NULL, 0, NULL}
