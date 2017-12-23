@@ -47,8 +47,11 @@ OBJ = \
     logging.o \
     main.o \
     mem.o \
+    midi-windows.o \
     model.o \
     mouse.o \
+    music2000.o \
+    music4000.o \
     music5000.o \
     pal.o \
     savestate.o \
@@ -58,6 +61,7 @@ OBJ = \
     sn76489.o \
     sound.o \
     soundopenal.o \
+    sysacia.o \
     sysvia.o \
     tape.o \
     tapenoise.o \

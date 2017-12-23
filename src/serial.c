@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include "b-em.h"
 #include "serial.h"
-#include "acia.h"
+#include "sysacia.h"
 #include "tape.h"
 #include "tapenoise.h"
 
@@ -30,15 +30,15 @@ void serial_write(uint16_t addr, uint8_t val)
         motor = (val & 0x80) && tape_loaded;
         if (val & 0x40)
         {
-                /*RS423*/
-                acia_sr &= ~12; /*Clear acia DCD and CTS*/
-		acia_is_tape = 0;
+            /*RS423*/
+            sysacia.status_reg &= ~12; /*Clear acia DCD and CTS*/
+            acia_is_tape = 0;
         }
         else
         {
-                /*Tape*/
-                acia_sr &= ~8; /*Clear acia CTS*/
-		acia_is_tape = 1;
+            /*Tape*/
+            sysacia.status_reg &= ~8; /*Clear acia CTS*/
+            acia_is_tape = 1;
         }
 }
 

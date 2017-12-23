@@ -20,7 +20,7 @@ b_em_CFLAGS = $(allegro_CFLAGS) -DBEM -DINCLUDE_DEBUGGER -DUSE_MEMORY_POINTER
 if OS_WIN
 b_em_LDADD = -lalleg -lz -lopenal -lalut -lm
 else
-b_em_LDADD = $(allegro_LIBS) -lz -lopenal -lalut -lm
+b_em_LDADD = $(allegro_LIBS) -lz -lopenal -lalut -lm -ljack -lpthread -lasound
 endif
 
 b_em_SOURCES = \
@@ -70,6 +70,9 @@ b_em_SOURCES = \
 	mem.c \
 	model.c \
 	mouse.c \
+	midi-linux.c \
+	music2000.c \
+	music4000.c \
 	music5000.c \
 	resid.cc \
 	savestate.c \
@@ -79,6 +82,7 @@ b_em_SOURCES = \
 	sn76489.c \
 	sound.c \
 	soundopenal.c \
+	sysacia.c \
 	sysvia.c \
 	tape.c \
 	tapenoise.c \

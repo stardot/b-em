@@ -4,14 +4,15 @@
 #include "b-em.h"
 
 #include "6502.h"
-#include "acia.h"
 #include "adc.h"
 #include "main.h"
 #include "mem.h"
 #include "model.h"
+#include "music5000.h"
 #include "savestate.h"
 #include "serial.h"
 #include "sn76489.h"
+#include "sysacia.h"
 #include "via.h"
 #include "sysvia.h"
 #include "uservia.h"
@@ -53,9 +54,10 @@ void savestate_dosave()
 	    video_savestate(f);
 	    sn_savestate(f);
 	    adc_savestate(f);
-	    acia_savestate(f);
+	    acia_savestate(&sysacia, f);
 	    serial_savestate(f);
         vdfs_savestate(f);
+        music5000_savestate(f);
 
 	    fclose(f);
 	}
@@ -90,9 +92,10 @@ void savestate_doload()
 		 video_loadstate(f);
 		 sn_loadstate(f);
 		 adc_loadstate(f);
-		 acia_loadstate(f);
+		 acia_loadstate(&sysacia, f);
 		 serial_loadstate(f);
          vdfs_loadstate(f);
+         music5000_loadstate(f);
 
 		 log_debug("Loadstate done!\n");
 	     }

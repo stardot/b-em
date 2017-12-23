@@ -5,17 +5,17 @@
 //
 // Beech - BBC Micro emulator
 // Copyright (C) 2015 Darren Izzard
-// 
+//
 // This program is free software; you can redistribute it and / or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation; either version 2 of the License, or
 // (at your option) any later version.
-// 
+//
 // This program is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.See the
 // GNU General Public License for more details.
-// 
+//
 // You should have received a copy of the GNU General Public License along
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110 - 1301 USA.
@@ -27,6 +27,8 @@
 #include <string.h>
 
 #include "b-em.h"
+#include "sound.h"
+#include "savestate.h"
 
 // #define LOG_LEVELS
 
@@ -78,6 +80,44 @@ void music5000_reset(void)
 	modulate = 0;
 	disable = 0;
 	sam = 0;
+}
+
+void music5000_loadstate(FILE *f) {
+    int ch;
+
+    if ((ch = getc(f)) != EOF) {
+        if (ch == 'M') {
+            sound_music5000 = 1;
+            pc = savestate_load_var(f);
+            channel = savestate_load_var(f);
+            modulate = savestate_load_var(f);
+            disable = savestate_load_var(f);
+            sam = savestate_load_var(f);
+            fread(RAM, sizeof RAM, 1, f);
+            fread(phaseRAM, sizeof phaseRAM, 1, f);
+            fread(sleft, sizeof sleft, 1, f);
+            fread(sright, sizeof sright, 1, f);
+        } else if (ch == 'm')
+            sound_music5000 = 0;
+        else
+            log_warn("music5000: invalid Music 5000 state from savestate file");
+    }
+}
+
+void music5000_savestate(FILE *f) {
+    if (sound_music5000) {
+        putc('M', f);
+        savestate_save_var(pc, f);
+        savestate_save_var(channel, f);
+        savestate_save_var(modulate, f);
+        savestate_save_var(disable, f);
+        savestate_save_var(sam, f);
+        fwrite(RAM, sizeof RAM, 1, f);
+        fwrite(phaseRAM, sizeof phaseRAM, 1, f);
+        fwrite(sleft, sizeof sleft, 1, f);
+        fwrite(sright, sizeof sright, 1, f);
+    } else
+        putc('m', f);
 }
 
 void music5000_init(void)
@@ -152,7 +192,7 @@ void music5000_update_6MHz(void)
 		// - sam holds the wave table output which is 1 bit sign and 7 bit magnitude
 		// - amp holds the amplitude which is 1 bit sign and 8 bit magnitude (0x00 being quite, 0x7f being loud)
 		// The real hardware combites these in a single 8 bit adder, as we do here
-		// 
+		//
 		// Consider a positive wav value (sign bit = 1)
 		//		 wav: (0x80 -> 0xFF) + amp: (0x00 -> 0x7F) => (0x80 -> 0x7E)
 		// values in the range 0x80...0xff are very small are clamped to zero

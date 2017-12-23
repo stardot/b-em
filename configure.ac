@@ -85,6 +85,9 @@ if test "x$found_stpcpy" = xyes; then
 	AC_DEFINE(HAVE_STPCPY)
 fi
 
+# Checks for Linux MIDI implementations.
+AC_CHECK_HEADERS(jack/jack.h alsa/asoundlib.h)
+
 AC_OUTPUT([Makefile src/Makefile])
 
 echo
