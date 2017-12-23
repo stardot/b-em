@@ -21,6 +21,13 @@ uint8_t ram_fe30, ram_fe34;
 int romused[ROM_SLOTS] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 int swram[ROM_SLOTS]   = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
+static const char slotkeys[16][6] = {
+    "rom00", "rom01", "rom02", "rom03",
+    "rom04", "rom05", "rom06", "rom07",
+    "rom08", "rom09", "rom10", "rom11",
+    "rom12", "rom13", "rom14", "rom15"
+};
+
 void mem_init() {
     log_debug("mem_init\n");
     ram = (uint8_t *)malloc(RAM_SIZE);
@@ -78,13 +85,14 @@ static void load_os_rom(const char *sect) {
 }
 
 static void cfg_load_rom(int slot, const char *sect, const char *def) {
-    const char *name;
-    char key[6];
+    const char *key, *name;
     FILE *f;
     char path[PATH_MAX];
 
-    snprintf(key, sizeof key, "rom%x", slot);
+    key = slotkeys[slot];
     name = get_config_string(sect, key, def);
+    if (name == def)
+        set_config_string(sect, key, def);
     if (*name == '\0' || strcasecmp(name, "ram") == 0) {
         log_debug("mem: ROM slot %02d set as sideways RAM", slot);
         swram[slot] = 1;
