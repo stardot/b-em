@@ -91,6 +91,7 @@ void main_reset()
 {
         m6502_reset();
         crtc_reset();
+        video_reset();
         sysvia_reset();
         uservia_reset();
         serial_reset();
@@ -347,6 +348,7 @@ void main_run()
                 if (key[KEY_F12] && !resetting)
                 {
                         m6502_reset();
+                        video_reset();
                         i8271_reset();
                         wd1770_reset();
                         sid_reset();
