@@ -20,9 +20,9 @@ int oldmodel;
 MODEL models[NUM_MODELS] =
 {
 /*       Name                        8271  1770             65c02  B+  Master  A  OS 0.1  Compact  Config Section    OS         BASIC      DFS ROM     CMOS       ROM setup function    Second processor*/
-        {"BBC A w/OS 0.1",            0,    WD1770_NONE,    0,     0,  0,      1, 1,      0,       "bbc_a_os01",     "os01",    "basic1",  "empty",    "",        mem_romsetup_os01,    -1},
-        {"BBC B w/OS 0.1",            0,    WD1770_NONE,    0,     0,  0,      0, 1,      0,       "bbc_b_os01",     "os01",    "basic1",  "empty",    "",        mem_romsetup_os01,    -1},
-        {"BBC A",                     1,    WD1770_NONE,    0,     0,  0,      1, 0,      0,       "bbc_a",          "os12",    "basic2",  "empty",    "",        mem_romsetup_std,     -1},
+        {"BBC A w/OS 0.1",            0,    WD1770_NONE,    0,     0,  0,      1, 1,      0,       "bbc_a_os01",     "os01",    "basic1",  "",         "",        mem_romsetup_os01,    -1},
+        {"BBC B w/OS 0.1",            0,    WD1770_NONE,    0,     0,  0,      0, 1,      0,       "bbc_b_os01",     "os01",    "basic1",  "",         "",        mem_romsetup_os01,    -1},
+        {"BBC A",                     1,    WD1770_NONE,    0,     0,  0,      1, 0,      0,       "bbc_a",          "os12",    "basic2",  "",         "",        mem_romsetup_std,     -1},
         {"BBC B w/8271 FDC",          1,    WD1770_NONE,    0,     0,  0,      0, 0,      0,       "bbc_b_8271",     "os12",    "basic2",  "dfs09",    "",        mem_romsetup_std,     -1},
         {"BBC B w/8271+SWRAM",        1,    WD1770_NONE,    0,     0,  0,      0, 0,      0,       "bbc_b_swram",    "os12",    "basic2",  "dfs09",    "",        mem_romsetup_swram,   -1},
         {"BBC B w/1770 FDC",          0,    WD1770_ACORN,   0,     0,  0,      0, 0,      0,       "bbc_b_1770",     "os12",    "basic2",  "dfs226",   "",        mem_romsetup_swram,   -1},
@@ -78,7 +78,10 @@ void model_check(void) {
 
 void model_init()
 {
+        model_check();
         log_info("mem: starting emulation as %s", models[curmodel].name);
+        set_config_string(models[curmodel].cfgsect, "name", models[curmodel].name);
+
         I8271       = models[curmodel].I8271;
         WD1770      = models[curmodel].WD1770;
         BPLUS       = models[curmodel].bplus;
@@ -88,12 +91,9 @@ void model_init()
         OS01        = models[curmodel].os01;
         compactcmos = models[curmodel].compact;
 
-        model_check();
         mem_clearroms();
         models[curmodel].romsetup();
 
-//      mem_loadroms(models[curmodel].os, models[curmodel].romdir);
-//        if (ideenable) loadiderom();
         if (curtube!=-1)
             tubes[curtube].init();
         tube_reset();

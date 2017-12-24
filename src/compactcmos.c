@@ -58,8 +58,8 @@ void compactcmos_save(MODEL m) {
     const char *msg;
 
     if (!find_cfg_dest(fn, sizeof fn, m.cmos, "bin")) {
-        if ((cmosf = fopen(fn, "rb"))) {
-            log_debug("compactcmos: saving to from %s", fn);
+        if ((cmosf = fopen(fn, "wb"))) {
+            log_debug("compactcmos: saving to %s", fn);
             fwrite(cmos_ram, 128, 1, cmosf);
             fclose(cmosf);
             return;

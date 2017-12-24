@@ -209,7 +209,7 @@ void arm_init()
         if (!armram) armram=(uint32_t *)malloc(0x400000);
         armromb=(uint8_t *)armrom;
         armramb=(uint8_t *)armram;
-        if (!find_dat_file(path, sizeof path, "tube", "ARMeval_100", "rom")) {
+        if (!find_dat_file(path, sizeof path, "roms/tube", "ARMeval_100", "rom")) {
             f = x_fopen(path, "rb");
             fread(armromb,0x4000,1,f);
             fclose(f);

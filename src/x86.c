@@ -642,7 +642,7 @@ void x86_init()
         if (!x86rom) x86rom=malloc(0x4000);
         x86makeznptable();
         memset(x86ram,0,0x100000);
-        if (!find_dat_file(fn, sizeof fn, "tube", "BIOS", "rom")) {
+        if (!find_dat_file(fn, sizeof fn, "roms/tube", "BIOS", "rom")) {
             f=x_fopen(fn,"rb");
             fread(x86rom,0x4000,1,f);
             fclose(f);

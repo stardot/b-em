@@ -42,7 +42,7 @@ static void tube_6502_loadrom() {
     FILE *f;
     char path[PATH_MAX];
 
-    if (!find_dat_file(path, sizeof path, "tube", "6502Tube", "rom")) {
+    if (!find_dat_file(path, sizeof path, "roms/tube", "6502Tube", "rom")) {
         f = x_fopen(path, "rb");
         fread(tuberom+0x800,0x800,1,f);
         fclose(f);
