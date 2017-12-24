@@ -21,8 +21,6 @@ int videoresize = 0;
 int mousecapture = 0;
 int quited = 0;
 
-void waitforready() { }
-void resumeready() { }
 int windx, windy;
 void updatewindowsize(int x, int y)
 {
@@ -38,22 +36,6 @@ void updatewindowsize(int x, int y)
                 set_color_depth(32);
                 //set_palette(pal);
         }
-}
-
-void startblit()
-{
-}
-
-void endblit()
-{
-}
-
-void cataddname(char *s)
-{
-}
-
-void updatewindow()
-{
 }
 
 void setquit()

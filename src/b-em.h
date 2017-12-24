@@ -42,13 +42,25 @@ extern int bempause;
 
 void setquit();
 
+#ifdef WIN32
+
 void startblit();
 void endblit();
 
-extern int autoboot;
-
 void cataddname(char *s);
 void showcatalogue();
+
+#else
+
+static inline void startblit(void) {};
+static inline void endblit(void) {};
+static inline void cataddname(char *s) {};
+static inline void showcatalogue() {};
+
+#endif
+
+extern int autoboot;
+
 
 void redefinekeys();
 
