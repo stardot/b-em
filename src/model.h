@@ -5,6 +5,7 @@
 
 void model_check(void);
 void model_init();
+void model_save(void);
 char *model_get();
 
 typedef struct

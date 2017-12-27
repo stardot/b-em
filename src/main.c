@@ -385,6 +385,7 @@ void main_close()
         timeEndPeriod(1);
 #endif
 
+        model_save();
         config_save();
         cmos_save(models[curmodel]);
 

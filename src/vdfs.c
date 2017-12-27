@@ -1601,7 +1601,7 @@ static int16_t swr_calc_addr(uint8_t flags, uint32_t *st_ptr, int16_t romid) {
             return -1;
         }
 
-        if ((romid > 16) | !swram[romid]) {
+        if ((romid > 16) | !rom_slots[romid].swram) {
             adfs_error(err_no_swr);
             return -1;
         }
@@ -1945,7 +1945,7 @@ static inline void cmd_rescan() {
 static inline void check_ram(void) {
     p.c = 0;
     if (y >= 0 && y <= 15)
-        if (swram[y])
+        if (rom_slots[y].swram)
             p.c = 1;
 }
 

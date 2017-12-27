@@ -454,7 +454,7 @@ static void do_writemem(uint32_t addr, uint32_t val)
                         memlook[0][c] = memlook[1][c] =
                             &rom[(val & 15) << 14] - 0x8000;
                 for (c = 128; c < 192; c++)
-                        memstat[0][c] = memstat[1][c] = swram[val & 15] ? 1 : 2;
+                        memstat[0][c] = memstat[1][c] = rom_slots[val & 15].swram ? 1 : 2;
                 romsel = (val & 15) << 14;
                 ram4k = ((val & 0x80) && MASTER);
                 ram12k = ((val & 0x80) && BPLUS);

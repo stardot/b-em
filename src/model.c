@@ -36,7 +36,7 @@ MODEL models[NUM_MODELS] =
         {"BBC Master Compact",        0,    WD1770_MASTER,  1,     0,  1,      0, 0,      1,       "master_compact", "os51",    "basic48", "adfs210",  "cmosc",   mem_romsetup_compact, -1},
         {"ARM Evaluation System",     0,    WD1770_MASTER,  1,     0,  1,      0, 0,      0,       "master_arm",     "mos320",  "",        "",         "cmosa",   mem_romsetup_master,   1},
         {"BBC Master 128 w/MOS 3.5",  0,    WD1770_MASTER,  1,     0,  1,      0, 0,      0,       "master_os350",   "mos350",  "",        "",         "cmos350", mem_romsetup_master,  -1},
-        {"BBC B wo/FDC w/SWRAM",      0,    WD1770_NONE,    0,     0,  0,      0, 0,      0,       "bbc_b_nofdc",    "os12",    "basic2",  "ram",      "",        mem_romsetup_swram,   -1},
+        {"BBC B wo/FDC w/SWRAM",      0,    WD1770_NONE,    0,     0,  0,      0, 0,      0,       "bbc_b_nofdc",    "os12",    "basic2",  "",         "",        mem_romsetup_swram,   -1},
         {"BBC B w/Solidisk 1770 FDC", 0,    WD1770_STL,     0,     0,  0,      0, 0,      0,       "bbc_b_solidisk", "os12",    "basic2",  "stldfs21", "",        mem_romsetup_swram,   -1},
         {"BBC B w/Opus 1770 FDC",     0,    WD1770_OPUS,    0,     0,  0,      0, 0,      0,       "bbc_b_opus",     "os12",    "basic2",  "oddos345", "",        mem_romsetup_swram,   -1},
         {"BBC B w/Watford 1770 FDC",  0,    WD1770_WATFORD, 0,     0,  0,      0, 0,      0,       "bbc_b_watford",  "os12",    "basic2",  "wddfs153", "",        mem_romsetup_swram,   -1}
@@ -99,4 +99,11 @@ void model_init()
         tube_reset();
 
         cmos_load(models[curmodel]);
+}
+
+void model_save(void) {
+    const char *sect = models[curmodel].cfgsect;
+    
+    set_config_string(sect, "name", models[curmodel].name);
+    mem_save_romcfg(sect);
 }

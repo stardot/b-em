@@ -14,6 +14,7 @@
 #include "keyboard.h"
 #include "linux-gui.h"
 #include "main.h"
+#include "mem.h"
 #include "midi-linux.h"
 #include "model.h"
 #include "mouse.h"
@@ -29,6 +30,7 @@
 #include "video.h"
 #include "video_render.h"
 
+#define ROM_LABEL_LEN 50
 
 #undef printf
 
@@ -75,7 +77,7 @@ MENU hdiskmenu[4];
 MENU settingsmenu[9];
 MENU miscmenu[6];
 MENU speedmenu[11];
-MENU mainmenu[6];
+MENU mainmenu[7];
 
 static void gui_m4000_update(void) {
     int i = 0;
@@ -465,6 +467,7 @@ MENU tapemenu[]=
 
 int gui_model()
 {
+        model_save();
         oldmodel = curmodel;
         curmodel = (intptr_t)active_menu->dp;
         main_restart();
@@ -1020,11 +1023,240 @@ MENU miscmenu[6] =
         {NULL, NULL, NULL, 0, NULL}
 };
 
-MENU mainmenu[6] =
+static int gui_rom_togram(void) {
+    rom_slot_t *slotp = active_menu->dp;
+
+    if (!slotp->locked) {
+        if (slotp->swram) {
+            slotp->swram = 0;
+            active_menu->flags &= ~D_SELECTED;
+        } else {
+            slotp->swram = 1;
+            active_menu->flags |= D_SELECTED;
+        }
+    }
+    return D_CLOSE;
+}
+
+static int gui_rom_clear(void) {
+    rom_slot_t *slotp = active_menu->dp;
+    
+    if (!slotp->locked)
+        mem_clearrom(slotp - rom_slots);
+    return D_CLOSE;
+}
+
+static int gui_rom_load(void) {
+    rom_slot_t *slotp = active_menu->dp;
+    int ret, slot, xsize = windx - 32, ysize = windy - 16;
+    char tempname[PATH_MAX];
+
+    if (!slotp->locked) {
+        if (slotp->name)
+            strncpy(tempname, slotp->name, sizeof tempname-1);
+        else
+            tempname[0] = 0;
+        ret = file_select_ex("Please choose a ROM image file", tempname, "ROM", sizeof tempname, xsize, ysize);
+        if (ret) {
+            slot = slotp - rom_slots;
+            mem_clearrom(slot);
+            mem_loadrom(slot, get_filename(tempname), tempname, 0);
+        }
+    }
+    return D_CLOSE;
+}
+
+static MENU rom15menu[4] =
+{
+    { "RAM",   gui_rom_togram, NULL, 0, rom_slots + 15 },
+    { "Clear", gui_rom_clear,  NULL, 0, rom_slots + 15 },
+    { "Load",  gui_rom_load,   NULL, 0, rom_slots + 15 },
+    {NULL, NULL, NULL, 0, NULL}
+};
+
+static MENU rom14menu[4] =
+{
+    { "RAM",   gui_rom_togram, NULL, 0, rom_slots + 14 },
+    { "Clear", gui_rom_clear,  NULL, 0, rom_slots + 14 },
+    { "Load",  gui_rom_load,   NULL, 0, rom_slots + 14 },
+    {NULL, NULL, NULL, 0, NULL}
+};
+
+static MENU rom13menu[4] =
+{
+    { "RAM",   gui_rom_togram, NULL, 0, rom_slots + 13 },
+    { "Clear", gui_rom_clear,  NULL, 0, rom_slots + 13 },
+    { "Load",  gui_rom_load,   NULL, 0, rom_slots + 13 },
+    {NULL, NULL, NULL, 0, NULL}
+};
+
+static MENU rom12menu[4] =
+{
+    { "RAM",   gui_rom_togram, NULL, 0, rom_slots + 12 },
+    { "Clear", gui_rom_clear,  NULL, 0, rom_slots + 12 },
+    { "Load",  gui_rom_load,   NULL, 0, rom_slots + 12 },
+    {NULL, NULL, NULL, 0, NULL}
+};
+
+static MENU rom11menu[4] =
+{
+    { "RAM",   gui_rom_togram, NULL, 0, rom_slots + 11 },
+    { "Clear", gui_rom_clear,  NULL, 0, rom_slots + 11 },
+    { "Load",  gui_rom_load,   NULL, 0, rom_slots + 11 },
+    {NULL, NULL, NULL, 0, NULL}
+};
+
+static MENU rom10menu[4] =
+{
+    { "RAM",   gui_rom_togram, NULL, 0, rom_slots + 10 },
+    { "Clear", gui_rom_clear,  NULL, 0, rom_slots + 10 },
+    { "Load",  gui_rom_load,   NULL, 0, rom_slots + 10 },
+    {NULL, NULL, NULL, 0, NULL}
+};
+
+static MENU rom09menu[4] =
+{
+    { "RAM",   gui_rom_togram, NULL, 0, rom_slots + 9 },
+    { "Clear", gui_rom_clear,  NULL, 0, rom_slots + 9 },
+    { "Load",  gui_rom_load,   NULL, 0, rom_slots + 9 },
+    {NULL, NULL, NULL, 0, NULL}
+};
+
+static MENU rom08menu[4] =
+{
+    { "RAM",   gui_rom_togram, NULL, 0, rom_slots + 8 },
+    { "Clear", gui_rom_clear,  NULL, 0, rom_slots + 8 },
+    { "Load",  gui_rom_load,   NULL, 0, rom_slots + 8 },
+    {NULL, NULL, NULL, 0, NULL}
+};
+
+static MENU rom07menu[4] =
+{
+    { "RAM",   gui_rom_togram, NULL, 0, rom_slots + 7 },
+    { "Clear", gui_rom_clear,  NULL, 0, rom_slots + 7 },
+    { "Load",  gui_rom_load,   NULL, 0, rom_slots + 7 },
+    {NULL, NULL, NULL, 0, NULL}
+};
+
+static MENU rom06menu[4] =
+{
+    { "RAM",   gui_rom_togram, NULL, 0, rom_slots + 6 },
+    { "Clear", gui_rom_clear,  NULL, 0, rom_slots + 6 },
+    { "Load",  gui_rom_load,   NULL, 0, rom_slots + 6 },
+    {NULL, NULL, NULL, 0, NULL}
+};
+
+static MENU rom05menu[4] =
+{
+    { "RAM",   gui_rom_togram, NULL, 0, rom_slots + 5 },
+    { "Clear", gui_rom_clear,  NULL, 0, rom_slots + 5 },
+    { "Load",  gui_rom_load,   NULL, 0, rom_slots + 5 },
+    {NULL, NULL, NULL, 0, NULL}
+};
+
+static MENU rom04menu[4] =
+{
+    { "RAM",   gui_rom_togram, NULL, 0, rom_slots + 4 },
+    { "Clear", gui_rom_clear,  NULL, 0, rom_slots + 4 },
+    { "Load",  gui_rom_load,   NULL, 0, rom_slots + 4 },
+    {NULL, NULL, NULL, 0, NULL}
+};
+
+static MENU rom03menu[4] =
+{
+    { "RAM",   gui_rom_togram, NULL, 0, rom_slots + 3 },
+    { "Clear", gui_rom_clear,  NULL, 0, rom_slots + 3 },
+    { "Load",  gui_rom_load,   NULL, 0, rom_slots + 3 },
+    {NULL, NULL, NULL, 0, NULL}
+};
+
+static MENU rom02menu[4] =
+{
+    { "RAM",   gui_rom_togram, NULL, 0, rom_slots + 2 },
+    { "Clear", gui_rom_clear,  NULL, 0, rom_slots + 2 },
+    { "Load",  gui_rom_load,   NULL, 0, rom_slots + 2 },
+    {NULL, NULL, NULL, 0, NULL}
+};
+
+static MENU rom01menu[4] =
+{
+    { "RAM",   gui_rom_togram, NULL, 0, rom_slots + 1 },
+    { "Clear", gui_rom_clear,  NULL, 0, rom_slots + 1 },
+    { "Load",  gui_rom_load,   NULL, 0, rom_slots + 1 },
+    {NULL, NULL, NULL, 0, NULL}
+};
+
+static MENU rom00menu[4] =
+{
+    { "RAM",   gui_rom_togram, NULL, 0, rom_slots + 0 },
+    { "Clear", gui_rom_clear,  NULL, 0, rom_slots + 0 },
+    { "Load",  gui_rom_load,   NULL, 0, rom_slots + 0 },
+    {NULL, NULL, NULL, 0, NULL}
+};
+
+static char gui_rom_labels[ROM_NSLOT][ROM_LABEL_LEN];
+
+static MENU rommenu[17] =
+{
+    { gui_rom_labels[15], NULL, rom15menu, 0, rom_slots + 15 },
+    { gui_rom_labels[14], NULL, rom14menu, 0, rom_slots + 14 },
+    { gui_rom_labels[13], NULL, rom13menu, 0, rom_slots + 13 },
+    { gui_rom_labels[12], NULL, rom12menu, 0, rom_slots + 12 },
+    { gui_rom_labels[11], NULL, rom11menu, 0, rom_slots + 11 },
+    { gui_rom_labels[10], NULL, rom10menu, 0, rom_slots + 10 },
+    { gui_rom_labels[9],  NULL, rom09menu, 0, rom_slots + 9 },
+    { gui_rom_labels[8],  NULL, rom08menu, 0, rom_slots + 8 },
+    { gui_rom_labels[7],  NULL, rom07menu, 0, rom_slots + 7 },
+    { gui_rom_labels[6],  NULL, rom06menu, 0, rom_slots + 6 },
+    { gui_rom_labels[5],  NULL, rom05menu, 0, rom_slots + 5 },
+    { gui_rom_labels[4],  NULL, rom04menu, 0, rom_slots + 4 },
+    { gui_rom_labels[3],  NULL, rom03menu, 0, rom_slots + 3 },
+    { gui_rom_labels[2],  NULL, rom02menu, 0, rom_slots + 2 },
+    { gui_rom_labels[1],  NULL, rom01menu, 0, rom_slots + 1 },
+    { gui_rom_labels[0],  NULL, rom00menu, 0, rom_slots },
+    {NULL, NULL, NULL, 0, NULL}
+};
+
+static void gui_init_rommenu(void) {
+    int slot, ver;
+    const uint8_t *detail;
+    const char *rr, *name;
+    MENU *menup;
+    
+    for (slot = 0; slot < ROM_NSLOT; slot++) {
+        rr = rom_slots[slot].swram ? "RAM" : "ROM";
+        detail = mem_romdetail(slot);
+        name = rom_slots[slot].name;
+        if (detail) {
+            ver = *detail++;
+            if (name)
+                snprintf(gui_rom_labels[slot], ROM_LABEL_LEN, "%02d %s: %s %02X (%s)", slot, rr, detail, ver, name);
+            else
+                snprintf(gui_rom_labels[slot], ROM_LABEL_LEN, "%02d %s: %s %02X", slot, rr, detail, ver);
+        } else {
+            if (name)
+                snprintf(gui_rom_labels[slot], ROM_LABEL_LEN, "%02d %s: %s", slot, rr, name);
+            else
+                snprintf(gui_rom_labels[slot], ROM_LABEL_LEN, "%02d %s", slot, rr);
+        }
+        menup = rommenu + ROM_NSLOT - 1 - slot;
+        if (rom_slots[slot].swram)
+            menup->child[0].flags |= D_SELECTED;
+        else
+            menup->child[0].flags &= ~D_SELECTED;
+        if (rom_slots[slot].locked)
+            menup->flags |= D_DISABLED;
+        else
+            menup->flags &= ~D_DISABLED;        
+    }
+}
+
+MENU mainmenu[7] =
 {
         {"&File",     NULL,filemenu,     0, NULL},
         {"&Disc",     NULL,discmenu,     0, NULL},
         {"&Tape",     NULL,tapemenu,     0, NULL},
+        {"&ROM",      NULL,rommenu,      0, NULL},
         {"&Settings", NULL,settingsmenu, 0, NULL},
         {"&Misc",     NULL,miscmenu,     0, NULL},
         {NULL, NULL, NULL, 0, NULL}
@@ -1059,6 +1291,7 @@ void gui_enter()
         bemgui[0].x  = (windx / 2) - 36;
         bemgui[0].y  = windy - 8;
         bemgui[0].fg = makecol(255,255,255);
+        gui_init_rommenu();
         dp=init_dialog(bemgui, 0);
         while (x && !key[KEY_F11] && !key[KEY_ESC])
         {
