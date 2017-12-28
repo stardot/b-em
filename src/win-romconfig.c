@@ -7,6 +7,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include "b-em.h"
 #include "mem.h"
 #include "win.h"
 
@@ -38,14 +39,18 @@ static void rom_update(int slot, int row) {
 
     rr = rom_slots[slot].swram ? "RAM" : "";
     ListView_SetItemText(hWndROMList, row, 1, rr);
-    if ((detail = mem_romdetail(slot)))
-        snprintf(str, sizeof str, "%s %02X", (char *)detail+1, *detail);
-    else
-        str[0] = 0;
-    ListView_SetItemText(hWndROMList, row, 2, str);
+    if ((detail = mem_romdetail(slot))) {
+        ListView_SetItemText(hWndROMList, row, 2, (char *)(detail+1));
+        snprintf(str, sizeof str, "%02X", *detail);
+        ListView_SetItemText(hWndROMList, row, 3, str);
+    }
+    else {
+        ListView_SetItemText(hWndROMList, row, 2, "");
+        ListView_SetItemText(hWndROMList, row, 3, "");
+    }
     if (!(name = rom_slots[slot].name))
         name = "";
-    ListView_SetItemText(hWndROMList, row, 3, name);
+    ListView_SetItemText(hWndROMList, row, 4, name);
 }
 
 static void rom_list(void) {
@@ -100,7 +105,9 @@ static void select_rom(HWND hwnd, int slot) {
         else
             name = rom_path;
         mem_loadrom(slot, name, rom_path, 0);
-    } else {
+    }
+#ifdef _DEBUG
+    else {
         switch(CommDlgExtendedError()) {
             case CDERR_DIALOGFAILURE:
                 log_debug("win-romcfg: CDERR_DIALOGFAILURE");
@@ -151,8 +158,7 @@ static void select_rom(HWND hwnd, int slot) {
                 log_debug("win-romcfg: dialoge error %d", CommDlgExtendedError());
         }
     }
-    //
-    //if (!getfile(hwnd, "Save State (*.SNP)\0*.SNP\0All files (*.*)\0*.*\0\0", path)) {
+#endif    
 }
 
 static void mark_as_ram(HWND hwnd, int slot) {
@@ -174,8 +180,9 @@ BOOL CALLBACK ROMConfigDlgProc(HWND hwndDlg, UINT message, WPARAM wParam, LPARAM
             ListView_SetExtendedListViewStyle(hWndROMList, LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES);
             LVInsertColumn(hWndROMList, 0, "Bank", LVCFMT_LEFT, 45);
             LVInsertColumn(hWndROMList, 1, "RAM?", LVCFMT_LEFT, 45);
-            LVInsertColumn(hWndROMList, 2, "ROM Title", LVCFMT_LEFT, 100);
-            LVInsertColumn(hWndROMList, 3, "File name", LVCFMT_LEFT, 200);
+            LVInsertColumn(hWndROMList, 2, "ROM Title", LVCFMT_LEFT, 110);
+            LVInsertColumn(hWndROMList, 3, "Ver", LVCFMT_LEFT, 32);
+            LVInsertColumn(hWndROMList, 4, "File name", LVCFMT_LEFT, 205);
             rom_list();
             return TRUE;
 
