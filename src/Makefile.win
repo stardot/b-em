@@ -77,6 +77,7 @@ OBJ = \
     win.o \
     win-catalogue.o \
     win-keydefine.o \
+    win-romconfig.o \
     x86.o \
     x86dasm.o \
     z80.o \

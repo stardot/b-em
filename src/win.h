@@ -4,4 +4,6 @@
 extern HINSTANCE hinstance;
 extern HWND ghwnd;
 
+int getfile(HWND hwnd, char *f, char *fn);
+
 #endif

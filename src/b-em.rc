@@ -203,6 +203,7 @@ BEGIN
                                 MENUITEM "&64mhz", IDM_TUBES_64
                         END
                 END
+                MENUITEM "ROMs", IDM_ROM_CONFIG
                 POPUP "&Video"
                 BEGIN
                         POPUP "&Display type"
@@ -519,4 +520,15 @@ CAPTION "Tape Catalogue"
 FONT 8, "FixedSys"
 BEGIN
    LISTBOX ListBox1, 7, 5, 179+64, 230, WS_TABSTOP
+END
+
+IDD_ROM_CONFIG DIALOGEX 20, 20, 291, 204
+CAPTION "B-Em ROMS"
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,235,183,50,14
+    CONTROL         "",IDC_ROMLIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_ALIGNLEFT | WS_BORDER | WS_TABSTOP,7,7,221,172
+    PUSHBUTTON      "Select ROM",IDC_SELECT_ROM,235,40,50,14
+    PUSHBUTTON      "Mark as ROM",IDC_MARK_ROM,235,56,50,14
+    PUSHBUTTON      "Mark as RAM",IDC_MARK_RAM,235,72,50,14
+    PUSHBUTTON      "Clear Slot",IDC_CLEAR_ROM,235,88,50,14
 END

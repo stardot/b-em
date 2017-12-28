@@ -18,6 +18,7 @@
 #include "ide.h"
 #include "keyboard.h"
 #include "main.h"
+#include "mem.h"
 #include "model.h"
 #include "mouse.h"
 #include "savestate.h"
@@ -31,9 +32,10 @@
 #include "video.h"
 #include "video_render.h"
 #include "win.h"
+#include "win-romconfig.h"
 
-static char exedir[PATH_MAX];
-char tempname[1000];
+char exedir[MAX_PATH];
+char tempname[MAX_PATH];
 
 RECT oldclip, newclip;
 int mousecapture = 0;
@@ -309,7 +311,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
         int c;
         int oldf = 0;
         char *p;
-
+        
         for (c = 0; c < 128; c++) keylookup[c] = c;
 
         processcommandline();
@@ -424,7 +426,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
 
 static char openfilestring[MAX_PATH];
 
-static int getfile(HWND hwnd, char *f, char *fn)
+int getfile(HWND hwnd, char *f, char *fn)
 {
         OPENFILENAME ofn;       // common dialog box structure
         EnterCriticalSection(&cs);
@@ -868,6 +870,11 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         vid_fskipmax = frameskips[emuspeed];
                         CheckMenuItem(hmenu, IDM_SPD_10 + emuspeed, MF_CHECKED);
                         break;
+
+                    case IDM_ROM_CONFIG:
+                        log_debug("win: posting ROM config dialogue");
+                        DialogBox(hinstance, MAKEINTRESOURCE(IDD_ROM_CONFIG), hwnd, ROMConfigDlgProc);
+                        break;
                 }
                 if (LOWORD(wParam) >= IDM_MODEL_0 && LOWORD(wParam) < (IDM_MODEL_0 + 50))
                 {
@@ -1000,7 +1007,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
                         key[c] = 0;
                 }
                 break;
-
+                
                 case WM_CREATE:
 
 //        initbbc(argc,argv);
