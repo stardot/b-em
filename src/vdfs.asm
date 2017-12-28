@@ -310,7 +310,6 @@ RTS
         LDA     #&FD
         STA     PORT_CMD
         BCS     gotram
-        LDY     romid
         LDA     (romtab),y
         BNE     gotrom
 .next   DEY
@@ -424,11 +423,15 @@ RTS
         STA     &f7
 .tloop  LDY     romid
         JSR     OSRDRM
+        CMP     #&7f
+        BCS     cchar
+        CMP     #' '
+        BCS     pchar
         CMP     #&00
-        BNE     notnul
+        BNE     cchar
         LDA     #' '
-.notnul JSR     OSWRCH
-        INC     &f6
+.pchar  JSR     OSWRCH
+.cchar  INC     &f6
         LDA     &f6
         CMP     copywr
         BNE     tloop
