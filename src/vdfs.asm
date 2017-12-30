@@ -502,9 +502,12 @@ RTS
 .found  LDA     #&00
         STA     dmpadd
         STA     dmpadd+1
+        STA     dmpadd+2
         BIT     &FF
         BMI     gotesc
-.linlp  LDA     dmpadd+1
+.linlp  LDA     dmpadd+2
+        JSR     hexbyt
+        LDA     dmpadd+1
         JSR     hexbyt
         LDA     dmpadd
         JSR     hexbyt
@@ -549,8 +552,11 @@ RTS
         CLC
         ADC     dmpadd
         STA     dmpadd
+        LDA     #&00
+        ADC     dmpadd+1
+        STA     dmpadd+1
         BCC     noinc
-        INC     dmpadd+1
+        INC     dmpadd+2
 .noinc  BIT     &FF
         BPL     linlp
 .gotesc LDA     #&7E
