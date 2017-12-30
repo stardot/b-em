@@ -1963,6 +1963,7 @@ static inline void dispatch(uint8_t value) {
         case 0x05: osargs();     break;
         case 0x06: osfile();     break;
         case 0x10: cat_prep();   break;
+        case 0x11: close_all();  break;
         case 0xd0: cmd_srload(); break;
         case 0xd1: cmd_srwrite();break;
         case 0xd2: exec_swr_fs();break;
