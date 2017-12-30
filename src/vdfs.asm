@@ -149,8 +149,10 @@ EQUS "PAGE"   :EQUB 13:EQUW page
 EQUS "QUIT"   :EQUB 13:EQUW quit
 EQUS "DESKTOP":EQUB 13:EQUW quit
 EQUS "DUMP"   :EQUB 13:EQUW dump
+EQUS "LIST"   :EQUB 13:EQUW list
 EQUS "PAGE"   :EQUB 13:EQUW page
 EQUS "SHADOW" :EQUB 13:EQUW shadow
+EQUS "TYPE"   :EQUB 13:EQUW type
 EQUS "INSERT" :EQUB 13:EQUW insert
 \ SRAM commands
 EQUS "ROMS"   :EQUB 13:EQUW roms
@@ -231,8 +233,10 @@ EQUB 13
 EQUS "Utility commands:":EQUB 13
 EQUS "  QUIT or DESKTOP : terminate emulator":EQUB 13
 EQUS "  DUMP : dump a file in hex and ASCII":EQUB 13
+EQUS "  LIST : list a file with line numbers":EQUB 13
 EQUS "  PAGE : force PAGE location":EQUB 13
 EQUS "  SHADOW : dummy command":EQUB 13
+EQUS "  TYPE : display a file on screen":EQUB 13
 EQUB 13
 EQUS "Sideays RAM commands:":EQUB 13
 EQUS "  ROMS":EQUB 13
@@ -481,7 +485,7 @@ RTS
         AND     #&0f
 .hexnyb CLC
         ADC     #'0'
-        CMP     #'9'
+        CMP     #'9'+1
         BCC     ddig
         ADC     #&06
 .ddig   JMP     OSWRCH
@@ -548,6 +552,80 @@ RTS
         INC     dmpadd+1
 .noinc  BIT     &FF
         BPL     linlp
+.gotesc LDA     #&7E
+        JSR     OSWRCH
+.eof    LDA     #&00
+        JMP     OSFIND
+}
+
+.list
+{
+        JSR     F2toXY
+        LDA     #&40
+        JSR     OSFIND
+        TAY
+        BNE     found
+        JMP     FileCmdNf
+.found  LDA     #&00
+        STA     dmpadd
+        STA     dmpadd+1
+        BIT     &FF
+        BMI     gotesc
+.linlp  JSR     OSBGET
+        BCS     eof
+        TAX
+        SED
+        SEC
+        LDA     #&00
+        ADC     dmpadd
+        STA     dmpadd
+        LDA     #&00
+        ADC     dmpadd+1
+        STA     dmpadd+1
+        CLD
+        JSR     hexbyt
+        LDA     dmpadd
+        JSR     hexbyt
+        LDA     #' '
+        JSR     OSWRCH
+        TXA
+        JSR     OSWRCH
+        CMP     #&0D
+        BEQ     newlin
+.chrlp  JSR     OSBGET
+        BCS     eof
+        JSR     OSWRCH
+        CMP     #&0D
+        BNE     chrlp
+.newlin LDA     #&0A
+        JSR     OSWRCH
+        BIT     &FF
+        BPL     linlp
+.gotesc LDA     #&7E
+        JSR     OSWRCH
+.eof    LDA     #&00
+        JMP     OSFIND
+}
+
+.type
+{
+        JSR     F2toXY
+        LDA     #&40
+        JSR     OSFIND
+        TAY
+        BNE     found
+        JMP     FileCmdNf
+.found  BIT     &FF
+        BMI     gotesc
+.getlp  JSR     OSBGET
+        BCS     eof
+        JSR     OSWRCH
+        CMP     #&0D
+        BNE     getlp
+        LDA     #&0A
+        JSR     OSWRCH
+        BIT     &FF
+        BPL     getlp
 .gotesc LDA     #&7E
         JSR     OSWRCH
 .eof    LDA     #&00
