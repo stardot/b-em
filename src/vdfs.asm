@@ -65,7 +65,6 @@ CMP #&04:BNE P%+5:JMP ServCommand  :\ *command
 CMP #&08:BNE P%+5:JMP ServOsword   :\ OSWORD
 CMP #&09:BNE P%+5:JMP ServHelp     :\ *DELETEHIMEM
 CMP #&0F:BNE P%+5:JMP ServVectors  :\ Vectors have changed
-CMP #&10:BNE P%+5:JMP ServShut     :\ Shut Spool/Exec
 CMP #&12:BNE P%+5:JMP ServFSSelect :\ Select a filing system
 CMP #&25:BNE P%+5:JMP ServFSInfo   :\ Request FS info
 CMP #&26:BNE P%+5:JMP ServShut     :\ Shut all channels
@@ -708,8 +707,9 @@ JSR OSNEWL:LDA #0:RTS
 \ --------------------------
 .ServVectors
 LDA #0:\STA FSFlag          :\ Clear FSflag, and exit
-.ServShut                   :\ Doesn't do anything
 JMP ServExit
+.ServShut                   :\ Close all open files
+LDA #&11:STA PORT_CMD:JMP ServExit
 .ServFSSelect
 CPY #vdfsno:BEQ FSSelect    :\ VDFS
 BIT ClaimFS:BPL FSSelectNone:\ If not claimed, don't check for DFS or ADFS
