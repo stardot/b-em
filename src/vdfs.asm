@@ -11,15 +11,17 @@
 ;            in ROM.
 :
 
-vdfsno  =   &11
-oswpb   =   &70
+vdfsno      =   &11
+oswpb       =   &70
 
-        ORG     &A8
-.romtab equw    &0000
-.romid  equb    &00
-.copywr equb    &00
-.dmpadd equw    &0000
-.dmpcnt equb    &00
+romtab      =   &A8
+romid       =   &AA
+copywr      =   &AB
+
+dmpadd      =   &A8
+dmpcnt      =   &AA
+
+lineno      =   &A8
         
 ClaimFS     =   &FC5C       :\ *FSCLAIM ON|OFF flag
 FSFlag      =   &FC5D       :\ FS id when claimed
@@ -483,8 +485,7 @@ RTS
         JSR     hexnyb
         PLA
         AND     #&0f
-.hexnyb CLC
-        ADC     #'0'
+.hexnyb ORA     #'0'
         CMP     #'9'+1
         BCC     ddig
         ADC     #&06
@@ -558,6 +559,27 @@ RTS
         JMP     OSFIND
 }
 
+.bcdbyt PHA
+        PHP
+        LSR     A
+        LSR     A
+        LSR     A
+        LSR     A
+        PLP
+        JSR     bcdnyb
+        PLA
+.bcdnyb AND     #&0f
+        BNE     bcddig
+        BCC     bcddig
+        LDA     #' '
+        JSR     OSWRCH
+        SEC
+        RTS
+.bcddig ORA     #'0'
+        JSR     OSWRCH
+        CLC
+        RTS
+
 .list
 {
         JSR     F2toXY
@@ -567,8 +589,8 @@ RTS
         BNE     found
         JMP     FileCmdNf
 .found  LDA     #&00
-        STA     dmpadd
-        STA     dmpadd+1
+        STA     lineno
+        STA     lineno+1
         BIT     &FF
         BMI     gotesc
 .linlp  JSR     OSBGET
@@ -577,15 +599,25 @@ RTS
         SED
         SEC
         LDA     #&00
-        ADC     dmpadd
-        STA     dmpadd
+        ADC     lineno
+        STA     lineno
         LDA     #&00
-        ADC     dmpadd+1
-        STA     dmpadd+1
+        ADC     lineno+1
+        STA     lineno+1
         CLD
-        JSR     hexbyt
-        LDA     dmpadd
-        JSR     hexbyt
+        SEC
+        JSR     bcdbyt
+        LDA     lineno
+        PHP
+        LSR     A
+        LSR     A
+        LSR     A
+        LSR     A
+        PLP
+        JSR     bcdnyb
+        LDA     lineno
+        CLC
+        JSR     bcdnyb        
         LDA     #' '
         JSR     OSWRCH
         TXA
