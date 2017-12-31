@@ -21,7 +21,9 @@ copywr      =   &AB
 dmpadd      =   &A8
 dmpcnt      =   &AA
 
-lineno      =   &A8
+ltflag      =   &A8
+ltpchr      =   &A9
+lineno      =   &AA
         
 ClaimFS     =   &FC5C       :\ *FSCLAIM ON|OFF flag
 FSFlag      =   &FC5D       :\ FS id when claimed
@@ -152,6 +154,7 @@ EQUS "DESKTOP":EQUB 13:EQUW quit
 EQUS "DUMP"   :EQUB 13:EQUW dump
 EQUS "LIST"   :EQUB 13:EQUW list
 EQUS "PAGE"   :EQUB 13:EQUW page
+EQUS "PRINT"  :EQUB 13:EQUW print
 EQUS "SHADOW" :EQUB 13:EQUW shadow
 EQUS "TYPE"   :EQUB 13:EQUW type
 EQUS "INSERT" :EQUB 13:EQUW insert
@@ -236,6 +239,7 @@ EQUS "  QUIT or DESKTOP : terminate emulator":EQUB 13
 EQUS "  DUMP : dump a file in hex and ASCII":EQUB 13
 EQUS "  LIST : list a file with line numbers":EQUB 13
 EQUS "  PAGE : force PAGE location":EQUB 13
+EQUS "  PRINT : display a file verbatim":EQUB 13
 EQUS "  SHADOW : dummy command":EQUB 13
 EQUS "  TYPE : display a file on screen":EQUB 13
 EQUB 13
@@ -617,22 +621,24 @@ RTS
         JMP     OSWRCH
 }
 
-.list
+.list   LDA     #&00
+        STA     lineno
+        STA     lineno+1
+        STA     lineno+2
+        BEQ     lstype
+
+.type   LDA     #&80
+
+.lstype
 {
+        STA     ltflag
         JSR     F2toXY
         LDA     #&40
         JSR     OSFIND
         TAY
         BNE     found
         JMP     FileCmdNf
-.found  LDA     #&00
-        STA     lineno
-        STA     lineno+1
-        BIT     &FF
-        BMI     gotesc
-.linlp  JSR     OSBGET
-        BCS     eof
-        TAX
+.pline  TAX
         SED
         SEC
         LDA     #&00
@@ -658,23 +664,46 @@ RTS
         LDA     #' '
         JSR     OSWRCH
         TXA
-        CMP     #&0D
+.chrlp  CMP     #&0D
         BEQ     newlin
-.chrlp  JSR     outesc
+        CMP     #&0A
+        BEQ     newlin
+        STA     ltpchr
+        JSR     outesc
+.rdchr  JSR     OSBGET
+        BCC     chrlp
+.eof    JSR     OSNEWL
+        LDA     #&00
+        JMP     OSFIND
+.newlin CMP     ltpchr
+        BEQ     blalin
+        PHA
+        LDA     ltpchr
+        CMP     #&0D
+        BEQ     nl2nd
+        CMP     #&0A
+        BEQ     nl2nd
+        PLA
+        STA     ltpchr
+.blalin JSR     OSNEWL
+.found  BIT     &FF
+        BMI     gotesc
         JSR     OSBGET
         BCS     eof
-        CMP     #&0D
-        BNE     chrlp
-.newlin JSR     OSNEWL
-        BIT     &FF
-        BPL     linlp
+        BIT     ltflag
+        BMI     chrlp
+        BPL     pline
+.nl2nd  LDA     #&00
+        STA     ltpchr
+        PLA
+        JMP     rdchr
 .gotesc LDA     #&7E
-        JSR     OSWRCH
-.eof    LDA     #&00
+        JSR     OSBYTE
+        LDA     #&00
         JMP     OSFIND
 }
 
-.type
+.print
 {
         JSR     F2toXY
         LDA     #&40
@@ -682,14 +711,11 @@ RTS
         TAY
         BNE     found
         JMP     FileCmdNf
-.chrlp  JSR     outesc
-.linlp  JSR     OSBGET
+.chrlp  JSR     OSWRCH
+        JSR     OSBGET
         BCS     eof
-        CMP     #&0D
-        BNE     chrlp
-        JSR     OSNEWL
 .found  BIT     &FF
-        BPL     linlp
+        BPL     chrlp
 .gotesc LDA     #&7E
         JSR     OSWRCH
 .eof    LDA     #&00
