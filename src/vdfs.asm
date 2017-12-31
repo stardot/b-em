@@ -585,6 +585,38 @@ RTS
         CLC
         RTS
 
+.outesc
+{
+        TAX
+        BMI     high
+.high2  CMP     #' '
+        BCC     low
+        INX
+        BMI     del
+        CMP     #'|'
+        BNE     notbar
+        JSR     OSWRCH
+.notbar JMP     OSWRCH
+.high   LDA     #'|'
+        JSR     OSWRCH
+        LDA     #'!'
+        JSR     OSWRCH
+        TXA
+        AND     #&7f
+        TAX
+        JMP     high2
+.low    ORA     #&40
+        TAX
+        LDA     #'|'
+        JSR     OSWRCH
+        TXA
+        JMP     OSWRCH
+.del    LDA     #'|'
+        JSR     OSWRCH
+        LDA     #'?'
+        JMP     OSWRCH
+}
+
 .list
 {
         JSR     F2toXY
@@ -626,16 +658,14 @@ RTS
         LDA     #' '
         JSR     OSWRCH
         TXA
-        JSR     OSWRCH
         CMP     #&0D
         BEQ     newlin
-.chrlp  JSR     OSBGET
+.chrlp  JSR     outesc
+        JSR     OSBGET
         BCS     eof
-        JSR     OSWRCH
         CMP     #&0D
         BNE     chrlp
-.newlin LDA     #&0A
-        JSR     OSWRCH
+.newlin JSR     OSNEWL
         BIT     &FF
         BPL     linlp
 .gotesc LDA     #&7E
@@ -652,17 +682,14 @@ RTS
         TAY
         BNE     found
         JMP     FileCmdNf
-.found  BIT     &FF
-        BMI     gotesc
-.getlp  JSR     OSBGET
+.chrlp  JSR     outesc
+.linlp  JSR     OSBGET
         BCS     eof
-        JSR     OSWRCH
         CMP     #&0D
-        BNE     getlp
-        LDA     #&0A
-        JSR     OSWRCH
-        BIT     &FF
-        BPL     getlp
+        BNE     chrlp
+        JSR     OSNEWL
+.found  BIT     &FF
+        BPL     linlp
 .gotesc LDA     #&7E
         JSR     OSWRCH
 .eof    LDA     #&00
