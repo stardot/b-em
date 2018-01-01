@@ -151,10 +151,11 @@ static inline void midi_jack_send_msg(midi_dev_t *midi, uint8_t *buffer, size_t 
 }
 
 #else
-#define midi_jack_init()
-#define midi_jack_close()
-#define midi_jack_load_config()
-#define midi_jack_save_config()
+static inline void midi_jack_init(void) {}
+static inline void midi_jack_close(void) {}
+static inline void midi_jack_load_config(void) {}
+static inline void midi_jack_save_config(void) {}
+static inline void midi_jack_send_msg(midi_dev_t *midi, uint8_t *buffer, size_t size) {}
 #endif
 
 #ifdef HAVE_ALSA_ASOUNDLIB_H
@@ -473,11 +474,12 @@ static inline void midi_alsa_raw_send_msg(midi_dev_t *midi, uint8_t *buffer, siz
 }
 
 #else
-#define midi_alsa_seq_init()
-#define midi_alsa_raw_init()
-#define midi_alsa_load_config()
-#define midi_alsa_save_config()
-#define midi_alsa_send_msg()
+static inline void midi_alsa_seq_init(void) {}
+static inline void midi_alsa_raw_init(void) {}
+static inline void midi_alsa_load_config(void) {}
+static inline void midi_alsa_save_config(void) {}
+static void midi_alsa_seq_send_msg(midi_dev_t *midi, uint8_t *buffer, size_t size) {}
+static inline void midi_alsa_raw_send_msg(midi_dev_t *midi, uint8_t *buffer, size_t size) {}
 #endif
 
 void midi_init(void) {
