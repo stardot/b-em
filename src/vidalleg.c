@@ -52,7 +52,7 @@ void video_close()
 
 void video_enterfullscreen()
 {
-	int alt = 0, value;
+	int alt = 0, value, c;
 	int gfx = GFX_AUTODETECT_FULLSCREEN;
     double aspect;
 
@@ -100,6 +100,7 @@ void video_enterfullscreen()
 	}
     log_debug("video: got x=%d, y=%d", SCREEN_W, SCREEN_H);
 
+    c = makecol(0, 0, 0);
     aspect = (double)desktop_width / (double)desktop_height;
     if (aspect > (4.0 / 3.0)) {
         value = 800 * desktop_height / 600;
@@ -107,13 +108,21 @@ void video_enterfullscreen()
         scr_y_start = 0;
         scr_x_size = value;
         scr_y_size = desktop_height;
+        // fill the gap between the left screen edge and the BBC image.
+        rectfill(screen, 0, 0, scr_x_start, scr_y_size, c);
+        // fill the gap between the BBC image and the right screen edge.
+        rectfill(screen, scr_x_start + value, 0, desktop_width, desktop_height, c);
     }
     else {
         value = 600 * desktop_width / 800;
         scr_x_start = 0;
         scr_y_start = (desktop_height - value) / 2;
         scr_x_size = desktop_width;
-        scr_y_size = 600;
+        scr_y_size = value;
+        // fill the gap between the top of the screen and the BBC image.
+        rectfill(screen, 0, 0, scr_x_size, scr_y_start, c);
+        // fill the gap between the BBC image and the bottom of the screen.
+        rectfill(screen, 0, scr_y_start + value, desktop_width, desktop_height, c);        
     }
 
 #ifdef WIN32
@@ -131,13 +140,15 @@ void video_leavefullscreen()
 #ifdef WIN32
     set_gfx_mode(GFX_AUTODETECT_WINDOWED, 2048, 2048, 0, 0);
     vb=create_video_bitmap(924, 614);
+    scr_x_size = 640;
+    scr_y_size = 480;
 #else
     set_gfx_mode(GFX_AUTODETECT_WINDOWED, 640, 480, 0, 0);
+    scr_x_size = SCREEN_W;
+    scr_y_size = SCREEN_H;
 #endif
     scr_x_start = 0;
     scr_y_start = 0;
-    scr_x_size = SCREEN_W;
-    scr_y_size = SCREEN_H;
     set_color_depth(32);
     updatewindowsize(640, 480);
 }
@@ -269,6 +280,27 @@ void video_doblit()
 #endif
             }
         }
+#ifdef WIN32
+        // One would expect that drawing black rectangles into the
+        // space that is not having the BBC screen blitted into it
+        // could be done once when full screen mode is entered but
+        // on Windows this does not seem to work so for Windows only
+        // we do it here.  For Linux there is no need to do it all
+        // as the space defaults to black anyway.
+
+        if (scr_x_start > 0) {
+            // fill the gap between the left screen edge and the BBC image.
+            rectfill(screen, 0, 0, scr_x_start, scr_y_size, c);
+            // fill the gap between the BBC image and the right screen edge.
+            rectfill(screen, scr_x_start + scr_x_size, 0, desktop_width, desktop_height, c);
+        }
+        else if (scr_y_start > 0) {
+            // fill the gap between the top of the screen and the BBC image.
+            rectfill(screen, 0, 0, scr_x_size, scr_y_start, c);
+            // fill the gap between the BBC image and the bottom of the screen.
+            rectfill(screen, 0, scr_y_start + scr_y_size, desktop_width, desktop_height, c);
+        }
+#endif
     }
     firstx = firsty = 65535;
     lastx  = lasty  = 0;
