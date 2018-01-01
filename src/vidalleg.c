@@ -50,79 +50,84 @@ void video_close()
 #endif
 }
 
+static int gfx_full_screen(void) {
+    int res, alt = 0;
+    const int gfx = GFX_AUTODETECT_FULLSCREEN;
+
+    set_color_depth(dcol);
+    if ((res = set_gfx_mode(gfx, desktop_width, desktop_height, 0, 0))) {
+        /*
+        * Setting full-screen mode failed with the desktop colour
+        * depth.  Under Unix, the colour depth available for
+        * full-screen will vary and is not necessarily the same as the
+        * current desktop so we need to select an alternative.  8bpp
+        * doesn't have an alternative, but other colour depths do,
+        * so we should use those.
+        */
+        
+        switch (dcol) {
+            case 8:
+                return 1; // return failure with no alternate coloir depth.
+            case 15:
+                alt = 16;
+                break;
+            case 16:
+                alt = 15;
+                break;
+            case 24:
+                alt = 32;
+                break;
+            case 32:
+                alt = 24;
+                break;
+            default:
+                alt = 16;
+                break;
+        }
+        set_color_depth(alt);
+        res = set_gfx_mode(gfx, desktop_width, desktop_height, 0, 0);
+    }
+    return res;
+}
+
 void video_enterfullscreen()
 {
-	int alt = 0, value, c;
-	int gfx = GFX_AUTODETECT_FULLSCREEN;
+	int value, c;
     double aspect;
 
 #ifdef WIN32
     destroy_bitmap(vb);
 #endif
-    set_color_depth(dcol);
 
-	/*
-	 * Try and set fullscreen mode here.  Under Unix, the colour depth
-	 * will vary, and it's likely the reason why fullscreen failed is that
-	 * we need to select an alternative.  8bpp doesn't have an
-	 * alternative, but other colour depths do, so we should use those.
-	 */
-    if (set_gfx_mode(gfx, desktop_width, desktop_height, 0, 0) != 0) {
-		switch (dcol) {
-		case 8:
-			alt = 0;
-			break;
-		case 15:
-			alt = 16;
-			break;
-		case 16:
-			alt = 15;
-			break;
-		case 24:
-			alt = 32;
-			break;
-		case 32:
-			alt = 24;
-			break;
-		default:
-			alt = 16;
-			break;
-		}
-
-		if (alt != 0) {
-			/* Try to set the alt colour depth and gfx mode. */
-			set_color_depth(alt);
-			if (set_gfx_mode(gfx, desktop_width, desktop_height, 0, 0) != 0) {
-				log_error("Couldn't set GFX mode fullscreen");
-				exit (-1);
-			}
-		}
-	}
-    log_debug("video: got x=%d, y=%d", SCREEN_W, SCREEN_H);
-
-    c = makecol(0, 0, 0);
-    aspect = (double)desktop_width / (double)desktop_height;
-    if (aspect > (4.0 / 3.0)) {
-        value = 800 * desktop_height / 600;
-        scr_x_start = (desktop_width - value) / 2;
-        scr_y_start = 0;
-        scr_x_size = value;
-        scr_y_size = desktop_height;
-        // fill the gap between the left screen edge and the BBC image.
-        rectfill(screen, 0, 0, scr_x_start, scr_y_size, c);
-        // fill the gap between the BBC image and the right screen edge.
-        rectfill(screen, scr_x_start + value, 0, desktop_width, desktop_height, c);
+    if (gfx_full_screen()) {
+        log_error("vidalleg: could not set graphics mode to full-screen");
+        fullscreen = 0;
     }
     else {
-        value = 600 * desktop_width / 800;
-        scr_x_start = 0;
-        scr_y_start = (desktop_height - value) / 2;
-        scr_x_size = desktop_width;
-        scr_y_size = value;
-        // fill the gap between the top of the screen and the BBC image.
-        rectfill(screen, 0, 0, scr_x_size, scr_y_start, c);
-        // fill the gap between the BBC image and the bottom of the screen.
-        rectfill(screen, 0, scr_y_start + value, desktop_width, desktop_height, c);        
+        c = makecol(0, 0, 0);
+        aspect = (double)desktop_width / (double)desktop_height;
+        if (aspect > (4.0 / 3.0)) {
+            value = 800 * desktop_height / 600;
+            scr_x_start = (desktop_width - value) / 2;
+            scr_y_start = 0;
+            scr_x_size = value;
+            scr_y_size = desktop_height;
+            // fill the gap between the left screen edge and the BBC image.
+            rectfill(screen, 0, 0, scr_x_start, scr_y_size, c);
+            // fill the gap between the BBC image and the right screen edge.
+            rectfill(screen, scr_x_start + value, 0, desktop_width, desktop_height, c);
+        }
+        else {
+            value = 600 * desktop_width / 800;
+            scr_x_start = 0;
+            scr_y_start = (desktop_height - value) / 2;
+            scr_x_size = desktop_width;
+            scr_y_size = value;
+            // fill the gap between the top of the screen and the BBC image.
+            rectfill(screen, 0, 0, scr_x_size, scr_y_start, c);
+            // fill the gap between the BBC image and the bottom of the screen.
+            rectfill(screen, 0, scr_y_start + value, desktop_width, desktop_height, c);        
+        }
     }
 
 #ifdef WIN32
