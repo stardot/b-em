@@ -328,9 +328,8 @@ void videoula_loadstate(FILE *f)
                 int r = getc(f);
                 int g = getc(f);
                 int b = getc(f);
-                //int a = getc(f);
-                //nula_collook[c] = makecol(r, g, b, a);
-                nula_collook[c] = makecol(r, g, b);
+                int a = getc(f);
+                nula_collook[c] = makeacol32(r, g, b, a);
         }
         nula_pal_write_flag=getc(f);
         nula_pal_first_byte = getc(f);
