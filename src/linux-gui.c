@@ -29,6 +29,9 @@
 #include "video.h"
 #include "video_render.h"
 
+#if defined(HAVE_JACK_JACK_H) || defined(HAVE_ALSA_ASOUNDLIB_H)
+#define HAVE_MIDI
+#endif
 
 #undef printf
 
@@ -65,17 +68,21 @@ MENU ddtypemenu[3];
 MENU ddvolmenu[4];
 MENU soundmenu[12];
 MENU keymenu[3];
+#ifdef HAVE_MIDI
 static MENU m4000menu[4];
 static MENU m2000out1menu[4];
 static MENU m2000out2menu[4];
 static MENU m2000out3menu[4];
 static MENU midimenu[5];
+#endif
 MENU mousemenu[2];
 MENU hdiskmenu[4];
 MENU settingsmenu[9];
 MENU miscmenu[6];
 MENU speedmenu[11];
 MENU mainmenu[6];
+
+#ifdef HAVE_MIDI
 
 static void gui_m4000_update(void) {
     int i = 0;
@@ -121,6 +128,8 @@ static void gui_m2000_out3_update(void) {
 #endif
 }
 
+#endif
+
 void gui_update()
 {
         int x;
@@ -162,10 +171,12 @@ void gui_update()
         ddtypemenu[0].flags = (!ddnoise_type) ? D_SELECTED : 0;
         ddtypemenu[1].flags = (ddnoise_type)  ? D_SELECTED : 0;
         for (x = 0; x < 3; x++)  ddvolmenu[x].flags = (ddnoise_vol == (intptr_t)ddvolmenu[x].dp) ? D_SELECTED : 0;
+#ifdef HAVE_MIDI
         gui_m4000_update();
         gui_m2000_out1_update();
         gui_m2000_out2_update();
         gui_m2000_out3_update();
+#endif
         keymenu[1].flags = (keyas) ? D_SELECTED : 0;
         mousemenu[0].flags = (mouse_amx) ? D_SELECTED : 0;
         for (x = 0; x < 10; x++) speedmenu[x].flags = (emuspeed == (intptr_t)speedmenu[x].dp) ? D_SELECTED : 0;
@@ -775,6 +786,8 @@ MENU soundmenu[12]=
         {NULL, NULL, NULL, 0, NULL}
 };
 
+#ifdef HAVE_MIDI
+
 #ifdef HAVE_JACK_JACK_H
 
 static int gui_m4000_jack(void) {
@@ -912,6 +925,9 @@ static MENU midimenu[5]=
     {NULL, NULL, NULL, 0, NULL}
 };
 
+#endif
+
+
 int gui_mapas()
 {
         keyas = !keyas;
@@ -946,7 +962,9 @@ MENU settingsmenu[9]=
         {"&Second processor", NULL, tubemenu,  0, NULL},
         {"&Video",            NULL, videomenu, 0, NULL},
         {"&Sound",            NULL, soundmenu, 0, NULL},
+#ifdef HAVE_MIDI
         {"M&idi",             NULL, midimenu,  0, NULL},
+#endif
         {"&Keyboard",         NULL, keymenu,   0, NULL},
         {"&Mouse",            NULL, mousemenu, 0, NULL},
         {NULL, NULL, NULL, 0, NULL}
