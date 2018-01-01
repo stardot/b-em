@@ -668,16 +668,13 @@ void video_init()
         set_color_depth(dcol);
 #ifdef WIN32
         set_gfx_mode(GFX_AUTODETECT_WINDOWED, 2048, 2048, 0, 0);
+        vb = create_video_bitmap(924, 614);
 #else
-        video_update_borders();
-        log_debug("video: initial graphics mode, x=%d, y=%d", SCREEN_W, SCREEN_H);
+        set_gfx_mode(GFX_AUTODETECT_WINDOWED, 640, 480, 0, 0);
         scr_x_start = 0;
         scr_y_start = 0;
         scr_x_size = SCREEN_W;
         scr_y_size = SCREEN_H;
-#endif
-#ifdef WIN32
-        vb = create_video_bitmap(924, 614);
 #endif
         b16x = create_bitmap(832, 614);
         b16  = create_bitmap(832, 614);

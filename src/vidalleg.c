@@ -114,7 +114,7 @@ void video_enterfullscreen()
         scr_y_start = (desktop_height - value) / 2;
         scr_x_size = desktop_width;
         scr_y_size = 600;
-	}
+    }
 
 #ifdef WIN32
     vb=create_video_bitmap(924, 614);
@@ -185,7 +185,7 @@ void video_doblit()
         }
         else if (vid_fullborders == 1) {
             firstx = 320;
-            lastx  = 992;
+            lastx  = 1024;
             firsty = 24;
             lasty  = 296;
         }
