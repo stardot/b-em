@@ -23,6 +23,8 @@ static BITMAP *scrshotb, *scrshotb2;
 
 int vid_clear = 0;
 
+int scr_x_start, scr_x_size, scr_y_start, scr_y_size;
+
 void video_clearscreen()
 {
     set_color_depth(dcol);
@@ -50,8 +52,9 @@ void video_close()
 
 void video_enterfullscreen()
 {
-	int alt = 0;
+	int alt = 0, value;
 	int gfx = GFX_AUTODETECT_FULLSCREEN;
+    double aspect;
 
 #ifdef WIN32
     destroy_bitmap(vb);
@@ -64,7 +67,7 @@ void video_enterfullscreen()
 	 * we need to select an alternative.  8bpp doesn't have an
 	 * alternative, but other colour depths do, so we should use those.
 	 */
-        if (set_gfx_mode(gfx, 800, 600, 0, 0) != 0) {
+    if (set_gfx_mode(gfx, desktop_width, desktop_height, 0, 0) != 0) {
 		switch (dcol) {
 		case 8:
 			alt = 0;
@@ -89,11 +92,28 @@ void video_enterfullscreen()
 		if (alt != 0) {
 			/* Try to set the alt colour depth and gfx mode. */
 			set_color_depth(alt);
-			if (set_gfx_mode(gfx, 800, 600, 0, 0) != 0) {
+			if (set_gfx_mode(gfx, desktop_width, desktop_height, 0, 0) != 0) {
 				log_error("Couldn't set GFX mode fullscreen");
 				exit (-1);
 			}
 		}
+	}
+    log_debug("video: got x=%d, y=%d", SCREEN_W, SCREEN_H);
+
+    aspect = (double)desktop_width / (double)desktop_height;
+    if (aspect > (4.0 / 3.0)) {
+        value = 800 * desktop_height / 600;
+        scr_x_start = (desktop_width - value) / 2;
+        scr_y_start = 0;
+        scr_x_size = value;
+        scr_y_size = desktop_height;
+    }
+    else {
+        value = 600 * desktop_width / 800;
+        scr_x_start = 0;
+        scr_y_start = (desktop_height - value) / 2;
+        scr_x_size = desktop_width;
+        scr_y_size = 600;
 	}
 
 #ifdef WIN32
@@ -114,8 +134,19 @@ void video_leavefullscreen()
 #else
     set_gfx_mode(GFX_AUTODETECT_WINDOWED, 640, 480, 0, 0);
 #endif
+    scr_x_start = 0;
+    scr_y_start = 0;
+    scr_x_size = SCREEN_W;
+    scr_y_size = SCREEN_H;
     set_color_depth(32);
     updatewindowsize(640, 480);
+}
+
+static inline void upscale_only(BITMAP *src, BITMAP *dst, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh) {
+    if (dw > sw || dh > sh)
+        stretch_blit(src, dst, sx, sy, sw, sh, dx, dy, dw, dh);
+    else
+        blit(src, dst, sx, sy, dx, dy, sw, sh);
 }
 
 void video_doblit()
@@ -210,13 +241,9 @@ void video_doblit()
             if (!fullscreen) updatewindowsize((lastx - firstx) + 2, ((lasty - firsty) << 1) + 2);
             fskipcount = 0;
             if (vid_scanlines) {
-#ifdef WIN32
-                for (c = firsty; c < lasty; c++) blit(b, b16x, firstx, c, 0, c << 1, lastx - firstx, 1);
-                blit(b16x, screen, 0, firsty << 1, 0, 0, lastx - firstx, (lasty - firsty) << 1);
-#else
-                blit(b, b16x, firstx, firsty, 0, 0, lastx - firstx, lasty - firsty);
-                for (c = firsty; c < lasty; c++) blit(b16x, screen, 0, c - firsty, 0, (c - firsty) << 1, lastx - firstx, 1);
-#endif
+                for (c = firsty; c < lasty; c++)
+                    blit(b, b16x, firstx, c, 0, c << 1, lastx - firstx, 1);
+                upscale_only(b16x, screen, 0, firsty << 1, lastx - firstx, (lasty - firsty) << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
             }
 #ifdef WIN32
             else if (vid_interlace && vid_pal) {
@@ -231,7 +258,7 @@ void video_doblit()
             }
 #endif
             else if (vid_interlace || vid_linedbl)
-                blit(b, screen, firstx, firsty << 1, 0, 0, lastx - firstx, (lasty - firsty) << 1);
+                upscale_only(b, screen, firstx, firsty << 1, lastx - firstx, (lasty - firsty) << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
             else {
 #ifdef WIN32
                 blit(b, vb, firstx, firsty, 0, 0, lastx - firstx, lasty - firsty);
@@ -241,8 +268,6 @@ void video_doblit()
                 blit(b16x, screen, 0, firsty << 1, 0, 0, lastx - firstx, (lasty - firsty) << 1);
 #endif
             }
-            if (fullscreen)
-                rectfill(screen, 0, 584, 799, 599, 0);
         }
     }
     firstx = firsty = 65535;
