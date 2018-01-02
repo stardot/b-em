@@ -631,7 +631,7 @@ static uint16_t simple_name(char *str, size_t size, uint16_t addr) {
 static uint16_t parse_name(char *str, size_t size, uint16_t addr) {
     char *ptr = str;
     char *end = str + size - 1;
-    int ch, quote;
+    int ch, quote= 0;
 
     log_debug("vdfs: parse_name: addr=%04x\n", addr);
     do
