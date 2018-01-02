@@ -1152,13 +1152,165 @@ static inline void osfind(void) {
     }
 }
 
-static inline void osgbpb(void) {
-    int      status = 0, ch;
-    uint32_t pb = (y << 8) | x;
+static void osgbpb_write(uint32_t pb) {
+    FILE *fp;
+    uint32_t mem_ptr, n;
+
+    if ((fp = getfp(readmem(pb)))) {
+        if (a == 0x01)
+            fseek(fp, readmem32(pb+9), SEEK_SET);
+        mem_ptr = readmem32(pb+1);
+        n = readmem32(pb+5);
+        if (mem_ptr > 0xffff0000 || curtube == -1) {
+            // IO processor
+            while (n--)
+                putc(readmem(mem_ptr++), fp);
+        } else {
+            while (n--)
+                putc(tube_readmem(mem_ptr++), fp);
+        }
+        writemem32(pb+1, mem_ptr);
+        writemem32(pb+5, 0);
+        writemem32(pb+9, ftell(fp));
+    }
+}
+
+static int osgbpb_read(uint32_t pb) {
+    FILE *fp;
+    uint32_t mem_ptr, n;
+    int status = 0, ch;
+
+    if ((fp = getfp(readmem(pb)))) {
+        if (a == 0x03)
+            fseek(fp, readmem32(pb+9), SEEK_SET);
+        mem_ptr = readmem32(pb+1);
+        n = readmem32(pb+5);
+        if (mem_ptr > 0xffff0000 || curtube == -1) {
+            // IO processor
+            while (n--) {
+                if ((ch = getc(fp)) == EOF) {
+                    status = 1;
+                    break;
+                }
+                writemem(mem_ptr++, ch);
+            }
+        } else {
+            while (n--) {
+                if ((ch = getc(fp)) == EOF) {
+                    status = 1;
+                    break;
+                }
+                tube_writemem(mem_ptr++, ch);
+            }
+        }
+        writemem32(pb+1, mem_ptr);
+        writemem32(pb+5, n+1);
+        writemem32(pb+9, ftell(fp));
+    }
+    return status;
+}
+
+static void osgbpb_get_title(uint32_t pb) {
+    uint32_t mem_ptr;
+    char *ptr;
+    int ch;
+
+    if (check_valid_dir(cur_dir, "current")) {
+        mem_ptr = pb;
+        writemem(mem_ptr++, strlen(cur_dir->acorn_fn));
+        for (ptr = cur_dir->acorn_fn; (ch = *ptr++); )
+            writemem(mem_ptr++, ch);
+        writemem(mem_ptr++, 0); // no start-up option.
+        writemem(mem_ptr, 0);   // drive is always 0.
+    }
+}
+
+static void osgbpb_get_dir(uint32_t pb, vdfs_ent_t *dir, const char *which) {
+    uint32_t mem_ptr;
+    char *ptr;
+    int ch;
+
+    if (check_valid_dir(dir, which)) {
+        mem_ptr = pb;
+        writemem(mem_ptr++, 1);   // length of drive number.
+        writemem(mem_ptr++, '0'); // drive number.
+        writemem(mem_ptr++, strlen(dir->acorn_fn));
+        for (ptr = dir->acorn_fn; (ch = *ptr++); )
+            writemem(mem_ptr++, ch);
+    }
+}
+
+static int osgbpb_list_acorn(uint32_t pb) {
     uint32_t seq_ptr, mem_ptr, n;
     vdfs_ent_t *cat_ptr;
+    int status, ch;
     char *ptr;
-    FILE *fp;
+
+    if (check_valid_dir(cur_dir, "current")) {
+        seq_ptr = readmem32(pb+9);
+        if (seq_ptr == 0) {
+            if ((status = gen_cat_tab(cur_dir))) {
+                adfs_error(err_notfound);
+                return status;
+            }
+        }
+        if (seq_ptr < cur_dir->cat_size) {
+            mem_ptr = readmem32(pb+1);
+            n = readmem32(pb+5);
+            log_debug("vdfs: seq_ptr=%d, writing max %d entries starting %04X\n", seq_ptr, n, mem_ptr);
+            do {
+                cat_ptr = cur_dir->cat_tab[seq_ptr++];
+                log_debug("vdfs: writing acorn name %s\n", cat_ptr->acorn_fn);
+                writemem(mem_ptr++, strlen(cat_ptr->acorn_fn));
+                for (ptr = cat_ptr->acorn_fn; (ch = *ptr++); )
+                    writemem(mem_ptr++, ch);
+            } while (--n > 0 && seq_ptr < cur_dir->cat_size);
+            log_debug("vdfs: finish at %04X\n", mem_ptr);
+            writemem32(pb+5, n);
+            writemem32(pb+9, seq_ptr);
+        }
+    }
+    return 0;
+}
+
+static int osgbpb_list_vdfs(uint32_t pb) {
+    uint32_t seq_ptr, mem_ptr, n;
+    vdfs_ent_t *cat_ptr;
+    int status, ch;
+    char *ptr;
+
+    if (check_valid_dir(cat_dir, "catalogue")) {
+        n = readmem(pb);
+        seq_ptr = readmem32(pb+9);
+        if (seq_ptr == 0) {
+            if ((status = gen_cat_tab(cat_dir))) {
+                adfs_error(err_notfound);
+                return status;
+            }
+        }
+        if (seq_ptr < cat_dir->cat_size) {
+            mem_ptr = readmem32(pb+1);
+            log_debug("vdfs: seq_ptr=%d, writing max %d entries starting %04X\n", seq_ptr, n, mem_ptr);
+            do {
+                cat_ptr = cat_dir->cat_tab[seq_ptr++];
+                log_debug("vdfs: writing acorn name %s\n", cat_ptr->acorn_fn);
+                for (ptr = cat_ptr->acorn_fn; (ch = *ptr++); )
+                    writemem(mem_ptr++, ch);
+                writemem(mem_ptr++, '\r');
+            } while (--n > 0 && seq_ptr < cat_dir->cat_size);
+            log_debug("vdfs: finish at %04X\n", mem_ptr);
+            writemem32(pb+9, seq_ptr);
+        } else {
+            status = 1; // no more filenames;
+            writemem(pb, 0);// VDFS ROM quirk.
+        }
+    }
+    return 0;
+}
+
+static inline void osgbpb(void) {
+    int status = 0;
+    uint32_t pb = (y << 8) | x;
 
     log_debug("vdfs: osgbpb(A=%02X, X=%02X, Y=%02X)", a, x, y);
 
@@ -1166,144 +1318,34 @@ static inline void osgbpb(void) {
     {
         case 0x01: // write multiple bytes to file.
         case 0x02:
-            if ((fp = getfp(readmem(pb)))) {
-                if (a == 0x01)
-                    fseek(fp, readmem32(pb+9), SEEK_SET);
-                mem_ptr = readmem32(pb+1);
-                n = readmem32(pb+5);
-                if (mem_ptr > 0xffff0000 || curtube == -1) {
-                    // IO processor
-                    while (n--)
-                        putc(readmem(mem_ptr++), fp);
-                } else {
-                    while (n--)
-                        putc(tube_readmem(mem_ptr++), fp);
-                }
-                writemem32(pb+1, mem_ptr);
-                writemem32(pb+5, 0);
-                writemem32(pb+9, ftell(fp));
-            }
+            osgbpb_write(pb);
             break;
 
         case 0x03: // read multiple bytes from file.
         case 0x04:
-            if ((fp = getfp(readmem(pb)))) {
-                if (a == 0x03)
-                    fseek(fp, readmem32(pb+9), SEEK_SET);
-                mem_ptr = readmem32(pb+1);
-                n = readmem32(pb+5);
-                if (mem_ptr > 0xffff0000 || curtube == -1) {
-                    // IO processor
-                    while (n--) {
-                        if ((ch = getc(fp)) == EOF) {
-                            status = 1;
-                            break;
-                        }
-                        writemem(mem_ptr++, ch);
-                    }
-                } else {
-                    while (n--) {
-                        if ((ch = getc(fp)) == EOF) {
-                            status = 1;
-                            break;
-                        }
-                        tube_writemem(mem_ptr++, ch);
-                    }
-                }
-                writemem32(pb+1, mem_ptr);
-                writemem32(pb+5, n+1);
-                writemem32(pb+9, ftell(fp));
-            }
+            status = osgbpb_read(pb);
             break;
 
         case 0x05: // get current dir title etc.
-            if (check_valid_dir(cur_dir, "current")) {
-                mem_ptr = pb;
-                writemem(mem_ptr++, strlen(cur_dir->acorn_fn));
-                for (ptr = cur_dir->acorn_fn; (ch = *ptr++); )
-                    writemem(mem_ptr++, ch);
-                writemem(mem_ptr++, 0); // no start-up option.
-                writemem(mem_ptr, 0);   // drive is always 0.
-            }
+            osgbpb_get_title(pb);
             break;
 
         case 0x06: // get durrent dir
-            if (check_valid_dir(cur_dir, "current")) {
-                mem_ptr = pb;
-                writemem(mem_ptr++, 1);   // length of drive number.
-                writemem(mem_ptr++, '0'); // drive number.
-                writemem(mem_ptr++, strlen(cur_dir->acorn_fn));
-                for (ptr = cur_dir->acorn_fn; (ch = *ptr++); )
-                    writemem(mem_ptr++, ch);
-            }
+            osgbpb_get_dir(pb, cur_dir, "current");
             break;
 
         case 0x07: // get library dir.
-            if (check_valid_dir(lib_dir, "library")) {
-                mem_ptr = pb;
-                writemem(mem_ptr++, 1);   // length of drive number.
-                writemem(mem_ptr++, '0'); // drive number.
-                writemem(mem_ptr++, strlen(lib_dir->acorn_fn));
-                for (ptr = cur_dir->acorn_fn; (ch = *ptr++); )
-                    writemem(mem_ptr++, ch);
-                break;
-            }
+            osgbpb_get_dir(pb, lib_dir, "library");
+            break;
 
         case 0x08: // list files in current directory in Acorn format.
-            if (check_valid_dir(cur_dir, "current")) {
-                seq_ptr = readmem32(pb+9);
-                if (seq_ptr == 0) {
-                    if ((status = gen_cat_tab(cur_dir))) {
-                        adfs_error(err_notfound);
-                        break;
-                    }
-                }
-                if (seq_ptr < cur_dir->cat_size) {
-                    mem_ptr = readmem32(pb+1);
-                    n = readmem32(pb+5);
-                    log_debug("vdfs: seq_ptr=%d, writing max %d entries starting %04X\n", seq_ptr, n, mem_ptr);
-                    do {
-                        cat_ptr = cur_dir->cat_tab[seq_ptr++];
-                        log_debug("vdfs: writing acorn name %s\n", cat_ptr->acorn_fn);
-                        writemem(mem_ptr++, strlen(cat_ptr->acorn_fn));
-                        for (ptr = cat_ptr->acorn_fn; (ch = *ptr++); )
-                            writemem(mem_ptr++, ch);
-                    } while (--n > 0 && seq_ptr < cur_dir->cat_size);
-                    log_debug("vdfs: finish at %04X\n", mem_ptr);
-                    writemem32(pb+5, n);
-                    writemem32(pb+9, seq_ptr);
-                }
-            }
+            status = osgbpb_list_acorn(pb);
             break;
 
         case 0x09: // list files in catalogue directory in VDFS ROM format.
-            if (check_valid_dir(cat_dir, "catalogue")) {
-                n = readmem(pb);
-                seq_ptr = readmem32(pb+9);
-                if (seq_ptr == 0) {
-                    if ((status = gen_cat_tab(cat_dir))) {
-                        adfs_error(err_notfound);
-                        break;
-                    }
-                }
-                if (seq_ptr < cat_dir->cat_size) {
-                    mem_ptr = readmem32(pb+1);
-                    log_debug("vdfs: seq_ptr=%d, writing max %d entries starting %04X\n", seq_ptr, n, mem_ptr);
-                    do {
-                        cat_ptr = cat_dir->cat_tab[seq_ptr++];
-                        log_debug("vdfs: writing acorn name %s\n", cat_ptr->acorn_fn);
-                        for (ptr = cat_ptr->acorn_fn; (ch = *ptr++); )
-                            writemem(mem_ptr++, ch);
-                        writemem(mem_ptr++, '\r');
-                    } while (--n > 0 && seq_ptr < cat_dir->cat_size);
-                    log_debug("vdfs: finish at %04X\n", mem_ptr);
-                    writemem32(pb+9, seq_ptr);
-                } else {
-                    status = 1; // no more filenames;
-                    writemem(pb, 0);// VDFS ROM quirk.
-                }
-            }
+            status = osgbpb_list_vdfs(pb);
             break;
+
         default:
             log_debug("vdfs: osgbpb unimplemented for a=%d", a);
             log_debug("vdfs: osgbpb pb.channel=%d, data=%04X num=%04X, ptr=%04X\n", readmem(pb), readmem32(pb+1), readmem32(pb+6), readmem32(pb+9));
@@ -1485,6 +1527,102 @@ static void osfile_cdir(vdfs_ent_t *ent) {
     }
 }
 
+static void osfile_ent_exists(uint32_t pb, vdfs_ent_t *ent, vdfs_ent_t *key) {
+
+    log_debug("vdfs: osfile found live entry '%s'", ent->acorn_fn);
+
+    switch (a) {
+        case 0x00:  // save file.
+            osfile_save(pb, ent);
+            break;
+
+        case 0x01:  // set all attributes.
+            ent->load_addr = readmem32(pb+0x02);
+            ent->exec_addr = readmem32(pb+0x06);
+            write_back(ent);
+            break;
+
+        case 0x02:  // set load address only.
+            ent->load_addr = readmem32(pb+0x02);
+            write_back(ent);
+            break;
+
+        case 0x03:  // set exec address only.
+            ent->exec_addr = readmem32(pb+0x06);
+            write_back(ent);
+            break;
+
+        case 0x04:  // write attributes.
+            break;
+
+        case 0x05:  // get addresses and attributes.
+            osfile_attribs(ent, pb);
+            a = (ent->attribs & ATTR_IS_DIR) ? 2 : 1;
+            break;
+
+        case 0x06:
+            osfile_delete(ent, pb);
+            break;
+
+        case 0x08:
+            log_debug("vdfs: new dir '%s' for cdir already exists", key->acorn_fn);
+            break;
+
+        case 0xff:  // load file.
+            osfile_load(pb, ent);
+            break;
+
+        default:
+            log_debug("vdfs: osfile unimplemented for a=%d", a);
+    }
+}    
+
+static void osfile_ent_deleted(uint32_t pb, vdfs_ent_t *ent) {
+
+    log_debug("vdfs: osfile found deleted entry '%s'", ent->acorn_fn);
+
+    switch(a) {
+        case 0x00: // save file.
+            osfile_save(pb, ent);
+            break;
+        case 0x05:
+            a = 0; // not found.
+            break;
+        case 0x08:
+            osfile_cdir(ent);
+            break;
+        default:
+            adfs_error(err_notfound);
+    }
+}
+
+static void osfile_ent_none(uint32_t pb, vdfs_ent_t *ent, vdfs_ent_t *key) {
+
+    log_debug("vdfs: osfile: entry not found '%s'", key->acorn_fn);
+ 
+    switch(a) {
+        case 0x00: // save file.
+            if ((ent = add_new_file(cur_dir, key->acorn_fn))) {
+                osfile_save(pb, ent);
+            }
+            break;
+        case 0x05:
+            a = 0; // not found.
+            break;
+        case 0x08:
+            if (key->parent) {
+                if ((ent = add_new_file(key->parent, key->acorn_fn)))
+                    osfile_cdir(ent);
+            } else {
+                log_debug("vdfs: attempt to create dir %s in non-existent directory", key->acorn_fn);
+                adfs_error(err_notfound);
+            }
+            break;
+        default:
+            adfs_error(err_notfound);
+    }
+}
+
 static inline void osfile(void)
 {
     vdfs_ent_t *ent, key;
@@ -1495,92 +1633,12 @@ static inline void osfile(void)
     if (check_valid_dir(cur_dir, "current")) {
         simple_name(path, sizeof path, readmem16(pb));
         if ((ent = find_entry(path, &key, cur_dir))) {
-            if (ent->attribs & ATTR_EXISTS) {
-                log_debug("vdfs: osfile found live entry '%s'", ent->acorn_fn);
-                switch (a) {
-                    case 0x00:  // save file.
-                        osfile_save(pb, ent);
-                        break;
-
-                    case 0x01:  // set all attributes.
-                        ent->load_addr = readmem32(pb+0x02);
-                        ent->exec_addr = readmem32(pb+0x06);
-                        write_back(ent);
-                        break;
-
-                    case 0x02:  // set load address only.
-                        ent->load_addr = readmem32(pb+0x02);
-                        write_back(ent);
-                        break;
-
-                    case 0x03:  // set exec address only.
-                        ent->exec_addr = readmem32(pb+0x06);
-                        write_back(ent);
-                        break;
-
-                    case 0x04:  // write attributes.
-                        break;
-
-                    case 0x05:  // get addresses and attributes.
-                        osfile_attribs(ent, pb);
-                        a = (ent->attribs & ATTR_IS_DIR) ? 2 : 1;
-                        break;
-
-                    case 0x06:
-                        osfile_delete(ent, pb);
-                        break;
-
-                    case 0x08:
-                        log_debug("vdfs: new dir '%s' for cdir already exists", key.acorn_fn);
-                        break;
-
-                    case 0xff:  // load file.
-                        osfile_load(pb, ent);
-                        break;
-
-                    default:
-                        log_debug("vdfs: osfile unimplemented for a=%d", a);
-                }
-            } else {
-                log_debug("vdfs: osfile found deleted entry '%s'", ent->acorn_fn);
-                switch(a) {
-                    case 0x00: // save file.
-                        osfile_save(pb, ent);
-                        break;
-                    case 0x05:
-                        a = 0; // not found.
-                        break;
-                    case 0x08:
-                        osfile_cdir(ent);
-                        break;
-                    default:
-                        adfs_error(err_notfound);
-                }
-            }
-        } else {
-            log_debug("vdfs: osfile: entry not found '%s'", key.acorn_fn);
-            switch(a) {
-                case 0x00: // save file.
-                    if ((ent = add_new_file(cur_dir, key.acorn_fn))) {
-                        osfile_save(pb, ent);
-                    }
-                    break;
-                case 0x05:
-                    a = 0; // not found.
-                    break;
-                case 0x08:
-                    if (key.parent) {
-                        if ((ent = add_new_file(key.parent, key.acorn_fn)))
-                            osfile_cdir(ent);
-                    } else {
-                        log_debug("vdfs: attempt to create dir %s in non-existent directory", key.acorn_fn);
-                        adfs_error(err_notfound);
-                    }
-                    break;
-                default:
-                    adfs_error(err_notfound);
-            }
-        }
+            if (ent->attribs & ATTR_EXISTS)
+                osfile_ent_exists(pb, ent, &key);
+            else
+                osfile_ent_deleted(pb, ent);
+        } else
+            osfile_ent_none(pb, ent, &key);
     }
 }
 
