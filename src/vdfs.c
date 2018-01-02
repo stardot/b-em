@@ -162,7 +162,7 @@ static void writemem32(uint16_t addr, uint32_t value) {
     writemem(addr+3, (value >> 24) & 0xff);
 }
 
-static void flush_all() {
+static void flush_all(void) {
     int channel;
     FILE *fp;
 
@@ -187,7 +187,7 @@ static void free_tree_node(void *ptr) {
     free(ent);
 }
 
-void vdfs_reset() {
+void vdfs_reset(void) {
     flush_all();
 }
 
@@ -740,7 +740,7 @@ static void close_file(int channel) {
     }
 }
 
-static void close_all() {
+static void close_all(void) {
     int channel;
 
     for (channel = 0; channel < NUM_CHANNELS; channel++)
@@ -811,7 +811,7 @@ void vdfs_set_root(const char *root) {
         free(new_root.host_path);
 }
 
-const char *vdfs_get_root() {
+const char *vdfs_get_root(void) {
     return root_dir.host_path;
 }
 
@@ -1027,7 +1027,7 @@ static void rename_tail(vdfs_ent_t *old_ent, vdfs_ent_t *new_ent) {
     }
 }
 
-static void osfsc_rename() {
+static void osfsc_rename(void) {
     vdfs_ent_t *old_ent, old_key, *new_ent, new_key;
     char old_path[MAX_ACORN_PATH], new_path[MAX_ACORN_PATH];
     
@@ -1057,7 +1057,7 @@ static void osfsc_rename() {
     }
 }
 
-static inline void osfsc() {
+static inline void osfsc(void) {
     FILE *fp;
 
     log_debug("vdfs: osfsc(A=%02X, X=%02X, Y=%02X)", a, x, y);
@@ -1085,7 +1085,7 @@ static inline void osfsc() {
     }
 }
 
-static inline void osfind() {
+static inline void osfind(void) {
     int acorn_mode, channel, chan2;
     vdfs_ent_t *ent, key;
     const char *mode;
@@ -1152,7 +1152,7 @@ static inline void osfind() {
     }
 }
 
-static inline void osgbpb() {
+static inline void osgbpb(void) {
     int      status = 0, ch;
     uint32_t pb = (y << 8) | x;
     uint32_t seq_ptr, mem_ptr, n;
@@ -1311,7 +1311,7 @@ static inline void osgbpb() {
     p.c = status;
 }
 
-static inline void osbput() {
+static inline void osbput(void) {
     FILE *fp;
 
     log_debug("vdfs: osbput(A=%02X, X=%02X, Y=%02X)", a, x, y);
@@ -1320,7 +1320,7 @@ static inline void osbput() {
         putc(a, fp);
 }
 
-static inline void osbget() {
+static inline void osbget(void) {
     int ch;
     FILE *fp;
 
@@ -1335,7 +1335,7 @@ static inline void osbget() {
     }
 }
 
-static inline void osargs() {
+static inline void osargs(void) {
     FILE *fp;
     long temp;
 
@@ -1485,7 +1485,7 @@ static void osfile_cdir(vdfs_ent_t *ent) {
     }
 }
 
-static inline void osfile()
+static inline void osfile(void)
 {
     vdfs_ent_t *ent, key;
     uint32_t pb = (y << 8) | x;
@@ -1682,7 +1682,7 @@ static inline void exec_swr_intern(uint8_t flags, uint16_t fname, int8_t romid, 
     }
 }
 
-static inline void exec_swr_fs() {
+static inline void exec_swr_fs(void) {
     uint16_t pb = (y << 8) | x;
     uint8_t flags  = readmem(pb);
     uint16_t fname = readmem16(pb+1);
@@ -1836,7 +1836,7 @@ static void srp_tail(uint16_t addr, uint8_t flag, uint16_t fnaddr, uint16_t star
     }
 }
 
-static inline void cmd_srload() {
+static inline void cmd_srload(void) {
     uint16_t addr, fnadd, start;
 
     if ((addr = srp_fn(&fnadd))) {
@@ -1848,7 +1848,7 @@ static inline void cmd_srload() {
     adfs_error(err_badparms);
 }
 
-static inline void cmd_srsave() {
+static inline void cmd_srsave(void) {
     uint16_t addr, fnadd, start, len;
 
     if ((addr = srp_fn(&fnadd))) {
@@ -1885,15 +1885,15 @@ static void srcopy(uint8_t flags) {
     adfs_error(err_badparms);
 }
 
-static inline void cmd_srread() {
+static inline void cmd_srread(void) {
     srcopy(0);
 }
 
-static inline void cmd_srwrite() {
+static inline void cmd_srwrite(void) {
     srcopy(0x80);
 }
 
-static inline void back() {
+static inline void back(void) {
     vdfs_ent_t *ent;
 
     ent = cur_dir;
@@ -1919,7 +1919,7 @@ static vdfs_ent_t *lookup_dir(void) {
     return NULL;
 }
 
-static inline void cmd_dir() {
+static inline void cmd_dir(void) {
     vdfs_ent_t *ent;
 
     if ((ent = lookup_dir())) {
@@ -1928,14 +1928,14 @@ static inline void cmd_dir() {
     }
 }
 
-static inline void cmd_lib() {
+static inline void cmd_lib(void) {
     vdfs_ent_t *ent;
 
     if ((ent = lookup_dir()))
         lib_dir = ent;
 }
 
-static void cat_prep() {
+static void cat_prep(void) {
     vdfs_ent_t *ent, key;
     char path[MAX_ACORN_PATH];
 
@@ -1955,7 +1955,7 @@ static void cat_prep() {
     }
 }
 
-static inline void cmd_rescan() {
+static inline void cmd_rescan(void) {
     scan_seq++;
 }
 
@@ -1966,7 +1966,7 @@ static inline void check_ram(void) {
             p.c = 1;
 }
 
-static inline void vdfs_check() {
+static inline void vdfs_check(void) {
     a=0;
 }
 
