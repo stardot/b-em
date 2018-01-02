@@ -619,7 +619,7 @@ static uint16_t simple_name(char *str, size_t size, uint16_t addr) {
     log_debug("vdfs: simple_name: addr=%04x\n", addr);
     do {
         ch = readmem(addr++);
-        if (ch == '\r')
+        if (ch == '\r' || ch == ' ')
             break;
         *ptr++ = ch;
     } while (ptr < end);
