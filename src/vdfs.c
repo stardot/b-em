@@ -1550,11 +1550,14 @@ static inline void osfile()
                         osfile_save(pb, ent);
                         a = (ent->attribs & ATTR_IS_DIR) ? 2 : 1;
                         break;
+                    case 0x05:
+                        a = 0; // not found.
+                        break;
                     case 0x08:
                         osfile_cdir(ent);
                         break;
                     default:
-                        a = 0; // not found.
+                        adfs_error(err_notfound);
                 }
             }
         } else {
@@ -1566,17 +1569,20 @@ static inline void osfile()
                         a = 1;
                     }
                     break;
+                case 0x05:
+                    a = 0; // not found.
+                    break;
                 case 0x08:
                     if (key.parent) {
                         if ((ent = add_new_file(key.parent, key.acorn_fn)))
                             osfile_cdir(ent);
                     } else {
                         log_debug("vdfs: attempt to create dir %s in non-existent directory", key.acorn_fn);
-                        a = 0;
+                        adfs_error(err_notfound);
                     }
                     break;
                 default:
-                    a = 0; // not found.
+                    adfs_error(err_notfound);
             }
         }
     }
