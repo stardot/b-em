@@ -672,7 +672,7 @@ static vdfs_ent_t *find_entry(const char *filename, vdfs_ent_t *key, vdfs_ent_t 
         log_debug("vdfs: find_entry: looking for acorn name=%s", key->acorn_fn);
         //if (tail_addr)
         //    *tail_addr = fn_addr;
-        if (key->acorn_fn[0] == '$' && key->acorn_fn[1] == '\0')
+        if ((key->acorn_fn[0] == '$' && key->acorn_fn[1] == '\0') || (key->acorn_fn[0] == ':' && isdigit(key->acorn_fn[1])))
             ent = &root_dir;
         else if (key->acorn_fn[0] == '^' && key->acorn_fn[1] == '\0')
             ent = ent->parent;
