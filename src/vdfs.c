@@ -1380,6 +1380,13 @@ static inline void osargs() {
     }
 }
 
+static void osfile_attribs(vdfs_ent_t *ent, uint32_t pb) {
+    writemem32(pb+0x02, ent->load_addr);
+    writemem32(pb+0x06, ent->exec_addr);
+    writemem32(pb+0x0a, ent->length);
+    writemem32(pb+0x0e, ent->attribs);
+}
+
 static void osfile_save(uint32_t pb, vdfs_ent_t *ent) {
     FILE *fp;
     uint32_t start_addr, end_addr, ptr;
@@ -1400,6 +1407,7 @@ static void osfile_save(uint32_t pb, vdfs_ent_t *ent) {
         ent->length = end_addr-start_addr;
         ent->attribs |= ATTR_EXISTS;
         write_back(ent);
+        osfile_attribs(ent, pb);
     } else
         log_warn("vdfs: unable to create file '%s': %s\n", ent->host_fn, strerror(errno));
 }
@@ -1410,61 +1418,54 @@ static void osfile_load(uint32_t pb, vdfs_ent_t *ent) {
     uint32_t size;
     int ch;
 
-    if (ent) {
-        if (ent->attribs & ATTR_IS_DIR)
-            adfs_error(err_wont);
-        else if ((fp = fopen(ent->host_path, "rb"))) {
-            if (readmem(pb+0x06) == 0)
-                addr = readmem32(pb+0x02);
-            else
-                addr = ent->load_addr;
-            size = 0;
-            if (addr > 0xffff0000 || curtube == -1) {
-                while ((ch = getc(fp)) != EOF) {
-                    writemem(addr++, ch);
-                    size++;
-                }
-            } else {
-                while ((ch = getc(fp)) != EOF) {
-                    tube_writemem(addr++, ch);
-                    size++;
-                }
+    if (ent->attribs & ATTR_IS_DIR)
+        adfs_error(err_wont);
+    else if ((fp = fopen(ent->host_path, "rb"))) {
+        if (readmem(pb+0x06) == 0)
+            addr = readmem32(pb+0x02);
+        else
+            addr = ent->load_addr;
+        size = 0;
+        if (addr > 0xffff0000 || curtube == -1) {
+            while ((ch = getc(fp)) != EOF) {
+                writemem(addr++, ch);
+                size++;
             }
-            fclose(fp);
-            writemem32(pb+0x02, ent->load_addr);
-            writemem32(pb+0x06, ent->exec_addr);
-            writemem32(pb+0x0A, size);
         } else {
-            log_warn("vdfs: unable to load file '%s': %s\n", ent->host_fn, strerror(errno));
-            adfs_hosterr(errno);
+            while ((ch = getc(fp)) != EOF) {
+                tube_writemem(addr++, ch);
+                size++;
+            }
         }
-    } else
-        adfs_error(err_notfound);
+        fclose(fp);
+        osfile_attribs(ent, pb);
+    } else {
+        log_warn("vdfs: unable to load file '%s': %s\n", ent->host_fn, strerror(errno));
+        adfs_hosterr(errno);
+    }
 }
 
-static void osfile_delete(vdfs_ent_t *ent) {
+static void osfile_delete(vdfs_ent_t *ent, uint32_t pb) {
 
-    if (ent) {
-        if (ent->attribs & ATTR_IS_DIR) {
-            if (ent == cur_dir)
-                adfs_error(err_delcsd);
-            else if (ent == lib_dir)
-                adfs_error(err_dellib);
-            else if (rmdir(ent->host_path) == 0) {
-                if (ent == prev_dir)
-                    prev_dir = cur_dir;
-                ent->attribs &= ~ATTR_EXISTS;
-            } else
-                adfs_hosterr(errno);
-        } else {
-            if (unlink(ent->host_path) == 0) {
-                delete_inf(ent);
-                ent->attribs &= ~ATTR_EXISTS;
-            } else
-                adfs_hosterr(errno);
-        }
-    } else
-        a = 0;
+    osfile_attribs(ent, pb);
+    if (ent->attribs & ATTR_IS_DIR) {
+        if (ent == cur_dir)
+            adfs_error(err_delcsd);
+        else if (ent == lib_dir)
+            adfs_error(err_dellib);
+        else if (rmdir(ent->host_path) == 0) {
+            if (ent == prev_dir)
+                prev_dir = cur_dir;
+            ent->attribs &= ~ATTR_EXISTS;
+        } else
+            adfs_hosterr(errno);
+    } else {
+        if (unlink(ent->host_path) == 0) {
+            delete_inf(ent);
+            ent->attribs &= ~ATTR_EXISTS;
+        } else
+            adfs_hosterr(errno);
+    }
 }
 
 static void osfile_cdir(vdfs_ent_t *ent) {
@@ -1521,14 +1522,12 @@ static inline void osfile()
                         break;
 
                     case 0x05:  // get addresses and attributes.
-                        writemem32(pb+0x02, ent->load_addr);
-                        writemem32(pb+0x06, ent->exec_addr);
-                        writemem32(pb+0x0a, ent->length);
-                        writemem32(pb+0x0e, ent->attribs);
+                        osfile_attribs(ent, pb);
+                        a = (ent->attribs & ATTR_IS_DIR) ? 2 : 1;
                         break;
 
                     case 0x06:
-                        osfile_delete(ent);
+                        osfile_delete(ent, pb);
                         break;
 
                     case 0x08:
@@ -1542,13 +1541,11 @@ static inline void osfile()
                     default:
                         log_debug("vdfs: osfile unimplemented for a=%d", a);
                 }
-                a = (ent->attribs & ATTR_IS_DIR) ? 2 : 1;
             } else {
                 log_debug("vdfs: osfile found deleted entry '%s'", ent->acorn_fn);
                 switch(a) {
                     case 0x00: // save file.
                         osfile_save(pb, ent);
-                        a = (ent->attribs & ATTR_IS_DIR) ? 2 : 1;
                         break;
                     case 0x05:
                         a = 0; // not found.
@@ -1566,7 +1563,6 @@ static inline void osfile()
                 case 0x00: // save file.
                     if ((ent = add_new_file(cur_dir, key.acorn_fn))) {
                         osfile_save(pb, ent);
-                        a = 1;
                     }
                     break;
                 case 0x05:
