@@ -87,6 +87,8 @@ fi
 
 # Checks for Linux MIDI implementations.
 AC_CHECK_HEADERS(jack/jack.h alsa/asoundlib.h)
+AC_SEARCH_LIBS(jack_port_register,jack jack2)
+AC_CHECK_LIB(asound,snd_rawmidi_open)
 
 AC_OUTPUT([Makefile src/Makefile])
 
