@@ -1458,7 +1458,7 @@ static void osfile_write(uint32_t pb, vdfs_ent_t *ent, vdfs_ent_t *key, void (*c
         return;
     }
 
-    if (ent->attribs & ATTR_IS_DIR) {
+    if ((ent->attribs & (ATTR_EXISTS|ATTR_IS_DIR)) == (ATTR_EXISTS|ATTR_IS_DIR)) {
         adfs_error(err_direxist);
         return;
     }
@@ -1527,17 +1527,19 @@ static void osfile_delete(uint32_t pb, vdfs_ent_t *ent) {
                 if (ent == prev_dir)
                     prev_dir = cur_dir;
                 ent->attribs &= ~ATTR_EXISTS;
+                a = 2;
             } else
                 adfs_hosterr(errno);
         } else {
             if (unlink(ent->host_path) == 0) {
                 delete_inf(ent);
                 ent->attribs &= ~ATTR_EXISTS;
+                a = 1;
             } else
                 adfs_hosterr(errno);
         }
     } else
-        adfs_error(err_notfound);
+        a = 0;
 }
 
 static void create_dir(vdfs_ent_t *ent) {
@@ -1548,7 +1550,7 @@ static void create_dir(vdfs_ent_t *ent) {
     res = mkdir(ent->host_path, 0777);
 #endif
     if (res == 0) {
-        ent->attribs |= (ATTR_EXISTS|ATTR_IS_DIR);
+        scan_entry(ent);
         a = 2;
     }
     else {
@@ -1586,31 +1588,34 @@ static void osfile_load(uint32_t pb, vdfs_ent_t *ent) {
     uint32_t size;
     int ch;
 
-    if (ent->attribs & ATTR_IS_DIR)
-        adfs_error(err_wont);
-    else if ((fp = fopen(ent->host_path, "rb"))) {
-        if (readmem(pb+0x06) == 0)
-            addr = readmem32(pb+0x02);
-        else
-            addr = ent->load_addr;
-        size = 0;
-        if (addr > 0xffff0000 || curtube == -1) {
-            while ((ch = getc(fp)) != EOF) {
-                writemem(addr++, ch);
-                size++;
+    if (ent && ent->attribs & ATTR_EXISTS) {
+        if (ent->attribs & ATTR_IS_DIR)
+            adfs_error(err_wont);
+        else if ((fp = fopen(ent->host_path, "rb"))) {
+            if (readmem(pb+0x06) == 0)
+                addr = readmem32(pb+0x02);
+            else
+                addr = ent->load_addr;
+            size = 0;
+            if (addr > 0xffff0000 || curtube == -1) {
+                while ((ch = getc(fp)) != EOF) {
+                    writemem(addr++, ch);
+                    size++;
+                }
+            } else {
+                while ((ch = getc(fp)) != EOF) {
+                    tube_writemem(addr++, ch);
+                    size++;
+                }
             }
+            fclose(fp);
+            osfile_attribs(ent, pb);
         } else {
-            while ((ch = getc(fp)) != EOF) {
-                tube_writemem(addr++, ch);
-                size++;
-            }
+            log_warn("vdfs: unable to load file '%s': %s\n", ent->host_fn, strerror(errno));
+            adfs_hosterr(errno);
         }
-        fclose(fp);
-        osfile_attribs(ent, pb);
-    } else {
-        log_warn("vdfs: unable to load file '%s': %s\n", ent->host_fn, strerror(errno));
-        adfs_hosterr(errno);
-    }
+    } else
+        adfs_error(err_notfound);
 }
 
 static void osfile(void) {
