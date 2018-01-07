@@ -624,9 +624,10 @@ static int gen_cat_tab(vdfs_ent_t *dir) {
     vdfs_ent_t **new_tab;
 
     if ((result = scan_dir(dir)) == 0 && dir->cat_size > 0) {
-        if ((new_tab = malloc(dir->cat_size * (sizeof(vdfs_ent_t *))))) {
+        if ((new_tab = malloc((dir->cat_size+1) * (sizeof(vdfs_ent_t *))))) {
             cat_ptr = new_tab;
             twalk(dir->acorn_tree, tree_visit_cat);
+            dir->cat_size = cat_ptr - new_tab;
             if (dir->cat_tab)
                 free(dir->cat_tab);
             dir->cat_tab = new_tab;
@@ -1065,8 +1066,10 @@ static void osfsc_rename(void) {
                         log_debug("vdfs: new file '%s' for rename already exists", new_key.acorn_fn);
                         adfs_error(err_exists);
                     }
-                } else
+                } else {
                     rename_tail(old_ent, new_ent);
+                    new_ent->parent->cat_size++;
+                }
             } else if (new_key.parent && (new_ent = add_new_file(new_key.parent, new_key.acorn_fn)))
                 rename_tail(old_ent, new_ent);
         } else {
@@ -1146,6 +1149,7 @@ static inline void osfind(void) {
                 else if (acorn_mode == 0xc0)
                     mode = "rb+";
             } else {
+                ent->parent->cat_size++;
                 if (acorn_mode == 0x80)
                     mode = "wb";
                 else if (acorn_mode == 0xc0)
@@ -1472,16 +1476,19 @@ static void osfile_write(uint32_t pb, vdfs_ent_t *ent, vdfs_ent_t *key, void (*c
     uint32_t start_addr, end_addr;
 
     if (ent) {
-        if ((ent->attribs & (ATTR_EXISTS|ATTR_IS_DIR)) == (ATTR_EXISTS|ATTR_IS_DIR)) {
-            log_debug("vdfs: attempt to create file %s over an existing dir", key->acorn_fn);
-            adfs_error(err_direxist);
-            return;
-        }
         if (ent->attribs & ATTR_IS_OPEN) {
             log_debug("vdfs: attempt to save file %s which is already open via OSFIND", key->acorn_fn);
             adfs_error(err_isopen);
             return;
         }
+        if (ent->attribs & ATTR_EXISTS) {
+            if (ent->attribs & ATTR_IS_DIR) {
+                log_debug("vdfs: attempt to create file %s over an existing dir", key->acorn_fn);
+                adfs_error(err_direxist);
+                return;
+            }
+        } else
+            ent->parent->cat_size++;
     } else if (!(ent = add_new_file(cur_dir, key->acorn_fn))) {
         adfs_error(err_nomem);
         return;
@@ -1593,8 +1600,10 @@ static void osfile_cdir(vdfs_ent_t *ent, vdfs_ent_t *key) {
                 log_debug("vdfs: attempt to create dir %s on top of an existing file", key->acorn_fn);
                 adfs_error(err_filexist);  // file in the way.
             }
-        } else
+        } else {
+            ent->parent->cat_size++;
             create_dir(ent);
+        }
     } else {
         parent = key->parent;
         if (parent && parent->attribs & ATTR_EXISTS) {
@@ -1746,6 +1755,7 @@ static inline void exec_swr_intern(uint8_t flags, uint16_t fname, int8_t romid, 
             simple_name(path, sizeof path, fname);
             ent = find_entry(path, &key, cur_dir);
             if (flags & 0x80) {
+                // read file into sideways RAM.
                 len = 0x4000 - start;
                 if (len > 0) {
                     if (ent && ent->attribs & ATTR_EXISTS) {
@@ -1763,6 +1773,7 @@ static inline void exec_swr_intern(uint8_t flags, uint16_t fname, int8_t romid, 
                 } else
                     adfs_error(err_too_big);
             } else {
+                // write sideways RAM to file.
                 len = pblen;
                 if (len <= 16384) {
                     if (!ent)
@@ -1775,7 +1786,10 @@ static inline void exec_swr_intern(uint8_t flags, uint16_t fname, int8_t romid, 
                             ent->load_addr = load_add;
                             ent->exec_addr = load_add;
                             ent->length = len;
-                            ent->attribs |= ATTR_EXISTS;
+                            if (!(ent->attribs & ATTR_EXISTS)) {
+                                ent->attribs |= ATTR_EXISTS;
+                                ent->parent->cat_size++;
+                            }
                             write_back(ent);
                         } else
                             log_warn("vdfs: unable to create file '%s': %s\n", ent->host_fn, strerror(errno));
