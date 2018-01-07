@@ -402,10 +402,14 @@ static void adfs_hosterr(int errnum) {
 static void tree_destroy(vdfs_ent_t *ent) {
     void *ptr;
 
-    tdestroy(ent->acorn_tree, free_noop);
-    ent->acorn_tree = NULL;
-    tdestroy(ent->host_tree, free_tree_node);
-    ent->host_tree = NULL;
+    if ((ptr = ent->acorn_tree)) {
+        tdestroy(ptr, free_noop);
+        ent->acorn_tree = NULL;
+    }
+    if ((ptr = ent->host_tree)) {
+        tdestroy(ptr, free_tree_node);
+        ent->host_tree = NULL;
+    }    
     if ((ptr = ent->cat_tab)) {
         free(ptr);
         ent->cat_tab = NULL;
@@ -544,7 +548,7 @@ static void tree_visit_del(const void *nodep, const VISIT which, const int depth
 
     if (which == postorder || which == leaf) {
         ent = *(vdfs_ent_t **)nodep;
-        ent->attribs = 0;
+        ent->attribs &= (ATTR_IS_DIR|ATTR_IS_OPEN);
     }
 }
 
@@ -674,6 +678,14 @@ static uint16_t parse_name(char *str, size_t size, uint16_t addr) {
     return addr;
 }
 
+static int check_valid_dir(vdfs_ent_t *ent, const char *which) {
+    if (ent->attribs & ATTR_IS_DIR)
+        return 1;
+    log_warn("vdfs: %s directory is not valid", which);
+    adfs_error(err_baddir);
+    return 0;
+}
+
 // Given the address in BBC RAM of a filename find the VDFS entry.
 
 static vdfs_ent_t *find_entry(const char *filename, vdfs_ent_t *key, vdfs_ent_t *ent) {
@@ -695,8 +707,10 @@ static vdfs_ent_t *find_entry(const char *filename, vdfs_ent_t *key, vdfs_ent_t 
         log_debug("vdfs: find_entry: looking for acorn name=%s", key->acorn_fn);
         //if (tail_addr)
         //    *tail_addr = fn_addr;
-        if ((key->acorn_fn[0] == '$' && key->acorn_fn[1] == '\0') || (key->acorn_fn[0] == ':' && isdigit(key->acorn_fn[1])))
+        if (((key->acorn_fn[0] == '$' || key->acorn_fn[0] == '&') && key->acorn_fn[1] == '\0') || (key->acorn_fn[0] == ':' && isdigit(key->acorn_fn[1])))
             ent = &root_dir;
+        else if (key->acorn_fn[0] == '%' && key->acorn_fn[1] == '\0' && check_valid_dir(lib_dir, "library"))
+            ent = lib_dir;
         else if (key->acorn_fn[0] == '^' && key->acorn_fn[1] == '\0')
             ent = ent->parent;
         else if (!scan_dir(ent) && (ptr = tfind(key, &ent->acorn_tree, acorn_comp)))
@@ -950,14 +964,6 @@ void vdfs_savestate(FILE *f) {
     ss_save_dir2(lib_dir, f);
     ss_save_dir2(prev_dir, f);
     ss_save_dir2(cat_dir, f);
-}
-
-static int check_valid_dir(vdfs_ent_t *ent, const char *which) {
-    if (ent->attribs & ATTR_IS_DIR)
-        return 1;
-    log_warn("vdfs: %s directory is not valid", which);
-    adfs_error(err_baddir);
-    return 0;
 }
 
 static FILE *getfp(int channel) {
@@ -1467,10 +1473,12 @@ static void osfile_write(uint32_t pb, vdfs_ent_t *ent, vdfs_ent_t *key, void (*c
 
     if (ent) {
         if ((ent->attribs & (ATTR_EXISTS|ATTR_IS_DIR)) == (ATTR_EXISTS|ATTR_IS_DIR)) {
+            log_debug("vdfs: attempt to create file %s over an existing dir", key->acorn_fn);
             adfs_error(err_direxist);
             return;
         }
         if (ent->attribs & ATTR_IS_OPEN) {
+            log_debug("vdfs: attempt to save file %s which is already open via OSFIND", key->acorn_fn);
             adfs_error(err_isopen);
             return;
         }
