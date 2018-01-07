@@ -71,6 +71,7 @@ int vdfs_enabled = 0;
 #define ATTR_OTHR_WRITE  0x0020
 #define ATTR_OTHR_EXEC   0x0040
 #define ATTR_OTHR_LOCKD  0x0080
+#define ATTR_IS_OPEN     0x2000
 #define ATTR_IS_DIR      0x4000
 #define ATTR_EXISTS      0x8000
 
@@ -322,6 +323,7 @@ static const char err_badren[]   = "\xb0" "Bad rename";
 static const char err_notempty[] = "\xb4" "Dir not empty";
 static const char err_access[]   = "\xbd" "Access violation";
 static const char err_nfile[]    = "\xc0" "Too many open files";
+static const char err_isopen[]   = "\xc2" "Already open";
 static const char err_exists[]   = "\xc4" "Already exists";
 static const char err_direxist[] = "\xc4" "Dir already exists";
 static const char err_filexist[] = "\xc4" "File already exists";
@@ -344,7 +346,6 @@ static const char err_aborted[]  = "\x92" "Aborted";
 static const char err_badcsum[]  = "\xaa" "Bad checksum";
 static const char err_outside[]  = "\xb7" "Outside file";
 static const char err_nupdate[]  = "\xc1" "Not open for update";
-static const char err_isopen[]   = "\xc2" "Already open";
 static const char err_locked[]   = "\xc3" "Locked";
 static const char err_full[]     = "\xc6" "Disc full";
 static const char err_datalost[] = "\xca" "Data lost, channel";
@@ -757,6 +758,7 @@ static void close_file(int channel) {
             fclose(fp);
             vdfs_chan[channel].fp = NULL;
         }
+        ent->attribs &= ~ATTR_IS_OPEN;
         write_back(ent);
         vdfs_chan[channel].ent = NULL;
     }
@@ -1100,7 +1102,7 @@ static inline void osfsc(void) {
 }
 
 static inline void osfind(void) {
-    int acorn_mode, channel, chan2;
+    int acorn_mode, channel;
     vdfs_ent_t *ent, key;
     const char *mode;
     FILE *fp;
@@ -1123,9 +1125,8 @@ static inline void osfind(void) {
                 return;
         simple_name(path, sizeof path, (y << 8) | x);
         if ((ent = find_entry(path, &key, cur_dir))) {
-            for (chan2 = 0; chan2 < NUM_CHANNELS; chan2++)
-                if (vdfs_chan[channel].ent == ent)
-                    return;
+            if (ent->attribs & ATTR_IS_OPEN)
+                return;
             if (ent->attribs & ATTR_EXISTS) {
                 if (ent->attribs & ATTR_IS_DIR) {
                     vdfs_chan[channel].ent = ent;  // make "half-open"
@@ -1156,7 +1157,7 @@ static inline void osfind(void) {
         }
         if (mode && ent) {
             if ((fp = fopen(ent->host_path, mode))) {
-                ent->attribs |= ATTR_EXISTS; // file now exists.
+                ent->attribs |= ATTR_EXISTS|ATTR_IS_OPEN; // file now exists.
                 vdfs_chan[channel].fp = fp;
                 vdfs_chan[channel].ent = ent;
                 a = MIN_CHANNEL + channel;
@@ -1464,13 +1465,17 @@ static void osfile_write(uint32_t pb, vdfs_ent_t *ent, vdfs_ent_t *key, void (*c
     FILE *fp;
     uint32_t start_addr, end_addr;
 
-    if (!ent && !(ent = add_new_file(cur_dir, key->acorn_fn))) {
+    if (ent) {
+        if ((ent->attribs & (ATTR_EXISTS|ATTR_IS_DIR)) == (ATTR_EXISTS|ATTR_IS_DIR)) {
+            adfs_error(err_direxist);
+            return;
+        }
+        if (ent->attribs & ATTR_IS_OPEN) {
+            adfs_error(err_isopen);
+            return;
+        }
+    } else if (!(ent = add_new_file(cur_dir, key->acorn_fn))) {
         adfs_error(err_nomem);
-        return;
-    }
-
-    if ((ent->attribs & (ATTR_EXISTS|ATTR_IS_DIR)) == (ATTR_EXISTS|ATTR_IS_DIR)) {
-        adfs_error(err_direxist);
         return;
     }
 
