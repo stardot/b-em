@@ -399,6 +399,20 @@ static void adfs_hosterr(int errnum) {
     adfs_error(msg);
 }
 
+static inline void mark_extant(vdfs_ent_t *ent) {
+    if (!(ent->attribs & ATTR_EXISTS)) {
+        ent->attribs |= ATTR_EXISTS;
+        ent->parent->cat_size++;
+    }
+}
+
+static inline void mark_deleted(vdfs_ent_t *ent) {
+    if (ent->attribs & ATTR_EXISTS) {
+        ent->attribs &= ~ATTR_EXISTS;
+        ent->parent->cat_size--;
+    }
+}
+
 static void tree_destroy(vdfs_ent_t *ent) {
     void *ptr;
 
@@ -622,12 +636,16 @@ static void tree_visit_cat(const void *nodep, const VISIT which, const int depth
 static int gen_cat_tab(vdfs_ent_t *dir) {
     int result;
     vdfs_ent_t **new_tab;
+    size_t new_size;
 
     if ((result = scan_dir(dir)) == 0 && dir->cat_size > 0) {
-        if ((new_tab = malloc((dir->cat_size+1) * (sizeof(vdfs_ent_t *))))) {
+        if ((new_tab = malloc((dir->cat_size) * (sizeof(vdfs_ent_t *))))) {
             cat_ptr = new_tab;
             twalk(dir->acorn_tree, tree_visit_cat);
-            dir->cat_size = cat_ptr - new_tab;
+            if ((new_size = cat_ptr - new_tab) != dir->cat_size) {
+                log_warn("vdfs: catalogue size mismatch for %s (%s), calculated %lu, counted %lu", dir->acorn_fn, dir->host_path, dir->cat_size, new_size);
+                dir->cat_size = new_size;
+            }
             if (dir->cat_tab)
                 free(dir->cat_tab);
             dir->cat_tab = new_tab;
@@ -741,7 +759,6 @@ static vdfs_ent_t *add_new_file(vdfs_ent_t *dir, const char *name) {
         if (make_host_path(new_ent, host_fn)) {
             tsearch(new_ent, &dir->acorn_tree, acorn_comp);
             tsearch(new_ent, &dir->host_tree, host_comp);
-            dir->cat_size++;
             return new_ent;
         }
         free(new_ent);
@@ -1031,8 +1048,7 @@ static void delete_inf(vdfs_ent_t *ent) {
 static void rename_tail(vdfs_ent_t *old_ent, vdfs_ent_t *new_ent) {
     if (rename(old_ent->host_path, new_ent->host_path) == 0) {
         log_debug("vdfs: '%s' renamed to '%s'", old_ent->host_path, new_ent->host_path);
-        new_ent->attribs |= ATTR_EXISTS;
-        old_ent->attribs &= ~ATTR_EXISTS;
+        mark_extant(new_ent);
         new_ent->load_addr  = old_ent->load_addr;
         new_ent->exec_addr  = old_ent->exec_addr;
         new_ent->length     = old_ent->length;
@@ -1042,6 +1058,11 @@ static void rename_tail(vdfs_ent_t *old_ent, vdfs_ent_t *new_ent) {
         new_ent->cat_size   = old_ent->cat_size;
         new_ent->scan_seq   = old_ent->scan_seq;
         new_ent->scan_mtime = old_ent->scan_mtime;
+        old_ent->acorn_tree = NULL;
+        old_ent->host_tree  = NULL;
+        old_ent->cat_tab    = NULL;
+        old_ent->cat_size   = 0;
+        mark_deleted(old_ent);
         delete_inf(old_ent);
         write_back(new_ent);
     } else {
@@ -1066,10 +1087,8 @@ static void osfsc_rename(void) {
                         log_debug("vdfs: new file '%s' for rename already exists", new_key.acorn_fn);
                         adfs_error(err_exists);
                     }
-                } else {
+                } else
                     rename_tail(old_ent, new_ent);
-                    new_ent->parent->cat_size++;
-                }
             } else if (new_key.parent && (new_ent = add_new_file(new_key.parent, new_key.acorn_fn)))
                 rename_tail(old_ent, new_ent);
         } else {
@@ -1149,7 +1168,6 @@ static inline void osfind(void) {
                 else if (acorn_mode == 0xc0)
                     mode = "rb+";
             } else {
-                ent->parent->cat_size++;
                 if (acorn_mode == 0x80)
                     mode = "wb";
                 else if (acorn_mode == 0xc0)
@@ -1167,7 +1185,8 @@ static inline void osfind(void) {
         }
         if (mode && ent) {
             if ((fp = fopen(ent->host_path, mode))) {
-                ent->attribs |= ATTR_EXISTS|ATTR_IS_OPEN; // file now exists.
+                mark_extant(ent);
+                ent->attribs |= ATTR_IS_OPEN; // file now exists.
                 vdfs_chan[channel].fp = fp;
                 vdfs_chan[channel].ent = ent;
                 a = MIN_CHANNEL + channel;
@@ -1487,14 +1506,15 @@ static void osfile_write(uint32_t pb, vdfs_ent_t *ent, vdfs_ent_t *key, void (*c
                 adfs_error(err_direxist);
                 return;
             }
-        } else
-            ent->parent->cat_size++;
+        }
     } else if (!(ent = add_new_file(cur_dir, key->acorn_fn))) {
         adfs_error(err_nomem);
         return;
     }
 
     if ((fp = fopen(ent->host_path, "wb"))) {
+        mark_extant(ent);
+        ent->attribs = (ent->attribs & ~ATTR_IS_DIR);
         start_addr = readmem32(pb+0x0a);
         end_addr = readmem32(pb+0x0e);
         callback(fp, start_addr, end_addr);
@@ -1502,7 +1522,6 @@ static void osfile_write(uint32_t pb, vdfs_ent_t *ent, vdfs_ent_t *key, void (*c
         ent->load_addr = readmem32(pb+0x02);
         ent->exec_addr = readmem32(pb+0x06);
         ent->length = end_addr-start_addr;
-        ent->attribs = (ent->attribs & ~ATTR_IS_DIR) | ATTR_EXISTS;
         write_back(ent);
         osfile_attribs(ent, pb);
     } else
@@ -1558,14 +1577,15 @@ static void osfile_delete(uint32_t pb, vdfs_ent_t *ent) {
                 if (ent == prev_dir)
                     prev_dir = cur_dir;
                 tree_destroy(ent);
-                ent->attribs &= ~(ATTR_EXISTS|ATTR_IS_DIR);
+                ent->attribs &= ~ATTR_IS_DIR;
+                mark_deleted(ent);
                 a = 2;
             } else
                 adfs_hosterr(errno);
         } else {
             if (unlink(ent->host_path) == 0) {
+                mark_deleted(ent);
                 delete_inf(ent);
-                ent->attribs &= ~ATTR_EXISTS;
                 a = 1;
             } else
                 adfs_hosterr(errno);
@@ -1582,6 +1602,7 @@ static void create_dir(vdfs_ent_t *ent) {
     res = mkdir(ent->host_path, 0777);
 #endif
     if (res == 0) {
+        mark_extant(ent);
         scan_entry(ent);
         a = 2;
     }
@@ -1600,10 +1621,8 @@ static void osfile_cdir(vdfs_ent_t *ent, vdfs_ent_t *key) {
                 log_debug("vdfs: attempt to create dir %s on top of an existing file", key->acorn_fn);
                 adfs_error(err_filexist);  // file in the way.
             }
-        } else {
-            ent->parent->cat_size++;
+        } else
             create_dir(ent);
-        }
     } else {
         parent = key->parent;
         if (parent && parent->attribs & ATTR_EXISTS) {
@@ -1786,10 +1805,7 @@ static inline void exec_swr_intern(uint8_t flags, uint16_t fname, int8_t romid, 
                             ent->load_addr = load_add;
                             ent->exec_addr = load_add;
                             ent->length = len;
-                            if (!(ent->attribs & ATTR_EXISTS)) {
-                                ent->attribs |= ATTR_EXISTS;
-                                ent->parent->cat_size++;
-                            }
+                            mark_extant(ent);
                             write_back(ent);
                         } else
                             log_warn("vdfs: unable to create file '%s': %s\n", ent->host_fn, strerror(errno));
