@@ -398,6 +398,20 @@ static void adfs_hosterr(int errnum) {
     adfs_error(msg);
 }
 
+static void tree_destroy(vdfs_ent_t *ent) {
+    void *ptr;
+
+    tdestroy(ent->acorn_tree, free_noop);
+    ent->acorn_tree = NULL;
+    tdestroy(ent->host_tree, free_tree_node);
+    ent->host_tree = NULL;
+    if ((ptr = ent->cat_tab)) {
+        free(ptr);
+        ent->cat_tab = NULL;
+        ent->cat_size = 0;
+    }
+}
+    
 // Populate a VDFS entry from host information.
 
 static void scan_entry(vdfs_ent_t *ent) {
@@ -424,6 +438,11 @@ static void scan_entry(vdfs_ent_t *ent) {
         ent->attribs = ATTR_EXISTS;
         if (S_ISDIR(stb.st_mode))
             ent->attribs |= ATTR_IS_DIR;
+        else if (ent->attribs & ATTR_IS_DIR) {
+            log_debug("vdfs: dir %s has become a file", ent->acorn_fn);
+            tree_destroy(ent);
+            ent->attribs &= ~ATTR_IS_DIR;
+        }
 #ifdef WIN32
         if (stb.st_mode & S_IRUSR)
             ent->attribs |= ATTR_USER_READ|ATTR_OTHR_READ;
@@ -754,15 +773,7 @@ void vdfs_close(void) {
     void *ptr;
 
     close_all();
-    tdestroy(root_dir.acorn_tree, free_noop);
-    root_dir.acorn_tree = NULL;
-    tdestroy(root_dir.host_tree, free_tree_node);
-    root_dir.host_tree = NULL;
-    if ((ptr = root_dir.cat_tab)) {
-        free(ptr);
-        root_dir.cat_tab = NULL;
-        root_dir.cat_size = 0;
-    }
+    tree_destroy(&root_dir);
     if ((ptr = root_dir.host_path)) {
         free(ptr);
         root_dir.host_path = NULL;
@@ -1471,7 +1482,7 @@ static void osfile_write(uint32_t pb, vdfs_ent_t *ent, vdfs_ent_t *key, void (*c
         ent->load_addr = readmem32(pb+0x02);
         ent->exec_addr = readmem32(pb+0x06);
         ent->length = end_addr-start_addr;
-        ent->attribs |= ATTR_EXISTS;
+        ent->attribs = (ent->attribs & ~ATTR_IS_DIR) | ATTR_EXISTS;
         write_back(ent);
         osfile_attribs(ent, pb);
     } else
@@ -1526,7 +1537,8 @@ static void osfile_delete(uint32_t pb, vdfs_ent_t *ent) {
             else if (rmdir(ent->host_path) == 0) {
                 if (ent == prev_dir)
                     prev_dir = cur_dir;
-                ent->attribs &= ~ATTR_EXISTS;
+                tree_destroy(ent);
+                ent->attribs &= ~(ATTR_EXISTS|ATTR_IS_DIR);
                 a = 2;
             } else
                 adfs_hosterr(errno);
