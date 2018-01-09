@@ -63,6 +63,8 @@ int vdfs_enabled = 0;
 #define MAX_FILE_NAME    10
 #define MAX_ACORN_PATH   256
 
+// These are Acorn standard attributes
+
 #define ATTR_USER_READ   0x0001
 #define ATTR_USER_WRITE  0x0002
 #define ATTR_USER_EXEC   0x0004
@@ -71,7 +73,11 @@ int vdfs_enabled = 0;
 #define ATTR_OTHR_WRITE  0x0020
 #define ATTR_OTHR_EXEC   0x0040
 #define ATTR_OTHR_LOCKD  0x0080
-#define ATTR_IS_OPEN     0x2000
+
+// These are VDFS internal attributes.
+
+#define ATTR_OPEN_READ   0x1000
+#define ATTR_OPEN_WRITE  0x2000
 #define ATTR_IS_DIR      0x4000
 #define ATTR_EXISTS      0x8000
 
@@ -323,6 +329,7 @@ static const char err_badren[]   = "\xb0" "Bad rename";
 static const char err_notempty[] = "\xb4" "Dir not empty";
 static const char err_access[]   = "\xbd" "Access violation";
 static const char err_nfile[]    = "\xc0" "Too many open files";
+static const char err_nupdate[]  = "\xc1" "Not open for update";
 static const char err_isopen[]   = "\xc2" "Already open";
 static const char err_exists[]   = "\xc4" "Already exists";
 static const char err_direxist[] = "\xc4" "Dir already exists";
@@ -345,7 +352,6 @@ static const char err_baddir[]  = "\xc7" "Bad directory";
 static const char err_aborted[]  = "\x92" "Aborted";
 static const char err_badcsum[]  = "\xaa" "Bad checksum";
 static const char err_outside[]  = "\xb7" "Outside file";
-static const char err_nupdate[]  = "\xc1" "Not open for update";
 static const char err_locked[]   = "\xc3" "Locked";
 static const char err_full[]     = "\xc6" "Disc full";
 static const char err_datalost[] = "\xca" "Data lost, channel";
@@ -562,7 +568,7 @@ static void tree_visit_del(const void *nodep, const VISIT which, const int depth
 
     if (which == postorder || which == leaf) {
         ent = *(vdfs_ent_t **)nodep;
-        ent->attribs &= (ATTR_IS_DIR|ATTR_IS_OPEN);
+        ent->attribs &= (ATTR_IS_DIR|ATTR_OPEN_READ|ATTR_OPEN_WRITE);
     }
 }
 
@@ -790,7 +796,7 @@ static void close_file(int channel) {
             fclose(fp);
             vdfs_chan[channel].fp = NULL;
         }
-        ent->attribs &= ~ATTR_IS_OPEN;
+        ent->attribs &= ~(ATTR_OPEN_READ|ATTR_OPEN_WRITE);
         write_back(ent);
         vdfs_chan[channel].ent = NULL;
     }
@@ -984,18 +990,38 @@ void vdfs_savestate(FILE *f) {
     ss_save_dir2(cat_dir, f);
 }
 
-static FILE *getfp(int channel) {
+static FILE *getfp_read(int channel) {
     FILE *fp;
 
     if (channel >= MIN_CHANNEL && channel < MAX_CHANNEL) {
         if ((fp = vdfs_chan[channel-MIN_CHANNEL].fp))
             return fp;
-        else
-            log_debug("vdfs: attempt to use closed channel %d", channel);
+        log_debug("vdfs: attempt to use closed channel %d", channel);
     } else
         log_debug("vdfs: channel %d out of range\n", channel);
-    adfs_error(err_channel);
     return NULL;
+}
+
+static FILE *getfp_write(int channel) {
+    vdfs_file_t *p;
+    FILE *fp = NULL;
+
+    if (channel >= MIN_CHANNEL && channel < MAX_CHANNEL) {
+        p = &vdfs_chan[channel-MIN_CHANNEL];
+        if (p->ent->attribs & ATTR_OPEN_WRITE) {
+            if (!(fp = p->fp)) {
+                log_debug("vdfs: attempt to use closed channel %d", channel);
+                adfs_error(err_channel);
+            }
+        } else {
+            log_debug("vdfs: attempt to write to a read-only channel %d", channel);
+            adfs_error(err_nupdate);
+        }            
+    } else {
+        log_debug("vdfs: channel %d out of range\n", channel);
+        adfs_error(err_channel);
+    }
+    return fp;
 }
 
 static void run_file(const char *err) {
@@ -1109,7 +1135,7 @@ static inline void osfsc(void) {
     p.c = 0;
     switch(a) {
         case 0x01: // check EOF
-            if ((fp = getfp(x)))
+            if ((fp = getfp_read(x)))
                 x = feof(fp) ? 0xff : 0x00;
             break;
         case 0x02: // */ command
@@ -1133,6 +1159,7 @@ static inline void osfind(void) {
     int acorn_mode, channel;
     vdfs_ent_t *ent, key;
     const char *mode;
+    uint16_t attribs;
     FILE *fp;
     char path[MAX_ACORN_PATH];
 
@@ -1144,6 +1171,8 @@ static inline void osfind(void) {
             close_all();
         else if (channel >= MIN_CHANNEL && channel < MAX_CHANNEL)
             close_file(channel-MIN_CHANNEL);
+        else
+            adfs_error(err_channel);
     } else if (check_valid_dir(cur_dir, "current")) {        // open file.
         mode = NULL;
         acorn_mode = a;
@@ -1152,41 +1181,52 @@ static inline void osfind(void) {
             if (channel >= NUM_CHANNELS)
                 return;
         simple_name(path, sizeof path, (y << 8) | x);
-        if ((ent = find_entry(path, &key, cur_dir))) {
-            if (ent->attribs & ATTR_IS_OPEN)
-                return;
-            if (ent->attribs & ATTR_EXISTS) {
-                if (ent->attribs & ATTR_IS_DIR) {
-                    vdfs_chan[channel].ent = ent;  // make "half-open"
-                    a = MIN_CHANNEL + channel;
-                    return;
-                }
-                if (acorn_mode == 0x40)
+        ent = find_entry(path, &key, cur_dir);
+        if (ent && (ent->attribs & (ATTR_EXISTS|ATTR_IS_DIR)) == (ATTR_EXISTS|ATTR_IS_DIR)) {
+            vdfs_chan[channel].ent = ent;  // make "half-open"
+            a = MIN_CHANNEL + channel;
+            return;
+        }
+        if (acorn_mode == 0x40) {
+            if (ent && ent->attribs & ATTR_EXISTS) {
+                if (ent->attribs & ATTR_OPEN_WRITE)
+                    adfs_error(err_isopen);
+                else {
                     mode = "rb";
-                else if (acorn_mode == 0x80)
-                    mode = "wb";
-                else if (acorn_mode == 0xc0)
-                    mode = "rb+";
-            } else {
-                if (acorn_mode == 0x80)
-                    mode = "wb";
-                else if (acorn_mode == 0xc0)
-                    mode = "wb+";
+                    attribs = ATTR_OPEN_READ;
+                }
             }
-        } else {
-            if (acorn_mode == 0x80) {
-                ent = add_new_file(cur_dir, key.acorn_fn);
+        }
+        else if (acorn_mode == 0x80) {
+            if (ent && (ent->attribs & ATTR_EXISTS) && (ent->attribs & (ATTR_OPEN_READ|ATTR_OPEN_WRITE)))
+                adfs_error(err_isopen);
+            else {
                 mode = "wb";
+                attribs = ATTR_OPEN_WRITE;
+                if (!ent)
+                    ent = add_new_file(cur_dir, key.acorn_fn);
             }
-            else if (acorn_mode == 0xc0) {
+        } else if (acorn_mode == 0xc0) {                    
+            attribs = ATTR_OPEN_READ|ATTR_OPEN_WRITE;
+            if (ent) {
+                if (ent->attribs & ATTR_EXISTS) {
+                    if (ent->attribs & (ATTR_OPEN_READ|ATTR_OPEN_WRITE))
+                        adfs_error(err_isopen);
+                    else
+                        mode = "rb+";
+                }
+                else
+                    mode = "wb+";
+            } else {
                 ent = add_new_file(cur_dir, key.acorn_fn);
                 mode = "wb+";
             }
         }
         if (mode && ent) {
+            log_debug("vdfs: osfind open host file %s in mode %s", ent->host_path, mode);
             if ((fp = fopen(ent->host_path, mode))) {
                 mark_extant(ent);
-                ent->attribs |= ATTR_IS_OPEN; // file now exists.
+                ent->attribs |= attribs; // file now exists.
                 vdfs_chan[channel].fp = fp;
                 vdfs_chan[channel].ent = ent;
                 a = MIN_CHANNEL + channel;
@@ -1194,13 +1234,14 @@ static inline void osfind(void) {
                 log_warn("vdfs: osfind: unable to open file '%s' in mode '%s': %s\n", ent->host_fn, mode, strerror(errno));
         }
     }
+    log_debug("vdfs: osfind returns a=%d", a);
 }
 
 static void osgbpb_write(uint32_t pb) {
     FILE *fp;
     uint32_t mem_ptr, n;
 
-    if ((fp = getfp(readmem(pb)))) {
+    if ((fp = getfp_write(readmem(pb)))) {
         if (a == 0x01)
             fseek(fp, readmem32(pb+9), SEEK_SET);
         mem_ptr = readmem32(pb+1);
@@ -1224,7 +1265,7 @@ static int osgbpb_read(uint32_t pb) {
     uint32_t mem_ptr, n;
     int status = 0, ch;
 
-    if ((fp = getfp(readmem(pb)))) {
+    if ((fp = getfp_read(readmem(pb)))) {
         if (a == 0x03)
             fseek(fp, readmem32(pb+9), SEEK_SET);
         mem_ptr = readmem32(pb+1);
@@ -1402,7 +1443,7 @@ static inline void osbput(void) {
 
     log_debug("vdfs: osbput(A=%02X, X=%02X, Y=%02X)", a, x, y);
 
-    if ((fp = getfp(y)))
+    if ((fp = getfp_write(y)))
         putc(a, fp);
 }
 
@@ -1413,7 +1454,7 @@ static inline void osbget(void) {
     log_debug("vdfs: osbget(A=%02X, X=%02X, Y=%02X)", a, x, y);
 
     p.c = 1;
-    if ((fp = getfp(y))) {
+    if ((fp = getfp_read(y))) {
         if ((ch = getc(fp)) != EOF) {
             a = ch;
             p.c = 0;
@@ -1442,7 +1483,7 @@ static inline void osargs(void) {
             default:
                 log_debug("vdfs: osargs not implemented for y=0, a=%d", a);
         }
-    } else if ((fp = getfp(y))) {
+    } else if ((fp = getfp_read(y))) {
         switch (a)
         {
             case 0:     // read sequential pointer
@@ -1495,7 +1536,7 @@ static void osfile_write(uint32_t pb, vdfs_ent_t *ent, vdfs_ent_t *key, void (*c
     uint32_t start_addr, end_addr;
 
     if (ent) {
-        if (ent->attribs & ATTR_IS_OPEN) {
+        if (ent->attribs & (ATTR_OPEN_READ|ATTR_OPEN_WRITE)) {
             log_debug("vdfs: attempt to save file %s which is already open via OSFIND", key->acorn_fn);
             adfs_error(err_isopen);
             return;
