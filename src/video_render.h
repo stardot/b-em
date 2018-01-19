@@ -8,7 +8,8 @@ extern BITMAP *vb;
 #endif
 
 extern int firstx, firsty, lastx, lasty;
-
+extern int desktop_width, desktop_height;
+extern int scr_x_start, scr_x_size, scr_y_start, scr_y_size;
 extern int winsizex, winsizey;
 
 extern int fullscreen;

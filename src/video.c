@@ -328,9 +328,8 @@ void videoula_loadstate(FILE *f)
                 int r = getc(f);
                 int g = getc(f);
                 int b = getc(f);
-                //int a = getc(f);
-                //nula_collook[c] = makecol(r, g, b, a);
-                nula_collook[c] = makecol(r, g, b);
+                int a = getc(f);
+                nula_collook[c] = makeacol32(r, g, b, a);
         }
         nula_pal_write_flag=getc(f);
         nula_pal_first_byte = getc(f);
@@ -641,6 +640,7 @@ int oldr8;
 
 int firstx, firsty, lastx, lasty;
 
+int desktop_width, desktop_height;
 
 BITMAP *b, *b16, *b16x, *b32, *tb;
 #ifdef WIN32
@@ -657,15 +657,23 @@ void video_init()
         int c,d;
         int temp,temp2,left;
 
+        if (get_desktop_resolution(&desktop_width, &desktop_height)) {
+            log_warn("video: unable to find desktop size, defaulting to 800x600");
+            desktop_width = 800;
+            desktop_height = 600;
+        }
+
         dcol = desktop_color_depth();
         set_color_depth(dcol);
 #ifdef WIN32
         set_gfx_mode(GFX_AUTODETECT_WINDOWED, 2048, 2048, 0, 0);
+        vb = create_video_bitmap(924, 614);
 #else
         set_gfx_mode(GFX_AUTODETECT_WINDOWED, 640, 480, 0, 0);
-#endif
-#ifdef WIN32
-        vb = create_video_bitmap(924, 614);
+        scr_x_start = 0;
+        scr_y_start = 0;
+        scr_x_size = SCREEN_W;
+        scr_y_size = SCREEN_H;
 #endif
         b16x = create_bitmap(832, 614);
         b16  = create_bitmap(832, 614);

@@ -20,7 +20,7 @@ b_em_CFLAGS = $(allegro_CFLAGS) -DBEM -DINCLUDE_DEBUGGER -DUSE_MEMORY_POINTER
 if OS_WIN
 b_em_LDADD = -lalleg -lz -lopenal -lalut -lm
 else
-b_em_LDADD = $(allegro_LIBS) -lz -lopenal -lalut -lm -ljack -lpthread -lasound
+b_em_LDADD = $(allegro_LIBS) -lz -lopenal -lalut -lm -lpthread
 endif
 
 b_em_SOURCES = \
