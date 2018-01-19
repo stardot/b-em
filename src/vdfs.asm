@@ -32,7 +32,7 @@ PORT_A      =   &FC5F       :\ store A ready for command.
 
 OS_CLI=&FFF7:OSBYTE=&FFF4:OSWORD=&FFF1:OSWRCH=&FFEE:OSNEWL=&FFE7:OSASCI=&FFE3
 OSFILE=&FFDD:OSARGS=&FFDA:OSBGET=&FFD7:OSBPUT=&FFD4:OSGBPB=&FFD1:OSFIND=&FFCE
-OSRDRM=&FFB9        
+OSRDRM=&FFB9:BRKV=&0202:EVNTV=&0220
 
 ORG     &8000
 .start
@@ -71,6 +71,8 @@ CMP #&12:BNE P%+5:JMP ServFSSelect :\ Select a filing system
 CMP #&25:BNE P%+5:JMP ServFSInfo   :\ Request FS info
 CMP #&26:BNE P%+5:JMP ServShut     :\ Shut all channels
 CMP #&27:BNE P%+5:JMP ServReset    :\ Reset occured
+CMP #&FE:BNE P%+5:JMP TubeExplode  :\ Tube explode character set etc.
+CMP #&FF:BNE P%+5:JMP TubeInit     :\ Initialise tube host
 .ServExit
 PLA:TAY:PLA:TAX:PLA:PLP            :\ Restore all registers
 RTS
@@ -184,7 +186,19 @@ JSR PrintText:JMP ServExit
 .HelpTitle
 JSR PrROMTitleNL            :\ Just print ROM title
 JSR PrROMVersion
-JMP ServExit
+            LDA  #&EA       ; check tube presence.
+            LDX  #&00
+            LDY  #&FF
+            JSR  OSBYTE
+            TXA
+            BEQ  skipmsg    ; skip if no tube.
+            LDX  #&00
+            LDA  tubemsg    ; print *HELP message.
+.tubemlp    JSR  OSWRCH
+            INX
+            LDA  tubemsg,X
+            BNE  tubemlp
+.skipmsg    JMP ServExit
 .L8538
 DEY:LDX #&FF
 .L853B
@@ -1191,6 +1205,56 @@ EQUB &A1:EQUB &A2:EQUB &A3:EQUB &A4:EQUB &A5:EQUB &A6
 EQUB &A7:EQUB &A8:EQUB &A9:EQUB &AA:EQUB &C8:EQUB &C9
 EQUB &D3:EQUB &D5:EQUB &D6:EQUB &DE:EQUB &DF:EQUB &E0
 EQUB &E1::EQUB 0
+
+include "tubehost.asm"
+
+.TubeInit
+{
+        LDA  #<TubeEvHnd    ; point EVENTV to tube host
+        STA  EVNTV
+        LDA  #>TubeEvHnd
+        STA  EVNTV+1
+        LDA  #<TubeBrkHnd   ; point BRKV to tube host
+        STA  BRKV
+        LDA  #>TubeBrkHnd
+        STA  BRKV+1
+        LDA  #&8E
+        STA  &FEE0
+        LDY  #&00           ; copy the tube host code into low memory
+.copy1  LDA  TubeHost1,Y
+        STA  &0400,Y
+        LDA  TubeHost2,Y
+        STA  &0500,Y
+        LDA  TubeHost3,Y
+        STA  &0600,Y
+        DEY
+        BNE  copy1
+        JSR  TubeCall
+        LDX  #TubeBrkLen
+.copyz  LDA  TubeHostZ,X
+        STA  TubeBrkHnd,X
+        DEX
+        BPL  copyz
+        JMP  ServClaim
+}
+
+.TubeExplode
+{
+        CPY  #&00
+        BEQ  notube         ; if no tube.
+        LDA  #&14           ; explode character set.
+        LDX  #&06
+        JSR  OSBYTE
+.imsglp BIT  &FEE0          ; wait for character to be send from tube
+        BPL  imsglp
+        LDA  &FEE1          ; fetch the character.
+        BEQ  done           ; end of message?
+        JSR  OSWRCH
+        JMP  imsglp
+.notube JMP  ServExit        
+.done   JMP  ServClaim
+}
+
 .end
 ;
 SAVE "VDFS5", start, end
