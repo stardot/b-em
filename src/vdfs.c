@@ -429,14 +429,14 @@ static void tree_destroy(vdfs_ent_t *ent) {
     if ((ptr = ent->host_tree)) {
         tdestroy(ptr, free_tree_node);
         ent->host_tree = NULL;
-    }    
+    }
     if ((ptr = ent->cat_tab)) {
         free(ptr);
         ent->cat_tab = NULL;
         ent->cat_size = 0;
     }
 }
-    
+
 // Populate a VDFS entry from host information.
 
 static void scan_entry(vdfs_ent_t *ent) {
@@ -689,7 +689,7 @@ static uint16_t parse_name(char *str, size_t size, uint16_t addr) {
     do
         ch = readmem(addr++);
     while (ch == ' ' || ch == '\t');
-    
+
     if (ch == '"') {
         quote = 1;
         ch = readmem(addr++);
@@ -1004,19 +1004,25 @@ static FILE *getfp_read(int channel) {
 
 static FILE *getfp_write(int channel) {
     vdfs_file_t *p;
+    vdfs_ent_t  *ent;
     FILE *fp = NULL;
 
     if (channel >= MIN_CHANNEL && channel < MAX_CHANNEL) {
         p = &vdfs_chan[channel-MIN_CHANNEL];
-        if (p->ent->attribs & ATTR_OPEN_WRITE) {
-            if (!(fp = p->fp)) {
-                log_debug("vdfs: attempt to use closed channel %d", channel);
-                adfs_error(err_channel);
+        if ((ent = p->ent)) {
+            if (ent->attribs & ATTR_OPEN_WRITE) {
+                if (!(fp = p->fp)) {
+                    log_debug("vdfs: attempt to use closed channel %d", channel);
+                    adfs_error(err_channel);
+                }
+            } else {
+                log_debug("vdfs: attempt to write to a read-only channel %d", channel);
+                adfs_error(err_nupdate);
             }
         } else {
-            log_debug("vdfs: attempt to write to a read-only channel %d", channel);
-            adfs_error(err_nupdate);
-        }            
+            log_debug("vdfs: attempt to use closed channel %d", channel);
+            adfs_error(err_channel);
+        }
     } else {
         log_debug("vdfs: channel %d out of range\n", channel);
         adfs_error(err_channel);
@@ -1100,7 +1106,7 @@ static void rename_tail(vdfs_ent_t *old_ent, vdfs_ent_t *new_ent) {
 static void osfsc_rename(void) {
     vdfs_ent_t *old_ent, old_key, *new_ent, new_key;
     char old_path[MAX_ACORN_PATH], new_path[MAX_ACORN_PATH];
-    
+
     parse_name(new_path, sizeof new_path, parse_name(old_path, sizeof old_path, (y << 8) | x));
     if (*old_path && *new_path) {
         if ((old_ent = find_entry(old_path, &old_key, cur_dir))) {
@@ -1206,7 +1212,7 @@ static inline void osfind(void) {
                 if (!ent)
                     ent = add_new_file(cur_dir, key.acorn_fn);
             }
-        } else if (acorn_mode == 0xc0) {                    
+        } else if (acorn_mode == 0xc0) {
             attribs = ATTR_OPEN_READ|ATTR_OPEN_WRITE;
             if (ent) {
                 if (ent->attribs & ATTR_EXISTS) {
