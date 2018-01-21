@@ -123,15 +123,16 @@ uint8_t i8271_read(uint16_t addr)
         switch (addr & 7)
         {
                 case 0: /*Status register*/
-//                printf("Read status reg %04X %02X\n",pc,i8271.status);
+                log_debug("i8271: Read status reg %04X %02X\n",pc,i8271.status);
                 return i8271.status;
                 case 1: /*Result register*/
+                log_debug("i8271: Read result reg %04X %02X\n",pc,i8271.result);
                 i8271.status &= ~0x18;
                 i8271_NMI();
-//                printf("Read result reg %04X %02X\n",pc,i8271.status);
   //              output=1; timetolive=50;
                 return i8271.result;
                 case 4: /*Data register*/
+                //log_debug("i8271: Read data reg %04X %02X\n",pc,i8271.data);
                 i8271.status &= ~0xC;
                 i8271_NMI();
 //                printf("Read data reg %04X %02X\n",pc,i8271.status);
@@ -157,8 +158,8 @@ void i8271_write(uint16_t addr, uint8_t val)
                 case 0: /*Command register*/
                 if (i8271.status & 0x80) return;
                 i8271.command = val & 0x3F;
+                log_debug("i8271: command %02X", i8271.command);
                 if (i8271.command == 0x17) i8271.command = 0x13;
-//                printf("8271 command %02X!\n",i8271.command);
                 // Only commands < ReadDriveStatus actually change the drive select signals
                 // We use this later to generate RDY in the ReadDriveStatus command
                 if (i8271.command < 0x2C)
@@ -195,6 +196,7 @@ void i8271_write(uint16_t addr, uint8_t val)
                 }
                 break;
                 case 1: /*Parameter register*/
+                log_debug("i8271: parameter %02X", val);
                 if (i8271.paramnum < 5)
                    i8271.params[i8271.paramnum++] = val;
                 if (i8271.paramnum == i8271.paramreq)
@@ -305,7 +307,9 @@ void i8271_write(uint16_t addr, uint8_t val)
                 }
                 break;
                 case 2: /*Reset register*/
+                log_debug("i8271: reset %02X", val);
                 if (val & 1) i8271_reset();
+
                 break;
                 case 4: /*Data register*/
                 i8271.data = val;
