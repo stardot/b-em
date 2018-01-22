@@ -999,6 +999,7 @@ static FILE *getfp_read(int channel) {
         log_debug("vdfs: attempt to use closed channel %d", channel);
     } else
         log_debug("vdfs: channel %d out of range\n", channel);
+    adfs_error(err_channel);
     return NULL;
 }
 
