@@ -460,7 +460,7 @@ static void scan_entry(vdfs_ent_t *ent) {
         log_warn("vdfs: unable to stat '%s': %s\n", ent->host_path, strerror(errno));
     else {
         ent->length = stb.st_size;
-        ent->attribs = ATTR_EXISTS;
+        ent->attribs |= ATTR_EXISTS;
         if (S_ISDIR(stb.st_mode))
             ent->attribs |= ATTR_IS_DIR;
         else if (ent->attribs & ATTR_IS_DIR) {
