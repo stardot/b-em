@@ -715,21 +715,21 @@ static int check_valid_dir(vdfs_ent_t *ent, const char *which) {
 
 static vdfs_ent_t *find_entry(const char *filename, vdfs_ent_t *key, vdfs_ent_t *ent) {
     int i, ch;
+    const char *fn_src;
     char *fn_ptr;
     vdfs_ent_t **ptr;
 
     init_entry(key);
     key->parent = NULL;
-    for (;;) {
+    for (fn_src = filename;;) {
         fn_ptr = key->acorn_fn;
         for (i = 0; i < MAX_FILE_NAME; i++) {
-            ch = *filename++;
+            ch = *fn_src++;
             if (ch == '\0' || ch == '.')
                 break;
             *fn_ptr++ = ch;
         }
         *fn_ptr = '\0';
-        log_debug("vdfs: find_entry: looking for acorn name=%s", key->acorn_fn);
         //if (tail_addr)
         //    *tail_addr = fn_addr;
         if (((key->acorn_fn[0] == '$' || key->acorn_fn[0] == '&') && key->acorn_fn[1] == '\0') || (key->acorn_fn[0] == ':' && isdigit(key->acorn_fn[1])))
@@ -743,12 +743,17 @@ static vdfs_ent_t *find_entry(const char *filename, vdfs_ent_t *key, vdfs_ent_t 
         else {
             if (ch != '.')
                 key->parent = ent;
+            log_debug("vdfs: find_entry: acorn path %s not found", filename);
             return NULL; // not found
         }
-        if (ch != '.')
+        if (ch != '.') {
+            log_debug("vdfs: find_entry: acorn path %s found as %s", filename, ent->host_path);
             return ent;
-        if (!(ent->attribs & ATTR_IS_DIR))
-            return NULL; // file in pathname where dir should be
+        }
+        if (!(ent->attribs & ATTR_IS_DIR)) {
+            log_debug("vdfs: find_entry: acorn path %s has file %s where directory expected", filename, ent->host_path);
+            return NULL;
+        }
     }
     return NULL;
 }
@@ -1555,7 +1560,7 @@ static void osfile_write(uint32_t pb, vdfs_ent_t *ent, vdfs_ent_t *key, void (*c
                 return;
             }
         }
-    } else if (!(ent = add_new_file(cur_dir, key->acorn_fn))) {
+    } else if (!(ent = add_new_file(key->parent, key->acorn_fn))) {
         adfs_error(err_nomem);
         return;
     }
