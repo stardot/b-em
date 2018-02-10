@@ -156,7 +156,7 @@ cpu_debug_t core6502_cpu_debug = {
 };
 
 static uint32_t dbg_disassemble(uint32_t addr, char *buf, size_t bufsize) {
-  return dbg6502_disassemble(&core6502_cpu_debug, addr, buf, bufsize, MASTER ? M65C02 : M6502);
+  return dbg6502_disassemble(&core6502_cpu_debug, addr, buf, bufsize, x65c02 ? M65C02 : M6502);
 }
 
 int tubecycle;
