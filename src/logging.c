@@ -47,25 +47,24 @@ static void log_common(unsigned dest, const char *level, char *msg, size_t len)
     time_t now;
 
     while (msg[len-1] == '\n')
-	len--;
+        len--;
     if ((dest & LOG_DEST_FILE) && log_fp) {
-	time(&now);
-	if (now != last)
-	{
-	    strftime(tmstr, sizeof(tmstr), "%d/%m/%Y %H:%M:%S", localtime(&now));
-	    last = now;
-	}
-	fprintf(log_fp, "%s %s ", tmstr, level); 
-	fwrite(msg, len, 1, log_fp);
-	putc('\n', log_fp);
-	fflush(log_fp);
+        time(&now);
+        if (now != last) {
+            strftime(tmstr, sizeof(tmstr), "%d/%m/%Y %H:%M:%S", localtime(&now));
+            last = now;
+        }
+        fprintf(log_fp, "%s %s ", tmstr, level); 
+        fwrite(msg, len, 1, log_fp);
+        putc('\n', log_fp);
+        fflush(log_fp);
     }
     if (dest & LOG_DEST_STDERR) {
-	fwrite(msg, len, 1, stderr);
-	putc('\n', stderr);
+        fwrite(msg, len, 1, stderr);
+        putc('\n', stderr);
     }
     if (dest & LOG_DEST_MSGBOX)
-	log_msgbox(level, msg);
+        log_msgbox(level, msg);
 }
 
 static char msg_malloc[] = "log_format: out of space - following message truncated";
@@ -76,20 +75,19 @@ static void log_format(const log_level_t *ll, const char *fmt, va_list ap)
     char   abuf[200], *mbuf;
     size_t len;
 
-    if ((opt = log_options & ll->mask))
-    {
-	dest = opt >> ll->shift;
-	len = vsnprintf(abuf, sizeof abuf, fmt, ap);
-	if (len <= sizeof abuf)
-	    log_common(dest, ll->name, abuf, len);
-	else if ((mbuf = malloc(len + 1))) {
-	    vsnprintf(mbuf, len, fmt, ap);
-	    log_common(dest, ll->name, mbuf, len);
-	    free(mbuf);
-	} else {
-	    log_common(dest, ll->name, msg_malloc, sizeof msg_malloc);
-	    log_common(dest, ll->name, abuf, len);
-	}
+    if ((opt = log_options & ll->mask)) {
+        dest = opt >> ll->shift;
+        len = vsnprintf(abuf, sizeof abuf, fmt, ap);
+        if (len <= sizeof abuf)
+            log_common(dest, ll->name, abuf, len);
+        else if ((mbuf = malloc(len + 1))) {
+            vsnprintf(mbuf, len, fmt, ap);
+            log_common(dest, ll->name, mbuf, len);
+            free(mbuf);
+        } else {
+            log_common(dest, ll->name, msg_malloc, sizeof msg_malloc);
+            log_common(dest, ll->name, abuf, len);
+        }
     }
 }
 
@@ -149,11 +147,11 @@ static int contains(const char *haystack, const char *needle)
     needle_len = strlen(needle);
     haystack--;
     do {
-	while (*++haystack == ' ')
-	    ;
-	if (strncasecmp(haystack, needle, needle_len) == 0)
-	    return 1;
-	haystack = strchr(haystack, ',');
+        while (*++haystack == ' ')
+            ;
+        if (strncasecmp(haystack, needle, needle_len) == 0)
+            return 1;
+        haystack = strchr(haystack, ',');
     } while (haystack);
     return 0;
 }
@@ -170,24 +168,23 @@ void log_open(void)
     to_stderr = get_config_string(log_section, "to_stderr", "FATAL,ERROR,WARNING");
     to_msgbox = get_config_string(log_section, "to_msgbox", "FATAL,ERROR");
     new_opt = 0;
-    for (llp = log_levels; (ll = *llp++); )
-    {
-	if (contains(to_file, ll->name))
-	    new_opt |= (LOG_DEST_FILE << ll->shift);
-	if (contains(to_stderr, ll->name))
-	    new_opt |= (LOG_DEST_STDERR << ll->shift);
-	if (contains(to_msgbox, ll->name))
-	    new_opt |= (LOG_DEST_MSGBOX << ll->shift);
+    for (llp = log_levels; (ll = *llp++); ) {
+        if (contains(to_file, ll->name))
+            new_opt |= (LOG_DEST_FILE << ll->shift);
+        if (contains(to_stderr, ll->name))
+            new_opt |= (LOG_DEST_STDERR << ll->shift);
+        if (contains(to_msgbox, ll->name))
+            new_opt |= (LOG_DEST_MSGBOX << ll->shift);
     }
     log_options = new_opt;
     append = get_config_int(log_section, "append", 1);
     if ((log_fp = fopen(log_fn, append ? "at" : "wt")) == NULL)
-	log_warn("log_open: unable to open log %s: %s", log_fn, strerror(errno));
+        log_warn("log_open: unable to open log %s: %s", log_fn, strerror(errno));
     log_debug("log_open: log options=%x", log_options);
 }
 
 void log_close(void)
 {
     if (log_fp)
-	fclose(log_fp);
+        fclose(log_fp);
 }
