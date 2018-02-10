@@ -34,7 +34,7 @@ static const log_level_t *log_levels[] =
 };
 
 static const char log_section[]    = "logging";
-static const char log_default_fn[] = "b-emlog.txt";
+static const char log_default_fn[] = "b-emlog";
 
 static unsigned log_options = 0;
 
@@ -156,30 +156,50 @@ static int contains(const char *haystack, const char *needle)
     return 0;
 }
 
-void log_open(void)
-{
-    const char *log_fn, *to_file, *to_stderr, *to_msgbox;
-    unsigned new_opt;
-    const log_level_t **llp, *ll;
+static void log_open_file(void) {
+    const char *log_fn;
+    char path[PATH_MAX];
     int append;
 
-    log_fn = get_config_string(log_section, "log_filename", log_default_fn);
+    log_fn = get_config_string(log_section, "log_filename", NULL);
+    if (!log_fn) {
+        if (find_cfg_dest(path, sizeof path, log_default_fn, "txt"))
+            log_warn("log_open: unable to find suitable destination for log file");
+        else
+            log_fn = path;
+    }
+    if (log_fn) {
+        append = get_config_int(log_section, "append", 1);
+        if ((log_fp = fopen(log_fn, append ? "at" : "wt")) == NULL)
+            log_warn("log_open: unable to open log %s: %s", log_fn, strerror(errno));
+    }
+}
+    
+void log_open(void)
+{
+    const char *to_file, *to_stderr, *to_msgbox;
+    unsigned new_opt;
+    const log_level_t **llp, *ll;
+    int open_file;
+
     to_file = get_config_string(log_section, "to_file", "FATAL,ERROR,WARNING,INFO,DEBUG");
     to_stderr = get_config_string(log_section, "to_stderr", "FATAL,ERROR,WARNING");
     to_msgbox = get_config_string(log_section, "to_msgbox", "FATAL,ERROR");
     new_opt = 0;
+    open_file = 0;
     for (llp = log_levels; (ll = *llp++); ) {
-        if (contains(to_file, ll->name))
+        if (contains(to_file, ll->name)) {
             new_opt |= (LOG_DEST_FILE << ll->shift);
+            open_file = 1;
+        }
         if (contains(to_stderr, ll->name))
             new_opt |= (LOG_DEST_STDERR << ll->shift);
         if (contains(to_msgbox, ll->name))
             new_opt |= (LOG_DEST_MSGBOX << ll->shift);
     }
     log_options = new_opt;
-    append = get_config_int(log_section, "append", 1);
-    if ((log_fp = fopen(log_fn, append ? "at" : "wt")) == NULL)
-        log_warn("log_open: unable to open log %s: %s", log_fn, strerror(errno));
+    if (open_file)
+        log_open_file();
     log_debug("log_open: log options=%x", log_options);
 }
 
