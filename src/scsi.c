@@ -822,7 +822,7 @@ static void scsi_init_lun(int lun)
         if (!find_cfg_file(path, sizeof path, name, "dat")) {
             if ((dat = fopen(path, "rb+")))
             {
-                strcpy(strchr(path, '.'), ".dsc");
+                strcpy(strrchr(path, '.'), ".dsc");
                 if ((dsc = fopen(path, "rb+")))
                 {
                         if (fread(geom, sizeof geom, 1, dsc) == 1)
@@ -838,7 +838,7 @@ static void scsi_init_lun(int lun)
                         fclose(dsc);
                 }
                 else
-                        log_warn("scsi lun %d: unable to open dsc file %s: %s", lun, name, strerror(errno));
+                        log_warn("scsi lun %d: unable to open dsc file %s: %s", lun, path, strerror(errno));
                 if (SCSISize[lun] == 0)
                 {
                         SCSISize[lun] = size = fseek(dat, 0, SEEK_END);
@@ -856,7 +856,7 @@ static void scsi_init_lun(int lun)
                 SCSIDisc[lun] = dat;
             }
             else
-                log_error("scsi lun %d: unable to open data file %s: %s", lun, name, strerror(errno));
+                log_error("scsi lun %d: unable to open data file %s: %s", lun, path, strerror(errno));
         } else
             log_warn("scsi lun %d: no disc file %s found", lun, name);
 }
