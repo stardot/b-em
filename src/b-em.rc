@@ -173,6 +173,8 @@ BEGIN
                         MENUITEM "BBC B w/Opus 1770 FDC",       IDM_MODEL_0+18
                         MENUITEM "BBC B w/Solidisk 1770 FDC",   IDM_MODEL_0+17
                         MENUITEM "BBC B w/Watford 1770 FDC",    IDM_MODEL_0+19
+                        MENUITEM "BBC B with 65C02, no FDC",    IDM_MODEL_0+20
+                        MENUITEM "BBC B 65C02, Acorn 1770",     IDM_MODEL_0+21
                         MENUITEM "BBC B US",                    IDM_MODEL_0+6
                         MENUITEM "BBC B German",                IDM_MODEL_0+7
                         MENUITEM "BBC B+ 64K",                  IDM_MODEL_0+8

@@ -27,7 +27,7 @@ typedef struct
         int tube;
 } MODEL;
 
-#define NUM_MODELS 20
+#define NUM_MODELS 22
 extern MODEL models[NUM_MODELS];
 
 typedef struct

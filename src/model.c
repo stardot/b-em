@@ -39,7 +39,9 @@ MODEL models[NUM_MODELS] =
         {"BBC B wo/FDC w/SWRAM",      0,    WD1770_NONE,    0,     0,  0,      0, 0,      0,       "bbc_b_nofdc",    "os12",    "basic2",  "",         "",        mem_romsetup_swram,   -1},
         {"BBC B w/Solidisk 1770 FDC", 0,    WD1770_STL,     0,     0,  0,      0, 0,      0,       "bbc_b_solidisk", "os12",    "basic2",  "stldfs21", "",        mem_romsetup_swram,   -1},
         {"BBC B w/Opus 1770 FDC",     0,    WD1770_OPUS,    0,     0,  0,      0, 0,      0,       "bbc_b_opus",     "os12",    "basic2",  "oddos345", "",        mem_romsetup_swram,   -1},
-        {"BBC B w/Watford 1770 FDC",  0,    WD1770_WATFORD, 0,     0,  0,      0, 0,      0,       "bbc_b_watford",  "os12",    "basic2",  "wddfs153", "",        mem_romsetup_swram,   -1}
+        {"BBC B w/Watford 1770 FDC",  0,    WD1770_WATFORD, 0,     0,  0,      0, 0,      0,       "bbc_b_watford",  "os12",    "basic2",  "wddfs153", "",        mem_romsetup_swram,   -1},
+        {"BBC B with 65C02, no FDC",  0,    WD1770_NONE,    1,     0,  0,      0, 0,      0,       "bbc_b_65c02",    "os12",    "basic4",  "",         "",        mem_romsetup_swram,   -1},
+        {"BBC B, 65C02, Acorn 1770",  0,    WD1770_ACORN,   1,     0,  0,      0, 0,      0,       "bbc_b_c1770",    "os12",    "basic4",  "dfs226",   "",        mem_romsetup_swram,   -1}
 };
 
 static int _modelcount = 0;

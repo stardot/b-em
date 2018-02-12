@@ -142,12 +142,11 @@ void gui_update()
         discmenu[9].flags = (vdfs_enabled) ? D_SELECTED : 0;
         tapespdmenu[0].flags = (!fasttape) ? D_SELECTED : 0;
         tapespdmenu[1].flags = (fasttape)  ? D_SELECTED : 0;
-        for (x = 0; x < 16; x++) modelmenu[x].flags = 0;
-	for (x = 0; x < 16; x++)
-	{
-		if (curmodel == (intptr_t)modelmenu[x].dp)
-		   modelmenu[x].flags = D_SELECTED;
-	}
+        for (x = 0; x < NUM_MODELS; x++) modelmenu[x].flags = 0;
+        for (x = 0; x < NUM_MODELS; x++) {
+            if (curmodel == (intptr_t)modelmenu[x].dp)
+                modelmenu[x].flags = D_SELECTED;
+        }
         #ifdef NS32016
         for (x = 0; x < 5; x++)  tubemenu[x].flags = (selecttube == (intptr_t)tubemenu[x].dp) ? D_SELECTED : 0;
         #else
@@ -499,6 +498,8 @@ MENU modelmenu[NUM_MODELS+1]=
         {"BBC B w/Opus 1770 FDC",     gui_model, NULL, 0, (void *)18},
         {"BBC B w/Solidisk 1770 FDC", gui_model, NULL, 0, (void *)17},
         {"BBC B w/Watford 1770 FDC",  gui_model, NULL, 0, (void *)19},
+        {"BBC B with 65C02, no FDC",  gui_model, NULL, 0, (void *)20},
+        {"BBC B 65C02, Acorn 1770",   gui_model, NULL, 0, (void *)21},
         {"BBC B US",                  gui_model, NULL, 0, (void *)6},
         {"BBC B German",              gui_model, NULL, 0, (void *)7},
         {"BBC B+ 64K",                gui_model, NULL, 0, (void *)8},
