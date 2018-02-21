@@ -297,6 +297,7 @@ static void Read6(void)
 	scsi.cd = false;
 
 	scsi.req = true;
+    autoboot = 0;
 }
 
 static bool WriteSector(unsigned char *buf, int block)

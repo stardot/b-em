@@ -125,6 +125,7 @@ void ide_write(uint16_t addr, uint8_t val)
                         case 0x20: /*Read sector*/
                         ide.atastat  = 0x80;
                         ide_count = 200;
+                        autoboot = 0;
                         return;
                         case 0x30: /*Write sector*/
                         ide.atastat = 0x08 | 0x40;
