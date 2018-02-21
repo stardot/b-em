@@ -3,7 +3,6 @@
   Originally from Snem, with some bugfixes*/
 
 #include <stdio.h>
-#include <allegro.h>
 #include "b-em.h"
 #include "tube.h"
 #include "65816.h"

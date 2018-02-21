@@ -3,7 +3,6 @@
   I can't remember what emulator I originally wrote this for... probably ZX82
   I think a few bugs left*/
 
-#include <allegro.h>
 #include <stdio.h>
 
 #include "b-em.h"

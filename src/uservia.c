@@ -2,7 +2,6 @@
   User VIA + Master 512 mouse emulation*/
 
 #include <stdio.h>
-#include <allegro.h>
 #include "b-em.h"
 #include "via.h"
 #include "uservia.h"

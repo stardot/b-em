@@ -1,7 +1,6 @@
 /*B-em v2.2 by Tom Walker
   Internal SN sound chip emulation*/
 
-#include <allegro.h>
 #include <stdio.h>
 #include "b-em.h"
 #include "sid_b-em.h"

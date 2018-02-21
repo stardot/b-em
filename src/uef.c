@@ -1,7 +1,6 @@
 /*B-em v2.2 by Tom Walker
   UEF/HQ-UEF tape support*/
 
-#include <allegro.h>
 #include <zlib.h>
 #include <stdio.h>
 #include "b-em.h"

@@ -1,7 +1,6 @@
 /*B-em v2.2 by Tom Walker
   6502 parasite CPU emulation*/
 
-#include <allegro.h>
 #include <stdio.h>
 
 #include "b-em.h"
@@ -2158,13 +2157,6 @@ void tube_6502_exec()
                                 break;
                         }
                         break;
-//                                default:
-//                                allegro_exit();
-//                                printf("Error : Bad tube 65c02 opcode %02X\n",opcode);
-//                                pc--;
-//                                dumpregs();
-//                                printf("Current ROM %02X\n",currom);
-//                                exit(-1);
                 }
                 if ((tube_irq & 2) && !tube_6502_oldnmi) {
                         push(pc >> 8);

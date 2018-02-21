@@ -1,7 +1,6 @@
 /*B-em v2.2 by Tom Walker
   OpenAL interface*/
 
-#include <allegro.h>
 #include <stdio.h>
 #include <AL/al.h>
 #include <AL/alut.h>

@@ -4,7 +4,6 @@
   A few bits of 80286 emulation hanging around also*/
 #include <stdio.h>
 #include <stdint.h>
-#include <allegro.h>
 #include "b-em.h"
 #include "x86.h"
 #include "tube.h"

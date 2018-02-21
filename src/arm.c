@@ -4,7 +4,6 @@
 
 #include <stdio.h>
 #include <stdint.h>
-#include <allegro.h>
 #include "b-em.h"
 #include "arm.h"
 #include "tube.h"
