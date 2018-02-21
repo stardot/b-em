@@ -146,8 +146,10 @@ void disc_seek(int drive, int track)
 
 void disc_readsector(int drive, int sector, int track, int side, int density)
 {
-        if (drives[drive].readsector)
-           drives[drive].readsector(drive, sector, track, side, density);
+        if (drives[drive].readsector) {
+            autoboot = 0;
+            drives[drive].readsector(drive, sector, track, side, density);
+        }
         else
            disc_notfound = 10000;
 }

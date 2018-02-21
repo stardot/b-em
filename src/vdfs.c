@@ -2209,6 +2209,7 @@ void vdfs_write(uint16_t addr, uint8_t value) {
             break;
         case 1:
             fs_flag = value;
+            autoboot = 0;
             log_debug("vdfs: set fs_flag=%02x", value);
             break;
         case 2:
