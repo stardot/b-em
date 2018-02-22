@@ -1,7 +1,7 @@
 /*B-em v2.2 by Tom Walker
   Configuration handling*/
 
-#include <allegro.h>
+#include <allegro5/allegro.h>
 #include "b-em.h"
 
 #include "config.h"
@@ -26,88 +26,121 @@ int selecttube = -1;
 int cursid = 0;
 int sidmethod = 0;
 
-void config_load()
-{
-        int c;
-        char s[PATH_MAX];
-        char *p;
-        if (!find_cfg_file(s, sizeof s, "b-em", "cfg"))
-            set_config_file(s);
-        else
-            log_warn("config: not config file found, using defaults");
+static ALLEGRO_CONFIG *bem_cfg;
 
-        p = (char *)get_config_string(NULL, "disc0", NULL);
-        if (p) strcpy(discfns[0], p);
-        else   discfns[0][0] = 0;
-        p = (char *)get_config_string(NULL, "disc1", NULL);
-        if (p) strcpy(discfns[1], p);
-        else   discfns[1][0] = 0;
-//        p=(char *)get_config_string(NULL,"tape",NULL);
-//        if (p) strcpy(tapefn,p);
-        /*else   */tape_fn[0] = 0;
+int get_config_int(const char *sect, const char *key, int ival) {
+    const char *str;
 
-        defaultwriteprot = get_config_int(NULL, "defaultwriteprotect", 1);
-
-        curmodel        = get_config_int(NULL, "model",         3);
-        selecttube      = get_config_int(NULL, "tube",         -1);
-        tube_6502_speed = get_config_int(NULL, "tube6502speed", 1);
-
-        sound_internal     = get_config_int(NULL, "sndinternal",   1);
-        sound_beebsid      = get_config_int(NULL, "sndbeebsid",    1);
-        sound_music5000    = get_config_int(NULL, "sndmusic5000",  0);
-        sound_dac          = get_config_int(NULL, "snddac    ",    0);
-        sound_ddnoise      = get_config_int(NULL, "sndddnoise",    1);
-        sound_tape         = get_config_int(NULL, "sndtape",       0);
-
-        sound_filter    = get_config_int(NULL, "soundfilter",   1);
-        curwave         = get_config_int(NULL, "soundwave",     0);
-
-        sidmethod       = get_config_int(NULL, "sidmethod",     0);
-        cursid          = get_config_int(NULL, "cursid",        2);
-
-        ddnoise_vol     = get_config_int(NULL, "ddvol",         2);
-        ddnoise_type    = get_config_int(NULL, "ddtype",        0);
-
-        vid_fullborders = get_config_int(NULL, "fullborders",   1);
-
-        c               = get_config_int(NULL, "displaymode",   3);
-        vid_scanlines = (c == 2);
-        vid_interlace = (c == 1) || (c == 5);
-        vid_linedbl   = (c == 3);
-        vid_pal       = (c == 4) || (c == 5);
-        videoresize     = get_config_int(NULL, "video_resize",  0);
-
-        fasttape        = get_config_int(NULL, "fasttape",      0);
-
-	scsi_enabled    = get_config_int(NULL, "scsienable", 0);
-        ide_enable      = get_config_int(NULL, "ideenable",     0);
-	vdfs_enabled    = get_config_int(NULL, "vdfsenable", 0);
-
-        keyas           = get_config_int(NULL, "key_as",        0);
-
-        mouse_amx       = get_config_int(NULL, "mouse_amx",     0);
-
-        kbdips = get_config_int(NULL, "kbdips", 0);
-
-        for (c = 0; c < 128; c++)
-        {
-                sprintf(s, "key_define_%03i", c);
-                keylookup[c] = get_config_int("user_keyboard", s, c);
-        }
-        buflen_m5 = get_config_int("sound", "buflen_music5000", BUFLEN_M5);
-        midi_load_config();
+    if (bem_cfg && (str = al_get_config_value(bem_cfg, sect, key)))
+        ival = atoi(str);
+    return ival;
 }
 
-void config_save()
+const char *get_config_string(const char *sect, const char *key, const char *sval) {
+    const char *str;
+
+    if (bem_cfg && (str = al_get_config_value(bem_cfg, sect, key)))
+        sval = str;
+    return sval;
+}
+
+void config_load(void)
+{
+    int c;
+    char s[PATH_MAX];
+    const char *p;
+    if (!find_cfg_file(s, sizeof s, "b-em", "cfg")) {
+        if (bem_cfg)
+            al_destroy_config(bem_cfg);
+        if (!(bem_cfg = al_load_config_file(s)))
+            log_warn("config: unable to load confif file '%s', using defaults", s);
+    } else
+        log_warn("config: no config file found, using defaults");
+
+    if (bem_cfg) {
+        if ((p = al_get_config_value(bem_cfg, NULL, "disc0")))
+            strncpy(discfns[0], p, sizeof(discfns[0]));
+        if ((p = al_get_config_value(bem_cfg, NULL, "disc1")))
+            strncpy(discfns[1], p, sizeof(discfns[1]));
+    }
+
+    defaultwriteprot = get_config_int(NULL, "defaultwriteprotect", 1);
+
+    curmodel         = get_config_int(NULL, "model",         3);
+    selecttube       = get_config_int(NULL, "tube",         -1);
+    tube_6502_speed  = get_config_int(NULL, "tube6502speed", 1);
+
+    sound_internal   = get_config_int(NULL, "sndinternal",   1);
+    sound_beebsid    = get_config_int(NULL, "sndbeebsid",    1);
+    sound_music5000  = get_config_int(NULL, "sndmusic5000",  0);
+    sound_dac        = get_config_int(NULL, "snddac    ",    0);
+    sound_ddnoise    = get_config_int(NULL, "sndddnoise",    1);
+    sound_tape       = get_config_int(NULL, "sndtape",       0);
+
+    sound_filter     = get_config_int(NULL, "soundfilter",   1);
+    curwave          = get_config_int(NULL, "soundwave",     0);
+
+    sidmethod        = get_config_int(NULL, "sidmethod",     0);
+    cursid           = get_config_int(NULL, "cursid",        2);
+
+    ddnoise_vol      = get_config_int(NULL, "ddvol",         2);
+    ddnoise_type     = get_config_int(NULL, "ddtype",        0);
+
+    vid_fullborders  = get_config_int(NULL, "fullborders",   1);
+
+    c                = get_config_int(NULL, "displaymode",   3);
+    vid_scanlines    = (c == 2);
+    vid_interlace    = (c == 1) || (c == 5);
+    vid_linedbl      = (c == 3);
+    vid_pal          = (c == 4) || (c == 5);
+    videoresize      = get_config_int(NULL, "video_resize",  0);
+
+    fasttape         = get_config_int(NULL, "fasttape",      0);
+
+    scsi_enabled     = get_config_int(NULL, "scsienable", 0);
+    ide_enable       = get_config_int(NULL, "ideenable",     0);
+    vdfs_enabled     = get_config_int(NULL, "vdfsenable", 0);
+
+    keyas            = get_config_int(NULL, "key_as",        0);
+    mouse_amx        = get_config_int(NULL, "mouse_amx",     0);
+    kbdips           = get_config_int(NULL, "kbdips", 0);
+
+    buflen_m5        = get_config_int("sound", "buflen_music5000", BUFLEN_M5);
+
+    for (c = 0; c < 128; c++) {
+        sprintf(s, "key_define_%03i", c);
+        keylookup[c] = get_config_int("user_keyboard", s, c);
+    }
+    midi_load_config();
+}
+
+void set_config_int(const char *sect, const char *key, int value)
+{
+    char buf[10];
+
+    snprintf(buf, sizeof buf, "%d", value);
+    al_set_config_value(bem_cfg, sect, key, buf);
+}
+
+void set_config_string(const char *sect, const char *key, const char *value)
+{
+    al_set_config_value(bem_cfg, sect, key, value);
+}
+
+void config_save(void)
 {
     int c;
     char s[PATH_MAX];
 
     if (!find_cfg_dest(s, sizeof s, "b-em", "cfg")) {
-        set_config_file(s);
-        set_config_string(NULL, "disc0", discfns[0]);
-        set_config_string(NULL, "disc1", discfns[1]);
-//        set_config_string(NULL,"tape",tape_fn);
+        if (!bem_cfg) {
+            if (!(bem_cfg = al_create_config())) {
+                log_error("config: unable to save configuration");
+                return;
+            }
+        }
+        al_set_config_value(bem_cfg, NULL, "disc0", discfns[0]);
+        al_set_config_value(bem_cfg, NULL, "disc1", discfns[1]);
 
         set_config_int(NULL, "defaultwriteprotect", defaultwriteprot);
 
@@ -144,14 +177,14 @@ void config_save()
         set_config_int(NULL, "key_as", keyas);
 
         set_config_int(NULL, "mouse_amx", mouse_amx);
+        set_config_int("sound", "buflen_music5000", buflen_m5);
 
         for (c = 0; c < 128; c++)
         {
             sprintf(s, "key_define_%03i", c);
             set_config_int("user_keyboard", s, keylookup[c]);
         }
-        set_config_int("sound", "buflen_music5000", buflen_m5);
         midi_save_config();
     } else
-        log_error("config: no suitable destination for config file- config will not be saved");
+        log_error("config: no suitable destination for config file - config will not be saved");
 }
