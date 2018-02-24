@@ -1,7 +1,6 @@
 /*B-em v2.2 by Tom Walker
   Configuration handling*/
 
-#include <allegro5/allegro.h>
 #include "b-em.h"
 
 #include "config.h"

@@ -1,8 +1,8 @@
 /* Part of B-Em by Tom Walker */
 
 #include "b-em.h"
+#include "config.h"
 
-#include <allegro.h>
 #include <errno.h>
 #include <stdarg.h>
 #include <time.h>

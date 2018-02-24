@@ -1,8 +1,6 @@
 #ifndef __INC_DISC_H
 #define __INC_DISC_H
 
-#include <allegro5/allegro.h>
-
 #define NUM_DRIVES 2
 
 typedef struct

@@ -1,8 +1,6 @@
 /*B-em v2.2 by Tom Walker
   Disc support*/
 
-#include <allegro.h>
-#include <stdio.h>
 #include "b-em.h"
 
 #include "fdi.h"

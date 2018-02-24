@@ -2,9 +2,8 @@
   Linux main*/
 
 #ifndef WIN32
-#include <allegro5/allegro.h>
-#include <allegro5/allegro_native_dialog.h>
 #include "b-em.h"
+#include <allegro5/allegro_native_dialog.h>
 #include "config.h"
 #include "linux-gui.h"
 #include "main.h"

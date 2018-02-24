@@ -1,4 +1,3 @@
-#include <allegro5/allegro.h>
 #include "b-em.h"
 #include "tape.h"
 #include "serial.h"

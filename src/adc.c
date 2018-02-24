@@ -1,8 +1,6 @@
 /*B-em v2.2 by Tom Walker
   ADC emulation*/
 
-#include <allegro5/allegro.h>
-#include <stdio.h>
 #include "b-em.h"
 #include "adc.h"
 #include "via.h"

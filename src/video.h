@@ -1,8 +1,6 @@
 #ifndef __INC_VIDEO_H
 #define __INC_VIDEO_H
 
-#include <allegro5/allegro.h>
-
 #define CLOCKS_PER_FRAME 80000
 
 /*CRTC (6845)*/

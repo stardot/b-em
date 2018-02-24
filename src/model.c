@@ -1,4 +1,3 @@
-#include <allegro.h>
 #include "b-em.h"
 
 #include "model.h"

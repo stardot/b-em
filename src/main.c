@@ -1,13 +1,9 @@
 /*B-em v2.2 by Tom Walker
   Main loop + start/finish code*/
 
-#include <allegro.h>
-
 #ifdef WIN32
 #include <winalleg.h>
 #endif
-#include <stdlib.h>
-#include <string.h>
 
 #include "b-em.h"
 
@@ -116,7 +112,6 @@ void main_reset()
 
 void main_init(int argc, char *argv[])
 {
-        char t[512];
         int c;
         int tapenext = 0, discnext = 0;
 
@@ -129,8 +124,9 @@ void main_init(int argc, char *argv[])
 
         al_init_main(argc, argv);
 
-        append_filename(t, exedir, "roms/tube/ReCo6502ROM_816", 511);
-        if (!file_exists(t,FA_ALL,NULL) && selecttube == 4) selecttube = -1;
+        //TODO - do this properly.
+        //append_filename(t, exedir, "roms/tube/ReCo6502ROM_816", 511);
+        //if (!file_exists(t,FA_ALL,NULL) && selecttube == 4) selecttube = -1;
 
         curtube = selecttube;
         model_check();
@@ -214,18 +210,25 @@ void main_init(int argc, char *argv[])
                         vid_interlace = 1;
             vid_linedbl = vid_scanlines = 0;
                 }
-                else if (tapenext)
-                   strcpy(tape_fn, argv[c]);
+                else if (tapenext) {
+                    if (tape_fn)
+                        al_destroy_path(tape_fn);
+                    tape_fn = al_create_path(argv[c]);
+                }
                 else if (discnext)
                 {
-                        strcpy(discfns[discnext-1], argv[c]);
-                        discnext = 0;
+                    if (discfns[discnext-1])
+                        al_destroy_path(discfns[discnext-1]);
+                    discfns[discnext-1] = al_create_path(argv[c]);
+                    discnext = 0;
                 }
                 else
                 {
-                        strcpy(discfns[0], argv[c]);
-                        discnext = 0;
-            autoboot = 150;
+                    if (discfns[0])
+                        al_destroy_path(discfns[0]);
+                    discfns[0] = al_create_path(argv[c]);
+                    discnext = 0;
+                    autoboot = 150;
                 }
                 if (tapenext) tapenext--;
         }

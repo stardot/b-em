@@ -1,8 +1,6 @@
 #ifndef __INC_KEYBOARD_H
 #define __INC_KEYBOARD_H
 
-#include <allegro5/allegro.h>
-
 extern int kbdips;
 
 extern int keylookup[ALLEGRO_KEY_MAX];

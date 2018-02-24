@@ -2,10 +2,7 @@
   Video emulation
   Incorporates 6845 CRTC, Video ULA and SAA5050*/
 
-#include <allegro5/allegro.h>
 #include <allegro5/allegro_native_dialog.h>
-#include <stdio.h>
-#include <stdint.h>
 #include "b-em.h"
 
 #include "bbctext.h"

@@ -1,11 +1,7 @@
 /*B-em v2.2 by Tom Walker
   ROM handling*/
 
-#include <allegro.h>
 #include <ctype.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include "b-em.h"
 #include "6502.h"
 #include "mem.h"

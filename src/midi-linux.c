@@ -3,7 +3,6 @@
 #include "music4000.h"
 #include "midi-linux.h"
 #include "sound.h"
-#include <allegro.h>
 #include <pthread.h>
 #include <unistd.h>
 

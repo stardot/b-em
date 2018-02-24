@@ -1,8 +1,6 @@
 /*B-em v2.2 by Tom Walker
   System VIA + keyboard emulation*/
 
-#include <allegro.h>
-#include <stdio.h>
 #include "b-em.h"
 #include "model.h"
 #include "cmos.h"

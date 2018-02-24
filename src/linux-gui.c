@@ -42,7 +42,7 @@ int timerspeeds[] = {5, 12, 25, 38, 50, 75, 100, 150, 200, 250};
 int frameskips[]  = {0, 0,  0,  0,  0,  0,  1,   2,   3,   4};
 int emuspeed = 4;
 
-void setejecttext(int d, char *s)
+void setejecttext(int d, const char *s)
 {
 }
 
@@ -210,11 +210,11 @@ int gui_loadss()
         char tempname[260];
         int ret;
         int xsize = windx - 32, ysize = windy - 16;
-        memcpy(tempname, discfns[0], 260);
+        memcpy(tempname, discfns[0], sizeof tempname);
         ret = file_select_ex("Please choose a save state", tempname, "SNP", 260, xsize, ysize);
         if (ret)
         {
-                strcpy(savestate_name, tempname);
+                strncpy(savestate_name, tempname, sizeof savestate_name);
                 savestate_load();
         }
         gui_update();
@@ -231,11 +231,11 @@ int gui_savess()
                 alert(NULL, "Second processor save states not supported yet.", NULL, "&OK", NULL, 0, 0);
                 return D_CLOSE;
         }
-        memcpy(tempname, discfns[0], 260);
+        memcpy(tempname, discfns[0], sizeof tempname);
         ret = file_select_ex("Please choose a save state", tempname, "SNP", 260, xsize, ysize);
         if (ret)
         {
-                strcpy(savestate_name, tempname);
+                strncpy(savestate_name, tempname, sizeof savestate_name);
                 savestate_save();
         }
         gui_update();
@@ -257,17 +257,17 @@ static int gui_load_drive(int drive, const char *prompt)
         char tempname[260];
         int ret;
         int xsize = windx - 32, ysize = windy - 16;
-        memcpy(tempname, discfns[drive], 260);
+        memcpy(tempname, discfns[drive], sizeof tempname);
         ret = file_select_ex(prompt, tempname, "SSD;DSD;IMG;ADF;ADL;FDI", 260, xsize, ysize);
         if (ret)
         {
-                disc_close(drive);
-                memcpy(discfns[drive], tempname, 260);
-                disc_load(drive, discfns[drive]);
-                if (defaultwriteprot)
-                        writeprot[drive] = 1;
+            ALLEGRO_PATH *path = al_create_path(tempname);
+            disc_close(drive);
+            disc_load(drive, path);
+            al_destroy_path(path);
+            if (defaultwriteprot)
+                writeprot[drive] = 1;
         }
-        gui_update();
         return ret;
 }
 
@@ -287,26 +287,27 @@ int gui_autoboot()
 int gui_load0()
 {
         gui_load_drive(0, "Please choose a disc image to load in drive 0/2");
+        gui_update();
         return D_CLOSE;
 }
 
 int gui_load1()
 {
         gui_load_drive(1, "Please choose a disc image to load in drive 1/3");
+        gui_update();
         return D_CLOSE;
 }
 
 int gui_eject0()
 {
-        disc_close(0);
-        discfns[0][0] = 0;
-        return D_CLOSE;
+    disc_close(0);
+    return D_CLOSE;
 }
+
 int gui_eject1()
 {
-        disc_close(1);
-        discfns[1][0] = 0;
-        return D_CLOSE;
+    disc_close(1);
+    return D_CLOSE;
 }
 
 int gui_wprot0()
@@ -392,7 +393,7 @@ int gui_vdfs_root() {
         int ret;
         int xsize = windx - 32, ysize = windy - 16;
         strncpy(tempname, vdfs_get_root(), sizeof(tempname));
-        memcpy(tempname, discfns[1], 260);
+        memcpy(tempname, discfns[0], sizeof tempname);
         ret = file_select_ex("Please select VDFS root directory", tempname, NULL, 260, xsize, ysize);
         if (ret)
             vdfs_set_root(tempname);
@@ -441,14 +442,14 @@ int gui_loadt()
         char tempname[260];
         int ret;
         int xsize = windx - 32, ysize = windy - 16;
-        memcpy(tempname, tape_fn, 260);
+        memcpy(tempname, al_path_cstr(tape_fn, ALLEGRO_NATIVE_PATH_SEP), 260);
         ret=file_select_ex("Please choose a tape image", tempname, "UEF;CSW", 260, xsize, ysize);
         if (ret)
         {
-                tape_close();
-                memcpy(tape_fn, tempname, 260);
-                tape_load(tape_fn);
-                tape_loaded = 1;
+            tape_close();
+            tape_fn = al_create_path(tempname);
+            tape_load(tape_fn);
+            tape_loaded = 1;
         }
         return D_CLOSE;
 }
