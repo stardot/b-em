@@ -4,6 +4,7 @@
 #include <ctype.h>
 #include "b-em.h"
 #include "6502.h"
+#include "config.h"
 #include "mem.h"
 #include "model.h"
 
@@ -111,8 +112,14 @@ void mem_loadrom(int slot, const char *name, const char *path, uint8_t use_name)
         log_warn("mem: unable to load ROM slot %02d with %s, uanble to open %s: %s", slot, name, path, strerror(errno));
 }
 
+static int is_relative_filename(const char *fn)
+{
+    int c0 = *fn;
+    return !(c0 == '/' || c0 == '\\' || (isalpha(c0) && fn[1] == ':'));
+}
+
 static void cfg_load_rom(int slot, const char *sect, const char *def) {
-    const char *key, *name;
+    const char *key, *name, *file;
     char path[PATH_MAX];
 
     key = slotkeys[slot];
@@ -123,8 +130,13 @@ static void cfg_load_rom(int slot, const char *sect, const char *def) {
                 mem_loadrom(slot, name, path, 1);
             else
                 log_warn("mem: unable to load ROM slot %02d with %s, ROM file not found", slot, name);
-        } else
-            mem_loadrom(slot, get_filename(name), name, 0);
+        } else {
+            if ((file = strrchr(name, '/')))
+                file++;
+            else
+                file = name;
+            mem_loadrom(slot, file, name, 0);
+        }
     }
 }
 

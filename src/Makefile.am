@@ -20,7 +20,7 @@ b_em_CFLAGS = $(allegro_CFLAGS) -DBEM -DINCLUDE_DEBUGGER -DUSE_MEMORY_POINTER
 if OS_WIN
 b_em_LDADD = -lalleg -lz -lopenal -lalut -lm
 else
-b_em_LDADD = $(allegro_LIBS) -lz -lopenal -lalut -lm -lpthread
+b_em_LDADD = -lallegro_audio -lallegro_primitives -lallegro_dialog -lallegro -lz -lopenal -lalut -lm -lpthread
 endif
 
 b_em_SOURCES = \
@@ -62,8 +62,6 @@ b_em_SOURCES = \
 	i8271.c \
 	ide.c \
 	keyboard.c \
-	linux-gui.c \
-	linux-keydefine.c \
 	linux.c \
 	logging.c \
 	main.c \

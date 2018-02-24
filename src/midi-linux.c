@@ -1,4 +1,5 @@
 #include "b-em.h"
+#include "config.h"
 #include "music2000.h"
 #include "music4000.h"
 #include "midi-linux.h"

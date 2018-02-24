@@ -21,6 +21,8 @@ int videoresize = 0;
 int mousecapture = 0;
 int quited = 0;
 
+void setejecttext(int drive, const char *fn) {};
+
 int windx, windy;
 void updatewindowsize(int x, int y)
 {
@@ -134,7 +136,6 @@ int main(int argc, char *argv[])
         exit(1);
     }
     al_init_native_dialog_addon();
-    //set_close_button_callback(setquit);
     al_set_new_window_title(VERSION_STR);
 
     config_load();

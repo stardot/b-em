@@ -86,6 +86,26 @@ static void key_update()
     sysvia_set_ca2(0);
 }
 
+void key_down(ALLEGRO_EVENT *event) {
+    int c, rc, row, col;
+
+    c = rc = event->keyboard.keycode;
+    if (keyas && c == ALLEGRO_KEY_A)
+        rc = ALLEGRO_KEY_CAPSLOCK;
+    if (TranslateKey(codeconvert[keylookup[rc]], &row, &col)>0)
+        key_press(row, col);
+}
+
+void key_up(ALLEGRO_EVENT *event) {
+    int c, rc, row, col;
+
+    c = rc = event->keyboard.keycode;
+    if (keyas && c == ALLEGRO_KEY_A)
+        rc = ALLEGRO_KEY_CAPSLOCK;
+    if (TranslateKey(codeconvert[keylookup[rc]], &row, &col)>0)
+        key_release(row, col);
+}
+
 void key_check()
 {    
     int c;
