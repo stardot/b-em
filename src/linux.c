@@ -2,7 +2,8 @@
   Linux main*/
 
 #ifndef WIN32
-#include <allegro.h>
+#include <allegro5/allegro.h>
+#include <allegro5/allegro_native_dialog.h>
 #include "b-em.h"
 #include "config.h"
 #include "linux-gui.h"
@@ -24,21 +25,19 @@ int quited = 0;
 int windx, windy;
 void updatewindowsize(int x, int y)
 {
-        x=(x+3)&~3; y=(y+3)&~3;
-        if (x<128) x=128;
-        if (y<64)  y=64;
-        if (windx!=x || windy!=y)
-        {
-//                printf("Update window size %i,%i\n",x,y);
-                windx=winsizex=x; windy=winsizey=y;
-                set_color_depth(dcol);
-                set_gfx_mode(GFX_AUTODETECT_WINDOWED,x,y,0,0);
-                scr_x_start = 0;
-                scr_y_start = 0;
-                scr_x_size = x;
-                scr_y_size = y;
-                set_color_depth(32);
-        }
+    x=(x+3)&~3; y=(y+3)&~3;
+    if (x<128) x=128;
+    if (y<64)  y=64;
+    if (windx!=x || windy!=y)
+    {
+        ALLEGRO_DISPLAY *display = al_get_current_display();
+        windx=winsizex=x; windy=winsizey=y;
+        al_resize_display(display, x, y);
+        scr_x_start = 0;
+        scr_y_start = 0;
+        scr_x_size = x;
+        scr_y_size = y;
+    }
 }
 
 void setquit()
@@ -131,38 +130,34 @@ int find_cfg_dest(char *path, size_t psize, const char *name, const char *ext) {
 
 int main(int argc, char *argv[])
 {
-        int oldf = 0;
+    int oldf = 0;
+    ALLEGRO_KEYBOARD_STATE keystate;
 
-        if (allegro_init())
-        {
-	        fputs("Failed to initialise Allegro!\n", stderr);
-                exit(-1);
+    if (!al_init()) {
+        fputs("Failed to initialise Allegro!\n", stderr);
+        exit(1);
+    }
+    al_init_native_dialog_addon();
+    //set_close_button_callback(setquit);
+    al_set_new_window_title(VERSION_STR);
+
+    config_load();
+    main_init(argc, argv);
+    while (!quited) {
+        main_run();
+        al_get_keyboard_state(&keystate);
+        if (al_key_down(&keystate, ALLEGRO_KEY_F11))
+            gui_enter();
+        if (al_key_down(&keystate, ALLEGRO_KEY_ALT) && al_key_down(&keystate, ALLEGRO_KEY_ENTER) && fullscreen && !oldf) {
+            fullscreen = 0;
+            video_leavefullscreen();
         }
-
-        set_close_button_callback(setquit);
-
-        set_window_title(VERSION_STR);
-
-        config_load();
-//        printf("Main\n");
-        main_init(argc, argv);
-//        printf("Inited\n");
-        while (!quited)
-        {
-                main_run();
-                if (key[KEY_F11]) gui_enter();
-                if (key[KEY_ALT] && key[KEY_ENTER] && fullscreen && !oldf)
-                {
-                        fullscreen = 0;
-                        video_leavefullscreen();
-                }
-                else if (key[KEY_ALT] && key[KEY_ENTER] && !fullscreen && !oldf)
-                {
-                        fullscreen = 1;
-                        video_enterfullscreen();
-                }
-                oldf = key[KEY_ALT] && key[KEY_ENTER];
+        else if (al_key_down(&keystate, ALLEGRO_KEY_ALT) && al_key_down(&keystate, ALLEGRO_KEY_ENTER) && !fullscreen && !oldf) {
+            fullscreen = 1;
+            video_enterfullscreen();
         }
+        oldf = al_key_down(&keystate, ALLEGRO_KEY_ALT) && al_key_down(&keystate, ALLEGRO_KEY_ENTER);
+    }
 	main_close();
 	return 0;
 }
@@ -171,25 +166,27 @@ void log_msgbox(const char *level, char *msg)
 {
     const int max_len = 80;
     char *max_ptr, *new_split, *cur_split;
+    ALLEGRO_DISPLAY *display;
 
+    display = al_get_current_display();
     if (strlen(msg) < max_len)
-        alert(level, msg, "", "&OK", NULL, 'a', 0);
+        al_show_native_message_box(display, level, msg, "", NULL, 0);
     else
     {
         max_ptr = msg + max_len;
         cur_split = msg;
         while ((new_split = strchr(cur_split+1, ' ')) && new_split < max_ptr)
             cur_split = new_split;
+        
         if (cur_split > msg)
         {
             *cur_split = '\0';
-            alert(level, msg, cur_split+1, "&OK", NULL, 'a', 0);
+            al_show_native_message_box(display, level, msg, cur_split+1, NULL, 0);
             *cur_split = ' ';
         }
         else
-            alert(level, msg, "", "&OK", NULL, 'a', 0);
+            al_show_native_message_box(display, level, msg, "", NULL, 0);
     }
 }
 
-END_OF_MAIN();
 #endif
