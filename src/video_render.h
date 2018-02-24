@@ -1,8 +1,9 @@
 #ifndef __INC_VIDEO_RENDER_H
 #define __INC_VIDEO_RENDER_H
 
-extern PALETTE pal;
-extern BITMAP *b, *b16, *b16x, *b32, *tb;
+#include <allegro5/allegro.h>
+/*extern PALETTE pal;*/
+extern ALLEGRO_BITMAP *b, *b16, *b16x, *b32, *tb;
 #ifdef WIN32
 extern BITMAP *vb;
 #endif

@@ -1,6 +1,6 @@
 /*B-em v2.2 by Tom Walker
   Allegro video code*/
-#include <allegro.h>
+#include <allegro5/allegro_primitives.h>
 #include "b-em.h"
 #ifdef WIN32
 #include "pal.h"
@@ -19,7 +19,7 @@ static int fskipcount;
 int vid_savescrshot = 0;
 char vid_scrshotname[260];
 
-static BITMAP *scrshotb, *scrshotb2;
+static ALLEGRO_BITMAP *scrshotb, *scrshotb2;
 
 int vid_clear = 0;
 
@@ -27,84 +27,42 @@ int scr_x_start, scr_x_size, scr_y_start, scr_y_size;
 
 void video_clearscreen()
 {
-    set_color_depth(dcol);
+    ALLEGRO_COLOR black = al_map_rgb(0, 0, 0);
+
 #ifdef WIN32
-    clear(vb);
+    al_set_target_bitmap(vb);
+    al_clear_to_color(black);
 #endif
-    clear(b16);
-    clear(b16x);
-    clear(b32);
-    clear(screen);
-    set_color_depth(32);
-    clear_to_color(b, 0);
+    al_set_target_bitmap(b16);
+    al_clear_to_color(black);
+    al_set_target_bitmap(b16x);
+    al_clear_to_color(black);
+    al_set_target_bitmap(b32);
+    al_clear_to_color(black);
+    al_set_target_backbuffer(al_get_current_display());
+    al_clear_to_color(black);
+    al_set_target_bitmap(b);
+    al_clear_to_color(black);
 }
 
 void video_close()
 {
-    destroy_bitmap(b32);
-    destroy_bitmap(b16x);
-    destroy_bitmap(b16);
-    destroy_bitmap(b);
+    al_destroy_bitmap(b32);
+    al_destroy_bitmap(b16x);
+    al_destroy_bitmap(b16);
+    al_destroy_bitmap(b);
 #ifdef WIN32
-    destroy_bitmap(vb);
+    al_destroy_bitmap(vb);
 #endif
-}
-
-static int gfx_full_screen(void) {
-    int res, alt = 0;
-    const int gfx = GFX_AUTODETECT_FULLSCREEN;
-
-    set_color_depth(dcol);
-    if ((res = set_gfx_mode(gfx, desktop_width, desktop_height, 0, 0))) {
-        /*
-        * Setting full-screen mode failed with the desktop colour
-        * depth.  Under Unix, the colour depth available for
-        * full-screen will vary and is not necessarily the same as the
-        * current desktop so we need to select an alternative.  8bpp
-        * doesn't have an alternative, but other colour depths do,
-        * so we should use those.
-        */
-        
-        switch (dcol) {
-            case 8:
-                return 1; // return failure with no alternate coloir depth.
-            case 15:
-                alt = 16;
-                break;
-            case 16:
-                alt = 15;
-                break;
-            case 24:
-                alt = 32;
-                break;
-            case 32:
-                alt = 24;
-                break;
-            default:
-                alt = 16;
-                break;
-        }
-        set_color_depth(alt);
-        res = set_gfx_mode(gfx, desktop_width, desktop_height, 0, 0);
-    }
-    return res;
 }
 
 void video_enterfullscreen()
 {
-	int value, c;
+    ALLEGRO_COLOR black = al_map_rgb(0, 0, 0);
+	int value;
     double aspect;
 
-#ifdef WIN32
-    destroy_bitmap(vb);
-#endif
-
-    if (gfx_full_screen()) {
-        log_error("vidalleg: could not set graphics mode to full-screen");
-        fullscreen = 0;
-    }
-    else {
-        c = makecol(0, 0, 0);
+    if (al_set_display_flag(al_get_current_display(), ALLEGRO_FULLSCREEN_WINDOW, true)) {
         aspect = (double)desktop_width / (double)desktop_height;
         if (aspect > (4.0 / 3.0)) {
             value = 800 * desktop_height / 600;
@@ -112,10 +70,11 @@ void video_enterfullscreen()
             scr_y_start = 0;
             scr_x_size = value;
             scr_y_size = desktop_height;
+            al_set_target_backbuffer(al_get_current_display());
             // fill the gap between the left screen edge and the BBC image.
-            rectfill(screen, 0, 0, scr_x_start, scr_y_size, c);
+            al_draw_filled_rectangle(0, 0, scr_x_start, scr_y_size, black);
             // fill the gap between the BBC image and the right screen edge.
-            rectfill(screen, scr_x_start + value, 0, desktop_width, desktop_height, c);
+            al_draw_filled_rectangle(scr_x_start + value, 0, desktop_width, desktop_height, black);
         }
         else {
             value = 600 * desktop_width / 800;
@@ -124,45 +83,28 @@ void video_enterfullscreen()
             scr_x_size = desktop_width;
             scr_y_size = value;
             // fill the gap between the top of the screen and the BBC image.
-            rectfill(screen, 0, 0, scr_x_size, scr_y_start, c);
+            al_draw_filled_rectangle(0, 0, scr_x_size, scr_y_start, black);
             // fill the gap between the BBC image and the bottom of the screen.
-            rectfill(screen, 0, scr_y_start + value, desktop_width, desktop_height, c);        
+            al_draw_filled_rectangle(0, scr_y_start + value, desktop_width, desktop_height, black);        
         }
+    } else {
+        log_error("vidalleg: could not set graphics mode to full-screen");
+        fullscreen = 0;
     }
-
-#ifdef WIN32
-    vb=create_video_bitmap(924, 614);
-#endif
-    set_color_depth(32);
 }
 
 void video_leavefullscreen()
 {
-#ifdef WIN32
-    destroy_bitmap(vb);
-#endif
-    set_color_depth(dcol);
-#ifdef WIN32
-    set_gfx_mode(GFX_AUTODETECT_WINDOWED, 2048, 2048, 0, 0);
-    vb=create_video_bitmap(924, 614);
-    scr_x_size = 640;
-    scr_y_size = 480;
-#else
-    set_gfx_mode(GFX_AUTODETECT_WINDOWED, 640, 480, 0, 0);
-    scr_x_size = SCREEN_W;
-    scr_y_size = SCREEN_H;
-#endif
-    scr_x_start = 0;
-    scr_y_start = 0;
-    set_color_depth(32);
-    updatewindowsize(640, 480);
+    al_set_display_flag(al_get_current_display(), ALLEGRO_FULLSCREEN_WINDOW, false);
 }
 
-static inline void upscale_only(BITMAP *src, BITMAP *dst, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh) {
+static inline void upscale_only(ALLEGRO_BITMAP *src, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh) {
+
+    al_set_target_backbuffer(al_get_current_display());
     if (dw > sw || dh > sh)
-        stretch_blit(src, dst, sx, sy, sw, sh, dx, dy, dw, dh);
+        al_draw_scaled_bitmap(src, sx, sy, sw, sh, dx, dy, dw, dh, 0);
     else
-        blit(src, dst, sx, sy, dx, dy, sw, sh);
+        al_draw_bitmap_region(src, sx, sy, sw, sh, dx, dy, 0);
 }
 
 void video_doblit()
@@ -174,19 +116,22 @@ void video_doblit()
     if (vid_savescrshot) {
         vid_savescrshot--;
         if (!vid_savescrshot) {
-            set_color_depth(dcol);
-            scrshotb  = create_bitmap(lastx - firstx, (lasty-firsty) << 1);
-            scrshotb2 = create_bitmap(lastx - firstx,  lasty-firsty);
-            if (vid_interlace || vid_linedbl)
-                blit(b, scrshotb, firstx, firsty << 1, 0, 0, lastx - firstx, (lasty - firsty) << 1);
-            else {
-                blit(b, scrshotb2, firstx, firsty, 0, 0, lastx - firstx, lasty - firsty);
-                stretch_blit(scrshotb2, scrshotb, 0, 0, lastx - firstx, lasty - firsty, 0, 0, lastx - firstx,(lasty - firsty) << 1);
+            scrshotb  = al_create_bitmap(lastx - firstx, (lasty-firsty) << 1);
+            if (vid_interlace || vid_linedbl) {
+                al_set_target_bitmap(scrshotb);
+                al_draw_bitmap_region(b, firstx, firsty << 1, lastx - firstx, (lasty - firsty) << 1, 0, 0, 0);
+                al_save_bitmap(vid_scrshotname, scrshotb);
             }
-            save_bmp(vid_scrshotname, scrshotb, NULL);
-            destroy_bitmap(scrshotb2);
-            destroy_bitmap(scrshotb);
-            set_color_depth(32);
+            else {
+                scrshotb2 = al_create_bitmap(lastx - firstx,  lasty-firsty);
+                al_set_target_bitmap(scrshotb2);
+                al_draw_bitmap_region(b, firstx, firsty, lastx - firstx, lasty - firsty, 0, 0, 0);
+                al_set_target_bitmap(scrshotb);
+                al_draw_scaled_bitmap(scrshotb2, 0, 0, lastx - firstx, lasty - firsty, 0, 0, lastx - firstx,(lasty - firsty) << 1, 0);
+                al_save_bitmap(vid_scrshotname, scrshotb);
+                al_destroy_bitmap(scrshotb2);
+            }
+            al_destroy_bitmap(scrshotb);
         }
     }
 
@@ -215,73 +160,103 @@ void video_doblit()
             fskipcount = 0;
             if (vid_scanlines) {
 #ifdef WIN32
-                for (c = firsty; c < lasty; c++) blit(b, b16x, firstx, c, 0, c << 1, lastx - firstx, 1);
-                blit(b16x, vb, 0, firsty << 1, 0, 0, lastx - firstx, (lasty - firsty) << 1);
-                stretch_blit(vb, screen, 0, 0, lastx - firstx, (lasty - firsty) << 1, 0, 0, winsizex, winsizey);
+                al_set_target_bitmap(b16x);
+                for (c = firsty; c < lasty; c++)
+                    al_draw_bitmap_region(b, firstx, c, lastx - firstx, 1, 0, c << 1, 0);
+                al_set_target_bitmap(vb);
+                al_draw_bitmap_region(b16x, 0, firsty << 1lastx - firstx, (lasty - firsty) << 1, 0, 0, 0);
+                al_set_target_backbuffer(al_get_current_display());
+                al_draw_scaled_bitmap(vb, 0, 0, lastx - firstx, (lasty - firsty) << 1, 0, 0, winsizex, winsizey, 0);
 #else
-                blit(b, b16x, firstx, firsty, 0, 0, lastx - firstx, lasty - firsty);
-                for (c = firsty; c < lasty; c++) blit(b16x, screen, 0, c - firsty, 0, (c - firsty) << 1, lastx - firstx, 1);
+                al_set_target_bitmap(b16x);
+                al_draw_bitmap_region(b, firstx, firsty, lastx - firstx, lasty - firsty, 0, 0, 0);
+                al_set_target_backbuffer(al_get_current_display());
+                for (c = firsty; c < lasty; c++)
+                    al_draw_bitmap_region(b16x, 0, c - firsty, lastx - firstx, 1, 0, (c - firsty) << 1, 0);
 #endif
             }
 #ifdef WIN32
             else if (vid_interlace && vid_pal) {
                 pal_convert(b, firstx, (firsty << 1) + (interlline ? 1 : 0), lastx, (lasty << 1) + (interlline ? 1 : 0), 2);
-                blit(b32, vb, (firstx * 922) / 832, firsty << 1, 0,0, ((lastx - firstx) * 922) / 832, (lasty - firsty) << 1);
-                stretch_blit(vb, screen, 0, 0, ((lastx - firstx) * 922) / 832, (lasty - firsty) << 1, 0, 0, winsizex, winsizey);
+                al_set_target_bitmap(vb);
+                al_draw_bitmap_region(b32, (firstx * 922) / 832, firsty << 1, ((lastx - firstx) * 922) / 832, (lasty - firsty) << 1, 0, 0);
+                al_set_target_backbuffer(al_get_current_display());
+                al_draw_scaled_bitmap(vb, 0, 0, ((lastx - firstx) * 922) / 832, (lasty - firsty) << 1, 0, 0, winsizex, winsizey);
             }
             else if (vid_pal) {
                 pal_convert(b, firstx, firsty, lastx, lasty, 1);
-                blit(b32, vb, (firstx * 922) / 832, firsty, 0,0, ((lastx - firstx) * 922) / 832, lasty - firsty);
-                stretch_blit(vb, screen, 0, 0, ((lastx - firstx) * 922) / 832, lasty-firsty, 0, 0, winsizex, winsizey);
+                al_set_target_bitmap(vb);
+                al_draw_bitmap_region(b32, (firstx * 922) / 832, firsty, ((lastx - firstx) * 922) / 832, lasty - firsty, 0, 0, 0);
+                al_set_target_backbuffer(al_get_current_display());
+                al_draw_scaled_bitmap(vb, 0, 0, ((lastx - firstx) * 922) / 832, lasty-firsty, 0, 0, winsizex, winsizey, 0);
             }
 #endif
             else if (vid_interlace || vid_linedbl) {
 #ifdef WIN32
-                blit(b, vb, firstx, firsty << 1, 0, 0, lastx - firstx, (lasty - firsty) << 1);
-                stretch_blit(vb, screen, 0, 0, lastx - firstx, (lasty - firsty) << 1, 0, 0, winsizex, winsizey);
+                al_set_target_bitmap(vb);
+                al_draw_bitmap_region(b, firstx, firsty << 1, lastx - firstx, (lasty - firsty) << 1, 0, 0, 0);
+                al_set_target_backbuffer(al_get_current_display());
+                al_draw_scaled_bitmap(vb, 0, 0, lastx - firstx, (lasty - firsty) << 1, 0, 0, winsizex, winsizey, 0);
 #else
-                blit(b, screen, firstx, firsty << 1, 0, 0, lastx - firstx, (lasty - firsty) << 1);
+                al_set_target_backbuffer(al_get_current_display());
+                al_draw_bitmap_region(b, firstx, firsty << 1, lastx - firstx, (lasty - firsty) << 1, 0, 0, 0);
 #endif
             }
             else {
 #ifdef WIN32
-                blit(b, vb, firstx, firsty, 0, 0, lastx - firstx, lasty - firsty);
-                stretch_blit(vb, screen, 0, 0, lastx - firstx, lasty - firsty, 0, 0, winsizex, winsizey);
+                al_set_target_bitmap(vb);
+                al_draw_bitmap_region(b, firstx, firsty, lastx - firstx, lasty - firsty, 0, 0, 0);
+                al_set_target_backbuffer(al_get_current_display());
+                al_draw_scaled_bitmap(vb, 0, 0, lastx - firstx, lasty - firsty, 0, 0, winsizex, winsizey, 0);
 #else
-                for (c = (firsty << 1); c < (lasty << 1); c++) blit(b, b16x, firstx, c >> 1, 0, c, lastx - firstx, 1);
-                blit(b16x, screen, 0, firsty << 1, 0, 0, lastx - firstx, (lasty - firsty) << 1);
+                al_set_target_bitmap(b16x);
+                for (c = (firsty << 1); c < (lasty << 1); c++)
+                    al_draw_bitmap_region(b, firstx, c >> 1, lastx - firstx, 1, 0, c, 0);
+                al_set_target_backbuffer(al_get_current_display());
+                al_draw_bitmap_region(b16x, 0, firsty << 1, lastx - firstx, (lasty - firsty) << 1, 0, 0, 0);
 #endif
             }
         }
         else {
-            if (!fullscreen) updatewindowsize((lastx - firstx) + 2, ((lasty - firsty) << 1) + 2);
+            if (!fullscreen)
+                updatewindowsize((lastx - firstx) + 2, ((lasty - firsty) << 1) + 2);
             fskipcount = 0;
             if (vid_scanlines) {
+                al_set_target_bitmap(b16x);
                 for (c = firsty; c < lasty; c++)
-                    blit(b, b16x, firstx, c, 0, c << 1, lastx - firstx, 1);
-                upscale_only(b16x, screen, 0, firsty << 1, lastx - firstx, (lasty - firsty) << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
+                    al_draw_bitmap_region(b, firstx, c, lastx - firstx, 1, 0, c << 1, 0);
+                upscale_only(b16x, 0, firsty << 1, lastx - firstx, (lasty - firsty) << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
             }
 #ifdef WIN32
             else if (vid_interlace && vid_pal) {
                 pal_convert(b, firstx, (firsty << 1) + (interlline ? 1 : 0), lastx, (lasty << 1) + (interlline ? 1 : 0), 2);
-                blit(b32, vb, (firstx * 922) / 832, firsty << 1, 0,0, ((lastx - firstx) * 922) / 832, (lasty - firsty) << 1);
-                stretch_blit(vb, screen, 0, 0, ((lastx - firstx) * 922) / 832, (lasty - firsty) << 1, 0, 0, (lastx - firstx), (lasty - firsty) << 1);
+                al_set_target_bitmap(vb);
+                al_draw_bitmap_region(b32, (firstx * 922) / 832, firsty << 1, ((lastx - firstx) * 922) / 832, (lasty - firsty) << 1, 0, 0, 0);
+                al_set_target_backbuffer(al_get_current_display());
+                al_draw_scaled_bitmap(vb, 0, 0, ((lastx - firstx) * 922) / 832, (lasty - firsty) << 1, 0, 0, (lastx - firstx), (lasty - firsty) << 1, 0);
             }
             else if (vid_pal) {
                 pal_convert(b, firstx, firsty, lastx, lasty, 1);
-                blit(b32, vb, (firstx * 922) / 832, firsty, 0,0, ((lastx - firstx) * 922) / 832, lasty - firsty);
-                stretch_blit(vb, screen, 0, 0, ((lastx - firstx) * 922) / 832, lasty-firsty, 0, 0, (lastx - firstx), (lasty - firsty) << 1);
+                al_set_target_bitmap(vb);
+                al_draw_bitmap_region(b32, (firstx * 922) / 832, firsty, ((lastx - firstx) * 922) / 832, lasty - firsty, 0, 0, 0);
+                al_set_target_backbuffer(al_get_current_display());
+                al_draw_scaled_bitmap(vb, 0, 0, ((lastx - firstx) * 922) / 832, lasty-firsty, 0, 0, (lastx - firstx), (lasty - firsty) << 1, 0);
             }
 #endif
             else if (vid_interlace || vid_linedbl)
-                upscale_only(b, screen, firstx, firsty << 1, lastx - firstx, (lasty - firsty) << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
+                upscale_only(b, firstx, firsty << 1, lastx - firstx, (lasty - firsty) << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
             else {
 #ifdef WIN32
-                blit(b, vb, firstx, firsty, 0, 0, lastx - firstx, lasty - firsty);
-                stretch_blit(vb, screen, 0, 0, lastx - firstx, lasty - firsty, 0, 0, lastx - firstx, (lasty - firsty) << 1);
+                al_set_target_bitmap(vb);
+                al_draw_bitmap_region(b, firstx, firsty, lastx - firstx, lasty - firsty, 0, 0, 0);
+                al_set_target_backbuffer(al_get_current_display());
+                al_draw_scaled_bitmap(vb, 0, 0, lastx - firstx, lasty - firsty, 0, 0, lastx - firstx, (lasty - firsty) << 1, 0);
 #else
-                for (c = (firsty << 1); c < (lasty << 1); c++) blit(b, b16x, firstx, c >> 1, 0, c, lastx - firstx, 1);
-                blit(b16x, screen, 0, firsty << 1, 0, 0, lastx - firstx, (lasty - firsty) << 1);
+                al_set_target_bitmap(b16x);
+                for (c = (firsty << 1); c < (lasty << 1); c++)
+                    al_draw_bitmap_region(b, firstx, c >> 1, lastx - firstx, 1, 0, c, 0);
+                al_set_target_backbuffer(al_get_current_display());
+                al_draw_bitmap_region(b16x, 0, firsty << 1, lastx - firstx, (lasty - firsty) << 1, 0, 0, 0);
 #endif
             }
         }
