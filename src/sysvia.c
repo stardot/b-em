@@ -13,7 +13,8 @@
 
 VIA sysvia;
 
-
+#define KB_CAPSLOCK_FLAG 0x0400
+#define KB_SCROLOCK_FLAG 0x0100
 
 void sysvia_set_ca1(int level)
 {

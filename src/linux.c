@@ -129,9 +129,6 @@ int find_cfg_dest(char *path, size_t psize, const char *name, const char *ext) {
 
 int main(int argc, char *argv[])
 {
-    int oldf = 0;
-    ALLEGRO_KEYBOARD_STATE keystate;
-
     if (!al_init()) {
         fputs("Failed to initialise Allegro!\n", stderr);
         exit(1);
@@ -142,11 +139,9 @@ int main(int argc, char *argv[])
 
     config_load();
     main_init(argc, argv);
-    while (!quited) {
-        main_run();
+    main_run();
+#if 0
         al_get_keyboard_state(&keystate);
-        if (al_key_down(&keystate, ALLEGRO_KEY_F11))
-            gui_enter();
         if (al_key_down(&keystate, ALLEGRO_KEY_ALT) && al_key_down(&keystate, ALLEGRO_KEY_ENTER) && fullscreen && !oldf) {
             fullscreen = 0;
             video_leavefullscreen();
@@ -156,7 +151,7 @@ int main(int argc, char *argv[])
             video_enterfullscreen();
         }
         oldf = al_key_down(&keystate, ALLEGRO_KEY_ALT) && al_key_down(&keystate, ALLEGRO_KEY_ENTER);
-    }
+#endif
 	main_close();
 	return 0;
 }

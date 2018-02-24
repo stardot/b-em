@@ -6,6 +6,9 @@ extern int kbdips;
 extern int keylookup[ALLEGRO_KEY_MAX];
 extern int keyas;
 
+extern void key_down(ALLEGRO_EVENT *event);
+extern void key_up(ALLEGRO_EVENT *event);
+
 extern void key_clear();
 extern void key_check();
 extern void key_scan(int row, int col);

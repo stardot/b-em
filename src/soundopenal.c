@@ -65,13 +65,12 @@ void al_init_main(int argc, char *argv[])
 //        printf("AlutInit\n");
 }
 
-void al_close()
+void openal_close()
 {
         alutExit();
 }
 
-#undef al_init
-void al_init()
+void openal_init()
 {
         int c;
         int i;

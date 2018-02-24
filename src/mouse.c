@@ -6,9 +6,16 @@
 #include "via.h"
 #include "uservia.h"
 
+int mouse_amx;
+
+void mouse_axes(ALLEGRO_EVENT *event) {} 
+void mouse_btn_down(ALLEGRO_EVENT *event) {}
+void mouse_btn_up(ALLEGRO_EVENT *event) {}
+void mouse_poll(void) {};
+
+#if 0
 int mcount = 8;
 uint8_t mouse_portb = 0;
-int mouse_amx;
 
 static int mx = 0,  my = 0;
 
@@ -32,8 +39,8 @@ void mouse_poll()
 #ifdef WIN32
                 get_mouse_mickeys(&dx,&dy);
 #else
-		dx = (mouse_x - mouse_ox);
-		dy = (mouse_y - mouse_oy);
+		//dx = (mouse_x - mouse_ox);
+		//dy = (mouse_y - mouse_oy);
                 if (dx > 0 || dy > 0)
                     log_debug("mouse: tube, dx=%d, dy=%d", dx, dy);
 		mouse_ox = mouse_x;
@@ -134,4 +141,5 @@ void mouse_poll()
         }
         if (mousecapture) position_mouse(64, 64);
 }
+#endif        
 

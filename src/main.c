@@ -59,6 +59,7 @@
 
 #undef printf
 
+bool quitted = false;
 int autoboot=0;
 int joybutton[2];
 
@@ -69,18 +70,11 @@ void secint()
 }
 
 int bempause = 0;
-static int bemstep = 0;
-static int old_key_pgdn = 0;
-static int old_key_right = 0;
-static int fcount = 0;
 
-void int50()
-{
-    if (!bempause || bemstep) {
-        fcount++;
-        bemstep = 0;
-    }
-}
+static ALLEGRO_TIMER *timer;
+static ALLEGRO_EVENT_QUEUE *queue;
+
+static int fcount = 0;
 
 char exedir[512];
 int ddnoiseframes = 0;
@@ -237,16 +231,17 @@ void main_init(int argc, char *argv[])
         mode7_makechars();
 
 #ifndef WIN32
-        install_keyboard();
+    if (!al_install_keyboard()) {
+        log_fatal("main: umable to install keyboard");
+        exit(1);
+    }
 #endif
-        install_timer();
-
         mem_init();
         ddnoise_init();
         tapenoise_init();
 
         sound_init();
-        al_init();
+        openal_init();
         sid_init();
         sid_settype(sidmethod, cursid);
         music5000_init();
@@ -267,21 +262,22 @@ void main_init(int argc, char *argv[])
         midi_init();
         main_reset();
 
-        install_int_ex(secint, MSEC_TO_TIMER(1000));
-        install_int_ex(int50,  MSEC_TO_TIMER(20));
+        timer = al_create_timer(1.0 / 50.0);
+        queue = al_create_event_queue();
 
-        set_display_switch_mode(SWITCH_BACKGROUND);
 #ifdef WIN32
                 timeBeginPeriod(1);
 #endif
         oldmodel = curmodel;
 
-        if (curtube == 3 || mouse_amx) install_mouse();
+        if (curtube == 3 || mouse_amx)
+            al_install_mouse();
 
         disc_load(0, discfns[0]);
         disc_load(1, discfns[1]);
         tape_load(tape_fn);
-        if (defaultwriteprot) writeprot[0] = writeprot[1] = 1;
+        if (defaultwriteprot)
+            writeprot[0] = writeprot[1] = 1;
 
         endblit();
 
@@ -292,7 +288,8 @@ void main_restart()
 {
         bempause = 1;
         startblit();
-        if (curtube == 3 || mouse_amx) remove_mouse();
+        if (curtube == 3 || mouse_amx)
+            al_uninstall_mouse();
         cmos_save(models[oldmodel]);
         oldmodel = curmodel;
 
@@ -300,18 +297,20 @@ void main_restart()
 
         main_reset();
 
-        if (curtube == 3 || mouse_amx) install_mouse();
+        if (curtube == 3 || mouse_amx)
+            al_install_mouse();
         endblit();
         bempause = 0;
 }
 
 void main_setmouse()
 {
-        if (curtube != 3)
-        {
-                if (mouse_amx) install_mouse();
-                else           remove_mouse();
-        }
+    if (curtube != 3) {
+        if (mouse_amx)
+            al_install_mouse();
+        else
+            al_uninstall_mouse();
+    }
 }
 
 int resetting = 0;
@@ -322,24 +321,11 @@ void main_cleardrawit()
         fcount = 0;
 }
 
-void main_run()
-{
-        int c, d;
+#if 0
         if ((fcount > 0 || key[KEY_PGUP] || (motor && fasttape)))
         {
-                if (autoboot) autoboot--;
-                fcount--;
-                framesrun++;
                 if (key[KEY_PGUP] || (motor && fasttape)) fcount=0;
-                if (x65c02) m65c02_exec();
-                else        m6502_exec();
-                ddnoiseframes++;
-                if (ddnoiseframes >= 5)
-                {
-                        ddnoiseframes = 0;
-                        ddnoise_mix();
-                }
-                key_check();
+                    key_check();
                 poll_joystick();
                 for (c = 0; c < 2; c++)
                 {
@@ -349,37 +335,84 @@ void main_run()
                                 if (joy[c].button[d].b) joybutton[c] = 1;
                         }
                 }
-                if (savestate_wantload) savestate_doload();
-                if (savestate_wantsave) savestate_dosave();
-                if (key[KEY_F10] && (debug_core || debug_tube)) debug_step = 1;
-                if (key[KEY_F12] && !resetting)
-                {
-                        m6502_reset();
-                        video_reset();
-                        i8271_reset();
-                        wd1770_reset();
-                        sid_reset();
-                        music5000_reset();
+#endif
 
-                        if (curtube != -1) tubes[curtube].reset();
-                        tube_reset();
-                }
-                resetting = key[KEY_F12];
-        }
-        else
-        {
-                framesrun = 0;
-                rest(1);
-        }
-        if (key[KEY_PGDN] && !old_key_pgdn)
-            bempause ^= 1;
-        old_key_pgdn = key[KEY_PGDN];
-        if (key[KEY_RIGHT] && !old_key_right && bempause)
-            bemstep = 1;
-        old_key_right = key[KEY_RIGHT];
-        if (framesrun > 10) fcount = 0;
+static void main_key_down(ALLEGRO_EVENT *event)
+{
+    switch(event->keyboard.keycode) {
+        case ALLEGRO_KEY_F10:
+            if (debug_core || debug_tube)
+                debug_step = 1;
+            break;
+        case ALLEGRO_KEY_F12:
+            m6502_reset();
+            video_reset();
+            i8271_reset();
+            wd1770_reset();
+            sid_reset();
+            music5000_reset();
+
+            if (curtube != -1)
+                tubes[curtube].reset();
+            tube_reset();
+    }
+}
+    
+static void main_timer(void) {
+    if (autoboot)
+        autoboot--;
+    framesrun++;
+
+    if (x65c02)
+        m65c02_exec();
+    else
+        m6502_exec();
+
+    ddnoiseframes++;
+    if (ddnoiseframes >= 5) {
+        ddnoiseframes = 0;
+        ddnoise_mix();
+    }
+    if (savestate_wantload)
+        savestate_doload();
+    if (savestate_wantsave)
+        savestate_dosave();
 }
 
+void main_run()
+{
+    ALLEGRO_EVENT event;
+
+    al_start_timer(timer);
+
+    while (!quitted) {
+        al_wait_for_event(queue, &event);
+        switch(event.type) {
+            case ALLEGRO_EVENT_KEY_DOWN:
+                key_down(&event);
+                main_key_down(&event);
+                break;
+            case ALLEGRO_EVENT_KEY_UP:
+                key_up(&event);
+                break;
+            case ALLEGRO_EVENT_MOUSE_AXES:
+                mouse_axes(&event);
+                break;
+            case ALLEGRO_EVENT_MOUSE_BUTTON_DOWN:
+                mouse_btn_down(&event);
+                break;
+            case ALLEGRO_EVENT_MOUSE_BUTTON_UP:
+                mouse_btn_up(&event);
+                break;
+            case ALLEGRO_EVENT_DISPLAY_CLOSE:
+                quitted = true;
+                break;
+            case ALLEGRO_EVENT_TIMER:
+                main_timer();
+        }
+    }
+}
+                
 void main_close()
 {
         debug_kill();
@@ -410,13 +443,12 @@ void main_close()
         ddnoise_close();
         tapenoise_close();
 
-        al_close();
+        openal_close();
         video_close();
         log_close();
 }
 
 void changetimerspeed(int i)
 {
-        remove_int(int50);
-        install_int_ex(int50, BPS_TO_TIMER(i));
+    al_set_timer_speed(timer, 1.0/i);
 }

@@ -13,7 +13,7 @@ uint8_t sn_vol[4];
 uint8_t sn_noise;
 static uint16_t sn_shift;
 static int lasttone;
-static fixed sn_count[4], sn_stat[4];
+static int sn_count[4], sn_stat[4];
 uint32_t sn_latch[4];
 
 static int sn_rect_pos = 0,sn_rect_dir = 0;
