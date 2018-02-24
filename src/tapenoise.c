@@ -2,7 +2,6 @@
   Tape noise (not very good)*/
 
 #include <stdio.h>
-#include <allegro.h>
 #include <math.h>
 #include "b-em.h"
 #include "ddnoise.h"
@@ -20,7 +19,7 @@ static int sinewave[32];
 
 #define PI 3.142
 
-static SAMPLE *tsamples[2];
+static ALLEGRO_SAMPLE *tsamples[2];
 
 void tapenoise_init()
 {
@@ -36,8 +35,8 @@ void tapenoise_init()
 
 void tapenoise_close()
 {
-        destroy_sample(tsamples[0]);
-        destroy_sample(tsamples[1]);
+        al_destroy_sample(tsamples[0]);
+        al_destroy_sample(tsamples[1]);
 }
 
 void tapenoise_addhigh()
@@ -123,15 +122,16 @@ void tapenoise_mix(int16_t *tapebuffer)
         {
                 if (tnoise_sstat >= 0)
                 {
-                        if (tnoise_spos >= tsamples[tnoise_sstat]->len)
+                        if (tnoise_spos >= al_get_sample_length(tsamples[tnoise_sstat]))
                         {
                                 tnoise_spos = 0;
                                 tnoise_sstat = -1;
                         }
                         else
                         {
-                                tapebuffer[c] += ((int16_t)((((int16_t *)tsamples[tnoise_sstat]->data)[(int)tnoise_spos]) ^ 0x8000) / 4);
-                                tnoise_spos += ((float)tsamples[tnoise_sstat]->freq / (float) FREQ_DD);
+                                int16_t *data = (int16_t *)al_get_sample_data(tsamples[tnoise_sstat]);
+                                tapebuffer[c] += ((int16_t)((data[(int)tnoise_spos]) ^ 0x8000) / 4);
+                                tnoise_spos += ((float)al_get_sample_frequency(tsamples[tnoise_sstat]) / (float) FREQ_DD);
                         }
                 }
         }
