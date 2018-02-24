@@ -1,7 +1,7 @@
 #ifndef __INC__CSW_H
 #define __INC__CSW_H
 
-void csw_load(char *fn);
+void csw_load(const char *fn);
 void csw_close();
 void csw_poll();
 void csw_findfilenames();

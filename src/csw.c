@@ -19,7 +19,7 @@ static int      csw_skip = 0;
 static int      csw_loop = 1;
 int csw_ena;
 
-void csw_load(char *fn)
+void csw_load(const char *fn)
 {
         int end,c;
         uint32_t destlen = 8 * 1024 * 1024;

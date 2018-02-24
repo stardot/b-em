@@ -20,7 +20,7 @@ static int uef_startchunk;
 static float uef_chunkf;
 static int uef_intone = 0;
 
-void uef_load(char *fn)
+void uef_load(const char *fn)
 {
         int c;
 //      printf("OpenUEF %s %08X\n",fn,uef);

@@ -1,6 +1,8 @@
 #ifndef __INC_DISC_H
 #define __INC_DISC_H
 
+#include <allegro5/allegro.h>
+
 #define NUM_DRIVES 2
 
 typedef struct
@@ -20,8 +22,8 @@ extern DRIVE drives[NUM_DRIVES];
 
 extern int curdrive;
 
-void disc_load(int drive, char *fn);
-void disc_new(int drive, char *fn);
+void disc_load(int drive, ALLEGRO_PATH *fn);
+void disc_new(int drive, ALLEGRO_PATH *fn);
 void disc_close(int drive);
 void disc_init();
 void disc_poll();
@@ -50,7 +52,7 @@ extern int motorspin;
 extern int motoron;
 
 extern int defaultwriteprot;
-extern char discfns[NUM_DRIVES][260];
+extern ALLEGRO_PATH *discfns[NUM_DRIVES];
 
 extern int writeprot[NUM_DRIVES], fwriteprot[NUM_DRIVES];
 

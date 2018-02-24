@@ -58,10 +58,16 @@ void config_load(void)
         log_warn("config: no config file found, using defaults");
 
     if (bem_cfg) {
-        if ((p = al_get_config_value(bem_cfg, NULL, "disc0")))
-            strncpy(discfns[0], p, sizeof(discfns[0]));
-        if ((p = al_get_config_value(bem_cfg, NULL, "disc1")))
-            strncpy(discfns[1], p, sizeof(discfns[1]));
+        if ((p = al_get_config_value(bem_cfg, NULL, "disc0"))) {
+            if (discfns[0])
+                al_destroy_path(discfns[0]);
+            discfns[0] = al_create_path(p);
+        }
+        if ((p = al_get_config_value(bem_cfg, NULL, "disc1"))) {
+            if (discfns[1])
+                al_destroy_path(discfns[1]);
+            discfns[1] = al_create_path(p);
+        }
     }
 
     defaultwriteprot = get_config_int(NULL, "defaultwriteprotect", 1);
@@ -139,8 +145,8 @@ void config_save(void)
                 return;
             }
         }
-        al_set_config_value(bem_cfg, NULL, "disc0", discfns[0]);
-        al_set_config_value(bem_cfg, NULL, "disc1", discfns[1]);
+        al_set_config_value(bem_cfg, NULL, "disc0", al_path_cstr(discfns[0], ALLEGRO_NATIVE_PATH_SEP));
+        al_set_config_value(bem_cfg, NULL, "disc1", al_path_cstr(discfns[1], ALLEGRO_NATIVE_PATH_SEP));
 
         set_config_int(NULL, "defaultwriteprotect", defaultwriteprot);
 

@@ -3,10 +3,10 @@
 
 #include "acia.h"
 
-extern char tape_fn[260];
+extern ALLEGRO_PATH *tape_fn;
 extern int tape_loaded;
 
-void tape_load(char *fn);
+void tape_load(ALLEGRO_PATH *fn);
 void tape_close();
 void tape_poll(void);
 void tape_receive(ACIA *acia, uint8_t data);

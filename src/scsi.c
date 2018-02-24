@@ -54,13 +54,12 @@ typedef enum {
 	selection,
 	command,
 	execute,
-	read,
-	write,
+	scsiread,
+	scsiwrite,
 	status,
 	message
 } phase_t;
 
-#define bool int
 #define false 0
 #define true  1
 #define FALSE 0
@@ -198,7 +197,7 @@ static void RequestSense(void)
 	if (scsi.length > 0) {
 		scsi.offset = 0;
 		scsi.blocks = 1;
-		scsi.phase = read;
+		scsi.phase = scsiread;
 		scsi.io = TRUE;
 		scsi.cd = FALSE;
 
@@ -292,7 +291,7 @@ static void Read6(void)
 	scsi.offset = 0;
 	scsi.next = record + 1;
 
-	scsi.phase = read;
+	scsi.phase = scsiread;
 	scsi.io = true;
 	scsi.cd = false;
 
@@ -333,7 +332,7 @@ static void Write6(void)
 	scsi.next = record + 1;
 	scsi.offset = 0;
 
-	scsi.phase = write;
+	scsi.phase = scsiwrite;
 	scsi.cd = false;
 
 	scsi.req = true;
@@ -358,7 +357,7 @@ static void Translate(void)
 
 	scsi.offset = 0;
 	scsi.blocks = 1;
-	scsi.phase = read;
+	scsi.phase = scsiread;
 	scsi.io = TRUE;
 	scsi.cd = FALSE;
 
@@ -380,7 +379,7 @@ static void ModeSelect(void)
 	scsi.next = 0;
 	scsi.offset = 0;
 
-	scsi.phase = write;
+	scsi.phase = scsiwrite;
 	scsi.cd = false;
 
 	scsi.req = true;
@@ -455,7 +454,7 @@ static void ModeSense(void)
 	if (scsi.length > 0) {
 		scsi.offset = 0;
 		scsi.blocks = 1;
-		scsi.phase = read;
+		scsi.phase = scsiread;
 		scsi.io = TRUE;
 		scsi.cd = FALSE;
 
@@ -621,7 +620,7 @@ static void WriteData(int data)
 			}
 			return;
 
-		case write :
+		case scsiwrite :
 			scsi.buffer[scsi.offset] = data;
 			scsi.offset++;
 			scsi.length--;
@@ -738,7 +737,7 @@ static int ReadData(void)
 			BusFree();
 			return data;
 
-		case read :
+		case scsiread :
 			data = scsi.buffer[scsi.offset];
 			scsi.offset++;
 			scsi.length--;

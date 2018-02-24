@@ -4,6 +4,7 @@
 #ifndef __INCLUDE_B_EM_HEADER__
 #define __INCLUDE_B_EM_HEADER__
 
+#include <allegro5/allegro.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -34,7 +35,7 @@ extern int find_cfg_dest(char *path, size_t psize, const char *name, const char 
 
 void updatewindowsize(int x, int y);
 
-void setejecttext(int drive, char *fn);
+void setejecttext(int drive, const char *fn);
 
 extern int joybutton[2];
 

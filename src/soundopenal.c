@@ -70,6 +70,7 @@ void al_close()
         alutExit();
 }
 
+#undef al_init
 void al_init()
 {
         int c;

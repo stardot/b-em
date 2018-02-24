@@ -1,4 +1,4 @@
-#include <allegro.h>
+#include <allegro5/allegro.h>
 #include "b-em.h"
 #include "tape.h"
 #include "serial.h"
@@ -9,12 +9,12 @@
 int tapelcount,tapellatch;
 
 int tape_loaded = 0;
-char tape_fn[260] = "";
+ALLEGRO_PATH *tape_fn = NULL;
 
 static struct
 {
         char *ext;
-        void (*load)(char *fn);
+        void (*load)(const char *fn);
         void (*close)();
 }
 loaders[]=
@@ -26,21 +26,22 @@ loaders[]=
 
 static int tape_loader;
 
-void tape_load(char *fn)
+void tape_load(ALLEGRO_PATH *fn)
 {
         int c = 0;
-        char *p;
+        const char *p, *cpath;
 
         if (!fn) return;
-        p = get_extension(fn);
+        p = al_get_path_extension(fn);
         if (!p || !*p) return;
-        log_info("tape: Loading %s %s", fn, p);
+        cpath = al_path_cstr(fn, ALLEGRO_NATIVE_PATH_SEP);
+        log_info("tape: Loading %s %s", cpath, p);
         while (loaders[c].ext)
         {
                 if (!strcasecmp(p, loaders[c].ext))
                 {
                         tape_loader = c;
-                        loaders[c].load(fn);
+                        loaders[c].load(cpath);
                         return;
                 }
                 c++;
