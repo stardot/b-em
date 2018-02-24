@@ -1,8 +1,8 @@
 /*B-em v2.2 by Tom Walker
   ADC emulation*/
 
+#include <allegro5/allegro.h>
 #include <stdio.h>
-#include <allegro.h>
 #include "b-em.h"
 #include "adc.h"
 #include "via.h"
@@ -42,24 +42,49 @@ void adc_write(uint16_t addr, uint8_t val)
 
 void adc_poll()
 {
-        uint32_t val = 0;
-//        printf("%i\n",joy[0].stick[0].axis[0].pos);
-        switch (adc_status & 3)
-        {
-                case 0: val = (128 - joy[0].stick[0].axis[0].pos) * 256; break;
-                case 1: val = (128 - joy[0].stick[0].axis[1].pos) * 256; break;
-                case 2: val = (128 - joy[1].stick[0].axis[0].pos) * 256; break;
-                case 3: val = (128 - joy[1].stick[0].axis[1].pos) * 256; break;
+    uint32_t val = 0x7FFF;
+    ALLEGRO_JOYSTICK *joy;
+    ALLEGRO_JOYSTICK_STATE jstate;
+
+    if (al_is_joystick_installed()) {
+        switch (adc_status & 3) {
+            case 0:
+                if (al_get_num_joysticks() >= 1) {
+                    joy = al_get_joystick(0);
+                    al_get_joystick_state(joy, &jstate);
+                    val = (128 - jstate.stick[0].axis[0]) * 256;
+                }
+                break;
+            case 1:
+                if (al_get_num_joysticks() >= 1) {
+                    joy = al_get_joystick(0);
+                    al_get_joystick_state(joy, &jstate);
+                    val = (128 - jstate.stick[0].axis[1]) * 256;
+                }
+                break;
+            case 2:
+                if (al_get_num_joysticks() >= 2) {
+                    joy = al_get_joystick(1);
+                    al_get_joystick_state(joy, &jstate);
+                    val = (128 - jstate.stick[0].axis[0]) * 256;
+                }
+                break;
+            case 3:
+                if (al_get_num_joysticks() >= 2) {
+                    joy = al_get_joystick(1);
+                    al_get_joystick_state(joy, &jstate);
+                    val = (128 - jstate.stick[0].axis[1]) * 256;
+                }
+                break;
         }
-        if (val > 0xFFFF) val = 0xFFFF;
-//        val^=0xFFFF;
-//        val++;
-//        if (val==0x10000) val=0xFFFF;
-        adc_status =(adc_status & 0xF) | 0x40; /*Not busy, conversion complete*/
-        adc_status|=(val & 0xC000) >> 10;
-        adc_high   = val >> 8;
-        adc_low    = val & 0xFF;
-        sysvia_set_cb1(0);
+        if (val > 0xFFFF)
+            val = 0xFFFF;
+    }
+    adc_status =(adc_status & 0xF) | 0x40; /*Not busy, conversion complete*/
+    adc_status|=(val & 0xC000) >> 10;
+    adc_high   = val >> 8;
+    adc_low    = val & 0xFF;
+    sysvia_set_cb1(0);
 }
 
 void adc_init()
@@ -67,7 +92,7 @@ void adc_init()
         adc_status = 0x40;            /*Not busy, conversion complete*/
         adc_high = adc_low = adc_latch = 0;
         adc_time = 0;
-        install_joystick(JOY_TYPE_AUTODETECT);
+        al_install_joystick();
 }
 
 void adc_savestate(FILE *f)
