@@ -1,11 +1,11 @@
-#include <allegro.h>
+#include <allegro5/allegro.h>
 #include "b-em.h"
 #include "via.h"
 #include "sysvia.h"
 #include "keyboard.h"
 #include "model.h"
 
-int keylookup[128];
+int keylookup[ALLEGRO_KEY_MAX];
 int keyas = 0;
 
 static int keycol, keyrow;
@@ -88,36 +88,28 @@ static void key_update()
 }
 
 void key_check()
-{
-        int c;
-        int row,col;
-        int rc;
-//        if (key[KEY_A]) printf("KEY_A!\n");
-        memset(bbckey, 0, sizeof(bbckey));
-        for (c = 0; c < 128; c++)
-        {
-                rc = c;
-                if (keyas && c == KEY_A) rc = KEY_CAPSLOCK;
-//                if (keyas && c==KEY_S) rc=KEY_LCONTROL;
-                if (key[c] && rc != KEY_F11)
-                {
-//                log_debug("%i %i\n",c,rc);
-                        if (TranslateKey(codeconvert[keylookup[rc]], &row, &col)>0)
-                        {
-                                if (key[c])
-                                   key_press(row, col);
-//                                else
-//                                   releasekey(row,col);
-                        }
-                }
+{    
+    int c;
+    int row,col;
+    int rc;
+    ALLEGRO_KEYBOARD_STATE keystate;
+
+    memset(bbckey, 0, sizeof(bbckey));
+    al_get_keyboard_state(&keystate);
+    for (c = 0; c < ALLEGRO_KEY_MAX; c++) {
+        rc = c;
+        if (keyas && c == ALLEGRO_KEY_A)
+            rc = ALLEGRO_KEY_CAPSLOCK;
+        if (al_key_down(&keystate, c) && rc != ALLEGRO_KEY_F11) {
+            if (TranslateKey(codeconvert[keylookup[rc]], &row, &col)>0)
+                key_press(row, col);
         }
-        if (key[keylookup[KEY_RSHIFT]] || key[keylookup[KEY_LSHIFT]] || autoboot)
-           key_press(0, 0);
-        /*if (autoboot)
-           key_press(3, 2); removed to allow the current FS to autoboot rather than DFS*/
-        if (key[keylookup[KEY_LCONTROL]] || key[keylookup[KEY_RCONTROL]] || (keyas && key[KEY_S]))
-           key_press(0, 1);
-        key_update();
+    }
+    if (al_key_down(&keystate, ALLEGRO_KEY_RSHIFT) || al_key_down(&keystate, ALLEGRO_KEY_LSHIFT) || autoboot)
+        key_press(0, 0);
+    if (al_key_down(&keystate, keylookup[ALLEGRO_KEY_LCTRL]) || al_key_down(&keystate, keylookup[ALLEGRO_KEY_RCTRL]) || (keyas && al_key_down(&keystate, ALLEGRO_KEY_S)))
+        key_press(0, 1);
+    key_update();
 }
 
 void key_scan(int row, int col) {
