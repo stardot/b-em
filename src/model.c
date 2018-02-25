@@ -1,6 +1,7 @@
 #include "b-em.h"
 
 #include "model.h"
+#include "config.h"
 #include "cmos.h"
 #include "mem.h"
 #include "tube.h"

@@ -3,6 +3,8 @@
   Incorporates 6845 CRTC, Video ULA and SAA5050*/
 
 #include <allegro5/allegro_native_dialog.h>
+#include <allegro5/allegro_primitives.h>
+
 #include "b-em.h"
 
 #include "bbctext.h"
@@ -14,7 +16,6 @@
 #include "sysvia.h"
 #include "video.h"
 #include "video_render.h"
-
 
 int fullscreen = 0;
 
@@ -115,8 +116,11 @@ static int nula_left_cut;
 static int nula_left_edge;
 static int mode7_need_new_lookup;
 
+int pixel_count = 0;
+
 static inline void nula_putpixel(int x, int y, ALLEGRO_COLOR colour)
 {
+    pixel_count++;
     if (crtc_mode && (nula_horizontal_offset || nula_left_blank) && (x < nula_left_cut || x >= nula_left_edge + (crtc[1] * crtc_mode * 8)))
         al_put_pixel(x, y, colblack);
     else if (x < 1280)
@@ -654,6 +658,7 @@ int firstx, firsty, lastx, lasty;
 
 int desktop_width, desktop_height;
 
+ALLEGRO_DISPLAY *display;
 ALLEGRO_BITMAP *b, *b16, *b16x, *b32, *tb;
 #ifdef WIN32
 ALLEGRO_BITMAP *vb;
@@ -670,20 +675,22 @@ void video_init()
     int temp, temp2, left;
 
     al_set_new_display_flags(ALLEGRO_WINDOWED | ALLEGRO_GTK_TOPLEVEL);
-    if (al_create_display(800, 600) == NULL) {
+    if ((display = al_create_display(704, 544)) == NULL) {
         log_fatal("video: unable to create display");
         exit(1);
     }
+    al_flip_display();
+
 #ifdef WIN32
     al_set_new_bitmap_flags(ALLEGRO_VIDEO_BITMAP);
     vb = al_create_bitmap(924, 614);
-    al_set_new_bitmap_flags(ALLEGRO_CONVERT_BITMAP);
 #else
     scr_x_start = 0;
     scr_y_start = 0;
-    scr_x_size = 800;
-    scr_y_size = 600;
+    scr_x_size = 704;
+    scr_y_size = 544;
 #endif
+    al_set_new_bitmap_flags(ALLEGRO_MEMORY_BITMAP);
     b16x = al_create_bitmap(832, 614);
     b16 = al_create_bitmap(832, 614);
     b32 = al_create_bitmap(1536, 800);
@@ -788,12 +795,15 @@ void video_poll(int clocks, int timer_enable)
     uint16_t addr;
     uint8_t dat;
 
+    //log_debug("video: begin video poll");
     while (clocks--) {
         scrx += 8;
         vidclocks++;
         oddclock = !oddclock;
         if (!(ula_ctrl & 0x10) && !oddclock)
             continue;
+
+        al_set_target_bitmap(b);
 
         if (hc == crtc[1]) {
             if (ula_ctrl & 2 && dispen)
@@ -980,13 +990,13 @@ void video_poll(int clocks, int timer_enable)
                         for (c = 0; c < ((ula_ctrl & 0x10) ? 8 : 16); c++) {
                             unsigned char red, grn, blu;
                             al_unmap_rgb(al_get_pixel(b, scrx + c, scry), &red, &grn, &blu);
-                            nula_putpixel(scrx + c, scry, al_map_rgb(red & 0xff, grn ^ 0xff, blu ^ 0xff));
+                            nula_putpixel(scrx + c, scry, al_map_rgb(red ^ 0xff, grn ^ 0xff, blu ^ 0xff));
                         }
                         if (vid_linedbl) {
                             for (c = 0; c < ((ula_ctrl & 0x10) ? 8 : 16); c++) {
                                 unsigned char red, grn, blu;
                                 al_unmap_rgb(al_get_pixel(b, scrx + c, scry + 1), &red, &grn, &blu);
-                                nula_putpixel(scrx + c, scry + 1, al_map_rgb(red & 0xff, grn ^ 0xff, blu ^ 0xff));
+                                nula_putpixel(scrx + c, scry + 1, al_map_rgb(red ^ 0xff, grn ^ 0xff, blu ^ 0xff));
                             }
                         }
                     }
@@ -1224,6 +1234,7 @@ void video_poll(int clocks, int timer_enable)
         }
         lasthc = hc;
     }
+    //log_debug("video: end video poll");
 }
 
 void video_savestate(FILE * f)

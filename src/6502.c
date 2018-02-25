@@ -838,6 +838,7 @@ void m6502_exec()
         int tempi;
         int8_t offset;
         cycles += 40000;
+
         while (cycles > 0) {
                 pc3 = oldoldpc;
                 oldoldpc = oldpc;

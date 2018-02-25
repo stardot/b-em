@@ -230,12 +230,6 @@ void main_init(int argc, char *argv[])
         video_init();
         mode7_makechars();
 
-#ifndef WIN32
-    if (!al_install_keyboard()) {
-        log_fatal("main: umable to install keyboard");
-        exit(1);
-    }
-#endif
         mem_init();
         ddnoise_init();
         tapenoise_init();
@@ -262,8 +256,20 @@ void main_init(int argc, char *argv[])
         midi_init();
         main_reset();
 
-        timer = al_create_timer(1.0 / 50.0);
-        queue = al_create_event_queue();
+    if (!(queue = al_create_event_queue())) {
+        log_fatal("main: unable to create event queue");
+        exit(1);
+    }
+    if (!(timer = al_create_timer(1.0 / 50.0))) {
+        log_fatal("main: unable to create timer");
+        exit(1);
+    }
+    al_register_event_source(queue, al_get_timer_event_source(timer));
+    if (!al_install_keyboard()) {
+        log_fatal("main: umable to install keyboard");
+        exit(1);
+    }
+    al_register_event_source(queue, al_get_keyboard_event_source());
 
 #ifdef WIN32
                 timeBeginPeriod(1);
@@ -357,16 +363,20 @@ static void main_key_down(ALLEGRO_EVENT *event)
             tube_reset();
     }
 }
+
+extern int pixel_count;
     
 static void main_timer(void) {
     if (autoboot)
         autoboot--;
     framesrun++;
 
+    pixel_count = 0;
     if (x65c02)
         m65c02_exec();
     else
         m6502_exec();
+    //log_debug("main: %d pixels this vsync", pixel_count);
 
     ddnoiseframes++;
     if (ddnoiseframes >= 5) {
@@ -383,16 +393,21 @@ void main_run()
 {
     ALLEGRO_EVENT event;
 
+    log_debug("main: about to start timer");
     al_start_timer(timer);
 
     while (!quitted) {
+        //log_debug("main: waiting for event");
         al_wait_for_event(queue, &event);
+        //log_debug("main: event received");
         switch(event.type) {
             case ALLEGRO_EVENT_KEY_DOWN:
+                log_debug("main: key down, code=%d", event.keyboard.keycode);
                 key_down(&event);
                 main_key_down(&event);
                 break;
             case ALLEGRO_EVENT_KEY_UP:
+                log_debug("main: key up, code=%d", event.keyboard.keycode);
                 key_up(&event);
                 break;
             case ALLEGRO_EVENT_MOUSE_AXES:

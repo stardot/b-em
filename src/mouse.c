@@ -7,6 +7,7 @@
 #include "uservia.h"
 
 int mouse_amx;
+int mcount = 8;
 
 void mouse_axes(ALLEGRO_EVENT *event) {} 
 void mouse_btn_down(ALLEGRO_EVENT *event) {}
@@ -14,7 +15,6 @@ void mouse_btn_up(ALLEGRO_EVENT *event) {}
 void mouse_poll(void) {};
 
 #if 0
-int mcount = 8;
 uint8_t mouse_portb = 0;
 
 static int mx = 0,  my = 0;

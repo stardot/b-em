@@ -218,8 +218,8 @@ void video_doblit()
             }
         }
         else {
-            if (!fullscreen)
-                updatewindowsize((lastx - firstx) + 2, ((lasty - firsty) << 1) + 2);
+            //if (!fullscreen)
+            //    updatewindowsize((lastx - firstx) + 2, ((lasty - firsty) << 1) + 2);
             fskipcount = 0;
             if (vid_scanlines) {
                 al_set_target_bitmap(b16x);
@@ -281,6 +281,7 @@ void video_doblit()
             rectfill(screen, 0, scr_y_start + scr_y_size, desktop_width, desktop_height, c);
         }
 #endif
+        al_flip_display();
     }
     firstx = firsty = 65535;
     lastx  = lasty  = 0;
