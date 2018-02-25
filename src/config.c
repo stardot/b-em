@@ -144,8 +144,10 @@ void config_save(void)
                 return;
             }
         }
-        al_set_config_value(bem_cfg, NULL, "disc0", al_path_cstr(discfns[0], ALLEGRO_NATIVE_PATH_SEP));
-        al_set_config_value(bem_cfg, NULL, "disc1", al_path_cstr(discfns[1], ALLEGRO_NATIVE_PATH_SEP));
+        if (discfns[0])
+            al_set_config_value(bem_cfg, NULL, "disc0", al_path_cstr(discfns[0], ALLEGRO_NATIVE_PATH_SEP));
+        if (discfns[1])
+            al_set_config_value(bem_cfg, NULL, "disc1", al_path_cstr(discfns[1], ALLEGRO_NATIVE_PATH_SEP));
 
         set_config_int(NULL, "defaultwriteprotect", defaultwriteprot);
 
