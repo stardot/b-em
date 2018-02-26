@@ -122,7 +122,7 @@ void ddnoise_mix()
                 for (c = 0; c < BUFLEN_DD; c++)
                 {
                         ddbuffer[c] = 0;
-                        if (ddnoise_mstat >= 0)
+                        if (ddnoise_mstat >= 0 && motorsmp[ddnoise_mstat])
                         {
                                 if (ddnoise_mpos >= al_get_sample_length(motorsmp[ddnoise_mstat]))
                                 {
@@ -141,7 +141,7 @@ void ddnoise_mix()
 
                 for (c = 0; c < BUFLEN_DD; c++)
                 {
-                        if (ddnoise_sstat >= 0)
+                        if (ddnoise_sstat >= 0 && seeksmp[ddnoise_sstat][ddnoise_sdir])
                         {
                                 if (ddnoise_spos >= al_get_sample_length(seeksmp[ddnoise_sstat][ddnoise_sdir]))
                                 {
