@@ -364,19 +364,15 @@ static void main_key_down(ALLEGRO_EVENT *event)
     }
 }
 
-extern int pixel_count;
-    
 static void main_timer(void) {
     if (autoboot)
         autoboot--;
     framesrun++;
 
-    pixel_count = 0;
     if (x65c02)
         m65c02_exec();
     else
         m6502_exec();
-    //log_debug("main: %d pixels this vsync", pixel_count);
 
     ddnoiseframes++;
     if (ddnoiseframes >= 5) {
@@ -389,6 +385,8 @@ static void main_timer(void) {
         savestate_dosave();
 }
 
+static int timer_count = 0;
+
 void main_run()
 {
     ALLEGRO_EVENT event;
@@ -396,6 +394,7 @@ void main_run()
     log_debug("main: about to start timer");
     al_start_timer(timer);
 
+    log_debug("main: entering main loop");
     while (!quitted) {
         //log_debug("main: waiting for event");
         al_wait_for_event(queue, &event);
@@ -424,6 +423,10 @@ void main_run()
                 break;
             case ALLEGRO_EVENT_TIMER:
                 main_timer();
+                if (++timer_count >= 500) {
+                    log_debug("reached 10s of timer events");
+                    timer_count = 0;
+                }
         }
     }
 }

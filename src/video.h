@@ -25,8 +25,8 @@ void videoula_savestate(FILE *f);
 void videoula_loadstate(FILE *f);
 
 extern uint8_t ula_ctrl;
-extern int ula_palbak[16];
-extern ALLEGRO_COLOR nula_collook[16];
+extern uint8_t ula_palbak[16];
+extern int nula_collook[16];
 extern uint8_t nula_flash[8];
 
 extern uint8_t nula_palette_mode;
