@@ -39,6 +39,14 @@ static inline int menu_get_num(ALLEGRO_EVENT *event)
     return event->user.data1 >> 8;
 }
 
+static void add_checkbox_item(ALLEGRO_MENU *parent, char const *title, uint16_t id, bool checked)
+{
+    int flags = ALLEGRO_MENU_ITEM_CHECKBOX;
+    if (checked)
+        flags |= ALLEGRO_MENU_ITEM_CHECKED;
+    al_append_menu_item(parent, title, id, flags, NULL, NULL);
+}
+
 static ALLEGRO_MENU *create_file_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
@@ -52,7 +60,6 @@ static ALLEGRO_MENU *create_file_menu(void)
 static ALLEGRO_MENU *create_disc_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
-    int flags;
 
     al_append_menu_item(menu, "Autoboo disc in 0/2...", IDM_DISC_AUTOBOOT, 0, NULL, NULL);
     al_append_menu_item(menu, "Load disc :0/2...", menu_id_num(IDM_DISC_LOAD, 0), 0, NULL, NULL);
@@ -61,21 +68,12 @@ static ALLEGRO_MENU *create_disc_menu(void)
     al_append_menu_item(menu, "Eject disc :1/3", menu_id_num(IDM_DISC_EJECT, 1), 0, NULL, NULL);
     al_append_menu_item(menu, "New disc :0/2...", menu_id_num(IDM_DISC_NEW, 0), 0, NULL, NULL);
     al_append_menu_item(menu, "New disc :1/3...", menu_id_num(IDM_DISC_NEW, 1), 0, NULL, NULL);
-    flags = ALLEGRO_MENU_ITEM_CHECKBOX;
-    if (writeprot[0])
-        flags |= ALLEGRO_MENU_ITEM_CHECKED;
-    al_append_menu_item(menu, "Write protect disc :0/2", menu_id_num(IDM_DISC_WPROT, 0), flags, NULL, NULL);
-    flags = ALLEGRO_MENU_ITEM_CHECKBOX;
-    if (writeprot[1])
-        flags |= ALLEGRO_MENU_ITEM_CHECKED;    
-    al_append_menu_item(menu, "Write protect disc :0/2", menu_id_num(IDM_DISC_WPROT, 1), flags, NULL, NULL);
-    flags = ALLEGRO_MENU_ITEM_CHECKBOX;
-    if (defaultwriteprot)
-        flags |= ALLEGRO_MENU_ITEM_CHECKED;
-    al_append_menu_item(menu, "Default write protect", IDM_DISC_WPROT_D, flags, NULL, NULL);
-    al_append_menu_item(menu, "IDE hard disc", IDM_DISC_HARD_IDE, ALLEGRO_MENU_ITEM_CHECKBOX, NULL, NULL);
-    al_append_menu_item(menu, "SCSI hard disc", IDM_DISC_HARD_SCSI, ALLEGRO_MENU_ITEM_CHECKBOX, NULL, NULL);
-    al_append_menu_item(menu, "VDFS Enabled", IDM_DISC_VDFS_ENABLE, ALLEGRO_MENU_ITEM_CHECKBOX, NULL, NULL);
+    add_checkbox_item(menu, "Write protect disc :0/2", menu_id_num(IDM_DISC_WPROT, 0), writeprot[0]);
+    add_checkbox_item(menu, "Write protect disc :1/3", menu_id_num(IDM_DISC_WPROT, 1), writeprot[1]);
+    add_checkbox_item(menu, "Default write protect", IDM_DISC_WPROT_D, defaultwriteprot);
+    add_checkbox_item(menu, "IDE hard disc", IDM_DISC_HARD_IDE, ide_enable);
+    add_checkbox_item(menu, "SCSI hard disc", IDM_DISC_HARD_SCSI, scsi_enabled);
+    add_checkbox_item(menu, "VDFS Enabled", IDM_DISC_VDFS_ENABLE, vdfs_enabled);
     al_append_menu_item(menu, "Choose VDFS Root...", IDM_DISC_VDFS_ROOT, 0, NULL, NULL);
     disc_menu = menu;
     return menu;
@@ -130,7 +128,7 @@ static void gen_rom_label(int slot, char *dest)
 static ALLEGRO_MENU *create_rom_menu(void)
 {
     ALLEGRO_MENU *menu, *sub;
-    int slot, flags;
+    int slot;
     char label[ROM_LABEL_LEN];
 
     menu =  al_create_menu();
@@ -139,10 +137,7 @@ static ALLEGRO_MENU *create_rom_menu(void)
         sub = al_create_menu();
         al_append_menu_item(sub, "Load...", menu_id_num(IDM_ROMS_LOAD, slot), 0, NULL, NULL);
         al_append_menu_item(sub, "Clear", menu_id_num(IDM_ROMS_CLEAR, slot), 0, NULL, NULL);
-        flags = ALLEGRO_MENU_ITEM_CHECKBOX;
-        if (rom_slots[slot].swram)
-            flags |= ALLEGRO_MENU_ITEM_CHECKED;
-        al_append_menu_item(sub, "RAM", menu_id_num(IDM_ROMS_RAM, slot), flags, NULL, NULL);
+        add_checkbox_item(sub, "RAM", menu_id_num(IDM_ROMS_RAM, slot), rom_slots[slot].swram);
         al_append_menu_item(menu, label, 0, 0, NULL, sub);
     }
     rom_menu = menu;
@@ -152,14 +147,10 @@ static ALLEGRO_MENU *create_rom_menu(void)
 static ALLEGRO_MENU *create_model_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
-    int i, flags;
+    int i;
 
-    for (i = 0; i < NUM_MODELS; i++) {
-        flags = ALLEGRO_MENU_ITEM_CHECKBOX;
-        if (i == curmodel)
-            flags |= ALLEGRO_MENU_ITEM_CHECKED;
-        al_append_menu_item(menu, models[i].name, menu_id_num(IDM_MODEL, i), flags, NULL, NULL);
-    }
+    for (i = 0; i < NUM_MODELS; i++)
+        add_checkbox_item(menu, models[i].name, menu_id_num(IDM_MODEL, i), i == curmodel);
     model_menu = menu;
     return menu;
 }
@@ -167,14 +158,10 @@ static ALLEGRO_MENU *create_model_menu(void)
 static ALLEGRO_MENU *create_tube_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
-    int i, flags;
+    int i;
 
-    for (i = 0; i < NUM_TUBES-1; i++) {
-        flags = ALLEGRO_MENU_ITEM_CHECKBOX;
-        if (i == curtube)
-            flags |= ALLEGRO_MENU_ITEM_CHECKED;
-        al_append_menu_item(menu, tubes[i].name, menu_id_num(IDM_TUBE, i), flags, NULL, NULL);
-    }
+    for (i = 0; i < NUM_TUBES-1; i++)
+        add_checkbox_item(menu, tubes[i].name, menu_id_num(IDM_TUBE, i), i == curtube);
     tube_menu = menu;
     return menu;
 }
@@ -183,43 +170,19 @@ static ALLEGRO_MENU *create_video_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
     ALLEGRO_MENU *sub = al_create_menu();
-    int flags = ALLEGRO_MENU_ITEM_CHECKBOX;
-    if (vid_linedbl)
-        flags |= ALLEGRO_MENU_ITEM_CHECKED;
-    al_append_menu_item(sub, "Line doubling", IDM_VIDEO_LINEDBL, flags, NULL, NULL);
-    flags = ALLEGRO_MENU_ITEM_CHECKBOX;
-    if (vid_scanlines)
-        flags |= ALLEGRO_MENU_ITEM_CHECKED;
-    al_append_menu_item(sub, "Scan lines", IDM_VIDEO_SCANLINES, flags, NULL, NULL);
-    flags = ALLEGRO_MENU_ITEM_CHECKBOX;
-    if (vid_interlace)
-        flags |= ALLEGRO_MENU_ITEM_CHECKED;
-    al_append_menu_item(sub, "Interlaced", IDM_VIDEO_INTERLACED, flags, NULL, NULL);
+    add_checkbox_item(sub, "Line doubling", IDM_VIDEO_LINEDBL, vid_linedbl);
+    add_checkbox_item(sub, "Scan lines", IDM_VIDEO_SCANLINES, vid_scanlines);
+    add_checkbox_item(sub, "Interlaced", IDM_VIDEO_INTERLACED, vid_interlace);
     al_append_menu_item(menu, "Display type...", 0, 0, NULL, sub);
     dtype_menu = sub;
     sub = al_create_menu();
-    flags = ALLEGRO_MENU_ITEM_CHECKBOX;
-    if (vid_fullborders == 0)
-        flags |= ALLEGRO_MENU_ITEM_CHECKED;
-    al_append_menu_item(sub, "None", IDM_VIDEO_NOBORDERS, flags, NULL, NULL);
-    flags = ALLEGRO_MENU_ITEM_CHECKBOX;
-    if (vid_fullborders == 1)
-        flags |= ALLEGRO_MENU_ITEM_CHECKED;
-    al_append_menu_item(sub, "Medium", IDM_VIDEO_MBORDERS, flags, NULL, NULL);
-    flags = ALLEGRO_MENU_ITEM_CHECKBOX;
-    if (vid_fullborders == 2)
-        flags |= ALLEGRO_MENU_ITEM_CHECKED;
-    al_append_menu_item(sub, "Full", IDM_VIDEO_FBORDERS, flags, NULL, NULL);
+    add_checkbox_item(sub, "None", IDM_VIDEO_NOBORDERS, vid_fullborders == 0);
+    add_checkbox_item(sub, "Medium", IDM_VIDEO_MBORDERS, vid_fullborders == 1);
+    add_checkbox_item(sub, "Full", IDM_VIDEO_FBORDERS, vid_fullborders == 2);
     al_append_menu_item(menu, "Borders...", 0, 0, NULL, sub);
     border_menu = sub;
-    flags = ALLEGRO_MENU_ITEM_CHECKBOX;
-    if (fullscreen)
-        flags |= ALLEGRO_MENU_ITEM_CHECKED;
-    al_append_menu_item(menu, "Fullscreen", IDM_VIDEO_FULLSCR, flags, NULL, NULL);
-    flags = ALLEGRO_MENU_ITEM_CHECKBOX;
-    if (!nula_disable)
-        flags |= ALLEGRO_MENU_ITEM_CHECKED;
-    al_append_menu_item(menu, "NuLA", IDM_VIDEO_NULA, flags, NULL, NULL);
+    add_checkbox_item(menu, "Fullscreen", IDM_VIDEO_FULLSCR, fullscreen);
+    add_checkbox_item(menu, "NuLA", IDM_VIDEO_NULA, !nula_disable);
     return menu;
 }
 
