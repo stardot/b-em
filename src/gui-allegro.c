@@ -17,6 +17,8 @@
 ALLEGRO_MENU *disc_menu;
 ALLEGRO_MENU *tspeed_menu;
 ALLEGRO_MENU *rom_menu;
+ALLEGRO_MENU *model_menu;
+ALLEGRO_MENU *tube_menu;
 
 static inline int menu_id_num(menu_id_t id, int num)
 {
@@ -142,7 +144,45 @@ static ALLEGRO_MENU *create_rom_menu(void)
     rom_menu = menu;
     return menu;
 }
-    
+
+static ALLEGRO_MENU *create_model_menu(void)
+{
+    ALLEGRO_MENU *menu = al_create_menu();
+    int i, flags;
+
+    for (i = 0; i < NUM_MODELS; i++) {
+        flags = ALLEGRO_MENU_ITEM_CHECKBOX;
+        if (i == curmodel)
+            flags |= ALLEGRO_MENU_ITEM_CHECKED;
+        al_append_menu_item(menu, models[i].name, menu_id_num(IDM_MODEL, i), flags, NULL, NULL);
+    }
+    model_menu = menu;
+    return menu;
+}
+
+static ALLEGRO_MENU *create_tube_menu(void)
+{
+    ALLEGRO_MENU *menu = al_create_menu();
+    int i, flags;
+
+    for (i = 0; i < NUM_TUBES-1; i++) {
+        flags = ALLEGRO_MENU_ITEM_CHECKBOX;
+        if (i == curtube)
+            flags |= ALLEGRO_MENU_ITEM_CHECKED;
+        al_append_menu_item(menu, tubes[i].name, menu_id_num(IDM_TUBE, i), flags, NULL, NULL);
+    }
+    tube_menu = menu;
+    return menu;
+}
+
+static ALLEGRO_MENU *create_settings_menu(void)
+{
+    ALLEGRO_MENU *menu = al_create_menu();
+    al_append_menu_item(menu, "Model...", 0, 0, NULL, create_model_menu());
+    al_append_menu_item(menu, "Tube...", 0, 0, NULL, create_tube_menu());
+    return menu;
+}
+
 void gui_allegro_init(ALLEGRO_EVENT_QUEUE *queue, ALLEGRO_DISPLAY *display)
 {
     ALLEGRO_MENU *menu = al_create_menu();
@@ -150,6 +190,9 @@ void gui_allegro_init(ALLEGRO_EVENT_QUEUE *queue, ALLEGRO_DISPLAY *display)
     al_append_menu_item(menu, "Disc", 0, 0, NULL, create_disc_menu());
     al_append_menu_item(menu, "Tape", 0, 0, NULL, create_tape_menu());
     al_append_menu_item(menu, "ROM", 0, 0, NULL, create_rom_menu());
+    al_append_menu_item(menu, "Model", 0, 0, NULL, create_model_menu());
+    al_append_menu_item(menu, "Tube", 0, 0, NULL, create_tube_menu());
+    //al_append_menu_item(menu, "Settings", 0, 0, NULL, create_settings_menu());
     al_set_display_menu(display, menu);
     al_register_event_source(queue, al_get_default_menu_event_source());
 }
@@ -387,6 +430,22 @@ static void rom_ram_toggle(ALLEGRO_EVENT *event)
     al_set_menu_item_caption(rom_menu, slot-ROM_NSLOT+1, label);
 }
 
+static void change_model(ALLEGRO_EVENT *event)
+{
+    al_set_menu_item_flags(model_menu, menu_id_num(IDM_MODEL, curmodel), ALLEGRO_MENU_ITEM_CHECKBOX);
+    model_save();
+    oldmodel = curmodel;
+    curmodel = menu_get_num(event);
+    main_restart();
+}
+
+static void change_tube(ALLEGRO_EVENT *event)
+{
+    al_set_menu_item_flags(tube_menu, menu_id_num(IDM_TUBE, curtube), ALLEGRO_MENU_ITEM_CHECKBOX);
+    selecttube = curtube = menu_get_num(event);
+    main_restart();
+}
+
 void gui_allegro_event(ALLEGRO_EVENT *event)
 {
     switch(menu_get_id(event)) {
@@ -455,6 +514,12 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             break;
         case IDM_ROMS_RAM:
             rom_ram_toggle(event);
+            break;
+        case IDM_MODEL:
+            change_model(event);
+            break;
+        case IDM_TUBE:
+            change_tube(event);
             break;
         default:
             log_warn("gui-allegro: menu ID %d not handled", menu_get_id(event));
