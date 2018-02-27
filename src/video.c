@@ -705,7 +705,8 @@ ALLEGRO_DISPLAY *video_init()
     int temp, temp2, left;
 
     al_set_new_display_flags(ALLEGRO_WINDOWED | ALLEGRO_GTK_TOPLEVEL);
-    if ((display = al_create_display(704, 544)) == NULL) {
+    video_set_window_size();
+    if ((display = al_create_display(winsizex, winsizey)) == NULL) {
         log_fatal("video: unable to create display");
         exit(1);
     }

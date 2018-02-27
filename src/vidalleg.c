@@ -93,13 +93,30 @@ void video_enterfullscreen()
     }
 }
 
+void video_set_window_size(void)
+{
+    switch(vid_fullborders) {
+        case 0:
+            winsizex = BORDER_NONE_X_SIZE;
+            winsizey = BORDER_NONE_Y_SIZE * 2;
+            break;
+        case 1:
+            winsizex = BORDER_MED_X_SIZE;
+            winsizey = BORDER_MED_Y_SIZE * 2;
+            break;
+        case 2:
+            winsizex = BORDER_FULL_X_SIZE;
+            winsizey = BORDER_FULL_Y_SIZE * 2;
+    }
+}
+    
 void video_leavefullscreen()
 {
     al_set_display_flag(al_get_current_display(), ALLEGRO_FULLSCREEN_WINDOW, false);
 }
 
-static inline void upscale_only(ALLEGRO_BITMAP *src, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh) {
-
+static inline void upscale_only(ALLEGRO_BITMAP *src, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh)
+{
     al_set_target_backbuffer(al_get_current_display());
     if (dw > sw || dh > sh)
         al_draw_scaled_bitmap(src, sx, sy, sw, sh, dx, dy, dw, dh, 0);
@@ -145,16 +162,16 @@ void video_doblit()
             lasty  = 300;
         }
         else if (vid_fullborders == 1) {
-            firstx = 320;
-            lastx  = 1024;
-            firsty = 24;
-            lasty  = 296;
+            firstx = BORDER_MED_X_START;
+            lastx  = BORDER_MED_X_START + BORDER_MED_X_SIZE;
+            firsty = BORDER_MED_Y_START;
+            lasty  = BORDER_MED_Y_START + BORDER_MED_Y_SIZE;
         }
         else if (vid_fullborders == 2) {
-            firstx = 240;
-            lastx  = 240 + 832;
-            firsty = 8;
-            lasty  = 312;
+            firstx = BORDER_FULL_X_START;
+            lastx  = BORDER_FULL_X_START + BORDER_FULL_X_SIZE;
+            firsty = BORDER_FULL_Y_START;
+            lasty  = BORDER_FULL_Y_START + BORDER_FULL_Y_SIZE;
         }
         if (videoresize && !fullscreen) {
             fskipcount = 0;

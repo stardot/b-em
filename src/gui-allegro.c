@@ -10,15 +10,19 @@
 #include "savestate.h"
 #include "scsi.h"
 #include "tape.h"
+#include "video.h"
+#include "video_render.h"
 #include "vdfs.h"
 
 #define ROM_LABEL_LEN 50
 
-ALLEGRO_MENU *disc_menu;
-ALLEGRO_MENU *tspeed_menu;
-ALLEGRO_MENU *rom_menu;
-ALLEGRO_MENU *model_menu;
-ALLEGRO_MENU *tube_menu;
+static ALLEGRO_MENU *disc_menu;
+static ALLEGRO_MENU *tspeed_menu;
+static ALLEGRO_MENU *rom_menu;
+static ALLEGRO_MENU *model_menu;
+static ALLEGRO_MENU *tube_menu;
+static ALLEGRO_MENU *dtype_menu;
+static ALLEGRO_MENU *border_menu;
 
 static inline int menu_id_num(menu_id_t id, int num)
 {
@@ -175,11 +179,54 @@ static ALLEGRO_MENU *create_tube_menu(void)
     return menu;
 }
 
+static ALLEGRO_MENU *create_video_menu(void)
+{
+    ALLEGRO_MENU *menu = al_create_menu();
+    ALLEGRO_MENU *sub = al_create_menu();
+    int flags = ALLEGRO_MENU_ITEM_CHECKBOX;
+    if (vid_linedbl)
+        flags |= ALLEGRO_MENU_ITEM_CHECKED;
+    al_append_menu_item(sub, "Line doubling", IDM_VIDEO_LINEDBL, flags, NULL, NULL);
+    flags = ALLEGRO_MENU_ITEM_CHECKBOX;
+    if (vid_scanlines)
+        flags |= ALLEGRO_MENU_ITEM_CHECKED;
+    al_append_menu_item(sub, "Scan lines", IDM_VIDEO_SCANLINES, flags, NULL, NULL);
+    flags = ALLEGRO_MENU_ITEM_CHECKBOX;
+    if (vid_interlace)
+        flags |= ALLEGRO_MENU_ITEM_CHECKED;
+    al_append_menu_item(sub, "Interlaced", IDM_VIDEO_INTERLACED, flags, NULL, NULL);
+    al_append_menu_item(menu, "Display type...", 0, 0, NULL, sub);
+    dtype_menu = sub;
+    sub = al_create_menu();
+    flags = ALLEGRO_MENU_ITEM_CHECKBOX;
+    if (vid_fullborders == 0)
+        flags |= ALLEGRO_MENU_ITEM_CHECKED;
+    al_append_menu_item(sub, "None", IDM_VIDEO_NOBORDERS, flags, NULL, NULL);
+    flags = ALLEGRO_MENU_ITEM_CHECKBOX;
+    if (vid_fullborders == 1)
+        flags |= ALLEGRO_MENU_ITEM_CHECKED;
+    al_append_menu_item(sub, "Medium", IDM_VIDEO_MBORDERS, flags, NULL, NULL);
+    flags = ALLEGRO_MENU_ITEM_CHECKBOX;
+    if (vid_fullborders == 2)
+        flags |= ALLEGRO_MENU_ITEM_CHECKED;
+    al_append_menu_item(sub, "Full", IDM_VIDEO_FBORDERS, flags, NULL, NULL);
+    al_append_menu_item(menu, "Borders...", 0, 0, NULL, sub);
+    border_menu = sub;
+    flags = ALLEGRO_MENU_ITEM_CHECKBOX;
+    if (fullscreen)
+        flags |= ALLEGRO_MENU_ITEM_CHECKED;
+    al_append_menu_item(menu, "Fullscreen", IDM_VIDEO_FULLSCR, flags, NULL, NULL);
+    flags = ALLEGRO_MENU_ITEM_CHECKBOX;
+    if (!nula_disable)
+        flags |= ALLEGRO_MENU_ITEM_CHECKED;
+    al_append_menu_item(menu, "NuLA", IDM_VIDEO_NULA, flags, NULL, NULL);
+    return menu;
+}
+
 static ALLEGRO_MENU *create_settings_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
-    al_append_menu_item(menu, "Model...", 0, 0, NULL, create_model_menu());
-    al_append_menu_item(menu, "Tube...", 0, 0, NULL, create_tube_menu());
+    al_append_menu_item(menu, "Video...", 0, 0, NULL, create_video_menu());
     return menu;
 }
 
@@ -192,7 +239,7 @@ void gui_allegro_init(ALLEGRO_EVENT_QUEUE *queue, ALLEGRO_DISPLAY *display)
     al_append_menu_item(menu, "ROM", 0, 0, NULL, create_rom_menu());
     al_append_menu_item(menu, "Model", 0, 0, NULL, create_model_menu());
     al_append_menu_item(menu, "Tube", 0, 0, NULL, create_tube_menu());
-    //al_append_menu_item(menu, "Settings", 0, 0, NULL, create_settings_menu());
+    al_append_menu_item(menu, "Settings", 0, 0, NULL, create_settings_menu());
     al_set_display_menu(display, menu);
     al_register_event_source(queue, al_get_default_menu_event_source());
 }
@@ -446,6 +493,62 @@ static void change_tube(ALLEGRO_EVENT *event)
     main_restart();
 }
 
+static void set_video_linedbl(void)
+{
+    vid_linedbl = 1;
+    vid_scanlines = vid_interlace = 0;
+    al_set_menu_item_flags(dtype_menu, IDM_VIDEO_SCANLINES, ALLEGRO_MENU_ITEM_CHECKBOX);
+    al_set_menu_item_flags(dtype_menu, IDM_VIDEO_INTERLACED, ALLEGRO_MENU_ITEM_CHECKBOX);
+}
+
+static void set_video_scanlines(void)
+{
+    vid_scanlines = 1;
+    vid_linedbl = vid_interlace = 0;
+    al_set_menu_item_flags(dtype_menu, IDM_VIDEO_LINEDBL, ALLEGRO_MENU_ITEM_CHECKBOX);
+    al_set_menu_item_flags(dtype_menu, IDM_VIDEO_INTERLACED, ALLEGRO_MENU_ITEM_CHECKBOX);
+}
+
+static void set_video_interlaced(void)
+{
+    vid_interlace = 1;
+    vid_linedbl = vid_scanlines = 0;
+    al_set_menu_item_flags(dtype_menu, IDM_VIDEO_LINEDBL, ALLEGRO_MENU_ITEM_CHECKBOX);
+    al_set_menu_item_flags(dtype_menu, IDM_VIDEO_SCANLINES, ALLEGRO_MENU_ITEM_CHECKBOX);
+}
+
+static void set_video_noborders(void)
+{
+    vid_fullborders = 0;
+    al_set_menu_item_flags(border_menu, IDM_VIDEO_MBORDERS, ALLEGRO_MENU_ITEM_CHECKBOX);
+    al_set_menu_item_flags(border_menu, IDM_VIDEO_FBORDERS, ALLEGRO_MENU_ITEM_CHECKBOX);
+}
+
+static void set_video_medium_borders(void)
+{
+    vid_fullborders = 1;
+    al_set_menu_item_flags(border_menu, IDM_VIDEO_NOBORDERS, ALLEGRO_MENU_ITEM_CHECKBOX);
+    al_set_menu_item_flags(border_menu, IDM_VIDEO_FBORDERS, ALLEGRO_MENU_ITEM_CHECKBOX);
+}
+
+static void set_video_fullborders(void)
+{
+    vid_fullborders = 2;
+    al_set_menu_item_flags(border_menu, IDM_VIDEO_NOBORDERS, ALLEGRO_MENU_ITEM_CHECKBOX);
+    al_set_menu_item_flags(border_menu, IDM_VIDEO_MBORDERS, ALLEGRO_MENU_ITEM_CHECKBOX);
+}
+
+static void toggle_video_fullscreen(void)
+{
+    if (fullscreen) {
+        fullscreen = 0;
+        video_leavefullscreen();
+    } else {
+        fullscreen = 1;
+        video_enterfullscreen();
+    }
+}
+
 void gui_allegro_event(ALLEGRO_EVENT *event)
 {
     switch(menu_get_id(event)) {
@@ -520,6 +623,27 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             break;
         case IDM_TUBE:
             change_tube(event);
+            break;
+        case IDM_VIDEO_LINEDBL:
+            set_video_linedbl();
+            break;
+        case IDM_VIDEO_SCANLINES:
+            set_video_scanlines();
+            break;
+        case IDM_VIDEO_INTERLACED:
+            set_video_interlaced();
+            break;
+        case IDM_VIDEO_NOBORDERS:
+            set_video_noborders();
+            break;
+        case IDM_VIDEO_MBORDERS:
+            set_video_medium_borders();
+            break;
+        case IDM_VIDEO_FBORDERS:
+            set_video_fullborders();
+            break;
+        case IDM_VIDEO_FULLSCR:
+            toggle_video_fullscreen();
             break;
         default:
             log_warn("gui-allegro: menu ID %d not handled", menu_get_id(event));
