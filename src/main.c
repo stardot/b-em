@@ -6,6 +6,7 @@
 #endif
 
 #include "b-em.h"
+#include <allegro5/allegro_native_dialog.h>
 
 #include "6502.h"
 #include "adc.h"
@@ -17,6 +18,7 @@
 #include "debugger.h"
 #include "disc.h"
 #include "fdi.h"
+#include "gui-allegro.h"
 #include "i8271.h"
 #include "ide.h"
 #include "keyboard.h"
@@ -59,7 +61,7 @@
 
 #undef printf
 
-bool quitted = false;
+bool quitting = false;
 int autoboot=0;
 int joybutton[2];
 
@@ -108,6 +110,7 @@ void main_init(int argc, char *argv[])
 {
         int c;
         int tapenext = 0, discnext = 0;
+        ALLEGRO_DISPLAY *display;
 
         startblit();
 
@@ -227,7 +230,7 @@ void main_init(int argc, char *argv[])
                 if (tapenext) tapenext--;
         }
 
-        video_init();
+        display = video_init();
         mode7_makechars();
 
         mem_init();
@@ -260,11 +263,15 @@ void main_init(int argc, char *argv[])
         log_fatal("main: unable to create event queue");
         exit(1);
     }
+
+    gui_allegro_init(queue, display);
+
     if (!(timer = al_create_timer(1.0 / 50.0))) {
         log_fatal("main: unable to create timer");
         exit(1);
     }
     al_register_event_source(queue, al_get_timer_event_source(timer));
+
     if (!al_install_keyboard()) {
         log_fatal("main: umable to install keyboard");
         exit(1);
@@ -395,7 +402,7 @@ void main_run()
     al_start_timer(timer);
 
     log_debug("main: entering main loop");
-    while (!quitted) {
+    while (!quitting) {
         //log_debug("main: waiting for event");
         al_wait_for_event(queue, &event);
         //log_debug("main: event received");
@@ -419,7 +426,7 @@ void main_run()
                 mouse_btn_up(&event);
                 break;
             case ALLEGRO_EVENT_DISPLAY_CLOSE:
-                quitted = true;
+                quitting = true;
                 break;
             case ALLEGRO_EVENT_TIMER:
                 main_timer();
@@ -427,6 +434,11 @@ void main_run()
                     log_debug("reached 10s of timer events");
                     timer_count = 0;
                 }
+                break;
+            case ALLEGRO_EVENT_MENU_CLICK:
+                al_stop_timer(timer);
+                gui_allegro_event(&event);
+                al_start_timer(timer);
         }
     }
 }

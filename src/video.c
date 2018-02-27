@@ -699,7 +699,7 @@ ALLEGRO_BITMAP *tvb;
 
 ALLEGRO_LOCKED_REGION *region;
 
-void video_init()
+ALLEGRO_DISPLAY *video_init()
 {
     int c, d;
     int temp, temp2, left;
@@ -766,6 +766,7 @@ void video_init()
     al_set_target_bitmap(b);
     al_clear_to_color(al_map_rgb(0, 0,0));
     region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_READWRITE);
+    return display;
 }
 
 

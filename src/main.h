@@ -1,6 +1,8 @@
 #ifndef __INC_MAIN_H
 #define __INC_MAIN_H
 
+extern bool quitting;
+
 void main_init(int argc, char *argv[]);
 void main_softreset();
 void main_reset();

@@ -59,6 +59,7 @@ b_em_SOURCES = \
 	debugger.c \
 	disc.c fdi.c \
 	fdi2raw.c \
+	gui-allegro.c\
 	i8271.c \
 	ide.c \
 	keyboard.c \
