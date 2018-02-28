@@ -8,21 +8,16 @@
 #include "mem.h"
 #include "model.h"
 #include "savestate.h"
+#include "sid_b-em.h"
 #include "scsi.h"
+#include "sound.h"
+#include "sn76489.h"
 #include "tape.h"
 #include "video.h"
 #include "video_render.h"
 #include "vdfs.h"
 
 #define ROM_LABEL_LEN 50
-
-static ALLEGRO_MENU *disc_menu;
-static ALLEGRO_MENU *tspeed_menu;
-static ALLEGRO_MENU *rom_menu;
-static ALLEGRO_MENU *model_menu;
-static ALLEGRO_MENU *tube_menu;
-static ALLEGRO_MENU *dtype_menu;
-static ALLEGRO_MENU *border_menu;
 
 static inline int menu_id_num(menu_id_t id, int num)
 {
@@ -45,6 +40,20 @@ static void add_checkbox_item(ALLEGRO_MENU *parent, char const *title, uint16_t 
     if (checked)
         flags |= ALLEGRO_MENU_ITEM_CHECKED;
     al_append_menu_item(parent, title, id, flags, NULL, NULL);
+}
+
+static void add_radio_item(ALLEGRO_MENU *parent, char const *title, uint16_t id, int this_value, int cur_value)
+{
+    add_checkbox_item(parent, title, menu_id_num(id, this_value), this_value == cur_value);
+}
+
+static void add_radio_set(ALLEGRO_MENU *parent, char const **labels, uint16_t id, int cur_value)
+{
+    int i;
+    const char *label;
+
+    for (i = 0; (label = *labels++); i++)
+        add_checkbox_item(parent, label, menu_id_num(id, i), i == cur_value);
 }
 
 static ALLEGRO_MENU *create_file_menu(void)
@@ -75,7 +84,6 @@ static ALLEGRO_MENU *create_disc_menu(void)
     add_checkbox_item(menu, "SCSI hard disc", IDM_DISC_HARD_SCSI, scsi_enabled);
     add_checkbox_item(menu, "VDFS Enabled", IDM_DISC_VDFS_ENABLE, vdfs_enabled);
     al_append_menu_item(menu, "Choose VDFS Root...", IDM_DISC_VDFS_ROOT, 0, NULL, NULL);
-    disc_menu = menu;
     return menu;
 }
 
@@ -98,7 +106,6 @@ static ALLEGRO_MENU *create_tape_menu(void)
     al_append_menu_item(speed, "Normal", IDM_TAPE_SPEED_NORMAL, nflags, NULL, NULL);
     al_append_menu_item(speed, "Fast", IDM_TAPE_SPEED_FAST, fflags, NULL, NULL);
     al_append_menu_item(menu, "Tape speed", 0, 0, NULL, speed);
-    tspeed_menu = speed;
     return menu;
 }
 
@@ -140,7 +147,6 @@ static ALLEGRO_MENU *create_rom_menu(void)
         add_checkbox_item(sub, "RAM", menu_id_num(IDM_ROMS_RAM, slot), rom_slots[slot].swram);
         al_append_menu_item(menu, label, 0, 0, NULL, sub);
     }
-    rom_menu = menu;
     return menu;
 }
 
@@ -150,8 +156,7 @@ static ALLEGRO_MENU *create_model_menu(void)
     int i;
 
     for (i = 0; i < NUM_MODELS; i++)
-        add_checkbox_item(menu, models[i].name, menu_id_num(IDM_MODEL, i), i == curmodel);
-    model_menu = menu;
+        add_radio_item(menu, models[i].name, IDM_MODEL, i, curmodel);
     return menu;
 }
 
@@ -161,8 +166,7 @@ static ALLEGRO_MENU *create_tube_menu(void)
     int i;
 
     for (i = 0; i < NUM_TUBES-1; i++)
-        add_checkbox_item(menu, tubes[i].name, menu_id_num(IDM_TUBE, i), i == curtube);
-    tube_menu = menu;
+        add_radio_item(menu, tubes[i].name, IDM_TUBE, i, curtube);
     return menu;
 }
 
@@ -174,22 +178,75 @@ static ALLEGRO_MENU *create_video_menu(void)
     add_checkbox_item(sub, "Scan lines", IDM_VIDEO_SCANLINES, vid_scanlines);
     add_checkbox_item(sub, "Interlaced", IDM_VIDEO_INTERLACED, vid_interlace);
     al_append_menu_item(menu, "Display type...", 0, 0, NULL, sub);
-    dtype_menu = sub;
     sub = al_create_menu();
-    add_checkbox_item(sub, "None", IDM_VIDEO_NOBORDERS, vid_fullborders == 0);
-    add_checkbox_item(sub, "Medium", IDM_VIDEO_MBORDERS, vid_fullborders == 1);
-    add_checkbox_item(sub, "Full", IDM_VIDEO_FBORDERS, vid_fullborders == 2);
+    add_radio_item(sub, "None",   IDM_VIDEO_BORDERS, 0, vid_fullborders);
+    add_radio_item(sub, "Medium", IDM_VIDEO_BORDERS, 1, vid_fullborders);
+    add_radio_item(sub, "Full",   IDM_VIDEO_BORDERS, 2, vid_fullborders);
     al_append_menu_item(menu, "Borders...", 0, 0, NULL, sub);
-    border_menu = sub;
     add_checkbox_item(menu, "Fullscreen", IDM_VIDEO_FULLSCR, fullscreen);
     add_checkbox_item(menu, "NuLA", IDM_VIDEO_NULA, !nula_disable);
     return menu;
 }
 
+static const char *sid_names[] =
+{
+    "6581",
+    "8580",
+    "8580 + digi boost",
+    "6581R4",
+    "6581R3 4885",
+    "6581R3 0486S",
+    "6581R3 3984",
+    "6581R4AR 3789",
+    "6581R3 4485",
+    "6581R4 1986S",
+    "8580R5 3691",
+    "8580R5 3691 + digi boost",
+    "8580R5 1489",
+    "8580R5 1489 + digi boost",
+    NULL
+};
+
+static ALLEGRO_MENU *create_sid_menu(void)
+{
+    ALLEGRO_MENU *menu = al_create_menu();
+    ALLEGRO_MENU *sub = al_create_menu();
+    add_radio_set(sub, sid_names, IDM_SID_TYPE, cursid);
+    al_append_menu_item(menu, "Model", 0, 0, NULL, sub);
+    sub = al_create_menu();
+    add_radio_item(sub, "Interpolating", IDM_SID_METHOD, 0, sidmethod);
+    add_radio_item(sub, "Resampling",    IDM_SID_METHOD, 1, sidmethod);
+    al_append_menu_item(menu, "Sample method", 0, 0, NULL, sub);
+    return menu;
+}
+    
+static ALLEGRO_MENU *create_sound_menu(void)
+{
+    ALLEGRO_MENU *menu = al_create_menu();
+    ALLEGRO_MENU *sub;
+    add_checkbox_item(menu, "Internal sound chip",   IDM_SOUND_INTERNAL,  sound_internal);
+    add_checkbox_item(menu, "BeebSID",               IDM_SOUND_BEEBSID,   sound_beebsid);
+    add_checkbox_item(menu, "Music 5000",            IDM_SOUND_MUSIC5000, sound_music5000);
+    add_checkbox_item(menu, "Printer port DAC",      IDM_SOUND_DAC,       sound_dac);
+    add_checkbox_item(menu, "Disc drive noise",      IDM_SOUND_DDNOISE,   sound_ddnoise);
+    add_checkbox_item(menu, "Tape noise",            IDM_SOUND_TAPE,      sound_tape);
+    add_checkbox_item(menu, "Internal sound filter", IDM_SOUND_FILTER,    sound_filter);
+    sub = al_create_menu();
+    add_radio_item(sub, "Square",   IDM_WAVE, 0, curwave);
+    add_radio_item(sub, "Saw",      IDM_WAVE, 1, curwave);
+    add_radio_item(sub, "Sine",     IDM_WAVE, 2, curwave);
+    add_radio_item(sub, "Triangle", IDM_WAVE, 3, curwave);
+    add_radio_item(sub, "SID",      IDM_WAVE, 4, curwave);
+    al_append_menu_item(menu, "Internal waveform", 0, 0, NULL, sub);
+    al_append_menu_item(menu, "reSID configuration", 0, 0, NULL, create_sid_menu());
+    return menu;
+}
+    
 static ALLEGRO_MENU *create_settings_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
     al_append_menu_item(menu, "Video...", 0, 0, NULL, create_video_menu());
+    al_append_menu_item(menu, "Sound...", 0, 0, NULL, create_sound_menu());
     return menu;
 }
 
@@ -205,6 +262,16 @@ void gui_allegro_init(ALLEGRO_EVENT_QUEUE *queue, ALLEGRO_DISPLAY *display)
     al_append_menu_item(menu, "Settings", 0, 0, NULL, create_settings_menu());
     al_set_display_menu(display, menu);
     al_register_event_source(queue, al_get_default_menu_event_source());
+}
+
+static int radio_event_simple(ALLEGRO_EVENT *event, int current)
+{
+    int id = menu_get_id(event);
+    int num = menu_get_num(event);
+    ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
+
+    al_set_menu_item_flags(menu, menu_id_num(id, current), ALLEGRO_MENU_ITEM_CHECKBOX);
+    return num;
 }
 
 static void file_load_state(ALLEGRO_EVENT *event)
@@ -247,6 +314,7 @@ static bool disc_choose(ALLEGRO_EVENT *event, const char *opname, void (*callbac
     ALLEGRO_FILECHOOSER *chooser;
     ALLEGRO_DISPLAY *display;
     ALLEGRO_PATH *apath;
+    ALLEGRO_MENU *menu;
     int drive;
     const char *fpath;
     char title[50];
@@ -265,13 +333,14 @@ static bool disc_choose(ALLEGRO_EVENT *event, const char *opname, void (*callbac
                 callback(drive, path);
                 rc = true;
                 al_destroy_path(path);
+                menu = (ALLEGRO_MENU *)(event->user.data3);
                 if (defaultwriteprot) {
                     writeprot[drive] = 1;
-                    al_set_menu_item_flags(disc_menu, menu_id_num(IDM_DISC_WPROT, drive), ALLEGRO_MENU_ITEM_CHECKBOX|ALLEGRO_MENU_ITEM_CHECKED);
+                    al_set_menu_item_flags(menu, menu_id_num(IDM_DISC_WPROT, drive), ALLEGRO_MENU_ITEM_CHECKBOX|ALLEGRO_MENU_ITEM_CHECKED);
                 } else if (writeprot[drive])
-                    al_set_menu_item_flags(disc_menu, menu_id_num(IDM_DISC_WPROT, drive), ALLEGRO_MENU_ITEM_CHECKBOX|ALLEGRO_MENU_ITEM_CHECKED);
+                    al_set_menu_item_flags(menu, menu_id_num(IDM_DISC_WPROT, drive), ALLEGRO_MENU_ITEM_CHECKBOX|ALLEGRO_MENU_ITEM_CHECKED);
                 else
-                    al_set_menu_item_flags(disc_menu, menu_id_num(IDM_DISC_WPROT, drive), ALLEGRO_MENU_ITEM_CHECKBOX);
+                    al_set_menu_item_flags(menu, menu_id_num(IDM_DISC_WPROT, drive), ALLEGRO_MENU_ITEM_CHECKBOX);
             }
         }
         al_destroy_native_file_dialog(chooser);
@@ -299,28 +368,32 @@ static void disc_wprot(ALLEGRO_EVENT *event)
     writeprot[drive] = !writeprot[drive];
 }
 
-static void disc_toggle_ide(void)
+static void disc_toggle_ide(ALLEGRO_EVENT *event)
 {
+    ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
+
     if (ide_enable)
         ide_enable = 0;
     else {
         ide_enable = 1;
         if (scsi_enabled) {
             scsi_enabled = 0;
-            al_set_menu_item_flags(disc_menu, IDM_DISC_HARD_SCSI, ALLEGRO_MENU_ITEM_CHECKBOX);
+            al_set_menu_item_flags(menu, IDM_DISC_HARD_SCSI, ALLEGRO_MENU_ITEM_CHECKBOX);
         }
     }
 }
 
-static void disc_toggle_scsi(void)
+static void disc_toggle_scsi(ALLEGRO_EVENT *event)
 {
+    ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
+
     if (scsi_enabled)
         scsi_enabled = 0;
     else {
         scsi_enabled = 1;
         if (ide_enable) {
             ide_enable = 0;
-            al_set_menu_item_flags(disc_menu, IDM_DISC_HARD_IDE, ALLEGRO_MENU_ITEM_CHECKBOX);
+            al_set_menu_item_flags(menu, IDM_DISC_HARD_IDE, ALLEGRO_MENU_ITEM_CHECKBOX);
         }
     }
 }
@@ -373,19 +446,23 @@ static void tape_eject(void)
     tape_loaded = 0;
 }
 
-static void tape_normal(void)
+static void tape_normal(ALLEGRO_EVENT *event)
 {
+    ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
+
     if (fasttape) {
         fasttape = 0;
-        al_set_menu_item_flags(tspeed_menu, IDM_TAPE_SPEED_FAST, ALLEGRO_MENU_ITEM_CHECKBOX);
+        al_set_menu_item_flags(menu, IDM_TAPE_SPEED_FAST, ALLEGRO_MENU_ITEM_CHECKBOX);
     }
 }
 
-static void tape_fast(void)
+static void tape_fast(ALLEGRO_EVENT *event)
 {
+    ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
+
     if (!fasttape) {
         fasttape = 1;
-        al_set_menu_item_flags(tspeed_menu, IDM_TAPE_SPEED_NORMAL, ALLEGRO_MENU_ITEM_CHECKBOX);
+        al_set_menu_item_flags(menu, IDM_TAPE_SPEED_NORMAL, ALLEGRO_MENU_ITEM_CHECKBOX);
     }
 }
 
@@ -396,6 +473,7 @@ static void rom_load(ALLEGRO_EVENT *event)
     char tempname[PATH_MAX], label[ROM_LABEL_LEN];
     ALLEGRO_FILECHOOSER *chooser;
     ALLEGRO_DISPLAY *display;
+    ALLEGRO_MENU *menu;
 
     slot = menu_get_num(event);
     slotp = rom_slots + slot;
@@ -413,7 +491,8 @@ static void rom_load(ALLEGRO_EVENT *event)
                     mem_loadrom(slot, al_get_path_filename(path), al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP), 0);
                     al_destroy_path(path);
                     gen_rom_label(slot, label);
-                    al_set_menu_item_caption(rom_menu, slot-ROM_NSLOT+1, label);
+                    menu = (ALLEGRO_MENU *)(event->user.data3);
+                    al_set_menu_item_caption(menu, slot-ROM_NSLOT+1, label);
                 }
             }
         }
@@ -422,27 +501,30 @@ static void rom_load(ALLEGRO_EVENT *event)
 
 static void rom_clear(ALLEGRO_EVENT *event)
 {
+    ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
     int slot = menu_get_num(event);
     char label[ROM_LABEL_LEN];
     
     mem_clearrom(slot);
     gen_rom_label(slot, label);
-    al_set_menu_item_caption(rom_menu, slot-ROM_NSLOT+1, label);
+    al_set_menu_item_caption(menu, slot-ROM_NSLOT+1, label);
 }
 
 static void rom_ram_toggle(ALLEGRO_EVENT *event)
 {
+    ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
     int slot = menu_get_num(event);
     char label[ROM_LABEL_LEN];
 
     rom_slots[slot].swram = !rom_slots[slot].swram;
     gen_rom_label(slot, label);
-    al_set_menu_item_caption(rom_menu, slot-ROM_NSLOT+1, label);
+    al_set_menu_item_caption(menu, slot-ROM_NSLOT+1, label);
 }
 
 static void change_model(ALLEGRO_EVENT *event)
 {
-    al_set_menu_item_flags(model_menu, menu_id_num(IDM_MODEL, curmodel), ALLEGRO_MENU_ITEM_CHECKBOX);
+    ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
+    al_set_menu_item_flags(menu, menu_id_num(IDM_MODEL, curmodel), ALLEGRO_MENU_ITEM_CHECKBOX);
     model_save();
     oldmodel = curmodel;
     curmodel = menu_get_num(event);
@@ -451,54 +533,37 @@ static void change_model(ALLEGRO_EVENT *event)
 
 static void change_tube(ALLEGRO_EVENT *event)
 {
-    al_set_menu_item_flags(tube_menu, menu_id_num(IDM_TUBE, curtube), ALLEGRO_MENU_ITEM_CHECKBOX);
+    ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
+    al_set_menu_item_flags(menu, menu_id_num(IDM_TUBE, curtube), ALLEGRO_MENU_ITEM_CHECKBOX);
     selecttube = curtube = menu_get_num(event);
     main_restart();
 }
 
-static void set_video_linedbl(void)
+static void set_video_linedbl(ALLEGRO_EVENT *event)
 {
+    ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
     vid_linedbl = 1;
     vid_scanlines = vid_interlace = 0;
-    al_set_menu_item_flags(dtype_menu, IDM_VIDEO_SCANLINES, ALLEGRO_MENU_ITEM_CHECKBOX);
-    al_set_menu_item_flags(dtype_menu, IDM_VIDEO_INTERLACED, ALLEGRO_MENU_ITEM_CHECKBOX);
+    al_set_menu_item_flags(menu, IDM_VIDEO_SCANLINES, ALLEGRO_MENU_ITEM_CHECKBOX);
+    al_set_menu_item_flags(menu, IDM_VIDEO_INTERLACED, ALLEGRO_MENU_ITEM_CHECKBOX);
 }
 
-static void set_video_scanlines(void)
+static void set_video_scanlines(ALLEGRO_EVENT *event)
 {
+    ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
     vid_scanlines = 1;
     vid_linedbl = vid_interlace = 0;
-    al_set_menu_item_flags(dtype_menu, IDM_VIDEO_LINEDBL, ALLEGRO_MENU_ITEM_CHECKBOX);
-    al_set_menu_item_flags(dtype_menu, IDM_VIDEO_INTERLACED, ALLEGRO_MENU_ITEM_CHECKBOX);
+    al_set_menu_item_flags(menu, IDM_VIDEO_LINEDBL, ALLEGRO_MENU_ITEM_CHECKBOX);
+    al_set_menu_item_flags(menu, IDM_VIDEO_INTERLACED, ALLEGRO_MENU_ITEM_CHECKBOX);
 }
 
-static void set_video_interlaced(void)
+static void set_video_interlaced(ALLEGRO_EVENT *event)
 {
+    ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
     vid_interlace = 1;
     vid_linedbl = vid_scanlines = 0;
-    al_set_menu_item_flags(dtype_menu, IDM_VIDEO_LINEDBL, ALLEGRO_MENU_ITEM_CHECKBOX);
-    al_set_menu_item_flags(dtype_menu, IDM_VIDEO_SCANLINES, ALLEGRO_MENU_ITEM_CHECKBOX);
-}
-
-static void set_video_noborders(void)
-{
-    vid_fullborders = 0;
-    al_set_menu_item_flags(border_menu, IDM_VIDEO_MBORDERS, ALLEGRO_MENU_ITEM_CHECKBOX);
-    al_set_menu_item_flags(border_menu, IDM_VIDEO_FBORDERS, ALLEGRO_MENU_ITEM_CHECKBOX);
-}
-
-static void set_video_medium_borders(void)
-{
-    vid_fullborders = 1;
-    al_set_menu_item_flags(border_menu, IDM_VIDEO_NOBORDERS, ALLEGRO_MENU_ITEM_CHECKBOX);
-    al_set_menu_item_flags(border_menu, IDM_VIDEO_FBORDERS, ALLEGRO_MENU_ITEM_CHECKBOX);
-}
-
-static void set_video_fullborders(void)
-{
-    vid_fullborders = 2;
-    al_set_menu_item_flags(border_menu, IDM_VIDEO_NOBORDERS, ALLEGRO_MENU_ITEM_CHECKBOX);
-    al_set_menu_item_flags(border_menu, IDM_VIDEO_MBORDERS, ALLEGRO_MENU_ITEM_CHECKBOX);
+    al_set_menu_item_flags(menu, IDM_VIDEO_LINEDBL, ALLEGRO_MENU_ITEM_CHECKBOX);
+    al_set_menu_item_flags(menu, IDM_VIDEO_SCANLINES, ALLEGRO_MENU_ITEM_CHECKBOX);
 }
 
 static void toggle_video_fullscreen(void)
@@ -510,6 +575,18 @@ static void toggle_video_fullscreen(void)
         fullscreen = 1;
         video_enterfullscreen();
     }
+}
+
+static void set_sid_type(ALLEGRO_EVENT *event)
+{
+    cursid = radio_event_simple(event, cursid);
+    sid_settype(sidmethod, cursid);
+}
+
+static void set_sid_method(ALLEGRO_EVENT *event)
+{
+    sidmethod = radio_event_simple(event, sidmethod);
+    sid_settype(sidmethod, cursid);
 }
 
 void gui_allegro_event(ALLEGRO_EVENT *event)
@@ -546,10 +623,10 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             defaultwriteprot = !defaultwriteprot;
             break;
         case IDM_DISC_HARD_IDE:
-            disc_toggle_ide();
+            disc_toggle_ide(event);
             break;
         case IDM_DISC_HARD_SCSI:
-            disc_toggle_scsi();
+            disc_toggle_scsi(event);
             break;
         case IDM_DISC_VDFS_ENABLE:
             vdfs_enabled = !vdfs_enabled;
@@ -567,10 +644,10 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             tape_eject();
             break;
         case IDM_TAPE_SPEED_NORMAL:
-            tape_normal();
+            tape_normal(event);
             break;
         case IDM_TAPE_SPEED_FAST:
-            tape_fast();
+            tape_fast(event);
             break;
         case IDM_ROMS_LOAD:
             rom_load(event);
@@ -588,25 +665,49 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             change_tube(event);
             break;
         case IDM_VIDEO_LINEDBL:
-            set_video_linedbl();
+            set_video_linedbl(event);
             break;
         case IDM_VIDEO_SCANLINES:
-            set_video_scanlines();
+            set_video_scanlines(event);
             break;
         case IDM_VIDEO_INTERLACED:
-            set_video_interlaced();
+            set_video_interlaced(event);
             break;
-        case IDM_VIDEO_NOBORDERS:
-            set_video_noborders();
-            break;
-        case IDM_VIDEO_MBORDERS:
-            set_video_medium_borders();
-            break;
-        case IDM_VIDEO_FBORDERS:
-            set_video_fullborders();
+        case IDM_VIDEO_BORDERS:
+            vid_fullborders = radio_event_simple(event, vid_fullborders);
             break;
         case IDM_VIDEO_FULLSCR:
             toggle_video_fullscreen();
+            break;
+        case IDM_SOUND_INTERNAL:
+            sound_internal = !sound_internal;
+            break;
+        case IDM_SOUND_BEEBSID:
+            sound_beebsid = !sound_beebsid;
+            break;
+        case IDM_SOUND_MUSIC5000:
+            sound_music5000 = !sound_music5000;
+            break;
+        case IDM_SOUND_DAC:
+            sound_dac = !sound_dac;
+            break;
+        case IDM_SOUND_DDNOISE:
+            sound_ddnoise = !sound_ddnoise;
+            break;
+        case IDM_SOUND_TAPE:
+            sound_tape = !sound_tape;
+            break;
+        case IDM_SOUND_FILTER:
+            sound_filter = !sound_filter;
+            break;
+        case IDM_WAVE:
+            curwave = radio_event_simple(event, curwave);
+            break;
+        case IDM_SID_TYPE:
+            set_sid_type(event);
+            break;
+        case IDM_SID_METHOD:
+            set_sid_method(event);
             break;
         default:
             log_warn("gui-allegro: menu ID %d not handled", menu_get_id(event));
