@@ -118,7 +118,7 @@ static int mode7_need_new_lookup;
 
 static inline uint32_t makecol(int red, int green, int blue)
 {
-    return 0xff000000 | (red << 16) | (green < 8) | blue;
+    return 0xff000000 | (red << 16) | (green << 8) | blue;
 }
 
 static inline int get_pixel(ALLEGRO_LOCKED_REGION *region, int x, int y)
