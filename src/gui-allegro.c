@@ -3,6 +3,7 @@
 #include "gui-allegro.h"
 
 #include "ide.h"
+#include "ddnoise.h"
 #include "disc.h"
 #include "main.h"
 #include "mem.h"
@@ -219,7 +220,10 @@ static ALLEGRO_MENU *create_sid_menu(void)
     al_append_menu_item(menu, "Sample method", 0, 0, NULL, sub);
     return menu;
 }
-    
+
+static const char *dd_type_names[] = { "5.25\"", "3.5\"", NULL };
+static const char *dd_noise_vols[] = { "33%", "66%", "100%", NULL };
+
 static ALLEGRO_MENU *create_sound_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
@@ -239,6 +243,12 @@ static ALLEGRO_MENU *create_sound_menu(void)
     add_radio_item(sub, "SID",      IDM_WAVE, 4, curwave);
     al_append_menu_item(menu, "Internal waveform", 0, 0, NULL, sub);
     al_append_menu_item(menu, "reSID configuration", 0, 0, NULL, create_sid_menu());
+    sub = al_create_menu();
+    add_radio_set(sub, dd_type_names, IDM_DISC_TYPE, ddnoise_type);
+    al_append_menu_item(menu, "Disc drive type", 0, 0, NULL, sub);
+    sub = al_create_menu();
+    add_radio_set(sub, dd_noise_vols, IDM_DISC_VOL, ddnoise_vol);
+    al_append_menu_item(menu, "Disc noise volume", 0, 0, NULL, sub);
     return menu;
 }
     
@@ -589,6 +599,13 @@ static void set_sid_method(ALLEGRO_EVENT *event)
     sid_settype(sidmethod, cursid);
 }
 
+static void change_ddnoise_dtype(ALLEGRO_EVENT *event)
+{
+    ddnoise_type = radio_event_simple(event, ddnoise_type);
+    ddnoise_close();
+    ddnoise_init();
+}
+
 void gui_allegro_event(ALLEGRO_EVENT *event)
 {
     switch(menu_get_id(event)) {
@@ -708,6 +725,12 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             break;
         case IDM_SID_METHOD:
             set_sid_method(event);
+            break;
+        case IDM_DISC_TYPE:
+            change_ddnoise_dtype(event);
+            break;
+        case IDM_DISC_VOL:
+            ddnoise_vol = radio_event_simple(event, ddnoise_vol);
             break;
         default:
             log_warn("gui-allegro: menu ID %d not handled", menu_get_id(event));
