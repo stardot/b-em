@@ -3,11 +3,14 @@
 #include "gui-allegro.h"
 
 #include "ide.h"
+#include "debugger.h"
 #include "ddnoise.h"
 #include "disc.h"
+#include "keyboard.h"
 #include "main.h"
 #include "mem.h"
 #include "model.h"
+#include "mouse.h"
 #include "savestate.h"
 #include "sid_b-em.h"
 #include "scsi.h"
@@ -17,6 +20,11 @@
 #include "video.h"
 #include "video_render.h"
 #include "vdfs.h"
+
+#if defined(HAVE_JACK_JACK_H) || defined(HAVE_ALSA_ASOUNDLIB_H)
+#define HAVE_LINUX_MIDI
+#include "midi-linux.h"
+#endif
 
 #define ROM_LABEL_LEN 50
 
@@ -171,6 +179,8 @@ static ALLEGRO_MENU *create_tube_menu(void)
     return menu;
 }
 
+static const char *border_names[] = { "None", "Medium", "Full", NULL };
+
 static ALLEGRO_MENU *create_video_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
@@ -180,9 +190,7 @@ static ALLEGRO_MENU *create_video_menu(void)
     add_checkbox_item(sub, "Interlaced", IDM_VIDEO_INTERLACED, vid_interlace);
     al_append_menu_item(menu, "Display type...", 0, 0, NULL, sub);
     sub = al_create_menu();
-    add_radio_item(sub, "None",   IDM_VIDEO_BORDERS, 0, vid_fullborders);
-    add_radio_item(sub, "Medium", IDM_VIDEO_BORDERS, 1, vid_fullborders);
-    add_radio_item(sub, "Full",   IDM_VIDEO_BORDERS, 2, vid_fullborders);
+    add_radio_set(sub, border_names, IDM_VIDEO_BORDERS, vid_fullborders);
     al_append_menu_item(menu, "Borders...", 0, 0, NULL, sub);
     add_checkbox_item(menu, "Fullscreen", IDM_VIDEO_FULLSCR, fullscreen);
     add_checkbox_item(menu, "NuLA", IDM_VIDEO_NULA, !nula_disable);
@@ -221,6 +229,7 @@ static ALLEGRO_MENU *create_sid_menu(void)
     return menu;
 }
 
+static const char *wave_names[] = { "Square", "Saw", "Sine", "Triangle", "SID", NULL };
 static const char *dd_type_names[] = { "5.25\"", "3.5\"", NULL };
 static const char *dd_noise_vols[] = { "33%", "66%", "100%", NULL };
 
@@ -236,11 +245,7 @@ static ALLEGRO_MENU *create_sound_menu(void)
     add_checkbox_item(menu, "Tape noise",            IDM_SOUND_TAPE,      sound_tape);
     add_checkbox_item(menu, "Internal sound filter", IDM_SOUND_FILTER,    sound_filter);
     sub = al_create_menu();
-    add_radio_item(sub, "Square",   IDM_WAVE, 0, curwave);
-    add_radio_item(sub, "Saw",      IDM_WAVE, 1, curwave);
-    add_radio_item(sub, "Sine",     IDM_WAVE, 2, curwave);
-    add_radio_item(sub, "Triangle", IDM_WAVE, 3, curwave);
-    add_radio_item(sub, "SID",      IDM_WAVE, 4, curwave);
+    add_radio_set(sub, wave_names, IDM_WAVE, curwave);
     al_append_menu_item(menu, "Internal waveform", 0, 0, NULL, sub);
     al_append_menu_item(menu, "reSID configuration", 0, 0, NULL, create_sid_menu());
     sub = al_create_menu();
@@ -252,14 +257,82 @@ static ALLEGRO_MENU *create_sound_menu(void)
     return menu;
 }
     
+#ifdef HAVE_LINUX_MIDI
+
+static ALLEGRO_MENU *create_midi_menu(void)
+{
+    ALLEGRO_MENU *menu = al_create_menu();
+    ALLEGRO_MENU *sub = al_create_menu();
+#ifdef HAVE_JACK_JACK_H    
+    add_checkbox_item(sub, "JACK MIDI", IDM_MIDI_M4000_JACK, midi_music4000.jack_enabled);
+#endif
+#ifdef HAVE_ALSA_ASOUNDLIB_H
+    add_checkbox_item(sub, "ALSA Sequencer", IDM_MIDI_M4000_ASEQ, midi_music4000.alsa_seq_enabled);
+    add_checkbox_item(sub, "ALSA Raw MIDI",  IDM_MIDI_M4000_ARAW, midi_music4000.alsa_raw_enabled);
+#endif
+    al_append_menu_item(menu, "M4000 Keyboard", 0, 0, NULL, sub);
+    sub = al_create_menu();
+#ifdef HAVE_JACK_JACK_H
+    add_checkbox_item(sub, "JACK MIDI", IDM_MIDI_M2000_OUT1_JACK, midi_music2000_out1.jack_enabled);
+#endif
+#ifdef HAVE_ALSA_ASOUNDLIB_H
+    add_checkbox_item(sub, "ALSA Sequencer", IDM_MIDI_M2000_OUT1_ASEQ, midi_music2000_out1.alsa_seq_enabled);
+    add_checkbox_item(sub, "ALSA Raw MIDI",  IDM_MIDI_M2000_OUT1_ARAW, midi_music2000_out1.alsa_raw_enabled);
+#endif
+    al_append_menu_item(menu, "M2000 I/F O/P 1", 0, 0, NULL, sub);
+    sub = al_create_menu();
+#ifdef HAVE_JACK_JACK_H
+    add_checkbox_item(sub, "JACK MIDI", IDM_MIDI_M2000_OUT2_JACK, midi_music2000_out2.jack_enabled);
+#endif
+#ifdef HAVE_ALSA_ASOUNDLIB_H
+    add_checkbox_item(sub, "ALSA Sequencer", IDM_MIDI_M2000_OUT2_ASEQ, midi_music2000_out2.alsa_seq_enabled);
+    add_checkbox_item(sub, "ALSA Raw MIDI",  IDM_MIDI_M2000_OUT2_ARAW, midi_music2000_out2.alsa_raw_enabled);
+#endif
+    al_append_menu_item(menu, "M2000 I/F O/P 2", 0, 0, NULL, sub);
+    sub = al_create_menu();
+#ifdef HAVE_JACK_JACK_H
+    add_checkbox_item(sub, "JACK MIDI", IDM_MIDI_M2000_OUT3_JACK, midi_music2000_out3.jack_enabled);
+#endif
+#ifdef HAVE_ALSA_ASOUNDLIB_H
+    add_checkbox_item(sub, "ALSA Sequencer", IDM_MIDI_M2000_OUT3_ASEQ, midi_music2000_out3.alsa_seq_enabled);
+    add_checkbox_item(sub, "ALSA Raw MIDI",  IDM_MIDI_M2000_OUT3_ARAW, midi_music2000_out3.alsa_raw_enabled);
+#endif
+    al_append_menu_item(menu, "M2000 I/F O/P 3", 0, 0, NULL, sub);
+    return menu;
+}
+
+#endif
+    
+static ALLEGRO_MENU *create_keyboard_menu(void)
+{
+    ALLEGRO_MENU *menu = al_create_menu();
+    al_append_menu_item(menu, "Remap Keyboard", IDM_KEY_REDEFINE, 0, NULL, NULL);
+    add_checkbox_item(menu, "Map CAPS/CTRL to A/S", IDM_KEY_AS, keyas);
+    return menu;
+}
+
 static ALLEGRO_MENU *create_settings_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
     al_append_menu_item(menu, "Video...", 0, 0, NULL, create_video_menu());
     al_append_menu_item(menu, "Sound...", 0, 0, NULL, create_sound_menu());
+#ifdef HAVE_LINUX_MIDI
+    al_append_menu_item(menu, "MIDI", 0, 0, NULL, create_midi_menu());
+#endif
+    al_append_menu_item(menu, "Keyboard", 0, 0, NULL, create_keyboard_menu());
+    add_checkbox_item(menu, "Mouse (AMX)", IDM_MOUSE_AMX, mouse_amx);
     return menu;
 }
 
+static ALLEGRO_MENU *create_debug_menu(void)
+{
+    ALLEGRO_MENU *menu = al_create_menu();
+    add_checkbox_item(menu, "Debugger", IDM_DEBUGGER, debug_core);
+    add_checkbox_item(menu, "Debug Tube", IDM_DEBUG_TUBE, debug_tube);
+    al_append_menu_item(menu, "Break", IDM_DEBUG_BREAK, 0, NULL, NULL);
+    return menu;
+}
+ 
 void gui_allegro_init(ALLEGRO_EVENT_QUEUE *queue, ALLEGRO_DISPLAY *display)
 {
     ALLEGRO_MENU *menu = al_create_menu();
@@ -270,6 +343,7 @@ void gui_allegro_init(ALLEGRO_EVENT_QUEUE *queue, ALLEGRO_DISPLAY *display)
     al_append_menu_item(menu, "Model", 0, 0, NULL, create_model_menu());
     al_append_menu_item(menu, "Tube", 0, 0, NULL, create_tube_menu());
     al_append_menu_item(menu, "Settings", 0, 0, NULL, create_settings_menu());
+    al_append_menu_item(menu, "Debug", 0, 0, NULL, create_debug_menu());
     al_set_display_menu(display, menu);
     al_register_event_source(queue, al_get_default_menu_event_source());
 }
@@ -731,6 +805,55 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             break;
         case IDM_DISC_VOL:
             ddnoise_vol = radio_event_simple(event, ddnoise_vol);
+            break;
+#ifdef HAVE_JACK_JACK_H
+        case IDM_MIDI_M4000_JACK:
+            midi_music4000.jack_enabled = !midi_music4000.jack_enabled;
+            break;
+        case IDM_MIDI_M2000_OUT1_JACK:
+            midi_music2000_out1.jack_enabled = !midi_music2000_out1.jack_enabled;
+            break;
+        case IDM_MIDI_M2000_OUT2_JACK:
+            midi_music2000_out2.jack_enabled = !midi_music2000_out2.jack_enabled;
+            break;
+        case IDM_MIDI_M2000_OUT3_JACK:
+            midi_music2000_out3.jack_enabled = !midi_music2000_out3.jack_enabled;
+            break;
+#endif
+#ifdef HAVE_ALSA_ASOUNDLIB_H
+        case IDM_MIDI_M4000_ASEQ:
+            midi_music4000.alsa_seq_enabled = !midi_music4000.alsa_seq_enabled;
+            break;
+        case IDM_MIDI_M4000_ARAW:
+            midi_music4000.alsa_raw_enabled = !midi_music4000.alsa_raw_enabled;
+            break;
+        case IDM_MIDI_M2000_OUT1_ASEQ:
+            midi_music2000_out1.alsa_seq_enabled = !midi_music2000_out1.alsa_seq_enabled;
+            break;
+        case IDM_MIDI_M2000_OUT1_ARAW:
+            midi_music2000_out1.alsa_raw_enabled = !midi_music2000_out1.alsa_raw_enabled;
+            break;
+        case IDM_MIDI_M2000_OUT2_ASEQ:
+            midi_music2000_out2.alsa_seq_enabled = !midi_music2000_out2.alsa_seq_enabled;
+            break;
+        case IDM_MIDI_M2000_OUT2_ARAW:
+            midi_music2000_out2.alsa_raw_enabled = !midi_music2000_out2.alsa_raw_enabled;
+            break;
+        case IDM_MIDI_M2000_OUT3_ASEQ:
+            midi_music2000_out3.alsa_seq_enabled = !midi_music2000_out3.alsa_seq_enabled;
+            break;
+        case IDM_MIDI_M2000_OUT3_ARAW:
+            midi_music2000_out3.alsa_raw_enabled = !midi_music2000_out3.alsa_raw_enabled;
+            break;
+#endif
+        case IDM_DEBUGGER:
+            debug_toggle_core();
+            break;
+        case IDM_DEBUG_TUBE:
+            debug_toggle_tube();
+            break;
+        case IDM_DEBUG_BREAK:
+            debug_step = 1;
             break;
         default:
             log_warn("gui-allegro: menu ID %d not handled", menu_get_id(event));

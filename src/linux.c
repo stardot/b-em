@@ -19,7 +19,6 @@ int winsizex, winsizey;
 int videoresize = 0;
 
 int mousecapture = 0;
-int quited = 0;
 
 void setejecttext(int drive, const char *fn) {};
 
@@ -43,7 +42,7 @@ void updatewindowsize(int x, int y)
 
 void setquit()
 {
-        quited=1;
+    quitting=1;
 }
 //#undef print
 

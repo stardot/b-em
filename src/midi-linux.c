@@ -160,7 +160,7 @@ static inline void midi_jack_send_msg(midi_dev_t *midi, uint8_t *buffer, size_t 
 
 #ifdef HAVE_ALSA_ASOUNDLIB_H
 
-extern int quited;
+extern int quitting;
 
 static pthread_t alsa_seq_thread;
 static snd_seq_t *midi_seq = NULL;
@@ -168,7 +168,7 @@ static snd_seq_t *midi_seq = NULL;
 static void *alsa_seq_midi_run(void *arg) {
     snd_seq_event_t *ev;
 
-    while (!quited) {
+    while (!quitting) {
         log_debug("midi-linux: waiting for ALSA MIDI sequencer event");
         if (snd_seq_event_input(midi_seq, &ev) >= 0) {
             log_debug("midi-linux: got ALSA MIDI sequencer event");
@@ -362,7 +362,7 @@ static void *alsa_raw_midi_run(void *arg) {
     if ((status = snd_rawmidi_open(&midiin, NULL, device, 0)) < 0)
         log_warn("midi-linux: unable to open ALSA raw MIDI port '%s': %s", device, snd_strerror(status));
     else {
-        while (!quited) {
+        while (!quitting) {
             log_debug("midi-linux: waiting to read ALSA raw MIDI port");
             if ((status = snd_rawmidi_read(midiin, buffer, sizeof buffer)) < 0)
                 log_warn("midi-linux: ALSA raw MIDI read failed: %s", snd_strerror(status));
