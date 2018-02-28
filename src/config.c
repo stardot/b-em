@@ -135,7 +135,7 @@ void set_config_string(const char *sect, const char *key, const char *value)
 void config_save(void)
 {
     int c;
-    char s[PATH_MAX];
+    char s[PATH_MAX], t[20];
 
     if (!find_cfg_dest(s, sizeof s, "b-em", "cfg")) {
         if (!bem_cfg) {
@@ -186,12 +186,13 @@ void config_save(void)
         set_config_int(NULL, "mouse_amx", mouse_amx);
         set_config_int("sound", "buflen_music5000", buflen_m5);
 
-        for (c = 0; c < 128; c++)
-        {
-            sprintf(s, "key_define_%03i", c);
-            set_config_int("user_keyboard", s, keylookup[c]);
+        for (c = 0; c < 128; c++) {
+            snprintf(t, sizeof t, "key_define_%03i", c);
+            set_config_int("user_keyboard", t, keylookup[c]);
         }
         midi_save_config();
+        log_debug("config: saving config to %s", s);
+        al_save_config_file(s, bem_cfg);
     } else
         log_error("config: no suitable destination for config file - config will not be saved");
 }
