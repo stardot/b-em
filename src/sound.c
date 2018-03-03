@@ -66,6 +66,7 @@ void sound_poll(void)
     float *buf;
     int c;
 
+#if 0
         if (sound_music5000) {
                 // every 64us Music 5000 must provide 3 stereo samples (46.875KHz)
                 music5000_fillbuf( m5_buffer + m5_pos, 3);
@@ -78,6 +79,7 @@ void sound_poll(void)
                         al_givebufferm5(m5_buffer);
                 }
         }
+#endif
     if (sound_beebsid)
         sid_fillbuf(sound_buffer + sound_pos, 2);
     if (sound_internal)

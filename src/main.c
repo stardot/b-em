@@ -259,7 +259,7 @@ void main_init(int argc, char *argv[])
         //openal_init();
         sid_init();
         sid_settype(sidmethod, cursid);
-        music5000_init();
+        music5000_init(queue);
 
     adc_init();
 #ifdef WIN32
@@ -451,6 +451,9 @@ void main_run()
                 al_stop_timer(timer);
                 gui_allegro_event(&event);
                 al_start_timer(timer);
+                break;
+            case ALLEGRO_EVENT_AUDIO_STREAM_FRAGMENT:
+                music5000_streamfrag(&event);
         }
     }
 }

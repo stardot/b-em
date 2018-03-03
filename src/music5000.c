@@ -27,14 +27,9 @@
 #include <string.h>
 
 #include "b-em.h"
+#include <allegro5/allegro_audio.h>
 #include "sound.h"
 #include "savestate.h"
-
-// #define LOG_LEVELS
-
-#ifdef LOG_LEVELS
-#include "soundopenal.h"
-#endif
 
 #define I_WAVEFORM(n) ((n)*128)
 #define I_WFTOP (14*128)
@@ -55,6 +50,10 @@
 
 #define ushort uint16_t
 #define byte uint8_t
+
+static ALLEGRO_VOICE *voice;
+static ALLEGRO_MIXER *mixer;
+static ALLEGRO_AUDIO_STREAM *stream;
 
 static ushort antilogtable[128];
 static byte RAM[2048];
@@ -120,17 +119,33 @@ void music5000_savestate(FILE *f) {
         putc('m', f);
 }
 
-void music5000_init(void)
+void music5000_init(ALLEGRO_EVENT_QUEUE *queue)
 {
 	int n;
 
-	for (n = 0; n < 128; n++) {
-		//12-bit antilog as per AM6070 datasheet
-		int S = n & 15, C = n >> 4;
-		antilogtable[n] = (ushort)(2 * (pow(2.0, C)*(S + 16.5) - 16.5));
-	}
+    if ((voice = al_create_voice(FREQ_M5, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_2))) {
+        if ((mixer = al_create_mixer(FREQ_M5, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_2))) {
+            if (al_attach_mixer_to_voice(mixer, voice)) {
+                if ((stream = al_create_audio_stream(4, BUFLEN_M5, FREQ_M5, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_2))) {
+                    if (al_attach_audio_stream_to_mixer(stream, mixer)) {
+                        al_register_event_source(queue, al_get_audio_stream_event_source(stream));
+                        for (n = 0; n < 128; n++) {
+                            //12-bit antilog as per AM6070 datasheet
+                            int S = n & 15, C = n >> 4;
+                            antilogtable[n] = (ushort)(2 * (pow(2.0, C)*(S + 16.5) - 16.5));
+                        }
+                        music5000_reset();
+                    } else
+                        log_error("sound: unable to attach stream to mixer for Music 5000");
+                } else
+                    log_error("sound: unable to create stream for Music 5000");
+            } else
+                log_error("sound: unable to attach mixer to voice for Music 5000");
+        } else
+            log_error("sound: unable to create mixer for Music 5000");
+    } else
+        log_error("sound: unable to create voice for Music 5000");
 
-	music5000_reset();
 }
 
 void music5000_write(uint16_t addr, uint8_t val)
@@ -368,3 +383,13 @@ void music5000_fillbuf(int16_t *buffer, int len) {
 	}
 }
 
+void music5000_streamfrag(ALLEGRO_EVENT *event)
+{
+    int16_t *buf;
+    
+    if ((buf = al_get_audio_stream_fragment(stream))) {
+        music5000_fillbuf(buf, BUFLEN_M5);
+        al_set_audio_stream_fragment(stream, buf);
+    }
+    
+}
