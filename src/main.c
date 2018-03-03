@@ -254,8 +254,8 @@ void main_init(int argc, char *argv[])
     }
     ddnoise_init();
     tapenoise_init();
+    sound_init();
 
-        sound_init();
         //openal_init();
         sid_init();
         sid_settype(sidmethod, cursid);

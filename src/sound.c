@@ -1,8 +1,8 @@
 /*B-em v2.2 by Tom Walker
   Internal SN sound chip emulation*/
 
-#include <stdio.h>
 #include "b-em.h"
+#include <allegro5/allegro_audio.h>
 #include "sid_b-em.h"
 #include "sn76489.h"
 #include "sound.h"
@@ -13,6 +13,10 @@
 
 int sound_internal = 0, sound_beebsid = 0, sound_dac = 0, sound_ddnoise = 0, sound_tape = 0, sound_music5000 = 0;
 int sound_filter = 0;
+
+static ALLEGRO_VOICE *voice;
+static ALLEGRO_MIXER *mixer;
+static ALLEGRO_AUDIO_STREAM *stream;
 
 static int sound_pos = 0;
 static short sound_buffer[BUFLEN_SO];
@@ -57,9 +61,10 @@ static float iir(float NewSample) {
     return y[0];
 }
 
-void sound_poll()
+void sound_poll(void)
 {
-        int c;
+    float *buf;
+    int c;
 
         if (sound_music5000) {
                 // every 64us Music 5000 must provide 3 stereo samples (46.875KHz)
@@ -73,38 +78,58 @@ void sound_poll()
                         al_givebufferm5(m5_buffer);
                 }
         }
+    if (sound_beebsid)
+        sid_fillbuf(sound_buffer + sound_pos, 2);
+    if (sound_internal)
+        sn_fillbuf(sound_buffer + sound_pos, 2);
+    if (sound_dac) {
+        sound_buffer[sound_pos]     += (((int)lpt_dac - 0x80) * 32);
+        sound_buffer[sound_pos + 1] += (((int)lpt_dac - 0x80) * 32);
+    }
 
-        // every 64us the sound emulation must provide 2 mono samples (31.25KHz)
-        if (!(sound_internal || sound_beebsid || sound_dac)) return;
-
-        if (sound_beebsid)  sid_fillbuf(sound_buffer + sound_pos, 2);
-
-        if (sound_internal) sn_fillbuf( sound_buffer + sound_pos, 2);
-
-        if (sound_dac)
-        {
-                sound_buffer[sound_pos]     += (((int)lpt_dac - 0x80) * 32);
-                sound_buffer[sound_pos + 1] += (((int)lpt_dac - 0x80) * 32);
-        }
-
-        // skip forward 2 mono samples
-        sound_pos += 2;
-        if (sound_pos == BUFLEN_SO)
-        {
-                if (sound_filter)
-                {
-                        for (c = 0; c < BUFLEN_SO; c++)
-                            sound_buffer[c] = (int)iir((float)sound_buffer[c]);
-                }
-
-                sound_pos = 0;
-                al_givebuffer(sound_buffer);
-                // Clear the buffer, so the next set of samples can just be added in
-                memset(sound_buffer, 0, sizeof(sound_buffer));
-        }
+    // skip forward 2 mono samples
+    sound_pos += 2;
+    if (sound_pos == BUFLEN_SO) {
+        if ((buf = al_get_audio_stream_fragment(stream))) {
+            if (sound_filter) {
+                for (c = 0; c < BUFLEN_SO; c++)
+                    buf[c] = iir((float)sound_buffer[c] / 32767.0);
+            } else {
+                for (c = 0; c < BUFLEN_SO; c++)
+                    buf[c] = (float)sound_buffer[c] / 32767.0;
+            }
+            sound_pos = 0;
+            al_set_audio_stream_fragment(stream, buf);
+            memset(sound_buffer, 0, sizeof(sound_buffer));
+        } else
+            log_debug("sound: overrun");
+    }
 }
 
-void sound_init()
+void sound_init(void)
 {
+    if ((voice = al_create_voice(FREQ_SO, ALLEGRO_AUDIO_DEPTH_FLOAT32, ALLEGRO_CHANNEL_CONF_1))) {
+        if ((mixer = al_create_mixer(FREQ_SO, ALLEGRO_AUDIO_DEPTH_FLOAT32, ALLEGRO_CHANNEL_CONF_1))) {
+            if (al_attach_mixer_to_voice(mixer, voice)) {
+                if ((stream = al_create_audio_stream(4, BUFLEN_SO, FREQ_SO, ALLEGRO_AUDIO_DEPTH_FLOAT32, ALLEGRO_CHANNEL_CONF_1))) {
+                    if (!al_attach_audio_stream_to_mixer(stream, mixer))
+                        log_error("sound: unable to attach stream to mixer for internal/SID/DAC sound");
+                } else
+                    log_error("sound: unable to create stream for internal/SID/DAC sound");
+            } else
+                log_error("sound: unable to attach mixer to voice for internal/SID/DAC sound");
+        } else
+            log_error("sound: unable to create mixer for internal/SID/DAC sound");
+    } else
+        log_error("sound: unable to create voice for internal/SID/DAC sound");
 }
 
+void sound_close(void)
+{
+    if (stream)
+        al_destroy_audio_stream(stream);
+    if (mixer)
+        al_destroy_mixer(mixer);
+    if (voice)
+        al_destroy_voice(voice);
+}

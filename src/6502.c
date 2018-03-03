@@ -1,7 +1,6 @@
 /*B-em v2.2 by Tom Walker
   6502/65c02 host CPU emulation*/
 
-#include <stdio.h>
 #include "b-em.h"
 
 #include "6502.h"
@@ -167,7 +166,7 @@ int timetolive = 0;
 #define polltime(c) { cycles -= (c); \
                       via_poll(&sysvia, (c)); \
                       via_poll(&uservia, (c)); \
-                      video_poll(c, 1);                                   \
+                      video_poll(c, 1); \
                       otherstuffcount -= (c); \
                       if (motoron) \
                       { \
