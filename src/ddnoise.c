@@ -15,6 +15,7 @@ int ddnoise_ticks = 0;
 static ALLEGRO_SAMPLE *seeksmp[4][2];
 static ALLEGRO_SAMPLE *motorsmp[3];
 
+static ALLEGRO_SAMPLE_ID seek_smp_id;
 static ALLEGRO_SAMPLE_ID motor_smp_id;
 
 ALLEGRO_SAMPLE *find_load_wav(const char *subdir, const char *name)
@@ -112,8 +113,8 @@ void ddnoise_seek(int len)
     int ddnoise_sdir = 0;
 
     log_debug("ddnoise: seek %i tracks", len);
-    fdc_time = 200;
 
+    fdc_time = 200;
     if (sound_ddnoise && len) {
         if (len < 0) {
             ddnoise_sdir = 1;
@@ -128,11 +129,12 @@ void ddnoise_seek(int len)
         else
             ddnoise_sstat = 3;
         if ((smp = seeksmp[ddnoise_sstat][ddnoise_sdir])) {
-            al_play_sample(smp, map_ddnoise_vol(), 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
-            fdc_time = (2000 * al_get_sample_length(smp)) / al_get_sample_frequency(smp);
-            log_debug("ddnoise: begin seek, fdc_time=%d", fdc_time);
+            al_stop_sample(&seek_smp_id);
+            al_play_sample(smp, map_ddnoise_vol(), 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, &seek_smp_id);
+            fdc_time = 64000 * len;
         }
     }
+    log_debug("ddnoise: begin seek, fdc_time=%d", fdc_time);
 }
 
 void ddnoise_spinup(void)
