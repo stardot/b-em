@@ -33,6 +33,8 @@ void tape_load(ALLEGRO_PATH *fn)
         if (!fn) return;
         p = al_get_path_extension(fn);
         if (!p || !*p) return;
+        if (*p == '.')
+            p++;
         cpath = al_path_cstr(fn, ALLEGRO_NATIVE_PATH_SEP);
         log_info("tape: Loading %s %s", cpath, p);
         while (loaders[c].ext)

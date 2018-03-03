@@ -45,6 +45,8 @@ void disc_load(int drive, ALLEGRO_PATH *fn)
     p = al_get_path_extension(fn);
     if (!p)
         return;
+    if (*p == '.')
+        p++;
     cpath = al_path_cstr(fn, ALLEGRO_NATIVE_PATH_SEP);
     setejecttext(drive, cpath);
     if (strcasecmp(p, "fdi") == 0) {
