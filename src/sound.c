@@ -21,9 +21,6 @@ static ALLEGRO_AUDIO_STREAM *stream;
 static int sound_pos = 0;
 static short sound_buffer[BUFLEN_SO];
 
-static int m5_pos = 0;
-static short m5_buffer[BUFLEN_M5 * 2];
-
 #define NCoef 4
 static float iir(float NewSample) {
     float ACoef[NCoef+1] = {
@@ -100,11 +97,11 @@ void sound_poll(void)
                 for (c = 0; c < BUFLEN_SO; c++)
                     buf[c] = (float)sound_buffer[c] / 32767.0;
             }
-            sound_pos = 0;
             al_set_audio_stream_fragment(stream, buf);
-            memset(sound_buffer, 0, sizeof(sound_buffer));
         } else
             log_debug("sound: overrun");
+        sound_pos = 0;
+        memset(sound_buffer, 0, sizeof(sound_buffer));
     }
 }
 
