@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "b-em.h"
+#include "ddnoise.h"
 #include "6502.h"
 #include "wd1770.h"
 #include "disc.h"
@@ -67,14 +68,20 @@ void wd1770_reset()
 void wd1770_spinup()
 {
     wd1770.status |= 0x80;
-    motoron = 1;
-    motorspin = 0;
+    if (!motoron) {
+        motoron = 1;
+        motorspin = 0;
+        ddnoise_spinup();
+    }
 }
 
 void wd1770_spindown()
 {
     wd1770.status &= ~0x80;
-    motoron = 0;
+    if (motoron) {
+        motoron = 0;
+        ddnoise_spindown();
+    }
 }
 
 void wd1770_setspindown()

@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include "b-em.h"
 #include "6502.h"
+#include "ddnoise.h"
 #include "i8271.h"
 #include "disc.h"
 #include "model.h"
@@ -81,14 +82,20 @@ static void i8271_NMI()
 
 void i8271_spinup()
 {
+    if (!motoron) {
         motoron = 1;
         motorspin = 0;
+        ddnoise_spinup();
+    }
 }
 
 void i8271_spindown()
 {
+    if (motoron) {
         motoron = 0;
-        i8271.drvout &= ~DRIVESEL;
+        ddnoise_spindown();
+    }
+    i8271.drvout &= ~DRIVESEL;
 }
 
 void i8271_setspindown()

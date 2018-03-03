@@ -11,36 +11,38 @@
 
 int ddnoise_vol=3;
 int ddnoise_type=0;
+int ddnoise_ticks = 0;
 
 static ALLEGRO_SAMPLE *seeksmp[4][2];
 static ALLEGRO_SAMPLE *motorsmp[3];
 
-static float ddnoise_mpos = 0;
-static int ddnoise_mstat = -1;
-static int oldmotoron = 0;
+static ALLEGRO_SAMPLE_ID motor_smp_id;
 
-static float ddnoise_spos = 0;
-static int ddnoise_sstat = -1;
-static int ddnoise_sdir = 0;
-
-ALLEGRO_SAMPLE *find_load_wav(const char *subdir, const char *name) {
+ALLEGRO_SAMPLE *find_load_wav(const char *subdir, const char *name)
+{
+    ALLEGRO_SAMPLE *smp;
     char path[PATH_MAX];
 
     if (find_dat_file(path, sizeof path, subdir, name, "wav") == 0) {
-        log_debug("ddnoise: loading sample %s from %s", name, path);
-        return al_load_sample(path);
+        if ((smp = al_load_sample(path))) {
+            log_debug("ddnoise: loaded %s from %s", name, path);
+            return smp;
+        }
+        log_error("ddnoise: unable to load %s from %s", name, path);
     }
     return NULL;
 }
 
-void ddnoise_init()
+void ddnoise_init(void)
 {
     const char *subdir;
+    static ALLEGRO_SAMPLE *smp;
 
     if (ddnoise_type) subdir = "ddnoise/35";
     else              subdir = "ddnoise/525";
-    seeksmp[0][0] = find_load_wav(subdir, "stepo");
-    if (seeksmp[0][0]) {
+
+    if ((smp = find_load_wav(subdir, "stepo"))) {
+        seeksmp[0][0] = smp;
         seeksmp[0][1] = find_load_wav(subdir, "stepi");
         seeksmp[1][0] = find_load_wav(subdir, "seek1o");
         seeksmp[1][1] = find_load_wav(subdir, "seek1i");
@@ -48,17 +50,19 @@ void ddnoise_init()
         seeksmp[2][1] = find_load_wav(subdir, "seek2i");
         seeksmp[3][0] = find_load_wav(subdir, "seek3o");
         seeksmp[3][1] = find_load_wav(subdir, "seek3i");
-    }
-    else
-    {
-        seeksmp[0][0] = find_load_wav(subdir, "step");
-        seeksmp[0][1] = find_load_wav(subdir, "step");
-        seeksmp[1][0] = find_load_wav(subdir, "seek");
-        seeksmp[1][1] = find_load_wav(subdir, "seek");
-        seeksmp[2][0] = find_load_wav(subdir, "seek3");
-        seeksmp[2][1] = find_load_wav(subdir, "seek3");
-        seeksmp[3][0] = find_load_wav(subdir, "seek2");
-        seeksmp[3][1] = find_load_wav(subdir, "seek2");
+    } else {
+        smp = find_load_wav(subdir, "step");
+        seeksmp[0][0] = smp;
+        seeksmp[0][1] = smp;
+        smp = find_load_wav(subdir, "seek");
+        seeksmp[1][0] = smp;
+        seeksmp[1][0] = smp;
+        smp = find_load_wav(subdir, "seek2");
+        seeksmp[2][0] = smp;
+        seeksmp[2][1] = smp;
+        smp = find_load_wav(subdir, "seek3");
+        seeksmp[3][0] = smp;
+        seeksmp[3][1] = smp;
     }
     motorsmp[0] = find_load_wav(subdir, "motoron");
     motorsmp[1] = find_load_wav(subdir, "motor");
@@ -67,104 +71,101 @@ void ddnoise_init()
 
 void ddnoise_close()
 {
-        int c;
-        for (c = 0; c < 4; c++)
-        {
-                if (seeksmp[c][0]) al_destroy_sample(seeksmp[c][0]);
-                if (seeksmp[c][1]) al_destroy_sample(seeksmp[c][1]);
-                seeksmp[c][0] = seeksmp[c][1] = NULL;
+    ALLEGRO_SAMPLE *smp, *smpo, *smpi;
+    int c;
+    
+    for (c = 0; c < 4; c++) {
+        if ((smpo = seeksmp[c][0])) {
+            al_destroy_sample(smpo);
+            seeksmp[c][0] = NULL;
         }
-        for (c = 0; c < 3; c++)
-        {
-                if (motorsmp[c]) al_destroy_sample(motorsmp[c]);
-                motorsmp[c] = NULL;
+        if ((smpi = seeksmp[c][1])) {
+            if (smpi != smpo)
+                al_destroy_sample(smpo);
+            seeksmp[c][1] = NULL;
         }
+    }
+    for (c = 0; c < 3; c++) {
+        if ((smp = motorsmp[c])) {
+            al_destroy_sample(motorsmp[c]);
+            motorsmp[c] = NULL;
+        }
+    }
 }
 
-static int16_t ddbuffer[BUFLEN_DD];
+static float map_ddnoise_vol(void)
+{
+    switch(ddnoise_vol)
+    {
+        case 0:
+            return 1.0/3.0;
+        case 1:
+            return 2.0/3.0;
+        default:
+            return 1.0;
+    }
+}
 
 void ddnoise_seek(int len)
 {
-//        printf("Seek %i tracks\n",len);
-        ddnoise_sdir = (len < 0) ? 1 : 0;
-        if (len < 0) len = -len;
-        ddnoise_spos = 0;
-        if (len == 0)      { ddnoise_sstat = -1; fdc_time = 200; }
-        else if (len == 1) { ddnoise_sstat = 0; fdc_time = 140000; }
-        else if (len < 7)    ddnoise_sstat = 1;
-        else if (len < 30)   ddnoise_sstat = 2;
-        else                 ddnoise_sstat = 3;
-        if (!sound_ddnoise) fdc_time = 200;
-//        log_debug("Start seek!\n");
+    ALLEGRO_SAMPLE *smp;
+    int ddnoise_sstat = -1;
+    int ddnoise_sdir = 0;
+
+    log_debug("ddnoise: seek %i tracks", len);
+    fdc_time = 200;
+
+    if (sound_ddnoise && len) {
+        if (len < 0) {
+            ddnoise_sdir = 1;
+            len = -len;
+        }
+        if (len == 1)
+            ddnoise_sstat = 0;
+        else if (len < 7)
+            ddnoise_sstat = 1;
+        else if (len < 30)
+            ddnoise_sstat = 2;
+        else
+            ddnoise_sstat = 3;
+        if ((smp = seeksmp[ddnoise_sstat][ddnoise_sdir])) {
+            al_play_sample(smp, map_ddnoise_vol(), 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
+            fdc_time = (2000 * al_get_sample_length(smp)) / al_get_sample_frequency(smp);
+            log_debug("ddnoise: begin seek, fdc_time=%d", fdc_time);
+        }
+    }
 }
 
-void ddnoise_mix()
+void ddnoise_spinup(void)
 {
-        int c;
-//        if (!f1) f1=x_fopen("f1.pcm","wb");
-//        if (!f2) f2=x_fopen("f2.pcm","wb");
+    ALLEGRO_SAMPLE *smp;
 
-        memset(ddbuffer, 0, BUFLEN_DD * 2);
-//        fwrite(ddbuffer,BUFLEN_DD*2,1,f1);
-        if (motoron && !oldmotoron)
-        {
-                ddnoise_mstat = 0;
-                ddnoise_mpos = 0;
-        }
-        if (!motoron && oldmotoron)
-        {
-                ddnoise_mstat = 2;
-                ddnoise_mpos = 0;
-        }
+    log_debug("ddnoise: spinup");
+    if ((smp = motorsmp[0])) {
+        al_play_sample(smp, map_ddnoise_vol(), 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
+        ddnoise_ticks = (50 * al_get_sample_length(smp)) / al_get_sample_frequency(smp);
+        log_debug("ddnoise: head load sample to finish in %d ticks", ddnoise_ticks);
+    }
+}
 
-        if (sound_ddnoise)
-        {
-                for (c = 0; c < BUFLEN_DD; c++)
-                {
-                        ddbuffer[c] = 0;
-                        if (ddnoise_mstat >= 0 && motorsmp[ddnoise_mstat])
-                        {
-                                if (ddnoise_mpos >= al_get_sample_length(motorsmp[ddnoise_mstat]))
-                                {
-                                        ddnoise_mpos = 0;
-                                        if (ddnoise_mstat != 1) ddnoise_mstat++;
-                                        if (ddnoise_mstat == 3) ddnoise_mstat = -1;
-                                }
-                                if (ddnoise_mstat != -1)
-                                {
-                                        int16_t *data = (int16_t *)al_get_sample_data(motorsmp[ddnoise_mstat]);
-                                        ddbuffer[c] += ((int16_t)((data[(int)ddnoise_mpos]) ^ 0x8000) / 2);
-                                        ddnoise_mpos += ((float)al_get_sample_frequency(motorsmp[ddnoise_mstat]) / (float) FREQ_DD);
-                                }
-                        }
-                }
+void ddnoise_headdown(void)
+{
+    ALLEGRO_SAMPLE *smp;
 
-                for (c = 0; c < BUFLEN_DD; c++)
-                {
-                        if (ddnoise_sstat >= 0 && seeksmp[ddnoise_sstat][ddnoise_sdir])
-                        {
-                                if (ddnoise_spos >= al_get_sample_length(seeksmp[ddnoise_sstat][ddnoise_sdir]))
-                                {
-                                        if (ddnoise_sstat > 0)
-                                           fdc_time = 100;
-                                        ddnoise_spos = 0;
-                                        ddnoise_sstat = -1;
-                                }
-                                else
-                                {
-                                        int16_t *data = (int16_t *)al_get_sample_data(seeksmp[ddnoise_sstat][ddnoise_sdir]);
-                                        ddbuffer[c] += ((int16_t)((data[(int)ddnoise_spos]) ^ 0x8000) / 2);
-                                        ddnoise_spos += ((float)al_get_sample_frequency(seeksmp[ddnoise_sstat][ddnoise_sdir]) / (float) FREQ_DD);
-                                }
-                        }
-                        ddbuffer[c] = (ddbuffer[c] / 3) * ddnoise_vol;
-                }
-        }
+    log_debug("ddnoise: head down");
+    if ((smp = motorsmp[1]))
+        al_play_sample(smp, map_ddnoise_vol(), 0.0, 1.0, ALLEGRO_PLAYMODE_LOOP, &motor_smp_id);
+}    
 
-        tapenoise_mix(ddbuffer);
-//        fwrite(ddbuffer,BUFLEN_DD*2,1,f2);
-//log_debug("Give buffer... %i %i\n",ddnoise_mstat,ddnoise_sstat);
-        al_givebufferdd(ddbuffer);
+void ddnoise_spindown(void)
+{
+    ALLEGRO_SAMPLE *smp;
 
-        oldmotoron=motoron;
+    log_debug("ddnoise: spindown");
+    if ((smp = motorsmp[1])) {
+        log_debug("ddnoise: stopping sample");
+        al_stop_sample(&motor_smp_id);
+    }
+    if ((smp = motorsmp[2]))
+        al_play_sample(smp, map_ddnoise_vol(), 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
 }

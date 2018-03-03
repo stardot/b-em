@@ -6,6 +6,8 @@
 #endif
 
 #include "b-em.h"
+#include <allegro5/allegro_audio.h>
+#include <allegro5/allegro_acodec.h>
 #include <allegro5/allegro_native_dialog.h>
 
 #include "6502.h"
@@ -79,7 +81,6 @@ static ALLEGRO_EVENT_QUEUE *queue;
 static int fcount = 0;
 
 char exedir[512];
-int ddnoiseframes = 0;
 
 void main_reset()
 {
@@ -234,11 +235,28 @@ void main_init(int argc, char *argv[])
         mode7_makechars();
 
         mem_init();
-        ddnoise_init();
-        tapenoise_init();
+
+    if (!(queue = al_create_event_queue())) {
+        log_fatal("main: unable to create event queue");
+        exit(1);
+    }
+    if (!al_install_audio()) {
+        log_fatal("main: unable to initialise audio");
+        exit(1);
+    }
+    if (!al_reserve_samples(3)) {
+        log_fatal("main: unable to reserve audio samples");
+        exit(1);
+    }
+    if (!al_init_acodec_addon()) {
+        log_fatal("main: unable to initialise audio codecs");
+        exit(1);
+    }
+    ddnoise_init();
+    tapenoise_init();
 
         sound_init();
-        openal_init();
+        //openal_init();
         sid_init();
         sid_settype(sidmethod, cursid);
         music5000_init();
@@ -259,10 +277,6 @@ void main_init(int argc, char *argv[])
         midi_init();
         main_reset();
 
-    if (!(queue = al_create_event_queue())) {
-        log_fatal("main: unable to create event queue");
-        exit(1);
-    }
 
     gui_allegro_init(queue, display);
 
@@ -381,11 +395,9 @@ static void main_timer(void) {
     else
         m6502_exec();
 
-    ddnoiseframes++;
-    if (ddnoiseframes >= 5) {
-        ddnoiseframes = 0;
-        ddnoise_mix();
-    }
+    if (ddnoise_ticks > 0 && --ddnoise_ticks == 0)
+        ddnoise_headdown();
+
     if (savestate_wantload)
         savestate_doload();
     if (savestate_wantsave)
