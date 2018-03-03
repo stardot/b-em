@@ -67,6 +67,11 @@ void config_load(void)
                 al_destroy_path(discfns[1]);
             discfns[1] = al_create_path(p);
         }
+        if ((p = al_get_config_value(bem_cfg, NULL, "tape"))) {
+            if (tape_fn)
+                al_destroy_path(tape_fn);
+            tape_fn = al_create_path(p);
+        }
     }
 
     defaultwriteprot = get_config_int(NULL, "defaultwriteprotect", 1);
@@ -148,6 +153,8 @@ void config_save(void)
             al_set_config_value(bem_cfg, NULL, "disc0", al_path_cstr(discfns[0], ALLEGRO_NATIVE_PATH_SEP));
         if (discfns[1])
             al_set_config_value(bem_cfg, NULL, "disc1", al_path_cstr(discfns[1], ALLEGRO_NATIVE_PATH_SEP));
+        if (tape_fn)
+            al_set_config_value(bem_cfg, NULL, "tape", al_path_cstr(tape_fn, ALLEGRO_NATIVE_PATH_SEP));
 
         set_config_int(NULL, "defaultwriteprotect", defaultwriteprot);
 
