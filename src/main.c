@@ -252,14 +252,12 @@ void main_init(int argc, char *argv[])
         log_fatal("main: unable to initialise audio codecs");
         exit(1);
     }
-    ddnoise_init();
-    tapenoise_init();
     sound_init();
-
-        //openal_init();
-        sid_init();
-        sid_settype(sidmethod, cursid);
-        music5000_init(queue);
+    sid_init();
+    sid_settype(sidmethod, cursid);
+    music5000_init(queue);
+    ddnoise_init();
+    tapenoise_init(queue);
 
     adc_init();
 #ifdef WIN32
@@ -453,7 +451,7 @@ void main_run()
                 al_start_timer(timer);
                 break;
             case ALLEGRO_EVENT_AUDIO_STREAM_FRAGMENT:
-                music5000_streamfrag(&event);
+                music5000_streamfrag();
         }
     }
 }

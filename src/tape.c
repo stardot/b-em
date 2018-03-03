@@ -63,8 +63,6 @@ void tape_close()
 static uint16_t newdat;
 
 void tape_poll(void) {
-    static uint16_t newdat;
-
     if (motor) {
         startblit();
         if (csw_ena) csw_poll();
