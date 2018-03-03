@@ -6,7 +6,6 @@
 #include "disc.h"
 #include "ddnoise.h"
 #include "sound.h"
-#include "soundopenal.h"
 #include "tapenoise.h"
 
 int ddnoise_vol=3;

@@ -8,7 +8,6 @@
 #include "sound.h"
 #include "via.h"
 #include "uservia.h"
-#include "soundopenal.h"
 #include "music5000.h"
 
 int sound_internal = 0, sound_beebsid = 0, sound_dac = 0, sound_ddnoise = 0, sound_tape = 0, sound_music5000 = 0;

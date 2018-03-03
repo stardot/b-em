@@ -39,7 +39,6 @@
 #include "sid_b-em.h"
 #include "sn76489.h"
 #include "sound.h"
-#include "soundopenal.h"
 #include "sysacia.h"
 #include "tape.h"
 #include "tapenoise.h"
@@ -119,8 +118,6 @@ void main_init(int argc, char *argv[])
         log_info("main: starting %s", VERSION_STR);
 
         vid_fskipmax = 1;
-
-        al_init_main(argc, argv);
 
         //TODO - do this properly.
         //append_filename(t, exedir, "roms/tube/ReCo6502ROM_816", 511);
@@ -486,7 +483,6 @@ void main_close()
         ddnoise_close();
         tapenoise_close();
 
-        openal_close();
         video_close();
         log_close();
 }

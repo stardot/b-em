@@ -7,7 +7,6 @@
 #include "ddnoise.h"
 #include "tapenoise.h"
 #include "sound.h"
-#include "soundopenal.h"
 
 static ALLEGRO_VOICE *voice;
 static ALLEGRO_MIXER *mixer;

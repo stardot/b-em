@@ -51,6 +51,8 @@
 #define ushort uint16_t
 #define byte uint8_t
 
+size_t buflen_m5 = BUFLEN_M5;
+
 static ALLEGRO_VOICE *voice;
 static ALLEGRO_MIXER *mixer;
 static ALLEGRO_AUDIO_STREAM *stream;

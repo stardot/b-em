@@ -13,7 +13,6 @@
 #include "scsi.h"
 #include "sn76489.h"
 #include "sound.h"
-#include "soundopenal.h"
 #include "tape.h"
 #include "tube.h"
 #include "vdfs.h"
