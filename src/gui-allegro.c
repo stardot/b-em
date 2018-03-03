@@ -140,7 +140,7 @@ static void gen_rom_label(int slot, char *dest)
             snprintf(dest, ROM_LABEL_LEN, "%02d %s", slot, rr);
     }
 }
-    
+
 static ALLEGRO_MENU *create_rom_menu(void)
 {
     ALLEGRO_MENU *menu, *sub;
@@ -256,14 +256,14 @@ static ALLEGRO_MENU *create_sound_menu(void)
     al_append_menu_item(menu, "Disc noise volume", 0, 0, NULL, sub);
     return menu;
 }
-    
+
 #ifdef HAVE_LINUX_MIDI
 
 static ALLEGRO_MENU *create_midi_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
     ALLEGRO_MENU *sub = al_create_menu();
-#ifdef HAVE_JACK_JACK_H    
+#ifdef HAVE_JACK_JACK_H
     add_checkbox_item(sub, "JACK MIDI", IDM_MIDI_M4000_JACK, midi_music4000.jack_enabled);
 #endif
 #ifdef HAVE_ALSA_ASOUNDLIB_H
@@ -302,7 +302,7 @@ static ALLEGRO_MENU *create_midi_menu(void)
 }
 
 #endif
-    
+
 static ALLEGRO_MENU *create_keyboard_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
@@ -332,7 +332,7 @@ static ALLEGRO_MENU *create_debug_menu(void)
     al_append_menu_item(menu, "Break", IDM_DEBUG_BREAK, 0, NULL, NULL);
     return menu;
 }
- 
+
 void gui_allegro_init(ALLEGRO_EVENT_QUEUE *queue, ALLEGRO_DISPLAY *display)
 {
     ALLEGRO_MENU *menu = al_create_menu();
@@ -414,9 +414,11 @@ static bool disc_choose(ALLEGRO_EVENT *event, const char *opname, void (*callbac
             if (al_get_native_file_dialog_count(chooser) > 0) {
                 ALLEGRO_PATH *path = al_create_path(al_get_native_file_dialog_path(chooser, 0));
                 disc_close(drive);
+                if (discfns[drive])
+                    al_destroy_path(discfns[drive]);
+                discfns[drive] = path;
                 callback(drive, path);
                 rc = true;
-                al_destroy_path(path);
                 menu = (ALLEGRO_MENU *)(event->user.data3);
                 if (defaultwriteprot) {
                     writeprot[drive] = 1;
@@ -588,7 +590,7 @@ static void rom_clear(ALLEGRO_EVENT *event)
     ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
     int slot = menu_get_num(event);
     char label[ROM_LABEL_LEN];
-    
+
     mem_clearrom(slot);
     gen_rom_label(slot, label);
     al_set_menu_item_caption(menu, slot-ROM_NSLOT+1, label);
