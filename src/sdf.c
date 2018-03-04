@@ -52,6 +52,7 @@ static const geometry_t adfs_new_formats[] = {
 };
 
 static const geometry_t adfs_old_formats[] = {
+    { "ADFS+DOS",     SIDES_INTERLEAVED, DENS_DOUBLE, 2720, 80, 16,  256 },
     { "Acorn ADFS L", SIDES_INTERLEAVED, DENS_DOUBLE, 2560, 80, 16,  256 },
     { "Acorn ADFS M", SIDES_SINGLE,      DENS_DOUBLE, 1280, 80, 16,  256 },
     { "Acorn ADFS S", SIDES_SINGLE,      DENS_DOUBLE,  640, 40, 16,  256 },
@@ -80,6 +81,16 @@ static const geometry_t dfs_formats[] = {
     { "Acorn DFS",         SIDES_SEQUENTIAL,  DENS_SINGLE, 400, 40, 10, 256 },
     { "Acorn DFS",         SIDES_SINGLE,      DENS_SINGLE, 400, 40, 10, 256 },
     { NULL,                SIDES_NA,          DENS_NA,       0,  0,  0,   0 }
+};
+
+static const geometry_t other_formats[] = {
+    { "ADFS+DOS 800K",     SIDES_INTERLEAVED, DENS_DOUBLE,  800, 80,  5, 1024 },
+    { "ADFS+DOS 640K",     SIDES_INTERLEAVED, DENS_DOUBLE, 2560, 80, 16,  256 },
+    { "DOS 720K",          SIDES_INTERLEAVED, DENS_DOUBLE, 1440, 80,  9,  512 },
+    { "DOS 360K",          SIDES_INTERLEAVED, DENS_DOUBLE,  720, 40,  9,  512 },
+    { "Acorn DFS",         SIDES_SINGLE,      DENS_SINGLE,  800, 80, 10,  256 },
+    { "Acorn DFS",         SIDES_INTERLEAVED, DENS_SINGLE, 1600, 80, 10,  256 },
+    { NULL,                SIDES_NA,          DENS_NA,        0,  0,  0,    0 }    
 };
 
 static int check_id(FILE *fp, long posn, const char *id) {
@@ -114,6 +125,7 @@ static const geometry_t *try_adfs_old(FILE *fp) {
     if (check_id(fp, 0x201, "Hugo") && check_id(fp, 0x6fb, "Hugo")) {
         fseek(fp, 0xfc, SEEK_SET);
         sects = getc(fp) | (getc(fp) << 8) | (getc(fp) << 16);
+        log_debug("sdf: found old ADFS signature, sects=%u", sects);
         for (ptr = adfs_old_formats; ptr->name; ptr++)
             if (sects == ptr->size_in_sectors)
                 return ptr;
@@ -143,6 +155,18 @@ static const geometry_t *try_dfs(FILE *fp, uint32_t offset) {
             }
         }
     }
+    return NULL;
+}
+
+static const geometry_t *try_others(FILE *fp) {
+    off_t size;
+    const geometry_t *ptr;
+
+    fseek(fp, 0, SEEK_END);
+    size = ftell(fp);
+    for (ptr = other_formats; ptr->name; ptr++)
+        if ((ptr->size_in_sectors * ptr->sector_size) == size)
+            return ptr;
     return NULL;
 }
 
@@ -495,9 +519,11 @@ void sdf_load(int drive, const char *fn) {
         if ((geo = try_adfs_old(fp)) == NULL) {
             if ((geo = try_dfs(fp, 0x106)) == NULL) {
                 if ((geo = try_dfs(fp, 0x1001)) == NULL) {
-                    log_error("Unable to determine geometry for %s", fn);
-                    fclose(fp);
-                    return;
+                    if ((geo = try_others(fp)) == NULL) {
+                        log_error("Unable to determine geometry for %s", fn);
+                        fclose(fp);
+                        return;
+                    }
                 }
             }
         }
