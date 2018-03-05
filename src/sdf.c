@@ -250,7 +250,7 @@ static void io_seek(const geometry_t *geo, uint8_t drive, uint8_t sector, uint8_
             offset = (track * 2 + 1) * track_bytes;
     }
     offset += sector * geo->sector_size;
-    log_debug("sdf: seeking to %d bytes\n", offset);
+    log_debug("sdf: seeking for drive=%u, side=%u, track=%u, sector=%u to %d bytes\n", drive, side, track, sector, offset);
     fseek(sdf_fp[drive], offset, SEEK_SET);
 }
 
@@ -263,19 +263,21 @@ static void sdf_readsector(int drive, int sector, int track, int side, int densi
             if ((geo = geometry[drive])) {
                 if ((!density && geo->density == DENS_SINGLE) || (density && geo->density == DENS_DOUBLE)) {
                     if (track == current_track[drive] && track >= 0 && track < geo->tracks) {
-                        if (sector >= 0 && sector < geo->sectors_per_track ) {
+                        if (geo->sector_size > 256)
+                            sector--;
+                        if (sector >= 0 && sector <= geo->sectors_per_track ) {
                             if (side == 0 || geo->sides != SIDES_SINGLE) {
                                 io_seek(geo, drive, sector, track, side);
                                 count = geo->sector_size;
                                 sdf_drive = drive;
                                 state = ST_READSECTOR;
                                 return;
-                            }
-                        }
-                    }
-                }
-            }
-        }
+                            } else log_debug("sdf: invalid side");
+                        } else log_debug("sdf: invalid sector: %d not between 0 and %d", sector, geo->sectors_per_track);
+                    }  else log_debug("sdf: invalid track: %d should be %d", track, current_track[drive]);
+                } else log_debug("sdf: invalid density");
+            }  else log_debug("sdf: geometry not found");
+        } else log_debug("sdf: drive %d out of range", drive);
         count = 500;
         state = ST_NOTFOUND;
     }
@@ -290,6 +292,8 @@ static void sdf_writesector(int drive, int sector, int track, int side, int dens
             if ((geo = geometry[drive])) {
                 if ((!density && geo->density == DENS_SINGLE) || (density && geo->density == DENS_DOUBLE)) {
                     if (track == current_track[drive] && track >= 0 && track < geo->tracks) {
+                        if (geo->sector_size > 256)
+                            sector--;
                         if (sector >= 0 && sector < geo->sectors_per_track ) {
                             if (side == 0 || geo->sides != SIDES_SINGLE) {
                                 io_seek(geo, drive, sector, track, side);
@@ -363,6 +367,7 @@ static void sdf_format(int drive, int track, int side, int density) {
 
 static void sdf_poll() {
     int c;
+    uint16_t sect_size;
 
     if (++sdf_time <= 16)
         return;
@@ -418,12 +423,16 @@ static void sdf_poll() {
             break;
 
         case ST_READ_ADDR2:
-            fdc_data(sdf_sector);
+            if (geometry[sdf_drive]->sector_size > 256)
+                fdc_data(sdf_sector+1);
+            else
+                fdc_data(sdf_sector);
             state = ST_READ_ADDR3;
             break;
 
         case ST_READ_ADDR3:
-            fdc_data(1);
+            sect_size = geometry[sdf_drive]->sector_size;
+            fdc_data(sect_size == 256 ? 1 : sect_size == 512 ? 2 : 3);
             state = ST_READ_ADDR4;
             break;
 
