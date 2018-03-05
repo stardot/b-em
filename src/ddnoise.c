@@ -142,7 +142,7 @@ void ddnoise_spinup(void)
     ALLEGRO_SAMPLE *smp;
 
     log_debug("ddnoise: spinup");
-    if ((smp = motorsmp[0])) {
+    if (sound_ddnoise && (smp = motorsmp[0])) {
         al_play_sample(smp, map_ddnoise_vol(), 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
         ddnoise_ticks = (50 * al_get_sample_length(smp)) / al_get_sample_frequency(smp);
         log_debug("ddnoise: head load sample to finish in %d ticks", ddnoise_ticks);
@@ -154,7 +154,7 @@ void ddnoise_headdown(void)
     ALLEGRO_SAMPLE *smp;
 
     log_debug("ddnoise: head down");
-    if ((smp = motorsmp[1]))
+    if (sound_ddnoise && (smp = motorsmp[1]))
         al_play_sample(smp, map_ddnoise_vol(), 0.0, 1.0, ALLEGRO_PLAYMODE_LOOP, &motor_smp_id);
 }    
 
@@ -163,10 +163,12 @@ void ddnoise_spindown(void)
     ALLEGRO_SAMPLE *smp;
 
     log_debug("ddnoise: spindown");
-    if ((smp = motorsmp[1])) {
-        log_debug("ddnoise: stopping sample");
-        al_stop_sample(&motor_smp_id);
+    if (sound_ddnoise) {
+        if ((smp = motorsmp[1])) {
+            log_debug("ddnoise: stopping sample");
+            al_stop_sample(&motor_smp_id);
+        }
+        if ((smp = motorsmp[2]))
+            al_play_sample(smp, map_ddnoise_vol(), 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
     }
-    if ((smp = motorsmp[2]))
-        al_play_sample(smp, map_ddnoise_vol(), 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
 }
