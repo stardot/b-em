@@ -408,7 +408,7 @@ static bool disc_choose(ALLEGRO_EVENT *event, const char *opname, void (*callbac
     if (!(apath = discfns[drive]) || !(fpath = al_path_cstr(apath, ALLEGRO_NATIVE_PATH_SEP)))
         fpath = ".";
     snprintf(title, sizeof title, "Choose a disc to %s drive %d/%d", opname, drive, drive+2);
-    if ((chooser = al_create_native_file_dialog(fpath, title, "*.ssd;*.dsd;*,ing;*.adf;*.adl;*.fdi", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST))) {
+    if ((chooser = al_create_native_file_dialog(fpath, title, "*.ssd;*.dsd;*.img;*.adf;*.adl;*.fdi", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST))) {
         display = (ALLEGRO_DISPLAY *)(event->user.data2);
         if (al_show_native_file_dialog(display, chooser)) {
             if (al_get_native_file_dialog_count(chooser) > 0) {
@@ -620,8 +620,14 @@ static void change_model(ALLEGRO_EVENT *event)
 static void change_tube(ALLEGRO_EVENT *event)
 {
     ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
-    al_set_menu_item_flags(menu, menu_id_num(IDM_TUBE, curtube), ALLEGRO_MENU_ITEM_CHECKBOX);
-    selecttube = curtube = menu_get_num(event);
+    int newtube = menu_get_num(event);
+    log_debug("gui: change_tube newtube=%d", newtube);
+    if (newtube == curtube)
+        selecttube = curtube = -1;
+    else {
+        al_set_menu_item_flags(menu, menu_id_num(IDM_TUBE, curtube), ALLEGRO_MENU_ITEM_CHECKBOX);
+        selecttube = curtube = newtube;
+    }
     main_restart();
 }
 
