@@ -72,16 +72,18 @@ static char msg_malloc[] = "log_format: out of space - following message truncat
 static void log_format(const log_level_t *ll, const char *fmt, va_list ap)
 {
     unsigned opt, dest;
+    va_list apc;
     char   abuf[200], *mbuf;
     size_t len;
 
     if ((opt = log_options & ll->mask)) {
         dest = opt >> ll->shift;
+        va_copy(apc, ap);
         len = vsnprintf(abuf, sizeof abuf, fmt, ap);
-        if (len <= sizeof abuf)
+        if (len < sizeof abuf)
             log_common(dest, ll->name, abuf, len);
         else if ((mbuf = malloc(len + 1))) {
-            vsnprintf(mbuf, len, fmt, ap);
+            vsnprintf(mbuf, len+1, fmt, apc);
             log_common(dest, ll->name, mbuf, len);
             free(mbuf);
         } else {
