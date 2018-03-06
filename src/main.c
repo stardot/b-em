@@ -116,7 +116,7 @@ void main_reset()
 
 void main_init(int argc, char *argv[])
 {
-        char t[512];
+        char t[512], *p;
         int c;
         int tapenext = 0, discnext = 0;
 
@@ -223,9 +223,15 @@ void main_init(int argc, char *argv[])
                 }
                 else
                 {
-                        strcpy(discfns[0], argv[c]);
+                    if ((p = strrchr(argv[c], '.')) && (!strcasecmp(p, ".uef") || !strcasecmp(p, ".csw"))) {
+                        strncpy(tape_fn, argv[c], sizeof tape_fn);
+                        tapenext = 0;
+                    }
+                    else {
+                        strncpy(discfns[0], argv[c], sizeof discfns[0]);
                         discnext = 0;
-            autoboot = 150;
+                        autoboot = 150;
+                    }
                 }
                 if (tapenext) tapenext--;
         }
