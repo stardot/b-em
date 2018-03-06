@@ -116,8 +116,12 @@ static inline void putpixel(BITMAP *bmp, int x, int y, int colour) {
     l[x] = colour;
 }
 
+int pixel_count = 0;
+
 static inline void nula_putpixel(BITMAP *bmp, int x, int y, int colour)
 {
+    pixel_count++;
+
     if (crtc_mode && (nula_horizontal_offset || nula_left_blank) && (x < nula_left_cut || x >= nula_left_edge + (crtc[1] * crtc_mode * 8)))
     {
         putpixel(bmp, x, y, colblack);
@@ -774,7 +778,7 @@ void video_reset()
         con = cdraw = 0;
         cursoron  = 0;
         charsleft = 0;
-        
+
         nula_left_cut = 0;
         nula_left_edge = 0;
         nula_left_blank = 0;
@@ -1134,7 +1138,7 @@ void video_poll(int clocks, int timer_enable)
                         {
                             // NULA left edge
                             nula_left_edge = scrx + crtc_mode * 8;
- 
+
                             // NULA left cut
                             nula_left_cut = nula_left_edge + nula_left_blank * crtc_mode * 8;
 
