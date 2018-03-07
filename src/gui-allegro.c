@@ -622,11 +622,11 @@ static void change_tube(ALLEGRO_EVENT *event)
     ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
     int newtube = menu_get_num(event);
     log_debug("gui: change_tube newtube=%d", newtube);
-    if (newtube == curtube)
-        selecttube = curtube = -1;
+    if (newtube == selecttube)
+        selecttube = -1;
     else {
-        al_set_menu_item_flags(menu, menu_id_num(IDM_TUBE, curtube), ALLEGRO_MENU_ITEM_CHECKBOX);
-        selecttube = curtube = newtube;
+        al_set_menu_item_flags(menu, menu_id_num(IDM_TUBE, selecttube), ALLEGRO_MENU_ITEM_CHECKBOX);
+        selecttube = newtube;
     }
     main_restart();
 }
