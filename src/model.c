@@ -54,7 +54,7 @@ TUBE tubes[NUM_TUBES]=
 {
         {"6502", tube_6502_init,  tube_6502_reset, &tube6502_cpu_debug  },
         {"ARM",  tube_arm_init,   arm_reset,       &tubearm_cpu_debug   },
-        {"Z80",  tube_z80_init,   z80_reset,       &tubez80_cpu_debug   }, 
+        {"Z80",  tube_z80_init,   z80_reset,       &tubez80_cpu_debug   },
         {"80186",tube_x86_init,   x86_reset,       &tubex86_cpu_debug   },
         {"65816",tube_65816_init, w65816_reset,    &tube65816_cpu_debug },
         {"32016",tube_32016_init, n32016_reset,    &n32016_cpu_debug    },
@@ -63,13 +63,15 @@ TUBE tubes[NUM_TUBES]=
 
 void model_check(void) {
     const int defmodel = 3;
-    
+
     if (curmodel < 0 || curmodel >= NUM_MODELS) {
         log_warn("No model #%d, using #%d (%s) instead", curmodel, defmodel, models[defmodel].name);
         curmodel = defmodel;
     }
     if (models[curmodel].tube != -1)
         curtube = models[curmodel].tube;
+    else
+        curtube = selecttube;
     if (curtube < -1 || curtube >= NUM_TUBES) {
         log_warn("No tube #%d, running with no tube instead", curtube);
         curtube = -1;
@@ -90,7 +92,7 @@ void model_init()
         compactcmos = models[curmodel].compact;
 
         model_check();
-        
+
         getcwd(t, 511);
         append_filename(t2, exedir, "roms", 511);
         chdir(t2);
@@ -103,7 +105,7 @@ void model_init()
             tubes[curtube].init();
         tube_reset();
         chdir(t);
-        
+
         cmos_load(models[curmodel]);
         if (models[curmodel].swram) mem_fillswram();
 }
