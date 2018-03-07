@@ -101,13 +101,12 @@ void model_init()
         if (curtube!=-1)
             tubes[curtube].init();
         tube_reset();
-        chdir(t);
         cmos_load(models[curmodel]);
 }
 
 void model_save(void) {
     const char *sect = models[curmodel].cfgsect;
-    
+
     set_config_string(sect, "name", models[curmodel].name);
     mem_save_romcfg(sect);
 }
