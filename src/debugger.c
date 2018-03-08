@@ -495,6 +495,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
     char dump[256], *dptr;
     char ins[256], *iptr, *cmd, *eptr;
 
+    main_pause();
     indebug = 1;
     log_debug("debugger: about to call disassembler, addr=%04X", addr);
     next_addr = cpu->disassemble(addr, ins, sizeof ins);
@@ -564,6 +565,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                     sscanf(iptr, "%d", &contcount);
                 debug_lastcommand = 'c';
                 indebug = 0;
+                main_resume();
                 return;
 
             case 'd':
@@ -614,6 +616,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 tbreak = next_addr;
                 debug_lastcommand = 'n';
                 indebug = 0;
+                main_resume();
                 return;
 
             case 'r':
@@ -678,6 +681,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                     debug_step = 1;
                 debug_lastcommand = 's';
                 indebug = 0;
+                main_resume();
                 return;
 
             case 't':
@@ -749,6 +753,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
     }
     fcount = 0;
     indebug = 0;
+    main_resume();
 }
 
 static inline void check_points(cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t size, int *break_tab, int *watch_tab, const char *desc)

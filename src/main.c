@@ -111,8 +111,6 @@ void main_init(int argc, char *argv[])
         int c;
         int tapenext = 0, discnext = 0;
         ALLEGRO_DISPLAY *display;
-        ALLEGRO_PATH *path;
-        const char *ext;
 
         startblit();
 
@@ -221,19 +219,11 @@ void main_init(int argc, char *argv[])
                 }
                 else
                 {
-                    path = al_create_path(argv[c]);
-                    if ((ext = al_get_path_extension(path)) && (!strcasecmp(ext, ".uef") || !strcasecmp(ext, ".csw"))) {
-                        if (tape_fn)
-                            al_destroy_path(tape_fn);
-                        tape_fn = path;
-                        tapenext = 0;
-                    } else {
-                        if (discfns[0])
-                            al_destroy_path(discfns[0]);
-                        discfns[0] = path;
-                        discnext = 0;
-                        autoboot = 150;
-                    }
+                    if (discfns[0])
+                        al_destroy_path(discfns[0]);
+                    discfns[0] = al_create_path(argv[c]);
+                    discnext = 0;
+                    autoboot = 150;
                 }
                 if (tapenext) tapenext--;
         }
@@ -500,4 +490,14 @@ void main_close()
 void changetimerspeed(int i)
 {
     al_set_timer_speed(timer, 1.0/i);
+}
+
+void main_pause(void)
+{
+    al_stop_timer(timer);
+}
+
+void main_resume(void)
+{
+    al_start_timer(timer);
 }
