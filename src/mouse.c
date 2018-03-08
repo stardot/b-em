@@ -132,10 +132,10 @@ static void mouse_poll_amx(void)
         uservia_set_cb2(1);
         if (my < 0) {
             mouse_portb |=  4;
-            my--;
+            my++;
         } else {
             mouse_portb &= ~4;
-            my++;
+            my--;
         }
     } else
         uservia_set_cb2(0);
