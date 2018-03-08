@@ -12,8 +12,8 @@ int mcount = 8;
 uint8_t mouse_portb = 0;
 
 static int mx = 0,  my = 0;
+static int mouse_ff = 0;
 static int mouse_xff = 0, mouse_yff = 0;
-static int buttons = 0;
 
 void mouse_axes(ALLEGRO_EVENT *event)
 {
@@ -26,15 +26,47 @@ void mouse_btn_down(ALLEGRO_EVENT *event)
 {
     int button = event->mouse.button;
     log_debug("mouse: button #%d down", button);
-    if (button < (sizeof(int)*8)) 
-        buttons |= 1 << button;
+    switch(button) {
+        case 1:
+            if (curtube == 3)
+                mouse_portb &= ~1;
+            else if (mouse_amx)
+                mouse_portb &= ~0x20;
+            break;
+        case 2:
+            if (curtube == 3)
+                mouse_portb &= ~4;
+            else if (mouse_amx)
+                mouse_portb &= ~0x80;
+            break;
+        case 4:
+            if (mouse_amx)
+                mouse_portb &= ~0x40;
+            break;
+    }
 }
 
 void mouse_btn_up(ALLEGRO_EVENT *event) {
     int button = event->mouse.button;
     log_debug("mouse: button #%d up", button);
-    if (button < (sizeof(int)*8))
-        buttons &= ~(1 << button);
+    switch(button) {
+        case 1:
+            if (curtube == 3)
+                mouse_portb |=  1;
+            else if (mouse_amx)
+                mouse_portb |=  0x20;
+            break;
+        case 2:
+            if (curtube == 3)
+                mouse_portb |=  4;
+            else if (mouse_amx)
+                mouse_portb |=  0x80;
+            break;
+        case 4:
+            if (mouse_amx)
+                mouse_portb |=  0x40;
+            break;
+    }
 }
 
 static void mouse_poll_x86(void)
@@ -72,16 +104,18 @@ static void mouse_poll_x86(void)
         uservia_set_cb2(mouse_yff);
         mouse_yff = !mouse_yff;
     }
-
-    if (buttons & 1) mouse_portb &= ~1;
-    else             mouse_portb |=  1;
-    if (buttons & 2) mouse_portb &= ~4;
-    else             mouse_portb |=  4;
     mouse_portb |= 2;
 }
 
 static void mouse_poll_amx(void)
 {
+    mouse_ff = !mouse_ff;
+    if (mouse_ff) {
+        uservia_set_cb1(0);
+        uservia_set_cb2(0);
+        return;
+    }
+
     if (mx) {
         uservia_set_cb1(1);
         if (mx > 0) {
@@ -105,13 +139,6 @@ static void mouse_poll_amx(void)
         }
     } else
         uservia_set_cb2(0);
-
-    if (buttons & 1) mouse_portb &= ~0x20;
-    else             mouse_portb |=  0x20;
-    if (buttons & 2) mouse_portb &= ~0x80;
-    else             mouse_portb |=  0x80;
-    if (buttons & 4) mouse_portb &= ~0x40;
-    else             mouse_portb |=  0x40;
 }
 
 void mouse_poll()

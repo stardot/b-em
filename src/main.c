@@ -292,8 +292,8 @@ void main_init(int argc, char *argv[])
 #endif
         oldmodel = curmodel;
 
-        if (curtube == 3 || mouse_amx)
-            al_install_mouse();
+    al_install_mouse();
+    al_register_event_source(queue, al_get_mouse_event_source());
 
         disc_load(0, discfns[0]);
         disc_load(1, discfns[1]);

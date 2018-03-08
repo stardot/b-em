@@ -50,8 +50,8 @@ uint8_t uservia_read_portA()
 
 uint8_t uservia_read_portB()
 {
-    //if (curtube == 3 || mouse_amx)
-    //    return mouse_portb;
+    if (curtube == 3 || mouse_amx)
+        return mouse_portb;
     if (compactcmos)
         return compact_joystick_read();
     if (sound_music5000)
