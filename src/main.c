@@ -72,12 +72,27 @@ void secint()
         printsec = 1;
 }
 
-int bempause = 0;
+int emuspeed = 4;
 
 static ALLEGRO_TIMER *timer;
 static ALLEGRO_EVENT_QUEUE *queue;
+static ALLEGRO_EVENT_SOURCE evsrc;
 
+static double time_limit;
 static int fcount = 0;
+
+const emu_speed_t emu_speeds[NUM_EMU_SPEEDS] = {
+    {  "10%", 1.0 / (50.0 * 0.10) },
+    {  "25%", 1.0 / (50.0 * 0.25) },
+    {  "50%", 1.0 / (50.0 * 0.50) },
+    {  "75%", 1.0 / (50.0 * 0.75) },
+    { "100%", 1.0 / 50.0          },
+    { "150%", 1.0 / (50.0 * 1.50) },
+    { "200%", 1.0 / (50.0 * 2.00) },
+    { "300%", 1.0 / (50.0 * 3.00) },
+    { "400%", 1.0 / (50.0 * 4.00) },
+    { "500%", 1.0 / (50.0 * 5.00) }
+};
 
 char exedir[512];
 
@@ -275,11 +290,14 @@ void main_init(int argc, char *argv[])
 
     gui_allegro_init(queue, display);
 
+    time_limit = 2.0 / 50.0;
     if (!(timer = al_create_timer(1.0 / 50.0))) {
         log_fatal("main: unable to create timer");
         exit(1);
     }
     al_register_event_source(queue, al_get_timer_event_source(timer));
+    al_init_user_event_source(&evsrc);
+    al_register_event_source(queue, &evsrc);
 
     if (!al_install_keyboard()) {
         log_fatal("main: umable to install keyboard");
@@ -308,7 +326,7 @@ void main_init(int argc, char *argv[])
 
 void main_restart()
 {
-        bempause = 1;
+    main_pause();
         startblit();
         if (curtube == 3 || mouse_amx)
             al_uninstall_mouse();
@@ -322,7 +340,7 @@ void main_restart()
         if (curtube == 3 || mouse_amx)
             al_install_mouse();
         endblit();
-        bempause = 0;
+    main_resume();
 }
 
 void main_setmouse()
@@ -380,26 +398,33 @@ static void main_key_down(ALLEGRO_EVENT *event)
     }
 }
 
-static void main_timer(void) {
-    if (autoboot)
-        autoboot--;
-    framesrun++;
+static void main_timer(ALLEGRO_EVENT *event)
+{
+    double delay = al_get_time() - event->any.timestamp;
+    if (delay < time_limit) {
+        if (autoboot)
+            autoboot--;
+        framesrun++;
 
-    if (x65c02)
-        m65c02_exec();
-    else
-        m6502_exec();
+        if (x65c02)
+            m65c02_exec();
+        else
+            m6502_exec();
 
-    if (ddnoise_ticks > 0 && --ddnoise_ticks == 0)
-        ddnoise_headdown();
+        if (ddnoise_ticks > 0 && --ddnoise_ticks == 0)
+            ddnoise_headdown();
 
-    if (savestate_wantload)
-        savestate_doload();
-    if (savestate_wantsave)
-        savestate_dosave();
+        if (savestate_wantload)
+            savestate_doload();
+        if (savestate_wantsave)
+            savestate_dosave();
+        if (emuspeed == EMU_SPEED_FULL) {
+            // Simulate another timer event immediately after this one.
+            event->type = ALLEGRO_EVENT_TIMER;
+            al_emit_user_event(&evsrc, event, NULL);
+        }
+    }
 }
-
-static int timer_count = 0;
 
 void main_run()
 {
@@ -436,16 +461,12 @@ void main_run()
                 quitting = true;
                 break;
             case ALLEGRO_EVENT_TIMER:
-                main_timer();
-                if (++timer_count >= 500) {
-                    log_debug("reached 10s of timer events");
-                    timer_count = 0;
-                }
+                main_timer(&event);
                 break;
             case ALLEGRO_EVENT_MENU_CLICK:
-                al_stop_timer(timer);
+                main_pause();
                 gui_allegro_event(&event);
-                al_start_timer(timer);
+                main_resume();
                 break;
             case ALLEGRO_EVENT_AUDIO_STREAM_FRAGMENT:
                 music5000_streamfrag();
@@ -486,9 +507,20 @@ void main_close()
         log_close();
 }
 
-void changetimerspeed(int i)
+void main_setspeed(int speed)
 {
-    al_set_timer_speed(timer, 1.0/i);
+    log_debug("main: setspeed %d", speed);
+    al_stop_timer(timer);
+    if (speed != EMU_SPEED_FULL && speed != EMU_SPEED_PAUSED) {
+        if (speed >= NUM_EMU_SPEEDS) {
+            log_warn("main: speed #%d out of range, defaulting to 100%%", speed);
+            speed = 4;
+        }
+        al_set_timer_speed(timer, emu_speeds[speed].timer_interval);
+        time_limit = emu_speeds[speed].timer_interval * 2.0;
+        al_start_timer(timer);
+    }
+    emuspeed = speed;
 }
 
 void main_pause(void)
@@ -498,5 +530,6 @@ void main_pause(void)
 
 void main_resume(void)
 {
-    al_start_timer(timer);
+    if (emuspeed != EMU_SPEED_PAUSED && emuspeed != EMU_SPEED_FULL)
+        al_start_timer(timer);
 }

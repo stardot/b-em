@@ -324,6 +324,18 @@ static ALLEGRO_MENU *create_settings_menu(void)
     return menu;
 }
 
+static ALLEGRO_MENU *create_speed_menu(void)
+{
+    int i;
+
+    ALLEGRO_MENU *menu = al_create_menu();
+    add_radio_item(menu, "Paused", IDM_SPEED, EMU_SPEED_PAUSED, emuspeed);
+    for (i = 0; i < NUM_EMU_SPEEDS; i++)
+        add_radio_item(menu, emu_speeds[i].name, IDM_SPEED, i, emuspeed);
+    add_radio_item(menu, "Full-speed", IDM_SPEED, EMU_SPEED_FULL, emuspeed);
+    return menu;
+}
+    
 static ALLEGRO_MENU *create_debug_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
@@ -343,6 +355,7 @@ void gui_allegro_init(ALLEGRO_EVENT_QUEUE *queue, ALLEGRO_DISPLAY *display)
     al_append_menu_item(menu, "Model", 0, 0, NULL, create_model_menu());
     al_append_menu_item(menu, "Tube", 0, 0, NULL, create_tube_menu());
     al_append_menu_item(menu, "Settings", 0, 0, NULL, create_settings_menu());
+    al_append_menu_item(menu, "Speed", 0, 0, NULL, create_speed_menu());
     al_append_menu_item(menu, "Debug", 0, 0, NULL, create_debug_menu());
     al_set_display_menu(display, menu);
     al_register_event_source(queue, al_get_default_menu_event_source());
@@ -853,6 +866,9 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             midi_music2000_out3.alsa_raw_enabled = !midi_music2000_out3.alsa_raw_enabled;
             break;
 #endif
+        case IDM_SPEED:
+            main_setspeed(radio_event_simple(event, emuspeed));
+            break;
         case IDM_DEBUGGER:
             debug_toggle_core();
             break;
