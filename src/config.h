@@ -1,8 +1,8 @@
 #ifndef __INC_CONFIG_H
 #define __INC_CONFIG_H
 
-void config_load();
-void config_save();
+void config_load(void);
+void config_save(void);
 
 int get_config_int(const char *sect, const char *key, int idefault);
 const char *get_config_string(const char *sect, const char *key, const char *sdefault);

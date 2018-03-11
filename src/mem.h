@@ -27,7 +27,7 @@ extern void mem_clearroms(void);
 void mem_clearrom(int slot);
 void mem_loadrom(int slot, const char *name, const char *path, uint8_t rel);
 const uint8_t *mem_romdetail(int slot);
-void mem_save_romcfg(const char *sect);
+void mem_save_romcfg(ALLEGRO_CONFIG *bem_cfg, const char *sect);
 
 void mem_init();
 void mem_reset();

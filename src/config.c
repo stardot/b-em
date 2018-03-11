@@ -7,6 +7,7 @@
 #include "ddnoise.h"
 #include "disc.h"
 #include "keyboard.h"
+#include "model.h"
 #include "mouse.h"
 #include "ide.h"
 #include "midi.h"
@@ -148,6 +149,8 @@ void config_save(void)
                 return;
             }
         }
+        model_save(bem_cfg);
+
         if (discfns[0])
             al_set_config_value(bem_cfg, NULL, "disc0", al_path_cstr(discfns[0], ALLEGRO_NATIVE_PATH_SEP));
         if (discfns[1])

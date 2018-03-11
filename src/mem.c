@@ -305,7 +305,7 @@ void mem_loadstate(FILE *f) {
     fread(rom, ROM_SIZE*ROM_NSLOT, 1, f);
 }
 
-void mem_save_romcfg(const char *sect) {
+void mem_save_romcfg(ALLEGRO_CONFIG *bem_cfg, const char *sect) {
     int slot;
     rom_slot_t *slotp;
     const char *value;
@@ -315,7 +315,7 @@ void mem_save_romcfg(const char *sect) {
         if (!slotp->locked) {
             value = slotp->use_name ? slotp->name : slotp->path;
             if (value)
-                set_config_string(sect, slotkeys[slot], value);
+                al_set_config_value(bem_cfg, sect, slotkeys[slot], value);
         }
     }
 }

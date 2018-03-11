@@ -83,8 +83,10 @@ void model_check(void) {
 void model_init()
 {
         model_check();
-        log_info("mem: starting emulation as %s", models[curmodel].name);
-        set_config_string(models[curmodel].cfgsect, "name", models[curmodel].name);
+        if (curtube == -1)
+            log_info("model: starting emulation as model #%d, %s", curmodel, models[curmodel].name);
+        else
+            log_info("model: starting emulation as model #%d, %s with tube #%d, %s", curmodel, models[curmodel].name, curtube, tubes[curtube].name);
 
         I8271       = models[curmodel].I8271;
         WD1770      = models[curmodel].WD1770;
@@ -105,9 +107,9 @@ void model_init()
         cmos_load(models[curmodel]);
 }
 
-void model_save(void) {
+void model_save(ALLEGRO_CONFIG *bem_cfg) {
     const char *sect = models[curmodel].cfgsect;
     
-    set_config_string(sect, "name", models[curmodel].name);
-    mem_save_romcfg(sect);
+    al_set_config_value(bem_cfg, sect, "name", models[curmodel].name);
+    mem_save_romcfg(bem_cfg, sect);
 }

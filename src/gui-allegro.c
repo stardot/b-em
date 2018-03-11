@@ -611,7 +611,6 @@ static void change_model(ALLEGRO_EVENT *event)
 {
     ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
     al_set_menu_item_flags(menu, menu_id_num(IDM_MODEL, curmodel), ALLEGRO_MENU_ITEM_CHECKBOX);
-    model_save();
     oldmodel = curmodel;
     curmodel = menu_get_num(event);
     main_restart();

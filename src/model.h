@@ -5,7 +5,7 @@
 
 void model_check(void);
 void model_init();
-void model_save(void);
+void model_save(ALLEGRO_CONFIG *bem_cfg);
 char *model_get();
 
 typedef struct
