@@ -720,7 +720,7 @@ ALLEGRO_DISPLAY *video_init()
     scr_x_size = 704;
     scr_y_size = 544;
 #endif
-    al_set_new_bitmap_flags(ALLEGRO_MEMORY_BITMAP);
+    al_set_new_bitmap_flags(ALLEGRO_VIDEO_BITMAP);
     b16x = al_create_bitmap(832, 614);
     b16 = al_create_bitmap(832, 614);
     b32 = al_create_bitmap(1536, 800);
@@ -784,7 +784,6 @@ int ccount = 0;
 int vid_cleared;
 
 int firstdispen = 0;
-
 
 void video_reset()
 {
