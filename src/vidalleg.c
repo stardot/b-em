@@ -95,18 +95,21 @@ void video_enterfullscreen()
 
 void video_set_window_size(void)
 {
+    scr_x_start = 0;
+    scr_y_start = 0;
+
     switch(vid_fullborders) {
         case 0:
-            winsizex = BORDER_NONE_X_SIZE;
-            winsizey = BORDER_NONE_Y_SIZE * 2;
+            scr_x_size = winsizex = BORDER_NONE_X_SIZE;
+            scr_y_size = winsizey = BORDER_NONE_Y_SIZE * 2;
             break;
         case 1:
-            winsizex = BORDER_MED_X_SIZE;
-            winsizey = BORDER_MED_Y_SIZE * 2;
+            scr_x_size = winsizex = BORDER_MED_X_SIZE;
+            scr_y_size = winsizey = BORDER_MED_Y_SIZE * 2;
             break;
         case 2:
-            winsizex = BORDER_FULL_X_SIZE;
-            winsizey = BORDER_FULL_Y_SIZE * 2;
+            scr_x_size = winsizex = BORDER_FULL_X_SIZE;
+            scr_y_size = winsizey = BORDER_FULL_Y_SIZE * 2;
     }
 }
 

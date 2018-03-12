@@ -711,15 +711,6 @@ ALLEGRO_DISPLAY *video_init()
         exit(1);
     }
 
-#ifdef WIN32
-    al_set_new_bitmap_flags(ALLEGRO_VIDEO_BITMAP);
-    vb = al_create_bitmap(924, 614);
-#else
-    scr_x_start = 0;
-    scr_y_start = 0;
-    scr_x_size = 704;
-    scr_y_size = 544;
-#endif
     al_set_new_bitmap_flags(ALLEGRO_VIDEO_BITMAP);
     b16x = al_create_bitmap(832, 614);
     b16 = al_create_bitmap(832, 614);
