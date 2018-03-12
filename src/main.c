@@ -254,6 +254,8 @@ void main_init(int argc, char *argv[])
         log_fatal("main: unable to create event queue");
         exit(1);
     }
+    al_register_event_source(queue, al_get_display_event_source(display));
+
     if (!al_install_audio()) {
         log_fatal("main: unable to initialise audio");
         exit(1);
@@ -510,6 +512,10 @@ void main_run()
                 break;
             case ALLEGRO_EVENT_AUDIO_STREAM_FRAGMENT:
                 music5000_streamfrag();
+                break;
+            case ALLEGRO_EVENT_DISPLAY_RESIZE:
+                video_update_window_size(&event);
+                break;
         }
     }
 }

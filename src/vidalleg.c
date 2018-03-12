@@ -109,7 +109,16 @@ void video_set_window_size(void)
             winsizey = BORDER_FULL_Y_SIZE * 2;
     }
 }
-    
+
+void video_update_window_size(ALLEGRO_EVENT *event)
+{
+    scr_x_start = 0;
+    scr_x_size = winsizex = event->display.width;
+    scr_y_start = 0;
+    scr_y_size = winsizey = event->display.height;
+    al_acknowledge_resize(event->display.source);
+}
+
 void video_leavefullscreen()
 {
     al_set_display_flag(al_get_current_display(), ALLEGRO_FULLSCREEN_WINDOW, false);
@@ -240,6 +249,7 @@ void video_doblit()
             fskipcount = 0;
             if (vid_scanlines) {
                 al_set_target_bitmap(b16x);
+                al_clear_to_color(al_map_rgb(0, 0,0));
                 for (c = firsty; c < lasty; c++)
                     al_draw_bitmap_region(b, firstx, c, lastx - firstx, 1, 0, c << 1, 0);
                 upscale_only(b16x, 0, firsty << 1, lastx - firstx, (lasty - firsty) << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
