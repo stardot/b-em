@@ -79,7 +79,7 @@ static ALLEGRO_MENU *create_disc_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
 
-    al_append_menu_item(menu, "Autoboo disc in 0/2...", IDM_DISC_AUTOBOOT, 0, NULL, NULL);
+    al_append_menu_item(menu, "Autoboot disc in 0/2...", IDM_DISC_AUTOBOOT, 0, NULL, NULL);
     al_append_menu_item(menu, "Load disc :0/2...", menu_id_num(IDM_DISC_LOAD, 0), 0, NULL, NULL);
     al_append_menu_item(menu, "Load disc :1/3...", menu_id_num(IDM_DISC_LOAD, 1), 0, NULL, NULL);
     al_append_menu_item(menu, "Eject disc :0/2", menu_id_num(IDM_DISC_EJECT, 0), 0, NULL, NULL);

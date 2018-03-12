@@ -39,8 +39,6 @@ void setejecttext(int drive, const char *fn);
 
 extern int joybutton[2];
 
-extern int bempause;
-
 void setquit();
 
 #ifdef WIN32

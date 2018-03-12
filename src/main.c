@@ -80,6 +80,8 @@ static ALLEGRO_EVENT_SOURCE evsrc;
 
 static double time_limit;
 static int fcount = 0;
+static bool fullspeed = false;
+static bool bempause  = false;
 
 const emu_speed_t emu_speeds[NUM_EMU_SPEEDS] = {
     {  "10%", 1.0 / (50.0 * 0.10) },
@@ -377,6 +379,16 @@ void main_cleardrawit()
                 }
 #endif
 
+static void main_start_fullspeed(void)
+{
+    ALLEGRO_EVENT event;
+
+    al_stop_timer(timer);
+    fullspeed = true;
+    event.type = ALLEGRO_EVENT_TIMER;
+    al_emit_user_event(&evsrc, &event, NULL);
+}
+    
 static void main_key_down(ALLEGRO_EVENT *event)
 {
     switch(event->keyboard.keycode) {
@@ -395,6 +407,36 @@ static void main_key_down(ALLEGRO_EVENT *event)
             if (curtube != -1)
                 tubes[curtube].reset();
             tube_reset();
+            break;
+        case ALLEGRO_KEY_PGUP:
+            if (!fullspeed)
+                main_start_fullspeed();
+            break;
+        case ALLEGRO_KEY_PGDN:
+            if (bempause) {
+                if (emuspeed != EMU_SPEED_PAUSED) {
+                    bempause = false;
+                    if (emuspeed != EMU_SPEED_FULL)
+                        al_start_timer(timer);
+                }
+            } else {
+                al_stop_timer(timer);
+                bempause = true;
+            }
+            break;
+    }
+}
+
+static void main_key_up(ALLEGRO_EVENT *event)
+{
+    switch(event->keyboard.keycode) {
+        case ALLEGRO_KEY_PGUP:
+            if (emuspeed != EMU_SPEED_FULL) {
+                fullspeed = false;
+                if (emuspeed != EMU_SPEED_PAUSED)
+                    al_start_timer(timer);
+            }
+            break;
     }
 }
 
@@ -418,11 +460,8 @@ static void main_timer(ALLEGRO_EVENT *event)
             savestate_doload();
         if (savestate_wantsave)
             savestate_dosave();
-        if (emuspeed == EMU_SPEED_FULL) {
-            // Simulate another timer event immediately after this one.
-            event->type = ALLEGRO_EVENT_TIMER;
+        if (fullspeed)
             al_emit_user_event(&evsrc, event, NULL);
-        }
     }
 }
 
@@ -447,6 +486,7 @@ void main_run()
             case ALLEGRO_EVENT_KEY_UP:
                 log_debug("main: key up, code=%d", event.keyboard.keycode);
                 key_up(&event);
+                main_key_up(&event);
                 break;
             case ALLEGRO_EVENT_MOUSE_AXES:
                 mouse_axes(&event);
@@ -510,15 +550,20 @@ void main_close()
 void main_setspeed(int speed)
 {
     log_debug("main: setspeed %d", speed);
-    al_stop_timer(timer);
-    if (speed != EMU_SPEED_FULL && speed != EMU_SPEED_PAUSED) {
-        if (speed >= NUM_EMU_SPEEDS) {
-            log_warn("main: speed #%d out of range, defaulting to 100%%", speed);
-            speed = 4;
+    if (speed == EMU_SPEED_FULL)
+        main_start_fullspeed();
+    else {
+        al_stop_timer(timer);
+        fullspeed = false;
+        if (speed != EMU_SPEED_PAUSED) {
+            if (speed >= NUM_EMU_SPEEDS) {
+                log_warn("main: speed #%d out of range, defaulting to 100%%", speed);
+                speed = 4;
+            }
+            al_set_timer_speed(timer, emu_speeds[speed].timer_interval);
+            time_limit = emu_speeds[speed].timer_interval * 2.0;
+            al_start_timer(timer);
         }
-        al_set_timer_speed(timer, emu_speeds[speed].timer_interval);
-        time_limit = emu_speeds[speed].timer_interval * 2.0;
-        al_start_timer(timer);
     }
     emuspeed = speed;
 }
