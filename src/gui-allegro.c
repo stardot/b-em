@@ -71,6 +71,7 @@ static ALLEGRO_MENU *create_file_menu(void)
     al_append_menu_item(menu, "Hard Reset", IDM_FILE_RESET, 0, NULL, NULL);
     al_append_menu_item(menu, "Load state...", IDM_FILE_LOAD_STATE, 0, NULL, NULL);
     al_append_menu_item(menu, "Save State...", IDM_FILE_SAVE_STATE, 0, NULL, NULL);
+    al_append_menu_item(menu, "Save Screenshot...", IDM_FILE_SCREEN_SHOT, 0, NULL, NULL);
     al_append_menu_item(menu, "Exit", IDM_FILE_EXIT, 0, NULL, NULL);
     return menu;
 }
@@ -392,7 +393,7 @@ static void file_save_state(ALLEGRO_EVENT *event)
     ALLEGRO_DISPLAY *display;
 
     if (curtube == -1) {
-        if ((chooser = al_create_native_file_dialog(savestate_name, "Save state from file", "*.snp", ALLEGRO_FILECHOOSER_SAVE))) {
+        if ((chooser = al_create_native_file_dialog(savestate_name, "Save state to file", "*.snp", ALLEGRO_FILECHOOSER_SAVE))) {
             display = (ALLEGRO_DISPLAY *)(event->user.data2);
             if (al_show_native_file_dialog(display, chooser)) {
                 if (al_get_native_file_dialog_count(chooser) > 0) {
@@ -404,6 +405,23 @@ static void file_save_state(ALLEGRO_EVENT *event)
         }
     } else
         log_error("Second processor save states not supported yet.");
+}
+
+static void file_save_scrshot(ALLEGRO_EVENT *event)
+{
+    ALLEGRO_FILECHOOSER *chooser;
+    ALLEGRO_DISPLAY *display;
+
+    if ((chooser = al_create_native_file_dialog(savestate_name, "Save screenshot to file", "*.bmp;*.pcx;*.tga;*.png;*.jpg", ALLEGRO_FILECHOOSER_SAVE))) {
+        display = (ALLEGRO_DISPLAY *)(event->user.data2);
+        if (al_show_native_file_dialog(display, chooser)) {
+            if (al_get_native_file_dialog_count(chooser) > 0) {
+                strncpy(vid_scrshotname, al_get_native_file_dialog_path(chooser, 0), sizeof vid_scrshotname);
+                vid_savescrshot = 2;
+            }
+        }
+        al_destroy_native_file_dialog(chooser);
+    }
 }
 
 static bool disc_choose(ALLEGRO_EVENT *event, const char *opname, void (*callback)(int drive, ALLEGRO_PATH *fn), int flags)
@@ -700,6 +718,9 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             break;
         case IDM_FILE_SAVE_STATE:
             file_save_state(event);
+            break;
+        case IDM_FILE_SCREEN_SHOT:
+            file_save_scrshot(event);
             break;
         case IDM_FILE_EXIT:
             quitting = true;

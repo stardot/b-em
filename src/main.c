@@ -8,6 +8,7 @@
 #include "b-em.h"
 #include <allegro5/allegro_audio.h>
 #include <allegro5/allegro_acodec.h>
+#include <allegro5/allegro_image.h>
 #include <allegro5/allegro_native_dialog.h>
 
 #include "6502.h"
@@ -247,6 +248,7 @@ void main_init(int argc, char *argv[])
 
         display = video_init();
         mode7_makechars();
+        al_init_image_addon();
 
         mem_init();
 
