@@ -1,17 +1,17 @@
 #ifndef __INC_TUBE_H
 #define __INC_TUBE_H
 
-void tube_reset();
-void tube_6502_init();
-void tube_arm_init();
-void tube_z80_init();
-void tube_x86_init();
-void tube_65816_init();
-void tube_32016_init();
+void tube_reset(void);
+void tube_6502_init(void);
+void tube_arm_init(void);
+void tube_z80_init(void);
+void tube_x86_init(void);
+void tube_65816_init(void);
+void tube_32016_init(void);
 
 uint8_t (*tube_readmem)(uint32_t addr);
 void (*tube_writemem)(uint32_t addr, uint8_t byte);
-void (*tube_exec)();
+void (*tube_exec)(void);
 extern int tubecycles;
 
 uint8_t tube_host_read(uint16_t addr);
@@ -24,7 +24,7 @@ extern int tube_6502_speed;
 
 extern int tube_irq;
 
-void tube_reset();
-void tube_updatespeed();
+void tube_reset(void);
+void tube_updatespeed(void);
 
 #endif

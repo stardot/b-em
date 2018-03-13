@@ -14,8 +14,8 @@ typedef struct VIA
         int      intnum;
         int      sr_count;
         
-        uint8_t  (*read_portA)();
-        uint8_t  (*read_portB)();
+        uint8_t  (*read_portA)(void);
+        uint8_t  (*read_portB)(void);
         void     (*write_portA)(uint8_t val);
         void     (*write_portB)(uint8_t val);
         

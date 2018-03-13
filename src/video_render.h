@@ -40,16 +40,16 @@ extern int videoresize;
 extern int vid_savescrshot;
 extern char vid_scrshotname[260];
 
-void video_doblit();
-void video_enterfullscreen();
-void video_leavefullscreen();
+void video_doblit(void);
+void video_enterfullscreen(void);
+void video_leavefullscreen(void);
 void video_toggle_fullscreen(void);
-void video_clearscreen();
+void video_clearscreen(void);
 void video_set_window_size(void);
 void video_update_window_size(ALLEGRO_EVENT *event);
 
-void video_close();
+void video_close(void);
 
-void clearscreen();
+void clearscreen(void);
 
 #endif

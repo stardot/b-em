@@ -188,7 +188,7 @@ void mem_romsetup_swram(void) {
     fill_swram();
 }
 
-void mem_romsetup_bp128(const char *rest) {
+void mem_romsetup_bp128(void) {
     const char *sect = models[curmodel].cfgsect;
     int slot;
 

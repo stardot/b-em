@@ -9,8 +9,8 @@ extern int keyas;
 extern void key_down(ALLEGRO_EVENT *event);
 extern void key_up(ALLEGRO_EVENT *event);
 
-extern void key_clear();
-extern void key_check();
+extern void key_clear(void);
+extern void key_check(void);
 extern void key_scan(int row, int col);
 extern int key_is_down(void);
 

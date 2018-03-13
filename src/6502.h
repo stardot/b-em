@@ -16,10 +16,10 @@ extern int nmi;
 
 extern uint8_t opcode;
 
-void m6502_reset();
-void m6502_exec();
-void m65c02_exec();
-void dumpregs();
+void m6502_reset(void);
+void m6502_exec(void);
+void m65c02_exec(void);
+void dumpregs(void);
 
 uint8_t readmem(uint16_t addr);
 void writemem(uint16_t addr, uint8_t val);

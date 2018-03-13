@@ -13,10 +13,10 @@
 //void dumparmregs();
 //int databort;
 
-void arm_init();
-void arm_reset();
-void arm_exec();
-void arm_close();
+void arm_init(void);
+void arm_reset(void);
+void arm_exec(void);
+void arm_close(void);
 uint8_t readarmb(uint32_t addr);
 void writearmb(uint32_t addr, uint8_t val);
 

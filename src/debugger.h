@@ -1,9 +1,9 @@
 #ifndef __INC_DEBUGGER_H
 #define __INC_DEBUGGER_H
 
-extern void debug_start();
-extern void debug_kill();
-extern void debug_end();
+extern void debug_start(void);
+extern void debug_kill(void);
+extern void debug_end(void);
 extern void debug_toggle_core(void);
 extern void debug_toggle_tube(void);
 

@@ -43,25 +43,25 @@ void setquit();
 
 #ifdef WIN32
 
-void startblit();
-void endblit();
+void startblit(void);
+void endblit(void);
 
 void cataddname(char *s);
-void showcatalogue();
+void showcatalogue(void);
 
 #else
 
 static inline void startblit(void) {};
 static inline void endblit(void) {};
 static inline void cataddname(char *s) {};
-static inline void showcatalogue() {};
+static inline void showcatalogue(void) {};
 
 #endif
 
 extern int autoboot;
 
 
-void redefinekeys();
+void redefinekeys(void);
 
 void changetimerspeed(int i);
 

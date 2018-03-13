@@ -1,7 +1,7 @@
 #ifndef __INC_SN74689_H
 #define __INC_SN74689_H
 
-void sn_init();
+void sn_init(void);
 void sn_fillbuf(int16_t *buffer, int len);
 void sn_write(uint8_t data);
 void sn_savestate(FILE *f);

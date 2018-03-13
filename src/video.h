@@ -4,10 +4,10 @@
 #define CLOCKS_PER_FRAME 80000
 
 /*CRTC (6845)*/
-void    crtc_reset();
+void    crtc_reset(void);
 void    crtc_write(uint16_t addr, uint8_t val);
 uint8_t crtc_read(uint16_t addr);
-void    crtc_latchpen();
+void    crtc_latchpen(void);
 void    crtc_savestate(FILE *f);
 void    crtc_loadstate(FILE *f);
 
@@ -44,7 +44,7 @@ void video_loadstate(FILE *f);
 
 extern uint16_t vidbank;
 
-void mode7_makechars();
+void mode7_makechars(void);
 extern int interlline;
 
 #endif

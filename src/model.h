@@ -4,9 +4,9 @@
 #include "cpu_debug.h"
 
 void model_check(void);
-void model_init();
+void model_init(void);
 void model_save(ALLEGRO_CONFIG *bem_cfg);
-char *model_get();
+char *model_get(void);
 
 typedef struct
 {
@@ -23,7 +23,7 @@ typedef struct
         char basic[16];
         char dfs[16];
         char cmos[16];
-        void (*romsetup)();
+        void (*romsetup)(void);
         int tube;
 } MODEL;
 
@@ -33,8 +33,8 @@ extern MODEL models[NUM_MODELS];
 typedef struct
 {
         char name[32];
-        void (*init)();
-        void (*reset)();
+        void (*init)(void);
+        void (*reset)(void);
         cpu_debug_t *debug;
 } TUBE;
 
