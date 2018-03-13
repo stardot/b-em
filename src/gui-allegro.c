@@ -670,17 +670,6 @@ static void set_video_interlaced(ALLEGRO_EVENT *event)
     al_set_menu_item_flags(menu, IDM_VIDEO_SCANLINES, ALLEGRO_MENU_ITEM_CHECKBOX);
 }
 
-static void toggle_video_fullscreen(void)
-{
-    if (fullscreen) {
-        fullscreen = 0;
-        video_leavefullscreen();
-    } else {
-        fullscreen = 1;
-        video_enterfullscreen();
-    }
-}
-
 static void set_sid_type(ALLEGRO_EVENT *event)
 {
     cursid = radio_event_simple(event, cursid);
@@ -788,7 +777,7 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             vid_fullborders = radio_event_simple(event, vid_fullborders);
             break;
         case IDM_VIDEO_FULLSCR:
-            toggle_video_fullscreen();
+            video_toggle_fullscreen();
             break;
         case IDM_SOUND_INTERNAL:
             sound_internal = !sound_internal;

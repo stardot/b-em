@@ -391,9 +391,18 @@ static void main_start_fullspeed(void)
     al_emit_user_event(&evsrc, &event, NULL);
 }
     
-static void main_key_down(ALLEGRO_EVENT *event)
+static bool main_key_down(ALLEGRO_EVENT *event)
 {
+    ALLEGRO_KEYBOARD_STATE kstate;
+
     switch(event->keyboard.keycode) {
+        case ALLEGRO_KEY_ENTER:
+            al_get_keyboard_state(&kstate);
+            if (al_key_down(&kstate, ALLEGRO_KEY_ALT)) {
+                video_toggle_fullscreen();
+                return false;
+            }
+            break;
         case ALLEGRO_KEY_F10:
             if (debug_core || debug_tube)
                 debug_step = 1;
@@ -427,9 +436,10 @@ static void main_key_down(ALLEGRO_EVENT *event)
             }
             break;
     }
+    return true;
 }
 
-static void main_key_up(ALLEGRO_EVENT *event)
+static bool main_key_up(ALLEGRO_EVENT *event)
 {
     switch(event->keyboard.keycode) {
         case ALLEGRO_KEY_PGUP:
@@ -440,6 +450,7 @@ static void main_key_up(ALLEGRO_EVENT *event)
             }
             break;
     }
+    return true;
 }
 
 static void main_timer(ALLEGRO_EVENT *event)
@@ -482,13 +493,15 @@ void main_run()
         switch(event.type) {
             case ALLEGRO_EVENT_KEY_DOWN:
                 log_debug("main: key down, code=%d", event.keyboard.keycode);
-                key_down(&event);
-                main_key_down(&event);
+                // main_key_down returns true if OK to pass to emulated BBC keyboard.
+                if (main_key_down(&event))
+                    key_down(&event);
                 break;
             case ALLEGRO_EVENT_KEY_UP:
                 log_debug("main: key up, code=%d", event.keyboard.keycode);
-                key_up(&event);
-                main_key_up(&event);
+                // main_key_up returns true if OK to pass to emulated BBC keyboard.
+                if (main_key_up(&event))
+                    key_up(&event);
                 break;
             case ALLEGRO_EVENT_MOUSE_AXES:
                 mouse_axes(&event);
