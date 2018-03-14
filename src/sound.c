@@ -92,9 +92,40 @@ void sound_poll(void)
     }
 }
 
+static ALLEGRO_VOICE *sound_create_voice(void)
+{
+    ALLEGRO_VOICE *voice;
+
+    if ((voice = al_create_voice(FREQ_SO, ALLEGRO_AUDIO_DEPTH_FLOAT32, ALLEGRO_CHANNEL_CONF_1))) {
+        log_debug("sound: created voice with standard sound freq, float depth");
+        return voice;
+    }
+    if ((voice = al_create_voice(FREQ_SO, ALLEGRO_AUDIO_DEPTH_INT24, ALLEGRO_CHANNEL_CONF_1))) {
+        log_debug("sound: created voice with standard sound freq, 24bit depth");
+        return voice;
+    }
+    if ((voice = al_create_voice(FREQ_SO, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_1))) {
+        log_debug("sound: created voice with standard sound freq, 16bit depth");
+        return voice;
+    }
+    if ((voice = al_create_voice(FREQ_DD, ALLEGRO_AUDIO_DEPTH_FLOAT32, ALLEGRO_CHANNEL_CONF_1))) {
+        log_debug("sound: created voice with ddnoise freq, float depth");
+        return voice;
+    }
+    if ((voice = al_create_voice(FREQ_DD, ALLEGRO_AUDIO_DEPTH_INT24, ALLEGRO_CHANNEL_CONF_1))) {
+        log_debug("sound: created voice with ddnoise freq, 24bit depth");
+        return voice;
+    }
+    if ((voice = al_create_voice(FREQ_DD, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_1))) {
+        log_debug("sound: created voice with ddnoise freq, 16bit depth");
+        return voice;
+    }
+    return NULL;
+}
+
 void sound_init(void)
 {
-    if ((voice = al_create_voice(FREQ_SO, ALLEGRO_AUDIO_DEPTH_FLOAT32, ALLEGRO_CHANNEL_CONF_1))) {
+    if ((voice = sound_create_voice())) {
         if ((mixer = al_create_mixer(FREQ_SO, ALLEGRO_AUDIO_DEPTH_FLOAT32, ALLEGRO_CHANNEL_CONF_1))) {
             if (al_attach_mixer_to_voice(mixer, voice)) {
                 if ((stream = al_create_audio_stream(4, BUFLEN_SO, FREQ_SO, ALLEGRO_AUDIO_DEPTH_FLOAT32, ALLEGRO_CHANNEL_CONF_1))) {
