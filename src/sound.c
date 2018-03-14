@@ -62,45 +62,33 @@ void sound_poll(void)
     float *buf;
     int c;
 
-#if 0
-        if (sound_music5000) {
-                // every 64us Music 5000 must provide 3 stereo samples (46.875KHz)
-                music5000_fillbuf( m5_buffer + m5_pos, 3);
-                // skip forward 3 stereo samples
-                m5_pos += 6;
-                // buflen_m5 is in units of samples, not integers
-                if ((m5_pos >> 1) == buflen_m5)
-                {
-                        m5_pos = 0;
-                        al_givebufferm5(m5_buffer);
-                }
+    if (stream) {
+        if (sound_beebsid)
+            sid_fillbuf(sound_buffer + sound_pos, 2);
+        if (sound_internal)
+            sn_fillbuf(sound_buffer + sound_pos, 2);
+        if (sound_dac) {
+            sound_buffer[sound_pos]     += (((int)lpt_dac - 0x80) * 32);
+            sound_buffer[sound_pos + 1] += (((int)lpt_dac - 0x80) * 32);
         }
-#endif
-    if (sound_beebsid)
-        sid_fillbuf(sound_buffer + sound_pos, 2);
-    if (sound_internal)
-        sn_fillbuf(sound_buffer + sound_pos, 2);
-    if (sound_dac) {
-        sound_buffer[sound_pos]     += (((int)lpt_dac - 0x80) * 32);
-        sound_buffer[sound_pos + 1] += (((int)lpt_dac - 0x80) * 32);
-    }
 
-    // skip forward 2 mono samples
-    sound_pos += 2;
-    if (sound_pos == BUFLEN_SO) {
-        if ((buf = al_get_audio_stream_fragment(stream))) {
-            if (sound_filter) {
-                for (c = 0; c < BUFLEN_SO; c++)
-                    buf[c] = iir((float)sound_buffer[c] / 32767.0);
-            } else {
-                for (c = 0; c < BUFLEN_SO; c++)
-                    buf[c] = (float)sound_buffer[c] / 32767.0;
-            }
-            al_set_audio_stream_fragment(stream, buf);
-        } else
-            log_debug("sound: overrun");
-        sound_pos = 0;
-        memset(sound_buffer, 0, sizeof(sound_buffer));
+        // skip forward 2 mono samples
+        sound_pos += 2;
+        if (sound_pos == BUFLEN_SO) {
+            if ((buf = al_get_audio_stream_fragment(stream))) {
+                if (sound_filter) {
+                    for (c = 0; c < BUFLEN_SO; c++)
+                        buf[c] = iir((float)sound_buffer[c] / 32767.0);
+                } else {
+                    for (c = 0; c < BUFLEN_SO; c++)
+                        buf[c] = (float)sound_buffer[c] / 32767.0;
+                }
+                al_set_audio_stream_fragment(stream, buf);
+            } else
+                log_debug("sound: overrun");
+            sound_pos = 0;
+            memset(sound_buffer, 0, sizeof(sound_buffer));
+        }
     }
 }
 
