@@ -303,7 +303,6 @@ void uef_findfilenames()
         uef_chunkpos = 0; uef_chunkdatabits = 8; uef_intone = 0;
         uef_chunkf   = 0;
         
-        startblit();
         temp=gztell(uef_f);
         gzseek(uef_f, 12, SEEK_SET);
         uefloop = 0;
@@ -394,6 +393,5 @@ void uef_findfilenames()
         fdat = bdat;
         ffound = bffound;
         uef_intone = bintone;
-        endblit();
 }
 

@@ -316,15 +316,12 @@ void main_init(int argc, char *argv[])
         if (defaultwriteprot)
             writeprot[0] = writeprot[1] = 1;
 
-        endblit();
-
         debug_start();
 }
 
 void main_restart()
 {
     main_pause();
-        startblit();
         if (curtube == 3 || mouse_amx)
             al_uninstall_mouse();
         cmos_save(models[oldmodel]);
@@ -336,7 +333,6 @@ void main_restart()
 
         if (curtube == 3 || mouse_amx)
             al_install_mouse();
-        endblit();
     main_resume();
 }
 
@@ -480,9 +476,7 @@ void main_run()
 
     log_debug("main: entering main loop");
     while (!quitting) {
-        //log_debug("main: waiting for event");
         al_wait_for_event(queue, &event);
-        //log_debug("main: event received");
         switch(event.type) {
             case ALLEGRO_EVENT_KEY_DOWN:
                 log_debug("main: key down, code=%d", event.keyboard.keycode);
@@ -497,33 +491,37 @@ void main_run()
                     key_up(&event);
                 break;
             case ALLEGRO_EVENT_MOUSE_AXES:
-                mouse_axes(&event);
+	        mouse_axes(&event);
                 break;
             case ALLEGRO_EVENT_MOUSE_BUTTON_DOWN:
-                mouse_btn_down(&event);
+	        log_debug("main: mouse button down");
+	        mouse_btn_down(&event);
                 break;
             case ALLEGRO_EVENT_MOUSE_BUTTON_UP:
+                log_debug("main: mouse button up");
                 mouse_btn_up(&event);
                 break;
             case ALLEGRO_EVENT_DISPLAY_CLOSE:
+	        log_debug("main: event display close - quitting");
                 quitting = true;
                 break;
             case ALLEGRO_EVENT_TIMER:
                 main_timer(&event);
                 break;
             case ALLEGRO_EVENT_MENU_CLICK:
-                main_pause();
+	        main_pause();
                 gui_allegro_event(&event);
                 main_resume();
                 break;
             case ALLEGRO_EVENT_AUDIO_STREAM_FRAGMENT:
-                music5000_streamfrag();
+	        music5000_streamfrag();
                 break;
             case ALLEGRO_EVENT_DISPLAY_RESIZE:
                 video_update_window_size(&event);
                 break;
         }
     }
+    log_debug("main: end loop");
 }
                 
 void main_close()

@@ -55,20 +55,6 @@ void setquit()
 
 HINSTANCE hinstance;
 
-CRITICAL_SECTION cs;
-
-void startblit()
-{
-//        log_debug("startblit\n");
-        EnterCriticalSection(&cs);
-}
-
-void endblit()
-{
-//        log_debug("endblit\n");
-        LeaveCriticalSection(&cs);
-}
-
 static BOOL win_file_exists(const char *szPath) {
     DWORD dwAttrib = GetFileAttributes(szPath);
 
@@ -93,6 +79,7 @@ int find_cfg_file(char *path, size_t psize, const char *name, const char *ext) {
 int find_cfg_dest(char *path, size_t psize, const char *name, const char *ext) {
     ALLEGRO_PATH *setpath = al_get_standard_path(ALLEGRO_USER_SETTINGS_PATH);
     const char *cpath = al_path_cstr(setpath, ALLEGRO_NATIVE_PATH_SEP);
+    CreateDirectory(cpath, NULL);
     snprintf(path, psize, "%s/%s.%s", cpath, name, ext);
     return 0;
 }
@@ -102,7 +89,6 @@ static char openfilestring[MAX_PATH];
 int getfile(HWND hwnd, char *f, char *fn)
 {
         OPENFILENAME ofn;       // common dialog box structure
-        EnterCriticalSection(&cs);
 
         // Initialize OPENFILENAME
         ZeroMemory(&ofn, sizeof(ofn));
@@ -127,11 +113,9 @@ int getfile(HWND hwnd, char *f, char *fn)
 
         if (GetOpenFileName(&ofn))
         {
-                LeaveCriticalSection(&cs);
                 strcpy(fn, openfilestring);
                 return 0;
         }
-        LeaveCriticalSection(&cs);
         return 1;
 }
 extern unsigned char hw_to_mycode[256];

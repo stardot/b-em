@@ -167,8 +167,6 @@ void video_doblit()
     int c;
     ALLEGRO_COLOR black;
 
-    startblit();
-
     if (vid_savescrshot) {
         vid_savescrshot--;
         if (!vid_savescrshot) {
@@ -267,5 +265,4 @@ void video_doblit()
     }
     firstx = firsty = 65535;
     lastx  = lasty  = 0;
-    endblit();
 }

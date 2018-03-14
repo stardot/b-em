@@ -41,9 +41,6 @@ void setquit();
 
 #include <windows.h>
 
-void startblit(void);
-void endblit(void);
-
 void cataddname(char *s);
 void showcatalogue(HINSTANCE hInstance, HWND hWnd);
 

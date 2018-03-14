@@ -50,9 +50,7 @@ static inline void debug_in(char *buf, size_t bufsize)
 
 static void debug_out(const char *s, size_t len)
 {
-    startblit();
     WriteConsole(consf, s, len, NULL, NULL);
-    endblit();
 }
 
 static void debug_outf(const char *fmt, ...)
@@ -64,9 +62,7 @@ static void debug_outf(const char *fmt, ...)
     va_start(ap, fmt);
     len = vsnprintf(s, sizeof s, fmt, ap);
     va_end(ap);
-    startblit();
     WriteConsole(consf, s, len, NULL, NULL);
-    endblit();
 }
 
 static HANDLE debugthread;
