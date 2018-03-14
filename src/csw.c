@@ -185,7 +185,6 @@ void csw_findfilenames()
         uint8_t status;
         int skip;
         if (!csw_dat) return;
-        startblit();
         temp    = csw_point;
         temps   = csw_indat;
         tempi   = csw_intone;
@@ -281,6 +280,5 @@ void csw_findfilenames()
         sysacia_tapespeed = tempspd;
         csw_point   = temp;
         csw_loop = 0;
-        endblit();
 }
 
