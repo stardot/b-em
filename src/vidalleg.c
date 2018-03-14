@@ -23,6 +23,7 @@ static ALLEGRO_BITMAP *scrshotb, *scrshotb2;
 
 int vid_clear = 0;
 
+int winsizex, winsizey;
 int scr_x_start, scr_x_size, scr_y_start, scr_y_size;
 
 void video_clearscreen()

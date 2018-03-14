@@ -556,7 +556,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 
             case 'q':
             case 'Q':
-                setquit();
+                main_setquit();
                 /* FALLTHOUGH */
 
             case 'c':

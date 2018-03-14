@@ -15,36 +15,7 @@
 #define PATH_MAX 512
 #endif
 
-int winsizex, winsizey;
-int videoresize = 0;
-
-int mousecapture = 0;
-
 void setejecttext(int drive, const char *fn) {};
-
-int windx, windy;
-void updatewindowsize(int x, int y)
-{
-    x=(x+3)&~3; y=(y+3)&~3;
-    if (x<128) x=128;
-    if (y<64)  y=64;
-    if (windx!=x || windy!=y)
-    {
-        ALLEGRO_DISPLAY *display = al_get_current_display();
-        windx=winsizex=x; windy=winsizey=y;
-        al_resize_display(display, x, y);
-        scr_x_start = 0;
-        scr_y_start = 0;
-        scr_x_size = x;
-        scr_y_size = y;
-    }
-}
-
-void setquit()
-{
-    quitting=1;
-}
-//#undef print
 
 static int try_file(char *path, size_t psize, const char *fmt, ...) {
     va_list ap;
@@ -126,61 +97,6 @@ int find_cfg_dest(char *path, size_t psize, const char *name, const char *ext) {
         if (!try_dest(path, psize, name, ext, "%s/.config/b-em", var))
             return 0;
     return 1;
-}
-
-int main(int argc, char *argv[])
-{
-    if (!al_init()) {
-        fputs("Failed to initialise Allegro!\n", stderr);
-        exit(1);
-    }
-    al_init_native_dialog_addon();
-    al_set_new_window_title(VERSION_STR);
-
-    config_load();
-    main_init(argc, argv);
-    main_run();
-#if 0
-        al_get_keyboard_state(&keystate);
-        if (al_key_down(&keystate, ALLEGRO_KEY_ALT) && al_key_down(&keystate, ALLEGRO_KEY_ENTER) && fullscreen && !oldf) {
-            fullscreen = 0;
-            video_leavefullscreen();
-        }
-        else if (al_key_down(&keystate, ALLEGRO_KEY_ALT) && al_key_down(&keystate, ALLEGRO_KEY_ENTER) && !fullscreen && !oldf) {
-            fullscreen = 1;
-            video_enterfullscreen();
-        }
-        oldf = al_key_down(&keystate, ALLEGRO_KEY_ALT) && al_key_down(&keystate, ALLEGRO_KEY_ENTER);
-#endif
-	main_close();
-	return 0;
-}
-
-void log_msgbox(const char *level, char *msg)
-{
-    const int max_len = 80;
-    char *max_ptr, *new_split, *cur_split;
-    ALLEGRO_DISPLAY *display;
-
-    display = al_get_current_display();
-    if (strlen(msg) < max_len)
-        al_show_native_message_box(display, level, msg, "", NULL, 0);
-    else
-    {
-        max_ptr = msg + max_len;
-        cur_split = msg;
-        while ((new_split = strchr(cur_split+1, ' ')) && new_split < max_ptr)
-            cur_split = new_split;
-        
-        if (cur_split > msg)
-        {
-            *cur_split = '\0';
-            al_show_native_message_box(display, level, msg, cur_split+1, NULL, 0);
-            *cur_split = ' ';
-        }
-        else
-            al_show_native_message_box(display, level, msg, "", NULL, 0);
-    }
 }
 
 #endif

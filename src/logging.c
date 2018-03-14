@@ -3,6 +3,7 @@
 #include "b-em.h"
 #include "config.h"
 
+#include <allegro5/allegro_native_dialog.h>
 #include <errno.h>
 #include <stdarg.h>
 #include <time.h>
@@ -41,6 +42,33 @@ static unsigned log_options = 0;
 static FILE *log_fp;
 static char   tmstr[20];
 static time_t last = 0;
+
+static void log_msgbox(const char *level, char *msg)
+{
+    const int max_len = 80;
+    char *max_ptr, *new_split, *cur_split;
+    ALLEGRO_DISPLAY *display;
+
+    display = al_get_current_display();
+    if (strlen(msg) < max_len)
+        al_show_native_message_box(display, level, msg, "", NULL, 0);
+    else
+    {
+        max_ptr = msg + max_len;
+        cur_split = msg;
+        while ((new_split = strchr(cur_split+1, ' ')) && new_split < max_ptr)
+            cur_split = new_split;
+        
+        if (cur_split > msg)
+        {
+            *cur_split = '\0';
+            al_show_native_message_box(display, level, msg, cur_split+1, NULL, 0);
+            *cur_split = ' ';
+        }
+        else
+            al_show_native_message_box(display, level, msg, "", NULL, 0);
+    }
+}
 
 static void log_common(unsigned dest, const char *level, char *msg, size_t len)
 {

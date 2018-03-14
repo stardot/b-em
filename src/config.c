@@ -103,7 +103,6 @@ void config_load(void)
     vid_interlace    = (c == 1) || (c == 5);
     vid_linedbl      = (c == 3);
     vid_pal          = (c == 4) || (c == 5);
-    videoresize      = get_config_int(NULL, "video_resize",  0);
 
     fasttape         = get_config_int(NULL, "fasttape",      0);
 
@@ -182,7 +181,6 @@ void config_save(void)
 
         set_config_int(NULL, "fullborders", vid_fullborders);
         set_config_int(NULL, "displaymode", (vid_pal && vid_interlace) ? 5 : (vid_scanlines ? 2 : (vid_interlace ? 1 : (vid_linedbl ? 3 : (vid_pal ? 4 : 0)))));
-        set_config_int(NULL, "video_resize", videoresize);
 
         set_config_int(NULL, "fasttape", fasttape);
 

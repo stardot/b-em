@@ -26,6 +26,7 @@
 
 #include "b-em.h"
 #include "6502.h"
+#include "main.h"
 #include "mem.h"
 #include "model.h"
 #include "tube.h"
@@ -2161,27 +2162,27 @@ static inline void vdfs_check(void) {
 
 static inline void dispatch(uint8_t value) {
     switch(value) {
-        case 0x00: osfsc();      break;
-        case 0x01: osfind();     break;
-        case 0x02: osgbpb();     break;
-        case 0x03: osbput();     break;
-        case 0x04: osbget();     break;
-        case 0x05: osargs();     break;
-        case 0x06: osfile();     break;
-        case 0x10: cat_prep();   break;
-        case 0x11: close_all();  break;
-        case 0xd0: cmd_srload(); break;
-        case 0xd1: cmd_srwrite();break;
-        case 0xd2: exec_swr_fs();break;
-        case 0xd3: cmd_srsave(); break;
-        case 0xd4: cmd_srread(); break;
-        case 0xd5: back();       break;
-        case 0xd7: cmd_dir();    break;
-        case 0xd8: cmd_lib();    break;
-        case 0xd9: cmd_rescan(); break;
-        case 0xfd: check_ram();  break;
-        case 0xfe: vdfs_check(); break;
-        case 0xff: setquit();    break;
+        case 0x00: osfsc();        break;
+        case 0x01: osfind();       break;
+        case 0x02: osgbpb();       break;
+        case 0x03: osbput();       break;
+        case 0x04: osbget();       break;
+        case 0x05: osargs();       break;
+        case 0x06: osfile();       break;
+        case 0x10: cat_prep();     break;
+        case 0x11: close_all();    break;
+        case 0xd0: cmd_srload();   break;
+        case 0xd1: cmd_srwrite();  break;
+        case 0xd2: exec_swr_fs();  break;
+        case 0xd3: cmd_srsave();   break;
+        case 0xd4: cmd_srread();   break;
+        case 0xd5: back();         break;
+        case 0xd7: cmd_dir();      break;
+        case 0xd8: cmd_lib();      break;
+        case 0xd9: cmd_rescan();   break;
+        case 0xfd: check_ram();    break;
+        case 0xfe: vdfs_check();   break;
+        case 0xff: main_setquit(); break;
         default: log_warn("vdfs: function code %d not recognised\n", value);
     }
 }

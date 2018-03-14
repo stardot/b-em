@@ -126,16 +126,23 @@ void main_reset()
 
 void main_init(int argc, char *argv[])
 {
-        int c;
-        int tapenext = 0, discnext = 0;
-        ALLEGRO_DISPLAY *display;
+    int c;
+    int tapenext = 0, discnext = 0;
+    ALLEGRO_DISPLAY *display;
 
-        startblit();
+    if (!al_init()) {
+        fputs("Failed to initialise Allegro!\n", stderr);
+        exit(1);
+    }
 
-        log_open();
-        log_info("main: starting %s", VERSION_STR);
+    al_init_native_dialog_addon();
+    al_set_new_window_title(VERSION_STR);
 
-        vid_fskipmax = 1;
+    config_load();
+    log_open();
+    log_info("main: starting %s", VERSION_STR);
+
+    vid_fskipmax = 1;
 
         //TODO - do this properly.
         //append_filename(t, exedir, "roms/tube/ReCo6502ROM_816", 511);
@@ -146,14 +153,6 @@ void main_init(int argc, char *argv[])
 
         for (c = 1; c < argc; c++)
         {
-//                log_debug("%i : %s",c,argv[c]);
-/*                if (!strcasecmp(argv[c],"-1770"))
-                {
-                        I8271=0;
-                        WD1770=1;
-                }
-                else*/
-//#ifndef WIN32
                 if (!strcasecmp(argv[c], "--help"))
                 {
                         printf("%s command line options :\n\n", VERSION_STR);
@@ -171,7 +170,6 @@ void main_init(int argc, char *argv[])
                         exit(-1);
                 }
                 else
-//#endif
                 if (!strcasecmp(argv[c], "-tape"))
                 {
                         tapenext = 2;
@@ -598,4 +596,17 @@ void main_resume(void)
 {
     if (emuspeed != EMU_SPEED_PAUSED && emuspeed != EMU_SPEED_FULL)
         al_start_timer(timer);
+}
+
+void main_setquit(void)
+{
+    quitting = 1;
+}
+
+int main(int argc, char **argv)
+{
+    main_init(argc, argv);
+    main_run();
+	main_close();
+	return 0;
 }

@@ -24,6 +24,7 @@ void main_close(void);
 void main_pause(void);
 void main_resume(void);
 void main_setspeed(int speed);
+void main_setquit(void);
 
 void main_cleardrawit(void);
 void main_setmouse(void);
