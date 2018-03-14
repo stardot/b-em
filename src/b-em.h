@@ -33,21 +33,19 @@ extern int find_dat_file(char *path, size_t psize, const char *subdir, const cha
 extern int find_cfg_file(char *path, size_t psize, const char *name, const char *ext);
 extern int find_cfg_dest(char *path, size_t psize, const char *name, const char *ext);
 
-void updatewindowsize(int x, int y);
-
-void setejecttext(int drive, const char *fn);
-
 extern int joybutton[2];
 
 void setquit();
 
 #ifdef WIN32
 
+#include <windows.h>
+
 void startblit(void);
 void endblit(void);
 
 void cataddname(char *s);
-void showcatalogue(void);
+void showcatalogue(HINSTANCE hInstance, HWND hWnd);
 
 #else
 

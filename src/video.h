@@ -36,8 +36,8 @@ extern uint8_t nula_disable;
 extern uint8_t nula_attribute_mode;
 extern uint8_t nula_attribute_text;
 
-ALLEGRO_DISPLAY *video_init();
-void video_reset();
+ALLEGRO_DISPLAY *video_init(void);
+void video_reset(void);
 void video_poll(int clocks, int timer_enable);
 void video_savestate(FILE *f);
 void video_loadstate(FILE *f);

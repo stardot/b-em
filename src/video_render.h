@@ -1,11 +1,7 @@
 #ifndef __INC_VIDEO_RENDER_H
 #define __INC_VIDEO_RENDER_H
 
-/*extern PALETTE pal;*/
-extern ALLEGRO_BITMAP *b, *b16, *b16x, *b32, *tb;
-#ifdef WIN32
-extern BITMAP *vb;
-#endif
+extern ALLEGRO_BITMAP *b, *b16, *b16x, *b32, *tb, *vb;
 
 #define BORDER_NONE_X_START 336
 #define BORDER_NONE_X_SIZE  640

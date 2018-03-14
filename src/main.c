@@ -1,10 +1,6 @@
 /*B-em v2.2 by Tom Walker
   Main loop + start/finish code*/
 
-#ifdef WIN32
-#include <winalleg.h>
-#endif
-
 #include "b-em.h"
 #include <allegro5/allegro_audio.h>
 #include <allegro5/allegro_acodec.h>
@@ -309,10 +305,7 @@ void main_init(int argc, char *argv[])
     }
     al_register_event_source(queue, al_get_keyboard_event_source());
 
-#ifdef WIN32
-                timeBeginPeriod(1);
-#endif
-        oldmodel = curmodel;
+    oldmodel = curmodel;
 
     al_install_mouse();
     al_register_event_source(queue, al_get_mouse_event_source());
@@ -536,10 +529,6 @@ void main_run()
 void main_close()
 {
         debug_kill();
-
-#ifdef WIN32
-        timeEndPeriod(1);
-#endif
 
         config_save();
         cmos_save(models[curmodel]);

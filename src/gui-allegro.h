@@ -84,5 +84,6 @@ typedef enum {
 
 extern void gui_allegro_init(ALLEGRO_EVENT_QUEUE *queue, ALLEGRO_DISPLAY *display);
 extern void gui_allegro_event(ALLEGRO_EVENT *event);
+extern void gui_allegro_set_eject_text(int drive, ALLEGRO_PATH *path);
 
 #endif

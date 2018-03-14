@@ -28,6 +28,8 @@
 
 #define ROM_LABEL_LEN 50
 
+static ALLEGRO_MENU *disc_menu;
+
 static inline int menu_id_num(menu_id_t id, int num)
 {
     return (num << 8) | id;
@@ -94,7 +96,18 @@ static ALLEGRO_MENU *create_disc_menu(void)
     add_checkbox_item(menu, "SCSI hard disc", IDM_DISC_HARD_SCSI, scsi_enabled);
     add_checkbox_item(menu, "VDFS Enabled", IDM_DISC_VDFS_ENABLE, vdfs_enabled);
     al_append_menu_item(menu, "Choose VDFS Root...", IDM_DISC_VDFS_ROOT, 0, NULL, NULL);
+    disc_menu = menu;
     return menu;
+}
+
+void gui_allegro_set_eject_text(int drive, ALLEGRO_PATH *path)
+{
+    char temp[256];
+
+    if (path) {
+        snprintf(temp, sizeof temp, "Eject drive %s: %s", drive ? "1/3" : "0/2", al_get_path_filename(path));
+        al_set_menu_item_caption(disc_menu, menu_id_num(IDM_DISC_LOAD, drive), temp);
+    }
 }
 
 static ALLEGRO_MENU *create_tape_menu(void)

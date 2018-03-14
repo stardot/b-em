@@ -4,7 +4,6 @@
 #include "music2000.h"
 #include "music4000.h"
 
-#include <allegro/config.h>
 #include <windows.h>
 
 static const char *szMusic4000InDevName;

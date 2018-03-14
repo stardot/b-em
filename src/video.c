@@ -699,12 +699,16 @@ ALLEGRO_BITMAP *tvb;
 
 ALLEGRO_LOCKED_REGION *region;
 
-ALLEGRO_DISPLAY *video_init()
+ALLEGRO_DISPLAY *video_init(void)
 {
     int c, d;
     int temp, temp2, left;
 
-    al_set_new_display_flags(ALLEGRO_WINDOWED | ALLEGRO_GTK_TOPLEVEL|ALLEGRO_RESIZABLE);
+#ifdef ALLEGRO_GTK_TOPLEVEL    
+    al_set_new_display_flags(ALLEGRO_WINDOWED | ALLEGRO_GTK_TOPLEVEL | ALLEGRO_RESIZABLE);
+#else
+    al_set_new_display_flags(ALLEGRO_WINDOWED | ALLEGRO_RESIZABLE);
+#endif
     video_set_window_size();
     if ((display = al_create_display(winsizex, winsizey)) == NULL) {
         log_fatal("video: unable to create display");
@@ -715,6 +719,10 @@ ALLEGRO_DISPLAY *video_init()
     b16x = al_create_bitmap(832, 614);
     b16 = al_create_bitmap(832, 614);
     b32 = al_create_bitmap(1536, 800);
+
+#ifdef WIN32
+    vb = al_create_bitmap(924, 614);
+#endif
 
     colblack = 0xff000000;
     colwhite = 0xffffffff;

@@ -2,7 +2,7 @@
   Disc support*/
 
 #include "b-em.h"
-
+#include "gui-allegro.h"
 #include "fdi.h"
 #include "sdf.h"
 
@@ -39,7 +39,6 @@ void disc_load(int drive, ALLEGRO_PATH *fn)
     const char *p;
     const char *cpath;
 
-    setejecttext(drive, "");
     if (!fn)
         return;
     p = al_get_path_extension(fn);
@@ -47,8 +46,8 @@ void disc_load(int drive, ALLEGRO_PATH *fn)
         return;
     if (*p == '.')
         p++;
+    gui_allegro_set_eject_text(drive, fn);
     cpath = al_path_cstr(fn, ALLEGRO_NATIVE_PATH_SEP);
-    setejecttext(drive, cpath);
     if (strcasecmp(p, "fdi") == 0) {
         log_debug("Loading %i: %s as FDI", drive, cpath);
         fdi_load(drive, cpath);
