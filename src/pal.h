@@ -2,6 +2,6 @@
 #define __INC_PAL_H
 
 void pal_init(void);
-void pal_convert(BITMAP *inb, int x1, int y1, int x2, int y2, int yoff);
+void pal_convert(ALLEGRO_BITMAP *inb, int x1, int y1, int x2, int y2, int yoff);
 
 #endif

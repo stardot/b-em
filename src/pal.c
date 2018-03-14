@@ -1,27 +1,19 @@
 #include <math.h>
-#include <allegro.h>
 #include "b-em.h"
 
 #include "pal.h"
 #include "video.h"
 #include "video_render.h"
 
-#define NCoef 1
-fixed vision_iir(fixed NewSample) {
-    static fixed x; //input samples
+#define PAL_FIXED
 
-    x = (x + NewSample) >> 1;
-//    x = NewSample;
+#ifdef PAL_FIXED
 
-    return x;
-}
-
-
-#undef NCoef
 #define NCoef 2
-static inline fixed chroma_iir(fixed NewSample) {
-    static fixed y[NCoef+1]; //output samples
-    static fixed x[NCoef+1]; //input samples
+
+static inline al_fixed chroma_iir(al_fixed NewSample) {
+    static al_fixed y[NCoef+1]; //output samples
+    static al_fixed x[NCoef+1]; //input samples
 
     x[2] = x[1];
     x[1] = x[0];
@@ -31,35 +23,34 @@ static inline fixed chroma_iir(fixed NewSample) {
 
 
     //Calculate the new output
-    y[0]  = fmul(49429, x[0]);
-    y[0] -= fmul(12112, y[1]);
-    y[0] -= fmul(49429, x[2]);
-    y[0] -= fmul(21779, y[2]);
+    y[0]  = al_fixmul(49429, x[0]);
+    y[0] -= al_fixmul(12112, y[1]);
+    y[0] -= al_fixmul(49429, x[2]);
+    y[0] -= al_fixmul(21779, y[2]);
 
     return y[0];
 }
 
-
 //3.609
 #define WT_INC ((4433618.75 / 16000000.0) * (2 * 3.14))
 
-fixed sint[1024], cost[1024];
-fixed sint2[1024], cost2[1024];
-fixed cols[256][4];
+static al_fixed sint[1024], cost[1024];
+static al_fixed sint2[1024], cost2[1024];
+static al_fixed cols[256][4];
 
-fixed colx[256][16];
+static al_fixed colx[256][16];
 
-void pal_init()
+void pal_init(void)
 {
         int c;
         float wt = 0.0;
         int r, g, b;
         for (c = 0; c < 1024; c++)
         {
-                sint[c] = ftofix(sin(wt));
-                cost[c] = ftofix(cos(wt));
-                sint2[c] = fmul(40000, fmul(16622, sint[c]));
-                cost2[c] = fmul(40000, fmul(9339, cost[c]));
+                sint[c] = al_ftofix(sin(wt));
+                cost[c] = al_ftofix(cos(wt));
+                sint2[c] = al_fixmul(40000, al_fixmul(16622, sint[c]));
+                cost2[c] = al_fixmul(40000, al_fixmul(9339, cost[c]));
                 wt += (2.0 * 3.14) / 1024.0;
         }
         for (c = 0; c < 256; c++)
@@ -68,38 +59,39 @@ void pal_init()
                 g = (c & 2) ? 255 : 0;
                 b = (c & 4) ? 255 : 0;
 
-                cols[c][0] = ftofix( 0.299 * r + 0.587 * g + 0.114 * b);
-                cols[c][1] = ftofix(-0.147 * r - 0.289 * g + 0.436 * b);
-                cols[c][2] = ftofix( 0.615 * r - 0.515 * g - 0.100 * b);
+                cols[c][0] = al_ftofix( 0.299 * r + 0.587 * g + 0.114 * b);
+                cols[c][1] = al_ftofix(-0.147 * r - 0.289 * g + 0.436 * b);
+                cols[c][2] = al_ftofix( 0.615 * r - 0.515 * g - 0.100 * b);
 
-                colx[c][0]  = fmul( 19595, c << 16);
-                colx[c][1]  = fmul( 38470, c << 16);
-                colx[c][2]  = fmul(  7471, c << 16);
-                colx[c][4]  = fmul( -9634, c << 16);
-                colx[c][5]  = fmul(-18940, c << 16);
-                colx[c][6]  = fmul( 28574, c << 16);
-                colx[c][8]  = fmul( 40305, c << 16);
-                colx[c][9]  = fmul(-33751, c << 16);
-                colx[c][10] = fmul( -6553, c << 16);
+                colx[c][0]  = al_fixmul( 19595, c << 16);
+                colx[c][1]  = al_fixmul( 38470, c << 16);
+                colx[c][2]  = al_fixmul(  7471, c << 16);
+                colx[c][4]  = al_fixmul( -9634, c << 16);
+                colx[c][5]  = al_fixmul(-18940, c << 16);
+                colx[c][6]  = al_fixmul( 28574, c << 16);
+                colx[c][8]  = al_fixmul( 40305, c << 16);
+                colx[c][9]  = al_fixmul(-33751, c << 16);
+                colx[c][10] = al_fixmul( -6553, c << 16);
         }
 }
 
-void pal_convert(BITMAP *inb, int x1, int y1, int x2, int y2, int yoff)
+void pal_convert(ALLEGRO_BITMAP *inb, int x1, int y1, int x2, int y2, int yoff)
 {
         int x, y;
         int r, g, b;
-        int pixel;
-        fixed Y, U, V;
-        fixed signal;
+        unsigned char red, grn, blu;
+        ALLEGRO_COLOR pixel;
+        al_fixed Y, U, V;
+        al_fixed signal;
         static int wt;
         int old_wt;
         int col;
 
-        fixed u_old[2][1536], v_old[2][1536];
-        fixed u_filt[4], v_filt[4];
-        fixed *uo[2], *vo[2];
+        al_fixed u_old[2][1536], v_old[2][1536];
+        al_fixed u_filt[4], v_filt[4];
+        al_fixed *uo[2], *vo[2];
 
-        fixed sr[1536], sg[1536], sb[1536];
+        al_fixed sr[1536], sg[1536], sb[1536];
 
         int dx1 = (x1 * 922) / 832;
         int dx2 = (x2 * 922) / 832;
@@ -124,6 +116,7 @@ void pal_convert(BITMAP *inb, int x1, int y1, int x2, int y2, int yoff)
 //        log_debug("PAL %i-%i %i-%i\n",x1,x2,dx1,dx2);
 
 
+        al_set_target_bitmap(b32);
         for (y = y1; y < y2; y += yoff)
         {
                 uo[0] = u_old[y&1];
@@ -135,18 +128,20 @@ void pal_convert(BITMAP *inb, int x1, int y1, int x2, int y2, int yoff)
                 for (x = dx1; x < dx2; x++)
                 {
                         //pixel = inb->line[y][sx >> 16];
-                        pixel = getpixel(inb, sx >> 16, y);
+                        pixel = al_get_pixel(inb, sx >> 16, y);
                         col = (0x10000 - (sx & 0xFFFF)) >> 8;
-                        sr[x] = getr32(pixel) * col;
-                        sg[x] = getg32(pixel) * col;
-                        sb[x] = getb32(pixel) * col;
+                        al_unmap_rgb(pixel, &red, &grn, &blu);
+                        sr[x] = al_itofix(red * col);
+                        sg[x] = al_itofix(grn * col);
+                        sb[x] = al_itofix(blu * col);
 
                         //pixel = inb->line[y][(sx >> 16) + 1];
- 				        pixel = getpixel(inb, (sx >> 16) + 1, y);
+ 				        pixel = al_get_pixel(inb, (sx >> 16) + 1, y);
                         col = (sx & 0xFFFF) >> 8;
-                        sr[x] += getr32(pixel) * col;
-                        sg[x] += getg32(pixel) * col;
-                        sb[x] += getb32(pixel) * col;
+                        al_unmap_rgb(pixel, &red, &grn, &blu);
+                        sr[x] += al_itofix(red * col);
+                        sg[x] += al_itofix(grn * col);
+                        sb[x] += al_itofix(blu * col);
 
                         sx += dx;
                 }
@@ -163,10 +158,10 @@ void pal_convert(BITMAP *inb, int x1, int y1, int x2, int y2, int yoff)
                         U = colx[r][4] + colx[g][5] + colx[b][6];
                         V = colx[r][8] + colx[g][9] + colx[b][10];
 
-                        signal = (Y << 1) + chroma_iir(fmul(U, sint[wt]) + fmul(V, cost[wt]));
+                        signal = (Y << 1) + chroma_iir(al_fixmul(U, sint[wt]) + al_fixmul(V, cost[wt]));
 
-                        u_filt[x & 3] = fmul(signal, sint2[wt]);
-                        v_filt[x & 3] = fmul(signal, cost2[wt]);
+                        u_filt[x & 3] = al_fixmul(signal, sint2[wt]);
+                        v_filt[x & 3] = al_fixmul(signal, cost2[wt]);
                         U = u_filt[0] + u_filt[1] + u_filt[2] + u_filt[3];
                         V = v_filt[0] + v_filt[1] + v_filt[2] + v_filt[3];
                         uo[0][x] = U;
@@ -177,12 +172,12 @@ void pal_convert(BITMAP *inb, int x1, int y1, int x2, int y2, int yoff)
                         wt += 256;
                         wt &= 1023;
 
-/*                        r = fixtoi(Y + fmul(9339, V));
-                        g = fixtoi(Y - fmul(3244,U) - fmul(4760, V));
-                        b = fixtoi(Y + fmul(16622,U));*/
-                        r = fixtoi(Y + V);
-                        g = fixtoi(Y - fmul(12790,  U) - fmul(33403, V));
-                        b = fixtoi(Y + U);
+/*                        r = al_fixtoi(Y + al_fixmul(9339, V));
+                        g = al_fixtoi(Y - al_fixmul(3244,U) - al_fixmul(4760, V));
+                        b = al_fixtoi(Y + al_fixmul(16622,U));*/
+                        r = al_fixtoi(Y + V);
+                        g = al_fixtoi(Y - al_fixmul(12790,  U) - al_fixmul(33403, V));
+                        b = al_fixtoi(Y + U);
 
                         if (r > 255) r = 255;
                         if (r < 0)   r = 0;
@@ -191,7 +186,7 @@ void pal_convert(BITMAP *inb, int x1, int y1, int x2, int y2, int yoff)
                         if (b > 255) b = 255;
                         if (b < 0)   b = 0;
 
-                        ((uint32_t *)b32->line[y])[x] = b | (g << 8) | (r << 16);
+                        al_put_pixel(x, y, al_map_rgb(r, b, g));
                 }
 
                 wt = old_wt - c;
@@ -206,18 +201,14 @@ void pal_convert(BITMAP *inb, int x1, int y1, int x2, int y2, int yoff)
         wt &= 1023;
 }
 
+#endif
 
 /*Floating point version. This would be faster than the above, if B-em didn't crash with -O3 -msse*/
 
-#if 0
-#include <allegro.h>
-#include "b-em.h"
-#include "video.h"
+#ifdef PAL_FLOAT
 
-#define NCoef 1
-float vision_iir(float NewSample) {
+static float vision_iir(float NewSample) {
     static float x; //input samples
-    float y;
 
     x = (x + NewSample) * 0.5;
 //    x = NewSample;
@@ -226,8 +217,8 @@ float vision_iir(float NewSample) {
 }
 
 
-#undef NCoef
 #define NCoef 2
+
 static inline float chroma_iir(float NewSample) {
     static float y[NCoef+1]; //output samples
     static float x[NCoef+1]; //input samples
@@ -248,13 +239,12 @@ static inline float chroma_iir(float NewSample) {
     return y[0];
 }
 
-
-
 #define WT_INC ((4433618.75 / 16000000.0) * (2 * 3.14))
 
-float sint[832*2], cost[832*2];
-float cols[256][4];
-void pal_init()
+static float sint[832*2], cost[832*2];
+static float cols[256][4];
+
+void pal_init(void)
 {
         int c;
         float wt = 0.0;
@@ -277,7 +267,7 @@ void pal_init()
         }
 }
 
-void pal_convert(BITMAP *inb, int x1, int y1, int x2, int y2)
+void pal_convert(ALLEGRO_BITMAP *inb, int x1, int y1, int x2, int y2)
 {
         int x, y;
         int r, g, b;
