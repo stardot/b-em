@@ -1,4 +1,5 @@
 #include "b-em.h"
+#include "config.h"
 #include "midi.h"
 #include "sound.h"
 #include "music2000.h"
