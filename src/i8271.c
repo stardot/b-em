@@ -20,8 +20,8 @@ void i8271_headercrcerror();
 void i8271_writeprotect();
 int  i8271_getdata(int last);
 
-int byte;
-int i8271_verify = 0;
+static int bytenum;
+static int i8271_verify = 0;
 
 // Output Port bit definitions in i8271.drvout
 #define SIDESEL   0x20
@@ -357,7 +357,7 @@ void i8271_callback()
                 }
                 i8271.cursector++;
                 disc_writesector(curdrive, i8271.cursector, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, 0);
-                byte = 0;
+                bytenum = 0;
                 i8271.status = 0x8C;
                 i8271.result = 0;
                 i8271_NMI();
@@ -388,7 +388,7 @@ void i8271_callback()
                 }
                 i8271.cursector++;
                 disc_readsector(curdrive, i8271.cursector, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, 0);
-                byte = 0;
+                bytenum = 0;
                 break;
 
                 case 0x1B: /*Read ID*/
@@ -415,7 +415,7 @@ void i8271_callback()
                 }
                 i8271.cursector++;
                 disc_readaddress(curdrive, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, 0);
-                byte = 0;
+                bytenum = 0;
                 break;
 
                 case 0x23: /*Format*/
@@ -470,8 +470,8 @@ void i8271_data(uint8_t dat)
         i8271.status = 0x8C;
         i8271.result = 0;
         i8271_NMI();
-//        printf("%02X : Data %02X\n",byte,dat);
-        byte++;
+//        printf("%02X : Data %02X\n",bytenum,dat);
+        bytenum++;
 }
 
 void i8271_finishread()
@@ -509,8 +509,8 @@ void i8271_headercrcerror()
 
 int i8271_getdata(int last)
 {
-//        printf("Disc get data %i\n",byte);
-        byte++;
+//        printf("Disc get data %i\n",bytenum);
+        bytenum++;
         if (!i8271.written) return -1;
         if (!last)
         {

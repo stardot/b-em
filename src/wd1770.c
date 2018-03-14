@@ -41,7 +41,7 @@ static uint8_t nmi_on_completion[6] = {
     1  // WD1770_WATFORD
 };
 
-int byte;
+static int bytenum;
 
 void wd1770_reset()
 {
@@ -100,7 +100,7 @@ static void begin_read_sector(const char *variant)
     wd1770.status = 0x80 | 0x1;
     wd1770.in_gap = 0;
     disc_readsector(curdrive, wd1770.sector, wd1770.track, wd1770.curside, wd1770.density);
-    byte = 0;
+    bytenum = 0;
 }
 
 static void begin_write_sector(const char *variant)
@@ -108,7 +108,7 @@ static void begin_write_sector(const char *variant)
     log_debug("wd1770: %s write sector drive=%d side=%d track=%d sector=%d dens=%d", variant, curdrive, wd1770.curside, wd1770.track, wd1770.sector, wd1770.density);
     wd1770.status = 0x80 | 0x1;
     disc_writesector(curdrive, wd1770.sector, wd1770.track, wd1770.curside, wd1770.density);
-    byte = 0;
+    bytenum = 0;
     nmi |= 2;
     wd1770.status |= 2;
     //Carlo Concari: wait for first data byte before starting sector write
@@ -193,7 +193,7 @@ static void write_1770(uint16_t addr, uint8_t val)
             log_debug("wd1770: read address side=%d track=%d dens=%d", wd1770.curside, wd1770.track, wd1770.density);
             wd1770.status = 0x80 | 0x1;
             disc_readaddress(curdrive, wd1770.track, wd1770.curside, wd1770.density);
-            byte = 0;
+            bytenum = 0;
             break;
 
         case 0xD: /*Force interrupt*/
