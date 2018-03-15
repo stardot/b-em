@@ -150,7 +150,7 @@ void videoula_write(uint16_t addr, uint8_t val)
                         {
                                 for (c = 0; c < 16; c++)
                                 {
-                                        if ((ula_palbak[c] & 8) && nula_flash[c&7]) ula_pal[c] = nula_collook[ula_palbak[c] & 15];
+                                        if ((ula_palbak[c] & 8) && nula_flash[(ula_palbak[c] & 7) ^ 7]) ula_pal[c] = nula_collook[ula_palbak[c] & 15];
                                         else                 ula_pal[c] = nula_collook[(ula_palbak[c] & 15) ^ 7];
                                 }
                         }
@@ -175,7 +175,7 @@ void videoula_write(uint16_t addr, uint8_t val)
                 c = ula_palbak[val >> 4];
                 ula_palbak[val >> 4] = val & 15;
                 ula_pal[val >> 4] = nula_collook[(val & 15) ^ 7];
-                if ((val & 8) && (ula_ctrl & 1) && nula_flash[val - 8]) ula_pal[val >> 4] = nula_collook[val & 15];
+                if ((val & 8) && (ula_ctrl & 1) && nula_flash[val&7]) ula_pal[val >> 4] = nula_collook[val & 15];
         }
         break;
 
@@ -281,7 +281,7 @@ void videoula_write(uint16_t addr, uint8_t val)
                         for (c = 0; c < 16; c++)
                         {
                                 ula_pal[c] = nula_collook[(ula_palbak[c] & 15) ^ 7];
-                                if ((ula_palbak[c] & 8) && (ula_ctrl & 1) && nula_flash[ula_palbak[c] - 8]) ula_pal[c] = nula_collook[ula_palbak[c] & 15];
+                                if ((ula_palbak[c] & 8) && (ula_ctrl & 1) && nula_flash[(ula_palbak[c] & 7) ^ 7]) ula_pal[c] = nula_collook[ula_palbak[c] & 15];
                         }
                         mode7_need_new_lookup = 1;
                 }
