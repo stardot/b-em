@@ -650,7 +650,7 @@ static int gen_cat_tab(vdfs_ent_t *dir) {
             cat_ptr = new_tab;
             twalk(dir->acorn_tree, tree_visit_cat);
             if ((new_size = cat_ptr - new_tab) != dir->cat_size) {
-	      log_warn("vdfs: catalogue size mismatch for %s (%s), calculated %u, counted %u", dir->acorn_fn, dir->host_path, (unsigned)dir->cat_size, (unsigned)new_size);
+                log_warn("vdfs: catalogue size mismatch for %s (%s), calculated %u, counted %u", dir->acorn_fn, dir->host_path, (unsigned)dir->cat_size, (unsigned)new_size);
                 dir->cat_size = new_size;
             }
             if (dir->cat_tab)
