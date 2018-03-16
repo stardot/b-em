@@ -12,6 +12,8 @@
 #include "model.h"
 #include "6502.h"
 
+#include <allegro5/allegro_primitives.h>
+
 #define NUM_BREAKPOINTS 8
 
 int debug_core = 0;
@@ -283,8 +285,72 @@ void debug_kill()
     close_trace();
 }
 
-static inline void debug_cons_open(void) {}
-static inline void debug_cons_close(void) {}
+static ALLEGRO_THREAD  *mem_thread;
+
+static void *mem_thread_proc(ALLEGRO_THREAD *thread, void *data)
+{
+    ALLEGRO_DISPLAY *mem_disp;
+    ALLEGRO_BITMAP *bitmap;
+    ALLEGRO_LOCKED_REGION *region;
+    int row, col, addr, cnt, red, grn, blu;
+
+    log_debug("debugger: memory view thread started");
+    al_set_new_window_title("B-Em Memory View");
+    if ((mem_disp = al_create_display(256, 256))) {
+        al_set_new_bitmap_flags(ALLEGRO_VIDEO_BITMAP);
+        if ((bitmap = al_create_bitmap(256, 256))) {
+            while (!quitting && !al_get_thread_should_stop(thread)) {
+                al_rest(0.02);
+                al_set_target_bitmap(bitmap);
+                if ((region = al_lock_bitmap(bitmap, ALLEGRO_LOCK_WRITEONLY, ALLEGRO_PIXEL_FORMAT_ANY))) {
+                    addr = 0;
+                    for (row = 0; row < 256; row++) {
+                        for (col = 0; col < 256; col++) {
+                            red = grn = blu = 0;
+                            if ((cnt = writec[addr])) {
+                                red = cnt * 8;
+                                writec[addr] = cnt - 1;
+                            }
+                            if ((cnt = readc[addr])) {
+                                grn = cnt * 8;
+                                readc[addr] = cnt - 1;
+                            }
+                            if ((cnt = fetchc[addr])) {
+                                blu = cnt * 8;
+                                fetchc[addr] = cnt - 1;
+                            }
+                            al_put_pixel(col, row, al_map_rgb(red, grn, blu));
+                            addr++;
+                        }
+                    }
+                    al_unlock_bitmap(bitmap);
+                    al_set_target_backbuffer(mem_disp);
+                    al_draw_bitmap(bitmap, 0.0, 0.0, 0);
+                    al_flip_display();
+                }
+            }
+            al_destroy_bitmap(bitmap);
+        }
+        al_destroy_display(mem_disp);
+    }
+    return NULL;
+}
+
+static void debug_cons_open(void)
+{
+    if ((mem_thread = al_create_thread(mem_thread_proc, NULL))) {
+        log_debug("debugger: memory view thread created");
+        al_start_thread(mem_thread);
+    }
+    else
+        log_error("debugger: failed to create memory view thread");
+}
+
+static inline void debug_cons_close(void)
+{
+    if (mem_thread)
+        al_join_thread(mem_thread, NULL);
+}
 
 #endif
 
