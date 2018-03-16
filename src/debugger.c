@@ -140,13 +140,14 @@ static void debug_outf(const char *fmt, ...)
     WriteConsole(consf, s, len, NULL, NULL);
 }
 
-static HANDLE debugthread;
-static HWND dhwnd;
-static int debugstarted = 0;
-static char DebugszClassName[] = "B-emDebugWnd";
 LRESULT CALLBACK DebugWindowProcedure (HWND, UINT, WPARAM, LPARAM);
 static HINSTANCE hinst;
-static uint8_t *usdat;
+
+BOOL CtrlHandler(DWORD fdwCtrlType)
+{
+    setquit();
+    return TRUE;
+}
 
 static void debug_open(void)
 {
