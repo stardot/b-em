@@ -374,12 +374,13 @@ static void main_start_fullspeed(void)
 {
     ALLEGRO_EVENT event;
 
+    log_debug("main: starting full-speed");
     al_stop_timer(timer);
     fullspeed = true;
     event.type = ALLEGRO_EVENT_TIMER;
     al_emit_user_event(&evsrc, &event, NULL);
 }
-    
+
 static bool main_key_down(ALLEGRO_EVENT *event)
 {
     ALLEGRO_KEYBOARD_STATE kstate;
@@ -430,12 +431,18 @@ static bool main_key_down(ALLEGRO_EVENT *event)
 
 static bool main_key_up(ALLEGRO_EVENT *event)
 {
+    ALLEGRO_KEYBOARD_STATE kstate;
+
     switch(event->keyboard.keycode) {
         case ALLEGRO_KEY_PGUP:
             if (emuspeed != EMU_SPEED_FULL) {
-                fullspeed = false;
-                if (emuspeed != EMU_SPEED_PAUSED)
-                    al_start_timer(timer);
+                al_get_keyboard_state(&kstate);
+                if (!al_key_down(&kstate, ALLEGRO_KEY_LSHIFT) && !al_key_down(&kstate, ALLEGRO_KEY_RSHIFT)) {
+                    log_debug("main: stopping fill-speed");
+                    fullspeed = false;
+                    if (emuspeed != EMU_SPEED_PAUSED)
+                        al_start_timer(timer);
+                }
             }
             break;
     }
@@ -491,30 +498,30 @@ void main_run()
                     key_up(&event);
                 break;
             case ALLEGRO_EVENT_MOUSE_AXES:
-	        mouse_axes(&event);
+            mouse_axes(&event);
                 break;
             case ALLEGRO_EVENT_MOUSE_BUTTON_DOWN:
-	        log_debug("main: mouse button down");
-	        mouse_btn_down(&event);
+            log_debug("main: mouse button down");
+            mouse_btn_down(&event);
                 break;
             case ALLEGRO_EVENT_MOUSE_BUTTON_UP:
                 log_debug("main: mouse button up");
                 mouse_btn_up(&event);
                 break;
             case ALLEGRO_EVENT_DISPLAY_CLOSE:
-	        log_debug("main: event display close - quitting");
+            log_debug("main: event display close - quitting");
                 quitting = true;
                 break;
             case ALLEGRO_EVENT_TIMER:
                 main_timer(&event);
                 break;
             case ALLEGRO_EVENT_MENU_CLICK:
-	        main_pause();
+            main_pause();
                 gui_allegro_event(&event);
                 main_resume();
                 break;
             case ALLEGRO_EVENT_AUDIO_STREAM_FRAGMENT:
-	        music5000_streamfrag();
+            music5000_streamfrag();
                 break;
             case ALLEGRO_EVENT_DISPLAY_RESIZE:
                 video_update_window_size(&event);
@@ -523,7 +530,7 @@ void main_run()
     }
     log_debug("main: end loop");
 }
-                
+
 void main_close()
 {
         debug_kill();
@@ -594,6 +601,6 @@ int main(int argc, char **argv)
 {
     main_init(argc, argv);
     main_run();
-	main_close();
-	return 0;
+    main_close();
+    return 0;
 }
