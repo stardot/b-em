@@ -201,12 +201,14 @@ static void debug_outf(const char *fmt, ...)
 
 static inline void debug_open(void)
 {
-    debug_memview_open();
+    if (debug_cons++ == 0)
+        debug_memview_open();
 }
 
 static inline void debug_close(void)
 {
-    debug_memview_close();
+    if (--debug_cons == 0)
+        debug_memview_close();
 }
 
 #endif
