@@ -73,8 +73,10 @@ void secint()
 }
 
 int bempause = 0;
+int bemfreerun = 0;
 static int bemstep = 0;
 static int old_key_pgdn = 0;
+static int old_key_pgup = 0;
 static int old_key_right = 0;
 static int fcount = 0;
 
@@ -327,13 +329,24 @@ void main_cleardrawit()
 
 void main_run()
 {
-        int c, d;
-        if ((fcount > 0 || key[KEY_PGUP] || (motor && fasttape)))
+    int c, d;
+
+    if (key[KEY_PGUP]) {
+        bemfreerun = 1;
+        old_key_pgup = 1;
+    }
+    else if (old_key_pgup) {
+        old_key_pgup = 0;
+        if (!key[KEY_LSHIFT] && !key[KEY_RSHIFT])
+            bemfreerun = 0;
+    }
+
+        if ((fcount > 0 || bemfreerun || (motor && fasttape)))
         {
                 if (autoboot) autoboot--;
                 fcount--;
                 framesrun++;
-                if (key[KEY_PGUP] || (motor && fasttape)) fcount=0;
+                if (bemfreerun || (motor && fasttape)) fcount=0;
                 if (x65c02) m65c02_exec();
                 else        m6502_exec();
                 ddnoiseframes++;
