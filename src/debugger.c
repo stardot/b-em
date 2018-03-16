@@ -149,11 +149,9 @@ BOOL CtrlHandler(DWORD fdwCtrlType)
     return TRUE;
 }
 
-static void debug_open(void)
+static void debug_cons_open(void)
 {
     int c;
-
-    debug_memview_open();
 
     if (debug_cons++ == 0)
     {
@@ -169,11 +167,10 @@ static void debug_open(void)
     }
 }
 
-static void debug_close(void)
+static void debug_cons_close(void)
 {
     if (--debug_cons == 0)
         FreeConsole();
-    debug_memview_close();
 }
 
 #else
@@ -199,17 +196,9 @@ static void debug_outf(const char *fmt, ...)
     fflush(stdout);
 }
 
-static inline void debug_open(void)
-{
-    if (debug_cons++ == 0)
-        debug_memview_open();
-}
+static inline void debug_cons_open(void) {}
 
-static inline void debug_close(void)
-{
-    if (--debug_cons == 0)
-        debug_memview_close();
-}
+static inline void debug_cons_close(void) {}
 
 #endif
 
@@ -225,12 +214,14 @@ static inline void debug_close(void)
 void debug_kill()
 {
     close_trace();
-    debug_close();
+    debug_memview_close();
+    debug_cons_close();
 }
 
 static void enable_core_debug(void)
 {
-    debug_open();
+    debug_cons_open();
+    debug_memview_open();
     debug_step = 1;
     debug_core = 1;
     log_info("debugger: debugging of core 6502 enabled");
@@ -241,7 +232,7 @@ static void enable_tube_debug(void)
 {
     if (curtube != -1)
     {
-        debug_open();
+        debug_cons_open();
         debug_step = 1;
         debug_tube = 1;
         log_info("debugger: debugging of tube CPU enabled");
@@ -253,8 +244,9 @@ static void disable_core_debug(void)
 {
     core6502_cpu_debug.debug_enable(0);
     log_info("debugger: debugging of core 6502 disabled");
-    debug_close();
     debug_core = 0;
+    debug_memview_close();
+    debug_cons_close();
 }
 
 static void disable_tube_debug(void)
@@ -263,8 +255,8 @@ static void disable_tube_debug(void)
     {
         tubes[curtube].debug->debug_enable(0);
         log_info("debugger: debugging of tube CPU disabled");
-        debug_close();
         debug_tube = 0;
+        debug_cons_close();
     }
 }
 
