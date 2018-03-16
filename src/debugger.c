@@ -43,9 +43,11 @@ static inline void debug_in(char *buf, size_t bufsize)
     int c;
     DWORD len;
 
-    c = ReadConsoleA(cinf, buf, bufsize, &len, NULL);
-    buf[len] = 0;
-    log_debug("read console, c=%d, len=%d, s=%s", c, (int)len, buf);
+    if ((c = ReadConsole(cinf, buf, bufsize, &len, NULL))) {
+        buf[len] = 0;
+        log_debug("debugger: read console, len=%d, s=%s", (int)len, buf);
+    } else
+        log_error("debugger: unable to read from console: %lu", GetLastError());
 }
 
 static void debug_out(const char *s, size_t len)
@@ -203,16 +205,22 @@ BOOL CtrlHandler(DWORD fdwCtrlType)
 
 static void debug_cons_open(void)
 {
+    int c;
+
     if (debug_cons++ == 0)
     {
         hinst = GetModuleHandle(NULL);
         debugthread = (HANDLE)_beginthread(_debugthread, 0, NULL);
         // debugconsolethread=(HANDLE)_beginthread(_debugconsolethread,0,NULL);
 
-        AllocConsole();
-        SetConsoleCtrlHandler((PHANDLER_ROUTINE)CtrlHandler, TRUE);
-        consf = GetStdHandle(STD_OUTPUT_HANDLE);
-        cinf  = GetStdHandle(STD_INPUT_HANDLE);
+        if ((c = AllocConsole())) {
+            SetConsoleCtrlHandler((PHANDLER_ROUTINE)CtrlHandler, TRUE);
+            consf = GetStdHandle(STD_OUTPUT_HANDLE);
+            cinf  = GetStdHandle(STD_INPUT_HANDLE);
+        } else {
+            log_fatal("debugger: unable to allocate console: %lu", GetLastError());
+            exit(1);
+        }
     }
 }
 
