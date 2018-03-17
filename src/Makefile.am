@@ -18,9 +18,9 @@ b_em_CFLAGS = $(allegro_CFLAGS) -DBEM -DINCLUDE_DEBUGGER -DUSE_MEMORY_POINTER
 
 # workaround for Win32 Allegro, which has `allegro-config' missing
 if OS_WIN
-b_em_LDADD = -lalleg -lz -lopenal -lalut -lm
+b_em_LDADD = -lallegro_audio -lallegro_acodec -lallegro_primitives -lallegro_dialog -lallegro_image -lallegro -lz -lm
 else
-b_em_LDADD = -lallegro_audio -lallegro_acodec -lallegro_primitives -lallegro_dialog -lallegro_image -lallegro -lz -lalut -lm -lpthread
+b_em_LDADD = -lallegro_audio -lallegro_acodec -lallegro_primitives -lallegro_dialog -lallegro_image -lallegro -lz -lm -lpthread
 endif
 
 b_em_SOURCES = \
