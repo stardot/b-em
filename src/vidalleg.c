@@ -57,11 +57,17 @@ void video_close()
 #endif
 }
 
+#ifdef WIN32
+static const int y_fudge = 0;
+#else
+static const int y_fudge = 28;
+#endif
+
 void video_enterfullscreen()
 {
     ALLEGRO_DISPLAY *display;
     ALLEGRO_COLOR black;
-	int value;
+    int value;
     double aspect;
 
     display = al_get_current_display();
@@ -91,7 +97,7 @@ void video_enterfullscreen()
             // fill the gap between the top of the screen and the BBC image.
             al_draw_filled_rectangle(0, 0, scr_x_size, scr_y_start, black);
             // fill the gap between the BBC image and the bottom of the screen.
-            al_draw_filled_rectangle(0, scr_y_start + value, winsizex, winsizey, black);        
+            al_draw_filled_rectangle(0, scr_y_start + value, winsizex, winsizey, black);
         }
     } else {
         log_error("vidalleg: could not set graphics mode to full-screen");
@@ -106,17 +112,19 @@ void video_set_window_size(void)
 
     switch(vid_fullborders) {
         case 0:
-            scr_x_size = winsizex = BORDER_NONE_X_SIZE;
-            scr_y_size = winsizey = BORDER_NONE_Y_SIZE * 2;
+            scr_x_size = BORDER_NONE_X_SIZE;
+            scr_y_size = BORDER_NONE_Y_SIZE * 2;
             break;
         case 1:
-            scr_x_size = winsizex = BORDER_MED_X_SIZE;
-            scr_y_size = winsizey = BORDER_MED_Y_SIZE * 2;
+            scr_x_size = BORDER_MED_X_SIZE;
+            scr_y_size = BORDER_MED_Y_SIZE * 2;
             break;
         case 2:
-            scr_x_size = winsizex = BORDER_FULL_X_SIZE;
-            scr_y_size = winsizey = BORDER_FULL_Y_SIZE * 2;
+            scr_x_size = BORDER_FULL_X_SIZE;
+            scr_y_size = BORDER_FULL_Y_SIZE * 2;
     }
+    winsizex = scr_x_size;
+    winsizey = scr_y_size + y_fudge;
 }
 
 void video_update_window_size(ALLEGRO_EVENT *event)
@@ -258,7 +266,7 @@ void video_doblit()
             // fill the gap between the top of the screen and the BBC image.
             al_draw_filled_rectangle(0, 0, scr_x_size, scr_y_start, black);
             // fill the gap between the BBC image and the bottom of the screen.
-            al_draw_filled_rectangle(0, scr_y_start + scr_y_size, winsizex, winsizey, black);        
+            al_draw_filled_rectangle(0, scr_y_start + scr_y_size, winsizex, winsizey, black);
         }
 /*#endif*/
         al_flip_display();
