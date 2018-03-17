@@ -37,7 +37,8 @@ static uint8_t codeconvert[128]=
 static inline void key_press(int row, int col)
 {
         bbckey[col][row] = 1;
-        bemfreerun = 2;
+        if (bemfreerun)
+            bemfreerun = 2;
 }
 
 static inline void key_release(int row, int col)
