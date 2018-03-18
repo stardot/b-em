@@ -200,8 +200,8 @@ void video_doblit()
             lasty  = 300;
         }
         else if (vid_fullborders == 1) {
-            firstx = 310;
-            lastx  = 1014;
+            firstx = 306;
+            lastx  = 1010;
             firsty = 24;
             lasty  = 296;
         }
