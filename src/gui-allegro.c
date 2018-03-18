@@ -7,6 +7,7 @@
 #include "ddnoise.h"
 #include "disc.h"
 #include "keyboard.h"
+#include "keydef-allegro.h"
 #include "main.h"
 #include "mem.h"
 #include "model.h"
@@ -349,7 +350,7 @@ static ALLEGRO_MENU *create_speed_menu(void)
     add_radio_item(menu, "Full-speed", IDM_SPEED, EMU_SPEED_FULL, emuspeed);
     return menu;
 }
-    
+
 static ALLEGRO_MENU *create_debug_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
@@ -900,6 +901,9 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             break;
         case IDM_DEBUG_BREAK:
             debug_step = 1;
+            break;
+        case IDM_KEY_REDEFINE:
+            gui_keydefine();
             break;
         default:
             log_warn("gui-allegro: menu ID %d not handled", menu_get_id(event));
