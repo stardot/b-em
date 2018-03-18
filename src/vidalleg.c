@@ -64,7 +64,7 @@ static int gfx_full_screen(void) {
         * doesn't have an alternative, but other colour depths do,
         * so we should use those.
         */
-        
+
         switch (dcol) {
             case 8:
                 return 1; // return failure with no alternate coloir depth.
@@ -126,7 +126,7 @@ void video_enterfullscreen()
             // fill the gap between the top of the screen and the BBC image.
             rectfill(screen, 0, 0, scr_x_size, scr_y_start, c);
             // fill the gap between the BBC image and the bottom of the screen.
-            rectfill(screen, 0, scr_y_start + value, desktop_width, desktop_height, c);        
+            rectfill(screen, 0, scr_y_start + value, desktop_width, desktop_height, c);
         }
     }
 
@@ -200,8 +200,8 @@ void video_doblit()
             lasty  = 300;
         }
         else if (vid_fullborders == 1) {
-            firstx = 320;
-            lastx  = 1024;
+            firstx = 310;
+            lastx  = 1014;
             firsty = 24;
             lasty  = 296;
         }
