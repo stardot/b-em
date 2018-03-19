@@ -170,7 +170,7 @@ static inline void upscale_only(ALLEGRO_BITMAP *src, int sx, int sy, int sw, int
         al_draw_bitmap_region(src, sx, sy, sw, sh, dx, dy, 0);
 }
 
-void video_doblit()
+void video_doblit(void)
 {
     int c;
     ALLEGRO_COLOR black;
@@ -201,18 +201,17 @@ void video_doblit()
     if (fskipcount >= ((motor && fasttape) ? 5 : vid_fskipmax)) {
         lasty++;
         if (vid_fullborders == 1) {
-            firstx = BORDER_MED_X_START;
-            lastx  = BORDER_MED_X_START + BORDER_MED_X_SIZE;
-            firsty = BORDER_MED_Y_START;
-            lasty  = BORDER_MED_Y_START + BORDER_MED_Y_SIZE;
+            firstx -= BORDER_SIZE_X_MED;
+            lastx  += BORDER_SIZE_X_MED;
+            firsty -= BORDER_SIZE_Y_MED;
+            lasty  += BORDER_SIZE_Y_MED;
         }
         else if (vid_fullborders == 2) {
-            firstx = BORDER_FULL_X_START;
-            lastx  = BORDER_FULL_X_START + BORDER_FULL_X_SIZE;
-            firsty = BORDER_FULL_Y_START;
-            lasty  = BORDER_FULL_Y_START + BORDER_FULL_Y_SIZE;
+            firstx -= BORDER_SIZE_X_FULL;
+            lastx  += BORDER_SIZE_X_FULL;
+            firsty -= BORDER_SIZE_Y_FULL;
+            lasty  += BORDER_SIZE_Y_FULL;
         }
-
         fskipcount = 0;
         if (vid_scanlines) {
             al_set_target_bitmap(b16x);

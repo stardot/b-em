@@ -3,19 +3,21 @@
 
 extern ALLEGRO_BITMAP *b, *b16, *b16x, *b32, *tb, *vb;
 
-#define BORDER_NONE_X_START 336
+#define BORDER_SIZE_X_NONE    0
+#define BORDER_SIZE_X_MED    32
+#define BORDER_SIZE_X_FULL   96
+
+#define BORDER_SIZE_Y_NONE    0
+#define BORDER_SIZE_Y_MED    10
+#define BORDER_SIZE_Y_FULL   26
+
 #define BORDER_NONE_X_SIZE  640
-#define BORDER_NONE_Y_START  30
 #define BORDER_NONE_Y_SIZE  252
 
-#define BORDER_MED_X_START  320
 #define BORDER_MED_X_SIZE   704
-#define BORDER_MED_Y_START   24
 #define BORDER_MED_Y_SIZE   272
 
-#define BORDER_FULL_X_START 240
 #define BORDER_FULL_X_SIZE  832
-#define BORDER_FULL_Y_START   8
 #define BORDER_FULL_Y_SIZE  304
 
 extern int firstx, firsty, lastx, lasty;
