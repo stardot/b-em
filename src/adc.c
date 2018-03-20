@@ -13,13 +13,13 @@ uint8_t adc_read(uint16_t addr)
 {
         switch (addr & 3)
         {
-                case 0:
+            case 0:
                 return adc_status;
                 break;
-                case 1:
+            case 1:
                 return adc_high;
                 break;
-                case 2:
+            case 2:
                 return adc_low;
                 break;
         }

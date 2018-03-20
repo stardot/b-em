@@ -74,7 +74,7 @@ void via_write(VIA *v, uint16_t addr, uint8_t val)
 {
         switch (addr&0xF)
         {
-                case ORA:
+            case ORA:
                 v->ifr &= ~INT_CA1;
                 if ((v->pcr & 0xA) != 0x2) /*Not independent interrupt for CA2*/
                    v->ifr &= ~INT_CA2;
@@ -92,12 +92,12 @@ void via_write(VIA *v, uint16_t addr, uint8_t val)
                         v->ca2 = 1;
                 }
 
-                case ORAnh:
+            case ORAnh:
                 v->write_portA((val & v->ddra) | ~v->ddra);
                 v->ora=val;
                 break;
 
-                case ORB:
+            case ORB:
                 v->ifr &= ~INT_CB1;
                 if ((v->pcr & 0xA0) != 0x20) /*Not independent interrupt for CB2*/
                    v->ifr &= ~INT_CB2;
@@ -119,18 +119,18 @@ void via_write(VIA *v, uint16_t addr, uint8_t val)
                 }
                 break;
 
-                case DDRA:
+            case DDRA:
                 v->ddra = val;
                 v->write_portA((v->ora & v->ddra) | ~v->ddra);
                 break;
-                case DDRB:
+            case DDRB:
                 v->ddrb = val;
                 v->write_portB((v->orb & v->ddrb) | ~v->ddrb);
                 break;
-                case ACR:
+            case ACR:
                 v->acr  = val;
                 break;
-                case PCR:
+            case PCR:
                 v->pcr  = val;
 
                 log_debug("PCR write %04X %02X\n",addr,val);
@@ -157,17 +157,17 @@ void via_write(VIA *v, uint16_t addr, uint8_t val)
                         v->cb2 = 1;
                 }
                 break;
-                case SR:
+            case SR:
                 v->sr   = val;
                 v->sr_count = 16;
                 v->ifr &= ~0x04;
                 break;
-                case T1LL:
-                case T1CL:
+            case T1LL:
+            case T1CL:
                 v->t1l &= 0x1FE00;
                 v->t1l |= (val<<1);
                 break;
-                case T1LH:
+            case T1LH:
                 v->t1l &= 0x1FE;
                 v->t1l |= (val<<9);
                 if (v->acr & 0x40)
@@ -176,7 +176,7 @@ void via_write(VIA *v, uint16_t addr, uint8_t val)
                         via_updateIFR(v);
                 }
                 break;
-                case T1CH:
+            case T1CH:
                 if ((v->acr & 0xC0) == 0x80) v->orb &= ~0x80; /*Lower PB7 for one-shot timer*/
                 v->t1l &= 0x1FE;
                 v->t1l |= (val<<9);
@@ -185,11 +185,11 @@ void via_write(VIA *v, uint16_t addr, uint8_t val)
                 v->ifr &= ~INT_TIMER1;
                 via_updateIFR(v);
                 break;
-                case T2CL:
+            case T2CL:
                 v->t2l &= 0x1FE00;
                 v->t2l |= (val << 1);
                 break;
-                case T2CH:
+            case T2CH:
                 /*Fix for Kevin Edwards protection - if interrupt triggers in cycle before write then let it run*/
                 if ((v->t2c == -3 && (v->ier & INT_TIMER2)) ||
                     (v->ifr & v->ier & INT_TIMER2))
@@ -203,14 +203,14 @@ void via_write(VIA *v, uint16_t addr, uint8_t val)
                 via_updateIFR(v);
                 v->t2hit=0;
                 break;
-                case IER:
+            case IER:
                 if (val & 0x80)
                    v->ier |=  (val&0x7F);
                 else
                    v->ier &= ~(val&0x7F);
                 via_updateIFR(v);
                 break;
-                case IFR:
+            case IFR:
                 v->ifr &= ~(val & 0x7F);
                 via_updateIFR(v);
                 break;
@@ -222,12 +222,12 @@ uint8_t via_read(VIA *v, uint16_t addr)
         uint8_t temp;
         switch (addr&0xF)
         {
-                case ORA:
+            case ORA:
                 v->ifr &= ~INT_CA1;
                 if ((v->pcr & 0xA) != 0x2) /*Not independent interrupt for CA2*/
                    v->ifr &= ~INT_CA2;
                 via_updateIFR(v);
-                case ORAnh:
+            case ORAnh:
                 temp=v->ora & v->ddra;
                 if (v->acr & 1)
                    temp|=(v->ira          & ~v->ddra); /*Read latch*/
@@ -235,7 +235,7 @@ uint8_t via_read(VIA *v, uint16_t addr)
                    temp|=(v->read_portA() & ~v->ddra); /*Read current port values*/
                 return temp;
 
-                case ORB:
+            case ORB:
                 v->ifr &= ~INT_CB1;
                 if ((v->pcr & 0xA0) != 0x20) /*Not independent interrupt for CB2*/
                    v->ifr &= ~INT_CB2;
@@ -248,49 +248,49 @@ uint8_t via_read(VIA *v, uint16_t addr)
                    temp|=(v->read_portB() & ~v->ddrb); /*Read current port values*/
                 return temp;
 
-                case DDRA:
+            case DDRA:
                 return v->ddra;
                 
-                case DDRB:
+            case DDRB:
                 return v->ddrb;
                 
-                case T1LL:
+            case T1LL:
                 return (v->t1l & 0x1FE) >> 1;
                 
-                case T1LH:
+            case T1LH:
                 return v->t1l >> 9;
                 
-                case T1CL:
+            case T1CL:
                 v->ifr &= ~INT_TIMER1;
                 via_updateIFR(v);
                 if (v->t1c < -1) return 0xFF; /*Return 0xFF during reload*/
                 return ((v->t1c + 1) >> 1) & 0xFF;
                 
-                case T1CH:
+            case T1CH:
                 if (v->t1c<-1) return 0xFF;   /*Return 0xFF during reload*/
                 return (v->t1c+1)>>9;
                 
-                case T2CL:
+            case T2CL:
                 v->ifr &= ~INT_TIMER2;
                 via_updateIFR(v);
                 return ((v->t2c + 1) >> 1) & 0xFF;
                 
-                case T2CH:
+            case T2CH:
                 return (v->t2c+1)>>9;
                 
-                case SR:
+            case SR:
                 return v->sr;
                 
-                case ACR:
+            case ACR:
                 return v->acr;
                 
-                case PCR:
+            case PCR:
                 return v->pcr;
                 
-                case IER:
+            case IER:
                 return v->ier | 0x80;
                 
-                case IFR:
+            case IFR:
                 return v->ifr;
         }
         return 0xFE;

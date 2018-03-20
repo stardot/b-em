@@ -72,18 +72,18 @@ static void updatemode(int m)
         usrregs[15]=&armregs[15];
         switch (mode) /*Store back registers*/
         {
-                case USER:
+            case USER:
                 for (c=8;c<15;c++) userregs[c]=armregs[c];
                 break;
-                case IRQ:
+            case IRQ:
                 for (c=8;c<13;c++) userregs[c]=armregs[c];
                 irqregs[0]=armregs[13];
                 irqregs[1]=armregs[14];
                 break;
-                case FIQ:
+            case FIQ:
                 for (c=8;c<15;c++) fiqregs[c]=armregs[c];
                 break;
-                case SUPERVISOR:
+            case SUPERVISOR:
                 for (c=8;c<13;c++) userregs[c]=armregs[c];
                 superregs[0]=armregs[13];
                 superregs[1]=armregs[14];
@@ -92,12 +92,12 @@ static void updatemode(int m)
         mode=m;
         switch (m)
         {
-                case USER:
+            case USER:
                 for (c=8;c<15;c++) armregs[c]=userregs[c];
                 memmode=osmode;
                 for (c=0;c<15;c++) usrregs[c]=&armregs[c];
                 break;
-                case IRQ:
+            case IRQ:
                 for (c=8;c<13;c++) armregs[c]=userregs[c];
                 armregs[13]=irqregs[0];
                 armregs[14]=irqregs[1];
@@ -105,13 +105,13 @@ static void updatemode(int m)
                 for (c=13;c<15;c++) usrregs[c]=&userregs[c];
                 memmode=2;
                 break;
-                case FIQ:
+            case FIQ:
                 for (c=8;c<15;c++) armregs[c]=fiqregs[c];
                 for (c=0;c<8;c++)  usrregs[c]=&armregs[c];
                 for (c=8;c<15;c++) usrregs[c]=&userregs[c];
                 memmode=2;
                 break;
-                case SUPERVISOR:
+            case SUPERVISOR:
                 for (c=8;c<13;c++) armregs[c]=userregs[c];
                 armregs[13]=superregs[0];
                 armregs[14]=superregs[1];

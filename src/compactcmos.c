@@ -132,7 +132,7 @@ void compactcmos_i2cchange(int nuclock, int nudata)
 //        log("I2C update clock %i %i data %i %i state %i\n",i2c_clock,nuclock,i2c_data,nudata,i2c_state);
         switch (i2c_state)
         {
-                case I2C_IDLE:
+            case I2C_IDLE:
                 if (i2c_clock && nuclock)
                 {
                         if (lastdata && !nudata) /*Start bit*/
@@ -145,7 +145,7 @@ void compactcmos_i2cchange(int nuclock, int nudata)
                 }
                 break;
 
-                case I2C_RECIEVE:
+            case I2C_RECIEVE:
                 if (!i2c_clock && nuclock)
                 {
 //                        printf("Reciving %07X %07X\n",(*armregs[15]-8)&0x3FFFFFC,(*armregs[14]-8)&0x3FFFFFC);
@@ -189,7 +189,7 @@ void compactcmos_i2cchange(int nuclock, int nudata)
                 }
                 break;
 
-                case I2C_TRANSACKNOWLEDGE:
+            case I2C_TRANSACKNOWLEDGE:
                 if (!i2c_clock && nuclock)
                 {
                         if (nudata) /*It's not acknowledged - must be end of transfer*/
@@ -208,7 +208,7 @@ void compactcmos_i2cchange(int nuclock, int nudata)
                 }
                 break;
 
-                case I2C_TRANSMIT:
+            case I2C_TRANSMIT:
                 if (!i2c_clock && nuclock)
                 {
                         i2c_data = nudata = i2c_byte & 128;

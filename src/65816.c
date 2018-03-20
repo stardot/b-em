@@ -70,38 +70,38 @@ static inline uint8_t pack_flags() {
     uint8_t flags = 0;
 
     if (p.c)
-	flags |= 0x01;
+        flags |= 0x01;
     if (p.z)
-	flags |= 0x02;
+        flags |= 0x02;
     if (p.i)
-	flags |= 0x04;
+        flags |= 0x04;
     if (p.d)
-	flags |= 0x08;
+        flags |= 0x08;
     if (p.ex)
-	flags |= 0x10;
+        flags |= 0x10;
     if (p.m)
-	flags |= 0x20;
+        flags |= 0x20;
     if (p.v)
-	flags |= 0x40;
+        flags |= 0x40;
     if (p.n)
-	flags |= 0x80;
+        flags |= 0x80;
     return flags;
 }
 
 static inline uint8_t pack_flags_em(uint8_t flags) {
 
     if (p.c)
-	flags |= 0x01;
+        flags |= 0x01;
     if (p.z)
-	flags |= 0x02;
+        flags |= 0x02;
     if (p.i)
-	flags |= 0x4;
+        flags |= 0x4;
     if (p.d)
-	flags |= 0x08;
+        flags |= 0x08;
     if (p.v)
-	flags |= 0x40;
+        flags |= 0x40;
     if (p.n)
-	flags |= 0x80;
+        flags |= 0x80;
     return flags;
 }
 
@@ -142,11 +142,11 @@ static uint32_t dbg_reg_get(int which) {
     case REG_PC:
         return pc;
     case REG_DP:
-	return dp;
+        return dp;
     case REG_DB:
-	return dbr;
+        return dbr;
     case REG_PB:
-	return pbr;
+        return pbr;
     default:
         log_warn("65816: attempt to get non-existent register");
         return 0;
@@ -174,11 +174,11 @@ static void dbg_reg_set(int which, uint32_t value) {
     case REG_PC:
         pc = value;
     case REG_DP:
-	dp = value;
+        dp = value;
     case REG_DB:
-	dbr = value;
+        dbr = value;
     case REG_PB:
-	pbr = value;
+        pbr = value;
     default:
         log_warn("65816: attempt to set non-existent register");
     }

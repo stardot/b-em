@@ -85,17 +85,17 @@ static int dbg_debug_enable(int newvalue) {
 
 static inline uint8_t pack_flags(uint8_t flags) {
     if (tubep.c)
-	flags |= 1;
+        flags |= 1;
     if (tubep.z)
-	flags |= 2;
+        flags |= 2;
     if (tubep.i)
-	flags |= 4;
+        flags |= 4;
     if (tubep.d)
-	flags |= 8;
+        flags |= 8;
     if (tubep.v)
-	flags |= 0x40;
+        flags |= 0x40;
     if (tubep.n)
-	flags |= 0x80;
+        flags |= 0x80;
     return flags;
 }
 
@@ -110,53 +110,53 @@ static inline void unpack_flags(uint8_t flags) {
 
 static uint32_t dbg_reg_get(int which) {
     switch (which) {
-    case REG_A:
-	return tubea;
-    case REG_X:
-	return tubex;
-    case REG_Y:
-	return tubey;
-    case REG_S:
-	return tubesp;
-    case REG_P:
-	return pack_flags(0x30);
-    case REG_PC:
-	return tubepc;
-    default:
-	log_warn("6502tube: attempt to get non-existent register");
-	return 0;
+        case REG_A:
+            return tubea;
+        case REG_X:
+            return tubex;
+        case REG_Y:
+            return tubey;
+        case REG_S:
+            return tubesp;
+        case REG_P:
+            return pack_flags(0x30);
+        case REG_PC:
+            return tubepc;
+        default:
+            log_warn("6502tube: attempt to get non-existent register");
+            return 0;
     }
 }
 
 static void dbg_reg_set(int which, uint32_t value) {
     switch (which) {
-    case REG_A:
-	tubea = value;
-    case REG_X:
-	tubex = value;
-    case REG_Y:
-	tubey = value;
-    case REG_S:
-	tubesp = value;
-    case REG_P:
-	unpack_flags(value);
-    case REG_PC:
-	tubepc = value;
-    default:
-	log_warn("6502tube: attempt to set non-existent register");
+        case REG_A:
+            tubea = value;
+        case REG_X:
+            tubex = value;
+        case REG_Y:
+            tubey = value;
+        case REG_S:
+            tubesp = value;
+        case REG_P:
+            unpack_flags(value);
+        case REG_PC:
+            tubepc = value;
+        default:
+            log_warn("6502tube: attempt to set non-existent register");
     }
 }
 
 static size_t dbg_reg_print(int which, char *buf, size_t bufsize) {
     switch (which) {
-    case REG_P:
-	return dbg6502_print_flags(&tubep, buf, bufsize);
-	break;
-    case REG_PC:
-	return snprintf(buf, bufsize, "%04X", tubepc);
-	break;
-    default:
-	return snprintf(buf, bufsize, "%02X", dbg_reg_get(which));
+        case REG_P:
+            return dbg6502_print_flags(&tubep, buf, bufsize);
+            break;
+        case REG_PC:
+            return snprintf(buf, bufsize, "%04X", tubepc);
+            break;
+        default:
+            return snprintf(buf, bufsize, "%02X", dbg_reg_get(which));
     }
 }
 

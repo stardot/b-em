@@ -59,20 +59,20 @@ uint8_t tube_host_read(uint16_t addr)
         if (!tube_exec) return 0xFE;
         switch (addr & 7)
         {
-                case 0: /*Reg 1 Stat*/
+            case 0: /*Reg 1 Stat*/
                 temp = (tubeula.hstat[0] & 0xC0) | tubeula.r1stat;
                 break;
-                case 1: /*Register 1*/
+            case 1: /*Register 1*/
                 temp = tubeula.ph1[0];
                 for (c = 0; c < 23; c++) tubeula.ph1[c] = tubeula.ph1[c + 1];
                 tubeula.ph1pos--;
                 tubeula.pstat[0] |= 0x40;
                 if (!tubeula.ph1pos) tubeula.hstat[0] &= ~0x80;
                 break;
-                case 2: /*Register 2 Stat*/
+            case 2: /*Register 2 Stat*/
                 temp = tubeula.hstat[1];
                 break;
-                case 3: /*Register 2*/
+            case 3: /*Register 2*/
                 temp = tubeula.ph2;
                 if (tubeula.hstat[1] & 0x80)
                 {
@@ -80,10 +80,10 @@ uint8_t tube_host_read(uint16_t addr)
                         tubeula.pstat[1] |=  0x40;
                 }
                 break;
-                case 4: /*Register 3 Stat*/
+            case 4: /*Register 3 Stat*/
                 temp = tubeula.hstat[2];
                 break;
-                case 5: /*Register 3*/
+            case 5: /*Register 3*/
                 temp = tubeula.ph3[0];
                 if (tubeula.ph3pos > 0)
                 {
@@ -93,10 +93,10 @@ uint8_t tube_host_read(uint16_t addr)
                         if (!tubeula.ph3pos) tubeula.hstat[2] &= ~0x80;
                 }
                 break;
-                case 6: /*Register 4 Stat*/
+            case 6: /*Register 4 Stat*/
                 temp = tubeula.hstat[3];
                 break;
-                case 7: /*Register 4*/
+            case 7: /*Register 4*/
                 temp = tubeula.ph4;
                 if (tubeula.hstat[3] & 0x80)
                 {
@@ -114,22 +114,22 @@ void tube_host_write(uint16_t addr, uint8_t val)
         if (!tube_exec) return;
         switch (addr & 7)
         {
-                case 0: /*Register 1 stat*/
+            case 0: /*Register 1 stat*/
                 if (val & 0x80) tubeula.r1stat |=  (val&0x3F);
                 else            tubeula.r1stat &= ~(val&0x3F);
                 tubeula.hstat[0] = (tubeula.hstat[0] & 0xC0) | (val & 0x3F);
                 break;
-                case 1: /*Register 1*/
+            case 1: /*Register 1*/
                 tubeula.hp1 = val;
                 tubeula.pstat[0] |=  0x80;
                 tubeula.hstat[0] &= ~0x40;
                 break;
-                case 3: /*Register 2*/
+            case 3: /*Register 2*/
                 tubeula.hp2 = val;
                 tubeula.pstat[1] |=  0x80;
                 tubeula.hstat[1] &= ~0x40;
                 break;
-                case 5: /*Register 3*/
+            case 5: /*Register 3*/
                 if (tubeula.r1stat & 16)
                 {
                         if (tubeula.hp3pos < 2)
@@ -150,7 +150,7 @@ void tube_host_write(uint16_t addr, uint8_t val)
                 }
 //                printf("Write R3 %i\n",tubeula.hp3pos);
                 break;
-                case 7: /*Register 4*/
+            case 7: /*Register 4*/
                 tubeula.hp4 = val;
                 tubeula.pstat[3] |=  0x80;
                 tubeula.hstat[3] &= ~0x40;
@@ -164,7 +164,7 @@ uint8_t tube_parasite_read(uint32_t addr)
         uint8_t temp = 0;
         switch (addr & 7)
         {
-                case 0: /*Register 1 stat*/
+            case 0: /*Register 1 stat*/
                 if (tube_romin)
                 {
                         if (tube_type == TUBE6502 || tube_type == TUBE65816)
@@ -173,7 +173,7 @@ uint8_t tube_parasite_read(uint32_t addr)
                 }
                 temp = tubeula.pstat[0] | tubeula.r1stat;
                 break;
-                case 1: /*Register 1*/
+            case 1: /*Register 1*/
                 temp = tubeula.hp1;
                 if (tubeula.pstat[0] & 0x80)
                 {
@@ -181,10 +181,10 @@ uint8_t tube_parasite_read(uint32_t addr)
                         tubeula.hstat[0] |=  0x40;
                 }
                 break;
-                case 2: /*Register 2 stat*/
+            case 2: /*Register 2 stat*/
                 temp = tubeula.pstat[1];
                 break;
-                case 3: /*Register 2*/
+            case 3: /*Register 2*/
                 temp = tubeula.hp2;
                 if (tubeula.pstat[1] & 0x80)
                 {
@@ -192,10 +192,10 @@ uint8_t tube_parasite_read(uint32_t addr)
                         tubeula.hstat[1] |=  0x40;
                 }
                 break;
-                case 4: /*Register 3 stat*/
+            case 4: /*Register 3 stat*/
                 temp = tubeula.pstat[2];
                 break;
-                case 5: /*Register 3*/
+            case 5: /*Register 3*/
                 temp = tubeula.hp3[0];
                 if (tubeula.hp3pos>0)
                 {
@@ -208,10 +208,10 @@ uint8_t tube_parasite_read(uint32_t addr)
                         }
                 }
                 break;
-                case 6: /*Register 4 stat*/
+            case 6: /*Register 4 stat*/
                 temp = tubeula.pstat[3];
                 break;
-                case 7: /*Register 4*/
+            case 7: /*Register 4*/
                 temp = tubeula.hp4;
                 if (tubeula.pstat[3] & 0x80)
                 {
@@ -228,7 +228,7 @@ void tube_parasite_write(uint32_t addr, uint8_t val)
 {
         switch (addr & 7)
         {
-                case 1: /*Register 1*/
+            case 1: /*Register 1*/
                 if (tubeula.ph1pos < 24)
                 {
                         tubeula.ph1[tubeula.ph1pos++] = val;
@@ -236,12 +236,12 @@ void tube_parasite_write(uint32_t addr, uint8_t val)
                         if (tubeula.ph1pos == 24) tubeula.pstat[0] &= ~0x40;
                 }
                 break;
-                case 3: /*Register 2*/
+            case 3: /*Register 2*/
                 tubeula.ph2 = val;
                 tubeula.hstat[1] |=  0x80;
                 tubeula.pstat[1] &= ~0x40;
                 break;
-                case 5: /*Register 3*/
+            case 5: /*Register 3*/
                 if (tubeula.r1stat & 16)
                 {
                         if (tubeula.ph3pos < 2)
@@ -260,7 +260,7 @@ void tube_parasite_write(uint32_t addr, uint8_t val)
                         tubeula.pstat[2] &= ~0xc0;
                 }
                 break;
-                case 7: /*Register 4*/
+            case 7: /*Register 4*/
                 tubeula.ph4 = val;
                 tubeula.hstat[3] |=  0x80;
                 tubeula.pstat[3] &= ~0x40;
