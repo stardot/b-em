@@ -26,6 +26,8 @@ int vid_clear = 0;
 int winsizex, winsizey;
 int scr_x_start, scr_x_size, scr_y_start, scr_y_size;
 
+bool vid_print_mode = false;
+
 void video_clearscreen()
 {
     ALLEGRO_COLOR black = al_map_rgb(0, 0, 0);
@@ -112,16 +114,16 @@ void video_set_window_size(void)
 
     switch(vid_fullborders) {
         case 0:
-            scr_x_size = BORDER_NONE_X_SIZE;
-            scr_y_size = BORDER_NONE_Y_SIZE * 2;
+            scr_x_size = BORDER_NONE_X_END_GRA - BORDER_NONE_X_START_GRA;
+            scr_y_size = (BORDER_NONE_Y_END_GRA - BORDER_NONE_Y_START_GRA) * 2;
             break;
         case 1:
-            scr_x_size = BORDER_MED_X_SIZE;
-            scr_y_size = BORDER_MED_Y_SIZE * 2;
+            scr_x_size = BORDER_MED_X_END_GRA - BORDER_MED_X_START_GRA;
+            scr_y_size = (BORDER_MED_Y_END_GRA - BORDER_MED_Y_START_GRA) * 2;
             break;
         case 2:
-            scr_x_size = BORDER_FULL_X_SIZE;
-            scr_y_size = BORDER_FULL_Y_SIZE * 2;
+            scr_x_size = BORDER_FULL_X_END_GRA - BORDER_FULL_X_START_GRA;
+            scr_y_size = (BORDER_FULL_Y_END_GRA - BORDER_FULL_Y_START_GRA) * 2;
     }
     winsizex = scr_x_size;
     winsizey = scr_y_size + y_fudge;
@@ -170,7 +172,7 @@ static inline void upscale_only(ALLEGRO_BITMAP *src, int sx, int sy, int sw, int
         al_draw_bitmap_region(src, sx, sy, sw, sh, dx, dy, 0);
 }
 
-void video_doblit(void)
+void video_doblit(bool non_ttx, uint8_t vtotal)
 {
     int c;
     ALLEGRO_COLOR black;
@@ -200,17 +202,59 @@ void video_doblit(void)
     fskipcount++;
     if (fskipcount >= ((motor && fasttape) ? 5 : vid_fskipmax)) {
         lasty++;
-        if (vid_fullborders == 1) {
-            firstx -= BORDER_SIZE_X_MED;
-            lastx  += BORDER_SIZE_X_MED;
-            firsty -= BORDER_SIZE_Y_MED;
-            lasty  += BORDER_SIZE_Y_MED;
+        if (vid_fullborders == 0) {
+            if (non_ttx) {
+                firstx = BORDER_NONE_X_START_GRA;
+                lastx  = BORDER_NONE_X_END_GRA;
+            }
+            else {
+                firstx = BORDER_NONE_X_START_TTX;
+                lastx  = BORDER_NONE_X_END_TTX;
+            }
+            if (vtotal > 30) {
+                firsty = BORDER_NONE_Y_START_GRA;
+                lasty  = BORDER_NONE_Y_END_GRA;
+            }
+            else {
+                firsty = BORDER_NONE_Y_START_TXT;
+                lasty  = BORDER_NONE_Y_END_TXT;
+            }
+        }
+        else if (vid_fullborders == 1) {
+            if (non_ttx) {
+                firstx = BORDER_MED_X_START_GRA;
+                lastx  = BORDER_MED_X_END_GRA;
+            }
+            else {
+                firstx = BORDER_MED_X_START_TTX;
+                lastx  = BORDER_MED_X_END_TTX;
+            }
+            if (vtotal > 30) {
+                firsty = BORDER_MED_Y_START_GRA;
+                lasty  = BORDER_MED_Y_END_GRA;
+            }
+            else {
+                firsty = BORDER_MED_Y_START_TXT;
+                lasty  = BORDER_MED_Y_END_TXT;
+            }
         }
         else if (vid_fullborders == 2) {
-            firstx -= BORDER_SIZE_X_FULL;
-            lastx  += BORDER_SIZE_X_FULL;
-            firsty -= BORDER_SIZE_Y_FULL;
-            lasty  += BORDER_SIZE_Y_FULL;
+            if (non_ttx) {
+                firstx = BORDER_FULL_X_START_GRA;
+                lastx  = BORDER_FULL_X_END_GRA;
+            }
+            else {
+                firstx = BORDER_FULL_X_START_TTX;
+                lastx  = BORDER_FULL_X_END_TTX;
+            }
+            if (vtotal > 30) {
+                firsty = BORDER_FULL_Y_START_GRA;
+                lasty  = BORDER_FULL_Y_END_GRA;
+            }
+            else {
+                firsty = BORDER_FULL_Y_START_TXT;
+                lasty  = BORDER_FULL_Y_END_TXT;
+            }
         }
         fskipcount = 0;
         if (vid_scanlines) {

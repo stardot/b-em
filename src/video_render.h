@@ -3,22 +3,32 @@
 
 extern ALLEGRO_BITMAP *b, *b16, *b16x, *b32, *tb, *vb;
 
-#define BORDER_SIZE_X_NONE    0
-#define BORDER_SIZE_X_MED    32
-#define BORDER_SIZE_X_FULL   96
+#define BORDER_NONE_X_START_GRA 336
+#define BORDER_NONE_X_END_GRA   976
+#define BORDER_NONE_X_START_TTX 352
+#define BORDER_NONE_X_END_TTX   992
+#define BORDER_NONE_Y_START_GRA  32
+#define BORDER_NONE_Y_END_GRA   288
+#define BORDER_NONE_Y_START_TXT  30
+#define BORDER_NONE_Y_END_TXT   282
 
-#define BORDER_SIZE_Y_NONE    0
-#define BORDER_SIZE_Y_MED    10
-#define BORDER_SIZE_Y_FULL   26
+#define BORDER_MED_X_START_GRA  304
+#define BORDER_MED_X_END_GRA   1008
+#define BORDER_MED_X_START_TTX  320
+#define BORDER_MED_X_END_TTX   1024
+#define BORDER_MED_Y_START_GRA   22
+#define BORDER_MED_Y_END_GRA    298
+#define BORDER_MED_Y_START_TXT   20
+#define BORDER_MED_Y_END_TXT    292
 
-#define BORDER_NONE_X_SIZE  640
-#define BORDER_NONE_Y_SIZE  252
-
-#define BORDER_MED_X_SIZE   704
-#define BORDER_MED_Y_SIZE   272
-
-#define BORDER_FULL_X_SIZE  832
-#define BORDER_FULL_Y_SIZE  304
+#define BORDER_FULL_X_START_GRA 240
+#define BORDER_FULL_X_END_GRA  1072
+#define BORDER_FULL_X_START_TTX 256
+#define BORDER_FULL_X_END_TTX  1088
+#define BORDER_FULL_Y_START_GRA   6
+#define BORDER_FULL_Y_END_GRA   314
+#define BORDER_FULL_Y_START_TXT   4
+#define BORDER_FULL_Y_END_TXT   308
 
 extern int firstx, firsty, lastx, lasty;
 extern int desktop_width, desktop_height;
@@ -32,13 +42,14 @@ extern int vid_linedbl;
 extern int vid_interlace, vid_pal;
 extern int vid_fskipmax,  vid_scanlines;
 extern int vid_fullborders;
+extern bool vid_print_mode;
 
 extern int videoresize;
 
 extern int vid_savescrshot;
 extern char vid_scrshotname[260];
 
-void video_doblit(void);
+void video_doblit(bool non_ttx, uint8_t vtotal);
 void video_enterfullscreen(void);
 void video_leavefullscreen(void);
 void video_toggle_fullscreen(void);
