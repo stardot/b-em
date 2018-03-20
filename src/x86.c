@@ -6,7 +6,6 @@
 #include <stdint.h>
 #include "b-em.h"
 #include "x86.h"
-#include "x86_tube.h"
 #include "tube.h"
 #include "cpu_debug.h"
 
@@ -634,13 +633,22 @@ void x86_reset()
         makemod1table();
 }
 
-void x86_init(FILE *romf)
+void x86_init()
 {
+        FILE *f;
+        char fn[PATH_MAX];
         if (!x86ram) x86ram=malloc(0x100000);
         if (!x86rom) x86rom=malloc(0x4000);
         x86makeznptable();
         memset(x86ram,0,0x100000);
-        fread(x86rom, 0x4000, 1, romf);
+        if (!find_dat_file(fn, sizeof fn, "roms/tube", "BIOS", "rom")) {
+            f=x_fopen(fn,"rb");
+            fread(x86rom,0x4000,1,f);
+            fclose(f);
+        } else {
+            log_fatal("x86: BIOS ROM not found");
+            exit(1);
+        }
 }
 
 void x86_close()
@@ -2123,9 +2131,9 @@ void x86_exec()
                                 loadseg(tempw,&_ss);
                                 if (ssegs) oldss=ss;
                                 skipnextprint=1;
-                noint=1;
+				noint=1;
 //                                printf("LOAD SS %04X %04X\n",tempw,SS);
-//              printf("SS loaded with %04X %04X:%04X %04X %04X %04X\n",ss>>4,cs>>4,pc,CX,DX,es>>4);
+//				printf("SS loaded with %04X %04X:%04X %04X %04X %04X\n",ss>>4,cs>>4,pc,CX,DX,es>>4);
                                 break;
                         }
                         tubecycles-=((mod==3)?2:9);

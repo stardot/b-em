@@ -33,10 +33,9 @@ extern MODEL models[NUM_MODELS];
 typedef struct
 {
         char name[32];
-        void (*init)(FILE *romf);
+        void (*init)(void);
         void (*reset)(void);
         cpu_debug_t *debug;
-        char bootrom[16];
 } TUBE;
 
 #define NUM_TUBES 7

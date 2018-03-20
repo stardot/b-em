@@ -2,9 +2,8 @@
 #define __INC_Z80_H
 
 #include "cpu_debug.h"
-#include <stdio.h>
 
-void z80_init(FILE *romf);
+void z80_init();
 void z80_reset();
 void z80_exec();
 void z80_close();

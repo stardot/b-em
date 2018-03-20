@@ -199,20 +199,29 @@ void arm_dumpregs()
 
 static uint32_t *armread[64];
 static uint32_t armmask[64];
-void arm_init(FILE *romf)
+void arm_init()
 {
+        FILE *f;
         int c;
+        char path[PATH_MAX];
         if (!armrom) armrom=(uint32_t *)malloc(0x4000);
         if (!armram) armram=(uint32_t *)malloc(0x400000);
         armromb=(uint8_t *)armrom;
         armramb=(uint8_t *)armram;
-        fread(armromb, 0x4000, 1, romf);
-        memcpy(armramb,armromb,0x4000);
-        for (c=0;c<64;c++) armread[c]=0;
-        for (c=0;c<4;c++) armread[c]=&armram[c*0x40000];
-        armread[48]=armrom;
-        for (c=0;c<64;c++) armmask[c]=0xFFFFF;
-        armmask[48]=0x3FFF;
+        if (!find_dat_file(path, sizeof path, "roms/tube", "ARMeval_100", "rom")) {
+            f = x_fopen(path, "rb");
+            fread(armromb,0x4000,1,f);
+            fclose(f);
+            memcpy(armramb,armromb,0x4000);
+            for (c=0;c<64;c++) armread[c]=0;
+            for (c=0;c<4;c++) armread[c]=&armram[c*0x40000];
+            armread[48]=armrom;
+            for (c=0;c<64;c++) armmask[c]=0xFFFFF;
+            armmask[48]=0x3FFF;
+        } else {
+            log_fatal("arm: ARM tube ROM not found");
+            exit(1);
+        }
 }
 
 void arm_close()
