@@ -189,7 +189,7 @@ static ALLEGRO_MENU *create_tube_menu(void)
     ALLEGRO_MENU *menu = al_create_menu();
     int i;
 
-    for (i = 0; i < NUM_TUBES-1; i++)
+    for (i = 0; i < NUM_TUBES; i++)
         add_radio_item(menu, tubes[i].name, IDM_TUBE, i, curtube);
     return menu;
 }
