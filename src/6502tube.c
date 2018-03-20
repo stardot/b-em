@@ -37,21 +37,7 @@ static uint8_t tuberom[0x1000];
 static FILE *trace_fp;
 #endif
 
-static void tube_6502_loadrom() {
-    FILE *f;
-    char path[PATH_MAX];
-
-    if (!find_dat_file(path, sizeof path, "roms/tube", "6502Tube", "rom")) {
-        f = x_fopen(path, "rb");
-        fread(tuberom+0x800,0x800,1,f);
-        fclose(f);
-    } else {
-        log_fatal("6502tube: tube ROM not found");
-        exit(1);
-    }
-}
-
-void tube_6502_init_cpu()
+void tube_6502_init_cpu(FILE *romf)
 {
         int c;
         if (!tuberam)
@@ -66,7 +52,7 @@ void tube_6502_init_cpu()
 //        tubememstat[0xFE]=tubememstat[0xFF]=2;
         tubemem[0x100] = tubemem[0];
         tubememstat[0x100] = tubememstat[0];
-        tube_6502_loadrom();
+        fread(tuberom+0x800, 0x800, 1, romf);
 #ifdef TRACE_TUBE
         if ((trace_fp = fopen("6502tube.trace", "wb"))) {
                 fwrite("6502NMOS", 8, 1, trace_fp);
@@ -99,17 +85,17 @@ static int dbg_debug_enable(int newvalue) {
 
 static inline uint8_t pack_flags(uint8_t flags) {
     if (tubep.c)
-	flags |= 1;
+    flags |= 1;
     if (tubep.z)
-	flags |= 2;
+    flags |= 2;
     if (tubep.i)
-	flags |= 4;
+    flags |= 4;
     if (tubep.d)
-	flags |= 8;
+    flags |= 8;
     if (tubep.v)
-	flags |= 0x40;
+    flags |= 0x40;
     if (tubep.n)
-	flags |= 0x80;
+    flags |= 0x80;
     return flags;
 }
 
@@ -125,52 +111,52 @@ static inline void unpack_flags(uint8_t flags) {
 static uint32_t dbg_reg_get(int which) {
     switch (which) {
     case REG_A:
-	return tubea;
+    return tubea;
     case REG_X:
-	return tubex;
+    return tubex;
     case REG_Y:
-	return tubey;
+    return tubey;
     case REG_S:
-	return tubesp;
+    return tubesp;
     case REG_P:
-	return pack_flags(0x30);
+    return pack_flags(0x30);
     case REG_PC:
-	return tubepc;
+    return tubepc;
     default:
-	log_warn("6502tube: attempt to get non-existent register");
-	return 0;
+    log_warn("6502tube: attempt to get non-existent register");
+    return 0;
     }
 }
 
 static void dbg_reg_set(int which, uint32_t value) {
     switch (which) {
     case REG_A:
-	tubea = value;
+    tubea = value;
     case REG_X:
-	tubex = value;
+    tubex = value;
     case REG_Y:
-	tubey = value;
+    tubey = value;
     case REG_S:
-	tubesp = value;
+    tubesp = value;
     case REG_P:
-	unpack_flags(value);
+    unpack_flags(value);
     case REG_PC:
-	tubepc = value;
+    tubepc = value;
     default:
-	log_warn("6502tube: attempt to set non-existent register");
+    log_warn("6502tube: attempt to set non-existent register");
     }
 }
 
 static size_t dbg_reg_print(int which, char *buf, size_t bufsize) {
     switch (which) {
     case REG_P:
-	return dbg6502_print_flags(&tubep, buf, bufsize);
-	break;
+    return dbg6502_print_flags(&tubep, buf, bufsize);
+    break;
     case REG_PC:
-	return snprintf(buf, bufsize, "%04X", tubepc);
-	break;
+    return snprintf(buf, bufsize, "%04X", tubepc);
+    break;
     default:
-	return snprintf(buf, bufsize, "%02X", dbg_reg_get(which));
+    return snprintf(buf, bufsize, "%02X", dbg_reg_get(which));
     }
 }
 
@@ -274,13 +260,13 @@ static void do_writemem(uint32_t addr, uint32_t value) {
 static uint8_t readmem(uint32_t addr) {
     uint32_t val = do_readmem(addr);
     if (dbg_tube6502)
-	debug_memread(&tube6502_cpu_debug, addr, val, 1);
+    debug_memread(&tube6502_cpu_debug, addr, val, 1);
     return val;
 }
 
 static void writemem(uint32_t addr, uint32_t value) {
     if (dbg_tube6502)
-	debug_memwrite(&tube6502_cpu_debug, addr, value, 1);
+    debug_memwrite(&tube6502_cpu_debug, addr, value, 1);
     do_writemem(addr, value);
 }
 
@@ -451,9 +437,9 @@ void tube_6502_exec()
         while (tubecycles > 0) {
                 oldtpc2 = oldtpc;
                 oldtpc = pc;
-		if (dbg_tube6502)
-		    debug_preexec(&tube6502_cpu_debug, pc);
-		opcode = readmem(pc);
+        if (dbg_tube6502)
+            debug_preexec(&tube6502_cpu_debug, pc);
+        opcode = readmem(pc);
                 pc++;
 #ifdef TRACE_TUBE
                 tube_6502_trace(opcode);
@@ -526,7 +512,7 @@ void tube_6502_exec()
                         break;
 
                 case 0x08:
-		        /*PHP*/ temp = pack_flags(0x30);
+                /*PHP*/ temp = pack_flags(0x30);
                         push(temp);
                         polltime(3);
                         break;
@@ -756,7 +742,7 @@ void tube_6502_exec()
 
                 case 0x28:
                         /*PLP*/ temp = pull();
-		        unpack_flags(temp);
+                unpack_flags(temp);
                         polltime(4);
                         break;
 

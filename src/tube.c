@@ -1,6 +1,6 @@
 /*B-em v2.2 by Tom Walker
   Tube ULA emulation*/
-  
+
 #include <stdio.h>
 #include "b-em.h"
 #include "6502.h"
@@ -42,12 +42,12 @@ void tube_updateints()
 {
         tube_irq = 0;
         interrupt &= ~8;
-        
+
         if ((tubeula.r1stat & 1) && (tubeula.hstat[3] & 128)) interrupt |= 8;
-        
+
         if ((tubeula.r1stat & 2) && (tubeula.pstat[0] & 128)) tube_irq  |= 1;
         if ((tubeula.r1stat & 4) && (tubeula.pstat[3] & 128)) tube_irq  |= 1;
-        
+
         if ((tubeula.r1stat & 8) && !(tubeula.r1stat & 16) && ((tubeula.hp3pos > 0) || (tubeula.ph3pos == 0))) tube_irq|=2;
         if ((tubeula.r1stat & 8) &&  (tubeula.r1stat & 16) && ((tubeula.hp3pos > 1) || (tubeula.ph3pos == 0))) tube_irq|=2;
 }
@@ -269,10 +269,10 @@ void tube_parasite_write(uint32_t addr, uint8_t val)
         tube_updateints();
 }
 
-void tube_6502_init()
+void tube_6502_init(FILE *romf)
 {
         tube_type = TUBE6502;
-        tube_6502_init_cpu();
+        tube_6502_init_cpu(romf);
         tube_6502_reset();
         tube_readmem = tube_6502_readmem;
         tube_writemem = tube_6502_writemem;
@@ -285,10 +285,10 @@ void tube_updatespeed()
         if (tube_type == TUBE6502) tube_shift = tube_6502_speed;
 }
 
-void tube_arm_init()
+void tube_arm_init(FILE *romf)
 {
         tube_type = TUBEARM;
-        arm_init();
+        arm_init(romf);
         arm_reset();
         tube_readmem = readarmb;
         tube_writemem = writearmb;
@@ -296,10 +296,10 @@ void tube_arm_init()
         tube_shift = 1;
 }
 
-void tube_z80_init()
+void tube_z80_init(FILE *romf)
 {
         tube_type = TUBEZ80;
-        z80_init();
+        z80_init(romf);
         z80_reset();
         tube_readmem = tube_z80_readmem;
         tube_writemem = tube_z80_writemem;
@@ -307,10 +307,10 @@ void tube_z80_init()
         tube_shift = 2;
 }
 
-void tube_x86_init()
+void tube_x86_init(FILE *romf)
 {
         tube_type = TUBEX86;
-        x86_init();
+        x86_init(romf);
         x86_reset();
         tube_readmem = x86_readmem;
         tube_writemem = x86_writemem;
@@ -318,10 +318,10 @@ void tube_x86_init()
         tube_shift = 2;
 }
 
-void tube_65816_init()
+void tube_65816_init(FILE *romf)
 {
         tube_type = TUBE65816;
-        w65816_init();
+        w65816_init(romf);
         w65816_reset();
         tube_readmem = readmem65816;
         tube_writemem = writemem65816;
@@ -329,7 +329,7 @@ void tube_65816_init()
         tube_shift = 3;
 }
 
-void tube_32016_init()
+void tube_32016_init(FILE *romf)
 {
         tube_type = TUBE32016;
         n32016_init();
@@ -340,7 +340,7 @@ void tube_32016_init()
         tube_shift = 2;
 }
 
-void tube_reset()
+void tube_reset(void)
 {
         tubeula.ph1pos = tubeula.hp3pos = 0;
         tubeula.ph3pos = 1;
@@ -350,4 +350,3 @@ void tube_reset()
         tubeula.hstat[2] = 0xC0;
         tube_romin = 1;
 }
-

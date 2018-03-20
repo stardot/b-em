@@ -69,7 +69,7 @@ static inline uint8_t z80_readmem(uint16_t a)
 {
     uint8_t v = z80_do_readmem(a);
     if (dbg_tube_z80)
-	debug_memread(&tubez80_cpu_debug, a, v, 1);
+    debug_memread(&tubez80_cpu_debug, a, v, 1);
     return v;
 }
 
@@ -88,7 +88,7 @@ static inline void z80_do_writemem(uint16_t a, uint8_t v)
 
 static inline void z80_writemem(uint16_t a, uint8_t v) {
     if (dbg_tube_z80)
-	debug_memwrite(&tubez80_cpu_debug, a, v, 1);
+    debug_memwrite(&tubez80_cpu_debug, a, v, 1);
     z80_do_writemem(a, v);
 }
 
@@ -156,11 +156,11 @@ static inline void setznc(uint8_t v)
 static inline void z80_setadd(uint8_t a, uint8_t b)
 {
        uint8_t r=a+b;
-				af.b.l = (r) ? ((r & 0x80) ? N_FLAG : 0) : Z_FLAG;
-				af.b.l |= (r & 0x28);	/* undocumented flag bits 5+3 */
-				if( (r & 0x0f) < (a & 0x0f) ) af.b.l |= H_FLAG;
-				if( r < a ) af.b.l |= C_FLAG;
-				if( (b^a^0x80) & (b^r) & 0x80 ) af.b.l |= V_FLAG;
+                af.b.l = (r) ? ((r & 0x80) ? N_FLAG : 0) : Z_FLAG;
+                af.b.l |= (r & 0x28);   /* undocumented flag bits 5+3 */
+                if( (r & 0x0f) < (a & 0x0f) ) af.b.l |= H_FLAG;
+                if( r < a ) af.b.l |= C_FLAG;
+                if( (b^a^0x80) & (b^r) & 0x80 ) af.b.l |= V_FLAG;
 }
 
 static inline void setinc(uint8_t v)
@@ -186,38 +186,38 @@ static inline void setadc(uint8_t a, uint8_t b)
        uint8_t r=a+b+(af.b.l&C_FLAG);
        if (af.b.l&C_FLAG)
        {
-				af.b.l = (r) ? ((r & 0x80) ? N_FLAG : 0) : Z_FLAG;
-				af.b.l |= (r & 0x28);	/* undocumented flag bits 5+3 */
-				if( (r & 0x0f) <= (a & 0x0f) ) af.b.l |= H_FLAG;
-				if( r <= a ) af.b.l |= C_FLAG;
-				if( (b^a^0x80) & (b^r) & 0x80 ) af.b.l |= V_FLAG;
+                af.b.l = (r) ? ((r & 0x80) ? N_FLAG : 0) : Z_FLAG;
+                af.b.l |= (r & 0x28);   /* undocumented flag bits 5+3 */
+                if( (r & 0x0f) <= (a & 0x0f) ) af.b.l |= H_FLAG;
+                if( r <= a ) af.b.l |= C_FLAG;
+                if( (b^a^0x80) & (b^r) & 0x80 ) af.b.l |= V_FLAG;
        }
        else
        {
-				af.b.l = (r) ? ((r & 0x80) ? N_FLAG : 0) : Z_FLAG;
-				af.b.l |= (r & 0x28);	/* undocumented flag bits 5+3 */
-				if( (r & 0x0f) < (a & 0x0f) ) af.b.l |= H_FLAG;
-				if( r < a ) af.b.l |= C_FLAG;
-				if( (b^a^0x80) & (b^r) & 0x80 ) af.b.l |= V_FLAG;
+                af.b.l = (r) ? ((r & 0x80) ? N_FLAG : 0) : Z_FLAG;
+                af.b.l |= (r & 0x28);   /* undocumented flag bits 5+3 */
+                if( (r & 0x0f) < (a & 0x0f) ) af.b.l |= H_FLAG;
+                if( r < a ) af.b.l |= C_FLAG;
+                if( (b^a^0x80) & (b^r) & 0x80 ) af.b.l |= V_FLAG;
        }
 }
 
 static inline void setadc16(uint16_t a, uint16_t b)
 {
         uint32_t r=a+b+(af.b.l&1);
-	af.b.l = (((a ^ r ^ b) >> 8) & H_FLAG) |
-		((r >> 16) & C_FLAG) |
-		((r >> 8) & (N_FLAG | 0x28)) |
-		((r & 0xffff) ? 0 : Z_FLAG) |
-		(((b ^ a ^ 0x8000) & (b ^ r) & 0x8000) >> 13);
+    af.b.l = (((a ^ r ^ b) >> 8) & H_FLAG) |
+        ((r >> 16) & C_FLAG) |
+        ((r >> 8) & (N_FLAG | 0x28)) |
+        ((r & 0xffff) ? 0 : Z_FLAG) |
+        (((b ^ a ^ 0x8000) & (b ^ r) & 0x8000) >> 13);
 }
 
 static inline void z80_setadd16(uint16_t a, uint16_t b)
 {
         uint32_t r=a+b;
-	af.b.l = (af.b.l & (N_FLAG | Z_FLAG | V_FLAG)) |
-		(((a ^ r ^ b) >> 8) & H_FLAG) |
-		((r >> 16) & C_FLAG) | ((r >> 8) & 0x28);
+    af.b.l = (af.b.l & (N_FLAG | Z_FLAG | V_FLAG)) |
+        (((a ^ r ^ b) >> 8) & H_FLAG) |
+        ((r >> 16) & C_FLAG) | ((r >> 8) & 0x28);
 }
 
 static inline void setsbc(uint8_t a, uint8_t b)
@@ -225,60 +225,60 @@ static inline void setsbc(uint8_t a, uint8_t b)
        uint8_t r=a-(b+(af.b.l&C_FLAG));
        if (af.b.l&C_FLAG)
        {
-				af.b.l = S_FLAG | ((r) ? ((r & 0x80) ? N_FLAG : 0) : Z_FLAG);
-				af.b.l |= (r & 0x28);	/* undocumented flag bits 5+3 */
-				if( (r & 0x0f) >= (a & 0x0f) ) af.b.l |= H_FLAG;
-				if( r >= a ) af.b.l |= C_FLAG;
-				if( (b^a) & (a^r) & 0x80 ) af.b.l |= V_FLAG;
+                af.b.l = S_FLAG | ((r) ? ((r & 0x80) ? N_FLAG : 0) : Z_FLAG);
+                af.b.l |= (r & 0x28);   /* undocumented flag bits 5+3 */
+                if( (r & 0x0f) >= (a & 0x0f) ) af.b.l |= H_FLAG;
+                if( r >= a ) af.b.l |= C_FLAG;
+                if( (b^a) & (a^r) & 0x80 ) af.b.l |= V_FLAG;
        }
        else
        {
-				af.b.l = S_FLAG | ((r) ? ((r & 0x80) ? N_FLAG : 0) : Z_FLAG);
-				af.b.l |= (r & 0x28);	/* undocumented flag bits 5+3 */
-				if( (r & 0x0f) > (a & 0x0f) ) af.b.l |= H_FLAG;
-				if( r > a ) af.b.l |= C_FLAG;
-				if( (b^a) & (a^r) & 0x80 ) af.b.l |= V_FLAG;
+                af.b.l = S_FLAG | ((r) ? ((r & 0x80) ? N_FLAG : 0) : Z_FLAG);
+                af.b.l |= (r & 0x28);   /* undocumented flag bits 5+3 */
+                if( (r & 0x0f) > (a & 0x0f) ) af.b.l |= H_FLAG;
+                if( r > a ) af.b.l |= C_FLAG;
+                if( (b^a) & (a^r) & 0x80 ) af.b.l |= V_FLAG;
        }
 }
 
 static inline void setsbc16(uint16_t a, uint16_t b)
 {
-	uint32_t r = a - b - (af.b.l & C_FLAG);
-	af.b.l = (((a ^ r ^ b) >> 8) & H_FLAG) | S_FLAG |
-		((r >> 16) & C_FLAG) |
-		((r >> 8) & (N_FLAG | 0x28)) |
-		((r & 0xffff) ? 0 : Z_FLAG) |
-		(((b ^ a) & (a ^ r) &0x8000) >> 13);
+    uint32_t r = a - b - (af.b.l & C_FLAG);
+    af.b.l = (((a ^ r ^ b) >> 8) & H_FLAG) | S_FLAG |
+        ((r >> 16) & C_FLAG) |
+        ((r >> 8) & (N_FLAG | 0x28)) |
+        ((r & 0xffff) ? 0 : Z_FLAG) |
+        (((b ^ a) & (a ^ r) &0x8000) >> 13);
 }
 
 static inline void setcpED(uint8_t a, uint8_t b)
 {
        uint8_t r=a-b;
        af.b.l&=C_FLAG;
-				af.b.l |= S_FLAG | ((r) ? ((r & 0x80) ? N_FLAG : 0) : Z_FLAG);
-				af.b.l |= (b & 0x28);	/* undocumented flag bits 5+3 */
-				if( (r & 0x0f) > (a & 0x0f) ) af.b.l |= H_FLAG;
-				if( (b^a) & (a^r) & 0x80 ) af.b.l |= V_FLAG;
+                af.b.l |= S_FLAG | ((r) ? ((r & 0x80) ? N_FLAG : 0) : Z_FLAG);
+                af.b.l |= (b & 0x28);   /* undocumented flag bits 5+3 */
+                if( (r & 0x0f) > (a & 0x0f) ) af.b.l |= H_FLAG;
+                if( (b^a) & (a^r) & 0x80 ) af.b.l |= V_FLAG;
 }
 
 static inline void setcp(uint8_t a, uint8_t b)
 {
        uint8_t r=a-b;
-				af.b.l = S_FLAG | ((r) ? ((r & 0x80) ? N_FLAG : 0) : Z_FLAG);
-				af.b.l |= (b & 0x28);	/* undocumented flag bits 5+3 */
-				if( (r & 0x0f) > (a & 0x0f) ) af.b.l |= H_FLAG;
-				if( r > a ) af.b.l |= C_FLAG;
-				if( (b^a) & (a^r) & 0x80 ) af.b.l |= V_FLAG;
+                af.b.l = S_FLAG | ((r) ? ((r & 0x80) ? N_FLAG : 0) : Z_FLAG);
+                af.b.l |= (b & 0x28);   /* undocumented flag bits 5+3 */
+                if( (r & 0x0f) > (a & 0x0f) ) af.b.l |= H_FLAG;
+                if( r > a ) af.b.l |= C_FLAG;
+                if( (b^a) & (a^r) & 0x80 ) af.b.l |= V_FLAG;
 }
 
 static inline void z80_setsub(uint8_t a, uint8_t b)
 {
        uint8_t r=a-b;
-				af.b.l = S_FLAG | ((r) ? ((r & 0x80) ? N_FLAG : 0) : Z_FLAG);
-				af.b.l |= (r & 0x28);	/* undocumented flag bits 5+3 */
-				if( (r & 0x0f) > (a & 0x0f) ) af.b.l |= H_FLAG;
-				if( r > a ) af.b.l |= C_FLAG;
-				if( (b^a) & (a^r) & 0x80 ) af.b.l |= V_FLAG;
+                af.b.l = S_FLAG | ((r) ? ((r & 0x80) ? N_FLAG : 0) : Z_FLAG);
+                af.b.l |= (r & 0x28);   /* undocumented flag bits 5+3 */
+                if( (r & 0x0f) > (a & 0x0f) ) af.b.l |= H_FLAG;
+                if( r > a ) af.b.l |= C_FLAG;
+                if( (b^a) & (a^r) & 0x80 ) af.b.l |= V_FLAG;
 }
 
 static void makeznptable()
@@ -334,69 +334,69 @@ enum { REG_A, REG_F, REG_BC, REG_DE, REG_HL, REG_IX, REG_IY, REG_SP, REG_PC } re
 static uint32_t dbg_z80_reg_get(int which) {
     switch(which) {
         case REG_A:
-	    return af.b.h;
-	    break;
+        return af.b.h;
+        break;
         case REG_F:
-	    return af.b.l;
-	    break;
+        return af.b.l;
+        break;
         case REG_BC:
-	    return bc.w;
-	    break;
+        return bc.w;
+        break;
         case REG_DE:
-	    return de.w;
-	    break;
+        return de.w;
+        break;
         case REG_HL:
-	    return hl.w;
-	    break;
+        return hl.w;
+        break;
         case REG_IX:
-	    return ix.w;
-	    break;
+        return ix.w;
+        break;
         case REG_IY:
-	    return iy.w;
-	    break;
+        return iy.w;
+        break;
         case REG_SP:
-	    return sp;
-	    break;
+        return sp;
+        break;
         case REG_PC:
-	    return pc;
-	    break;
+        return pc;
+        break;
         default:
-	    log_warn("z80: attempt to read non-existent register");
-	    return 0;
+        log_warn("z80: attempt to read non-existent register");
+        return 0;
     }
 }
 
 static void dbg_z80_reg_set(int which, uint32_t value) {
     switch(which) {
         case REG_A:
-	    af.b.h = value;
-	    break;
+        af.b.h = value;
+        break;
         case REG_F:
-	    af.b.l = value;
-	    break;
+        af.b.l = value;
+        break;
         case REG_BC:
-	    bc.w = value;
-	    break;
+        bc.w = value;
+        break;
         case REG_DE:
-	    de.w = value;
-	    break;
+        de.w = value;
+        break;
         case REG_HL:
-	    hl.w = value;
-	    break;
+        hl.w = value;
+        break;
         case REG_IX:
-	    ix.w = value;
-	    break;
+        ix.w = value;
+        break;
         case REG_IY:
-	    iy.w = value;
-	    break;
+        iy.w = value;
+        break;
         case REG_SP:
-	    sp = value;
-	    break;
+        sp = value;
+        break;
         case REG_PC:
-	    pc = value;
-	    break;
+        pc = value;
+        break;
         default:
-	    log_warn("z80: attempt to write non-existent register");
+        log_warn("z80: attempt to write non-existent register");
     }
 }
 
@@ -428,19 +428,10 @@ cpu_debug_t tubez80_cpu_debug = {
     .get_instr_addr = dbg_z80_get_instr_addr
 };
 
-void z80_init()
+void z80_init(FILE *romf)
 {
-        FILE *f;
-        char fn[512];
-        if (!find_dat_file(fn, sizeof fn, "tube", "Z80_120", "rom")) {
-            f=x_fopen(fn,"rb");
-            fread(z80rom,0x1000,1,f);
-            fclose(f);
-            makeznptable();
-        } else {
-            log_fatal("z80: unable to find tube ROM");
-            exit(1);
-        }
+        fread(z80rom, 0x1000, 1, romf);
+        makeznptable();
 }
 
 void z80_close()
@@ -485,9 +476,9 @@ void z80_exec()
                 opc=pc;
                 if ((tube_irq&1) && iff1) enterint=1;
                 cycles=0;
-		if (dbg_tube_z80)
-		    debug_preexec(&tubez80_cpu_debug, pc);
-		tempc=af.b.l&C_FLAG;
+        if (dbg_tube_z80)
+            debug_preexec(&tubez80_cpu_debug, pc);
+        tempc=af.b.l&C_FLAG;
                 opcode=z80_readmem(pc++);
                 ir.b.l=((ir.b.l+1)&0x7F)|(ir.b.l&0x80);
                 switch (opcode)

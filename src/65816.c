@@ -70,38 +70,38 @@ static inline uint8_t pack_flags() {
     uint8_t flags = 0;
 
     if (p.c)
-	flags |= 0x01;
+    flags |= 0x01;
     if (p.z)
-	flags |= 0x02;
+    flags |= 0x02;
     if (p.i)
-	flags |= 0x04;
+    flags |= 0x04;
     if (p.d)
-	flags |= 0x08;
+    flags |= 0x08;
     if (p.ex)
-	flags |= 0x10;
+    flags |= 0x10;
     if (p.m)
-	flags |= 0x20;
+    flags |= 0x20;
     if (p.v)
-	flags |= 0x40;
+    flags |= 0x40;
     if (p.n)
-	flags |= 0x80;
+    flags |= 0x80;
     return flags;
 }
 
 static inline uint8_t pack_flags_em(uint8_t flags) {
 
     if (p.c)
-	flags |= 0x01;
+    flags |= 0x01;
     if (p.z)
-	flags |= 0x02;
+    flags |= 0x02;
     if (p.i)
-	flags |= 0x4;
+    flags |= 0x4;
     if (p.d)
-	flags |= 0x08;
+    flags |= 0x08;
     if (p.v)
-	flags |= 0x40;
+    flags |= 0x40;
     if (p.n)
-	flags |= 0x80;
+    flags |= 0x80;
     return flags;
 }
 
@@ -142,11 +142,11 @@ static uint32_t dbg_reg_get(int which) {
     case REG_PC:
         return pc;
     case REG_DP:
-	return dp;
+    return dp;
     case REG_DB:
-	return dbr;
+    return dbr;
     case REG_PB:
-	return pbr;
+    return pbr;
     default:
         log_warn("65816: attempt to get non-existent register");
         return 0;
@@ -174,11 +174,11 @@ static void dbg_reg_set(int which, uint32_t value) {
     case REG_PC:
         pc = value;
     case REG_DP:
-	dp = value;
+    dp = value;
     case REG_DB:
-	dbr = value;
+    dbr = value;
     case REG_PB:
-	pbr = value;
+    pbr = value;
     default:
         log_warn("65816: attempt to set non-existent register");
     }
@@ -186,15 +186,15 @@ static void dbg_reg_set(int which, uint32_t value) {
 
 size_t dbg65816_print_flags(char *buf, size_t bufsize) {
     if (bufsize >= 8) {
-	*buf++ = p.n  ? 'N' : ' ';
-	*buf++ = p.v  ? 'V' : ' ';
-	*buf++ = p.m  ? 'M' : ' ';
-	*buf++ = p.ex ? 'X' : ' ';
-	*buf++ = p.d  ? 'D' : ' ';
-	*buf++ = p.i  ? 'I' : ' ';
-	*buf++ = p.z  ? 'Z' : ' ';
-	*buf++ = p.c  ? 'C' : ' ';
-	return 6;
+    *buf++ = p.n  ? 'N' : ' ';
+    *buf++ = p.v  ? 'V' : ' ';
+    *buf++ = p.m  ? 'M' : ' ';
+    *buf++ = p.ex ? 'X' : ' ';
+    *buf++ = p.d  ? 'D' : ' ';
+    *buf++ = p.i  ? 'I' : ' ';
+    *buf++ = p.z  ? 'Z' : ' ';
+    *buf++ = p.c  ? 'C' : ' ';
+    return 6;
     }
     return 0;
 }
@@ -266,7 +266,7 @@ uint8_t readmem65816(uint32_t addr)
 {
     uint32_t value = do_readmem65816(addr);
     if (dbg_w65816)
-	debug_memread(&tube65816_cpu_debug, addr, value, 1);
+    debug_memread(&tube65816_cpu_debug, addr, value, 1);
     return value;
 }
 
@@ -277,7 +277,7 @@ static uint16_t readmemw65816(uint32_t a)
     a&=w65816mask;
     value = do_readmem65816(a) | (do_readmem65816(a+1)<<8);
     if (dbg_w65816)
-	debug_memread(&tube65816_cpu_debug, a, value, 2);
+    debug_memread(&tube65816_cpu_debug, a, value, 2);
 //        cycles-=2;
     return value;
 }
@@ -321,14 +321,14 @@ void do_writemem65816(uint32_t a, uint32_t v)
 void writemem65816(uint32_t addr, uint8_t val)
 {
     if (dbg_w65816)
-	debug_memwrite(&tube65816_cpu_debug, addr, val, 1);
+    debug_memwrite(&tube65816_cpu_debug, addr, val, 1);
     do_writemem65816(addr, val);
 }
 
 static void writememw65816(uint32_t a, uint16_t v)
 {
     if (dbg_w65816)
-	debug_memwrite(&tube65816_cpu_debug, a, v, 2);
+    debug_memwrite(&tube65816_cpu_debug, a, v, 2);
     a&=w65816mask;
     do_writemem65816(a,v);
     do_writemem65816(a+1,v>>8);
@@ -453,7 +453,7 @@ static uint32_t sindirecty()
 
 static uint32_t indirectl()
 {
-		uint32_t temp, addr;
+        uint32_t temp, addr;
         temp=(readmem(pbr|pc)+dp)&0xFFFF; pc++;
         addr=readmemw(temp)|(readmem(temp+2)<<16);
 //        printf("IND %06X\n",addr);
@@ -462,7 +462,7 @@ static uint32_t indirectl()
 
 static uint32_t indirectly()
 {
-		uint32_t temp, addr;
+        uint32_t temp, addr;
         temp=(readmem(pbr|pc)+dp)&0xFFFF; pc++;
         addr=(readmemw(temp)|(readmem(temp+2)<<16))+y.w;
 //        if (pc==0xFDC9) printf("INDy %04X %06X\n",temp,addr);
@@ -3107,7 +3107,7 @@ static void plp()
 static void plpe()
 {
         s.b.l++;
-	unpack_flags_em(readmem(s.w));
+    unpack_flags_em(readmem(s.w));
         cycles-=2; clockspc(12);
 }
 
@@ -4807,21 +4807,12 @@ static void makeopcodetable65816()
                          opcodes[0xDB][3]=opcodes[0xDB][4]=stp;
 }
 
-void w65816_init()
+void w65816_init(FILE *romf)
 {
-        FILE *f;
-        char fn[512];
         if (!w65816rom) w65816rom=malloc(0x8000);
         if (!w65816ram) w65816ram=malloc(0x80000);
-        if (!find_dat_file(fn, sizeof fn, "tube", "ReCo6502ROM_816", "rom")) {
-            f=x_fopen(fn,"rb");
-            fread(w65816rom,0x8000,1,f);
-            fclose(f);
-            makeopcodetable65816();
-        } else {
-            log_fatal("65816: unable to find tube ROM");
-            exit(1);
-        }
+        fread(w65816rom, 0x8000, 1, romf);
+        makeopcodetable65816();
 }
 
 void w65816_close()
@@ -4932,7 +4923,7 @@ void w65816_exec()
 
         while (tubecycles>0)
         {
-	        ia = pbr|pc;
+            ia = pbr|pc;
                 if (dbg_w65816)
                     debug_preexec(&tube65816_cpu_debug, ia);
                 opcode=readmem(ia); pc++;
