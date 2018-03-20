@@ -132,16 +132,22 @@ static void dbg_reg_set(int which, uint32_t value) {
     switch (which) {
         case REG_A:
             tubea = value;
+            break;
         case REG_X:
             tubex = value;
+            break;
         case REG_Y:
             tubey = value;
+            break;
         case REG_S:
             tubesp = value;
+            break;
         case REG_P:
             unpack_flags(value);
+            break;
         case REG_PC:
             tubepc = value;
+            break;
         default:
             log_warn("6502tube: attempt to set non-existent register");
     }
