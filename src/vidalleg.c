@@ -129,6 +129,13 @@ void video_set_window_size(void)
     winsizey = scr_y_size + y_fudge;
 }
 
+void video_set_borders(int borders)
+{
+    vid_fullborders = borders;
+    video_set_window_size();
+    al_resize_display(al_get_current_display(), winsizex, winsizey);
+}
+
 void video_update_window_size(ALLEGRO_EVENT *event)
 {
     if (!fullscreen) {

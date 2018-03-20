@@ -809,7 +809,7 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             set_video_interlaced(event);
             break;
         case IDM_VIDEO_BORDERS:
-            vid_fullborders = radio_event_simple(event, vid_fullborders);
+            video_set_borders(radio_event_simple(event, vid_fullborders));
             break;
         case IDM_VIDEO_FULLSCR:
             video_toggle_fullscreen();
