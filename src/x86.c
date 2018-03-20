@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include "b-em.h"
 #include "x86.h"
+#include "x86_tube.h"
 #include "tube.h"
 #include "cpu_debug.h"
 
@@ -633,22 +634,13 @@ void x86_reset()
         makemod1table();
 }
 
-void x86_init()
+void x86_init(FILE *romf)
 {
-        FILE *f;
-        char fn[PATH_MAX];
         if (!x86ram) x86ram=malloc(0x100000);
         if (!x86rom) x86rom=malloc(0x4000);
         x86makeznptable();
         memset(x86ram,0,0x100000);
-        if (!find_dat_file(fn, sizeof fn, "roms/tube", "BIOS", "rom")) {
-            f=x_fopen(fn,"rb");
-            fread(x86rom,0x4000,1,f);
-            fclose(f);
-        } else {
-            log_fatal("x86: BIOS ROM not found");
-            exit(1);
-        }
+        fread(x86rom, 0x4000, 1, romf);
 }
 
 void x86_close()

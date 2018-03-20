@@ -3,10 +3,10 @@
 
 #include "cpu_debug.h"
 
-void x86_init();
-void x86_reset();
-void x86_exec();
-void x86_close();
+void x86_init(FILE *romf);
+void x86_reset(void);
+void x86_exec(void);
+void x86_close(void);
 uint8_t x86_readmem(uint32_t addr);
 void x86_writemem(uint32_t addr, uint8_t byte);
 

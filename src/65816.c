@@ -4807,21 +4807,12 @@ static void makeopcodetable65816()
                          opcodes[0xDB][3]=opcodes[0xDB][4]=stp;
 }
 
-void w65816_init()
+void w65816_init(FILE *romf)
 {
-        FILE *f;
-        char fn[512];
         if (!w65816rom) w65816rom=malloc(0x8000);
         if (!w65816ram) w65816ram=malloc(0x80000);
-        if (!find_dat_file(fn, sizeof fn, "tube", "ReCo6502ROM_816", "rom")) {
-            f=x_fopen(fn,"rb");
-            fread(w65816rom,0x8000,1,f);
-            fclose(f);
-            makeopcodetable65816();
-        } else {
-            log_fatal("65816: unable to find tube ROM");
-            exit(1);
-        }
+        fread(w65816rom, 0x8000, 1, romf);
+        makeopcodetable65816();
 }
 
 void w65816_close()

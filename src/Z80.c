@@ -428,19 +428,10 @@ cpu_debug_t tubez80_cpu_debug = {
     .get_instr_addr = dbg_z80_get_instr_addr
 };
 
-void z80_init()
+void z80_init(FILE *romf)
 {
-        FILE *f;
-        char fn[512];
-        if (!find_dat_file(fn, sizeof fn, "tube", "Z80_120", "rom")) {
-            f=x_fopen(fn,"rb");
-            fread(z80rom,0x1000,1,f);
-            fclose(f);
-            makeznptable();
-        } else {
-            log_fatal("z80: unable to find tube ROM");
-            exit(1);
-        }
+        fread(z80rom, 0x1000, 1, romf);
+        makeznptable();
 }
 
 void z80_close()

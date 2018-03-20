@@ -37,21 +37,7 @@ static uint8_t tuberom[0x1000];
 static FILE *trace_fp;
 #endif
 
-static void tube_6502_loadrom() {
-    FILE *f;
-    char path[PATH_MAX];
-
-    if (!find_dat_file(path, sizeof path, "roms/tube", "6502Tube", "rom")) {
-        f = x_fopen(path, "rb");
-        fread(tuberom+0x800,0x800,1,f);
-        fclose(f);
-    } else {
-        log_fatal("6502tube: tube ROM not found");
-        exit(1);
-    }
-}
-
-void tube_6502_init_cpu()
+void tube_6502_init_cpu(FILE *romf)
 {
         int c;
         if (!tuberam)
@@ -66,7 +52,7 @@ void tube_6502_init_cpu()
 //        tubememstat[0xFE]=tubememstat[0xFF]=2;
         tubemem[0x100] = tubemem[0];
         tubememstat[0x100] = tubememstat[0];
-        tube_6502_loadrom();
+        fread(tuberom+0x800, 0x800, 1, romf);
 #ifdef TRACE_TUBE
         if ((trace_fp = fopen("6502tube.trace", "wb"))) {
                 fwrite("6502NMOS", 8, 1, trace_fp);

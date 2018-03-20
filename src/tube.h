@@ -2,12 +2,12 @@
 #define __INC_TUBE_H
 
 void tube_reset(void);
-void tube_6502_init(void);
-void tube_arm_init(void);
-void tube_z80_init(void);
-void tube_x86_init(void);
-void tube_65816_init(void);
-void tube_32016_init(void);
+void tube_6502_init(FILE *romf);
+void tube_arm_init(FILE *romf);
+void tube_z80_init(FILE *romf);
+void tube_x86_init(FILE *romf);
+void tube_65816_init(FILE *romf);
+void tube_32016_init(FILE *romf);
 
 uint8_t (*tube_readmem)(uint32_t addr);
 void (*tube_writemem)(uint32_t addr, uint8_t byte);

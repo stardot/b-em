@@ -13,7 +13,7 @@
 //void dumparmregs();
 //int databort;
 
-void arm_init(void);
+void arm_init(FILE *romf);
 void arm_reset(void);
 void arm_exec(void);
 void arm_close(void);

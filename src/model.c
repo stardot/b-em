@@ -54,13 +54,12 @@ extern cpu_debug_t n32016_cpu_debug;
 
 TUBE tubes[NUM_TUBES]=
 {
-        {"6502", tube_6502_init,  tube_6502_reset, &tube6502_cpu_debug  },
-        {"ARM",  tube_arm_init,   arm_reset,       &tubearm_cpu_debug   },
-        {"Z80",  tube_z80_init,   z80_reset,       &tubez80_cpu_debug   },
-        {"80186",tube_x86_init,   x86_reset,       &tubex86_cpu_debug   },
-        {"65816",tube_65816_init, w65816_reset,    &tube65816_cpu_debug },
-        {"32016",tube_32016_init, n32016_reset,    &n32016_cpu_debug    },
-        {"",0,0}
+        {"6502",           tube_6502_init,  tube_6502_reset, &tube6502_cpu_debug,  "6502Tube"        },
+        {"ARM",            tube_arm_init,   arm_reset,       &tubearm_cpu_debug,   "ARMeval_100"     },
+        {"Z80",            tube_z80_init,   z80_reset,       &tubez80_cpu_debug,   "Z80_120"         },
+        {"80186",          tube_x86_init,   x86_reset,       &tubex86_cpu_debug,   "BIOS"            },
+        {"65816",          tube_65816_init, w65816_reset,    &tube65816_cpu_debug, "ReCo6502ROM_816" },
+        {"32016",          tube_32016_init, n32016_reset,    &n32016_cpu_debug,    ""                }
 };
 
 void model_check(void) {
@@ -77,6 +76,32 @@ void model_check(void) {
     if (curtube < -1 || curtube >= NUM_TUBES) {
         log_warn("No tube #%d, running with no tube instead", curtube);
         curtube = -1;
+    }
+}
+
+static void tube_init(void)
+{
+    char path[PATH_MAX];
+    FILE *romf;
+
+    if (curtube!=-1) {
+        if (!tubes[curtube].bootrom[0]) // no boot ROM needed
+            tubes[curtube].init(NULL);
+        else if (!find_dat_file(path, sizeof path, "roms/tube", tubes[curtube].bootrom, "rom")) {
+            if ((romf = fopen(path, "rb"))) {
+                tubes[curtube].init(romf);
+                fclose(romf);
+            } else {
+                log_error("model: unable to open boot rom %s for tube %s: %s", path, tubes[curtube].name, strerror(errno));
+                curtube = -1;
+                return;
+            }
+        } else {
+            log_error("model: boot rom %s for tube %s not found", tubes[curtube].bootrom, tubes[curtube].name);
+            curtube = -1;
+            return;
+        }
+        tube_reset();
     }
 }
 
@@ -99,17 +124,13 @@ void model_init()
 
         mem_clearroms();
         models[curmodel].romsetup();
-
-        if (curtube!=-1)
-            tubes[curtube].init();
-        tube_reset();
-
+        tube_init();
         cmos_load(models[curmodel]);
 }
 
 void model_save(ALLEGRO_CONFIG *bem_cfg) {
     const char *sect = models[curmodel].cfgsect;
-    
+
     al_set_config_value(bem_cfg, sect, "name", models[curmodel].name);
     mem_save_romcfg(bem_cfg, sect);
 }
