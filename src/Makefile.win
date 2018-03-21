@@ -9,7 +9,7 @@ WINDRES = windres.exe
 #   INCLUDE_DEBUGGER - include the cpu_debug implementation
 # USE_MEMORY_POINTER - do not assume Co Pro memory starts at address 0
 
-COMMON_FLAGS = -O3 -Wall -I /usr/local/include -DBEM -DVERSION=\"Win32\" -DINCLUDE_DEBUGGER -DUSE_MEMORY_POINTER
+COMMON_FLAGS = -O3 -D_DEBUG -Wall -I /usr/local/include -DBEM -DVERSION=\"Win32\" -DINCLUDE_DEBUGGER -DUSE_MEMORY_POINTER
 CFLAGS       = -std=gnu99 $(COMMON_FLAGS)
 CXXFLAGS     = $(COMMON_FLAGS)
 
@@ -45,6 +45,7 @@ OBJ = \
     i8271.o \
     ide.o \
     keyboard.o \
+    keydef-allegro.o \
     logging.o \
     main.o \
     mem.o \
@@ -112,7 +113,7 @@ SIDOBJ = \
     wave8580_PST.o \
     wave.o
 
-LIBS = -L /usr/local/lib -lallegro_audio -lallegro_acodec -lallegro_primitives -lallegro_dialog -lallegro_image -lallegro -mwindows -lz -lgdi32 -lwinmm -lstdc++
+LIBS = -L /usr/local/lib -lallegro_audio -lallegro_acodec -lallegro_primitives -lallegro_dialog -lallegro_image -lallegro_font -lallegro -mwindows -lz -lgdi32 -lwinmm -lstdc++
 
 all : b-em.exe
 
