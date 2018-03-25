@@ -37,6 +37,8 @@ static uint8_t codeconvert[128]=
 static inline void key_press(int row, int col)
 {
         bbckey[col][row] = 1;
+        if (bemfreerun)
+            bemfreerun = 2;
 }
 
 static inline void key_release(int row, int col)
@@ -59,6 +61,17 @@ void key_clear()
         int row, col;
         for (c = 0; c < 128; c++)
                 if (TranslateKey(codeconvert[keylookup[c]], &row, &col) > 0) key_release(row,col);
+}
+
+int key_any_down()
+{
+    for (int i = 0; i < 16; ++i) {
+        for (int j = 0; j < 16; ++j) {
+            if (bbckey[i][j])
+                return 1;
+        }
+    }
+    return 0;
 }
 
 static void key_update()

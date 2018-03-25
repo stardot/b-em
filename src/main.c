@@ -341,7 +341,14 @@ void main_run()
             bemfreerun = 0;
     }
 
-        if ((fcount > 0 || bemfreerun || (motor && fasttape)))
+    if (bemfreerun == 2) {
+        // A key was pressed while freerunning; disable freerun temporarily
+        // until no key is pressed any more.
+        if (!key_any_down())
+            bemfreerun = 1;
+    }
+
+        if ((fcount > 0 || (bemfreerun == 1) || (motor && fasttape)))
         {
                 if (autoboot) autoboot--;
                 fcount--;
