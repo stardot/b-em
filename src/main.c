@@ -27,9 +27,7 @@
 #include "midi.h"
 #include "music4000.h"
 #include "music5000.h"
-#ifdef WIN32
 #include "pal.h"
-#endif
 #include "savestate.h"
 #include "scsi.h"
 #include "serial.h"
