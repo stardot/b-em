@@ -103,28 +103,41 @@ char exedir[512];
 
 void main_reset()
 {
-        m6502_reset();
-        crtc_reset();
-        video_reset();
-        sysvia_reset();
-        uservia_reset();
-        serial_reset();
-        acia_reset(&sysacia);
-        wd1770_reset();
-        i8271_reset();
-        scsi_reset();
-        vdfs_reset();
-        sid_reset();
-        music4000_reset();
-        music5000_reset();
-        sn_init();
-        if (curtube != -1) tubes[curtube].reset();
-        else               tube_exec = NULL;
-        tube_reset();
+    m6502_reset();
+    crtc_reset();
+    video_reset();
+    sysvia_reset();
+    uservia_reset();
+    serial_reset();
+    acia_reset(&sysacia);
+    wd1770_reset();
+    i8271_reset();
+    scsi_reset();
+    vdfs_reset();
+    sid_reset();
+    music4000_reset();
+    music5000_reset();
+    sn_init();
+    if (curtube != -1) tubes[curtube].reset();
+    else               tube_exec = NULL;
+    tube_reset();
 
-        memset(ram, 0, 64 * 1024);
+    memset(ram, 0, 64 * 1024);
 }
 
+static const char helptext[] =
+    VERSION_STR " command line options:\n\n"
+    "-mx             - start as model x (see readme.txt for models)\n"
+    "-tx             - start with tube x (see readme.txt for tubes)\n"
+    "-disc disc.ssd  - load disc.ssd into drives :0/:2\n"
+    "-disc1 disc.ssd - load disc.ssd into drives :1/:3\n"
+    "-autoboot       - boot disc in drive :0\n"
+    "-tape tape.uef  - load tape.uef\n"
+    "-fasttape       - set tape speed to fast\n"
+    "-s              - scanlines display mode\n"
+    "-i              - interlace display mode\n"
+    "-debug          - start debugger\n"
+    "-allegro        - use Allegro for video rendering\n";
 
 void main_init(int argc, char *argv[])
 {
@@ -146,111 +159,68 @@ void main_init(int argc, char *argv[])
 
     vid_fskipmax = 1;
 
-        //TODO - do this properly.
-        //append_filename(t, exedir, "roms/tube/ReCo6502ROM_816", 511);
-        //if (!file_exists(t,FA_ALL,NULL) && selecttube == 4) selecttube = -1;
+    model_check();
 
-        curtube = selecttube;
-        model_check();
-
-        for (c = 1; c < argc; c++)
-        {
-                if (!strcasecmp(argv[c], "--help"))
-                {
-                        printf("%s command line options :\n\n", VERSION_STR);
-                        printf("-mx             - start as model x (see readme.txt for models)\n");
-                        printf("-tx             - start with tube x (see readme.txt for tubes)\n");
-                        printf("-disc disc.ssd  - load disc.ssd into drives :0/:2\n");
-                        printf("-disc1 disc.ssd - load disc.ssd into drives :1/:3\n");
-                        printf("-autoboot       - boot disc in drive :0\n");
-                        printf("-tape tape.uef  - load tape.uef\n");
-                        printf("-fasttape       - set tape speed to fast\n");
-                        printf("-s              - scanlines display mode\n");
-                        printf("-i              - interlace display mode\n");
-                        printf("-debug          - start debugger\n");
-                        printf("-allegro        - use Allegro for video rendering\n");
-                        exit(-1);
-                }
-                else
-                if (!strcasecmp(argv[c], "-tape"))
-                {
-                        tapenext = 2;
-                }
-                else if (!strcasecmp(argv[c], "-disc") || !strcasecmp(argv[c], "-disk"))
-                {
-                        discnext = 1;
-                }
-                else if (!strcasecmp(argv[c], "-disc1"))
-                {
-                        discnext = 2;
-                }
-                else if (argv[c][0] == '-' && (argv[c][1] == 'm' || argv[c][1] == 'M'))
-                {
-                        sscanf(&argv[c][2], "%i", &curmodel);
-                }
-                else if (argv[c][0] == '-' && (argv[c][1] == 't' || argv[c][1] == 'T'))
-                {
-                        sscanf(&argv[c][2], "%i", &curtube);
-                }
-                else if (!strcasecmp(argv[c], "-fasttape"))
-                {
-                        fasttape = 1;
-                }
-                else if (!strcasecmp(argv[c], "-autoboot"))
-                {
-                        autoboot = 150;
-                }
-                else if (argv[c][0] == '-' && (argv[c][1] == 'f' || argv[c][1]=='F'))
-                {
-                        sscanf(&argv[c][2], "%i", &vid_fskipmax);
+    for (c = 1; c < argc; c++) {
+        if (!strcasecmp(argv[c], "--help")) {
+            fwrite(helptext, sizeof helptext-1, 1, stdout);
+            exit(1);
+        }
+        else if (!strcasecmp(argv[c], "-tape"))
+            tapenext = 2;
+        else if (!strcasecmp(argv[c], "-disc") || !strcasecmp(argv[c], "-disk"))
+            discnext = 1;
+        else if (!strcasecmp(argv[c], "-disc1"))
+            discnext = 2;
+        else if (argv[c][0] == '-' && (argv[c][1] == 'm' || argv[c][1] == 'M'))
+            sscanf(&argv[c][2], "%i", &curmodel);
+        else if (argv[c][0] == '-' && (argv[c][1] == 't' || argv[c][1] == 'T'))
+            sscanf(&argv[c][2], "%i", &curtube);
+        else if (!strcasecmp(argv[c], "-fasttape"))
+            fasttape = 1;
+        else if (!strcasecmp(argv[c], "-autoboot"))
+            autoboot = 150;
+        else if (argv[c][0] == '-' && (argv[c][1] == 'f' || argv[c][1]=='F')) {
+            sscanf(&argv[c][2], "%i", &vid_fskipmax);
             if (vid_fskipmax < 1) vid_fskipmax = 1;
             if (vid_fskipmax > 9) vid_fskipmax = 9;
-                }
-                else if (argv[c][0] == '-' && (argv[c][1] == 's' || argv[c][1] == 'S'))
-                {
-                        vid_scanlines = 1;
-                }
-                else if (!strcasecmp(argv[c], "-debug"))
-                {
-                        debug_core = 1;
-                }
-                else if (!strcasecmp(argv[c], "-debugtube"))
-                {
-                        debug_tube = 1;
-                }
-                else if (argv[c][0] == '-' && (argv[c][1] == 'i' || argv[c][1] == 'I'))
-                {
-                        vid_interlace = 1;
-            vid_linedbl = vid_scanlines = 0;
-                }
-                else if (tapenext) {
-                    if (tape_fn)
-                        al_destroy_path(tape_fn);
-                    tape_fn = al_create_path(argv[c]);
-                }
-                else if (discnext)
-                {
-                    if (discfns[discnext-1])
-                        al_destroy_path(discfns[discnext-1]);
-                    discfns[discnext-1] = al_create_path(argv[c]);
-                    discnext = 0;
-                }
-                else
-                {
-                    if (discfns[0])
-                        al_destroy_path(discfns[0]);
-                    discfns[0] = al_create_path(argv[c]);
-                    discnext = 0;
-                    autoboot = 150;
-                }
-                if (tapenext) tapenext--;
         }
+        else if (argv[c][0] == '-' && (argv[c][1] == 's' || argv[c][1] == 'S'))
+            vid_scanlines = 1;
+        else if (!strcasecmp(argv[c], "-debug"))
+            debug_core = 1;
+        else if (!strcasecmp(argv[c], "-debugtube"))
+            debug_tube = 1;
+        else if (argv[c][0] == '-' && (argv[c][1] == 'i' || argv[c][1] == 'I')) {
+            vid_interlace = 1;
+            vid_linedbl = vid_scanlines = 0;
+        }
+        else if (tapenext) {
+            if (tape_fn)
+                al_destroy_path(tape_fn);
+            tape_fn = al_create_path(argv[c]);
+        }
+        else if (discnext) {
+            if (discfns[discnext-1])
+                al_destroy_path(discfns[discnext-1]);
+            discfns[discnext-1] = al_create_path(argv[c]);
+            discnext = 0;
+        }
+        else {
+            if (discfns[0])
+                al_destroy_path(discfns[0]);
+            discfns[0] = al_create_path(argv[c]);
+            discnext = 0;
+            autoboot = 150;
+        }
+        if (tapenext) tapenext--;
+    }
 
-        display = video_init();
-        mode7_makechars();
-        al_init_image_addon();
+    display = video_init();
+    mode7_makechars();
+    al_init_image_addon();
 
-        mem_init();
+    mem_init();
 
     if (!(queue = al_create_event_queue())) {
         log_fatal("main: unable to create event queue");
@@ -270,6 +240,7 @@ void main_init(int argc, char *argv[])
         log_fatal("main: unable to initialise audio codecs");
         exit(1);
     }
+
     sound_init();
     sid_init();
     sid_settype(sidmethod, cursid);
@@ -279,20 +250,19 @@ void main_init(int argc, char *argv[])
 
     adc_init();
 #ifdef WIN32
-        pal_init();
+    pal_init();
 #endif
-        disc_init();
-        fdi_init();
+    disc_init();
+    fdi_init();
 
-        scsi_init();
-        ide_init();
-        vdfs_init();
+    scsi_init();
+    ide_init();
+    vdfs_init();
 
-        model_init();
+    model_init();
 
-        midi_init();
-        main_reset();
-
+    midi_init();
+    main_reset();
 
     gui_allegro_init(queue, display);
 
@@ -316,29 +286,29 @@ void main_init(int argc, char *argv[])
     al_install_mouse();
     al_register_event_source(queue, al_get_mouse_event_source());
 
-        disc_load(0, discfns[0]);
-        disc_load(1, discfns[1]);
-        tape_load(tape_fn);
-        if (defaultwriteprot)
-            writeprot[0] = writeprot[1] = 1;
+    disc_load(0, discfns[0]);
+    disc_load(1, discfns[1]);
+    tape_load(tape_fn);
+    if (defaultwriteprot)
+        writeprot[0] = writeprot[1] = 1;
 
-        debug_start();
+    debug_start();
 }
 
 void main_restart()
 {
     main_pause();
-        if (curtube == 3 || mouse_amx)
-            al_uninstall_mouse();
-        cmos_save(models[oldmodel]);
-        oldmodel = curmodel;
+    if (curtube == 3 || mouse_amx)
+        al_uninstall_mouse();
+    cmos_save(models[oldmodel]);
+    oldmodel = curmodel;
 
-        model_init();
+    model_init();
 
-        main_reset();
+    main_reset();
 
-        if (curtube == 3 || mouse_amx)
-            al_install_mouse();
+    if (curtube == 3 || mouse_amx)
+        al_install_mouse();
     main_resume();
 }
 
@@ -357,7 +327,7 @@ int framesrun = 0;
 
 void main_cleardrawit()
 {
-        fcount = 0;
+    fcount = 0;
 }
 
 static void main_start_fullspeed(void)
@@ -532,31 +502,31 @@ void main_run()
 
 void main_close()
 {
-        debug_kill();
+    debug_kill();
 
-        config_save();
-        cmos_save(models[curmodel]);
+    config_save();
+    cmos_save(models[curmodel]);
 
-        midi_close();
-        mem_close();
-        uef_close();
-        csw_close();
-        tube_6502_close();
-        arm_close();
-        x86_close();
-        z80_close();
-        w65816_close();
-        n32016_close();
-        disc_close(0);
-        disc_close(1);
-        scsi_close();
-        ide_close();
-        vdfs_close();
-        ddnoise_close();
-        tapenoise_close();
+    midi_close();
+    mem_close();
+    uef_close();
+    csw_close();
+    tube_6502_close();
+    arm_close();
+    x86_close();
+    z80_close();
+    w65816_close();
+    n32016_close();
+    disc_close(0);
+    disc_close(1);
+    scsi_close();
+    ide_close();
+    vdfs_close();
+    ddnoise_close();
+    tapenoise_close();
 
-        video_close();
-        log_close();
+    video_close();
+    log_close();
 }
 
 void main_setspeed(int speed)
