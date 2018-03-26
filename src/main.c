@@ -134,10 +134,11 @@ static const char helptext[] =
     "-autoboot       - boot disc in drive :0\n"
     "-tape tape.uef  - load tape.uef\n"
     "-fasttape       - set tape speed to fast\n"
+    "-Fx             - set maximum video frames skipped\n"
     "-s              - scanlines display mode\n"
     "-i              - interlace display mode\n"
     "-debug          - start debugger\n"
-    "-allegro        - use Allegro for video rendering\n";
+    "-debugtube      - start debugging tube processor\n\n";
 
 void main_init(int argc, char *argv[])
 {
