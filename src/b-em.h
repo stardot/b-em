@@ -37,24 +37,15 @@ extern int joybutton[2];
 
 void setquit();
 
+void cataddname(char *s);
+
 #ifdef WIN32
 
 #include <windows.h>
 
-void cataddname(char *s);
-void showcatalogue(HINSTANCE hInstance, HWND hWnd);
-
-#else
-
-static inline void startblit(void) {};
-static inline void endblit(void) {};
-static inline void cataddname(char *s) {};
-static inline void showcatalogue(void) {};
-
 #endif
 
 extern int autoboot;
-
 
 void redefinekeys(void);
 
