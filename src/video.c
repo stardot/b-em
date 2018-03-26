@@ -16,7 +16,6 @@
 #include "video.h"
 #include "video_render.h"
 
-
 int fullscreen = 0;
 
 int scrx, scry;
@@ -829,9 +828,7 @@ void video_poll(int clocks, int timer_enable)
             scry++;
             if (scry >= 384) {
                 scry = 0;
-                al_unlock_bitmap(b);
                 video_doblit(crtc_mode, crtc[4]);
-                region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_READWRITE);
             }
         }
 
@@ -1165,16 +1162,14 @@ void video_poll(int clocks, int timer_enable)
                     interlline = frameodd && (crtc[8] & 1);
                     oldr8 = crtc[8] & 1;
                     if (vidclocks > 1024 && !ccount) {
-                        al_unlock_bitmap(b);
                         video_doblit(crtc_mode, crtc[4]);
-                        region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_READWRITE);
                         vid_cleared = 0;
                     } else if (vidclocks <= 1024 && !vid_cleared) {
                         vid_cleared = 1;
                         al_unlock_bitmap(b);
                         al_clear_to_color(al_map_rgb(0, 0, 0));
-                        video_doblit(crtc_mode, crtc[4]);
                         region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_READWRITE);
+                        video_doblit(crtc_mode, crtc[4]);
                     }
                     ccount++;
                     if (ccount == 10 || ((!motor || !fasttape) && !is_free_run()))

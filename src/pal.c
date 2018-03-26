@@ -207,6 +207,16 @@ void pal_convert(ALLEGRO_BITMAP *inb, int x1, int y1, int x2, int y2, int yoff)
 
 #ifdef PAL_FLOAT
 
+static inline int get_pixel(ALLEGRO_LOCKED_REGION *region, int x, int y)
+{
+    return *((uint32_t *)(region->data + region->pitch * y + x * region->pixel_size));
+}
+
+static inline void put_pixel(ALLEGRO_LOCKED_REGION *region, int x, int y, uint32_t colour)
+{
+    *((uint32_t *)(region->data + region->pitch * y + x * region->pixel_size)) = colour;
+}
+
 static float vision_iir(float NewSample) {
     static float x; //input samples
 
@@ -255,25 +265,24 @@ void pal_init(void)
         }
 }
 
-void pal_convert(ALLEGRO_BITMAP *inb, int x1, int y1, int x2, int y2, int yoff)
+void pal_convert(int x1, int y1, int x2, int y2, int yoff)
 {
         int x, y;
         int r, g, b;
-        ALLEGRO_COLOR pixel;
-        unsigned char ir, ig, ib;
+        int pixel;
         float Y, U, V;
         float signal;
         static int wt;
         float u_old[2][1536], v_old[2][1536];
         float u_filt[4], v_filt[4];
         float *uo[2], *vo[2];
+        ALLEGRO_LOCKED_REGION *dr;
 
         for (x = x1; x < x2; x++)
             u_old[0][x] = u_old[1][x] = v_old[0][x] = v_old[1][x] = 0.0;
         for (x = 0; x < 4; x++)
             u_filt[x] = v_filt[x] = 0.0;
-
-        al_set_target_bitmap(b32);
+        dr = al_lock_bitmap(b32, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_WRITEONLY);
         for (y = y1; y < y2; y += yoff)
         {
                 uo[0] = u_old[y&1];
@@ -282,11 +291,13 @@ void pal_convert(ALLEGRO_BITMAP *inb, int x1, int y1, int x2, int y2, int yoff)
                 vo[1] = v_old[(y&1)^1];
                 for (x = x1; x < x2; x++)
                 {
-                        pixel = al_get_pixel(inb, x, y);
-                        al_unmap_rgb(pixel, &ir, &ig, &ib);
-                        Y = vision_iir(0.299 * ir + 0.587 * ig + 0.114 * ib);
-                        U = -0.147 * ir - 0.289 * ig + 0.436 * ib;
-                        V = 0.615 * ir - 0.515 * ig - 0.100 * ib;
+                        pixel = get_pixel(region, x, y);
+                        r = (pixel >> 16) & 0xff;
+                        g = (pixel >> 8) & 0xff;
+                        b = pixel & 0xff;
+                        Y = vision_iir(0.299 * r + 0.587 * g + 0.114 * b);
+                        U = -0.147 * r - 0.289 * g + 0.436 * b;
+                        V = 0.615 * r - 0.515 * g - 0.100 * b;
 
                         signal = Y + chroma_iir(U * sint[wt] + V * cost[wt]);
 
@@ -312,13 +323,13 @@ void pal_convert(ALLEGRO_BITMAP *inb, int x1, int y1, int x2, int y2, int yoff)
                         if (b > 255) b = 255;
                         if (b < 0)   b = 0;
 
-                        al_put_pixel(x, y, al_map_rgb(r, g, b));
-
+                        put_pixel(dr, x, y, 0xff000000|(r << 16)|(r << 8)|b);
                 }
 
                 wt += (1024 - (x2 - x1));
                 wt %= 832;
         }
+        al_unlock_bitmap(b32);
 }
 
 #endif
