@@ -2,9 +2,7 @@
   Allegro video code*/
 #include <allegro5/allegro_primitives.h>
 #include "b-em.h"
-#ifdef WIN32
 #include "pal.h"
-#endif
 #include "serial.h"
 #include "tape.h"
 #include "video.h"
@@ -38,8 +36,6 @@ void video_clearscreen()
 #endif
     al_set_target_bitmap(b16);
     al_clear_to_color(black);
-    al_set_target_bitmap(b16x);
-    al_clear_to_color(black);
     al_set_target_bitmap(b32);
     al_clear_to_color(black);
     al_set_target_backbuffer(al_get_current_display());
@@ -51,7 +47,6 @@ void video_clearscreen()
 void video_close()
 {
     al_destroy_bitmap(b32);
-    al_destroy_bitmap(b16x);
     al_destroy_bitmap(b16);
     al_destroy_bitmap(b);
 #ifdef WIN32
@@ -265,44 +260,26 @@ void video_doblit(bool non_ttx, uint8_t vtotal)
         }
         fskipcount = 0;
         if (vid_scanlines) {
-            al_set_target_bitmap(b16x);
+            al_set_target_bitmap(b16);
             al_clear_to_color(al_map_rgb(0, 0,0));
             for (c = firsty; c < lasty; c++)
                 al_draw_bitmap_region(b, firstx, c, lastx - firstx, 1, 0, c << 1, 0);
-            upscale_only(b16x, 0, firsty << 1, lastx - firstx, (lasty - firsty) << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
+            upscale_only(b16, 0, firsty << 1, lastx - firstx, (lasty - firsty) << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
         }
-#ifdef WIN32
         else if (vid_interlace && vid_pal) {
             pal_convert(b, firstx, (firsty << 1) + (interlline ? 1 : 0), lastx, (lasty << 1) + (interlline ? 1 : 0), 2);
-            al_set_target_bitmap(vb);
-            al_draw_bitmap_region(b32, (firstx * 922) / 832, firsty << 1, ((lastx - firstx) * 922) / 832, (lasty - firsty) << 1, 0, 0, 0);
             al_set_target_backbuffer(al_get_current_display());
-            al_draw_scaled_bitmap(vb, 0, 0, ((lastx - firstx) * 922) / 832, (lasty - firsty) << 1, 0, 0, (lastx - firstx), (lasty - firsty) << 1, 0);
+            upscale_only(b32, firstx, firsty << 1, lastx - firstx, (lasty - firsty) << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
         }
         else if (vid_pal) {
             pal_convert(b, firstx, firsty, lastx, lasty, 1);
-            al_set_target_bitmap(vb);
-            al_draw_bitmap_region(b32, (firstx * 922) / 832, firsty, ((lastx - firstx) * 922) / 832, lasty - firsty, 0, 0, 0);
             al_set_target_backbuffer(al_get_current_display());
-            al_draw_scaled_bitmap(vb, 0, 0, ((lastx - firstx) * 922) / 832, lasty-firsty, 0, 0, (lastx - firstx), (lasty - firsty) << 1, 0);
+            upscale_only(b32, firstx, firsty << 1, lastx - firstx, (lasty - firsty) << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
         }
-#endif
         else if (vid_interlace || vid_linedbl)
             upscale_only(b, firstx, firsty << 1, lastx - firstx, (lasty - firsty) << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
-        else {
-#ifdef WIN32
-            al_set_target_bitmap(vb);
-            al_draw_bitmap_region(b, firstx, firsty, lastx - firstx, lasty - firsty, 0, 0, 0);
-            al_set_target_backbuffer(al_get_current_display());
-            al_draw_scaled_bitmap(vb, 0, 0, lastx - firstx, lasty - firsty, 0, 0, lastx - firstx, (lasty - firsty) << 1, 0);
-#else
-            al_set_target_bitmap(b16x);
-            for (c = (firsty << 1); c < (lasty << 1); c++)
-                al_draw_bitmap_region(b, firstx, c >> 1, lastx - firstx, 1, 0, c, 0);
-            al_set_target_backbuffer(al_get_current_display());
-            al_draw_bitmap_region(b16x, 0, firsty << 1, lastx - firstx, (lasty - firsty) << 1, 0, 0, 0);
-#endif
-        }
+        else
+            upscale_only(b, firstx, firsty, lastx - firstx, lasty - firsty, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
 
         if (scr_x_start > 0) {
             black = al_map_rgb(0, 0, 0);
@@ -318,7 +295,6 @@ void video_doblit(bool non_ttx, uint8_t vtotal)
             // fill the gap between the BBC image and the bottom of the screen.
             al_draw_filled_rectangle(0, scr_y_start + scr_y_size, winsizex, winsizey, black);
         }
-/*#endif*/
         al_flip_display();
     }
     firstx = firsty = 65535;

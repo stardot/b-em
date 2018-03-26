@@ -5,7 +5,7 @@
 #include "video.h"
 #include "video_render.h"
 
-#define PAL_FIXED
+#define PAL_FLOAT
 
 #ifdef PAL_FIXED
 
@@ -98,9 +98,9 @@ void pal_convert(ALLEGRO_BITMAP *inb, int x1, int y1, int x2, int y2, int yoff)
 
         int sx;
         int dx = 59139;
-        
+
         int c = (crtc[0] + 1) * ((ula_ctrl & 0x10) ? 8 : 16);
-        
+
         c = ((c * 256) * 922) / 832;
 
         if (x1 > 1535) x1 = 1535;
@@ -136,7 +136,7 @@ void pal_convert(ALLEGRO_BITMAP *inb, int x1, int y1, int x2, int y2, int yoff)
                         sb[x] = al_itofix(blu * col);
 
                         //pixel = inb->line[y][(sx >> 16) + 1];
- 				        pixel = al_get_pixel(inb, (sx >> 16) + 1, y);
+                        pixel = al_get_pixel(inb, (sx >> 16) + 1, y);
                         col = (sx & 0xFFFF) >> 8;
                         al_unmap_rgb(pixel, &red, &grn, &blu);
                         sr[x] += al_itofix(red * col);
@@ -147,7 +147,7 @@ void pal_convert(ALLEGRO_BITMAP *inb, int x1, int y1, int x2, int y2, int yoff)
                 }
 
                 old_wt = wt;
-                
+
                 for (x = dx1; x < dx2; x++)
                 {
                         r = sr[x] >> 6;
@@ -194,7 +194,7 @@ void pal_convert(ALLEGRO_BITMAP *inb, int x1, int y1, int x2, int y2, int yoff)
 //                wt += (c - (256 * (dx2 - dx1)));
                 wt &= 1023;
         }
-        
+
         /*cheat*/
         wt -= (c * (312 - ((y2 - y1) / yoff)));
         if (crtc[8] & 1) wt -= (c >> 1);
@@ -242,37 +242,25 @@ static inline float chroma_iir(float NewSample) {
 #define WT_INC ((4433618.75 / 16000000.0) * (2 * 3.14))
 
 static float sint[832*2], cost[832*2];
-static float cols[256][4];
 
 void pal_init(void)
 {
         int c;
         float wt = 0.0;
-        int r, g, b;
         for (c = 0; c < 832*2; c++)
         {
                 sint[c] = sin(wt);
                 cost[c] = cos(wt);
                 wt += WT_INC;
         }
-        for (c = 0; c < 256; c++)
-        {
-                r = pal[c].r << 2;
-                g = pal[c].g << 2;
-                b = pal[c].b << 2;
-
-                cols[c][0] =  0.299 * r + 0.587 * g + 0.114 * b;
-                cols[c][1] = -0.147 * r - 0.289 * g + 0.436 * b;
-                cols[c][2] =  0.615 * r - 0.515 * g - 0.100 * b;
-        }
 }
 
-void pal_convert(ALLEGRO_BITMAP *inb, int x1, int y1, int x2, int y2)
+void pal_convert(ALLEGRO_BITMAP *inb, int x1, int y1, int x2, int y2, int yoff)
 {
         int x, y;
         int r, g, b;
-        int pixel;
-        int c;
+        ALLEGRO_COLOR pixel;
+        unsigned char ir, ig, ib;
         float Y, U, V;
         float signal;
         static int wt;
@@ -285,7 +273,8 @@ void pal_convert(ALLEGRO_BITMAP *inb, int x1, int y1, int x2, int y2)
         for (x = 0; x < 4; x++)
             u_filt[x] = v_filt[x] = 0.0;
 
-        for (y = y1; y < y2; y++)
+        al_set_target_bitmap(b32);
+        for (y = y1; y < y2; y += yoff)
         {
                 uo[0] = u_old[y&1];
                 vo[0] = v_old[y&1];
@@ -293,11 +282,11 @@ void pal_convert(ALLEGRO_BITMAP *inb, int x1, int y1, int x2, int y2)
                 vo[1] = v_old[(y&1)^1];
                 for (x = x1; x < x2; x++)
                 {
-                        pixel = inb->line[y][x];
-
-                        Y = vision_iir(cols[pixel][0]);
-                        U = cols[pixel][1];
-                        V = cols[pixel][2];
+                        pixel = al_get_pixel(inb, x, y);
+                        al_unmap_rgb(pixel, &ir, &ig, &ib);
+                        Y = vision_iir(0.299 * ir + 0.587 * ig + 0.114 * ib);
+                        U = -0.147 * ir - 0.289 * ig + 0.436 * ib;
+                        V = 0.615 * ir - 0.515 * ig - 0.100 * ib;
 
                         signal = Y + chroma_iir(U * sint[wt] + V * cost[wt]);
 
@@ -323,7 +312,8 @@ void pal_convert(ALLEGRO_BITMAP *inb, int x1, int y1, int x2, int y2)
                         if (b > 255) b = 255;
                         if (b < 0)   b = 0;
 
-                        ((uint32_t *)b32->line[y])[x] = b | (g << 8) | (r << 16);
+                        al_put_pixel(x, y, al_map_rgb(r, g, b));
+
                 }
 
                 wt += (1024 - (x2 - x1));

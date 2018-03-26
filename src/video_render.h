@@ -1,7 +1,7 @@
 #ifndef __INC_VIDEO_RENDER_H
 #define __INC_VIDEO_RENDER_H
 
-extern ALLEGRO_BITMAP *b, *b16, *b16x, *b32, *tb, *vb;
+extern ALLEGRO_BITMAP *b, *b16, *b32;
 
 #define BORDER_NONE_X_START_GRA 336
 #define BORDER_NONE_X_END_GRA   976

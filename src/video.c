@@ -687,15 +687,9 @@ int firstx, firsty, lastx, lasty;
 int desktop_width, desktop_height;
 
 ALLEGRO_DISPLAY *display;
-ALLEGRO_BITMAP *b, *b16, *b16x, *b32, *tb;
-#ifdef WIN32
-ALLEGRO_BITMAP *vb;
-#endif
+ALLEGRO_BITMAP *b, *b16, *b32;
 
-//int inverttbl[256];
 int dcol;
-//PALETTE pal;
-ALLEGRO_BITMAP *tvb;
 
 ALLEGRO_LOCKED_REGION *region;
 
@@ -716,13 +710,8 @@ ALLEGRO_DISPLAY *video_init(void)
     }
 
     al_set_new_bitmap_flags(ALLEGRO_VIDEO_BITMAP);
-    b16x = al_create_bitmap(832, 614);
     b16 = al_create_bitmap(832, 614);
     b32 = al_create_bitmap(1536, 800);
-
-#ifdef WIN32
-    vb = al_create_bitmap(924, 614);
-#endif
 
     colblack = 0xff000000;
     colwhite = 0xffffffff;

@@ -74,6 +74,7 @@ b_em_SOURCES = \
 	music2000.c \
 	music4000.c \
 	music5000.c \
+	pal.c\
 	resid.cc \
 	savestate.c \
 	scsi.c \
