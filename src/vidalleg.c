@@ -30,10 +30,6 @@ void video_clearscreen()
 {
     ALLEGRO_COLOR black = al_map_rgb(0, 0, 0);
 
-#ifdef WIN32
-    al_set_target_bitmap(vb);
-    al_clear_to_color(black);
-#endif
     al_set_target_bitmap(b16);
     al_clear_to_color(black);
     al_set_target_bitmap(b32);
