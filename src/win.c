@@ -2,34 +2,7 @@
   Windows main*/
 
 #ifdef WIN32
-#include <process.h>
-#include <windows.h>
-#include <shlobj.h>
-
 #include "b-em.h"
-
-#include "config.h"
-#include "ddnoise.h"
-#include "debugger.h"
-#include "disc.h"
-#include "ide.h"
-#include "keyboard.h"
-#include "main.h"
-#include "mem.h"
-#include "model.h"
-#include "mouse.h"
-#include "savestate.h"
-#include "sid_b-em.h"
-#include "scsi.h"
-#include "sound.h"
-#include "sn76489.h"
-#include "tape.h"
-#include "tube.h"
-#include "vdfs.h"
-#include "video.h"
-#include "video_render.h"
-#include "win.h"
-#include "win-romconfig.h"
 
 char exedir[MAX_PATH];
 char tempname[MAX_PATH];
