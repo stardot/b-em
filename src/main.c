@@ -75,9 +75,15 @@ static ALLEGRO_TIMER *timer;
 static ALLEGRO_EVENT_QUEUE *queue;
 static ALLEGRO_EVENT_SOURCE evsrc;
 
+typedef enum {
+    FSPEED_NONE,
+    FSPEED_SELECTED,
+    FSPEED_RUNNING
+} fspeed_type_t;
+
 static double time_limit;
 static int fcount = 0;
-static bool fullspeed = false;
+static fspeed_type_t fullspeed = FSPEED_NONE;
 static bool bempause  = false;
 
 const emu_speed_t emu_speeds[NUM_EMU_SPEEDS] = {
@@ -376,7 +382,7 @@ static void main_start_fullspeed(void)
 
     log_debug("main: starting full-speed");
     al_stop_timer(timer);
-    fullspeed = true;
+    fullspeed = FSPEED_RUNNING;
     event.type = ALLEGRO_EVENT_TIMER;
     al_emit_user_event(&evsrc, &event, NULL);
 }
@@ -386,6 +392,21 @@ static bool main_key_down(ALLEGRO_EVENT *event)
     ALLEGRO_KEYBOARD_STATE kstate;
 
     switch(event->keyboard.keycode) {
+        case ALLEGRO_KEY_PGUP:
+            if (fullspeed != FSPEED_RUNNING)
+                main_start_fullspeed();
+            break;
+        case ALLEGRO_KEY_PGDN:
+            if (bempause) {
+                if (emuspeed != EMU_SPEED_PAUSED) {
+                    bempause = false;
+                    if (emuspeed != EMU_SPEED_FULL)
+                        al_start_timer(timer);
+                }
+            } else {
+                al_stop_timer(timer);
+                bempause = true;
+            }
         case ALLEGRO_KEY_ENTER:
             al_get_keyboard_state(&kstate);
             if (al_key_down(&kstate, ALLEGRO_KEY_ALT)) {
@@ -409,22 +430,12 @@ static bool main_key_down(ALLEGRO_EVENT *event)
                 tubes[curtube].reset();
             tube_reset();
             break;
-        case ALLEGRO_KEY_PGUP:
-            if (!fullspeed)
-                main_start_fullspeed();
-            break;
-        case ALLEGRO_KEY_PGDN:
-            if (bempause) {
-                if (emuspeed != EMU_SPEED_PAUSED) {
-                    bempause = false;
-                    if (emuspeed != EMU_SPEED_FULL)
-                        al_start_timer(timer);
-                }
-            } else {
-                al_stop_timer(timer);
-                bempause = true;
+        default:
+            if (fullspeed == FSPEED_RUNNING) {
+                fullspeed = FSPEED_SELECTED;
+                if (emuspeed != EMU_SPEED_PAUSED)
+                    al_start_timer(timer);
             }
-            break;
     }
     return true;
 }
@@ -438,14 +449,18 @@ static bool main_key_up(ALLEGRO_EVENT *event)
             if (emuspeed != EMU_SPEED_FULL) {
                 al_get_keyboard_state(&kstate);
                 if (!al_key_down(&kstate, ALLEGRO_KEY_LSHIFT) && !al_key_down(&kstate, ALLEGRO_KEY_RSHIFT)) {
-                    log_debug("main: stopping fill-speed");
-                    fullspeed = false;
-                    if (emuspeed != EMU_SPEED_PAUSED)
+                    log_debug("main: stopping fullspeed (PgUp)");
+                    if (fullspeed == FSPEED_RUNNING && emuspeed != EMU_SPEED_PAUSED)
                         al_start_timer(timer);
+                    fullspeed = FSPEED_NONE;
                 }
+                else
+                    fullspeed = FSPEED_SELECTED;
             }
             break;
     }
+    if (fullspeed == FSPEED_SELECTED)
+        main_start_fullspeed();
     return true;
 }
 
@@ -469,7 +484,7 @@ static void main_timer(ALLEGRO_EVENT *event)
             savestate_doload();
         if (savestate_wantsave)
             savestate_dosave();
-        if (fullspeed)
+        if (fullspeed == FSPEED_RUNNING)
             al_emit_user_event(&evsrc, event, NULL);
     }
 }
@@ -486,13 +501,13 @@ void main_run()
         al_wait_for_event(queue, &event);
         switch(event.type) {
             case ALLEGRO_EVENT_KEY_DOWN:
-                log_debug("main: key down, code=%d", event.keyboard.keycode);
+                log_debug("main: key down, code=%d, fullspeed=%d", event.keyboard.keycode, fullspeed);
                 // main_key_down returns true if OK to pass to emulated BBC keyboard.
                 if (main_key_down(&event))
                     key_down(&event);
                 break;
             case ALLEGRO_EVENT_KEY_UP:
-                log_debug("main: key up, code=%d", event.keyboard.keycode);
+                log_debug("main: key up, code=%d, fullspeed=%d", event.keyboard.keycode, fullspeed);
                 // main_key_up returns true if OK to pass to emulated BBC keyboard.
                 if (main_key_up(&event))
                     key_up(&event);
