@@ -360,22 +360,6 @@ void main_cleardrawit()
         fcount = 0;
 }
 
-#if 0
-        if ((fcount > 0 || key[KEY_PGUP] || (motor && fasttape)))
-        {
-                if (key[KEY_PGUP] || (motor && fasttape)) fcount=0;
-                    key_check();
-                poll_joystick();
-                for (c = 0; c < 2; c++)
-                {
-                        joybutton[c] = 0;
-                        for (d = 0; d < joy[c].num_buttons; d++)
-                        {
-                                if (joy[c].button[d].b) joybutton[c] = 1;
-                        }
-                }
-#endif
-
 static void main_start_fullspeed(void)
 {
     ALLEGRO_EVENT event;
@@ -513,30 +497,30 @@ void main_run()
                     key_up(&event);
                 break;
             case ALLEGRO_EVENT_MOUSE_AXES:
-            mouse_axes(&event);
+                mouse_axes(&event);
                 break;
             case ALLEGRO_EVENT_MOUSE_BUTTON_DOWN:
-            log_debug("main: mouse button down");
-            mouse_btn_down(&event);
+                log_debug("main: mouse button down");
+                mouse_btn_down(&event);
                 break;
             case ALLEGRO_EVENT_MOUSE_BUTTON_UP:
                 log_debug("main: mouse button up");
                 mouse_btn_up(&event);
                 break;
             case ALLEGRO_EVENT_DISPLAY_CLOSE:
-            log_debug("main: event display close - quitting");
+                log_debug("main: event display close - quitting");
                 quitting = true;
                 break;
             case ALLEGRO_EVENT_TIMER:
                 main_timer(&event);
                 break;
             case ALLEGRO_EVENT_MENU_CLICK:
-            main_pause();
+                main_pause();
                 gui_allegro_event(&event);
                 main_resume();
                 break;
             case ALLEGRO_EVENT_AUDIO_STREAM_FRAGMENT:
-            music5000_streamfrag();
+                music5000_streamfrag();
                 break;
             case ALLEGRO_EVENT_DISPLAY_RESIZE:
                 video_update_window_size(&event);
