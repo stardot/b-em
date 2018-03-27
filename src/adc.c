@@ -40,44 +40,9 @@ void adc_write(uint16_t addr, uint8_t val)
 
 void adc_poll()
 {
-    uint32_t val = 0x7FFF;
-    ALLEGRO_JOYSTICK *joy;
-    ALLEGRO_JOYSTICK_STATE jstate;
-
-    if (al_is_joystick_installed()) {
-        switch (adc_status & 3) {
-            case 0:
-                if (al_get_num_joysticks() >= 1) {
-                    joy = al_get_joystick(0);
-                    al_get_joystick_state(joy, &jstate);
-                    val = (128 - jstate.stick[0].axis[0]) * 256;
-                }
-                break;
-            case 1:
-                if (al_get_num_joysticks() >= 1) {
-                    joy = al_get_joystick(0);
-                    al_get_joystick_state(joy, &jstate);
-                    val = (128 - jstate.stick[0].axis[1]) * 256;
-                }
-                break;
-            case 2:
-                if (al_get_num_joysticks() >= 2) {
-                    joy = al_get_joystick(1);
-                    al_get_joystick_state(joy, &jstate);
-                    val = (128 - jstate.stick[0].axis[0]) * 256;
-                }
-                break;
-            case 3:
-                if (al_get_num_joysticks() >= 2) {
-                    joy = al_get_joystick(1);
-                    al_get_joystick_state(joy, &jstate);
-                    val = (128 - jstate.stick[0].axis[1]) * 256;
-                }
-                break;
-        }
-        if (val > 0xFFFF)
-            val = 0xFFFF;
-    }
+    uint32_t val = (joyaxes[adc_status & 3] + 1.0) * 256.0;
+    if (val > 0xFFFF)
+        val = 0xFFFF;
     adc_status =(adc_status & 0xF) | 0x40; /*Not busy, conversion complete*/
     adc_status|=(val & 0xC000) >> 10;
     adc_high   = val >> 8;

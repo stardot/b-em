@@ -34,6 +34,7 @@ extern int find_cfg_file(char *path, size_t psize, const char *name, const char 
 extern int find_cfg_dest(char *path, size_t psize, const char *name, const char *ext);
 
 extern int joybutton[2];
+extern float joyaxes[4];
 
 void setquit();
 

@@ -60,13 +60,7 @@
 bool quitting = false;
 int autoboot=0;
 int joybutton[2];
-
-int printsec;
-void secint()
-{
-        printsec = 1;
-}
-
+float joyaxes[4];
 int emuspeed = 4;
 
 static ALLEGRO_TIMER *timer;
@@ -85,19 +79,17 @@ static fspeed_type_t fullspeed = FSPEED_NONE;
 static bool bempause  = false;
 
 const emu_speed_t emu_speeds[NUM_EMU_SPEEDS] = {
-    {  "10%", 1.0 / (50.0 * 0.10) },
-    {  "25%", 1.0 / (50.0 * 0.25) },
-    {  "50%", 1.0 / (50.0 * 0.50) },
-    {  "75%", 1.0 / (50.0 * 0.75) },
-    { "100%", 1.0 / 50.0          },
-    { "150%", 1.0 / (50.0 * 1.50) },
-    { "200%", 1.0 / (50.0 * 2.00) },
-    { "300%", 1.0 / (50.0 * 3.00) },
-    { "400%", 1.0 / (50.0 * 4.00) },
-    { "500%", 1.0 / (50.0 * 5.00) }
+    {  "10%", 1.0 / (50.0 * 0.10), 0 },
+    {  "25%", 1.0 / (50.0 * 0.25), 0 },
+    {  "50%", 1.0 / (50.0 * 0.50), 0 },
+    {  "75%", 1.0 / (50.0 * 0.75), 0 },
+    { "100%", 1.0 / 50.0,          0 },
+    { "150%", 1.0 / (50.0 * 1.50), 0 },
+    { "200%", 1.0 / (50.0 * 2.00), 1 },
+    { "300%", 1.0 / (50.0 * 3.00), 2 },
+    { "400%", 1.0 / (50.0 * 4.00), 3 },
+    { "500%", 1.0 / (50.0 * 5.00), 4 }
 };
-
-char exedir[512];
 
 void main_reset()
 {
@@ -417,6 +409,38 @@ static bool main_key_up(ALLEGRO_EVENT *event)
     return true;
 }
 
+static void main_joystick_axes(ALLEGRO_EVENT *event)
+{
+    if (event->joystick.stick == 0) {
+        if (event->joystick.axis == 0)
+            joyaxes[0] = event->joystick.pos;
+        else
+            joyaxes[1] = event->joystick.pos;
+    }
+    else if (event->joystick.stick == 1) {
+        if (event->joystick.axis == 0)
+            joyaxes[2] = event->joystick.pos;
+        else
+            joyaxes[3] = event->joystick.pos;
+    }
+}
+
+static void main_joystick_button_down(ALLEGRO_EVENT *event)
+{
+    if (event->joystick.stick == 0)
+        joybutton[0] = 1;
+    else if (event->joystick.stick == 1)
+        joybutton[1] = 1;
+}
+
+static void main_joystick_button_up(ALLEGRO_EVENT *event)
+{
+    if (event->joystick.stick == 0)
+        joybutton[0] = 0;
+    else if (event->joystick.stick == 1)
+        joybutton[1] = 0;
+}
+
 static void main_timer(ALLEGRO_EVENT *event)
 {
     double delay = al_get_time() - event->any.timestamp;
@@ -475,6 +499,15 @@ void main_run()
             case ALLEGRO_EVENT_MOUSE_BUTTON_UP:
                 log_debug("main: mouse button up");
                 mouse_btn_up(&event);
+                break;
+            case ALLEGRO_EVENT_JOYSTICK_AXIS:
+                main_joystick_axes(&event);
+                break;
+            case ALLEGRO_EVENT_JOYSTICK_BUTTON_DOWN:
+                main_joystick_button_down(&event);
+                break;
+            case ALLEGRO_EVENT_JOYSTICK_BUTTON_UP:
+                main_joystick_button_up(&event);
                 break;
             case ALLEGRO_EVENT_DISPLAY_CLOSE:
                 log_debug("main: event display close - quitting");
@@ -535,7 +568,7 @@ void main_setspeed(int speed)
         main_start_fullspeed();
     else {
         al_stop_timer(timer);
-        fullspeed = false;
+        fullspeed = FSPEED_NONE;
         if (speed != EMU_SPEED_PAUSED) {
             if (speed >= NUM_EMU_SPEEDS) {
                 log_warn("main: speed #%d out of range, defaulting to 100%%", speed);
@@ -543,6 +576,7 @@ void main_setspeed(int speed)
             }
             al_set_timer_speed(timer, emu_speeds[speed].timer_interval);
             time_limit = emu_speeds[speed].timer_interval * 2.0;
+            vid_fskipmax = emu_speeds[speed].fskipmax;
             al_start_timer(timer);
         }
     }

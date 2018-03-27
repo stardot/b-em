@@ -8,6 +8,7 @@
 typedef struct {
     const char *name;
     float timer_interval;
+    int fskipmax;
 } emu_speed_t;
 
 extern const emu_speed_t emu_speeds[NUM_EMU_SPEEDS];
