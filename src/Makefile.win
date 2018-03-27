@@ -78,7 +78,7 @@ OBJ = \
     win.o \
     x86.o \
     x86dasm.o \
-    Z80.o \
+    z80.o \
     z80dis.o \
     resid.o \
     b-em.res

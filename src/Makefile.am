@@ -35,7 +35,7 @@ b_em_SOURCES = \
 	NS32016/Profile.c \
 	NS32016/Trap.c \
 	NS32016/mem32016.c \
-	Z80.c \
+	z80.c \
 	z80dis.c \
 	acia.c \
 	adc.c \
