@@ -90,7 +90,7 @@ static const geometry_t other_formats[] = {
     { "DOS 360K",          SIDES_INTERLEAVED, DENS_DOUBLE,  720, 40,  9,  512 },
     { "Acorn DFS",         SIDES_SINGLE,      DENS_SINGLE,  800, 80, 10,  256 },
     { "Acorn DFS",         SIDES_INTERLEAVED, DENS_SINGLE, 1600, 80, 10,  256 },
-    { NULL,                SIDES_NA,          DENS_NA,        0,  0,  0,    0 }    
+    { NULL,                SIDES_NA,          DENS_NA,        0,  0,  0,    0 }
 };
 
 static int check_id(FILE *fp, long posn, const char *id) {
@@ -134,14 +134,16 @@ static const geometry_t *try_adfs_old(FILE *fp) {
 }
 
 static const geometry_t *try_dfs(FILE *fp, uint32_t offset) {
-    uint32_t sects0, sects2, side2_off, track_bytes;
+    uint32_t sects0, fsize, sects2, side2_off, track_bytes;
     const geometry_t *ptr;
 
     fseek(fp, offset, SEEK_SET);
     sects0 = (getc(fp) & 7) << 8;
     sects0 |= getc(fp);
+    fseek(fp, 0L, SEEK_END);
+    fsize = ftell(fp);
     for (ptr = dfs_formats; ptr->name; ptr++) {
-        if (sects0 == ptr->size_in_sectors) {
+        if (sects0 == ptr->size_in_sectors && (ptr->size_in_sectors * ptr->sector_size) >= fsize) {
             if (ptr->sides == SIDES_SINGLE)
                 return ptr;
             side2_off = track_bytes = ptr->sectors_per_track * ptr->sector_size;
