@@ -6,7 +6,7 @@ typedef struct {
     float multipler;
 } tube_speed_t;
 
-#define NUM_TUBE_SPEEDS 5
+#define NUM_TUBE_SPEEDS 7
 extern tube_speed_t tube_speeds[NUM_TUBE_SPEEDS];
 extern int tube_speed_num, tube_multipler;
 
