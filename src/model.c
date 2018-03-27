@@ -52,15 +52,21 @@ char *model_get()
 
 extern cpu_debug_t n32016_cpu_debug;
 
+/*
+ * The number of tube cycles to run for each core 6502 processor cycle
+ * is calculated by mutliplying the multiplier in this table with the
+ * one in the general tube speed table and dividing by two.
+ */
+
 TUBE tubes[NUM_TUBES]=
 {
-        {"6502 Internal",  tube_6502_init,  tube_6502_reset, &tube6502_cpu_debug,  "6502Intern"      },
-        {"6502 External",  tube_6502_init,  tube_6502_reset, &tube6502_cpu_debug,  "6502Tube"        },
-        {"ARM",            tube_arm_init,   arm_reset,       &tubearm_cpu_debug,   "ARMeval_100"     },
-        {"Z80",            tube_z80_init,   z80_reset,       &tubez80_cpu_debug,   "Z80_120"         },
-        {"80186",          tube_x86_init,   x86_reset,       &tubex86_cpu_debug,   "BIOS"            },
-        {"65816",          tube_65816_init, w65816_reset,    &tube65816_cpu_debug, "ReCo6502ROM_816" },
-        {"32016",          tube_32016_init, n32016_reset,    &n32016_cpu_debug,    ""                }
+        {"6502 Internal",  tube_6502_init,  tube_6502_reset, &tube6502_cpu_debug,  "6502Intern",       4 },
+        {"6502 External",  tube_6502_init,  tube_6502_reset, &tube6502_cpu_debug,  "6502Tube",         3 },
+        {"ARM",            tube_arm_init,   arm_reset,       &tubearm_cpu_debug,   "ARMeval_100",      4 },
+        {"Z80",            tube_z80_init,   z80_reset,       &tubez80_cpu_debug,   "Z80_120",          8 },
+        {"80186",          tube_x86_init,   x86_reset,       &tubex86_cpu_debug,   "BIOS",             8 },
+        {"65816",          tube_65816_init, w65816_reset,    &tube65816_cpu_debug, "ReCo6502ROM_816", 16 },
+        {"32016",          tube_32016_init, n32016_reset,    &n32016_cpu_debug,    "",                 8 }
 };
 
 void model_check(void) {
@@ -102,6 +108,7 @@ static void tube_init(void)
             curtube = -1;
             return;
         }
+        tube_updatespeed();
         tube_reset();
     }
 }

@@ -37,6 +37,7 @@ typedef struct
         void (*reset)(void);
         cpu_debug_t *debug;
         char bootrom[16];
+        int  speed_multiplier;
 } TUBE;
 
 #define NUM_TUBES 7

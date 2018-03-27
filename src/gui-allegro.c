@@ -18,6 +18,7 @@
 #include "sound.h"
 #include "sn76489.h"
 #include "tape.h"
+#include "tube.h"
 #include "video.h"
 #include "video_render.h"
 #include "vdfs.h"
@@ -189,10 +190,14 @@ static ALLEGRO_MENU *create_model_menu(void)
 static ALLEGRO_MENU *create_tube_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
+    ALLEGRO_MENU *sub = al_create_menu();
     int i;
 
     for (i = 0; i < NUM_TUBES; i++)
         add_radio_item(menu, tubes[i].name, IDM_TUBE, i, curtube);
+    for (i = 0; i < NUM_TUBE_SPEEDS; i++)
+        add_radio_item(sub, tube_speeds[i].name, IDM_TUBE_SPEED, i, tube_speed_num);
+    al_append_menu_item(menu, "Tube speed", 0, 0, NULL, sub);
     return menu;
 }
 
@@ -692,6 +697,12 @@ static void change_tube(ALLEGRO_EVENT *event)
     main_restart();
 }
 
+static void change_tube_speed(ALLEGRO_EVENT *event)
+{
+    tube_speed_num = radio_event_simple(event, tube_speed_num);
+    tube_updatespeed();
+}
+
 static void set_video_linedbl(ALLEGRO_EVENT *event)
 {
     ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
@@ -818,6 +829,9 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             break;
         case IDM_TUBE:
             change_tube(event);
+            break;
+        case IDM_TUBE_SPEED:
+            change_tube_speed(event);
             break;
         case IDM_VIDEO_LINEDBL:
             set_video_linedbl(event);

@@ -341,7 +341,7 @@ uint8_t readmem(uint16_t addr)
 {
     uint32_t value = do_readmem(addr);
     if (dbg_core6502)
-	debug_memread(&core6502_cpu_debug, addr, value, 1);
+    debug_memread(&core6502_cpu_debug, addr, value, 1);
     return value;
 }
 
@@ -575,7 +575,7 @@ static void do_writemem(uint32_t addr, uint32_t val)
 void writemem(uint16_t addr, uint8_t val)
 {
     if (dbg_core6502)
-	debug_memwrite(&core6502_cpu_debug, addr, val, 1);
+    debug_memwrite(&core6502_cpu_debug, addr, val, 1);
     do_writemem(addr, val);
 }
 
@@ -3598,7 +3598,7 @@ void m6502_exec()
                 if (otherstuffcount <= 0)
                     otherstuff_poll();
                 if (tube_exec && tubecycle) {
-                        tubecycles += (tubecycle << tube_shift);
+                        tubecycles += (tubecycle * tube_multipler) >> 1;
                         if (tubecycles > 3)
                                 tube_exec();
                         tubecycle = 0;
@@ -5376,7 +5376,7 @@ void m65c02_exec()
                         case 3:
                         case 7:
                         case 0xB:
-                        case 0xF:                           
+                        case 0xF:
                                 polltime(1);
                                 break;
                         case 4:
@@ -5444,7 +5444,7 @@ void m65c02_exec()
                 interrupt &= ~128;
                 if (tube_exec && tubecycle) {
 //                        log_debug("tubeexec %i %i %i\n",tubecycles,tubecycle,tube_shift);
-                        tubecycles += (tubecycle << tube_shift);
+                        tubecycles += (tubecycle * tube_multipler) >> 1;
                         if (tubecycles > 3)
                                 tube_exec();
                         tubecycle = 0;

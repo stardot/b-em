@@ -78,7 +78,7 @@ void config_load(void)
 
     curmodel         = get_config_int(NULL, "model",         3);
     selecttube       = get_config_int(NULL, "tube",         -1);
-    tube_6502_speed  = get_config_int(NULL, "tube6502speed", 1);
+    tube_speed_num   = get_config_int(NULL, "tubespeed",     0);
 
     sound_internal   = get_config_int(NULL, "sndinternal",   1);
     sound_beebsid    = get_config_int(NULL, "sndbeebsid",    1);
@@ -161,7 +161,7 @@ void config_save(void)
 
         set_config_int(NULL, "model", curmodel);
         set_config_int(NULL, "tube", selecttube);
-        set_config_int(NULL, "tube6502speed", tube_6502_speed);
+        set_config_int(NULL, "tubespeed", tube_speed_num);
 
         set_config_int(NULL, "sndinternal", sound_internal);
         set_config_int(NULL, "sndbeebsid",  sound_beebsid);

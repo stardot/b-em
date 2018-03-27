@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include "b-em.h"
 #include "6502.h"
+#include "model.h"
 #include "tube.h"
 
 #include "NS32016/32016.h"
@@ -21,9 +22,24 @@
 #define TUBE65816 5
 #define TUBE32016 6
 
-int tube_shift;
-int tube_6502_speed=1;
+int tube_multipler = 1;
+int tube_speed_num = 0;
 int tubecycles = 0;
+
+/*
+ * The number of tube cycles to run for each core 6502 processor cycle
+ * is calculated by mutliplying the multiplier in this table with the
+ * one in the processor-specific tube entry and dividing by four.
+ */
+
+tube_speed_t tube_speeds[NUM_TUBE_SPEEDS] =
+{
+    { "100%",   1 },
+    { "200%",   2 },
+    { "400%",   4 },
+    { "800%",   8 },
+    { "1600%", 16 }
+};
 
 int tube_irq=0;
 int tube_type=TUBEX86;
@@ -42,12 +58,12 @@ void tube_updateints()
 {
         tube_irq = 0;
         interrupt &= ~8;
-        
+
         if ((tubeula.r1stat & 1) && (tubeula.hstat[3] & 128)) interrupt |= 8;
-        
+
         if ((tubeula.r1stat & 2) && (tubeula.pstat[0] & 128)) tube_irq  |= 1;
         if ((tubeula.r1stat & 4) && (tubeula.pstat[3] & 128)) tube_irq  |= 1;
-        
+
         if ((tubeula.r1stat & 8) && !(tubeula.r1stat & 16) && ((tubeula.hp3pos > 0) || (tubeula.ph3pos == 0))) tube_irq|=2;
         if ((tubeula.r1stat & 8) &&  (tubeula.r1stat & 16) && ((tubeula.hp3pos > 1) || (tubeula.ph3pos == 0))) tube_irq|=2;
 }
@@ -277,12 +293,11 @@ void tube_6502_init(FILE *romf)
         tube_readmem = tube_6502_readmem;
         tube_writemem = tube_6502_writemem;
         tube_exec  = tube_6502_exec;
-        tube_shift = tube_6502_speed;
 }
 
 void tube_updatespeed()
 {
-        if (tube_type == TUBE6502) tube_shift = tube_6502_speed;
+    tube_multipler = tube_speeds[tube_speed_num].multipler * tubes[curtube].speed_multiplier;
 }
 
 void tube_arm_init(FILE *romf)
@@ -293,7 +308,6 @@ void tube_arm_init(FILE *romf)
         tube_readmem = readarmb;
         tube_writemem = writearmb;
         tube_exec  = arm_exec;
-        tube_shift = 1;
 }
 
 void tube_z80_init(FILE *romf)
@@ -304,7 +318,6 @@ void tube_z80_init(FILE *romf)
         tube_readmem = tube_z80_readmem;
         tube_writemem = tube_z80_writemem;
         tube_exec  = z80_exec;
-        tube_shift = 2;
 }
 
 void tube_x86_init(FILE *romf)
@@ -315,7 +328,6 @@ void tube_x86_init(FILE *romf)
         tube_readmem = x86_readmem;
         tube_writemem = x86_writemem;
         tube_exec  = x86_exec;
-        tube_shift = 2;
 }
 
 void tube_65816_init(FILE *romf)
@@ -326,7 +338,6 @@ void tube_65816_init(FILE *romf)
         tube_readmem = readmem65816;
         tube_writemem = writemem65816;
         tube_exec  = w65816_exec;
-        tube_shift = 3;
 }
 
 void tube_32016_init(FILE *romf)
@@ -337,7 +348,6 @@ void tube_32016_init(FILE *romf)
         tube_readmem = read_x8;
         tube_writemem = write_x8;
         tube_exec  = n32016_exec;
-        tube_shift = 2;
 }
 
 void tube_reset(void)
