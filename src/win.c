@@ -1,32 +1,12 @@
-/*B-em v2.2 by Tom Walker
-  Windows main*/
+/* B-em by Tom Walker, Allegro 5 port.
+ *
+ * Previously containing a Windows-specific main function this file now
+ * B-Em specific functions whose definition varies between Windows and
+ * Linux/Linux-like systems.
+ */
 
 #ifdef WIN32
 #include "b-em.h"
-
-char exedir[MAX_PATH];
-char tempname[MAX_PATH];
-
-RECT oldclip, newclip;
-int mousecapture = 0;
-int videoresize  = 0;
-
-/*  Declare Windows procedure  */
-LRESULT CALLBACK WindowProcedure (HWND, UINT, WPARAM, LPARAM);
-
-/*  Make the class name into a global variable  */
-char szClassName[] = "B-emMainWnd";
-
-HWND ghwnd;
-int winsizex = 640, winsizey = 480;
-
-static int quited = 0;
-void setquit()
-{
-        quited = 1;
-}
-
-HINSTANCE hinstance;
 
 static BOOL win_file_exists(const char *szPath) {
     DWORD dwAttrib = GetFileAttributes(szPath);

@@ -145,7 +145,7 @@ static HINSTANCE hinst;
 
 BOOL CtrlHandler(DWORD fdwCtrlType)
 {
-    setquit();
+    main_setquit();
     return TRUE;
 }
 
