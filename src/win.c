@@ -57,7 +57,4 @@ int find_cfg_dest(char *path, size_t psize, const char *name, const char *ext) {
     return 0;
 }
 
-int timerspeeds[] = {5, 12, 25, 38, 50, 75, 100, 150, 200, 250};
-int frameskips[]  = {0, 0,  0,  0,  0,  0,  1,   2,   3,   4};
-
 #endif
