@@ -955,7 +955,7 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             debug_step = 1;
             break;
         case IDM_KEY_REDEFINE:
-            gui_keydefine();
+            gui_keydefine_open();
             break;
         default:
             log_warn("gui-allegro: menu ID %d not handled", menu_get_id(event));

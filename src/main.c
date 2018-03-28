@@ -21,6 +21,7 @@
 #include "i8271.h"
 #include "ide.h"
 #include "keyboard.h"
+#include "keydef-allegro.h"
 #include "main.h"
 #include "mem.h"
 #include "mouse.h"
@@ -536,6 +537,8 @@ void main_run()
 void main_close()
 {
     gui_tapecat_close();
+    gui_keydefine_close();
+
     debug_kill();
 
     config_save();
