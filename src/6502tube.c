@@ -37,11 +37,13 @@ static uint8_t tuberom[0x1000];
 static FILE *trace_fp;
 #endif
 
+#define TUBE_6502_RAM_SIZE 0x10000
+
 void tube_6502_init_cpu(FILE *romf)
 {
         int c;
         if (!tuberam)
-                tuberam = (uint8_t *) malloc(0x10000);
+                tuberam = (uint8_t *) malloc(TUBE_6502_RAM_SIZE);
         memset(tuberam, 0, 0x10000);
         for (c = 0x00; c < 0x100; c++)
                 tubemem[c] = (uint8_t *) (tuberam + (c << 8));
@@ -99,6 +101,25 @@ static inline uint8_t pack_flags(uint8_t flags) {
     return flags;
 }
 
+void tube_6502_savestate(FILE *f)
+{
+    uint8_t temp;
+
+    putc(tube_6502_skipint, f);
+    putc(tube_6502_oldnmi, f);
+    putc(a, f);
+    putc(x, f);
+    putc(y, f);
+    temp = pack_flags(0x30);
+    putc(temp, f);
+    putc(s, f);
+    putc(pc & 0xFF, f);
+    putc(pc >> 8, f);
+    fwrite(tubememstat, sizeof tubememstat, 1, f);
+    fwrite(tuberam, TUBE_6502_RAM_SIZE, 1, f);
+    fwrite(tuberom, sizeof tuberom, 1, f);
+}
+
 static inline void unpack_flags(uint8_t flags) {
     tubep.c = flags & 1;
     tubep.z = flags & 2;
@@ -106,6 +127,22 @@ static inline void unpack_flags(uint8_t flags) {
     tubep.d = flags & 8;
     tubep.v = flags & 0x40;
     tubep.n = flags & 0x80;
+}
+
+void tube_6502_loadstate(FILE *f)
+{
+    tube_6502_skipint = getc(f);
+    tube_6502_oldnmi = getc(f);
+    a = getc(f);
+    x = getc(f);
+    y = getc(f);
+    unpack_flags(getc(f));
+    s = getc(f);
+    pc = getc(f);
+    pc |= getc(f) << 8;
+    fread(tubememstat, sizeof tubememstat, 1, f);
+    fread(tuberam, TUBE_6502_RAM_SIZE, 1, f);
+    fread(tuberom, sizeof tuberom, 1, f);
 }
 
 static uint32_t dbg_reg_get(int which) {
@@ -266,13 +303,13 @@ static void do_writemem(uint32_t addr, uint32_t value) {
 static uint8_t readmem(uint32_t addr) {
     uint32_t val = do_readmem(addr);
     if (dbg_tube6502)
-	debug_memread(&tube6502_cpu_debug, addr, val, 1);
+    debug_memread(&tube6502_cpu_debug, addr, val, 1);
     return val;
 }
 
 static void writemem(uint32_t addr, uint32_t value) {
     if (dbg_tube6502)
-	debug_memwrite(&tube6502_cpu_debug, addr, value, 1);
+    debug_memwrite(&tube6502_cpu_debug, addr, value, 1);
     do_writemem(addr, value);
 }
 
@@ -443,9 +480,9 @@ void tube_6502_exec()
         while (tubecycles > 0) {
                 oldtpc2 = oldtpc;
                 oldtpc = pc;
-		if (dbg_tube6502)
-		    debug_preexec(&tube6502_cpu_debug, pc);
-		opcode = readmem(pc);
+        if (dbg_tube6502)
+            debug_preexec(&tube6502_cpu_debug, pc);
+        opcode = readmem(pc);
                 pc++;
 #ifdef TRACE_TUBE
                 tube_6502_trace(opcode);
@@ -518,7 +555,7 @@ void tube_6502_exec()
                         break;
 
                 case 0x08:
-		        /*PHP*/ temp = pack_flags(0x30);
+                /*PHP*/ temp = pack_flags(0x30);
                         push(temp);
                         polltime(3);
                         break;
@@ -748,7 +785,7 @@ void tube_6502_exec()
 
                 case 0x28:
                         /*PLP*/ temp = pull();
-		        unpack_flags(temp);
+                unpack_flags(temp);
                         polltime(4);
                         break;
 

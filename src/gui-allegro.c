@@ -421,17 +421,14 @@ static void file_save_state(ALLEGRO_EVENT *event)
     ALLEGRO_FILECHOOSER *chooser;
     ALLEGRO_DISPLAY *display;
 
-    if (curtube == -1) {
-        if ((chooser = al_create_native_file_dialog(savestate_name, "Save state to file", "*.snp", ALLEGRO_FILECHOOSER_SAVE))) {
-            display = (ALLEGRO_DISPLAY *)(event->user.data2);
-            if (al_show_native_file_dialog(display, chooser)) {
-                if (al_get_native_file_dialog_count(chooser) > 0)
-                    savestate_save(al_get_native_file_dialog_path(chooser, 0));
-            }
-            al_destroy_native_file_dialog(chooser);
+    if ((chooser = al_create_native_file_dialog(savestate_name, "Save state to file", "*.snp", ALLEGRO_FILECHOOSER_SAVE))) {
+        display = (ALLEGRO_DISPLAY *)(event->user.data2);
+        if (al_show_native_file_dialog(display, chooser)) {
+            if (al_get_native_file_dialog_count(chooser) > 0)
+                savestate_save(al_get_native_file_dialog_path(chooser, 0));
         }
-    } else
-        log_error("Second processor save states not supported yet.");
+        al_destroy_native_file_dialog(chooser);
+    }
 }
 
 static void file_save_scrshot(ALLEGRO_EVENT *event)

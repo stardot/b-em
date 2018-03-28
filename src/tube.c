@@ -295,6 +295,8 @@ void tube_6502_init(FILE *romf)
         tube_readmem = tube_6502_readmem;
         tube_writemem = tube_6502_writemem;
         tube_exec  = tube_6502_exec;
+        tube_proc_savestate = tube_6502_savestate;
+        tube_proc_loadstate = tube_6502_loadstate;
 }
 
 void tube_updatespeed()
