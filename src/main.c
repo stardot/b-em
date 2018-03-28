@@ -36,6 +36,7 @@
 #include "sound.h"
 #include "sysacia.h"
 #include "tape.h"
+#include "tapecat-allegro.h"
 #include "tapenoise.h"
 #include "tube.h"
 #include "via.h"
@@ -534,6 +535,7 @@ void main_run()
 
 void main_close()
 {
+    gui_tapecat_close();
     debug_kill();
 
     config_save();

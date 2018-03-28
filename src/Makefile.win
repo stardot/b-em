@@ -65,6 +65,7 @@ OBJ = \
     sysacia.o \
     sysvia.o \
     tape.o \
+    tapecat-allegro.o \
     tapenoise.o \
     tsearch.o \
     tube.o \

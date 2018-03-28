@@ -85,6 +85,7 @@ b_em_SOURCES = \
 	sysacia.c \
 	sysvia.c \
 	tape.c \
+	tapecat-allegro.c \
 	tapenoise.c \
 	tube.c \
 	uef.c \

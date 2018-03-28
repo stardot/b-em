@@ -18,6 +18,7 @@
 #include "sound.h"
 #include "sn76489.h"
 #include "tape.h"
+#include "tapecat-allegro.h"
 #include "tube.h"
 #include "uservia.h"
 #include "video.h"
@@ -32,7 +33,6 @@
 #define ROM_LABEL_LEN 50
 
 static ALLEGRO_MENU *disc_menu;
-static ALLEGRO_TEXTLOG *tape_cat;
 
 static inline int menu_id_num(menu_id_t id, int num)
 {
@@ -141,7 +141,6 @@ static ALLEGRO_MENU *create_tape_menu(void)
     al_append_menu_item(speed, "Normal", IDM_TAPE_SPEED_NORMAL, nflags, NULL, NULL);
     al_append_menu_item(speed, "Fast", IDM_TAPE_SPEED_FAST, fflags, NULL, NULL);
     al_append_menu_item(menu, "Tape speed", 0, 0, NULL, speed);
-    add_checkbox_item(menu, "Show tape catalogue", IDM_TAPE_CAT, 0);
     return menu;
 }
 
@@ -619,14 +618,6 @@ static void tape_normal(ALLEGRO_EVENT *event)
     }
 }
 
-static void tape_toggle_cat(void)
-{
-    if (tape_cat)
-        al_close_native_text_log(tape_cat);
-    else
-        tape_cat = al_open_native_text_log("B-Em Tape Catalogue", 0);
-}
-
 static void tape_fast(ALLEGRO_EVENT *event)
 {
     ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
@@ -635,12 +626,6 @@ static void tape_fast(ALLEGRO_EVENT *event)
         fasttape = 1;
         al_set_menu_item_flags(menu, IDM_TAPE_SPEED_NORMAL, ALLEGRO_MENU_ITEM_CHECKBOX);
     }
-}
-
-void cataddname(char *s)
-{
-    if (tape_cat)
-        al_append_native_text_log(tape_cat, "%s\n", s);
 }
 
 static void rom_load(ALLEGRO_EVENT *event)
@@ -843,7 +828,7 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             tape_fast(event);
             break;
         case IDM_TAPE_CAT:
-            tape_toggle_cat();
+            gui_tapecat_start();
             break;
         case IDM_ROMS_LOAD:
             rom_load(event);
