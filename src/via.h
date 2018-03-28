@@ -13,16 +13,17 @@ typedef struct VIA
         int      ca1,   ca2,   cb1,   cb2;
         int      intnum;
         int      sr_count;
-        
+
         uint8_t  (*read_portA)(void);
         uint8_t  (*read_portB)(void);
         void     (*write_portA)(uint8_t val);
         void     (*write_portB)(uint8_t val);
-        
+
         void     (*set_ca1)(int level);
         void     (*set_ca2)(int level);
         void     (*set_cb1)(int level);
         void     (*set_cb2)(int level);
+        void     (*timer_expire1)(void);
 } VIA;
 
 uint8_t via_read(VIA *v, uint16_t addr);

@@ -81,6 +81,13 @@ static ALLEGRO_MENU *create_file_menu(void)
     return menu;
 }
 
+static ALLEGRO_MENU *create_edit_menu(void)
+{
+    ALLEGRO_MENU *menu = al_create_menu();
+    al_append_menu_item(menu, "Type from clipboard", IDM_EDIT_PASTE, 0, NULL, NULL);
+    return menu;
+}
+
 static ALLEGRO_MENU *create_disc_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
@@ -372,6 +379,7 @@ void gui_allegro_init(ALLEGRO_EVENT_QUEUE *queue, ALLEGRO_DISPLAY *display)
 {
     ALLEGRO_MENU *menu = al_create_menu();
     al_append_menu_item(menu, "File", 0, 0, NULL, create_file_menu());
+    al_append_menu_item(menu, "Edit", 0, 0, NULL, create_edit_menu());
     al_append_menu_item(menu, "Disc", 0, 0, NULL, create_disc_menu());
     al_append_menu_item(menu, "Tape", 0, 0, NULL, create_tape_menu());
     al_append_menu_item(menu, "ROM", 0, 0, NULL, create_rom_menu());
@@ -766,6 +774,9 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             break;
         case IDM_FILE_EXIT:
             quitting = true;
+            break;
+        case IDM_EDIT_PASTE:
+            key_paste_start(al_get_clipboard_text((ALLEGRO_DISPLAY *)(event->user.data2)));
             break;
         case IDM_DISC_AUTOBOOT:
             disc_autoboot(event);

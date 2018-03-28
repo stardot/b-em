@@ -11,6 +11,8 @@ extern void key_up(ALLEGRO_EVENT *event);
 
 extern void key_clear(void);
 extern void key_check(void);
+extern void key_paste_start(char *str);
+extern void key_paste_poll(void);
 extern void key_scan(int row, int col);
 extern int key_is_down(void);
 
