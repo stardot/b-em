@@ -409,10 +409,8 @@ static void file_load_state(ALLEGRO_EVENT *event)
     ALLEGRO_FILECHOOSER *chooser = al_create_native_file_dialog(savestate_name, "Load state from file", "*.snp", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST);
     if (chooser) {
         if (al_show_native_file_dialog(display, chooser)) {
-            if (al_get_native_file_dialog_count(chooser) > 0) {
-                strncpy(savestate_name, al_get_native_file_dialog_path(chooser, 0), sizeof savestate_name);
-                savestate_load();
-            }
+            if (al_get_native_file_dialog_count(chooser) > 0)
+                savestate_load(al_get_native_file_dialog_path(chooser, 0));
         }
         al_destroy_native_file_dialog(chooser);
     }
@@ -427,10 +425,8 @@ static void file_save_state(ALLEGRO_EVENT *event)
         if ((chooser = al_create_native_file_dialog(savestate_name, "Save state to file", "*.snp", ALLEGRO_FILECHOOSER_SAVE))) {
             display = (ALLEGRO_DISPLAY *)(event->user.data2);
             if (al_show_native_file_dialog(display, chooser)) {
-                if (al_get_native_file_dialog_count(chooser) > 0) {
-                    strncpy(savestate_name, al_get_native_file_dialog_path(chooser, 0), sizeof savestate_name);
-                    savestate_save();
-                }
+                if (al_get_native_file_dialog_count(chooser) > 0)
+                    savestate_save(al_get_native_file_dialog_path(chooser, 0));
             }
             al_destroy_native_file_dialog(chooser);
         }

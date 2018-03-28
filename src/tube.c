@@ -362,3 +362,16 @@ void tube_reset(void)
         tubeula.hstat[2] = 0xC0;
         tube_romin = 1;
 }
+
+void tube_ula_savestate(FILE *f)
+{
+    putc(tube_romin, f);
+    fwrite(&tubeula, sizeof tubeula, 1, f);
+}
+
+void tube_ula_loadstate(FILE *f)
+{
+    tube_romin = getc(f);
+    fread(&tubeula, sizeof tubeula, 1, f);
+    tube_updateints();
+}

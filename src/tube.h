@@ -21,6 +21,8 @@ void tube_32016_init(FILE *romf);
 uint8_t (*tube_readmem)(uint32_t addr);
 void (*tube_writemem)(uint32_t addr, uint8_t byte);
 void (*tube_exec)(void);
+void (*tube_proc_savestate)(FILE *f);
+void (*tube_proc_loadstate)(FILE *f);
 extern int tubecycles;
 
 uint8_t tube_host_read(uint16_t addr);
@@ -32,5 +34,8 @@ extern int tube_irq;
 
 void tube_reset(void);
 void tube_updatespeed(void);
+
+void tube_ula_savestate(FILE *f);
+void tube_ula_loadstate(FILE *f);
 
 #endif
