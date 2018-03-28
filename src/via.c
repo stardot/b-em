@@ -40,8 +40,6 @@ static void via_updateIFR(VIA *v)
         }
 }
 
-extern void key_paste_poll(void);
-
 void via_updatetimers(VIA *v)
 {
         if (v->t1c<-3)
@@ -95,6 +93,7 @@ void via_write(VIA *v, uint16_t addr, uint8_t val)
                         v->set_ca2(1);
                         v->ca2 = 1;
                 }
+                // FALLTHROUGH
 
             case ORAnh:
                 v->write_portA((val & v->ddra) | ~v->ddra);
@@ -136,8 +135,7 @@ void via_write(VIA *v, uint16_t addr, uint8_t val)
                 break;
             case PCR:
                 v->pcr  = val;
-
-                log_debug("PCR write %04X %02X\n",addr,val);
+                log_debug("via: PCR write %04X %02X", addr, val);
 
                 if ((val & 0xE) == 0xC)
                 {

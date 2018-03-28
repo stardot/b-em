@@ -1,7 +1,10 @@
 #ifndef __INC_USERVIA_H
 #define __INC_USERVIA_H
 
+#include "via.h"
+
 extern VIA uservia;
+extern ALLEGRO_USTR *prt_clip_str;
 
 void    uservia_reset(void);
 void    uservia_write(uint16_t addr, uint8_t val);

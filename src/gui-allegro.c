@@ -19,6 +19,7 @@
 #include "sn76489.h"
 #include "tape.h"
 #include "tube.h"
+#include "uservia.h"
 #include "video.h"
 #include "video_render.h"
 #include "vdfs.h"
@@ -85,6 +86,7 @@ static ALLEGRO_MENU *create_edit_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
     al_append_menu_item(menu, "Type from clipboard", IDM_EDIT_PASTE, 0, NULL, NULL);
+    add_checkbox_item(menu, "Printer to clipboard", IDM_EDIT_COPY, prt_clip_str);
     return menu;
 }
 
@@ -454,6 +456,20 @@ static void file_save_scrshot(ALLEGRO_EVENT *event)
     }
 }
 
+static void edit_print_clip(ALLEGRO_EVENT *event)
+{
+    ALLEGRO_DISPLAY *display;
+
+    if (prt_clip_str) {
+        display = (ALLEGRO_DISPLAY *)(event->user.data2);
+        al_set_clipboard_text(display, al_cstr(prt_clip_str));
+        al_ustr_free(prt_clip_str);
+        prt_clip_str = NULL;
+    }
+    else
+        prt_clip_str = al_ustr_dup(al_ustr_empty_string());
+}
+
 static bool disc_choose(ALLEGRO_EVENT *event, const char *opname, void (*callback)(int drive, ALLEGRO_PATH *fn), int flags)
 {
     ALLEGRO_FILECHOOSER *chooser;
@@ -777,6 +793,9 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             break;
         case IDM_EDIT_PASTE:
             key_paste_start(al_get_clipboard_text((ALLEGRO_DISPLAY *)(event->user.data2)));
+            break;
+        case IDM_EDIT_COPY:
+            edit_print_clip(event);
             break;
         case IDM_DISC_AUTOBOOT:
             disc_autoboot(event);
