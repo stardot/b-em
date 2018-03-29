@@ -233,7 +233,7 @@ static ALLEGRO_MENU *create_tube_menu(void)
         map[i].label = tubes[i].name;
         map[i].itemno = i;
     }
-    add_sorted_set(menu, map, NUM_TUBES, IDM_TUBE, curmodel);
+    add_sorted_set(menu, map, NUM_TUBES, IDM_TUBE, curtube);
     for (i = 0; i < NUM_TUBE_SPEEDS; i++)
         add_radio_item(sub, tube_speeds[i].name, IDM_TUBE_SPEED, i, tube_speed_num);
     al_append_menu_item(menu, "Tube speed", 0, 0, NULL, sub);
