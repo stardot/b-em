@@ -98,13 +98,9 @@ static void sysacia_loadstate(FILE *f) {
     acia_loadstate(&sysacia, f);
 }
 
-static void save_tail(int key, long start, long end)
+static void save_tail(long start, long end, long size)
 {
-    long size;
-
     fseek(savestate_fp, start, SEEK_SET);
-    size = end - start - 3;
-    log_debug("savestate: section %c saved, %ld bytes", key, size);
     putc(size & 0xff, savestate_fp);
     putc((size >> 8) & 0xff, savestate_fp);
     putc((size >> 16) & 0xff, savestate_fp);
@@ -113,18 +109,21 @@ static void save_tail(int key, long start, long end)
 
 static void save_sect(int key, void (*save_func)(FILE *f))
 {
-    long start;
+    long start, end, size;
 
     putc(key, savestate_fp);
     start = ftell(savestate_fp);
     fseek(savestate_fp, 3, SEEK_CUR);
     save_func(savestate_fp);
-    save_tail(key, start, ftell(savestate_fp));
+    end = ftell(savestate_fp);
+    size = end - start - 3;
+    log_debug("savestate: section %c saved, %ld bytes", key, size);
+    save_tail(start, end, size);
 }
 
 static void save_zlib(int key, void (*save_func)(ZFILE *zpf))
 {
-    long start;
+    long start, end;
     ZFILE zfile;
     int res;
 
@@ -147,11 +146,13 @@ static void save_zlib(int key, void (*save_func)(ZFILE *zpf))
     if (res == Z_STREAM_END) {
         if (zfile.zs.avail_out < BUFSIZ)
             fwrite(zfile.buf, BUFSIZ - zfile.zs.avail_out, 1, savestate_fp);
-        save_tail(key, start, start + zfile.zs.total_out + 3);
+        log_debug("savestate: section %c saved deflated, %ld bytes into %ld", key, zfile.zs.total_in, zfile.zs.total_out);
+        save_tail(start, start + zfile.zs.total_out + 3, zfile.zs.total_out);
     }
     else {
         log_error("savestate: compression error in section %c: %d(%s)", key, res, zfile.zs.msg);
-        save_tail(key, start, ftell(savestate_fp));
+        end = ftell(savestate_fp);
+        save_tail(start, end, end - start - 3);
     }
     deflateEnd(&zfile.zs);
 }
@@ -171,6 +172,7 @@ void savestate_zwrite(ZFILE *zfp, void *src, size_t size)
         if (zfp->zs.avail_in == 0)
             return;
     }
+    log_warn("savestate: compression error %d (%s)", res, zfp->zs.msg);
 }
 
 void savestate_dosave(void)
@@ -235,6 +237,7 @@ static void load_zlib(long size, void (*load_func)(ZFILE *zpf))
     zfile.zs.avail_in = 0;
     zfile.togo = size;
     load_func(&zfile);
+    log_debug("savestate: inflated %ld bytes to %ld", zfile.zs.total_in, zfile.zs.total_out);
     inflateEnd(&zfile.zs);
 }
 
@@ -281,6 +284,7 @@ static void load_state_two(void)
         size |= getc(savestate_fp) << 8;
         size |= getc(savestate_fp) << 16;
         start = ftell(savestate_fp);
+        log_debug("savestate: found section %c of %ld bytes", ch, size);
 
         switch(ch) {
             case '6':
