@@ -429,6 +429,71 @@ void z80_close()
 {
 }
 
+void z80_savestate(ZFILE *zfp)
+{
+    unsigned char bytes[44];
+
+    bytes[0]  = af.b.l;       bytes[1]  = af.b.h;
+    bytes[2]  = bc.b.l;       bytes[3]  = bc.b.h;
+    bytes[4]  = de.b.l;       bytes[5]  = de.b.h;
+    bytes[6]  = hl.b.l;       bytes[7]  = hl.b.h;
+    bytes[8]  = ix.b.l;       bytes[9]  = ix.b.h;
+    bytes[10] = iy.b.l;       bytes[11] = iy.b.h;
+    bytes[12] = ir.b.l;       bytes[13] = ir.b.h;
+    bytes[14] = saf.b.l;      bytes[15] = saf.b.h;
+    bytes[16] = sbc.b.l;      bytes[17] = sbc.b.h;
+    bytes[18] = sde.b.l;      bytes[19] = sde.b.h;
+    bytes[20] = shl.b.l;      bytes[21] = shl.b.h;
+    bytes[22] = sp;           bytes[23] = sp   >> 8;
+    bytes[24] = pc;           bytes[25] = pc   >> 8;
+    bytes[26] = opc;          bytes[27] = opc  >> 8;
+    bytes[28] = oopc;         bytes[29] = oopc >> 8;
+    bytes[30] = iff1;         bytes[31] = iff2;
+    bytes[32] = z80int;       bytes[33] = im;
+    bytes[34] = cycles;       bytes[35] = cycles >> 8;
+    bytes[36] = cycles >> 16; bytes[37] = cycles >> 24;
+    bytes[38] = ins;          bytes[39] = ins >> 8;
+    bytes[40] = ins >> 16;    bytes[41] = ins >> 24;
+    bytes[42] = tuberomin;    bytes[43] = intreg;
+
+    savestate_zwrite(zfp, bytes, sizeof bytes);
+    savestate_zwrite(zfp, z80ram, sizeof z80ram);
+    savestate_zwrite(zfp, z80rom, sizeof z80rom);
+}
+
+void z80_loadstate(ZFILE *zfp)
+{
+    unsigned char bytes[44];
+
+    savestate_zread(zfp, bytes, sizeof bytes);
+
+    af.b.l  = bytes[0];        af.b.h  = bytes[1];
+    bc.b.l  = bytes[2];        bc.b.h  = bytes[3];
+    de.b.l  = bytes[4];        de.b.h  = bytes[5];
+    hl.b.l  = bytes[6];        hl.b.h  = bytes[7];
+    ix.b.l  = bytes[8];        ix.b.h  = bytes[9];
+    iy.b.l  = bytes[10];       iy.b.h  = bytes[11];
+    ir.b.l  = bytes[12];       ir.b.h  = bytes[13];
+    saf.b.l = bytes[14];       saf.b.h = bytes[15];
+    sbc.b.l = bytes[16];       sbc.b.h = bytes[17];
+    sde.b.l = bytes[18];       sde.b.h = bytes[19];
+    shl.b.l = bytes[20];       shl.b.h = bytes[21];
+    sp      = bytes[22];       sp     |= bytes[23] << 8;
+    pc      = bytes[24];       pc     |= bytes[25] << 8;
+    opc     = bytes[26];       opc    |= bytes[27] << 8;
+    oopc    = bytes[28];       oopc   |= bytes[29] << 8;
+    iff1    = bytes[30];       iff2    = bytes[31];
+    z80int  = bytes[32];       im      = bytes[33];
+    cycles  = bytes[34];       cycles |= bytes[35] << 8;
+    cycles |= bytes[36] << 16; cycles |= bytes[37] << 24;
+    ins     = bytes[38];       ins    |= bytes[39] << 8;
+    ins    |= bytes[40] << 16; ins    |= bytes[41] << 24;
+    tuberomin = bytes[42];     intreg  = bytes[43];
+
+    savestate_zread(zfp, z80ram, sizeof z80ram);
+    savestate_zread(zfp, z80rom, sizeof z80rom);
+}
+
 void z80_dumpregs()
 {
         log_debug("AF =%04X BC =%04X DE =%04X HL =%04X IX=%04X IY=%04X\n",af.w,bc.w,de.w,hl.w,ix.w,iy.w);

@@ -322,6 +322,8 @@ void tube_z80_init(FILE *romf)
         tube_readmem = tube_z80_readmem;
         tube_writemem = tube_z80_writemem;
         tube_exec  = z80_exec;
+        tube_proc_savestate = z80_savestate;
+        tube_proc_loadstate = z80_loadstate;
 }
 
 void tube_x86_init(FILE *romf)

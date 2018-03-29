@@ -1,6 +1,8 @@
 #ifndef __INC_SAVESTATE_H
 #define __INC_SAVESTATE_H
 
+#include <stdio.h>
+
 typedef struct _sszfile ZFILE;
 
 extern int savestate_wantsave, savestate_wantload;
