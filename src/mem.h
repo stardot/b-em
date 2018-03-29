@@ -1,6 +1,8 @@
 #ifndef __INC_MEM_H
 #define __INC_MEM_H
 
+#include "savestate.h"
+
 #define RAM_SIZE  (64*1024)
 #define ROM_SIZE  (16*1024)
 #define ROM_NSLOT 16
@@ -33,7 +35,8 @@ void mem_init(void);
 void mem_reset(void);
 void mem_close(void);
 
-void mem_savestate(FILE *f);
+void mem_savezlib(ZFILE *zfp);
+void mem_loadzlib(ZFILE *zfp);
 void mem_loadstate(FILE *f);
 
 void mem_dump(void);

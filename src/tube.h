@@ -1,6 +1,8 @@
 #ifndef __INC_TUBE_H
 #define __INC_TUBE_H
 
+#include "savestate.h"
+
 typedef struct {
     const char *name;
     float multipler;
@@ -21,8 +23,8 @@ void tube_32016_init(FILE *romf);
 uint8_t (*tube_readmem)(uint32_t addr);
 void (*tube_writemem)(uint32_t addr, uint8_t byte);
 void (*tube_exec)(void);
-void (*tube_proc_savestate)(FILE *f);
-void (*tube_proc_loadstate)(FILE *f);
+void (*tube_proc_savestate)(ZFILE *zfp);
+void (*tube_proc_loadstate)(ZFILE *zfp);
 extern int tubecycles;
 
 uint8_t tube_host_read(uint16_t addr);

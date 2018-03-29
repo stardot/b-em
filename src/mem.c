@@ -49,7 +49,7 @@ void mem_close() {
 }
 
 static void dump_mem(void *start, size_t size, const char *which, const char *file) {
-	FILE *f;
+    FILE *f;
 
     if ((f = fopen(file, "wb"))) {
         fwrite(start, size, 1, f);
@@ -65,7 +65,7 @@ void mem_dump(void) {
 
 static void load_os_rom(const char *sect) {
     const char *osname;
-	FILE *f;
+    FILE *f;
     char path[PATH_MAX];
 
     osname = get_config_string(sect, "os", models[curmodel].os);
@@ -145,7 +145,7 @@ void mem_romsetup_os01() {
     char *name, *path;
     int c;
 
-	load_os_rom(sect);
+    load_os_rom(sect);
     cfg_load_rom(15, sect, models[curmodel].basic);
     memcpy(rom + 14 * ROM_SIZE, rom + 15 * ROM_SIZE, ROM_SIZE);
     memcpy(rom + 12 * ROM_SIZE, rom + 14 * ROM_SIZE, ROM_SIZE * 2);
@@ -207,7 +207,7 @@ void mem_romsetup_bp128(void) {
 void mem_romsetup_master(void) {
     const char *sect = models[curmodel].cfgsect;
     const char *osname;
-	FILE *f;
+    FILE *f;
     char path[PATH_MAX];
     int slot;
 
@@ -245,7 +245,7 @@ void mem_romsetup_compact(void) {
     const char *sect = models[curmodel].cfgsect;
     int slot;
 
-	load_os_rom(sect);
+    load_os_rom(sect);
     cfg_load_rom(15, sect, "utils");
     cfg_load_rom(14, sect, models[curmodel].basic);
     cfg_load_rom(13, sect, models[curmodel].dfs);
@@ -276,7 +276,7 @@ static void rom_clearmeta(int slot) {
 
 void mem_clearrom(int slot) {
     uint8_t *base = rom + (slot * ROM_SIZE);
-    
+
     memset(base, 0xff, ROM_SIZE);
     rom_clearmeta(slot);
 }
@@ -291,11 +291,26 @@ void mem_clearroms(void) {
     }
 }
 
-void mem_savestate(FILE *f) {
-    putc(ram_fe30, f);
-    putc(ram_fe34, f);
-    fwrite(ram, RAM_SIZE, 1, f);
-    fwrite(rom, ROM_SIZE*ROM_NSLOT, 1, f);
+void mem_savezlib(ZFILE *zfp)
+{
+    unsigned char latches[2];
+
+    latches[0] = ram_fe30;
+    latches[1] = ram_fe34;
+    savestate_zwrite(zfp, latches, 2);
+    savestate_zwrite(zfp, ram, RAM_SIZE);
+    savestate_zwrite(zfp, rom, ROM_SIZE*ROM_NSLOT);
+}
+
+void mem_loadzlib(ZFILE *zfp)
+{
+    unsigned char latches[2];
+
+    savestate_zread(zfp, latches, 2);
+    ram_fe30 = latches[0];
+    ram_fe34 = latches[1];
+    savestate_zread(zfp, ram, RAM_SIZE);
+    savestate_zread(zfp, rom, ROM_SIZE*ROM_NSLOT);
 }
 
 void mem_loadstate(FILE *f) {

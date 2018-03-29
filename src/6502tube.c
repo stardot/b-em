@@ -101,23 +101,23 @@ static inline uint8_t pack_flags(uint8_t flags) {
     return flags;
 }
 
-void tube_6502_savestate(FILE *f)
+void tube_6502_savestate(ZFILE *zfp)
 {
-    uint8_t temp;
+    unsigned char bytes[9];
 
-    putc(tube_6502_skipint, f);
-    putc(tube_6502_oldnmi, f);
-    putc(a, f);
-    putc(x, f);
-    putc(y, f);
-    temp = pack_flags(0x30);
-    putc(temp, f);
-    putc(s, f);
-    putc(pc & 0xFF, f);
-    putc(pc >> 8, f);
-    fwrite(tubememstat, sizeof tubememstat, 1, f);
-    fwrite(tuberam, TUBE_6502_RAM_SIZE, 1, f);
-    fwrite(tuberom, sizeof tuberom, 1, f);
+    bytes[0] = tube_6502_skipint;
+    bytes[1] = tube_6502_oldnmi;
+    bytes[2] = a;
+    bytes[3] = x;
+    bytes[4] = y;
+    bytes[5] = pack_flags(0x30);
+    bytes[6] = s;
+    bytes[7] = pc & 0xff;
+    bytes[8] = pc >> 8;
+    savestate_zwrite(zfp, bytes, sizeof bytes);
+    savestate_zwrite(zfp, tubememstat, sizeof tubememstat);
+    savestate_zwrite(zfp, tuberam, TUBE_6502_RAM_SIZE);
+    savestate_zwrite(zfp, tuberom, sizeof tuberom);
 }
 
 static inline void unpack_flags(uint8_t flags) {
@@ -129,20 +129,24 @@ static inline void unpack_flags(uint8_t flags) {
     tubep.n = flags & 0x80;
 }
 
-void tube_6502_loadstate(FILE *f)
+void tube_6502_loadstate(ZFILE *zfp)
 {
-    tube_6502_skipint = getc(f);
-    tube_6502_oldnmi = getc(f);
-    a = getc(f);
-    x = getc(f);
-    y = getc(f);
-    unpack_flags(getc(f));
-    s = getc(f);
-    pc = getc(f);
-    pc |= getc(f) << 8;
-    fread(tubememstat, sizeof tubememstat, 1, f);
-    fread(tuberam, TUBE_6502_RAM_SIZE, 1, f);
-    fread(tuberom, sizeof tuberom, 1, f);
+    unsigned char bytes[9];
+
+    savestate_zread(zfp, bytes, sizeof bytes);
+    tube_6502_skipint = bytes[0];
+    tube_6502_oldnmi = bytes[1];
+    a = bytes[2];
+    x = bytes[3];
+    y = bytes[4];
+    unpack_flags(bytes[5]);
+    s = bytes[6];
+    pc = bytes[7];
+    pc |= bytes[8] << 8;
+
+    savestate_zread(zfp, tubememstat, sizeof tubememstat);
+    savestate_zread(zfp, tuberam, TUBE_6502_RAM_SIZE);
+    savestate_zread(zfp, tuberom, sizeof tuberom);
 }
 
 static uint32_t dbg_reg_get(int which) {

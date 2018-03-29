@@ -1,7 +1,7 @@
 /*B-em v2.2 by Tom Walker
   Savestate handling*/
-#include <stdio.h>
 #include "b-em.h"
+#include <zlib.h>
 
 #include "6502.h"
 #include "adc.h"
@@ -19,6 +19,13 @@
 #include "uservia.h"
 #include "video.h"
 #include "vdfs.h"
+
+struct _sszfile {
+    z_stream zs;
+    size_t togo;
+    int flush;
+    unsigned char buf[BUFSIZ];
+};
 
 int savestate_wantsave, savestate_wantload;
 char *savestate_name;
@@ -83,12 +90,6 @@ void savestate_load(const char *name)
         log_error("savestate: unable to open %s for reading: %s", name, strerror(errno));
 }
 
-typedef struct {
-    char key;
-    void (*save_func)(FILE *f);
-    void (*load_func)(FILE *f);
-} savesect_t;
-
 static void sysacia_savestate(FILE *f) {
     acia_savestate(&sysacia, f);
 }
@@ -97,15 +98,10 @@ static void sysacia_loadstate(FILE *f) {
     acia_loadstate(&sysacia, f);
 }
 
-static void save_sect(int key, void (*save_func)(FILE *f))
+static void save_tail(int key, long start, long end)
 {
-    long start, end, size;
+    long size;
 
-    putc(key, savestate_fp);
-    start = ftell(savestate_fp);
-    fseek(savestate_fp, 3, SEEK_CUR);
-    save_func(savestate_fp);
-    end = ftell(savestate_fp);
     fseek(savestate_fp, start, SEEK_SET);
     size = end - start - 3;
     log_debug("savestate: section %c saved, %ld bytes", key, size);
@@ -115,13 +111,75 @@ static void save_sect(int key, void (*save_func)(FILE *f))
     fseek(savestate_fp, end, SEEK_SET);
 }
 
+static void save_sect(int key, void (*save_func)(FILE *f))
+{
+    long start;
+
+    putc(key, savestate_fp);
+    start = ftell(savestate_fp);
+    fseek(savestate_fp, 3, SEEK_CUR);
+    save_func(savestate_fp);
+    save_tail(key, start, ftell(savestate_fp));
+}
+
+static void save_zlib(int key, void (*save_func)(ZFILE *zpf))
+{
+    long start;
+    ZFILE zfile;
+    int res;
+
+    putc(key, savestate_fp);
+    start = ftell(savestate_fp);
+    fseek(savestate_fp, 3, SEEK_CUR);
+
+    zfile.zs.zalloc = Z_NULL;
+    zfile.zs.zfree = Z_NULL;
+    zfile.zs.opaque = Z_NULL;
+    deflateInit(&zfile.zs, Z_DEFAULT_COMPRESSION);
+    zfile.zs.next_out = zfile.buf;
+    zfile.zs.avail_out = BUFSIZ;
+    save_func(&zfile);
+    while ((res = deflate(&zfile.zs, Z_FINISH)) == Z_OK) {
+        fwrite(zfile.buf, BUFSIZ, 1, savestate_fp);
+        zfile.zs.next_out = zfile.buf;
+        zfile.zs.avail_out = BUFSIZ;
+    }
+    if (res == Z_STREAM_END) {
+        if (zfile.zs.avail_out < BUFSIZ)
+            fwrite(zfile.buf, BUFSIZ - zfile.zs.avail_out, 1, savestate_fp);
+        save_tail(key, start, start + zfile.zs.total_out + 3);
+    }
+    else {
+        log_error("savestate: compression error in section %c: %d(%s)", key, res, zfile.zs.msg);
+        save_tail(key, start, ftell(savestate_fp));
+    }
+    deflateEnd(&zfile.zs);
+}
+
+void savestate_zwrite(ZFILE *zfp, void *src, size_t size)
+{
+    int res;
+
+    zfp->zs.next_in = src;
+    zfp->zs.avail_in = size;
+    while ((res = deflate(&zfp->zs, Z_NO_FLUSH) == Z_OK)) {
+        if (zfp->zs.avail_out == 0) {
+            fwrite(zfp->buf, BUFSIZ, 1, savestate_fp);
+            zfp->zs.next_out = zfp->buf;
+            zfp->zs.avail_out = BUFSIZ;
+        }
+        if (zfp->zs.avail_in == 0)
+            return;
+    }
+}
+
 void savestate_dosave(void)
 {
     fwrite("BEMSNAP2", 8, 1, savestate_fp);
     putc(curmodel, savestate_fp);
     putc(curtube, savestate_fp);
     save_sect('6', m6502_savestate);
-    save_sect('M', mem_savestate);
+    save_zlib('M', mem_savezlib);
     save_sect('S', sysvia_savestate);
     save_sect('U', uservia_savestate);
     save_sect('V', videoula_savestate);
@@ -135,7 +193,7 @@ void savestate_dosave(void)
     save_sect('m', music5000_savestate);
     if (curtube != -1) {
         save_sect('T', tube_ula_savestate);
-        save_sect('P', tube_proc_savestate);
+        save_zlib('P', tube_proc_savestate);
     }
     fclose(savestate_fp);
     savestate_wantsave = 0;
@@ -165,6 +223,47 @@ static void load_state_one(void)
     log_debug("savestate: loaded V1 snapshot file");
 }
 
+static void load_zlib(long size, void (*load_func)(ZFILE *zpf))
+{
+    ZFILE zfile;
+
+    zfile.zs.zalloc = Z_NULL;
+    zfile.zs.zfree = Z_NULL;
+    zfile.zs.opaque = Z_NULL;
+    inflateInit(&zfile.zs);
+    zfile.zs.next_in = Z_NULL;
+    zfile.zs.avail_in = 0;
+    zfile.togo = size;
+    load_func(&zfile);
+    inflateEnd(&zfile.zs);
+}
+
+void savestate_zread(ZFILE *zfp, void *dest, size_t size)
+{
+    int res;
+    size_t chunk;
+
+    zfp->zs.next_out = dest;
+    zfp->zs.avail_out = size;
+    do {
+        if (zfp->zs.avail_in == 0) {
+            if (zfp->togo > BUFSIZ) {
+                zfp->flush = Z_NO_FLUSH;
+                chunk = BUFSIZ;
+            }
+            else {
+                zfp->flush = Z_FINISH;
+                chunk = zfp->togo;
+            }
+            fread(zfp->buf, chunk, 1, savestate_fp);
+            zfp->zs.next_in = zfp->buf;
+            zfp->zs.avail_in = chunk;
+            zfp->togo -= chunk;
+        }
+        res = inflate(&zfp->zs, zfp->flush);
+    } while (res == Z_OK && zfp->zs.avail_out > 0);
+}
+
 static void load_state_two(void)
 {
     int ch;
@@ -188,7 +287,7 @@ static void load_state_two(void)
                 m6502_loadstate(savestate_fp);
                 break;
             case 'M':
-                mem_loadstate(savestate_fp);
+                load_zlib(size, mem_loadzlib);
                 break;
             case 'S':
                 sysvia_loadstate(savestate_fp);
@@ -229,7 +328,7 @@ static void load_state_two(void)
                 break;
             case 'P':
                 if (tube_proc_loadstate)
-                    tube_proc_loadstate(savestate_fp);
+                    load_zlib(size, tube_proc_loadstate);
                 break;
         }
         end = ftell(savestate_fp);
