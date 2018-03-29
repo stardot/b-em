@@ -32,6 +32,11 @@
 
 #define ROM_LABEL_LEN 50
 
+typedef struct {
+    const char *label;
+    int itemno;
+} menu_map_t;
+
 static ALLEGRO_MENU *disc_menu;
 
 static inline int menu_id_num(menu_id_t id, int num)
@@ -69,6 +74,24 @@ static void add_radio_set(ALLEGRO_MENU *parent, char const **labels, uint16_t id
 
     for (i = 0; (label = *labels++); i++)
         add_checkbox_item(parent, label, menu_id_num(id, i), i == cur_value);
+}
+
+static int menu_cmp(const void *va, const void *vb)
+{
+    menu_map_t *a = (menu_map_t *)va;
+    menu_map_t *b = (menu_map_t *)vb;
+    return strcasecmp(a->label, b->label);
+}
+
+static void add_sorted_set(ALLEGRO_MENU *parent, menu_map_t *map, size_t items, uint16_t id, int cur_value)
+{
+    int i, ino;
+
+    qsort(map, items, sizeof(menu_map_t), menu_cmp);
+    for (i = 0; i < items; i++) {
+        ino = map[i].itemno;
+        add_checkbox_item(parent, map[i].label, menu_id_num(id, ino), ino == cur_value);
+    }
 }
 
 static ALLEGRO_MENU *create_file_menu(void)
@@ -188,10 +211,14 @@ static ALLEGRO_MENU *create_rom_menu(void)
 static ALLEGRO_MENU *create_model_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
+    menu_map_t map[NUM_MODELS];
     int i;
 
-    for (i = 0; i < NUM_MODELS; i++)
-        add_radio_item(menu, models[i].name, IDM_MODEL, i, curmodel);
+    for (i = 0; i < NUM_MODELS; i++) {
+        map[i].label = models[i].name;
+        map[i].itemno = i;
+    }
+    add_sorted_set(menu, map, NUM_MODELS, IDM_MODEL, curmodel);
     return menu;
 }
 
@@ -199,10 +226,14 @@ static ALLEGRO_MENU *create_tube_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
     ALLEGRO_MENU *sub = al_create_menu();
+    menu_map_t map[NUM_TUBES];
     int i;
 
-    for (i = 0; i < NUM_TUBES; i++)
-        add_radio_item(menu, tubes[i].name, IDM_TUBE, i, curtube);
+    for (i = 0; i < NUM_TUBES; i++) {
+        map[i].label = tubes[i].name;
+        map[i].itemno = i;
+    }
+    add_sorted_set(menu, map, NUM_TUBES, IDM_TUBE, curmodel);
     for (i = 0; i < NUM_TUBE_SPEEDS; i++)
         add_radio_item(sub, tube_speeds[i].name, IDM_TUBE_SPEED, i, tube_speed_num);
     al_append_menu_item(menu, "Tube speed", 0, 0, NULL, sub);
