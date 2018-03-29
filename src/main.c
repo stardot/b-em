@@ -305,28 +305,12 @@ void main_init(int argc, char *argv[])
 void main_restart()
 {
     main_pause();
-    if (curtube == 3 || mouse_amx)
-        al_uninstall_mouse();
     cmos_save(models[oldmodel]);
     oldmodel = curmodel;
 
     model_init();
-
     main_reset();
-
-    if (curtube == 3 || mouse_amx)
-        al_install_mouse();
     main_resume();
-}
-
-void main_setmouse()
-{
-    if (curtube != 3) {
-        if (mouse_amx)
-            al_install_mouse();
-        else
-            al_uninstall_mouse();
-    }
 }
 
 int resetting = 0;

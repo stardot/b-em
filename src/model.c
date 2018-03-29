@@ -31,10 +31,10 @@ MODEL models[NUM_MODELS] =
         {"BBC B+ 64K",                0,    WD1770_ACORN,   0,     1,  0,      0, 0,      0,       "bbc_b+64",       "bpos",    "basic2",  "dfs226",   "",        mem_romsetup_std,     -1},
         {"BBC B+ 128K",               0,    WD1770_ACORN,   0,     1,  0,      0, 0,      0,       "bbc_b+128",      "bpos",    "basic2",  "dfs226",   "",        mem_romsetup_bp128,   -1},
         {"BBC Master 128",            0,    WD1770_MASTER,  1,     0,  1,      0, 0,      0,       "master_128",     "mos320",  "",        "",         "cmos",    mem_romsetup_master,  -1},
-        {"BBC Master 512",            0,    WD1770_MASTER,  1,     0,  1,      0, 0,      0,       "master_512",     "mos320",  "",        "",         "cmos",    mem_romsetup_master,   4},
+        {"BBC Master 512",            0,    WD1770_MASTER,  1,     0,  1,      0, 0,      0,       "master_512",     "mos320",  "",        "",         "cmos",    mem_romsetup_master,   3},
         {"BBC Master Turbo",          0,    WD1770_MASTER,  1,     0,  1,      0, 0,      0,       "master_turbo",   "mos320",  "",        "",         "cmos",    mem_romsetup_master,   0},
         {"BBC Master Compact",        0,    WD1770_MASTER,  1,     0,  1,      0, 0,      1,       "master_compact", "os51",    "basic48", "adfs210",  "cmosc",   mem_romsetup_compact, -1},
-        {"ARM Evaluation System",     0,    WD1770_MASTER,  1,     0,  1,      0, 0,      0,       "master_arm",     "mos320",  "",        "",         "cmosa",   mem_romsetup_master,   2},
+        {"ARM Evaluation System",     0,    WD1770_MASTER,  1,     0,  1,      0, 0,      0,       "master_arm",     "mos320",  "",        "",         "cmosa",   mem_romsetup_master,   1},
         {"BBC Master 128 w/MOS 3.5",  0,    WD1770_MASTER,  1,     0,  1,      0, 0,      0,       "master_os350",   "mos350",  "",        "",         "cmos350", mem_romsetup_master,  -1},
         {"BBC B wo/FDC w/SWRAM",      0,    WD1770_NONE,    0,     0,  0,      0, 0,      0,       "bbc_b_nofdc",    "os12",    "basic2",  "",         "",        mem_romsetup_swram,   -1},
         {"BBC B w/Solidisk 1770 FDC", 0,    WD1770_STL,     0,     0,  0,      0, 0,      0,       "bbc_b_solidisk", "os12",    "basic2",  "stldfs21", "",        mem_romsetup_swram,   -1},
@@ -61,12 +61,12 @@ extern cpu_debug_t n32016_cpu_debug;
 TUBE tubes[NUM_TUBES]=
 {
         {"6502 Internal",  tube_6502_init,  tube_6502_reset, &tube6502_cpu_debug,  "6502Intern",       4 },
-        {"6502 External",  tube_6502_init,  tube_6502_reset, &tube6502_cpu_debug,  "6502Tube",         3 },
         {"ARM",            tube_arm_init,   arm_reset,       &tubearm_cpu_debug,   "ARMeval_100",      4 },
         {"Z80",            tube_z80_init,   z80_reset,       &tubez80_cpu_debug,   "Z80_120",          8 },
         {"80186",          tube_x86_init,   x86_reset,       &tubex86_cpu_debug,   "BIOS",             8 },
         {"65816",          tube_65816_init, w65816_reset,    &tube65816_cpu_debug, "ReCo6502ROM_816", 16 },
-        {"32016",          tube_32016_init, n32016_reset,    &n32016_cpu_debug,    "",                 8 }
+        {"32016",          tube_32016_init, n32016_reset,    &n32016_cpu_debug,    "",                 8 },
+        {"6502 External",  tube_6502_init,  tube_6502_reset, &tube6502_cpu_debug,  "6502Tube",         3 }
 };
 
 void model_check(void) {
