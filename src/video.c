@@ -310,7 +310,7 @@ void videoula_write(uint16_t addr, uint8_t val)
 void videoula_savestate(FILE * f)
 {
     int c;
-    uint8_t v;
+    uint32_t v;
 
     putc(ula_ctrl, f);
     for (c = 0; c < 16; c++)
@@ -338,7 +338,6 @@ void videoula_loadstate(FILE * f)
 {
     int c;
     uint8_t red, grn, blu, alp;
-
     videoula_write(0, getc(f));
     for (c = 0; c < 16; c++)
         videoula_write(1, getc(f) | (c << 4));
@@ -360,7 +359,6 @@ void videoula_loadstate(FILE * f)
     nula_attribute_mode = getc(f);
     nula_attribute_text = getc(f);
 }
-
 
 /*Mode 7 (SAA5050)*/
 static uint8_t mode7_chars[96 * 160], mode7_charsi[96 * 160], mode7_graph[96 * 160], mode7_graphi[96 * 160], mode7_sepgraph[96 * 160], mode7_sepgraphi[96 * 160], mode7_tempi[96 * 120], mode7_tempi2[96 * 120];
