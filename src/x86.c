@@ -601,33 +601,10 @@ static void x86dumpregs()
         printf("PC=%04X CS=%04X DS=%04X ES=%04X SS=%04X FLAGS=%04X\n",pc,CS,DS,ES,SS,flags);
         printf("%04X:%04X %08X %08X %08X\n",oldcs,oldpc,old8,old82,old83);
         printf("%i %04X %04X\n",x86ins,pc,x86pc);
-/*        if (is386)
-           printf("In %s mode\n",(msw&1)?((eflags&VM_FLAG)?"V86":"protected"):"real");
-        else
-           printf("In %s mode\n",(msw&1)?"protected":"real");
-        printf("CS : base=%06X limit=%04X access=%02X\n",cs,_cs.limit,_cs.access);
-        printf("DS : base=%06X limit=%04X access=%02X\n",ds,_ds.limit,_ds.access);
-        printf("ES : base=%06X limit=%04X access=%02X\n",es,_es.limit,_es.access);
-        if (is386)
-        {
-                printf("FS : base=%06X limit=%04X access=%02X\n",fs,_fs.limit,_fs.access);
-                printf("GS : base=%06X limit=%04X access=%02X\n",gs,_gs.limit,_gs.access);
-        }
-        printf("SS : base=%06X limit=%04X access=%02X\n",ss,_ss.limit,_ss.access);
-        printf("GDT : base=%06X limit=%04X\n",gdt.base,gdt.limit);
-        printf("LDT : base=%06X limit=%04X\n",ldt.base,ldt.limit);
-        printf("IDT : base=%06X limit=%04X\n",idt.base,idt.limit);
-        printf("TR  : base=%06X limit=%04X\n", tr.base, tr.limit);
-        if (is386)
-        {
-                printf("386 in %s mode   stack in %s mode\n",(use32)?"32-bit":"16-bit",(stack32)?"32-bit":"16-bit");
-                printf("CR0=%08X CR2=%08X CR3=%08X\n",cr0,cr2,cr3);
-        }*/
 }
 
 void x86_reset()
 {
-//        return;
         pc=0;
         loadcs(0xFFFF);
         flags=2;
@@ -2123,9 +2100,9 @@ void x86_exec()
                                 loadseg(tempw,&_ss);
                                 if (ssegs) oldss=ss;
                                 skipnextprint=1;
-				noint=1;
+                noint=1;
 //                                printf("LOAD SS %04X %04X\n",tempw,SS);
-//				printf("SS loaded with %04X %04X:%04X %04X %04X %04X\n",ss>>4,cs>>4,pc,CX,DX,es>>4);
+//              printf("SS loaded with %04X %04X:%04X %04X %04X %04X\n",ss>>4,cs>>4,pc,CX,DX,es>>4);
                                 break;
                         }
                         tubecycles-=((mod==3)?2:9);
