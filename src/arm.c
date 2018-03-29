@@ -9,6 +9,7 @@
 #include "tube.h"
 #include "cpu_debug.h"
 #include "darm/darm.h"
+#include "ssinline.h"
 
 #define ARM_ROM_SIZE   0x4000
 #define ARM_RAM_SIZE 0x400000
@@ -253,15 +254,6 @@ void arm_close()
         if (armram) free(armram);
 }
 
-static unsigned char *save_uint32(unsigned char *ptr, uint32_t val)
-{
-    *ptr++ = val; val >>= 8;
-    *ptr++ = val; val >>= 8;
-    *ptr++ = val; val >>= 8;
-    *ptr++ = val;
-    return ptr;
-}
-
 static unsigned char *save_regset(unsigned char *ptr, uint32_t *regs)
 {
     for (int i = 0; i < 16; i++)
@@ -289,17 +281,6 @@ void arm_savestate(ZFILE *zfp)
     savestate_zwrite(zfp, bytes, sizeof bytes);
     savestate_zwrite(zfp, armram, ARM_RAM_SIZE);
     savestate_zwrite(zfp, armrom, ARM_ROM_SIZE);
-}
-
-static unsigned char *load_uint32(unsigned char *ptr, uint32_t *dest)
-{
-    uint32_t v;
-    v = *ptr++;
-    v |= (*ptr++) <<  8;
-    v |= (*ptr++) << 16;
-    v |= (*ptr++) << 24;
-    *dest = v;
-    return ptr;
 }
 
 static unsigned char *load_regset(unsigned char *ptr, uint32_t *regs)
