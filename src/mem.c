@@ -307,8 +307,8 @@ void mem_loadzlib(ZFILE *zfp)
     unsigned char latches[2];
 
     savestate_zread(zfp, latches, 2);
-    ram_fe30 = latches[0];
-    ram_fe34 = latches[1];
+    writemem(0xFE30, latches[0]);
+    writemem(0xFE34, latches[1]);
     savestate_zread(zfp, ram, RAM_SIZE);
     savestate_zread(zfp, rom, ROM_SIZE*ROM_NSLOT);
 }
