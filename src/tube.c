@@ -336,8 +336,8 @@ void tube_x86_init(FILE *romf)
         tube_readmem = x86_readmem;
         tube_writemem = x86_writemem;
         tube_exec  = x86_exec;
-        tube_proc_savestate = NULL;
-        tube_proc_loadstate = NULL;
+        tube_proc_savestate = x86_savestate;
+        tube_proc_loadstate = x86_loadstate;
 }
 
 void tube_65816_init(FILE *romf)

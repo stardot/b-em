@@ -9,6 +9,10 @@
 #include "x86_tube.h"
 #include "tube.h"
 #include "cpu_debug.h"
+#include "ssinline.h"
+
+#define X86_RAM_SIZE 0x100000
+#define X86_ROM_SIZE   0x4000
 
 static int x86ins=0;
 static int dbg_x86 = 0;
@@ -613,17 +617,111 @@ void x86_reset()
 
 void x86_init(FILE *romf)
 {
-        if (!x86ram) x86ram=malloc(0x100000);
-        if (!x86rom) x86rom=malloc(0x4000);
+        if (!x86ram) x86ram=malloc(X86_RAM_SIZE);
+        if (!x86rom) x86rom=malloc(X86_ROM_SIZE);
         x86makeznptable();
-        memset(x86ram,0,0x100000);
-        fread(x86rom, 0x4000, 1, romf);
+        memset(x86ram,0,X86_RAM_SIZE);
+        fread(x86rom, X86_ROM_SIZE, 1, romf);
 }
 
 void x86_close()
 {
         if (x86rom) free(x86rom);
         if (x86ram) free(x86ram);
+}
+
+static unsigned char *save_seg(unsigned char *ptr, x86seg *seg)
+{
+    ptr = save_uint32(ptr, seg->base);
+    ptr = save_uint16(ptr, seg->limit);
+    *ptr++ = seg->access;
+    ptr = save_uint16(ptr, seg->seg);
+    return ptr;
+}
+
+void x86_savestate(ZFILE *zfp)
+{
+    unsigned char bytes[150], *ptr;
+    int i;
+
+    ptr = bytes;
+    for (i = 0; i < 8; i++)
+        ptr = save_uint32(ptr, regs[i].l);
+    ptr = save_uint16(ptr, flags);
+    ptr = save_uint32(ptr, oldpc);
+    ptr = save_uint32(ptr, oldds);
+    ptr = save_uint32(ptr, oldss);
+    ptr = save_uint32(ptr, x86pc);
+    ptr = save_seg(ptr, &_cs);
+    ptr = save_seg(ptr, &_ds);
+    ptr = save_seg(ptr, &_es);
+    ptr = save_seg(ptr, &_ss);
+    ptr = save_seg(ptr, &_fs);
+    ptr = save_seg(ptr, &_gs);
+    ptr = save_uint32(ptr, (uint32_t)x86ins);
+    ptr = save_uint32(ptr, x86sa);
+    ptr = save_uint32(ptr, x86ss);
+    ptr = save_uint32(ptr, x86src);
+    ptr = save_uint32(ptr, x86da);
+    ptr = save_uint32(ptr, x86ds);
+    ptr = save_uint32(ptr, x86dst);
+    ptr = save_uint16(ptr, x86ena);
+    ptr = save_uint16(ptr, x86imask);
+    ptr = save_uint32(ptr, old8);
+    ptr = save_uint32(ptr, old82);
+    ptr = save_uint32(ptr, old83);
+    ptr = save_uint16(ptr, oldcs);
+
+    savestate_zwrite(zfp, bytes, sizeof bytes);
+    savestate_zwrite(zfp, x86ram, X86_RAM_SIZE);
+    savestate_zwrite(zfp, x86rom, X86_ROM_SIZE);
+}
+
+static unsigned char *load_seg(unsigned char *ptr, x86seg *seg)
+{
+    ptr = load_uint32(ptr, &seg->base);
+    ptr = load_uint16(ptr, &seg->limit);
+    seg->access = *ptr++;
+    ptr = load_uint16(ptr, &seg->seg);
+    return ptr;
+}
+
+void x86_loadstate(ZFILE *zfp)
+{
+    unsigned char bytes[150], *ptr;
+    int i;
+    uint32_t temp;
+
+    savestate_zread(zfp, bytes, sizeof bytes);
+    ptr = bytes;
+    for (i = 0; i < 8; i++)
+        ptr = load_uint32(ptr, &regs[i].l);
+    ptr = load_uint16(ptr, &flags);
+    ptr = load_uint32(ptr, &oldpc);
+    ptr = load_uint32(ptr, &oldds);
+    ptr = load_uint32(ptr, &oldss);
+    ptr = load_uint32(ptr, &x86pc);
+    ptr = load_seg(ptr, &_cs);
+    ptr = load_seg(ptr, &_ds);
+    ptr = load_seg(ptr, &_es);
+    ptr = load_seg(ptr, &_ss);
+    ptr = load_seg(ptr, &_fs);
+    ptr = load_seg(ptr, &_gs);
+    ptr = load_uint32(ptr, &temp); x86ins = temp;
+    ptr = load_uint32(ptr, &x86sa);
+    ptr = load_uint32(ptr, &x86ss);
+    ptr = load_uint32(ptr, &x86src);
+    ptr = load_uint32(ptr, &x86da);
+    ptr = load_uint32(ptr, &x86ds);
+    ptr = load_uint32(ptr, &x86dst);
+    ptr = load_uint16(ptr, &x86ena);
+    ptr = load_uint16(ptr, &x86imask);
+    ptr = load_uint32(ptr, &old8);
+    ptr = load_uint32(ptr, &old82);
+    ptr = load_uint32(ptr, &old83);
+    ptr = load_uint16(ptr, &oldcs);
+    savestate_zread(zfp, x86ram, X86_RAM_SIZE);
+    savestate_zread(zfp, x86rom, X86_ROM_SIZE);
 }
 
 static void setznp8(uint8_t val)
