@@ -312,6 +312,8 @@ void tube_arm_init(FILE *romf)
         tube_readmem = readarmb;
         tube_writemem = writearmb;
         tube_exec  = arm_exec;
+        tube_proc_savestate = arm_savestate;
+        tube_proc_loadstate = arm_loadstate;
 }
 
 void tube_z80_init(FILE *romf)
@@ -334,6 +336,8 @@ void tube_x86_init(FILE *romf)
         tube_readmem = x86_readmem;
         tube_writemem = x86_writemem;
         tube_exec  = x86_exec;
+        tube_proc_savestate = NULL;
+        tube_proc_loadstate = NULL;
 }
 
 void tube_65816_init(FILE *romf)
@@ -344,6 +348,8 @@ void tube_65816_init(FILE *romf)
         tube_readmem = readmem65816;
         tube_writemem = writemem65816;
         tube_exec  = w65816_exec;
+        tube_proc_savestate = NULL;
+        tube_proc_loadstate = NULL;
 }
 
 void tube_32016_init(FILE *romf)
@@ -354,6 +360,8 @@ void tube_32016_init(FILE *romf)
         tube_readmem = read_x8;
         tube_writemem = write_x8;
         tube_exec  = n32016_exec;
+        tube_proc_savestate = NULL;
+        tube_proc_loadstate = NULL;
 }
 
 void tube_reset(void)
