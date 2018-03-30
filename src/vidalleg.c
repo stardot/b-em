@@ -254,7 +254,7 @@ void video_doblit()
             }
         }
         else {
-            if (!fullscreen) updatewindowsize((lastx - firstx) + 2, ((lasty - firsty) << 1) + 2);
+            if (!fullscreen) updatewindowsize((lastx - firstx), ((lasty - firsty) << 1));
             fskipcount = 0;
             if (vid_scanlines) {
                 for (c = firsty; c < lasty; c++)
