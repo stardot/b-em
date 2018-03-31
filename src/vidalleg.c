@@ -169,24 +169,26 @@ static inline void upscale_only(ALLEGRO_BITMAP *src, int sx, int sy, int sw, int
 
 void video_doblit(bool non_ttx, uint8_t vtotal)
 {
-    int c;
+    int c, xsize, ysize;
     ALLEGRO_COLOR black;
 
     if (vid_savescrshot) {
         vid_savescrshot--;
         if (!vid_savescrshot) {
-            scrshotb  = al_create_bitmap(lastx - firstx, (lasty-firsty) << 1);
+            xsize = lastx - firstx;
+            ysize = lasty - firsty + 1;
+            scrshotb  = al_create_bitmap(xsize, ysize << 1);
             if (vid_interlace || vid_linedbl) {
                 al_set_target_bitmap(scrshotb);
-                al_draw_bitmap_region(b, firstx, firsty << 1, lastx - firstx, (lasty - firsty) << 1, 0, 0, 0);
+                al_draw_bitmap_region(b, firstx, firsty << 1, xsize, ysize << 1, 0, 0, 0);
                 al_save_bitmap(vid_scrshotname, scrshotb);
             }
             else {
                 scrshotb2 = al_create_bitmap(lastx - firstx,  lasty-firsty);
                 al_set_target_bitmap(scrshotb2);
-                al_draw_bitmap_region(b, firstx, firsty, lastx - firstx, lasty - firsty, 0, 0, 0);
+                al_draw_bitmap_region(b, firstx, firsty, xsize, ysize, 0, 0, 0);
                 al_set_target_bitmap(scrshotb);
-                al_draw_scaled_bitmap(scrshotb2, 0, 0, lastx - firstx, lasty - firsty, 0, 0, lastx - firstx,(lasty - firsty) << 1, 0);
+                al_draw_scaled_bitmap(scrshotb2, 0, 0, xsize, ysize, 0, 0, xsize, ysize << 1, 0);
                 al_save_bitmap(vid_scrshotname, scrshotb);
                 al_destroy_bitmap(scrshotb2);
             }
