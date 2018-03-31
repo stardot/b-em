@@ -167,7 +167,7 @@ static inline void upscale_only(BITMAP *src, BITMAP *dst, int sx, int sy, int sw
 
 void video_doblit()
 {
-    int c;
+    int c, xsize, ysize;
 
     startblit();
 
@@ -175,13 +175,15 @@ void video_doblit()
         vid_savescrshot--;
         if (!vid_savescrshot) {
             set_color_depth(dcol);
-            scrshotb  = create_bitmap(lastx - firstx, (lasty-firsty) << 1);
-            scrshotb2 = create_bitmap(lastx - firstx,  lasty-firsty);
+            xsize = lastx - firstx;
+            ysize = lasty - firsty + 1;
+            scrshotb  = create_bitmap(xsize, ysize << 1);
+            scrshotb2 = create_bitmap(xsize, ysize);
             if (vid_interlace || vid_linedbl)
-                blit(b, scrshotb, firstx, firsty << 1, 0, 0, lastx - firstx, (lasty - firsty) << 1);
+                blit(b, scrshotb, firstx, firsty << 1, 0, 0, xsize, ysize << 1);
             else {
-                blit(b, scrshotb2, firstx, firsty, 0, 0, lastx - firstx, lasty - firsty);
-                stretch_blit(scrshotb2, scrshotb, 0, 0, lastx - firstx, lasty - firsty, 0, 0, lastx - firstx,(lasty - firsty) << 1);
+                blit(b, scrshotb2, firstx, firsty, 0, 0, xsize, ysize);
+                stretch_blit(scrshotb2, scrshotb, 0, 0, xsize, ysize, 0, 0, xsize, ysize << 1);
             }
             save_bmp(vid_scrshotname, scrshotb, NULL);
             destroy_bitmap(scrshotb2);
