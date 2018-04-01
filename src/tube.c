@@ -348,8 +348,8 @@ void tube_65816_init(FILE *romf)
         tube_readmem = readmem65816;
         tube_writemem = writemem65816;
         tube_exec  = w65816_exec;
-        tube_proc_savestate = NULL;
-        tube_proc_loadstate = NULL;
+        tube_proc_savestate = w65816_savestate;
+        tube_proc_loadstate = w65816_loadstate;
 }
 
 void tube_32016_init(FILE *romf)

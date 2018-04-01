@@ -5,9 +5,14 @@
 #include <stdio.h>
 #include "b-em.h"
 #include "tube.h"
+#include "ssinline.h"
 #include "65816.h"
 
 #define printf log_debug
+
+#define W65816_ROM_SIZE  0x8000
+#define W65816_RAM_SIZE 0x80000
+
 
 static uint8_t *w65816ram,*w65816rom;
 /*Registers*/
@@ -24,7 +29,7 @@ static reg w65816a,w65816x,w65816y,w65816s;
 static uint32_t pbr,dbr;
 static uint16_t w65816pc,dp;
 
-static int wins=0;
+static uint32_t wins=0;
 
 w65816p_t w65816p;
 
@@ -186,15 +191,15 @@ static void dbg_reg_set(int which, uint32_t value) {
 
 size_t dbg65816_print_flags(char *buf, size_t bufsize) {
     if (bufsize >= 8) {
-	*buf++ = p.n  ? 'N' : ' ';
-	*buf++ = p.v  ? 'V' : ' ';
-	*buf++ = p.m  ? 'M' : ' ';
-	*buf++ = p.ex ? 'X' : ' ';
-	*buf++ = p.d  ? 'D' : ' ';
-	*buf++ = p.i  ? 'I' : ' ';
-	*buf++ = p.z  ? 'Z' : ' ';
-	*buf++ = p.c  ? 'C' : ' ';
-	return 6;
+    *buf++ = p.n  ? 'N' : ' ';
+    *buf++ = p.v  ? 'V' : ' ';
+    *buf++ = p.m  ? 'M' : ' ';
+    *buf++ = p.ex ? 'X' : ' ';
+    *buf++ = p.d  ? 'D' : ' ';
+    *buf++ = p.i  ? 'I' : ' ';
+    *buf++ = p.z  ? 'Z' : ' ';
+    *buf++ = p.c  ? 'C' : ' ';
+    return 6;
     }
     return 0;
 }
@@ -266,7 +271,7 @@ uint8_t readmem65816(uint32_t addr)
 {
     uint32_t value = do_readmem65816(addr);
     if (dbg_w65816)
-	debug_memread(&tube65816_cpu_debug, addr, value, 1);
+    debug_memread(&tube65816_cpu_debug, addr, value, 1);
     return value;
 }
 
@@ -277,7 +282,7 @@ static uint16_t readmemw65816(uint32_t a)
     a&=w65816mask;
     value = do_readmem65816(a) | (do_readmem65816(a+1)<<8);
     if (dbg_w65816)
-	debug_memread(&tube65816_cpu_debug, a, value, 2);
+    debug_memread(&tube65816_cpu_debug, a, value, 2);
 //        cycles-=2;
     return value;
 }
@@ -321,14 +326,14 @@ void do_writemem65816(uint32_t a, uint32_t v)
 void writemem65816(uint32_t addr, uint8_t val)
 {
     if (dbg_w65816)
-	debug_memwrite(&tube65816_cpu_debug, addr, val, 1);
+    debug_memwrite(&tube65816_cpu_debug, addr, val, 1);
     do_writemem65816(addr, val);
 }
 
 static void writememw65816(uint32_t a, uint16_t v)
 {
     if (dbg_w65816)
-	debug_memwrite(&tube65816_cpu_debug, a, v, 2);
+    debug_memwrite(&tube65816_cpu_debug, a, v, 2);
     a&=w65816mask;
     do_writemem65816(a,v);
     do_writemem65816(a+1,v>>8);
@@ -453,7 +458,7 @@ static uint32_t sindirecty()
 
 static uint32_t indirectl()
 {
-		uint32_t temp, addr;
+        uint32_t temp, addr;
         temp=(readmem(pbr|pc)+dp)&0xFFFF; pc++;
         addr=readmemw(temp)|(readmem(temp+2)<<16);
 //        printf("IND %06X\n",addr);
@@ -462,7 +467,7 @@ static uint32_t indirectl()
 
 static uint32_t indirectly()
 {
-		uint32_t temp, addr;
+        uint32_t temp, addr;
         temp=(readmem(pbr|pc)+dp)&0xFFFF; pc++;
         addr=(readmemw(temp)|(readmem(temp+2)<<16))+y.w;
 //        if (pc==0xFDC9) printf("INDy %04X %06X\n",temp,addr);
@@ -3107,7 +3112,7 @@ static void plp()
 static void plpe()
 {
         s.b.l++;
-	unpack_flags_em(readmem(s.w));
+    unpack_flags_em(readmem(s.w));
         cycles-=2; clockspc(12);
 }
 
@@ -4809,8 +4814,8 @@ static void makeopcodetable65816()
 
 void w65816_init(FILE *romf)
 {
-        if (!w65816rom) w65816rom=malloc(0x8000);
-        if (!w65816ram) w65816ram=malloc(0x80000);
+        if (!w65816rom) w65816rom=malloc(W65816_ROM_SIZE);
+        if (!w65816ram) w65816ram=malloc(W65816_RAM_SIZE);
         fread(w65816rom, 0x8000, 1, romf);
         makeopcodetable65816();
 }
@@ -4819,6 +4824,76 @@ void w65816_close()
 {
         if (w65816ram) free(w65816ram);
         if (w65816rom) free(w65816rom);
+}
+
+static inline unsigned char *save_reg(unsigned char *ptr, reg *rp)
+{
+    *ptr++ = rp->b.l;
+    *ptr++ = rp->b.h;
+    return ptr;
+}
+
+void w65816_savestate(ZFILE *zfp)
+{
+    unsigned char bytes[38], *ptr;
+
+    ptr = save_reg(bytes, &w65816a);
+    ptr = save_reg(ptr, &w65816x);
+    ptr = save_reg(ptr, &w65816y);
+    ptr = save_reg(ptr, &w65816s);
+    *ptr++ = pack_flags();
+    ptr = save_uint32(ptr, pbr);
+    ptr = save_uint32(ptr, dbr);
+    ptr = save_uint16(ptr, w65816pc);
+    ptr = save_uint16(ptr, dp);
+    ptr = save_uint32(ptr, wins);
+    *ptr++ = inwai;
+    *ptr++ = cpumode;
+    *ptr++ = w65816opcode;
+    *ptr++ = def;
+    *ptr++ = divider;
+    *ptr++ = banking;
+    *ptr++ = banknum;
+    ptr = save_uint32(ptr, w65816mask);
+    ptr = save_uint16(ptr, toldpc);
+    savestate_zwrite(zfp, bytes, sizeof bytes);
+    savestate_zwrite(zfp, w65816ram, W65816_RAM_SIZE);
+    savestate_zwrite(zfp, w65816rom, W65816_ROM_SIZE);
+}
+
+static inline unsigned char *load_reg(unsigned char *ptr, reg *rp)
+{
+    rp->b.l = *ptr++;
+    rp->b.h = *ptr++;
+    return ptr;
+}
+
+void w65816_loadstate(ZFILE *zfp)
+{
+    unsigned char bytes[38], *ptr;
+
+    savestate_zread(zfp, bytes, sizeof bytes);
+    ptr = load_reg(bytes, &w65816a);
+    ptr = load_reg(ptr, &w65816x);
+    ptr = load_reg(ptr, &w65816y);
+    ptr = load_reg(ptr, &w65816s);
+    unpack_flags(*ptr++);
+    ptr = load_uint32(ptr, &pbr);
+    ptr = load_uint32(ptr, &dbr);
+    ptr = load_uint16(ptr, &w65816pc);
+    ptr = load_uint16(ptr, &dp);
+    ptr = load_uint32(ptr, &wins);
+    inwai = *ptr++;
+    cpumode = *ptr++;
+    w65816opcode = *ptr++;
+    def = *ptr++;
+    divider = *ptr++;
+    banking = *ptr++;
+    banknum = *ptr++;
+    ptr = load_uint32(ptr, &w65816mask);
+    ptr = load_uint16(ptr, &toldpc);
+    savestate_zread(zfp, w65816ram, W65816_RAM_SIZE);
+    savestate_zread(zfp, w65816rom, W65816_ROM_SIZE);
 }
 
 static void updatecpumode()
@@ -4923,7 +4998,7 @@ void w65816_exec()
 
         while (tubecycles>0)
         {
-	        ia = pbr|pc;
+            ia = pbr|pc;
                 if (dbg_w65816)
                     debug_preexec(&tube65816_cpu_debug, ia);
                 opcode=readmem(ia); pc++;
