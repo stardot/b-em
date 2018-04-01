@@ -191,15 +191,15 @@ static void dbg_reg_set(int which, uint32_t value) {
 
 size_t dbg65816_print_flags(char *buf, size_t bufsize) {
     if (bufsize >= 8) {
-    *buf++ = p.n  ? 'N' : ' ';
-    *buf++ = p.v  ? 'V' : ' ';
-    *buf++ = p.m  ? 'M' : ' ';
-    *buf++ = p.ex ? 'X' : ' ';
-    *buf++ = p.d  ? 'D' : ' ';
-    *buf++ = p.i  ? 'I' : ' ';
-    *buf++ = p.z  ? 'Z' : ' ';
-    *buf++ = p.c  ? 'C' : ' ';
-    return 6;
+        *buf++ = p.n  ? 'N' : ' ';
+        *buf++ = p.v  ? 'V' : ' ';
+        *buf++ = p.m  ? 'M' : ' ';
+        *buf++ = p.ex ? 'X' : ' ';
+        *buf++ = p.d  ? 'D' : ' ';
+        *buf++ = p.i  ? 'I' : ' ';
+        *buf++ = p.z  ? 'Z' : ' ';
+        *buf++ = p.c  ? 'C' : ' ';
+        return 6;
     }
     return 0;
 }
@@ -271,7 +271,7 @@ uint8_t readmem65816(uint32_t addr)
 {
     uint32_t value = do_readmem65816(addr);
     if (dbg_w65816)
-    debug_memread(&tube65816_cpu_debug, addr, value, 1);
+        debug_memread(&tube65816_cpu_debug, addr, value, 1);
     return value;
 }
 
@@ -282,7 +282,7 @@ static uint16_t readmemw65816(uint32_t a)
     a&=w65816mask;
     value = do_readmem65816(a) | (do_readmem65816(a+1)<<8);
     if (dbg_w65816)
-    debug_memread(&tube65816_cpu_debug, a, value, 2);
+        debug_memread(&tube65816_cpu_debug, a, value, 2);
 //        cycles-=2;
     return value;
 }
@@ -326,14 +326,14 @@ void do_writemem65816(uint32_t a, uint32_t v)
 void writemem65816(uint32_t addr, uint8_t val)
 {
     if (dbg_w65816)
-    debug_memwrite(&tube65816_cpu_debug, addr, val, 1);
+        debug_memwrite(&tube65816_cpu_debug, addr, val, 1);
     do_writemem65816(addr, val);
 }
 
 static void writememw65816(uint32_t a, uint16_t v)
 {
     if (dbg_w65816)
-    debug_memwrite(&tube65816_cpu_debug, a, v, 2);
+        debug_memwrite(&tube65816_cpu_debug, a, v, 2);
     a&=w65816mask;
     do_writemem65816(a,v);
     do_writemem65816(a+1,v>>8);
@@ -3112,7 +3112,7 @@ static void plp()
 static void plpe()
 {
         s.b.l++;
-    unpack_flags_em(readmem(s.w));
+        unpack_flags_em(readmem(s.w));
         cycles-=2; clockspc(12);
 }
 
