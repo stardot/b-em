@@ -81,16 +81,16 @@ static fspeed_type_t fullspeed = FSPEED_NONE;
 static bool bempause  = false;
 
 const emu_speed_t emu_speeds[NUM_EMU_SPEEDS] = {
-    {  "10%", 1.0 / (50.0 * 0.10), 0 },
-    {  "25%", 1.0 / (50.0 * 0.25), 0 },
-    {  "50%", 1.0 / (50.0 * 0.50), 0 },
-    {  "75%", 1.0 / (50.0 * 0.75), 0 },
-    { "100%", 1.0 / 50.0,          0 },
-    { "150%", 1.0 / (50.0 * 1.50), 0 },
-    { "200%", 1.0 / (50.0 * 2.00), 1 },
-    { "300%", 1.0 / (50.0 * 3.00), 2 },
-    { "400%", 1.0 / (50.0 * 4.00), 3 },
-    { "500%", 1.0 / (50.0 * 5.00), 4 }
+    {  "10%", 1.0 / (50.0 * 0.10), 1 },
+    {  "25%", 1.0 / (50.0 * 0.25), 1 },
+    {  "50%", 1.0 / (50.0 * 0.50), 1 },
+    {  "75%", 1.0 / (50.0 * 0.75), 1 },
+    { "100%", 1.0 / 50.0,          1 },
+    { "150%", 1.0 / (50.0 * 1.50), 2 },
+    { "200%", 1.0 / (50.0 * 2.00), 2 },
+    { "300%", 1.0 / (50.0 * 3.00), 3 },
+    { "400%", 1.0 / (50.0 * 4.00), 4 },
+    { "500%", 1.0 / (50.0 * 5.00), 5 }
 };
 
 void main_reset()
@@ -580,6 +580,7 @@ void main_setspeed(int speed)
             al_set_timer_speed(timer, emu_speeds[speed].timer_interval);
             time_limit = emu_speeds[speed].timer_interval * 2.0;
             vid_fskipmax = emu_speeds[speed].fskipmax;
+            log_debug("main: new speed#%d, timer interval=%g, vid_fskipmax=%d", speed, emu_speeds[speed].timer_interval, vid_fskipmax);
             al_start_timer(timer);
         }
     }
