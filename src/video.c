@@ -854,18 +854,18 @@ void video_poll(int clocks, int timer_enable)
                 if ((crtc[8] & 0x30) == 0x30 || ((sc & 8) && !(ula_ctrl & 2))) {
                     // Gaps between lines in modes 3 & 6.
                     for (c = 0; c < ((ula_ctrl & 0x10) ? 8 : 16); c += 4) {
-                        nula_putpixel(region, scrx + c, scry, colblack);
-                        nula_putpixel(region, scrx + c + 1, scry, colblack);
-                        nula_putpixel(region, scrx + c + 2, scry, colblack);
-                        nula_putpixel(region, scrx + c + 3, scry, colblack);
+                        put_pixel(region, scrx + c, scry, colblack);
+                        put_pixel(region, scrx + c + 1, scry, colblack);
+                        put_pixel(region, scrx + c + 2, scry, colblack);
+                        put_pixel(region, scrx + c + 3, scry, colblack);
 
                     }
                     if (vid_linedbl) {
                         for (c = 0; c < ((ula_ctrl & 0x10) ? 8 : 16); c += 4) {
-                            nula_putpixel(region, scrx + c, scry + 1, colblack);
-                            nula_putpixel(region, scrx + c + 1, scry + 1, colblack);
-                            nula_putpixel(region, scrx + c + 2, scry + 1, colblack);
-                            nula_putpixel(region, scrx + c + 3, scry + 1, colblack);
+                            put_pixel(region, scrx + c, scry + 1, colblack);
+                            put_pixel(region, scrx + c + 1, scry + 1, colblack);
+                            put_pixel(region, scrx + c + 2, scry + 1, colblack);
+                            put_pixel(region, scrx + c + 3, scry + 1, colblack);
                         }
                     }
                 } else
@@ -1004,36 +1004,36 @@ void video_poll(int clocks, int timer_enable)
             } else if (scrx < 1280) {
                 for (c = 0; c < ((ula_ctrl & 0x10) ? 8 : 16); c += 4) {
                     // *((uint32_t *)&b->line[scry][scrx + c]) = col0;
-                    nula_putpixel(region, scrx + c, scry, colblack);
-                    nula_putpixel(region, scrx + c + 1, scry, colblack);
-                    nula_putpixel(region, scrx + c + 2, scry, colblack);
-                    nula_putpixel(region, scrx + c + 3, scry, colblack);
+                    put_pixel(region, scrx + c, scry, colblack);
+                    put_pixel(region, scrx + c + 1, scry, colblack);
+                    put_pixel(region, scrx + c + 2, scry, colblack);
+                    put_pixel(region, scrx + c + 3, scry, colblack);
                 }
 
                 if (vid_linedbl) {
                     for (c = 0; c < ((ula_ctrl & 0x10) ? 8 : 16); c += 4) {
                         // *((uint32_t *)&b->line[scry + 1][scrx + c])=col0;
-                        nula_putpixel(region, scrx + c, scry + 1, colblack);
-                        nula_putpixel(region, scrx + c + 1, scry + 1, colblack);
-                        nula_putpixel(region, scrx + c + 2, scry + 1, colblack);
-                        nula_putpixel(region, scrx + c + 3, scry + 1, colblack);
+                        put_pixel(region, scrx + c, scry + 1, colblack);
+                        put_pixel(region, scrx + c + 1, scry + 1, colblack);
+                        put_pixel(region, scrx + c + 2, scry + 1, colblack);
+                        put_pixel(region, scrx + c + 3, scry + 1, colblack);
                     }
                 }
                 if (!crtc_mode) {
                     for (c = 0; c < 16; c += 4) {
                         // *((uint32_t *)&b->line[scry][scrx + c + 16]) = col0;
-                        nula_putpixel(region, scrx + c + 16, scry, colblack);
-                        nula_putpixel(region, scrx + c + 16 + 1, scry, colblack);
-                        nula_putpixel(region, scrx + c + 16 + 2, scry, colblack);
-                        nula_putpixel(region, scrx + c + 16 + 3, scry, colblack);
+                        put_pixel(region, scrx + c + 16, scry, colblack);
+                        put_pixel(region, scrx + c + 16 + 1, scry, colblack);
+                        put_pixel(region, scrx + c + 16 + 2, scry, colblack);
+                        put_pixel(region, scrx + c + 16 + 3, scry, colblack);
                     }
                     if (vid_linedbl) {
                         for (c = 0; c < 16; c += 4) {
                             // *((uint32_t *)&b->line[scry + 1][scrx + c + 16]) = col0;
-                            nula_putpixel(region, scrx + c + 16, scry + 1, colblack);
-                            nula_putpixel(region, scrx + c + 16 + 1, scry + 1, colblack);
-                            nula_putpixel(region, scrx + c + 16 + 2, scry + 1, colblack);
-                            nula_putpixel(region, scrx + c + 16 + 3, scry + 1, colblack);
+                            put_pixel(region, scrx + c + 16, scry + 1, colblack);
+                            put_pixel(region, scrx + c + 16 + 1, scry + 1, colblack);
+                            put_pixel(region, scrx + c + 16 + 2, scry + 1, colblack);
+                            put_pixel(region, scrx + c + 16 + 3, scry + 1, colblack);
                         }
                     }
                 }
