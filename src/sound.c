@@ -62,7 +62,7 @@ void sound_poll(void)
     float *buf;
     int c;
 
-    if (stream) {
+    if ((sound_internal || sound_beebsid) && stream) {
         if (sound_beebsid)
             sid_fillbuf(sound_buffer + sound_pos, 2);
         if (sound_internal)
@@ -84,6 +84,7 @@ void sound_poll(void)
                         buf[c] = (float)sound_buffer[c] / 32767.0;
                 }
                 al_set_audio_stream_fragment(stream, buf);
+                al_set_audio_stream_playing(stream, true);
             } else
                 log_debug("sound: overrun");
             sound_pos = 0;

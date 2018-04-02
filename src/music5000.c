@@ -388,14 +388,17 @@ void music5000_fillbuf(int16_t *buffer, int len) {
 void music5000_streamfrag(void)
 {
     int16_t *buf;
-    
+
     // This function is called when a audio stream fragment available
     // event is received in the main event handling loop but the event
     // does not specify for which stream a new fragment has become
     // available so we need to check if it is this one!
 
-    if ((buf = al_get_audio_stream_fragment(stream))) {
-        music5000_fillbuf(buf, BUFLEN_M5);
-        al_set_audio_stream_fragment(stream, buf);
-    }    
+    if (sound_music5000) {
+        if ((buf = al_get_audio_stream_fragment(stream))) {
+            music5000_fillbuf(buf, BUFLEN_M5);
+            al_set_audio_stream_fragment(stream, buf);
+            al_set_audio_stream_playing(stream, true);
+        }
+    }
 }
