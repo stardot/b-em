@@ -50,7 +50,7 @@ void video_close()
 #ifdef WIN32
 static const int y_fudge = 0;
 #else
-static const int y_fudge = 28;
+static const int y_fudge = 27;
 #endif
 
 void video_enterfullscreen()
@@ -115,6 +115,7 @@ void video_set_window_size(void)
     }
     winsizex = scr_x_size;
     winsizey = scr_y_size + y_fudge;
+    log_debug("vidalleg: video_set_window_size, scr_x_size=%d, scr_y_size=%d, fudgedy=%d", scr_x_size, scr_y_size, winsizey);
 }
 
 void video_set_borders(int borders)
@@ -131,6 +132,7 @@ void video_update_window_size(ALLEGRO_EVENT *event)
         scr_x_size = winsizex = event->display.width;
         scr_y_start = 0;
         scr_y_size = winsizey = event->display.height;
+        log_debug("vidalleg: video_update_window_size, scr_x_size=%d, scr_y_size=%d", scr_x_size, scr_y_size);
     }
     al_acknowledge_resize(event->display.source);
 }
@@ -161,8 +163,10 @@ void video_toggle_fullscreen(void)
 static inline void upscale_only(ALLEGRO_BITMAP *src, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh)
 {
     al_set_target_backbuffer(al_get_current_display());
-    if (dw > sw || dh > sh)
+    if (dw > sw+10 || dh > sh+10) {
         al_draw_scaled_bitmap(src, sx, sy, sw, sh, dx, dy, dw, dh, 0);
+        log_debug("vidalleg: scaling sw=%d, sh=%d, dh=%d, dw=%d", sw, sh, dw, dh);
+    }
     else
         al_draw_bitmap_region(src, sx, sy, sw, sh, dx, dy, 0);
 }
