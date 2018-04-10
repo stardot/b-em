@@ -190,6 +190,43 @@ static int vis20k = 0;
 
 static uint8_t acccon;
 
+static unsigned char *clip_paste_str, *clip_paste_ptr;
+
+void os_paste_start(char *str)
+{
+    if (str) {
+        if (clip_paste_str)
+            free(clip_paste_str);
+        clip_paste_str = clip_paste_ptr = (unsigned char *)str;
+    }
+}
+
+static void os_paste_getch(void)
+{
+    int ch;
+
+    do {
+        ch = *clip_paste_ptr++;
+        if (!ch) {
+            al_free(clip_paste_str);
+            clip_paste_str = clip_paste_ptr = NULL;
+            opcode = readmem(pc);
+            return;
+        }
+        if (ch == 0xc2 && *clip_paste_ptr == 0xa3) {
+            ch = 0x60; // convert UTF-8 pound into BBC pound.
+            clip_paste_ptr++;
+        }
+        else if (ch == 0x0d && *clip_paste_ptr == 0x0a)
+            clip_paste_ptr++;
+        else if (ch == 0x0a)
+            ch = 0x0d;
+    } while (ch >= 128);
+
+    a = ch;
+    opcode = 0x60; // RTS
+}
+
 #define read_zp_indirect(zp) (readmem(zp & 0xff) + (readmem((zp + 1) & 0xff) << 8))
 
 static uint32_t do_readmem(uint32_t addr)
@@ -847,7 +884,10 @@ void m6502_exec()
                 vis20k = RAMbank[pc >> 12];
                 if (dbg_core6502)
                     debug_preexec(&core6502_cpu_debug, pc);
-                opcode = readmem(pc);
+                if (pc == 0xffe0 && clip_paste_ptr)
+                    os_paste_getch();
+                else
+                    opcode = readmem(pc);
                 pc++;
                 switch (opcode) {
                 case 0x00:      /* BRK */
@@ -3636,7 +3676,10 @@ void m65c02_exec()
                 vis20k = RAMbank[pc >> 12];
                 if (dbg_core6502)
                     debug_preexec(&core6502_cpu_debug, pc);
-                opcode = readmem(pc);
+                if (pc == 0xffe0 && clip_paste_ptr)
+                    os_paste_getch();
+                else
+                    opcode = readmem(pc);
                 pc++;
                 switch (opcode) {
                 case 0x00:      /* BRK */

@@ -2,6 +2,7 @@
 #include <allegro5/allegro_native_dialog.h>
 #include "gui-allegro.h"
 
+#include "6502.h"
 #include "ide.h"
 #include "debugger.h"
 #include "ddnoise.h"
@@ -108,7 +109,7 @@ static ALLEGRO_MENU *create_file_menu(void)
 static ALLEGRO_MENU *create_edit_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
-    al_append_menu_item(menu, "Type from clipboard", IDM_EDIT_PASTE, 0, NULL, NULL);
+    al_append_menu_item(menu, "Paste via OSRDCH", IDM_EDIT_PASTE, 0, NULL, NULL);
     add_checkbox_item(menu, "Printer to clipboard", IDM_EDIT_COPY, prt_clip_str);
     return menu;
 }
@@ -801,7 +802,7 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             quitting = true;
             break;
         case IDM_EDIT_PASTE:
-            key_paste_start(al_get_clipboard_text((ALLEGRO_DISPLAY *)(event->user.data2)));
+            os_paste_start(al_get_clipboard_text((ALLEGRO_DISPLAY *)(event->user.data2)));
             break;
         case IDM_EDIT_COPY:
             edit_print_clip(event);
