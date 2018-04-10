@@ -109,7 +109,7 @@ static ALLEGRO_MENU *create_file_menu(void)
 static ALLEGRO_MENU *create_edit_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
-    al_append_menu_item(menu, "Paste via OSRDCH", IDM_EDIT_PASTE, 0, NULL, NULL);
+    al_append_menu_item(menu, "Paste via keyboard", IDM_EDIT_PASTE, 0, NULL, NULL);
     add_checkbox_item(menu, "Printer to clipboard", IDM_EDIT_COPY, prt_clip_str);
     return menu;
 }

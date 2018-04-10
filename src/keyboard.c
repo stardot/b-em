@@ -241,19 +241,6 @@ int keyas = 0;
 static int keycol, keyrow;
 static int bbckey[16][16];
 
-typedef enum {
-    KP_IDLE,
-    KP_NEXT,
-    KP_SHIFT_DOWN,
-    KP_SHIFT_UP,
-    KP_DELAY1,
-    KP_CTRL_DOWN,
-    KP_CTRL_UP,
-    KP_CHAR,
-    KP_DELAY2,
-    KP_UP
-} kp_state_t;
-
 void key_clear(void)
 {
     int c, r;
