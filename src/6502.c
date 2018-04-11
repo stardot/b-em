@@ -388,12 +388,16 @@ static uint32_t do_readmem(uint32_t addr)
         case 0xFE94:
         case 0xFE98:
         case 0xFE9C:
-                if (!MASTER) {
-                        if (WD1770)
-                                return wd1770_read(addr);
-                        return i8271_read(addr);
-                }
-                break;
+            switch(fdc_type) {
+                case FDC_NONE:
+                case FDC_MASTER:
+                    break;
+                case FDC_I8271:
+                    return i8271_read(addr);
+                default:
+                    return wd1770_read(addr);
+            }
+            break;
 
         case 0xFEC0:
         case 0xFEC4:
@@ -638,13 +642,17 @@ static void do_writemem(uint32_t addr, uint32_t val)
         case 0xFE94:
         case 0xFE98:
         case 0xFE9C:
-                if (!MASTER) {
-                        if (WD1770)
-                                wd1770_write(addr, val);
-                        else
-                                i8271_write(addr, val);
-                }
-                break;
+            switch(fdc_type) {
+                case FDC_NONE:
+                case FDC_MASTER:
+                    break;
+                case FDC_I8271:
+                    i8271_write(addr, val);
+                    break;
+                default:
+                    wd1770_write(addr, val);
+            }
+            break;
 
         case 0xFEC0:
         case 0xFEC4:

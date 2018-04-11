@@ -47,7 +47,7 @@ struct
 
 void i8271_reset()
 {
-        if (I8271)
+        if (fdc_type == FDC_I8271)
         {
                 fdc_callback       = i8271_callback;
                 fdc_data           = i8271_data;
