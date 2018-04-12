@@ -16,39 +16,111 @@
 fdc_type_t fdc_type;
 int BPLUS, x65c02, MASTER, MODELA, OS01, compactcmos;
 int curtube;
-int oldmodel;
+int oldmodel, model_count;
+MODEL *models;
 
-MODEL models[NUM_MODELS] =
+static const char fdc_names[FDC_MAX][8] =
 {
-/*       Name                         FDC TYPE     65c02  B+  Master  A  OS 0.1  Compact  Config Section    OS         BASIC      DFS ROM     CMOS       ROM setup function    Second processor*/
-        {"BBC A w/OS 0.1",            FDC_NONE,    0,     0,  0,      1, 1,      0,       "bbc_a_os01",     "os01",    "basic1",  "",         "",        mem_romsetup_os01,    -1},
-        {"BBC B w/OS 0.1",            FDC_NONE,    0,     0,  0,      0, 1,      0,       "bbc_b_os01",     "os01",    "basic1",  "",         "",        mem_romsetup_os01,    -1},
-        {"BBC A",                     FDC_I8271,   0,     0,  0,      1, 0,      0,       "bbc_a",          "os12",    "basic2",  "",         "",        mem_romsetup_std,     -1},
-        {"BBC B w/8271 FDC",          FDC_I8271,   0,     0,  0,      0, 0,      0,       "bbc_b_8271",     "os12",    "basic2",  "dfs09",    "",        mem_romsetup_std,     -1},
-        {"BBC B w/8271+SWRAM",        FDC_I8271,   0,     0,  0,      0, 0,      0,       "bbc_b_swram",    "os12",    "basic2",  "dfs09",    "",        mem_romsetup_swram,   -1},
-        {"BBC B w/1770 FDC",          FDC_ACORN,   0,     0,  0,      0, 0,      0,       "bbc_b_1770",     "os12",    "basic2",  "dfs226",   "",        mem_romsetup_swram,   -1},
-        {"BBC B US",                  FDC_I8271,   0,     0,  0,      0, 0,      0,       "bbc_b_us",       "usmos",   "usbasic", "usdnfs",   "",        mem_romsetup_std,     -1},
-        {"BBC B German",              FDC_I8271,   0,     0,  0,      0, 0,      0,       "bbc_b_de",       "deos",    "usbasic", "usdnfs",   "",        mem_romsetup_std,     -1},
-        {"BBC B+ 64K",                FDC_ACORN,   0,     1,  0,      0, 0,      0,       "bbc_b+64",       "bpos",    "basic2",  "dfs226",   "",        mem_romsetup_std,     -1},
-        {"BBC B+ 128K",               FDC_ACORN,   0,     1,  0,      0, 0,      0,       "bbc_b+128",      "bpos",    "basic2",  "dfs226",   "",        mem_romsetup_bp128,   -1},
-        {"BBC Master 128",            FDC_MASTER,  1,     0,  1,      0, 0,      0,       "master_128",     "mos320",  "",        "",         "cmos",    mem_romsetup_master,  -1},
-        {"BBC Master 512",            FDC_MASTER,  1,     0,  1,      0, 0,      0,       "master_512",     "mos320",  "",        "",         "cmos",    mem_romsetup_master,   3},
-        {"BBC Master Turbo",          FDC_MASTER,  1,     0,  1,      0, 0,      0,       "master_turbo",   "mos320",  "",        "",         "cmos",    mem_romsetup_master,   0},
-        {"BBC Master Compact",        FDC_MASTER,  1,     0,  1,      0, 0,      1,       "master_compact", "os51",    "basic48", "adfs210",  "cmosc",   mem_romsetup_compact, -1},
-        {"ARM Evaluation System",     FDC_MASTER,  1,     0,  1,      0, 0,      0,       "master_arm",     "mos320",  "",        "",         "cmosa",   mem_romsetup_master,   1},
-        {"BBC Master 128 w/MOS 3.5",  FDC_MASTER,  1,     0,  1,      0, 0,      0,       "master_os350",   "mos350",  "",        "",         "cmos350", mem_romsetup_master,  -1},
-        {"BBC B wo/FDC w/SWRAM",      FDC_NONE,    0,     0,  0,      0, 0,      0,       "bbc_b_nofdc",    "os12",    "basic2",  "",         "",        mem_romsetup_swram,   -1},
-        {"BBC B w/Solidisk 1770 FDC", FDC_STL,     0,     0,  0,      0, 0,      0,       "bbc_b_solidisk", "os12",    "basic2",  "stldfs21", "",        mem_romsetup_swram,   -1},
-        {"BBC B w/Opus 1770 FDC",     FDC_OPUS,    0,     0,  0,      0, 0,      0,       "bbc_b_opus",     "os12",    "basic2",  "oddos345", "",        mem_romsetup_swram,   -1},
-        {"BBC B w/Watford 1770 FDC",  FDC_WATFORD, 0,     0,  0,      0, 0,      0,       "bbc_b_watford",  "os12",    "basic2",  "wddfs153", "",        mem_romsetup_swram,   -1},
-        {"BBC B with 65C02, no FDC",  FDC_NONE,    1,     0,  0,      0, 0,      0,       "bbc_b_65c02",    "os12",    "basic4",  "",         "",        mem_romsetup_swram,   -1},
-        {"BBC B, 65C02, Acorn 1770",  FDC_ACORN,   1,     0,  0,      0, 0,      0,       "bbc_b_c1770",    "os12",    "basic4",  "dfs226",   "",        mem_romsetup_swram,   -1}
+    "none",
+    "i8271",
+    "acorn",
+    "master",
+    "opus",
+    "stl",
+    "watford"
 };
 
-static int _modelcount = 0;
-char *model_get()
+typedef struct
 {
-        return models[_modelcount++].name;
+    char name[16];
+    rom_setup_f func;
+} rom_setup_t;
+
+#define NUM_ROM_SETUP 5
+static rom_setup_t rom_setups[NUM_ROM_SETUP] =
+{
+    { "os01",    mem_romsetup_os01    },
+    { "std",     mem_romsetup_std     },
+    { "swram",   mem_romsetup_swram   },
+    { "bp128",   mem_romsetup_bp128   },
+    { "master",  mem_romsetup_master  }
+};
+
+static fdc_type_t model_find_fdc(const char *name, const char *model)
+{
+    fdc_type_t fdc_type;
+
+    for (fdc_type = FDC_NONE; fdc_type < FDC_MAX; fdc_type++)
+        if (strcmp(fdc_names[fdc_type], name) == 0)
+            return fdc_type;
+    log_warn("model: invalid fdc type '%s' in model '%s', using 'none' instead", name, model);
+    return FDC_NONE;
+}
+
+static rom_setup_f model_find_romsetup(const char *name, const char *model)
+{
+    for (int i = 0; i < NUM_ROM_SETUP; i++)
+        if (strcmp(rom_setups[i].name, name) == 0)
+            return rom_setups[i].func;
+    log_warn("model: invalid rom setup type '%s' in model '%s', using 'swram' instead", name, model);
+    return mem_romsetup_swram;
+}
+
+static int model_find_tube(const char *name, const char *model)
+{
+    if (strcmp(name, "none")) {
+        for (int i = 0; i < NUM_TUBES; i++)
+            if (strcmp(tubes[i].name, name) == 0)
+                return i;
+        log_warn("model: invalid tube name '%s' in model '%s', no tube will be used", name, model);
+    }
+    return -1;
+}
+
+void model_loadcfg(void)
+{
+    ALLEGRO_CONFIG_SECTION *siter;
+    const char *sect;
+    int num, max = -1;
+    MODEL *ptr;
+
+    for (sect = al_get_first_config_section(bem_cfg, &siter); sect; sect = al_get_next_config_section(&siter)) {
+        if (strncmp(sect, "model_", 6) == 0) {
+            num = atoi(sect+6);
+            log_debug("model: pass1, found model#%02d", num);
+            if (num > max)
+                max = num;
+        }
+    }
+    if (max < 0) {
+        log_fatal("model: no models defined in config file");
+        exit(1);
+    }
+    if (!(models = malloc(++max * sizeof(MODEL)))) {
+        log_fatal("model: out of memory allocating models");
+        exit(1);
+    }
+    for (sect = al_get_first_config_section(bem_cfg, &siter); sect; sect = al_get_next_config_section(&siter)) {
+        if (strncmp(sect, "model_", 6) == 0) {
+            num = atoi(sect+6);
+            log_debug("model: pass2, found model#%02d", num);
+            ptr = models + num;
+            ptr->cfgsect = sect;
+            ptr->name = get_config_string(sect, "name", sect);
+            ptr->fdc_type = model_find_fdc(get_config_string(sect, "fdc", "none"), ptr->name);
+            ptr->x65c02  = get_config_bool(sect, "65c02",  false);
+            ptr->bplus   = get_config_bool(sect, "b+",   false);
+            ptr->master  = get_config_bool(sect, "master",  false);
+            ptr->modela  = get_config_bool(sect, "modela",  false);
+            ptr->os01    = get_config_bool(sect, "os01",    false);
+            ptr->compact = get_config_bool(sect, "compact", false);
+            ptr->os      = get_config_string(sect, "os", "os12");
+            ptr->cmos    = get_config_string(sect, "cmos", "");
+            ptr->romsetup = model_find_romsetup(get_config_string(sect, "romsetup", "swram"), ptr->name);
+            ptr->tube = model_find_tube(get_config_string(sect, "tube", "none"), ptr->name);
+        }
+    }
+    model_count = max;
 }
 
 extern cpu_debug_t n32016_cpu_debug;
@@ -73,7 +145,7 @@ TUBE tubes[NUM_TUBES]=
 void model_check(void) {
     const int defmodel = 3;
 
-    if (curmodel < 0 || curmodel >= NUM_MODELS) {
+    if (curmodel < 0 || curmodel >= model_count) {
         log_warn("No model #%d, using #%d (%s) instead", curmodel, defmodel, models[defmodel].name);
         curmodel = defmodel;
     }
@@ -136,9 +208,9 @@ void model_init()
         cmos_load(models[curmodel]);
 }
 
-void model_save(ALLEGRO_CONFIG *bem_cfg) {
+void model_savecfg(void) {
     const char *sect = models[curmodel].cfgsect;
 
     al_set_config_value(bem_cfg, sect, "name", models[curmodel].name);
-    mem_save_romcfg(bem_cfg, sect);
+    mem_save_romcfg(sect);
 }

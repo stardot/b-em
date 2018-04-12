@@ -212,15 +212,22 @@ static ALLEGRO_MENU *create_rom_menu(void)
 static ALLEGRO_MENU *create_model_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
-    menu_map_t map[NUM_MODELS];
+    menu_map_t *map;
     int i;
 
-    for (i = 0; i < NUM_MODELS; i++) {
-        map[i].label = models[i].name;
-        map[i].itemno = i;
+    if ((map = malloc(model_count * sizeof(menu_map_t)))) {
+        for (i = 0; i < model_count; i++) {
+            map[i].label = models[i].name;
+            map[i].itemno = i;
+        }
+        add_sorted_set(menu, map, model_count, IDM_MODEL, curmodel);
+        free(map);
+        return menu;
     }
-    add_sorted_set(menu, map, NUM_MODELS, IDM_MODEL, curmodel);
-    return menu;
+    else {
+        log_fatal("gui-allegro: out of memory");
+        exit(1);
+    }
 }
 
 static ALLEGRO_MENU *create_tube_menu(void)

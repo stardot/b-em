@@ -118,12 +118,12 @@ static int is_relative_filename(const char *fn)
     return !(c0 == '/' || c0 == '\\' || (isalpha(c0) && fn[1] == ':'));
 }
 
-static void cfg_load_rom(int slot, const char *sect, const char *def) {
+static void cfg_load_rom(int slot, const char *sect) {
     const char *key, *name, *file;
     char path[PATH_MAX];
 
     key = slotkeys[slot];
-    name = get_config_string(sect, key, def);
+    name = al_get_config_value(bem_cfg, sect, key);
     if (name != NULL && *name != '\0') {
         if (is_relative_filename(name)) {
             if (!find_dat_file(path, sizeof path, "roms/general", name, "rom"))
@@ -146,7 +146,7 @@ void mem_romsetup_os01() {
     int c;
 
     load_os_rom(sect);
-    cfg_load_rom(15, sect, models[curmodel].basic);
+    cfg_load_rom(15, sect);
     memcpy(rom + 14 * ROM_SIZE, rom + 15 * ROM_SIZE, ROM_SIZE);
     memcpy(rom + 12 * ROM_SIZE, rom + 14 * ROM_SIZE, ROM_SIZE * 2);
     memcpy(rom + 8 * ROM_SIZE, rom + 12 * ROM_SIZE, ROM_SIZE * 4);
@@ -167,11 +167,8 @@ void mem_romsetup_std(void) {
     int slot;
 
     load_os_rom(sect);
-    cfg_load_rom(15, sect, models[curmodel].basic);
-    cfg_load_rom(14, sect, "vdfs");
-    cfg_load_rom(13, sect, models[curmodel].dfs);
-    for (slot = 12; slot >= 0; slot--)
-        cfg_load_rom(slot, sect, NULL);
+    for (slot = 15; slot >= 0; slot--)
+        cfg_load_rom(slot, sect);
 }
 
 static void fill_swram(void) {
@@ -193,13 +190,12 @@ void mem_romsetup_bp128(void) {
     int slot;
 
     load_os_rom(sect);
-    cfg_load_rom(15, sect, models[curmodel].basic);
-    cfg_load_rom(14, sect, "vdfs");
+    cfg_load_rom(15, sect);
+    cfg_load_rom(14, sect);
     rom_slots[13].swram = 1;
     rom_slots[12].swram = 1;
-    cfg_load_rom(11, sect, models[curmodel].dfs);
-    for (slot = 10; slot >= 0; slot--)
-        cfg_load_rom(slot, sect, NULL);
+    for (slot = 11; slot >= 0; slot--)
+        cfg_load_rom(slot, sect);
     rom_slots[1].swram = 1;
     rom_slots[0].swram = 1;
 }
@@ -220,15 +216,16 @@ void mem_romsetup_master(void) {
                     for (slot = ROM_NSLOT-1; slot >= 9; slot--) {
                         rom_slots[slot].swram = 0;
                         rom_slots[slot].locked = 1;
-                        rom_slots[slot].name = models[curmodel].os;
+                        rom_slots[slot].alloc = 0;
+                        rom_slots[slot].name = (char *)models[curmodel].os;
                     }
-                    cfg_load_rom(8, sect, "vdfs");
+                    cfg_load_rom(8, sect);
                     rom_slots[7].swram = 1;
                     rom_slots[6].swram = 1;
                     rom_slots[5].swram = 1;
                     rom_slots[4].swram = 1;
                     for (slot = 7; slot >= 0; slot--)
-                        cfg_load_rom(slot, sect, NULL);
+                        cfg_load_rom(slot, sect);
                     return;
                 }
             }
@@ -239,20 +236,6 @@ void mem_romsetup_master(void) {
     } else
         log_fatal("mem: unable to find OS %s", osname);
     exit(1);
-}
-
-void mem_romsetup_compact(void) {
-    const char *sect = models[curmodel].cfgsect;
-    int slot;
-
-    load_os_rom(sect);
-    cfg_load_rom(15, sect, "utils");
-    cfg_load_rom(14, sect, models[curmodel].basic);
-    cfg_load_rom(13, sect, models[curmodel].dfs);
-    cfg_load_rom(12, sect, "vdfs");
-    for (slot = 11; slot >= 0; slot--)
-        cfg_load_rom(slot, sect, NULL);
-    fill_swram();
 }
 
 int mem_findswram(int n) {
@@ -320,7 +303,7 @@ void mem_loadstate(FILE *f) {
     fread(rom, ROM_SIZE*ROM_NSLOT, 1, f);
 }
 
-void mem_save_romcfg(ALLEGRO_CONFIG *bem_cfg, const char *sect) {
+void mem_save_romcfg(const char *sect) {
     int slot;
     rom_slot_t *slotp;
     const char *value;

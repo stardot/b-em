@@ -154,7 +154,7 @@ void main_init(int argc, char *argv[])
 
     vid_fskipmax = 1;
 
-    model_check();
+    model_loadcfg();
 
     for (c = 1; c < argc; c++) {
         if (!strcasecmp(argv[c], "--help")) {

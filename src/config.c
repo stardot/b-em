@@ -25,7 +25,7 @@ int selecttube = -1;
 int cursid = 0;
 int sidmethod = 0;
 
-static ALLEGRO_CONFIG *bem_cfg;
+ALLEGRO_CONFIG *bem_cfg;
 
 int get_config_int(const char *sect, const char *key, int ival) {
     const char *str;
@@ -33,6 +33,18 @@ int get_config_int(const char *sect, const char *key, int ival) {
     if (bem_cfg && (str = al_get_config_value(bem_cfg, sect, key)))
         ival = atoi(str);
     return ival;
+}
+
+bool get_config_bool(const char *sect, const char *key, bool bval)
+{
+    const char *str;
+    int ch;
+
+    if (bem_cfg && (str = al_get_config_value(bem_cfg, sect, key))) {
+        ch = *str;
+        bval = (ch == 't' || ch == 'T' || ch == 'y' || ch == 'Y' || ch == '1');
+    }
+    return bval;
 }
 
 const char *get_config_string(const char *sect, const char *key, const char *sval) {
@@ -133,7 +145,10 @@ void set_config_int(const char *sect, const char *key, int value)
 
 void set_config_string(const char *sect, const char *key, const char *value)
 {
-    al_set_config_value(bem_cfg, sect, key, value);
+    if (value && *value)
+        al_set_config_value(bem_cfg, sect, key, value);
+    else
+        al_remove_config_key(bem_cfg, sect, key);
 }
 
 void config_save(void)
@@ -148,7 +163,7 @@ void config_save(void)
                 return;
             }
         }
-        model_save(bem_cfg);
+        model_savecfg();
 
         if (discfns[0])
             al_set_config_value(bem_cfg, NULL, "disc0", al_path_cstr(discfns[0], ALLEGRO_NATIVE_PATH_SEP));
@@ -195,7 +210,10 @@ void config_save(void)
 
         for (c = 0; c < 128; c++) {
             snprintf(t, sizeof t, "key_define_%03i", c);
-            set_config_int("user_keyboard", t, keylookup[c]);
+            if (keylookup[c] == c)
+                al_remove_config_key(bem_cfg, "user_keyboard", t);
+            else
+                set_config_int("user_keyboard", t, keylookup[c]);
         }
         midi_save_config();
         log_debug("config: saving config to %s", s);
