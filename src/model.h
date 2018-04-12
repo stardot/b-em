@@ -16,7 +16,11 @@ typedef enum
     FDC_MAX
 } fdc_type_t;
 
-typedef void (*rom_setup_f)(void);
+typedef struct
+{
+    char name[8];
+    void (*func)(void);
+} rom_setup_t;
 
 typedef struct
 {
@@ -24,7 +28,7 @@ typedef struct
     const char *name;
     const char *os;
     const char *cmos;
-    rom_setup_f romsetup;
+    rom_setup_t *romsetup;
     fdc_type_t fdc_type;
     uint8_t x65c02:1;
     uint8_t bplus:1;
@@ -53,11 +57,13 @@ extern TUBE tubes[NUM_TUBES];
 
 extern int curmodel, curtube, oldmodel, selecttube;
 extern fdc_type_t fdc_type;
-extern int BPLUS, x65c02, MASTER, MODELA, OS01, compactcmos;
+extern bool BPLUS, x65c02, MASTER, MODELA, OS01, compactcmos;
 
 void model_loadcfg(void);
 void model_check(void);
 void model_init(void);
+void model_savestate(FILE *f);
+void model_loadstate(FILE *f);
 void model_savecfg(void);
 
 #endif

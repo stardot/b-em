@@ -889,28 +889,15 @@ void vdfs_init(void) {
 }
 
 static vdfs_ent_t *ss_spec_path(FILE *f, const char *which) {
-    size_t len;
     char *path;
     vdfs_ent_t *ent, key;
 
-
-    if ((len = savestate_load_var(f)) <= 0)
-        return NULL;
-    if ((path = malloc(len+1)) == NULL) {
-        log_error("vdfs: out of memory reading savestate file");
-        return NULL;
-    }
-    if (fread(path, len, 1, f) != 1) {
-        log_error("vdfs: read error on savestate file: %s", strerror(errno));
-        ent = NULL;
-    } else {
-        path[len] = '\0';
-        log_debug("vdfs: loadstate setting %s directory to $.%s", which, path);
-        if ((ent = find_entry(path, &key, &root_dir)))
-            if (!(ent->attribs & ATTR_IS_DIR))
-                ent = NULL;
-        free(path);
-    }
+    path = savestate_load_str(f);
+    log_debug("vdfs: loadstate setting %s directory to $.%s", which, path);
+    if ((ent = find_entry(path, &key, &root_dir)))
+        if (!(ent->attribs & ATTR_IS_DIR))
+            ent = NULL;
+    free(path);
     return ent;
 }
 

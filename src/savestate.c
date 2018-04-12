@@ -178,8 +178,7 @@ void savestate_zwrite(ZFILE *zfp, void *src, size_t size)
 void savestate_dosave(void)
 {
     fwrite("BEMSNAP2", 8, 1, savestate_fp);
-    putc(curmodel, savestate_fp);
-    putc(curtube, savestate_fp);
+    save_sect('m', model_savestate);
     save_sect('6', m6502_savestate);
     save_zlib('M', mem_savezlib);
     save_sect('S', sysvia_savestate);
@@ -192,7 +191,7 @@ void savestate_dosave(void)
     save_sect('a', sysacia_savestate);
     save_sect('r', serial_savestate);
     save_sect('F', vdfs_savestate);
-    save_sect('m', music5000_savestate);
+    save_sect('5', music5000_savestate);
     if (curtube != -1) {
         save_sect('T', tube_ula_savestate);
         save_zlib('P', tube_proc_savestate);
@@ -272,13 +271,6 @@ static void load_state_two(void)
     int ch;
     long start, end, size;
 
-    curmodel = getc(savestate_fp);
-    selecttube = getc(savestate_fp);
-    if (selecttube == 0xff)
-        selecttube = -1;
-    curtube = selecttube;
-    main_restart();
-
     while ((ch = getc(savestate_fp)) != EOF) {
         size = getc(savestate_fp);
         size |= getc(savestate_fp) << 8;
@@ -287,6 +279,9 @@ static void load_state_two(void)
         log_debug("savestate: found section %c of %ld bytes", ch, size);
 
         switch(ch) {
+            case 'm':
+                model_loadstate(savestate_fp);
+                break;
             case '6':
                 m6502_loadstate(savestate_fp);
                 break;
@@ -323,7 +318,7 @@ static void load_state_two(void)
             case 'F':
                 vdfs_loadstate(savestate_fp);
                 break;
-            case 'm':
+            case '5':
                 music5000_loadstate(savestate_fp);
                 break;
             case 'T':
@@ -365,6 +360,7 @@ void savestate_doload(void)
 void savestate_save_var(unsigned var, FILE *f) {
     uint8_t byte;
 
+    log_debug("savestate: saving variable-length integer %u", var);
     for (;;) {
         byte = var & 0x7f;
         var >>= 7;
@@ -375,16 +371,41 @@ void savestate_save_var(unsigned var, FILE *f) {
     putc(byte | 0x80, f);
 }
 
+void savestate_save_str(const char *str, FILE *f)
+{
+    size_t len = strlen(str);
+    savestate_save_var(len, f);
+    fwrite(str, len, 1, f);
+    log_debug("savestate: saving string '%s'", str);
+}
+
 unsigned savestate_load_var(FILE *f) {
     unsigned var, lshift;
     int      ch;
 
     var = lshift = 0;
     while ((ch = getc(f)) != EOF) {
-        if (ch & 0x80)
-            return var | ((ch & 0x7f) << lshift);
+        if (ch & 0x80) {
+            var |= ((ch & 0x7f) << lshift);
+            break;
+        }
         var |= ch << lshift;
         lshift += 7;
     }
+    log_debug("savestate: loaded variable-length integer %u", var);
     return var;
+}
+
+char *savestate_load_str(FILE *f)
+{
+    size_t len = savestate_load_var(f);
+    char *str = malloc(len+1);
+    if (!str) {
+        log_fatal("savestate: out of memory");
+        exit(1);
+    }
+    fread(str, len, 1, f);
+    str[len] = '\0';
+    log_debug("savestate: loaded string '%s'", str);
+    return str;
 }

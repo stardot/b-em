@@ -1,5 +1,6 @@
 #include "b-em.h"
 
+#include "main.h"
 #include "model.h"
 #include "config.h"
 #include "cmos.h"
@@ -14,7 +15,7 @@
 #include "z80.h"
 
 fdc_type_t fdc_type;
-int BPLUS, x65c02, MASTER, MODELA, OS01, compactcmos;
+bool BPLUS, x65c02, MASTER, MODELA, OS01, compactcmos;
 int curtube;
 int oldmodel, model_count;
 MODEL *models;
@@ -30,20 +31,33 @@ static const char fdc_names[FDC_MAX][8] =
     "watford"
 };
 
-typedef struct
-{
-    char name[16];
-    rom_setup_f func;
-} rom_setup_t;
-
 #define NUM_ROM_SETUP 5
 static rom_setup_t rom_setups[NUM_ROM_SETUP] =
 {
+    { "swram",   mem_romsetup_swram   },
     { "os01",    mem_romsetup_os01    },
     { "std",     mem_romsetup_std     },
-    { "swram",   mem_romsetup_swram   },
     { "bp128",   mem_romsetup_bp128   },
     { "master",  mem_romsetup_master  }
+};
+
+/*
+ * The number of tube cycles to run for each core 6502 processor cycle
+ * is calculated by mutliplying the multiplier in this table with the
+ * one in the general tube speed table and dividing by two.
+ */
+
+extern cpu_debug_t n32016_cpu_debug;
+
+TUBE tubes[NUM_TUBES]=
+{
+    {"6502 Internal",  tube_6502_init,  tube_6502_reset, &tube6502_cpu_debug,  "6502Intern",       4 },
+    {"ARM",            tube_arm_init,   arm_reset,       &tubearm_cpu_debug,   "ARMeval_100",      4 },
+    {"Z80",            tube_z80_init,   z80_reset,       &tubez80_cpu_debug,   "Z80_120",          8 },
+    {"80186",          tube_x86_init,   x86_reset,       &tubex86_cpu_debug,   "BIOS",             8 },
+    {"65816",          tube_65816_init, w65816_reset,    &tube65816_cpu_debug, "ReCo6502ROM_816", 16 },
+    {"32016",          tube_32016_init, n32016_reset,    &n32016_cpu_debug,    "",                 8 },
+    {"6502 External",  tube_6502_init,  tube_6502_reset, &tube6502_cpu_debug,  "6502Tube",         3 }
 };
 
 static fdc_type_t model_find_fdc(const char *name, const char *model)
@@ -57,13 +71,13 @@ static fdc_type_t model_find_fdc(const char *name, const char *model)
     return FDC_NONE;
 }
 
-static rom_setup_f model_find_romsetup(const char *name, const char *model)
+static rom_setup_t *model_find_romsetup(const char *name, const char *model)
 {
     for (int i = 0; i < NUM_ROM_SETUP; i++)
         if (strcmp(rom_setups[i].name, name) == 0)
-            return rom_setups[i].func;
+            return rom_setups + i;
     log_warn("model: invalid rom setup type '%s' in model '%s', using 'swram' instead", name, model);
-    return mem_romsetup_swram;
+    return rom_setups;
 }
 
 static int model_find_tube(const char *name, const char *model)
@@ -123,25 +137,6 @@ void model_loadcfg(void)
     model_count = max;
 }
 
-extern cpu_debug_t n32016_cpu_debug;
-
-/*
- * The number of tube cycles to run for each core 6502 processor cycle
- * is calculated by mutliplying the multiplier in this table with the
- * one in the general tube speed table and dividing by two.
- */
-
-TUBE tubes[NUM_TUBES]=
-{
-        {"6502 Internal",  tube_6502_init,  tube_6502_reset, &tube6502_cpu_debug,  "6502Intern",       4 },
-        {"ARM",            tube_arm_init,   arm_reset,       &tubearm_cpu_debug,   "ARMeval_100",      4 },
-        {"Z80",            tube_z80_init,   z80_reset,       &tubez80_cpu_debug,   "Z80_120",          8 },
-        {"80186",          tube_x86_init,   x86_reset,       &tubex86_cpu_debug,   "BIOS",             8 },
-        {"65816",          tube_65816_init, w65816_reset,    &tube65816_cpu_debug, "ReCo6502ROM_816", 16 },
-        {"32016",          tube_32016_init, n32016_reset,    &n32016_cpu_debug,    "",                 8 },
-        {"6502 External",  tube_6502_init,  tube_6502_reset, &tube6502_cpu_debug,  "6502Tube",         3 }
-};
-
 void model_check(void) {
     const int defmodel = 3;
 
@@ -188,24 +183,142 @@ static void tube_init(void)
 
 void model_init()
 {
-        model_check();
-        if (curtube == -1)
-            log_info("model: starting emulation as model #%d, %s", curmodel, models[curmodel].name);
-        else
-            log_info("model: starting emulation as model #%d, %s with tube #%d, %s", curmodel, models[curmodel].name, curtube, tubes[curtube].name);
+    model_check();
 
-        fdc_type    = models[curmodel].fdc_type;
-        BPLUS       = models[curmodel].bplus;
-        x65c02      = models[curmodel].x65c02;
-        MASTER      = models[curmodel].master;
-        MODELA      = models[curmodel].modela;
-        OS01        = models[curmodel].os01;
-        compactcmos = models[curmodel].compact;
+    if (curtube == -1)
+        log_info("model: starting emulation as model #%d, %s", curmodel, models[curmodel].name);
+    else
+        log_info("model: starting emulation as model #%d, %s with tube #%d, %s", curmodel, models[curmodel].name, curtube, tubes[curtube].name);
 
-        mem_clearroms();
-        models[curmodel].romsetup();
-        tube_init();
-        cmos_load(models[curmodel]);
+    fdc_type    = models[curmodel].fdc_type;
+    BPLUS       = models[curmodel].bplus;
+    x65c02      = models[curmodel].x65c02;
+    MASTER      = models[curmodel].master;
+    MODELA      = models[curmodel].modela;
+    OS01        = models[curmodel].os01;
+    compactcmos = models[curmodel].compact;
+
+    mem_clearroms();
+    models[curmodel].romsetup->func();
+    tube_init();
+    cmos_load(models[curmodel]);
+}
+
+void model_savestate(FILE *f)
+{
+    MODEL *model = models + curmodel;
+    savestate_save_var(curmodel, f);
+    savestate_save_str(model->name, f);
+    savestate_save_str(model->os, f);
+    savestate_save_str(model->cmos, f);
+    savestate_save_str(model->romsetup->name, f);
+    savestate_save_str(fdc_names[model->fdc_type], f);
+    putc(model->x65c02, f);
+    putc(model->bplus, f);
+    putc(model->master, f);
+    putc(model->modela, f);
+    putc(model->os01, f);
+    putc(model->compact, f);
+    if (model->tube >= 0) {
+        putc(1, f);
+        savestate_save_str(tubes[model->tube].name, f);
+    }
+    else if (curtube >= 0) {
+        putc(2, f);
+        savestate_save_str(tubes[curtube].name, f);
+    }
+    else
+        putc(0, f);
+}
+
+static bool model_cmp(int modelno, MODEL *nmodel)
+{
+    MODEL *tmodel = models + modelno;
+
+    return strcmp(tmodel->name, nmodel->name) == 0 &&
+           strcmp(tmodel->os,   nmodel->os)   == 0 &&
+           strcmp(tmodel->cmos, nmodel->cmos) == 0 &&
+           tmodel->romsetup == nmodel->romsetup    &&
+           tmodel->fdc_type == nmodel->fdc_type    &&
+           tmodel->x65c02   == nmodel->x65c02      &&
+           tmodel->bplus    == nmodel->bplus       &&
+           tmodel->master   == nmodel->master      &&
+           tmodel->modela   == nmodel->modela      &&
+           tmodel->compact  == nmodel->compact     &&
+           tmodel->tube     == nmodel->tube;
+}
+
+void model_loadstate(FILE *f)
+{
+    int newmodel, i;
+    MODEL model;
+    char *rom_setup, *fdc_name, *tube_name;
+
+    newmodel   = savestate_load_var(f);
+    model.name = savestate_load_str(f);
+    model.os   = savestate_load_str(f);
+    model.cmos = savestate_load_str(f);
+    rom_setup = savestate_load_str(f);
+    model.romsetup = model_find_romsetup(rom_setup, model.name);
+    fdc_name = savestate_load_str(f);
+    model.fdc_type = model_find_fdc(fdc_name, model.name);
+    model.x65c02  = getc(f);
+    model.bplus   = getc(f);
+    model.master  = getc(f);
+    model.modela  = getc(f);
+    model.os01    = getc(f);
+    model.compact = getc(f);
+
+    switch(getc(f)) {
+        case 1:
+            tube_name = savestate_load_str(f);
+            model.tube = model_find_tube(tube_name, model.name);
+            break;
+        case 2:
+            tube_name = savestate_load_str(f);
+            model.tube = -1;
+            selecttube = model_find_tube(tube_name, model.name);
+            break;
+        default:
+            tube_name = NULL;
+            model.tube = -1;
+            selecttube = -1;
+    }
+
+    if (newmodel < model_count && model_cmp(newmodel, &model)) {
+        log_debug("model: found savestate model at expected model #%d", newmodel);
+        curmodel = newmodel;
+        free((char *)model.name);
+        free((char *)model.os);
+        free((char *)model.cmos);
+    }
+    else {
+        for (i = 0; i < model_count; i++)
+            if (model_cmp(i, &model))
+                break;
+        if (i == model_count) {
+            curmodel = model_count;
+            if (!(models = realloc(models, ++model_count * sizeof(MODEL)))) {
+                log_fatal("model: out of memory in model_loadstate");
+                exit(1);
+            }
+            models[curmodel] = model;
+            log_debug("model: added savestate model at model #%d", curmodel);
+        }
+        else {
+            log_debug("model: found savestate model in table at model #%d", i);
+            curmodel = i;
+            free((char *)model.name);
+            free((char *)model.os);
+            free((char *)model.cmos);
+        }
+    }
+    free(rom_setup);
+    free(fdc_name);
+    if (tube_name)
+        free(tube_name);
+
+    main_restart();
 }
 
 void model_savecfg(void) {
