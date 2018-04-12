@@ -1,7 +1,7 @@
 #ifndef __INC_IDE_H
 #define __INC_IDE_H
 
-extern int ide_enable;
+extern bool ide_enable;
 extern int ide_count;
 
 void ide_init(void);

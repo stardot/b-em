@@ -39,13 +39,9 @@ extern int winsizex, winsizey;
 extern int fullscreen;
 extern int dcol;
 
-extern int vid_linedbl;
-extern int vid_interlace, vid_pal;
-extern int vid_fskipmax,  vid_scanlines;
-extern int vid_fullborders;
+extern bool vid_linedbl, vid_interlace, vid_scanlines, vid_pal;
+extern int vid_fskipmax, vid_fullborders;
 extern bool vid_print_mode;
-
-extern int videoresize;
 
 extern int vid_savescrshot;
 extern char vid_scrshotname[260];

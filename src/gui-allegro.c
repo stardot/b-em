@@ -567,11 +567,11 @@ static void disc_toggle_ide(ALLEGRO_EVENT *event)
     ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
 
     if (ide_enable)
-        ide_enable = 0;
+        ide_enable = false;
     else {
-        ide_enable = 1;
+        ide_enable = true;
         if (scsi_enabled) {
-            scsi_enabled = 0;
+            scsi_enabled = false;
             al_set_menu_item_flags(menu, IDM_DISC_HARD_SCSI, ALLEGRO_MENU_ITEM_CHECKBOX);
         }
     }
@@ -582,11 +582,11 @@ static void disc_toggle_scsi(ALLEGRO_EVENT *event)
     ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
 
     if (scsi_enabled)
-        scsi_enabled = 0;
+        scsi_enabled = false;
     else {
-        scsi_enabled = 1;
+        scsi_enabled = true;
         if (ide_enable) {
-            ide_enable = 0;
+            ide_enable = false;
             al_set_menu_item_flags(menu, IDM_DISC_HARD_IDE, ALLEGRO_MENU_ITEM_CHECKBOX);
         }
     }
@@ -645,7 +645,7 @@ static void tape_normal(ALLEGRO_EVENT *event)
     ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
 
     if (fasttape) {
-        fasttape = 0;
+        fasttape = false;
         al_set_menu_item_flags(menu, IDM_TAPE_SPEED_FAST, ALLEGRO_MENU_ITEM_CHECKBOX);
     }
 }
@@ -655,7 +655,7 @@ static void tape_fast(ALLEGRO_EVENT *event)
     ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
 
     if (!fasttape) {
-        fasttape = 1;
+        fasttape = true;
         al_set_menu_item_flags(menu, IDM_TAPE_SPEED_NORMAL, ALLEGRO_MENU_ITEM_CHECKBOX);
     }
 }

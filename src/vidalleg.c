@@ -8,7 +8,7 @@
 #include "video.h"
 #include "video_render.h"
 
-int vid_interlace, vid_linedbl, vid_pal, vid_scanlines;
+bool vid_interlace, vid_linedbl, vid_pal, vid_scanlines;
 int vid_fskipmax = 3;
 int vid_fullborders = 1;
 

@@ -7,7 +7,8 @@
 
 int tapelcount,tapellatch;
 
-int tape_loaded = 0;
+bool tape_loaded = false;
+bool fasttape = false;
 ALLEGRO_PATH *tape_fn = NULL;
 
 static struct
@@ -66,7 +67,7 @@ void tape_poll(void) {
     if (motor) {
         if (csw_ena) csw_poll();
         else         uef_poll();
-    
+
         if (newdat & 0x100) {
             newdat&=0xFF;
             tapenoise_adddat(newdat);

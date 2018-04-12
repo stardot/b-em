@@ -4,7 +4,7 @@
 #include "acia.h"
 
 extern ALLEGRO_PATH *tape_fn;
-extern int tape_loaded;
+extern bool tape_loaded;
 
 void tape_load(ALLEGRO_PATH *fn);
 void tape_close(void);
@@ -12,6 +12,6 @@ void tape_poll(void);
 void tape_receive(ACIA *acia, uint8_t data);
 
 extern int tapelcount,tapellatch;
-extern int fasttape;
+extern bool fasttape;
 
 #endif

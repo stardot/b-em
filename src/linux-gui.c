@@ -340,7 +340,7 @@ int gui_hdisk()
         {
                 if (sel != 0)
                 {
-                        ide_enable = 0;
+                        ide_enable = false;
                         changed = 1;
                 }
         }
@@ -348,7 +348,7 @@ int gui_hdisk()
         {
                 if (sel == 0)
                 {
-                        ide_enable = 1;
+                        ide_enable = true;
                         changed = 1;
                 }
         }
@@ -356,7 +356,7 @@ int gui_hdisk()
         {
                 if (sel != 1)
                 {
-                        scsi_enabled = 0;
+                        scsi_enabled = false;
                         changed = 1;
                 }
         }
@@ -364,7 +364,7 @@ int gui_hdisk()
         {
                 if (sel == 1)
                 {
-                        scsi_enabled = 1;
+                        scsi_enabled = true;
                         changed = 1;
                 }
         }
@@ -419,13 +419,13 @@ MENU discmenu[12]=
 
 int gui_normal()
 {
-        fasttape = 0;
+        fasttape = false;
         gui_update();
         return D_CLOSE;
 }
 int gui_fast()
 {
-        fasttape = 1;
+        fasttape = true;
         gui_update();
         return D_CLOSE;
 }
@@ -1061,7 +1061,7 @@ static int gui_rom_togram(void) {
 
 static int gui_rom_clear(void) {
     rom_slot_t *slotp = active_menu->dp;
-    
+
     if (!slotp->locked)
         mem_clearrom(slotp - rom_slots);
     return D_CLOSE;
@@ -1243,7 +1243,7 @@ static void gui_init_rommenu(void) {
     const uint8_t *detail;
     const char *rr, *name;
     MENU *menup;
-    
+
     for (slot = 0; slot < ROM_NSLOT; slot++) {
         rr = rom_slots[slot].swram ? "RAM" : "ROM";
         detail = mem_romdetail(slot);
@@ -1268,7 +1268,7 @@ static void gui_init_rommenu(void) {
         if (rom_slots[slot].locked)
             menup->flags |= D_DISABLED;
         else
-            menup->flags &= ~D_DISABLED;        
+            menup->flags &= ~D_DISABLED;
     }
 }
 

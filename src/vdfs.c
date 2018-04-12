@@ -41,7 +41,7 @@
 #include <search.h>
 #include <sys/stat.h>
 
-int vdfs_enabled = 0;
+bool vdfs_enabled = 0;
 
 /*
  * The definition of the VDFS entry that follows is the key data
@@ -936,9 +936,9 @@ void vdfs_loadstate(FILE *f) {
 
     if ((ch = getc(f)) != EOF) {
         if (ch == 'V')
-            vdfs_enabled = 1;
+            vdfs_enabled = true;
         else if (ch == 'v')
-            vdfs_enabled = 0;
+            vdfs_enabled = false;
         cur_dir = ss_load_dir(cur_dir, f, "current");
         lib_dir = ss_load_dir(lib_dir, f, "library");
         prev_dir = ss_load_dir(prev_dir, f, "previous");

@@ -15,8 +15,9 @@
 
 extern size_t buflen_m5;
 
-extern int sound_internal, sound_beebsid, sound_dac, sound_ddnoise, sound_tape, sound_music5000;
-extern int sound_filter;
+extern bool sound_internal, sound_beebsid, sound_dac;
+extern bool sound_ddnoise, sound_tape;
+extern bool sound_music5000, sound_filter;
 
 void sound_init(void);
 void sound_poll(void);

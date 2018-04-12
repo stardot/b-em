@@ -88,7 +88,7 @@ void music5000_loadstate(FILE *f) {
 
     if ((ch = getc(f)) != EOF) {
         if (ch == 'M') {
-            sound_music5000 = 1;
+            sound_music5000 = true;
             pc = savestate_load_var(f);
             channel = savestate_load_var(f);
             modulate = savestate_load_var(f);
@@ -99,7 +99,7 @@ void music5000_loadstate(FILE *f) {
             fread(sleft, sizeof sleft, 1, f);
             fread(sright, sizeof sright, 1, f);
         } else if (ch == 'm')
-            sound_music5000 = 0;
+            sound_music5000 = false;
         else
             log_warn("music5000: invalid Music 5000 state from savestate file");
     }

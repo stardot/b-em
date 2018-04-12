@@ -4,7 +4,7 @@
 #include "b-em.h"
 #include "ide.h"
 
-int ide_enable;
+bool ide_enable;
 int ide_count;
 
 static struct

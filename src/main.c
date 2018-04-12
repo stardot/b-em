@@ -172,7 +172,7 @@ void main_init(int argc, char *argv[])
         else if (argv[c][0] == '-' && (argv[c][1] == 't' || argv[c][1] == 'T'))
             sscanf(&argv[c][2], "%i", &curtube);
         else if (!strcasecmp(argv[c], "-fasttape"))
-            fasttape = 1;
+            fasttape = true;
         else if (!strcasecmp(argv[c], "-autoboot"))
             autoboot = 150;
         else if (argv[c][0] == '-' && (argv[c][1] == 'f' || argv[c][1]=='F')) {

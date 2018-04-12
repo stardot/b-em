@@ -6,7 +6,7 @@
 #include "via.h"
 #include "uservia.h"
 
-int mouse_amx;
+bool mouse_amx;
 int mcount = 8;
 
 uint8_t mouse_portb = 0;

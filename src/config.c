@@ -20,38 +20,60 @@
 #include "video_render.h"
 
 int curmodel;
-int fasttape = 0;
 int selecttube = -1;
 int cursid = 0;
 int sidmethod = 0;
 
 ALLEGRO_CONFIG *bem_cfg;
 
-int get_config_int(const char *sect, const char *key, int ival) {
+int get_config_int(const char *sect, const char *key, int ival)
+{
     const char *str;
 
-    if (bem_cfg && (str = al_get_config_value(bem_cfg, sect, key)))
-        ival = atoi(str);
+    if (bem_cfg) {
+        if ((str = al_get_config_value(bem_cfg, sect, key)))
+            ival = atoi(str);
+        else if (sect && (str = al_get_config_value(bem_cfg, NULL, key))) {
+            ival = atoi(str);
+            al_remove_config_key(bem_cfg, NULL, key);
+        }
+    }
     return ival;
+}
+
+static bool parse_bool(const char *value)
+{
+    return strcasecmp(value, "true") == 0 || strcasecmp(value, "yes") == 0 || atoi(value) > 0;
 }
 
 bool get_config_bool(const char *sect, const char *key, bool bval)
 {
     const char *str;
-    int ch;
 
-    if (bem_cfg && (str = al_get_config_value(bem_cfg, sect, key))) {
-        ch = *str;
-        bval = (ch == 't' || ch == 'T' || ch == 'y' || ch == 'Y' || ch == '1');
+    if (bem_cfg) {
+        if ((str = al_get_config_value(bem_cfg, sect, key)))
+            bval = parse_bool(str);
+        else if (sect && (str = al_get_config_value(bem_cfg, NULL, key))) {
+            bval = parse_bool(str);
+            al_remove_config_key(bem_cfg, NULL, key);
+        }
     }
     return bval;
 }
 
-const char *get_config_string(const char *sect, const char *key, const char *sval) {
+const char *get_config_string(const char *sect, const char *key, const char *sval)
+{
     const char *str;
 
-    if (bem_cfg && (str = al_get_config_value(bem_cfg, sect, key)))
-        sval = str;
+    if (bem_cfg) {
+        if ((str = al_get_config_value(bem_cfg, sect, key)))
+            sval = str;
+        else if (sect && (str = al_get_config_value(bem_cfg, NULL, key))) {
+            al_set_config_value(bem_cfg, sect, key, str);
+            al_remove_config_key(bem_cfg, NULL, key);
+            sval = al_get_config_value(bem_cfg, sect, key);
+        }
+    }
     return sval;
 }
 
@@ -69,61 +91,62 @@ void config_load(void)
         log_warn("config: no config file found, using defaults");
 
     if (bem_cfg) {
-        if ((p = al_get_config_value(bem_cfg, NULL, "disc0"))) {
+        if ((p = get_config_string("disc", "disc0", NULL))) {
             if (discfns[0])
                 al_destroy_path(discfns[0]);
             discfns[0] = al_create_path(p);
         }
-        if ((p = al_get_config_value(bem_cfg, NULL, "disc1"))) {
+        if ((p = get_config_string("disc", "disc1", NULL))) {
             if (discfns[1])
                 al_destroy_path(discfns[1]);
             discfns[1] = al_create_path(p);
         }
-        if ((p = al_get_config_value(bem_cfg, NULL, "tape"))) {
+        if ((p = get_config_string("tape", "tape", NULL))) {
             if (tape_fn)
                 al_destroy_path(tape_fn);
             tape_fn = al_create_path(p);
         }
+        al_remove_config_key(bem_cfg, NULL, "video_resize");
+        al_remove_config_key(bem_cfg, NULL, "tube6502speed");
     }
 
-    defaultwriteprot = get_config_int(NULL, "defaultwriteprotect", 1);
+    defaultwriteprot = get_config_int("disc", "defaultwriteprotect", 1);
 
     curmodel         = get_config_int(NULL, "model",         3);
     selecttube       = get_config_int(NULL, "tube",         -1);
     tube_speed_num   = get_config_int(NULL, "tubespeed",     0);
 
-    sound_internal   = get_config_int(NULL, "sndinternal",   1);
-    sound_beebsid    = get_config_int(NULL, "sndbeebsid",    1);
-    sound_music5000  = get_config_int(NULL, "sndmusic5000",  0);
-    sound_dac        = get_config_int(NULL, "snddac    ",    0);
-    sound_ddnoise    = get_config_int(NULL, "sndddnoise",    1);
-    sound_tape       = get_config_int(NULL, "sndtape",       0);
+    sound_internal   = get_config_bool("sound", "sndinternal",   true);
+    sound_beebsid    = get_config_bool("sound", "sndbeebsid",    true);
+    sound_music5000  = get_config_bool("sound", "sndmusic5000",  false);
+    sound_dac        = get_config_bool("sound", "snddac",        false);
+    sound_ddnoise    = get_config_bool("sound", "sndddnoise",    true);
+    sound_tape       = get_config_bool("sound", "sndtape",       false);
+    sound_filter     = get_config_bool("sound", "soundfilter",   true);
 
-    sound_filter     = get_config_int(NULL, "soundfilter",   1);
-    curwave          = get_config_int(NULL, "soundwave",     0);
+    curwave          = get_config_int("sound", "soundwave",     0);
+    sidmethod        = get_config_int("sound", "sidmethod",     0);
+    cursid           = get_config_int("sound", "cursid",        2);
 
-    sidmethod        = get_config_int(NULL, "sidmethod",     0);
-    cursid           = get_config_int(NULL, "cursid",        2);
+    ddnoise_vol      = get_config_int("sound", "ddvol",         2);
+    ddnoise_type     = get_config_int("sound", "ddtype",        0);
 
-    ddnoise_vol      = get_config_int(NULL, "ddvol",         2);
-    ddnoise_type     = get_config_int(NULL, "ddtype",        0);
+    vid_fullborders  = get_config_int("video", "fullborders",   1);
 
-    vid_fullborders  = get_config_int(NULL, "fullborders",   1);
-
-    c                = get_config_int(NULL, "displaymode",   3);
+    c                = get_config_int("video", "displaymode",   3);
     vid_scanlines    = (c == 2);
     vid_interlace    = (c == 1) || (c == 5);
     vid_linedbl      = (c == 3);
     vid_pal          = (c == 4) || (c == 5);
 
-    fasttape         = get_config_int(NULL, "fasttape",      0);
+    fasttape         = get_config_bool("tape", "fasttape",      0);
 
-    scsi_enabled     = get_config_int(NULL, "scsienable", 0);
-    ide_enable       = get_config_int(NULL, "ideenable",     0);
-    vdfs_enabled     = get_config_int(NULL, "vdfsenable", 0);
+    scsi_enabled     = get_config_bool("disc", "scsienable", 0);
+    ide_enable       = get_config_bool("disc", "ideenable",     0);
+    vdfs_enabled     = get_config_bool("disc", "vdfsenable", 0);
 
-    keyas            = get_config_int(NULL, "key_as",        0);
-    mouse_amx        = get_config_int(NULL, "mouse_amx",     0);
+    keyas            = get_config_bool(NULL, "key_as",        0);
+    mouse_amx        = get_config_bool(NULL, "mouse_amx",     0);
     kbdips           = get_config_int(NULL, "kbdips", 0);
 
     buflen_m5        = get_config_int("sound", "buflen_music5000", BUFLEN_M5);
@@ -141,6 +164,11 @@ void set_config_int(const char *sect, const char *key, int value)
 
     snprintf(buf, sizeof buf, "%d", value);
     al_set_config_value(bem_cfg, sect, key, buf);
+}
+
+void set_config_bool(const char *sect, const char *key, bool value)
+{
+    al_set_config_value(bem_cfg, sect, key, value ? "true" : "false");
 }
 
 void set_config_string(const char *sect, const char *key, const char *value)
@@ -166,47 +194,46 @@ void config_save(void)
         model_savecfg();
 
         if (discfns[0])
-            al_set_config_value(bem_cfg, NULL, "disc0", al_path_cstr(discfns[0], ALLEGRO_NATIVE_PATH_SEP));
+            al_set_config_value(bem_cfg, "disc", "disc0", al_path_cstr(discfns[0], ALLEGRO_NATIVE_PATH_SEP));
         if (discfns[1])
-            al_set_config_value(bem_cfg, NULL, "disc1", al_path_cstr(discfns[1], ALLEGRO_NATIVE_PATH_SEP));
+            al_set_config_value(bem_cfg, "disc", "disc1", al_path_cstr(discfns[1], ALLEGRO_NATIVE_PATH_SEP));
         if (tape_fn)
-            al_set_config_value(bem_cfg, NULL, "tape", al_path_cstr(tape_fn, ALLEGRO_NATIVE_PATH_SEP));
+            al_set_config_value(bem_cfg, "tape", "tape", al_path_cstr(tape_fn, ALLEGRO_NATIVE_PATH_SEP));
 
-        set_config_int(NULL, "defaultwriteprotect", defaultwriteprot);
+        set_config_bool("disc", "defaultwriteprotect", defaultwriteprot);
 
         set_config_int(NULL, "model", curmodel);
         set_config_int(NULL, "tube", selecttube);
         set_config_int(NULL, "tubespeed", tube_speed_num);
 
-        set_config_int(NULL, "sndinternal", sound_internal);
-        set_config_int(NULL, "sndbeebsid",  sound_beebsid);
-        set_config_int(NULL, "sndmusic5000",sound_music5000);
-        set_config_int(NULL, "snddac",      sound_dac);
-        set_config_int(NULL, "sndddnoise",  sound_ddnoise);
-        set_config_int(NULL, "sndtape",     sound_tape);
+        set_config_bool("sound", "sndinternal", sound_internal);
+        set_config_bool("sound", "sndbeebsid",  sound_beebsid);
+        set_config_bool("sound", "sndmusic5000",sound_music5000);
+        set_config_bool("sound", "snddac",      sound_dac);
+        set_config_bool("sound", "sndddnoise",  sound_ddnoise);
+        set_config_bool("sound", "sndtape",     sound_tape);
+        set_config_bool("sound", "soundfilter", sound_filter);
 
-        set_config_int(NULL, "soundfilter", sound_filter);
-        set_config_int(NULL, "soundwave", curwave);
-
-        set_config_int(NULL, "sidmethod", sidmethod);
-        set_config_int(NULL, "cursid", cursid);
-
-        set_config_int(NULL, "ddvol", ddnoise_vol);
-        set_config_int(NULL, "ddtype", ddnoise_type);
-
-        set_config_int(NULL, "fullborders", vid_fullborders);
-        set_config_int(NULL, "displaymode", (vid_pal && vid_interlace) ? 5 : (vid_scanlines ? 2 : (vid_interlace ? 1 : (vid_linedbl ? 3 : (vid_pal ? 4 : 0)))));
-
-        set_config_int(NULL, "fasttape", fasttape);
-
-        set_config_int(NULL, "scsienable", scsi_enabled);
-        set_config_int(NULL, "ideenable", ide_enable);
-        set_config_int(NULL, "vdfsenable", vdfs_enabled);
-
-        set_config_int(NULL, "key_as", keyas);
-
-        set_config_int(NULL, "mouse_amx", mouse_amx);
+        set_config_int("sound", "soundwave", curwave);
+        set_config_int("sound", "sidmethod", sidmethod);
+        set_config_int("sound", "cursid", cursid);
         set_config_int("sound", "buflen_music5000", buflen_m5);
+
+        set_config_int("sound", "ddvol", ddnoise_vol);
+        set_config_int("sound", "ddtype", ddnoise_type);
+
+        set_config_int("video", "fullborders", vid_fullborders);
+        set_config_int("video", "displaymode", (vid_pal && vid_interlace) ? 5 : (vid_scanlines ? 2 : (vid_interlace ? 1 : (vid_linedbl ? 3 : (vid_pal ? 4 : 0)))));
+
+        set_config_bool("tape", "fasttape", fasttape);
+
+        set_config_bool("disc", "scsienable", scsi_enabled);
+        set_config_bool("disc", "ideenable", ide_enable);
+        set_config_bool("disc", "vdfsenable", vdfs_enabled);
+
+        set_config_bool(NULL, "key_as", keyas);
+
+        set_config_bool(NULL, "mouse_amx", mouse_amx);
 
         for (c = 0; c < 128; c++) {
             snprintf(t, sizeof t, "key_define_%03i", c);

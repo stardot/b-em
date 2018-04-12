@@ -15,13 +15,13 @@
 
 struct _midi_dev {
 #ifdef HAVE_JACK_JACK_H
-    int           jack_enabled;
+    bool          jack_enabled;
     jack_port_t   *jack_port;
     jack_ringbuffer_t *ring_buf;
 #endif
 #ifdef HAVE_ALSA_ASOUNDLIB_H
-    int           alsa_seq_enabled;
-    int           alsa_raw_enabled;
+    bool          alsa_seq_enabled;
+    bool          alsa_raw_enabled;
     int           alsa_seq_port;
     snd_rawmidi_t *alsa_raw_port;
     const char    *alsa_raw_device;
@@ -32,5 +32,5 @@ extern midi_dev_t midi_music4000;
 extern midi_dev_t midi_music2000_out1;
 extern midi_dev_t midi_music2000_out2;
 extern midi_dev_t midi_music2000_out3;
-    
+
 #endif

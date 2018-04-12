@@ -10,8 +10,9 @@
 #include "uservia.h"
 #include "music5000.h"
 
-int sound_internal = 0, sound_beebsid = 0, sound_dac = 0, sound_ddnoise = 0, sound_tape = 0, sound_music5000 = 0;
-int sound_filter = 0;
+bool sound_internal = false, sound_beebsid = false, sound_dac = false;
+bool sound_ddnoise = false, sound_tape = false;
+bool sound_music5000 = false, sound_filter = false;
 
 static ALLEGRO_VOICE *voice;
 static ALLEGRO_MIXER *mixer;

@@ -4,7 +4,7 @@
 extern int kbdips;
 
 extern int keylookup[ALLEGRO_KEY_MAX];
-extern int keyas;
+extern bool keyas;
 
 extern void key_down(ALLEGRO_EVENT *event);
 extern void key_up(ALLEGRO_EVENT *event);

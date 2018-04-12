@@ -236,7 +236,7 @@ static uint8_t allegro2bbc[ALLEGRO_KEY_MAX] =
 };
 
 int keylookup[ALLEGRO_KEY_MAX];
-int keyas = 0;
+bool keyas = 0;
 
 static int keycol, keyrow;
 static int bbckey[16][16];
