@@ -118,4 +118,3 @@ b_em_SOURCES = \
 if NO_TSEARCH
 b_em_SOURCES += tsearch.c
 endif
-
