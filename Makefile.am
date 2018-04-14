@@ -1,5 +1,6 @@
 SUBDIRS = src
 dist_doc_DATA = README.md
+dist_pkgdata_DATA = b-em.cfg
 
 install-data-hook:
 	mkdir -p $(DESTDIR)$(pkgdatadir)
