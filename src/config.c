@@ -35,7 +35,7 @@ int get_config_int(const char *sect, const char *key, int ival)
             ival = atoi(str);
         else if (sect && (str = al_get_config_value(bem_cfg, NULL, key))) {
             ival = atoi(str);
-            al_remove_config_key(bem_cfg, NULL, key);
+            al_remove_config_key(bem_cfg, "", key);
         }
     }
     return ival;
@@ -55,7 +55,7 @@ bool get_config_bool(const char *sect, const char *key, bool bval)
             bval = parse_bool(str);
         else if (sect && (str = al_get_config_value(bem_cfg, NULL, key))) {
             bval = parse_bool(str);
-            al_remove_config_key(bem_cfg, NULL, key);
+            al_remove_config_key(bem_cfg, "", key);
         }
     }
     return bval;
@@ -70,7 +70,7 @@ const char *get_config_string(const char *sect, const char *key, const char *sva
             sval = str;
         else if (sect && (str = al_get_config_value(bem_cfg, NULL, key))) {
             al_set_config_value(bem_cfg, sect, key, str);
-            al_remove_config_key(bem_cfg, NULL, key);
+            al_remove_config_key(bem_cfg, "", key);
             sval = al_get_config_value(bem_cfg, sect, key);
         }
     }
@@ -106,8 +106,8 @@ void config_load(void)
                 al_destroy_path(tape_fn);
             tape_fn = al_create_path(p);
         }
-        al_remove_config_key(bem_cfg, NULL, "video_resize");
-        al_remove_config_key(bem_cfg, NULL, "tube6502speed");
+        al_remove_config_key(bem_cfg, "", "video_resize");
+        al_remove_config_key(bem_cfg, "", "tube6502speed");
     }
 
     defaultwriteprot = get_config_int("disc", "defaultwriteprotect", 1);
