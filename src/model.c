@@ -162,7 +162,7 @@ static void tube_init(void)
     if (curtube!=-1) {
         if (!tubes[curtube].bootrom[0]) // no boot ROM needed
             tubes[curtube].init(NULL);
-        else if (!find_dat_file(path, sizeof path, "roms/tube", tubes[curtube].bootrom, "rom")) {
+        else if (find_dat_file(path, sizeof path, "roms/tube", tubes[curtube].bootrom, "rom")) {
             if ((romf = fopen(path, "rb"))) {
                 tubes[curtube].init(romf);
                 fclose(romf);

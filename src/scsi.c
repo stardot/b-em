@@ -819,7 +819,7 @@ static void scsi_init_lun(int lun)
 
         SCSISize[lun] = 0;
         snprintf(name, sizeof(name), "scsi/scsi%d", lun);
-        if (!find_cfg_file(path, sizeof path, name, "dat")) {
+        if (find_cfg_file(path, sizeof path, name, "dat")) {
             if ((dat = fopen(path, "rb+")))
             {
                 strcpy(strrchr(path, '.'), ".dsc");

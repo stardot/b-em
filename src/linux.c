@@ -17,46 +17,59 @@
 
 void setejecttext(int drive, const char *fn) {};
 
-static int try_file(char *path, size_t psize, const char *fmt, ...) {
+static bool try_file(char *path, size_t psize, const char *fmt, ...) {
     va_list ap;
 
     va_start(ap, fmt);
     vsnprintf(path, psize, fmt, ap);
     va_end(ap);
     log_debug("linux: trying file %s", path);
-    return access(path, R_OK);
+    return access(path, R_OK) == 0;
 }
 
-int find_dat_file(char *path, size_t psize, const char *subdir, const char *name, const char *ext) {
+bool find_dat_file(char *path, size_t psize, const char *subdir, const char *name, const char *ext) {
     const char *var, *ptr, *sep;
 
-    if (!try_file(path, psize, "%s/%s.%s", subdir, name, ext))
-        return 0;
+    if (try_file(path, psize, "%s/%s.%s", subdir, name, ext))
+        return true;
     if ((var = getenv("XDG_DATA_HOME"))) {
-        if (!try_file(path, psize, "%s/b-em/%s/%s.%s", var, subdir, name, ext))
-            return 0;
+        if (try_file(path, psize, "%s/b-em/%s/%s.%s", var, subdir, name, ext))
+            return true;
     } else if ((var = getenv("HOME"))) {
-        if (!try_file(path, psize, "%s/.local/share/b-em/%s/%s.%s", var, subdir, name, ext))
-            return 0;
+        if (try_file(path, psize, "%s/.local/share/b-em/%s/%s.%s", var, subdir, name, ext))
+            return true;
     }
     if ((var = getenv("XDG_DATA_DIRS")) == NULL)
         var = "/usr/local/share:/usr/share";
     for (ptr = var; (sep = strchr(ptr, ':')); ptr = sep+1)
-        if (!try_file(path, psize, "%.*s/b-em/%s/%s.%s", (int)(sep-ptr), ptr, subdir, name, ext))
-            return 0;
+        if (try_file(path, psize, "%.*s/b-em/%s/%s.%s", (int)(sep-ptr), ptr, subdir, name, ext))
+            return true;
     return try_file(path, psize, "%s/b-em/%s/%s.%s", ptr, subdir, name, ext);
 }
 
-int find_cfg_file(char *path, size_t psize, const char *name, const char *ext) {
-    const char *var;
+bool find_cfg_file(char *path, size_t psize, const char *name, const char *ext) {
+    const char *var, *ptr, *sep;
 
     if ((var = getenv("XDG_CONFIG_HOME")))
-        if (!try_file(path, psize, "%s/b-em/%s.%s", var, name, ext))
-            return 0;
+        if (try_file(path, psize, "%s/b-em/%s.%s", var, name, ext))
+            return true;
     if ((var = getenv("HOME")))
-        if (!try_file(path, psize, "%s/.config/b-em/%s.%s", var, name, ext))
-            return 0;
-    return 1;
+        if (try_file(path, psize, "%s/.config/b-em/%s.%s", var, name, ext))
+            return true;
+    if ((var = getenv("XDG_CONFIG_DIRS"))) {
+        for (ptr = var; (sep = strchr(ptr, ':')); ptr = sep+1)
+            if (try_file(path, psize, "%.*s/b-em/%s.%s", (int)(sep-ptr), ptr, name, ext))
+                return true;
+    }
+    if ((var = getenv("XDG_DATA_HOME")))
+        if (try_file(path, psize, "%s/b-em/%s.%s", var, name, ext))
+            return true;
+    if ((var = getenv("XDG_DATA_DIRS")) == NULL)
+        var = "/usr/local/share:/usr/share";
+    for (ptr = var; (sep = strchr(ptr, ':')); ptr = sep+1)
+        if (try_file(path, psize, "%.*s/b-em/%s.%s", (int)(sep-ptr), ptr, name, ext))
+            return true;
+    return try_file(path, psize, "%s/b-em/%s.%s", ptr, name, ext);
 }
 
 static int try_dest(char *path, size_t psize, const char *name, const char *ext, const char *fmt, ...) {
@@ -75,28 +88,28 @@ static int try_dest(char *path, size_t psize, const char *name, const char *ext,
         if (stat(path, &stb) == 0) {
             if ((stb.st_mode & S_IFMT) == S_IFDIR) {
                 snprintf(npath, psize, "/%s.%s", name, ext);
-                return 0;
+                return true;
             }
         } else if (errno == ENOENT) {
             if (mkdir(path, 0777) == 0) {
                 snprintf(npath, psize, "/%s.%s", name, ext);
-                return 0;
+                return true;
             }
         }
     }
-    return 1;
+    return false;
 }
 
-int find_cfg_dest(char *path, size_t psize, const char *name, const char *ext) {
+bool find_cfg_dest(char *path, size_t psize, const char *name, const char *ext) {
     const char *var;
 
     if ((var = getenv("XDG_CONFIG_HOME")))
-        if (!try_dest(path, psize, name, ext, "%s/b-em", var))
-            return 0;
+        if (try_dest(path, psize, name, ext, "%s/b-em", var))
+            return true;
     if ((var = getenv("HOME")))
-        if (!try_dest(path, psize, name, ext, "%s/.config/b-em", var))
-            return 0;
-    return 1;
+        if (try_dest(path, psize, name, ext, "%s/.config/b-em", var))
+            return true;
+    return false;
 }
 
 #endif

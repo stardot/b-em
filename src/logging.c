@@ -37,7 +37,7 @@ static const log_level_t *log_levels[] =
 static const char log_section[]    = "logging";
 static const char log_default_fn[] = "b-emlog";
 
-static unsigned log_options = 0;
+static unsigned log_options = 0x22222;
 
 static FILE *log_fp;
 static char   tmstr[20];
@@ -58,7 +58,7 @@ static void log_msgbox(const char *level, char *msg)
         cur_split = msg;
         while ((new_split = strchr(cur_split+1, ' ')) && new_split < max_ptr)
             cur_split = new_split;
-        
+
         if (cur_split > msg)
         {
             *cur_split = '\0';
@@ -82,7 +82,7 @@ static void log_common(unsigned dest, const char *level, char *msg, size_t len)
             strftime(tmstr, sizeof(tmstr), "%d/%m/%Y %H:%M:%S", localtime(&now));
             last = now;
         }
-        fprintf(log_fp, "%s %s ", tmstr, level); 
+        fprintf(log_fp, "%s %s ", tmstr, level);
         fwrite(msg, len, 1, log_fp);
         putc('\n', log_fp);
         fflush(log_fp);
@@ -194,9 +194,9 @@ static void log_open_file(void) {
     log_fn = get_config_string(log_section, "log_filename", NULL);
     if (!log_fn) {
         if (find_cfg_dest(path, sizeof path, log_default_fn, "txt"))
-            log_warn("log_open: unable to find suitable destination for log file");
-        else
             log_fn = path;
+        else
+            log_warn("log_open: unable to find suitable destination for log file");
     }
     if (log_fn) {
         append = get_config_int(log_section, "append", 1);
@@ -204,7 +204,7 @@ static void log_open_file(void) {
             log_warn("log_open: unable to open log %s: %s", log_fn, strerror(errno));
     }
 }
-    
+
 void log_open(void)
 {
     const char *to_file, *to_stderr, *to_msgbox;

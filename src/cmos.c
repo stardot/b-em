@@ -165,7 +165,7 @@ void cmos_load(MODEL m) {
     if (m.compact) compactcmos_load(m);
     else {
         rtc_epoc_ref = rtc_epoc_adj = 0;
-        if (!find_cfg_file(fn, sizeof fn, m.cmos, "bin")) {
+        if (find_cfg_file(fn, sizeof fn, m.cmos, "bin")) {
             if ((f = fopen(fn, "rb"))) {
                 fread(cmos, 64, 1, f);
                 fclose(f);
@@ -188,7 +188,7 @@ void cmos_save(MODEL m) {
     if (!m.cmos[0]) return;
     if (m.compact) compactcmos_save(m);
     else {
-        if (!find_cfg_dest(fn, sizeof fn, m.cmos, "bin")) {
+        if (find_cfg_dest(fn, sizeof fn, m.cmos, "bin")) {
             if ((f = fopen(fn, "wb"))) {
                 log_debug("cmos: saving to %s", fn);
                 fwrite(cmos, 64, 1, f);

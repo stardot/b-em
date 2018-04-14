@@ -34,12 +34,12 @@ static void ide_open_hd(int i, const char *name) {
     char s[PATH_MAX];
 
     if (!hdfile[i]) {
-        if (!find_cfg_file(s, sizeof s, name, "hdf")) {
+        if (find_cfg_file(s, sizeof s, name, "hdf")) {
             if ((f = fopen(s, "rb+")))
                 hdfile[i] = f;
             else
                 log_error("ide: unable to open hard disk file %s: %s", s, strerror(errno));
-        } else if (!find_cfg_dest(s, sizeof s, name, "hdf")) {
+        } else if (find_cfg_dest(s, sizeof s, name, "hdf")) {
             if ((f = fopen(s, "wb+")))
                 hdfile[i] = f;
             else

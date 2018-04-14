@@ -82,7 +82,7 @@ void config_load(void)
     int c;
     char s[PATH_MAX];
     const char *p;
-    if (!find_cfg_file(s, sizeof s, "b-em", "cfg")) {
+    if (find_cfg_file(s, sizeof s, "b-em", "cfg")) {
         if (bem_cfg)
             al_destroy_config(bem_cfg);
         if (!(bem_cfg = al_load_config_file(s)))
@@ -184,7 +184,7 @@ void config_save(void)
     int c;
     char s[PATH_MAX], t[20];
 
-    if (!find_cfg_dest(s, sizeof s, "b-em", "cfg")) {
+    if (find_cfg_dest(s, sizeof s, "b-em", "cfg")) {
         if (!bem_cfg) {
             if (!(bem_cfg = al_create_config())) {
                 log_error("config: unable to save configuration");

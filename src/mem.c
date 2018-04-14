@@ -69,7 +69,7 @@ static void load_os_rom(const char *sect) {
     char path[PATH_MAX];
 
     osname = get_config_string(sect, "os", models[curmodel].os);
-    if (!find_dat_file(path, sizeof path, "roms/os", osname, "rom")) {
+    if (find_dat_file(path, sizeof path, "roms/os", osname, "rom")) {
         if ((f = fopen(path, "rb"))) {
             fread(os, ROM_SIZE, 1, f);
             fclose(f);
@@ -126,7 +126,7 @@ static void cfg_load_rom(int slot, const char *sect) {
     name = al_get_config_value(bem_cfg, sect, key);
     if (name != NULL && *name != '\0') {
         if (is_relative_filename(name)) {
-            if (!find_dat_file(path, sizeof path, "roms/general", name, "rom"))
+            if (find_dat_file(path, sizeof path, "roms/general", name, "rom"))
                 mem_loadrom(slot, name, path, 1);
             else
                 log_warn("mem: unable to load ROM slot %02d with %s, ROM file not found", slot, name);
@@ -208,7 +208,7 @@ void mem_romsetup_master(void) {
     int slot;
 
     osname = get_config_string(sect, "os", models[curmodel].os);
-    if (!find_dat_file(path, sizeof path, "roms/os", osname, "rom")) {
+    if (find_dat_file(path, sizeof path, "roms/os", osname, "rom")) {
         if ((f = fopen(path, "rb"))) {
             if (fread(os, ROM_SIZE, 1, f) == 1) {
                 if (fread(rom + (9 * ROM_SIZE), 7 * ROM_SIZE, 1, f) == 1) {

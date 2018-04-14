@@ -38,7 +38,7 @@ void compactcmos_load(MODEL m) {
     char fn[PATH_MAX];
     const char *msg;
 
-    if (!find_cfg_file(fn, sizeof fn, m.cmos, "bin")) {
+    if (find_cfg_file(fn, sizeof fn, m.cmos, "bin")) {
         if ((cmosf = fopen(fn, "rb"))) {
             fread(cmos_ram, 128, 1, cmosf);
             fclose(cmosf);
@@ -57,7 +57,7 @@ void compactcmos_save(MODEL m) {
     char fn[PATH_MAX];
     const char *msg;
 
-    if (!find_cfg_dest(fn, sizeof fn, m.cmos, "bin")) {
+    if (find_cfg_dest(fn, sizeof fn, m.cmos, "bin")) {
         if ((cmosf = fopen(fn, "wb"))) {
             log_debug("compactcmos: saving to %s", fn);
             fwrite(cmos_ram, 128, 1, cmosf);

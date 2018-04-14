@@ -23,7 +23,7 @@ ALLEGRO_SAMPLE *find_load_wav(const char *subdir, const char *name)
     ALLEGRO_SAMPLE *smp;
     char path[PATH_MAX];
 
-    if (find_dat_file(path, sizeof path, subdir, name, "wav") == 0) {
+    if (find_dat_file(path, sizeof path, subdir, name, "wav")) {
         if ((smp = al_load_sample(path))) {
             log_debug("ddnoise: loaded %s from %s", name, path);
             return smp;
@@ -73,7 +73,7 @@ void ddnoise_close()
 {
     ALLEGRO_SAMPLE *smp, *smpo, *smpi;
     int c;
-    
+
     for (c = 0; c < 4; c++) {
         if ((smpo = seeksmp[c][0])) {
             al_destroy_sample(smpo);
@@ -156,7 +156,7 @@ void ddnoise_headdown(void)
     log_debug("ddnoise: head down");
     if (sound_ddnoise && (smp = motorsmp[1]))
         al_play_sample(smp, map_ddnoise_vol(), 0.0, 1.0, ALLEGRO_PLAYMODE_LOOP, &motor_smp_id);
-}    
+}
 
 void ddnoise_spindown(void)
 {
