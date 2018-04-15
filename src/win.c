@@ -11,6 +11,7 @@
 static bool win_file_exists(const char *szPath) {
     DWORD dwAttrib = GetFileAttributes(szPath);
 
+    log_debug("win: trying %s", szPath);
     return (dwAttrib != INVALID_FILE_ATTRIBUTES &&
             !(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
 }
@@ -25,6 +26,11 @@ bool find_dat_file(char *path, size_t psize, const char *subdir, const char *nam
 bool find_cfg_file(char *path, size_t psize, const char *name, const char *ext) {
     ALLEGRO_PATH *setpath = al_get_standard_path(ALLEGRO_USER_SETTINGS_PATH);
     const char *cpath = al_path_cstr(setpath, ALLEGRO_NATIVE_PATH_SEP);
+    snprintf(path, psize, "%s/%s.%s", cpath, name, ext);
+    if (win_file_exists(path))
+	return true;
+    setpath = al_get_standard_path(ALLEGRO_RESOURCES_PATH);
+    cpath = al_path_cstr(setpath, ALLEGRO_NATIVE_PATH_SEP);
     snprintf(path, psize, "%s/%s.%s", cpath, name, ext);
     return win_file_exists(path);
 }
