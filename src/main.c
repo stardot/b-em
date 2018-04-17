@@ -287,6 +287,10 @@ void main_init(int argc, char *argv[])
         exit(1);
     }
     al_register_event_source(queue, al_get_keyboard_event_source());
+    if (al_install_joystick())
+        al_register_event_source(queue, al_get_joystick_event_source());
+    else
+        log_warn("main: unable to install joystick driver");
 
     oldmodel = curmodel;
 
