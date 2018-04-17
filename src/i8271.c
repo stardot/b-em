@@ -100,9 +100,14 @@ void i8271_spindown()
 
 void i8271_setspindown()
 {
-        motorspin = 45000;
+    motorspin = 45000;
 }
 
+static void short_spindown(void)
+{
+    motorspin = 15000;
+    fdc_time = 0;
+}
 
 int params[][2]=
 {
@@ -481,11 +486,10 @@ void i8271_finishread()
 
 void i8271_notfound()
 {
-        i8271_spindown();
         i8271.result = 0x18;
         i8271.status = 0x18;
         i8271_NMI();
-        fdc_time = 0;
+        short_spindown();
 //        printf("Not found 8271\n");
 }
 
@@ -494,7 +498,7 @@ void i8271_datacrcerror()
         i8271.result = 0x0E;
         i8271.status = 0x18;
         i8271_NMI();
-        fdc_time = 0;
+        short_spindown();
 //        printf("CRCdat 8271\n");
 }
 
@@ -503,7 +507,7 @@ void i8271_headercrcerror()
         i8271.result = 0x0C;
         i8271.status = 0x18;
         i8271_NMI();
-        fdc_time = 0;
+        short_spindown();
 //        printf("CRChead 8271\n");
 }
 
@@ -527,5 +531,5 @@ void i8271_writeprotect()
         i8271.result = 0x12;
         i8271.status = 0x18;
         i8271_NMI();
-        fdc_time = 0;
+        short_spindown();
 }
