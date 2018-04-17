@@ -692,7 +692,7 @@ ALLEGRO_LOCKED_REGION *region;
 
 ALLEGRO_DISPLAY *video_init(void)
 {
-    int c, d;
+    int c;
     int temp, temp2, left;
 
 #ifdef ALLEGRO_GTK_TOPLEVEL
@@ -717,15 +717,7 @@ ALLEGRO_DISPLAY *video_init(void)
 
     for (c = 0; c < 8; c++)
         nula_flash[c] = 1;
-    for (c = 0; c < 16; c++) {
-        for (d = 0; d < 64; d++) {
-            int red = (((d & 1) * c) * 255) / 15 + ((((d & 8) >> 3) * (15 - c)) * 255) / 15;
-            int blu = ((((d & 2) >> 1) * c) * 255) / 15 + ((((d & 16) >> 4) * (15 - c)) * 255) / 15;
-            int grn = ((((d & 4) >> 2) * c) * 255) / 15 + ((((d & 32) >> 5) * (15 - c)) * 255) / 15;
-            mode7_lookup[d & 7][(d >> 3) & 7][c] = makecol(red, grn, blu);
-        }
-    }
-    mode7_need_new_lookup = 0;
+    mode7_need_new_lookup = 1;
     for (temp = 0; temp < 256; temp++) {
         temp2 = temp;
         for (c = 0; c < 16; c++) {
