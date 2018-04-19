@@ -42,6 +42,8 @@ void video_poll(int clocks, int timer_enable);
 void video_savestate(FILE *f);
 void video_loadstate(FILE *f);
 
+void nula_default_palette(void);
+
 extern uint16_t vidbank;
 
 void mode7_makechars(void);

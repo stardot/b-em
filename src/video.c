@@ -130,6 +130,15 @@ static inline void put_pixel(ALLEGRO_LOCKED_REGION *region, int x, int y, uint32
     *((uint32_t *)(region->data + region->pitch * y + x * region->pixel_size)) = colour;
 }
 
+static inline void put_pixels(ALLEGRO_LOCKED_REGION *region, int x, int y, int count, uint32_t colour)
+{
+    void *ptr = region->data + region->pitch * y + x * region->pixel_size;
+    while (count--) {
+        *(uint32_t *)ptr = colour;
+        ptr += region->pixel_size;
+    }
+}
+
 static inline void nula_putpixel(ALLEGRO_LOCKED_REGION *region, int x, int y, uint32_t colour)
 {
     if (crtc_mode && (nula_horizontal_offset || nula_left_blank) && (x < nula_left_cut || x >= nula_left_edge + (crtc[1] * crtc_mode * 8)))
@@ -138,9 +147,7 @@ static inline void nula_putpixel(ALLEGRO_LOCKED_REGION *region, int x, int y, ui
         put_pixel(region, x, y, colour);
 }
 
-//#define nula_putpixel(r, x, y, c) { log_debug("video: x=%d, y=%d at %d", x, y, __LINE__); xxxx_putpixel(r, x, y, c); }
-
-static void nula_default_palette(void)
+void nula_default_palette(void)
 {
     nula_collook[0]  = 0xff000000; // black
     nula_collook[1]  = 0xffff0000; // red
@@ -158,6 +165,8 @@ static void nula_default_palette(void)
     nula_collook[13] = 0xffff00ff; // magenta
     nula_collook[14] = 0xff00ffff; // cyan
     nula_collook[15] = 0xffffffff; // white
+
+    mode7_need_new_lookup = 1;
 }
 
 void videoula_write(uint16_t addr, uint8_t val)
@@ -240,7 +249,6 @@ void videoula_write(uint16_t addr, uint8_t val)
                 for (c = 0; c < 8; c++) {
                     nula_flash[c] = 1;
                 }
-                mode7_need_new_lookup = 1;
                 break;
 
             case 5:
@@ -717,7 +725,6 @@ ALLEGRO_DISPLAY *video_init(void)
 
     for (c = 0; c < 8; c++)
         nula_flash[c] = 1;
-    mode7_need_new_lookup = 1;
     for (temp = 0; temp < 256; temp++) {
         temp2 = temp;
         for (c = 0; c < 16; c++) {
@@ -845,12 +852,9 @@ void video_poll(int clocks, int timer_enable)
             if (scrx < 1280) {
                 if ((crtc[8] & 0x30) == 0x30 || ((sc & 8) && !(ula_ctrl & 2))) {
                     // Gaps between lines in modes 3 & 6.
-                    for (c = 0; c < ((ula_ctrl & 0x10) ? 8 : 16); c++)
-                        put_pixel(region, scrx + c, scry, colblack);
-                    if (vid_linedbl) {
-                        for (c = 0; c < ((ula_ctrl & 0x10) ? 8 : 16); c++)
-                            put_pixel(region, scrx + c, scry + 1, colblack);
-                    }
+                    put_pixels(region, scrx, scry, (ula_ctrl & 0x10) ? 8 : 16, colblack);
+                    if (vid_linedbl)
+                        put_pixels(region, scrx, scry+1, (ula_ctrl & 0x10) ? 8 : 16, colblack);
                 } else
                     switch (crtc_mode) {
                     case 0:
@@ -962,11 +966,11 @@ void video_poll(int clocks, int timer_enable)
                     }
                 if (cdraw) {
                     if (cursoron && (ula_ctrl & cursorlook[cdraw])) {
-                        for (c = 0; c < ((ula_ctrl & 0x10) ? 8 : 16); c++) {
+                        for (c = ((ula_ctrl & 0x10) ? 8 : 16); c >= 0; c--) {
                             nula_putpixel(region, scrx + c, scry, get_pixel(region, scrx + c, scry) ^ colwhite);
                         }
                         if (vid_linedbl) {
-                            for (c = 0; c < ((ula_ctrl & 0x10) ? 8 : 16); c++) {
+                            for (c = ((ula_ctrl & 0x10) ? 8 : 16); c >= 0; c--) {
                                 nula_putpixel(region, scrx + c, scry + 1, get_pixel(region, scrx + c, scry + 1) ^ colwhite);
                             }
                         }
@@ -985,28 +989,22 @@ void video_poll(int clocks, int timer_enable)
                 charsleft--;
 
             } else if (scrx < 1280) {
-                for (c = 0; c < ((ula_ctrl & 0x10) ? 8 : 16); c++)
-                    put_pixel(region, scrx + c, scry, colblack);
-                if (vid_linedbl) {
-                    for (c = 0; c < ((ula_ctrl & 0x10) ? 8 : 16); c++)
-                        put_pixel(region, scrx + c, scry + 1, colblack);
-                }
+                put_pixels(region, scrx, scry, (ula_ctrl & 0x10) ? 8 : 16, colblack);
+                if (vid_linedbl)
+                    put_pixels(region, scrx, scry+1, (ula_ctrl & 0x10) ? 8 : 16, colblack);
                 if (!crtc_mode) {
-                    for (c = 0; c < 16; c++)
-                        put_pixel(region, scrx + c + 16, scry, colblack);
-                    if (vid_linedbl) {
-                        for (c = 0; c < 16; c++)
-                            put_pixel(region, scrx + c + 16, scry + 1, colblack);
-                    }
+                    put_pixels(region, scrx + 16, scry, 16, colblack);
+                    if (vid_linedbl)
+                        put_pixels(region, scrx + 16, scry+1, 16, colblack);
                 }
             }
             if (cdraw && scrx < 1280) {
                 if (cursoron && (ula_ctrl & cursorlook[cdraw])) {
-                    for (c = 0; c < ((ula_ctrl & 0x10) ? 8 : 16); c++) {
+                    for (c = ((ula_ctrl & 0x10) ? 8 : 16); c >= 0; c--) {
                         nula_putpixel(region, scrx + c, scry, get_pixel(region, scrx + c, scry) ^ colwhite);
                     }
                     if (vid_linedbl) {
-                        for (c = 0; c < ((ula_ctrl & 0x10) ? 8 : 16); c++) {
+                        for (c = ((ula_ctrl & 0x10) ? 8 : 16); c >= 0; c--) {
                             nula_putpixel(region, scrx + c, scry + 1, get_pixel(region, scrx + c, scry + 1) ^ colwhite);
                         }
                     }
@@ -1117,8 +1115,6 @@ void video_poll(int clocks, int timer_enable)
                         region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_READWRITE);
                     }
                     frameodd ^= 1;
-                    if (frameodd)
-                        interline = (crtc[8] & 1);
                     interlline = frameodd && (crtc[8] & 1);
                     oldr8 = crtc[8] & 1;
                     if (vidclocks > 1024 && !ccount) {

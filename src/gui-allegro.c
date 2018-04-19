@@ -794,6 +794,7 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
 {
     switch(menu_get_id(event)) {
         case IDM_FILE_RESET:
+            nula_default_palette();
             main_restart();
             break;
         case IDM_FILE_LOAD_STATE:
