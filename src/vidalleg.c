@@ -50,7 +50,7 @@ void video_close()
 #ifdef WIN32
 static const int y_fudge = 0;
 #else
-static const int y_fudge = 27;
+static const int y_fudge = 19;
 #endif
 
 void video_enterfullscreen()
@@ -163,10 +163,8 @@ void video_toggle_fullscreen(void)
 static inline void upscale_only(ALLEGRO_BITMAP *src, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh)
 {
     al_set_target_backbuffer(al_get_current_display());
-    if (dw > sw+10 || dh > sh+10) {
+    if (dw > sw+10 || dh > sh+10)
         al_draw_scaled_bitmap(src, sx, sy, sw, sh, dx, dy, dw, dh, 0);
-        log_debug("vidalleg: scaling sw=%d, sh=%d, dh=%d, dw=%d", sw, sh, dw, dh);
-    }
     else
         al_draw_bitmap_region(src, sx, sy, sw, sh, dx, dy, 0);
 }
