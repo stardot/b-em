@@ -29,7 +29,7 @@
 
 #define VERSION_STR "B-em v-" VERSION
 
-extern ALLEGRO_PATH *find_dat_file(const char *subdir1, const char *subdir2, const char *name, const char *ext);
+extern ALLEGRO_PATH *find_dat_file(ALLEGRO_PATH *dir, const char *name, const char *ext);
 extern ALLEGRO_PATH *find_cfg_file(const char *name, const char *ext);
 extern ALLEGRO_PATH *find_cfg_dest(const char *name, const char *ext);
 

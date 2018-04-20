@@ -17,36 +17,45 @@
 
 void setejecttext(int drive, const char *fn) {};
 
-static bool try_dat_file(ALLEGRO_PATH *path, const char *subdir1, const char *subdir2, const char *name, const char *ext)
+static bool try_file(ALLEGRO_PATH *path, const char *name, const char *ext)
 {
     const char *cpath;
 
-    al_append_path_component(path, "b-em");
-    if (subdir1)
-        al_append_path_component(path, subdir1);
-    if (subdir2)
-        al_append_path_component(path, subdir2);
     al_set_path_filename(path, name);
     al_set_path_extension(path, ext);
     cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
-    log_debug("linux: looking for dat file %s at %s", name, cpath);
-    return access(cpath, R_OK) == 0;
+    if (access(cpath, R_OK)) {
+        log_debug("linux: %s not found at %s", name, cpath);
+        return false;
+    }
+    else {
+        log_debug("linux: %s found at %s", name, cpath);
+        return true;
+    }
 }
 
-ALLEGRO_PATH *find_dat_file(const char *subdir1, const char *subdir2, const char *name, const char *ext)
+static bool try_dat_file(ALLEGRO_PATH *path, ALLEGRO_PATH *dir, const char *name, const char *ext)
+{
+    al_append_path_component(path, "b-em");
+    al_join_paths(path, dir);
+    return try_file(path, name, ext);
+}
+
+ALLEGRO_PATH *find_dat_file(ALLEGRO_PATH *dir, const char *name, const char *ext)
 {
     ALLEGRO_PATH *path;
     const char *var;
     char *cpy, *ptr, *sep;
 
     if ((path = al_get_standard_path(ALLEGRO_RESOURCES_PATH))) {
-        if (try_dat_file(path, subdir1, subdir2, name, ext))
+        al_join_paths(path, dir);
+        if (try_file(path, name, ext))
             return path;
         al_destroy_path(path);
     }
     if ((var = getenv("XDG_DATA_HOME"))) {
         if ((path = al_create_path_for_directory(var))) {
-            if (try_dat_file(path, subdir1, subdir2, name, ext))
+            if (try_dat_file(path, dir, name, ext))
                 return path;
             al_destroy_path(path);
         }
@@ -55,7 +64,7 @@ ALLEGRO_PATH *find_dat_file(const char *subdir1, const char *subdir2, const char
         if ((path = al_create_path_for_directory(var))) {
             al_append_path_component(path, ".local");
             al_append_path_component(path, "share");
-            if (try_dat_file(path, subdir1, subdir2, name, ext))
+            if (try_dat_file(path, dir, name, ext))
                 return path;
             al_destroy_path(path);
         }
@@ -66,7 +75,7 @@ ALLEGRO_PATH *find_dat_file(const char *subdir1, const char *subdir2, const char
         for (ptr = cpy; (sep = strchr(ptr, ':')); ptr = sep) {
             *sep++ = '\0';
             if ((path = al_create_path_for_directory(ptr))) {
-                if (try_dat_file(path, subdir1, subdir2, name, ext)) {
+                if (try_dat_file(path, dir, name, ext)) {
                     free(cpy);
                     return path;
                 }
@@ -76,7 +85,7 @@ ALLEGRO_PATH *find_dat_file(const char *subdir1, const char *subdir2, const char
         path = al_create_path_for_directory(ptr);
         free(cpy);
         if (path) {
-            if (try_dat_file(path, subdir1, subdir2, name, ext))
+            if (try_dat_file(path, dir, name, ext))
                 return path;
             al_destroy_path(path);
         }
@@ -86,14 +95,8 @@ ALLEGRO_PATH *find_dat_file(const char *subdir1, const char *subdir2, const char
 
 static bool try_cfg_file(ALLEGRO_PATH *path, const char *name, const char *ext)
 {
-    const char *cpath;
-
     al_append_path_component(path, "b-em");
-    al_set_path_filename(path, name);
-    al_set_path_extension(path, ext);
-    cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
-    log_debug("linux: looking for cfg file %s at %s", name, cpath);
-    return access(cpath, R_OK) == 0;
+    return try_file(path, name, ext);
 }
 
 ALLEGRO_PATH *find_cfg_file(const char *name, const char *ext) {

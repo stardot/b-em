@@ -1,9 +1,8 @@
 /*B-em v2.2 by Tom Walker
   Tape noise (not very good)*/
 
-#include <stdio.h>
-#include <math.h>
 #include "b-em.h"
+#include <math.h>
 #include "ddnoise.h"
 #include "tapenoise.h"
 #include "sound.h"
@@ -26,6 +25,7 @@ static ALLEGRO_SAMPLE *tsamples[2];
 
 void tapenoise_init(ALLEGRO_EVENT_QUEUE *queue)
 {
+    ALLEGRO_PATH *dir;
     int c;
 
     log_debug("tapenoise: tapenoise_init");
@@ -34,8 +34,10 @@ void tapenoise_init(ALLEGRO_EVENT_QUEUE *queue)
             if (al_attach_mixer_to_voice(mixer, voice)) {
                 if ((stream = al_create_audio_stream(4, BUFLEN_DD, FREQ_DD, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_1))) {
                     if (al_attach_audio_stream_to_mixer(stream, mixer)) {
-                        tsamples[0] = find_load_wav(NULL, "motoron");
-                        tsamples[1] = find_load_wav(NULL, "motoroff");
+                        dir = al_create_path_for_directory("ddnoise");
+                        tsamples[0] = find_load_wav(dir, "motoron");
+                        tsamples[1] = find_load_wav(dir, "motoroff");
+                        al_destroy_path(dir);
                         for (c = 0; c < 32; c++)
                             sinewave[c] = (int)(sin((float)c * ((2.0 * PI) / 32.0)) * 128.0);
                     } else

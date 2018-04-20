@@ -26,14 +26,11 @@ static bool win_file_exists(ALLEGRO_PATH *path, const char *name, const char *ex
     }
 }
 
-ALLEGRO_PATH *find_dat_file(const char *subdir1, const char *subdir2, const char *name, const char *ext) {
+ALLEGRO_PATH *find_dat_file(ALLEGRO_PATH *dir, const char *name, const char *ext) {
     ALLEGRO_PATH *path;
 
     if ((path = al_get_standard_path(ALLEGRO_RESOURCES_PATH))) {
-        if (subdir1)
-            al_append_path_component(path, subdir1);
-        if (subdir2)
-            al_append_path_component(path, subdir2);
+        al_join_paths(path, dir);
         if (win_file_exists(path, name, ext))
             return path;
         al_destroy_path(path);

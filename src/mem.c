@@ -13,6 +13,8 @@ uint8_t ram_fe30, ram_fe34;
 
 rom_slot_t rom_slots[ROM_NSLOT];
 
+ALLEGRO_PATH *os_dir, *rom_dir;
+
 static const char slotkeys[16][6] = {
     "rom00", "rom01", "rom02", "rom03",
     "rom04", "rom05", "rom06", "rom07",
@@ -26,6 +28,8 @@ void mem_init() {
     rom = (uint8_t *)malloc(ROM_NSLOT * ROM_SIZE);
     os  = (uint8_t *)malloc(ROM_SIZE);
     memset(ram, 0, RAM_SIZE);
+    os_dir  = al_create_path_for_directory("roms/os");
+    rom_dir = al_create_path_for_directory("roms/general");
 }
 
 static void rom_free(int slot) {
@@ -69,7 +73,7 @@ static void load_os_rom(const char *sect) {
     ALLEGRO_PATH *path;
 
     osname = get_config_string(sect, "os", models[curmodel].os);
-    if ((path = find_dat_file("roms", "os", osname, ".rom"))) {
+    if ((path = find_dat_file(os_dir, osname, ".rom"))) {
         cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
         if ((f = fopen(cpath, "rb"))) {
             fread(os, ROM_SIZE, 1, f);
@@ -131,7 +135,7 @@ static void cfg_load_rom(int slot, const char *sect) {
     name = al_get_config_value(bem_cfg, sect, key);
     if (name != NULL && *name != '\0') {
         if (is_relative_filename(name)) {
-            if ((path = find_dat_file("roms", "general", name, ".rom"))) {
+            if ((path = find_dat_file(rom_dir, name, ".rom"))) {
                 file = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
                 mem_loadrom(slot, name, file, 1);
                 al_destroy_path(path);
@@ -216,7 +220,7 @@ void mem_romsetup_master(void) {
     int slot;
 
     osname = get_config_string(sect, "os", models[curmodel].os);
-    if ((path = find_dat_file("roms", "os", osname, ".rom"))) {
+    if ((path = find_dat_file(os_dir, osname, ".rom"))) {
         cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
         if ((f = fopen(cpath, "rb"))) {
             if (fread(os, ROM_SIZE, 1, f) == 1) {
