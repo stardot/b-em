@@ -810,14 +810,14 @@ void video_poll(int clocks, int timer_enable)
         if (!(ula_ctrl & 0x10) && !oddclock)
             continue;
 
-        if (hc == crtc[1]) {
+        if (hc == crtc[1]) { // reached horizontal displayed count.
             if (ula_ctrl & 2 && dispen)
                 charsleft = 3;
             else
                 charsleft = 0;
             dispen = 0;
         }
-        if (hc == crtc[2]) {
+        if (hc == crtc[2]) { // reached horizontal sync position.
             if (ula_ctrl & 0x10)
                 scrx = 128 - ((crtc[3] & 15) * 4);
             else
@@ -833,6 +833,8 @@ void video_poll(int clocks, int timer_enable)
             scry = (scry << 1) + interlline;
         if (vid_linedbl)
             scry <<= 1;
+        if (dispen && (vc > crtc[6] || hc > crtc[1]))
+            dispen = 0;
         if (dispen) {
             if (!((ma ^ (crtc[15] | (crtc[14] << 8))) & 0x3FFF) && con)
                 cdraw = cdrawlook[crtc[8] >> 6];
@@ -1093,11 +1095,10 @@ void video_poll(int clocks, int timer_enable)
                 if (oldvc == crtc[4]) {
                     vc = 0;
                     vadj = crtc[5];
-                    if (!vadj)
+                    if (!vadj) {
                         vdispen = 1;
-                    if (!vadj)
                         ma = maback = (crtc[13] | (crtc[12] << 8)) & 0x3FFF;
-
+                    }
                     frcount++;
                     if (!(crtc[10] & 0x60))
                         cursoron = 1;
