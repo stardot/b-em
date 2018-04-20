@@ -18,17 +18,22 @@ static ALLEGRO_SAMPLE *motorsmp[3];
 static ALLEGRO_SAMPLE_ID seek_smp_id;
 static ALLEGRO_SAMPLE_ID motor_smp_id;
 
+static const char ddnoise[] = "ddnoise";
+
 ALLEGRO_SAMPLE *find_load_wav(const char *subdir, const char *name)
 {
+    ALLEGRO_PATH *path;
     ALLEGRO_SAMPLE *smp;
-    char path[PATH_MAX];
+    const char *cpath;
 
-    if (find_dat_file(path, sizeof path, subdir, name, "wav")) {
-        if ((smp = al_load_sample(path))) {
-            log_debug("ddnoise: loaded %s from %s", name, path);
+    if ((path = find_dat_file(ddnoise, subdir, name, ".wav"))) {
+        cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+        if ((smp = al_load_sample(cpath))) {
+            log_debug("ddnoise: loaded %s from %s", name, cpath);
             return smp;
         }
-        log_error("ddnoise: unable to load %s from %s", name, path);
+        log_error("ddnoise: unable to load %s from %s", name, cpath);
+        al_destroy_path(path);
     }
     return NULL;
 }
@@ -38,8 +43,8 @@ void ddnoise_init(void)
     const char *subdir;
     static ALLEGRO_SAMPLE *smp;
 
-    if (ddnoise_type) subdir = "ddnoise/35";
-    else              subdir = "ddnoise/525";
+    if (ddnoise_type) subdir = "35";
+    else              subdir = "525";
 
     if ((smp = find_load_wav(subdir, "stepo"))) {
         seeksmp[0][0] = smp;

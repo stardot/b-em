@@ -29,9 +29,9 @@
 
 #define VERSION_STR "B-em v-" VERSION
 
-extern bool find_dat_file(char *path, size_t psize, const char *subdir, const char *name, const char *ext);
-extern bool find_cfg_file(char *path, size_t psize, const char *name, const char *ext);
-extern bool find_cfg_dest(char *path, size_t psize, const char *name, const char *ext);
+extern ALLEGRO_PATH *find_dat_file(const char *subdir1, const char *subdir2, const char *name, const char *ext);
+extern ALLEGRO_PATH *find_cfg_file(const char *name, const char *ext);
+extern ALLEGRO_PATH *find_cfg_dest(const char *name, const char *ext);
 
 extern int joybutton[2];
 extern float joyaxes[4];

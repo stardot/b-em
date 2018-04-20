@@ -79,14 +79,18 @@ const char *get_config_string(const char *sect, const char *key, const char *sva
 
 void config_load(void)
 {
+    ALLEGRO_PATH *path;
+    const char *cpath, *p;
+    char s[16];
     int c;
-    char s[PATH_MAX];
-    const char *p;
-    if (find_cfg_file(s, sizeof s, "b-em", "cfg")) {
+
+    if ((path = find_cfg_file("b-em", ".cfg"))) {
+        cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
         if (bem_cfg)
             al_destroy_config(bem_cfg);
-        if (!(bem_cfg = al_load_config_file(s)))
-            log_warn("config: unable to load confif file '%s', using defaults", s);
+        if (!(bem_cfg = al_load_config_file(cpath)))
+            log_warn("config: unable to load config file '%s', using defaults", cpath);
+        al_destroy_path(path);
     } else
         log_warn("config: no config file found, using defaults");
 
@@ -181,13 +185,17 @@ void set_config_string(const char *sect, const char *key, const char *value)
 
 void config_save(void)
 {
+    ALLEGRO_PATH *path;
+    const char *cpath;
+    char t[20];
     int c;
-    char s[PATH_MAX], t[20];
 
-    if (find_cfg_dest(s, sizeof s, "b-em", "cfg")) {
+    if ((path = find_cfg_dest("b-em", ".cfg"))) {
+        cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
         if (!bem_cfg) {
             if (!(bem_cfg = al_create_config())) {
                 log_error("config: unable to save configuration");
+                al_destroy_path(path);
                 return;
             }
         }
@@ -243,8 +251,9 @@ void config_save(void)
                 set_config_int("user_keyboard", t, keylookup[c]);
         }
         midi_save_config();
-        log_debug("config: saving config to %s", s);
-        al_save_config_file(s, bem_cfg);
+        log_debug("config: saving config to %s", cpath);
+        al_save_config_file(cpath, bem_cfg);
+        al_destroy_path(path);
     } else
         log_error("config: no suitable destination for config file - config will not be saved");
 }

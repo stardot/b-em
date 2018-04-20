@@ -31,19 +31,24 @@ void ide_close()
 
 static void ide_open_hd(int i, const char *name) {
     FILE *f;
-    char s[PATH_MAX];
+    ALLEGRO_PATH *path;
+    const char *cpath;
 
     if (!hdfile[i]) {
-        if (find_cfg_file(s, sizeof s, name, "hdf")) {
-            if ((f = fopen(s, "rb+")))
+        if ((path = find_cfg_file(name, ".hdf"))) {
+            cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+            if ((f = fopen(cpath, "rb+")))
                 hdfile[i] = f;
             else
-                log_error("ide: unable to open hard disk file %s: %s", s, strerror(errno));
-        } else if (find_cfg_dest(s, sizeof s, name, "hdf")) {
-            if ((f = fopen(s, "wb+")))
+                log_error("ide: unable to open hard disk file %s: %s", cpath, strerror(errno));
+            al_destroy_path(path);
+        } else if ((path = find_cfg_dest(name, ".hdf"))) {
+            cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+            if ((f = fopen(cpath, "wb+")))
                 hdfile[i] = f;
             else
-                log_error("ide: unable to open hard disk file %s: %s", s, strerror(errno));
+                log_error("ide: unable to open hard disk file %s: %s", cpath, strerror(errno));
+            al_destroy_path(path);
         }
     }
 }

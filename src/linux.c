@@ -17,82 +17,181 @@
 
 void setejecttext(int drive, const char *fn) {};
 
-static bool try_file(char *path, size_t psize, const char *fmt, ...) {
-    va_list ap;
+static bool try_dat_file(ALLEGRO_PATH *path, const char *subdir1, const char *subdir2, const char *name, const char *ext)
+{
+    const char *cpath;
 
-    va_start(ap, fmt);
-    vsnprintf(path, psize, fmt, ap);
-    va_end(ap);
-    log_debug("linux: trying file %s", path);
-    return access(path, R_OK) == 0;
+    al_append_path_component(path, "b-em");
+    if (subdir1)
+        al_append_path_component(path, subdir1);
+    if (subdir2)
+        al_append_path_component(path, subdir2);
+    al_set_path_filename(path, name);
+    al_set_path_extension(path, ext);
+    cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+    log_debug("linux: looking for dat file %s at %s", name, cpath);
+    return access(cpath, R_OK) == 0;
 }
 
-bool find_dat_file(char *path, size_t psize, const char *subdir, const char *name, const char *ext) {
-    const char *var, *ptr, *sep;
+ALLEGRO_PATH *find_dat_file(const char *subdir1, const char *subdir2, const char *name, const char *ext)
+{
+    ALLEGRO_PATH *path;
+    const char *var;
+    char *cpy, *ptr, *sep;
 
-    if (try_file(path, psize, "%s/%s.%s", subdir, name, ext))
-        return true;
+    if ((path = al_get_standard_path(ALLEGRO_RESOURCES_PATH))) {
+        if (try_dat_file(path, subdir1, subdir2, name, ext))
+            return path;
+        al_destroy_path(path);
+    }
     if ((var = getenv("XDG_DATA_HOME"))) {
-        if (try_file(path, psize, "%s/b-em/%s/%s.%s", var, subdir, name, ext))
-            return true;
-    } else if ((var = getenv("HOME"))) {
-        if (try_file(path, psize, "%s/.local/share/b-em/%s/%s.%s", var, subdir, name, ext))
-            return true;
+        if ((path = al_create_path_for_directory(var))) {
+            if (try_dat_file(path, subdir1, subdir2, name, ext))
+                return path;
+            al_destroy_path(path);
+        }
+    }
+    if ((var = getenv("HOME"))) {
+        if ((path = al_create_path_for_directory(var))) {
+            al_append_path_component(path, ".local");
+            al_append_path_component(path, "share");
+            if (try_dat_file(path, subdir1, subdir2, name, ext))
+                return path;
+            al_destroy_path(path);
+        }
     }
     if ((var = getenv("XDG_DATA_DIRS")) == NULL)
         var = "/usr/local/share:/usr/share";
-    for (ptr = var; (sep = strchr(ptr, ':')); ptr = sep+1)
-        if (try_file(path, psize, "%.*s/b-em/%s/%s.%s", (int)(sep-ptr), ptr, subdir, name, ext))
-            return true;
-    return try_file(path, psize, "%s/b-em/%s/%s.%s", ptr, subdir, name, ext);
-}
-
-bool find_cfg_file(char *path, size_t psize, const char *name, const char *ext) {
-    const char *var, *ptr, *sep;
-
-    if ((var = getenv("XDG_CONFIG_HOME")))
-        if (try_file(path, psize, "%s/b-em/%s.%s", var, name, ext))
-            return true;
-    if ((var = getenv("HOME")))
-        if (try_file(path, psize, "%s/.config/b-em/%s.%s", var, name, ext))
-            return true;
-    if ((var = getenv("XDG_CONFIG_DIRS"))) {
-        for (ptr = var; (sep = strchr(ptr, ':')); ptr = sep+1)
-            if (try_file(path, psize, "%.*s/b-em/%s.%s", (int)(sep-ptr), ptr, name, ext))
-                return true;
-    }
-    if ((var = getenv("XDG_DATA_HOME")))
-        if (try_file(path, psize, "%s/b-em/%s.%s", var, name, ext))
-            return true;
-    if ((var = getenv("XDG_DATA_DIRS")) == NULL)
-        var = "/usr/local/share:/usr/share";
-    for (ptr = var; (sep = strchr(ptr, ':')); ptr = sep+1)
-        if (try_file(path, psize, "%.*s/b-em/%s.%s", (int)(sep-ptr), ptr, name, ext))
-            return true;
-    return try_file(path, psize, "%s/b-em/%s.%s", ptr, name, ext);
-}
-
-static int try_dest(char *path, size_t psize, const char *name, const char *ext, const char *fmt, ...) {
-    va_list ap;
-    size_t len;
-    struct stat stb;
-    char *npath;
-
-    va_start(ap, fmt);
-    len = vsnprintf(path, psize, fmt, ap);
-    va_end(ap);
-    if (len < psize) {
-        log_debug("linux: trying dest dir %s", path);
-        psize -= len;
-        npath = path + len;
-        if (stat(path, &stb) == 0) {
-            if ((stb.st_mode & S_IFMT) == S_IFDIR) {
-                snprintf(npath, psize, "/%s.%s", name, ext);
-                return true;
+    if ((cpy = strdup(var))) {
+        for (ptr = cpy; (sep = strchr(ptr, ':')); ptr = sep) {
+            *sep++ = '\0';
+            if ((path = al_create_path_for_directory(ptr))) {
+                if (try_dat_file(path, subdir1, subdir2, name, ext)) {
+                    free(cpy);
+                    return path;
+                }
+                al_destroy_path(path);
             }
-        } else if (errno == ENOENT) {
-            if (mkdir(path, 0777) == 0) {
-                snprintf(npath, psize, "/%s.%s", name, ext);
+        }
+        path = al_create_path_for_directory(ptr);
+        free(cpy);
+        if (path) {
+            if (try_dat_file(path, subdir1, subdir2, name, ext))
+                return path;
+            al_destroy_path(path);
+        }
+    }
+    return NULL;
+}
+
+static bool try_cfg_file(ALLEGRO_PATH *path, const char *name, const char *ext)
+{
+    const char *cpath;
+
+    al_append_path_component(path, "b-em");
+    al_set_path_filename(path, name);
+    al_set_path_extension(path, ext);
+    cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+    log_debug("linux: looking for cfg file %s at %s", name, cpath);
+    return access(cpath, R_OK) == 0;
+}
+
+ALLEGRO_PATH *find_cfg_file(const char *name, const char *ext) {
+    ALLEGRO_PATH *path;
+    const char *var;
+    char *cpy, *ptr, *sep;
+
+    if ((var = getenv("XDG_CONFIG_HOME"))) {
+        if ((path = al_create_path_for_directory(var))) {
+            if (try_cfg_file(path, name, ext))
+                return path;
+            al_destroy_path(path);
+        }
+    }
+    if ((var = getenv("HOME"))) {
+        if ((path = al_create_path_for_directory(var))) {
+            al_append_path_component(path, ".config");
+            if (try_cfg_file(path, name, ext))
+                return path;
+            al_destroy_path(path);
+        }
+    }
+    if ((var = getenv("XDG_CONFIG_DIRS"))) {
+        if ((cpy = strdup(var))) {
+            for (ptr = cpy; (sep = strchr(ptr, ':')); ptr = sep) {
+                *sep++ = '\0';
+                if ((path = al_create_path_for_directory(ptr))) {
+                    if (try_cfg_file(path, name, ext)) {
+                        free(cpy);
+                        return path;
+                    }
+                    al_destroy_path(path);
+                }
+            }
+            path = al_create_path_for_directory(ptr);
+            free(cpy);
+            if (path) {
+                if (try_cfg_file(path, name, ext))
+                    return path;
+                al_destroy_path(path);
+            }
+        }
+    }
+    if ((path = al_get_standard_path(ALLEGRO_RESOURCES_PATH))) {
+        if (try_cfg_file(path, name, ext))
+            return path;
+        al_destroy_path(path);
+    }
+    if ((var = getenv("XDG_DATA_HOME"))) {
+        al_append_path_component(path, ".config");
+        if ((path = al_create_path_for_directory(var))) {
+            if (try_cfg_file(path, name, ext))
+                return path;
+            al_destroy_path(path);
+        }
+    }
+    if ((var = getenv("XDG_DATA_DIRS")) == NULL)
+        var = "/usr/local/share:/usr/share";
+    if ((cpy = strdup(var))) {
+        for (ptr = cpy; (sep = strchr(ptr, ':')); ptr = sep) {
+            *sep++ = '\0';
+            if ((path = al_create_path_for_directory(ptr))) {
+                if (try_cfg_file(path, name, ext)) {
+                    free(cpy);
+                    return path;
+                }
+                al_destroy_path(path);
+            }
+        }
+        path = al_create_path_for_directory(ptr);
+        free(cpy);
+        if (path) {
+            if (try_cfg_file(path, name, ext))
+                return path;
+            al_destroy_path(path);
+        }
+    }
+    return NULL;
+}
+
+static bool try_cfg_dest(ALLEGRO_PATH *path, const char *name, const char *ext)
+{
+    const char *cpath;
+    struct stat stb;
+
+    al_append_path_component(path, "b-em");
+    cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+    log_debug("linux: trying cfg dest dir %s", cpath);
+    if (stat(cpath, &stb) == 0) {
+        if ((stb.st_mode & S_IFMT) == S_IFDIR) {
+            al_set_path_filename(path, name);
+            al_set_path_extension(path, ext);
+            return true;
+        }
+        else if (errno == ENOENT) {
+            if (mkdir(cpath, 0777) == 0) {
+                al_set_path_filename(path, name);
+                al_set_path_extension(path, ext);
                 return true;
             }
         }
@@ -100,15 +199,26 @@ static int try_dest(char *path, size_t psize, const char *name, const char *ext,
     return false;
 }
 
-bool find_cfg_dest(char *path, size_t psize, const char *name, const char *ext) {
+ALLEGRO_PATH *find_cfg_dest(const char *name, const char *ext)
+{
+    ALLEGRO_PATH *path;
     const char *var;
 
-    if ((var = getenv("XDG_CONFIG_HOME")))
-        if (try_dest(path, psize, name, ext, "%s/b-em", var))
-            return true;
-    if ((var = getenv("HOME")))
-        if (try_dest(path, psize, name, ext, "%s/.config/b-em", var))
-            return true;
+    if ((var = getenv("XDG_CONFIG_HOME"))) {
+        if ((path = al_create_path_for_directory(var))) {
+            if (try_cfg_dest(path, name, ext))
+                return path;
+            al_destroy_path(path);
+        }
+    }
+    if ((var = getenv("HOME"))) {
+        if ((path = al_create_path_for_directory(var))) {
+            al_append_path_component(path, ".config");
+            if (try_cfg_dest(path, name, ext))
+                return path;
+            al_destroy_path(path);
+        }
+    }
     return false;
 }
 

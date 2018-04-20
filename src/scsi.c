@@ -815,15 +815,18 @@ static void scsi_init_lun(int lun)
 {
         int size, cyl;
         FILE *dat, *dsc;
-        char name[50], geom[22], path[PATH_MAX];
+        char name[50], geom[22];
+        ALLEGRO_PATH *path;
+        const char *cpath;
 
         SCSISize[lun] = 0;
         snprintf(name, sizeof(name), "scsi/scsi%d", lun);
-        if (find_cfg_file(path, sizeof path, name, "dat")) {
-            if ((dat = fopen(path, "rb+")))
-            {
-                strcpy(strrchr(path, '.'), ".dsc");
-                if ((dsc = fopen(path, "rb+")))
+        if ((path = find_cfg_file(name, ".dat"))) {
+            cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+            if ((dat = fopen(cpath, "rb+"))) {
+                al_set_path_extension(path, ".dsc");
+                cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+                if ((dsc = fopen(cpath, "rb+")))
                 {
                         if (fread(geom, sizeof geom, 1, dsc) == 1)
                         {
@@ -838,7 +841,7 @@ static void scsi_init_lun(int lun)
                         fclose(dsc);
                 }
                 else
-                        log_warn("scsi lun %d: unable to open dsc file %s: %s", lun, path, strerror(errno));
+                        log_warn("scsi lun %d: unable to open dsc file %s: %s", lun, cpath, strerror(errno));
                 if (SCSISize[lun] == 0)
                 {
                         SCSISize[lun] = size = fseek(dat, 0, SEEK_END);
@@ -856,7 +859,8 @@ static void scsi_init_lun(int lun)
                 SCSIDisc[lun] = dat;
             }
             else
-                log_error("scsi lun %d: unable to open data file %s: %s", lun, path, strerror(errno));
+                log_error("scsi lun %d: unable to open data file %s: %s", lun, cpath, strerror(errno));
+            al_destroy_path(path);
         } else
             log_warn("scsi lun %d: no disc file %s found", lun, name);
 }

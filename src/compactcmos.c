@@ -35,39 +35,46 @@ static uint8_t cmos_ram[256];
 
 void compactcmos_load(MODEL m) {
     FILE *cmosf;
-    char fn[PATH_MAX];
-    const char *msg;
+    ALLEGRO_PATH *path;
+    const char *cpath;
 
-    if (find_cfg_file(fn, sizeof fn, m.cmos, "bin")) {
-        if ((cmosf = fopen(fn, "rb"))) {
+    if ((path = find_cfg_file(m.cmos, ".bin"))) {
+        cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+        if ((cmosf = fopen(cpath, "rb"))) {
             fread(cmos_ram, 128, 1, cmosf);
             fclose(cmosf);
-            log_debug("compactcmos: loaded from %s", fn);
-            return;
-        } else
-            msg = strerror(errno);
-    } else
-        msg = "file not found";
-    log_error("compactcmos: unable to load CMOS file '%s': %s", fn, msg);
-    memset(cmos_ram, 0, 128);
+            log_debug("compactcmos: loaded from %s", cpath);
+        }
+        else {
+            log_warn("compactcmos: unable to load CMOS file '%s': %s", cpath, strerror(errno));
+            memset(cmos_ram, 0, 128);
+        }
+        al_destroy_path(path);
+    }
+    else {
+        log_error("compactcmos: unable to find CMOS file %s", m.cmos);
+        memset(cmos_ram, 0, 128);
+    }
 }
 
 void compactcmos_save(MODEL m) {
     FILE *cmosf;
-    char fn[PATH_MAX];
-    const char *msg;
+    ALLEGRO_PATH *path;
+    const char *cpath;
 
-    if (find_cfg_dest(fn, sizeof fn, m.cmos, "bin")) {
-        if ((cmosf = fopen(fn, "wb"))) {
-            log_debug("compactcmos: saving to %s", fn);
+    if ((path = find_cfg_dest(m.cmos, ".bin"))) {
+        cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+        if ((cmosf = fopen(cpath, "wb"))) {
+            log_debug("compactcmos: saving to %s", cpath);
             fwrite(cmos_ram, 128, 1, cmosf);
             fclose(cmosf);
-            return;
-        } else
-            msg = strerror(errno);
-    } else
-        msg = "no suitable destination";
-    log_error("compactcmos: unable to save CMOS file '%s': %s", fn, msg);
+        }
+        else
+            log_error("compactcmos: unable to save CMOS file '%s': %s", cpath, strerror(errno));
+        al_destroy_path(path);
+    }
+    else
+        log_error("compactcmos: unable to save CMOS file %s: no suitable destination", m.cmos);
 }
 
 static void cmos_stop()

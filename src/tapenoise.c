@@ -34,8 +34,8 @@ void tapenoise_init(ALLEGRO_EVENT_QUEUE *queue)
             if (al_attach_mixer_to_voice(mixer, voice)) {
                 if ((stream = al_create_audio_stream(4, BUFLEN_DD, FREQ_DD, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_1))) {
                     if (al_attach_audio_stream_to_mixer(stream, mixer)) {
-                        tsamples[0] = find_load_wav("ddnoise", "motoron");
-                        tsamples[1] = find_load_wav("ddnoise", "motoroff");
+                        tsamples[0] = find_load_wav(NULL, "motoron");
+                        tsamples[1] = find_load_wav(NULL, "motoroff");
                         for (c = 0; c < 32; c++)
                             sinewave[c] = (int)(sin((float)c * ((2.0 * PI) / 32.0)) * 128.0);
                     } else
@@ -49,7 +49,7 @@ void tapenoise_init(ALLEGRO_EVENT_QUEUE *queue)
     } else
         log_error("sound: unable to create voice for for tape noise");
 }
-                    
+
 void tapenoise_close()
 {
     ALLEGRO_SAMPLE *smp;
@@ -91,7 +91,7 @@ static void add_high(void)
         swavepos += wavediv;
     }
 }
-    
+
 void tapenoise_addhigh(void)
 {
     if (sound_tape)

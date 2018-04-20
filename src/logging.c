@@ -188,13 +188,13 @@ static int contains(const char *haystack, const char *needle)
 
 static void log_open_file(void) {
     const char *log_fn;
-    char path[PATH_MAX];
+    ALLEGRO_PATH *path = NULL;
     int append;
 
     log_fn = get_config_string(log_section, "log_filename", NULL);
     if (!log_fn) {
-        if (find_cfg_dest(path, sizeof path, log_default_fn, "txt"))
-            log_fn = path;
+        if ((path = find_cfg_dest(log_default_fn, ".txt")))
+            log_fn = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
         else
             log_warn("log_open: unable to find suitable destination for log file");
     }
@@ -203,6 +203,8 @@ static void log_open_file(void) {
         if ((log_fp = fopen(log_fn, append ? "at" : "wt")) == NULL)
             log_warn("log_open: unable to open log %s: %s", log_fn, strerror(errno));
     }
+    if (path)
+        al_destroy_path(path);
 }
 
 void log_open(void)

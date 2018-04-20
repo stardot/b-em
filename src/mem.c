@@ -64,19 +64,24 @@ void mem_dump(void) {
 }
 
 static void load_os_rom(const char *sect) {
-    const char *osname;
+    const char *osname, *cpath;
     FILE *f;
-    char path[PATH_MAX];
+    ALLEGRO_PATH *path;
 
     osname = get_config_string(sect, "os", models[curmodel].os);
-    if (find_dat_file(path, sizeof path, "roms/os", osname, "rom")) {
-        if ((f = fopen(path, "rb"))) {
+    if ((path = find_dat_file("roms", "os", osname, ".rom"))) {
+        cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+        if ((f = fopen(cpath, "rb"))) {
             fread(os, ROM_SIZE, 1, f);
             fclose(f);
-            log_debug("mem: OS %s loaded from %s", osname, path);
+            log_debug("mem: OS %s loaded from %s", osname, cpath);
+            al_destroy_path(path);
             return;
-        } else
-            log_fatal("mem: unable to load OS %s, unable to open %s: %s", osname, path, strerror(errno));
+        }
+        else {
+            log_fatal("mem: unable to load OS %s, unable to open %s: %s", osname, cpath, strerror(errno));
+            al_destroy_path(path);
+        }
     } else
         log_fatal("mem: unable to find OS %s", osname);
     exit(1);
@@ -120,14 +125,17 @@ static int is_relative_filename(const char *fn)
 
 static void cfg_load_rom(int slot, const char *sect) {
     const char *key, *name, *file;
-    char path[PATH_MAX];
+    ALLEGRO_PATH *path;
 
     key = slotkeys[slot];
     name = al_get_config_value(bem_cfg, sect, key);
     if (name != NULL && *name != '\0') {
         if (is_relative_filename(name)) {
-            if (find_dat_file(path, sizeof path, "roms/general", name, "rom"))
-                mem_loadrom(slot, name, path, 1);
+            if ((path = find_dat_file("roms", "general", name, ".rom"))) {
+                file = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+                mem_loadrom(slot, name, file, 1);
+                al_destroy_path(path);
+            }
             else
                 log_warn("mem: unable to load ROM slot %02d with %s, ROM file not found", slot, name);
         } else {
@@ -202,17 +210,19 @@ void mem_romsetup_bp128(void) {
 
 void mem_romsetup_master(void) {
     const char *sect = models[curmodel].cfgsect;
-    const char *osname;
+    const char *osname, *cpath;
     FILE *f;
-    char path[PATH_MAX];
+    ALLEGRO_PATH *path;
     int slot;
 
     osname = get_config_string(sect, "os", models[curmodel].os);
-    if (find_dat_file(path, sizeof path, "roms/os", osname, "rom")) {
-        if ((f = fopen(path, "rb"))) {
+    if ((path = find_dat_file("roms", "os", osname, ".rom"))) {
+        cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+        if ((f = fopen(cpath, "rb"))) {
             if (fread(os, ROM_SIZE, 1, f) == 1) {
                 if (fread(rom + (9 * ROM_SIZE), 7 * ROM_SIZE, 1, f) == 1) {
                     fclose(f);
+                    al_destroy_path(path);
                     for (slot = ROM_NSLOT-1; slot >= 9; slot--) {
                         rom_slots[slot].swram = 0;
                         rom_slots[slot].locked = 1;
@@ -232,7 +242,8 @@ void mem_romsetup_master(void) {
             log_fatal("mem: unable to read complete OS ROM %s: %s", osname, strerror(errno));
             fclose(f);
         } else
-            log_fatal("mem: unable to load OS %s, unable to open %s: %s", osname, path, strerror(errno));
+            log_fatal("mem: unable to load OS %s, unable to open %s: %s", osname, cpath, strerror(errno));
+        al_destroy_path(path);
     } else
         log_fatal("mem: unable to find OS %s", osname);
     exit(1);

@@ -8,33 +8,67 @@
 #ifdef WIN32
 #include "b-em.h"
 
-static bool win_file_exists(const char *szPath) {
-    DWORD dwAttrib = GetFileAttributes(szPath);
+static bool win_file_exists(ALLEGRO_PATH *path, const char *name, const char *ext) {
+    const char *cpath;
+    DWORD dwAttrib;
 
-    return (dwAttrib != INVALID_FILE_ATTRIBUTES &&
-            !(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+    al_set_path_filename(path, name);
+    al_set_path_extension(path, ext);
+    cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+    dwAttrib = GetFileAttributes(cpath);
+    if (dwAttrib != INVALID_FILE_ATTRIBUTES && !(dwAttrib & FILE_ATTRIBUTE_DIRECTORY)) {
+        log_debug("win: %s found at '%s'", name, cpath);
+        return true;
+    }
+    else {
+        log_debug("win: %s not found at '%s'", name, cpath);
+        return false;
+    }
 }
 
-bool find_dat_file(char *path, size_t psize, const char *subdir, const char *name, const char *ext) {
-    ALLEGRO_PATH *respath = al_get_standard_path(ALLEGRO_RESOURCES_PATH);
-    const char *cpath = al_path_cstr(respath, ALLEGRO_NATIVE_PATH_SEP);
-    snprintf(path, psize, "%s/%s/%s.%s", cpath, subdir, name, ext);
-    return win_file_exists(path);
+ALLEGRO_PATH *find_dat_file(const char *subdir1, const char *subdir2, const char *name, const char *ext) {
+    ALLEGRO_PATH *path;
+
+    if ((path = al_get_standard_path(ALLEGRO_RESOURCES_PATH))) {
+        if (subdir1)
+            al_append_path_component(path, subdir1);
+        if (subdir2)
+            al_append_path_component(path, subdir2);
+        if (win_file_exists(path, name, ext))
+            return path;
+        al_destroy_path(path);
+    }
+    return NULL;
 }
 
-bool find_cfg_file(char *path, size_t psize, const char *name, const char *ext) {
-    ALLEGRO_PATH *setpath = al_get_standard_path(ALLEGRO_USER_SETTINGS_PATH);
-    const char *cpath = al_path_cstr(setpath, ALLEGRO_NATIVE_PATH_SEP);
-    snprintf(path, psize, "%s/%s.%s", cpath, name, ext);
-    return win_file_exists(path);
+ALLEGRO_PATH *find_cfg_file(const char *name, const char *ext) {
+    ALLEGRO_PATH *path;
+
+    if ((path = al_get_standard_path(ALLEGRO_USER_SETTINGS_PATH))) {
+        if (win_file_exists(path, name, ext))
+            return path;
+        al_destroy_path(path);
+    }
+    if ((path = al_get_standard_path(ALLEGRO_RESOURCES_PATH))) {
+        if (win_file_exists(path, name, ext))
+            return path;
+        al_destroy_path(path);
+    }
+    return NULL;
 }
 
-bool find_cfg_dest(char *path, size_t psize, const char *name, const char *ext) {
-    ALLEGRO_PATH *setpath = al_get_standard_path(ALLEGRO_USER_SETTINGS_PATH);
-    const char *cpath = al_path_cstr(setpath, ALLEGRO_NATIVE_PATH_SEP);
-    CreateDirectory(cpath, NULL);
-    snprintf(path, psize, "%s/%s.%s", cpath, name, ext);
-    return true;
+ALLEGRO_PATH *find_cfg_dest(const char *name, const char *ext) {
+    ALLEGRO_PATH *path;
+    const char *cpath;
+
+    if ((path = al_get_standard_path(ALLEGRO_USER_SETTINGS_PATH))) {
+        cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+        CreateDirectory(cpath, NULL);
+        al_set_path_filename(path, name);
+        al_set_path_extension(path, ext);
+        return path;
+    }
+    return NULL;
 }
 
 #endif
