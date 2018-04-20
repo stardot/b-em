@@ -32,6 +32,7 @@ int crtc_i;
 
 int hc, vc, sc, vadj;
 uint16_t ma, maback;
+int vdispen, dispen;
 
 void crtc_reset()
 {
@@ -44,8 +45,11 @@ void crtc_write(uint16_t addr, uint8_t val)
 //        log_debug("Write CRTC %04X %02X %04X\n",addr,val,pc);
     if (!(addr & 1))
         crtc_i = val & 31;
-    else
+    else {
         crtc[crtc_i] = val & crtc_mask[crtc_i];
+        if (crtc_i == 6 && vc >= val)
+            vdispen = 0;
+    }
 }
 
 uint8_t crtc_read(uint16_t addr)
@@ -679,7 +683,6 @@ int con, cdraw, coff;
 int cursoron;
 int frcount;
 int charsleft;
-int vdispen, dispen;
 
 int vidclocks = 0;
 int oddclock = 0;
@@ -810,8 +813,8 @@ void video_poll(int clocks, int timer_enable)
         if (!(ula_ctrl & 0x10) && !oddclock)
             continue;
 
-        if (hc == crtc[1]) { // reached horizontal displayed count.
-            if (ula_ctrl & 2 && dispen)
+        if (hc >= crtc[1]) { // reached horizontal displayed count.
+            if (dispen && ula_ctrl & 2)
                 charsleft = 3;
             else
                 charsleft = 0;
@@ -833,8 +836,6 @@ void video_poll(int clocks, int timer_enable)
             scry = (scry << 1) + interlline;
         if (vid_linedbl)
             scry <<= 1;
-        if (dispen && (vc > crtc[6] || hc > crtc[1]))
-            dispen = 0;
         if (dispen) {
             if (!((ma ^ (crtc[15] | (crtc[14] << 8))) & 0x3FFF) && con)
                 cdraw = cdrawlook[crtc[8] >> 6];
