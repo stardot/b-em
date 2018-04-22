@@ -141,7 +141,7 @@ ALLEGRO_PATH *find_cfg_file(const char *name, const char *ext) {
         }
     }
     if ((path = al_get_standard_path(ALLEGRO_RESOURCES_PATH))) {
-        if (try_cfg_file(path, name, ext))
+        if (try_file(path, name, ext))
             return path;
         al_destroy_path(path);
     }
