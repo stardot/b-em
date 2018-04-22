@@ -37,7 +37,6 @@ extern int scr_x_start, scr_x_size, scr_y_start, scr_y_size;
 extern int winsizex, winsizey;
 
 extern int fullscreen;
-extern int dcol;
 
 extern bool vid_linedbl, vid_interlace, vid_scanlines, vid_pal;
 extern int vid_fskipmax, vid_fullborders;

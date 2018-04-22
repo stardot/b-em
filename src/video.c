@@ -18,21 +18,23 @@
 
 int fullscreen = 0;
 
-int scrx, scry;
+static int scrx, scry;
 int interlline = 0;
 
-int colblack;
-int colwhite;
+static int colblack;
+static int colwhite;
 
 /*6845 CRTC*/
 uint8_t crtc[32];
-static uint8_t crtc_mask[32] = { 0xFF, 0xFF, 0xFF, 0xFF, 0x7F, 0x1F, 0x7F, 0x7F, 0xF3, 0x1F, 0x7F, 0x1F, 0x3F, 0xFF, 0x3F, 0xFF, 0x3F, 0xFF };
+static const uint8_t crtc_mask[32] = { 0xFF, 0xFF, 0xFF, 0xFF, 0x7F, 0x1F, 0x7F, 0x7F, 0xF3, 0x1F, 0x7F, 0x1F, 0x3F, 0xFF, 0x3F, 0xFF, 0x3F, 0xFF };
 
 int crtc_i;
 
-int hc, vc, sc, vadj;
-uint16_t ma, maback;
-int vdispen, dispen;
+int hc, vc, sc;
+static int vadj;
+uint16_t ma;
+static uint16_t maback;
+static int vdispen, dispen;
 
 void crtc_reset()
 {
@@ -674,31 +676,29 @@ static inline void mode7_render(ALLEGRO_LOCKED_REGION *region, uint8_t dat)
 }
 
 uint16_t vidbank;
-int screenlen[4] = { 0x4000, 0x5000, 0x2000, 0x2800 };
+static const int screenlen[4] = { 0x4000, 0x5000, 0x2000, 0x2800 };
 
-int vsynctime;
-int interline;
-int hvblcount;
-int frameodd;
-int con, cdraw, coff;
-int cursoron;
-int frcount;
-int charsleft;
+static int vsynctime;
+static int interline;
+static int hvblcount;
+static int frameodd;
+static int con, cdraw, coff;
+static int cursoron;
+static int frcount;
+static int charsleft;
 
-int vidclocks = 0;
-int oddclock = 0;
-int vidbytes = 0;
+static int vidclocks = 0;
+static int oddclock = 0;
+static int vidbytes = 0;
 
-int oldr8;
+static int oldr8;
 
 int firstx, firsty, lastx, lasty;
 
 int desktop_width, desktop_height;
 
-ALLEGRO_DISPLAY *display;
+static ALLEGRO_DISPLAY *display;
 ALLEGRO_BITMAP *b, *b16, *b32;
-
-int dcol;
 
 ALLEGRO_LOCKED_REGION *region;
 
