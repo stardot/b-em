@@ -46,8 +46,9 @@ void crtc_write(uint16_t addr, uint8_t val)
     if (!(addr & 1))
         crtc_i = val & 31;
     else {
-        crtc[crtc_i] = val & crtc_mask[crtc_i];
-        if (crtc_i == 6 && vc >= val)
+        val &= crtc_mask[crtc_i];
+        crtc[crtc_i] = val;
+        if (crtc_i == 6 && vc == val)
             vdispen = 0;
     }
 }
