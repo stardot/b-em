@@ -816,7 +816,7 @@ void video_poll(int clocks, int timer_enable)
         if (!(ula_ctrl & 0x10) && !oddclock)
             continue;
 
-        if (hc >= crtc[1]) { // reached horizontal displayed count.
+        if (hc == crtc[1]) { // reached horizontal displayed count.
             if (dispen && ula_ctrl & 2)
                 charsleft = 3;
             else
