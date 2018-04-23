@@ -276,32 +276,37 @@ static void key_update()
     sysvia_set_ca2(0);
 }
 
-static void set_key(int index, int state)
+int key_map(ALLEGRO_EVENT *event)
 {
-    int code;
+    int code = event->keyboard.keycode;
+    if (code < ALLEGRO_KEY_MAX) {
+        if (keyas && code == ALLEGRO_KEY_A)
+            code = ALLEGRO_KEY_CAPSLOCK;
+        code = keylookup[code];
+    }
+    return code;
+}
+
+static void set_key(int code, int state)
+{
     unsigned vkey;
 
-    if (index < ALLEGRO_KEY_MAX) {
-        code = index;
-        if (keyas && index == ALLEGRO_KEY_A)
-            code = ALLEGRO_KEY_CAPSLOCK;
-        vkey = allegro2bbc[keylookup[code]];
-        log_debug("keyboard: code=%d, vkey=%02X", code, vkey);
-        if (vkey != 0xaa) {
-            bbckey[vkey & 15][vkey >> 4] = state;
-            key_update();
-        }
+    vkey = allegro2bbc[code];
+    log_debug("keyboard: code=%d, vkey=%02X", code, vkey);
+    if (vkey != 0xaa) {
+        bbckey[vkey & 15][vkey >> 4] = state;
+        key_update();
     }
 }
 
-void key_down(ALLEGRO_EVENT *event)
+void key_down(int code)
 {
-    set_key(event->keyboard.keycode, 1);
+    set_key(code, 1);
 }
 
-void key_up(ALLEGRO_EVENT *event)
+void key_up(int code)
 {
-    set_key(event->keyboard.keycode, 0);
+    set_key(code, 0);
 }
 
 void key_scan(int row, int col) {

@@ -31,7 +31,7 @@ typedef enum {
     ST_DONE
 } state_t;
 
-#define BBC_NKEY 73
+#define BBC_NKEY 74
 
 static const key_cap_t kcaps_bbc[BBC_NKEY] = {
     {  82,  10,  28,  28, COL_RED,   "F0",     "F0",         ALLEGRO_KEY_F1         },
@@ -44,7 +44,8 @@ static const key_cap_t kcaps_bbc[BBC_NKEY] = {
     { 306,  10,  28,  28, COL_RED,   "F7",     "F7",         ALLEGRO_KEY_F8         },
     { 338,  10,  28,  28, COL_RED,   "F8",     "F8",         ALLEGRO_KEY_F9         },
     { 370,  10,  28,  28, COL_RED,   "F9",     "F9",         ALLEGRO_KEY_F10        },
-    {  10,  42,  28,  28, COL_BLACK, "ESC",    "ESC",        ALLEGRO_KEY_ESCAPE     },
+    { 402,  10,  28,  28, COL_BLACK, "BRK",    "Break",      ALLEGRO_KEY_F12        },
+    {  10,  42,  28,  28, COL_BLACK, "ESC",    "Escape",     ALLEGRO_KEY_ESCAPE     },
     {  42,  42,  28,  28, COL_BLACK, "1",      "1",          ALLEGRO_KEY_1          },
     {  74,  42,  28,  28, COL_BLACK, "2",      "2",          ALLEGRO_KEY_2          },
     { 106,  42,  28,  28, COL_BLACK, "3",      "3",          ALLEGRO_KEY_3          },
@@ -58,9 +59,9 @@ static const key_cap_t kcaps_bbc[BBC_NKEY] = {
     { 362,  42,  28,  28, COL_BLACK, "=",      "=",          ALLEGRO_KEY_MINUS      },
     { 394,  42,  28,  28, COL_BLACK, "^",      "^",          ALLEGRO_KEY_EQUALS     },
     { 426,  42,  28,  28, COL_BLACK, "\\",     "\\",         ALLEGRO_KEY_BACKSLASH2 },
-    { 458,  42,  28,  28, COL_GREY,  "LFT",    "LEFT",       ALLEGRO_KEY_LEFT       },
-    { 490,  42,  28,  28, COL_GREY,  "RGT",    "RIGHT",      ALLEGRO_KEY_RIGHT      },
-    {  10,  74,  44,  28, COL_BLACK, "TAB",    "TAB",        ALLEGRO_KEY_TAB        },
+    { 458,  42,  28,  28, COL_GREY,  "LFT",    "Left",       ALLEGRO_KEY_LEFT       },
+    { 490,  42,  28,  28, COL_GREY,  "RGT",    "Right",      ALLEGRO_KEY_RIGHT      },
+    {  10,  74,  44,  28, COL_BLACK, "TAB",    "Tab",        ALLEGRO_KEY_TAB        },
     {  58,  74,  28,  28, COL_BLACK, "Q",      "Q",          ALLEGRO_KEY_Q          },
     {  90,  74,  28,  28, COL_BLACK, "W",      "W",          ALLEGRO_KEY_W          },
     { 122,  74,  28,  28, COL_BLACK, "E",      "E",          ALLEGRO_KEY_E          },
@@ -74,9 +75,9 @@ static const key_cap_t kcaps_bbc[BBC_NKEY] = {
     { 378,  74,  28,  28, COL_BLACK, "@",      "@",          ALLEGRO_KEY_OPENBRACE  },
     { 410,  74,  28,  28, COL_BLACK, "[",      "[",          ALLEGRO_KEY_CLOSEBRACE },
     { 442,  74,  28,  28, COL_BLACK, "_",      "_",          ALLEGRO_KEY_TILDE      },
-    { 474,  74,  28,  28, COL_GREY,  "UP",     "UP",         ALLEGRO_KEY_UP         },
-    { 506,  74,  28,  28, COL_GREY,  "DWN",    "DOWN",       ALLEGRO_KEY_DOWN       },
-    {  10, 106,  28,  28, COL_BLACK, "CLK",    "CAPS LOCK",  ALLEGRO_KEY_CAPSLOCK   },
+    { 474,  74,  28,  28, COL_GREY,  "UP",     "Up",         ALLEGRO_KEY_UP         },
+    { 506,  74,  28,  28, COL_GREY,  "DWN",    "Down",       ALLEGRO_KEY_DOWN       },
+    {  10, 106,  28,  28, COL_BLACK, "CLK",    "Caps Lock",  ALLEGRO_KEY_CAPSLOCK   },
     {  42, 106,  28,  28, COL_BLACK, "CTL",    "CTRL",       ALLEGRO_KEY_LCTRL      },
     {  74, 106,  28,  28, COL_BLACK, "A",      "A",          ALLEGRO_KEY_A          },
     { 106, 106,  28,  28, COL_BLACK, "S",      "S",          ALLEGRO_KEY_S          },
@@ -90,9 +91,9 @@ static const key_cap_t kcaps_bbc[BBC_NKEY] = {
     { 362, 106,  28,  28, COL_BLACK, ";",      ";",          ALLEGRO_KEY_SEMICOLON  },
     { 394, 106,  28,  28, COL_BLACK, ":",      ":",          ALLEGRO_KEY_QUOTE      },
     { 426, 106,  28,  28, COL_BLACK, "]",      "]",          ALLEGRO_KEY_BACKSLASH  },
-    { 458, 106,  60,  28, COL_BLACK, "RET",    "RETURN",     ALLEGRO_KEY_ENTER      },
-    {  10, 138,  28,  28, COL_BLACK, "SLK",    "SHIFT LOCK", ALLEGRO_KEY_ALT        },
-    {  42, 138,  44,  28, COL_BLACK, "SHIFT",  "SHIFT",      ALLEGRO_KEY_LSHIFT     },
+    { 458, 106,  60,  28, COL_BLACK, "RET",    "Return",     ALLEGRO_KEY_ENTER      },
+    {  10, 138,  28,  28, COL_BLACK, "SLK",    "Shift Lock", ALLEGRO_KEY_ALT        },
+    {  42, 138,  44,  28, COL_BLACK, "SHIFT",  "Shift",      ALLEGRO_KEY_LSHIFT     },
     {  90, 138,  28,  28, COL_BLACK, "Z",      "Z",          ALLEGRO_KEY_Z          },
     { 122, 138,  28,  28, COL_BLACK, "X",      "X",          ALLEGRO_KEY_X          },
     { 154, 138,  28,  28, COL_BLACK, "C",      "C",          ALLEGRO_KEY_C          },
@@ -103,15 +104,15 @@ static const key_cap_t kcaps_bbc[BBC_NKEY] = {
     { 314, 138,  28,  28, COL_BLACK, ",",      ",",          ALLEGRO_KEY_COMMA      },
     { 346, 138,  28,  28, COL_BLACK, ".",      ".",          ALLEGRO_KEY_FULLSTOP   },
     { 378, 138,  28,  28, COL_BLACK, "/",      "/",          ALLEGRO_KEY_SLASH      },
-    { 410, 138,  44,  28, COL_BLACK, "SHIFT",  "SHIFT",      ALLEGRO_KEY_RSHIFT     },
-    { 458, 138,  28,  28, COL_BLACK, "DEL",    "DELETE",     ALLEGRO_KEY_DELETE     },
-    { 490, 138,  28,  28, COL_GREY,  "CPY",    "COPY",       ALLEGRO_KEY_END        },
-    { 122, 170, 256,  28, COL_BLACK, "SPACE",  "SPACE",      ALLEGRO_KEY_SPACE      }
+    { 410, 138,  44,  28, COL_BLACK, "SHIFT",  "Shift",      ALLEGRO_KEY_RSHIFT     },
+    { 458, 138,  28,  28, COL_BLACK, "DEL",    "Delete",     ALLEGRO_KEY_DELETE     },
+    { 490, 138,  28,  28, COL_GREY,  "CPY",    "Copy",       ALLEGRO_KEY_END        },
+    { 122, 170, 256,  28, COL_BLACK, "SPACE",  "Space",      ALLEGRO_KEY_SPACE      }
 };
 
 static const key_dlg_t bbc_kbd_dlg = { kcaps_bbc, kcaps_bbc + BBC_NKEY, 538, 256 };
 
-#define MASTER_NKEY 92
+#define MASTER_NKEY 93
 
 static const key_cap_t kcaps_master[MASTER_NKEY] = {
     {  50,  10,  28,  28, COL_RED,   "F0",     "F0",         ALLEGRO_KEY_F1         },
@@ -124,7 +125,8 @@ static const key_cap_t kcaps_master[MASTER_NKEY] = {
     { 274,  10,  28,  28, COL_RED,   "F7",     "F7",         ALLEGRO_KEY_F8         },
     { 306,  10,  28,  28, COL_RED,   "F8",     "F8",         ALLEGRO_KEY_F9         },
     { 338,  10,  28,  28, COL_RED,   "F9",     "F9",         ALLEGRO_KEY_F10        },
-    {  10,  42,  28,  28, COL_BLACK, "ESC",    "ESCAPE",     ALLEGRO_KEY_ESCAPE     },
+    { 370,  10,  28,  28, COL_BLACK, "BRK",    "Break",      ALLEGRO_KEY_F12        },
+    {  10,  42,  28,  28, COL_BLACK, "ESC",    "Escape",     ALLEGRO_KEY_ESCAPE     },
     {  42,  42,  28,  28, COL_BLACK, "1",      "1",          ALLEGRO_KEY_1          },
     {  74,  42,  28,  28, COL_BLACK, "2",      "2",          ALLEGRO_KEY_2          },
     { 106,  42,  28,  28, COL_BLACK, "3",      "3",          ALLEGRO_KEY_3          },
@@ -138,9 +140,9 @@ static const key_cap_t kcaps_master[MASTER_NKEY] = {
     { 362,  42,  28,  28, COL_BLACK, "=",      "=",          ALLEGRO_KEY_MINUS      },
     { 394,  42,  28,  28, COL_BLACK, "^",      "^",          ALLEGRO_KEY_EQUALS     },
     { 426,  42,  28,  28, COL_BLACK, "\\",     "\\",         ALLEGRO_KEY_BACKSLASH2 },
-    { 458,  42,  28,  28, COL_GREY,  "LFT",    "LEFT",       ALLEGRO_KEY_LEFT       },
-    { 490,  42,  28,  28, COL_GREY,  "RGT",    "RIGHT",      ALLEGRO_KEY_RIGHT      },
-    {  10,  74,  44,  28, COL_BLACK, "TAB",    "TAB",        ALLEGRO_KEY_TAB        },
+    { 458,  42,  28,  28, COL_GREY,  "LFT",    "Left",       ALLEGRO_KEY_LEFT       },
+    { 490,  42,  28,  28, COL_GREY,  "RGT",    "Right",      ALLEGRO_KEY_RIGHT      },
+    {  10,  74,  44,  28, COL_BLACK, "TAB",    "Tab",        ALLEGRO_KEY_TAB        },
     {  58,  74,  28,  28, COL_BLACK, "Q",      "Q",          ALLEGRO_KEY_Q          },
     {  90,  74,  28,  28, COL_BLACK, "W",      "W",          ALLEGRO_KEY_W          },
     { 122,  74,  28,  28, COL_BLACK, "E",      "E",          ALLEGRO_KEY_E          },
@@ -170,9 +172,9 @@ static const key_cap_t kcaps_master[MASTER_NKEY] = {
     { 362, 106,  28,  28, COL_BLACK, ";",      ";",          ALLEGRO_KEY_SEMICOLON  },
     { 394, 106,  28,  28, COL_BLACK, ":",      ":",          ALLEGRO_KEY_QUOTE      },
     { 426, 106,  28,  28, COL_BLACK, "]",      "]",          ALLEGRO_KEY_BACKSLASH  },
-    { 458, 106,  60,  28, COL_BLACK, "RET",    "RETURN",     ALLEGRO_KEY_ENTER      },
-    {  10, 138,  28,  28, COL_BLACK, "SLK",    "SHIFT LOCK", ALLEGRO_KEY_ALT        },
-    {  42, 138,  44,  28, COL_BLACK, "SHIFT",  "SHIFT",      ALLEGRO_KEY_LSHIFT     },
+    { 458, 106,  60,  28, COL_BLACK, "RET",    "Return",     ALLEGRO_KEY_ENTER      },
+    {  10, 138,  28,  28, COL_BLACK, "SLK",    "Shift Lock", ALLEGRO_KEY_ALT        },
+    {  42, 138,  44,  28, COL_BLACK, "SHIFT",  "Shift",      ALLEGRO_KEY_LSHIFT     },
     {  90, 138,  28,  28, COL_BLACK, "Z",      "Z",          ALLEGRO_KEY_Z          },
     { 122, 138,  28,  28, COL_BLACK, "X",      "X",          ALLEGRO_KEY_X          },
     { 154, 138,  28,  28, COL_BLACK, "C",      "C",          ALLEGRO_KEY_C          },
@@ -183,10 +185,10 @@ static const key_cap_t kcaps_master[MASTER_NKEY] = {
     { 314, 138,  28,  28, COL_BLACK, ",",      ",",          ALLEGRO_KEY_COMMA      },
     { 346, 138,  28,  28, COL_BLACK, ".",      ".",          ALLEGRO_KEY_FULLSTOP   },
     { 378, 138,  28,  28, COL_BLACK, "/",      "/",          ALLEGRO_KEY_SLASH      },
-    { 410, 138,  44,  28, COL_BLACK, "SHIFT",  "SHIFT",      ALLEGRO_KEY_RSHIFT     },
-    { 458, 138,  28,  28, COL_BLACK, "DEL",    "DELETE",     ALLEGRO_KEY_DELETE     },
-    { 490, 138,  28,  28, COL_GREY,  "CPY",    "COPY",       ALLEGRO_KEY_END        },
-    { 122, 170, 256,  28, COL_BLACK, "SPACE",  "SPACE",      ALLEGRO_KEY_SPACE,     },
+    { 410, 138,  44,  28, COL_BLACK, "SHIFT",  "Shift",      ALLEGRO_KEY_RSHIFT     },
+    { 458, 138,  28,  28, COL_BLACK, "DEL",    "Delete",     ALLEGRO_KEY_DELETE     },
+    { 490, 138,  28,  28, COL_GREY,  "CPY",    "Copy",       ALLEGRO_KEY_END        },
+    { 122, 170, 256,  28, COL_BLACK, "SPACE",  "Space",      ALLEGRO_KEY_SPACE,     },
 
     { 538,  10,  28,  28, COL_BLACK, "+",      "+",          ALLEGRO_KEY_PAD_PLUS,  },
     { 570,  10,  28,  28, COL_BLACK, "-",      "-",          ALLEGRO_KEY_PAD_MINUS, },
@@ -199,14 +201,14 @@ static const key_cap_t kcaps_master[MASTER_NKEY] = {
     { 538,  74,  28,  28, COL_BLACK, "4",      "4",          ALLEGRO_KEY_PAD_4,     },
     { 570,  74,  28,  28, COL_BLACK, "5",      "5",          ALLEGRO_KEY_PAD_5,     },
     { 602,  74,  28,  28, COL_BLACK, "6",      "6",          ALLEGRO_KEY_PAD_6,     },
-    { 634,  74,  28,  28, COL_BLACK, "DEL",    "DEL",        ALLEGRO_KEY_PAD_DELETE },
+    { 634,  74,  28,  28, COL_BLACK, "DEL",    "Delete",     ALLEGRO_KEY_PAD_DELETE },
     { 538, 106,  28,  28, COL_BLACK, "1",      "1",          ALLEGRO_KEY_PAD_1,     },
     { 570, 106,  28,  28, COL_BLACK, "2",      "2",          ALLEGRO_KEY_PAD_2,     },
     { 602, 106,  28,  28, COL_BLACK, "3",      "3",          ALLEGRO_KEY_PAD_3,     },
     { 634, 106,  28,  28, COL_BLACK, ",",      ",",          ALLEGRO_KEY_HOME,      },
     { 538, 138,  28,  28, COL_BLACK, "0",      "0",          ALLEGRO_KEY_PAD_0,     },
     { 570, 138,  28,  28, COL_BLACK, ".",      ".",          ALLEGRO_KEY_PGDN,      },
-    { 602, 138,  60,  28, COL_BLACK, "RETURN", "RETURN",     ALLEGRO_KEY_PAD_ENTER  }
+    { 602, 138,  60,  28, COL_BLACK, "RETURN", "Return",     ALLEGRO_KEY_PAD_ENTER  }
 };
 
 static const key_dlg_t master_kbd_dlg = { kcaps_master, kcaps_master + MASTER_NKEY, 676, 256 };

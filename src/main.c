@@ -336,11 +336,14 @@ static void main_start_fullspeed(void)
     al_emit_user_event(&evsrc, &event, NULL);
 }
 
-static bool main_key_down(ALLEGRO_EVENT *event)
+static void main_key_down(ALLEGRO_EVENT *event)
 {
     ALLEGRO_KEYBOARD_STATE kstate;
+    int code = key_map(event);
 
-    switch(event->keyboard.keycode) {
+    log_debug("main: key down, code=%d, fullspeed=%d", event->keyboard.keycode, fullspeed);
+
+    switch(code) {
         case ALLEGRO_KEY_PGUP:
             if (fullspeed != FSPEED_RUNNING)
                 main_start_fullspeed();
@@ -360,7 +363,7 @@ static bool main_key_down(ALLEGRO_EVENT *event)
             al_get_keyboard_state(&kstate);
             if (al_key_down(&kstate, ALLEGRO_KEY_ALT)) {
                 video_toggle_fullscreen();
-                return false;
+                return;
             }
             break;
         case ALLEGRO_KEY_F10:
@@ -386,14 +389,17 @@ static bool main_key_down(ALLEGRO_EVENT *event)
                     al_start_timer(timer);
             }
     }
-    return true;
+    key_down(code);
 }
 
-static bool main_key_up(ALLEGRO_EVENT *event)
+static void main_key_up(ALLEGRO_EVENT *event)
 {
     ALLEGRO_KEYBOARD_STATE kstate;
+    int code = key_map(event);
 
-    switch(event->keyboard.keycode) {
+    log_debug("main: key up, code=%d, fullspeed=%d", event->keyboard.keycode, fullspeed);
+
+    switch(code) {
         case ALLEGRO_KEY_PGUP:
             if (emuspeed != EMU_SPEED_FULL) {
                 al_get_keyboard_state(&kstate);
@@ -410,7 +416,7 @@ static bool main_key_up(ALLEGRO_EVENT *event)
     }
     if (fullspeed == FSPEED_SELECTED)
         main_start_fullspeed();
-    return true;
+    key_up(code);
 }
 
 static void main_joystick_axes(ALLEGRO_EVENT *event)
@@ -482,16 +488,10 @@ void main_run()
         al_wait_for_event(queue, &event);
         switch(event.type) {
             case ALLEGRO_EVENT_KEY_DOWN:
-                log_debug("main: key down, code=%d, fullspeed=%d", event.keyboard.keycode, fullspeed);
-                // main_key_down returns true if OK to pass to emulated BBC keyboard.
-                if (main_key_down(&event))
-                    key_down(&event);
+                main_key_down(&event);
                 break;
             case ALLEGRO_EVENT_KEY_UP:
-                log_debug("main: key up, code=%d, fullspeed=%d", event.keyboard.keycode, fullspeed);
-                // main_key_up returns true if OK to pass to emulated BBC keyboard.
-                if (main_key_up(&event))
-                    key_up(&event);
+                main_key_up(&event);
                 break;
             case ALLEGRO_EVENT_MOUSE_AXES:
                 mouse_axes(&event);
