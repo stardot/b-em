@@ -191,12 +191,12 @@ static bool try_cfg_dest(ALLEGRO_PATH *path, const char *name, const char *ext)
             al_set_path_extension(path, ext);
             return true;
         }
-        else if (errno == ENOENT) {
-            if (mkdir(cpath, 0777) == 0) {
-                al_set_path_filename(path, name);
-                al_set_path_extension(path, ext);
-                return true;
-            }
+    }
+    else if (errno == ENOENT) {
+        if (mkdir(cpath, 0777) == 0) {
+            al_set_path_filename(path, name);
+            al_set_path_extension(path, ext);
+            return true;
         }
     }
     return false;
