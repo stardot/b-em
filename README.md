@@ -5,7 +5,7 @@ Introduction
 
 B-em is an emulator for various models of BBC Microcomputer as made
 by Acorn Computers in the 1980s along with a selection of 2nd
-processors.  It is support for Win32 and Linux/UNIX but may also work
+processors.  It is supported for Win32 and Linux/UNIX but may also work
 on other systems supported by the Allegro library.
 
 B-em is licensed under the GPL, see COPYING for more details.
@@ -37,6 +37,15 @@ You will need the following libraries:
 * Allegro 5.2 or later
 * Zlib
 
+Linux distros which include Allegro 5.2 at the time of writing include:
+
+* Arch
+* Debian Stable (stretch)
+* Ubuntu 17.10 (Artful Aardvark)
+
+Allegro 5.2 packages for Ubuntu 16.04 LTS can be had from
+[Launchpad](https://launchpad.net/~allegro/+archive/ubuntu/5.2)
+
 ### Released version
 
 Open a terminal window, navigate to the B-em directory then enter:
@@ -53,14 +62,13 @@ Open a terminal window, navigate to the B-em directory then enter:
 
 ### Notes
 
-* If you want to run B-Em from the directory in which you have
-  compiled it you will need to make sure a suiatble b-em.cfg file
-  is at ~/.config/b-em.cfg or point $XDG_CONFIG_DIR to where such
-  a file may be found.  Failure to do this will result in no models
-  being available.
-* Any changes to the configuration will be saved back to the config
-  file at ~/.config/b-em.cfg or wherever you point $XDG_CONFIG_DIR
-  to.  This same directory is used for CMOS RAM images and hard discs.
+* B-Em looks for its config file at $XDG_CONFIGID_RI/b-em/b-em.cfg
+  or, if $XDG_CONFIG_DIR is not defined, at ~/.config/b-em.cfg
+* If a config file cannot be found in those locations it will pick
+  up a default config from where the package is installed or from
+  the build directory, if being run from there.  It will always be
+  saved back to $XDG_CONFIGID_RI/b-em/b-em.cfg or ~/.config/b-em.cfg
+* This same config dir is used for CMOS RAM images and hard disc images.
 * On Linux, the debugger expects to use the terminal window from
   swhich you started b-em for input and output.  On Windows it opens
   a console window for this purpose.
