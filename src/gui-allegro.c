@@ -7,6 +7,7 @@
 #include "debugger.h"
 #include "ddnoise.h"
 #include "disc.h"
+#include "joystick.h"
 #include "keyboard.h"
 #include "keydef-allegro.h"
 #include "main.h"
@@ -793,6 +794,8 @@ static void change_ddnoise_dtype(ALLEGRO_EVENT *event)
 void gui_allegro_event(ALLEGRO_EVENT *event)
 {
     switch(menu_get_id(event)) {
+        case IDM_ZERO:
+            break;
         case IDM_FILE_RESET:
             nula_default_palette();
             main_restart();
@@ -899,6 +902,9 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
         case IDM_VIDEO_PAL:
             vid_pal = !vid_pal;
             break;
+        case IDM_VIDEO_NULA:
+            nula_disable = !nula_disable;
+            break;
         case IDM_SOUND_INTERNAL:
             sound_internal = !sound_internal;
             break;
@@ -990,7 +996,11 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
         case IDM_KEY_REDEFINE:
             gui_keydefine_open();
             break;
-        default:
-            log_warn("gui-allegro: menu ID %d not handled", menu_get_id(event));
+        case IDM_KEY_AS:
+            keyas = !keyas;
+            break;
+        case IDM_MOUSE_AMX:
+            mouse_amx = !mouse_amx;
+            break;
     }
 }

@@ -40,7 +40,7 @@ void adc_write(uint16_t addr, uint8_t val)
 
 void adc_poll()
 {
-    uint32_t val = (joyaxes[adc_status & 3] + 1.0) * 256.0;
+    uint32_t val = joyaxes[adc_status & 3] * 65520.0 / 2.0;
     if (val > 0xFFFF)
         val = 0xFFFF;
     adc_status =(adc_status & 0xF) | 0x40; /*Not busy, conversion complete*/
