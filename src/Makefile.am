@@ -1,6 +1,6 @@
 # Makefile.am for B-em
 
-bin_PROGRAMS = b-em
+bin_PROGRAMS = b-em jstest
 noinst_SCRIPTS = ../b-em
 CLEANFILES = $(noinst_SCRIPTS)
 
@@ -62,6 +62,7 @@ b_em_SOURCES = \
 	gui-allegro.c\
 	i8271.c \
 	ide.c \
+	joystick.c \
 	keyboard.c \
 	keydef-allegro.c \
 	linux.c \
@@ -118,3 +119,7 @@ b_em_SOURCES = \
 if NO_TSEARCH
 b_em_SOURCES += tsearch.c
 endif
+
+jstest_SOURCES = jstest.c
+
+jstest_LDADD = -lallegro
