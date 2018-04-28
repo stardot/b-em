@@ -70,6 +70,7 @@ typedef enum {
     IDM_KEY_REDEFINE,
     IDM_KEY_AS,
     IDM_MOUSE_AMX,
+    IDM_JOYMAP,
     IDM_SPEED,
     IDM_DEBUGGER,
     IDM_DEBUG_TUBE,

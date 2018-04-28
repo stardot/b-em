@@ -382,6 +382,30 @@ static ALLEGRO_MENU *create_keyboard_menu(void)
     return menu;
 }
 
+static ALLEGRO_MENU *create_joymap_menu(void)
+{
+    ALLEGRO_MENU *menu = al_create_menu();
+    menu_map_t *map;
+    const char *name;
+    int i;
+
+    if ((map = malloc(joymap_count * sizeof(menu_map_t)))) {
+        for (i = 0; i < joymap_count; i++) {
+            if ((name = joymap_names[i])) {
+                map[i].label = name;
+                map[i].itemno = i;
+            }
+        }
+        add_sorted_set(menu, map, joymap_count, IDM_JOYMAP, joymap_num);
+        free(map);
+        return menu;
+    }
+    else {
+        log_fatal("gui-allegro: out of memory");
+        exit(1);
+    }
+}
+
 static ALLEGRO_MENU *create_settings_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
@@ -392,6 +416,8 @@ static ALLEGRO_MENU *create_settings_menu(void)
 #endif
     al_append_menu_item(menu, "Keyboard", 0, 0, NULL, create_keyboard_menu());
     add_checkbox_item(menu, "Mouse (AMX)", IDM_MOUSE_AMX, mouse_amx);
+    if (joymap_count > 0)
+        al_append_menu_item(menu, "Joystick Map", 0, 0, NULL, create_joymap_menu());
     return menu;
 }
 
@@ -1002,5 +1028,7 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
         case IDM_MOUSE_AMX:
             mouse_amx = !mouse_amx;
             break;
+        case IDM_JOYMAP:
+            joystick_change_joymap(radio_event_simple(event, joymap_num));
     }
 }

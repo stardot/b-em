@@ -445,3 +445,16 @@ void gui_keydefine_close(void)
     event.type = ALLEGRO_EVENT_DISPLAY_CLOSE;
     al_emit_user_event(&uevsrc, &event, NULL);
 }
+
+int keydef_lookup_name(const char *name)
+{
+    const key_cap_t *ptr = kcaps_master;
+    const key_cap_t *end = ptr + MASTER_NKEY;
+
+    while (ptr < end) {
+        if (strcasecmp(name, ptr->cap) == 0 || strcasecmp(name, ptr->name) == 0)
+            return ptr->keycode;
+        ptr++;
+    }
+    return 0;
+}

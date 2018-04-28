@@ -20,6 +20,7 @@
 #include "gui-allegro.h"
 #include "i8271.h"
 #include "ide.h"
+#include "joystick.h"
 #include "keyboard.h"
 #include "keydef-allegro.h"
 #include "main.h"
@@ -271,6 +272,8 @@ void main_init(int argc, char *argv[])
     midi_init();
     main_reset();
 
+    joystick_init(queue);
+
     gui_allegro_init(queue, display);
 
     time_limit = 2.0 / 50.0;
@@ -287,10 +290,6 @@ void main_init(int argc, char *argv[])
         exit(1);
     }
     al_register_event_source(queue, al_get_keyboard_event_source());
-    if (al_install_joystick())
-        al_register_event_source(queue, al_get_joystick_event_source());
-    else
-        log_warn("main: unable to install joystick driver");
 
     oldmodel = curmodel;
 
@@ -419,38 +418,6 @@ static void main_key_up(ALLEGRO_EVENT *event)
     key_up(code);
 }
 
-static void main_joystick_axes(ALLEGRO_EVENT *event)
-{
-    if (event->joystick.stick == 0) {
-        if (event->joystick.axis == 0)
-            joyaxes[0] = event->joystick.pos;
-        else
-            joyaxes[1] = event->joystick.pos;
-    }
-    else if (event->joystick.stick == 1) {
-        if (event->joystick.axis == 0)
-            joyaxes[2] = event->joystick.pos;
-        else
-            joyaxes[3] = event->joystick.pos;
-    }
-}
-
-static void main_joystick_button_down(ALLEGRO_EVENT *event)
-{
-    if (event->joystick.stick == 0)
-        joybutton[0] = 1;
-    else if (event->joystick.stick == 1)
-        joybutton[1] = 1;
-}
-
-static void main_joystick_button_up(ALLEGRO_EVENT *event)
-{
-    if (event->joystick.stick == 0)
-        joybutton[0] = 0;
-    else if (event->joystick.stick == 1)
-        joybutton[1] = 0;
-}
-
 static void main_timer(ALLEGRO_EVENT *event)
 {
     double delay = al_get_time() - event->any.timestamp;
@@ -505,13 +472,13 @@ void main_run()
                 mouse_btn_up(&event);
                 break;
             case ALLEGRO_EVENT_JOYSTICK_AXIS:
-                main_joystick_axes(&event);
+                joystick_axis(&event);
                 break;
             case ALLEGRO_EVENT_JOYSTICK_BUTTON_DOWN:
-                main_joystick_button_down(&event);
+                joystick_button_down(&event);
                 break;
             case ALLEGRO_EVENT_JOYSTICK_BUTTON_UP:
-                main_joystick_button_up(&event);
+                joystick_button_up(&event);
                 break;
             case ALLEGRO_EVENT_DISPLAY_CLOSE:
                 log_debug("main: event display close - quitting");
