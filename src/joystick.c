@@ -334,6 +334,7 @@ void joystick_axis(ALLEGRO_EVENT *event)
     joystick_map_t *js;
     js_stick_t *stick;
     js_axis_map_t *axis;
+    double value;
 
     log_debug("joystick: js_id=%p, stick=%d, axis=%d, pos=%g", event->joystick.id, event->joystick.stick, event->joystick.axis, event->joystick.pos);
     for (js = joystick_map; js < joystick_end; js++) {
@@ -342,18 +343,23 @@ void joystick_axis(ALLEGRO_EVENT *event)
                 stick = js->js_sticks + event->joystick.stick;
                 if (event->joystick.axis < stick->num_axes) {
                     axis = stick->axes_map + event->joystick.axis;
+                    value = axis->js_scale * event->joystick.pos;
+                    if (value < -1.0)
+                        value = -1.0;
+                    else if (value > 1.0)
+                        value = 1.0;
                     if (axis->js_adc_chan)
-                        joyaxes[axis->js_adc_chan-1] = axis->js_scale + axis->js_scale * event->joystick.pos;
+                        joyaxes[axis->js_adc_chan-1] = value;
                     else
                         log_debug("joystick: unmapped axis %d", event->joystick.axis);
                     if (axis->js_nkey) {
-                        if (event->joystick.pos < -0.5)
+                        if (value < -0.5)
                             key_down(axis->js_nkey);
                         else
                             key_up(axis->js_nkey);
                     }
                     if (axis->js_pkey) {
-                        if (event->joystick.pos > 0.5)
+                        if (value > 0.5)
                             key_down(axis->js_pkey);
                         else
                             key_up(axis->js_pkey);
