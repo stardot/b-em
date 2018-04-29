@@ -6,8 +6,10 @@
 
 #include "b-em.h"
 #include "config.h"
+#include "joystick.h"
 #include "keyboard.h"
 #include "keydef-allegro.h"
+#include <ctype.h>
 
 typedef struct {
     int   js_adc_chan;
@@ -39,7 +41,7 @@ static joystick_map_t *joystick_map;
 static joystick_map_t *joystick_end;
 static int num_joystick;
 
-const char **joymap_names;
+joymap_t *joymaps;
 int joymap_count;
 int joymap_num;
 
@@ -152,38 +154,40 @@ static void init_joysticks(void)
     joystick_end = jsptr;
 }
 
+static int cmp_joymap(const void *va, const void *vb)
+{
+    const joymap_t *ja = va;
+    const joymap_t *jb = vb;
+    return strcmp(ja->name, jb->name);
+}
+
 static void read_joymaps(void)
 {
     const char *sect, *name;
     ALLEGRO_CONFIG_SECTION *siter;
-    int num, max = -1;
+    int num_jm, jm_num;
 
     if (bem_cfg) {
-        for (sect = al_get_first_config_section(bem_cfg, &siter); sect; sect = al_get_next_config_section(&siter)) {
-            if (strncmp(sect, "joymap", 6) == 0) {
-                num = atoi(sect+6);
-                log_debug("joystick: pass1, found joymap#%d", num);
-                if (num > max)
-                    max = num;
-            }
-        }
-        if (max < 0)
+        num_jm = 0;
+        for (sect = al_get_first_config_section(bem_cfg, &siter); sect; sect = al_get_next_config_section(&siter))
+            if (strncasecmp(sect, "joymap", 6) == 0)
+                num_jm++;
+        if (num_jm == 0)
             log_debug("joystick: no joymaps found");
         else {
-            joymap_count = max + 1;
-            joymap_names = js_malloc(joymap_count * sizeof(char *));
-            for (num = 0; num <= max; num++)
-                joymap_names[num] = NULL;
+            joymap_count = num_jm;
+            joymaps = js_malloc(num_jm * sizeof(joymap_t));
+            jm_num = 0;
             for (sect = al_get_first_config_section(bem_cfg, &siter); sect; sect = al_get_next_config_section(&siter)) {
-                if (strncmp(sect, "joymap", 6) == 0) {
-                    num = atoi(sect+6);
-                    name = al_get_config_value(bem_cfg, sect, "name");
-                    if (!name)
-                        name = sect;
-                    joymap_names[num] = name;
-                    log_debug("joystick: pass2, found joymap#%02d, name=%s", num, name);
+                if (strncasecmp(sect, "joymap", 6) == 0) {
+                    joymaps[jm_num].sect = sect;
+                    for (name = sect + 6; isspace(*name); name++)
+                        ;
+                    joymaps[jm_num++].name = name;
+                    log_debug("joystick: found joymap %s", name);
                 }
             }
+            qsort(joymaps, num_jm, sizeof(joymap_t), cmp_joymap);
         }
     }
 }
@@ -280,14 +284,13 @@ static void apply_buttons(const char *sect, joystick_map_t *jsptr)
 void joystick_change_joymap(int mapno)
 {
     joystick_map_t *js;
-    const char *name;
+    const char *sect, *name;
     int js_num;
-    char sect[20];
 
     if (mapno < joymap_count) {
-        log_debug("joystick: changing to joymap #%d, %s", mapno, joymap_names[mapno]);
+        log_debug("joystick: changing to joymap #%d, %s", mapno, joymaps[mapno].name);
+        sect = joymaps[mapno].sect;
         js = joystick_map;
-        snprintf(sect, sizeof sect, "joymap%d", mapno);
         if ((name = al_get_config_value(bem_cfg, sect, "joystick"))) {
             while (!js->js_name || strcasecmp(name, js->js_name)) {
                 if (++js == joystick_end) {

@@ -385,25 +385,11 @@ static ALLEGRO_MENU *create_keyboard_menu(void)
 static ALLEGRO_MENU *create_joymap_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
-    menu_map_t *map;
-    const char *name;
     int i;
 
-    if ((map = malloc(joymap_count * sizeof(menu_map_t)))) {
-        for (i = 0; i < joymap_count; i++) {
-            if ((name = joymap_names[i])) {
-                map[i].label = name;
-                map[i].itemno = i;
-            }
-        }
-        add_sorted_set(menu, map, joymap_count, IDM_JOYMAP, joymap_num);
-        free(map);
-        return menu;
-    }
-    else {
-        log_fatal("gui-allegro: out of memory");
-        exit(1);
-    }
+    for (i = 0; i < joymap_count; i++)
+        add_checkbox_item(menu, joymaps[i].name, menu_id_num(IDM_JOYMAP, i), i == joymap_num);
+    return menu;
 }
 
 static ALLEGRO_MENU *create_settings_menu(void)

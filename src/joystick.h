@@ -1,7 +1,12 @@
 #ifndef BEM_JOYSTICK_INC
 #define BEM_JOYSTICK_INC
 
-extern char **joymap_names;
+typedef struct {
+    const char *sect;
+    const char *name;
+} joymap_t;
+
+extern joymap_t *joymaps;
 extern int joymap_count;
 extern int joymap_num;
 
