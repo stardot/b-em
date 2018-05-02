@@ -12,7 +12,6 @@ int mcount = 8;
 uint8_t mouse_portb = 0xff;
 
 static int mx = 0,  my = 0;
-static int mouse_ff = 0;
 static int mouse_xff = 0, mouse_yff = 0;
 
 void mouse_axes(ALLEGRO_EVENT *event)
@@ -73,21 +72,21 @@ void mouse_btn_up(ALLEGRO_EVENT *event) {
     }
 }
 
-static void mouse_poll_x86(void)
+static void mouse_poll_x86(int xmask, int ymask)
 {
     if (uservia.ifr & 0x18)
         return;
 
     if (mx) {
         if (mx > 0) {
-            mouse_portb |=  8;
+            mouse_portb |=  xmask;
             mx--;
         } else {
-            mouse_portb &= ~8;
+            mouse_portb &= ~xmask;
             mx++;
         }
         if (mouse_xff)
-            mouse_portb ^= 8;
+            mouse_portb ^= xmask;
 
         uservia_set_cb1(mouse_xff);
         mouse_xff = !mouse_xff;
@@ -95,60 +94,25 @@ static void mouse_poll_x86(void)
 
     if (my) {
         if (my > 0) {
-            mouse_portb &= ~0x10;
+            mouse_portb &= ~ymask;
             my--;
         } else {
-            mouse_portb |=  0x10;
+            mouse_portb |=  ymask;
             my++;
         }
 
         if (mouse_yff)
-            mouse_portb ^= 0x10;
+            mouse_portb ^= ymask;
 
         uservia_set_cb2(mouse_yff);
         mouse_yff = !mouse_yff;
     }
-    mouse_portb |= 2;
-}
-
-static void mouse_poll_amx(void)
-{
-    mouse_ff = !mouse_ff;
-    if (mouse_ff) {
-        uservia_set_cb1(0);
-        uservia_set_cb2(0);
-        return;
-    }
-
-    if (mx) {
-        uservia_set_cb1(1);
-        if (mx > 0) {
-            mouse_portb |=  1;
-            mx--;
-        } else {
-            mouse_portb &= ~1;
-            mx++;
-        }
-    } else
-        uservia_set_cb1(0);
-
-    if (my) {
-        uservia_set_cb2(1);
-        if (my < 0) {
-            mouse_portb |=  4;
-            my++;
-        } else {
-            mouse_portb &= ~4;
-            my--;
-        }
-    } else
-        uservia_set_cb2(0);
 }
 
 void mouse_poll()
 {
     if (curtube == 3)
-        mouse_poll_x86();
+        mouse_poll_x86(0x08, 0x10);
     else if (mouse_amx)
-        mouse_poll_amx();
+        mouse_poll_x86(0x01, 0x04);
 }
