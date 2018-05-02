@@ -9,7 +9,7 @@
 bool mouse_amx;
 int mcount = 8;
 
-uint8_t mouse_portb = 0;
+uint8_t mouse_portb = 0xff;
 
 static int mx = 0,  my = 0;
 static int mouse_ff = 0;
@@ -39,8 +39,10 @@ void mouse_btn_down(ALLEGRO_EVENT *event)
             else if (mouse_amx)
                 mouse_portb &= ~0x80;
             break;
-        case 4:
-            if (mouse_amx)
+        case 3:
+            if (curtube == 3)
+                mouse_portb &= ~2;
+            else if (mouse_amx)
                 mouse_portb &= ~0x40;
             break;
     }
@@ -62,8 +64,10 @@ void mouse_btn_up(ALLEGRO_EVENT *event) {
             else if (mouse_amx)
                 mouse_portb |=  0x80;
             break;
-        case 4:
-            if (mouse_amx)
+        case 3:
+            if (curtube == 3)
+                mouse_portb |= 2;
+            else if (mouse_amx)
                 mouse_portb |=  0x40;
             break;
     }
