@@ -16,8 +16,14 @@ static int mouse_xff = 0, mouse_yff = 0;
 
 void mouse_axes(ALLEGRO_EVENT *event)
 {
-    mx += event->mouse.dx;
-    my += event->mouse.dy;
+    if (curtube == 3) {
+        mx += event->mouse.dx;
+        my += event->mouse.dy;
+    }
+    else if (mouse_amx) {
+        mx += event->mouse.dx * 2;
+        my += event->mouse.dy * 2;
+    }
     log_debug("mouse: axes event, dx=%d, mx=%d, dy=%d, my=%d", event->mouse.dx, mx, event->mouse.dy, my);
 }
 
@@ -80,10 +86,14 @@ static void mouse_poll_x86(int xmask, int ymask)
     if (mx) {
         if (mx > 0) {
             mouse_portb |=  xmask;
-            mx--;
+            mx -= 2;
+            if (mx < 0)
+                mx = 0;
         } else {
             mouse_portb &= ~xmask;
-            mx++;
+            mx += 2;
+            if (mx > 0)
+                mx = 0;
         }
         if (mouse_xff)
             mouse_portb ^= xmask;
@@ -95,12 +105,15 @@ static void mouse_poll_x86(int xmask, int ymask)
     if (my) {
         if (my > 0) {
             mouse_portb &= ~ymask;
-            my--;
+            my -= 2;
+            if (my < 0)
+                my = 0;
         } else {
             mouse_portb |=  ymask;
-            my++;
+            my += 2;
+            if (my > 0)
+                my = 0;;
         }
-
         if (mouse_yff)
             mouse_portb ^= ymask;
 
