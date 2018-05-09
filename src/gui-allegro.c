@@ -492,7 +492,8 @@ static void file_save_scrshot(ALLEGRO_EVENT *event)
         display = (ALLEGRO_DISPLAY *)(event->user.data2);
         if (al_show_native_file_dialog(display, chooser)) {
             if (al_get_native_file_dialog_count(chooser) > 0) {
-                strncpy(vid_scrshotname, al_get_native_file_dialog_path(chooser, 0), sizeof vid_scrshotname);
+                strncpy(vid_scrshotname, al_get_native_file_dialog_path(chooser, 0), sizeof vid_scrshotname-1);
+                vid_scrshotname[sizeof vid_scrshotname-1] = 0;
                 vid_savescrshot = 2;
             }
         }

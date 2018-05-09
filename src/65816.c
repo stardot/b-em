@@ -262,8 +262,8 @@ static uint32_t do_readmem65816(uint32_t a)
                 return temp;
         }
         if ((a&0x78000)==0x8000 && (def || (banking&8))) return w65816rom[a&0x7FFF];
-        if ((a&0x78000)==0x4000 && !def && (banking&1)) return w65816ram[(a&0x3FFF)|((banknum&7)<<14)];
-        if ((a&0x78000)==0x8000 && !def && (banking&2)) return w65816ram[(a&0x3FFF)|(((banknum>>3)&7)<<14)];
+        if ((a&0x7C000)==0x4000 && !def && (banking&1)) return w65816ram[(a&0x3FFF)|((banknum&7)<<14)];
+        if ((a&0x7C000)==0x8000 && !def && (banking&2)) return w65816ram[(a&0x3FFF)|(((banknum>>3)&7)<<14)];
         return w65816ram[a];
 }
 
@@ -316,8 +316,8 @@ void do_writemem65816(uint32_t a, uint32_t v)
                 endtimeslice=1;
                 return;
         }
-        if ((a&0x78000)==0x4000 && !def && (banking&1)) { w65816ram[(a&0x3FFF)|((banknum&7)<<14)]=v; return; }
-        if ((a&0x78000)==0x8000 && !def && (banking&2)) { w65816ram[(a&0x3FFF)|(((banknum>>3)&7)<<14)]=v; return; }
+        if ((a&0x7C000)==0x4000 && !def && (banking&1)) { w65816ram[(a&0x3FFF)|((banknum&7)<<14)]=v; return; }
+        if ((a&0x7C000)==0x8000 && !def && (banking&2)) { w65816ram[(a&0x3FFF)|(((banknum>>3)&7)<<14)]=v; return; }
 //        if (a>0xF000) log_debug("Write %04X %02X %04X\n",a,v,pc);
 //        if (a==0xF7FF && v==0xFF) toutput=1;
         w65816ram[a]=v;
