@@ -24,7 +24,7 @@ dmpcnt      =   &AA
 ltflag      =   &A8
 ltpchr      =   &A9
 lineno      =   &AA
-        
+
 ClaimFS     =   &FC5C       :\ *FSCLAIM ON|OFF flag
 FSFlag      =   &FC5D       :\ FS id when claimed
 PORT_CMD    =   &FC5E       :\ execute cmds on VDFS in host
@@ -308,7 +308,7 @@ RTS
         STA PORT_CMD
         LDA #&00
         RTS
-        
+
 .srwrit LDA #&D1            :\ Pass to host and return
         STA PORT_CMD
         LDA #&00
@@ -320,7 +320,7 @@ RTS
         ENDMACRO
 
 .roms
-{        
+{
         LDA     #&aa
         LDX     #&00
         LDY     #&ff
@@ -674,7 +674,7 @@ RTS
         JSR     bcdnyb
         LDA     lineno
         CLC
-        JSR     bcdnyb        
+        JSR     bcdnyb
         LDA     #' '
         JSR     OSWRCH
         TXA
@@ -866,7 +866,7 @@ CMP #&03:BNE P%+5:JMP FSCommandLookup:\ Filing system commands
 CMP #&06:BNE FSCemul:LDA #&77:JSR OSBYTE:LDA#&06
 .FSCemul
 STA PORT_A:LDA #&00:STA PORT_CMD :\ Pass to emulator.
-BCS FSCtube                 :\ start execution in tube?	
+BCS FSCtube                 :\ start execution in tube?
 .FSCDone
 RTS
 .FSCtube		:\ claim the tube.
@@ -1138,9 +1138,7 @@ RTS
 .ServOsword
 LDA &EF:CMP #127            :\ Check OSWORD number
 BNE P%+5:JSR Osword7F       :\ If FM disk access, play with memory
-PLA:TAY:PLA:TAX:PLA:PLP     :\ Restore registers
-STA PORT_A:LDA #&40:STA PORT_CMD :\Pass OSWORD call to emulator and return
-RTS	
+JMP ServExit
 \ -------------------------------------------------------------
 \ Corrupt bits of memory to simulate effects of real OSWORD &7F
 \ -------------------------------------------------------------
@@ -1251,7 +1249,7 @@ include "tubehost.asm"
         BEQ  done           ; end of message?
         JSR  OSWRCH
         JMP  imsglp
-.notube JMP  ServExit        
+.notube JMP  ServExit
 .done   JMP  ServClaim
 }
 
