@@ -913,8 +913,7 @@ INX:INX:LDA FSCommands,X
 BNE L833C                   :\ Loop until terminator found
 .L8384                      :\ No match, pass to host to try
 PLA:TAY:PLA:TAX:PLA         :\ Restore registers
-STA PORT_A:LDA #&00:STA PORT_CMD :\ Pass FSC to host to try
-RTS                         :\ And return
+JMP FSCemul                 :\ Pass FSC to host to try
 \ ---------------------------
 \ Filing System Command Table
 \ ---------------------------
