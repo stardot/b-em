@@ -466,9 +466,14 @@ static inline uint32_t indirect(void)
 
 static inline uint32_t indirectx(void)
 {
-    uint32_t temp = (readmem(pbr | pc) + dp + x.w) & 0xFFFF;
-    pc++;
-    return (readmemw(temp)) + dbr;
+    uint32_t addr = (readmem(pbr | pc++) + dp + x.w) & 0xFFFF;
+    return (readmemw(addr)) + dbr;
+}
+
+static inline uint32_t indirectxE(void)
+{
+    uint32_t addr = (readmem(pbr | pc++) + dp + x.b.l) & 0xff;
+    return (readmemw(addr)) + dbr;
 }
 
 static inline uint32_t jindirectx(void)
@@ -481,9 +486,23 @@ static inline uint32_t jindirectx(void)
 
 static inline uint32_t indirecty(void)
 {
-    uint32_t temp = (readmem(pbr | pc) + dp) & 0xFFFF;
-    pc++;
-    return (readmemw(temp)) + y.w + dbr;
+    uint32_t addr = (readmem(pbr | pc++) + dp) & 0xFFFF;
+    return (readmemw(addr)) + y.w + dbr;
+}
+
+static inline uint32_t indirectyE(void)
+{
+    uint32_t addr;
+    uint8_t imm = readmem(pbr | pc++);
+    if (imm == 0xff) {
+        addr = readmem((dp + imm) & 0xffff);
+        addr |= readmem(dp) << 8;
+    }
+    else {
+        addr = (imm + dp) & 0xFFFF;
+        addr = (readmemw(addr) + y.w + dbr) & 0xffff;
+    }
+    return addr;
 }
 
 static inline uint32_t sindirecty(void)
@@ -536,6 +555,39 @@ static inline void adcbin8(uint8_t temp)
     p.c = tempw & 0x100;
 }
 
+static inline void adcbcd8(uint8_t temp)
+{
+    int al, ah;
+
+    ah = 0;
+    al = (a.b.l & 0xF) + (temp & 0xF) + (p.c ? 1 : 0);
+    if (al > 9) {
+        al -= 10;
+        al &= 0xF;
+        ah = 1;
+    }
+    ah += ((a.b.l >> 4) + (temp >> 4));
+    p.v = (((ah << 4) ^ a.b.l) & 0x80) && !((a.b.l ^ temp) & 0x80);
+    p.c = 0;
+    if (ah > 9) {
+        p.c = 1;
+        ah -= 10;
+        ah &= 0xF;
+    }
+    a.b.l = (al & 0xF) | (ah << 4);
+    setzn8(a.b.l);
+    cycles--;
+    clockspc(6);
+}
+
+static inline void adc8(uint8_t temp)
+{
+    if (p.d)
+        adcbcd8(temp);
+    else
+        adcbin8(temp);
+}
+
 static inline void adcbin16(uint16_t tempw)
 {
     uint32_t templ = a.w+tempw + ((p.c) ? 1 : 0);
@@ -543,22 +595,6 @@ static inline void adcbin16(uint16_t tempw)
     a.w = templ & 0xFFFF;
     setzn16(a.w);
     p.c = templ & 0x10000;
-}
-
-static inline void adcbcd8(uint8_t temp)
-{
-    uint16_t tempw = (a.b.l & 0xF) + (temp & 0xF) + (p.c ? 1 : 0);
-    if (tempw > 9)
-        tempw += 6;
-    tempw += ((a.b.l & 0xF0) + (temp & 0xF0));
-    if (tempw>0x9F)
-        tempw += 0x60;
-    p.v = (!((a.b.l ^ temp) & 0x80) && ((a.b.l ^ tempw) & 0x80));
-    a.b.l = tempw & 0xFF;
-    setzn8(a.b.l);
-    p.c = tempw > 0xFF;
-    cycles--;
-    clockspc(6);
 }
 
 static inline void adcbcd16(uint16_t tempw)
@@ -592,6 +628,35 @@ static inline void sbcbin8(uint8_t temp)
     p.c = tempw <= 0xFF;
 }
 
+static inline void sbcbcd8(uint8_t temp)
+{
+    int al;
+    int16_t tempw;
+    int32_t tempv;
+
+    al = (a.b.l & 0x0f) - (temp & 0x0f) - (p.c ? 0 : 1);
+    tempw = a.b.l - temp - (p.c ? 0 : 1);
+    tempv = (signed char)a.b.l - (signed char)temp - (p.c ? 0 : 1);
+    p.v = ((tempw & 0x80) > 0) ^ ((tempv & 0x100) != 0);
+    p.c = tempw >= 0;
+    if (tempw < 0)
+       tempw -= 0x60;
+    if (al < 0)
+       tempw -= 0x06;
+    a.b.l = tempw & 0xFF;
+    setzn8(a.b.l);
+    cycles--;
+    clockspc(6);
+}
+
+static inline void sbc8(uint8_t temp)
+{
+    if (p.d)
+        sbcbcd8(temp);
+    else
+        sbcbin8(temp);
+}
+
 static inline void sbcbin16(uint16_t tempw)
 {
     uint32_t templ = a.w - tempw - ((p.c) ? 0 : 1);
@@ -599,22 +664,6 @@ static inline void sbcbin16(uint16_t tempw)
     a.w = templ & 0xFFFF;
     setzn16(a.w);
     p.c=templ<=0xFFFF;
-}
-
-static inline void sbcbcd8(uint8_t temp)
-{
-    uint16_t tempw=(a.b.l&0xF)-(temp&0xF)-(p.c?0:1);
-    if (tempw > 9)
-        tempw -= 6;
-    tempw += ((a.b.l & 0xF0) - (temp & 0xF0));
-    if (tempw > 0x9F)
-        tempw -= 0x60;
-    p.v = (((a.b.l ^ temp) & 0x80) && ((a.b.l ^ tempw) & 0x80));
-    a.b.l = tempw & 0xFF;
-    setzn8(a.b.l);
-    p.c = tempw <= 0xFF;
-    cycles--;
-    clockspc(6);
 }
 
 static inline void sbcbcd16(uint16_t tempw)
@@ -1353,15 +1402,25 @@ static void ldaIndirect8(void)
 
 static void ldaIndirectx8(void)
 {
-    addr = indirectx();
-    a.b.l = readmem(addr);
+    a.b.l = readmem(indirectx());
+    setzn8(a.b.l);
+}
+
+static void ldaIndirectxE(void)
+{
+    a.b.l = readmem(indirectxE());
     setzn8(a.b.l);
 }
 
 static void ldaIndirecty8(void)
 {
-    addr = indirecty();
-    a.b.l = readmem(addr);
+    a.b.l = readmem(indirecty());
+    setzn8(a.b.l);
+}
+
+static void ldaIndirectyE(void)
+{
+    a.b.l = readmem(indirectyE());
     setzn8(a.b.l);
 }
 
@@ -1535,14 +1594,22 @@ static void staIndirect8(void)
 
 static void staIndirectx8(void)
 {
-    addr = indirectx();
-    writemem(addr, a.b.l);
+    writemem(indirectx(), a.b.l);
+}
+
+static void staIndirectxE(void)
+{
+    writemem(indirectxE(), a.b.l);
 }
 
 static void staIndirecty8(void)
 {
-    addr = indirecty();
-    writemem(addr, a.b.l);
+    writemem(indirecty(), a.b.l);
+}
+
+static void staIndirectyE(void)
+{
+    writemem(indirectyE(), a.b.l);
 }
 
 static void staIndirectLong8(void)
@@ -1898,26 +1965,22 @@ static void adcIndirect8(void)
 
 static void adcIndirectx8(void)
 {
-    uint8_t temp;
-    addr = indirectx();
-    temp = readmem(addr);
-    if (p.d) {
-        adcbcd8(temp);
-    } else {
-        adcbin8(temp);
-    }
+    adc8(readmem(indirectx()));
+}
+
+static void adcIndirectxE(void)
+{
+    adc8(readmem(indirectxE()));
 }
 
 static void adcIndirecty8(void)
 {
-    uint8_t temp;
-    addr = indirecty();
-    temp = readmem(addr);
-    if (p.d) {
-        adcbcd8(temp);
-    } else {
-        adcbin8(temp);
-    }
+    adc8(readmem(indirecty()));
+}
+
+static void adcIndirectyE(void)
+{
+    adc8(readmem(indirectyE()));
 }
 
 static void adcsIndirecty8(void)
@@ -2207,74 +2270,42 @@ static void sbcAbsx8(void)
 
 static void sbcAbsy8(void)
 {
-    uint8_t temp;
-    addr = absolutey();
-    temp = readmem(addr);
-    if (p.d) {
-        sbcbcd8(temp);
-    } else {
-        sbcbin8(temp);
-    }
+    sbc8(readmem(absolutey()));
 }
 
 static void sbcLong8(void)
 {
-    uint8_t temp;
-    addr = absolutelong();
-    temp = readmem(addr);
-    if (p.d) {
-        sbcbcd8(temp);
-    } else {
-        sbcbin8(temp);
-    }
+    sbc8(readmem(absolutelong()));
 }
 
 static void sbcLongx8(void)
 {
-    uint8_t temp;
-    addr = absolutelongx();
-    temp = readmem(addr);
-    if (p.d) {
-        sbcbcd8(temp);
-    } else {
-        sbcbin8(temp);
-    }
+    sbc8(readmem(absolutelongx()));
 }
 
 static void sbcIndirect8(void)
 {
-    uint8_t temp;
-    addr = indirect();
-    temp = readmem(addr);
-    if (p.d) {
-        sbcbcd8(temp);
-    } else {
-        sbcbin8(temp);
-    }
+    sbc8(readmem(indirect()));
 }
 
 static void sbcIndirectx8(void)
 {
-    uint8_t temp;
-    addr = indirectx();
-    temp = readmem(addr);
-    if (p.d) {
-        sbcbcd8(temp);
-    } else {
-        sbcbin8(temp);
-    }
+    sbc8(readmem(indirectx()));
+}
+
+static void sbcIndirectxE(void)
+{
+    sbc8(readmem(indirectxE()));
 }
 
 static void sbcIndirecty8(void)
 {
-    uint8_t temp;
-    addr = indirecty();
-    temp = readmem(addr);
-    if (p.d) {
-        sbcbcd8(temp);
-    } else {
-        sbcbin8(temp);
-    }
+    sbc8(readmem(indirecty()));
+}
+
+static void sbcIndirectyE(void)
+{
+    sbc8(readmem(indirectyE()));
 }
 
 static void sbcsIndirecty8(void)
@@ -2571,10 +2602,22 @@ static void eorIndirectx8(void)
     setzn8(a.b.l);
 }
 
+static void eorIndirectxE(void)
+{
+    a.b.l ^= readmem(indirectxE());
+    setzn8(a.b.l);
+}
+
 static void eorIndirecty8(void)
 {
     addr = indirecty();
     a.b.l ^= readmem(addr);
+    setzn8(a.b.l);
+}
+
+static void eorIndirectyE(void)
+{
+    a.b.l ^= readmem(indirectyE());
     setzn8(a.b.l);
 }
 
@@ -2782,9 +2825,22 @@ static void andIndirectx8(void)
     setzn8(a.b.l);
 }
 
+static void andIndirectxE(void)
+{
+    a.b.l &= readmem(indirectxE());
+    setzn8(a.b.l);
+}
+
 static void andIndirecty8(void)
 {
     addr = indirecty();
+    a.b.l &= readmem(addr);
+    setzn8(a.b.l);
+}
+
+static void andIndirectyE(void)
+{
+    uint32_t addr = indirectyE();
     a.b.l &= readmem(addr);
     setzn8(a.b.l);
 }
@@ -2993,10 +3049,22 @@ static void oraIndirectx8(void)
     setzn8(a.b.l);
 }
 
+static void oraIndirectxE(void)
+{
+    a.b.l |= readmem(indirectxE());
+    setzn8(a.b.l);
+}
+
 static void oraIndirecty8(void)
 {
     addr = indirecty();
     a.b.l |= readmem(addr);
+    setzn8(a.b.l);
+}
+
+static void oraIndirectyE(void)
+{
+    a.b.l |= readmem(indirectyE());
     setzn8(a.b.l);
 }
 
@@ -3321,11 +3389,25 @@ static void cmpIndirectx8(void)
     p.c = (a.b.l >= temp);
 }
 
+static void cmpIndirectxE(void)
+{
+    uint8_t temp = readmem(indirectxE());
+    setzn8(a.b.l - temp);
+    p.c = (a.b.l >= temp);
+}
+
 static void cmpIndirecty8(void)
 {
     uint8_t temp;
     addr = indirecty();
     temp = readmem(addr);
+    setzn8(a.b.l - temp);
+    p.c = (a.b.l >= temp);
+}
+
+static void cmpIndirectyE(void)
+{
+    uint8_t temp = readmem(indirectyE());
     setzn8(a.b.l - temp);
     p.c = (a.b.l >= temp);
 }
@@ -3577,6 +3659,13 @@ static void pha8(void)
     s.w--;
 }
 
+static void phaE(void)
+{
+    pha8();
+    if (s.w < 0x100)
+        s.w = 0x1ff;
+}
+
 static void pha16(void)
 {
     readmem(pbr | pc);
@@ -3591,6 +3680,13 @@ static void phx8(void)
     readmem(pbr | pc);
     writemem(s.w, x.b.l);
     s.w--;
+}
+
+static void phxE(void)
+{
+    phx8();
+    if (s.w < 0x100)
+        s.w = 0x1ff;
 }
 
 static void phx16(void)
@@ -3609,6 +3705,13 @@ static void phy8(void)
     s.w--;
 }
 
+static void phyE(void)
+{
+    phy8();
+    if (s.w < 0x100)
+        s.w = 0x1ff;
+}
+
 static void phy16(void)
 {
     readmem(pbr | pc);
@@ -3618,14 +3721,26 @@ static void phy16(void)
     s.w--;
 }
 
-static void pla8(void)
+static inline void pla8_tail(void)
 {
     readmem(pbr | pc);
-    s.w++;
     cycles--;
     clockspc(6);
     a.b.l = readmem(s.w);
     setzn8(a.b.l);
+}
+
+static void pla8(void)
+{
+    ++s.w;
+    pla8_tail();
+}
+
+static void plaE(void)
+{
+    if (++s.w >= 0x200)
+        s.w = 0x100;
+    pla8_tail();
 }
 
 static void pla16(void)
@@ -3640,14 +3755,26 @@ static void pla16(void)
     setzn16(a.w);
 }
 
-static void plx8(void)
+static inline void plx8_tail(void)
 {
     readmem(pbr | pc);
-    s.w++;
     cycles--;
     clockspc(6);
     x.b.l = readmem(s.w);
     setzn8(x.b.l);
+}
+
+static void plx8(void)
+{
+    ++s.w;
+    plx8_tail();
+}
+
+static void plxE(void)
+{
+    if (++s.w >= 0x200)
+        s.w = 0x100;
+    plx8_tail();
 }
 
 static void plx16(void)
@@ -3662,14 +3789,26 @@ static void plx16(void)
     setzn16(x.w);
 }
 
-static void ply8(void)
+static void ply8_tail(void)
 {
     readmem(pbr | pc);
-    s.w++;
     cycles--;
     clockspc(6);
     y.b.l = readmem(s.w);
     setzn8(y.b.l);
+}
+
+static void ply8(void)
+{
+    ++s.w;
+    ply8_tail();
+}
+
+static void plyE(void)
+{
+    if (++s.w >= 0x200)
+        s.w = 0x100;
+    ply8_tail();
 }
 
 static void ply16(void)
@@ -3711,7 +3850,7 @@ static void plp(void)
     updatecpumode();
 }
 
-static void plpe(void)
+static void plpE(void)
 {
     s.b.l++;
     unpack_flags_em(readmem(s.w));
@@ -3727,7 +3866,7 @@ static void php(void)
     s.w--;
 }
 
-static void phpe(void)
+static void phpE(void)
 {
     readmem(pbr | pc);
     writemem(s.w, pack_flags_em(0x30));
@@ -3992,10 +4131,9 @@ static void jsr(void)
     pc = addr;
 }
 
-static void jsre(void)
+static void jsrE(void)
 {
-    addr = readmemw(pbr | pc);
-    pc++;
+    uint32_t addr = readmemw(pbr | pc++);
     readmem(pbr | pc);
     writemem(s.w, pc >> 8);
     s.b.l--;
@@ -4015,9 +4153,9 @@ static void jsrIndx(void)
     pc = readmemw(addr);
 }
 
-static void jsrIndxe(void)
+static void jsrIndxE(void)
 {
-    addr = jindirectx();
+    uint32_t addr = jindirectx();
     pc--;
     writemem(s.w, pc >> 8);
     s.b.l--;
@@ -4042,10 +4180,10 @@ static void jsl(void)
     pbr = temp << 16;
 }
 
-static void jsle(void)
+static void jslE(void)
 {
     uint8_t temp;
-    addr = readmemw(pbr | pc);
+    uint32_t addr = readmemw(pbr | pc);
     pc += 2;
     temp = readmem(pbr | pc);
     writemem(s.w, pbr >> 16);
@@ -4069,7 +4207,7 @@ static void rtl(void)
     pc++;
 }
 
-static void rtle(void)
+static void rtlE(void)
 {
     cycles -= 3;
     clockspc(18);
@@ -4091,7 +4229,7 @@ static void rts(void)
     pc++;
 }
 
-static void rtse(void)
+static void rtsE(void)
 {
     cycles -= 3;
     clockspc(18);
@@ -4117,7 +4255,7 @@ static void rti(void)
     updatecpumode();
 }
 
-static void rtie(void)
+static void rtiE(void)
 {
     cycles--;
     s.b.l++;
@@ -4884,15 +5022,12 @@ static void op_brk(void)
     p.d = 0;
 }
 
-static void brke(void)
+static void brkE(void)
 {
     pc++;
-    writemem(s.w, pc >> 8);
-    s.w--;
-    writemem(s.w, pc & 0xFF);
-    s.w--;
-    writemem(s.w, pack_flags_em(0x30));
-    s.w--;
+    writemem(s.w--, pc >> 8);
+    writemem(s.w--, pc & 0xFF);
+    writemem(s.w--, pack_flags_em(0x30));
     pc = readmemw(0xFFFE);
     pbr = 0;
     p.i = 1;
@@ -5980,15 +6115,15 @@ static void (*opcodes[5][256])() =
         sbcLongx16,         /* X0M0 ff */
     },
     {
-        brke,               /* EMUL 00 */
-        oraIndirectx8,      /* EMUL 01 */
+        brkE,               /* EMUL 00 */
+        oraIndirectxE,      /* EMUL 01 */
         cope,               /* EMUL 02 */
         oraSp8,             /* EMUL 03 */
         tsbZp8,             /* EMUL 04 */
         oraZp8,             /* EMUL 05 */
         aslZp8,             /* EMUL 06 */
         oraIndirectLong8,   /* EMUL 07 */
-        phpe,               /* EMUL 08 */
+        phpE,               /* EMUL 08 */
         oraImm8,            /* EMUL 09 */
         asla8,              /* EMUL 0a */
         phd,                /* EMUL 0b */
@@ -5997,7 +6132,7 @@ static void (*opcodes[5][256])() =
         aslAbs8,            /* EMUL 0e */
         oraLong8,           /* EMUL 0f */
         bpl,                /* EMUL 10 */
-        oraIndirecty8,      /* EMUL 11 */
+        oraIndirectyE,      /* EMUL 11 */
         oraIndirect8,       /* EMUL 12 */
         orasIndirecty8,     /* EMUL 13 */
         trbZp8,             /* EMUL 14 */
@@ -6012,15 +6147,15 @@ static void (*opcodes[5][256])() =
         oraAbsx8,           /* EMUL 1d */
         aslAbsx8,           /* EMUL 1e */
         oraLongx8,          /* EMUL 1f */
-        jsre,               /* EMUL 20 */
-        andIndirectx8,      /* EMUL 21 */
-        jsle,               /* EMUL 22 */
+        jsrE,               /* EMUL 20 */
+        andIndirectxE,      /* EMUL 21 */
+        jslE,               /* EMUL 22 */
         andSp8,             /* EMUL 23 */
         bitZp8,             /* EMUL 24 */
         andZp8,             /* EMUL 25 */
         rolZp8,             /* EMUL 26 */
         andIndirectLong8,   /* EMUL 27 */
-        plpe,               /* EMUL 28 */
+        plpE,               /* EMUL 28 */
         andImm8,            /* EMUL 29 */
         rola8,              /* EMUL 2a */
         pld,                /* EMUL 2b */
@@ -6029,7 +6164,7 @@ static void (*opcodes[5][256])() =
         rolAbs8,            /* EMUL 2e */
         andLong8,           /* EMUL 2f */
         bmi,                /* EMUL 30 */
-        andIndirecty8,      /* EMUL 31 */
+        andIndirectyE,      /* EMUL 31 */
         andIndirect8,       /* EMUL 32 */
         andsIndirecty8,     /* EMUL 33 */
         bitZpx8,            /* EMUL 34 */
@@ -6044,15 +6179,15 @@ static void (*opcodes[5][256])() =
         andAbsx8,           /* EMUL 3d */
         rolAbsx8,           /* EMUL 3e */
         andLongx8,          /* EMUL 3f */
-        rtie,               /* EMUL 40 */
-        eorIndirectx8,      /* EMUL 41 */
+        rtiE,               /* EMUL 40 */
+        eorIndirectxE,      /* EMUL 41 */
         wdm,                /* EMUL 42 */
         eorSp8,             /* EMUL 43 */
         mvp,                /* EMUL 44 */
         eorZp8,             /* EMUL 45 */
         lsrZp8,             /* EMUL 46 */
         eorIndirectLong8,   /* EMUL 47 */
-        pha8,               /* EMUL 48 */
+        phaE,               /* EMUL 48 */
         eorImm8,            /* EMUL 49 */
         lsra8,              /* EMUL 4a */
         phke,               /* EMUL 4b */
@@ -6061,7 +6196,7 @@ static void (*opcodes[5][256])() =
         lsrAbs8,            /* EMUL 4e */
         eorLong8,           /* EMUL 4f */
         bvc,                /* EMUL 50 */
-        eorIndirecty8,      /* EMUL 51 */
+        eorIndirectyE,      /* EMUL 51 */
         eorIndirect8,       /* EMUL 52 */
         eorsIndirecty8,     /* EMUL 53 */
         mvn,                /* EMUL 54 */
@@ -6070,30 +6205,30 @@ static void (*opcodes[5][256])() =
         eorIndirectLongy8,  /* EMUL 57 */
         cli,                /* EMUL 58 */
         eorAbsy8,           /* EMUL 59 */
-        phy8,               /* EMUL 5a */
+        phyE,               /* EMUL 5a */
         tcd,                /* EMUL 5b */
         jmplong,            /* EMUL 5c */
         eorAbsx8,           /* EMUL 5d */
         lsrAbsx8,           /* EMUL 5e */
         eorLongx8,          /* EMUL 5f */
-        rtse,               /* EMUL 60 */
-        adcIndirectx8,      /* EMUL 61 */
+        rtsE,               /* EMUL 60 */
+        adcIndirectxE,      /* EMUL 61 */
         per,                /* EMUL 62 */
         adcSp8,             /* EMUL 63 */
         stzZp8,             /* EMUL 64 */
         adcZp8,             /* EMUL 65 */
         rorZp8,             /* EMUL 66 */
         adcIndirectLong8,   /* EMUL 67 */
-        pla8,               /* EMUL 68 */
+        plaE,               /* EMUL 68 */
         adcImm8,            /* EMUL 69 */
         rora8,              /* EMUL 6a */
-        rtle,               /* EMUL 6b */
+        rtlE,               /* EMUL 6b */
         jmpind,             /* EMUL 6c */
         adcAbs8,            /* EMUL 6d */
         rorAbs8,            /* EMUL 6e */
         adcLong8,           /* EMUL 6f */
         bvs,                /* EMUL 70 */
-        adcIndirecty8,      /* EMUL 71 */
+        adcIndirectyE,      /* EMUL 71 */
         adcIndirect8,       /* EMUL 72 */
         adcsIndirecty8,     /* EMUL 73 */
         stzZpx8,            /* EMUL 74 */
@@ -6102,14 +6237,14 @@ static void (*opcodes[5][256])() =
         adcIndirectLongy8,  /* EMUL 77 */
         sei,                /* EMUL 78 */
         adcAbsy8,           /* EMUL 79 */
-        ply8,               /* EMUL 7a */
+        plyE,               /* EMUL 7a */
         tdc,                /* EMUL 7b */
         jmpindx,            /* EMUL 7c */
         adcAbsx8,           /* EMUL 7d */
         rorAbsx8,           /* EMUL 7e */
         adcLongx8,          /* EMUL 7f */
         bra,                /* EMUL 80 */
-        staIndirectx8,      /* EMUL 81 */
+        staIndirectxE,      /* EMUL 81 */
         brl,                /* EMUL 82 */
         staSp8,             /* EMUL 83 */
         styZp8,             /* EMUL 84 */
@@ -6125,7 +6260,7 @@ static void (*opcodes[5][256])() =
         stxAbs8,            /* EMUL 8e */
         staLong8,           /* EMUL 8f */
         bcc,                /* EMUL 90 */
-        staIndirecty8,      /* EMUL 91 */
+        staIndirectyE,      /* EMUL 91 */
         staIndirect8,       /* EMUL 92 */
         staSIndirecty8,     /* EMUL 93 */
         styZpx8,            /* EMUL 94 */
@@ -6141,7 +6276,7 @@ static void (*opcodes[5][256])() =
         stzAbsx8,           /* EMUL 9e */
         staLongx8,          /* EMUL 9f */
         ldyImm8,            /* EMUL a0 */
-        ldaIndirectx8,      /* EMUL a1 */
+        ldaIndirectxE,      /* EMUL a1 */
         ldxImm8,            /* EMUL a2 */
         ldaSp8,             /* EMUL a3 */
         ldyZp8,             /* EMUL a4 */
@@ -6157,7 +6292,7 @@ static void (*opcodes[5][256])() =
         ldxAbs8,            /* EMUL ae */
         ldaLong8,           /* EMUL af */
         bcs,                /* EMUL b0 */
-        ldaIndirecty8,      /* EMUL b1 */
+        ldaIndirectyE,      /* EMUL b1 */
         ldaIndirect8,       /* EMUL b2 */
         ldaSIndirecty8,     /* EMUL b3 */
         ldyZpx8,            /* EMUL b4 */
@@ -6173,7 +6308,7 @@ static void (*opcodes[5][256])() =
         ldxAbsy8,           /* EMUL be */
         ldaLongx8,          /* EMUL bf */
         cpyImm8,            /* EMUL c0 */
-        cmpIndirectx8,      /* EMUL c1 */
+        cmpIndirectxE,      /* EMUL c1 */
         rep65816,           /* EMUL c2 */
         cmpSp8,             /* EMUL c3 */
         cpyZp8,             /* EMUL c4 */
@@ -6189,7 +6324,7 @@ static void (*opcodes[5][256])() =
         decAbs8,            /* EMUL ce */
         cmpLong8,           /* EMUL cf */
         bne,                /* EMUL d0 */
-        cmpIndirecty8,      /* EMUL d1 */
+        cmpIndirectyE,      /* EMUL d1 */
         cmpIndirect8,       /* EMUL d2 */
         cmpsIndirecty8,     /* EMUL d3 */
         pei,                /* EMUL d4 */
@@ -6198,14 +6333,14 @@ static void (*opcodes[5][256])() =
         cmpIndirectLongy8,  /* EMUL d7 */
         cld,                /* EMUL d8 */
         cmpAbsy8,           /* EMUL d9 */
-        phx8,               /* EMUL da */
+        phxE,               /* EMUL da */
         stp,                /* EMUL db */
         jmlind,             /* EMUL dc */
         cmpAbsx8,           /* EMUL dd */
         decAbsx8,           /* EMUL de */
         cmpLongx8,          /* EMUL df */
         cpxImm8,            /* EMUL e0 */
-        sbcIndirectx8,      /* EMUL e1 */
+        sbcIndirectxE,      /* EMUL e1 */
         sep,                /* EMUL e2 */
         sbcSp8,             /* EMUL e3 */
         cpxZp8,             /* EMUL e4 */
@@ -6221,7 +6356,7 @@ static void (*opcodes[5][256])() =
         incAbs8,            /* EMUL ee */
         sbcLong8,           /* EMUL ef */
         beq,                /* EMUL f0 */
-        sbcIndirecty8,      /* EMUL f1 */
+        sbcIndirectyE,      /* EMUL f1 */
         sbcIndirect8,       /* EMUL f2 */
         sbcsIndirecty8,     /* EMUL f3 */
         pea,                /* EMUL f4 */
@@ -6230,9 +6365,9 @@ static void (*opcodes[5][256])() =
         sbcIndirectLongy8,  /* EMUL f7 */
         sed,                /* EMUL f8 */
         sbcAbsy8,           /* EMUL f9 */
-        plx8,               /* EMUL fa */
+        plxE,               /* EMUL fa */
         xce,                /* EMUL fb */
-        jsrIndxe,           /* EMUL fc */
+        jsrIndxE,           /* EMUL fc */
         sbcAbsx8,           /* EMUL fd */
         incAbsx8,           /* EMUL fe */
         sbcLongx8,          /* EMUL ff */
