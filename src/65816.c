@@ -511,121 +511,132 @@ static inline uint32_t indirectly(void)
 }
 
 /*Flag setting*/
-#define setzn8(v)  p.z=!(v); p.n=(v)&0x80
-#define setzn16(v) p.z=!(v); p.n=(v)&0x8000
 
-/*ADC/SBC macros*/
-#define ADC8()  tempw=a.b.l+temp+((p.c)?1:0);                          \
-                p.v=(!((a.b.l^temp)&0x80)&&((a.b.l^tempw)&0x80));       \
-                a.b.l=tempw&0xFF;                                       \
-                setzn8(a.b.l);                                          \
-                p.c=tempw&0x100;
+static inline void setzn8(uint8_t v)
+{
+    p.z=!(v);
+    p.n=(v)&0x80;
+}
 
-#define ADC16() templ=a.w+tempw+((p.c)?1:0);                           \
-                p.v=(!((a.w^tempw)&0x8000)&&((a.w^templ)&0x8000));      \
-                a.w=templ&0xFFFF;                                       \
-                setzn16(a.w);                                           \
-                p.c=templ&0x10000;
+static inline void setzn16(uint16_t v)
+{
+    p.z=!(v);
+    p.n=(v)&0x8000;
+}
 
-#define ADCBCD8()                                                       \
-                tempw=(a.b.l&0xF)+(temp&0xF)+(p.c?1:0);                 \
-                if (tempw>9)                                            \
-                {                                                       \
-                        tempw+=6;                                       \
-                }                                                       \
-                tempw+=((a.b.l&0xF0)+(temp&0xF0));                      \
-                if (tempw>0x9F)                                         \
-                {                                                       \
-                        tempw+=0x60;                                    \
-                }                                                       \
-                p.v=(!((a.b.l^temp)&0x80)&&((a.b.l^tempw)&0x80));       \
-                a.b.l=tempw&0xFF;                                       \
-                setzn8(a.b.l);                                          \
-                p.c=tempw>0xFF;                                         \
-                cycles--; clockspc(6);
+/*ADC/SBC*/
 
-#define ADCBCD16()                                                      \
-                templ=(a.w&0xF)+(tempw&0xF)+(p.c?1:0);                  \
-                if (templ>9)                                            \
-                {                                                       \
-                        templ+=6;                                       \
-                }                                                       \
-                templ+=((a.w&0xF0)+(tempw&0xF0));                       \
-                if (templ>0x9F)                                         \
-                {                                                       \
-                        templ+=0x60;                                    \
-                }                                                       \
-                templ+=((a.w&0xF00)+(tempw&0xF00));                     \
-                if (templ>0x9FF)                                        \
-                {                                                       \
-                        templ+=0x600;                                   \
-                }                                                       \
-                templ+=((a.w&0xF000)+(tempw&0xF000));                   \
-                if (templ>0x9FFF)                                       \
-                {                                                       \
-                        templ+=0x6000;                                  \
-                }                                                       \
-                p.v=(!((a.w^tempw)&0x8000)&&((a.w^templ)&0x8000));      \
-                a.w=templ&0xFFFF;                                       \
-                setzn16(a.w);                                           \
-                p.c=templ>0xFFFF;                                       \
-                cycles--; clockspc(6);
+static inline void adcbin8(uint8_t temp)
+{
+    uint16_t tempw=a.b.l + temp + ((p.c) ? 1 : 0);
+    p.v = (!((a.b.l ^ temp) & 0x80) && ((a.b.l ^ tempw) & 0x80));
+    a.b.l = tempw & 0xFF;
+    setzn8(a.b.l);
+    p.c = tempw & 0x100;
+}
 
-#define SBC8()  tempw=a.b.l-temp-((p.c)?0:1);                          \
-                p.v=(((a.b.l^temp)&0x80)&&((a.b.l^tempw)&0x80));        \
-                a.b.l=tempw&0xFF;                                       \
-                setzn8(a.b.l);                                          \
-                p.c=tempw<=0xFF;
+static inline void adcbin16(uint16_t tempw)
+{
+    uint32_t templ = a.w+tempw + ((p.c) ? 1 : 0);
+    p.v = (!((a.w ^ tempw) & 0x8000) && ((a.w ^ templ) & 0x8000));
+    a.w = templ & 0xFFFF;
+    setzn16(a.w);
+    p.c = templ & 0x10000;
+}
 
-#define SBC16() templ=a.w-tempw-((p.c)?0:1);                           \
-                p.v=(((a.w^tempw)&(a.w^templ))&0x8000);                 \
-                a.w=templ&0xFFFF;                                       \
-                setzn16(a.w);                                           \
-                p.c=templ<=0xFFFF;
+static inline void adcbcd8(uint8_t temp)
+{
+    uint16_t tempw = (a.b.l & 0xF) + (temp & 0xF) + (p.c ? 1 : 0);
+    if (tempw > 9)
+        tempw += 6;
+    tempw += ((a.b.l & 0xF0) + (temp & 0xF0));
+    if (tempw>0x9F)
+        tempw += 0x60;
+    p.v = (!((a.b.l ^ temp) & 0x80) && ((a.b.l ^ tempw) & 0x80));
+    a.b.l = tempw & 0xFF;
+    setzn8(a.b.l);
+    p.c = tempw > 0xFF;
+    cycles--;
+    clockspc(6);
+}
 
-#define SBCBCD8()                                                       \
-                tempw=(a.b.l&0xF)-(temp&0xF)-(p.c?0:1);                 \
-                if (tempw>9)                                            \
-                {                                                       \
-                        tempw-=6;                                       \
-                }                                                       \
-                tempw+=((a.b.l&0xF0)-(temp&0xF0));                      \
-                if (tempw>0x9F)                                         \
-                {                                                       \
-                        tempw-=0x60;                                    \
-                }                                                       \
-                p.v=(((a.b.l^temp)&0x80)&&((a.b.l^tempw)&0x80));        \
-                a.b.l=tempw&0xFF;                                       \
-                setzn8(a.b.l);                                          \
-                p.c=tempw<=0xFF;                                        \
-                cycles--; clockspc(6);
+static inline void adcbcd16(uint16_t tempw)
+{
+    uint32_t templ = (a.w & 0xF) + (tempw & 0xF) + (p.c ? 1 : 0);
+    if (templ > 9)
+        templ += 6;
+    templ += ((a.w & 0xF0) + (tempw & 0xF0));
+    if (templ > 0x9F)
+        templ += 0x60;
+    templ += ((a.w & 0xF00) + (tempw & 0xF00));
+    if (templ > 0x9FF)
+        templ += 0x600;
+    templ += ((a.w & 0xF000) + (tempw & 0xF000));
+    if (templ > 0x9FFF)
+        templ += 0x6000;
+    p.v= (!((a.w ^ tempw) & 0x8000) && ((a.w ^ templ) & 0x8000));
+    a.w = templ & 0xFFFF;
+    setzn16(a.w);
+    p.c=templ > 0xFFFF;
+    cycles--;
+    clockspc(6);
+}
 
-#define SBCBCD16()                                                      \
-                templ=(a.w&0xF)-(tempw&0xF)-(p.c?0:1);                  \
-                if (templ>9)                                            \
-                {                                                       \
-                        templ-=6;                                       \
-                }                                                       \
-                templ+=((a.w&0xF0)-(tempw&0xF0));                       \
-                if (templ>0x9F)                                         \
-                {                                                       \
-                        templ-=0x60;                                    \
-                }                                                       \
-                templ+=((a.w&0xF00)-(tempw&0xF00));                     \
-                if (templ>0x9FF)                                        \
-                {                                                       \
-                        templ-=0x600;                                   \
-                }                                                       \
-                templ+=((a.w&0xF000)-(tempw&0xF000));                   \
-                if (templ>0x9FFF)                                       \
-                {                                                       \
-                        templ-=0x6000;                                  \
-                }                                                       \
-                p.v=(((a.w^tempw)&0x8000)&&((a.w^templ)&0x8000));       \
-                a.w=templ&0xFFFF;                                       \
-                setzn16(a.w);                                           \
-                p.c=templ<=0xFFFF;                                      \
-                cycles--; clockspc(6);
+static inline void sbcbin8(uint8_t temp)
+{
+    uint16_t tempw = a.b.l - temp - ((p.c) ? 0 : 1);
+    p.v = (((a.b.l ^ temp) & 0x80) && ((a.b.l ^ tempw) & 0x80));
+    a.b.l = tempw & 0xFF;
+    setzn8(a.b.l);
+    p.c = tempw <= 0xFF;
+}
+
+static inline void sbcbin16(uint16_t tempw)
+{
+    uint32_t templ = a.w - tempw - ((p.c) ? 0 : 1);
+    p.v = (((a.w ^ tempw) & (a.w ^ templ)) & 0x8000);
+    a.w = templ & 0xFFFF;
+    setzn16(a.w);
+    p.c=templ<=0xFFFF;
+}
+
+static inline void sbcbcd8(uint8_t temp)
+{
+    uint16_t tempw=(a.b.l&0xF)-(temp&0xF)-(p.c?0:1);
+    if (tempw > 9)
+        tempw -= 6;
+    tempw += ((a.b.l & 0xF0) - (temp & 0xF0));
+    if (tempw > 0x9F)
+        tempw -= 0x60;
+    p.v = (((a.b.l ^ temp) & 0x80) && ((a.b.l ^ tempw) & 0x80));
+    a.b.l = tempw & 0xFF;
+    setzn8(a.b.l);
+    p.c = tempw <= 0xFF;
+    cycles--;
+    clockspc(6);
+}
+
+static inline void sbcbcd16(uint16_t tempw)
+{
+    uint32_t templ = (a.w & 0xF) - (tempw & 0xF) - (p.c ? 0 : 1);
+    if (templ > 9)
+        templ -= 6;
+    templ += ((a.w & 0xF0) - (tempw & 0xF0));
+    if (templ > 0x9F)
+        templ -= 0x60;
+    templ += ((a.w & 0xF00) - (tempw & 0xF00));
+    if (templ > 0x9FF)
+        templ -= 0x600;
+    templ += ((a.w & 0xF000) - (tempw & 0xF000));
+    if (templ > 0x9FFF)
+        templ -= 0x6000;
+    p.v = (((a.w ^ tempw) & 0x8000) && ((a.w ^ templ) & 0x8000));
+    a.w = templ & 0xFFFF;
+    setzn16(a.w);
+    p.c=templ <= 0xFFFF;
+    cycles--;
+    clockspc(6);
+}
 
 /*Instructions*/
 static void inca8(void)
@@ -1767,780 +1778,717 @@ static void stzAbsx16(void)
 /*ADC group*/
 static void adcImm8(void)
 {
-    uint16_t tempw;
     uint8_t temp = readmem(pbr | pc);
     pc++;
     if (p.d) {
-        ADCBCD8();
+        adcbcd8(temp);
     } else {
-        ADC8();
+        adcbin8(temp);
     }
 }
 
 static void adcZp8(void)
 {
-    uint16_t tempw;
     uint8_t temp;
     addr = zeropage();
     temp = readmem(addr);
     if (p.d) {
-        ADCBCD8();
+        adcbcd8(temp);
     } else {
-        ADC8();
+        adcbin8(temp);
     }
 }
 
 static void adcZpx8(void)
 {
-    uint16_t tempw;
     uint8_t temp;
     addr = zeropagex();
     temp = readmem(addr);
     if (p.d) {
-        ADCBCD8();
+        adcbcd8(temp);
     } else {
-        ADC8();
+        adcbin8(temp);
     }
 }
 
 static void adcSp8(void)
 {
-    uint16_t tempw;
     uint8_t temp;
     addr = stack();
     temp = readmem(addr);
     if (p.d) {
-        ADCBCD8();
+        adcbcd8(temp);
     } else {
-        ADC8();
+        adcbin8(temp);
     }
 }
 
 static void adcAbs8(void)
 {
-    uint16_t tempw;
     uint8_t temp;
     addr = absolute();
     temp = readmem(addr);
     if (p.d) {
-        ADCBCD8();
+        adcbcd8(temp);
     } else {
-        ADC8();
+        adcbin8(temp);
     }
 }
 
 static void adcAbsx8(void)
 {
-    uint16_t tempw;
     uint8_t temp;
     addr = absolutex();
     temp = readmem(addr);
     if (p.d) {
-        ADCBCD8();
+        adcbcd8(temp);
     } else {
-        ADC8();
+        adcbin8(temp);
     }
 }
 
 static void adcAbsy8(void)
 {
-    uint16_t tempw;
     uint8_t temp;
     addr = absolutey();
     temp = readmem(addr);
     if (p.d) {
-        ADCBCD8();
+        adcbcd8(temp);
     } else {
-        ADC8();
+        adcbin8(temp);
     }
 }
 
 static void adcLong8(void)
 {
-    uint16_t tempw;
     uint8_t temp;
     addr = absolutelong();
     temp = readmem(addr);
     if (p.d) {
-        ADCBCD8();
+        adcbcd8(temp);
     } else {
-        ADC8();
+        adcbin8(temp);
     }
 }
 
 static void adcLongx8(void)
 {
-    uint16_t tempw;
     uint8_t temp;
     addr = absolutelongx();
     temp = readmem(addr);
     if (p.d) {
-        ADCBCD8();
+        adcbcd8(temp);
     } else {
-        ADC8();
+        adcbin8(temp);
     }
 }
 
 static void adcIndirect8(void)
 {
-    uint16_t tempw;
     uint8_t temp;
     addr = indirect();
     temp = readmem(addr);
     if (p.d) {
-        ADCBCD8();
+        adcbcd8(temp);
     } else {
-        ADC8();
+        adcbin8(temp);
     }
 }
 
 static void adcIndirectx8(void)
 {
-    uint16_t tempw;
     uint8_t temp;
     addr = indirectx();
     temp = readmem(addr);
     if (p.d) {
-        ADCBCD8();
+        adcbcd8(temp);
     } else {
-        ADC8();
+        adcbin8(temp);
     }
 }
 
 static void adcIndirecty8(void)
 {
-    uint16_t tempw;
     uint8_t temp;
     addr = indirecty();
     temp = readmem(addr);
     if (p.d) {
-        ADCBCD8();
+        adcbcd8(temp);
     } else {
-        ADC8();
+        adcbin8(temp);
     }
 }
 
 static void adcsIndirecty8(void)
 {
-    uint16_t tempw;
     uint8_t temp;
     addr = sindirecty();
     temp = readmem(addr);
     if (p.d) {
-        ADCBCD8();
+        adcbcd8(temp);
     } else {
-        ADC8();
+        adcbin8(temp);
     }
 }
 
 static void adcIndirectLong8(void)
 {
-    uint16_t tempw;
     uint8_t temp;
     addr = indirectl();
     temp = readmem(addr);
     if (p.d) {
-        ADCBCD8();
+        adcbcd8(temp);
     } else {
-        ADC8();
+        adcbin8(temp);
     }
 }
 
 static void adcIndirectLongy8(void)
 {
-    uint16_t tempw;
     uint8_t temp;
     addr = indirectly();
     temp = readmem(addr);
     if (p.d) {
-        ADCBCD8();
+        adcbcd8(temp);
     } else {
-        ADC8();
+        adcbin8(temp);
     }
 }
 
 static void adcImm16(void)
 {
-    uint32_t templ;
-    uint16_t tempw;
-    tempw = readmemw(pbr | pc);
+    uint16_t tempw = readmemw(pbr | pc);
     pc += 2;
     if (p.d) {
-        ADCBCD16();
+        adcbcd16(tempw);
     } else {
-        ADC16();
+        adcbin16(tempw);
     }
 }
 
 static void adcZp16(void)
 {
-    uint32_t templ;
-    uint16_t tempw;
     addr = zeropage();
-    tempw = readmemw(addr);
+    uint16_t tempw = readmemw(addr);
     if (p.d) {
-        ADCBCD16();
+        adcbcd16(tempw);
     } else {
-        ADC16();
+        adcbin16(tempw);
     }
 }
 
 static void adcZpx16(void)
 {
-    uint32_t templ;
-    uint16_t tempw;
     addr = zeropagex();
-    tempw = readmemw(addr);
+    uint16_t tempw = readmemw(addr);
     if (p.d) {
-        ADCBCD16();
+        adcbcd16(tempw);
     } else {
-        ADC16();
+        adcbin16(tempw);
     }
 }
 
 static void adcSp16(void)
 {
-    uint32_t templ;
     uint16_t tempw;
     addr = stack();
     tempw = readmemw(addr);
     if (p.d) {
-        ADCBCD16();
+        adcbcd16(tempw);
     } else {
-        ADC16();
+        adcbin16(tempw);
     }
 }
 
 static void adcAbs16(void)
 {
-    uint32_t templ;
     uint16_t tempw;
     addr = absolute();
     tempw = readmemw(addr);
     if (p.d) {
-        ADCBCD16();
+        adcbcd16(tempw);
     } else {
-        ADC16();
+        adcbin16(tempw);
     }
 }
 
 static void adcAbsx16(void)
 {
-    uint32_t templ;
     uint16_t tempw;
     addr = absolutex();
     tempw = readmemw(addr);
     if (p.d) {
-        ADCBCD16();
+        adcbcd16(tempw);
     } else {
-        ADC16();
+        adcbin16(tempw);
     }
 }
 
 static void adcAbsy16(void)
 {
-    uint32_t templ;
     uint16_t tempw;
     addr = absolutey();
     tempw = readmemw(addr);
     if (p.d) {
-        ADCBCD16();
+        adcbcd16(tempw);
     } else {
-        ADC16();
+        adcbin16(tempw);
     }
 }
 
 static void adcLong16(void)
 {
-    uint32_t templ;
     uint16_t tempw;
     addr = absolutelong();
     tempw = readmemw(addr);
     if (p.d) {
-        ADCBCD16();
+        adcbcd16(tempw);
     } else {
-        ADC16();
+        adcbin16(tempw);
     }
 }
 
 static void adcLongx16(void)
 {
-    uint32_t templ;
     uint16_t tempw;
     addr = absolutelongx();
     tempw = readmemw(addr);
     if (p.d) {
-        ADCBCD16();
+        adcbcd16(tempw);
     } else {
-        ADC16();
+        adcbin16(tempw);
     }
 }
 
 static void adcIndirect16(void)
 {
-    uint32_t templ;
     uint16_t tempw;
     addr = indirect();
     tempw = readmemw(addr);
     if (p.d) {
-        ADCBCD16();
+        adcbcd16(tempw);
     } else {
-        ADC16();
+        adcbin16(tempw);
     }
 }
 
 static void adcIndirectx16(void)
 {
-    uint32_t templ;
     uint16_t tempw;
     addr = indirectx();
     tempw = readmemw(addr);
     if (p.d) {
-        ADCBCD16();
+        adcbcd16(tempw);
     } else {
-        ADC16();
+        adcbin16(tempw);
     }
 }
 
 static void adcIndirecty16(void)
 {
-    uint32_t templ;
     uint16_t tempw;
     addr = indirecty();
     tempw = readmemw(addr);
     if (p.d) {
-        ADCBCD16();
+        adcbcd16(tempw);
     } else {
-        ADC16();
+        adcbin16(tempw);
     }
 }
 
 static void adcsIndirecty16(void)
 {
-    uint32_t templ;
     uint16_t tempw;
     addr = sindirecty();
     tempw = readmemw(addr);
     if (p.d) {
-        ADCBCD16();
+        adcbcd16(tempw);
     } else {
-        ADC16();
+        adcbin16(tempw);
     }
 }
 
 static void adcIndirectLong16(void)
 {
-    uint32_t templ;
     uint16_t tempw;
     addr = indirectl();
     tempw = readmemw(addr);
     if (p.d) {
-        ADCBCD16();
+        adcbcd16(tempw);
     } else {
-        ADC16();
+        adcbin16(tempw);
     }
 }
 
 static void adcIndirectLongy16(void)
 {
-    uint32_t templ;
     uint16_t tempw;
     addr = indirectly();
     tempw = readmemw(addr);
     if (p.d) {
-        ADCBCD16();
+        adcbcd16(tempw);
     } else {
-        ADC16();
+        adcbin16(tempw);
     }
 }
 
 /*SBC group*/
 static void sbcImm8(void)
 {
-    uint16_t tempw;
     uint8_t temp = readmem(pbr | pc);
     pc++;
     if (p.d) {
-        SBCBCD8();
+        sbcbcd8(temp);
     } else {
-        SBC8();
+        sbcbin8(temp);
     }
 }
 
 static void sbcZp8(void)
 {
-    uint16_t tempw;
     uint8_t temp;
     addr = zeropage();
     temp = readmem(addr);
     if (p.d) {
-        SBCBCD8();
+        sbcbcd8(temp);
     } else {
-        SBC8();
+        sbcbin8(temp);
     }
 }
 
 static void sbcZpx8(void)
 {
-    uint16_t tempw;
     uint8_t temp;
     addr = zeropagex();
     temp = readmem(addr);
     if (p.d) {
-        SBCBCD8();
+        sbcbcd8(temp);
     } else {
-        SBC8();
+        sbcbin8(temp);
     }
 }
 
 static void sbcSp8(void)
 {
-    uint16_t tempw;
     uint8_t temp;
     addr = stack();
     temp = readmem(addr);
     if (p.d) {
-        SBCBCD8();
+        sbcbcd8(temp);
     } else {
-        SBC8();
+        sbcbin8(temp);
     }
 }
 
 static void sbcAbs8(void)
 {
-    uint16_t tempw;
     uint8_t temp;
     addr = absolute();
     temp = readmem(addr);
     if (p.d) {
-        SBCBCD8();
+        sbcbcd8(temp);
     } else {
-        SBC8();
+        sbcbin8(temp);
     }
 }
 
 static void sbcAbsx8(void)
 {
-    uint16_t tempw;
     uint8_t temp;
     addr = absolutex();
     temp = readmem(addr);
     if (p.d) {
-        SBCBCD8();
+        sbcbcd8(temp);
     } else {
-        SBC8();
+        sbcbin8(temp);
     }
 }
 
 static void sbcAbsy8(void)
 {
-    uint16_t tempw;
     uint8_t temp;
     addr = absolutey();
     temp = readmem(addr);
     if (p.d) {
-        SBCBCD8();
+        sbcbcd8(temp);
     } else {
-        SBC8();
+        sbcbin8(temp);
     }
 }
 
 static void sbcLong8(void)
 {
-    uint16_t tempw;
     uint8_t temp;
     addr = absolutelong();
     temp = readmem(addr);
     if (p.d) {
-        SBCBCD8();
+        sbcbcd8(temp);
     } else {
-        SBC8();
+        sbcbin8(temp);
     }
 }
 
 static void sbcLongx8(void)
 {
-    uint16_t tempw;
     uint8_t temp;
     addr = absolutelongx();
     temp = readmem(addr);
     if (p.d) {
-        SBCBCD8();
+        sbcbcd8(temp);
     } else {
-        SBC8();
+        sbcbin8(temp);
     }
 }
 
 static void sbcIndirect8(void)
 {
-    uint16_t tempw;
     uint8_t temp;
     addr = indirect();
     temp = readmem(addr);
     if (p.d) {
-        SBCBCD8();
+        sbcbcd8(temp);
     } else {
-        SBC8();
+        sbcbin8(temp);
     }
 }
 
 static void sbcIndirectx8(void)
 {
-    uint16_t tempw;
     uint8_t temp;
     addr = indirectx();
     temp = readmem(addr);
     if (p.d) {
-        SBCBCD8();
+        sbcbcd8(temp);
     } else {
-        SBC8();
+        sbcbin8(temp);
     }
 }
 
 static void sbcIndirecty8(void)
 {
-    uint16_t tempw;
     uint8_t temp;
     addr = indirecty();
     temp = readmem(addr);
     if (p.d) {
-        SBCBCD8();
+        sbcbcd8(temp);
     } else {
-        SBC8();
+        sbcbin8(temp);
     }
 }
 
 static void sbcsIndirecty8(void)
 {
-    uint16_t tempw;
     uint8_t temp;
     addr = sindirecty();
     temp = readmem(addr);
     if (p.d) {
-        SBCBCD8();
+        sbcbcd8(temp);
     } else {
-        SBC8();
+        sbcbin8(temp);
     }
 }
 
 static void sbcIndirectLong8(void)
 {
-    uint16_t tempw;
     uint8_t temp;
     addr = indirectl();
     temp = readmem(addr);
     if (p.d) {
-        SBCBCD8();
+        sbcbcd8(temp);
     } else {
-        SBC8();
+        sbcbin8(temp);
     }
 }
 
 static void sbcIndirectLongy8(void)
 {
-    uint16_t tempw;
     uint8_t temp;
     addr = indirectly();
     temp = readmem(addr);
     if (p.d) {
-        SBCBCD8();
+        sbcbcd8(temp);
     } else {
-        SBC8();
+        sbcbin8(temp);
     }
 }
 
 static void sbcImm16(void)
 {
-    uint32_t templ;
     uint16_t tempw;
     tempw = readmemw(pbr | pc);
     pc += 2;
     if (p.d) {
-        SBCBCD16();
+        sbcbcd16(tempw);
     } else {
-        SBC16();
+        sbcbin16(tempw);
     }
 }
 
 static void sbcZp16(void)
 {
-    uint32_t templ;
     uint16_t tempw;
     addr = zeropage();
     tempw = readmemw(addr);
     if (p.d) {
-        SBCBCD16();
+        sbcbcd16(tempw);
     } else {
-        SBC16();
+        sbcbin16(tempw);
     }
 }
 
 static void sbcZpx16(void)
 {
-    uint32_t templ;
     uint16_t tempw;
     addr = zeropagex();
     tempw = readmemw(addr);
     if (p.d) {
-        SBCBCD16();
+        sbcbcd16(tempw);
     } else {
-        SBC16();
+        sbcbin16(tempw);
     }
 }
 
 static void sbcSp16(void)
 {
-    uint32_t templ;
     uint16_t tempw;
     addr = stack();
     tempw = readmemw(addr);
     if (p.d) {
-        SBCBCD16();
+        sbcbcd16(tempw);
     } else {
-        SBC16();
+        sbcbin16(tempw);
     }
 }
 
 static void sbcAbs16(void)
 {
-    uint32_t templ;
     uint16_t tempw;
     addr = absolute();
     tempw = readmemw(addr);
     if (p.d) {
-        SBCBCD16();
+        sbcbcd16(tempw);
     } else {
-        SBC16();
+        sbcbin16(tempw);
     }
 }
 
 static void sbcAbsx16(void)
 {
-    uint32_t templ;
     uint16_t tempw;
     addr = absolutex();
     tempw = readmemw(addr);
     if (p.d) {
-        SBCBCD16();
+        sbcbcd16(tempw);
     } else {
-        SBC16();
+        sbcbin16(tempw);
     }
 }
 
 static void sbcAbsy16(void)
 {
-    uint32_t templ;
     uint16_t tempw;
     addr = absolutey();
     tempw = readmemw(addr);
     if (p.d) {
-        SBCBCD16();
+        sbcbcd16(tempw);
     } else {
-        SBC16();
+        sbcbin16(tempw);
     }
 }
 
 static void sbcLong16(void)
 {
-    uint32_t templ;
     uint16_t tempw;
     addr = absolutelong();
     tempw = readmemw(addr);
     if (p.d) {
-        SBCBCD16();
+        sbcbcd16(tempw);
     } else {
-        SBC16();
+        sbcbin16(tempw);
     }
 }
 
 static void sbcLongx16(void)
 {
-    uint32_t templ;
     uint16_t tempw;
     addr = absolutelongx();
     tempw = readmemw(addr);
     if (p.d) {
-        SBCBCD16();
+        sbcbcd16(tempw);
     } else {
-        SBC16();
+        sbcbin16(tempw);
     }
 }
 
 static void sbcIndirect16(void)
 {
-    uint32_t templ;
     uint16_t tempw;
     addr = indirect();
     tempw = readmemw(addr);
     if (p.d) {
-        SBCBCD16();
+        sbcbcd16(tempw);
     } else {
-        SBC16();
+        sbcbin16(tempw);
     }
 }
 
 static void sbcIndirectx16(void)
 {
-    uint32_t templ;
     uint16_t tempw;
     addr = indirectx();
     tempw = readmemw(addr);
     if (p.d) {
-        SBCBCD16();
+        sbcbcd16(tempw);
     } else {
-        SBC16();
+        sbcbin16(tempw);
     }
 }
 
 static void sbcIndirecty16(void)
 {
-    uint32_t templ;
     uint16_t tempw;
     addr = indirecty();
     tempw = readmemw(addr);
     if (p.d) {
-        SBCBCD16();
+        sbcbcd16(tempw);
     } else {
-        SBC16();
+        sbcbin16(tempw);
     }
 }
 
 static void sbcsIndirecty16(void)
 {
-    uint32_t templ;
     uint16_t tempw;
     addr = sindirecty();
     tempw = readmemw(addr);
     if (p.d) {
-        SBCBCD16();
+        sbcbcd16(tempw);
     } else {
-        SBC16();
+        sbcbin16(tempw);
     }
 }
 
 static void sbcIndirectLong16(void)
 {
-    uint32_t templ;
     uint16_t tempw;
     addr = indirectl();
     tempw = readmemw(addr);
     if (p.d) {
-        SBCBCD16();
+        sbcbcd16(tempw);
     } else {
-        SBC16();
+        sbcbin16(tempw);
     }
 }
 
 static void sbcIndirectLongy16(void)
 {
-    uint32_t templ;
     uint16_t tempw;
     addr = indirectly();
     tempw = readmemw(addr);
     if (p.d) {
-        SBCBCD16();
+        sbcbcd16(tempw);
     } else {
-        SBC16();
+        sbcbin16(tempw);
     }
 }
 
