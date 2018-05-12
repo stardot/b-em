@@ -180,12 +180,16 @@ static void dbg_reg_set(int which, uint32_t value)
             break;
         case REG_PC:
             pc = value;
+            break;
         case REG_DP:
             dp = value;
+            break;
         case REG_DB:
             dbr = value;
+            break;
         case REG_PB:
             pbr = value;
+            break;
         default:
             log_warn("65816: attempt to set non-existent register");
     }
