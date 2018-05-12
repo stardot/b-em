@@ -14,6 +14,7 @@
 #define W65816_RAM_SIZE 0x80000
 
 static uint8_t *w65816ram, *w65816rom;
+
 /*Registers*/
 typedef union {
     uint16_t w;
@@ -94,7 +95,6 @@ static inline uint8_t pack_flags(void)
 
 static inline uint8_t pack_flags_em(uint8_t flags)
 {
-
     if (p.c)
         flags |= 0x01;
     if (p.z)
@@ -364,6 +364,7 @@ static void writememw65816(uint32_t a, uint16_t v)
 
 static void updatecpumode(void);
 static int inwai = 0;
+
 /*Temporary variables*/
 static uint32_t addr;
 
@@ -6406,6 +6407,7 @@ static void nmi65816(void)
 }
 
 static int toutput = 0;
+
 static void irq65816(void)
 {
     readmem(pbr | pc);
