@@ -368,28 +368,28 @@ static int inwai = 0;
 static uint32_t addr;
 
 /*Addressing modes*/
-static uint32_t absolute()
+static inline uint32_t absolute()
 {
     uint32_t temp = readmemw(pbr | pc);
     pc += 2;
     return temp | dbr;
 }
 
-static uint32_t absolutex()
+static inline uint32_t absolutex()
 {
     uint32_t temp = (readmemw(pbr | pc)) + x.w + dbr;
     pc += 2;
     return temp;
 }
 
-static uint32_t absolutey()
+static inline uint32_t absolutey()
 {
     uint32_t temp = (readmemw(pbr | pc)) + y.w + dbr;
     pc += 2;
     return temp;
 }
 
-static uint32_t absolutelong()
+static inline uint32_t absolutelong()
 {
     uint32_t temp = readmemw(pbr | pc);
     pc += 2;
@@ -398,7 +398,7 @@ static uint32_t absolutelong()
     return temp;
 }
 
-static uint32_t absolutelongx()
+static inline uint32_t absolutelongx()
 {
     uint32_t temp = (readmemw(pbr | pc)) + x.w;
     pc += 2;
@@ -407,7 +407,7 @@ static uint32_t absolutelongx()
     return temp;
 }
 
-static uint32_t zeropage()
+static inline uint32_t zeropage()
 {
     /* It's actually direct page, but I'm used to calling it zero page */
     uint32_t temp = readmem(pbr | pc);
@@ -420,7 +420,7 @@ static uint32_t zeropage()
     return temp & 0xFFFF;
 }
 
-static uint32_t zeropagex()
+static inline uint32_t zeropagex()
 {
     uint32_t temp = readmem(pbr | pc) + x.w;
     pc++;
@@ -434,7 +434,7 @@ static uint32_t zeropagex()
     return temp & 0xFFFF;
 }
 
-static uint32_t zeropagey()
+static inline uint32_t zeropagey()
 {
     uint32_t temp = readmem(pbr | pc) + y.w;
     pc++;
@@ -448,7 +448,7 @@ static uint32_t zeropagey()
     return temp & 0xFFFF;
 }
 
-static uint32_t stack()
+static inline uint32_t stack()
 {
     uint32_t temp = readmem(pbr | pc);
     pc++;
@@ -456,21 +456,21 @@ static uint32_t stack()
     return temp & 0xFFFF;
 }
 
-static uint32_t indirect()
+static inline uint32_t indirect()
 {
     uint32_t temp = (readmem(pbr | pc) + dp) & 0xFFFF;
     pc++;
     return (readmemw(temp)) + dbr;
 }
 
-static uint32_t indirectx()
+static inline uint32_t indirectx()
 {
     uint32_t temp = (readmem(pbr | pc) + dp + x.w) & 0xFFFF;
     pc++;
     return (readmemw(temp)) + dbr;
 }
 
-static uint32_t jindirectx()
+static inline uint32_t jindirectx()
 {
     /* JSR (,x) uses PBR instead of DBR, and 2 byte address insted of 1 + dp */
     uint32_t temp = (readmem(pbr | pc) + (readmem((pbr | pc) + 1) << 8) + x.w) + pbr;
@@ -478,21 +478,21 @@ static uint32_t jindirectx()
     return temp;
 }
 
-static uint32_t indirecty()
+static inline uint32_t indirecty()
 {
     uint32_t temp = (readmem(pbr | pc) + dp) & 0xFFFF;
     pc++;
     return (readmemw(temp)) + y.w + dbr;
 }
 
-static uint32_t sindirecty()
+static inline uint32_t sindirecty()
 {
     uint32_t temp = (readmem(pbr | pc) + s.w) & 0xFFFF;
     pc++;
     return (readmemw(temp)) + y.w + dbr;
 }
 
-static uint32_t indirectl()
+static inline uint32_t indirectl()
 {
     uint32_t temp, addr;
     temp = (readmem(pbr | pc) + dp) & 0xFFFF;
@@ -501,7 +501,7 @@ static uint32_t indirectl()
     return addr;
 }
 
-static uint32_t indirectly()
+static inline uint32_t indirectly()
 {
     uint32_t temp, addr;
     temp = (readmem(pbr | pc) + dp) & 0xFFFF;
