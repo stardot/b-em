@@ -5718,8 +5718,6 @@ static void nmi65816(void)
     }
 }
 
-static int toutput = 0;
-
 static void irq65816(void)
 {
     readmem(pbr | pc);
@@ -5764,13 +5762,10 @@ void w65816_exec(void)
 
     while (tubecycles > 0) {
         ia = pbr | pc;
+        toldpc = pc++;
         if (dbg_w65816)
             debug_preexec(&tube65816_cpu_debug, ia);
         opcode = readmem(ia);
-        pc++;
-        if (toutput)
-            log_debug("%i : %02X:%04X %04X %02X %i %04X  %04X %04X %04X\n", wins, pbr, pc - 1, toldpc, opcode, cycles, s.b.l, a.w, x.w, y.w);
-        toldpc = pc - 1;
         modeptr[opcode]();
         wins++;
         if ((tube_irq & 2) && !woldnmi)
