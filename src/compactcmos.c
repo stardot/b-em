@@ -38,23 +38,21 @@ void compactcmos_load(MODEL m) {
     ALLEGRO_PATH *path;
     const char *cpath;
 
+    memset(cmos_ram, 0, 128);
     if ((path = find_cfg_file(m.cmos, ".bin"))) {
         cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
         if ((cmosf = fopen(cpath, "rb"))) {
-            fread(cmos_ram, 128, 1, cmosf);
+            if (fread(cmos_ram, 128, 1, cmosf) != 1)
+                log_warn("compactcmos: cmos file %s read incompletely, some values will be zero", cpath);
             fclose(cmosf);
             log_debug("compactcmos: loaded from %s", cpath);
         }
-        else {
+        else
             log_warn("compactcmos: unable to load CMOS file '%s': %s", cpath, strerror(errno));
-            memset(cmos_ram, 0, 128);
-        }
         al_destroy_path(path);
     }
-    else {
+    else
         log_error("compactcmos: unable to find CMOS file %s", m.cmos);
-        memset(cmos_ram, 0, 128);
-    }
 }
 
 void compactcmos_save(MODEL m) {
