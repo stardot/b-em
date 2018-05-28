@@ -45,7 +45,7 @@ extern int model_count;
 typedef struct
 {
     char name[32];
-    void (*init)(FILE *romf);
+    bool (*init)(FILE *romf);
     void (*reset)(void);
     cpu_debug_t *debug;
     char bootrom[16];

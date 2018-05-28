@@ -11,7 +11,7 @@ typedef struct
 
 extern w65816p_t w65816p;
 
-void w65816_init(FILE *romf);
+bool w65816_init(FILE *romf);
 void w65816_reset(void);
 void w65816_exec(void);
 void w65816_close(void);

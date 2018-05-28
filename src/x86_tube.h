@@ -4,7 +4,7 @@
 #include "cpu_debug.h"
 #include "savestate.h"
 
-void x86_init(FILE *romf);
+bool x86_init(FILE *romf);
 void x86_reset(void);
 void x86_exec(void);
 void x86_close(void);

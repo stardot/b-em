@@ -4,8 +4,9 @@
 #include "cpu_debug.h"
 #include "savestate.h"
 #include <stdio.h>
+#include <stdbool.h>
 
-void z80_init(FILE *romf);
+bool z80_init(FILE *romf);
 void z80_reset(void);
 void z80_exec(void);
 void z80_close(void);

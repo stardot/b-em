@@ -419,10 +419,12 @@ cpu_debug_t tubez80_cpu_debug = {
     .get_instr_addr = dbg_z80_get_instr_addr
 };
 
-void z80_init(FILE *romf)
+bool z80_init(FILE *romf)
 {
-        fread(z80rom, 0x1000, 1, romf);
+        if (fread(z80rom, 0x1000, 1, romf) != 1)
+            return false;
         makeznptable();
+        return true;
 }
 
 void z80_close()

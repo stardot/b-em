@@ -160,6 +160,7 @@ static void tube_init(void)
     ALLEGRO_PATH *path;
     const char *cpath;
     FILE *romf;
+    bool res;
 
     if (curtube!=-1) {
         if (!tubes[curtube].bootrom[0]) // no boot ROM needed
@@ -170,17 +171,19 @@ static void tube_init(void)
             if ((path = find_dat_file(tube_dir, tubes[curtube].bootrom, ".rom"))) {
                 cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
                 if ((romf = fopen(cpath, "rb"))) {
-                    al_destroy_path(path);
-                    tubes[curtube].init(romf);
+                    res = tubes[curtube].init(romf);
                     fclose(romf);
-                    tube_updatespeed();
-                    tube_reset();
-                    return;
-                } else {
+                    if (res) {
+                        tube_updatespeed();
+                        tube_reset();
+                    }
+                    else {
+                        log_error("model: error reading boot rom %s for tube %s: %s", cpath, tubes[curtube].name, strerror(errno));
+                        curtube = -1;
+                    }
+                } else
                     log_error("model: unable to open boot rom %s for tube %s: %s", cpath, tubes[curtube].name, strerror(errno));
-                    al_destroy_path(path);
-                    curtube = -1;
-                }
+                al_destroy_path(path);
             } else {
                 log_error("model: boot rom %s for tube %s not found", tubes[curtube].bootrom, tubes[curtube].name);
                 curtube = -1;

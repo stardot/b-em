@@ -615,13 +615,13 @@ void x86_reset()
         makemod1table();
 }
 
-void x86_init(FILE *romf)
+bool x86_init(FILE *romf)
 {
         if (!x86ram) x86ram=malloc(X86_RAM_SIZE);
         if (!x86rom) x86rom=malloc(X86_ROM_SIZE);
         x86makeznptable();
         memset(x86ram,0,X86_RAM_SIZE);
-        fread(x86rom, X86_ROM_SIZE, 1, romf);
+        return fread(x86rom, X86_ROM_SIZE, 1, romf) == 1;
 }
 
 void x86_close()

@@ -39,7 +39,7 @@ static FILE *trace_fp;
 
 #define TUBE_6502_RAM_SIZE 0x10000
 
-void tube_6502_init_cpu(FILE *romf)
+bool tube_6502_init_cpu(FILE *romf)
 {
         int c;
         if (!tuberam)
@@ -54,7 +54,7 @@ void tube_6502_init_cpu(FILE *romf)
 //        tubememstat[0xFE]=tubememstat[0xFF]=2;
         tubemem[0x100] = tubemem[0];
         tubememstat[0x100] = tubememstat[0];
-        fread(tuberom+0x800, 0x800, 1, romf);
+        return fread(tuberom+0x800, 0x800, 1, romf) == 1;
 #ifdef TRACE_TUBE
         if ((trace_fp = fopen("6502tube.trace", "wb"))) {
                 fwrite("6502NMOS", 8, 1, trace_fp);

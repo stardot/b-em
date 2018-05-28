@@ -232,20 +232,22 @@ void arm_dumpregs()
 static uint32_t *armread[64];
 static uint32_t armmask[64];
 
-void arm_init(FILE *romf)
+bool arm_init(FILE *romf)
 {
         int c;
         if (!armrom) armrom=(uint32_t *)malloc(ARM_ROM_SIZE);
         if (!armram) armram=(uint32_t *)malloc(ARM_RAM_SIZE);
         armromb=(uint8_t *)armrom;
         armramb=(uint8_t *)armram;
-        fread(armromb, ARM_ROM_SIZE, 1, romf);
+        if (fread(armromb, ARM_ROM_SIZE, 1, romf) != 1)
+            return false;
         memcpy(armramb,armromb,ARM_ROM_SIZE);
         for (c=0;c<64;c++) armread[c]=0;
         for (c=0;c<4;c++) armread[c]=&armram[c*0x40000];
         armread[48]=armrom;
         for (c=0;c<64;c++) armmask[c]=0xFFFFF;
         armmask[48]=0x3FFF;
+        return true;
 }
 
 void arm_close()

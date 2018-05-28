@@ -5600,13 +5600,13 @@ void w65816_reset(void)
     cycles = 0;
 }
 
-void w65816_init(FILE * romf)
+bool w65816_init(FILE * romf)
 {
     if (!w65816rom)
         w65816rom = malloc(W65816_ROM_SIZE);
     if (!w65816ram)
         w65816ram = malloc(W65816_RAM_SIZE);
-    fread(w65816rom, 0x8000, 1, romf);
+    return fread(w65816rom, 0x8000, 1, romf) == 1;
 }
 
 void w65816_close(void)
