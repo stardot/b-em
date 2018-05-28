@@ -20,7 +20,7 @@ b_em_CFLAGS = $(allegro_CFLAGS) -DBEM -DINCLUDE_DEBUGGER -DUSE_MEMORY_POINTER
 if OS_WIN
 b_em_LDADD = -lallegro_audio -lallegro_acodec -lallegro_primitives -lallegro_dialog -lallegro_image -lallegro_font -lallegro -lz -lm
 else
-b_em_LDADD = -lallegro_audio -lallegro_acodec -lallegro_primitives -lallegro_dialog -lallegro_image -lallegro_font -lallegro -lz -lm -lpthread
+b_em_LDADD = -lallegro_audio -lallegro_acodec -lallegro_primitives -lallegro_dialog -lallegro_image -lallegro_font -lallegro_main -lallegro -lz -lm -lpthread
 endif
 
 b_em_SOURCES = \
@@ -122,4 +122,4 @@ endif
 
 jstest_SOURCES = jstest.c
 
-jstest_LDADD = -lallegro
+jstest_LDADD = -lallegro -lallegro_main
