@@ -170,7 +170,7 @@ uint8_t ide_read(uint16_t addr)
 //        log_debug("Read IDE %04X %04X %02X\n",addr,pc,ide.atastat);
         switch (addr&0xF)
         {
-                case 0x0:
+            case 0x0:
                 temp = ide_bufferb[ide.pos];
                 ide.pos2 = ide.pos + 1;
                 ide.pos += 2;
@@ -218,13 +218,14 @@ uint8_t ide_read(uint16_t addr)
             case 0x6:
                 return ide.head | (ide.drive << 4);
             case 0x7:
-                indexcount++;
-                if (indexcount == 199)
-                {
-                        indexcount = 0;
-                        return ide.atastat | 2;
+                temp = ide.atastat;
+                if (++indexcount == 199) {
+                    indexcount = 0;
+                    temp |= 2;
                 }
-                return ide.atastat;
+                if (ide.atastat)
+                    ide.atastat = (ide.atastat & 0xfe) | 0x40;
+                return temp;
         }
         return 0xFF;
 }
@@ -243,8 +244,10 @@ void ide_callback()
                 addr = ((((ide.cylinder * ide.hpc) + ide.head) * ide.spt) + (ide.sector)) * 256;
                 fseek(hdfile[ide.drive], addr, SEEK_SET);
                 memset(ide_buffer, 0, 512);
-                if (fread(ide_buffer2, 256, 1, hdfile[ide.drive]) != 1 && ferror(hdfile[ide.drive]))
+                if (fread(ide_buffer2, 256, 1, hdfile[ide.drive]) != 1 && ferror(hdfile[ide.drive])) {
+                    ide.error = 0x40;
                     ide.atastat = 0x51;
+                }
                 else {
                     ide.atastat = 0x48;
                     for (c = 0; c < 256; c++)
