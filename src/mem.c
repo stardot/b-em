@@ -319,8 +319,8 @@ void mem_loadzlib(ZFILE *zfp)
 void mem_loadstate(FILE *f) {
     writemem(0xFE30, getc(f));
     writemem(0xFE34, getc(f));
-    (void)fread(ram, RAM_SIZE, 1, f);
-    (void)fread(rom, ROM_SIZE*ROM_NSLOT, 1, f);
+    fread(ram, RAM_SIZE, 1, f);
+    fread(rom, ROM_SIZE*ROM_NSLOT, 1, f);
 }
 
 void mem_save_romcfg(const char *sect) {

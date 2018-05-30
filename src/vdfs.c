@@ -1822,10 +1822,11 @@ static inline void exec_swr_intern(uint8_t flags, uint16_t fname, int8_t romid, 
                         if (ent->attribs & ATTR_IS_DIR)
                             adfs_error(err_wont);
                         else if ((fp = fopen(ent->host_path, "rb"))) {
-                            fread(rom + romid * 0x4000 + start, len, 1, fp);
+                            if (fread(rom + romid * 0x4000 + start, len, 1, fp) != 1 && ferror(fp))
+                                log_warn("vdfs: error reading file '%s': %s", ent->host_fn, strerror(errno));
                             fclose(fp);
                         } else {
-                            log_warn("vdfs: unable to load file '%s': %s\n", ent->host_fn, strerror(errno));
+                            log_warn("vdfs: unable to load file '%s': %s", ent->host_fn, strerror(errno));
                             adfs_hosterr(errno);
                         }
                     } else

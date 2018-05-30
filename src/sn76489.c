@@ -77,7 +77,7 @@ void sn_fillbuf(int16_t *buffer, int len)
                         c++;
                         if (sn_latch[c] > 256) buffer[d] += (int16_t) (snwaves[curwave][sn_stat[c]] * volslog[sn_vol[c]]);
                         else                   buffer[d] += (int16_t) (volslog[sn_vol[c]] * 127);
-                        
+
                         sn_count[c] -= 8192;
                         while ((int)sn_count[c] < 0  && sn_latch[c])
                         {
@@ -117,7 +117,7 @@ void sn_fillbuf(int16_t *buffer, int len)
                 else
                    sn_stat[0] &= 32767;
 //                buffer[d] += (lpt_dac * 32);
-                
+
                 sidcount++;
                 if (sidcount == 624)
                 {

@@ -243,10 +243,14 @@ void ide_callback()
                 addr = ((((ide.cylinder * ide.hpc) + ide.head) * ide.spt) + (ide.sector)) * 256;
                 fseek(hdfile[ide.drive], addr, SEEK_SET);
                 memset(ide_buffer, 0, 512);
-                fread(ide_buffer2, 256, 1, hdfile[ide.drive]);
-                for (c = 0; c < 256; c++) ide_bufferb[c << 1] = ide_buffer2[c];
+                if (fread(ide_buffer2, 256, 1, hdfile[ide.drive]) != 1 && ferror(hdfile[ide.drive]))
+                    ide.atastat = 0x51;
+                else {
+                    ide.atastat = 0x48;
+                    for (c = 0; c < 256; c++)
+                        ide_bufferb[c << 1] = ide_buffer2[c];
+                }
                 ide.pos = 0;
-                ide.atastat = 0x08 | 0x40;
                 return;
             case 0x30: /*Write sector*/
                 addr = ((((ide.cylinder * ide.hpc) + ide.head) * ide.spt) + (ide.sector)) * 256;

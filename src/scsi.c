@@ -252,14 +252,13 @@ static void Format(void)
 
 static int ReadSector(unsigned char *buf, int block)
 {
-        log_debug("scsi lun %d: read sector %d\n", scsi.lun, block);
-	if (SCSIDisc[scsi.lun] == NULL) return 0;
-
-        fseek(SCSIDisc[scsi.lun], block * 256, SEEK_SET);
-
-	fread(buf, 256, 1, SCSIDisc[scsi.lun]);
-
-	return 256;
+    log_debug("scsi lun %d: read sector %d\n", scsi.lun, block);
+    if (SCSIDisc[scsi.lun] == NULL)
+        return 0;
+    fseek(SCSIDisc[scsi.lun], block * 256, SEEK_SET);
+    if (fread(buf, 256, 1, SCSIDisc[scsi.lun]) != 1 && ferror(SCSIDisc[scsi.lun]))
+        return -1;
+    return 256;
 }
 
 static void Read6(void)
