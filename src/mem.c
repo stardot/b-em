@@ -111,7 +111,7 @@ void mem_loadrom(int slot, const char *name, const char *path, uint8_t use_name)
     FILE *f;
 
     if ((f = fopen(path, "rb"))) {
-        if (fread(rom + (slot * ROM_SIZE), ROM_SIZE, 1, f) == 1) {
+        if (fread(rom + (slot * ROM_SIZE), ROM_SIZE, 1, f) == 1 || feof(f)) {
             fclose(f);
             log_debug("mem: ROM slot %02d loaded with %s from %s", slot, name, path);
             rom_slots[slot].use_name = use_name;
@@ -120,7 +120,7 @@ void mem_loadrom(int slot, const char *name, const char *path, uint8_t use_name)
             rom_slots[slot].path = strdup(path);
         }
         else
-            log_warn("mem: unable to load ROM slot %02d with %s, read error/truncated file on %s", slot, name, path);
+            log_warn("mem: unable to load ROM slot %02d with %s: %s", slot, name, strerror(errno));
     }
     else
         log_warn("mem: unable to load ROM slot %02d with %s, uanble to open %s: %s", slot, name, path, strerror(errno));
