@@ -726,12 +726,12 @@ RTS
         BNE     found
         JMP     FileCmdNf
 .chrlp  JSR     OSWRCH
-        JSR     OSBGET
+.found  JSR     OSBGET
         BCS     eof
-.found  BIT     &FF
+        BIT     &FF
         BPL     chrlp
-.gotesc LDA     #&7E
-        JSR     OSWRCH
+        LDA     #&7E
+        JSR     OSBYTE
 .eof    LDA     #&00
         JMP     OSFIND
 }
