@@ -76,16 +76,18 @@ static void load_os_rom(const char *sect) {
     if ((path = find_dat_file(os_dir, osname, ".rom"))) {
         cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
         if ((f = fopen(cpath, "rb"))) {
-            fread(os, ROM_SIZE, 1, f);
-            fclose(f);
-            log_debug("mem: OS %s loaded from %s", osname, cpath);
-            al_destroy_path(path);
-            return;
+            if (fread(os, ROM_SIZE, 1, f) == 1) {
+                fclose(f);
+                log_debug("mem: OS %s loaded from %s", osname, cpath);
+                al_destroy_path(path);
+                return;
+            }
+            else
+                log_fatal("mem: unable to load OS %s, read error/truncated file on %s", osname, cpath);
         }
-        else {
+        else
             log_fatal("mem: unable to load OS %s, unable to open %s: %s", osname, cpath, strerror(errno));
-            al_destroy_path(path);
-        }
+        al_destroy_path(path);
     } else
         log_fatal("mem: unable to find OS %s", osname);
     exit(1);
@@ -109,13 +111,16 @@ void mem_loadrom(int slot, const char *name, const char *path, uint8_t use_name)
     FILE *f;
 
     if ((f = fopen(path, "rb"))) {
-        fread(rom + (slot * ROM_SIZE), ROM_SIZE, 1, f);
-        fclose(f);
-        log_debug("mem: ROM slot %02d loaded with %s from %s", slot, name, path);
-        rom_slots[slot].use_name = use_name;
-        rom_slots[slot].alloc = 1;
-        rom_slots[slot].name = strdup(name);
-        rom_slots[slot].path = strdup(path);
+        if (fread(rom + (slot * ROM_SIZE), ROM_SIZE, 1, f) == 1) {
+            fclose(f);
+            log_debug("mem: ROM slot %02d loaded with %s from %s", slot, name, path);
+            rom_slots[slot].use_name = use_name;
+            rom_slots[slot].alloc = 1;
+            rom_slots[slot].name = strdup(name);
+            rom_slots[slot].path = strdup(path);
+        }
+        else
+            log_warn("mem: unable to load ROM slot %02d with %s, read error/truncated file on %s", slot, name, path);
     }
     else
         log_warn("mem: unable to load ROM slot %02d with %s, uanble to open %s: %s", slot, name, path, strerror(errno));
@@ -314,8 +319,8 @@ void mem_loadzlib(ZFILE *zfp)
 void mem_loadstate(FILE *f) {
     writemem(0xFE30, getc(f));
     writemem(0xFE34, getc(f));
-    fread(ram, RAM_SIZE, 1, f);
-    fread(rom, ROM_SIZE*ROM_NSLOT, 1, f);
+    (void)fread(ram, RAM_SIZE, 1, f);
+    (void)fread(rom, ROM_SIZE*ROM_NSLOT, 1, f);
 }
 
 void mem_save_romcfg(const char *sect) {

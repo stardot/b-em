@@ -257,7 +257,8 @@ void savestate_zread(ZFILE *zfp, void *dest, size_t size)
                 zfp->flush = Z_FINISH;
                 chunk = zfp->togo;
             }
-            fread(zfp->buf, chunk, 1, savestate_fp);
+            if (fread(zfp->buf, chunk, 1, savestate_fp) != 1)
+                break;
             zfp->zs.next_in = zfp->buf;
             zfp->zs.avail_in = chunk;
             zfp->togo -= chunk;
@@ -268,17 +269,15 @@ void savestate_zread(ZFILE *zfp, void *dest, size_t size)
 
 static void load_state_two(void)
 {
-    int ch;
+    unsigned char hdr[4];
     long start, end, size;
 
-    while ((ch = getc(savestate_fp)) != EOF) {
-        size = getc(savestate_fp);
-        size |= getc(savestate_fp) << 8;
-        size |= getc(savestate_fp) << 16;
+    while (fread(hdr, sizeof hdr, 1, savestate_fp) == 1) {
+        size = hdr[1] | (hdr[2] << 8) | (hdr[3] << 16);
         start = ftell(savestate_fp);
-        log_debug("savestate: found section %c of %ld bytes", ch, size);
+        log_debug("savestate: found section %c of %ld bytes", hdr[0], size);
 
-        switch(ch) {
+        switch(hdr[0]) {
             case 'm':
                 model_loadstate(savestate_fp);
                 break;
@@ -332,11 +331,11 @@ static void load_state_two(void)
         }
         end = ftell(savestate_fp);
         if (end == start) {
-            log_warn("savestate: section %c skipped", ch);
+            log_warn("savestate: section %c skipped", hdr[0]);
             fseek(savestate_fp, size, SEEK_CUR);
         }
         else if (size != (end - start)) {
-            log_warn("savestate: section %c, size mismatch, file=%ld, read=%ld", ch, size, end - start);
+            log_warn("savestate: section %c, size mismatch, file=%ld, read=%ld", hdr[0], size, end - start);
             fseek(savestate_fp, start + size, SEEK_SET);
         }
     }
@@ -353,6 +352,9 @@ void savestate_doload(void)
             load_state_two();
             break;
     }
+    if (ferror(savestate_fp))
+        log_error("savestate: state not fully restored from '%s': %s", savestate_name, strerror(errno));
+    fclose(savestate_fp);
     savestate_wantload = 0;
     savestate_fp = NULL;
 }

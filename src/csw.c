@@ -11,7 +11,6 @@
 int csw_toneon=0;
 
 static int csw_intone = 1, csw_indat = 0, csw_datbits = 0, csw_enddat = 0;
-static FILE    *csw_f = NULL;
 static uint8_t *csw_dat = NULL;
 static int      csw_point;
 static uint8_t  csw_head[0x34];
@@ -19,55 +18,77 @@ static int      csw_skip = 0;
 static int      csw_loop = 1;
 int csw_ena;
 
+static void csw_read_failed(FILE *csw_f, const char *fn)
+{
+    if (ferror(csw_f))
+        log_error("csw: read error on '%s': %s", fn, strerror(errno));
+    else
+        log_error("csw: premature EOF on '%s'", fn);
+}
+
 void csw_load(const char *fn)
 {
-        int end,c;
-        uint32_t destlen = 8 * 1024 * 1024;
-        uint8_t *tempin;
-        if (csw_f) fclose(csw_f);
-        if (csw_dat) free(csw_dat);
-        csw_ena = 1;
-        /*Allocate buffer*/
-        csw_dat = malloc(8 * 1024 * 1024);
-        /*Open file and get size*/
-        csw_f = fopen(fn,"rb");
-        if (!csw_f)
-        {
-                free(csw_dat);
-                csw_dat = NULL;
-		log_warn("csw: uanble to open CSW file '%s': %s", fn, strerror(errno));
-                return;
+    FILE *csw_f;
+    int end,c;
+    uint32_t destlen = 8 * 1024 * 1024;
+    uint8_t *tempin;
+
+    /*Allocate buffer*/
+    if (!csw_dat) {
+        if (!(csw_dat = malloc(8 * 1024 * 1024))) {
+            log_error("csw: out of memory reading '%s'", fn);
+            return;
         }
-        fseek(csw_f, -1, SEEK_END);
-        end = ftell(csw_f);
-        fseek(csw_f, 0, SEEK_SET);
-        /*Read header*/
-        fread(csw_head, 0x34, 1, csw_f);
-        for (c = 0; c < csw_head[0x23]; c++) getc(csw_f);
+    }
+
+    /*Open file and get size*/
+    if (!(csw_f = fopen(fn,"rb"))) {
+        log_warn("csw: uanble to open CSW file '%s': %s", fn, strerror(errno));
+        return;
+    }
+    fseek(csw_f, -1, SEEK_END);
+    end = ftell(csw_f);
+    fseek(csw_f, 0, SEEK_SET);
+
+    /*Read header*/
+    if (fread(csw_head, 0x34, 1, csw_f) == 1) {
+        for (c = 0; c < csw_head[0x23]; c++)
+            getc(csw_f);
         /*Allocate temporary memory and read file into memory*/
         end -= ftell(csw_f);
-        tempin = malloc(end);
-        fread(tempin, end, 1, csw_f);
-        fclose(csw_f);
-//        sprintf(csws,"Decompressing %i %i\n",destlen,end);
-//        fputs(csws,cswlog);
-        /*Decompress*/
-        uncompress(csw_dat, (unsigned long *)&destlen, tempin, end);
-        free(tempin);
-        /*Reset data pointer*/
-        csw_point = 0;
-        acia_dcdhigh(&sysacia);
-        tapellatch  = (1000000 / (1200 / 10)) / 64;
-        tapelcount  = 0;
-	tape_loaded = 1;
+        if ((tempin = malloc(end))) {
+            if (fread(tempin, end, 1, csw_f) == 1) {
+                fclose(csw_f);
+                /*Decompress*/
+                uncompress(csw_dat, (unsigned long *)&destlen, tempin, end);
+                free(tempin);
+                /*Reset data pointer*/
+                csw_point = 0;
+                acia_dcdhigh(&sysacia);
+                tapellatch  = (1000000 / (1200 / 10)) / 64;
+                tapelcount  = 0;
+                tape_loaded = 1;
+                return;
+            }
+            else {
+                csw_read_failed(csw_f, fn);
+                free(tempin);
+            }
+        }
+        else
+            log_error("csw: out of memory reading '%s'", fn);
+    }
+    else
+        csw_read_failed(csw_f, fn);
+    fclose(csw_f);
 }
 
 void csw_close()
 {
-        if (csw_f) fclose(csw_f);
-        if (csw_dat) free(csw_dat);
+    if (csw_dat) {
+        free(csw_dat);
         csw_dat = NULL;
-        csw_f   = NULL;
+    }
 }
 
 int ffound, fdat;
@@ -89,7 +110,7 @@ void csw_poll()
         int c;
         uint8_t dat;
         if (!csw_dat) return;
-        
+
         for (c = 0; c < 10; c++)
         {
                 dat = csw_dat[csw_point++];
@@ -192,11 +213,11 @@ void csw_findfilenames()
         tempsk  = csw_skip;
         tempspd = sysacia_tapespeed;
         csw_point = 0;
-        
+
         csw_indat = csw_intone = csw_datbits = csw_skip = 0;
         csw_intone = 1;
         sysacia_tapespeed = 0;
-        
+
 //        gzseek(csw,12,SEEK_SET);
         csw_loop = 0;
         infilenames = 1;

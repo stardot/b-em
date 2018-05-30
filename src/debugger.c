@@ -111,7 +111,7 @@ static void debug_memview_close(void)
 static int debug_cons = 0;
 static HANDLE cinf, consf;
 
-static inline void debug_in(char *buf, size_t bufsize)
+static inline bool debug_in(char *buf, size_t bufsize)
 {
     int c;
     DWORD len;
@@ -175,9 +175,9 @@ static void debug_cons_close(void)
 
 #else
 
-static inline void debug_in(char *buf, size_t bufsize)
+static inline bool debug_in(char *buf, size_t bufsize)
 {
-    fgets(buf, bufsize, stdin);
+    return fgets(buf, bufsize, stdin);
 }
 
 static void debug_out(const char *s, size_t len)
@@ -430,9 +430,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
     if (vrefresh)
         video_poll(CLOCKS_PER_FRAME, 0);
 
-    while (1) {
-        debug_out(">", 1);
-        debug_in(ins, 255);
+    for (debug_out(">", 1); debug_in(ins, 255); debug_out(">", 1)) {
         // Skip past any leading spaces.
         for (iptr = ins; (c = *iptr) && isspace(c); iptr++);
         if (c) {
@@ -678,7 +676,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 break;
         }
     }
-    fcount = 0;
+    fputs("\nTreating EOF on console as 'continue'\n", stdout);
     indebug = 0;
     main_resume();
 }
