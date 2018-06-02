@@ -45,13 +45,15 @@ typedef struct {
     uint16_t   sector_size;
 } geometry_t;
 
-static const geometry_t adfs_new_formats[] = {
+static const geometry_t adfs_new_formats[] =
+{
     { "Acorn ADFS F", SIDES_INTERLEAVED, DENS_QUAD,  1600, 80, 10, 1024 },
     { "Acorn ADFS D", SIDES_INTERLEAVED, DENS_DOUBLE, 800, 80,  5, 1024 },
     { NULL,           SIDES_NA,          DENS_NA,       0,  0,  0,    0 }
 };
 
-static const geometry_t adfs_old_formats[] = {
+static const geometry_t adfs_old_formats[] =
+{
     { "ADFS+DOS",     SIDES_INTERLEAVED, DENS_DOUBLE, 2720, 80, 16,  256 },
     { "Acorn ADFS L", SIDES_INTERLEAVED, DENS_DOUBLE, 2560, 80, 16,  256 },
     { "Acorn ADFS M", SIDES_SINGLE,      DENS_DOUBLE, 1280, 80, 16,  256 },
@@ -59,7 +61,8 @@ static const geometry_t adfs_old_formats[] = {
     { NULL,           SIDES_NA,          DENS_NA,        0,  0,  0,    0 }
 };
 
-static const geometry_t dfs_formats[] = {
+static const geometry_t dfs_formats[] =
+{
     { "Watford/Opus DDFS", SIDES_INTERLEAVED, DENS_DOUBLE, 1440, 80, 18,  256 },
     { "Watford/Opus DDFS", SIDES_SEQUENTIAL,  DENS_DOUBLE, 1440, 80, 18,  256 },
     { "Watford/Opus DDFS", SIDES_SINGLE,      DENS_DOUBLE, 1440, 80, 18,  256 },
@@ -83,7 +86,8 @@ static const geometry_t dfs_formats[] = {
     { NULL,                SIDES_NA,          DENS_NA,       0,  0,  0,   0 }
 };
 
-static const geometry_t other_formats[] = {
+static const geometry_t other_formats[] =
+{
     { "ADFS+DOS 800K",     SIDES_INTERLEAVED, DENS_DOUBLE,  800, 80,  5, 1024 },
     { "ADFS+DOS 640K",     SIDES_INTERLEAVED, DENS_DOUBLE, 2560, 80, 16,  256 },
     { "DOS 720K",          SIDES_INTERLEAVED, DENS_DOUBLE, 1440, 80,  9,  512 },
@@ -93,7 +97,8 @@ static const geometry_t other_formats[] = {
     { NULL,                SIDES_NA,          DENS_NA,        0,  0,  0,    0 }
 };
 
-static int check_id(FILE *fp, long posn, const char *id) {
+static int check_id(FILE *fp, long posn, const char *id)
+{
     int ch;
 
     if (fseek(fp, posn, SEEK_SET) == -1)
@@ -104,7 +109,8 @@ static int check_id(FILE *fp, long posn, const char *id) {
     return 1;
 }
 
-static const geometry_t *try_adfs_new(FILE *fp) {
+static const geometry_t *try_adfs_new(FILE *fp)
+{
     long size;
     const geometry_t *ptr;
 
@@ -118,7 +124,8 @@ static const geometry_t *try_adfs_new(FILE *fp) {
     return NULL;
 }
 
-static const geometry_t *try_adfs_old(FILE *fp) {
+static const geometry_t *try_adfs_old(FILE *fp)
+{
     uint32_t sects;
     const geometry_t *ptr;
 
@@ -133,7 +140,8 @@ static const geometry_t *try_adfs_old(FILE *fp) {
     return NULL;
 }
 
-static const geometry_t *try_dfs(FILE *fp, uint32_t offset) {
+static const geometry_t *try_dfs(FILE *fp, uint32_t offset)
+{
     uint32_t sects0, fsize, sects2, side2_off, track_bytes;
     const geometry_t *ptr;
 
@@ -160,7 +168,8 @@ static const geometry_t *try_dfs(FILE *fp, uint32_t offset) {
     return NULL;
 }
 
-static const geometry_t *try_others(FILE *fp) {
+static const geometry_t *try_others(FILE *fp)
+{
     off_t size;
     const geometry_t *ptr;
 
@@ -172,7 +181,8 @@ static const geometry_t *try_others(FILE *fp) {
     return NULL;
 }
 
-static void info_msg(int drive, const char *fn, const geometry_t *geo) {
+static void info_msg(int drive, const char *fn, const geometry_t *geo)
+{
     const char *sides;
     const char *dens;
 
@@ -235,7 +245,8 @@ static uint8_t sdf_side;
 static uint8_t sdf_track;
 static uint8_t sdf_sector;
 
-static void sdf_close(int drive) {
+static void sdf_close(int drive)
+{
     if (drive < NUM_DRIVES) {
         geometry[drive] = NULL;
         if (sdf_fp[drive]) {
@@ -245,12 +256,14 @@ static void sdf_close(int drive) {
     }
 }
 
-static void sdf_seek(int drive, int track) {
+static void sdf_seek(int drive, int track)
+{
     if (drive < NUM_DRIVES)
         current_track[drive] = track;
 }
 
-static int sdf_verify(int drive, int track, int density) {
+static int sdf_verify(int drive, int track, int density)
+{
     const geometry_t *geo;
 
     if (drive < NUM_DRIVES)
@@ -261,7 +274,8 @@ static int sdf_verify(int drive, int track, int density) {
     return 0;
 }
 
-static void io_seek(const geometry_t *geo, uint8_t drive, uint8_t sector, uint8_t track, uint8_t side) {
+static void io_seek(const geometry_t *geo, uint8_t drive, uint8_t sector, uint8_t track, uint8_t side)
+{
     uint32_t track_bytes, offset;
 
     track_bytes = geo->sectors_per_track * geo->sector_size;
@@ -342,7 +356,8 @@ static void sdf_writesector(int drive, int sector, int track, int side, int dens
     }
 }
 
-static void sdf_readaddress(int drive, int track, int side, int density) {
+static void sdf_readaddress(int drive, int track, int side, int density)
+{
     const geometry_t *geo;
 
     if (state == ST_IDLE) {
@@ -364,7 +379,8 @@ static void sdf_readaddress(int drive, int track, int side, int density) {
     }
 }
 
-static void sdf_format(int drive, int track, int side, int density) {
+static void sdf_format(int drive, int track, int side, int density)
+{
     const geometry_t *geo;
 
     if (state == ST_IDLE) {
@@ -391,7 +407,8 @@ static void sdf_format(int drive, int track, int side, int density) {
     }
 }
 
-static void sdf_poll() {
+static void sdf_poll()
+{
     int c;
     uint16_t sect_size;
 
@@ -501,11 +518,13 @@ static void sdf_poll() {
     }
 }
 
-static void sdf_abort(int drive) {
+static void sdf_abort(int drive)
+{
     state = ST_IDLE;
 }
 
-void sdf_load(int drive, const char *fn) {
+void sdf_load(int drive, const char *fn)
+{
     FILE *fp;
     const geometry_t *geo;
 
