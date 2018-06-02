@@ -48,8 +48,7 @@ typedef struct {
 static const geometry_t adfs_new_formats[] =
 {
     { "Acorn ADFS F", SIDES_INTERLEAVED, DENS_QUAD,  1600, 80, 10, 1024 },
-    { "Acorn ADFS D", SIDES_INTERLEAVED, DENS_DOUBLE, 800, 80,  5, 1024 },
-    { NULL,           SIDES_NA,          DENS_NA,       0,  0,  0,    0 }
+    { "Acorn ADFS D", SIDES_INTERLEAVED, DENS_DOUBLE, 800, 80,  5, 1024 }
 };
 
 static const geometry_t adfs_old_formats[] =
@@ -57,8 +56,7 @@ static const geometry_t adfs_old_formats[] =
     { "ADFS+DOS",     SIDES_INTERLEAVED, DENS_DOUBLE, 2720, 80, 16,  256 },
     { "Acorn ADFS L", SIDES_INTERLEAVED, DENS_DOUBLE, 2560, 80, 16,  256 },
     { "Acorn ADFS M", SIDES_SINGLE,      DENS_DOUBLE, 1280, 80, 16,  256 },
-    { "Acorn ADFS S", SIDES_SINGLE,      DENS_DOUBLE,  640, 40, 16,  256 },
-    { NULL,           SIDES_NA,          DENS_NA,        0,  0,  0,    0 }
+    { "Acorn ADFS S", SIDES_SINGLE,      DENS_DOUBLE,  640, 40, 16,  256 }
 };
 
 static const geometry_t dfs_formats[] =
@@ -82,8 +80,7 @@ static const geometry_t dfs_formats[] =
     { "Acorn DFS",         SIDES_SINGLE,      DENS_SINGLE, 800, 80, 10, 256 },
     { "Acorn DFS",         SIDES_INTERLEAVED, DENS_SINGLE, 400, 40, 10, 256 },
     { "Acorn DFS",         SIDES_SEQUENTIAL,  DENS_SINGLE, 400, 40, 10, 256 },
-    { "Acorn DFS",         SIDES_SINGLE,      DENS_SINGLE, 400, 40, 10, 256 },
-    { NULL,                SIDES_NA,          DENS_NA,       0,  0,  0,   0 }
+    { "Acorn DFS",         SIDES_SINGLE,      DENS_SINGLE, 400, 40, 10, 256 }
 };
 
 static const geometry_t other_formats[] =
@@ -93,9 +90,10 @@ static const geometry_t other_formats[] =
     { "DOS 720K",          SIDES_INTERLEAVED, DENS_DOUBLE, 1440, 80,  9,  512 },
     { "DOS 360K",          SIDES_INTERLEAVED, DENS_DOUBLE,  720, 40,  9,  512 },
     { "Acorn DFS",         SIDES_SINGLE,      DENS_SINGLE,  800, 80, 10,  256 },
-    { "Acorn DFS",         SIDES_INTERLEAVED, DENS_SINGLE, 1600, 80, 10,  256 },
-    { NULL,                SIDES_NA,          DENS_NA,        0,  0,  0,    0 }
+    { "Acorn DFS",         SIDES_INTERLEAVED, DENS_SINGLE, 1600, 80, 10,  256 }
 };
+
+#define ARRAYEND(a) (a + sizeof(a) / sizeof(a[0]))
 
 static int check_id(FILE *fp, long posn, const char *id)
 {
@@ -112,12 +110,13 @@ static int check_id(FILE *fp, long posn, const char *id)
 static const geometry_t *try_adfs_new(FILE *fp)
 {
     long size;
-    const geometry_t *ptr;
+    const geometry_t *ptr, *end;
 
     if (check_id(fp, 0x401, "Nick") || check_id(fp, 0x801, "Nick")) {
         fseek(fp, 0, SEEK_END);
         size = ftell(fp);
-        for (ptr = adfs_new_formats; ptr->name; ptr++)
+        end = ARRAYEND(adfs_new_formats);
+        for (ptr = adfs_new_formats; ptr < end; ptr++)
             if (size == (ptr->size_in_sectors * ptr->sector_size))
                 return ptr;
     }
@@ -127,13 +126,14 @@ static const geometry_t *try_adfs_new(FILE *fp)
 static const geometry_t *try_adfs_old(FILE *fp)
 {
     uint32_t sects;
-    const geometry_t *ptr;
+    const geometry_t *ptr, *end;
 
     if (check_id(fp, 0x201, "Hugo") && check_id(fp, 0x6fb, "Hugo")) {
         fseek(fp, 0xfc, SEEK_SET);
         sects = getc(fp) | (getc(fp) << 8) | (getc(fp) << 16);
         log_debug("sdf: found old ADFS signature, sects=%u", sects);
-        for (ptr = adfs_old_formats; ptr->name; ptr++)
+        end = ARRAYEND(adfs_old_formats);
+        for (ptr = adfs_old_formats; ptr < end; ptr++)
             if (sects == ptr->size_in_sectors)
                 return ptr;
     }
@@ -143,14 +143,15 @@ static const geometry_t *try_adfs_old(FILE *fp)
 static const geometry_t *try_dfs(FILE *fp, uint32_t offset)
 {
     uint32_t sects0, fsize, sects2, side2_off, track_bytes;
-    const geometry_t *ptr;
+    const geometry_t *ptr, *end;
 
     fseek(fp, offset, SEEK_SET);
     sects0 = (getc(fp) & 7) << 8;
     sects0 |= getc(fp);
     fseek(fp, 0L, SEEK_END);
     fsize = ftell(fp);
-    for (ptr = dfs_formats; ptr->name; ptr++) {
+    end = ARRAYEND(dfs_formats);
+    for (ptr = dfs_formats; ptr < end; ptr++) {
         if (sects0 == ptr->size_in_sectors && (ptr->size_in_sectors * ptr->sector_size) >= fsize) {
             if (ptr->sides == SIDES_SINGLE)
                 return ptr;
@@ -171,11 +172,12 @@ static const geometry_t *try_dfs(FILE *fp, uint32_t offset)
 static const geometry_t *try_others(FILE *fp)
 {
     off_t size;
-    const geometry_t *ptr;
+    const geometry_t *ptr, *end;
 
     fseek(fp, 0, SEEK_END);
     size = ftell(fp);
-    for (ptr = other_formats; ptr->name; ptr++)
+    end = ARRAYEND(other_formats);
+    for (ptr = other_formats; ptr < end; ptr++)
         if ((ptr->size_in_sectors * ptr->sector_size) == size)
             return ptr;
     return NULL;
