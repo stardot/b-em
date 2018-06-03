@@ -22,7 +22,6 @@
 #include "disc.h"
 
 typedef enum {
-    SIDES_NA,
     SIDES_SINGLE,
     SIDES_SEQUENTIAL,
     SIDES_INTERLEAVED
@@ -208,30 +207,43 @@ static const char *desc_dens(const geometry_t *geo)
 static const geometry_t *dfs_search(FILE *fp, uint32_t offset, uint32_t dirsize0, uint32_t sects0, uint8_t *twosect0, uint32_t fsize, const geometry_t *formats, const geometry_t *end, uint32_t (*get_start_sect)(const uint8_t *entry))
 {
     const geometry_t *ptr;
-    uint32_t dirsize2, sects2, side2_off, track_bytes;
+    uint32_t dirsize2, sects2, side2_off, total_size;
     uint8_t twosect2[512];
 
     if (check_sorted(twosect0, dirsize0, get_start_sect)) {
         log_debug("sdf: dfs_search: check_sorted true for side0");
         for (ptr = formats; ptr < end; ptr++) {
             log_debug("sdf: dfs_search: trying entry name=%s, sides=%s, dens=%s", ptr->name, desc_sides(ptr), desc_dens(ptr));
-            if (sects0 == ptr->size_in_sectors && (ptr->size_in_sectors * ptr->sector_size) >= fsize) {
-                if (ptr->sides == SIDES_SINGLE)
-                    return ptr;
-                side2_off = track_bytes = ptr->sectors_per_track * ptr->sector_size;
-                if (ptr->sides == SIDES_SEQUENTIAL)
-                    side2_off = ptr->tracks * track_bytes;
-                if (fseek(fp, side2_off+offset, SEEK_SET) >= 0) {
-                    if (fread(twosect2, sizeof twosect2, 1, fp) == 1) {
-                        dirsize2 = twosect2[0x105];
-                        log_debug("sdf: dfs_search: dirsize2=%d bytes, %d entries", dirsize2, dirsize2 / 8);
-                        if (!(dirsize2 & 0x07) && dirsize2 < (31 * 8)) {
-                            sects2 = ((twosect2[0x106] & 0x07) << 8) | twosect2[0x107];
-                            log_debug("sdf: dfs_search: sects2=%d", sects2);
-                            if (sects2 == sects0) {
-                                if (check_sorted(twosect2, dirsize2, get_start_sect)) {
-                                    log_debug("sdf: dfs_search: check_sorted true for side2");
-                                    return ptr;
+            if (sects0 == ptr->size_in_sectors) {
+                total_size = ptr->size_in_sectors * ptr->sector_size;
+                switch(ptr->sides) {
+                    case SIDES_SINGLE:
+                        if (total_size >= fsize)
+                            return ptr;
+                    default:
+                        continue;
+                    case SIDES_SEQUENTIAL:
+                        total_size *= 2;
+                        side2_off = ptr->tracks * ptr->sectors_per_track * ptr->sector_size;
+                        break;
+                    case SIDES_INTERLEAVED:
+                        total_size *= 2;
+                        side2_off = ptr->sectors_per_track * ptr->sector_size;
+                }
+                if (total_size >= fsize) {
+                    log_debug("sdf: dfs_search: looking for side2 at offset %d", side2_off);
+                    if (fseek(fp, side2_off+offset, SEEK_SET) >= 0) {
+                        if (fread(twosect2, sizeof twosect2, 1, fp) == 1) {
+                            dirsize2 = twosect2[0x105];
+                            log_debug("sdf: dfs_search: dirsize2=%d bytes, %d entries", dirsize2, dirsize2 / 8);
+                            if (!(dirsize2 & 0x07) && dirsize2 < (31 * 8)) {
+                                sects2 = ((twosect2[0x106] & 0x07) << 8) | twosect2[0x107];
+                                log_debug("sdf: dfs_search: sects2=%d", sects2);
+                                if (sects2 == sects0) {
+                                    if (check_sorted(twosect2, dirsize2, get_start_sect)) {
+                                        log_debug("sdf: dfs_search: check_sorted true for side2");
+                                        return ptr;
+                                    }
                                 }
                             }
                         }
