@@ -194,13 +194,13 @@ static const char *desc_dens(const geometry_t *geo)
 {
     switch(geo->density) {
         case DENS_QUAD:
-            return "quad";
+            return "quad-density";
         case DENS_DOUBLE:
-            return "double";
+            return "double-density";
         case DENS_SINGLE:
-            return "single";
+            return "single-density";
         default:
-            return "unknown";
+            return "unknown-density";
     }
 }
 
@@ -213,7 +213,7 @@ static const geometry_t *dfs_search(FILE *fp, uint32_t offset, uint32_t dirsize0
     if (check_sorted(twosect0, dirsize0, get_start_sect)) {
         log_debug("sdf: dfs_search: check_sorted true for side0");
         for (ptr = formats; ptr < end; ptr++) {
-            log_debug("sdf: dfs_search: trying entry name=%s, sides=%s, dens=%s", ptr->name, desc_sides(ptr), desc_dens(ptr));
+            log_debug("sdf: dfs_search: trying entry %s, %s, %s", ptr->name, desc_sides(ptr), desc_dens(ptr));
             if (sects0 == ptr->size_in_sectors) {
                 total_size = ptr->size_in_sectors * ptr->sector_size;
                 switch(ptr->sides) {
@@ -629,7 +629,7 @@ void sdf_load(int drive, const char *fn)
         }
     }
     sdf_fp[drive] = fp;
-    log_info("Loaded drive %d with %s, format %s, %s, %d tracks, %s-density, %d %d byte sectors/track",
+    log_info("Loaded drive %d with %s, format %s, %s, %d tracks, %s, %d %d byte sectors/track",
              drive, fn, geo->name, desc_sides(geo), geo->tracks, desc_dens(geo), geo->sectors_per_track, geo->sector_size);
     geometry[drive] = geo;
     drives[drive].close       = sdf_close;
