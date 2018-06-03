@@ -177,6 +177,34 @@ static bool check_sorted(const uint8_t *base, uint32_t dirsize, uint32_t (*get_s
     return true;
 }
 
+static const char *desc_sides(const geometry_t *geo)
+{
+    switch(geo->sides) {
+        case SIDES_SINGLE:
+            return "single-sided";
+        case SIDES_SEQUENTIAL:
+            return "doubled-sided, sequential";
+        case SIDES_INTERLEAVED:
+            return "double-sided, interleaved";
+        default:
+            return "unknown";
+    }
+}
+
+static const char *desc_dens(const geometry_t *geo)
+{
+    switch(geo->density) {
+        case DENS_QUAD:
+            return "quad";
+        case DENS_DOUBLE:
+            return "double";
+        case DENS_SINGLE:
+            return "single";
+        default:
+            return "unknown";
+    }
+}
+
 static const geometry_t *dfs_search(FILE *fp, uint32_t offset, uint32_t dirsize0, uint32_t sects0, uint8_t *twosect0, uint32_t fsize, const geometry_t *formats, const geometry_t *end, uint32_t (*get_start_sect)(const uint8_t *entry))
 {
     const geometry_t *ptr;
@@ -186,6 +214,7 @@ static const geometry_t *dfs_search(FILE *fp, uint32_t offset, uint32_t dirsize0
     if (check_sorted(twosect0, dirsize0, get_start_sect)) {
         log_debug("sdf: dfs_search: check_sorted true for side0");
         for (ptr = formats; ptr < end; ptr++) {
+            log_debug("sdf: dfs_search: trying entry name=%s, sides=%s, dens=%s", ptr->name, desc_sides(ptr), desc_dens(ptr));
             if (sects0 == ptr->size_in_sectors && (ptr->size_in_sectors * ptr->sector_size) >= fsize) {
                 if (ptr->sides == SIDES_SINGLE)
                     return ptr;
@@ -201,7 +230,7 @@ static const geometry_t *dfs_search(FILE *fp, uint32_t offset, uint32_t dirsize0
                             log_debug("sdf: dfs_search: sects2=%d", sects2);
                             if (sects2 == sects0) {
                                 if (check_sorted(twosect2, dirsize2, get_start_sect)) {
-                                    log_debug("sdf: dfs_search: check_sorted true for side0");
+                                    log_debug("sdf: dfs_search: check_sorted true for side2");
                                     return ptr;
                                 }
                             }
@@ -252,41 +281,6 @@ static const geometry_t *try_others(FILE *fp) {
         if ((ptr->size_in_sectors * ptr->sector_size) == size)
             return ptr;
     return NULL;
-}
-
-static void info_msg(int drive, const char *fn, const geometry_t *geo)
-{
-    const char *sides;
-    const char *dens;
-
-    switch(geo->sides) {
-        case SIDES_SINGLE:
-            sides = "single-sided";
-            break;
-        case SIDES_SEQUENTIAL:
-            sides = "doubled-sided, sequential";
-            break;
-        case SIDES_INTERLEAVED:
-            sides = "double-sided, interleaved";
-            break;
-        default:
-            sides = "unknown";
-    }
-    switch(geo->density) {
-        case DENS_QUAD:
-            dens = "quad";
-            break;
-        case DENS_DOUBLE:
-            dens = "double";
-            break;
-        case DENS_SINGLE:
-            dens = "single";
-            break;
-        default:
-            dens = "unknown";
-    }
-    log_info("Loaded drive %d with %s, format %s, %s, %d tracks, %s-density, %d %d byte sectors/track",
-             drive, fn, geo->name, sides, geo->tracks, dens, geo->sectors_per_track, geo->sector_size);
 }
 
 static const geometry_t *geometry[NUM_DRIVES];
@@ -623,7 +617,8 @@ void sdf_load(int drive, const char *fn)
         }
     }
     sdf_fp[drive] = fp;
-    info_msg(drive, fn, geo);
+    log_info("Loaded drive %d with %s, format %s, %s, %d tracks, %s-density, %d %d byte sectors/track",
+             drive, fn, geo->name, desc_sides(geo), geo->tracks, desc_dens(geo), geo->sectors_per_track, geo->sector_size);
     geometry[drive] = geo;
     drives[drive].close       = sdf_close;
     drives[drive].seek        = sdf_seek;
