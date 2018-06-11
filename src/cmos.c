@@ -164,12 +164,12 @@ void cmos_load(MODEL m) {
     if (!m.cmos[0]) return;
     if (m.compact) compactcmos_load(m);
     else {
-        memset(cmos, 0, 64);
+        memset(cmos, 0, sizeof cmos);
         rtc_epoc_ref = rtc_epoc_adj = 0;
         if ((path = find_cfg_file(m.cmos, ".bin"))) {
             cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
             if ((f = fopen(cpath, "rb"))) {
-                if (fread(cmos, 64, 1, f) != 1)
+                if (fread(cmos, sizeof cmos, 1, f) != 1)
                     log_warn("cmos: cmos file %s read incompletely, some values will be zero", cpath);
                 fclose(f);
                 log_debug("cmos: loaded from %s", cpath);
@@ -195,7 +195,7 @@ void cmos_save(MODEL m) {
             cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
             if ((f = fopen(cpath, "wb"))) {
                 log_debug("cmos: saving to %s", cpath);
-                fwrite(cmos, 64, 1, f);
+                fwrite(cmos, sizeof cmos, 1, f);
                 fclose(f);
             }
             else
