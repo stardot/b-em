@@ -169,7 +169,7 @@ void cmos_load(MODEL m) {
         if ((path = find_cfg_file(m.cmos, ".bin"))) {
             cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
             if ((f = fopen(cpath, "rb"))) {
-                if (fread(cmos, 64, 1, f) == 1)
+                if (fread(cmos, 64, 1, f) != 1)
                     log_warn("cmos: cmos file %s read incompletely, some values will be zero", cpath);
                 fclose(f);
                 log_debug("cmos: loaded from %s", cpath);
