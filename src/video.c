@@ -855,7 +855,7 @@ void video_poll(int clocks, int timer_enable)
                 dat = ram[(addr & 0x7FFF) | vidbank];
             }
 
-            if (scrx < 1280) {
+            if (scrx < (1280-16)) {
                 if ((crtc[8] & 0x30) == 0x30 || ((sc & 8) && !(ula_ctrl & 2))) {
                     // Gaps between lines in modes 3 & 6.
                     put_pixels(region, scrx, scry, (ula_ctrl & 0x10) ? 8 : 16, colblack);

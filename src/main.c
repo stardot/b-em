@@ -309,7 +309,6 @@ void main_restart()
 {
     main_pause();
     cmos_save(models[oldmodel]);
-    oldmodel = curmodel;
 
     model_init();
     main_reset();
