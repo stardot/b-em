@@ -23,7 +23,7 @@ static const char slotkeys[16][6] = {
 };
 
 void mem_init() {
-    log_debug("mem_init\n");
+    log_debug("mem: mem_init");
     ram = (uint8_t *)malloc(RAM_SIZE);
     rom = (uint8_t *)malloc(ROM_NSLOT * ROM_SIZE);
     os  = (uint8_t *)malloc(ROM_SIZE);
