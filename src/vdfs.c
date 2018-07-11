@@ -1900,7 +1900,7 @@ static void osword(void)
             case 2:  ssize = 512; break;
             default: ssize = 256; break;
         }
-        FILE *fp = sdf_owseek(drive >> 1, readmem(pb+8), readmem(pb+7), drive & 1, ssize);
+        FILE *fp = sdf_owseek(drive & 1, readmem(pb+8), readmem(pb+7), drive >> 1, ssize);
         if (fp) {
             uint32_t addr = readmem32(pb+1);
             uint8_t cmd   = readmem(pb+6);
