@@ -1135,18 +1135,14 @@ INY:LDA (&B0),Y:STA &B1
 PLA:STA &B0:DEY
 RTS
 .ServOsword
-LDA &EF:CMP #127            :\ Check OSWORD number
-BNE P%+5:JSR Osword7F       :\ If FM disk access, play with memory
+LDA #&40
+STA PORT_CMD
+BEQ Osword7F
 JMP ServExit
 \ -------------------------------------------------------------
 \ Corrupt bits of memory to simulate effects of real OSWORD &7F
 \ -------------------------------------------------------------
 .Osword7F
-LDA #&00            :\ query current FS
-TAY
-JSR OSARGS
-CMP FSFlag
-BNE SkipOSW7F
 LDA &B0:PHA:LDA &B1:PHA     :\ Code calling Osword7F may be using &B0/1
 JSR fdcFetchAddr
 JSR fdcFetchPtr
@@ -1156,8 +1152,7 @@ EOR &1000,X:ROL A:EOR #&23:STA &1000,X
 INY:BNE Osw7FLp
 .Osw7FDone
 PLA:STA &B1:PLA:STA &B0     :\ A,X,Y preserved outside here
-.SkipOSW7F
-RTS
+JMP ServClaim
 :
 .Osw7FAddr
 EQUW Osw7FTableNone         :\ Pointer to address table

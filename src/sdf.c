@@ -374,6 +374,27 @@ static void io_seek(const geometry_t *geo, uint8_t drive, uint8_t sector, uint8_
     fseek(sdf_fp[drive], offset, SEEK_SET);
 }
 
+FILE *sdf_owseek(uint8_t drive, uint8_t sector, uint8_t track, uint8_t side, uint16_t ssize)
+{
+    const geometry_t *geo;
+
+    if (drive < NUM_DRIVES) {
+        if ((geo = geometry[drive])) {
+            if (ssize == geo->sector_size) {
+                io_seek(geo, drive, sector, track, side);
+                return sdf_fp[drive];
+            }
+            else
+                log_debug("sdf: osword seek, sector size %u does not match disk (%u)", ssize, geo->sector_size);
+        }
+        else
+            log_debug("sdf: osword seek, no geometry for drive %u", drive);
+    }
+    else
+        log_debug("sdf: osword seek, drive %u out of range", drive);
+    return NULL;
+}
+
 static void sdf_readsector(int drive, int sector, int track, int side, int density)
 {
     const geometry_t *geo;

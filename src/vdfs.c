@@ -29,6 +29,7 @@
 #include "main.h"
 #include "mem.h"
 #include "model.h"
+#include "sdf.h"
 #include "tube.h"
 #include "savestate.h"
 
@@ -731,8 +732,6 @@ static vdfs_ent_t *find_entry(const char *filename, vdfs_ent_t *key, vdfs_ent_t 
             *fn_ptr++ = ch;
         }
         *fn_ptr = '\0';
-        //if (tail_addr)
-        //    *tail_addr = fn_addr;
         if (((key->acorn_fn[0] == '$' || key->acorn_fn[0] == '&') && key->acorn_fn[1] == '\0') || (key->acorn_fn[0] == ':' && isdigit(key->acorn_fn[1])))
             ent = &root_dir;
         else if (key->acorn_fn[0] == '%' && key->acorn_fn[1] == '\0' && check_valid_dir(lib_dir, "library"))
@@ -1042,12 +1041,12 @@ static void run_file(const char *err) {
             else if ((fp = fopen(ent->host_path, "rb"))) {
                 addr = ent->load_addr;
                 if (addr > 0xffff0000 || curtube == -1) {
-                    log_debug("vdfs: run_file: writing to I/O proc memory");
+                    log_debug("vdfs: run_file: writing to I/O proc memory at %08X", addr);
                     while ((ch = getc(fp)) != EOF)
                         writemem(addr++, ch);
                     pc = ent->exec_addr;
                 } else {
-                    log_debug("vdfs: run_file: writing to tube proc memory");
+                    log_debug("vdfs: run_file: writing to tube proc memory at %08X", addr);
                     writemem32(0xc0, ent->exec_addr); // set up for tube execution.
                     while ((ch = getc(fp)) != EOF)
                         tube_writemem(addr++, ch);
@@ -1887,6 +1886,62 @@ static void exec_swr_ram(uint8_t flags, uint16_t ram_start, uint16_t len, uint32
     }
 }
 
+
+static void osword(void)
+{
+    p.z = 0;
+    if (fs_flag && readmem(0xef) == 0x7f) {
+        uint16_t pb   = readmem(0xf0) | (readmem(0xf1) << 8);
+        uint8_t drive = readmem(pb);
+        uint8_t sects = readmem(pb+9);
+        uint16_t ssize;
+        switch((sects & 0xe0) >> 5) {
+            case 0:  ssize = 128; break;
+            case 2:  ssize = 512; break;
+            default: ssize = 256; break;
+        }
+        FILE *fp = sdf_owseek(drive >> 1, readmem(pb+8), readmem(pb+7), drive & 1, ssize);
+        if (fp) {
+            uint32_t addr = readmem32(pb+1);
+            uint8_t cmd   = readmem(pb+6);
+            size_t bytes = (sects & 0x0f) << 8;
+            if (cmd == 0x53) {
+                if (addr > 0xffff0000 || curtube == -1) {
+                    int ch;
+                    log_debug("vdfs: osword: writing to I/O proc memory at %08X", addr);
+                    while (bytes-- && (ch = getc(fp)) != EOF)
+                        writemem(addr++, ch);
+                }
+                else {
+                    int ch;
+                    log_debug("vdfs: osword: writing to tube memory at %08X", addr);
+                    while (bytes-- && (ch = getc(fp)) != EOF)
+                        tube_writemem(addr++, ch);
+                }
+                p.z = 1;
+            }
+            else if (cmd == 0x4b) {
+                if (addr > 0xffff0000 || curtube == -1) {
+                    log_debug("vdfs: osword: reading from I/O proc memory at %08X", addr);
+                    while (bytes--)
+                        putc(readmem(addr++), fp);
+                }
+                else {
+                    log_debug("vdfs: osword: reading from tube memory at %08X", addr);
+                    while (bytes--)
+                        putc(tube_readmem(addr++), fp);
+                }
+                p.z = 1;
+            }
+            writemem(pb+10, 0);
+        }
+        else {
+            log_debug("vdfs: osword attempting to read invalid/empty drive %d", drive);
+            writemem(pb+10, 0x14); // track 0 not found.
+        }
+    }
+}
+
 /*
  * The following routines parse the SRLOAD and SRSAVE commands into
  * an OSWORD parameter block as used on the BBC Master.  Control is
@@ -2159,6 +2214,7 @@ static inline void dispatch(uint8_t value) {
         case 0x06: osfile();       break;
         case 0x10: cat_prep();     break;
         case 0x11: close_all();    break;
+        case 0x40: osword();       break;
         case 0xd0: cmd_srload();   break;
         case 0xd1: cmd_srwrite();  break;
         case 0xd2: exec_swr_fs();  break;
