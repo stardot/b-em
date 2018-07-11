@@ -216,6 +216,7 @@ static const geometry_t *dfs_search(FILE *fp, uint32_t offset, uint32_t dirsize0
             log_debug("sdf: dfs_search: trying entry %s, %s, %s", ptr->name, desc_sides(ptr), desc_dens(ptr));
             if (sects0 == ptr->size_in_sectors) {
                 total_size = ptr->size_in_sectors * ptr->sector_size;
+                log_debug("sdf: dfs_search: sects0 matches, total_size=%u", total_size);
                 switch(ptr->sides) {
                     case SIDES_SINGLE:
                         if (total_size >= fsize)
@@ -265,7 +266,7 @@ static const geometry_t *try_dfs(FILE *fp, uint32_t offset)
         if (fread(twosect0, sizeof twosect0, 1, fp) == 1) {
             dirsize0 = twosect0[0x105];
             log_debug("sdf: try_dfs: dirsize0=%d bytes, %d entries", dirsize0, dirsize0 / 8);
-            if (!(dirsize0 & 0x07) && dirsize0 < (31 * 8)) {
+            if (!(dirsize0 & 0x07) && dirsize0 <= (31 * 8)) {
                 sects0 = ((twosect0[0x106] & 0x07) << 8) | twosect0[0x107];
                 fseek(fp, 0L, SEEK_END);
                 fsize = ftell(fp);
