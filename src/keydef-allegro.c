@@ -322,6 +322,8 @@ static void redef_message(const key_dlg_t *key_dlg, const key_cap_t *kptr, int *
     int size, remain, code, count;
     const char *fmt;
 
+    log_debug("keydef-allegro: BBC key %s (%s), code %d clicked", kptr->cap, kptr->name, kptr->keycode);
+
     al_draw_filled_rectangle(left_x, top_y, left_x + 400, top_y + 72, navy);
     snprintf(s, sizeof s, "Redefining %s", kptr->name);
     al_draw_text(font, white, left_x+24, top_y+16, ALLEGRO_ALIGN_LEFT, s);
@@ -415,6 +417,7 @@ static void *keydef_thread(ALLEGRO_THREAD *thread, void *tdata)
                         break;
                     case ALLEGRO_EVENT_KEY_DOWN:
                         if (state == ST_PC_KEY) {
+                            log_debug("keydef-allegro: mapping %d to %d", event.keyboard.keycode, kptr->keycode);
                             keylookcpy[event.keyboard.keycode] = kptr->keycode;
                             state = ST_BBC_KEY;
                             draw_keyboard(key_dlg, ok_x, can_x);
