@@ -116,9 +116,9 @@ int main(int argc, char **argv)
                         dsc_fn = alloca(len);
                         snprintf(dsc_fn, len, "%s.dsc", fn);
 
-                        if ((dat_fp = fopen(dat_fn, "w")))
+                        if ((dat_fp = fopen(dat_fn, "wb")))
                         {
-                                if ((dsc_fp = fopen(dsc_fn, "w")))
+                                if ((dsc_fp = fopen(dsc_fn, "wb")))
                                 {
                                         sectors = size / 256;
                                         cyl = 1 + ((sectors - 1) / (33 * 255));
