@@ -53,16 +53,16 @@ static uint8_t allegro2bbc[ALLEGRO_KEY_MAX] =
     0x1b,   // 44   ALLEGRO_KEY_PAD_7
     0x2a,   // 45   ALLEGRO_KEY_PAD_8
     0x2b,   // 46   ALLEGRO_KEY_PAD_9
-    0x71,   // 47   ALLEGRO_KEY_F1
-    0x72,   // 48   ALLEGRO_KEY_F2
-    0x73,   // 49   ALLEGRO_KEY_F3
-    0x14,   // 50   ALLEGRO_KEY_F4
-    0x74,   // 51   ALLEGRO_KEY_F5
-    0x75,   // 52   ALLEGRO_KEY_F6
-    0x16,   // 53   ALLEGRO_KEY_F7
-    0x76,   // 54   ALLEGRO_KEY_F8
-    0x77,   // 55   ALLEGRO_KEY_F9
-    0x20,   // 56   ALLEGRO_KEY_F10
+    0x20,   // 56   ALLEGRO_KEY_F1
+    0x71,   // 47   ALLEGRO_KEY_F2
+    0x72,   // 48   ALLEGRO_KEY_F3
+    0x73,   // 49   ALLEGRO_KEY_F4
+    0x14,   // 50   ALLEGRO_KEY_F5
+    0x74,   // 51   ALLEGRO_KEY_F6
+    0x75,   // 52   ALLEGRO_KEY_F7
+    0x16,   // 53   ALLEGRO_KEY_F8
+    0x76,   // 54   ALLEGRO_KEY_F9
+    0x77,   // 55   ALLEGRO_KEY_F10
     0x28,   // 57   ALLEGRO_KEY_F11
     0xaa,   // 58   ALLEGRO_KEY_F12
     0x70,   // 59   ALLEGRO_KEY_ESCAPE
@@ -284,6 +284,7 @@ int key_map(ALLEGRO_EVENT *event)
             code = ALLEGRO_KEY_CAPSLOCK;
         code = keylookup[code];
     }
+    log_debug("keyboard: mapping %d to %d", event->keyboard.keycode, code);
     return code;
 }
 
