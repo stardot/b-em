@@ -1,7 +1,7 @@
 VPATH = . resid-fp NS32016 darm
 
-CPP  = i686-w64-mingw32-g++.exe
-CC   = i686-w64-mingw32-gcc.exe
+CPP  = g++
+CC   = gcc
 WINDRES = windres.exe
 
 # The following flags are used by PiTubeDirect Co Pros:
@@ -113,7 +113,7 @@ SIDOBJ = \
 
 LIBS = -L ../../allegro5/lib -lallegro_audio -lallegro_acodec -lallegro_primitives -lallegro_dialog -lallegro_image -lallegro_font -lallegro -mwindows -lz -lgdi32 -lwinmm -lstdc++
 
-all : b-em.exe
+all : b-em.exe hdfmt.exe
 
 b-em.exe: $(OBJ) $(SIDOBJ) $(NS32KOBJ)
 	$(CC) $(OBJ) $(SIDOBJ) $(NS32KOBJ) -o "b-em.exe" $(LIBS)
@@ -129,3 +129,6 @@ clean :
 
 b-em.res: b-em.rc
 	$(WINDRES) -i b-em.rc --input-format=rc -o b-em.res -O coff
+
+hdfmt.exe: hdfmt.c
+	$(CC) $(CFLAGS) -o hdfmt.exe hdfmt.c
