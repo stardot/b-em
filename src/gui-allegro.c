@@ -590,6 +590,11 @@ static void disc_eject(ALLEGRO_EVENT *event)
 {
     int drive = menu_get_num(event);
     disc_close(drive);
+    if (discfns[drive]) {
+        al_destroy_path(discfns[drive]);
+        discfns[drive] = NULL;
+    }
+    al_set_menu_item_caption(disc_menu, menu_id_num(IDM_DISC_EJECT, drive), drive ? "Eject disc :1/3" : "Eject disc :0/2");
 }
 
 static void disc_wprot(ALLEGRO_EVENT *event)

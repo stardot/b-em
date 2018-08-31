@@ -95,12 +95,12 @@ void config_load(void)
         log_warn("config: no config file found, using defaults");
 
     if (bem_cfg) {
-        if ((p = get_config_string("disc", "disc0", NULL))) {
+        if ((p = get_config_string("disc", "disc0", NULL)) && *p) {
             if (discfns[0])
                 al_destroy_path(discfns[0]);
             discfns[0] = al_create_path(p);
         }
-        if ((p = get_config_string("disc", "disc1", NULL))) {
+        if ((p = get_config_string("disc", "disc1", NULL)) && *p) {
             if (discfns[1])
                 al_destroy_path(discfns[1]);
             discfns[1] = al_create_path(p);
@@ -201,12 +201,9 @@ void config_save(void)
         }
         model_savecfg();
 
-        if (discfns[0])
-            al_set_config_value(bem_cfg, "disc", "disc0", al_path_cstr(discfns[0], ALLEGRO_NATIVE_PATH_SEP));
-        if (discfns[1])
-            al_set_config_value(bem_cfg, "disc", "disc1", al_path_cstr(discfns[1], ALLEGRO_NATIVE_PATH_SEP));
-        if (tape_fn)
-            al_set_config_value(bem_cfg, "tape", "tape", al_path_cstr(tape_fn, ALLEGRO_NATIVE_PATH_SEP));
+        al_set_config_value(bem_cfg, "disc", "disc0", discfns[0] ? al_path_cstr(discfns[0], ALLEGRO_NATIVE_PATH_SEP) : "");
+        al_set_config_value(bem_cfg, "disc", "disc1", discfns[1] ? al_path_cstr(discfns[1], ALLEGRO_NATIVE_PATH_SEP) : "");
+        al_set_config_value(bem_cfg, "tape", "tape", tape_fn ? al_path_cstr(tape_fn, ALLEGRO_NATIVE_PATH_SEP) : "");
 
         set_config_bool("disc", "defaultwriteprotect", defaultwriteprot);
 
