@@ -213,7 +213,7 @@ static const geometry_t *dfs_search(FILE *fp, uint32_t offset, uint32_t dirsize0
     if (check_sorted(twosect0, dirsize0, get_start_sect)) {
         log_debug("sdf: dfs_search: check_sorted true for side0");
         for (ptr = formats; ptr < end; ptr++) {
-            log_debug("sdf: dfs_search: trying entry %s, %s, %s", ptr->name, desc_sides(ptr), desc_dens(ptr));
+            log_debug("sdf: dfs_search: trying %s, %s, %d tracks, %s", ptr->name, desc_sides(ptr), ptr->tracks, desc_dens(ptr));
             if (sects0 == ptr->size_in_sectors) {
                 total_size = ptr->size_in_sectors * ptr->sector_size;
                 log_debug("sdf: dfs_search: sects0 matches, total_size=%u", total_size);
