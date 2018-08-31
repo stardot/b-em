@@ -21,7 +21,6 @@ extern DRIVE drives[NUM_DRIVES];
 extern int curdrive;
 
 void disc_load(int drive, ALLEGRO_PATH *fn);
-void disc_new(int drive, ALLEGRO_PATH *fn);
 void disc_close(int drive);
 void disc_init(void);
 void disc_poll(void);

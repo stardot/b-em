@@ -664,3 +664,90 @@ void sdf_load(int drive, const char *fn)
     drives[drive].format      = sdf_format;
     drives[drive].abort       = sdf_abort;
 }
+
+static void sdf_prep_dfs(unsigned char *twosect, int nsect)
+{
+    memset(twosect, 0, 512);
+    twosect[0x104] = 1;
+    twosect[0x106] = (nsect >> 8);
+    twosect[0x107] = (nsect & 0xff);
+}
+
+void sdf_prep_ssd(FILE *f, int tracks)
+{
+    int nsect = tracks * 10;
+    unsigned char twosect[512];
+
+    sdf_prep_dfs(twosect, nsect);
+    fwrite(twosect, sizeof twosect, 1, f);
+}
+
+void sdf_prep_dsd(FILE *f, int tracks)
+{
+    int nsect = tracks * 10;
+    unsigned char twosect[512];
+
+    sdf_prep_dfs(twosect, nsect);
+    fwrite(twosect, sizeof twosect, 1, f);
+    fseek(f, nsect << 8, SEEK_SET);
+    fwrite(twosect, sizeof twosect, 1, f);
+}
+
+static uint8_t adfs_checksum(uint8_t *base) {
+    int i = 255, c = 0;
+    unsigned sum = 255;
+    while (--i >= 0) {
+        sum += base[i] + c;
+        c = 0;
+        if (sum >= 256) {
+            sum &= 0xff;
+            c = 1;
+        }
+    }
+    return sum;
+}
+
+void sdf_prep_adfs(FILE *f, int tracks)
+{
+    int nsect = tracks * 16;
+    unsigned char sects[7*256];
+
+    log_debug("sdf: sdf_prep_adfs, tracks=%d, nsect=%d", tracks, nsect);
+    memset(sects, 0, sizeof sects);
+    sects[0x000] = 7;
+    sects[0x0fc] = nsect;
+    sects[0x0fd] = nsect >> 8;
+    sects[0x0fe] = nsect >> 16;
+    sects[0x0ff] = adfs_checksum(sects);
+    nsect -= 7;
+    sects[0x100] = nsect;
+    sects[0x101] = nsect >> 8;
+    sects[0x102] = nsect >> 16;
+    sects[0x1fe] = 3;
+    sects[0x1ff] = adfs_checksum(sects+256);
+    sects[0x201] = 'H';
+    sects[0x202] = 'u';
+    sects[0x203] = 'g';
+    sects[0x204] = 'o';
+    sects[0x6cc] = 0x24;
+    sects[0x6d6] = 0x02;
+    sects[0x6d9] = 0x24;
+    sects[0x6fb] = 'H';
+    sects[0x6fc] = 'u';
+    sects[0x6fd] = 'g';
+    sects[0x6fe] = 'o';
+    fwrite(sects, sizeof sects, 1, f);
+}
+
+void sdf_new_disc(int drive, ALLEGRO_PATH *fn, int tracks, void (*callback)(FILE *f, int tracks))
+{
+    FILE *f;
+    const char *cpath = al_path_cstr(fn, ALLEGRO_NATIVE_PATH_SEP);
+    if ((f = fopen(cpath, "wb"))) {
+        callback(f, tracks);
+        fclose(f);
+        sdf_load(drive, cpath);
+    }
+    else
+        log_error("Unable to open disk image %s for writing: %s", cpath, strerror(errno));
+}

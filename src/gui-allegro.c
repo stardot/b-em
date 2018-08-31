@@ -17,6 +17,7 @@
 #include "savestate.h"
 #include "sid_b-em.h"
 #include "scsi.h"
+#include "sdf.h"
 #include "sound.h"
 #include "sn76489.h"
 #include "tape.h"
@@ -116,6 +117,20 @@ static ALLEGRO_MENU *create_edit_menu(void)
     return menu;
 }
 
+static ALLEGRO_MENU *create_disc_new_menu(int drive)
+{
+    ALLEGRO_MENU *menu = al_create_menu();
+
+    al_append_menu_item(menu, "DFS, Single-Sided, 40T", menu_id_num(IDM_DISC_NEW_DFS_SS40, drive), 0, NULL, NULL);
+    al_append_menu_item(menu, "DFS, Single-Sided, 80T", menu_id_num(IDM_DISC_NEW_DFS_SS80, drive), 0, NULL, NULL);
+    al_append_menu_item(menu, "DFS, Double-Sided, 40T", menu_id_num(IDM_DISC_NEW_DFS_DS40, drive), 0, NULL, NULL);
+    al_append_menu_item(menu, "DFS, Double-Sided, 80T", menu_id_num(IDM_DISC_NEW_DFS_DS80, drive), 0, NULL, NULL);
+    al_append_menu_item(menu, "ADFS, Single-Sided 40T", menu_id_num(IDM_DISC_NEW_ADFS_S, drive), 0, NULL, NULL);
+    al_append_menu_item(menu, "ADFS, Single-Sided 80T", menu_id_num(IDM_DISC_NEW_ADFS_M, drive), 0, NULL, NULL);
+    al_append_menu_item(menu, "ADFS, Double-Sided 80T", menu_id_num(IDM_DISC_NEW_ADFS_L, drive), 0, NULL, NULL);
+    return menu;
+}
+
 static ALLEGRO_MENU *create_disc_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
@@ -125,8 +140,8 @@ static ALLEGRO_MENU *create_disc_menu(void)
     al_append_menu_item(menu, "Load disc :1/3...", menu_id_num(IDM_DISC_LOAD, 1), 0, NULL, NULL);
     al_append_menu_item(menu, "Eject disc :0/2", menu_id_num(IDM_DISC_EJECT, 0), 0, NULL, NULL);
     al_append_menu_item(menu, "Eject disc :1/3", menu_id_num(IDM_DISC_EJECT, 1), 0, NULL, NULL);
-    al_append_menu_item(menu, "New disc :0/2...", menu_id_num(IDM_DISC_NEW, 0), 0, NULL, NULL);
-    al_append_menu_item(menu, "New disc :1/3...", menu_id_num(IDM_DISC_NEW, 1), 0, NULL, NULL);
+    al_append_menu_item(menu, "New disc :0/2...", 0, 0, NULL, create_disc_new_menu(0));
+    al_append_menu_item(menu, "New disc :1/3...", 0, 0, NULL, create_disc_new_menu(1));
     add_checkbox_item(menu, "Write protect disc :0/2", menu_id_num(IDM_DISC_WPROT, 0), writeprot[0]);
     add_checkbox_item(menu, "Write protect disc :1/3", menu_id_num(IDM_DISC_WPROT, 1), writeprot[1]);
     add_checkbox_item(menu, "Default write protect", IDM_DISC_WPROT_D, defaultwriteprot);
@@ -537,7 +552,7 @@ static void edit_print_clip(ALLEGRO_EVENT *event)
         prt_clip_str = al_ustr_dup(al_ustr_empty_string());
 }
 
-static bool disc_choose(ALLEGRO_EVENT *event, const char *opname, void (*callback)(int drive, ALLEGRO_PATH *fn), int flags)
+static void disc_choose(ALLEGRO_EVENT *event, const char *opname, const char *exts, int flags)
 {
     ALLEGRO_FILECHOOSER *chooser;
     ALLEGRO_DISPLAY *display;
@@ -546,13 +561,12 @@ static bool disc_choose(ALLEGRO_EVENT *event, const char *opname, void (*callbac
     int drive;
     const char *fpath;
     char title[50];
-    bool rc = false;
 
     drive = menu_get_num(event);
     if (!(apath = discfns[drive]) || !(fpath = al_path_cstr(apath, ALLEGRO_NATIVE_PATH_SEP)))
         fpath = ".";
     snprintf(title, sizeof title, "Choose a disc to %s drive %d/%d", opname, drive, drive+2);
-    if ((chooser = al_create_native_file_dialog(fpath, title, "*.ssd;*.dsd;*.img;*.adf;*.adl;*.fdi", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST))) {
+    if ((chooser = al_create_native_file_dialog(fpath, title, exts, flags))) {
         display = (ALLEGRO_DISPLAY *)(event->user.data2);
         if (al_show_native_file_dialog(display, chooser)) {
             if (al_get_native_file_dialog_count(chooser) > 0) {
@@ -561,8 +575,39 @@ static bool disc_choose(ALLEGRO_EVENT *event, const char *opname, void (*callbac
                 if (discfns[drive])
                     al_destroy_path(discfns[drive]);
                 discfns[drive] = path;
-                callback(drive, path);
-                rc = true;
+                switch(menu_get_id(event)) {
+                    case IDM_DISC_AUTOBOOT:
+                        disc_load(drive, path);
+                        main_reset();
+                        autoboot = 150;
+                        break;
+                    case IDM_DISC_LOAD:
+                        disc_load(drive, path);
+                        break;
+                    case IDM_DISC_NEW_DFS_SS40:
+                        sdf_new_disc(drive, path, 40, sdf_prep_ssd);
+                        break;
+                    case IDM_DISC_NEW_DFS_SS80:
+                        sdf_new_disc(drive, path, 80, sdf_prep_ssd);
+                        break;
+                    case IDM_DISC_NEW_DFS_DS40:
+                        sdf_new_disc(drive, path, 40, sdf_prep_dsd);
+                        break;
+                    case IDM_DISC_NEW_DFS_DS80:
+                        sdf_new_disc(drive, path, 80, sdf_prep_dsd);
+                        break;
+                    case IDM_DISC_NEW_ADFS_S:
+                        sdf_new_disc(drive, path, 40, sdf_prep_adfs);
+                        break;
+                    case IDM_DISC_NEW_ADFS_M:
+                        sdf_new_disc(drive, path, 80, sdf_prep_adfs);
+                        break;
+                    case IDM_DISC_NEW_ADFS_L:
+                        sdf_new_disc(drive, path, 160, sdf_prep_adfs);
+                        break;
+                    default:
+                        break;
+                }
                 menu = (ALLEGRO_MENU *)(event->user.data3);
                 if (defaultwriteprot) {
                     writeprot[drive] = 1;
@@ -574,15 +619,6 @@ static bool disc_choose(ALLEGRO_EVENT *event, const char *opname, void (*callbac
             }
         }
         al_destroy_native_file_dialog(chooser);
-    }
-    return rc;
-}
-
-static void disc_autoboot(ALLEGRO_EVENT *event)
-{
-    if (disc_choose(event, "autoboot in", disc_load, ALLEGRO_FILECHOOSER_FILE_MUST_EXIST)) {
-        main_reset();
-        autoboot = 150;
     }
 }
 
@@ -862,16 +898,28 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             edit_print_clip(event);
             break;
         case IDM_DISC_AUTOBOOT:
-            disc_autoboot(event);
+            disc_choose(event, "autoboot in", "*.ssd;*.dsd;*.img;*.adf;*.adl;*.fdi", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST);
             break;
         case IDM_DISC_LOAD:
-            disc_choose(event, "load into", disc_load, ALLEGRO_FILECHOOSER_FILE_MUST_EXIST);
+            disc_choose(event, "load into", "*.ssd;*.dsd;*.img;*.adf;*.adl;*.fdi", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST);
             break;
         case IDM_DISC_EJECT:
             disc_eject(event);
             break;
-        case IDM_DISC_NEW:
-            disc_choose(event, "create in", disc_new, ALLEGRO_FILECHOOSER_SAVE);
+        case IDM_DISC_NEW_DFS_SS40:
+        case IDM_DISC_NEW_DFS_SS80:
+            disc_choose(event, "create in", "*.ssd", ALLEGRO_FILECHOOSER_SAVE);
+            break;
+        case IDM_DISC_NEW_DFS_DS40:
+        case IDM_DISC_NEW_DFS_DS80:
+            disc_choose(event, "create in", "*.ssd", ALLEGRO_FILECHOOSER_SAVE);
+            break;
+        case IDM_DISC_NEW_ADFS_S:
+        case IDM_DISC_NEW_ADFS_M:
+            disc_choose(event, "create in", "*.adf", ALLEGRO_FILECHOOSER_SAVE);
+            break;
+        case IDM_DISC_NEW_ADFS_L:
+            disc_choose(event, "create in", "*.adl", ALLEGRO_FILECHOOSER_SAVE);
             break;
         case IDM_DISC_WPROT:
             disc_wprot(event);
