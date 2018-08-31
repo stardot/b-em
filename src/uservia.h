@@ -5,6 +5,7 @@
 
 extern VIA uservia;
 extern ALLEGRO_USTR *prt_clip_str;
+extern FILE *prt_fp;
 
 void    uservia_reset(void);
 void    uservia_write(uint16_t addr, uint8_t val);

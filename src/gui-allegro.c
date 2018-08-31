@@ -103,6 +103,7 @@ static ALLEGRO_MENU *create_file_menu(void)
     al_append_menu_item(menu, "Load state...", IDM_FILE_LOAD_STATE, 0, NULL, NULL);
     al_append_menu_item(menu, "Save State...", IDM_FILE_SAVE_STATE, 0, NULL, NULL);
     al_append_menu_item(menu, "Save Screenshot...", IDM_FILE_SCREEN_SHOT, 0, NULL, NULL);
+    add_checkbox_item(menu, "Print to file", IDM_FILE_PRINT, prt_fp);
     al_append_menu_item(menu, "Exit", IDM_FILE_EXIT, 0, NULL, NULL);
     return menu;
 }
@@ -501,6 +502,27 @@ static void file_save_scrshot(ALLEGRO_EVENT *event)
     }
 }
 
+static void file_print(ALLEGRO_EVENT *event)
+{
+    ALLEGRO_FILECHOOSER *chooser;
+    ALLEGRO_DISPLAY *display;
+
+    if (prt_fp) {
+        fclose(prt_fp);
+        prt_fp = NULL;
+    }
+    else if ((chooser = al_create_native_file_dialog(savestate_name, "Print to file", "*.prn", ALLEGRO_FILECHOOSER_SAVE))) {
+        display = (ALLEGRO_DISPLAY *)(event->user.data2);
+        while (al_show_native_file_dialog(display, chooser)) {
+            if (al_get_native_file_dialog_count(chooser) <= 0)
+                break;
+            if ((prt_fp = fopen(al_get_native_file_dialog_path(chooser, 0), "wb")))
+                break;
+        }
+        al_destroy_native_file_dialog(chooser);
+    }
+}
+
 static void edit_print_clip(ALLEGRO_EVENT *event)
 {
     ALLEGRO_DISPLAY *display;
@@ -821,6 +843,9 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             break;
         case IDM_FILE_SCREEN_SHOT:
             file_save_scrshot(event);
+            break;
+        case IDM_FILE_PRINT:
+            file_print(event);
             break;
         case IDM_FILE_EXIT:
             quitting = true;

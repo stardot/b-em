@@ -15,6 +15,7 @@ VIA uservia;
 
 uint8_t lpt_dac;
 ALLEGRO_USTR *prt_clip_str;
+FILE *prt_fp;
 
 void uservia_set_ca1(int level)
 {
@@ -35,11 +36,14 @@ void uservia_set_cb2(int level)
 
 void uservia_write_portA(uint8_t val)
 {
-    if (prt_clip_str) {
-        // Print to clipboard.
+    if (prt_clip_str || prt_fp) {
+        // Printer output.
         if (val == 0x60)
             val = 0xa3; // pound sign.
-        al_ustr_append_chr(prt_clip_str, val);
+        if (prt_clip_str)
+            al_ustr_append_chr(prt_clip_str, val);
+        if (prt_fp)
+            putc(val, prt_fp);
         via_set_ca1(&uservia, 1);
         log_debug("uservia: set CA1 low for printer");
     }
@@ -49,7 +53,7 @@ void uservia_write_portA(uint8_t val)
 
 void printer_set_ca2(int level)
 {
-    if (level && prt_clip_str) {
+    if (level && (prt_clip_str || prt_fp)) {
         via_set_ca1(&uservia, 0);
         log_debug("uservia: set CA1 high for printer");
     }
