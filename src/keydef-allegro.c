@@ -357,7 +357,7 @@ static void *keydef_thread(ALLEGRO_THREAD *thread, void *tdata)
     ALLEGRO_EVENT event;
     state_t state;
     int keylookcpy[ALLEGRO_KEY_MAX];
-    const key_cap_t *kptr;
+    const key_cap_t *kptr = NULL;
     int mid_x, ok_x, can_x;
 
     if (!font) {

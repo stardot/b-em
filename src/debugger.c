@@ -119,8 +119,11 @@ static inline bool debug_in(char *buf, size_t bufsize)
     if ((c = ReadConsole(cinf, buf, bufsize, &len, NULL))) {
         buf[len] = 0;
         log_debug("debugger: read console, len=%d, s=%s", (int)len, buf);
-    } else
+        return true;
+    } else {
         log_error("debugger: unable to read from console: %lu", GetLastError());
+        return false;
+    }
 }
 
 static void debug_out(const char *s, size_t len)
