@@ -4,13 +4,6 @@
  * This is a module to handle the various disk image formats where
  * the sectors that comprise the disk image are stored in the file
  * in a logical order and without ID headers.
- *
- * It understands enough of the filing systems on Acorn to be able
- * to work out the geometry including the sector size, the number
- * of sectors per track etc. and whether the sides are interleaved
- * as used in DSD images or sequential as in SSD.  It can handle
- * double-density images that are not ADFS, i.e. are one of the
- * non-Acorn DFS.
  */
 
 #include <errno.h>
@@ -20,6 +13,9 @@
 
 #include "b-em.h"
 #include "disc.h"
+#include "sdf.h"
+
+#define SSD_SIDE_SIZE (80 * 10 * 256)
 
 typedef enum {
     SIDES_SINGLE,
@@ -34,149 +30,165 @@ typedef enum {
     DENS_QUAD
 } density_t;
 
-typedef struct {
+struct sdf_geometry {
     const char *name;
     sides_t    sides;
     density_t  density;
-    uint16_t   size_in_sectors;
     uint8_t    tracks;
     uint8_t    sectors_per_track;
     uint16_t   sector_size;
-} geometry_t;
-
-static const geometry_t adfs_new_formats[] =
-{
-    { "Acorn ADFS F", SIDES_INTERLEAVED, DENS_QUAD,  1600, 80, 10, 1024 },
-    { "Acorn ADFS D", SIDES_INTERLEAVED, DENS_DOUBLE, 800, 80,  5, 1024 }
+    void (*new_disc)(FILE *f, const struct sdf_geometry *geo);
 };
 
-static const geometry_t adfs_old_formats[] =
+static void prep_dfs(unsigned char *twosect, const struct sdf_geometry *geo)
 {
-    { "ADFS+DOS",     SIDES_INTERLEAVED, DENS_DOUBLE, 2720, 80, 16,  256 },
-    { "Acorn ADFS L", SIDES_INTERLEAVED, DENS_DOUBLE, 2560, 80, 16,  256 },
-    { "Acorn ADFS M", SIDES_SINGLE,      DENS_DOUBLE, 1280, 80, 16,  256 },
-    { "Acorn ADFS S", SIDES_SINGLE,      DENS_DOUBLE,  640, 40, 16,  256 }
-};
-
-static const geometry_t watford_dfs_formats[] =
-{
-    { "Watford/Opus DDFS", SIDES_INTERLEAVED, DENS_DOUBLE, 1440, 80, 18,  256 },
-    { "Watford/Opus DDFS", SIDES_SEQUENTIAL,  DENS_DOUBLE, 1440, 80, 18,  256 },
-    { "Watford/Opus DDFS", SIDES_SINGLE,      DENS_DOUBLE, 1440, 80, 18,  256 },
-    { "Watford/Opus DDFS", SIDES_INTERLEAVED, DENS_DOUBLE,  720, 40, 18,  256 },
-    { "Watford/Opus DDFS", SIDES_SEQUENTIAL,  DENS_DOUBLE,  720, 40, 18,  256 },
-    { "Watford/Opus DDFS", SIDES_SINGLE,      DENS_DOUBLE,  720, 40, 18,  256 }
-};
-
-static const geometry_t solidisk_dfs_formats[] =
-{
-    { "Solidisk DDFS",     SIDES_INTERLEAVED, DENS_DOUBLE, 1280, 80, 16,  256 },
-    { "Solidisk DDFS",     SIDES_SEQUENTIAL,  DENS_DOUBLE, 1280, 80, 16,  256 },
-    { "Solidisk DDFS",     SIDES_SINGLE,      DENS_DOUBLE, 1280, 80, 16,  256 },
-    { "Solidisk DDFS",     SIDES_INTERLEAVED, DENS_DOUBLE,  640, 40, 16,  256 },
-    { "Solidisk DDFS",     SIDES_SEQUENTIAL,  DENS_DOUBLE,  640, 40, 16,  256 },
-    { "Solidisk DDFS",     SIDES_SINGLE,      DENS_DOUBLE,  640, 40, 16,  256 }
-};
-
-static const geometry_t acorn_dfs_formats[] =
-{
-    { "Acorn DFS",         SIDES_INTERLEAVED, DENS_SINGLE, 800, 80, 10, 256 },
-    { "Acorn DFS",         SIDES_SEQUENTIAL,  DENS_SINGLE, 800, 80, 10, 256 },
-    { "Acorn DFS",         SIDES_SINGLE,      DENS_SINGLE, 800, 80, 10, 256 },
-    { "Acorn DFS",         SIDES_INTERLEAVED, DENS_SINGLE, 400, 40, 10, 256 },
-    { "Acorn DFS",         SIDES_SEQUENTIAL,  DENS_SINGLE, 400, 40, 10, 256 },
-    { "Acorn DFS",         SIDES_SINGLE,      DENS_SINGLE, 400, 40, 10, 256 }
-};
-
-static const geometry_t other_formats[] =
-{
-    { "ADFS+DOS 800K",     SIDES_INTERLEAVED, DENS_DOUBLE,  800, 80,  5, 1024 },
-    { "ADFS+DOS 640K",     SIDES_INTERLEAVED, DENS_DOUBLE, 2560, 80, 16,  256 },
-    { "DOS 720K",          SIDES_INTERLEAVED, DENS_DOUBLE, 1440, 80,  9,  512 },
-    { "DOS 360K",          SIDES_INTERLEAVED, DENS_DOUBLE,  720, 40,  9,  512 },
-    { "Acorn DFS",         SIDES_SINGLE,      DENS_SINGLE,  800, 80, 10,  256 },
-    { "Acorn DFS",         SIDES_INTERLEAVED, DENS_SINGLE, 1600, 80, 10,  256 }
-};
-
-#define ARRAYEND(a) (a + sizeof(a) / sizeof(a[0]))
-
-static int check_id(FILE *fp, long posn, const char *id)
-{
-    int ch;
-
-    if (fseek(fp, posn, SEEK_SET) == -1)
-        return 0;
-    while ((ch = *id++))
-        if (ch != getc(fp))
-            return 0;
-    return 1;
+    uint32_t nsect = geo->tracks * geo->sectors_per_track;
+    memset(twosect, ' ', 8);
+    memset(twosect+8, 0, 512-8);
+    twosect[0x100] = ' ';
+    twosect[0x101] = ' ';
+    twosect[0x102] = ' ';
+    twosect[0x103] = ' ';
+    twosect[0x104] = 1;
+    twosect[0x106] = (nsect >> 8);
+    twosect[0x107] = (nsect & 0xff);
 }
 
-static const geometry_t *try_adfs_new(FILE *fp)
+static void new_dfs_single(FILE *f, const struct sdf_geometry *geo)
 {
-    long size;
-    const geometry_t *ptr, *end;
+    unsigned char twosect[512];
 
-    if (check_id(fp, 0x401, "Nick") || check_id(fp, 0x801, "Nick")) {
-        fseek(fp, 0, SEEK_END);
-        size = ftell(fp);
-        end = ARRAYEND(adfs_new_formats);
-        for (ptr = adfs_new_formats; ptr < end; ptr++)
-            if (size == (ptr->size_in_sectors * ptr->sector_size))
-                return ptr;
+    prep_dfs(twosect, geo);
+    fwrite(twosect, sizeof twosect, 1, f);
+}
+
+static void new_dfs_interleaved(FILE *f, const struct sdf_geometry *geo)
+{
+    unsigned char twosect[512];
+
+    prep_dfs(twosect, geo);
+    fwrite(twosect, sizeof twosect, 1, f);
+    fseek(f, geo->sectors_per_track * geo->sector_size, SEEK_SET);
+    fwrite(twosect, sizeof twosect, 1, f);
+}
+
+static void pad_out(FILE *f, const struct sdf_geometry *geo)
+{
+    long size = geo->tracks * geo->sectors_per_track * geo->sector_size;
+    if (geo->sides != SIDES_SINGLE)
+        size <<= 1;
+    fseek(f, size-1, SEEK_SET);
+    putc(0xe5, f);
+    fflush(f);
+}
+
+static void new_stl_single(FILE *f, const struct sdf_geometry *geo)
+{
+    new_dfs_single(f, geo);
+    pad_out(f, geo);
+}
+
+static void new_stl_interleaved(FILE *f, const struct sdf_geometry *geo)
+{
+    new_dfs_interleaved(f, geo);
+    pad_out(f, geo);
+}
+
+static void prep_watford(unsigned char *foursect, const struct sdf_geometry *geo)
+{
+    // normal DFS catalogue.
+    prep_dfs(foursect, geo);
+    // duplicate in sectors 2 and 3.
+    memcpy(foursect+512+8, foursect+8, 512-8);
+    // set marker for 2nd catalogue.
+    memset(foursect+512, 0xaa, 8);
+}
+
+static void new_watford_single(FILE *f, const struct sdf_geometry *geo)
+{
+    unsigned char foursect[1024];
+
+    prep_watford(foursect, geo);
+    fwrite(foursect, sizeof foursect, 1, f);
+    pad_out(f, geo);
+}
+
+static void new_watford_interleaved(FILE *f, const struct sdf_geometry *geo)
+{
+    unsigned char foursect[1024];
+
+    prep_watford(foursect, geo);
+    fwrite(foursect, sizeof foursect, 1, f);
+    fseek(f, geo->sectors_per_track * geo->sector_size, SEEK_SET);
+    fwrite(foursect, sizeof foursect, 1, f);
+    pad_out(f, geo);
+}
+
+static uint8_t adfs_checksum(uint8_t *base) {
+    int i = 255, c = 0;
+    unsigned sum = 255;
+    while (--i >= 0) {
+        sum += base[i] + c;
+        c = 0;
+        if (sum >= 256) {
+            sum &= 0xff;
+            c = 1;
+        }
     }
-    return NULL;
+    return sum;
 }
 
-static const geometry_t *try_adfs_old(FILE *fp)
+static void new_adfs(FILE *f, const struct sdf_geometry *geo)
 {
-    uint32_t sects;
-    const geometry_t *ptr, *end;
+    uint32_t nsect = geo->tracks * geo->sectors_per_track;
+    unsigned char sects[7*256];
 
-    if (check_id(fp, 0x201, "Hugo") && check_id(fp, 0x6fb, "Hugo")) {
-        fseek(fp, 0xfc, SEEK_SET);
-        sects = getc(fp) | (getc(fp) << 8) | (getc(fp) << 16);
-        log_debug("sdf: found old ADFS signature, sects=%u", sects);
-        end = ARRAYEND(adfs_old_formats);
-        for (ptr = adfs_old_formats; ptr < end; ptr++)
-            if (sects == ptr->size_in_sectors)
-                return ptr;
-    }
-    return NULL;
+    if (geo->sides != SIDES_SINGLE)
+        nsect *= 2;
+    log_debug("sdf: sdf_prep_adfs, nsect=%d", nsect);
+    memset(sects, 0, sizeof sects);
+    sects[0x000] = 7;
+    sects[0x0fc] = nsect;
+    sects[0x0fd] = nsect >> 8;
+    sects[0x0fe] = nsect >> 16;
+    sects[0x0ff] = adfs_checksum(sects);
+    nsect -= 7;
+    sects[0x100] = nsect;
+    sects[0x101] = nsect >> 8;
+    sects[0x102] = nsect >> 16;
+    sects[0x1fe] = 3;
+    sects[0x1ff] = adfs_checksum(sects+256);
+    sects[0x201] = 'H';
+    sects[0x202] = 'u';
+    sects[0x203] = 'g';
+    sects[0x204] = 'o';
+    sects[0x6cc] = 0x24;
+    sects[0x6d6] = 0x02;
+    sects[0x6d9] = 0x24;
+    sects[0x6fb] = 'H';
+    sects[0x6fc] = 'u';
+    sects[0x6fd] = 'g';
+    sects[0x6fe] = 'o';
+    fwrite(sects, sizeof sects, 1, f);
 }
 
-static uint32_t watford_start_sect(const uint8_t *entry)
+static const struct sdf_geometry geo_tab[] =
 {
-    return ((entry[0x006] & 0x80) << 3) | ((entry[0x106] & 0x03) << 8) | entry[0x107];
-}
+    { "DFS",          SIDES_SINGLE,      DENS_SINGLE, 80, 10,  256, new_dfs_single          },
+    { "DFS",          SIDES_SEQUENTIAL,  DENS_SINGLE, 80, 10,  256, NULL                    },
+    { "DFS",          SIDES_INTERLEAVED, DENS_SINGLE, 80, 10,  256, new_dfs_interleaved     },
+    { "ADFS",         SIDES_SEQUENTIAL,  DENS_DOUBLE, 80, 16,  256, new_adfs                },
+    { "ADFS",         SIDES_SEQUENTIAL,  DENS_DOUBLE, 80,  5, 1024, new_adfs                },
+    { "ADFS",         SIDES_INTERLEAVED, DENS_DOUBLE, 80, 16,  256, new_adfs                },
+    { "Solidisk",     SIDES_SINGLE,      DENS_DOUBLE, 80, 16,  256, new_stl_single          },
+    { "Watford/Opus", SIDES_SINGLE,      DENS_DOUBLE, 80, 16,  256, new_watford_single      },
+    { "Solidisk",     SIDES_INTERLEAVED, DENS_DOUBLE, 80, 16,  256, new_stl_interleaved     },
+    { "Watford/Opus", SIDES_INTERLEAVED, DENS_DOUBLE, 80, 18,  256, new_watford_interleaved },
+    { "DOS 720k",     SIDES_INTERLEAVED, DENS_DOUBLE, 80,  9,  512, NULL                    },
+    { "DOS 360k",     SIDES_INTERLEAVED, DENS_DOUBLE, 40,  9,  512, NULL                    }
+};
 
-static uint32_t solidisk_start_sect(const uint8_t *entry)
-{
-    return ((entry[0x106] & 0x07) << 8) | entry[0x107];
-}
-
-static uint32_t acorn_start_sect(const uint8_t *entry)
-{
-    return ((entry[0x106] & 0x03) << 8) | entry[0x107];
-}
-
-static bool check_sorted(const uint8_t *base, uint32_t dirsize, uint32_t (*get_start_sect)(const uint8_t *entry))
-{
-    uint32_t cur_start = UINT32_MAX;
-    uint32_t new_start;
-
-    while (dirsize > 0) {
-        base += 8;
-        dirsize -= 8;
-        new_start = get_start_sect(base);
-        if (new_start > cur_start)
-            return false;
-        cur_start = new_start;
-    }
-    return true;
-}
-
-static const char *desc_sides(const geometry_t *geo)
+static const char *desc_sides(const struct sdf_geometry *geo)
 {
     switch(geo->sides) {
         case SIDES_SINGLE:
@@ -190,7 +202,7 @@ static const char *desc_sides(const geometry_t *geo)
     }
 }
 
-static const char *desc_dens(const geometry_t *geo)
+static const char *desc_dens(const struct sdf_geometry *geo)
 {
     switch(geo->density) {
         case DENS_QUAD:
@@ -204,99 +216,7 @@ static const char *desc_dens(const geometry_t *geo)
     }
 }
 
-static const geometry_t *dfs_search(FILE *fp, uint32_t offset, uint32_t dirsize0, uint32_t sects0, uint8_t *twosect0, uint32_t fsize, const geometry_t *formats, const geometry_t *end, uint32_t (*get_start_sect)(const uint8_t *entry))
-{
-    const geometry_t *ptr;
-    uint32_t dirsize2, sects2, side2_off, total_size;
-    uint8_t twosect2[512];
-
-    if (check_sorted(twosect0, dirsize0, get_start_sect)) {
-        log_debug("sdf: dfs_search: check_sorted true for side0");
-        for (ptr = formats; ptr < end; ptr++) {
-            log_debug("sdf: dfs_search: trying %s, %s, %d tracks, %s", ptr->name, desc_sides(ptr), ptr->tracks, desc_dens(ptr));
-            if (sects0 == ptr->size_in_sectors) {
-                total_size = ptr->size_in_sectors * ptr->sector_size;
-                log_debug("sdf: dfs_search: sects0 matches, total_size=%u", total_size);
-                switch(ptr->sides) {
-                    case SIDES_SINGLE:
-                        if (total_size >= fsize)
-                            return ptr;
-                    default:
-                        continue;
-                    case SIDES_SEQUENTIAL:
-                        total_size *= 2;
-                        side2_off = ptr->tracks * ptr->sectors_per_track * ptr->sector_size;
-                        break;
-                    case SIDES_INTERLEAVED:
-                        total_size *= 2;
-                        side2_off = ptr->sectors_per_track * ptr->sector_size;
-                }
-                if (total_size >= fsize) {
-                    log_debug("sdf: dfs_search: looking for side2 at offset %d", side2_off);
-                    if (fseek(fp, side2_off+offset, SEEK_SET) >= 0) {
-                        if (fread(twosect2, sizeof twosect2, 1, fp) == 1) {
-                            dirsize2 = twosect2[0x105];
-                            log_debug("sdf: dfs_search: dirsize2=%d bytes, %d entries", dirsize2, dirsize2 / 8);
-                            if (!(dirsize2 & 0x07) && dirsize2 < (31 * 8)) {
-                                sects2 = ((twosect2[0x106] & 0x07) << 8) | twosect2[0x107];
-                                log_debug("sdf: dfs_search: sects2=%d", sects2);
-                                if (sects2 == sects0) {
-                                    if (check_sorted(twosect2, dirsize2, get_start_sect)) {
-                                        log_debug("sdf: dfs_search: check_sorted true for side2");
-                                        return ptr;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    return NULL;
-}
-
-static const geometry_t *try_dfs(FILE *fp, uint32_t offset)
-{
-    uint32_t dirsize0, sects0, fsize;
-    const geometry_t *ptr;
-    uint8_t twosect0[512];
-
-    if (fseek(fp, offset, SEEK_SET) >= 0) {
-        if (fread(twosect0, sizeof twosect0, 1, fp) == 1) {
-            dirsize0 = twosect0[0x105];
-            log_debug("sdf: try_dfs: dirsize0=%d bytes, %d entries", dirsize0, dirsize0 / 8);
-            if (!(dirsize0 & 0x07) && dirsize0 <= (31 * 8)) {
-                sects0 = ((twosect0[0x106] & 0x07) << 8) | twosect0[0x107];
-                fseek(fp, 0L, SEEK_END);
-                fsize = ftell(fp);
-                log_debug("sdf: try_dfs: sects0=%d, fsize=%d", sects0, fsize);
-                if ((ptr = dfs_search(fp, offset, dirsize0, sects0, twosect0, fsize, watford_dfs_formats, ARRAYEND(watford_dfs_formats), watford_start_sect)))
-                    return ptr;
-                if ((ptr = dfs_search(fp, offset, dirsize0, sects0, twosect0, fsize, solidisk_dfs_formats, ARRAYEND(solidisk_dfs_formats), solidisk_start_sect)))
-                    return ptr;
-                if ((ptr = dfs_search(fp, offset, dirsize0, sects0, twosect0, fsize, acorn_dfs_formats, ARRAYEND(acorn_dfs_formats), acorn_start_sect)))
-                    return ptr;
-            }
-        }
-    }
-    return NULL;
-}
-
-static const geometry_t *try_others(FILE *fp) {
-    off_t size;
-    const geometry_t *ptr, *end;
-
-    fseek(fp, 0, SEEK_END);
-    size = ftell(fp);
-    end = ARRAYEND(other_formats);
-    for (ptr = other_formats; ptr < end; ptr++)
-        if ((ptr->size_in_sectors * ptr->sector_size) == size)
-            return ptr;
-    return NULL;
-}
-
-static const geometry_t *geometry[NUM_DRIVES];
+static const struct sdf_geometry *geometry[NUM_DRIVES];
 static FILE *sdf_fp[NUM_DRIVES];
 static uint8_t current_track[NUM_DRIVES];
 
@@ -344,7 +264,7 @@ static void sdf_seek(int drive, int track)
 
 static int sdf_verify(int drive, int track, int density)
 {
-    const geometry_t *geo;
+    const struct sdf_geometry *geo;
 
     if (drive < NUM_DRIVES)
         if ((geo = geometry[drive]))
@@ -354,7 +274,7 @@ static int sdf_verify(int drive, int track, int density)
     return 0;
 }
 
-static void io_seek(const geometry_t *geo, uint8_t drive, uint8_t sector, uint8_t track, uint8_t side)
+static void io_seek(const struct sdf_geometry *geo, uint8_t drive, uint8_t sector, uint8_t track, uint8_t side)
 {
     uint32_t track_bytes, offset;
 
@@ -376,7 +296,7 @@ static void io_seek(const geometry_t *geo, uint8_t drive, uint8_t sector, uint8_
 
 FILE *sdf_owseek(uint8_t drive, uint8_t sector, uint8_t track, uint8_t side, uint16_t ssize)
 {
-    const geometry_t *geo;
+    const struct sdf_geometry *geo;
 
     if (drive < NUM_DRIVES) {
         if ((geo = geometry[drive])) {
@@ -397,7 +317,7 @@ FILE *sdf_owseek(uint8_t drive, uint8_t sector, uint8_t track, uint8_t side, uin
 
 static void sdf_readsector(int drive, int sector, int track, int side, int density)
 {
-    const geometry_t *geo;
+    const struct sdf_geometry *geo;
 
     if (state == ST_IDLE) {
         if (drive < NUM_DRIVES) {
@@ -426,7 +346,7 @@ static void sdf_readsector(int drive, int sector, int track, int side, int densi
 
 static void sdf_writesector(int drive, int sector, int track, int side, int density)
 {
-    const geometry_t *geo;
+    const struct sdf_geometry *geo;
 
     if (state == ST_IDLE) {
         if (drive < NUM_DRIVES) {
@@ -459,7 +379,7 @@ static void sdf_writesector(int drive, int sector, int track, int side, int dens
 
 static void sdf_readaddress(int drive, int track, int side, int density)
 {
-    const geometry_t *geo;
+    const struct sdf_geometry *geo;
 
     if (state == ST_IDLE) {
         if (drive < NUM_DRIVES) {
@@ -482,7 +402,7 @@ static void sdf_readaddress(int drive, int track, int side, int density)
 
 static void sdf_format(int drive, int track, int side, int density)
 {
-    const geometry_t *geo;
+    const struct sdf_geometry *geo;
 
     if (state == ST_IDLE) {
         if (drive < NUM_DRIVES) {
@@ -624,32 +544,48 @@ static void sdf_abort(int drive)
     state = ST_IDLE;
 }
 
-void sdf_load(int drive, const char *fn)
+static bool has_dfs_cat(FILE *fp, long offset)
 {
-    FILE *fp;
-    const geometry_t *geo;
+    uint32_t dirsize, sects, cur_start, new_start;
+    uint8_t *base, twosect[512];
 
-    writeprot[drive] = 0;
-    if ((fp = fopen(fn, "rb+")) == NULL) {
-        if ((fp = fopen(fn, "rb")) == NULL) {
-            log_error("Unable to open file '%s' for reading - %s", fn, strerror(errno));
-            return;
-        }
-        writeprot[drive] = 1;
-    }
-    if ((geo = try_adfs_new(fp)) == NULL) {
-        if ((geo = try_adfs_old(fp)) == NULL) {
-            if ((geo = try_dfs(fp, 0)) == NULL) {
-                if ((geo = try_dfs(fp, 0xefb)) == NULL) {
-                    if ((geo = try_others(fp)) == NULL) {
-                        log_error("Unable to determine geometry for %s", fn);
-                        fclose(fp);
-                        return;
+    if (fseek(fp, offset, SEEK_SET) >= 0) {
+        if (fread(twosect, sizeof twosect, 1, fp) == 1) {
+            dirsize = twosect[0x105];
+            log_debug("sdf: has_dfs_cat: dirsize=%d bytes, %d entries", dirsize, dirsize / 8);
+            if (!(dirsize & 0x07) && dirsize <= (31 * 8)) {
+                sects = ((twosect[0x106] & 0x07) << 8) | twosect[0x107];
+                if (sects <= SSD_SIDE_SIZE) {
+                    base = twosect + 0x100;
+                    cur_start = UINT32_MAX;
+                    // Check the files are sorted by decreasing start sector.
+                    while (dirsize > 0) {
+                        base += 8;
+                        dirsize -= 8;
+                        new_start = ((base[0x006] & 0x80) << 3) | ((base[0x106] & 0x03) << 8) | base[0x107];
+                        if (new_start > cur_start)
+                            return false;
+                        cur_start = new_start;
                     }
+                    return true;
+                    log_debug("sdf: has_dfs_cat: returning true for %lx", offset);
                 }
+                else
+                    log_debug("sdf: has_dfs_cat: too many sectors for %lx", offset);
             }
+            else
+                log_debug("sdf: has_dfs_cat: dirsize not valid for %lx", offset);
         }
+        else
+            log_debug("sdf: has_dfs_cat: unable to read for %lx", offset);
     }
+    else
+        log_debug("sdf: has_dfs_cat: unable to seek to %lx: %s", offset, strerror(errno));
+    return false;
+}
+
+static void sdf_mount(int drive, const char *fn, FILE *fp, const struct sdf_geometry *geo)
+{
     sdf_fp[drive] = fp;
     log_info("Loaded drive %d with %s, format %s, %s, %d tracks, %s, %d %d byte sectors/track",
              drive, fn, geo->name, desc_sides(geo), geo->tracks, desc_dens(geo), geo->sectors_per_track, geo->sector_size);
@@ -665,89 +601,110 @@ void sdf_load(int drive, const char *fn)
     drives[drive].abort       = sdf_abort;
 }
 
-static void sdf_prep_dfs(unsigned char *twosect, int nsect)
+void sdf_load(int drive, const char *fn, const char *ext)
 {
-    memset(twosect, 0, 512);
-    twosect[0x104] = 1;
-    twosect[0x106] = (nsect >> 8);
-    twosect[0x107] = (nsect & 0xff);
-}
+    FILE *fp;
+    const struct sdf_geometry *geo;
+    long fsize;
 
-void sdf_prep_ssd(FILE *f, int tracks)
-{
-    int nsect = tracks * 10;
-    unsigned char twosect[512];
+    writeprot[drive] = 0;
+    if ((fp = fopen(fn, "rb+")) == NULL) {
+        if ((fp = fopen(fn, "rb")) == NULL) {
+            log_error("Unable to open file '%s' for reading - %s", fn, strerror(errno));
+            return;
+        }
+        writeprot[drive] = 1;
+    }
+    fseek(fp, 0, SEEK_END);
+    fsize = ftell(fp);
 
-    sdf_prep_dfs(twosect, nsect);
-    fwrite(twosect, sizeof twosect, 1, f);
-}
-
-void sdf_prep_dsd(FILE *f, int tracks)
-{
-    int nsect = tracks * 10;
-    unsigned char twosect[512];
-
-    sdf_prep_dfs(twosect, nsect);
-    fwrite(twosect, sizeof twosect, 1, f);
-    fseek(f, nsect << 8, SEEK_SET);
-    fwrite(twosect, sizeof twosect, 1, f);
-}
-
-static uint8_t adfs_checksum(uint8_t *base) {
-    int i = 255, c = 0;
-    unsigned sum = 255;
-    while (--i >= 0) {
-        sum += base[i] + c;
-        c = 0;
-        if (sum >= 256) {
-            sum &= 0xff;
-            c = 1;
+    geo = NULL;
+    if (ext) {
+        if (!strcasecmp(ext, "ssd")) {
+            // check for sequential sides.
+            if (fsize > SSD_SIDE_SIZE && has_dfs_cat(fp, 0) && has_dfs_cat(fp, SSD_SIDE_SIZE))
+                geo = geo_tab + SDF_FMT_DFS_SEQUENTIAL;
+            else
+                geo = geo_tab + SDF_FMT_DFS_SINGLE;
+        }
+        else if (!strcasecmp(ext, "dsd")) {
+            // check for sequential sides.
+            if (has_dfs_cat(fp, 0) && has_dfs_cat(fp, SSD_SIDE_SIZE))
+                geo = geo_tab + SDF_FMT_DFS_SEQUENTIAL;
+            else
+                geo = geo_tab + SDF_FMT_DFS_INTERLEAVED;
+        }
+        else if (!strcasecmp(ext, "adf")) {
+            if (fsize > (700 * 1024))
+                geo = geo_tab + SDF_FMT_ADFS_SEQ_LARGE;
+            else
+                geo = geo_tab + SDF_FMT_ADFS_SEQ_SMALL;
+        }
+        else if (!strcasecmp(ext, "adl"))
+            geo = geo_tab + SDF_FMT_ADFS_INTERLEAVED;
+        else if (!strcasecmp(ext, "sdd")) {
+            if (fsize == (80 * 16 * 256))
+                geo = geo_tab + SDF_FMT_DDFS_SINGLE_16S;
+            else if (fsize == (80 * 18 * 256))
+                geo = geo_tab + SDF_FMT_DDFS_SINGLE_18S;
+        }
+        else if (!strcasecmp(ext, "ddd")) {
+            if (fsize == (2 * 80 * 16 * 256))
+                geo = geo_tab + SDF_FMT_DDFS_INTERLEAVED_16S;
+            else if (fsize == (2 * 80 * 18 * 256))
+                geo = geo_tab + SDF_FMT_DDFS_INTERLEAVED_18S;
         }
     }
-    return sum;
-}
-
-void sdf_prep_adfs(FILE *f, int tracks)
-{
-    int nsect = tracks * 16;
-    unsigned char sects[7*256];
-
-    log_debug("sdf: sdf_prep_adfs, tracks=%d, nsect=%d", tracks, nsect);
-    memset(sects, 0, sizeof sects);
-    sects[0x000] = 7;
-    sects[0x0fc] = nsect;
-    sects[0x0fd] = nsect >> 8;
-    sects[0x0fe] = nsect >> 16;
-    sects[0x0ff] = adfs_checksum(sects);
-    nsect -= 7;
-    sects[0x100] = nsect;
-    sects[0x101] = nsect >> 8;
-    sects[0x102] = nsect >> 16;
-    sects[0x1fe] = 3;
-    sects[0x1ff] = adfs_checksum(sects+256);
-    sects[0x201] = 'H';
-    sects[0x202] = 'u';
-    sects[0x203] = 'g';
-    sects[0x204] = 'o';
-    sects[0x6cc] = 0x24;
-    sects[0x6d6] = 0x02;
-    sects[0x6d9] = 0x24;
-    sects[0x6fb] = 'H';
-    sects[0x6fc] = 'u';
-    sects[0x6fd] = 'g';
-    sects[0x6fe] = 'o';
-    fwrite(sects, sizeof sects, 1, f);
-}
-
-void sdf_new_disc(int drive, ALLEGRO_PATH *fn, int tracks, void (*callback)(FILE *f, int tracks))
-{
-    FILE *f;
-    const char *cpath = al_path_cstr(fn, ALLEGRO_NATIVE_PATH_SEP);
-    if ((f = fopen(cpath, "wb"))) {
-        callback(f, tracks);
-        fclose(f);
-        sdf_load(drive, cpath);
+    if (!geo) {
+        switch(fsize)
+        {
+        case 800*1024: // 800k ADFS/DOS - 80*2*5*1024
+            geo = geo_tab + SDF_FMT_ADFS_SEQ_LARGE;
+            break;
+        case 640*1024: // 640k ADFS/DOS - 80*2*16*256
+            geo = geo_tab + SDF_FMT_ADFS_INTERLEAVED;
+            break;
+        case 720*1024: // 720k DOS - 80*2*9*512
+            geo = geo_tab + SDF_FMT_DOS720K;
+            break;
+        case 360*1024: // 360k DOS - 40*2*9*512
+            geo = geo_tab + SDF_FMT_DOS360K;
+            break;
+        case 200*1024: // 200k DFS - 80*1*10*256
+            geo = geo_tab + SDF_FMT_DFS_SINGLE;
+            break;
+        case 400*1024: // 400k DFS - 80*2*10*256
+            geo = geo_tab + SDF_FMT_DFS_INTERLEAVED;
+            break;
+        default:
+            log_error("Unable to determine geometry for %s", fn);
+            fclose(fp);
+            return;
+        }
     }
-    else
-        log_error("Unable to open disk image %s for writing: %s", cpath, strerror(errno));
+    sdf_mount(drive, fn, fp, geo);
+}
+
+void sdf_new_disc(int drive, ALLEGRO_PATH *fn, sdf_disc_type dtype)
+{
+    const struct sdf_geometry *geo;
+    const char *cpath;
+    FILE *f;
+
+    if (dtype > SDF_FMT_MAX)
+        log_error("sdf: inavlid disc type %d for new disc", dtype);
+    else {
+        geo = geo_tab + dtype;
+        if (!geo->new_disc)
+            log_error("sdf: creation of file disc type %s (%d) not supported", geo->name, dtype);
+        else {
+            cpath = al_path_cstr(fn, ALLEGRO_NATIVE_PATH_SEP);
+            if ((f = fopen(cpath, "wb+"))) {
+                geo->new_disc(f, geo);
+                sdf_mount(drive, cpath, f, geo);
+            }
+            else
+                log_error("Unable to open disk image %s for writing: %s", cpath, strerror(errno));
+        }
+    }
 }

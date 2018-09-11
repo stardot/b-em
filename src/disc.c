@@ -36,25 +36,23 @@ int  (*fdc_getdata)(int last);
 
 void disc_load(int drive, ALLEGRO_PATH *fn)
 {
-    const char *p;
+    const char *ext;
     const char *cpath;
 
     if (!fn)
         return;
-    p = al_get_path_extension(fn);
-    if (!p)
-        return;
-    if (*p == '.')
-        p++;
     gui_allegro_set_eject_text(drive, fn);
     cpath = al_path_cstr(fn, ALLEGRO_NATIVE_PATH_SEP);
-    if (strcasecmp(p, "fdi") == 0) {
-        log_debug("Loading %i: %s as FDI", drive, cpath);
-        fdi_load(drive, cpath);
-    } else {
-        log_debug("Loading %i: %s as SDF", drive, cpath);
-        sdf_load(drive, cpath);
+    if ((ext = al_get_path_extension(fn))) {
+        if (*ext == '.')
+            ext++;
+        if (strcasecmp(ext, "fdi") == 0) {
+            log_debug("Loading %i: %s as FDI", drive, cpath);
+            fdi_load(drive, cpath);
+            return;
+        }
     }
+    sdf_load(drive, cpath, ext);
 }
 
 void disc_close(int drive)
