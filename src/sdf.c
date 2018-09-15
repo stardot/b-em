@@ -599,6 +599,41 @@ static void sdf_mount(int drive, const char *fn, FILE *fp, const struct sdf_geom
     drives[drive].abort       = sdf_abort;
 }
 
+static bool adfs_root_at(FILE *fp, long offset)
+{
+    bool hugo, nick;
+    int ch;
+
+    if (fseek(fp, offset, SEEK_SET) == 0) {
+        hugo = nick = true;
+        ch = getc(fp);
+        if (ch != 'H') hugo = false;
+        if (ch != 'N') nick = false;
+        ch = getc(fp);
+        if (ch != 'u') hugo = false;
+        if (ch != 'i') nick = false;
+        ch = getc(fp);
+        if (ch != 'g') hugo = false;
+        if (ch != 'c') nick = false;
+        ch = getc(fp);
+        if (ch != 'o') hugo = false;
+        if (ch != 'k') nick = false;
+        return hugo || nick;
+    }
+    return false;
+}
+
+static const struct sdf_geometry *find_geo_adfs(FILE *fp, sdf_disc_type dtype)
+{
+    if (adfs_root_at(fp, 0x200)) {
+        if (dtype == SDF_FMT_ADFS_SEQ_LARGE)
+            dtype = SDF_FMT_ADFS_SEQ_SMALL;
+    }
+    else if (adfs_root_at(fp, 0x400))
+        dtype = SDF_FMT_ADFS_SEQ_LARGE;
+    return geo_tab + dtype;
+}
+
 void sdf_load(int drive, const char *fn, const char *ext)
 {
     FILE *fp;
@@ -634,12 +669,14 @@ void sdf_load(int drive, const char *fn, const char *ext)
         }
         else if (!strcasecmp(ext, "adf")) {
             if (fsize > (700 * 1024))
-                geo = geo_tab + SDF_FMT_ADFS_SEQ_LARGE;
+                geo = find_geo_adfs(fp, SDF_FMT_ADFS_SEQ_LARGE);
             else
-                geo = geo_tab + SDF_FMT_ADFS_SEQ_SMALL;
+                geo = find_geo_adfs(fp, SDF_FMT_ADFS_SEQ_SMALL);
         }
+        else if (!strcasecmp(ext, "adm"))
+            geo = find_geo_adfs(fp, SDF_FMT_ADFS_SEQ_SMALL);
         else if (!strcasecmp(ext, "adl"))
-            geo = geo_tab + SDF_FMT_ADFS_INTERLEAVED;
+            geo = find_geo_adfs(fp, SDF_FMT_ADFS_INTERLEAVED);
         else if (!strcasecmp(ext, "sdd")) {
             if (fsize == (80 * 16 * 256))
                 geo = geo_tab + SDF_FMT_DDFS_SINGLE_16S;
