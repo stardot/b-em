@@ -121,15 +121,17 @@ static ALLEGRO_MENU *create_disc_new_menu(int drive)
 {
     ALLEGRO_MENU *menu = al_create_menu();
 
-    al_append_menu_item(menu, "Acorn DFS, Single-sided", menu_id_num(IDM_DISC_NEW_DFS_SINGLE, drive), 0, NULL, NULL);
-    al_append_menu_item(menu, "Acorn DFS, Double-sided", menu_id_num(IDM_DISC_NEW_DFS_INTERLEAVED, drive), 0, NULL, NULL);
-    al_append_menu_item(menu, "ADFS, Single-sided, Small Sectors", menu_id_num(IDM_DISC_NEW_ADFS_SEQ_SMALL, drive), 0, NULL, NULL);
-    al_append_menu_item(menu, "ADFS, Single-sided, Large Sectors", menu_id_num(IDM_DISC_NEW_ADFS_SEQ_LARGE, drive), 0, NULL, NULL);
-    al_append_menu_item(menu, "ADFS, Double-sided", menu_id_num(IDM_DISC_NEW_ADFS_INTERLEAVED, drive), 0, NULL, NULL);
-    al_append_menu_item(menu, "Solidisk DDFS, Single-sided", menu_id_num(IDM_DISC_NEW_DDFS_SINGLE_16S, drive), 0, NULL, NULL);
-    al_append_menu_item(menu, "Solidisk DDFS, Double-sided", menu_id_num(IDM_DISC_NEW_DDFS_INTERLEAVED_16S, drive), 0, NULL, NULL);
-    al_append_menu_item(menu, "Watford DDFS, Single-sided", menu_id_num(IDM_DISC_NEW_DDFS_SINGLE_18S, drive), 0, NULL, NULL);
-    al_append_menu_item(menu, "Watford DDFS, Double-sided", menu_id_num(IDM_DISC_NEW_DDFS_INTERLEAVED_18S, drive), 0, NULL, NULL);
+    al_append_menu_item(menu, "Acorn DFS, Single-sided, 40T", menu_id_num(IDM_DISC_NEW_DFS_10S_SIN_40T, drive), 0, NULL, NULL);
+    al_append_menu_item(menu, "Acorn DFS, Single-sided, 80T", menu_id_num(IDM_DISC_NEW_DFS_10S_SIN_80T, drive), 0, NULL, NULL);
+    al_append_menu_item(menu, "Acorn DFS, Double-sided, 40T", menu_id_num(IDM_DISC_NEW_DFS_10S_INT_40T, drive), 0, NULL, NULL);
+    al_append_menu_item(menu, "Acorn DFS, Double-sided, 80T", menu_id_num(IDM_DISC_NEW_DFS_10S_INT_80T, drive), 0, NULL, NULL);
+    al_append_menu_item(menu, "ADFS, Single-sided, 40T (S)", menu_id_num(IDM_DISC_NEW_ADFS_S, drive), 0, NULL, NULL);
+    al_append_menu_item(menu, "ADFS, Single-sided, 80T (M)", menu_id_num(IDM_DISC_NEW_ADFS_M, drive), 0, NULL, NULL);
+    al_append_menu_item(menu, "ADFS, Double-sided, 80T (L)", menu_id_num(IDM_DISC_NEW_ADFS_L, drive), 0, NULL, NULL);
+    al_append_menu_item(menu, "Solidisk DDFS, Single-sided, 80T", menu_id_num(IDM_DISC_NEW_DFS_16S_SIN_80T, drive), 0, NULL, NULL);
+    al_append_menu_item(menu, "Solidisk DDFS, Double-sided, 80T", menu_id_num(IDM_DISC_NEW_DFS_16S_INT_80T, drive), 0, NULL, NULL);
+    al_append_menu_item(menu, "Watford DDFS, Single-sided, 80T", menu_id_num(IDM_DISC_NEW_DFS_18S_SIN_80T, drive), 0, NULL, NULL);
+    al_append_menu_item(menu, "Watford DDFS, Double-sided, 80T", menu_id_num(IDM_DISC_NEW_DFS_18S_INT_80T, drive), 0, NULL, NULL);
     return menu;
 }
 
@@ -586,32 +588,38 @@ static void disc_choose(ALLEGRO_EVENT *event, const char *opname, const char *ex
                     case IDM_DISC_LOAD:
                         disc_load(drive, path);
                         break;
-                    case IDM_DISC_NEW_DFS_SINGLE:
-                        sdf_new_disc(drive, path, SDF_FMT_DFS_SINGLE);
+                    case IDM_DISC_NEW_ADFS_S:
+                        sdf_new_disc(drive, path, SDF_FMT_ADFS_S);
                         break;
-                    case IDM_DISC_NEW_DFS_INTERLEAVED:
-                        sdf_new_disc(drive, path, SDF_FMT_DFS_INTERLEAVED);
+                    case IDM_DISC_NEW_ADFS_M:
+                        sdf_new_disc(drive, path, SDF_FMT_ADFS_M);
                         break;
-                    case IDM_DISC_NEW_ADFS_SEQ_SMALL:
-                        sdf_new_disc(drive, path, SDF_FMT_ADFS_SEQ_SMALL);
+                    case IDM_DISC_NEW_ADFS_L:
+                        sdf_new_disc(drive, path, SDF_FMT_ADFS_L);
                         break;
-                    case IDM_DISC_NEW_ADFS_SEQ_LARGE:
-                        sdf_new_disc(drive, path, SDF_FMT_ADFS_SEQ_LARGE);
+                    case IDM_DISC_NEW_DFS_10S_SIN_40T:
+                        sdf_new_disc(drive, path, SDF_FMT_DFS_10S_SIN_40T);
                         break;
-                    case IDM_DISC_NEW_ADFS_INTERLEAVED:
-                        sdf_new_disc(drive, path, SDF_FMT_ADFS_INTERLEAVED);
+                    case IDM_DISC_NEW_DFS_10S_INT_40T:
+                        sdf_new_disc(drive, path, SDF_FMT_DFS_10S_INT_40T);
                         break;
-                    case IDM_DISC_NEW_DDFS_SINGLE_16S:
-                        sdf_new_disc(drive, path, SDF_FMT_DDFS_SINGLE_16S);
+                    case IDM_DISC_NEW_DFS_10S_SIN_80T:
+                        sdf_new_disc(drive, path, SDF_FMT_DFS_10S_SIN_80T);
                         break;
-                    case IDM_DISC_NEW_DDFS_SINGLE_18S:
-                        sdf_new_disc(drive, path, SDF_FMT_DDFS_SINGLE_18S);
+                    case IDM_DISC_NEW_DFS_10S_INT_80T:
+                        sdf_new_disc(drive, path, SDF_FMT_DFS_10S_INT_80T);
                         break;
-                    case IDM_DISC_NEW_DDFS_INTERLEAVED_16S:
-                        sdf_new_disc(drive, path, SDF_FMT_DDFS_INTERLEAVED_16S);
+                    case IDM_DISC_NEW_DFS_16S_SIN_80T:
+                        sdf_new_disc(drive, path, SDF_FMT_DFS_16S_SIN_80T);
                         break;
-                    case IDM_DISC_NEW_DDFS_INTERLEAVED_18S:
-                        sdf_new_disc(drive, path, SDF_FMT_DDFS_INTERLEAVED_18S);
+                    case IDM_DISC_NEW_DFS_16S_INT_80T:
+                        sdf_new_disc(drive, path, SDF_FMT_DFS_16S_INT_80T);
+                        break;
+                    case IDM_DISC_NEW_DFS_18S_SIN_80T:
+                        sdf_new_disc(drive, path, SDF_FMT_DFS_18S_SIN_80T);
+                        break;
+                    case IDM_DISC_NEW_DFS_18S_INT_80T:
+                        sdf_new_disc(drive, path, SDF_FMT_DFS_18S_INT_80T);
                         break;
                     default:
                         break;
@@ -875,7 +883,7 @@ static void change_ddnoise_dtype(ALLEGRO_EVENT *event)
     ddnoise_init();
 }
 
-static const char all_dext[] = "*.ssd;*.dsd;*.img;*.adf;*.adl;*.sdd;*.ddd;*.fdi";
+static const char all_dext[] = "*.ssd;*.dsd;*.img;*.adf;*.ads;*.adm;*.adl;*.sdd;*.ddd;*.fdi";
 
 void gui_allegro_event(ALLEGRO_EVENT *event)
 {
@@ -916,25 +924,29 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
         case IDM_DISC_EJECT:
             disc_eject(event);
             break;
-        case IDM_DISC_NEW_DFS_SINGLE:
-            disc_choose(event, "create in", "*.ssd", ALLEGRO_FILECHOOSER_SAVE);
+        case IDM_DISC_NEW_ADFS_S:
+            disc_choose(event, "create in", "*.ads", ALLEGRO_FILECHOOSER_SAVE);
             break;
-        case IDM_DISC_NEW_DFS_INTERLEAVED:
-            disc_choose(event, "create in", "*.dsd", ALLEGRO_FILECHOOSER_SAVE);
+        case IDM_DISC_NEW_ADFS_M:
+            disc_choose(event, "create in", "*.adm", ALLEGRO_FILECHOOSER_SAVE);
             break;
-        case IDM_DISC_NEW_ADFS_SEQ_SMALL:
-        case IDM_DISC_NEW_ADFS_SEQ_LARGE:
-            disc_choose(event, "create in", "*.adf", ALLEGRO_FILECHOOSER_SAVE);
-            break;
-        case IDM_DISC_NEW_ADFS_INTERLEAVED:
+        case IDM_DISC_NEW_ADFS_L:
             disc_choose(event, "create in", "*.adl", ALLEGRO_FILECHOOSER_SAVE);
             break;
-        case IDM_DISC_NEW_DDFS_SINGLE_16S:
-        case IDM_DISC_NEW_DDFS_SINGLE_18S:
+        case IDM_DISC_NEW_DFS_10S_SIN_40T:
+        case IDM_DISC_NEW_DFS_10S_SIN_80T:
+            disc_choose(event, "create in", "*.ssd", ALLEGRO_FILECHOOSER_SAVE);
+            break;
+        case IDM_DISC_NEW_DFS_10S_INT_40T:
+        case IDM_DISC_NEW_DFS_10S_INT_80T:
+            disc_choose(event, "create in", "*.dsd", ALLEGRO_FILECHOOSER_SAVE);
+            break;
+        case IDM_DISC_NEW_DFS_16S_SIN_80T:
+        case IDM_DISC_NEW_DFS_18S_SIN_80T:
             disc_choose(event, "create in", "*.sdd", ALLEGRO_FILECHOOSER_SAVE);
             break;
-        case IDM_DISC_NEW_DDFS_INTERLEAVED_16S:
-        case IDM_DISC_NEW_DDFS_INTERLEAVED_18S:
+        case IDM_DISC_NEW_DFS_16S_INT_80T:
+        case IDM_DISC_NEW_DFS_18S_INT_80T:
             disc_choose(event, "create in", "*.ddd", ALLEGRO_FILECHOOSER_SAVE);
             break;
         case IDM_DISC_WPROT:

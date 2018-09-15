@@ -174,16 +174,22 @@ static void new_adfs(FILE *f, const struct sdf_geometry *geo)
 
 static const struct sdf_geometry geo_tab[] =
 {
-    { "DFS",          SIDES_SINGLE,      DENS_SINGLE, 80, 10,  256, new_dfs_single          },
-    { "DFS",          SIDES_SEQUENTIAL,  DENS_SINGLE, 80, 10,  256, NULL                    },
-    { "DFS",          SIDES_INTERLEAVED, DENS_SINGLE, 80, 10,  256, new_dfs_interleaved     },
-    { "ADFS",         SIDES_SEQUENTIAL,  DENS_DOUBLE, 80, 16,  256, new_adfs                },
-    { "ADFS",         SIDES_SEQUENTIAL,  DENS_DOUBLE, 80,  5, 1024, new_adfs                },
-    { "ADFS",         SIDES_INTERLEAVED, DENS_DOUBLE, 80, 16,  256, new_adfs                },
+    { "ADFS-S",       SIDES_SINGLE,      DENS_DOUBLE, 40, 16,  256, new_adfs                },
+    { "ADFS-M",       SIDES_SINGLE,      DENS_DOUBLE, 80, 16,  256, new_adfs                },
+    { "ADFS-L",       SIDES_INTERLEAVED, DENS_DOUBLE, 80, 16,  256, new_adfs                },
+    { "ADFS-D",       SIDES_SEQUENTIAL,  DENS_DOUBLE, 80,  5, 1024, NULL                    },
+    { "Acorn DFS",    SIDES_SINGLE,      DENS_SINGLE, 40, 10,  256, new_dfs_single          },
+    { "Acorn DFS",    SIDES_INTERLEAVED, DENS_SINGLE, 40, 10,  256, new_dfs_interleaved     },
+    { "Acorn DFS",    SIDES_SEQUENTIAL,  DENS_SINGLE, 40, 10,  256, NULL                    },
+    { "Acorn DFS",    SIDES_SINGLE,      DENS_SINGLE, 80, 10,  256, new_dfs_single          },
+    { "Acorn DFS",    SIDES_INTERLEAVED, DENS_SINGLE, 80, 10,  256, new_dfs_interleaved     },
+    { "Acorn DFS",    SIDES_SEQUENTIAL,  DENS_SINGLE, 80, 10,  256, NULL                    },
     { "Solidisk",     SIDES_SINGLE,      DENS_DOUBLE, 80, 16,  256, new_stl_single          },
-    { "Watford/Opus", SIDES_SINGLE,      DENS_DOUBLE, 80, 16,  256, new_watford_single      },
     { "Solidisk",     SIDES_INTERLEAVED, DENS_DOUBLE, 80, 16,  256, new_stl_interleaved     },
+    { "Solidisk",     SIDES_SEQUENTIAL,  DENS_DOUBLE, 80, 16,  256, NULL                    },
+    { "Watford/Opus", SIDES_SINGLE,      DENS_DOUBLE, 80, 18,  256, new_watford_single      },
     { "Watford/Opus", SIDES_INTERLEAVED, DENS_DOUBLE, 80, 18,  256, new_watford_interleaved },
+    { "Watford/Opus", SIDES_SEQUENTIAL,  DENS_DOUBLE, 80, 18,  256, NULL                    },
     { "DOS 720k",     SIDES_INTERLEAVED, DENS_DOUBLE, 80,  9,  512, NULL                    },
     { "DOS 360k",     SIDES_INTERLEAVED, DENS_DOUBLE, 40,  9,  512, NULL                    }
 };
@@ -542,46 +548,6 @@ static void sdf_abort(int drive)
     state = ST_IDLE;
 }
 
-static bool has_dfs_cat(FILE *fp, long offset)
-{
-    uint32_t dirsize, sects, cur_start, new_start;
-    uint8_t *base, twosect[512];
-
-    if (fseek(fp, offset, SEEK_SET) >= 0) {
-        if (fread(twosect, sizeof twosect, 1, fp) == 1) {
-            dirsize = twosect[0x105];
-            log_debug("sdf: has_dfs_cat: dirsize=%d bytes, %d entries", dirsize, dirsize / 8);
-            if (!(dirsize & 0x07) && dirsize <= (31 * 8)) {
-                sects = ((twosect[0x106] & 0x07) << 8) | twosect[0x107];
-                if (sects <= SSD_SIDE_SIZE) {
-                    base = twosect + 0x100;
-                    cur_start = UINT32_MAX;
-                    // Check the files are sorted by decreasing start sector.
-                    while (dirsize > 0) {
-                        base += 8;
-                        dirsize -= 8;
-                        new_start = ((base[0x006] & 0x80) << 3) | ((base[0x106] & 0x03) << 8) | base[0x107];
-                        if (new_start > cur_start)
-                            return false;
-                        cur_start = new_start;
-                    }
-                    return true;
-                    log_debug("sdf: has_dfs_cat: returning true for %lx", offset);
-                }
-                else
-                    log_debug("sdf: has_dfs_cat: too many sectors for %lx", offset);
-            }
-            else
-                log_debug("sdf: has_dfs_cat: dirsize not valid for %lx", offset);
-        }
-        else
-            log_debug("sdf: has_dfs_cat: unable to read for %lx", offset);
-    }
-    else
-        log_debug("sdf: has_dfs_cat: unable to seek to %lx: %s", offset, strerror(errno));
-    return false;
-}
-
 static void sdf_mount(int drive, const char *fn, FILE *fp, const struct sdf_geometry *geo)
 {
     sdf_fp[drive] = fp;
@@ -601,44 +567,147 @@ static void sdf_mount(int drive, const char *fn, FILE *fp, const struct sdf_geom
 
 static bool adfs_root_at(FILE *fp, long offset)
 {
-    bool hugo, nick;
-    int ch;
+    unsigned char hugo[4];
 
     if (fseek(fp, offset, SEEK_SET) == 0) {
-        hugo = nick = true;
-        ch = getc(fp);
-        if (ch != 'H') hugo = false;
-        if (ch != 'N') nick = false;
-        ch = getc(fp);
-        if (ch != 'u') hugo = false;
-        if (ch != 'i') nick = false;
-        ch = getc(fp);
-        if (ch != 'g') hugo = false;
-        if (ch != 'c') nick = false;
-        ch = getc(fp);
-        if (ch != 'o') hugo = false;
-        if (ch != 'k') nick = false;
-        return hugo || nick;
+        if (fread(hugo, sizeof hugo, 1, fp) == 1) {
+            if (!memcmp(hugo, "Hugo", 4)) {
+                log_debug("sdf: found ADFS root at %lx", offset);
+                return true;
+            }
+        }
     }
     return false;
 }
 
-static const struct sdf_geometry *find_geo_adfs(FILE *fp, sdf_disc_type dtype)
+static int32_t read_size24(FILE *fp, long offset)
 {
-    if (adfs_root_at(fp, 0x200)) {
-        if (dtype == SDF_FMT_ADFS_SEQ_LARGE)
-            dtype = SDF_FMT_ADFS_SEQ_SMALL;
+    int32_t size;
+    unsigned char bytes[3];
+
+    if (fseek(fp, offset, SEEK_SET) == 0) {
+        if (fread(bytes, sizeof bytes, 1, fp) == 1) {
+            size = (bytes[2] << 16) | (bytes[1] << 8) | bytes[0];
+            log_debug("sdf: found ADFS total sectors as %u", size);
+            return size;
+        }
     }
-    else if (adfs_root_at(fp, 0x400))
-        dtype = SDF_FMT_ADFS_SEQ_LARGE;
-    return geo_tab + dtype;
+    return -1;
+}
+
+static const struct sdf_geometry *find_geo_adfs(FILE *fp)
+{
+    int32_t size;
+
+    if (adfs_root_at(fp, 0x201)) {
+        // ADFS format S, M or L
+        if ((size = read_size24(fp, 0xfc)) >= 0) {
+            if (size <= (40*16))
+                return geo_tab + SDF_FMT_ADFS_S;
+            else if (size <= (80*16))
+                return geo_tab + SDF_FMT_ADFS_M;
+            else
+                return geo_tab + SDF_FMT_ADFS_L;
+        }
+    }
+    else if (adfs_root_at(fp, 0x401))
+        return geo_tab + SDF_FMT_ADFS_D;
+    return NULL;
+}
+
+static int32_t dfs_size(FILE *fp, long offset)
+{
+    uint32_t dirsize, sects, cur_start, new_start;
+    uint8_t *base, sect[0x100];
+
+    log_debug("sdf: looking for DFS catalogue at offset %lx", offset);
+    if (fseek(fp, offset+0x100, SEEK_SET) >= 0) {
+        if (fread(sect, sizeof sect, 1, fp) == 1) {
+            dirsize = sect[5];
+            log_debug("sdf: DFS dirsize=%d bytes, %d entries", dirsize, dirsize / 8);
+            if (!(dirsize & 0x07) && dirsize <= (31 * 8)) {
+                sects = ((sect[6] & 0x07) << 8) | sect[7];
+                base = sect;
+                cur_start = UINT32_MAX;
+                // Check the files are sorted by decreasing start sector.
+                while (dirsize > 0) {
+                    base += 8;
+                    dirsize -= 8;
+                    new_start = ((base[6] & 0x03) << 8) | base[7];
+                    if (new_start > cur_start) {
+                        log_debug("sdf: catalogue not sorted");
+                        return -1;
+                    }
+                    cur_start = new_start;
+                }
+                log_debug("sdf: found DFS size as %d sectors", sects);
+                return sects;
+            }
+            else
+                log_debug("sdf: DFS dirsize not valid");
+        }
+        else
+            log_debug("sdf: unable to read");
+    }
+    else
+        log_debug("sdf: unable to seek: %s", strerror(errno));
+    return -1;
+}
+
+static const struct sdf_geometry *find_geo_dfs(int drive, const char *fn, const char *ext, FILE *fp, long fsize)
+{
+    int32_t sects, track_bytes, side_bytes;
+    const struct sdf_geometry *geo;
+
+    if ((sects = dfs_size(fp, 0)) >= 0) {
+        if (sects <= (40 * 10))
+            geo = geo_tab + SDF_FMT_DFS_10S_SIN_40T;
+        else if (sects <= (80 * 10))
+            geo = geo_tab + SDF_FMT_DFS_10S_SIN_80T;
+        else if (sects <= (80 * 16))
+            geo = geo_tab + SDF_FMT_DFS_16S_SIN_80T;
+        else if (sects <= (80 * 18))
+            geo = geo_tab + SDF_FMT_DFS_18S_SIN_80T;
+        else {
+            log_warn("sdf: drive %d: sector count too high (%u) for %s", drive, sects, fn);
+            return NULL;
+        }
+        track_bytes = geo->sectors_per_track * geo->sector_size;
+        side_bytes = track_bytes * geo->tracks;
+        if (fsize > side_bytes && dfs_size(fp, side_bytes) >= 3)
+            geo += 2; // sequential sided-version.
+        else if (!strcasecmp(ext, "dsd") || !strcasecmp(ext, "ddd"))
+            geo++;    // interleaved side version.
+        return geo;
+    }
+    return NULL;
+}
+
+static const struct sdf_geometry *find_geo_size(FILE *fp, long fsize)
+{
+    switch(fsize)
+    {
+    case 800*1024: // 800k ADFS/DOS - 80*2*5*1024
+        return geo_tab + SDF_FMT_ADFS_D;
+    case 640*1024: // 640k ADFS/DOS - 80*2*16*256
+        return geo_tab + SDF_FMT_ADFS_L;
+    case 720*1024: // 720k DOS - 80*2*9*512
+        return geo_tab + SDF_FMT_DOS720K;
+    case 360*1024: // 360k DOS - 40*2*9*512
+        return geo_tab + SDF_FMT_DOS360K;
+    case 200*1024: // 200k DFS - 80*1*10*256
+        return geo_tab + SDF_FMT_DFS_10S_SIN_80T;
+    case 400*1024: // 400k DFS - 80*2*10*256
+        return geo_tab + SDF_FMT_DFS_10S_INT_80T;
+    }
+    return NULL;
 }
 
 void sdf_load(int drive, const char *fn, const char *ext)
 {
     FILE *fp;
-    const struct sdf_geometry *geo;
     long fsize;
+    const struct sdf_geometry *geo;
 
     writeprot[drive] = 0;
     if ((fp = fopen(fn, "rb+")) == NULL) {
@@ -648,73 +717,15 @@ void sdf_load(int drive, const char *fn, const char *ext)
         }
         writeprot[drive] = 1;
     }
-    fseek(fp, 0, SEEK_END);
-    fsize = ftell(fp);
-
-    geo = NULL;
-    if (ext) {
-        if (!strcasecmp(ext, "ssd")) {
-            // check for sequential sides.
-            if (fsize > SSD_SIDE_SIZE && has_dfs_cat(fp, 0) && has_dfs_cat(fp, SSD_SIDE_SIZE))
-                geo = geo_tab + SDF_FMT_DFS_SEQUENTIAL;
-            else
-                geo = geo_tab + SDF_FMT_DFS_SINGLE;
-        }
-        else if (!strcasecmp(ext, "dsd")) {
-            // check for sequential sides.
-            if (has_dfs_cat(fp, 0) && has_dfs_cat(fp, SSD_SIDE_SIZE))
-                geo = geo_tab + SDF_FMT_DFS_SEQUENTIAL;
-            else
-                geo = geo_tab + SDF_FMT_DFS_INTERLEAVED;
-        }
-        else if (!strcasecmp(ext, "adf")) {
-            if (fsize > (700 * 1024))
-                geo = find_geo_adfs(fp, SDF_FMT_ADFS_SEQ_LARGE);
-            else
-                geo = find_geo_adfs(fp, SDF_FMT_ADFS_SEQ_SMALL);
-        }
-        else if (!strcasecmp(ext, "adm"))
-            geo = find_geo_adfs(fp, SDF_FMT_ADFS_SEQ_SMALL);
-        else if (!strcasecmp(ext, "adl"))
-            geo = find_geo_adfs(fp, SDF_FMT_ADFS_INTERLEAVED);
-        else if (!strcasecmp(ext, "sdd")) {
-            if (fsize == (80 * 16 * 256))
-                geo = geo_tab + SDF_FMT_DDFS_SINGLE_16S;
-            else if (fsize == (80 * 18 * 256))
-                geo = geo_tab + SDF_FMT_DDFS_SINGLE_18S;
-        }
-        else if (!strcasecmp(ext, "ddd")) {
-            if (fsize == (2 * 80 * 16 * 256))
-                geo = geo_tab + SDF_FMT_DDFS_INTERLEAVED_16S;
-            else if (fsize == (2 * 80 * 18 * 256))
-                geo = geo_tab + SDF_FMT_DDFS_INTERLEAVED_18S;
-        }
-    }
-    if (!geo) {
-        switch(fsize)
-        {
-        case 800*1024: // 800k ADFS/DOS - 80*2*5*1024
-            geo = geo_tab + SDF_FMT_ADFS_SEQ_LARGE;
-            break;
-        case 640*1024: // 640k ADFS/DOS - 80*2*16*256
-            geo = geo_tab + SDF_FMT_ADFS_INTERLEAVED;
-            break;
-        case 720*1024: // 720k DOS - 80*2*9*512
-            geo = geo_tab + SDF_FMT_DOS720K;
-            break;
-        case 360*1024: // 360k DOS - 40*2*9*512
-            geo = geo_tab + SDF_FMT_DOS360K;
-            break;
-        case 200*1024: // 200k DFS - 80*1*10*256
-            geo = geo_tab + SDF_FMT_DFS_SINGLE;
-            break;
-        case 400*1024: // 400k DFS - 80*2*10*256
-            geo = geo_tab + SDF_FMT_DFS_INTERLEAVED;
-            break;
-        default:
-            log_error("Unable to determine geometry for %s", fn);
-            fclose(fp);
-            return;
+    if ((geo = find_geo_adfs(fp)) == NULL) {
+        fseek(fp, 0, SEEK_END);
+        fsize = ftell(fp);
+        if ((geo = find_geo_dfs(drive, fn, ext, fp, fsize)) == NULL) {
+            if ((geo = find_geo_size(fp, fsize))) {
+                log_error("sdf: drive %d: Unable to determine geometry for %s", drive, fn);
+                fclose(fp);
+                return;
+            }
         }
     }
     sdf_mount(drive, fn, fp, geo);
