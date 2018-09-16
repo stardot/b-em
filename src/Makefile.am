@@ -1,6 +1,6 @@
 # Makefile.am for B-em
 
-bin_PROGRAMS = b-em jstest
+bin_PROGRAMS = b-em jstest gtest
 noinst_SCRIPTS = ../b-em
 CLEANFILES = $(noinst_SCRIPTS)
 
@@ -79,7 +79,8 @@ b_em_SOURCES = \
 	resid.cc \
 	savestate.c \
 	scsi.c \
-	sdf.c \
+	sdf-acc.c \
+	sdf-geo.c \
 	serial.c \
 	sn76489.c \
 	sound.c \
@@ -123,3 +124,5 @@ endif
 jstest_SOURCES = jstest.c
 
 jstest_LDADD = -lallegro -lallegro_main
+
+gtest_SOURCES = sdf-gtest.c sdf-geo.c

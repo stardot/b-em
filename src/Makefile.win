@@ -114,7 +114,7 @@ SIDOBJ = \
 
 LIBS = -L ../../allegro5/lib -lz -lallegro_audio -lallegro_acodec -lallegro_primitives -lallegro_dialog -lallegro_image -lallegro_font -lallegro -mwindows -lgdi32 -lwinmm -lstdc++
 
-all : b-em.exe hdfmt.exe
+all : b-em.exe hdfmt.exe jstest.exe gtest.exe
 
 b-em.exe: $(OBJ) $(SIDOBJ) $(NS32KOBJ)
 	$(CC) $(OBJ) $(SIDOBJ) $(NS32KOBJ) -o "b-em.exe" $(LIBS)
@@ -133,3 +133,11 @@ b-em.res: b-em.rc
 
 hdfmt.exe: hdfmt.c
 	$(CC) $(CFLAGS) -o hdfmt.exe hdfmt.c
+
+jstest: jstest.c
+	$(CC) $(CFLAGS) -o jstest $(LIBS)
+
+GTEST_OBJ = gtest.o sdf-geo.o sdf-acc.o
+
+gtest: $(GTEST_OBJ)
+	$(CC) $(CFLAGS) -o gtest $(GTEST_OBJ)
