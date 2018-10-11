@@ -59,7 +59,8 @@ OBJ = \
     pal.o \
     savestate.o \
     scsi.o \
-    sdf.o \
+    sdf-acc.o \
+    sdf-geo.o \
     serial.o \
     sn76489.o \
     sound.o \
@@ -134,10 +135,10 @@ b-em.res: b-em.rc
 hdfmt.exe: hdfmt.c
 	$(CC) $(CFLAGS) -o hdfmt.exe hdfmt.c
 
-jstest: jstest.c
+jstest.exe: jstest.c
 	$(CC) $(CFLAGS) -o jstest $(LIBS)
 
 GTEST_OBJ = gtest.o sdf-geo.o sdf-acc.o
 
-gtest: $(GTEST_OBJ)
+gtest.exe: $(GTEST_OBJ)
 	$(CC) $(CFLAGS) -o gtest $(GTEST_OBJ)
