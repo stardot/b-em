@@ -527,6 +527,7 @@ void main_close()
     scsi_close();
     ide_close();
     vdfs_close();
+    music5000_close();
     ddnoise_close();
     tapenoise_close();
 

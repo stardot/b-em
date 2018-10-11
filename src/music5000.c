@@ -31,6 +31,8 @@
 #include "sound.h"
 #include "savestate.h"
 
+#include <sndfile.h>
+
 #define I_WAVEFORM(n) ((n)*128)
 #define I_WFTOP (14*128)
 
@@ -66,10 +68,12 @@ struct synth {
 static struct synth m5000, m3000;
 
 size_t buflen_m5 = BUFLEN_M5;
+FILE *music5000_fp;
 
 static ALLEGRO_VOICE *voice;
 static ALLEGRO_MIXER *mixer;
 static ALLEGRO_AUDIO_STREAM *stream;
+static bool rec_started;
 
 static ushort antilogtable[128];
 
@@ -178,7 +182,63 @@ void music5000_init(ALLEGRO_EVENT_QUEUE *queue)
             log_error("sound: unable to create mixer for Music 5000");
     } else
         log_error("sound: unable to create voice for Music 5000");
+}
 
+FILE *music5000_rec_start(const char *filename)
+{
+    static const char zeros[] = { 0, 0, 0, 0, 0, 0 };
+
+    FILE *fp = fopen(filename, "wb");
+    if (fp) {
+        fseek(fp, 44, SEEK_SET);
+        fwrite(zeros, 6, 1, fp);
+        music5000_fp = fp;
+        rec_started = false;
+    }
+    else
+        log_error("unable to open %s for writing: %s", filename, strerror(errno));
+    return fp;
+}
+
+static void fput32le(uint32_t v, FILE *fp)
+{
+    putc(v & 0xff, fp);
+    putc((v >> 8) & 0xff, fp);
+    putc((v >> 16) & 0xff, fp);
+    putc((v >> 24) & 0xff, fp);
+}
+
+void music5000_rec_stop(void)
+{
+    static const char wavfmt[] = {
+        0x57, 0x41, 0x56, 0x45, // "WAVE"
+        0x66, 0x6D, 0x74, 0x20, // "fmt "
+        0x10, 0x00, 0x00, 0x00, // format chunk size
+        0x01, 0x00,             // format 1=PCM
+        0x02, 0x00,             // channels 2=stereo
+        0x1B, 0xB7, 0x00, 0x00, // sample rate.
+        0xA2, 0x4A, 0x04, 0x00, // byte rate.
+        0x06, 0x00,             // block align.
+        0x18, 0x00,             // bits per sample.
+        0x64, 0x61, 0x74, 0x61  // "DATA".
+    };
+
+    FILE *fp = music5000_fp;
+    long size = ftell(fp) - 8;
+    fseek(fp, 0, SEEK_SET);
+    fwrite("RIFF", 4, 1, fp);
+    fput32le(size, fp);
+    fwrite(wavfmt, sizeof wavfmt, 1, fp);
+    size -= 36;
+    fput32le(size, fp);        // data size.
+    fclose(fp);
+    music5000_fp = NULL;
+}
+
+void music5000_close(void)
+{
+    if (music5000_fp)
+        music5000_rec_stop();
 }
 
 static uint8_t page = 0;
@@ -322,6 +382,21 @@ static void update_6MHz(struct synth *s)
     }
 }
 
+static void fput_samples(FILE *fp, int sl, int sr)
+{
+    if (fp && (rec_started || sl || sr)) {
+        char bytes[6];
+        bytes[0] = sl << 6;
+        bytes[1] = sl >> 2;
+        bytes[2] = sl >> 10;
+        bytes[3] = sr << 6;
+        bytes[4] = sr >> 2;
+        bytes[5] = sr >> 10;
+        fwrite(bytes, 6, 1, fp);
+        rec_started = true;
+    }
+}
+
 static void music5000_get_sample(int16_t *left, int16_t *right)
 {
     int clip;
@@ -346,6 +421,8 @@ static void music5000_get_sample(int16_t *left, int16_t *right)
         sl += m5000.sleft[t]  + m3000.sleft[t];
         sr += m5000.sright[t] + m3000.sright[t];
     }
+    fput_samples(music5000_fp, sl, sr);
+
 #ifdef LOG_LEVELS
     if (sl < min_l) {
         min_l = sl;
@@ -419,13 +496,14 @@ static void music5000_get_sample(int16_t *left, int16_t *right)
 static void music5000_fillbuf(int16_t *buffer, int len) {
     int i;
     int sample;
+    int16_t *bufptr = buffer;
     for (sample = 0; sample < len; sample++) {
         for (i = 0; i < 128; i++) {
             update_6MHz(&m5000);
             update_6MHz(&m3000);
         }
-        music5000_get_sample(buffer, buffer + 1);
-        buffer += 2;
+        music5000_get_sample(bufptr, bufptr + 1);
+        bufptr += 2;
     }
 }
 
