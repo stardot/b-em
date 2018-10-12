@@ -209,12 +209,12 @@ void pal_convert(ALLEGRO_BITMAP *inb, int x1, int y1, int x2, int y2, int yoff)
 
 static inline int get_pixel(ALLEGRO_LOCKED_REGION *region, int x, int y)
 {
-    return *((uint32_t *)(region->data + region->pitch * y + x * region->pixel_size));
+    return *((uint32_t *)((char *)region->data + region->pitch * y + x * region->pixel_size));
 }
 
 static inline void put_pixel(ALLEGRO_LOCKED_REGION *region, int x, int y, uint32_t colour)
 {
-    *((uint32_t *)(region->data + region->pitch * y + x * region->pixel_size)) = colour;
+    *((uint32_t *)((char *)region->data + region->pitch * y + x * region->pixel_size)) = colour;
 }
 
 static float vision_iir(float NewSample) {
