@@ -161,7 +161,7 @@ static uint32_t dbg_disassemble(uint32_t addr, char *buf, size_t bufsize) {
 int tubecycle;
 
 int output = 0;
-int timetolive = 0;
+static int timetolive = 0;
 
 static int cycles;
 static int otherstuffcount = 0;
