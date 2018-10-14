@@ -1547,7 +1547,12 @@ static void osfile_write(uint32_t pb, vdfs_ent_t *ent, vdfs_ent_t *key, void (*c
                 return;
             }
         }
-    } else if (!(ent = add_new_file(key->parent, key->acorn_fn))) {
+    }
+    else if (!key->parent) {
+        adfs_error(err_notfound);
+        return;
+    }
+    else if (!(ent = add_new_file(key->parent, key->acorn_fn))) {
         adfs_error(err_nomem);
         return;
     }
