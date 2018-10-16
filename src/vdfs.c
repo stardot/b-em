@@ -1339,6 +1339,7 @@ static int osgbpb_list_acorn(uint32_t pb) {
             }
         }
         if (seq_ptr < cur_dir->cat_size) {
+            status = 0;
             mem_ptr = readmem32(pb+1);
             n = readmem32(pb+5);
             log_debug("vdfs: seq_ptr=%d, writing max %d entries starting %04X\n", seq_ptr, n, mem_ptr);
@@ -1348,13 +1349,18 @@ static int osgbpb_list_acorn(uint32_t pb) {
                 writemem(mem_ptr++, strlen(cat_ptr->acorn_fn));
                 for (ptr = cat_ptr->acorn_fn; (ch = *ptr++); )
                     writemem(mem_ptr++, ch);
-            } while (--n > 0 && seq_ptr < cur_dir->cat_size);
+                if (seq_ptr >= cur_dir->cat_size) {
+                    status = 1;
+                    break;
+                }
+            } while (--n);
             log_debug("vdfs: finish at %04X\n", mem_ptr);
             writemem32(pb+5, n);
             writemem32(pb+9, seq_ptr);
+            return status;
         }
     }
-    return 0;
+    return 1;
 }
 
 static int osgbpb_list_vdfs(uint32_t pb) {
@@ -1373,6 +1379,7 @@ static int osgbpb_list_vdfs(uint32_t pb) {
             }
         }
         if (seq_ptr < cat_dir->cat_size) {
+            status = 0;
             mem_ptr = readmem32(pb+1);
             log_debug("vdfs: seq_ptr=%d, writing max %d entries starting %04X\n", seq_ptr, n, mem_ptr);
             do {
@@ -1381,15 +1388,21 @@ static int osgbpb_list_vdfs(uint32_t pb) {
                 for (ptr = cat_ptr->acorn_fn; (ch = *ptr++); )
                     writemem(mem_ptr++, ch);
                 writemem(mem_ptr++, '\r');
-            } while (--n > 0 && seq_ptr < cat_dir->cat_size);
+                if (seq_ptr >= cur_dir->cat_size) {
+                    status = 1;
+                    writemem(pb, 0);// VDFS ROM quirk.
+                    break;
+                }
+            } while (--n > 0);
             log_debug("vdfs: finish at %04X\n", mem_ptr);
             writemem32(pb+9, seq_ptr);
         } else {
             status = 1; // no more filenames;
             writemem(pb, 0);// VDFS ROM quirk.
         }
+        return status;
     }
-    return 0;
+    return 1;
 }
 
 static inline void osgbpb(void) {
