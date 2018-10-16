@@ -1506,7 +1506,7 @@ static inline void osargs(void) {
     }
 }
 
-static void osfile_attribs(vdfs_ent_t *ent, uint32_t pb) {
+static void osfile_attribs(uint32_t pb, vdfs_ent_t *ent) {
     writemem32(pb+0x02, ent->load_addr);
     writemem32(pb+0x06, ent->exec_addr);
     writemem32(pb+0x0a, ent->length);
@@ -1568,42 +1568,56 @@ static void osfile_write(uint32_t pb, vdfs_ent_t *ent, vdfs_ent_t *key, void (*c
         ent->exec_addr = readmem32(pb+0x06);
         ent->length = end_addr-start_addr;
         write_back(ent);
-        osfile_attribs(ent, pb);
+        writemem32(pb+0x0a, ent->length);
+        writemem32(pb+0x0e, ent->attribs);
+        a = 1;
     } else
         log_warn("vdfs: unable to create file '%s': %s\n", ent->host_fn, strerror(errno));
 }
 
-static void osfile_set_attr(uint32_t pb, vdfs_ent_t *ent) {
+static void osfile_set_all(uint32_t pb, vdfs_ent_t *ent) {
     if (ent && ent->attribs & ATTR_EXISTS) {
         ent->load_addr = readmem32(pb+0x02);
         ent->exec_addr = readmem32(pb+0x06);
         write_back(ent);
+        a = (ent->attribs & ATTR_IS_DIR) ? 2 : 1;
     }
     else
-        adfs_error(err_notfound);
+        a = 0;
 }
 
 static void osfile_set_load(uint32_t pb, vdfs_ent_t *ent) {
     if (ent && ent->attribs & ATTR_EXISTS) {
         ent->load_addr = readmem32(pb+0x02);
         write_back(ent);
+        a = (ent->attribs & ATTR_IS_DIR) ? 2 : 1;
     }
     else
-        adfs_error(err_notfound);
+        a = 0;
 }
 
 static void osfile_set_exec(uint32_t pb, vdfs_ent_t *ent) {
     if (ent && ent->attribs & ATTR_EXISTS) {
         ent->exec_addr = readmem32(pb+0x06);
         write_back(ent);
+        a = (ent->attribs & ATTR_IS_DIR) ? 2 : 1;
     }
     else
-        adfs_error(err_notfound);
+        a = 0;
+}
+
+static void osfile_set_attr(vdfs_ent_t *ent)
+{
+    log_debug("vdfs: write attributes not implemented");
+    if (ent && ent->attribs & ATTR_EXISTS)
+        a = (ent->attribs & ATTR_IS_DIR) ? 2 : 1;
+    else
+        a = 0;
 }
 
 static void osfile_get_attr(uint32_t pb, vdfs_ent_t *ent) {
     if (ent && ent->attribs & ATTR_EXISTS) {
-        osfile_attribs(ent, pb);
+        osfile_attribs(pb, ent);
         a = (ent->attribs & ATTR_IS_DIR) ? 2 : 1;
     }
     else
@@ -1612,7 +1626,7 @@ static void osfile_get_attr(uint32_t pb, vdfs_ent_t *ent) {
 
 static void osfile_delete(uint32_t pb, vdfs_ent_t *ent) {
     if (ent && ent->attribs & ATTR_EXISTS) {
-        osfile_attribs(ent, pb);
+        osfile_attribs(pb, ent);
         if (ent->attribs & ATTR_IS_DIR) {
             if (ent == cur_dir)
                 adfs_error(err_delcsd);
@@ -1707,7 +1721,8 @@ static void osfile_load(uint32_t pb, vdfs_ent_t *ent) {
                 }
             }
             fclose(fp);
-            osfile_attribs(ent, pb);
+            osfile_attribs(pb, ent);
+            a = 1;
         } else {
             log_warn("vdfs: unable to load file '%s': %s\n", ent->host_fn, strerror(errno));
             adfs_hosterr(errno);
@@ -1731,7 +1746,7 @@ static void osfile(void) {
                     osfile_write(pb, ent, &key, save_callback);
                     break;
                 case 0x01:  // set all attributes.
-                    osfile_set_attr(pb, ent);
+                    osfile_set_all(pb, ent);
                     break;
                 case 0x02:  // set load address only.
                     osfile_set_load(pb, ent);
@@ -1740,7 +1755,7 @@ static void osfile(void) {
                     osfile_set_exec(pb, ent);
                     break;
                 case 0x04:  // write attributes.
-                    log_debug("vdfs: write attributes not implemented");
+                    osfile_set_attr(ent);
                     break;
                 case 0x05:  // get addresses and attributes.
                     osfile_get_attr(pb, ent);
