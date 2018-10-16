@@ -10,7 +10,6 @@ extern uint16_t oldpc, oldoldpc, pc3;
 extern PREG p;
 
 extern int output;
-extern int timetolive;
 extern int interrupt;
 extern int nmi;
 

@@ -129,17 +129,17 @@ static inline uint32_t makecol(int red, int green, int blue)
 
 static inline int get_pixel(ALLEGRO_LOCKED_REGION *region, int x, int y)
 {
-    return *((uint32_t *)(region->data + region->pitch * y + x * region->pixel_size));
+    return *((uint32_t *)((char *)region->data + region->pitch * y + x * region->pixel_size));
 }
 
 static inline void put_pixel(ALLEGRO_LOCKED_REGION *region, int x, int y, uint32_t colour)
 {
-    *((uint32_t *)(region->data + region->pitch * y + x * region->pixel_size)) = colour;
+    *((uint32_t *)((char *)region->data + region->pitch * y + x * region->pixel_size)) = colour;
 }
 
 static inline void put_pixels(ALLEGRO_LOCKED_REGION *region, int x, int y, int count, uint32_t colour)
 {
-    void *ptr = region->data + region->pitch * y + x * region->pixel_size;
+    char *ptr = (char *)region->data + region->pitch * y + x * region->pixel_size;
     while (count--) {
         *(uint32_t *)ptr = colour;
         ptr += region->pixel_size;
