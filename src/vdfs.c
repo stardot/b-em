@@ -1390,7 +1390,6 @@ static int osgbpb_list_vdfs(uint32_t pb) {
                 writemem(mem_ptr++, '\r');
                 if (seq_ptr >= cur_dir->cat_size) {
                     status = 1;
-                    writemem(pb, 0);// VDFS ROM quirk.
                     break;
                 }
             } while (--n > 0);
@@ -1427,7 +1426,7 @@ static inline void osgbpb(void) {
             osgbpb_get_title(pb);
             break;
 
-        case 0x06: // get durrent dir
+        case 0x06: // get current dir
             osgbpb_get_dir(pb, cur_dir, "current");
             break;
 
