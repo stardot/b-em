@@ -31,8 +31,6 @@
 #include "sound.h"
 #include "savestate.h"
 
-#include <sndfile.h>
-
 #define I_WAVEFORM(n) ((n)*128)
 #define I_WFTOP (14*128)
 
