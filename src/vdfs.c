@@ -1617,6 +1617,7 @@ static void osfile_set_attr(vdfs_ent_t *ent)
 
 static void osfile_get_attr(uint32_t pb, vdfs_ent_t *ent) {
     if (ent && ent->attribs & ATTR_EXISTS) {
+        scan_entry(ent);
         osfile_attribs(pb, ent);
         a = (ent->attribs & ATTR_IS_DIR) ? 2 : 1;
     }
