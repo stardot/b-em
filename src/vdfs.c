@@ -142,6 +142,7 @@ enum vdfs_action {
     VDFS_ROM_FSSTART,
     VDFS_ROM_FSBOOT,
     VDFS_ROM_FSINFO,
+    VDFS_ROM_FSCLAIM,
     VDFS_ROM_CAT,
     VDFS_ROM_EX,
     VDFS_ROM_INFO,
@@ -165,7 +166,11 @@ enum vdfs_action {
     VDFS_ACT_DIR,
     VDFS_ACT_LIB,
     VDFS_ACT_RENAME,
-    VDFS_ACT_RESCAN
+    VDFS_ACT_RESCAN,
+    VDFS_ACT_VDFS,
+    VDFS_ACT_ADFS,
+    VDFS_ACT_DISC,
+    VDFS_ACT_FSCLAIM
 };
 
 #define MAX_CMD_LEN 8
@@ -2317,6 +2322,14 @@ static uint16_t parse_cmd(uint16_t addr, char *dest)
         dest[i++] = ch;
     } while (ch != ' ' && ch != '\r' && ch != '.');
 
+    log_debug("vdfs: parse_cmd: finish with %02X at %04X", ch, addr);
+    if (ch != '\r') {
+        log_debug("vdfs: parse_cmd: skipping spaces");
+        while ((ch = readmem(addr)) == ' ') {
+            addr++;
+            log_debug("vdfs: parse_cmd: skipped %02X at %04X", ch, addr);
+        }
+    }
     return addr;
 }
 
@@ -2341,6 +2354,50 @@ static const struct cmdent *lookup_cmd(const struct cmdent *tab, size_t nentry, 
 }
 
 #define ARRAY_SIZE(a) (sizeof(a)/sizeof(*a))
+
+static void fsclaim(uint16_t addr)
+{
+    int ch = readmem(addr);
+    log_debug("vdfs: fsclaim, ch = %02X, addr=%04X", ch, addr);
+    if (ch == 'o' || ch == 'O') {
+        ch = readmem(++addr);
+        if (ch == 'n' || ch == 'N') {
+            fs_flags |= CLAIM_ADFS|CLAIM_DFS;
+            return;
+        }
+        else if (ch == 'f' || ch == 'F') {
+            fs_flags &= ~(CLAIM_ADFS|CLAIM_DFS);
+            return;
+        }
+    }
+    else if (ch == '+') {
+        ch = readmem(++addr);
+        if (ch == 'a' || ch == 'A') {
+            fs_flags |= CLAIM_ADFS;
+            return;
+        }
+        else if (ch == 'd' || ch == 'D') {
+            fs_flags |= CLAIM_DFS;
+            return;
+        }
+    }
+    else if (ch == '-') {
+        ch = readmem(++addr);
+        if (ch == 'a' || ch == 'A') {
+            fs_flags &= ~CLAIM_ADFS;
+            return;
+        }
+        else if (ch == 'd' || ch == 'D') {
+            fs_flags &= ~CLAIM_DFS;
+            return;
+        }
+    }
+    else if (ch == '\r') {
+        rom_dispatch(VDFS_ROM_FSCLAIM);
+        return;
+    }
+    adfs_error(err_badparms);
+}
 
 static void vdfs_do(enum vdfs_action act, uint16_t addr)
 {
@@ -2390,6 +2447,25 @@ static void vdfs_do(enum vdfs_action act, uint16_t addr)
         break;
     case VDFS_ACT_RESCAN:
         scan_seq++;
+        break;
+    case VDFS_ACT_VDFS:
+        y = FSNO_VDFS;
+        rom_dispatch(VDFS_ROM_FSSTART);
+        break;
+    case VDFS_ACT_ADFS:
+        if (fs_flags & CLAIM_ADFS) {
+            y = FSNO_ADFS;
+            rom_dispatch(VDFS_ROM_FSSTART);
+        }
+        break;
+    case VDFS_ACT_DISC:
+        if (fs_flags & CLAIM_DFS) {
+            y = FSNO_DFS;
+            rom_dispatch(VDFS_ROM_FSSTART);
+        }
+        break;
+    case VDFS_ACT_FSCLAIM:
+        fsclaim(addr);
         break;
     default:
         rom_dispatch(act);
@@ -2630,6 +2706,15 @@ const struct cmdent ctab_always[] = {
     { "SRWrite", VDFS_ACT_SRWRITE }
 };
 
+const struct cmdent ctab_enabled[] = {
+    { "VDFS",    VDFS_ACT_VDFS    },
+    { "ADFS",    VDFS_ACT_ADFS    },
+    { "FADFS",   VDFS_ACT_ADFS    },
+    { "DISC",    VDFS_ACT_DISC    },
+    { "DISK",    VDFS_ACT_DISC    },
+    { "FSclaim", VDFS_ACT_FSCLAIM }
+};
+
 static void serv_cmd(void)
 {
     uint16_t addr;
@@ -2637,7 +2722,10 @@ static void serv_cmd(void)
     char  cmd[MAX_CMD_LEN];
 
     if ((addr = parse_cmd(readmem16(0xf2) + y, cmd))) {
-        if ((ent = lookup_cmd(ctab_always, ARRAY_SIZE(ctab_always), cmd))) {
+        ent = lookup_cmd(ctab_always, ARRAY_SIZE(ctab_always), cmd);
+        if (!ent && vdfs_enabled)
+            ent = lookup_cmd(ctab_enabled, ARRAY_SIZE(ctab_enabled), cmd);
+        if (ent) {
             vdfs_do(ent->act, addr);
             a = 0;
         }

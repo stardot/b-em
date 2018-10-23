@@ -106,6 +106,7 @@ lineno      =   &AA
             equw    fsstart         ; normal filing system start.
             equw    fsboot          ; filing system start at boot.
             equw    fs_info         ; give OS filing system info.
+            equw    fs_claim        ; say which filing systems claimed.
             equw    dir_cat         ; *CAT  via OSFSC
             equw    dir_ex          ; *EX   via OSFSC
             equw    pr_all          ; *INFO via ISFSC
@@ -187,6 +188,7 @@ lineno      =   &AA
             jsr     OSBYTE          ; Notify that vectors have changed
             pla
             tay
+            lda     #&00
             rts
 .callfscv   jmp     (&021E)
 .vectab     equw    file
@@ -278,6 +280,36 @@ lineno      =   &AA
 .adfs_ent   equs    "ADFS    ", &30, &3A, &08
 .dfs_ents   equs    "DISK    ", &11, &15, &04
             equs    "DISC    ", &11, &15, &04
+}
+
+.fs_claim
+{
+            bit     port_flags
+            bmi     adfs_yes
+            ldx     #&00
+            beq     adfs_msg
+.adfs_yes   ldx     #msg_yes-msg_no
+.adfs_msg   lda     msg_no,x
+            beq     adfs_done
+            jsr     OSWRCH
+            inx
+            bne     adfs_msg
+.adfs_done  jsr     OSNEWL
+            bit     port_flags
+            bvs     dfs_yes
+            ldx     #&00
+            beq     dfs_msg
+.dfs_yes    ldx     #msg_yes-msg_no
+.dfs_msg    lda     msg_no+1,x
+            beq     done
+            jsr     OSWRCH
+            inx
+            bne     dfs_msg
+.done       jsr     OSNEWL
+            lda     #&00
+            rts
+.msg_no     equs    "ADFS is not being claimed", &00
+.msg_yes    equs    "ADFS is being claimed", &00
 }
 
 ; Routines to list information about files.
