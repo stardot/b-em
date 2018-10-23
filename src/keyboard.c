@@ -316,9 +316,27 @@ void key_scan(int row, int col) {
     key_update();
 }
 
-int key_is_down(void) {
+bool key_is_down(void) {
     if (keyrow == 0 && keycol >= 2 && keycol <= 9)
         return kbdips & (1 << (9 - keycol));
     else
         return bbckey[keycol][keyrow];
+}
+
+bool key_any_down(void)
+{
+    for (int c = 0; c < 16; c++)
+        for (int r = 1; r < 16; r++)
+            if (bbckey[c][r])
+                return true;
+    return false;
+}
+
+bool key_code_down(int code)
+{
+    if (code < ALLEGRO_KEY_MAX) {
+        code = allegro2bbc[code];
+        return bbckey[code & 0x0f][code >> 4];
+    }
+    return false;
 }
