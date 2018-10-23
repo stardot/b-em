@@ -80,6 +80,8 @@ ltflag      =   &A8
 ltpchr      =   &A9
 lineno      =   &AA
 
+prtextws    =   &A8
+
 ; Standard BBC Micro service ROM header except that what would
 ; be the language entry point in a language ROM contains details
 ; of the dispatch table the vdfs.c module uses to transfer control
@@ -115,6 +117,11 @@ lineno      =   &AA
             equw    cmd_print       ; *PRiNT
             equw    cmd_type        ; *TYPE
             equw    cmd_roms        ; *ROMS
+            equw    help_short
+            equw    help_all
+            equw    help_vdfs
+            equw    help_utils
+            equw    help_sram
             equw    tube_exec       ; start execution ob tube proc.
             equw    tube_init       ; initialise tube.
             equw    tube_explode    ; explode character set for tube.
@@ -848,6 +855,209 @@ lineno      =   &AA
             jmp     OSWRCH
 }
 
+; Help text and suboutines to print parts of it.
+
+.help_title
+{
+            jsr     OSNEWL
+            ldx     #&ff
+            beq     start
+.loop1      jsr     OSWRCH
+.start      inx
+            lda     romtitle,x
+            bne     loop1
+            lda     #' '
+.loop2      jsr     OSWRCH
+            inx
+            lda     romtitle,x
+            bne     loop2
+            jmp     OSNEWL
+}
+
+.help_short
+{
+            tya
+            pha
+            jsr     help_title
+            ldx     #&ff
+            bne     start
+.loop       jsr     OSWRCH
+.start      inx
+            lda     helpkeys,x
+            bne     loop
+            lda     #&ea            ; check tube presence.
+            ldx     #&00
+            ldy     #&f
+            jsr     OSBYTE
+            txa
+            beq     done            ; skip if no tube.
+            jsr     OSNEWL
+            ldx     #&00
+            lda     tubemsg         ; print *HELP message.
+.tubemlp    jsr     OSWRCH
+            inx
+            lda     tubemsg,X
+            bne     tubemlp
+.done       pla
+            tay
+            lda     #&09
+            rts
+.helpkeys   equs    "  VDFS",  &0d, &0a
+            equs    "  SRAM",  &0d, &0a
+            equs    "  UTILS", &0d, &0a, &00
+}
+
+.pr_text_xy
+{
+            lda     prtextws        ; save ZP workspace.
+            pha
+            lda     prtextws+1
+            pha
+            stx     prtextws        ; set up address in ZP
+            sty     prtextws+1
+            lda     #&87            ; find screen mode.
+            jsr     OSBYTE
+            cpy     #&00
+            beq     wide0
+            cpy     #&03
+            beq     wide3
+            ldy     #&00
+.nloop      lda     (prtextws),y
+            beq     done
+            cmp     #&0a
+            beq     nlnarrow
+.nnotnl     jsr     OSASCI
+.nnext      iny
+            bne     nloop
+            inc     &a9
+            bne     nloop
+.nlnarrow   jsr     OSNEWL          ; in narrow mode we treat an LF
+            lda     #' '            ; character as a newline followed
+            jsr     OSWRCH
+            jsr     OSWRCH
+            jmp     nnext
+.wide3      ldy     #&00
+.wide0      lda     (prtextws),y
+            beq     done
+            cmp     #&0a
+            bne     wnotnl          ; in wide mode we treat an LF
+            lda     #' '            ; character as a space.
+.wnotnl     jsr     OSASCI
+            iny
+            bne     wide0
+            inc     prtextws+1
+            bne     wide0
+.done       pla
+            sta     prtextws+1
+            pla
+            sta     prtextws
+            rts
+}
+
+.help_txt_v equs    "Filing system selection:", &0d
+            equs    "  DISK, DISC, ADFS, FADFS:", &0a
+            equs    "Select VDFS if claimed", &0d
+            equs    "  VDFS: Select VDFS", &0d
+            equs    "  FSCLAIM on|off|+a|-a|+d|-d : ", &0a
+            equs    "control claiming of DFS/ADFS", &0d
+            equb    &0d
+            equs    "VDFS commands:", &0d
+            equs    "  BACK : return to previous directory", &0d
+            equs    "  DELETE : delete file or empty dir", &0d
+            equs    "  CDIR : create a new directory", &0d
+            equs    "  DIR : change current directory", &0d
+            equs    "  LIB : change current library", &0d
+            equs    "  INFO : show info on single file", &0d
+            equs    "  EX : show info on all files in CSD", &0d
+            equs    "  ACCESS, BACKUP, COMPACT, COPY,", &0a
+            equs    "DESTROY, DRIVE, ENABLE, FORM,", &0d
+            equs    "  FREE, MAP, MOUNT, TITLE, VERIFY,", &0a
+            equs    "WIPE : trapped and ignored", &0d
+            equb    &00
+
+.help_txt_u equs    "Utility commands:", &0d
+            equs    "  QUIT or DESKTOP : terminate emulator", &0d
+            equs    "  DUMP : dump a file in hex and ASCII", &0d
+            equs    "  LIST : list a file with line numbers", &0d
+            equs    "  PAGE : force PAGE location", &0d
+            equs    "  PRINT : display a file verbatim", &0d
+            equs    "  SHADOW : dummy command", &0d
+            equs    "  TYPE : display a file on screen", &0d
+            equb    &00
+
+.help_txt_s equs    "Sideays RAM commands:", &0d
+            equs    "  ROMS", &0d
+            equs    "  SRLOAD <fsp> <address> (<r#>) (Q)", &0d
+            equs    "  SRSAVE <fsp> <start> <end> (<r#>) (Q)", &0d
+            equs    "  SRSAVE <fsp> <start> <+ln> (<r#>) (Q)", &0d
+            equs    "  SRREAD <start> <end> <swadd> (<r#>)", &0d
+            equs    "  SRREAD <start> <+len> <swadd> (<r#>)", &0d
+            equs    "  SRWRITE <start> <end> <swadd> (<r#>)", &0d
+            equs    "  SRWRITE <start> <+len> <swadd> (<r#>)", &0d
+            equb    &00
+
+.help_all
+{
+            tya
+            pha
+            jsr     help_title
+            jsr     OSNEWL
+            ldx     #<help_txt_v
+            ldy     #>help_txt_v
+            jsr     pr_text_xy
+            jsr     OSNEWL
+            ldx     #<help_txt_u
+            ldy     #>help_txt_u
+            jsr     pr_text_xy
+            jsr     OSNEWL
+            ldx     #<help_txt_s
+            ldy     #>help_txt_s
+            jsr     pr_text_xy
+            pla
+            tay
+            lda     #&09
+            rts
+}
+
+.help_vdfs
+{
+            tya
+            pha
+            ldx     #<help_txt_v
+            ldy     #>help_txt_v
+            jsr     pr_text_xy
+            pla
+            tay
+            lda     #&09
+            rts
+}
+
+.help_utils
+{
+            tya
+            pha
+            ldx     #<help_txt_u
+            ldy     #>help_txt_u
+            jsr     pr_text_xy
+            pla
+            tay
+            lda     #&09
+            rts
+}
+
+.help_sram
+{
+            tya
+            pha
+            ldx     #<help_txt_s
+            ldy     #>help_txt_s
+            jsr     pr_text_xy
+            pla
+            tay
+            lda     #&09
+            rts
+}
+
 ; Start executation in the tube.  This will be called at the tail
 ; or a */, *RUN or when an unrecognised command is satified by a
 ; file on disk and the code concerned needs to execute over the tube.
@@ -864,8 +1074,6 @@ lineno      =   &AA
 
 .tube_init
 {
-            tya
-            pha
             lda     #<TubeEvHnd     ; point EVENTV to tube host
             sta     EVNTV
             lda     #>TubeEvHnd
@@ -891,8 +1099,6 @@ lineno      =   &AA
             sta     TubeBrkHnd,X
             dex
             bpl     copyz
-            pla
-            tay
             lda     #&00
             rts
 }
@@ -910,8 +1116,8 @@ lineno      =   &AA
             beq     done            ; end of message?
             jsr     OSWRCH
             jmp     imsglp
-.done       lda     #&ff
-.notube     rts
+.notube     lda     #&ff
+.done       rts
 }
 
 .end

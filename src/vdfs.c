@@ -151,6 +151,11 @@ enum vdfs_action {
     VDFS_ROM_PRINT,
     VDFS_ROM_TYPE,
     VDFS_ROM_ROMS,
+    VDFS_ROM_HELP_SHORT,
+    VDFS_ROM_HELP_ALL,
+    VDFS_ROM_HELP_VDFS,
+    VDFS_ROM_HELP_UTILS,
+    VDFS_ROM_HELP_SRAM,
     VDFS_ROM_TUBE_EXEC,
     VDFS_ROM_TUBE_INIT,
     VDFS_ROM_TUBE_EXPL,
@@ -2732,6 +2737,28 @@ static void serv_cmd(void)
     }
 }
 
+const struct cmdent ctab_help[] = {
+    { "VDFS",  VDFS_ROM_HELP_VDFS  },
+    { "SRAM",  VDFS_ROM_HELP_SRAM  },
+    { "UTILS", VDFS_ROM_HELP_UTILS }
+};
+
+static void serv_help(void)
+{
+    const struct cmdent *ent;
+    char  cmd[MAX_CMD_LEN];
+    uint16_t addr = readmem16(0xf2) + y;
+
+    int ch = readmem(addr);
+    if (ch == '\r')
+        rom_dispatch(VDFS_ROM_HELP_SHORT);
+    else if (ch == '.')
+        rom_dispatch(VDFS_ROM_HELP_ALL);
+    else if ((addr = parse_cmd(addr, cmd)))
+        if ((ent = lookup_cmd(ctab_help, ARRAY_SIZE(ctab_help), cmd)))
+            rom_dispatch(ent->act);
+}
+
 static void service(void)
 {
     log_debug("vdfs: rom service a=%02X, x=%02X, y=%02X", a, x, y);
@@ -2748,6 +2775,7 @@ static void service(void)
         osword();
         break;
     case 0x09: // *HELP
+        serv_help();
         break;
     case 0x12: // Select filing system.
         if (y == FSNO_VDFS || ((fs_flags & CLAIM_ADFS) && y == FSNO_ADFS) || ((fs_flags & CLAIM_DFS) && y == FSNO_DFS)) {
