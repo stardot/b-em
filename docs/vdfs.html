@@ -2,9 +2,10 @@
 <html>
   <head>
     <title>B-Em VDFS</title>
+    <link rel="stylesheet" type="text/css" href="b-em.css">
   </head>
   <body>
-    <h1>VDFS</h1>
+    <h1>B-Em VDFS</h1>
     <h2>Introduction</h2>
     <p>VDFS is an emulator-specific filing system for the BBC Micro
       that allows access to a subset of the filesystem of the host,
@@ -13,18 +14,18 @@
       VirtualBox allows the guest to view parts of the host filesystem
       as if it were a network drive, though the implementation is
       rather different.</p>
-    <p>In use it is very similar to hybrid of ADFS and NFS, because
-      this is the most natural way to map the host filesystem which
-      will be hierarchical. It is not aimed at proving a completely
-      authentic experience and there are no noises, no speed
-      restrictions and no emulation of DFS-specfic rather than
-      generalised filing system behaviour. Where it is most useful is
-      in being able to share files fast between the host and the guest,
-      for example when developing software on the guest where the
-      editor or some other part of the toolchain runs on the host and
-      then the software needs to run on the guest BBC for testing,
-      possibly with one or more toolchain steps on the guest before
-      that.</p>
+    <p>In use it is very similar to ADFS, because this is the most
+      natural way to map the host filesystem which will be
+      hierarchical, but with a little of NFS. It is not aimed at
+      proving a completely authentic experience and there are no
+      noises, no speed restrictions and no emulation of DFS-specfic
+      rather than generalised filing system behaviour. Where it is most
+      useful is in being able to share files fast between the host and
+      the guest, for example when developing software on the guest
+      where the editor or some other part of the toolchain runs on the
+      host and then the software needs to run on the guest BBC for
+      testing, possibly with one or more toolchain steps on the guest
+      before that.</p>
     <h2>Implementations</h2>
     <p>The VDFS concept started life on a BBC emulator running under
       RiscOS.  There are two implementations I am aware of for PC-based
@@ -42,14 +43,26 @@
       <code>roms/general/vdfs.rom</code>.  This ROM is included in the
       default machine configurations but if you have configured a
       custom machine, or have removed it, then you would need to add
-      it.  There is no requirement for it to occupy any particular
-      slot, though on machines other than the master the slot will
-      determine whether it can become the default filing system at
-      startup or will need to be selected explicitly.</p>
+      it.  For basic use, there is no requirement for it to occupy any
+      particular slot, though on machines other than the master the
+      slot will determine whether it can become the default filing
+      system at startup or will need to be selected explicitly.</p>
     <h3>Settings</h3>
     <p>The setting for VDFS is under the "Disc" menu.  When this is
       ticked, VDFS is enabled:</p>
     <img src="setting.png">
+    <h3>Choosing the Root Directory</h3>
+    <p>For secutity reasons, VDFS does not allow the whole filsystem
+      on the host to be seen from the guest.  Instead one chooses a
+      specific directory on the host that will then become the virtual
+      root directory on the guest.  This means the guest (BBC Micro)
+      can see anything in that directory of any sub-directory thereof
+      but not anything above that level.</p>
+    <p>This VDFS root directory is specified either by setting the
+      environment variable BEM_VDFS_ROOT before starting b-em or
+      by choosing "Choose VDFS Root" from the Disc menu which will
+      then present a file chooser dialogue configured to select a
+      directory rather than a file.</p>
     <h3>Selection on Startup</h3>
     <p>When enabled, as above, VDFS is a candidate for selection
       on startup as the default filing system.  Whether this happens
@@ -66,14 +79,16 @@
     <p>If enabled in the settings, VDFS can always be selected
       with the command:</p>
     <p><kbd>*VDFS</kbd></p>
-    <p>or by issusing a ROM service call with A=&12 and Y=&11, with
-      &11 being the filing system number normally used by VDFS.</p>
+    <p>or by issusing a ROM service call with A=&amp;12 and Y=&amp;11,
+      with &amp;11 being the filing system number normally used by
+      VDFS.</p>
     <p>Depending on which priority slot the VDFS ROM is in and the
       FSCLAIM setting, VDFS may also be selected by commands and
       service calls that would otherwise select the DFS or ADFS filing
       systems.  This is to enable VDFS to be used with programs which
       embed either commands or service calls to start these other
-      filing systems without having to patch the programs concerned.</p>
+      filing systems without having to patch the programs
+      concerned.</p>
     <p>In order to step in in place of another filing system in this
       way, the VDFS ROM needs to be in a higher priority ROM slot than
       the filing system concerned so that the VDFS ROM sees the
@@ -85,12 +100,13 @@
     <kbd>*ADFS</kbd><br>
     <kbd>*FADFS</kbd><br>
     <kbd>*VDFS</kbd></p>
-    <p>are executed or when the ROM service call with A=&12 is issued
-      with Y=&04, Y=&08 or Y=&11.  After executing:</p>
+    <p>are executed or when the ROM service call with A=&amp;12 is
+      issued with Y=&amp;04, Y=&amp;08 or Y=&amp;11.  After
+      executing:</p>
     <p><kbd>*FSCLAIM OFF</kbd></p>
     <p>VDFS will only be selected with:</p>
     <p><kbd>*VDFS</kbd></p>
-    <p>or by issusing a ROM service call with A=&12 and Y=&11.
+    <p>or by issusing a ROM service call with A=&amp;12 and Y=&amp;11.
     <h2>Using VDFS</h2>
     <h3>VDFS from Programs</h3>
     <p>VDFS implements the complete set of filing system calls
@@ -107,9 +123,13 @@
       ROM knows about is DFS and this can make it very slow on more
       modern filing systems.  This could be addressed via *FSCLAIM
       above as that causes VDFS to report as having the filing system
-      number of the filing system it is standing in for.  Another
-      solution is to patch the BCPL ROM and a patched version is
-      available.</p>
+      number of the filing system it is standing in for.  In that case
+      you would have VDFS stand in for DFS by doing:
+    <p><kbd>*FSCLAIM ON</kbd><br>
+    <kbd>*DISC</kbd></p>
+    <p>Another solution is to patch the BCPL ROM and a patched version
+      is available in the <a href="https://stardot.org.uk/forums/viewtopic.php?f=4&t=15834&start=30#p217677">fstest.zip
+      file attached to this forum post</a>.</p>
     <h3>VDFS Commands</h3>
     <p>The following commands are implemented by VDFS:</p>
     <p><kbd>*BACK</kbd><br>
@@ -175,7 +195,7 @@
       that can be included in Acorn filenames and the set of characters
       that have special meanings will be different from those on the
       host.  Looking at these two rows of characters:</p>
-    <p><code># $ % & . ? @ ^<br>
+    <p><code># $ % &amp; . ? @ ^<br>
       ? < ; + / # = ></code></p>
     <p>whenever one of the characters in the top row is found in a
       host filename it is translated to the corresponding one on the
@@ -194,5 +214,368 @@
       i.e. any character on the bottom row is translated to the
       corresponding character on the top row before the file is
       created on the host.</p>
+    <h2>Internals</h2>
+    <p>VDFS is implemented through co-operation between a service
+      ROM that runs from within the guest BBC micro and a module
+      within the emulator, vdfs.c.</p>
+    <p>The ROM receives requests from the BBC Micro MOS or user
+      programs via the normal paged ROM service calls and by setting
+      the filing system vectors to point to routines within this ROM
+      when it is selected as the current filing system.  As necessary,
+      control is then passed to the emulator module.</p>
+    <p>In the original RiscOS emulator, the mechanism by which control
+      was transferred was an undocumented 6502 instruction, i.e. the
+      ROM would use this instruction and the processor emulator would
+      trap to the emulator module when it went to execute this
+      instruction.  In B-Em some effort has been put into make the
+      emulated 6502 behave as close to a real one as possible and that
+      includes executing undocumented insructions as a real CPU
+      would.  B-Em therefore takes a slighly different approach and
+      uses a set of four ports in the JIM (1Mhz bus) area starting
+      at &amp;FC5C.</p>
+    <h3>&amp;FC5C - Flags</h3>
+    <p>In version 5 of VDFS, the current master version, this
+      is simply a boolean flag which corresponds to the FSCLAIM
+      setting, i.e. whether VDFS should initialise itself when a
+      command or service call attempts to select ADFS or DFS.</p>
+    <p>In version 6 of VDFS this will enable individual selection
+      or whether VDFS claims ADFS and/or DFS with bit 7 (&amp;80)
+      meaning claim ADFS and bit 6 (&amp;40) meaning claim DFS</p>
+    <h3>&amp;FC5D - Filing System Number</h3>
+    <p>When VDFS is the current filing system, this is set to the
+      filing system number that caused it to initialise, i.e. if
+      this is not &amp;11, VDFS usual filing system number, this is the
+      number of the filing system VDFS is pretending to be.  When
+      VDFS is not the current filing system this is zero.</p>
+    <h3>&amp;FC5E - Command</h3>
+    <p>Stroring a value in this port causes the vdfs.c module to
+      take some action.  The values as used for VDFS version 5
+      are:</p>
+    <table border="1">
+      <thead>
+        <tr>
+          <th>Code</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>&amp;00</td>
+          <td>OSFSC</td>
+        </tr>
+        <tr>
+          <td>&amp;01</td>
+          <td>OSFIND</td>
+        </tr>
+        <tr>
+          <td>&amp;02</td>
+          <td>OSGBPB</td>
+        </tr>
+        <tr>
+          <td>&amp;03</td>
+          <td>OSBPUT</td>
+        </tr>
+        <tr>
+          <td>&amp;04</td>
+          <td>OSBGET</td>
+        </tr>
+        <tr>
+          <td>&amp;05</td>
+          <td>OSARGS</td>
+        </tr>
+        <tr>
+          <td>&amp;06</td>
+          <td>OSFILE</td>
+        </tr>
+        <tr>
+          <td>&amp;10</td>
+          <td>Prepare for *CAT.</td>
+        </tr>
+        <tr>
+          <td>&amp;11</td>
+          <td>Close all open files.</td>
+        </tr>
+        <tr>
+          <td>&amp;40</td>
+          <td>VDFS-specific OSWORD</td>
+        </tr>
+        <tr>
+          <td>&amp;D0</td>
+          <td>*SRLOAD command</td>
+        </tr>
+        <tr>
+          <td>&amp;D1</td>
+          <td>*SRWRITE command</td>
+        </tr>
+        <tr>
+          <td>&amp;D2</td>
+          <td>Execute SWRAM <> filing system OSWWORD.</td>
+        </tr>
+        <tr>
+          <td>&amp;D3</td>
+          <td>*SRSAVE</td>
+        </tr>
+        <tr>
+          <td>&amp;D4</td>
+          <td>*SRREAD</td>
+        </tr>
+        <tr>
+          <td>&amp;D5</td>
+          <td>*BACK</td>
+        </tr>
+        <tr>
+          <td>&amp;D6</td>
+          <td>*DIR</td>
+        </tr>
+        <tr>
+          <td>&amp;D7</td>
+          <td>*LIB</td>
+        </tr>
+        <tr>
+          <td>&amp;D8</td>
+          <td>*RESCAN</td>
+        </tr>
+        <tr>
+          <td>&amp;FD</td>
+          <td>Check for sideways RAM in specified bank.</td>
+        </tr>
+        <tr>
+          <td>&amp;FE</td>
+          <td>Check if VDFS is enabled.</td>
+        </tr>
+        <tr>
+          <td>&amp;FF</td>
+          <td>*QUIT - Request emulator to exit.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>In VDFS 6 this changes to:</p>
+    <table border="1">
+      <thead>
+        <tr>
+          <th>Code</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>&amp;00</td>
+          <td>ROM Service</td>
+        </tr>
+        <tr>
+          <td>&amp;01</td>
+          <td>OSFILE</td>
+        </tr>
+        <tr>
+          <td>&amp;02</td>
+          <td>OSARGS</td>
+        </tr>
+        <tr>
+          <td>&amp;03</td>
+          <td>OSBGET</td>
+        </tr>
+        <tr>
+          <td>&amp;04</td>
+          <td>OSBPUT</td>
+        </tr>
+        <tr>
+          <td>&amp;05</td>
+          <td>OSGBPB</td>
+        </tr>
+        <tr>
+          <td>&amp;06</td>
+          <td>OSFIND</td>
+        </tr>
+        <tr>
+          <td>&amp;07</td>
+          <td>OSFSC</td>
+        </tr>
+        <tr>
+          <td>&amp;08</td>
+          <td>Get details of next file in catalogue./td>
+        </tr>
+        <tr>
+          <td>&amp;09</td>
+          <td>Check for sideways RAM in specified bank.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>There are fewer command codes for VDFS 6 because the new code
+      for ROM sevice call means more functions are implemented in the
+      vdfs.c module and less in the ROM.  In particular OS command
+      parsing is now in vdfs.c so there is no need for a separate
+      command code for each command.</p>
+    <p>VDFS version 6 also adds a mechanism to transfer control in
+      the other direction.  Normally, when the command port is written
+      to the corresponding action is carried out and the emulated 6502
+      continues from the next instruction.  With VDFS 6 the vdfs.c
+      module may instead set the PC for the emulated CPU to some other
+      address within the ROM to continue execution there and to do so
+      uses a table of addresses wthin the ROM.  The first three bytes
+      of the VDFS ROM, where the language entry would be if it were
+      a language ROM, describe this table with the first byte at
+      &amp;8000 being the number of enties and thd next two at
+      &amp;8001 and &amp;8002 pointing to the first entry.  At the time
+      of writing the correspondance between internal vdfs.c action
+      codes, table entries and the associated assenmbler routine in
+      the ROM are as follows:</p>
+    <table border="1">
+      <thead>
+        <tr>
+          <th>Code in vdfs.c</th>
+          <th>Number</th>
+          <th>Assembler Label</th>
+          <th>Desription</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>VDFS_ROM_RETURN</td>
+          <td>&amp;00</td>
+          <td>serv_done</td>
+          <td>Simply return (execute RTS)</td>
+        </tr>
+        <tr>
+          <td>VDFS_ROM_FSSTART</td>
+          <td>&amp;01</td>
+          <td>fsstart</td>
+          <td>Start VDFS when selected by command or ROM service
+            call</td>
+        </tr>
+        <tr>
+          <td>VDFS_ROM_FSBOOT</td>
+          <td>&amp;02</td>
+          <td>fsboot</td>
+          <td>Start VDFS when selected at system startup.  *EXEC a
+            !BOOT file if found.</td>
+        </tr>
+        <tr>
+          <td>VDFS_ROM_FSINFO</td>
+          <td>&amp;03</td>
+          <td>fs_info</td>
+          <td>Provide filing system info to the OS on the master.</td>
+        </tr>
+        <tr>
+          <td>VDFS_ROM_FSCLAIM</td>
+          <td>&amp;04</td>
+          <td>fs_claim</td>
+          <td>Print a message saying which filing systems are
+            claimed.</td>
+        </tr>
+        <tr>
+          <td>VDFS_ROM_CAT</td>
+          <td>&amp;05</td>
+          <td>dir_cat</td>
+          <td>Execute *CAT.</td>
+        </tr>
+        <tr>
+          <td>VDFS_ROM_EX</td>
+          <td>&amp;06</td>
+          <td>dir_ex</td>
+          <td>Execute *EX</td>
+        </tr>
+        <tr>
+          <td>VDFS_ROM_INFO</td>
+          <td>&amp;07</td>
+          <td>pr_all</td>
+          <td>Execute *INFO</td>
+        </tr>
+        <tr>
+          <td>VDFS_ROM_DUMP</td>
+          <td>&amp;08</td>
+          <td>cmd_dump</td>
+          <td>Execute *DUMP</td>
+        </tr>
+        <tr>
+          <td>VDFS_ROM_LIST</td>
+          <td>&amp;09</td>
+          <td>cmd_list</td>
+          <td>Execute *LIST</td>
+        </tr>
+        <tr>
+          <td>VDFS_ROM_PRINT</td>
+          <td>&amp;0A</td>
+          <td>cmd_print</td>
+          <td>Execute *PRINT</td>
+        </tr>
+        <tr>
+          <td>VDFS_ROM_TYPE</td>
+          <td>&amp;0B</td>
+          <td>cmd_type</td>
+          <td>Execute *PRiNT</td>
+        </tr>
+        <tr>
+          <td>VDFS_ROM_ROMS</td>
+          <td>&amp;0C</td>
+          <td>cmd_roms</td>
+          <td>Execute *ROMS</td>
+        </tr>
+        <tr>
+          <td>VDFS_ROM_HELP_SHORT</td>
+          <td>&amp;0D</td>
+          <td>help_short</td>
+          <td>Give short help, i.e. with no help key specified.</td>
+        </tr>
+        <tr>
+          <td>VDFS_ROM_HELP_ALL</td>
+          <td>&amp;0E</td>
+          <td>help_all</td>
+          <td>Give long help, i.e. a single '.' specified.</td>
+        </tr>
+        <tr>
+          <td>VDFS_ROM_HELP_VDFS</td>
+          <td>&amp;0F</td>
+          <td>help_vdfs</td>
+          <td>Give help when VDFS specified as help key.</td>
+        </tr>
+        <tr>
+          <td>VDFS_ROM_HELP_UTILS</td>
+          <td>&amp;10</td>
+          <td>help_utils</td>
+          <td>Give help when UTILS specified as help key.</td>
+        </tr>
+        <tr>
+          <td>VDFS_ROM_HELP_SRAM</td>
+          <td>&amp;11</td>
+          <td>help_sram</td>
+          <td>Give help when SRAM specified as help key.</td>
+        </tr>
+        <tr>
+          <td>VDFS_ROM_TUBE_EXEC</td>
+          <td>&amp;12</td>
+          <td>tube_exec</td>
+          <td>Start execution in the tube processor for *RUN etc.</td>
+        </tr>
+        <tr>
+          <td>VDFS_ROM_TUBE_INIT</td>
+          <td>&amp;13</td>
+          <td>tube_init</td>
+          <td>Initialise tube - ROM service call &amp;FE</td>
+        </tr>
+        <tr>
+          <td>VDFS_ROM_TUBE_EXPL</td>
+          <td>&amp;14</td>
+          <td>tube_explode</td>
+          <td>Explode character set for tube - ROM service call &amp;FF</td>
+        </tr>
+      </tbody>
+    </table>
+    <h3>&amp;FC5F - Save A</h3>
+    <p>Unlike the scheme that used an undocumented instruction, writing
+      to a port means one of the emulated processor's register has to
+      be loaded with the value to write but some commands may need to
+      pass values in all three 6502 registers to the routine in
+      vdfs.c</p>
+    <p>This solves the problem by allowing the accumulator (A) to
+      be written here, then loaded with the command code.  As soon
+      as the command code is written to &amp;FC5E above the vdfs.c
+      module puts the value that was written to this port back into A
+      before dispatching to the routine that implements the command
+      code concerned.  This means a typical invocation of an action in
+      vdfs.c looks like this in 6502 assembler:</p
+    <code><pre>sta     port_a   ; &amp;FC5F
+lda     #&amp;01
+sta     port_cmd ; &amp;FC5E
+rts</pre></code>
   </body>
 </html>
