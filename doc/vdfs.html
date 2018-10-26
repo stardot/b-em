@@ -1,0 +1,198 @@
+<DOCTYPE html>
+<html>
+  <head>
+    <title>B-Em VDFS</title>
+  </head>
+  <body>
+    <h1>VDFS</h1>
+    <h2>Introduction</h2>
+    <p>VDFS is an emulator-specific filing system for the BBC Micro
+      that allows access to a subset of the filesystem of the host,
+      i.e. the PC running the emulator. The concept is very similar
+      to the way in which modern virtual machine software such as
+      VirtualBox allows the guest to view parts of the host filesystem
+      as if it were a network drive, though the implementation is
+      rather different.</p>
+    <p>In use it is very similar to hybrid of ADFS and NFS, because
+      this is the most natural way to map the host filesystem which
+      will be hierarchical. It is not aimed at proving a completely
+      authentic experience and there are no noises, no speed
+      restrictions and no emulation of DFS-specfic rather than
+      generalised filing system behaviour. Where it is most useful is
+      in being able to share files fast between the host and the guest,
+      for example when developing software on the guest where the
+      editor or some other part of the toolchain runs on the host and
+      then the software needs to run on the guest BBC for testing,
+      possibly with one or more toolchain steps on the guest before
+      that.</p>
+    <h2>Implementations</h2>
+    <p>The VDFS concept started life on a BBC emulator running under
+      RiscOS.  There are two implementations I am aware of for PC-based
+      emulators: the one I wrote for B-Em, which the rest of this
+      documentation is about, and another one for BeebEm by J.G.
+      Harston.</p>
+    <h2>Enabling and Selecting VDFS</h2>
+    <p>Two things are required to be able to use VDFS in B-Em:</p>
+    <ul>
+      <li>The VDFS ROM must be present.</li>
+      <li>It must be enabled in the settings.</li>
+    </ul>
+    <h3>VDFS ROM</h3>
+    <p>The VDFS ROM is supplied as part of B-Em in
+      <code>roms/general/vdfs.rom</code>.  This ROM is included in the
+      default machine configurations but if you have configured a
+      custom machine, or have removed it, then you would need to add
+      it.  There is no requirement for it to occupy any particular
+      slot, though on machines other than the master the slot will
+      determine whether it can become the default filing system at
+      startup or will need to be selected explicitly.</p>
+    <h3>Settings</h3>
+    <p>The setting for VDFS is under the "Disc" menu.  When this is
+      ticked, VDFS is enabled:</p>
+    <img src="setting.png">
+    <h3>Selection on Startup</h3>
+    <p>When enabled, as above, VDFS is a candidate for selection
+      on startup as the default filing system.  Whether this happens
+      depends on the order of the ROMs in the slots and on whether
+      keys are held down during startup.  VDFS will be selected
+      when it is either the highest priority filing system selected
+      and no keys are held down, or when the 'S' key is held down.</p>
+    <p>On the master, the default filing system can be configured
+      as one of the CMOS settings.  The syntax is:</p>
+    <p><kbd>*CONFIGURE FILE &lt;n&gt;</kbd></p>
+    <p>where &lt;n&gt; n is the number of the ROM containing the
+      filing system.</p>
+    <h3>Selection via Command or ROM Service Call</h3>
+    <p>If enabled in the settings, VDFS can always be selected
+      with the command:</p>
+    <p><kbd>*VDFS</kbd></p>
+    <p>or by issusing a ROM service call with A=&12 and Y=&11, with
+      &11 being the filing system number normally used by VDFS.</p>
+    <p>Depending on which priority slot the VDFS ROM is in and the
+      FSCLAIM setting, VDFS may also be selected by commands and
+      service calls that would otherwise select the DFS or ADFS filing
+      systems.  This is to enable VDFS to be used with programs which
+      embed either commands or service calls to start these other
+      filing systems without having to patch the programs concerned.</p>
+    <p>In order to step in in place of another filing system in this
+      way, the VDFS ROM needs to be in a higher priority ROM slot than
+      the filing system concerned so that the VDFS ROM sees the
+      command or service call first.</p>
+    <p>Assuming this is the case, after executing:</p>
+    <p><kbd>*FSCLAIM ON</kbd></p>
+    <p>VDFS will be selected when any of:</p>
+    <p><kbd>*DFS</kbd><br>
+    <kbd>*ADFS</kbd><br>
+    <kbd>*FADFS</kbd><br>
+    <kbd>*VDFS</kbd></p>
+    <p>are executed or when the ROM service call with A=&12 is issued
+      with Y=&04, Y=&08 or Y=&11.  After executing:</p>
+    <p><kbd>*FSCLAIM OFF</kbd></p>
+    <p>VDFS will only be selected with:</p>
+    <p><kbd>*VDFS</kbd></p>
+    <p>or by issusing a ROM service call with A=&12 and Y=&11.
+    <h2>Using VDFS</h2>
+    <h3>VDFS from Programs</h3>
+    <p>VDFS implements the complete set of filing system calls
+      including OSGBPB so should work from existing programs like
+      any other filing system, provided the program does not make
+      assumptions about the directory structure.</p>
+    <p>It is worth noting that, as well as embedding filing system
+      selection commands as noted above, some programs may change
+      their behaviour according to the number of the filing system
+      selected.  The BCPL ROM is a case in point which, if it does not
+      recognise the filing system, assumes it only implements the
+      core filing system calls as implemented by the cassette and
+      ROM filing systems.  Unfortunately the latest filing system this
+      ROM knows about is DFS and this can make it very slow on more
+      modern filing systems.  This could be addressed via *FSCLAIM
+      above as that causes VDFS to report as having the filing system
+      number of the filing system it is standing in for.  Another
+      solution is to patch the BCPL ROM and a patched version is
+      available.</p>
+    <h3>VDFS Commands</h3>
+    <p>The following commands are implemented by VDFS:</p>
+    <p><kbd>*BACK</kbd><br>
+    <kbd>*CAT</kbd><br>
+    <kbd>*CDIR</kbd><br>
+    <kbd>*DELETE</kbd><br>
+    <kbd>*DIR</kbd><br>
+    <kbd>*EX/kbd><br>
+    <kbd>*INFO/kbd><br>
+    <kbd>*RENAME</kbd><br>
+    <kbd>*RESCAN</kbd></p>
+    <p>All of these have the same meaning as under ADFS except for
+      RESCAN which is VDFS-specific and can be used to force VDFS
+      to re-scan host directories if it has not picked up changes
+      made directly on the host.</p>
+    <p>The following commands are recognised but do nothing:</p>
+    <p><kbd>*ACCESS</kbd><br>
+    <kbd>*BACKUP</kbd><br>
+    <kbd>*COMPACT</kbd><br>
+    <kbd>*COPY</kbd><br>
+    <kbd>*DESTROY</kbd><br>
+    <kbd>*DRIVE</kbd><br>
+    <kbd>*ENABLE</kbd><br>
+    <kbd>*FORM</kbd><br>
+    <kbd>*FREE</kbd><br>
+    <kbd>*MAP</kbd><br>
+    <kbd>*MOUNT</kbd><br>
+    <kbd>*TITLE</kbd><br>
+    <kbd>*VERIFY</kbd><br>
+    <kbd>*WIPE</kbd></p>
+    <h3>Attribute Mapping</h3>
+    <p>VDFS supplies attributes to programs and displays them in the
+      catalogue in the form used for NFS.  In the catalogue display
+      this means those that apply to the current user are in capitals
+      and those that apply to others are in lower case.  For example
+      here is a directory set up to look like the system disc for
+      a Music 5000 system:</p>
+    <img src="m5000sysg.png">
+    <p>and here is the same directory display on a Linux host:</p>
+    <img src="m5000sysh.png">
+    <p>The NFS "current user" attributes are taken from the host
+      file permissions that apply to the user running the emulator.
+      The NFS "public" permissions are a composite - if anyone else
+      on the host system is able to perform the action concerned
+      however they get that permission, the NFS permission is
+      considered to be granted, so in the case of Linux this includes
+      permissions obtained via the group mechanism.</p>
+    <p>As noted above the *ACCESS command does not do anything on
+      VDFS and neither does the OSFILE call to set file attributes.  It
+      is simply not clear how this operation should be translated to
+      work on the host system and would differ between Windows and
+      Linux.  If you need to change file permissions you will need
+      to do it on the host.</p>
+    <p>The Acorn-specific LOAD and EXEC addresses are supported - these
+      are held in <em>.inf</em> files on the host, one for each real
+      file, visible in the image above.  These are intended to be
+      compatible with SWH's <em>beeb</em> and Acorn-aware ZIP
+      archivers.</p>
+    <h3>Filename Mapping</h3>
+    <p>Acorn filenames are limited to 10 characters so host filenames
+      longer than this are truncated before being presented to code
+      running on the emulated BBC micro.  Also, the set of characters
+      that can be included in Acorn filenames and the set of characters
+      that have special meanings will be different from those on the
+      host.  Looking at these two rows of characters:</p>
+    <p><code># $ % & . ? @ ^<br>
+      ? < ; + / # = ></code></p>
+    <p>whenever one of the characters in the top row is found in a
+      host filename it is translated to the corresponding one on the
+      bottom row.  If the combination of truncation and/or mapping
+      would result in more than one host file appearing to have the
+      same name to the guest this is resolved by adding a ~ character
+      and a numeric suffix, truncating the name further, if necessary,
+      to make room for the suffix.  This is modelled after the way
+      Windows deals with multiple long filenames mapping to the same
+      8.3 filename.</p>
+    <p>In the reverse direction, VDFS will remember the guest name it
+      gave to each host file, though only while B-Em continues to run,
+      so adding or removing files should not cause the mapping to
+      become unstable.  When VDFS sees a new guest name, for example
+      when creating a new file, it performs the mapping in reverse,
+      i.e. any character on the bottom row is translated to the
+      corresponding character on the top row before the file is
+      created on the host.</p>
+  </body>
+</html>
