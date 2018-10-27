@@ -2724,29 +2724,36 @@ static void osword_discio(void)
 {
     uint16_t pb   = readmem(0xf0) | (readmem(0xf1) << 8);
     uint8_t drive = readmem(pb);
-    uint8_t sects = readmem(pb+9);
+    uint8_t cmd   = readmem(pb+6);
+    uint8_t track = readmem(pb+7);
+    uint8_t sect  = readmem(pb+8);
+    uint8_t byte9 = readmem(pb+9);
+    uint8_t sects = byte9 & 0x0f;
     uint16_t ssize;
 
-    switch((sects & 0xe0) >> 5) {
-        case 0:  ssize = 128; break;
-        case 2:  ssize = 512; break;
-        default: ssize = 256; break;
-    }
-    FILE *fp = sdf_owseek(drive & 1, readmem(pb+8), readmem(pb+7), drive >> 1, ssize);
+    byte9 &= 0xe0;
+    if (byte9 == 0)
+        ssize = 128;
+    else if (byte9 == 0x40)
+        ssize = 512;
+    else
+        ssize = 256;
+    log_debug("vdfs: osword 7F: cmd=%02X, track=%d, sect=%d, sects=%d, ssize=%d", cmd, track, sect, sects, ssize);
+
+    FILE *fp = sdf_owseek(drive & 1, sect, track, drive >> 1, ssize);
     if (fp) {
         uint32_t addr = readmem32(pb+1);
-        uint8_t cmd   = readmem(pb+6);
         size_t bytes = (sects & 0x0f) << 8;
         if (cmd == 0x53) {
             if (addr > 0xffff0000 || curtube == -1) {
                 int ch;
-                log_debug("vdfs: osword: writing to I/O proc memory at %08X", addr);
+                log_debug("vdfs: osword 7F: writing to I/O proc memory at %08X", addr);
                 while (bytes-- && (ch = getc(fp)) != EOF)
                     writemem(addr++, ch);
             }
             else {
                 int ch;
-                log_debug("vdfs: osword: writing to tube memory at %08X", addr);
+                log_debug("vdfs: osword 7F: writing to tube memory at %08X", addr);
                 while (bytes-- && (ch = getc(fp)) != EOF)
                     tube_writemem(addr++, ch);
             }
@@ -2754,12 +2761,12 @@ static void osword_discio(void)
         }
         else if (cmd == 0x4b) {
             if (addr > 0xffff0000 || curtube == -1) {
-                log_debug("vdfs: osword: reading from I/O proc memory at %08X", addr);
+                log_debug("vdfs: osword 7F: reading from I/O proc memory at %08X", addr);
                 while (bytes--)
                     putc(readmem(addr++), fp);
             }
             else {
-                log_debug("vdfs: osword: reading from tube memory at %08X", addr);
+                log_debug("vdfs: osword 7F: reading from tube memory at %08X", addr);
                 while (bytes--)
                     putc(tube_readmem(addr++), fp);
             }
