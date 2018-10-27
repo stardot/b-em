@@ -125,6 +125,7 @@ prtextws    =   &A8
             equw    tube_exec       ; start execution ob tube proc.
             equw    tube_init       ; initialise tube.
             equw    tube_explode    ; explode character set for tube.
+            equw    osw7f_stat
 .dispend
 
 ; Stubs to transfer control to the vdfs.c module.
@@ -1056,6 +1057,32 @@ prtextws    =   &A8
             tay
             lda     #&09
             rts
+}
+
+.osw7f_stat
+{
+            lda     vtab,x
+            tax
+            lda     vals,x
+.loop_val   jsr     OSWRCH
+            inx
+            lda     vals,x
+            bne     loop_val
+            jsr     OSNEWL
+            lda     #&00
+            rts
+.vals       equs    "No OSWORD 7F corruption",&00
+.all        equs    "All known DFSes",&00
+.ac1        equs    "Acorn 0.90 and 1.20", &00
+.ac2        equs    "Acorn 2.10", &00
+.watf       equs    "Watford 1.10, 1.20, 1.30 and 1.4x",&00
+.wat5       equs    "Watford 1.5x", &00
+.vtab       equb    &00
+            equb    all-vals
+            equb    ac1-vals
+            equb    ac2-vals
+            equb    watf-vals
+            equb    wat5-vals
 }
 
 ; Start executation in the tube.  This will be called at the tail

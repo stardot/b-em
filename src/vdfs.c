@@ -159,6 +159,7 @@ enum vdfs_action {
     VDFS_ROM_TUBE_EXEC,
     VDFS_ROM_TUBE_INIT,
     VDFS_ROM_TUBE_EXPL,
+    VDFS_ROM_OSW7F,
     VDFS_ACT_NOP,
     VDFS_ACT_QUIT,
     VDFS_ACT_SRLOAD,
@@ -177,7 +178,14 @@ enum vdfs_action {
     VDFS_ACT_VDFS,
     VDFS_ACT_ADFS,
     VDFS_ACT_DISC,
-    VDFS_ACT_FSCLAIM
+    VDFS_ACT_FSCLAIM,
+    VDFS_ACT_OSW7F,
+    VDFS_ACT_OSW7F_NONE,
+    VDFS_ACT_OSW7F_ALL,
+    VDFS_ACT_OSW7F_AC1,
+    VDFS_ACT_OSW7F_AC2,
+    VDFS_ACT_OSW7F_WATF,
+    VDFS_ACT_OSW7F_WAT5
 };
 
 #define MAX_CMD_LEN 8
@@ -2313,6 +2321,7 @@ const struct cmdent ctab_filing[] = {
     { "LIB",     VDFS_ACT_LIB     },
     { "MAP",     VDFS_ACT_NOP     },
     { "MOunt",   VDFS_ACT_NOP     },
+    { "OSW7f",   VDFS_ACT_OSW7F   },
     { "REname",  VDFS_ACT_RENAME  },
     { "REScan",  VDFS_ACT_RESCAN  },
     { "TItle",   VDFS_ACT_NOP     },
@@ -2332,11 +2341,9 @@ static uint16_t parse_cmd(uint16_t addr, char *dest)
     } while (ch != ' ' && ch != '\r' && ch != '.');
 
     log_debug("vdfs: parse_cmd: finish with %02X at %04X", ch, addr);
-    if (ch != '\r') {
-        log_debug("vdfs: parse_cmd: skipping spaces");
+    if (ch != '\r')
         while ((ch = readmem(addr++)) == ' ')
             ;
-    }
     return --addr;
 }
 
@@ -2353,7 +2360,7 @@ static const struct cmdent *lookup_cmd(const struct cmdent *tab, size_t nentry, 
             tab_ch = *tab_cmd++;
             cmd_ch = *cmd_ptr++;
         } while (tab_ch && !((tab_ch ^ cmd_ch) & 0x5f)); // case insensitive comparison.
-        if ((!tab_ch && (cmd_ch == ' ' || cmd_ch == '\r')) || (tab_ch >= 'a' && cmd_ch == '.'))
+        if ((!tab_ch && (cmd_ch == ' ' || cmd_ch == '\r')) || (cmd_ch == '.' && (tab_ch < 'A' || tab_ch > 'Z')))
             return tab_ptr;
         tab_ptr++;
     }
@@ -2482,6 +2489,86 @@ static void file_info(uint16_t addr)
     }
 }
 
+static enum vdfs_action osw7fmc_act = VDFS_ACT_OSW7F_NONE;
+static const uint8_t *osw7fmc_tab;
+
+static const uint8_t osw7fmc_ac1[] =
+{
+    0x72, 0x73, 0x74, 0x75, 0x80, 0x82, 0x83,
+    0x85, 0xC8, 0xC9, 0xD3, 0xD5, 0xD6, 0x00
+};
+
+static const uint8_t osw7fmc_ac2[] =
+{
+    0x87, 0x88, 0x89, 0x8B, 0x8C, 0x8D, 0x8E,
+    0xD3, 0xD6, 0xDE, 0xDF, 0xE0, 0xE1, 0x00
+};
+
+static const uint8_t osw7fmc_watf[] =
+{
+ 0x42, 0x43, 0x4A, 0x78, 0x88, 0x89, 0x8A, 0x00
+};
+
+static const uint8_t osw7fmc_wat5[] =
+{
+    0x30, 0x36, 0x38, 0x3F, 0x42, 0x43, 0x4A, 0x78,
+    0x88, 0x89, 0x8A, 0xA0, 0xA1, 0xA2, 0xA3, 0xA4,
+    0xA5, 0xA6, 0xA7, 0xA8, 0xA9, 0xAA, 0x00
+};
+
+static const uint8_t osw7fmc_all[] =
+{
+    0x30, 0x33, 0x36, 0x38, 0x3F, 0x42, 0x43, 0x44,
+    0x4A, 0x72, 0x73, 0x74, 0x75, 0x78, 0x79, 0x7A,
+    0x7B, 0x80, 0x82, 0x83, 0x85, 0x87, 0x88, 0x89,
+    0x8A, 0x8B, 0x8C, 0x8D, 0x8E, 0xA0, 0xA1, 0xA2,
+    0xA3, 0xA4, 0xA5, 0xA6, 0xA7, 0xA8, 0xA9, 0xAA,
+    0xC8, 0xC9, 0xD3, 0xD5, 0xD6, 0xDE, 0xDF, 0xE0,
+    0xE1, 0x00
+};
+
+static const uint8_t *osw7fmc_tabs[] =
+{
+    osw7fmc_all,
+    osw7fmc_ac1,
+    osw7fmc_ac2,
+    osw7fmc_watf,
+    osw7fmc_wat5,
+};
+
+const struct cmdent ctab_osw7f[] = {
+    { "None", VDFS_ACT_OSW7F_NONE },
+    { "All",  VDFS_ACT_OSW7F_ALL  },
+    { "A090", VDFS_ACT_OSW7F_AC1  },
+    { "A120", VDFS_ACT_OSW7F_AC1  },
+    { "A210", VDFS_ACT_OSW7F_AC2  },
+    { "W110", VDFS_ACT_OSW7F_WATF },
+    { "W120", VDFS_ACT_OSW7F_WATF },
+    { "W130", VDFS_ACT_OSW7F_WATF },
+    { "W14x", VDFS_ACT_OSW7F_WATF },
+    { "W15x", VDFS_ACT_OSW7F_WAT5 }
+};
+
+static void cmd_osw7f(uint16_t addr)
+{
+    const struct cmdent *ent;
+    char  cmd[MAX_CMD_LEN];
+
+    if (readmem(addr) == '\r') {
+        x = osw7fmc_act - VDFS_ACT_OSW7F_NONE;
+        rom_dispatch(VDFS_ROM_OSW7F);
+    }
+    else if ((addr = parse_cmd(addr, cmd)) && ((ent = lookup_cmd(ctab_osw7f, ARRAY_SIZE(ctab_osw7f), cmd)))) {
+        osw7fmc_act = ent->act;
+        if (ent->act == VDFS_ACT_OSW7F_NONE)
+            osw7fmc_tab = NULL;
+        else
+            osw7fmc_tab = osw7fmc_tabs[ent->act - VDFS_ACT_OSW7F_NONE - 1];
+    }
+    else
+        adfs_error(err_badcmd);
+}
+
 static void vdfs_do(enum vdfs_action act, uint16_t addr)
 {
     log_debug("vdfs: vdfs_do, act=%d, addr=%04X", act, addr);
@@ -2560,6 +2647,9 @@ static void vdfs_do(enum vdfs_action act, uint16_t addr)
     case VDFS_ACT_FSCLAIM:
         fsclaim(addr);
         break;
+    case VDFS_ACT_OSW7F:
+        cmd_osw7f(addr);
+        break;
     default:
         rom_dispatch(act);
     }
@@ -2636,6 +2726,7 @@ static void osword_discio(void)
     uint8_t drive = readmem(pb);
     uint8_t sects = readmem(pb+9);
     uint16_t ssize;
+
     switch((sects & 0xe0) >> 5) {
         case 0:  ssize = 128; break;
         case 2:  ssize = 512; break;
@@ -2680,8 +2771,20 @@ static void osword_discio(void)
         log_debug("vdfs: osword attempting to read invalid/empty drive %d", drive);
         writemem(pb+10, 0x14); // track 0 not found.
     }
+    if (osw7fmc_tab) {
+        const uint8_t *ptr;
+        uint8_t tb, mb, nc, cf = 0;
+        for (ptr = osw7fmc_tab; (tb = *ptr++); ) {
+            mb = tb ^ readmem(0x1000+tb);
+            // Simulate a ROL A
+            nc = mb & 0x80;
+            mb = mb << 1 | cf;
+            cf = nc ? 1 : 0;
+            mb ^= 0x23;
+            writemem(0x1000+tb, mb);
+        }
+    }
 }
-
 
 static void osword(void)
 {
