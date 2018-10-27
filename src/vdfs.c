@@ -169,6 +169,8 @@ enum vdfs_action {
     VDFS_ACT_CDIR,
     VDFS_ACT_DELETE,
     VDFS_ACT_DIR,
+    VDFS_ACT_EX,
+    VDFS_ACT_INFO,
     VDFS_ACT_LIB,
     VDFS_ACT_RENAME,
     VDFS_ACT_RESCAN,
@@ -792,7 +794,7 @@ static uint16_t parse_name(char *str, size_t size, uint16_t addr)
     while (ptr < end && ch != '\r' && (ch != '"' || !quote) && (ch != ' ' || quote)) {
         *ptr++ = ch & 0x7f;
         ch = readmem(addr++);
-    };
+    }
 
     *ptr = '\0';
     return addr;
@@ -1760,13 +1762,14 @@ static void osbget(void)
     FILE *fp;
 
     log_debug("vdfs: osbget(A=%02X, X=%02X, Y=%02X)", a, x, y);
-    p.c = 1;
     if ((fp = getfp_read(y))) {
         if ((ch = getc(fp)) != EOF) {
             a = ch;
             p.c = 0;
+            return;
         }
     }
+    p.c = 1;
 }
 
 static FILE *getfp_write(int channel)
@@ -2221,8 +2224,7 @@ static void run_file(const char *err)
                     writemem32(0xc0, ent->exec_addr); // set up for tube execution.
                     while ((ch = getc(fp)) != EOF)
                         tube_writemem(addr++, ch);
-                    p.c = 1; // carry set means execute in tube to VDFS ROM.
-                    log_debug("vdfs: run_file: write complete");
+                    rom_dispatch(VDFS_ROM_TUBE_EXEC);
                 }
                 fclose(fp);
             } else {
@@ -2304,8 +2306,10 @@ const struct cmdent ctab_filing[] = {
     { "DIR",     VDFS_ACT_DIR     },
     { "DRive",   VDFS_ACT_NOP     },
     { "ENable",  VDFS_ACT_NOP     },
+    { "EX",      VDFS_ACT_EX      },
     { "FORM",    VDFS_ACT_NOP     },
     { "FRee",    VDFS_ACT_NOP     },
+    { "INFO",    VDFS_ACT_INFO    },
     { "LIB",     VDFS_ACT_LIB     },
     { "MAP",     VDFS_ACT_NOP     },
     { "MOunt",   VDFS_ACT_NOP     },
@@ -2330,12 +2334,10 @@ static uint16_t parse_cmd(uint16_t addr, char *dest)
     log_debug("vdfs: parse_cmd: finish with %02X at %04X", ch, addr);
     if (ch != '\r') {
         log_debug("vdfs: parse_cmd: skipping spaces");
-        while ((ch = readmem(addr)) == ' ') {
-            addr++;
-            log_debug("vdfs: parse_cmd: skipped %02X at %04X", ch, addr);
-        }
+        while ((ch = readmem(addr++)) == ' ')
+            ;
     }
-    return addr;
+    return --addr;
 }
 
 static const struct cmdent *lookup_cmd(const struct cmdent *tab, size_t nentry, char *cmd)
@@ -2404,6 +2406,82 @@ static void fsclaim(uint16_t addr)
     adfs_error(err_badparms);
 }
 
+static unsigned cat_seq = 0;
+
+static bool cat_prep(uint16_t addr)
+{
+    vdfs_ent_t *ent, key;
+    char path[MAX_ACORN_PATH];
+
+    if (check_valid_dir(cur_dir, "current")) {
+        parse_name(path, sizeof path, addr);
+        if (*path) {
+            ent = find_entry(path, &key, cur_dir);
+            if (ent && ent->attribs & ATTR_EXISTS) {
+                if (ent->attribs & ATTR_IS_DIR) {
+                    cat_dir = ent;
+                } else {
+                    adfs_error(err_baddir);
+                    return false;
+                }
+            } else {
+                adfs_error(err_notfound);
+                return false;
+            }
+        } else
+            cat_dir = cur_dir;
+        if (gen_cat_tab(cat_dir)) {
+            adfs_error(err_notfound);
+            return false;
+        }
+        cat_seq = 0;
+        return true;
+    }
+    return false;
+}
+
+static void ent2guest(vdfs_ent_t *ent)
+{
+    uint16_t mem_ptr = 0x100;
+    const char *ptr = ent->acorn_fn;
+    int i, ch;
+
+    for (i = MAX_FILE_NAME; i > 0 && (ch = *ptr++); i--)
+        writemem(mem_ptr++, ch);
+    while (i-- > 0)
+        writemem(mem_ptr++, ' ');
+    writemem16(mem_ptr, ent->attribs);
+    writemem32(mem_ptr+2, ent->load_addr);
+    writemem32(mem_ptr+6, ent->exec_addr);
+    writemem32(mem_ptr+10, ent->length);
+}
+
+static void cat_next(void)
+{
+    if (cat_dir && cat_seq < cat_dir->cat_size) {
+        ent2guest(cat_dir->cat_tab[cat_seq++]);
+        p.c = 0;
+    }
+    else
+        p.c = 1;
+}
+
+static void file_info(uint16_t addr)
+{
+    vdfs_ent_t *ent, key;
+    char path[MAX_ACORN_PATH];
+
+    if (check_valid_dir(cur_dir, "current")) {
+        simple_name(path, sizeof path, addr);
+        if ((ent = find_entry(path, &key, cur_dir)) && ent->attribs & ATTR_EXISTS) {
+            ent2guest(ent);
+            rom_dispatch(VDFS_ROM_INFO);
+            return;
+        }
+        adfs_error(err_notfound);
+    }
+}
+
 static void vdfs_do(enum vdfs_action act, uint16_t addr)
 {
     log_debug("vdfs: vdfs_do, act=%d, addr=%04X", act, addr);
@@ -2443,6 +2521,16 @@ static void vdfs_do(enum vdfs_action act, uint16_t addr)
         break;
     case VDFS_ACT_DIR:
         cmd_dir(addr);
+        break;
+    case VDFS_ACT_EX:
+        cat_prep(addr);
+        rom_dispatch(VDFS_ROM_EX);
+        break;
+    case VDFS_ACT_INFO:
+        if (readmem(addr) == '\r')
+            adfs_error(err_badcmd);
+        else
+            file_info(addr);
         break;
     case VDFS_ACT_LIB:
         cmd_lib(addr);
@@ -2496,81 +2584,6 @@ static void osfsc_cmd(void)
     run_file(err_badcmd);
 }
 
-static unsigned cat_seq = 0;
-
-static bool cat_prep(void)
-{
-    vdfs_ent_t *ent, key;
-    char path[MAX_ACORN_PATH];
-
-    if (check_valid_dir(cur_dir, "current")) {
-        parse_name(path, sizeof path, x + (y << 8));
-        if (*path) {
-            ent = find_entry(path, &key, cur_dir);
-            if (ent && ent->attribs & ATTR_EXISTS) {
-                if (ent->attribs & ATTR_IS_DIR) {
-                    cat_dir = ent;
-                } else {
-                    adfs_error(err_baddir);
-                    return false;
-                }
-            } else {
-                adfs_error(err_notfound);
-                return false;
-            }
-        } else
-            cat_dir = cur_dir;
-        if (gen_cat_tab(cat_dir)) {
-            adfs_error(err_notfound);
-            return false;
-        }
-        cat_seq = 0;
-        return true;
-    }
-    return false;
-}
-
-static void ent2guest(vdfs_ent_t *ent)
-{
-    uint16_t mem_ptr = 0x100;
-    const char *ptr = ent->acorn_fn;
-    int i, ch;
-
-    for (i = MAX_FILE_NAME; i > 0 && (ch = *ptr++); i--)
-        writemem(mem_ptr++, ch);
-    while (i-- > 0)
-        writemem(mem_ptr++, ' ');
-    writemem16(mem_ptr, ent->attribs);
-    writemem32(mem_ptr+2, ent->load_addr);
-    writemem32(mem_ptr+6, ent->exec_addr);
-    writemem32(mem_ptr+10, ent->length);
-}
-
-static void cat_next(void)
-{
-    if (cat_dir && cat_seq < cat_dir->cat_size) {
-        ent2guest(cat_dir->cat_tab[cat_seq++]);
-        p.c = 0;
-    }
-    else
-        p.c = 1;
-}
-
-static void osfsc_info(void)
-{
-    vdfs_ent_t *ent, key;
-    char path[MAX_ACORN_PATH];
-
-    if (check_valid_dir(cur_dir, "current")) {
-        simple_name(path, sizeof path, (y << 8) | x);
-        if ((ent = find_entry(path, &key, cur_dir)) && ent->attribs & ATTR_EXISTS) {
-            ent2guest(ent);
-            rom_dispatch(VDFS_ROM_INFO);
-            return;
-        }
-        adfs_error(err_notfound);
-    }
-}
 
 static void osfsc(void)
 {
@@ -2592,17 +2605,17 @@ static void osfsc(void)
             osfsc_cmd();
             break;
         case 0x05:
-            if (cat_prep())
+            if (cat_prep(x + (y << 8)))
                 rom_dispatch(VDFS_ROM_CAT);
             break;
         case 0x06: // new filesystem taking over.
             break;
         case 0x09:
-            if (cat_prep())
+            if (cat_prep(x + (y << 8)))
                 rom_dispatch(VDFS_ROM_EX);
             break;
         case 0x0a:
-            osfsc_info();
+            file_info((y << 8) | x);
             break;
         case 0x0c:
             rename_file((y << 8) | x);
