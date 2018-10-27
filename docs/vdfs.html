@@ -101,8 +101,9 @@
     <kbd>*FADFS</kbd><br>
     <kbd>*VDFS</kbd></p>
     <p>are executed or when the ROM service call with A=&amp;12 is
-      issued with Y=&amp;04, Y=&amp;08 or Y=&amp;11.  After
-      executing:</p>
+      issued with Y=&amp;04, Y=&amp;08 or Y=&amp;11, with &amp;04 being
+      the filing system number for DFS and &amp;08 being the filing
+      system number for ADFS.  After executing:</p>
     <p><kbd>*FSCLAIM OFF</kbd></p>
     <p>VDFS will only be selected with:</p>
     <p><kbd>*VDFS</kbd></p>
@@ -137,8 +138,8 @@
     <kbd>*CDIR</kbd><br>
     <kbd>*DELETE</kbd><br>
     <kbd>*DIR</kbd><br>
-    <kbd>*EX/kbd><br>
-    <kbd>*INFO/kbd><br>
+    <kbd>*EX</kbd><br>
+    <kbd>*INFO</kbd><br>
     <kbd>*RENAME</kbd><br>
     <kbd>*RESCAN</kbd></p>
     <p>All of these have the same meaning as under ADFS except for
@@ -174,7 +175,7 @@
       file permissions that apply to the user running the emulator.
       The NFS "public" permissions are a composite - if anyone else
       on the host system is able to perform the action concerned
-      however they get that permission, the NFS permission is
+      however they get that permission, the NFS public permission is
       considered to be granted, so in the case of Linux this includes
       permissions obtained via the group mechanism.</p>
     <p>As noted above the *ACCESS command does not do anything on
@@ -225,9 +226,9 @@
       control is then passed to the emulator module.</p>
     <p>In the original RiscOS emulator, the mechanism by which control
       was transferred was an undocumented 6502 instruction, i.e. the
-      ROM would use this instruction and the processor emulator would
-      trap to the emulator module when it went to execute this
-      instruction.  In B-Em some effort has been put into make the
+      ROM would use this instruction and the 6502 processor emulator
+      would trap to the VDFS emulator module when it went to execute
+      this instruction.  In B-Em some effort has been put into make the
       emulated 6502 behave as close to a real one as possible and that
       includes executing undocumented insructions as a real CPU
       would.  B-Em therefore takes a slighly different approach and
@@ -410,10 +411,10 @@
       to the corresponding action is carried out and the emulated 6502
       continues from the next instruction.  With VDFS 6 the vdfs.c
       module may instead set the PC for the emulated CPU to some other
-      address within the ROM to continue execution there and to do so
-      uses a table of addresses wthin the ROM.  The first three bytes
-      of the VDFS ROM, where the language entry would be if it were
-      a language ROM, describe this table with the first byte at
+      address within the ROM to continue execution from there and to
+      do so uses a table of addresses wthin the ROM.  The first three
+      bytes of the VDFS ROM, where the language entry would be if it
+      were a language ROM, describe this table with the first byte at
       &amp;8000 being the number of enties and thd next two at
       &amp;8001 and &amp;8002 pointing to the first entry.  At the time
       of writing the correspondance between internal vdfs.c action
@@ -566,7 +567,7 @@
       be loaded with the value to write but some commands may need to
       pass values in all three 6502 registers to the routine in
       vdfs.c</p>
-    <p>This solves the problem by allowing the accumulator (A) to
+    <p>This port solves the problem by allowing the accumulator (A) to
       be written here, then loaded with the command code.  As soon
       as the command code is written to &amp;FC5E above the vdfs.c
       module puts the value that was written to this port back into A
