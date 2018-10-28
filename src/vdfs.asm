@@ -1143,7 +1143,7 @@ prtextws    =   &A8
             beq     done            ; end of message?
             jsr     OSWRCH
             jmp     imsglp
-.notube     lda     #&ff
+.notube     lda     #&fe
 .done       rts
 }
 
