@@ -16,11 +16,17 @@
 
 #include "b-em.h"
 #include "disc.h"
+#include "mmb.h"
 #include "sdf.h"
 
+#define MMB_CAT_SIZE 0x2000
+
+static FILE *sdf_fp[NUM_DRIVES], *mmb_fp;
 static const struct sdf_geometry *geometry[NUM_DRIVES];
-static FILE *sdf_fp[NUM_DRIVES];
 static uint8_t current_track[NUM_DRIVES];
+static off_t mmb_offset[NUM_DRIVES][2];
+static char *mmb_cat;
+char *mmb_fn;
 
 typedef enum {
     ST_IDLE,
@@ -52,7 +58,8 @@ static void sdf_close(int drive)
     if (drive < NUM_DRIVES) {
         geometry[drive] = NULL;
         if (sdf_fp[drive]) {
-            fclose(sdf_fp[drive]);
+            if (sdf_fp[drive] != mmb_fp)
+                fclose(sdf_fp[drive]);
             sdf_fp[drive] = NULL;
         }
     }
@@ -103,7 +110,7 @@ static bool io_seek(const struct sdf_geometry *geo, uint8_t drive, uint8_t secto
                     return false;
                 }
             }
-            offset += sector * geo->sector_size;
+            offset += sector * geo->sector_size + mmb_offset[drive][side];
             log_debug("sdf: drive %u: seeking for side=%u, track=%u, sector=%u to %d bytes\n", drive, side, track, sector, offset);
             fseek(sdf_fp[drive], offset, SEEK_SET);
             return true;
@@ -351,6 +358,7 @@ static void sdf_mount(int drive, const char *fn, FILE *fp, const struct sdf_geom
              drive, fn, geo->name, sdf_desc_sides(geo), geo->tracks,
              sdf_desc_dens(geo), geo->sectors_per_track, geo->sector_size);
     geometry[drive] = geo;
+    mmb_offset[drive][0] = mmb_offset[drive][1] = 0;
     drives[drive].close       = sdf_close;
     drives[drive].seek        = sdf_seek;
     drives[drive].verify      = sdf_verify;
@@ -405,4 +413,124 @@ void sdf_new_disc(int drive, ALLEGRO_PATH *fn, enum sdf_disc_type dtype)
                 log_error("sdf: drive %d: unable to open disk image %s for writing: %s", drive, cpath, strerror(errno));
         }
     }
+}
+
+void mmb_load(const char *fn)
+{
+    FILE *fp;
+
+    if (!mmb_cat) {
+        if (!(mmb_cat = malloc(MMB_CAT_SIZE))) {
+            log_error("sdf: out of memory allocating MMB catalogue");
+            return;
+        }
+    }
+    writeprot[0] = 0;
+    if ((fp = fopen(fn, "rb+")) == NULL) {
+        if ((fp = fopen(fn, "rb")) == NULL) {
+            log_error("Unable to open file '%s' for reading - %s", fn, strerror(errno));
+            return;
+        }
+        writeprot[0] = 1;
+    }
+    if (fread(mmb_cat, MMB_CAT_SIZE, 1, fp) != 1) {
+        log_error("mmb: %s is not a valid MMB file", fn);
+        fclose(fp);
+        return;
+    }
+    if (mmb_fp) {
+        fclose(mmb_fp);
+        if (sdf_fp[1] == mmb_fp) {
+            sdf_mount(1, fn, fp, &sdf_geo_tab[SDF_FMT_DFS_10S_SEQ_80T]);
+            writeprot[1] = writeprot[0];
+            mmb_offset[1][0] = MMB_CAT_SIZE;
+            mmb_offset[1][1] = MMB_CAT_SIZE + 10 * 256 * 80;
+        }
+    }
+    sdf_mount(0, fn, fp, &sdf_geo_tab[SDF_FMT_DFS_10S_SEQ_80T]);
+    mmb_offset[0][0] = MMB_CAT_SIZE;
+    mmb_offset[0][1] = MMB_CAT_SIZE + 10 * 256 * 80;
+    mmb_fp = fp;
+    if (mmb_fn)
+        free(mmb_fn);
+    mmb_fn = strdup(fn);
+    fdc_spindown();
+}
+
+static void mmb_eject_one(int drive)
+{
+    ALLEGRO_PATH *path;
+
+    if (sdf_fp[drive] == mmb_fp) {
+        disc_close(drive);
+        if ((path = discfns[drive]))
+            disc_load(drive, path);
+    }
+}
+
+void mmb_eject(void)
+{
+    if (mmb_fp) {
+        mmb_eject_one(0);
+        mmb_eject_one(1);
+    }
+    if (mmb_fn) {
+        free(mmb_fn);
+        mmb_fn = NULL;
+    }
+}
+
+void mmb_pick(int drive, int disc)
+{
+    int side;
+
+    switch(drive) {
+        case 0:
+        case 1:
+            side = 0;
+            break;
+        case 2:
+        case 4:
+            drive &= 1;
+            disc--;
+            break;
+        default:
+            log_debug("sdf: sdf_mmb_pick: invalid logical drive %d", drive);
+            return;
+    }
+    log_debug("sdf: picking MMB disc, drive=%d, side=%d, disc=%d", drive, side, disc);
+
+    if (sdf_fp[drive] != mmb_fp) {
+        disc_close(drive);
+        sdf_mount(drive, mmb_fn, mmb_fp, &sdf_geo_tab[SDF_FMT_DFS_10S_SEQ_80T]);
+    }
+    mmb_offset[drive][side] = MMB_CAT_SIZE + 10 * 256 * 80 * disc;
+    fdc_spindown();
+}
+
+int mmb_find(const char *name)
+{
+    const char *cat_ptr = mmb_cat + 16;
+    const char *cat_end = mmb_cat + MMB_CAT_SIZE;
+    const char *cat_nxt, *nam_ptr;
+    int cat_ch, nam_ch, i;
+
+    while (cat_ptr < cat_end) {
+        cat_nxt = cat_ptr + 16;
+        nam_ptr = name;
+        do {
+            if (cat_ptr == cat_nxt)
+                goto found;
+            cat_ch = *cat_ptr++;
+            nam_ch = *nam_ptr++;
+            if (!cat_ch && !nam_ch)
+                goto found;
+        } while (!((cat_ch ^ nam_ch) & 0x5f));
+        cat_ptr = cat_nxt;
+    }
+    return -1;
+found:
+    i = (cat_nxt - mmb_cat) / 16 - 2;
+    log_debug("mmb: found MMB SSD '%s' at %d", name, i);
+    return i;
 }

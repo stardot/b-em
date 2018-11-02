@@ -26,9 +26,11 @@
 
 #include "b-em.h"
 #include "6502.h"
+#include "disc.h"
 #include "keyboard.h"
 #include "main.h"
 #include "mem.h"
+#include "mmb.h"
 #include "model.h"
 #include "sdf.h"
 #include "tube.h"
@@ -185,7 +187,8 @@ enum vdfs_action {
     VDFS_ACT_OSW7F_AC1,
     VDFS_ACT_OSW7F_AC2,
     VDFS_ACT_OSW7F_WATF,
-    VDFS_ACT_OSW7F_WAT5
+    VDFS_ACT_OSW7F_WAT5,
+    VDFS_ACT_MMBDIN
 };
 
 #define MAX_CMD_LEN 8
@@ -2340,7 +2343,7 @@ static uint16_t parse_cmd(uint16_t addr, char *dest)
         dest[i++] = ch;
     } while (ch != ' ' && ch != '\r' && ch != '.');
 
-    log_debug("vdfs: parse_cmd: finish with %02X at %04X", ch, addr);
+    log_debug("vdfs: parse_cmd: cmd=%.*s, finish with %02X at %04X", i, dest, ch, addr);
     if (ch != '\r')
         while ((ch = readmem(addr++)) == ' ')
             ;
@@ -2569,6 +2572,57 @@ static void cmd_osw7f(uint16_t addr)
         adfs_error(err_badcmd);
 }
 
+static int mmb_parse_find(uint16_t addr, int ch)
+{
+    char name[17];
+    int i;
+
+    if (ch == '"')
+        ch = readmem(addr++);
+    i = 0;
+    while (ch != '"' && ch != '\r' && i < sizeof(name)) {
+        name[i++] = ch;
+        ch = readmem(addr++);
+    }
+    name[i] = 0;
+    if ((i = mmb_find(name)) < 0)
+        adfs_error(err_discerr);
+    return i;
+}
+
+static void cmd_mmb_din(uint16_t addr)
+{
+    int num1, num2, ch;
+
+    ch = readmem(addr++);
+    if (ch >= '0' && ch <= '9') {
+        num1 = ch - '0';
+        while ((ch = readmem(addr++)) >= '0' && ch <= '9')
+            num1 = num1 * 10 + ch - '0';
+        while (ch == ' ')
+            ch = readmem(addr++);
+        if (ch == '\r')
+            mmb_pick(0, num1);
+        else if (ch >= '0' && ch <= '9') {
+            num2 = ch - '0';
+            while ((ch = readmem(addr++)) >= '0' && ch <= '9')
+                num2 = num2 * 10 + ch - '0';
+            if (num1 >= 0 && num1 <= 3)
+                mmb_pick(num1, num2);
+            else
+                adfs_error(err_badparms);
+        }
+        else if ((num2 = mmb_parse_find(addr, ch)) >= 0) {
+            if (num1 >= 0 && num1 <= 3)
+                mmb_pick(num1, num2);
+            else
+                adfs_error(err_badparms);
+        }
+    }
+    else if ((num1 = mmb_parse_find(addr, ch)) >= 0)
+        mmb_pick(0, num1);
+}
+
 static void vdfs_do(enum vdfs_action act, uint16_t addr)
 {
     log_debug("vdfs: vdfs_do, act=%d, addr=%04X", act, addr);
@@ -2649,6 +2703,9 @@ static void vdfs_do(enum vdfs_action act, uint16_t addr)
         break;
     case VDFS_ACT_OSW7F:
         cmd_osw7f(addr);
+        break;
+    case VDFS_ACT_MMBDIN:
+        cmd_mmb_din(addr);
         break;
     default:
         rom_dispatch(act);
@@ -2831,7 +2888,9 @@ const struct cmdent ctab_always[] = {
     { "SRLoad",  VDFS_ACT_SRLOAD  },
     { "SRSave",  VDFS_ACT_SRSAVE  },
     { "SRRead",  VDFS_ACT_SRREAD  },
-    { "SRWrite", VDFS_ACT_SRWRITE }
+    { "SRWrite", VDFS_ACT_SRWRITE },
+    { "DAbout",  VDFS_ACT_NOP     },
+    { "Din",     VDFS_ACT_MMBDIN  }
 };
 
 const struct cmdent ctab_enabled[] = {

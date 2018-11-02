@@ -47,6 +47,7 @@ struct sdf_geometry {
 };
 
 extern struct sdf_geometry sdf_geo_tab[];
+extern char *mmb_fn;
 
 // In sdf-geo.c
 const struct sdf_geometry *sdf_find_geo(const char *fn, const char *ext, FILE *fp);
