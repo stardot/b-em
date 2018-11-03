@@ -492,6 +492,7 @@ void mmb_pick(int drive, int disc)
         case 4:
             drive &= 1;
             disc--;
+            side = 1;
             break;
         default:
             log_debug("sdf: sdf_mmb_pick: invalid logical drive %d", drive);
