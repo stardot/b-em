@@ -16,7 +16,6 @@
 
 #include "b-em.h"
 #include "disc.h"
-#include "mmb.h"
 #include "sdf.h"
 
 #define MMB_CAT_SIZE 0x2000

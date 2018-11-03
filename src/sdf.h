@@ -59,4 +59,10 @@ void sdf_new_disc(int drive, ALLEGRO_PATH *fn, enum sdf_disc_type type);
 void sdf_load(int drive, const char *fn, const char *ext);
 FILE *sdf_owseek(uint8_t drive, uint8_t sector, uint8_t track, uint8_t side, uint16_t ssize);
 
+// Functions for MMB files.
+void mmb_load(const char *fn);
+void mmb_eject(void);
+void mmb_pick(int drive, int disc);
+int mmb_find(const char *name);
+
 #endif

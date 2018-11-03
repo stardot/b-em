@@ -12,7 +12,6 @@
 #include "keydef-allegro.h"
 #include "main.h"
 #include "mem.h"
-#include "mmb.h"
 #include "model.h"
 #include "mouse.h"
 #include "music5000.h"
