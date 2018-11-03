@@ -519,18 +519,13 @@ int mmb_find(const char *name)
         cat_nxt = cat_ptr + 16;
         nam_ptr = name;
         do {
-            if (cat_ptr == cat_nxt)
-                goto found;
-            cat_ch = *cat_ptr++;
-            nam_ch = *nam_ptr++;
-            if (!cat_ch && !nam_ch)
-                goto found;
+            if (cat_ptr == cat_nxt|| (!(cat_ch = *cat_ptr++) && !(nam_ch = *nam_ptr++))) {
+                i = (cat_nxt - mmb_cat) / 16 - 2;
+                log_debug("mmb: found MMB SSD '%s' at %d", name, i);
+                return i;
+            }
         } while (!((cat_ch ^ nam_ch) & 0x5f));
         cat_ptr = cat_nxt;
     }
     return -1;
-found:
-    i = (cat_nxt - mmb_cat) / 16 - 2;
-    log_debug("mmb: found MMB SSD '%s' at %d", name, i);
-    return i;
 }
