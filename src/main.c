@@ -299,10 +299,9 @@ void main_init(int argc, char *argv[])
 
     if (mmb_fn)
         mmb_load(mmb_fn);
-    else {
+    else
         disc_load(0, discfns[0]);
-        disc_load(1, discfns[1]);
-    }
+    disc_load(1, discfns[1]);
     tape_load(tape_fn);
     if (defaultwriteprot)
         writeprot[0] = writeprot[1] = 1;

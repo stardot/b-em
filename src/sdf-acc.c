@@ -414,7 +414,7 @@ void sdf_new_disc(int drive, ALLEGRO_PATH *fn, enum sdf_disc_type dtype)
     }
 }
 
-void mmb_load(const char *fn)
+void mmb_load(char *fn)
 {
     FILE *fp;
 
@@ -450,9 +450,7 @@ void mmb_load(const char *fn)
     mmb_offset[0][0] = MMB_CAT_SIZE;
     mmb_offset[0][1] = MMB_CAT_SIZE + 10 * 256 * 80;
     mmb_fp = fp;
-    if (mmb_fn)
-        free(mmb_fn);
-    mmb_fn = strdup(fn);
+    mmb_fn = fn;
     if (fdc_spindown)
         fdc_spindown();
 }

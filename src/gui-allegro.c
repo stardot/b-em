@@ -686,9 +686,13 @@ static void disc_mmb_load(ALLEGRO_EVENT *event)
 
     if ((chooser = al_create_native_file_dialog(fpath, "Choose an MMB file", "*.mmb", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST))) {
         display = (ALLEGRO_DISPLAY *)(event->user.data2);
-        if (al_show_native_file_dialog(display, chooser))
-            if (al_get_native_file_dialog_count(chooser) > 0)
-                mmb_load(al_get_native_file_dialog_path(chooser, 0));
+        if (al_show_native_file_dialog(display, chooser)) {
+            if (al_get_native_file_dialog_count(chooser) > 0) {
+                char *fn = strdup(al_get_native_file_dialog_path(chooser, 0));
+                mmb_eject();
+                mmb_load(fn);
+            }
+        }
         al_destroy_native_file_dialog(chooser);
     }
 }
