@@ -453,7 +453,8 @@ void mmb_load(const char *fn)
     if (mmb_fn)
         free(mmb_fn);
     mmb_fn = strdup(fn);
-    fdc_spindown();
+    if (fdc_spindown)
+        fdc_spindown();
 }
 
 static void mmb_eject_one(int drive)
@@ -505,7 +506,8 @@ void mmb_pick(int drive, int disc)
         sdf_mount(drive, mmb_fn, mmb_fp, &sdf_geo_tab[SDF_FMT_DFS_10S_SEQ_80T]);
     }
     mmb_offset[drive][side] = MMB_CAT_SIZE + 10 * 256 * 80 * disc;
-    fdc_spindown();
+    if (fdc_spindown)
+        fdc_spindown();
 }
 
 int mmb_find(const char *name)
