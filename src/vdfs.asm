@@ -126,6 +126,7 @@ prtextws    =   &A8
             equw    tube_init       ; initialise tube.
             equw    tube_explode    ; explode character set for tube.
             equw    osw7f_stat
+            equw    break_type
 .dispend
 
 ; Stubs to transfer control to the vdfs.c module.
@@ -1145,6 +1146,18 @@ prtextws    =   &A8
             jmp     imsglp
 .notube     lda     #&fe
 .done       rts
+}
+
+.break_type
+{
+            lda     #&fd            ; get last break type.
+            ldx     #&00
+            ldy     #&ff
+            jsr     OSBYTE
+            stx     port_a
+            lda     #&0a
+            sta     port_cmd
+            rts
 }
 
 .end

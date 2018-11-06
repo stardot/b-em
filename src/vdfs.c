@@ -161,6 +161,7 @@ enum vdfs_action {
     VDFS_ROM_TUBE_INIT,
     VDFS_ROM_TUBE_EXPL,
     VDFS_ROM_OSW7F,
+    VDFS_ROM_BREAK,
     VDFS_ACT_NOP,
     VDFS_ACT_QUIT,
     VDFS_ACT_SRLOAD,
@@ -2940,11 +2941,17 @@ static void serv_help(void)
             rom_dispatch(ent->act);
 }
 
+static uint8_t save_y;
+
 static void service(void)
 {
     log_debug("vdfs: rom service a=%02X, x=%02X, y=%02X", a, x, y);
     switch(a)
     {
+    case 0x02:
+        save_y = y;
+        rom_dispatch(VDFS_ROM_BREAK);
+        break;
     case 0x03: // filing system boot.
         if (vdfs_enabled && (!key_any_down() || key_code_down(ALLEGRO_KEY_S)))
             rom_dispatch(VDFS_ROM_FSBOOT);
@@ -2979,6 +2986,14 @@ static void service(void)
     }
 }
 
+static void startup(void)
+{
+    if (a > 0)
+        mmb_reset();
+    a = 0x02;
+    y = save_y;
+}
+
 static inline void dispatch(uint8_t value)
 {
     switch(value) {
@@ -2992,6 +3007,7 @@ static inline void dispatch(uint8_t value)
         case 0x07: osfsc();     break;
         case 0x08: cat_next();  break;
         case 0x09: check_ram(); break;
+        case 0x0a: startup();   break;
         default: log_warn("vdfs: function code %d not recognised\n", value);
     }
 }

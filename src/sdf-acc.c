@@ -478,6 +478,22 @@ void mmb_eject(void)
     }
 }
 
+static void reset_one(int drive)
+{
+    if (sdf_fp[drive] == mmb_fp) {
+        mmb_offset[drive][0] = MMB_CAT_SIZE;
+        mmb_offset[drive][1] = MMB_CAT_SIZE + 10 * 256 * 80;
+    }
+}
+
+void mmb_reset(void)
+{
+    if (mmb_fp) {
+        reset_one(0);
+        reset_one(1);
+    }
+}
+
 void mmb_pick(int drive, int disc)
 {
     int side;
@@ -508,29 +524,36 @@ void mmb_pick(int drive, int disc)
         fdc_spindown();
 }
 
+static inline int cat_name_cmp(const char *nam_ptr, const char *cat_ptr, const char *cat_nxt)
+{
+    do {
+        char cat_ch = *cat_ptr++;
+        char nam_ch = *nam_ptr++;
+        if (!nam_ch) {
+            if (!cat_ch)
+                break;
+            else
+                return -1;
+        }
+        if ((cat_ch ^ nam_ch) & 0x5f)
+            return -1;
+    } while (cat_nxt != cat_ptr);
+    return (cat_nxt - mmb_cat) / 16 - 2;
+}
+
 int mmb_find(const char *name)
 {
     const char *cat_ptr = mmb_cat + 16;
     const char *cat_end = mmb_cat + MMB_CAT_SIZE;
-    const char *cat_nxt, *nam_ptr;
-    int cat_ch, nam_ch, i;
+    int i;
 
-    while (cat_ptr < cat_end) {
-        cat_nxt = cat_ptr + 16;
-        nam_ptr = name;
-        do {
-            if (cat_ptr == cat_nxt)
-                goto found;
-            cat_ch = *cat_ptr++;
-            nam_ch = *nam_ptr++;
-            if (!cat_ch && !nam_ch)
-                goto found;
-        } while (!((cat_ch ^ nam_ch) & 0x5f));
+    do {
+        const char *cat_nxt = cat_ptr + 16;
+        if ((i = cat_name_cmp(name, cat_ptr, cat_nxt)) >= 0) {
+            log_debug("mmb: found MMB SSD '%s' at %d", name, i);
+            return i;
+        }
         cat_ptr = cat_nxt;
-    }
+    } while (cat_ptr < cat_end);
     return -1;
-found:
-    i = (cat_nxt - mmb_cat) / 16 - 2;
-    log_debug("mmb: found MMB SSD '%s' at %d", name, i);
-    return i;
 }

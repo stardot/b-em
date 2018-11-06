@@ -63,6 +63,8 @@ FILE *sdf_owseek(uint8_t drive, uint8_t sector, uint8_t track, uint8_t side, uin
 void mmb_load(char *fn);
 void mmb_eject(void);
 void mmb_pick(int drive, int disc);
+void mmb_reset(void);
 int mmb_find(const char *name);
+
 
 #endif
