@@ -32,6 +32,7 @@
 #include "pal.h"
 #include "savestate.h"
 #include "scsi.h"
+#include "sdf.h"
 #include "serial.h"
 #include "sid_b-em.h"
 #include "sn76489.h"
@@ -296,7 +297,10 @@ void main_init(int argc, char *argv[])
     al_install_mouse();
     al_register_event_source(queue, al_get_mouse_event_source());
 
-    disc_load(0, discfns[0]);
+    if (mmb_fn)
+        mmb_load(mmb_fn);
+    else
+        disc_load(0, discfns[0]);
     disc_load(1, discfns[1]);
     tape_load(tape_fn);
     if (defaultwriteprot)

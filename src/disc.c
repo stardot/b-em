@@ -4,9 +4,8 @@
 #include "b-em.h"
 #include "gui-allegro.h"
 #include "fdi.h"
-#include "sdf.h"
-
 #include "disc.h"
+#include "sdf.h"
 
 #include "ddnoise.h"
 

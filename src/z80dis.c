@@ -18,7 +18,7 @@ static const char *ins2[4]  = { "RET", "EXX", "JP  (HL)", "LD  SP,HL" };
 static const char *ins3[8]  = { "RLC","RRC","RL ","RR ","SLA","SRA","???","SRL"};
 static const char *ins4[8]  = { "NEG","???","???","???","???","???","???","???"};
 static const char *ins5[8]  = { "RETN","RETI","???","???","???","???","???","???"};
-static const char *ins6[8]  = { "LD   I,A","???","LD   A,I","???","RRD","RLD","???","???"};
+static const char *ins6[8]  = { "LD    I,A","???","LD   A,I","???","RRD","RLD","???","???"};
 static const char *ins7[32] = { "LDI","CPI","INI","OUTI","???","???","???","???",
                                 "LDD","CPD","IND","OUTD","???","???","???","???",
                                 "LDIR","CPIR","INIR","OTIR","???","???","???","???",
@@ -351,7 +351,7 @@ static inline uint32_t pfx_ireg(uint32_t addr, uint8_t a, const char **ptr, char
     }
     return addr;
 }
-    
+
 static uint32_t unp_misc2(uint32_t addr, uint8_t a, uint8_t d, uint8_t e, const char **ptr, char *ibuf) {
     uint16_t opaddr;
 

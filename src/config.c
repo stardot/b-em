@@ -12,6 +12,7 @@
 #include "ide.h"
 #include "midi.h"
 #include "scsi.h"
+#include "sdf.h"
 #include "sn76489.h"
 #include "sound.h"
 #include "tape.h"
@@ -104,6 +105,11 @@ void config_load(void)
             if (discfns[1])
                 al_destroy_path(discfns[1]);
             discfns[1] = al_create_path(p);
+        }
+        if ((p = get_config_string("disc", "mmb", NULL))) {
+            if (mmb_fn)
+                free(mmb_fn);
+            mmb_fn = strdup(p);
         }
         if ((p = get_config_string("tape", "tape", NULL))) {
             if (tape_fn)
@@ -211,6 +217,7 @@ void config_save(void)
 
         set_config_path("disc", "disc0", discfns[0]);
         set_config_path("disc", "disc1", discfns[1]);
+        set_config_string("disc", "mmb", mmb_fn);
         set_config_path("tape", "tape", tape_fn);
 
         set_config_bool("disc", "defaultwriteprotect", defaultwriteprot);

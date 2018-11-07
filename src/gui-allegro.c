@@ -144,8 +144,10 @@ static ALLEGRO_MENU *create_disc_menu(void)
     al_append_menu_item(menu, "Autoboot disc in 0/2...", IDM_DISC_AUTOBOOT, 0, NULL, NULL);
     al_append_menu_item(menu, "Load disc :0/2...", menu_id_num(IDM_DISC_LOAD, 0), 0, NULL, NULL);
     al_append_menu_item(menu, "Load disc :1/3...", menu_id_num(IDM_DISC_LOAD, 1), 0, NULL, NULL);
+    al_append_menu_item(menu, "Load MMB file...", IDM_DISC_MMB_LOAD, 0, NULL, NULL);
     al_append_menu_item(menu, "Eject disc :0/2", menu_id_num(IDM_DISC_EJECT, 0), 0, NULL, NULL);
     al_append_menu_item(menu, "Eject disc :1/3", menu_id_num(IDM_DISC_EJECT, 1), 0, NULL, NULL);
+    al_append_menu_item(menu, "Eject MMB file", IDM_DISC_MMB_EJECT, 0, NULL, NULL);
     al_append_menu_item(menu, "New disc :0/2...", 0, 0, NULL, create_disc_new_menu(0));
     al_append_menu_item(menu, "New disc :1/3...", 0, 0, NULL, create_disc_new_menu(1));
     add_checkbox_item(menu, "Write protect disc :0/2", menu_id_num(IDM_DISC_WPROT, 0), writeprot[0]);
@@ -676,6 +678,25 @@ static void disc_wprot(ALLEGRO_EVENT *event)
     writeprot[drive] = !writeprot[drive];
 }
 
+static void disc_mmb_load(ALLEGRO_EVENT *event)
+{
+    ALLEGRO_FILECHOOSER *chooser;
+    ALLEGRO_DISPLAY *display;
+    const char *fpath = mmb_fn ? mmb_fn : ".";
+
+    if ((chooser = al_create_native_file_dialog(fpath, "Choose an MMB file", "*.mmb", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST))) {
+        display = (ALLEGRO_DISPLAY *)(event->user.data2);
+        if (al_show_native_file_dialog(display, chooser)) {
+            if (al_get_native_file_dialog_count(chooser) > 0) {
+                char *fn = strdup(al_get_native_file_dialog_path(chooser, 0));
+                mmb_eject();
+                mmb_load(fn);
+            }
+        }
+        al_destroy_native_file_dialog(chooser);
+    }
+}
+
 static void disc_toggle_ide(ALLEGRO_EVENT *event)
 {
     ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
@@ -945,8 +966,14 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
         case IDM_DISC_LOAD:
             disc_choose(event, "load into", all_dext, ALLEGRO_FILECHOOSER_FILE_MUST_EXIST);
             break;
+        case IDM_DISC_MMB_LOAD:
+            disc_mmb_load(event);
+            break;
         case IDM_DISC_EJECT:
             disc_eject(event);
+            break;
+        case IDM_DISC_MMB_EJECT:
+            mmb_eject();
             break;
         case IDM_DISC_NEW_ADFS_S:
             disc_choose(event, "create in", "*.ads", ALLEGRO_FILECHOOSER_SAVE);
