@@ -174,6 +174,8 @@ enum vdfs_action {
     VDFS_ACT_DIR,
     VDFS_ACT_EX,
     VDFS_ACT_INFO,
+    VDFS_ACT_LCAT,
+    VDFS_ACT_LEX,
     VDFS_ACT_LIB,
     VDFS_ACT_RENAME,
     VDFS_ACT_RESCAN,
@@ -2320,7 +2322,9 @@ const struct cmdent ctab_filing[] = {
     { "EX",      VDFS_ACT_EX      },
     { "FORM",    VDFS_ACT_NOP     },
     { "FRee",    VDFS_ACT_NOP     },
-    { "INFO",    VDFS_ACT_INFO    },
+    { "Info",    VDFS_ACT_INFO    },
+    { "LCat",    VDFS_ACT_LCAT    },
+    { "LEX",     VDFS_ACT_LEX     },
     { "LIB",     VDFS_ACT_LIB     },
     { "MAP",     VDFS_ACT_NOP     },
     { "MOunt",   VDFS_ACT_NOP     },
@@ -2418,15 +2422,15 @@ static void fsclaim(uint16_t addr)
 
 static unsigned cat_seq = 0;
 
-static bool cat_prep(uint16_t addr)
+static bool cat_prep(uint16_t addr, vdfs_ent_t *def_dir, const char *dir_desc)
 {
     vdfs_ent_t *ent, key;
     char path[MAX_ACORN_PATH];
 
-    if (check_valid_dir(cur_dir, "current")) {
+    if (check_valid_dir(def_dir, dir_desc)) {
         parse_name(path, sizeof path, addr);
         if (*path) {
-            ent = find_entry(path, &key, cur_dir);
+            ent = find_entry(path, &key, def_dir);
             if (ent && ent->attribs & ATTR_EXISTS) {
                 if (ent->attribs & ATTR_IS_DIR) {
                     cat_dir = ent;
@@ -2439,7 +2443,7 @@ static bool cat_prep(uint16_t addr)
                 return false;
             }
         } else
-            cat_dir = cur_dir;
+            cat_dir = def_dir;
         if (gen_cat_tab(cat_dir)) {
             adfs_error(err_notfound);
             return false;
@@ -2664,7 +2668,7 @@ static void vdfs_do(enum vdfs_action act, uint16_t addr)
         cmd_dir(addr);
         break;
     case VDFS_ACT_EX:
-        cat_prep(addr);
+        cat_prep(addr, cur_dir, "current");
         rom_dispatch(VDFS_ROM_EX);
         break;
     case VDFS_ACT_INFO:
@@ -2672,6 +2676,14 @@ static void vdfs_do(enum vdfs_action act, uint16_t addr)
             adfs_error(err_badcmd);
         else
             file_info(addr);
+        break;
+    case VDFS_ACT_LCAT:
+        cat_prep(addr, lib_dir, "library");
+        rom_dispatch(VDFS_ROM_CAT);
+        break;
+    case VDFS_ACT_LEX:
+        cat_prep(addr, lib_dir, "library");
+        rom_dispatch(VDFS_ROM_EX);
         break;
     case VDFS_ACT_LIB:
         cmd_lib(addr);
@@ -2752,13 +2764,13 @@ static void osfsc(void)
             osfsc_cmd();
             break;
         case 0x05:
-            if (cat_prep(x + (y << 8)))
+            if (cat_prep(x + (y << 8), cur_dir, "current"))
                 rom_dispatch(VDFS_ROM_CAT);
             break;
         case 0x06: // new filesystem taking over.
             break;
         case 0x09:
-            if (cat_prep(x + (y << 8)))
+            if (cat_prep(x + (y << 8), cur_dir, "current"))
                 rom_dispatch(VDFS_ROM_EX);
             break;
         case 0x0a:
