@@ -2627,7 +2627,7 @@ static void cmd_mmb_din(uint16_t addr)
         mmb_pick(0, num1);
 }
 
-static void vdfs_do(enum vdfs_action act, uint16_t addr)
+static bool vdfs_do(enum vdfs_action act, uint16_t addr)
 {
     log_debug("vdfs: vdfs_do, act=%d, addr=%04X", act, addr);
     switch(act)
@@ -2699,16 +2699,16 @@ static void vdfs_do(enum vdfs_action act, uint16_t addr)
         rom_dispatch(VDFS_ROM_FSSTART);
         break;
     case VDFS_ACT_ADFS:
-        if (fs_flags & CLAIM_ADFS) {
-            y = FSNO_ADFS;
-            rom_dispatch(VDFS_ROM_FSSTART);
-        }
+        if (!(fs_flags & CLAIM_ADFS))
+            return false;
+        y = FSNO_ADFS;
+        rom_dispatch(VDFS_ROM_FSSTART);
         break;
     case VDFS_ACT_DISC:
-        if (fs_flags & CLAIM_DFS) {
-            y = FSNO_DFS;
-            rom_dispatch(VDFS_ROM_FSSTART);
-        }
+        if (!(fs_flags & CLAIM_DFS))
+            return false;
+        y = FSNO_DFS;
+        rom_dispatch(VDFS_ROM_FSSTART);
         break;
     case VDFS_ACT_FSCLAIM:
         fsclaim(addr);
@@ -2722,6 +2722,7 @@ static void vdfs_do(enum vdfs_action act, uint16_t addr)
     default:
         rom_dispatch(act);
     }
+    return true;
 }
 
 /*
@@ -2736,8 +2737,8 @@ static void osfsc_cmd(void)
 
     if ((addr = parse_cmd((y << 8) | x, cmd))) {
         if ((ent = lookup_cmd(ctab_filing, ARRAY_SIZE(ctab_filing), cmd))) {
-            vdfs_do(ent->act, addr);
-            return;
+            if (vdfs_do(ent->act, addr))
+                return;
         }
     }
     run_file(err_badcmd);
@@ -2924,10 +2925,9 @@ static void serv_cmd(void)
         ent = lookup_cmd(ctab_always, ARRAY_SIZE(ctab_always), cmd);
         if (!ent && vdfs_enabled)
             ent = lookup_cmd(ctab_enabled, ARRAY_SIZE(ctab_enabled), cmd);
-        if (ent) {
-            vdfs_do(ent->act, addr);
-            a = 0;
-        }
+        if (ent)
+            if (vdfs_do(ent->act, addr))
+                a = 0;
     }
 }
 
