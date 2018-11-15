@@ -209,7 +209,7 @@ struct cmdent {
 #define CLAIM_DFS   0x40
 
 static uint8_t  reg_a;
-static uint8_t  fs_flags = 0xff;
+static uint8_t  fs_flags = 0;
 static uint8_t  fs_num   = 0x11;
 static uint16_t cmd_tail;
 
