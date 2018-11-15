@@ -2474,12 +2474,15 @@ static bool cat_prep(uint16_t addr, vdfs_ent_t *def_dir, const char *dir_desc)
 static void ent2guest(vdfs_ent_t *ent)
 {
     uint16_t mem_ptr = 0x100;
+    uint16_t mem_end = mem_ptr + MAX_FILE_NAME;
     const char *ptr = ent->acorn_fn;
-    int i, ch;
+    int ch;
 
-    for (i = MAX_FILE_NAME; i > 0 && (ch = *ptr++); i--)
+    do {
+        ch = *ptr++;
         writemem(mem_ptr++, ch);
-    while (i-- > 0)
+    } while (ch && mem_ptr < mem_end);
+    while (mem_ptr < mem_end)
         writemem(mem_ptr++, ' ');
     writemem16(mem_ptr, ent->attribs);
     writemem32(mem_ptr+2, ent->load_addr);
