@@ -324,14 +324,14 @@ static void get_filename(FILE *fp, vdfs_ent_t *dest)
     }
     else {
         dest->dfs_dir = '$';
-        ch = ic;
+        *ptr++ = ic;
     }
 
-    do {
+    while (ch != EOF && ch != ' ' && ch != '\t') {
         if (ptr < end)
             *ptr++ = ch;
         ch = getc(fp);
-    }  while (ch != EOF && ch != ' ' && ch != '\t');
+    }  
     if (ptr < end)
         *ptr = '\0';
 }
