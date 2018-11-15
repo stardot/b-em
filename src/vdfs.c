@@ -880,15 +880,16 @@ static vdfs_ent_t *find_entry(const char *filename, vdfs_ent_t *key, vdfs_ent_t 
     return NULL;
 }
 
-static vdfs_ent_t *add_new_file(vdfs_ent_t *dir, const char *name)
+static vdfs_ent_t *add_new_file(vdfs_ent_t *dir, vdfs_ent_t *ent)
 {
     vdfs_ent_t *new_ent;
     char host_fn[MAX_FILE_NAME];
 
     if ((new_ent = malloc(sizeof(vdfs_ent_t)))) {
         init_entry(new_ent);
-        strncpy(new_ent->acorn_fn, name, MAX_FILE_NAME);
-        bbc2hst(name, host_fn);
+        memcpy(new_ent->acorn_fn, ent->acorn_fn, MAX_FILE_NAME+1);
+        new_ent->dfs_dir = '$';
+        bbc2hst(ent->acorn_fn, host_fn);
         new_ent->parent = dir;
         if (make_host_path(new_ent, host_fn)) {
             tsearch(new_ent, &dir->acorn_tree, acorn_comp);
@@ -1209,7 +1210,7 @@ static void exec_swr_fs(uint8_t flags, uint16_t fname, int8_t romid, uint32_t st
                 len = pblen;
                 if (len <= 16384) {
                     if (!ent)
-                        ent = add_new_file(cur_dir, key.acorn_fn);
+                        ent = add_new_file(key.parent, &key);
                     if (ent) {
                         if ((fp = fopen(ent->host_path, "wb"))) {
                             fwrite(rom + romid * 0x4000 + start, len, 1, fp);
@@ -1516,7 +1517,7 @@ static void osfile_write(uint32_t pb, vdfs_ent_t *ent, vdfs_ent_t *key, void (*c
         adfs_error(err_notfound);
         return;
     }
-    else if (!(ent = add_new_file(key->parent, key->acorn_fn))) {
+    else if (!(ent = add_new_file(key->parent, key))) {
         adfs_error(err_nomem);
         return;
     }
@@ -1671,7 +1672,7 @@ static void osfile_cdir(vdfs_ent_t *ent, vdfs_ent_t *key)
     } else {
         parent = key->parent;
         if (parent && parent->attribs & ATTR_EXISTS) {
-            if ((ent = add_new_file(key->parent, key->acorn_fn)))
+            if ((ent = add_new_file(key->parent, key)))
                 create_dir(ent);
         } else {
             log_debug("vdfs: attempt to create dir %s in non-existent directory", key->acorn_fn);
@@ -1890,7 +1891,7 @@ static void osfind(void)
                 mode = "wb";
                 attribs = ATTR_OPEN_WRITE;
                 if (!ent)
-                    ent = add_new_file(cur_dir, key.acorn_fn);
+                    ent = add_new_file(key.parent, &key);
             }
         } else if (acorn_mode == 0xc0) {
             attribs = ATTR_OPEN_READ|ATTR_OPEN_WRITE;
@@ -1904,7 +1905,7 @@ static void osfind(void)
                 else
                     mode = "wb+";
             } else {
-                ent = add_new_file(cur_dir, key.acorn_fn);
+                ent = add_new_file(key.parent, &key);
                 mode = "wb+";
             }
         }
@@ -2303,7 +2304,7 @@ static void rename_file(uint16_t addr)
             if ((new_ent = find_entry(new_path, &new_key, cur_dir))) {
                 if (new_ent->attribs & ATTR_EXISTS) {
                     if (new_ent->attribs & ATTR_IS_DIR) {
-                        if ((new_ent = add_new_file(new_ent, old_ent->acorn_fn)))
+                        if ((new_ent = add_new_file(new_ent, old_ent)))
                             rename_tail(old_ent, new_ent);
                     } else {
                         log_debug("vdfs: new file '%s' for rename already exists", new_key.acorn_fn);
@@ -2311,7 +2312,7 @@ static void rename_file(uint16_t addr)
                     }
                 } else
                     rename_tail(old_ent, new_ent);
-            } else if (new_key.parent && (new_ent = add_new_file(new_key.parent, new_key.acorn_fn)))
+            } else if (new_key.parent && (new_ent = add_new_file(new_key.parent, &new_key)))
                 rename_tail(old_ent, new_ent);
         } else {
             log_debug("vdfs: old file '%s' for rename not found", old_key.acorn_fn);
