@@ -331,7 +331,7 @@ static void get_filename(FILE *fp, vdfs_ent_t *dest)
         if (ptr < end)
             *ptr++ = ch;
         ch = getc(fp);
-    }  
+    }
     if (ptr < end)
         *ptr = '\0';
 }
@@ -2478,10 +2478,8 @@ static void ent2guest(vdfs_ent_t *ent)
     const char *ptr = ent->acorn_fn;
     int ch;
 
-    do {
-        ch = *ptr++;
+    while (mem_ptr < mem_end && (ch = *ptr++))
         writemem(mem_ptr++, ch);
-    } while (ch && mem_ptr < mem_end);
     while (mem_ptr < mem_end)
         writemem(mem_ptr++, ' ');
     writemem16(mem_ptr, ent->attribs);
