@@ -93,6 +93,7 @@ struct _vdfs_entry {
     char       *host_fn;
     char       *host_inf;
     char       acorn_fn[MAX_FILE_NAME+1];
+    char       dfs_dir;
     uint16_t   attribs;
     uint32_t   load_addr;
     uint32_t   exec_addr;
@@ -305,22 +306,32 @@ static int acorn_comp(const void *a, const void *b)
  * Functions used to parse values from the INF file on the host
  */
 
-static void get_filename(FILE *fp, char *dest)
+static void get_filename(FILE *fp, vdfs_ent_t *dest)
 {
-    int ch;
+    int ic, ch;
     char *ptr, *end;
 
     do
-        ch = getc(fp);
-    while (isspace(ch));
+        ic = getc(fp);
+    while (ic == ' ' || ic == '\t');
 
-    ptr = dest;
-    end = dest + MAX_FILE_NAME;
-    while (ch != EOF && !isspace(ch)) {
+    ptr = dest->acorn_fn;
+    end = ptr + MAX_FILE_NAME;
+
+    if ((ch = getc(fp)) == '.') {
+        dest->dfs_dir = ic;
+        ch = getc(fp);
+    }
+    else {
+        dest->dfs_dir = '$';
+        ch = ic;
+    }
+
+    do {
         if (ptr < end)
             *ptr++ = ch;
         ch = getc(fp);
-    }
+    }  while (ch != EOF && ch != ' ' && ch != '\t');
     if (ptr < end)
         *ptr = '\0';
 }
@@ -550,7 +561,7 @@ static void scan_entry(vdfs_ent_t *ent)
     fp = fopen(ent->host_path, "rt");
     *ent->host_inf = '\0';
     if (fp) {
-        get_filename(fp, ent->acorn_fn);
+        get_filename(fp, ent);
         ent->load_addr = get_hex(fp);
         ent->exec_addr = get_hex(fp);
         fclose(fp);
@@ -897,6 +908,10 @@ static void write_back(vdfs_ent_t *ent)
 
     *ent->host_inf = '.'; // select .inf file.
     if ((fp = fopen(ent->host_path, "wt"))) {
+        if (ent->dfs_dir) {
+            putc(ent->dfs_dir, fp);
+            putc('.', fp);
+        }
         fprintf(fp, "%s %08X %08X %08X\n", ent->acorn_fn, ent->load_addr, ent->exec_addr, ent->length);
         fclose(fp);
     } else
