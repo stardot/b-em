@@ -824,13 +824,13 @@ static uint16_t parse_name(char *str, size_t size, uint16_t addr)
     return addr;
 }
 
-static int check_valid_dir(vdfs_ent_t *ent, const char *which)
+static bool check_valid_dir(vdfs_ent_t *ent, const char *which)
 {
-    if (ent->attribs & ATTR_IS_DIR)
-        return 1;
+    if (ent && ent->attribs & ATTR_IS_DIR)
+        return true;
     log_warn("vdfs: %s directory is not valid", which);
     adfs_error(err_baddir);
-    return 0;
+    return false;
 }
 
 // Given the address in BBC RAM of a filename find the VDFS entry.
