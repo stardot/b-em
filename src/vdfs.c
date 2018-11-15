@@ -833,25 +833,26 @@ static bool check_valid_dir(vdfs_ent_t *ent, const char *which)
     return false;
 }
 
-// Given the address in BBC RAM of a filename find the VDFS entry.
+// Given an Acorn filename, find the VDFS entry.
 
 static vdfs_ent_t *find_entry(const char *filename, vdfs_ent_t *key, vdfs_ent_t *ent)
 {
-    int i, ch;
+    int ch;
     const char *fn_src;
-    char *fn_ptr;
+    char *fn_ptr, *fn_end;
     vdfs_ent_t **ptr;
 
     init_entry(key);
     key->parent = NULL;
     for (fn_src = filename;;) {
         fn_ptr = key->acorn_fn;
-        for (i = 0; i < MAX_FILE_NAME; i++) {
+        fn_end = fn_ptr + MAX_FILE_NAME;
+        do {
             ch = *fn_src++;
             if (ch == '\0' || ch == '.')
                 break;
             *fn_ptr++ = ch;
-        }
+        } while (fn_ptr < fn_end);
         *fn_ptr = '\0';
         if (((key->acorn_fn[0] == '$' || key->acorn_fn[0] == '&') && key->acorn_fn[1] == '\0') || (key->acorn_fn[0] == ':' && isdigit(key->acorn_fn[1])))
             ent = &root_dir;
