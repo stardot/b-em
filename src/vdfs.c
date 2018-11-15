@@ -2596,6 +2596,26 @@ static void cmd_osw7f(uint16_t addr)
         adfs_error(err_badcmd);
 }
 
+static bool vdfs_selected(void)
+{
+    if (readmem(0x21f) == 0xff) { // FSC is an extended vector.
+        unsigned offset = readmem(0x21e);
+        if (offset <= 0x4e)
+            if (readmem(0xd9f + 2 + offset) == x) // extended vector has our ROM no.
+                return true;
+    }
+    return false;
+}
+
+static void select_vdfs(uint8_t fsno)
+{
+    fs_num = fsno;
+    if (!vdfs_selected()) {
+        y = fsno;
+        rom_dispatch(VDFS_ROM_FSSTART);
+    }
+}
+
 static int mmb_parse_find(uint16_t addr, int ch)
 {
     char name[17];
@@ -2715,20 +2735,17 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
         scan_seq++;
         break;
     case VDFS_ACT_VDFS:
-        y = FSNO_VDFS;
-        rom_dispatch(VDFS_ROM_FSSTART);
+        select_vdfs(FSNO_VDFS);
         break;
     case VDFS_ACT_ADFS:
         if (!(fs_flags & CLAIM_ADFS))
             return false;
-        y = FSNO_ADFS;
-        rom_dispatch(VDFS_ROM_FSSTART);
+        select_vdfs(FSNO_ADFS);
         break;
     case VDFS_ACT_DISC:
         if (!(fs_flags & CLAIM_DFS))
             return false;
-        y = FSNO_DFS;
-        rom_dispatch(VDFS_ROM_FSSTART);
+        select_vdfs(FSNO_DFS);
         break;
     case VDFS_ACT_FSCLAIM:
         fsclaim(addr);
@@ -2998,10 +3015,8 @@ static void service(void)
         serv_help();
         break;
     case 0x12: // Select filing system.
-        if (y == FSNO_VDFS || ((fs_flags & CLAIM_ADFS) && y == FSNO_ADFS) || ((fs_flags & CLAIM_DFS) && y == FSNO_DFS)) {
-            fs_num = y;
-            rom_dispatch(VDFS_ROM_FSSTART);
-        }
+        if (y == FSNO_VDFS || ((fs_flags & CLAIM_ADFS) && y == FSNO_ADFS) || ((fs_flags & CLAIM_DFS) && y == FSNO_DFS))
+            select_vdfs(y);
         break;
     case 0x25: // Filing system info.
         rom_dispatch(VDFS_ROM_FSINFO);
