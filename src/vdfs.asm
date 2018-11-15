@@ -433,6 +433,7 @@ prtextws    =   &A8
             bpl     loop
             jmp     &0100
 .msg        brk
+            equb    &d6
             equs    "Not found"
             equb    &00
 .end
