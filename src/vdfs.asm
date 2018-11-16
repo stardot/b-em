@@ -209,15 +209,16 @@ prtextws    =   &A8
             equw    fsc
 }
 
-.prtitle
+.prtitle    ldx     #&00
+
+.prmsg
 {
-            ldx     #&00
-.loop       lda     banner,x
-            beq     done
-            jsr     OSWRCH
+            lda     banner,x
+.loop       jsr     OSWRCH
             inx
+            lda     banner,x
             bne     loop
-.done       rts
+            rts
 }
 
 ; Filing system boot.  This is called in response to ROM service
@@ -295,30 +296,20 @@ prtextws    =   &A8
 {
             bit     port_flags
             bmi     adfs_yes
-            ldx     #&00
-            beq     adfs_msg
-.adfs_yes   ldx     #msg_yes-msg_no
-.adfs_msg   lda     msg_no,x
-            beq     adfs_done
-            jsr     OSWRCH
-            inx
+            ldx     #msg_nclaim-banner
             bne     adfs_msg
-.adfs_done  jsr     OSNEWL
+.adfs_yes   ldx     #msg_claim-banner
+.adfs_msg   jsr     prmsg
+            jsr     OSNEWL
             bit     port_flags
             bvs     dfs_yes
-            ldx     #&00
-            beq     dfs_msg
-.dfs_yes    ldx     #msg_yes-msg_no
-.dfs_msg    lda     msg_no+1,x
-            beq     done
-            jsr     OSWRCH
-            inx
+            ldx     #msg_nclaim-banner+1
             bne     dfs_msg
-.done       jsr     OSNEWL
+.dfs_yes    ldx     #msg_claim-banner+1
+.dfs_msg    jsr     prmsg
+            jsr     OSNEWL
             lda     #&00
             rts
-.msg_no     equs    "ADFS is not being claimed", &00
-.msg_yes    equs    "ADFS is being claimed", &00
 }
 
 ; Routines to list information about files.
@@ -864,7 +855,7 @@ prtextws    =   &A8
 {
             jsr     OSNEWL
             ldx     #&ff
-            beq     start
+            bne     start
 .loop1      jsr     OSWRCH
 .start      inx
             lda     romtitle,x
