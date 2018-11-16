@@ -128,9 +128,8 @@ static unsigned   scan_seq;
  * FILE pointer being NULL.
  */
 
-#define MIN_CHANNEL      128
-#define MAX_CHANNEL      255
-#define NUM_CHANNELS     (MAX_CHANNEL-MIN_CHANNEL)
+#define NUM_CHANNELS  32
+#define MIN_CHANNEL  128
 
 typedef struct {
     FILE       *fp;
@@ -1777,10 +1776,11 @@ static void osfile(void)
 
 static FILE *getfp_read(int channel)
 {
+    int chan = channel - MIN_CHANNEL;
     FILE *fp;
 
-    if (channel >= MIN_CHANNEL && channel < MAX_CHANNEL) {
-        if ((fp = vdfs_chan[channel-MIN_CHANNEL].fp))
+    if (chan >= 0 && chan < NUM_CHANNELS) {
+        if ((fp = vdfs_chan[chan].fp))
             return fp;
         log_debug("vdfs: attempt to use closed channel %d", channel);
     } else
@@ -1807,16 +1807,17 @@ static void osbget(void)
 
 static FILE *getfp_write(int channel)
 {
+    int chan = channel - MIN_CHANNEL;
     vdfs_file_t *p;
     vdfs_ent_t  *ent;
     FILE *fp = NULL;
 
-    if (channel >= MIN_CHANNEL && channel < MAX_CHANNEL) {
-        p = &vdfs_chan[channel-MIN_CHANNEL];
+    if (chan >= 0 && chan < NUM_CHANNELS) {
+        p = &vdfs_chan[chan];
         if ((ent = p->ent)) {
             if (ent->attribs & ATTR_OPEN_WRITE) {
                 if (!(fp = p->fp)) {
-                    log_debug("vdfs: attempt to use closed channel %d", channel);
+                    log_debug("vdfs: attempt to use write to channel %d not open for write", channel);
                     adfs_error(err_channel);
                 }
             } else {
@@ -1854,15 +1855,17 @@ static void osfind(void)
     char path[MAX_ACORN_PATH];
 
     log_debug("vdfs: osfind(A=%02X, X=%02X, Y=%02X)", a, x, y);
-    log_debug("vdfs: #=%d", NUM_CHANNELS);
     if (a == 0) {   // close file.
         channel = y;
         if (channel == 0)
             close_all();
-        else if (channel >= MIN_CHANNEL && channel < MAX_CHANNEL)
-            close_file(channel-MIN_CHANNEL);
-        else
-            adfs_error(err_channel);
+        else {
+            channel -= MIN_CHANNEL;
+            if (channel >= 0 && channel < NUM_CHANNELS)
+                close_file(channel);
+            else
+                adfs_error(err_channel);
+        }
     } else if (check_valid_dir(cur_dir, "current")) {        // open file.
         mode = NULL;
         acorn_mode = a;
