@@ -100,6 +100,8 @@ prtextws    =   &A8
             equs    "(C) 2018 Steve Fosdick, GPL3", &00
             equd    0
 .banner     equs    "Virtual DFS", &00
+.msg_nclaim equs    "ADFS is not being claimed", &00
+.msg_claim  equs    "ADFS is being claimed", &00
 
 ; The dispatch table.  This needs to be in the same order as
 ; enum vdfs_action in the vdfs.c module.
