@@ -1854,7 +1854,7 @@ static void osfind(void)
     char path[MAX_ACORN_PATH];
 
     log_debug("vdfs: osfind(A=%02X, X=%02X, Y=%02X)", a, x, y);
-
+    log_debug("vdfs: #=%d", NUM_CHANNELS);
     if (a == 0) {   // close file.
         channel = y;
         if (channel == 0)
@@ -1867,9 +1867,13 @@ static void osfind(void)
         mode = NULL;
         acorn_mode = a;
         a = 0;
-        for (channel = 0; vdfs_chan[channel].ent; channel++)
-            if (channel >= NUM_CHANNELS)
+        channel = -1;
+        do {
+            if (++channel >= NUM_CHANNELS) {
+                log_debug("vdfs: no free channel");
                 return;
+            }
+        } while (vdfs_chan[channel].ent);
         simple_name(path, sizeof path, (y << 8) | x);
         ent = find_entry(path, &key, cur_dir);
         if (ent && (ent->attribs & (ATTR_EXISTS|ATTR_IS_DIR)) == (ATTR_EXISTS|ATTR_IS_DIR)) {
