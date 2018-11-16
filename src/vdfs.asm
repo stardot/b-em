@@ -316,9 +316,26 @@ prtextws    =   &A8
 
 ; Routines to list information about files.
 
-            macro   outcnt char
+            macro   outchr char
             lda     #char
             jsr     OSWRCH
+            endmacro
+
+            macro   outtwo char
+            outchr  char
+            jsr     OSWRCH
+            endmacro
+
+            macro   outspc
+            outchr  ' '
+            endmacro
+
+            macro   twospc
+            outtwo  ' '
+            endmacro
+
+            macro   outcnt char
+            outchr  char
             inx
             endmacro
 
@@ -377,12 +394,6 @@ prtextws    =   &A8
             macro   hexout addr
             lda     addr
             jsr     hexbyt
-            endmacro
-
-            macro   twospc
-            lda     #' '
-            jsr     OSWRCH
-            jsr     OSWRCH
             endmacro
 
 .pr_all     jsr     pr_basic
@@ -464,25 +475,20 @@ prtextws    =   &A8
             jsr     hexbyt
             lda     dmpadd
             jsr     hexbyt
-            lda     #' '
-            jsr     OSWRCH
+            outspc
             ldx     dmpcnt
 .getlp      jsr     OSBGET
             bcs     skip
             sta     &0100,X
             jsr     hexbyt
-            lda     #' '
-            jsr     OSWRCH
+            outspc
             dex
             bne     getlp
             clc
 .skip       php
             bcc     ascii
-.endlp      lda     #'*'
-            jsr     OSWRCH
-            jsr     OSWRCH
-            lda     #' '
-            jsr     OSWRCH
+.endlp      outtwo  '*'
+            outspc
             lda     #&00
             sta     &0100,X
             dex
@@ -512,8 +518,7 @@ prtextws    =   &A8
             inc     dmpadd+2
 .noinc      bit     &FF
             bpl     linlp
-.gotesc     lda     #&7E
-            jsr     OSWRCH
+.gotesc     outchr  &7E
 .eof        lda     #&00
             jmp     OSFIND
 }
@@ -532,8 +537,7 @@ prtextws    =   &A8
 .bcdnyb     and     #&0f
             bne     bcddig
             bcc     bcddig
-            lda     #' '
-            jsr     OSWRCH
+            outspc
             sec
             rts
 .bcddig     ora     #'0'
@@ -553,22 +557,18 @@ prtextws    =   &A8
             bne     notbar
             jsr     OSWRCH
 .notbar     jmp     OSWRCH
-.high       lda     #'|'
-            jsr     OSWRCH
-            lda     #'!'
-            jsr     OSWRCH
+.high       outchr  '|'
+            outchr  '!'
             txa
             and     #&7f
             tax
             jmp     high2
 .low        ora     #&40
             tax
-            lda     #'|'
-            jsr     OSWRCH
+            outchr  '|'
             txa
             jmp     OSWRCH
-.del        lda     #'|'
-            jsr     OSWRCH
+.del        outchr  '|'
             lda     #'?'
             jmp     OSWRCH
 }
@@ -614,8 +614,7 @@ prtextws    =   &A8
             lda     lineno
             clc
             jsr     bcdnyb
-            lda     #' '
-            jsr     OSWRCH
+            outspc
             txa
 .chrlp      cmp     #&0D
             beq     newlin
@@ -699,7 +698,7 @@ prtextws    =   &A8
             rts
 .gotrom     tax
             jsr     prinfo
-            jsr     space
+            outspc
             jsr     cparen
             jsr     rdcpyr
             jsr     prtitl
@@ -752,22 +751,17 @@ prtextws    =   &A8
             sta     copywr
             rts
 
-.prinfo     lda     #'R'
-            jsr     OSWRCH
-            lda     #'o'
-            jsr     OSWRCH
-            lda     #'m'
-            jsr     OSWRCH
-            jsr     space
+.prinfo     outchr  'R'
+            outchr  'o'
+            outchr  'm'
+            outspc
             lda     romid
             cmp     #&0A
             bcs     geten
-            lda     #'0'
-            jsr     OSWRCH
+            outchr  '0'
             lda     romid
             jmp     both
-.geten      lda     #'1'
-            jsr     OSWRCH
+.geten      outchr  '1'
             lda     romid
             sec
             sbc     #&0a
@@ -775,12 +769,10 @@ prtextws    =   &A8
             clc
             adc     #'0'
             jsr     OSWRCH
-            jsr     space
-            lda     #':'
-            jsr     OSWRCH
-            jsr     space
-            lda     #'('
-            jsr     OSWRCH
+            outspc
+            outchr  ':'
+            outspc
+            outchr  '('
             txa
             and     #&80
             beq     notsrv
@@ -796,7 +788,7 @@ prtextws    =   &A8
 .space      lda     #' '
 .islng      jmp     OSWRCH
 
-.prtitl     jsr     space
+.prtitl     outspc
             lda     #&09
             sta     &f6
             lda     #&80
@@ -845,8 +837,7 @@ prtextws    =   &A8
 .copyst     equs    ")C("
             equb    &00
 
-.rparen     lda     #'R'
-            jsr     OSWRCH
+.rparen     outchr  'R'
 .cparen     lda     #')'
             jmp     OSWRCH
 }
@@ -928,10 +919,8 @@ prtextws    =   &A8
             inc     &a9
             bne     nloop
 .nlnarrow   jsr     OSNEWL          ; in narrow mode we treat an LF
-            lda     #' '            ; character as a newline followed
-            jsr     OSWRCH
-            jsr     OSWRCH
-            jmp     nnext
+            twospc                  ; character as a newline followed
+            jmp     nnext           ; by two spaces.
 .wide3      ldy     #&00
 .wide0      lda     (prtextws),y
             beq     done
