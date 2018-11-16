@@ -163,6 +163,8 @@ enum vdfs_action {
     VDFS_ROM_TUBE_EXPL,
     VDFS_ROM_OSW7F,
     VDFS_ROM_BREAK,
+    VDFS_ROM_FILES,
+    VDFS_ROM_NOPEN,
     VDFS_ACT_NOP,
     VDFS_ACT_QUIT,
     VDFS_ACT_SRLOAD,
@@ -174,6 +176,7 @@ enum vdfs_action {
     VDFS_ACT_DELETE,
     VDFS_ACT_DIR,
     VDFS_ACT_EX,
+    VDFS_ACT_FILES,
     VDFS_ACT_INFO,
     VDFS_ACT_LCAT,
     VDFS_ACT_LEX,
@@ -2337,6 +2340,7 @@ const struct cmdent ctab_filing[] = {
     { "DRive",   VDFS_ACT_NOP     },
     { "ENable",  VDFS_ACT_NOP     },
     { "EX",      VDFS_ACT_EX      },
+    { "FIles",   VDFS_ACT_FILES   },
     { "FORM",    VDFS_ACT_NOP     },
     { "FRee",    VDFS_ACT_NOP     },
     { "Info",    VDFS_ACT_INFO    },
@@ -2471,9 +2475,8 @@ static bool cat_prep(uint16_t addr, vdfs_ent_t *def_dir, const char *dir_desc)
     return false;
 }
 
-static void ent2guest(vdfs_ent_t *ent)
+static uint16_t gcopy_fn(vdfs_ent_t *ent, uint16_t mem_ptr)
 {
-    uint16_t mem_ptr = 0x100;
     uint16_t mem_end = mem_ptr + MAX_FILE_NAME;
     const char *ptr = ent->acorn_fn;
     int ch;
@@ -2482,6 +2485,12 @@ static void ent2guest(vdfs_ent_t *ent)
         writemem(mem_ptr++, ch);
     while (mem_ptr < mem_end)
         writemem(mem_ptr++, ' ');
+    return mem_ptr;
+}
+
+static void gcopy_attr(vdfs_ent_t *ent)
+{
+    uint16_t mem_ptr = gcopy_fn(ent, 0x100);
     writemem16(mem_ptr, ent->attribs);
     writemem32(mem_ptr+2, ent->load_addr);
     writemem32(mem_ptr+6, ent->exec_addr);
@@ -2491,7 +2500,8 @@ static void ent2guest(vdfs_ent_t *ent)
 static void cat_next(void)
 {
     if (cat_dir && cat_seq < cat_dir->cat_size) {
-        ent2guest(cat_dir->cat_tab[cat_seq++]);
+        vdfs_ent_t *ent = cat_dir->cat_tab[cat_seq++];
+        gcopy_attr(ent);
         p.c = 0;
     }
     else
@@ -2506,12 +2516,60 @@ static void file_info(uint16_t addr)
     if (check_valid_dir(cur_dir, "current")) {
         simple_name(path, sizeof path, addr);
         if ((ent = find_entry(path, &key, cur_dir)) && ent->attribs & ATTR_EXISTS) {
-            ent2guest(ent);
+            gcopy_attr(ent);
             rom_dispatch(VDFS_ROM_INFO);
             return;
         }
         adfs_error(err_notfound);
     }
+}
+
+static void gcopy_open(vdfs_ent_t *ent)
+{
+    writemem(0x100, MIN_CHANNEL + cat_seq);
+    uint16_t mem_ptr = gcopy_fn(ent, 0x101);
+    writemem(mem_ptr++, ent->attribs >> 8);
+    FILE *fp = vdfs_chan[cat_seq].fp;
+    if (fp) {
+        long pos = ftell(fp);
+        writemem32(mem_ptr, pos);
+        fseek(fp, 0, SEEK_END);
+        long ext = ftell(fp);
+        writemem32(mem_ptr+4, ext);
+        ent->length = ext;
+        fseek(fp, pos, SEEK_SET);
+    }
+}
+
+static void files_prep(void)
+{
+    for (int chan = 0; chan < NUM_CHANNELS; chan++) {
+        log_debug("vdfs: files_prep: chan=%d", chan);
+        vdfs_ent_t *ent = vdfs_chan[chan].ent;
+        log_debug("vdfs: files_prep: ent=%p", ent);
+        if (ent) {
+            cat_seq = chan;
+            gcopy_open(ent);
+            rom_dispatch(VDFS_ROM_FILES);
+            return;
+        }
+    }
+    rom_dispatch(VDFS_ROM_NOPEN);
+}
+
+static void files_nxt(void)
+{
+    int chan = cat_seq;
+    while (++chan < NUM_CHANNELS) {
+        vdfs_ent_t *ent = vdfs_chan[chan].ent;
+        if (ent) {
+            cat_seq = chan;
+            gcopy_open(ent);
+            p.c = 0;
+            return;
+        }
+    }
+    p.c = 1;
 }
 
 static enum vdfs_action osw7fmc_act = VDFS_ACT_OSW7F_NONE;
@@ -2708,6 +2766,9 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
     case VDFS_ACT_EX:
         cat_prep(addr, cur_dir, "current");
         rom_dispatch(VDFS_ROM_EX);
+        break;
+    case VDFS_ACT_FILES:
+        files_prep();
         break;
     case VDFS_ACT_INFO:
         if (readmem(addr) == '\r')
@@ -3053,6 +3114,7 @@ static inline void dispatch(uint8_t value)
         case 0x08: cat_next();  break;
         case 0x09: check_ram(); break;
         case 0x0a: startup();   break;
+        case 0x0b: files_nxt(); break;
         default: log_warn("vdfs: function code %d not recognised\n", value);
     }
 }

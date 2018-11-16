@@ -102,6 +102,8 @@ prtextws    =   &A8
 .banner     equs    "Virtual DFS", &00
 .msg_nclaim equs    "ADFS is not being claimed", &00
 .msg_claim  equs    "ADFS is being claimed", &00
+.msg_nopen  equs    "No open files",&0d,&0a,&00
+.msg_files  equs    "Chan Name       Mode Ptr      Ext",&0d,&0a,&00
 
 ; The dispatch table.  This needs to be in the same order as
 ; enum vdfs_action in the vdfs.c module.
@@ -129,6 +131,8 @@ prtextws    =   &A8
             equw    tube_explode    ; explode character set for tube.
             equw    osw7f_stat
             equw    break_type
+            equw    cmd_files       ; *FILE command.
+            equw    none_open       ; "No open files" message.
 .dispend
 
 ; Stubs to transfer control to the vdfs.c module.
@@ -377,6 +381,14 @@ prtextws    =   &A8
 .done       rts
 }
 
+.hexfour    lda     &0103,x
+            jsr     hexbyt
+            lda     &0102,x
+            jsr     hexbyt
+            lda     &0101,x
+            jsr     hexbyt
+            lda     &0100,x
+
 .hexbyt     pha
             lsr     A
             lsr     A
@@ -390,6 +402,7 @@ prtextws    =   &A8
             bcc     ddig
             adc     #&06
 .ddig       jmp     OSWRCH
+
 
             macro   hexout addr
             lda     addr
@@ -1142,6 +1155,77 @@ prtextws    =   &A8
             sta     port_cmd
             rts
 }
+
+.cmd_files {
+            ldx     #msg_files-banner
+            jsr     prmsg
+.fileloop   lda     &0100           ; print the channel number.
+            jsr     hexbyt
+            outspc
+            jsr     OSWRCH
+            jsr     OSWRCH
+            ldx     #&00            ; print characters of the name.
+.charloop   lda     &0101,x
+            jsr     OSWRCH
+            inx
+            cpx     #&0a
+            bne     charloop
+            outspc
+            lda     #&20            ; test if open for writing.
+            bit     &010b
+            beq     openin
+            lda     #&10            ; test if open for reading.
+            bit     &010b
+            BNE     openup
+            lda     #'O'
+            ldx     #'U'
+            ldy     #'T'
+            bne     mode
+.openup     lda     #'U'
+            ldx     #'P'
+            bne     spcmode
+.openin     lda     #'I'
+            ldx     #'N'
+.spcmode    ldy     #' '
+.mode       jsr     OSWRCH
+            txa
+            jsr     OSWRCH
+            tya
+            jsr     OSWRCH
+            twospc
+            bit     &010b
+            bvs     isdir
+            ldx     #&0c
+            jsr     hexfour
+            outspc
+            ldx     #&10
+            jsr     hexfour
+.next       jsr     OSNEWL
+            lda     #&0b
+            sta     port_cmd
+            bcc     fileloop
+            lda     #&00
+            rts
+.isdir      jsr     prdir
+            ldx     #&03
+            lda     #' '
+.dirlp      jsr     OSWRCH
+            dex
+            bpl     dirlp
+            jsr     prdir
+            jmp     next
+.prdir      outchr  '<'
+            outchr  'D'
+            outchr  'I'
+            outchr  'R'
+            lda     #'>'
+            jmp     OSWRCH
+}
+
+.none_open  ldx     #msg_nopen-banner
+            jsr     prmsg
+            lda     #&00
+            rts
 
 .end
             save    "vdfs6", start, end
