@@ -298,6 +298,9 @@ prtextws    =   &A8
             equs    "DISC    ", &11, &15, &04
 }
 
+; Filing system claim.  This prints info about which other filing
+; systems VDFS is claiming.
+
 .fs_claim
 {
             bit     port_flags

@@ -1,6 +1,6 @@
 /*
  * VDFS for B-EM
- * Steve Fosdick 2016,2017
+ * Steve Fosdick 2016-2018
  *
  * This module implements the host part of a Virtual Disk Filing
  * System, one in which a part of filing system of the host is
@@ -10,18 +10,27 @@
  *
  * 1. A ROM which runs on the guest, the emulated BBC, and takes over
  *    the filing system vectors to become the current filing system.
- *    This rom processes some operations locally on the guest but
- *    many options are passed on to the host by writing values to
- *    a pair of designated ports, in this case at the end of the
- *    address space allocated to the hard disk interface.  For this
- *    part this uses a modified version of the VDFS ROM by J.G Harston
- *    which was in turn based on work by sprow.
+ *
+ *    In the first implementation of VDFS for B-Em this ROM would
+ *    process some operations locally and only forward operations it
+ *    could not do to this module by writing to a set of ports in the
+ *    expansion area FRED.  This original implementation was based
+ *    on the VDFS ROM by J.G Harston which was in turn based on work
+ *    by Sprow.
  *
  *    See http://mdfs.net/Apps/Filing/
  *
+ *    The current implementation takes a different approach where the
+ *    ROM forwards all service calls and filing system operations to
+ *    the host module via the ports in FRED and then carries out
+ *    operations with the MOS on behalf of the host module via a
+ *    dispatch table.
+ *
  * 2. This module which runs in the emulator and is called when
  *    the ports concerned are written to.  This module then carries
- *    out the filesystem opertation concerned from the host side.
+ *    out the filing system opertation concerned from the host side
+ *    and uses the dispatch table mentioned above if it needs the ROM
+ *    to carry out operations with the guest machine's MOS.
  */
 
 #include "b-em.h"
@@ -51,7 +60,7 @@ bool vdfs_enabled = 0;
  * structure for this module and models the association between
  * a file/directory as seen by the BBC and as it exists on the host.
  *
- * The pointers host_path, host_fn and host_ext all point into a
+ * The pointers host_path, host_fn and host_inf all point into a
  * single chunk of memory obtained from malloc with host_path
  * containing the start address as well as pointing to the full
  * path name.  The host_fn pointer points to the last element within
@@ -129,7 +138,7 @@ static unsigned   scan_seq;
  */
 
 #define NUM_CHANNELS  32
-#define MIN_CHANNEL      128
+#define MIN_CHANNEL  128
 
 typedef struct {
     FILE       *fp;
@@ -137,6 +146,26 @@ typedef struct {
 } vdfs_file_t;
 
 static vdfs_file_t vdfs_chan[NUM_CHANNELS];
+
+/*
+ * Actions.  These are used in two ways:
+ *
+ * 1. When this module requires the VDFS ROM to carry out some action
+ *    from within the guest, i.e. some interaction with the guest OS
+ *    it sets the 6502 PC to an address found in a dispatch table
+ *    within the ROM itself.
+ *
+ *    The lowered numbered actions, with ROM in the name, are indexes
+ *    into this dispatch table.  These values can be passed to the
+ *    rom_dispatch function or to vdfs_do function.  These values
+ *    must match the entries in the dispatch table in vdfs.asm
+ *
+ * 2. Because some of the commands are dispatched as ROM actions as
+ *    above, for consistency, and avoid a needing to use a union,
+ *    other command table entries also translate to one of these
+ *    action codes and the entire set of action codes can be passwd
+ *    to the vdfs_do function to be carried out.
+ */
 
 enum vdfs_action {
     VDFS_ROM_RETURN,
@@ -196,6 +225,15 @@ enum vdfs_action {
     VDFS_ACT_MMBDIN
 };
 
+/*
+ * Command tables.  These map command names as used in a guest OS
+ * command to one of the action codes above.  There can be multiple
+ * command tables sharing the same lookup function.  The lookup
+ * function supports abbreviated commands in the BBC OS fashion
+ * with the additional requirement that that initial part of the
+ * command name that is in capitals must be present.
+ */
+
 #define MAX_CMD_LEN 8
 
 struct cmdent {
@@ -203,16 +241,31 @@ struct cmdent {
     enum vdfs_action act;
 };
 
+/*
+ * Filing system numbers.  By default, VDFS uses its own filing
+ * system number but when it is masquerading as DFS or ADFS it will
+ * use the filing system number for those filing systems.
+ */
+
 #define FSNO_VDFS   0x11
 #define FSNO_ADFS   0x08
 #define FSNO_DFS    0x04
+
+/*
+ * Claiming (masquerading as) other filing systems.  For compatibility
+ * with programs that select a specific filing system, VDFS is able to
+ * pretend to be either DFS or ADFS in that it responds to the
+ * command to select those filings systems and also the ROM service
+ * call to select a filing system by number.  The next two flags
+ * define this behaviour and are set/reset with the *FSCLAIM command.
+ */
 
 #define CLAIM_ADFS  0x80
 #define CLAIM_DFS   0x40
 
 static uint8_t  reg_a;
 static uint8_t  fs_flags = 0;
-static uint8_t  fs_num   = 0x11;
+static uint8_t  fs_num   = FSNO_VDFS;
 static uint16_t cmd_tail;
 
 static uint16_t readmem16(uint16_t addr)
@@ -1860,7 +1913,7 @@ static void osfind(void)
                 return;
             }
         } while (vdfs_chan[channel].ent);
-        simple_name(path, sizeof path, (y << 8) | x);
+        parse_name(path, sizeof path, (y << 8) | x);
         ent = find_entry(path, &key, cur_dir);
         if (ent && (ent->attribs & (ATTR_EXISTS|ATTR_IS_DIR)) == (ATTR_EXISTS|ATTR_IS_DIR)) {
             vdfs_chan[channel].ent = ent;  // make "half-open"
