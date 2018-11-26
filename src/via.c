@@ -392,8 +392,8 @@ static void via_set_null(int level)
 
 void via_reset(VIA *v)
 {
-        v->ora   = v->orb   = 0xFF;
-        v->ddra  = v->ddrb  = 0xFF;
+        v->ora   = v->orb   = 0;
+        v->ddra  = v->ddrb  = 0;
         v->ifr   = v->ier   = 0;
         v->t1c   = v->t1l   = 0x1FFFE;
         v->t2c   = v->t2l   = 0x1FFFE;
