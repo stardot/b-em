@@ -129,7 +129,7 @@ static unsigned   scan_seq;
  */
 
 #define NUM_CHANNELS  32
-#define MIN_CHANNEL  128
+#define MIN_CHANNEL      128
 
 typedef struct {
     FILE       *fp;
@@ -784,24 +784,6 @@ static int gen_cat_tab(vdfs_ent_t *dir)
     return result;
 }
 
-static uint16_t simple_name(char *str, size_t size, uint16_t addr)
-{
-    char *ptr = str;
-    char *end = str + size - 1;
-    int ch;
-
-    log_debug("vdfs: simple_name: addr=%04x\n", addr);
-    do {
-        ch = readmem(addr++);
-        if (ch == '\r' || ch == ' ')
-            break;
-        *ptr++ = ch;
-    } while (ptr < end);
-
-    *ptr = '\0';
-    return addr;
-}
-
 static uint16_t parse_name(char *str, size_t size, uint16_t addr)
 {
     char *ptr = str;
@@ -1186,7 +1168,7 @@ static void exec_swr_fs(uint8_t flags, uint16_t fname, int8_t romid, uint32_t st
     log_debug("vdfs: exec_swr_fs: flags=%02x, fn=%04x, romid=%02d, start=%04x, len=%04x\n", flags, fname, romid, start, pblen);
     if (check_valid_dir(cur_dir, "current")) {
         if ((romid = swr_calc_addr(flags, &start, romid)) >= 0) {
-            simple_name(path, sizeof path, fname);
+            parse_name(path, sizeof path, fname);
             ent = find_entry(path, &key, cur_dir);
             if (flags & 0x80) {
                 // read file into sideways RAM.
@@ -1730,7 +1712,7 @@ static void osfile(void)
     if (a <= 0x08 || a == 0xff) {
         log_debug("vdfs: osfile(A=%02X, X=%02X, Y=%02X)", a, x, y);
         if (check_valid_dir(cur_dir, "current")) {
-            simple_name(path, sizeof path, readmem16(pb));
+            parse_name(path, sizeof path, readmem16(pb));
             ent = find_entry(path, &key, cur_dir);
             switch (a) {
                 case 0x00:  // save file.
@@ -1855,6 +1837,7 @@ static void osfind(void)
     char path[MAX_ACORN_PATH];
 
     log_debug("vdfs: osfind(A=%02X, X=%02X, Y=%02X)", a, x, y);
+
     if (a == 0) {   // close file.
         channel = y;
         if (channel == 0)
@@ -1863,8 +1846,8 @@ static void osfind(void)
             channel -= MIN_CHANNEL;
             if (channel >= 0 && channel < NUM_CHANNELS)
                 close_file(channel);
-            else
-                adfs_error(err_channel);
+        else
+            adfs_error(err_channel);
         }
     } else if (check_valid_dir(cur_dir, "current")) {        // open file.
         mode = NULL;
@@ -2521,7 +2504,7 @@ static void file_info(uint16_t addr)
     char path[MAX_ACORN_PATH];
 
     if (check_valid_dir(cur_dir, "current")) {
-        simple_name(path, sizeof path, addr);
+        parse_name(path, sizeof path, addr);
         if ((ent = find_entry(path, &key, cur_dir)) && ent->attribs & ATTR_EXISTS) {
             gcopy_attr(ent);
             rom_dispatch(VDFS_ROM_INFO);
@@ -2841,7 +2824,7 @@ static void osfsc_cmd(void)
     if ((addr = parse_cmd((y << 8) | x, cmd))) {
         if ((ent = lookup_cmd(ctab_filing, ARRAY_SIZE(ctab_filing), cmd))) {
             if (vdfs_do(ent->act, addr))
-                return;
+            return;
         }
     }
     run_file(err_badcmd);
@@ -3030,7 +3013,7 @@ static void serv_cmd(void)
             ent = lookup_cmd(ctab_enabled, ARRAY_SIZE(ctab_enabled), cmd);
         if (ent)
             if (vdfs_do(ent->act, addr))
-                a = 0;
+            a = 0;
     }
 }
 

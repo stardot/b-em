@@ -6,6 +6,7 @@ typedef struct VIA
         uint8_t  ora,   orb,   ira,   irb;
         uint8_t  ddra,  ddrb;
         uint8_t  sr;
+        uint8_t  t1pb7;
         uint32_t t1l,   t2l;
         int      t1c,   t2c;
         uint8_t  acr,   pcr,   ifr,   ier;
