@@ -270,18 +270,14 @@ static uint16_t cmd_tail;
 
 static uint16_t readmem16(uint16_t addr)
 {
-    uint32_t value;
-
-    value = readmem(addr);
+    uint16_t value = readmem(addr);
     value |= (readmem(addr+1) << 8);
     return value;
 }
 
 static uint32_t readmem32(uint16_t addr)
 {
-    uint32_t value;
-
-    value = readmem(addr);
+    uint32_t value = readmem(addr);
     value |= (readmem(addr+1) << 8);
     value |= (readmem(addr+2) << 16);
     value |= (readmem(addr+3) << 24);
