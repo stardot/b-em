@@ -1952,6 +1952,7 @@ static void osfind(void)
         do {
             if (++channel >= NUM_CHANNELS) {
                 log_debug("vdfs: no free channel");
+                adfs_error(err_nfile);
                 return;
             }
         } while (vdfs_chan[channel].ent);
