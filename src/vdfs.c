@@ -3074,7 +3074,7 @@ static void osword(void)
             p.c = 1;
 }
 
-const struct cmdent ctab_always[] = {
+static const struct cmdent ctab_always[] = {
     { "QUIT",    VDFS_ACT_QUIT    },
     { "Dump",    VDFS_ROM_DUMP    },
     { "List",    VDFS_ROM_LIST    },
@@ -3089,7 +3089,7 @@ const struct cmdent ctab_always[] = {
     { "Din",     VDFS_ACT_MMBDIN  }
 };
 
-const struct cmdent ctab_enabled[] = {
+static const struct cmdent ctab_enabled[] = {
     { "VDFS",    VDFS_ACT_VDFS    },
     { "ADFS",    VDFS_ACT_ADFS    },
     { "FADFS",   VDFS_ACT_ADFS    },
