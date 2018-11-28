@@ -1974,6 +1974,8 @@ static void osfind(void)
             }
         }
         else if (acorn_mode == 0x80) {
+            if (!no_wildcards(path))
+                return;
             if (ent && (ent->attribs & ATTR_EXISTS) && (ent->attribs & (ATTR_OPEN_READ|ATTR_OPEN_WRITE)))
                 adfs_error(err_isopen);
             else {
