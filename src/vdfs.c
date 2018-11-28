@@ -2163,8 +2163,11 @@ static int osgbpb_list(uint32_t pb)
         seq_ptr = readmem32(pb+9);
         if (seq_ptr == 0)
             acorn_sort(cur_dir);
-        for (cat_ptr = cur_dir->u.dir.children, n = seq_ptr; cat_ptr && n; cat_ptr = cat_ptr->next, n--)
-            ;
+        n = seq_ptr;
+        for (cat_ptr = cur_dir->u.dir.children; cat_ptr; cat_ptr = cat_ptr->next)
+            if (cat_ptr->attribs & ATTR_EXISTS)
+                if (n-- == 0)
+                    break;
         if (cat_ptr) {
             status = 0;
             mem_ptr = readmem32(pb+1);
@@ -2175,7 +2178,9 @@ static int osgbpb_list(uint32_t pb)
                 writemem(mem_ptr++, strlen(cat_ptr->acorn_fn));
                 for (ptr = cat_ptr->acorn_fn; (ch = *ptr++); )
                     writemem(mem_ptr++, ch);
-                cat_ptr = cat_ptr->next;
+                do
+                    cat_ptr = cat_ptr->next;
+                while (cat_ptr && !(cat_ptr->attribs & ATTR_EXISTS));
                 if (!cat_ptr) {
                     status = 1;
                     break;
@@ -2628,6 +2633,8 @@ static void gcopy_attr(vdfs_entry *ent)
 
 static void cat_next(void)
 {
+    while (cat_ent && !(cat_ent->attribs & ATTR_EXISTS))
+        cat_ent = cat_ent->next;
     if (cat_ent) {
         gcopy_attr(cat_ent);
         cat_ent = cat_ent->next;
