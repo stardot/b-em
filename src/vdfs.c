@@ -44,7 +44,6 @@
 #include "tube.h"
 #include "savestate.h"
 
-#include <ctype.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <dirent.h>
@@ -370,24 +369,31 @@ static void get_filename(FILE *fp, vdfs_entry *dest)
         *ptr = '\0';
 }
 
+static int hex2nyb(int ch)
+{
+    if (ch >= '0' && ch <= '9')
+        return ch - '0';
+    else if (ch >= 'A' && ch <= 'F')
+        return ch - 'A' + 10;
+    else if (ch >= 'a' && ch <='f')
+        return ch - 'a' + 10;
+    else
+        return -1;
+}
+
 static unsigned get_hex(FILE *fp)
 {
     int ch;
     unsigned value = 0;
+    int nyb;
 
     if (!feof(fp)) {
         do
             ch = getc(fp);
-        while (isspace(ch));
+        while (ch == ' ' || ch == '\t');
 
-        while (isxdigit(ch)) {
-            value = value << 4;
-            if (ch >= '0' && ch <= '9')
-                value += (ch - '0');
-            else if (ch >= 'A' && ch <= 'F')
-                value += 10 + (ch - 'A');
-            else
-                value += 10 + (ch - 'a');
+        while ((nyb = hex2nyb(ch)) >= 0) {
+            value = (value << 4) | nyb;
             ch = getc(fp);
         }
     }
@@ -810,7 +816,7 @@ static bool check_valid_dir(vdfs_entry *ent, const char *which)
 
 static vdfs_entry *find_entry(const char *filename, vdfs_entry *key, vdfs_entry *ent)
 {
-    int ch;
+    int ch, fn0, fn1;
     const char *fn_src;
     char *fn_ptr, *fn_end;
     vdfs_entry *ptr;
@@ -827,11 +833,13 @@ static vdfs_entry *find_entry(const char *filename, vdfs_entry *key, vdfs_entry 
             *fn_ptr++ = ch;
         } while (fn_ptr < fn_end);
         *fn_ptr = '\0';
-        if (((key->acorn_fn[0] == '$' || key->acorn_fn[0] == '&') && key->acorn_fn[1] == '\0') || (key->acorn_fn[0] == ':' && isdigit(key->acorn_fn[1])))
+        fn0 = key->acorn_fn[0];
+        fn1 = key->acorn_fn[1];
+        if (((fn0 == '$' || fn0 == '&') && fn1 == '\0') || (fn0 == ':' && fn1 >= '0' && fn1 <= '9'))
             ent = &root_dir;
-        else if (key->acorn_fn[0] == '%' && key->acorn_fn[1] == '\0' && check_valid_dir(lib_dir, "library"))
+        else if (fn0 == '%' && fn1 == '\0' && check_valid_dir(lib_dir, "library"))
             ent = lib_dir;
-        else if (key->acorn_fn[0] == '^' && key->acorn_fn[1] == '\0')
+        else if (fn0 == '^' && fn1 == '\0')
             ent = ent->parent;
         else if (!scan_dir(ent) && (ptr = acorn_search(ent, key->acorn_fn)))
             ent = ptr;
@@ -1293,18 +1301,12 @@ static uint16_t srp_fn(uint16_t addr, uint16_t *vptr)
 static uint16_t srp_hex(int ch, uint16_t addr, uint16_t *vptr)
 {
     uint16_t value = 0;
+    int nyb;
 
-    if (isxdigit(ch)) {
-        do {
-            value = value << 4;
-            if (ch >= '0' && ch <= '9')
-                value += (ch - '0');
-            else if (ch >= 'A' && ch <= 'F')
-                value += 10 + (ch - 'A');
-            else
-                value += 10 + (ch - 'a');
-            ch = readmem(addr++);
-        } while (isxdigit(ch));
+    if ((nyb = hex2nyb(ch)) >= 0) {
+        value = nyb;
+        while ((nyb = hex2nyb(readmem(addr++))) >= 0)
+            value = value << 4 | nyb;
         *vptr = value;
         return --addr;
     }
@@ -1347,13 +1349,14 @@ static uint16_t srp_length(uint16_t addr, uint16_t start, uint16_t *len)
 static uint16_t srp_romid(uint16_t addr, int16_t *romid)
 {
     int ch;
+    uint16_t naddr;
 
     do
         ch = readmem(addr++);
     while (ch == ' ' || ch == '\t');
 
-    if (isxdigit(ch))
-        return srp_hex(ch, addr, (uint16_t*)romid);
+    if ((naddr = srp_hex(ch, addr, (uint16_t*)romid)))
+        return naddr;
     if (ch >= 'W' && ch <= 'Z')
         *romid = mem_findswram(ch - 'W');
     else if (ch >= 'w' && ch <= 'z')
