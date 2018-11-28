@@ -2088,10 +2088,14 @@ static void acorn_sort(vdfs_entry *dir)
             while (p) {
                 nmerges++; /* there exists a merge to be done */
                 q = p;
-                for (psize = 0; psize < insize; psize++) {
+                /* step `insize' places along from p */
+                psize = 0;
+                do {
+                    if (psize >= insize)
+                        break;
+                    psize++;
                     q = q->next;
-                    if (!q) break;
-                }
+                } while (q);
                 /* if q hasn't fallen off end, we have two lists to merge */
                 qsize = insize;
 
