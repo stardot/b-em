@@ -767,14 +767,19 @@ static vdfs_entry *host_search(vdfs_entry *dir, const char *host_fn)
     return NULL;
 }
 
+static bool is_inf(const char *path)
+{
+    const char *ptr = strrchr(path, '.');
+    // we know if ptr is not NULL, ptr[0] is a dot, no need to test.
+    return ptr && (ptr[1] == 'I' || ptr[1] == 'i') && (ptr[2] == 'N' || ptr[2] == 'n') && (ptr[3] == 'F' || ptr[3] == 'f') && !ptr[4];
+}
+
 static int scan_dir(vdfs_entry *dir)
 {
-    int  count = 0;
     DIR  *dp;
     struct stat stb;
     struct dirent *dep;
     vdfs_entry *ent;
-    const char *ext;
 
     // Has this been scanned sufficiently recently already?
 
@@ -795,16 +800,11 @@ static int scan_dir(vdfs_entry *dir)
         // entry if not.
         while ((dep = readdir(dp))) {
             if (*(dep->d_name) != '.') {
-                if (!(ext = strrchr(dep->d_name, '.')) || vdfs_cmp(ext, ".inf", 4)) {
-                    if ((ent = host_search(dir, dep->d_name))) {
+                if (!is_inf(dep->d_name)) {
+                    if ((ent = host_search(dir, dep->d_name)))
                         scan_entry(ent);
-                        count++;
-                    } else if ((ent = new_entry(dir, dep->d_name)))
-                        count++;
-                    else {
-                        count = -1;
+                    else if (!(ent = new_entry(dir, dep->d_name)))
                         break;
-                    }
                 }
             }
         }
