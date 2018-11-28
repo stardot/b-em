@@ -112,8 +112,8 @@ struct vdfs_entry {
         } file;
         struct {
             vdfs_entry *children;
-            unsigned   scan_seq;
             time_t     scan_mtime;
+            unsigned   scan_seq;
             bool       sorted;
         } dir;
     } u;
@@ -633,15 +633,13 @@ static void init_entry(vdfs_entry *ent)
     ent->attribs = 0;
 }
 
-static int cmp_nocase(const char *fa, const char *fb)
+static int vdfs_cmp(const char *namea, const char *nameb, size_t len)
 {
-    const unsigned char *ua = (const unsigned char *)fa;
-    const unsigned char *ub = (const unsigned char *)fb;
-    int ca, cb;
+    int ca, cb, d;
 
-    for (;;) {
-        ca = *ua++;
-        cb = *ub++;
+    while (len-- > 0) {
+        ca = *(const unsigned char *)namea++;
+        cb = *(const unsigned char *)nameb++;
         if (!ca)
             return cb ? -1 : 0;
         if (ca != cb) {
@@ -649,10 +647,11 @@ static int cmp_nocase(const char *fa, const char *fb)
                 ca = ca - 'a' + 'A';
             if (cb >= 'a' && cb <= 'z')
                 cb = cb - 'a' + 'A';
-            if (ca != cb)
-                return ca - cb;
+            if ((d = ca - cb))
+                return d;
         }
     }
+    return 0;
 }
 
 static vdfs_entry *acorn_search(vdfs_entry *dir, const char *acorn_fn)
@@ -660,7 +659,48 @@ static vdfs_entry *acorn_search(vdfs_entry *dir, const char *acorn_fn)
     vdfs_entry *ent;
 
     for (ent = dir->u.dir.children; ent; ent = ent->next)
-        if (!cmp_nocase(ent->acorn_fn, acorn_fn))
+        if (!vdfs_cmp(ent->acorn_fn, acorn_fn, MAX_FILE_NAME))
+            return ent;
+    return NULL;
+}
+
+static int vdfs_wildmat(const char *pattern, const char *candidate, size_t len)
+{
+    int pat_ch, can_ch, d;
+
+    while (len-- > 0) {
+        pat_ch = *(const unsigned char *)pattern++;
+        if (pat_ch == '*') {
+            if (!*pattern)
+                return 0;
+            len++;
+            do {
+                if (vdfs_wildmat(pattern, candidate++, len--))
+                    return 0;
+            } while (len && *candidate);
+            return 1;
+        }
+        can_ch = *(const unsigned char *)candidate++;
+        if (!pat_ch)
+            return can_ch ? -1 : 0;
+        if (pat_ch != can_ch && pat_ch != '#') {
+            if (pat_ch >= 'a' && pat_ch <= 'z')
+                pat_ch = pat_ch - 'a' + 'A';
+            if (can_ch >= 'a' && can_ch <= 'z')
+                can_ch = can_ch - 'a' + 'A';
+            if ((d = pat_ch - can_ch))
+                return d;
+        }
+    }
+    return 0;
+}
+
+static vdfs_entry *wild_search(vdfs_entry *dir, const char *pattern)
+{
+    vdfs_entry *ent;
+
+    for (ent = dir->u.dir.children; ent; ent = ent->next)
+        if (!vdfs_wildmat(pattern, ent->acorn_fn, MAX_FILE_NAME))
             return ent;
     return NULL;
 }
@@ -755,7 +795,7 @@ static int scan_dir(vdfs_entry *dir)
         // entry if not.
         while ((dep = readdir(dp))) {
             if (*(dep->d_name) != '.') {
-                if (!(ext = strrchr(dep->d_name, '.')) || cmp_nocase(ext, ".inf")) {
+                if (!(ext = strrchr(dep->d_name, '.')) || vdfs_cmp(ext, ".inf", 4)) {
                     if ((ent = host_search(dir, dep->d_name))) {
                         scan_entry(ent);
                         count++;
@@ -841,7 +881,7 @@ static vdfs_entry *find_entry(const char *filename, vdfs_entry *key, vdfs_entry 
             ent = lib_dir;
         else if (fn0 == '^' && fn1 == '\0')
             ent = ent->parent;
-        else if (!scan_dir(ent) && (ptr = acorn_search(ent, key->acorn_fn)))
+        else if (!scan_dir(ent) && (ptr = wild_search(ent, key->acorn_fn)))
             ent = ptr;
         else {
             if (ch != '.')
@@ -2070,7 +2110,7 @@ static void acorn_sort(vdfs_entry *dir)
                         p = p->next;
                         psize--;
                     }
-                    else if (cmp_nocase(p->acorn_fn, q->acorn_fn) <= 0) {
+                    else if (vdfs_cmp(p->acorn_fn, q->acorn_fn, MAX_FILE_NAME) <= 0) {
                         /* First element of p is lower (or same);
                         * e must come from p. */
                         e = p;
