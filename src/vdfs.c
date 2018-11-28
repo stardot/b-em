@@ -579,6 +579,7 @@ static void scan_entry(vdfs_entry *ent)
                 ent->u.dir.children = NULL;
                 ent->u.dir.scan_mtime = 0;
                 ent->u.dir.scan_seq = 0;
+                ent->u.dir.sorted = false;
             }
         }
         else {
@@ -699,6 +700,7 @@ static vdfs_entry *new_entry(vdfs_entry *dir, const char *host_fn)
             }
             ent->next = dir->u.dir.children;
             dir->u.dir.children = ent;
+            dir->u.dir.sorted = false;
             log_debug("vdfs: new_entry: returing new entry %p\n", ent);
             return ent;
         }
@@ -865,6 +867,7 @@ static vdfs_entry *add_new_file(vdfs_entry *dir, vdfs_entry *ent)
         if (make_host_path(new_ent, host_fn)) {
             new_ent->next = dir->u.dir.children;
             dir->u.dir.children = new_ent;
+            dir->u.dir.sorted = false;
             return new_ent;
         }
         free(new_ent);
@@ -933,6 +936,7 @@ void vdfs_close(void)
     if ((ptr = root_dir.u.dir.children)) {
         free_entry(ptr);
         root_dir.u.dir.children = NULL;
+        root_dir.u.dir.sorted = false;
     }
 }
 
@@ -2091,6 +2095,7 @@ static void acorn_sort(vdfs_entry *dir)
             /* If we have done only one merge, we're finished. */
             if (nmerges <= 1) {  /* allow for nmerges==0, the empty list case */
                 dir->u.dir.children = list;
+                dir->u.dir.sorted = true;
                 return;
             }
 
@@ -2357,7 +2362,9 @@ static void rename_tail(vdfs_entry *old_ent, vdfs_entry *new_ent)
             new_ent->u.dir.children   = old_ent->u.dir.children;
             new_ent->u.dir.scan_seq   = old_ent->u.dir.scan_seq;
             new_ent->u.dir.scan_mtime = old_ent->u.dir.scan_mtime;
+            new_ent->u.dir.sorted     = old_ent->u.dir.sorted;
             old_ent->u.dir.children   = NULL;
+            old_ent->u.dir.sorted     = false;
         }
         else {
             new_ent->attribs |= ATTR_EXISTS;
