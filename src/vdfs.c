@@ -1984,7 +1984,7 @@ static void osfind(void)
             else {
                 mode = "wb";
                 attribs = ATTR_OPEN_WRITE;
-                if (!ent)
+                if (!ent && key.parent)
                     ent = add_new_file(key.parent, &key);
             }
         } else if (acorn_mode == 0xc0) {
@@ -2001,7 +2001,8 @@ static void osfind(void)
             } else {
                 if (!no_wildcards(path))
                     return;
-                ent = add_new_file(key.parent, &key);
+                if (key.parent)
+                    ent = add_new_file(key.parent, &key);
                 mode = "wb+";
             }
         }
