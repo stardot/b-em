@@ -14,7 +14,7 @@ DRIVE drives[2];
 int curdrive = 0;
 
 ALLEGRO_PATH *discfns[2] = { NULL, NULL };
-int defaultwriteprot = 0;
+bool defaultwriteprot = false;
 int writeprot[NUM_DRIVES], fwriteprot[NUM_DRIVES];
 
 int fdc_time;
