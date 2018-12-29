@@ -178,11 +178,8 @@ void via_write(VIA *v, uint16_t addr, uint8_t val)
             case T1LH:
                 v->t1l &= 0x1FE;
                 v->t1l |= (val<<9);
-                if (v->acr & 0x40)
-                {
-                        v->ifr &= ~INT_TIMER1;
-                        via_updateIFR(v);
-                }
+                v->ifr &= ~INT_TIMER1;
+                via_updateIFR(v);
                 break;
             case T1CH:
                 if ((v->acr & 0xC0) == 0x80)
