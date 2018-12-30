@@ -26,6 +26,8 @@
 #define     IER 0x0e
 #define     ORAnh   0x0f
 
+#define TLIMIT -3
+
 static void via_updateIFR(VIA *v)
 {
         if ((v->ifr & 0x7F) & (v->ier & 0x7F))
@@ -40,11 +42,11 @@ static void via_updateIFR(VIA *v)
         }
 }
 
-void via_updatetimers(VIA *v)
+static void via_updatetimers(VIA *v)
 {
-        if (v->t1c<-3)
+        if (v->t1c < TLIMIT)
         {
-                while (v->t1c<-3)
+                while (v->t1c < TLIMIT)
                       v->t1c+=v->t1l+4;
                 if (!v->t1hit)
                 {
@@ -60,7 +62,7 @@ void via_updatetimers(VIA *v)
         }
         if (!(v->acr & 0x20))
         {
-                if (v->t2c < -3 && !v->t2hit)
+                if (v->t2c < TLIMIT && !v->t2hit)
                 {
                         if (!v->t2hit)
                         {
@@ -70,6 +72,17 @@ void via_updatetimers(VIA *v)
                         v->t2hit=1;
                 }
         }
+}
+
+void via_poll(VIA *v, int cycles)
+{
+    v->t1c -= cycles;
+    if (!(v->acr & 0x20))
+        v->t2c -= cycles;
+    if (v->t1c < TLIMIT || v->t2c < TLIMIT)
+        via_updatetimers(v);
+    if (v->acr & 0x1c)
+        via_shift(v, cycles);
 }
 
 void via_write(VIA *v, uint16_t addr, uint8_t val)
@@ -197,7 +210,7 @@ void via_write(VIA *v, uint16_t addr, uint8_t val)
                 break;
             case T2CH:
                 /*Fix for Kevin Edwards protection - if interrupt triggers in cycle before write then let it run*/
-                if ((v->t2c == -3 && (v->ier & INT_TIMER2)) ||
+                if ((v->t2c == TLIMIT && (v->ier & INT_TIMER2)) ||
                     (v->ifr & v->ier & INT_TIMER2))
                 {
                         interrupt |= 128;
