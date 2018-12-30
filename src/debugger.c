@@ -23,6 +23,7 @@ int indebug = 0;
 extern int fcount;
 static int vrefresh = 1;
 static FILE *trace_fp = NULL;
+static FILE *exec_fp = NULL;
 
 static void close_trace()
 {
@@ -337,8 +338,10 @@ static const char helptext[] =
     "    c          - continue running until breakpoint\n"
     "    c n        - continue until the nth breakpoint\n"
     "    d [n]      - disassemble from address n\n"
+    "    exec f     - take commands from file f\n"
     "    n          - step, but treat a called subroutine as one step\n"
     "    m [n]      - memory dump from address n\n"
+    "    paste s    - paste string s as keyboard input\n"
     "    q          - force emulator exit\n"
     "    r          - print 6502 registers\n"
     "    r sysvia   - print System VIA registers\n"
@@ -417,6 +420,30 @@ static void list_points(int *table, const char *desc)
             debug_outf("    %s %i : %04X\n", desc, c, table[c]);
 }
 
+static void debug_paste(const char *iptr)
+{
+    int ch;
+    char *str, *dptr;
+
+    if ((ch = *iptr++)) {
+        if ((str = malloc(strlen(iptr) + 1))) {
+            dptr = str;
+            do {
+                if (ch == '|') {
+                    if (!(ch = *iptr++))
+                        break;
+                    if (ch != '|')
+                        ch &= 0x1f;
+                }
+                *dptr++ = ch;
+                ch = *iptr++;
+            } while (ch);
+            *dptr = '\0';
+            os_paste_start(str);
+        }
+    }
+}
+
 void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 {
     int c, d, e, f;
@@ -433,7 +460,19 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
     if (vrefresh)
         video_poll(CLOCKS_PER_FRAME, 0);
 
-    for (debug_out(">", 1); debug_in(ins, 255); debug_out(">", 1)) {
+    for (;;) {
+        if (exec_fp) {
+            if (!fgets(ins, sizeof ins, exec_fp)) {
+                fclose(exec_fp);
+                exec_fp = NULL;
+                continue;
+            }
+        }
+        else {
+            debug_out(">", 1);
+            debug_in(ins, 255);
+        }
+
         // Skip past any leading spaces.
         for (iptr = ins; (c = *iptr) && isspace(c); iptr++);
         if (c) {
@@ -509,6 +548,18 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 debug_lastcommand = 'd';
                 break;
 
+            case 'e':
+            case 'E':
+                if (!strcasecmp(cmd, "exec")) {
+                    if (*iptr) {
+                        if ((eptr = strchr(iptr, '\n')))
+                            *eptr = 0;
+                        if (!(exec_fp = fopen(iptr, "r")))
+                            debug_outf("unable to open '%s': %s\n", iptr, strerror(errno));
+                    }
+                }
+                break;
+
             case 'h':
             case 'H':
             case '?':
@@ -546,6 +597,12 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 indebug = 0;
                 main_resume();
                 return;
+
+            case 'p':
+            case 'P':
+                if (!strcasecmp(cmd, "paste"))
+                    debug_paste(iptr);
+                break;
 
             case 'r':
             case 'R':
