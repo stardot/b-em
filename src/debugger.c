@@ -339,6 +339,7 @@ static const char helptext[] =
     "    d [n]      - disassemble from address n\n"
     "    n          - step, but treat a called subroutine as one step\n"
     "    m [n]      - memory dump from address n\n"
+    "    paste s    - paste string s as keyboard input\n"
     "    q          - force emulator exit\n"
     "    r          - print 6502 registers\n"
     "    r sysvia   - print System VIA registers\n"
@@ -415,6 +416,33 @@ static void list_points(int *table, const char *desc)
     for (c = 0; c < NUM_BREAKPOINTS; c++)
         if (table[c] != -1)
             debug_outf("    %s %i : %04X\n", desc, c, table[c]);
+}
+
+static void debug_paste(const char *iptr)
+{
+    int ch;
+    char *str, *dptr;
+
+    if ((ch = *iptr++)) {
+        if ((str = malloc(strlen(iptr) + 1))) {
+            dptr = str;
+            do {
+                if (ch == '|') {
+                    ch = *iptr++;
+                    if (!ch)
+                        break;
+                    else if (ch >= 'A' && ch <= 'Z')
+                        ch -= 'A';
+                    else if (ch >= 'a' && ch <= 'z')
+                        ch -= 'a';
+                }
+                *dptr++ = ch;
+                ch = *iptr++;
+            } while (ch);
+            *dptr = '\0';
+            os_paste_start(str);
+        }
+    }
 }
 
 void debugger_do(cpu_debug_t *cpu, uint32_t addr)
@@ -546,6 +574,12 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 indebug = 0;
                 main_resume();
                 return;
+
+            case 'p':
+            case 'P':
+                if (!strcasecmp(cmd, "paste"))
+                    debug_paste(iptr);
+                break;
 
             case 'r':
             case 'R':
