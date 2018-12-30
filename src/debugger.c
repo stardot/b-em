@@ -428,13 +428,10 @@ static void debug_paste(const char *iptr)
             dptr = str;
             do {
                 if (ch == '|') {
-                    ch = *iptr++;
-                    if (!ch)
+                    if (!(ch = *iptr++))
                         break;
-                    else if (ch >= 'A' && ch <= 'Z')
-                        ch -= 'A';
-                    else if (ch >= 'a' && ch <= 'z')
-                        ch -= 'a';
+                    if (ch != '|')
+                        ch &= 0x1f;
                 }
                 *dptr++ = ch;
                 ch = *iptr++;
