@@ -42,45 +42,31 @@ static void via_updateIFR(VIA *v)
         }
 }
 
-static void via_updatetimers(VIA *v)
-{
-        if (v->t1c < TLIMIT)
-        {
-                while (v->t1c < TLIMIT)
-                      v->t1c+=v->t1l+4;
-                if (!v->t1hit)
-                {
-                        v->ifr |= INT_TIMER1;
-                        via_updateIFR(v);
-                        if (v->timer_expire1)
-                            v->timer_expire1();
-                        if (v->acr & 0x80) /*Output to PB7*/
-                            v->t1pb7 ^= 0x80;
-                }
-                if (!(v->acr & 0x40))
-                   v->t1hit = 1;
-        }
-        if (!(v->acr & 0x20))
-        {
-                if (v->t2c < TLIMIT && !v->t2hit)
-                {
-                        if (!v->t2hit)
-                        {
-                                v->ifr |= INT_TIMER2;
-                                via_updateIFR(v);
-                        }
-                        v->t2hit=1;
-                }
-        }
-}
-
 void via_poll(VIA *v, int cycles)
 {
     v->t1c -= cycles;
-    if (!(v->acr & 0x20))
+    if (v->t1c < TLIMIT) {
+        while (v->t1c < TLIMIT)
+              v->t1c+=v->t1l+4;
+        if (!v->t1hit) {
+            v->ifr |= INT_TIMER1;
+            via_updateIFR(v);
+            if (v->timer_expire1)
+                v->timer_expire1();
+            if (v->acr & 0x80) /*Output to PB7*/
+                v->t1pb7 ^= 0x80;
+        }
+        if (!(v->acr & 0x40))
+            v->t1hit = 1;
+    }
+    if (!(v->acr & 0x20)) {
         v->t2c -= cycles;
-    if (v->t1c < TLIMIT || v->t2c < TLIMIT)
-        via_updatetimers(v);
+        if (v->t2c < TLIMIT && !v->t2hit) {
+            v->ifr |= INT_TIMER2;
+            via_updateIFR(v);
+            v->t2hit=1;
+        }
+    }
     if (v->acr & 0x1c)
         via_shift(v, cycles);
 }
