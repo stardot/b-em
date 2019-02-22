@@ -39,7 +39,7 @@
 #define I_WAVESEL(c) (I_CHAN(c)+0x50)
 #define I_AMP(c) (I_CHAN(c)+0x60)
 #define I_CTL(c) (I_CHAN(c)+0x70)
-#define FREQ(s, c) ((s->ram[I_FREQ(c)+0x20]<<16)|(s->ram[I_FREQ(c)+0x10]<<8)|(s->ram[I_FREQ(c)]&0x7e))
+#define FREQ(s, c) ((s->ram[I_FREQ(c)+0x20]<<16)|(s->ram[I_FREQ(c)+0x10]<<8)|(s->ram[I_FREQ(c)]&0xfe))
 #define DISABLE(s, c) (!!(s->ram[I_FREQ(c)]&1))
 #define AMP(s, c) (s->ram[I_AMP(c)])
 #define WAVESEL(s, c) (s->ram[I_WAVESEL(c)]>>4)
