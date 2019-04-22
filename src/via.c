@@ -26,6 +26,8 @@
 #define     IER 0x0e
 #define     ORAnh   0x0f
 
+#define TLIMIT -3
+
 static void via_updateIFR(VIA *v)
 {
         if ((v->ifr & 0x7F) & (v->ier & 0x7F))
@@ -40,36 +42,33 @@ static void via_updateIFR(VIA *v)
         }
 }
 
-void via_updatetimers(VIA *v)
+void via_poll(VIA *v, int cycles)
 {
-        if (v->t1c<-3)
-        {
-                while (v->t1c<-3)
-                      v->t1c+=v->t1l+4;
-                if (!v->t1hit)
-                {
-                        v->ifr |= INT_TIMER1;
-                        via_updateIFR(v);
-                        if (v->timer_expire1)
-                            v->timer_expire1();
-                        if (v->acr & 0x80) /*Output to PB7*/
-                            v->t1pb7 ^= 0x80;
-                }
-                if (!(v->acr & 0x40))
-                   v->t1hit = 1;
+    v->t1c -= cycles;
+    if (v->t1c < TLIMIT) {
+        while (v->t1c < TLIMIT)
+              v->t1c+=v->t1l+4;
+        if (!v->t1hit) {
+            v->ifr |= INT_TIMER1;
+            via_updateIFR(v);
+            if (v->timer_expire1)
+                v->timer_expire1();
+            if (v->acr & 0x80) /*Output to PB7*/
+                v->t1pb7 ^= 0x80;
         }
-        if (!(v->acr & 0x20))
-        {
-                if (v->t2c < -3 && !v->t2hit)
-                {
-                        if (!v->t2hit)
-                        {
-                                v->ifr |= INT_TIMER2;
-                                via_updateIFR(v);
-                        }
-                        v->t2hit=1;
-                }
+        if (!(v->acr & 0x40))
+            v->t1hit = 1;
+    }
+    if (!(v->acr & 0x20)) {
+        v->t2c -= cycles;
+        if (v->t2c < TLIMIT && !v->t2hit) {
+            v->ifr |= INT_TIMER2;
+            via_updateIFR(v);
+            v->t2hit=1;
         }
+    }
+    if (v->acr & 0x1c)
+        via_shift(v, cycles);
 }
 
 void via_write(VIA *v, uint16_t addr, uint8_t val)
@@ -178,11 +177,8 @@ void via_write(VIA *v, uint16_t addr, uint8_t val)
             case T1LH:
                 v->t1l &= 0x1FE;
                 v->t1l |= (val<<9);
-                if (v->acr & 0x40)
-                {
-                        v->ifr &= ~INT_TIMER1;
-                        via_updateIFR(v);
-                }
+                v->ifr &= ~INT_TIMER1;
+                via_updateIFR(v);
                 break;
             case T1CH:
                 if ((v->acr & 0xC0) == 0x80)
@@ -200,7 +196,7 @@ void via_write(VIA *v, uint16_t addr, uint8_t val)
                 break;
             case T2CH:
                 /*Fix for Kevin Edwards protection - if interrupt triggers in cycle before write then let it run*/
-                if ((v->t2c == -3 && (v->ier & INT_TIMER2)) ||
+                if ((v->t2c == TLIMIT && (v->ier & INT_TIMER2)) ||
                     (v->ifr & v->ier & INT_TIMER2))
                 {
                         interrupt |= 128;

@@ -23,7 +23,7 @@ static short sound_buffer[BUFLEN_SO];
 
 #define NCoef 4
 static float iir(float NewSample) {
-    float ACoef[NCoef+1] = {
+    static const float ACoef[NCoef+1] = {
         0.30631912757971225000,
         0.00000000000000000000,
         -0.61263825515942449000,
@@ -31,7 +31,7 @@ static float iir(float NewSample) {
         0.30631912757971225000
     };
 
-    float BCoef[NCoef+1] = {
+    static const float BCoef[NCoef+1] = {
         1.00000000000000000000,
         -1.86772356053227330000,
         1.08459167506874430000,
