@@ -292,7 +292,7 @@ prtextws    =   &A8
             bne     loopd
 .nodfs      lda     #&25
             rts
-.vdfs_ent   equs    "VDFS    ", &80, &9F, &11
+.vdfs_ent   equs    "VDFS    ", &60, &7F, &11
 .adfs_ent   equs    "ADFS    ", &30, &3A, &08
 .dfs_ents   equs    "DISK    ", &11, &15, &04
             equs    "DISC    ", &11, &15, &04

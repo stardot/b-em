@@ -138,7 +138,7 @@ static unsigned   scan_seq;
  */
 
 #define NUM_CHANNELS  32
-#define MIN_CHANNEL  128
+#define MIN_CHANNEL   96
 
 typedef struct {
     FILE       *fp;
