@@ -2,18 +2,21 @@
 #define __INC_65816_H
 
 #include "6502debug.h"
+#include "savestate.h"
 
-typedef struct 
+typedef struct
 {
     int c,z,i,d,b,v,n,m,ex,e; /*X renamed to EX due to #define conflict*/
 } w65816p_t;
 
 extern w65816p_t w65816p;
 
-void w65816_init();
-void w65816_reset();
-void w65816_exec();
-void w65816_close();
+bool w65816_init(FILE *romf);
+void w65816_reset(void);
+void w65816_exec(void);
+void w65816_close(void);
+void w65816_savestate(ZFILE *zfp);
+void w65816_loadstate(ZFILE *zfp);
 uint8_t readmem65816(uint32_t a);
 void writemem65816(uint32_t a, uint8_t v);
 

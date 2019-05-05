@@ -3,12 +3,18 @@
 
 extern int kbdips;
 
-extern int keylookup[128];
-extern int keyas;
+extern int keylookup[ALLEGRO_KEY_MAX];
+extern bool keyas;
 
-extern void key_clear();
-extern void key_check();
+extern int key_map(ALLEGRO_EVENT *event);
+extern void key_down(int code);
+extern void key_up(int code);
+
+extern void key_clear(void);
+extern void key_check(void);
 extern void key_scan(int row, int col);
-extern int key_is_down(void);
+extern bool key_is_down(void);
+extern bool key_any_down(void);
+extern bool key_code_down(int code);
 
 #endif

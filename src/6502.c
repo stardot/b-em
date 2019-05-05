@@ -1,7 +1,6 @@
 /*B-em v2.2 by Tom Walker
   6502/65c02 host CPU emulation*/
 
-#include <stdio.h>
 #include "b-em.h"
 
 #include "6502.h"
@@ -162,25 +161,34 @@ static uint32_t dbg_disassemble(uint32_t addr, char *buf, size_t bufsize) {
 int tubecycle;
 
 int output = 0;
-int timetolive = 0;
-
-#define polltime(c) { cycles -= (c); \
-                      via_poll(&sysvia, (c)); \
-                      via_poll(&uservia, (c)); \
-                      video_poll(c, 1);                                   \
-                      otherstuffcount -= (c); \
-                      if (motoron) \
-                      { \
-                                if (fdc_time) { fdc_time -= (c); if (fdc_time <= 0) fdc_callback(); } \
-                                disc_time -= (c); if (disc_time <= 0) { disc_time += 16; disc_poll(); } \
-                      } \
-                      tubecycle += (c); \
-                    }
+static int timetolive = 0;
 
 static int cycles;
 static int otherstuffcount = 0;
 static int romsel;
 static int ram4k, ram8k, ram12k, ram20k;
+
+static inline void polltime(int c)
+{
+    cycles -= c;
+    via_poll(&sysvia, c);
+    via_poll(&uservia, c);
+    video_poll(c, 1);
+    otherstuffcount -= c;
+    if (motoron) {
+        if (fdc_time) {
+            fdc_time -= c;
+            if (fdc_time <= 0)
+                fdc_callback();
+        }
+        disc_time -= c;
+        if (disc_time <= 0) {
+            disc_time += 16;
+            disc_poll();
+        }
+    }
+    tubecycle += c;
+}
 
 static int FEslowdown[8] = { 1, 0, 1, 1, 0, 0, 1, 0 };
 static int RAMbank[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -191,7 +199,95 @@ static int vis20k = 0;
 
 static uint8_t acccon;
 
-#define read_zp_indirect(zp) (readmem(zp & 0xff) + (readmem((zp + 1) & 0xff) << 8))
+static uint16_t buf_remv = 0xffff;
+static uint16_t buf_cnpv = 0xffff;
+static unsigned char *clip_paste_str, *clip_paste_ptr;
+static int os_paste_ch;
+
+void os_paste_start(char *str)
+{
+    if (str) {
+        if (clip_paste_str)
+            free(clip_paste_str);
+        clip_paste_str = clip_paste_ptr = (unsigned char *)str;
+        os_paste_ch = -1;
+        log_debug("6502: paste start, clip_paste_str=%p", clip_paste_str);
+    }
+}
+
+static void os_paste_remv(void)
+{
+    int ch;
+
+    if (os_paste_ch >= 0) {
+        if (p.v)
+            a = os_paste_ch;
+        else {
+            a = y = os_paste_ch;
+            os_paste_ch = -1;
+        }
+    }
+    else {
+        do {
+            ch = *clip_paste_ptr++;
+            if (!ch) {
+                al_free(clip_paste_str);
+                clip_paste_str = clip_paste_ptr = NULL;
+                opcode = readmem(pc);
+                return;
+            }
+            if (ch == 0xc2 && *clip_paste_ptr == 0xa3) {
+                ch = 0x60; // convert UTF-8 pound into BBC pound.
+                clip_paste_ptr++;
+            }
+            else if (ch == 0x0d && *clip_paste_ptr == 0x0a)
+                clip_paste_ptr++;
+            else if (ch == 0x0a)
+                ch = 0x0d;
+        } while (ch >= 128);
+        if (p.v)
+            a = os_paste_ch = ch;
+        else
+            a = y = ch;
+    }
+    p.c = 0;
+    opcode = 0x60; // RTS
+}
+
+static void os_paste_cnpv(void)
+{
+    if (!p.v && !p.c) {
+        int len = strlen((char *)clip_paste_ptr);
+        x = len & 0xff;
+        y = len >> 8;
+        opcode = 0x60; // RTS
+        return;
+    }
+    opcode = readmem(pc);
+}
+
+static inline void fetch_opcode(void)
+{
+    pc3 = oldoldpc;
+    oldoldpc = oldpc;
+    oldpc = pc;
+    vis20k = RAMbank[pc >> 12];
+
+    if (dbg_core6502)
+        debug_preexec(&core6502_cpu_debug, pc);
+    if (pc == buf_remv && x == 0 && clip_paste_ptr)
+        os_paste_remv();
+    else if (pc == buf_cnpv && x == 0 && clip_paste_ptr)
+        os_paste_cnpv();
+    else
+        opcode = readmem(pc);
+    pc++;
+}
+
+static inline uint16_t read_zp_indirect(uint16_t zp)
+{
+    return readmem(zp & 0xff) + (readmem((zp + 1) & 0xff) << 8);
+}
 
 static uint32_t do_readmem(uint32_t addr)
 {
@@ -244,8 +340,7 @@ static uint32_t do_readmem(uint32_t addr)
                 break;
 
         case 0xFC5C:
-                if (vdfs_enabled)
-                    return vdfs_read(addr);
+                return vdfs_read(addr);
                 break;
 
         case 0xFE00:
@@ -304,12 +399,16 @@ static uint32_t do_readmem(uint32_t addr)
         case 0xFE94:
         case 0xFE98:
         case 0xFE9C:
-                if (!MASTER) {
-                        if (WD1770)
-                                return wd1770_read(addr);
-                        return i8271_read(addr);
-                }
-                break;
+            switch(fdc_type) {
+                case FDC_NONE:
+                case FDC_MASTER:
+                    break;
+                case FDC_I8271:
+                    return i8271_read(addr);
+                default:
+                    return wd1770_read(addr);
+            }
+            break;
 
         case 0xFEC0:
         case 0xFEC4:
@@ -342,7 +441,7 @@ uint8_t readmem(uint16_t addr)
 {
     uint32_t value = do_readmem(addr);
     if (dbg_core6502)
-	debug_memread(&core6502_cpu_debug, addr, value, 1);
+    debug_memread(&core6502_cpu_debug, addr, value, 1);
     return value;
 }
 
@@ -354,6 +453,20 @@ static void do_writemem(uint32_t addr, uint32_t val)
         c = memstat[vis20k][addr >> 8];
         if (c == 1) {
                 memlook[vis20k][addr >> 8][addr] = val;
+                switch(addr) {
+                    case 0x022c:
+                        buf_remv = (buf_remv & 0xff00) | val;
+                        break;
+                    case 0x022d:
+                        buf_remv = (buf_remv & 0xff) | (val << 8);
+                        break;
+                    case 0x022e:
+                        buf_cnpv = (buf_cnpv & 0xff00) | val;
+                        break;
+                    case 0x022f:
+                        buf_cnpv = (buf_cnpv & 0xff) | (val << 8);
+                        break;
+                }
                 return;
         } else if (c == 2) {
                 log_debug("6502: attempt to write to ROM %x:%04x=%02x\n", vis20k, addr, val);
@@ -408,8 +521,7 @@ static void do_writemem(uint32_t addr, uint32_t val)
                 break;
 
         case 0xFC5C:
-                if (vdfs_enabled)
-                    vdfs_write(addr, val);
+                vdfs_write(addr, val);
                 break;
 
         case 0xFE00:
@@ -454,7 +566,7 @@ static void do_writemem(uint32_t addr, uint32_t val)
                         memlook[0][c] = memlook[1][c] =
                             &rom[(val & 15) << 14] - 0x8000;
                 for (c = 128; c < 192; c++)
-                        memstat[0][c] = memstat[1][c] = swram[val & 15] ? 1 : 2;
+                        memstat[0][c] = memstat[1][c] = rom_slots[val & 15].swram ? 1 : 2;
                 romsel = (val & 15) << 14;
                 ram4k = ((val & 0x80) && MASTER);
                 ram12k = ((val & 0x80) && BPLUS);
@@ -540,13 +652,17 @@ static void do_writemem(uint32_t addr, uint32_t val)
         case 0xFE94:
         case 0xFE98:
         case 0xFE9C:
-                if (!MASTER) {
-                        if (WD1770)
-                                wd1770_write(addr, val);
-                        else
-                                i8271_write(addr, val);
-                }
-                break;
+            switch(fdc_type) {
+                case FDC_NONE:
+                case FDC_MASTER:
+                    break;
+                case FDC_I8271:
+                    i8271_write(addr, val);
+                    break;
+                default:
+                    wd1770_write(addr, val);
+            }
+            break;
 
         case 0xFEC0:
         case 0xFEC4:
@@ -576,7 +692,7 @@ static void do_writemem(uint32_t addr, uint32_t val)
 void writemem(uint16_t addr, uint8_t val)
 {
     if (dbg_core6502)
-	debug_memwrite(&core6502_cpu_debug, addr, val, 1);
+    debug_memwrite(&core6502_cpu_debug, addr, val, 1);
     do_writemem(addr, val);
 }
 
@@ -674,149 +790,164 @@ static void otherstuff_poll(void) {
 
 #define getw() getsw()
 
-//#define getw() (readmem(pc)|(readmem(pc+1)<<8)); pc+=2
+static inline void setzn(uint8_t v)
+{
+    p.z = !v;
+    p.n = (v) & 0x80;
+}
 
-#define setzn(v) p.z = !(v); p.n = (v) & 0x80
+static inline void push(uint8_t v)
+{
+    writemem(0x100 + s--, v);
+}
 
-#define push(v) writemem(0x100 + (s--), v)
-#define pull()  readmem(0x100 + (++s))
+static inline uint8_t pull(void)
+{
+    return readmem(0x100 + ++s);
+}
 
-/*ADC/SBC temp variables*/
-static int16_t tempw;
-static int tempv, hc6, al, ah;
-static uint8_t tempb;
+static inline void adc_nmos(uint8_t temp)
+{
+    int al, ah;
+    uint8_t tempb;
+    int16_t tempw;
 
-#define ADC(temp)       if (!p.d)                            \
-                        {                                  \
-                                tempw = (a + temp + (p.c ? 1 : 0));        \
-                                p.v = (!((a ^ temp) & 0x80) && ((a ^ tempw) & 0x80));  \
-                                a = tempw & 0xFF;                  \
-                                p.c = tempw & 0x100;                  \
-                                setzn(a);                  \
-                        }                                  \
-                        else                               \
-                        {                                  \
-                                ah = 0;        \
-                                p.z = p.n = 0; \
-                                tempb = a + temp + (p.c ? 1:0);                            \
-                                if (!tempb)                                      \
-                                   p.z = 1;                                          \
-                                al = (a & 0xF) + (temp & 0xF) + (p.c ? 1 : 0);                            \
-                                if (al > 9)                                        \
-                                {                                                \
-                                        al -= 10;                                  \
-                                        al &= 0xF;                                 \
-                                        ah = 1;                                    \
-                                }                                                \
-                                ah += ((a >> 4) + (temp >> 4));                             \
-                                if (ah & 8) p.n = 1;                                   \
-                                p.v = (((ah << 4) ^ a) & 128) && !((a ^ temp) & 128);   \
-                                p.c = 0;                                             \
-                                if (ah > 9)                                        \
-                                {                                                \
-                                        p.c = 1;                                     \
-                                        ah -= 10;                                  \
-                                        ah &= 0xF;                                 \
-                                }                                                \
-                                a = (al & 0xF) | (ah << 4);                              \
-                        }
+    if (p.d) {
+        ah = 0;
+        p.z = p.n = 0;
+        tempb = a + temp + (p.c ? 1:0);
+        if (!tempb)
+           p.z = 1;
+        al = (a & 0xF) + (temp & 0xF) + (p.c ? 1 : 0);
+        if (al > 9) {
+            al -= 10;
+            al &= 0xF;
+            ah = 1;
+        }
+        ah += ((a >> 4) + (temp >> 4));
+        if (ah & 8)
+            p.n = 1;
+        p.v = (((ah << 4) ^ a) & 128) && !((a ^ temp) & 128);
+        p.c = 0;
+        if (ah > 9) {
+            p.c = 1;
+            ah -= 10;
+            ah &= 0xF;
+        }
+        a = (al & 0xF) | (ah << 4);                              \
+    }
+    else {
+        tempw = (a + temp + (p.c ? 1 : 0));
+        p.v = (!((a ^ temp) & 0x80) && ((a ^ tempw) & 0x80));
+        a = tempw & 0xFF;
+        p.c = tempw & 0x100;
+        setzn(a);
+    }
+}
 
-#define SBC(temp)       if (!p.d)                            \
-                        {                                  \
-                                tempw = a-temp-(p.c ? 0 : 1);    \
-                                tempv = (signed char)a -(signed char)temp-(p.c ? 0 : 1);        \
-                                p.v = ((tempw & 0x80) > 0) ^ ((tempv & 0x100) != 0);         \
-                                p.c = tempw >= 0;          \
-                                a = tempw & 0xFF;          \
-                                setzn(a);                  \
-                        }                                  \
-                        else                               \
-                        {                                  \
-                                hc6 = 0;                               \
-                                p.z = p.n = 0;                            \
-                                tempb = a - temp - ((p.c) ? 0 : 1); \
-                                if (!(tempb))                       \
-                                   p.z = 1;                             \
-                                al = (a & 15) - (temp & 15) - (p.c ? 0 : 1);      \
-                                if (al & 16)                           \
-                                {                                   \
-                                        al -= 6;                      \
-                                        al &= 0xF;                    \
-                                        hc6 = 1;                       \
-                                }                                   \
-                                ah = (a >> 4) - (temp >> 4);                \
-                                if (hc6) ah--;                       \
-                                if ((a - (temp + (p.c ? 0 : 1))) & 0x80)        \
-                                   p.n = 1;                             \
-                                p.v = ((a ^ temp) & 0x80) && ((a ^ tempb) & 0x80); \
-                                p.c = 1; \
-                                if (ah & 16)                           \
-                                {                                   \
-                                        p.c = 0; \
-                                        ah -= 6;                      \
-                                        ah &= 0xF;                    \
-                                }                                   \
-                                a = (al & 0xF) | ((ah & 0xF) << 4);                 \
-                        }
+static inline void sbc_nmos(uint8_t temp)
+{
+    int hc6, al, ah, tempv;
+    uint8_t tempb;
+    int16_t tempw;
 
-#define ADCc(temp)      if (!p.d)                            \
-                        {                                  \
-                                tempw = (a + temp + (p.c ? 1 : 0));        \
-                                p.v = (!((a ^ temp) & 0x80) && ((a ^ tempw) & 0x80));  \
-                                a = tempw & 0xFF;                  \
-                                p.c = tempw & 0x100;                  \
-                                setzn(a);                  \
-                        }                                  \
-                        else                               \
-                        {                                  \
-                                ah = 0;        \
-                                tempb = a + temp + (p.c ? 1 : 0);                            \
-                                al = (a & 0xF) + (temp & 0xF) + (p.c ? 1 : 0);                            \
-                                if (al > 9)                                        \
-                                {                                                \
-                                        al -= 10;                                  \
-                                        al &= 0xF;                                 \
-                                        ah = 1;                                    \
-                                }                                                \
-                                ah += ((a >> 4) + (temp >> 4));                             \
-                                p.v = (((ah << 4) ^ a) & 0x80) && !((a ^ temp) & 0x80);   \
-                                p.c = 0;                                             \
-                                if (ah > 9)                                        \
-                                {                                                \
-                                        p.c = 1;                                     \
-                                        ah -= 10;                                  \
-                                        ah &= 0xF;                                 \
-                                }                                                \
-                                a = (al & 0xF) | (ah << 4);                              \
-                                setzn(a); \
-                                polltime(1); \
-                        }
+    if (p.d) {
+        hc6 = 0;
+        p.z = p.n = 0;
+        tempb = a - temp - ((p.c) ? 0 : 1);
+        if (!(tempb))
+           p.z = 1;
+        al = (a & 15) - (temp & 15) - (p.c ? 0 : 1);
+        if (al & 16) {
+            al -= 6;
+            al &= 0xF;
+            hc6 = 1;
+        }
+        ah = (a >> 4) - (temp >> 4);
+        if (hc6)
+            ah--;                       \
+        if ((a - (temp + (p.c ? 0 : 1))) & 0x80)
+           p.n = 1;
+        p.v = ((a ^ temp) & 0x80) && ((a ^ tempb) & 0x80);
+        p.c = 1;
+        if (ah & 16) {
+            p.c = 0;
+            ah -= 6;
+            ah &= 0xF;
+        }
+        a = (al & 0xF) | ((ah & 0xF) << 4);
+    }
+    else {
+        tempw = a-temp-(p.c ? 0 : 1);
+        tempv = (signed char)a -(signed char)temp-(p.c ? 0 : 1);
+        p.v = ((tempw & 0x80) > 0) ^ ((tempv & 0x100) != 0);
+        p.c = tempw >= 0;
+        a = tempw & 0xFF;
+        setzn(a);
+    }
+}
 
-#define SBCc(temp)      if (!p.d)                            \
-                        {                                  \
-                                tempw = a-temp-(p.c ? 0 : 1);    \
-                                tempv = (signed char)a -(signed char)temp-(p.c ? 0 : 1);        \
-                                p.v = ((tempw & 0x80) > 0) ^ ((tempv & 0x100) != 0);         \
-                                p.c = tempw >= 0;          \
-                                a = tempw & 0xFF;          \
-                                setzn(a);                  \
-                        }                                  \
-                        else                               \
-                        {                                  \
-                                al = (a & 15) - (temp & 15) - (p.c ? 0 : 1); \
-                                tempw = a-temp-(p.c ? 0 : 1);           \
-                                tempv = (signed char)a -(signed char)temp-(p.c ? 0 : 1); \
-                                p.v = ((tempw & 0x80) > 0) ^ ((tempv & 0x100) != 0); \
-                                p.c = tempw >= 0;                       \
-                                if (tempw < 0) {                        \
-                                   tempw -= 0x60;                       \
-                                }                                       \
-                                if (al < 0) {                           \
-                                   tempw -= 0x06;                       \
-                                }                                       \
-                                a = tempw & 0xFF;                       \
-                                setzn(a);                               \
-                                polltime(1);                            \
+static inline void adc_cmos(uint8_t temp)
+{
+    int al, ah;
+    int16_t tempw;
+
+    if (p.d) {
+        ah = 0;
+        al = (a & 0xF) + (temp & 0xF) + (p.c ? 1 : 0);
+        if (al > 9) {
+            al -= 10;
+            al &= 0xF;
+            ah = 1;
+        }
+        ah += ((a >> 4) + (temp >> 4));
+        p.v = (((ah << 4) ^ a) & 0x80) && !((a ^ temp) & 0x80);
+        p.c = 0;
+        if (ah > 9) {
+            p.c = 1;
+            ah -= 10;
+            ah &= 0xF;
+        }
+        a = (al & 0xF) | (ah << 4);
+        setzn(a);
+        polltime(1);
+    }
+    else {
+        tempw = (a + temp + (p.c ? 1 : 0));
+        p.v = (!((a ^ temp) & 0x80) && ((a ^ tempw) & 0x80));
+        a = tempw & 0xFF;
+        p.c = tempw & 0x100;
+        setzn(a);
+    }
+}
+
+static inline void sbc_cmos(uint8_t temp)
+{
+    int al, tempv;
+    int16_t tempw;
+
+    if (p.d) {
+        al = (a & 15) - (temp & 15) - (p.c ? 0 : 1);
+        tempw = a-temp-(p.c ? 0 : 1);
+        tempv = (signed char)a -(signed char)temp-(p.c ? 0 : 1);
+        p.v = ((tempw & 0x80) > 0) ^ ((tempv & 0x100) != 0);
+        p.c = tempw >= 0;
+        if (tempw < 0)
+           tempw -= 0x60;
+        if (al < 0)
+           tempw -= 0x06;
+        a = tempw & 0xFF;
+        setzn(a);
+        polltime(1);
+    }
+    else {
+        tempw = a-temp-(p.c ? 0 : 1);
+        tempv = (signed char)a -(signed char)temp-(p.c ? 0 : 1);
+        p.v = ((tempw & 0x80) > 0) ^ ((tempv & 0x100) != 0);
+        p.c = tempw >= 0;
+        a = tempw & 0xFF;
+        setzn(a);
+    }
 }
 
 static void branchcycles(int temp)
@@ -838,17 +969,9 @@ void m6502_exec()
         int tempi;
         int8_t offset;
         cycles += 40000;
+
         while (cycles > 0) {
-                pc3 = oldoldpc;
-                oldoldpc = oldpc;
-                oldpc = pc;
-//                if (pc==0x2853) output=1;
-//                if (skipint==1) skipint=0;
-                vis20k = RAMbank[pc >> 12];
-                if (dbg_core6502)
-                    debug_preexec(&core6502_cpu_debug, pc);
-                opcode = readmem(pc);
-                pc++;
+                fetch_opcode();
                 switch (opcode) {
                 case 0x00:      /* BRK */
                         if (dbg_core6502)
@@ -1915,7 +2038,7 @@ void m6502_exec()
                         pc++;
                         addr = read_zp_indirect(temp);
                         temp = readmem(addr);
-                        ADC(temp);
+                        adc_nmos(temp);
                         polltime(6);
                         takeint = (interrupt && !p.i);
                         break;
@@ -1933,7 +2056,7 @@ void m6502_exec()
                                 temp |= 0x80;
                         polltime(1);
                         writemem(addr, temp);
-                        ADC(temp);
+                        adc_nmos(temp);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -1949,7 +2072,7 @@ void m6502_exec()
                         addr = readmem(pc);
                         pc++;
                         temp = readmem(addr);
-                        ADC(temp);
+                        adc_nmos(temp);
                         polltime(3);
                         takeint = (interrupt && !p.i);
                         break;
@@ -1981,7 +2104,7 @@ void m6502_exec()
                                 temp |= 0x80;
                         polltime(1);
                         writemem(addr, temp);
-                        ADC(temp);
+                        adc_nmos(temp);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -1995,7 +2118,7 @@ void m6502_exec()
                 case 0x69:      /*ADC imm */
                         temp = readmem(pc);
                         pc++;
-                        ADC(temp);
+                        adc_nmos(temp);
                         polltime(2);
                         takeint = (interrupt && !p.i);
                         break;
@@ -2056,7 +2179,7 @@ void m6502_exec()
                         polltime(4);
                         takeint = (interrupt && !p.i);
                         temp = readmem(addr);
-                        ADC(temp);
+                        adc_nmos(temp);
                         break;
 
                 case 0x6E:      /*ROR abs */
@@ -2091,7 +2214,7 @@ void m6502_exec()
                                 temp |= 0x80;
                         polltime(1);
                         writemem(addr, temp);
-                        ADC(temp);
+                        adc_nmos(temp);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -2115,7 +2238,7 @@ void m6502_exec()
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         temp = readmem(addr + y);
-                        ADC(temp);
+                        adc_nmos(temp);
                         polltime(5);
                         takeint = (interrupt && !p.i);
                         break;
@@ -2135,7 +2258,7 @@ void m6502_exec()
                                 temp |= 0x80;
                         polltime(1);
                         writemem(addr, temp);
-                        ADC(temp);
+                        adc_nmos(temp);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -2151,7 +2274,7 @@ void m6502_exec()
                         addr = readmem(pc);
                         pc++;
                         temp = readmem((addr + x) & 0xFF);
-                        ADC(temp);
+                        adc_nmos(temp);
                         polltime(4);
                         takeint = (interrupt && !p.i);
                         break;
@@ -2185,7 +2308,7 @@ void m6502_exec()
                                 temp |= 0x80;
                         polltime(1);
                         writemem(addr, temp);
-                        ADC(temp);
+                        adc_nmos(temp);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -2200,7 +2323,7 @@ void m6502_exec()
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         temp = readmem(addr + y);
-                        ADC(temp);
+                        adc_nmos(temp);
                         polltime(4);
                         takeint = (interrupt && !p.i);
                         break;
@@ -2223,7 +2346,7 @@ void m6502_exec()
                                 temp |= 0x80;
                         polltime(1);
                         writemem(addr + y, temp);
-                        ADC(temp);
+                        adc_nmos(temp);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -2242,7 +2365,7 @@ void m6502_exec()
                                 polltime(1);
                         addr += x;
                         temp = readmem(addr);
-                        ADC(temp);
+                        adc_nmos(temp);
                         polltime(4);
                         takeint = (interrupt && !p.i);
                         break;
@@ -2277,7 +2400,7 @@ void m6502_exec()
                                 temp |= 0x80;
                         polltime(1);
                         writemem(addr + x, temp);
-                        ADC(temp);
+                        adc_nmos(temp);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -3156,7 +3279,7 @@ void m6502_exec()
                         pc++;
                         addr = read_zp_indirect(temp);
                         temp = readmem(addr);
-                        SBC(temp);
+                        sbc_nmos(temp);
                         polltime(6);
                         takeint = (interrupt && !p.i);
                         break;
@@ -3179,7 +3302,7 @@ void m6502_exec()
                         temp++;
                         polltime(1);
                         writemem(addr, temp);
-                        SBC(temp);
+                        sbc_nmos(temp);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -3197,7 +3320,7 @@ void m6502_exec()
                         addr = readmem(pc);
                         pc++;
                         temp = readmem(addr);
-                        SBC(temp);
+                        sbc_nmos(temp);
                         polltime(3);
                         takeint = (interrupt && !p.i);
                         break;
@@ -3222,7 +3345,7 @@ void m6502_exec()
                         temp++;
                         polltime(1);
                         writemem(addr, temp);
-                        SBC(temp);
+                        sbc_nmos(temp);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -3236,7 +3359,7 @@ void m6502_exec()
                 case 0xE9:      /*SBC imm */
                         temp = readmem(pc);
                         pc++;
-                        SBC(temp);
+                        sbc_nmos(temp);
                         polltime(2);
                         takeint = (interrupt && !p.i);
                         break;
@@ -3249,7 +3372,7 @@ void m6502_exec()
                 case 0xEB:      /*Undocumented - SBC imm */
                         temp = readmem(pc);
                         pc++;
-                        SBC(temp);
+                        sbc_nmos(temp);
                         polltime(2);
                         takeint = (interrupt && !p.i);
                         break;
@@ -3268,7 +3391,7 @@ void m6502_exec()
                         polltime(4);
                         takeint = (interrupt && !p.i);
                         temp = readmem(addr);
-                        SBC(temp);
+                        sbc_nmos(temp);
                         break;
 
                 case 0xEE:      /*INC abs */
@@ -3295,7 +3418,7 @@ void m6502_exec()
                         temp++;
                         polltime(1);
                         writemem(addr, temp);
-                        SBC(temp);
+                        sbc_nmos(temp);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -3320,7 +3443,7 @@ void m6502_exec()
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         temp = readmem(addr + y);
-                        SBC(temp);
+                        sbc_nmos(temp);
                         polltime(5);
                         takeint = (interrupt && !p.i);
                         break;
@@ -3338,7 +3461,7 @@ void m6502_exec()
                         temp++;
                         polltime(1);
                         writemem(addr + y, temp);
-                        SBC(temp);
+                        sbc_nmos(temp);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -3353,7 +3476,7 @@ void m6502_exec()
                         addr = readmem(pc);
                         pc++;
                         temp = readmem((addr + x) & 0xFF);
-                        SBC(temp);
+                        sbc_nmos(temp);
                         polltime(3);
                         takeint = (interrupt && !p.i);
                         break;
@@ -3378,7 +3501,7 @@ void m6502_exec()
                         temp++;
                         polltime(1);
                         writemem(addr, temp);
-                        SBC(temp);
+                        sbc_nmos(temp);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -3393,7 +3516,7 @@ void m6502_exec()
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         temp = readmem(addr + y);
-                        SBC(temp);
+                        sbc_nmos(temp);
                         polltime(4);
                         takeint = (interrupt && !p.i);
                         break;
@@ -3412,7 +3535,7 @@ void m6502_exec()
                         temp++;
                         polltime(1);
                         writemem(addr, temp);
-                        SBC(temp);
+                        sbc_nmos(temp);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -3430,7 +3553,7 @@ void m6502_exec()
                         if ((addr & 0xFF00) ^ ((addr + x) & 0xFF00))
                                 polltime(1);
                         temp = readmem(addr + x);
-                        SBC(temp);
+                        sbc_nmos(temp);
                         polltime(4);
                         takeint = (interrupt && !p.i);
                         break;
@@ -3456,7 +3579,7 @@ void m6502_exec()
                         temp++;
                         polltime(1);
                         writemem(addr, temp);
-                        SBC(temp);
+                        sbc_nmos(temp);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -3598,7 +3721,7 @@ void m6502_exec()
                 if (otherstuffcount <= 0)
                     otherstuff_poll();
                 if (tube_exec && tubecycle) {
-                        tubecycles += (tubecycle << tube_shift);
+                        tubecycles += (tubecycle * tube_multipler) >> 1;
                         if (tubecycles > 3)
                                 tube_exec();
                         tubecycle = 0;
@@ -3621,23 +3744,14 @@ void m65c02_exec()
 {
         uint16_t addr;
         uint8_t temp;
+        uint16_t tempw;
         int tempi;
         int8_t offset;
         cycles += 40000;
 //        log_debug("PC = %04X\n",pc);
 //        log_debug("Exec cycles %i\n",cycles);
         while (cycles > 0) {
-//                if (pc==0x806F) log_debug("806F from %04X %04X\n",oldpc,oldoldpc);
-//                if (pc>0xDFF && pc<0x8000) log_debug("EXEC %04X\n",pc);
-                pc3 = oldoldpc;
-                oldoldpc = oldpc;
-                oldpc = pc;
-//                if (skipint==1) skipint=0;
-                vis20k = RAMbank[pc >> 12];
-                if (dbg_core6502)
-                    debug_preexec(&core6502_cpu_debug, pc);
-                opcode = readmem(pc);
-                pc++;
+                fetch_opcode();
                 switch (opcode) {
                 case 0x00:      /* BRK */
                         if (dbg_core6502)
@@ -4332,7 +4446,7 @@ void m65c02_exec()
                         pc++;
                         addr = read_zp_indirect(temp);
                         temp = readmem(addr);
-                        ADCc(temp);
+                        adc_cmos(temp);
                         polltime(6);
                         takeint = (interrupt && !p.i);
                         break;
@@ -4348,7 +4462,7 @@ void m65c02_exec()
                         addr = readmem(pc);
                         pc++;
                         temp = readmem(addr);
-                        ADCc(temp);
+                        adc_cmos(temp);
                         polltime(3);
                         takeint = (interrupt && !p.i);
                         break;
@@ -4378,7 +4492,7 @@ void m65c02_exec()
                 case 0x69:      /*ADC imm */
                         temp = readmem(pc);
                         pc++;
-                        ADCc(temp);
+                        adc_cmos(temp);
                         polltime(2);
                         takeint = (interrupt && !p.i);
                         break;
@@ -4406,7 +4520,7 @@ void m65c02_exec()
                         polltime(4);
                         takeint = (interrupt && !p.i);
                         temp = readmem(addr);
-                        ADCc(temp);
+                        adc_cmos(temp);
                         break;
 
                 case 0x6E:      /*ROR abs */
@@ -4450,7 +4564,7 @@ void m65c02_exec()
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         temp = readmem(addr + y);
-                        ADCc(temp);
+                        adc_cmos(temp);
                         polltime(5);
                         takeint = (interrupt && !p.i);
                         break;
@@ -4460,7 +4574,7 @@ void m65c02_exec()
                         pc++;
                         addr = read_zp_indirect(temp);
                         temp = readmem(addr);
-                        ADCc(temp);
+                        adc_cmos(temp);
                         polltime(5);
                         break;
 
@@ -4475,7 +4589,7 @@ void m65c02_exec()
                         addr = readmem(pc);
                         pc++;
                         temp = readmem((addr + x) & 0xFF);
-                        ADCc(temp);
+                        adc_cmos(temp);
                         polltime(4);
                         takeint = (interrupt && !p.i);
                         break;
@@ -4508,7 +4622,7 @@ void m65c02_exec()
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         temp = readmem(addr + y);
-                        ADCc(temp);
+                        adc_cmos(temp);
                         polltime(4);
                         takeint = (interrupt && !p.i);
                         break;
@@ -4532,7 +4646,7 @@ void m65c02_exec()
                                 polltime(1);
                         addr += x;
                         temp = readmem(addr);
-                        ADCc(temp);
+                        adc_cmos(temp);
                         polltime(4);
                         takeint = (interrupt && !p.i);
                         break;
@@ -5186,7 +5300,7 @@ void m65c02_exec()
                         pc++;
                         addr = read_zp_indirect(temp);
                         temp = readmem(addr);
-                        SBCc(temp);
+                        sbc_cmos(temp);
                         polltime(6);
                         takeint = (interrupt && !p.i);
                         break;
@@ -5205,7 +5319,7 @@ void m65c02_exec()
                         addr = readmem(pc);
                         pc++;
                         temp = readmem(addr);
-                        SBCc(temp);
+                        sbc_cmos(temp);
                         polltime(3);
                         takeint = (interrupt && !p.i);
                         break;
@@ -5230,7 +5344,7 @@ void m65c02_exec()
                 case 0xE9:      /*SBC imm */
                         temp = readmem(pc);
                         pc++;
-                        SBCc(temp);
+                        sbc_cmos(temp);
                         polltime(2);
                         takeint = (interrupt && !p.i);
                         break;
@@ -5254,7 +5368,7 @@ void m65c02_exec()
                         polltime(4);
                         takeint = (interrupt && !p.i);
                         temp = readmem(addr);
-                        SBCc(temp);
+                        sbc_cmos(temp);
                         break;
 
                 case 0xEE:      /*INC abs */
@@ -5290,7 +5404,7 @@ void m65c02_exec()
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         temp = readmem(addr + y);
-                        SBCc(temp);
+                        sbc_cmos(temp);
                         polltime(5);
                         takeint = (interrupt && !p.i);
                         break;
@@ -5300,7 +5414,7 @@ void m65c02_exec()
                         pc++;
                         addr = read_zp_indirect(temp);
                         temp = readmem(addr);
-                        SBCc(temp);
+                        sbc_cmos(temp);
                         polltime(5);
                         break;
 
@@ -5308,7 +5422,7 @@ void m65c02_exec()
                         addr = readmem(pc);
                         pc++;
                         temp = readmem((addr + x) & 0xFF);
-                        SBCc(temp);
+                        sbc_cmos(temp);
                         polltime(3);
                         takeint = (interrupt && !p.i);
                         break;
@@ -5334,7 +5448,7 @@ void m65c02_exec()
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         temp = readmem(addr + y);
-                        SBCc(temp);
+                        sbc_cmos(temp);
                         polltime(4);
                         takeint = (interrupt && !p.i);
                         break;
@@ -5350,7 +5464,7 @@ void m65c02_exec()
                         if ((addr & 0xFF00) ^ ((addr + x) & 0xFF00))
                                 polltime(1);
                         temp = readmem(addr + x);
-                        SBCc(temp);
+                        sbc_cmos(temp);
                         polltime(4);
                         takeint = (interrupt && !p.i);
                         break;
@@ -5376,7 +5490,7 @@ void m65c02_exec()
                         case 3:
                         case 7:
                         case 0xB:
-                        case 0xF:                           
+                        case 0xF:
                                 polltime(1);
                                 break;
                         case 4:
@@ -5444,7 +5558,7 @@ void m65c02_exec()
                 interrupt &= ~128;
                 if (tube_exec && tubecycle) {
 //                        log_debug("tubeexec %i %i %i\n",tubecycles,tubecycle,tube_shift);
-                        tubecycles += (tubecycle << tube_shift);
+                        tubecycles += (tubecycle * tube_multipler) >> 1;
                         if (tubecycles > 3)
                                 tube_exec();
                         tubecycle = 0;

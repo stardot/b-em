@@ -1,14 +1,15 @@
 /*B-em v2.2 by Tom Walker
   Tape noise (not very good)*/
 
-#include <stdio.h>
-#include <allegro.h>
-#include <math.h>
 #include "b-em.h"
+#include <math.h>
 #include "ddnoise.h"
 #include "tapenoise.h"
 #include "sound.h"
-#include "soundopenal.h"
+
+static ALLEGRO_VOICE *voice;
+static ALLEGRO_MIXER *mixer;
+static ALLEGRO_AUDIO_STREAM *stream;
 
 static int tpnoisep = 0;
 static int tmcount = 0;
@@ -20,125 +21,137 @@ static int sinewave[32];
 
 #define PI 3.142
 
-static SAMPLE *tsamples[2];
+static ALLEGRO_SAMPLE *tsamples[2];
 
-void tapenoise_init()
+void tapenoise_init(ALLEGRO_EVENT_QUEUE *queue)
 {
-        char path[512], p2[512];
-        int c;
+    ALLEGRO_PATH *dir;
+    int c;
 
-        getcwd(p2, 511);
-        sprintf(path, "%sddnoise", exedir);
-//        printf("path now %s\n",path);
-        chdir(path);
-        tsamples[0] = load_wav("motoron.wav");
-        tsamples[1] = load_wav("motoroff.wav");
-        chdir(p2);
-        for (c = 0; c < 32; c++)
-        {
-                sinewave[c] = (int)(sin((float)c * ((2.0 * PI) / 32.0)) * 128.0);
-        }
+    log_debug("tapenoise: tapenoise_init");
+    if ((voice = al_create_voice(FREQ_DD, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_1))) {
+        if ((mixer = al_create_mixer(FREQ_DD, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_1))) {
+            if (al_attach_mixer_to_voice(mixer, voice)) {
+                if ((stream = al_create_audio_stream(4, BUFLEN_DD, FREQ_DD, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_1))) {
+                    if (al_attach_audio_stream_to_mixer(stream, mixer)) {
+                        dir = al_create_path_for_directory("ddnoise");
+                        tsamples[0] = find_load_wav(dir, "motoron");
+                        tsamples[1] = find_load_wav(dir, "motoroff");
+                        al_destroy_path(dir);
+                        for (c = 0; c < 32; c++)
+                            sinewave[c] = (int)(sin((float)c * ((2.0 * PI) / 32.0)) * 128.0);
+                    } else
+                        log_error("sound: unable to attach stream to mixer for tape noise");
+                } else
+                    log_error("sound: unable to create stream for tape noise");
+            } else
+                log_error("sound: unable to attach mixer to voice for tape noise");
+        } else
+            log_error("sound: unable to create mixer for tape noise");
+    } else
+        log_error("sound: unable to create voice for for tape noise");
 }
 
 void tapenoise_close()
 {
-        destroy_sample(tsamples[0]);
-        destroy_sample(tsamples[1]);
+    ALLEGRO_SAMPLE *smp;
+
+    log_debug("tapenoise: tapenoise_close");
+    if ((smp = tsamples[0]))
+        al_destroy_sample(smp);
+    if ((smp = tsamples[1]))
+        al_destroy_sample(smp);
 }
 
-void tapenoise_addhigh()
+static void send_buffer(void)
 {
-        int c;
-        float wavediv = (32.0f * 2400.0f) / (float) FREQ_DD;
-//        log_debug("Wavediv %f %i\n",wavediv,tmcount);
-        tmcount++;
-        for (c = 0; c < 368; c++)
-        {
-                if (tpnoisep >= BUFLEN_DD) return;
-                tapenoise[tpnoisep++] = sinewave[((int)swavepos) & 0x1F] * 64;
-                swavepos += wavediv;
+    int16_t *tapebuffer;
+    int c;
+
+    tpnoisep = 0;
+    if ((tapebuffer = al_get_audio_stream_fragment(stream))) {
+
+        for (c = 0; c < BUFLEN_DD; c++) {
+            tapebuffer[c] = tapenoise[c];
+            tapenoise[c] = 0;
         }
+        al_set_audio_stream_fragment(stream, tapebuffer);
+    } else
+        log_debug("tapenoise: overrun");
+}
+
+static void add_high(void)
+{
+    int c;
+    float wavediv = (32.0f * 2400.0f) / (float) FREQ_DD;
+
+    tmcount++;
+    for (c = 0; c < 368; c++) {
+        if (tpnoisep >= BUFLEN_DD)
+            send_buffer();
+        tapenoise[tpnoisep++] = sinewave[((int)swavepos) & 0x1F] * 64;
+        swavepos += wavediv;
+    }
+}
+
+void tapenoise_addhigh(void)
+{
+    if (sound_tape)
+        add_high();
+}
+
+static void add_dat(uint8_t dat)
+{
+    int c, d, e = 0;
+    float wavediv = (32.0f * 2400.0f) / (float) FREQ_DD;
+
+    for (c = 0; c < 30; c++) { /*Start bit*/
+        if (tpnoisep >= BUFLEN_DD)
+            send_buffer();
+        tapenoise[tpnoisep++] = sinewave[((int)swavepos) & 0x1F] * 64;
+        e++;
+        swavepos += (wavediv / 2);
+    }
+    swavepos = fmod(swavepos, 32.0);
+    while (swavepos < 32.0) {
+        if (tpnoisep >= BUFLEN_DD)
+            send_buffer();
+        tapenoise[tpnoisep++] = sinewave[((int)swavepos) & 0x1F] * 64;
+        swavepos += (wavediv / 2);
+        e++;
+    }
+    for (d = 0; d < 8; d++) {
+        swavepos = fmod(swavepos, 32.0);
+        while (swavepos < 32.0) {
+            if (tpnoisep >= BUFLEN_DD)
+                send_buffer();
+            tapenoise[tpnoisep++] = sinewave[((int)swavepos) & 0x1F] * ((dat & 1) ? 50 : 64);
+            if (dat & 1) swavepos += wavediv;
+            else         swavepos += (wavediv / 2);
+            e++;
+        }
+        dat >>= 1;
+    }
+    for ( ;e < 368; e++) { /*Stop bit*/
+        if (tpnoisep >= BUFLEN_DD)
+            send_buffer();
+        tapenoise[tpnoisep++] = sinewave[((int)swavepos) & 0x1F] * 64;
+        swavepos += (wavediv / 2);
+    }
+    add_high();
 }
 
 void tapenoise_adddat(uint8_t dat)
 {
-        int c, d,e = 0;
-        float wavediv = (32.0f * 2400.0f) / (float) FREQ_DD;
-//        swavepos=0;
-        for (c = 0; c < 30; c++) /*Start bit*/
-        {
-                if (tpnoisep >= BUFLEN_DD) return;
-                tapenoise[tpnoisep++] = sinewave[((int)swavepos) & 0x1F] * 64;
-                e++;
-                swavepos += (wavediv / 2);
-        }
-        swavepos = fmod(swavepos, 32.0);
-        while (swavepos < 32.0)
-        {
-                if (tpnoisep >= BUFLEN_DD) return;
-                tapenoise[tpnoisep++] = sinewave[((int)swavepos) & 0x1F] * 64;
-                swavepos += (wavediv / 2);
-                e++;
-        }
-        for (d = 0; d < 8; d++)
-        {
-                swavepos = fmod(swavepos, 32.0);
-                while (swavepos < 32.0)
-                {
-                        if (tpnoisep >= BUFLEN_DD) return;
-                        tapenoise[tpnoisep++] = sinewave[((int)swavepos) & 0x1F] * ((dat & 1) ? 50 : 64);
-                        if (dat & 1) swavepos += wavediv;
-                        else         swavepos += (wavediv / 2);
-                        e++;
-                }
-                dat >>= 1;
-        }
-//        swavepos=0;
-        for ( ;e < 368; e++) /*Stop bit*/
-        {
-                if (tpnoisep >= BUFLEN_DD) return;
-                tapenoise[tpnoisep++] = sinewave[((int)swavepos) & 0x1F] * 64;
-                swavepos += (wavediv / 2);
-        }
-
-        tapenoise_addhigh();
+    if (sound_tape)
+        add_dat(dat);
 }
-
-static int tnoise_sstat = -1, tnoise_spos;
 
 void tapenoise_motorchange(int stat)
 {
-        tnoise_sstat = stat ^ 1;
-        tnoise_spos = 0;
-}
+    ALLEGRO_SAMPLE *smp;
 
-void tapenoise_mix(int16_t *tapebuffer)
-{
-        int c;
-        tpnoisep = 0;
-        if (!sound_tape) return;
-//        log_debug("Mix!\n");
-
-        for (c = 0; c < BUFLEN_DD; c++)
-        {
-                tapebuffer[c] += tapenoise[c];
-                tapenoise[c] = 0;
-        }
-
-        for (c = 0; c < BUFLEN_DD; c++)
-        {
-                if (tnoise_sstat >= 0)
-                {
-                        if (tnoise_spos >= tsamples[tnoise_sstat]->len)
-                        {
-                                tnoise_spos = 0;
-                                tnoise_sstat = -1;
-                        }
-                        else
-                        {
-                                tapebuffer[c] += ((int16_t)((((int16_t *)tsamples[tnoise_sstat]->data)[(int)tnoise_spos]) ^ 0x8000) / 4);
-                                tnoise_spos += ((float)tsamples[tnoise_sstat]->freq / (float) FREQ_DD);
-                        }
-                }
-        }
+    log_debug("tapenoise: motorchange, stat=%d", stat);
+    if ((stat < 2) && (smp = tsamples[stat]))
+        al_play_sample(smp, 1.0, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
 }

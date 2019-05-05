@@ -1,9 +1,9 @@
 #include "b-em.h"
+#include "config.h"
 #include "music2000.h"
 #include "music4000.h"
 #include "midi-linux.h"
 #include "sound.h"
-#include <allegro.h>
 #include <pthread.h>
 #include <unistd.h>
 
@@ -132,17 +132,17 @@ static inline void midi_jack_close(void) {
 }
 
 static inline void midi_jack_load_config(void) {
-    midi_music4000.jack_enabled = get_config_int("midi", "music4000_jack_enabled", 0);
-    midi_music2000_out1.jack_enabled = get_config_int("midi", "music2000_out1_jack_enabled", 0);
-    midi_music2000_out2.jack_enabled = get_config_int("midi", "music2000_out2_jack_enabled", 0);
-    midi_music2000_out3.jack_enabled = get_config_int("midi", "music2000_out3_jack_enabled", 0);
+    midi_music4000.jack_enabled = get_config_bool("midi", "music4000_jack_enabled", 0);
+    midi_music2000_out1.jack_enabled = get_config_bool("midi", "music2000_out1_jack_enabled", 0);
+    midi_music2000_out2.jack_enabled = get_config_bool("midi", "music2000_out2_jack_enabled", 0);
+    midi_music2000_out3.jack_enabled = get_config_bool("midi", "music2000_out3_jack_enabled", 0);
 }
 
 static inline void midi_jack_save_config(void) {
-    set_config_int("midi", "music4000_jack_enabled", midi_music4000.jack_enabled);
-    set_config_int("midi", "music2000_out1_jack_enabled", midi_music2000_out1.jack_enabled);
-    set_config_int("midi", "music2000_out2_jack_enabled", midi_music2000_out2.jack_enabled);
-    set_config_int("midi", "music2000_out3_jack_enabled", midi_music2000_out3.jack_enabled);
+    set_config_bool("midi", "music4000_jack_enabled", midi_music4000.jack_enabled);
+    set_config_bool("midi", "music2000_out1_jack_enabled", midi_music2000_out1.jack_enabled);
+    set_config_bool("midi", "music2000_out2_jack_enabled", midi_music2000_out2.jack_enabled);
+    set_config_bool("midi", "music2000_out3_jack_enabled", midi_music2000_out3.jack_enabled);
 }
 
 static inline void midi_jack_send_msg(midi_dev_t *midi, uint8_t *buffer, size_t size) {
@@ -160,7 +160,7 @@ static inline void midi_jack_send_msg(midi_dev_t *midi, uint8_t *buffer, size_t 
 
 #ifdef HAVE_ALSA_ASOUNDLIB_H
 
-extern int quited;
+extern int quitting;
 
 static pthread_t alsa_seq_thread;
 static snd_seq_t *midi_seq = NULL;
@@ -168,7 +168,7 @@ static snd_seq_t *midi_seq = NULL;
 static void *alsa_seq_midi_run(void *arg) {
     snd_seq_event_t *ev;
 
-    while (!quited) {
+    while (!quitting) {
         log_debug("midi-linux: waiting for ALSA MIDI sequencer event");
         if (snd_seq_event_input(midi_seq, &ev) >= 0) {
             log_debug("midi-linux: got ALSA MIDI sequencer event");
@@ -263,7 +263,7 @@ static void midi_alsa_seq_send_msg(midi_dev_t *midi, uint8_t *buffer, size_t siz
 
     if (midi->alsa_seq_enabled && midi->alsa_seq_port) {
         snd_seq_ev_clear(&ev);
-        
+
         switch(buffer[0] >> 4) {
             case 0x8:
                 snd_seq_ev_set_noteoff(&ev, buffer[0] & 0x0f, buffer[1], buffer[2]);
@@ -362,7 +362,7 @@ static void *alsa_raw_midi_run(void *arg) {
     if ((status = snd_rawmidi_open(&midiin, NULL, device, 0)) < 0)
         log_warn("midi-linux: unable to open ALSA raw MIDI port '%s': %s", device, snd_strerror(status));
     else {
-        while (!quited) {
+        while (!quitting) {
             log_debug("midi-linux: waiting to read ALSA raw MIDI port");
             if ((status = snd_rawmidi_read(midiin, buffer, sizeof buffer)) < 0)
                 log_warn("midi-linux: ALSA raw MIDI read failed: %s", snd_strerror(status));
@@ -436,30 +436,30 @@ static inline void midi_alsa_raw_init(void) {
 }
 
 static inline void midi_alsa_load_config(void) {
-    midi_music4000.alsa_seq_enabled = get_config_int("midi", "music4000_alsa_seq_enabled", 1);
-    midi_music4000.alsa_raw_enabled = get_config_int("midi", "music4000_alsa_raw_enabled", 1);
+    midi_music4000.alsa_seq_enabled = get_config_bool("midi", "music4000_alsa_seq_enabled", 1);
+    midi_music4000.alsa_raw_enabled = get_config_bool("midi", "music4000_alsa_raw_enabled", 1);
     midi_music4000.alsa_raw_device  = strdup(get_config_string("midi", "music4000_alsa_raw_device", "default"));
-    midi_music2000_out1.alsa_seq_enabled = get_config_int("midi", "music2000_out1_alsa_seq_enabled", 0);
-    midi_music2000_out2.alsa_seq_enabled = get_config_int("midi", "music2000_out2_alsa_seq_enabled", 0);
-    midi_music2000_out3.alsa_seq_enabled = get_config_int("midi", "music2000_out3_alsa_seq_enabled", 0);
-    midi_music2000_out1.alsa_raw_enabled = get_config_int("midi", "music2000_out1_alsa_raw_enabled", 1);
-    midi_music2000_out2.alsa_raw_enabled = get_config_int("midi", "music2000_out2_alsa_raw_enabled", 0);
-    midi_music2000_out3.alsa_raw_enabled = get_config_int("midi", "music2000_out3_alsa_raw_enabled", 0);
+    midi_music2000_out1.alsa_seq_enabled = get_config_bool("midi", "music2000_out1_alsa_seq_enabled", 0);
+    midi_music2000_out2.alsa_seq_enabled = get_config_bool("midi", "music2000_out2_alsa_seq_enabled", 0);
+    midi_music2000_out3.alsa_seq_enabled = get_config_bool("midi", "music2000_out3_alsa_seq_enabled", 0);
+    midi_music2000_out1.alsa_raw_enabled = get_config_bool("midi", "music2000_out1_alsa_raw_enabled", 1);
+    midi_music2000_out2.alsa_raw_enabled = get_config_bool("midi", "music2000_out2_alsa_raw_enabled", 0);
+    midi_music2000_out3.alsa_raw_enabled = get_config_bool("midi", "music2000_out3_alsa_raw_enabled", 0);
     midi_music2000_out1.alsa_raw_device  = strdup(get_config_string("midi", "music2000_out1_alsa_raw_device", "default"));
     midi_music2000_out2.alsa_raw_device  = strdup(get_config_string("midi", "music2000_out2_alsa_raw_device", "default"));
     midi_music2000_out3.alsa_raw_device  = strdup(get_config_string("midi", "music2000_out3_alsa_raw_device", "default"));
 }
 
 static inline void midi_alsa_save_config(void) {
-    set_config_int("midi", "music4000_alsa_seq_enabled", midi_music4000.alsa_seq_enabled);
-    set_config_int("midi", "music4000_alsa_raw_enabled", midi_music4000.alsa_raw_enabled);
+    set_config_bool("midi", "music4000_alsa_seq_enabled", midi_music4000.alsa_seq_enabled);
+    set_config_bool("midi", "music4000_alsa_raw_enabled", midi_music4000.alsa_raw_enabled);
     set_config_string("midi", "music4000_alsa_raw_device", midi_music4000.alsa_raw_device);
-    set_config_int("midi", "music2000_out1_alsa_seq_enabled", midi_music2000_out1.alsa_seq_enabled);
-    set_config_int("midi", "music2000_out2_alsa_seq_enabled", midi_music2000_out2.alsa_seq_enabled);
-    set_config_int("midi", "music2000_out3_alsa_seq_enabled", midi_music2000_out3.alsa_seq_enabled);
-    set_config_int("midi", "music2000_out1_alsa_raw_enabled", midi_music2000_out1.alsa_raw_enabled);
-    set_config_int("midi", "music2000_out2_alsa_raw_enabled", midi_music2000_out2.alsa_raw_enabled);
-    set_config_int("midi", "music2000_out3_alsa_raw_enabled", midi_music2000_out3.alsa_raw_enabled);
+    set_config_bool("midi", "music2000_out1_alsa_seq_enabled", midi_music2000_out1.alsa_seq_enabled);
+    set_config_bool("midi", "music2000_out2_alsa_seq_enabled", midi_music2000_out2.alsa_seq_enabled);
+    set_config_bool("midi", "music2000_out3_alsa_seq_enabled", midi_music2000_out3.alsa_seq_enabled);
+    set_config_bool("midi", "music2000_out1_alsa_raw_enabled", midi_music2000_out1.alsa_raw_enabled);
+    set_config_bool("midi", "music2000_out2_alsa_raw_enabled", midi_music2000_out2.alsa_raw_enabled);
+    set_config_bool("midi", "music2000_out3_alsa_raw_enabled", midi_music2000_out3.alsa_raw_enabled);
     set_config_string("midi", "music2000_out1_alsa_raw_device", midi_music2000_out1.alsa_raw_device);
     set_config_string("midi", "music2000_out2_alsa_raw_device", midi_music2000_out2.alsa_raw_device);
     set_config_string("midi", "music2000_out3_alsa_raw_device", midi_music2000_out3.alsa_raw_device);

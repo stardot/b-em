@@ -1,8 +1,6 @@
 /*B-em v2.2 by Tom Walker
   Internal SN sound chip emulation*/
 
-#include <allegro.h>
-#include <stdio.h>
 #include "b-em.h"
 #include "sid_b-em.h"
 #include "sn76489.h"
@@ -15,7 +13,7 @@ uint8_t sn_vol[4];
 uint8_t sn_noise;
 static uint16_t sn_shift;
 static int lasttone;
-static fixed sn_count[4], sn_stat[4];
+static int sn_count[4], sn_stat[4];
 uint32_t sn_latch[4];
 
 static int sn_rect_pos = 0,sn_rect_dir = 0;
@@ -79,7 +77,7 @@ void sn_fillbuf(int16_t *buffer, int len)
                         c++;
                         if (sn_latch[c] > 256) buffer[d] += (int16_t) (snwaves[curwave][sn_stat[c]] * volslog[sn_vol[c]]);
                         else                   buffer[d] += (int16_t) (volslog[sn_vol[c]] * 127);
-                        
+
                         sn_count[c] -= 8192;
                         while ((int)sn_count[c] < 0  && sn_latch[c])
                         {
@@ -119,7 +117,7 @@ void sn_fillbuf(int16_t *buffer, int len)
                 else
                    sn_stat[0] &= 32767;
 //                buffer[d] += (lpt_dac * 32);
-                
+
                 sidcount++;
                 if (sidcount == 624)
                 {
@@ -171,41 +169,41 @@ void sn_write(uint8_t data)
                 firstdat = data;
                 switch (data & 0x70)
                 {
-                        case 0:
+                    case 0:
                         sn_freqlo[3] = data & 0xF;
                         sn_latch[3] = (sn_freqlo[3] | (sn_freqhi[3] << 4)) << 6;
                         lasttone = 3;
                         break;
-                        case 0x10:
+                    case 0x10:
                         data &= 0xF;
                         sn_vol[3] = 0xF - data;
                         break;
-                        case 0x20:
+                    case 0x20:
                         sn_freqlo[2] = data & 0xF;
                         sn_latch[2] = (sn_freqlo[2] | (sn_freqhi[2] << 4)) << 6;
                         lasttone = 2;
                         break;
-                        case 0x30:
+                    case 0x30:
                         data &= 0xF;
                         sn_vol[2] = 0xF - data;
                         break;
-                        case 0x40:
+                    case 0x40:
                         sn_freqlo[1] = data & 0xF;
                         sn_latch[1] = (sn_freqlo[1] | (sn_freqhi[1] << 4)) << 6;
                         lasttone = 1;
                         break;
-                        case 0x50:
+                    case 0x50:
                         data &= 0xF;
                         sn_vol[1] = 0xF - data;
                         break;
-                        case 0x60:
+                    case 0x60:
                         sn_shift = 0x4000;
                         if ((data & 3) != (sn_noise & 3)) sn_count[0] = 0;
                         sn_noise = data & 0xF;
                         if ((data & 3) == 3) sn_latch[0] = sn_latch[1];
                         else                 sn_latch[0] = 0x400 << (data & 3);
                         break;
-                        case 0x70:
+                    case 0x70:
                         data &= 0xF;
                         sn_vol[0] = 0xF - data;
                         break;

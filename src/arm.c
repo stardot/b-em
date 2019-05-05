@@ -4,12 +4,15 @@
 
 #include <stdio.h>
 #include <stdint.h>
-#include <allegro.h>
 #include "b-em.h"
 #include "arm.h"
 #include "tube.h"
 #include "cpu_debug.h"
 #include "darm/darm.h"
+#include "ssinline.h"
+
+#define ARM_ROM_SIZE   0x4000
+#define ARM_RAM_SIZE 0x400000
 
 static int arm_debug_enabled = 0;
 
@@ -67,60 +70,88 @@ static uint8_t *armromb,*armramb;
 static int mode;
 static int osmode=0,memmode;
 
+static void mode_store_regs(void)
+{
+    int c;
+
+    switch (mode)
+    {
+        case USER:
+            for (c=8; c<15; c++)
+                userregs[c]=armregs[c];
+            break;
+        case IRQ:
+            for (c=8; c<13; c++)
+                userregs[c]=armregs[c];
+            irqregs[0]=armregs[13];
+            irqregs[1]=armregs[14];
+            break;
+        case FIQ:
+            for (c=8; c<15; c++)
+                fiqregs[c]=armregs[c];
+            break;
+        case SUPERVISOR:
+            for (c=8; c<13; c++)
+                userregs[c]=armregs[c];
+            superregs[0]=armregs[13];
+            superregs[1]=armregs[14];
+            break;
+    }
+}
+
+static void mode_load_regs(void)
+{
+    int c;
+
+    switch (mode)
+    {
+        case USER:
+            for (c=8; c<15; c++)
+                armregs[c]=userregs[c];
+            memmode=osmode;
+            for (c=0; c<15; c++)
+                usrregs[c]=&armregs[c];
+            break;
+        case IRQ:
+            for (c=8; c<13; c++)
+                armregs[c]=userregs[c];
+            armregs[13]=irqregs[0];
+            armregs[14]=irqregs[1];
+            for (c=0; c<13; c++)
+                usrregs[c]=&armregs[c];
+            for (c=13; c<15; c++)
+                usrregs[c]=&userregs[c];
+            memmode=2;
+            break;
+        case FIQ:
+            for (c=8; c<15; c++)
+                armregs[c]=fiqregs[c];
+            for (c=0; c<8; c++)
+                usrregs[c]=&armregs[c];
+            for (c=8; c<15; c++)
+                usrregs[c]=&userregs[c];
+            memmode=2;
+            break;
+        case SUPERVISOR:
+            for (c=8; c<13; c++)
+                armregs[c]=userregs[c];
+            armregs[13]=superregs[0];
+            armregs[14]=superregs[1];
+            for (c=0; c<13; c++)
+                usrregs[c]=&armregs[c];
+            for (c=13; c<15; c++)
+                usrregs[c]=&userregs[c];
+            memmode=2;
+            break;
+    }
+}
+
 static void updatemode(int m)
 {
-        int c;
-        usrregs[15]=&armregs[15];
-        switch (mode) /*Store back registers*/
-        {
-                case USER:
-                for (c=8;c<15;c++) userregs[c]=armregs[c];
-                break;
-                case IRQ:
-                for (c=8;c<13;c++) userregs[c]=armregs[c];
-                irqregs[0]=armregs[13];
-                irqregs[1]=armregs[14];
-                break;
-                case FIQ:
-                for (c=8;c<15;c++) fiqregs[c]=armregs[c];
-                break;
-                case SUPERVISOR:
-                for (c=8;c<13;c++) userregs[c]=armregs[c];
-                superregs[0]=armregs[13];
-                superregs[1]=armregs[14];
-                break;
-        }
-        mode=m;
-        switch (m)
-        {
-                case USER:
-                for (c=8;c<15;c++) armregs[c]=userregs[c];
-                memmode=osmode;
-                for (c=0;c<15;c++) usrregs[c]=&armregs[c];
-                break;
-                case IRQ:
-                for (c=8;c<13;c++) armregs[c]=userregs[c];
-                armregs[13]=irqregs[0];
-                armregs[14]=irqregs[1];
-                for (c=0;c<13;c++) usrregs[c]=&armregs[c];
-                for (c=13;c<15;c++) usrregs[c]=&userregs[c];
-                memmode=2;
-                break;
-                case FIQ:
-                for (c=8;c<15;c++) armregs[c]=fiqregs[c];
-                for (c=0;c<8;c++)  usrregs[c]=&armregs[c];
-                for (c=8;c<15;c++) usrregs[c]=&userregs[c];
-                memmode=2;
-                break;
-                case SUPERVISOR:
-                for (c=8;c<13;c++) armregs[c]=userregs[c];
-                armregs[13]=superregs[0];
-                armregs[14]=superregs[1];
-                for (c=0;c<13;c++) usrregs[c]=&armregs[c];
-                for (c=13;c<15;c++) usrregs[c]=&userregs[c];
-                memmode=2;
-                break;
-        }
+    usrregs[15]=&armregs[15];
+    mode_store_regs();
+    mode=m;
+    mode_load_regs();
 }
 
 static uint8_t flaglookup[16][16];
@@ -181,7 +212,7 @@ void arm_reset()
         armregs[15]=0x0C00000B;
         mode=3;
         memmode=2;
-        memcpy(armramb,armromb,0x4000);
+        memcpy(armramb,armromb,ARM_ROM_SIZE);
         refillpipeline2();
 }
 
@@ -200,31 +231,87 @@ void arm_dumpregs()
 
 static uint32_t *armread[64];
 static uint32_t armmask[64];
-void arm_init()
+
+bool arm_init(FILE *romf)
 {
-        FILE *f;
         int c;
-        char fn[256];
-        if (!armrom) armrom=(uint32_t *)malloc(0x4000);
-        if (!armram) armram=(uint32_t *)malloc(0x400000);
+        if (!armrom) armrom=(uint32_t *)malloc(ARM_ROM_SIZE);
+        if (!armram) armram=(uint32_t *)malloc(ARM_RAM_SIZE);
         armromb=(uint8_t *)armrom;
         armramb=(uint8_t *)armram;
-        append_filename(fn,exedir,"roms/tube/ARMeval_100.rom",511);
-        f=x_fopen(fn,"rb");
-        fread(armromb,0x4000,1,f);
-        fclose(f);
-        memcpy(armramb,armromb,0x4000);
+        if (fread(armromb, ARM_ROM_SIZE, 1, romf) != 1)
+            return false;
+        memcpy(armramb,armromb,ARM_ROM_SIZE);
         for (c=0;c<64;c++) armread[c]=0;
         for (c=0;c<4;c++) armread[c]=&armram[c*0x40000];
         armread[48]=armrom;
         for (c=0;c<64;c++) armmask[c]=0xFFFFF;
         armmask[48]=0x3FFF;
+        return true;
 }
 
 void arm_close()
 {
         if (armrom) free(armrom);
         if (armram) free(armram);
+}
+
+static unsigned char *save_regset(unsigned char *ptr, uint32_t *regs)
+{
+    for (int i = 0; i < 16; i++)
+        ptr = save_uint32(ptr, regs[i]);
+    return ptr;
+}
+
+void arm_savestate(ZFILE *zfp)
+{
+    unsigned char bytes[332], *ptr;
+
+    ptr = bytes;
+    *ptr++ = mode;
+    *ptr++ = osmode;
+    mode_store_regs();
+    ptr = save_regset(ptr, armregs);
+    ptr = save_regset(ptr, userregs);
+    ptr = save_regset(ptr, superregs);
+    ptr = save_regset(ptr, fiqregs);
+    ptr = save_regset(ptr, irqregs);
+    ptr = save_uint32(ptr, opcode2);
+    ptr = save_uint32(ptr, opcode3);
+    *ptr++ = armirq;
+    *ptr++ = databort;
+    savestate_zwrite(zfp, bytes, sizeof bytes);
+    savestate_zwrite(zfp, armram, ARM_RAM_SIZE);
+    savestate_zwrite(zfp, armrom, ARM_ROM_SIZE);
+}
+
+static unsigned char *load_regset(unsigned char *ptr, uint32_t *regs)
+{
+    for (int i = 0; i < 16; i++)
+        ptr = load_uint32(ptr, &regs[i]);
+    return ptr;
+}
+
+void arm_loadstate(ZFILE *zfp)
+{
+    unsigned char bytes[332], *ptr;
+
+    savestate_zread(zfp, bytes, sizeof bytes);
+    ptr = bytes;
+    mode = *ptr++;
+    osmode = *ptr++;
+    ptr = load_regset(ptr, armregs);
+    ptr = load_regset(ptr, userregs);
+    ptr = load_regset(ptr, superregs);
+    ptr = load_regset(ptr, fiqregs);
+    ptr = load_regset(ptr, irqregs);
+    mode_load_regs();
+    ptr = load_uint32(ptr, &opcode2);
+    ptr = load_uint32(ptr, &opcode3);
+    armirq = *ptr++;
+    databort = *ptr;
+    savestate_zread(zfp, armram, ARM_RAM_SIZE);
+    savestate_zread(zfp, armrom, ARM_ROM_SIZE);
 }
 
 int endtimeslice=0;
@@ -280,7 +367,6 @@ uint8_t readarmb(uint32_t addr)
         debug_memread(&tubearm_cpu_debug, addr, v, 1);
     return v;
 }
-    
 
 static inline void do_writearmb(uint32_t addr, uint8_t val)
 {
@@ -500,7 +586,7 @@ static size_t arm_dbg_reg_print(int which, char *buf, size_t bufsize) {
         char c;
         const char *flagnameptr = flagname;
         int psr = arm_dbg_reg_get(i_PSR);
-        
+
         if (bufsize < 40) {
             strncpy(buf, "buffer too small!!!", bufsize);
         }

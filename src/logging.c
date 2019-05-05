@@ -1,8 +1,9 @@
 /* Part of B-Em by Tom Walker */
 
 #include "b-em.h"
+#include "config.h"
 
-#include <allegro.h>
+#include <allegro5/allegro_native_dialog.h>
 #include <errno.h>
 #include <stdarg.h>
 #include <time.h>
@@ -34,38 +35,64 @@ static const log_level_t *log_levels[] =
 };
 
 static const char log_section[]    = "logging";
-static const char log_default_fn[] = "b-emlog.txt";
+static const char log_default_fn[] = "b-emlog";
 
-static unsigned log_options = 0;
+static unsigned log_options = 0x22222;
 
 static FILE *log_fp;
 static char   tmstr[20];
 static time_t last = 0;
+
+static void log_msgbox(const char *level, char *msg)
+{
+    const int max_len = 80;
+    char *max_ptr, *new_split, *cur_split;
+    ALLEGRO_DISPLAY *display;
+
+    display = al_get_current_display();
+    if (strlen(msg) < max_len)
+        al_show_native_message_box(display, level, msg, "", NULL, 0);
+    else
+    {
+        max_ptr = msg + max_len;
+        cur_split = msg;
+        while ((new_split = strchr(cur_split+1, ' ')) && new_split < max_ptr)
+            cur_split = new_split;
+
+        if (cur_split > msg)
+        {
+            *cur_split = '\0';
+            al_show_native_message_box(display, level, msg, cur_split+1, NULL, 0);
+            *cur_split = ' ';
+        }
+        else
+            al_show_native_message_box(display, level, msg, "", NULL, 0);
+    }
+}
 
 static void log_common(unsigned dest, const char *level, char *msg, size_t len)
 {
     time_t now;
 
     while (msg[len-1] == '\n')
-	len--;
+        len--;
     if ((dest & LOG_DEST_FILE) && log_fp) {
-	time(&now);
-	if (now != last)
-	{
-	    strftime(tmstr, sizeof(tmstr), "%d/%m/%Y %H:%M:%S", localtime(&now));
-	    last = now;
-	}
-	fprintf(log_fp, "%s %s ", tmstr, level); 
-	fwrite(msg, len, 1, log_fp);
-	putc('\n', log_fp);
-	fflush(log_fp);
+        time(&now);
+        if (now != last) {
+            strftime(tmstr, sizeof(tmstr), "%d/%m/%Y %H:%M:%S", localtime(&now));
+            last = now;
+        }
+        fprintf(log_fp, "%s %s ", tmstr, level);
+        fwrite(msg, len, 1, log_fp);
+        putc('\n', log_fp);
+        fflush(log_fp);
     }
     if (dest & LOG_DEST_STDERR) {
-	fwrite(msg, len, 1, stderr);
-	putc('\n', stderr);
+        fwrite(msg, len, 1, stderr);
+        putc('\n', stderr);
     }
     if (dest & LOG_DEST_MSGBOX)
-	log_msgbox(level, msg);
+        log_msgbox(level, msg);
 }
 
 static char msg_malloc[] = "log_format: out of space - following message truncated";
@@ -150,45 +177,66 @@ static int contains(const char *haystack, const char *needle)
     needle_len = strlen(needle);
     haystack--;
     do {
-	while (*++haystack == ' ')
-	    ;
-	if (strncasecmp(haystack, needle, needle_len) == 0)
-	    return 1;
-	haystack = strchr(haystack, ',');
+        while (*++haystack == ' ')
+            ;
+        if (strncasecmp(haystack, needle, needle_len) == 0)
+            return 1;
+        haystack = strchr(haystack, ',');
     } while (haystack);
     return 0;
 }
 
-void log_open(void)
-{
-    const char *log_fn, *to_file, *to_stderr, *to_msgbox;
-    unsigned new_opt;
-    const log_level_t **llp, *ll;
+static void log_open_file(void) {
+    const char *log_fn;
+    ALLEGRO_PATH *path = NULL;
     int append;
 
-    log_fn = get_config_string(log_section, "log_filename", log_default_fn);
+    log_fn = get_config_string(log_section, "log_filename", NULL);
+    if (!log_fn) {
+        if ((path = find_cfg_dest(log_default_fn, ".txt")))
+            log_fn = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+        else
+            log_warn("log_open: unable to find suitable destination for log file");
+    }
+    if (log_fn) {
+        append = get_config_int(log_section, "append", 1);
+        if ((log_fp = fopen(log_fn, append ? "at" : "wt")) == NULL)
+            log_warn("log_open: unable to open log %s: %s", log_fn, strerror(errno));
+    }
+    if (path)
+        al_destroy_path(path);
+}
+
+void log_open(void)
+{
+    const char *to_file, *to_stderr, *to_msgbox;
+    unsigned new_opt;
+    const log_level_t **llp, *ll;
+    int open_file;
+
     to_file = get_config_string(log_section, "to_file", "FATAL,ERROR,WARNING,INFO,DEBUG");
     to_stderr = get_config_string(log_section, "to_stderr", "FATAL,ERROR,WARNING");
     to_msgbox = get_config_string(log_section, "to_msgbox", "FATAL,ERROR");
     new_opt = 0;
-    for (llp = log_levels; (ll = *llp++); )
-    {
-	if (contains(to_file, ll->name))
-	    new_opt |= (LOG_DEST_FILE << ll->shift);
-	if (contains(to_stderr, ll->name))
-	    new_opt |= (LOG_DEST_STDERR << ll->shift);
-	if (contains(to_msgbox, ll->name))
-	    new_opt |= (LOG_DEST_MSGBOX << ll->shift);
+    open_file = 0;
+    for (llp = log_levels; (ll = *llp++); ) {
+        if (contains(to_file, ll->name)) {
+            new_opt |= (LOG_DEST_FILE << ll->shift);
+            open_file = 1;
+        }
+        if (contains(to_stderr, ll->name))
+            new_opt |= (LOG_DEST_STDERR << ll->shift);
+        if (contains(to_msgbox, ll->name))
+            new_opt |= (LOG_DEST_MSGBOX << ll->shift);
     }
     log_options = new_opt;
-    append = get_config_int(log_section, "append", 1);
-    if ((log_fp = fopen(log_fn, append ? "at" : "wt")) == NULL)
-	log_warn("log_open: unable to open log %s: %s", log_fn, strerror(errno));
+    if (open_file)
+        log_open_file();
     log_debug("log_open: log options=%x", log_options);
 }
 
 void log_close(void)
 {
     if (log_fp)
-	fclose(log_fp);
+        fclose(log_fp);
 }

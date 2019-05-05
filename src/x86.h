@@ -2,9 +2,6 @@
 #define __INC_X86_H
 
 uint32_t oldpc;
-int oldcpl;
-
-int lldt;
 
 #define setznp168 setznp16
 
@@ -13,9 +10,6 @@ int lldt;
 #define setr8(r,v) if (r&4) regs[r&3].b.h=v; \
                    else     regs[r&3].b.l=v;
 
-int use32;
-int stack32;
-
 #define fetchea()   { rmdat=readmembl(cs+pc); pc++;  \
                     reg=(rmdat>>3)&7;             \
                     mod=rmdat>>6;                 \
@@ -23,12 +17,9 @@ int stack32;
                     if (mod!=3) fetcheal(); }
 
 
-int optype;
 #define JMP 1
 #define CALL 2
 #define IRET 3
-
-uint32_t oxpc;
 
 #define EAX regs[0].l
 #define ECX regs[1].l
@@ -77,7 +68,6 @@ typedef struct
         uint16_t seg;
 } x86seg;
 
-x86seg gdt,ldt,idt,tr;
 x86seg _cs,_ds,_es,_ss,_fs,_gs;
 
 /*Segments -

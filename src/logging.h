@@ -14,11 +14,6 @@ extern void log_error(const char *fmt, ...) printflike;
 extern void log_warn(const char *fmt, ...) printflike;
 extern void log_info(const char *fmt, ...) printflike;
 
-// The following function is called by, not provided
-// by the logging module.
-
-extern void log_msgbox(const char *level, char *s);
-
 // If the debugging compilation option is enabled a real function will
 // be available to log debug messages.  If the debugging compilation
 // optionis disabled we use a static inline empty function to make the

@@ -1,0 +1,18 @@
+Source: b-em-a5
+Maintainer: Steve Fosdick <steve@fosdick.me.uk>
+Priority: extra
+Section: misc
+Build-Depends: automake, gcc, make, libasound2-dev, libjack-dev, liballegro-acodec5-dev (>= 5.2), liballegro-audio5-dev (>= 5.2), liballegro-dialog5-dev (>= 5.2), liballegro-image5-dev (>= 5.2), liballegro5-dev (>= 5.2)
+
+Package: b-em-a5
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: a BBC Microcomputer System emulator including tube processors
+ B-Em is an emulator for the BBC Microcomputer System made back in the 1980s
+ by Acorn Computers Limited and used for the BBC Computer Literacy Project.
+ The emulation includes a range of models from the Model A, through
+ variations on the Model B with various disc interfaces including the 8271,
+ Acorn 1770, Opus 1770, Solidisc 1770, and Watford 1770, the Model B+,
+ to Master, Master Compact, Master Turbo, Master 512 and ARM Evalulation
+ System.  It emulates a range of tube processors as required including the
+ internal and external 6502, the Z80, the ARM, the 80186 and the 32016.

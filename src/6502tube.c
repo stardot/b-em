@@ -1,7 +1,6 @@
 /*B-em v2.2 by Tom Walker
   6502 parasite CPU emulation*/
 
-#include <allegro.h>
 #include <stdio.h>
 
 #include "b-em.h"
@@ -38,21 +37,13 @@ static uint8_t tuberom[0x1000];
 static FILE *trace_fp;
 #endif
 
-static void tube_6502_loadrom()
-{
-        FILE *f;
-        char fn[512];
-        append_filename(fn,exedir,"roms/tube/6502Tube.rom",511);
-        f=x_fopen(fn,"rb");
-        fread(tuberom+0x800,0x800,1,f);
-        fclose(f);
-}
+#define TUBE_6502_RAM_SIZE 0x10000
 
-void tube_6502_init_cpu()
+bool tube_6502_init_cpu(FILE *romf)
 {
         int c;
         if (!tuberam)
-                tuberam = (uint8_t *) malloc(0x10000);
+                tuberam = (uint8_t *) malloc(TUBE_6502_RAM_SIZE);
         memset(tuberam, 0, 0x10000);
         for (c = 0x00; c < 0x100; c++)
                 tubemem[c] = (uint8_t *) (tuberam + (c << 8));
@@ -63,7 +54,7 @@ void tube_6502_init_cpu()
 //        tubememstat[0xFE]=tubememstat[0xFF]=2;
         tubemem[0x100] = tubemem[0];
         tubememstat[0x100] = tubememstat[0];
-        tube_6502_loadrom();
+        return fread(tuberom+0x800, 0x800, 1, romf) == 1;
 #ifdef TRACE_TUBE
         if ((trace_fp = fopen("6502tube.trace", "wb"))) {
                 fwrite("6502NMOS", 8, 1, trace_fp);
@@ -96,18 +87,37 @@ static int dbg_debug_enable(int newvalue) {
 
 static inline uint8_t pack_flags(uint8_t flags) {
     if (tubep.c)
-	flags |= 1;
+        flags |= 1;
     if (tubep.z)
-	flags |= 2;
+        flags |= 2;
     if (tubep.i)
-	flags |= 4;
+        flags |= 4;
     if (tubep.d)
-	flags |= 8;
+        flags |= 8;
     if (tubep.v)
-	flags |= 0x40;
+        flags |= 0x40;
     if (tubep.n)
-	flags |= 0x80;
+        flags |= 0x80;
     return flags;
+}
+
+void tube_6502_savestate(ZFILE *zfp)
+{
+    unsigned char bytes[9];
+
+    bytes[0] = tube_6502_skipint;
+    bytes[1] = tube_6502_oldnmi;
+    bytes[2] = a;
+    bytes[3] = x;
+    bytes[4] = y;
+    bytes[5] = pack_flags(0x30);
+    bytes[6] = s;
+    bytes[7] = pc & 0xff;
+    bytes[8] = pc >> 8;
+    savestate_zwrite(zfp, bytes, sizeof bytes);
+    savestate_zwrite(zfp, tubememstat, sizeof tubememstat);
+    savestate_zwrite(zfp, tuberam, TUBE_6502_RAM_SIZE);
+    savestate_zwrite(zfp, tuberom, sizeof tuberom);
 }
 
 static inline void unpack_flags(uint8_t flags) {
@@ -119,55 +129,81 @@ static inline void unpack_flags(uint8_t flags) {
     tubep.n = flags & 0x80;
 }
 
+void tube_6502_loadstate(ZFILE *zfp)
+{
+    unsigned char bytes[9];
+
+    savestate_zread(zfp, bytes, sizeof bytes);
+    tube_6502_skipint = bytes[0];
+    tube_6502_oldnmi = bytes[1];
+    a = bytes[2];
+    x = bytes[3];
+    y = bytes[4];
+    unpack_flags(bytes[5]);
+    s = bytes[6];
+    pc = bytes[7];
+    pc |= bytes[8] << 8;
+
+    savestate_zread(zfp, tubememstat, sizeof tubememstat);
+    savestate_zread(zfp, tuberam, TUBE_6502_RAM_SIZE);
+    savestate_zread(zfp, tuberom, sizeof tuberom);
+}
+
 static uint32_t dbg_reg_get(int which) {
     switch (which) {
-    case REG_A:
-	return tubea;
-    case REG_X:
-	return tubex;
-    case REG_Y:
-	return tubey;
-    case REG_S:
-	return tubesp;
-    case REG_P:
-	return pack_flags(0x30);
-    case REG_PC:
-	return tubepc;
-    default:
-	log_warn("6502tube: attempt to get non-existent register");
-	return 0;
+        case REG_A:
+            return tubea;
+        case REG_X:
+            return tubex;
+        case REG_Y:
+            return tubey;
+        case REG_S:
+            return tubesp;
+        case REG_P:
+            return pack_flags(0x30);
+        case REG_PC:
+            return tubepc;
+        default:
+            log_warn("6502tube: attempt to get non-existent register");
+            return 0;
     }
 }
 
 static void dbg_reg_set(int which, uint32_t value) {
     switch (which) {
-    case REG_A:
-	tubea = value;
-    case REG_X:
-	tubex = value;
-    case REG_Y:
-	tubey = value;
-    case REG_S:
-	tubesp = value;
-    case REG_P:
-	unpack_flags(value);
-    case REG_PC:
-	tubepc = value;
-    default:
-	log_warn("6502tube: attempt to set non-existent register");
+        case REG_A:
+            tubea = value;
+            break;
+        case REG_X:
+            tubex = value;
+            break;
+        case REG_Y:
+            tubey = value;
+            break;
+        case REG_S:
+            tubesp = value;
+            break;
+        case REG_P:
+            unpack_flags(value);
+            break;
+        case REG_PC:
+            tubepc = value;
+            break;
+        default:
+            log_warn("6502tube: attempt to set non-existent register");
     }
 }
 
 static size_t dbg_reg_print(int which, char *buf, size_t bufsize) {
     switch (which) {
-    case REG_P:
-	return dbg6502_print_flags(&tubep, buf, bufsize);
-	break;
-    case REG_PC:
-	return snprintf(buf, bufsize, "%04X", tubepc);
-	break;
-    default:
-	return snprintf(buf, bufsize, "%02X", dbg_reg_get(which));
+        case REG_P:
+            return dbg6502_print_flags(&tubep, buf, bufsize);
+            break;
+        case REG_PC:
+            return snprintf(buf, bufsize, "%04X", tubepc);
+            break;
+        default:
+            return snprintf(buf, bufsize, "%02X", dbg_reg_get(which));
     }
 }
 
@@ -271,13 +307,13 @@ static void do_writemem(uint32_t addr, uint32_t value) {
 static uint8_t readmem(uint32_t addr) {
     uint32_t val = do_readmem(addr);
     if (dbg_tube6502)
-	debug_memread(&tube6502_cpu_debug, addr, val, 1);
+    debug_memread(&tube6502_cpu_debug, addr, val, 1);
     return val;
 }
 
 static void writemem(uint32_t addr, uint32_t value) {
     if (dbg_tube6502)
-	debug_memwrite(&tube6502_cpu_debug, addr, value, 1);
+    debug_memwrite(&tube6502_cpu_debug, addr, value, 1);
     do_writemem(addr, value);
 }
 
@@ -288,84 +324,90 @@ static void writemem(uint32_t addr, uint32_t value) {
 void tube_6502_reset()
 {
         tuberomin = 1;
-//memset(tuberam,0,0x10000);
         pc = readmem(0xFFFC) | (readmem(0xFFFD) << 8);
         tubep.i = 1;
         tube_irq = 0;
         tube_6502_skipint = 0;
 }
 
-#define setzn(v) tubep.z=!(v); tubep.n=(v)&0x80
+static inline void setzn(uint8_t v)
+{
+    tubep.z = !v;
+    tubep.n = (v) & 0x80;
+}
 
-#define push(v) tuberam[0x100+(s--)]=v
-#define pull()  tuberam[0x100+(++s)]
+static inline void push(uint8_t v)
+{
+    tuberam[0x100+(s--)] = v;
+}
 
-/*ADC/SBC temp variables*/
-static int16_t tempw;
-static int tempv, al, ah;
-static uint8_t tempb;
+static inline uint8_t pull(void)
+{
+    return tuberam[0x100+(++s)];
+}
 
-#define ADC(temp)       if (!tubep.d)                            \
-                        {                                  \
-                                tempw=(a+temp+(tubep.c?1:0));        \
-                                tubep.v=(!((a^temp)&0x80)&&((a^tempw)&0x80));  \
-                                a=tempw&0xFF;                  \
-                                tubep.c=tempw&0x100;                  \
-                                setzn(a);                  \
-                        }                                  \
-                        else                               \
-                        {                                  \
-                                ah=0;        \
-                                tubep.z = tubep.n = 0;     \
-                                tempb=a+temp+(tubep.c?1:0);             \
-                                if (!tempb)                                      \
-                                   tubep.z=1;                                          \
-                                al=(a&0xF)+(temp&0xF)+(tubep.c?1:0);                            \
-                                if (al>9)                                        \
-                                {                                                \
-                                        al-=10;                                  \
-                                        al&=0xF;                                 \
-                                        ah=1;                                    \
-                                }                                                \
-                                ah+=((a>>4)+(temp>>4));                             \
-                                if (ah&8) tubep.n=1;                                   \
-                                tubep.v=(((ah << 4) ^ a) & 128) && !((a ^ temp) & 128);   \
-                                tubep.c=0;                                             \
-                                if (ah>9)                                        \
-                                {                                                \
-                                        tubep.c=1;                                     \
-                                        ah-=10;                                  \
-                                        ah&=0xF;                                 \
-                                }                                                \
-                                a=(al&0xF)|(ah<<4);                              \
-                                setzn(a);                  \
-                        }
+static inline void adc_cmos(uint8_t temp)
+{
+    int al, ah;
+    int16_t tempw;
 
-#define SBC(temp)       if (!tubep.d)                            \
-                        {                                  \
-                                tempw = a-temp-(tubep.c ? 0 : 1);    \
-                                tempv = (signed char)a-(signed char)temp - (tubep.c ? 0 : 1);        \
-                                tubep.v = ((tempw & 0x80) > 0) ^ ((tempv & 0x100) != 0);         \
-                                tubep.c = tempw >= 0;          \
-                                a = tempw & 0xFF;          \
-                                setzn(a);                  \
-                        }                                  \
-                        else                               \
-                        {                                  \
-                                al = (a & 15) - (temp & 15) - (tubep.c ? 0 : 1); \
-                                tempw = a-temp-(tubep.c ? 0 : 1);       \
-                                tempv = (signed char)a -(signed char)temp-(tubep.c ? 0 : 1); \
-                                tubep.v = ((tempw & 0x80) > 0) ^ ((tempv & 0x100) != 0); \
-                                tubep.c = tempw >= 0;                   \
-                                if (tempw < 0) {                        \
-                                   tempw -= 0x60;                       \
-                                }                                       \
-                                if (al < 0) {                           \
-                                   tempw -= 0x06;                       \
-                                }                                       \
-                                a = tempw & 0xFF;                       \
-                                setzn(a);                               \
-                        }
+    if (tubep.d) {
+        ah = 0;
+        al = (a & 0xF) + (temp & 0xF) + (tubep.c ? 1 : 0);
+        if (al > 9) {
+            al -= 10;
+            al &= 0xF;
+            ah = 1;
+        }
+        ah += ((a >> 4) + (temp >> 4));
+        tubep.v = (((ah << 4) ^ a) & 0x80) && !((a ^ temp) & 0x80);
+        tubep.c = 0;
+        if (ah > 9) {
+            tubep.c = 1;
+            ah -= 10;
+            ah &= 0xF;
+        }
+        a = (al & 0xF) | (ah << 4);
+        setzn(a);
+        polltime(1);
+    }
+    else {
+        tempw = (a + temp + (tubep.c ? 1 : 0));
+        tubep.v = (!((a ^ temp) & 0x80) && ((a ^ tempw) & 0x80));
+        a = tempw & 0xFF;
+        tubep.c = tempw & 0x100;
+        setzn(a);
+    }
+}
+
+static inline void sbc_cmos(uint8_t temp)
+{
+    int al, tempv;
+    int16_t tempw;
+
+    if (tubep.d) {
+        al = (a & 15) - (temp & 15) - (tubep.c ? 0 : 1);
+        tempw = a-temp-(tubep.c ? 0 : 1);
+        tempv = (signed char)a -(signed char)temp-(tubep.c ? 0 : 1);
+        tubep.v = ((tempw & 0x80) > 0) ^ ((tempv & 0x100) != 0);
+        tubep.c = tempw >= 0;
+        if (tempw < 0)
+           tempw -= 0x60;
+        if (al < 0)
+           tempw -= 0x06;
+        a = tempw & 0xFF;
+        setzn(a);
+        polltime(1);
+    }
+    else {
+        tempw = a-temp-(tubep.c ? 0 : 1);
+        tempv = (signed char)a -(signed char)temp-(tubep.c ? 0 : 1);
+        tubep.v = ((tempw & 0x80) > 0) ^ ((tempv & 0x100) != 0);
+        tubep.c = tempw >= 0;
+        a = tempw & 0xFF;
+        setzn(a);
+    }
+}
 
 static inline void rmb(uint8_t mask)
 {
@@ -417,20 +459,7 @@ static INLINE void tube_6502_trace(uint8_t opcode)
                 putc_unlocked(x, trace_fp);
                 putc_unlocked(y, trace_fp);
                 putc_unlocked(s, trace_fp);
-                uint8_t flags = 0x30;
-                if (tubep.n)
-                        flags |= 0x80;
-                if (tubep.v)
-                        flags |= 0x40;
-                if (tubep.d)
-                        flags |= 0x08;
-                if (tubep.i)
-                        flags |= 0x04;
-                if (tubep.z)
-                        flags |= 0x02;
-                if (tubep.c)
-                        flags |= 0x01;
-                putc_unlocked(flags, trace_fp);
+                putc_unlocked(pack_flags(), trace_fp);
                 funlockfile(trace_fp);
         }
 }
@@ -448,9 +477,9 @@ void tube_6502_exec()
         while (tubecycles > 0) {
                 oldtpc2 = oldtpc;
                 oldtpc = pc;
-		if (dbg_tube6502)
-		    debug_preexec(&tube6502_cpu_debug, pc);
-		opcode = readmem(pc);
+        if (dbg_tube6502)
+            debug_preexec(&tube6502_cpu_debug, pc);
+        opcode = readmem(pc);
                 pc++;
 #ifdef TRACE_TUBE
                 tube_6502_trace(opcode);
@@ -463,18 +492,7 @@ void tube_6502_exec()
                             pc++;
                         push(pc >> 8);
                         push(pc & 0xFF);
-                        temp = 0x30;
-                        if (tubep.c)
-                                temp |= 1;
-                        if (tubep.z)
-                                temp |= 2;
-                        if (tubep.d)
-                                temp |= 8;
-                        if (tubep.v)
-                                temp |= 0x40;
-                        if (tubep.n)
-                                temp |= 0x80;
-                        push(temp);
+                        push(pack_flags(0x30));
                         pc = readmem(0xFFFE) | (readmem(0xFFFF) << 8);
                         tubep.i = 1;
                         polltime(7);
@@ -523,7 +541,7 @@ void tube_6502_exec()
                         break;
 
                 case 0x08:
-		        /*PHP*/ temp = pack_flags(0x30);
+                /*PHP*/ temp = pack_flags(0x30);
                         push(temp);
                         polltime(3);
                         break;
@@ -753,7 +771,7 @@ void tube_6502_exec()
 
                 case 0x28:
                         /*PLP*/ temp = pull();
-		        unpack_flags(temp);
+                unpack_flags(temp);
                         polltime(4);
                         break;
 
@@ -940,14 +958,8 @@ void tube_6502_exec()
                         bbr(0x08);
                         break;
 
-                case 0x40:
-                        /*RTI*/ temp = pull();
-                        tubep.c = temp & 1;
-                        tubep.z = temp & 2;
-                        tubep.i = temp & 4;
-                        tubep.d = temp & 8;
-                        tubep.v = temp & 0x40;
-                        tubep.n = temp & 0x80;
+                case 0x40: /* RTI */
+                        unpack_flags(pull());
                         pc = pull();
                         pc |= (pull() << 8);
                         polltime(6);
@@ -1141,12 +1153,12 @@ void tube_6502_exec()
                         polltime(6);
                         break;
 
-                case 0x61:      /*ADC (,x) */
+                case 0x61:      /*adc_cmos (,x) */
                         temp = readmem(pc) + x;
                         pc++;
                         addr = read_zp_indirect(temp);
                         temp = readmem(addr);
-                        ADC(temp);
+                        adc_cmos(temp);
                         polltime(6);
                         break;
 
@@ -1161,7 +1173,7 @@ void tube_6502_exec()
                         addr = readmem(pc);
                         pc++;
                         temp = tuberam[addr];
-                        ADC(temp);
+                        adc_cmos(temp);
                         polltime(3);
                         break;
 
@@ -1192,7 +1204,7 @@ void tube_6502_exec()
                 case 0x69:      /*ADC imm */
                         temp = readmem(pc);
                         pc++;
-                        ADC(temp);
+                        adc_cmos(temp);
                         polltime(2);
                         break;
 
@@ -1216,7 +1228,7 @@ void tube_6502_exec()
                         addr = getw();
                         polltime(4);
                         temp = readmem(addr);
-                        ADC(temp);
+                        adc_cmos(temp);
                         break;
 
                 case 0x6E:      /*ROR abs */
@@ -1259,7 +1271,7 @@ void tube_6502_exec()
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         temp = readmem(addr + y);
-                        ADC(temp);
+                        adc_cmos(temp);
                         polltime(5);
                         break;
 
@@ -1268,7 +1280,7 @@ void tube_6502_exec()
                         pc++;
                         addr = read_zp_indirect(temp);
                         temp = readmem(addr);
-                        ADC(temp);
+                        adc_cmos(temp);
                         polltime(5);
                         break;
 
@@ -1283,7 +1295,7 @@ void tube_6502_exec()
                         addr = readmem(pc);
                         pc++;
                         temp = tuberam[(addr + x) & 0xFF];
-                        ADC(temp);
+                        adc_cmos(temp);
                         polltime(4);
                         break;
 
@@ -1318,7 +1330,7 @@ void tube_6502_exec()
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         temp = readmem(addr + y);
-                        ADC(temp);
+                        adc_cmos(temp);
                         polltime(4);
                         break;
 
@@ -1340,7 +1352,7 @@ void tube_6502_exec()
                         if ((addr & 0xFF00) ^ ((addr + x) & 0xFF00))
                                 polltime(1);
                         temp = readmem(addr + x);
-                        ADC(temp);
+                        adc_cmos(temp);
                         polltime(4);
                         break;
 
@@ -1957,12 +1969,12 @@ void tube_6502_exec()
                         polltime(2);
                         break;
 
-                case 0xE1:      /*SBC (,x) *//*This was missed out of every B-em version since 0.6 as it was never used! */
+                case 0xE1:      /*sbc_cmos (,x) *//*This was missed out of every B-em version since 0.6 as it was never used! */
                         temp = readmem(pc) + x;
                         pc++;
                         addr = read_zp_indirect(temp);
                         temp = readmem(addr);
-                        SBC(temp);
+                        sbc_cmos(temp);
                         polltime(6);
                         break;
 
@@ -1979,7 +1991,7 @@ void tube_6502_exec()
                         addr = readmem(pc);
                         pc++;
                         temp = tuberam[addr];
-                        SBC(temp);
+                        sbc_cmos(temp);
                         polltime(3);
                         break;
 
@@ -2004,7 +2016,7 @@ void tube_6502_exec()
                 case 0xE9:      /*SBC imm */
                         temp = readmem(pc);
                         pc++;
-                        SBC(temp);
+                        sbc_cmos(temp);
                         polltime(2);
                         break;
 
@@ -2023,7 +2035,7 @@ void tube_6502_exec()
                 case 0xED:      /*SBC abs */
                         addr = getw();
                         temp = readmem(addr);
-                        SBC(temp);
+                        sbc_cmos(temp);
                         polltime(4);
                         break;
 
@@ -2062,7 +2074,7 @@ void tube_6502_exec()
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         temp = readmem(addr + y);
-                        SBC(temp);
+                        sbc_cmos(temp);
                         polltime(5);
                         break;
 
@@ -2071,7 +2083,7 @@ void tube_6502_exec()
                         pc++;
                         addr = read_zp_indirect(temp);
                         temp = readmem(addr);
-                        SBC(temp);
+                        sbc_cmos(temp);
                         polltime(5);
                         break;
 
@@ -2079,7 +2091,7 @@ void tube_6502_exec()
                         addr = readmem(pc);
                         pc++;
                         temp = tuberam[(addr + x) & 0xFF];
-                        SBC(temp);
+                        sbc_cmos(temp);
                         polltime(3);
                         break;
 
@@ -2105,7 +2117,7 @@ void tube_6502_exec()
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         temp = readmem(addr + y);
-                        SBC(temp);
+                        sbc_cmos(temp);
                         polltime(4);
                         break;
 
@@ -2120,7 +2132,7 @@ void tube_6502_exec()
                         if ((addr & 0xFF00) ^ ((addr + x) & 0xFF00))
                                 polltime(1);
                         temp = readmem(addr + x);
-                        SBC(temp);
+                        sbc_cmos(temp);
                         polltime(4);
                         break;
 
@@ -2154,31 +2166,11 @@ void tube_6502_exec()
                                 break;
                         }
                         break;
-//                                default:
-//                                allegro_exit();
-//                                printf("Error : Bad tube 65c02 opcode %02X\n",opcode);
-//                                pc--;
-//                                dumpregs();
-//                                printf("Current ROM %02X\n",currom);
-//                                exit(-1);
                 }
                 if ((tube_irq & 2) && !tube_6502_oldnmi) {
                         push(pc >> 8);
                         push(pc & 0xFF);
-                        temp = 0x20;
-                        if (tubep.c)
-                                temp |= 1;
-                        if (tubep.z)
-                                temp |= 2;
-                        if (tubep.i)
-                                temp |= 4;
-                        if (tubep.d)
-                                temp |= 8;
-                        if (tubep.v)
-                                temp |= 0x40;
-                        if (tubep.n)
-                                temp |= 0x80;
-                        push(temp);
+                        push(pack_flags(0x20));
                         pc = readmem(0xFFFA) | (readmem(0xFFFB) << 8);
                         tubep.i = 1;
                         polltime(7);
@@ -2190,20 +2182,7 @@ void tube_6502_exec()
                         tube_6502_skipint = 0;
                         push(pc >> 8);
                         push(pc & 0xFF);
-                        temp = 0x20;
-                        if (tubep.c)
-                                temp |= 1;
-                        if (tubep.z)
-                                temp |= 2;
-                        if (tubep.i)
-                                temp |= 4;
-                        if (tubep.d)
-                                temp |= 8;
-                        if (tubep.v)
-                                temp |= 0x40;
-                        if (tubep.n)
-                                temp |= 0x80;
-                        push(temp);
+                        push(pack_flags(0x20));
                         pc = readmem(0xFFFE) | (readmem(0xFFFF) << 8);
                         tubep.i = 1;
                         polltime(7);

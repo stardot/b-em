@@ -1,7 +1,6 @@
 /*B-em v2.2 by Tom Walker
   UEF/HQ-UEF tape support*/
 
-#include <allegro.h>
 #include <zlib.h>
 #include <stdio.h>
 #include "b-em.h"
@@ -21,7 +20,7 @@ static int uef_startchunk;
 static float uef_chunkf;
 static int uef_intone = 0;
 
-void uef_load(char *fn)
+void uef_load(const char *fn)
 {
         int c;
 //      printf("OpenUEF %s %08X\n",fn,uef);
@@ -100,19 +99,19 @@ void uef_poll()
 //           printf("Chunk %04X\n",uef_chunkid);
         switch (uef_chunkid)
         {
-                case 0x000: /*Origin*/
+            case 0x000: /*Origin*/
                 for (c = 0; c < uef_chunklen; c++)
                     gzgetc(uef_f);
                 uef_inchunk = 0;
                 return;
 
-                case 0x005: /*Target platform*/
+            case 0x005: /*Target platform*/
                 for (c = 0; c < uef_chunklen; c++)
                     gzgetc(uef_f);
                 uef_inchunk = 0;
                 return;
 
-                case 0x100: /*Raw data*/
+            case 0x100: /*Raw data*/
                 if (uef_startchunk)
                 {
                         acia_dcdlow(&sysacia);
@@ -126,7 +125,7 @@ void uef_poll()
                 uef_receive(gzgetc(uef_f));
                 return;
 
-                case 0x104: /*Defined data*/
+            case 0x104: /*Defined data*/
                 if (!uef_chunkpos)
                 {
                         uef_chunkdatabits = gzgetc(uef_f);
@@ -147,7 +146,7 @@ void uef_poll()
                 }
                 return;
 
-                case 0x110: /*High tone*/
+            case 0x110: /*High tone*/
                 uef_toneon = 2;
                 if (!uef_intone)
                 {
@@ -168,7 +167,7 @@ void uef_poll()
                 }
                 return;
 
-                case 0x111: /*High tone with dummy byte*/
+            case 0x111: /*High tone with dummy byte*/
                 uef_toneon = 2;
                 if (!uef_intone)
                 {
@@ -197,7 +196,7 @@ void uef_poll()
                 }
                 return;
 
-                case 0x112: /*Gap*/
+            case 0x112: /*Gap*/
                 uef_toneon = 0;
                 if (!uef_intone)
                 {
@@ -218,7 +217,7 @@ void uef_poll()
                 }
                 return;
 
-                case 0x113: /*Float baud rate*/
+            case 0x113: /*Float baud rate*/
                 templ = gzgetc(uef_f);
                 templ |= (gzgetc(uef_f) << 8);
                 templ |= (gzgetc(uef_f) << 16);
@@ -229,7 +228,7 @@ void uef_poll()
                 uef_inchunk = 0;
                 return;
 
-                case 0x116: /*Float gap*/
+            case 0x116: /*Float gap*/
                 uef_toneon = 0;
                 if (!uef_chunkpos)
                 {
@@ -251,15 +250,15 @@ void uef_poll()
                 }
                 return;
 
-                case 0x114: /*Security waves*/
-                case 0x115: /*Polarity change*/
+            case 0x114: /*Security waves*/
+            case 0x115: /*Polarity change*/
 //                default:
                 for (c = 0; c < uef_chunklen; c++)
                     gzgetc(uef_f);
                 uef_inchunk = 0;
                 return;
 
-                default:
+            default:
                 for (c = 0; c < uef_chunklen; c++)
                     gzgetc(uef_f);
                 uef_inchunk = 0;
@@ -304,7 +303,6 @@ void uef_findfilenames()
         uef_chunkpos = 0; uef_chunkdatabits = 8; uef_intone = 0;
         uef_chunkf   = 0;
         
-        startblit();
         temp=gztell(uef_f);
         gzseek(uef_f, 12, SEEK_SET);
         uefloop = 0;
@@ -395,6 +393,5 @@ void uef_findfilenames()
         fdat = bdat;
         ffound = bffound;
         uef_intone = bintone;
-        endblit();
 }
 

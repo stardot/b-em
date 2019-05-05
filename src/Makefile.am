@@ -1,6 +1,6 @@
 # Makefile.am for B-em
 
-bin_PROGRAMS = b-em
+bin_PROGRAMS = b-em jstest gtest
 noinst_SCRIPTS = ../b-em
 CLEANFILES = $(noinst_SCRIPTS)
 
@@ -18,9 +18,9 @@ b_em_CFLAGS = $(allegro_CFLAGS) -DBEM -DINCLUDE_DEBUGGER -DUSE_MEMORY_POINTER
 
 # workaround for Win32 Allegro, which has `allegro-config' missing
 if OS_WIN
-b_em_LDADD = -lalleg -lz -lopenal -lalut -lm
+b_em_LDADD = -lallegro_audio -lallegro_acodec -lallegro_primitives -lallegro_dialog -lallegro_image -lallegro_font -lallegro -lz -lm
 else
-b_em_LDADD = $(allegro_LIBS) -lz -lopenal -lalut -lm -lpthread
+b_em_LDADD = -lallegro_audio -lallegro_acodec -lallegro_primitives -lallegro_dialog -lallegro_image -lallegro_font -lallegro_main -lallegro -lz -lm -lpthread
 endif
 
 b_em_SOURCES = \
@@ -35,7 +35,7 @@ b_em_SOURCES = \
 	NS32016/Profile.c \
 	NS32016/Trap.c \
 	NS32016/mem32016.c \
-	Z80.c \
+	z80.c \
 	z80dis.c \
 	acia.c \
 	adc.c \
@@ -59,11 +59,12 @@ b_em_SOURCES = \
 	debugger.c \
 	disc.c fdi.c \
 	fdi2raw.c \
+	gui-allegro.c\
 	i8271.c \
 	ide.c \
+	joystick.c \
 	keyboard.c \
-	linux-gui.c \
-	linux-keydefine.c \
+	keydef-allegro.c \
 	linux.c \
 	logging.c \
 	main.c \
@@ -74,17 +75,19 @@ b_em_SOURCES = \
 	music2000.c \
 	music4000.c \
 	music5000.c \
+	pal.c\
 	resid.cc \
 	savestate.c \
 	scsi.c \
-	sdf.c \
+	sdf-acc.c \
+	sdf-geo.c \
 	serial.c \
 	sn76489.c \
 	sound.c \
-	soundopenal.c \
 	sysacia.c \
 	sysvia.c \
 	tape.c \
+	tapecat-allegro.c \
 	tapenoise.c \
 	tube.c \
 	uef.c \
@@ -118,3 +121,8 @@ if NO_TSEARCH
 b_em_SOURCES += tsearch.c
 endif
 
+jstest_SOURCES = jstest.c
+
+jstest_LDADD = -lallegro -lallegro_main
+
+gtest_SOURCES = sdf-gtest.c sdf-geo.c

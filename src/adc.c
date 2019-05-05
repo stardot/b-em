@@ -1,8 +1,6 @@
 /*B-em v2.2 by Tom Walker
   ADC emulation*/
 
-#include <stdio.h>
-#include <allegro.h>
 #include "b-em.h"
 #include "adc.h"
 #include "via.h"
@@ -15,13 +13,13 @@ uint8_t adc_read(uint16_t addr)
 {
         switch (addr & 3)
         {
-                case 0:
+            case 0:
                 return adc_status;
                 break;
-                case 1:
+            case 1:
                 return adc_high;
                 break;
-                case 2:
+            case 2:
                 return adc_low;
                 break;
         }
@@ -42,24 +40,14 @@ void adc_write(uint16_t addr, uint8_t val)
 
 void adc_poll()
 {
-        uint32_t val = 0;
-//        printf("%i\n",joy[0].stick[0].axis[0].pos);
-        switch (adc_status & 3)
-        {
-                case 0: val = (128 - joy[0].stick[0].axis[0].pos) * 256; break;
-                case 1: val = (128 - joy[0].stick[0].axis[1].pos) * 256; break;
-                case 2: val = (128 - joy[1].stick[0].axis[0].pos) * 256; break;
-                case 3: val = (128 - joy[1].stick[0].axis[1].pos) * 256; break;
-        }
-        if (val > 0xFFFF) val = 0xFFFF;
-//        val^=0xFFFF;
-//        val++;
-//        if (val==0x10000) val=0xFFFF;
-        adc_status =(adc_status & 0xF) | 0x40; /*Not busy, conversion complete*/
-        adc_status|=(val & 0xC000) >> 10;
-        adc_high   = val >> 8;
-        adc_low    = val & 0xFF;
-        sysvia_set_cb1(0);
+    uint32_t val = (uint32_t)(joyaxes[adc_status & 3] * 32760.0) + 32760;
+    if (val > 0xFFFF)
+        val = 0xFFFF;
+    adc_status =(adc_status & 0xF) | 0x40; /*Not busy, conversion complete*/
+    adc_status|=(val & 0xC000) >> 10;
+    adc_high   = val >> 8;
+    adc_low    = val & 0xFF;
+    sysvia_set_cb1(0);
 }
 
 void adc_init()
@@ -67,7 +55,7 @@ void adc_init()
         adc_status = 0x40;            /*Not busy, conversion complete*/
         adc_high = adc_low = adc_latch = 0;
         adc_time = 0;
-        install_joystick(JOY_TYPE_AUTODETECT);
+        al_install_joystick();
 }
 
 void adc_savestate(FILE *f)

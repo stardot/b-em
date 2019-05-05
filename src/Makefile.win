@@ -1,7 +1,7 @@
 VPATH = . resid-fp NS32016 darm
 
-CPP  = g++.exe
-CC   = gcc.exe
+CPP  = i686-w64-mingw32-g++
+CC   = i686-w64-mingw32-gcc
 WINDRES = windres.exe
 
 # The following flags are used by PiTubeDirect Co Pros:
@@ -9,7 +9,7 @@ WINDRES = windres.exe
 #   INCLUDE_DEBUGGER - include the cpu_debug implementation
 # USE_MEMORY_POINTER - do not assume Co Pro memory starts at address 0
 
-COMMON_FLAGS = -O3 -Wall -DBEM -DVERSION=\"Win32\" -DINCLUDE_DEBUGGER -DUSE_MEMORY_POINTER
+COMMON_FLAGS = -O3 -Wall -I ../../allegro5/include -DBEM -DVERSION=\"Win32\" -DINCLUDE_DEBUGGER -DUSE_MEMORY_POINTER
 CFLAGS       = -std=gnu99 $(COMMON_FLAGS)
 CXXFLAGS     = $(COMMON_FLAGS)
 
@@ -41,9 +41,12 @@ OBJ = \
     disc.o \
     fdi2raw.o \
     fdi.o \
+    gui-allegro.o \
     i8271.o \
     ide.o \
+    joystick.o\
     keyboard.o \
+    keydef-allegro.o \
     logging.o \
     main.o \
     mem.o \
@@ -56,14 +59,15 @@ OBJ = \
     pal.o \
     savestate.o \
     scsi.o \
-    sdf.o \
+    sdf-acc.o \
+    sdf-geo.o \
     serial.o \
     sn76489.o \
     sound.o \
-    soundopenal.o \
     sysacia.o \
     sysvia.o \
     tape.o \
+    tapecat-allegro.o \
     tapenoise.o \
     tsearch.o \
     tube.o \
@@ -75,8 +79,6 @@ OBJ = \
     video.o \
     wd1770.o \
     win.o \
-    win-catalogue.o \
-    win-keydefine.o \
     x86.o \
     x86dasm.o \
     z80.o \
@@ -111,9 +113,9 @@ SIDOBJ = \
     wave8580_PST.o \
     wave.o
 
-LIBS =  -mwindows -lalleg -lz -lalut -lopenal32 -lgdi32 -lwinmm -lstdc++
+LIBS = -L ../../allegro5/lib -lz -lallegro_audio -lallegro_acodec -lallegro_primitives -lallegro_dialog -lallegro_image -lallegro_font -lallegro -mwindows -lgdi32 -lwinmm -lstdc++
 
-all : b-em.exe
+all : b-em.exe hdfmt.exe jstest.exe gtest.exe
 
 b-em.exe: $(OBJ) $(SIDOBJ) $(NS32KOBJ)
 	$(CC) $(OBJ) $(SIDOBJ) $(NS32KOBJ) -o "b-em.exe" $(LIBS)
@@ -129,3 +131,14 @@ clean :
 
 b-em.res: b-em.rc
 	$(WINDRES) -i b-em.rc --input-format=rc -o b-em.res -O coff
+
+hdfmt.exe: hdfmt.c
+	$(CC) $(CFLAGS) -o hdfmt.exe hdfmt.c
+
+jstest.exe: jstest.c
+	$(CC) $(CFLAGS) -o jstest $(LIBS)
+
+GTEST_OBJ = gtest.o sdf-geo.o sdf-acc.o
+
+gtest.exe: $(GTEST_OBJ)
+	$(CC) $(CFLAGS) -o gtest $(GTEST_OBJ)

@@ -33,36 +33,46 @@ static int cmos_rw;
 static uint8_t cmos_addr = 0;
 static uint8_t cmos_ram[256];
 
-void compactcmos_load(MODEL m)
-{
-        FILE *cmosf;
-        char fn[512];
-        sprintf(fn, "%s%s", exedir, m.cmos);
-        cmosf = fopen(fn, "rb");
-        if (cmosf)
-        {
-                fread(cmos_ram, 128, 1, cmosf);
-                fclose(cmosf);
+void compactcmos_load(MODEL m) {
+    FILE *cmosf;
+    ALLEGRO_PATH *path;
+    const char *cpath;
+
+    memset(cmos_ram, 0, 128);
+    if ((path = find_cfg_file(m.cmos, ".bin"))) {
+        cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+        if ((cmosf = fopen(cpath, "rb"))) {
+            if (fread(cmos_ram, 128, 1, cmosf) != 1)
+                log_warn("compactcmos: cmos file %s read incompletely, some values will be zero", cpath);
+            fclose(cmosf);
+            log_debug("compactcmos: loaded from %s", cpath);
         }
         else
-	{
-		log_error("compactcmos: unable to load CMOS file '%s': %s", fn, strerror(errno));
-		memset(cmos_ram, 0, 128);
-	}
+            log_warn("compactcmos: unable to load CMOS file '%s': %s", cpath, strerror(errno));
+        al_destroy_path(path);
+    }
+    else
+        log_error("compactcmos: unable to find CMOS file %s", m.cmos);
 }
 
-void compactcmos_save(MODEL m)
-{
-        FILE *cmosf;
-        char fn[512];
-        sprintf(fn, "%s%s", exedir, m.cmos);
-        if ((cmosf = fopen(fn, "wb")))
-	{
-		fwrite(cmos_ram, 128, 1, cmosf);
-		fclose(cmosf);
-	}
-	else
-		log_error("compactcmos: unable to save CMOS file '%s': %s", fn, strerror(errno));
+void compactcmos_save(MODEL m) {
+    FILE *cmosf;
+    ALLEGRO_PATH *path;
+    const char *cpath;
+
+    if ((path = find_cfg_dest(m.cmos, ".bin"))) {
+        cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+        if ((cmosf = fopen(cpath, "wb"))) {
+            log_debug("compactcmos: saving to %s", cpath);
+            fwrite(cmos_ram, 128, 1, cmosf);
+            fclose(cmosf);
+        }
+        else
+            log_error("compactcmos: unable to save CMOS file '%s': %s", cpath, strerror(errno));
+        al_destroy_path(path);
+    }
+    else
+        log_error("compactcmos: unable to save CMOS file %s: no suitable destination", m.cmos);
 }
 
 static void cmos_stop()
@@ -127,7 +137,7 @@ void compactcmos_i2cchange(int nuclock, int nudata)
 //        log("I2C update clock %i %i data %i %i state %i\n",i2c_clock,nuclock,i2c_data,nudata,i2c_state);
         switch (i2c_state)
         {
-                case I2C_IDLE:
+            case I2C_IDLE:
                 if (i2c_clock && nuclock)
                 {
                         if (lastdata && !nudata) /*Start bit*/
@@ -140,7 +150,7 @@ void compactcmos_i2cchange(int nuclock, int nudata)
                 }
                 break;
 
-                case I2C_RECIEVE:
+            case I2C_RECIEVE:
                 if (!i2c_clock && nuclock)
                 {
 //                        printf("Reciving %07X %07X\n",(*armregs[15]-8)&0x3FFFFFC,(*armregs[14]-8)&0x3FFFFFC);
@@ -184,7 +194,7 @@ void compactcmos_i2cchange(int nuclock, int nudata)
                 }
                 break;
 
-                case I2C_TRANSACKNOWLEDGE:
+            case I2C_TRANSACKNOWLEDGE:
                 if (!i2c_clock && nuclock)
                 {
                         if (nudata) /*It's not acknowledged - must be end of transfer*/
@@ -203,7 +213,7 @@ void compactcmos_i2cchange(int nuclock, int nudata)
                 }
                 break;
 
-                case I2C_TRANSMIT:
+            case I2C_TRANSMIT:
                 if (!i2c_clock && nuclock)
                 {
                         i2c_data = nudata = i2c_byte & 128;

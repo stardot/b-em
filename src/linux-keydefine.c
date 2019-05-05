@@ -1,6 +1,7 @@
 /*B-em v2.2 by Tom Walker
   Linux keyboard redefinition GUI*/
 
+#if 0
 #ifndef WIN32
 #include <allegro.h>
 #include "b-em.h"
@@ -327,4 +328,5 @@ int gui_keydefine()
         }
         return D_CLOSE;
 }
+#endif
 #endif

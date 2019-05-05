@@ -4,11 +4,15 @@
   A few bits of 80286 emulation hanging around also*/
 #include <stdio.h>
 #include <stdint.h>
-#include <allegro.h>
 #include "b-em.h"
 #include "x86.h"
+#include "x86_tube.h"
 #include "tube.h"
 #include "cpu_debug.h"
+#include "ssinline.h"
+
+#define X86_RAM_SIZE 0x100000
+#define X86_ROM_SIZE   0x4000
 
 static int x86ins=0;
 static int dbg_x86 = 0;
@@ -601,57 +605,123 @@ static void x86dumpregs()
         printf("PC=%04X CS=%04X DS=%04X ES=%04X SS=%04X FLAGS=%04X\n",pc,CS,DS,ES,SS,flags);
         printf("%04X:%04X %08X %08X %08X\n",oldcs,oldpc,old8,old82,old83);
         printf("%i %04X %04X\n",x86ins,pc,x86pc);
-/*        if (is386)
-           printf("In %s mode\n",(msw&1)?((eflags&VM_FLAG)?"V86":"protected"):"real");
-        else
-           printf("In %s mode\n",(msw&1)?"protected":"real");
-        printf("CS : base=%06X limit=%04X access=%02X\n",cs,_cs.limit,_cs.access);
-        printf("DS : base=%06X limit=%04X access=%02X\n",ds,_ds.limit,_ds.access);
-        printf("ES : base=%06X limit=%04X access=%02X\n",es,_es.limit,_es.access);
-        if (is386)
-        {
-                printf("FS : base=%06X limit=%04X access=%02X\n",fs,_fs.limit,_fs.access);
-                printf("GS : base=%06X limit=%04X access=%02X\n",gs,_gs.limit,_gs.access);
-        }
-        printf("SS : base=%06X limit=%04X access=%02X\n",ss,_ss.limit,_ss.access);
-        printf("GDT : base=%06X limit=%04X\n",gdt.base,gdt.limit);
-        printf("LDT : base=%06X limit=%04X\n",ldt.base,ldt.limit);
-        printf("IDT : base=%06X limit=%04X\n",idt.base,idt.limit);
-        printf("TR  : base=%06X limit=%04X\n", tr.base, tr.limit);
-        if (is386)
-        {
-                printf("386 in %s mode   stack in %s mode\n",(use32)?"32-bit":"16-bit",(stack32)?"32-bit":"16-bit");
-                printf("CR0=%08X CR2=%08X CR3=%08X\n",cr0,cr2,cr3);
-        }*/
 }
 
 void x86_reset()
 {
-//        return;
         pc=0;
         loadcs(0xFFFF);
         flags=2;
         makemod1table();
 }
 
-void x86_init()
+bool x86_init(FILE *romf)
 {
-        FILE *f;
-        char fn[512];
-        if (!x86ram) x86ram=malloc(0x100000);
-        if (!x86rom) x86rom=malloc(0x4000);
+        if (!x86ram) x86ram=malloc(X86_RAM_SIZE);
+        if (!x86rom) x86rom=malloc(X86_ROM_SIZE);
         x86makeznptable();
-        memset(x86ram,0,0x100000);
-        append_filename(fn,exedir,"roms/tube/BIOS.ROM",511);
-        f=x_fopen(fn,"rb");
-        fread(x86rom,0x4000,1,f);
-        fclose(f);
+        memset(x86ram,0,X86_RAM_SIZE);
+        return fread(x86rom, X86_ROM_SIZE, 1, romf) == 1;
 }
 
 void x86_close()
 {
         if (x86rom) free(x86rom);
         if (x86ram) free(x86ram);
+}
+
+static unsigned char *save_seg(unsigned char *ptr, x86seg *seg)
+{
+    ptr = save_uint32(ptr, seg->base);
+    ptr = save_uint16(ptr, seg->limit);
+    *ptr++ = seg->access;
+    ptr = save_uint16(ptr, seg->seg);
+    return ptr;
+}
+
+void x86_savestate(ZFILE *zfp)
+{
+    unsigned char bytes[150], *ptr;
+    int i;
+
+    ptr = bytes;
+    for (i = 0; i < 8; i++)
+        ptr = save_uint32(ptr, regs[i].l);
+    ptr = save_uint16(ptr, flags);
+    ptr = save_uint32(ptr, oldpc);
+    ptr = save_uint32(ptr, oldds);
+    ptr = save_uint32(ptr, oldss);
+    ptr = save_uint32(ptr, x86pc);
+    ptr = save_seg(ptr, &_cs);
+    ptr = save_seg(ptr, &_ds);
+    ptr = save_seg(ptr, &_es);
+    ptr = save_seg(ptr, &_ss);
+    ptr = save_seg(ptr, &_fs);
+    ptr = save_seg(ptr, &_gs);
+    ptr = save_uint32(ptr, (uint32_t)x86ins);
+    ptr = save_uint32(ptr, x86sa);
+    ptr = save_uint32(ptr, x86ss);
+    ptr = save_uint32(ptr, x86src);
+    ptr = save_uint32(ptr, x86da);
+    ptr = save_uint32(ptr, x86ds);
+    ptr = save_uint32(ptr, x86dst);
+    ptr = save_uint16(ptr, x86ena);
+    ptr = save_uint16(ptr, x86imask);
+    ptr = save_uint32(ptr, old8);
+    ptr = save_uint32(ptr, old82);
+    ptr = save_uint32(ptr, old83);
+    ptr = save_uint16(ptr, oldcs);
+
+    savestate_zwrite(zfp, bytes, sizeof bytes);
+    savestate_zwrite(zfp, x86ram, X86_RAM_SIZE);
+    savestate_zwrite(zfp, x86rom, X86_ROM_SIZE);
+}
+
+static unsigned char *load_seg(unsigned char *ptr, x86seg *seg)
+{
+    ptr = load_uint32(ptr, &seg->base);
+    ptr = load_uint16(ptr, &seg->limit);
+    seg->access = *ptr++;
+    ptr = load_uint16(ptr, &seg->seg);
+    return ptr;
+}
+
+void x86_loadstate(ZFILE *zfp)
+{
+    unsigned char bytes[150], *ptr;
+    int i;
+    uint32_t temp;
+
+    savestate_zread(zfp, bytes, sizeof bytes);
+    ptr = bytes;
+    for (i = 0; i < 8; i++)
+        ptr = load_uint32(ptr, &regs[i].l);
+    ptr = load_uint16(ptr, &flags);
+    ptr = load_uint32(ptr, &oldpc);
+    ptr = load_uint32(ptr, &oldds);
+    ptr = load_uint32(ptr, &oldss);
+    ptr = load_uint32(ptr, &x86pc);
+    ptr = load_seg(ptr, &_cs);
+    ptr = load_seg(ptr, &_ds);
+    ptr = load_seg(ptr, &_es);
+    ptr = load_seg(ptr, &_ss);
+    ptr = load_seg(ptr, &_fs);
+    ptr = load_seg(ptr, &_gs);
+    ptr = load_uint32(ptr, &temp); x86ins = temp;
+    ptr = load_uint32(ptr, &x86sa);
+    ptr = load_uint32(ptr, &x86ss);
+    ptr = load_uint32(ptr, &x86src);
+    ptr = load_uint32(ptr, &x86da);
+    ptr = load_uint32(ptr, &x86ds);
+    ptr = load_uint32(ptr, &x86dst);
+    ptr = load_uint16(ptr, &x86ena);
+    ptr = load_uint16(ptr, &x86imask);
+    ptr = load_uint32(ptr, &old8);
+    ptr = load_uint32(ptr, &old82);
+    ptr = load_uint32(ptr, &old83);
+    ptr = load_uint16(ptr, &oldcs);
+    savestate_zread(zfp, x86ram, X86_RAM_SIZE);
+    savestate_zread(zfp, x86rom, X86_ROM_SIZE);
 }
 
 static void setznp8(uint8_t val)
@@ -2128,9 +2198,9 @@ void x86_exec()
                                 loadseg(tempw,&_ss);
                                 if (ssegs) oldss=ss;
                                 skipnextprint=1;
-				noint=1;
+                noint=1;
 //                                printf("LOAD SS %04X %04X\n",tempw,SS);
-//				printf("SS loaded with %04X %04X:%04X %04X %04X %04X\n",ss>>4,cs>>4,pc,CX,DX,es>>4);
+//              printf("SS loaded with %04X %04X:%04X %04X %04X %04X\n",ss>>4,cs>>4,pc,CX,DX,es>>4);
                                 break;
                         }
                         tubecycles-=((mod==3)?2:9);
@@ -3748,7 +3818,7 @@ void x86_exec()
                         x86dumpregs();
                         exit(-1);
                 }*/
-                
+
                 if (tube_irq&2)
                 {
                         //tube_irq&=~2;

@@ -1,10 +1,10 @@
 /*B-em v2.2 by Tom Walker
   Master 128 CMOS emulation*/
-  
+
 /*Master 128 uses a HD146818
 
   It is connected as -
-  
+
   System VIA PB6 - enable
   System VIA PB7 - address strobe
   IC32 B1        - RW
@@ -156,45 +156,52 @@ uint8_t cmos_read()
         return 0xff;
 }
 
-void cmos_load(MODEL m)
-{
-        FILE *f;
-        char fn[512];
-        if (!m.cmos[0]) return;
-        if (m.compact) compactcmos_load(m);
-        else
-        {
-		snprintf(fn, sizeof fn, "%s%s", exedir, m.cmos);
-                log_debug("CMOS Opening %s\n", fn);
-                f=fopen(fn, "rb");
-                if (!f)
-                {
-                        log_error("unable to load CMOS file %s: %s", fn, strerror(errno));
-                        memset(cmos, 0, 64);
-                        return;
-                }
-                fread(cmos, 64, 1, f);
-                fclose(f);
-        }
+void cmos_load(MODEL m) {
+    FILE *f;
+    ALLEGRO_PATH *path;
+    const char *cpath;
+
+    if (!m.cmos[0]) return;
+    if (m.compact) compactcmos_load(m);
+    else {
+        memset(cmos, 0, sizeof cmos);
         rtc_epoc_ref = rtc_epoc_adj = 0;
+        if ((path = find_cfg_file(m.cmos, ".bin"))) {
+            cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+            if ((f = fopen(cpath, "rb"))) {
+                if (fread(cmos, sizeof cmos, 1, f) != 1)
+                    log_warn("cmos: cmos file %s read incompletely, some values will be zero", cpath);
+                fclose(f);
+                log_debug("cmos: loaded from %s", cpath);
+            }
+            else
+                log_warn("cmos: unable to load CMOS file '%s': %s", cpath, strerror(errno));
+            al_destroy_path(path);
+        }
+        else
+            log_warn("cmos: CMOS file %s not found", m.cmos);
+    }
 }
 
-void cmos_save(MODEL m)
-{
-        FILE *f;
-        char fn[512];
-        if (!m.cmos[0]) return;
-        if (m.compact) compactcmos_save(m);
-        else
-        {
-                snprintf(fn, sizeof fn, "%s%s", exedir, m.cmos);
-                log_debug("CMOS Opening\n");
-                if ((f=fopen(fn, "wb")))
-		{
-			fwrite(cmos, 64, 1, f);
-			fclose(f);
-		}
-		else
-                        log_error("unable to save CMOS file %s: %s", fn, strerror(errno));
-        }
+void cmos_save(MODEL m) {
+    FILE *f;
+    ALLEGRO_PATH *path;
+    const char *cpath;
+
+    if (!m.cmos[0]) return;
+    if (m.compact) compactcmos_save(m);
+    else {
+        if ((path = find_cfg_dest(m.cmos, ".bin"))) {
+            cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+            if ((f = fopen(cpath, "wb"))) {
+                log_debug("cmos: saving to %s", cpath);
+                fwrite(cmos, sizeof cmos, 1, f);
+                fclose(f);
+            }
+            else
+                log_error("unable to save CMOS file %s: %s", cpath, strerror(errno));
+            al_destroy_path(path);
+        } else
+            log_error("unable to save CMOS file %s: no suitable destination", m.cmos);
+    }
 }

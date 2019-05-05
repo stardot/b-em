@@ -1,14 +1,11 @@
 /*B-em v2.2 by Tom Walker
   Disc support*/
-  
-#include <allegro.h>
-#include <stdio.h>
+
 #include "b-em.h"
-
+#include "gui-allegro.h"
 #include "fdi.h"
-#include "sdf.h"
-
 #include "disc.h"
+#include "sdf.h"
 
 #include "ddnoise.h"
 
@@ -16,7 +13,7 @@ DRIVE drives[2];
 
 int curdrive = 0;
 
-char discfns[2][260] = {"", ""};
+ALLEGRO_PATH *discfns[2] = { NULL, NULL };
 int defaultwriteprot = 0;
 int writeprot[NUM_DRIVES], fwriteprot[NUM_DRIVES];
 
@@ -36,83 +33,36 @@ void (*fdc_headercrcerror)();
 void (*fdc_writeprotect)();
 int  (*fdc_getdata)(int last);
 
-void disc_load(int drive, char *fn)
+void disc_load(int drive, ALLEGRO_PATH *fn)
 {
-    const char *p;
+    const char *ext;
+    const char *cpath;
 
-    setejecttext(drive, "");
-    if (!fn || !*fn) return;
-    p = get_extension(fn);
-    if (!p) return;
-    setejecttext(drive, fn);
-    if (strcasecmp(p, "fdi") == 0) {
-        log_debug("Loading %i: %s as FDI", drive, fn);
-        fdi_load(drive, fn);
-    } else {
-        log_debug("Loading %i: %s as SDF", drive, fn);
-        sdf_load(drive, fn);
-    }
-}
-
-void disc_new(int drive, char *fn)
-{
-    FILE *f;
-
-    char *p = get_extension(fn);
-    if (p == NULL) {
-        log_error("The filename needs an extension to identify the format");
+    if (!fn)
         return;
+    gui_allegro_set_eject_text(drive, fn);
+    cpath = al_path_cstr(fn, ALLEGRO_NATIVE_PATH_SEP);
+    if ((ext = al_get_path_extension(fn))) {
+        if (*ext == '.')
+            ext++;
+        if (strcasecmp(ext, "fdi") == 0) {
+            log_debug("Loading %i: %s as FDI", drive, cpath);
+            fdi_load(drive, cpath);
+            return;
+        }
     }
-    if (!strcasecmp(p, "ADF")) {
-        if ((f = fopen(fn, "wb"))) {
-            fseek(f, 0, SEEK_SET);
-            putc(7, f);
-            fseek(f, 0xFD, SEEK_SET);
-            putc(5, f); putc(0, f); putc(0xC, f); putc(0xF9, f); putc(0x04, f);
-            fseek(f, 0x1FB, SEEK_SET);
-            putc(0x88,f); putc(0x39,f); putc(0,f); putc(3,f); putc(0xC1,f);
-            putc(0, f); putc('H', f); putc('u', f); putc('g', f); putc('o', f);
-            fseek(f, 0x6CC, SEEK_SET);
-            putc(0x24, f);
-            fseek(f, 0x6D6, SEEK_SET);
-            putc(2, f); putc(0, f); putc(0, f); putc(0x24, f);
-            fseek(f, 0x6FB, SEEK_SET);
-            putc('H', f); putc('u', f); putc('g', f); putc('o', f);
-            fclose(f);
-            disc_load(drive, fn);
-        } else
-            log_error("Unable to open disk image %s for writing: %s", fn, strerror(errno));
-    } else if (!strcasecmp(p, "ADL")) {
-        if ((f = fopen(fn, "wb"))) {
-            fseek(f, 0, SEEK_SET);
-            putc(7, f);
-            fseek(f, 0xFD, SEEK_SET);
-            putc(0xA, f); putc(0, f); putc(0x11, f); putc(0xF9, f); putc(0x09, f);
-            fseek(f, 0x1FB, SEEK_SET);
-            putc(0x01, f); putc(0x84, f); putc(0, f); putc(3, f); putc(0x8A, f);
-            putc(0, f); putc('H', f); putc('u', f); putc('g', f); putc('o', f);
-            fseek(f, 0x6CC, SEEK_SET);
-            putc(0x24, f);
-            fseek(f, 0x6D6, SEEK_SET);
-            putc(2, f); putc(0, f); putc(0, f); putc(0x24, f);
-            fseek(f, 0x6FB, SEEK_SET);
-            putc('H', f); putc('u', f); putc('g', f); putc('o', f);
-            fclose(f);
-            disc_load(drive, fn);
-        } else
-            log_error("Unable to open disk image %s for writing: %s", fn, strerror(errno));
-    } else
-        log_error("Creating new disks of format %s not supported", p);
+    sdf_load(drive, cpath, ext);
 }
 
 void disc_close(int drive)
 {
-        if (drives[0].close) drives[0].close(drive);
+        if (drives[drive].close)
+            drives[drive].close(drive);
         // Force the drive to spin down (i.e. become not-ready) when the disk is unloaded
         // This prevents the file system (e.g DFS) caching the old disk catalogue
-        
         if (fdc_spindown)
             fdc_spindown();
+
 }
 
 int disc_notfound=0;

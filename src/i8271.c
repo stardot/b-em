@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include "b-em.h"
 #include "6502.h"
+#include "ddnoise.h"
 #include "i8271.h"
 #include "disc.h"
 #include "model.h"
@@ -19,8 +20,8 @@ void i8271_headercrcerror();
 void i8271_writeprotect();
 int  i8271_getdata(int last);
 
-int byte;
-int i8271_verify = 0;
+static int bytenum;
+static int i8271_verify = 0;
 
 // Output Port bit definitions in i8271.drvout
 #define SIDESEL   0x20
@@ -46,7 +47,7 @@ struct
 
 void i8271_reset()
 {
-        if (I8271)
+        if (fdc_type == FDC_I8271)
         {
                 fdc_callback       = i8271_callback;
                 fdc_data           = i8271_data;
@@ -81,21 +82,32 @@ static void i8271_NMI()
 
 void i8271_spinup()
 {
+    if (!motoron) {
         motoron = 1;
         motorspin = 0;
+        ddnoise_spinup();
+    }
 }
 
 void i8271_spindown()
 {
+    if (motoron) {
         motoron = 0;
-        i8271.drvout &= ~DRIVESEL;
+        ddnoise_spindown();
+    }
+    i8271.drvout &= ~DRIVESEL;
 }
 
 void i8271_setspindown()
 {
-        motorspin = 45000;
+    motorspin = 45000;
 }
 
+static void short_spindown(void)
+{
+    motorspin = 15000;
+    fdc_time = 0;
+}
 
 int params[][2]=
 {
@@ -122,16 +134,17 @@ uint8_t i8271_read(uint16_t addr)
 //        printf("Read 8271 %04X\n",addr);
         switch (addr & 7)
         {
-                case 0: /*Status register*/
-//                printf("Read status reg %04X %02X\n",pc,i8271.status);
+            case 0: /*Status register*/
+                log_debug("i8271: Read status reg %04X %02X\n",pc,i8271.status);
                 return i8271.status;
-                case 1: /*Result register*/
+            case 1: /*Result register*/
+                log_debug("i8271: Read result reg %04X %02X\n",pc,i8271.result);
                 i8271.status &= ~0x18;
                 i8271_NMI();
-//                printf("Read result reg %04X %02X\n",pc,i8271.status);
   //              output=1; timetolive=50;
                 return i8271.result;
-                case 4: /*Data register*/
+            case 4: /*Data register*/
+                //log_debug("i8271: Read data reg %04X %02X\n",pc,i8271.data);
                 i8271.status &= ~0xC;
                 i8271_NMI();
 //                printf("Read data reg %04X %02X\n",pc,i8271.status);
@@ -154,11 +167,11 @@ void i8271_write(uint16_t addr, uint8_t val)
 //        printf("Write 8271 %04X %02X\n",addr,val);
         switch (addr&7)
         {
-                case 0: /*Command register*/
+            case 0: /*Command register*/
                 if (i8271.status & 0x80) return;
                 i8271.command = val & 0x3F;
+                log_debug("i8271: command %02X", i8271.command);
                 if (i8271.command == 0x17) i8271.command = 0x13;
-//                printf("8271 command %02X!\n",i8271.command);
                 // Only commands < ReadDriveStatus actually change the drive select signals
                 // We use this later to generate RDY in the ReadDriveStatus command
                 if (i8271.command < 0x2C)
@@ -174,7 +187,7 @@ void i8271_write(uint16_t addr, uint8_t val)
                 {
                         switch (i8271.command)
                         {
-                                case 0x2C: /*Read drive status*/
+                            case 0x2C: /*Read drive status*/
                                 i8271.status = 0x10;
                                 i8271.result = 0x80 | 8 | track0;
                                 if (i8271.drvout & DRIVESEL0) i8271.result |= 0x04;
@@ -182,7 +195,7 @@ void i8271_write(uint16_t addr, uint8_t val)
 //                                printf("Status %02X\n",i8271.result);
                                 break;
 
-                                default:
+                            default:
                                 i8271.result = 0x18;
                                 i8271.status = 0x18;
                                 i8271_NMI();
@@ -194,14 +207,15 @@ void i8271_write(uint16_t addr, uint8_t val)
                         }
                 }
                 break;
-                case 1: /*Parameter register*/
+            case 1: /*Parameter register*/
+                log_debug("i8271: parameter %02X", val);
                 if (i8271.paramnum < 5)
                    i8271.params[i8271.paramnum++] = val;
                 if (i8271.paramnum == i8271.paramreq)
                 {
                         switch (i8271.command)
                         {
-                                case 0x0B: /*Write sector*/
+                            case 0x0B: /*Write sector*/
                                 i8271.sectorsleft = i8271.params[2] & 31;
                                 i8271.cursector = i8271.params[1];
                                 i8271_spinup();
@@ -209,7 +223,7 @@ void i8271_write(uint16_t addr, uint8_t val)
                                 if (i8271.curtrack[curdrive] != i8271.params[0]) i8271_seek();
                                 else                                             fdc_time = 200;
                                 break;
-                                case 0x13: /*Read sector*/
+                            case 0x13: /*Read sector*/
                                 i8271.sectorsleft = i8271.params[2] & 31;
                                 i8271.cursector = i8271.params[1];
                                 i8271_spinup();
@@ -217,7 +231,7 @@ void i8271_write(uint16_t addr, uint8_t val)
                                 if (i8271.curtrack[curdrive] != i8271.params[0]) i8271_seek();
                                 else                                             fdc_time = 200;
                                 break;
-                                case 0x1F: /*Verify sector*/
+                            case 0x1F: /*Verify sector*/
                                 i8271.sectorsleft = i8271.params[2] & 31;
                                 i8271.cursector = i8271.params[1];
                                 i8271_spinup();
@@ -226,7 +240,7 @@ void i8271_write(uint16_t addr, uint8_t val)
                                 else                                             fdc_time = 200;
                                 i8271_verify = 1;
                                 break;
-                                case 0x1B: /*Read ID*/
+                            case 0x1B: /*Read ID*/
 //                                printf("8271 : Read ID start\n");
                                 i8271.sectorsleft = i8271.params[2] & 31;
                                 i8271_spinup();
@@ -234,31 +248,31 @@ void i8271_write(uint16_t addr, uint8_t val)
                                 if (i8271.curtrack[curdrive] != i8271.params[0]) i8271_seek();
                                 else                                             fdc_time = 200;
                                 break;
-                                case 0x23: /*Format track*/
+                            case 0x23: /*Format track*/
                                 i8271_spinup();
                                 i8271.phase = 0;
                                 if (i8271.curtrack[curdrive] != i8271.params[0]) i8271_seek();
                                 else                                             fdc_time = 200;
                                 break;
                                 break;
-                                case 0x29: /*Seek*/
+                            case 0x29: /*Seek*/
 //                                fdc_time=10000;
                                 i8271_seek();
                                 i8271_spinup();
                                 break;
-                                case 0x35: /*Specify*/
+                            case 0x35: /*Specify*/
                                 i8271.status = 0;
                                 break;
-                                case 0x3A: /*Write special register*/
+                            case 0x3A: /*Write special register*/
                                 i8271.status = 0;
 //                                printf("Write special %02X\n",i8271.params[0]);
                                 switch (i8271.params[0])
                                 {
-                                        case 0x12: i8271.curtrack[0] = val; /*printf("Write real track now %i\n",val);*/ break;
-                                        case 0x17: break; /*Mode register*/
-                                        case 0x1A: i8271.curtrack[1] = val; /*printf("Write real track now %i\n",val);*/ break;
-                                        case 0x23: i8271.drvout = i8271.params[1]; break;
-                                        default:
+                                    case 0x12: i8271.curtrack[0] = val; /*printf("Write real track now %i\n",val);*/ break;
+                                    case 0x17: break; /*Mode register*/
+                                    case 0x1A: i8271.curtrack[1] = val; /*printf("Write real track now %i\n",val);*/ break;
+                                    case 0x23: i8271.drvout = i8271.params[1]; break;
+                                    default:
                                         i8271.result = 0x18;
                                         i8271.status = 0x18;
                                         i8271_NMI();
@@ -270,7 +284,7 @@ void i8271_write(uint16_t addr, uint8_t val)
 //                                        exit(-1);
                                 }
                                 break;
-                                case 0x3D: /*Read special register*/
+                            case 0x3D: /*Read special register*/
                                 i8271.status = 0x10;
                                 i8271.result = 0;
                                 switch (i8271.params[0])
@@ -304,10 +318,12 @@ void i8271_write(uint16_t addr, uint8_t val)
                         }
                 }
                 break;
-                case 2: /*Reset register*/
+            case 2: /*Reset register*/
+                log_debug("i8271: reset %02X", val);
                 if (val & 1) i8271_reset();
+
                 break;
-                case 4: /*Data register*/
+            case 4: /*Data register*/
                 i8271.data = val;
                 i8271.written = 1;
                 i8271.status &= ~0xC;
@@ -322,7 +338,7 @@ void i8271_callback()
 //        printf("Callback 8271 - command %02X\n",i8271.command);
         switch (i8271.command)
         {
-                case 0x0B: /*Write*/
+            case 0x0B: /*Write*/
                 if (!i8271.phase)
                 {
                         i8271.curtrack[curdrive] = i8271.params[0];
@@ -346,14 +362,14 @@ void i8271_callback()
                 }
                 i8271.cursector++;
                 disc_writesector(curdrive, i8271.cursector, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, 0);
-                byte = 0;
+                bytenum = 0;
                 i8271.status = 0x8C;
                 i8271.result = 0;
                 i8271_NMI();
                 break;
 
-                case 0x13: /*Read*/
-                case 0x1F: /*Verify*/
+            case 0x13: /*Read*/
+            case 0x1F: /*Verify*/
                 if (!i8271.phase)
                 {
 //                        printf("Seek to %i\n",i8271.params[0]);
@@ -377,10 +393,10 @@ void i8271_callback()
                 }
                 i8271.cursector++;
                 disc_readsector(curdrive, i8271.cursector, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, 0);
-                byte = 0;
+                bytenum = 0;
                 break;
 
-                case 0x1B: /*Read ID*/
+            case 0x1B: /*Read ID*/
 //                printf("Read ID callback %i\n",i8271.phase);
                 if (!i8271.phase)
                 {
@@ -404,10 +420,10 @@ void i8271_callback()
                 }
                 i8271.cursector++;
                 disc_readaddress(curdrive, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, 0);
-                byte = 0;
+                bytenum = 0;
                 break;
 
-                case 0x23: /*Format*/
+            case 0x23: /*Format*/
                 if (!i8271.phase)
                 {
                         i8271.curtrack[curdrive] = i8271.params[0];
@@ -432,7 +448,7 @@ void i8271_callback()
                 i8271.phase = 2;
                 break;
 
-                case 0x29: /*Seek*/
+            case 0x29: /*Seek*/
                 i8271.curtrack[curdrive] = i8271.params[0];
 //                i8271.realtrack+=diff;
                 i8271.status = 0x18;
@@ -443,7 +459,7 @@ void i8271_callback()
                 i8271_setspindown();
                 break;
 
-                case 0xFF: break;
+            case 0xFF: break;
 
                 default: break;
                 printf("Unknown 8271 command %02X 3\n", i8271.command);
@@ -459,8 +475,8 @@ void i8271_data(uint8_t dat)
         i8271.status = 0x8C;
         i8271.result = 0;
         i8271_NMI();
-//        printf("%02X : Data %02X\n",byte,dat);
-        byte++;
+//        printf("%02X : Data %02X\n",bytenum,dat);
+        bytenum++;
 }
 
 void i8271_finishread()
@@ -470,11 +486,10 @@ void i8271_finishread()
 
 void i8271_notfound()
 {
-        i8271_spindown();
         i8271.result = 0x18;
         i8271.status = 0x18;
         i8271_NMI();
-        fdc_time = 0;
+        short_spindown();
 //        printf("Not found 8271\n");
 }
 
@@ -483,7 +498,7 @@ void i8271_datacrcerror()
         i8271.result = 0x0E;
         i8271.status = 0x18;
         i8271_NMI();
-        fdc_time = 0;
+        short_spindown();
 //        printf("CRCdat 8271\n");
 }
 
@@ -492,14 +507,14 @@ void i8271_headercrcerror()
         i8271.result = 0x0C;
         i8271.status = 0x18;
         i8271_NMI();
-        fdc_time = 0;
+        short_spindown();
 //        printf("CRChead 8271\n");
 }
 
 int i8271_getdata(int last)
 {
-//        printf("Disc get data %i\n",byte);
-        byte++;
+//        printf("Disc get data %i\n",bytenum);
+        bytenum++;
         if (!i8271.written) return -1;
         if (!last)
         {
@@ -516,5 +531,5 @@ void i8271_writeprotect()
         i8271.result = 0x12;
         i8271.status = 0x18;
         i8271_NMI();
-        fdc_time = 0;
+        short_spindown();
 }
