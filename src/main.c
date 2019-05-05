@@ -338,6 +338,12 @@ static void main_start_fullspeed(void)
     al_emit_user_event(&evsrc, &event, NULL);
 }
 
+static void main_key_char(ALLEGRO_EVENT *event)
+{
+    log_debug("main: key char, code=%d, unichar=%d", event->keyboard.keycode, event->keyboard.unichar);
+    key_char(event);
+}
+
 static void main_key_down(ALLEGRO_EVENT *event)
 {
     ALLEGRO_KEYBOARD_STATE kstate;
@@ -457,6 +463,9 @@ void main_run()
     while (!quitting) {
         al_wait_for_event(queue, &event);
         switch(event.type) {
+            case ALLEGRO_EVENT_KEY_CHAR:
+                main_key_char(&event);
+                break;
             case ALLEGRO_EVENT_KEY_DOWN:
                 main_key_down(&event);
                 break;

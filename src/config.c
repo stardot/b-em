@@ -156,6 +156,7 @@ void config_load(void)
     vdfs_enabled     = get_config_bool("disc", "vdfsenable", 0);
 
     keyas            = get_config_bool(NULL, "key_as",        0);
+    keylogical       = get_config_bool(NULL, "key_logical",   0);
     mouse_amx        = get_config_bool(NULL, "mouse_amx",     0);
     kbdips           = get_config_int(NULL, "kbdips", 0);
 

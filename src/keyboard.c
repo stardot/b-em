@@ -3,6 +3,8 @@
 #include "sysvia.h"
 #include "keyboard.h"
 #include "model.h"
+#include "6502.h"
+#include <ctype.h>
 
 static uint8_t allegro2bbc[ALLEGRO_KEY_MAX] =
 {
@@ -235,8 +237,240 @@ static uint8_t allegro2bbc[ALLEGRO_KEY_MAX] =
     0x40,   // 226  ALLEGRO_KEY_CAPSLOCK
 };
 
+static uint8_t allegro2bbclogical[ALLEGRO_KEY_MAX] =
+{
+    0xaa,   // 0
+    0xaa,   // 1    ALLEGRO_KEY_A
+    0xaa,   // 2    ALLEGRO_KEY_B
+    0xaa,   // 3    ALLEGRO_KEY_C
+    0xaa,   // 4    ALLEGRO_KEY_D
+    0xaa,   // 5    ALLEGRO_KEY_E
+    0xaa,   // 6    ALLEGRO_KEY_F
+    0xaa,   // 7    ALLEGRO_KEY_G
+    0xaa,   // 8    ALLEGRO_KEY_H
+    0xaa,   // 9    ALLEGRO_KEY_I
+    0xaa,   // 10   ALLEGRO_KEY_J
+    0xaa,   // 11   ALLEGRO_KEY_K
+    0xaa,   // 12   ALLEGRO_KEY_L
+    0xaa,   // 13   ALLEGRO_KEY_M
+    0xaa,   // 14   ALLEGRO_KEY_N
+    0xaa,   // 15   ALLEGRO_KEY_O
+    0xaa,   // 16   ALLEGRO_KEY_P
+    0xaa,   // 17   ALLEGRO_KEY_Q
+    0xaa,   // 18   ALLEGRO_KEY_R
+    0xaa,   // 19   ALLEGRO_KEY_S
+    0xaa,   // 20   ALLEGRO_KEY_T
+    0xaa,   // 21   ALLEGRO_KEY_U
+    0xaa,   // 22   ALLEGRO_KEY_V
+    0xaa,   // 23   ALLEGRO_KEY_W
+    0xaa,   // 24   ALLEGRO_KEY_X
+    0xaa,   // 25   ALLEGRO_KEY_Y
+    0xaa,   // 26   ALLEGRO_KEY_Z
+    0xaa,   // 27   ALLEGRO_KEY_0
+    0xaa,   // 28   ALLEGRO_KEY_1
+    0xaa,   // 29   ALLEGRO_KEY_2
+    0xaa,   // 30   ALLEGRO_KEY_3
+    0xaa,   // 31   ALLEGRO_KEY_4
+    0xaa,   // 32   ALLEGRO_KEY_5
+    0xaa,   // 33   ALLEGRO_KEY_6
+    0xaa,   // 34   ALLEGRO_KEY_7
+    0xaa,   // 35   ALLEGRO_KEY_8
+    0xaa,   // 36   ALLEGRO_KEY_9
+    0xaa,   // 37   ALLEGRO_KEY_PAD_0
+    0xaa,   // 38   ALLEGRO_KEY_PAD_1
+    0xaa,   // 39   ALLEGRO_KEY_PAD_2
+    0xaa,   // 40   ALLEGRO_KEY_PAD_3
+    0xaa,   // 41   ALLEGRO_KEY_PAD_4
+    0xaa,   // 42   ALLEGRO_KEY_PAD_5
+    0xaa,   // 43   ALLEGRO_KEY_PAD_6
+    0xaa,   // 44   ALLEGRO_KEY_PAD_7
+    0xaa,   // 45   ALLEGRO_KEY_PAD_8
+    0xaa,   // 46   ALLEGRO_KEY_PAD_9
+    0x71,   // 56   ALLEGRO_KEY_F1
+    0x72,   // 47   ALLEGRO_KEY_F2
+    0x73,   // 48   ALLEGRO_KEY_F3
+    0x14,   // 49   ALLEGRO_KEY_F4
+    0x74,   // 50   ALLEGRO_KEY_F5
+    0x75,   // 51   ALLEGRO_KEY_F6
+    0x16,   // 52   ALLEGRO_KEY_F7
+    0x76,   // 53   ALLEGRO_KEY_F8
+    0x77,   // 54   ALLEGRO_KEY_F9
+    0x20,   // 55   ALLEGRO_KEY_F10
+    0xaa,   // 57   ALLEGRO_KEY_F11
+    0xaa,   // 58   ALLEGRO_KEY_F12
+    0x70,   // 59   ALLEGRO_KEY_ESCAPE
+    0xaa,   // 60   ALLEGRO_KEY_TILDE
+    0xaa,   // 61   ALLEGRO_KEY_MINUS
+    0xaa,   // 62   ALLEGRO_KEY_EQUALS
+    0x59,   // 63   ALLEGRO_KEY_BACKSPACE
+    0x60,   // 64   ALLEGRO_KEY_TAB
+    0xaa,   // 65   ALLEGRO_KEY_OPENBRACE
+    0xaa,   // 66   ALLEGRO_KEY_CLOSEBRACE
+    0xaa,   // 67   ALLEGRO_KEY_ENTER
+    0xaa,   // 68   ALLEGRO_KEY_SEMICOLON
+    0xaa,   // 69   ALLEGRO_KEY_QUOTE
+    0xaa,   // 70   ALLEGRO_KEY_BACKSLASH
+    0xaa,   // 71   ALLEGRO_KEY_BACKSLASH2
+    0xaa,   // 72   ALLEGRO_KEY_COMMA
+    0xaa,   // 73   ALLEGRO_KEY_FULLSTOP
+    0xaa,   // 74   ALLEGRO_KEY_SLASH
+    0xaa,   // 75   ALLEGRO_KEY_SPACE
+    0xaa,   // 76   ALLEGRO_KEY_INSERT
+    0x59,   // 77   ALLEGRO_KEY_DELETE
+    0xaa,   // 78   ALLEGRO_KEY_HOME
+    0xaa,   // 79   ALLEGRO_KEY_END
+    0xaa,   // 80   ALLEGRO_KEY_PGUP
+    0xaa,   // 81   ALLEGRO_KEY_PGDN
+    0x19,   // 82   ALLEGRO_KEY_LEFT
+    0x79,   // 83   ALLEGRO_KEY_RIGHT
+    0x39,   // 84   ALLEGRO_KEY_UP
+    0x29,   // 85   ALLEGRO_KEY_DOWN
+    0xaa,   // 86   ALLEGRO_KEY_PAD_SLASH
+    0xaa,   // 87   ALLEGRO_KEY_PAD_ASTERISK
+    0xaa,   // 88   ALLEGRO_KEY_PAD_MINUS
+    0xaa,   // 89   ALLEGRO_KEY_PAD_PLUS
+    0x59,   // 90   ALLEGRO_KEY_PAD_DELETE
+    0xaa,   // 91   ALLEGRO_KEY_PAD_ENTER
+    0x4c,   // 92   ALLEGRO_KEY_PRINTSCREEN
+    0xaa,   // 93   ALLEGRO_KEY_PAUSE
+    0x4c,   // 94   ALLEGRO_KEY_ABNT_C1
+    0xaa,   // 95   ALLEGRO_KEY_YEN
+    0xaa,   // 96   ALLEGRO_KEY_KANA
+    0xaa,   // 97   ALLEGRO_KEY_CONVERT
+    0xaa,   // 98   ALLEGRO_KEY_NOCONVERT
+    0xaa,   // 99   ALLEGRO_KEY_AT
+    0xaa,   // 100  ALLEGRO_KEY_CIRCUMFLEX
+    0xaa,   // 101  ALLEGRO_KEY_COLON2
+    0xaa,   // 102  ALLEGRO_KEY_KANJI
+    0xaa,   // 103  ALLEGRO_KEY_PAD_EQUALS
+    0xaa,   // 104  ALLEGRO_KEY_BACKQUOTE
+    0xaa,   // 105  ALLEGRO_KEY_SEMICOLON2
+    0xaa,   // 106  ALLEGRO_KEY_COMMAND
+    0xaa,   // 107  ALLEGRO_KEY_BACK
+    0xaa,   // 108  ALLEGRO_KEY_VOLUME_UP
+    0xaa,   // 109  ALLEGRO_KEY_VOLUME_DOWN
+    0xaa,   // 110
+    0xaa,   // 111
+    0xaa,   // 112
+    0xaa,   // 113
+    0xaa,   // 114
+    0xaa,   // 115
+    0xaa,   // 116
+    0xaa,   // 117
+    0xaa,   // 118
+    0xaa,   // 119
+    0xaa,   // 120
+    0xaa,   // 121
+    0xaa,   // 122
+    0xaa,   // 123
+    0xaa,   // 124
+    0xaa,   // 125
+    0xaa,   // 126
+    0xaa,   // 127
+    0xaa,   // 128
+    0xaa,   // 129
+    0xaa,   // 130
+    0xaa,   // 131
+    0xaa,   // 132
+    0xaa,   // 133
+    0xaa,   // 134
+    0xaa,   // 135
+    0xaa,   // 136
+    0xaa,   // 137
+    0xaa,   // 138
+    0xaa,   // 139
+    0xaa,   // 140
+    0xaa,   // 141
+    0xaa,   // 142
+    0xaa,   // 143
+    0xaa,   // 144
+    0xaa,   // 145
+    0xaa,   // 146
+    0xaa,   // 147
+    0xaa,   // 148
+    0xaa,   // 149
+    0xaa,   // 150
+    0xaa,   // 151
+    0xaa,   // 152
+    0xaa,   // 153
+    0xaa,   // 154
+    0xaa,   // 155
+    0xaa,   // 156
+    0xaa,   // 157
+    0xaa,   // 158
+    0xaa,   // 159
+    0xaa,   // 160
+    0xaa,   // 161
+    0xaa,   // 162
+    0xaa,   // 163
+    0xaa,   // 164
+    0xaa,   // 165
+    0xaa,   // 166
+    0xaa,   // 167
+    0xaa,   // 168
+    0xaa,   // 169
+    0xaa,   // 170
+    0xaa,   // 171
+    0xaa,   // 172
+    0xaa,   // 173
+    0xaa,   // 174
+    0xaa,   // 175
+    0xaa,   // 176
+    0xaa,   // 177
+    0xaa,   // 178
+    0xaa,   // 179
+    0xaa,   // 180
+    0xaa,   // 181
+    0xaa,   // 182
+    0xaa,   // 183
+    0xaa,   // 184
+    0xaa,   // 185
+    0xaa,   // 186
+    0xaa,   // 187
+    0xaa,   // 188
+    0xaa,   // 189
+    0xaa,   // 190
+    0xaa,   // 191
+    0xaa,   // 192
+    0xaa,   // 193
+    0xaa,   // 194
+    0xaa,   // 195
+    0xaa,   // 196
+    0xaa,   // 197
+    0xaa,   // 198
+    0xaa,   // 199
+    0xaa,   // 200
+    0xaa,   // 201
+    0xaa,   // 202
+    0xaa,   // 203
+    0xaa,   // 204
+    0xaa,   // 205
+    0xaa,   // 206
+    0xaa,   // 207
+    0xaa,   // 208
+    0xaa,   // 209
+    0xaa,   // 210
+    0xaa,   // 211
+    0xaa,   // 212
+    0xaa,   // 213
+    0xaa,   // 214
+    0x00,   // 215  ALLEGRO_KEY_LSHIFT
+    0x00,   // 216  ALLEGRO_KEY_RSHIFT
+    0x01,   // 217  ALLEGRO_KEY_LCTRL
+    0x01,   // 218  ALLEGRO_KEY_RCTRL
+    0xaa,   // 219  ALLEGRO_KEY_ALT
+    0xaa,   // 220  ALLEGRO_KEY_ALTGR
+    0xaa,   // 221  ALLEGRO_KEY_LWIN
+    0xaa,   // 222  ALLEGRO_KEY_RWIN
+    0xaa,   // 223  ALLEGRO_KEY_MENU
+    0xaa,   // 224  ALLEGRO_KEY_SCROLLLOCK
+    0x71,   // 225  ALLEGRO_KEY_NUMLOCK
+    0x40,   // 226  ALLEGRO_KEY_CAPSLOCK
+};
+
 int keylookup[ALLEGRO_KEY_MAX];
 bool keyas = 0;
+bool keylogical = 0;
 
 static int keycol, keyrow;
 static int bbckey[16][16];
@@ -288,11 +522,31 @@ int key_map(ALLEGRO_EVENT *event)
     return code;
 }
 
+void key_char(ALLEGRO_EVENT *event)
+{
+    if (keylogical && allegro2bbclogical[event->keyboard.keycode] == 0xaa) {
+        int c = event->keyboard.unichar;
+        switch (c)
+        {
+            case 96:  // unicode backtick
+                break;
+            case 163: // unicode pound currency symbol
+                c = 96;
+            default: {
+                char *str = malloc(2);
+                str[0] = (char) c;
+                str[1] = 0;
+                os_paste_start(str);
+            }
+        }
+    }
+}
+
 static void set_key(int code, int state)
 {
     unsigned vkey;
 
-    vkey = allegro2bbc[code];
+    vkey = keylogical ? allegro2bbclogical[code] : allegro2bbc[code];
     log_debug("keyboard: code=%d, vkey=%02X", code, vkey);
     if (vkey != 0xaa) {
         bbckey[vkey & 15][vkey >> 4] = state;
@@ -335,7 +589,7 @@ bool key_any_down(void)
 bool key_code_down(int code)
 {
     if (code < ALLEGRO_KEY_MAX) {
-        code = allegro2bbc[code];
+        code = keylogical ? allegro2bbclogical[code] : allegro2bbc[code];
         return bbckey[code & 0x0f][code >> 4];
     }
     return false;
