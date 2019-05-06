@@ -533,7 +533,7 @@ void key_char(ALLEGRO_EVENT *event)
             case 163: // unicode pound currency symbol
                 c = 96;
             default: {
-                char *str = malloc(2);
+                char *str = al_malloc(2);
                 str[0] = (char) c;
                 str[1] = 0;
                 os_paste_start(str);
