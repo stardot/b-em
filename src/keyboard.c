@@ -240,32 +240,32 @@ static uint8_t allegro2bbc[ALLEGRO_KEY_MAX] =
 static uint8_t allegro2bbclogical[ALLEGRO_KEY_MAX] =
 {
     0xaa,   // 0
-    0xaa,   // 1    ALLEGRO_KEY_A
-    0xaa,   // 2    ALLEGRO_KEY_B
-    0xaa,   // 3    ALLEGRO_KEY_C
-    0xaa,   // 4    ALLEGRO_KEY_D
-    0xaa,   // 5    ALLEGRO_KEY_E
-    0xaa,   // 6    ALLEGRO_KEY_F
-    0xaa,   // 7    ALLEGRO_KEY_G
-    0xaa,   // 8    ALLEGRO_KEY_H
-    0xaa,   // 9    ALLEGRO_KEY_I
-    0xaa,   // 10   ALLEGRO_KEY_J
-    0xaa,   // 11   ALLEGRO_KEY_K
-    0xaa,   // 12   ALLEGRO_KEY_L
-    0xaa,   // 13   ALLEGRO_KEY_M
-    0xaa,   // 14   ALLEGRO_KEY_N
-    0xaa,   // 15   ALLEGRO_KEY_O
-    0xaa,   // 16   ALLEGRO_KEY_P
-    0xaa,   // 17   ALLEGRO_KEY_Q
-    0xaa,   // 18   ALLEGRO_KEY_R
-    0xaa,   // 19   ALLEGRO_KEY_S
-    0xaa,   // 20   ALLEGRO_KEY_T
-    0xaa,   // 21   ALLEGRO_KEY_U
-    0xaa,   // 22   ALLEGRO_KEY_V
-    0xaa,   // 23   ALLEGRO_KEY_W
-    0xaa,   // 24   ALLEGRO_KEY_X
-    0xaa,   // 25   ALLEGRO_KEY_Y
-    0xaa,   // 26   ALLEGRO_KEY_Z
+    0x41,   // 1    ALLEGRO_KEY_A
+    0x64,   // 2    ALLEGRO_KEY_B
+    0x52,   // 3    ALLEGRO_KEY_C
+    0x32,   // 4    ALLEGRO_KEY_D
+    0x22,   // 5    ALLEGRO_KEY_E
+    0x43,   // 6    ALLEGRO_KEY_F
+    0x53,   // 7    ALLEGRO_KEY_G
+    0x54,   // 8    ALLEGRO_KEY_H
+    0x25,   // 9    ALLEGRO_KEY_I
+    0x45,   // 10   ALLEGRO_KEY_J
+    0x46,   // 11   ALLEGRO_KEY_K
+    0x56,   // 12   ALLEGRO_KEY_L
+    0x65,   // 13   ALLEGRO_KEY_M
+    0x55,   // 14   ALLEGRO_KEY_N
+    0x36,   // 15   ALLEGRO_KEY_O
+    0x37,   // 16   ALLEGRO_KEY_P
+    0x10,   // 17   ALLEGRO_KEY_Q
+    0x33,   // 18   ALLEGRO_KEY_R
+    0x51,   // 19   ALLEGRO_KEY_S
+    0x23,   // 20   ALLEGRO_KEY_T
+    0x35,   // 21   ALLEGRO_KEY_U
+    0x63,   // 22   ALLEGRO_KEY_V
+    0x21,   // 23   ALLEGRO_KEY_W
+    0x42,   // 24   ALLEGRO_KEY_X
+    0x44,   // 25   ALLEGRO_KEY_Y
+    0x61,   // 26   ALLEGRO_KEY_Z
     0xaa,   // 27   ALLEGRO_KEY_0
     0xaa,   // 28   ALLEGRO_KEY_1
     0xaa,   // 29   ALLEGRO_KEY_2
