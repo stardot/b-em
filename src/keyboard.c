@@ -536,7 +536,7 @@ void key_char(ALLEGRO_EVENT *event)
                 char *str = al_malloc(2);
                 str[0] = (char) c;
                 str[1] = 0;
-                os_paste_start(str);
+                os_paste_append(str);
             }
         }
     }

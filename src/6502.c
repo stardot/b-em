@@ -215,6 +215,22 @@ void os_paste_start(char *str)
     }
 }
 
+void os_paste_append(char *str)
+{
+    if (!clip_paste_str)
+        os_paste_start(str);
+    else {
+        ptrdiff_t clip_paste_ptr_offset = clip_paste_ptr - clip_paste_str;
+        size_t clip_paste_str_len = strlen((char *)clip_paste_str);
+        clip_paste_str = (unsigned char *)al_realloc(clip_paste_str, clip_paste_str_len + strlen(str));
+        strcat((char *)clip_paste_str + clip_paste_str_len, str);
+        clip_paste_ptr = clip_paste_str + clip_paste_ptr_offset;
+        // We don't set os_paste_ch to -1; if a character has been examined it
+        // should be returned (and clip_paste_ptr was already advanced past it).
+        log_debug("6502: paste append, clip_paste_str=%p", clip_paste_str);
+    }
+}
+
 static void os_paste_remv(void)
 {
     int ch;
