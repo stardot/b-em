@@ -318,7 +318,7 @@ static uint8_t allegro2bbclogical[ALLEGRO_KEY_MAX] =
     0xaa,   // 76   ALLEGRO_KEY_INSERT
     0x59,   // 77   ALLEGRO_KEY_DELETE
     0xaa,   // 78   ALLEGRO_KEY_HOME
-    0xaa,   // 79   ALLEGRO_KEY_END
+    0x69,   // 79   ALLEGRO_KEY_END
     0xaa,   // 80   ALLEGRO_KEY_PGUP
     0xaa,   // 81   ALLEGRO_KEY_PGDN
     0x19,   // 82   ALLEGRO_KEY_LEFT
