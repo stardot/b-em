@@ -340,40 +340,6 @@ void vdfs_reset(void)
     flush_all();
 }
 
-/*
- * Functions used to parse values from the INF file on the host
- */
-
-static void get_filename(FILE *fp, vdfs_entry *dest)
-{
-    int ic, ch;
-    char *ptr, *end;
-
-    do
-        ic = getc(fp);
-    while (ic == ' ' || ic == '\t');
-
-    ptr = dest->acorn_fn;
-    end = ptr + MAX_FILE_NAME;
-
-    if ((ch = getc(fp)) == '.') {
-        dest->dfs_dir = ic;
-        ch = getc(fp);
-    }
-    else {
-        dest->dfs_dir = '$';
-        *ptr++ = ic;
-    }
-
-    while (ch != EOF && ch != ' ' && ch != '\t') {
-        if (ptr < end)
-            *ptr++ = ch;
-        ch = getc(fp);
-    }
-    if (ptr < end)
-        *ptr = '\0';
-}
-
 static int hex2nyb(int ch)
 {
     if (ch >= '0' && ch <= '9')
@@ -384,25 +350,6 @@ static int hex2nyb(int ch)
         return ch - 'a' + 10;
     else
         return -1;
-}
-
-static unsigned get_hex(FILE *fp)
-{
-    int ch;
-    unsigned value = 0;
-    int nyb;
-
-    if (!feof(fp)) {
-        do
-            ch = getc(fp);
-        while (ch == ' ' || ch == '\t');
-
-        while ((nyb = hex2nyb(ch)) >= 0) {
-            value = (value << 4) | nyb;
-            ch = getc(fp);
-        }
-    }
-    return value;
 }
 
 /*
@@ -623,11 +570,51 @@ static void scan_entry(vdfs_entry *ent)
     fp = fopen(ent->host_path, "rt");
     *ent->host_inf = '\0';
     if (fp) {
-        get_filename(fp, ent);
-        load_addr = get_hex(fp);
-        exec_addr = get_hex(fp);
+        char inf_line[80];
+        const char *lptr = fgets(inf_line, sizeof inf_line, fp);
         fclose(fp);
-    } else if (ent->acorn_fn[0] == '\0')
+        if (lptr) {
+            int ic, ch, nyb;
+            char *ptr = ent->acorn_fn;
+            char *end = ptr + MAX_FILE_NAME;
+
+            // Parse filename.
+            while ((ic = *lptr++) == ' ' || ic == '\t')
+                ;
+            if ((ch = *lptr++) == '.') {
+                ent->dfs_dir = ic;
+                ch = *lptr++;
+            }
+            else {
+                ent->dfs_dir = '$';
+                *ptr++ = ic;
+            }
+            while (ch && ch != ' ' && ch != '\t') {
+                if (ptr < end)
+                    *ptr++ = ch;
+                ch = *lptr++;
+            }
+            if (ptr < end)
+                *ptr = '\0';
+
+            // Parse load address.
+            while (ch == ' ' || ch == '\t')
+                ch = *lptr++;
+            while ((nyb = hex2nyb(ch)) >= 0) {
+                load_addr = (load_addr << 4) | nyb;
+                ch = *lptr++;
+            }
+
+            // Parse exec address.
+            while (ch == ' ' || ch == '\t')
+                ch = *lptr++;
+            while ((nyb = hex2nyb(ch)) >= 0) {
+                exec_addr = (exec_addr << 4) | nyb;
+                ch = *lptr++;
+            }
+        }
+    }
+    if (ent->acorn_fn[0] == '\0')
         hst2bbc(ent->host_fn, ent->acorn_fn);
 
     // stat the real file.
@@ -1537,26 +1524,63 @@ static void osfile_attribs(uint32_t pb, vdfs_entry *ent)
     writemem32(pb+0x0e, ent->attribs);
 }
 
-static void save_callback(FILE *fp, uint32_t start_addr, uint32_t end_addr)
+static void write_bytes_io(FILE *fp, uint32_t addr, size_t bytes)
 {
-    uint32_t ptr;
+    char buffer[8192];
 
-    if (start_addr > 0xffff0000 || curtube == -1) {
-        for (ptr = start_addr; ptr < end_addr; ptr++)
-            putc(readmem(ptr), fp);
-    } else {
-        for (ptr = start_addr; ptr < end_addr; ptr++)
-            putc(tube_readmem(ptr), fp);
+    while (bytes >= sizeof buffer) {
+        char *ptr = buffer;
+        size_t chunk = sizeof buffer;
+        while (chunk--)
+            *ptr++ = readmem(addr++);
+        fwrite(buffer, sizeof buffer, 1, fp);
+        bytes -= sizeof buffer;
+    }
+    if (bytes > 0) {
+        char *ptr = buffer;
+        size_t chunk = bytes;
+        while (chunk--)
+            *ptr++ = readmem(addr++);
+        fwrite(buffer, bytes, 1, fp);
     }
 }
 
-static void cfile_callback(FILE *fp, uint32_t start_addr, uint32_t end_addr)
+static void write_bytes_tube(FILE *fp, uint32_t addr, size_t bytes)
 {
-    fseek(fp, end_addr - start_addr -1, SEEK_SET);
+    char buffer[8192];
+
+    while (bytes >= sizeof buffer) {
+        char *ptr = buffer;
+        size_t chunk = sizeof buffer;
+        while (chunk--)
+            *ptr++ = tube_readmem(addr++);
+        fwrite(buffer, sizeof buffer, 1, fp);
+        bytes -= sizeof buffer;
+    }
+    if (bytes > 0) {
+        char *ptr = buffer;
+        size_t chunk = bytes;
+        while (chunk--)
+            *ptr++ = tube_readmem(addr++);
+        fwrite(buffer, bytes, 1, fp);
+    }
+}
+
+static void save_callback(FILE *fp, uint32_t start_addr, size_t bytes)
+{
+    if (start_addr > 0xffff0000 || curtube == -1)
+        write_bytes_io(fp, start_addr, bytes);
+    else
+        write_bytes_tube(fp, start_addr, bytes);
+}
+
+static void cfile_callback(FILE *fp, uint32_t start_addr, size_t bytes)
+{
+    fseek(fp, bytes, SEEK_SET);
     putc(0, fp);
 }
 
-static void osfile_write(uint32_t pb, const char *path, void (*callback)(FILE *fp, uint32_t start_addr, uint32_t end_addr))
+static void osfile_write(uint32_t pb, const char *path, void (*callback)(FILE *fp, uint32_t addr, size_t bytes))
 {
     vdfs_entry *ent, key;
     FILE *fp;
@@ -1590,7 +1614,7 @@ static void osfile_write(uint32_t pb, const char *path, void (*callback)(FILE *f
             ent->attribs = (ent->attribs & ~ATTR_IS_DIR) | ATTR_EXISTS;
             start_addr = readmem32(pb+0x0a);
             end_addr = readmem32(pb+0x0e);
-            callback(fp, start_addr, end_addr);
+            callback(fp, start_addr, end_addr - start_addr);
             fclose(fp);
             scan_attr(ent, readmem32(pb+0x02), readmem32(pb+0x06));
             write_back(ent);
@@ -1726,13 +1750,35 @@ static void osfile_cdir(const char *path)
     }
 }
 
+static void read_file_io(FILE *fp, uint32_t addr)
+{
+    char buffer[32768];
+    size_t nbytes;
+
+    while ((nbytes = fread(buffer, 1, sizeof buffer, fp)) > 0) {
+        char *ptr = buffer;
+        while (nbytes--)
+            writemem(addr++, *ptr++);
+    }
+}
+
+static void read_file_tube(FILE *fp, uint32_t addr)
+{
+    char buffer[32768];
+    size_t nbytes;
+
+    while ((nbytes = fread(buffer, 1, sizeof buffer, fp)) > 0) {
+        char *ptr = buffer;
+        while (nbytes--)
+            tube_writemem(addr++, *ptr++);
+    }
+}
+
 static void osfile_load(uint32_t pb, const char *path)
 {
     vdfs_entry *ent, key;
     FILE *fp;
     uint32_t addr;
-    uint32_t size;
-    int ch;
 
     if ((ent = find_entry(path, &key, cur_dir)) && ent->attribs & ATTR_EXISTS) {
         if (ent->attribs & ATTR_IS_DIR)
@@ -1742,18 +1788,10 @@ static void osfile_load(uint32_t pb, const char *path)
                 addr = readmem32(pb+0x02);
             else
                 addr = ent->u.file.load_addr;
-            size = 0;
-            if (addr > 0xffff0000 || curtube == -1) {
-                while ((ch = getc(fp)) != EOF) {
-                    writemem(addr++, ch);
-                    size++;
-                }
-            } else {
-                while ((ch = getc(fp)) != EOF) {
-                    tube_writemem(addr++, ch);
-                    size++;
-                }
-            }
+            if (addr > 0xffff0000 || curtube == -1)
+                read_file_io(fp, addr);
+            else
+                read_file_tube(fp, addr);
             fclose(fp);
             osfile_attribs(pb, ent);
             a = 1;
@@ -1993,49 +2031,79 @@ static void osgbpb_write(uint32_t pb)
             fseek(fp, readmem32(pb+9), SEEK_SET);
         mem_ptr = readmem32(pb+1);
         n = readmem32(pb+5);
-        if (mem_ptr > 0xffff0000 || curtube == -1) {
-            // IO processor
-            while (n--)
-                putc(readmem(mem_ptr++), fp);
-        } else {
-            while (n--)
-                putc(tube_readmem(mem_ptr++), fp);
-        }
+        if (mem_ptr > 0xffff0000 || curtube == -1)
+            write_bytes_io(fp, mem_ptr, n);
+        else
+            write_bytes_tube(fp, mem_ptr, n);
         writemem32(pb+1, mem_ptr);
         writemem32(pb+5, 0);
         writemem32(pb+9, ftell(fp));
     }
 }
 
+static int read_bytes_io(FILE *fp, uint32_t addr, size_t bytes)
+{
+    char buffer[8192];
+    size_t nbytes;
+
+    while (bytes >= sizeof buffer) {
+        char *ptr = buffer;
+        if ((nbytes = fread(buffer, 1, sizeof buffer, fp)) <= 0)
+            return 1;
+        bytes -= nbytes;
+        while (nbytes--)
+            writemem(addr++, *ptr++);
+    }
+    while (bytes > 0) {
+        char *ptr = buffer;
+        if ((nbytes = fread(buffer, 1, bytes, fp)) <= 0)
+            return 1;
+        bytes -= nbytes;
+        while (nbytes--)
+            writemem(addr++, *ptr++);
+    }
+    return 0;
+}
+
+static int read_bytes_tube(FILE *fp, uint32_t addr, size_t bytes)
+{
+    char buffer[8192];
+    size_t nbytes;
+
+    while (bytes >= sizeof buffer) {
+        char *ptr = buffer;
+        if ((nbytes = fread(buffer, 1, sizeof buffer, fp)) <= 0)
+            return 1;
+        bytes -= nbytes;
+        while (nbytes--)
+            tube_writemem(addr++, *ptr++);
+    }
+    while (bytes > 0) {
+        char *ptr = buffer;
+        if ((nbytes = fread(buffer, 1, bytes, fp)) <= 0)
+            return 1;
+        bytes -= nbytes;
+        while (nbytes--)
+            tube_writemem(addr++, *ptr++);
+    }
+    return 0;
+}
+
 static int osgbpb_read(uint32_t pb)
 {
     FILE *fp;
     uint32_t mem_ptr, n;
-    int status = 0, ch;
+    int status = 0;
 
     if ((fp = getfp_read(readmem(pb)))) {
         if (a == 0x03)
             fseek(fp, readmem32(pb+9), SEEK_SET);
         mem_ptr = readmem32(pb+1);
         n = readmem32(pb+5);
-        if (mem_ptr > 0xffff0000 || curtube == -1) {
-            // IO processor
-            while (n--) {
-                if ((ch = getc(fp)) == EOF) {
-                    status = 1;
-                    break;
-                }
-                writemem(mem_ptr++, ch);
-            }
-        } else {
-            while (n--) {
-                if ((ch = getc(fp)) == EOF) {
-                    status = 1;
-                    break;
-                }
-                tube_writemem(mem_ptr++, ch);
-            }
-        }
+        if (mem_ptr > 0xffff0000 || curtube == -1)
+            status = read_bytes_io(fp, mem_ptr, n);
+        else
+            status = read_bytes_tube(fp, mem_ptr, n);
         writemem32(pb+1, mem_ptr);
         writemem32(pb+5, n+1);
         writemem32(pb+9, ftell(fp));
@@ -2373,7 +2441,6 @@ static void run_file(const char *err)
     uint16_t addr;
     vdfs_entry *ent, key;
     FILE *fp;
-    int ch;
     char path[MAX_ACORN_PATH];
 
     if (check_valid_dir(cur_dir, "current")) {
@@ -2388,14 +2455,12 @@ static void run_file(const char *err)
                 addr = ent->u.file.load_addr;
                 if (addr > 0xffff0000 || curtube == -1) {
                     log_debug("vdfs: run_file: writing to I/O proc memory at %08X", addr);
-                    while ((ch = getc(fp)) != EOF)
-                        writemem(addr++, ch);
+                    read_file_io(fp, addr);
                     pc = ent->u.file.exec_addr;
                 } else {
                     log_debug("vdfs: run_file: writing to tube proc memory at %08X", addr);
                     writemem32(0xc0, ent->u.file.exec_addr); // set up for tube execution.
-                    while ((ch = getc(fp)) != EOF)
-                        tube_writemem(addr++, ch);
+                    read_file_tube(fp, addr);
                     rom_dispatch(VDFS_ROM_TUBE_EXEC);
                 }
                 fclose(fp);
@@ -3053,29 +3118,23 @@ static void osword_discio(void)
         size_t bytes = (sects & 0x0f) << 8;
         if (cmd == 0x53) {
             if (addr > 0xffff0000 || curtube == -1) {
-                int ch;
                 log_debug("vdfs: osword 7F: writing to I/O proc memory at %08X", addr);
-                while (bytes-- && (ch = getc(fp)) != EOF)
-                    writemem(addr++, ch);
+                read_bytes_io(fp, addr, bytes);
             }
             else {
-                int ch;
                 log_debug("vdfs: osword 7F: writing to tube memory at %08X", addr);
-                while (bytes-- && (ch = getc(fp)) != EOF)
-                    tube_writemem(addr++, ch);
+                read_bytes_tube(fp, addr, bytes);
             }
             p.z = 1;
         }
         else if (cmd == 0x4b) {
             if (addr > 0xffff0000 || curtube == -1) {
                 log_debug("vdfs: osword 7F: reading from I/O proc memory at %08X", addr);
-                while (bytes--)
-                    putc(readmem(addr++), fp);
+                write_bytes_io(fp, addr, bytes);
             }
             else {
                 log_debug("vdfs: osword 7F: reading from tube memory at %08X", addr);
-                while (bytes--)
-                    putc(tube_readmem(addr++), fp);
+                write_bytes_tube(fp, addr, bytes);
             }
             p.z = 1;
         }
