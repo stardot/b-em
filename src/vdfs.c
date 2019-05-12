@@ -518,7 +518,6 @@ static void scan_attr(vdfs_entry *ent, uint32_t load_addr, uint32_t exec_addr)
         log_warn("vdfs: unable to stat '%s': %s\n", ent->host_path, strerror(errno));
     else {
         ent->attribs |= ATTR_EXISTS;
-        log_debug("vdfs: scan_attr(%s, %08X, %08X)", ent->acorn_fn, load_addr, exec_addr);
         if (S_ISDIR(stb.st_mode)) {
             if (!(ent->attribs & ATTR_IS_DIR)) {
                 ent->attribs |= ATTR_IS_DIR;
