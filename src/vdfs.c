@@ -1578,7 +1578,7 @@ static void save_callback(FILE *fp, uint32_t start_addr, size_t bytes)
 
 static void cfile_callback(FILE *fp, uint32_t start_addr, size_t bytes)
 {
-    fseek(fp, bytes, SEEK_SET);
+    fseek(fp, bytes-1, SEEK_SET);
     putc(0, fp);
 }
 
