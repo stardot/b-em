@@ -87,11 +87,16 @@ bool vdfs_enabled = 0;
 
 // These are VDFS internal attributes.
 
-
 #define ATTR_EXISTS      0x8000
 #define ATTR_OPEN_READ   0x1000
 #define ATTR_OPEN_WRITE  0x2000
 #define ATTR_IS_DIR      0x4000
+
+// Which file metadata to process.
+
+#define META_LOAD        0x0001
+#define META_EXEC        0x0002
+#define META_ATTR        0x0004
 
 typedef struct vdfs_entry vdfs_entry;
 
@@ -945,7 +950,7 @@ static void write_back(vdfs_entry *ent)
             fputs(ent->acorn_fn, fp);
             putc('\n', fp);
         }
-        else
+            else
             fprintf(fp, "%s %08X %08X %08X\n", ent->acorn_fn, ent->u.file.load_addr, ent->u.file.exec_addr, ent->u.file.length);
         fclose(fp);
     } else
@@ -1597,7 +1602,7 @@ static void osfile_write(uint32_t pb, const char *path, void (*callback)(FILE *f
     }
 }
 
-static void osfile_set_all(uint32_t pb, const char *path)
+static void osfile_set_meta(uint32_t pb, const char *path, uint16_t which)
 {
     vdfs_entry *ent, key;
 
@@ -1605,57 +1610,14 @@ static void osfile_set_all(uint32_t pb, const char *path)
         if (ent->attribs & ATTR_IS_DIR)
             a = 2;
         else {
-            ent->u.file.load_addr = readmem32(pb+0x02);
-            ent->u.file.exec_addr = readmem32(pb+0x06);
+            if (which & META_LOAD)
+                ent->u.file.load_addr = readmem32(pb+0x02);
+            if (which & META_EXEC)
+                ent->u.file.exec_addr = readmem32(pb+0x06);
             write_back(ent);
             a = 1;
         }
     }
-    else
-        a = 0;
-}
-
-static void osfile_set_load(uint32_t pb, const char *path)
-{
-    vdfs_entry *ent, key;
-
-    if ((ent = find_entry(path, &key, cur_dir)) && ent->attribs & ATTR_EXISTS) {
-        if (ent->attribs & ATTR_IS_DIR)
-            a = 2;
-        else {
-            ent->u.file.load_addr = readmem32(pb+0x02);
-            write_back(ent);
-            a = 1;
-        }
-    }
-    else
-        a = 0;
-}
-
-static void osfile_set_exec(uint32_t pb, const char *path)
-{
-    vdfs_entry *ent, key;
-
-    if ((ent = find_entry(path, &key, cur_dir)) && ent->attribs & ATTR_EXISTS) {
-        if (ent->attribs & ATTR_IS_DIR)
-            a = 2;
-        else {
-            ent->u.file.exec_addr = readmem32(pb+0x06);
-            write_back(ent);
-            a = 1;
-        }
-    }
-    else
-        a = 0;
-}
-
-static void osfile_set_attr(const char *path)
-{
-    vdfs_entry *ent, key;
-
-    log_debug("vdfs: write attributes not implemented");
-    if ((ent = find_entry(path, &key, cur_dir)) && ent->attribs & ATTR_EXISTS)
-        a = (ent->attribs & ATTR_IS_DIR) ? 2 : 1;
     else
         a = 0;
 }
@@ -1817,16 +1779,16 @@ static void osfile(void)
                     osfile_write(pb, path, save_callback);
                     break;
                 case 0x01:  // set all attributes.
-                    osfile_set_all(pb, path);
+                    osfile_set_meta(pb, path, META_LOAD|META_EXEC);
                     break;
                 case 0x02:  // set load address only.
-                    osfile_set_load(pb, path);
+                    osfile_set_meta(pb, path, META_LOAD);
                     break;
                 case 0x03:  // set exec address only.
-                    osfile_set_exec(pb, path);
+                    osfile_set_meta(pb, path, META_EXEC);
                     break;
                 case 0x04:  // write attributes.
-                    osfile_set_attr(path);
+                    osfile_set_meta(pb, path, 0);
                     break;
                 case 0x05:  // get addresses and attributes.
                     osfile_get_attr(pb, path);
