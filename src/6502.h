@@ -28,6 +28,4 @@ void m6502_loadstate(FILE *f);
 
 extern cpu_debug_t core6502_cpu_debug;
 
-void os_paste_start(char *str);
-
 #endif

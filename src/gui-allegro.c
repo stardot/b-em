@@ -955,7 +955,7 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             quitting = true;
             break;
         case IDM_EDIT_PASTE:
-            os_paste_start(al_get_clipboard_text((ALLEGRO_DISPLAY *)(event->user.data2)));
+            key_paste_start(al_get_clipboard_text((ALLEGRO_DISPLAY *)(event->user.data2)));
             break;
         case IDM_EDIT_COPY:
             edit_print_clip(event);

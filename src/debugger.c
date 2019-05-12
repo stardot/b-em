@@ -11,6 +11,7 @@
 #include "main.h"
 #include "model.h"
 #include "6502.h"
+#include "keyboard.h"
 
 #include <allegro5/allegro_primitives.h>
 
@@ -439,7 +440,7 @@ static void debug_paste(const char *iptr)
                 ch = *iptr++;
             } while (ch);
             *dptr = '\0';
-            os_paste_start(str);
+            key_paste_start(str);
         }
     }
 }

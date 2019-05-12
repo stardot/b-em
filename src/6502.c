@@ -199,73 +199,6 @@ static int vis20k = 0;
 
 static uint8_t acccon;
 
-static uint16_t buf_remv = 0xffff;
-static uint16_t buf_cnpv = 0xffff;
-static unsigned char *clip_paste_str, *clip_paste_ptr;
-static int os_paste_ch;
-
-void os_paste_start(char *str)
-{
-    if (str) {
-        if (clip_paste_str)
-            free(clip_paste_str);
-        clip_paste_str = clip_paste_ptr = (unsigned char *)str;
-        os_paste_ch = -1;
-        log_debug("6502: paste start, clip_paste_str=%p", clip_paste_str);
-    }
-}
-
-static void os_paste_remv(void)
-{
-    int ch;
-
-    if (os_paste_ch >= 0) {
-        if (p.v)
-            a = os_paste_ch;
-        else {
-            a = y = os_paste_ch;
-            os_paste_ch = -1;
-        }
-    }
-    else {
-        do {
-            ch = *clip_paste_ptr++;
-            if (!ch) {
-                al_free(clip_paste_str);
-                clip_paste_str = clip_paste_ptr = NULL;
-                opcode = readmem(pc);
-                return;
-            }
-            if (ch == 0xc2 && *clip_paste_ptr == 0xa3) {
-                ch = 0x60; // convert UTF-8 pound into BBC pound.
-                clip_paste_ptr++;
-            }
-            else if (ch == 0x0d && *clip_paste_ptr == 0x0a)
-                clip_paste_ptr++;
-            else if (ch == 0x0a)
-                ch = 0x0d;
-        } while (ch >= 128);
-        if (p.v)
-            a = os_paste_ch = ch;
-        else
-            a = y = ch;
-    }
-    p.c = 0;
-    opcode = 0x60; // RTS
-}
-
-static void os_paste_cnpv(void)
-{
-    if (!p.v && !p.c) {
-        int len = strlen((char *)clip_paste_ptr);
-        x = len & 0xff;
-        y = len >> 8;
-        opcode = 0x60; // RTS
-        return;
-    }
-    opcode = readmem(pc);
-}
-
 static inline void fetch_opcode(void)
 {
     pc3 = oldoldpc;
@@ -275,12 +208,7 @@ static inline void fetch_opcode(void)
 
     if (dbg_core6502)
         debug_preexec(&core6502_cpu_debug, pc);
-    if (pc == buf_remv && x == 0 && clip_paste_ptr)
-        os_paste_remv();
-    else if (pc == buf_cnpv && x == 0 && clip_paste_ptr)
-        os_paste_cnpv();
-    else
-        opcode = readmem(pc);
+    opcode = readmem(pc);
     pc++;
 }
 
@@ -453,20 +381,6 @@ static void do_writemem(uint32_t addr, uint32_t val)
         c = memstat[vis20k][addr >> 8];
         if (c == 1) {
                 memlook[vis20k][addr >> 8][addr] = val;
-                switch(addr) {
-                    case 0x022c:
-                        buf_remv = (buf_remv & 0xff00) | val;
-                        break;
-                    case 0x022d:
-                        buf_remv = (buf_remv & 0xff) | (val << 8);
-                        break;
-                    case 0x022e:
-                        buf_cnpv = (buf_cnpv & 0xff00) | val;
-                        break;
-                    case 0x022f:
-                        buf_cnpv = (buf_cnpv & 0xff) | (val << 8);
-                        break;
-                }
                 return;
         } else if (c == 2) {
                 log_debug("6502: attempt to write to ROM %x:%04x=%02x\n", vis20k, addr, val);
