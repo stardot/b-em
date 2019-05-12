@@ -85,6 +85,8 @@ bool vdfs_enabled = 0;
 #define ATTR_OTHR_EXEC   0x0040
 #define ATTR_OTHR_LOCKD  0x0080
 
+#define ATTR_ACORN_MASK  0x00ff
+
 // These are VDFS internal attributes.
 
 #define ATTR_EXISTS      0x8000
@@ -1638,6 +1640,31 @@ static void osfile_set_meta(uint32_t pb, const char *path, uint16_t which)
                 ent->u.file.load_addr = readmem32(pb+0x02);
             if (which & META_EXEC)
                 ent->u.file.exec_addr = readmem32(pb+0x06);
+            if (which & META_ATTR) {
+                uint16_t attr = readmem(pb+0x0e);
+                log_debug("vdfs: setting attributes of %02X", attr);
+#ifndef WIN32
+                if (attr != (ent->attribs & ATTR_ACORN_MASK)) {
+                    mode_t mode = 0;
+                    if (attr & ATTR_USER_READ)
+                        mode |= S_IRUSR;
+                    if (attr & ATTR_USER_WRITE)
+                        mode |= S_IWUSR;
+                    if (attr & ATTR_USER_EXEC)
+                        mode |= S_IXUSR;
+                    if (attr & ATTR_OTHR_READ)
+                        mode |= S_IRGRP|S_IROTH;
+                    if (attr & ATTR_OTHR_WRITE)
+                        mode |= S_IWGRP|S_IWOTH;
+                    if (attr & ATTR_OTHR_EXEC)
+                        mode |= S_IXGRP|S_IXOTH;
+                    log_debug("vdfs: chmod(%s, %o)", ent->host_path, mode);
+                    if (chmod(ent->host_path, mode) == -1)
+                        log_warn("unable to chmod %s: %s", ent->host_path, strerror(errno));
+                }
+#endif
+                ent->attribs = (ent->attribs & ~ATTR_ACORN_MASK) | attr;
+            }
             write_back(ent);
             a = 1;
         }
@@ -1817,7 +1844,7 @@ static void osfile(void)
                     osfile_write(pb, path, save_callback);
                     break;
                 case 0x01:  // set all attributes.
-                    osfile_set_meta(pb, path, META_LOAD|META_EXEC);
+                    osfile_set_meta(pb, path, META_LOAD|META_EXEC|META_ATTR);
                     break;
                 case 0x02:  // set load address only.
                     osfile_set_meta(pb, path, META_LOAD);
@@ -1826,7 +1853,7 @@ static void osfile(void)
                     osfile_set_meta(pb, path, META_EXEC);
                     break;
                 case 0x04:  // write attributes.
-                    osfile_set_meta(pb, path, 0);
+                    osfile_set_meta(pb, path, META_ATTR);
                     break;
                 case 0x05:  // get addresses and attributes.
                     osfile_get_attr(pb, path);
