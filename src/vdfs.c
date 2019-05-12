@@ -950,8 +950,8 @@ static void write_back(vdfs_entry *ent)
             fputs(ent->acorn_fn, fp);
             putc('\n', fp);
         }
-            else
-            fprintf(fp, "%s %08X %08X %08X\n", ent->acorn_fn, ent->u.file.load_addr, ent->u.file.exec_addr, ent->u.file.length);
+        else
+            fprintf(fp, "%s %08X %08X\n", ent->acorn_fn, ent->u.file.load_addr, ent->u.file.exec_addr);
         fclose(fp);
     } else
         log_warn("vdfs: unable to create INF file '%s': %s\n", ent->host_path, strerror(errno));
