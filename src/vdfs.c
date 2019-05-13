@@ -2161,7 +2161,7 @@ static void osgbpb_get_dir(uint32_t pb, vdfs_entry *dir, const char *which)
     int ch;
 
     if (check_valid_dir(dir, which)) {
-        mem_ptr = pb;
+        mem_ptr = readmem32(pb+1);
         writemem(mem_ptr++, 1);   // length of drive number.
         writemem(mem_ptr++, '0'); // drive number.
         writemem(mem_ptr++, strlen(dir->acorn_fn));
