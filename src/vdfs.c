@@ -2276,7 +2276,7 @@ static void osgbpb(void)
     int status = 0;
     uint32_t pb = (y << 8) | x;
 
-    log_debug("vdfs: osgbpb(A=%02X, X=%02X, Y=%02X)", a, x, y);
+    log_debug("vdfs: osgbpb(A=%02X, YX=%04X)\n", a, pb);
 
     switch (a)
     {
@@ -2308,7 +2308,6 @@ static void osgbpb(void)
 
         default:
             log_debug("vdfs: osgbpb unimplemented for a=%d", a);
-            log_debug("vdfs: osgbpb pb.channel=%d, data=%04X num=%04X, ptr=%04X\n", readmem(pb), readmem32(pb+1), readmem32(pb+6), readmem32(pb+9));
     }
     p.c = status;
 }
