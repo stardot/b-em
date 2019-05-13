@@ -1526,7 +1526,7 @@ static void osfile_attribs(uint32_t pb, vdfs_entry *ent)
     writemem32(pb+0x0e, ent->attribs);
 }
 
-static void write_bytes_io(FILE *fp, uint32_t addr, size_t bytes)
+static uint32_t write_bytes_io(FILE *fp, uint32_t addr, size_t bytes)
 {
     char buffer[8192];
 
@@ -1545,9 +1545,10 @@ static void write_bytes_io(FILE *fp, uint32_t addr, size_t bytes)
             *ptr++ = readmem(addr++);
         fwrite(buffer, bytes, 1, fp);
     }
+    return addr;
 }
 
-static void write_bytes_tube(FILE *fp, uint32_t addr, size_t bytes)
+static uint32_t write_bytes_tube(FILE *fp, uint32_t addr, size_t bytes)
 {
     char buffer[8192];
 
@@ -1566,6 +1567,7 @@ static void write_bytes_tube(FILE *fp, uint32_t addr, size_t bytes)
             *ptr++ = tube_readmem(addr++);
         fwrite(buffer, bytes, 1, fp);
     }
+    return addr;
 }
 
 static void save_callback(FILE *fp, uint32_t start_addr, size_t bytes)
@@ -2059,61 +2061,13 @@ static void osgbpb_write(uint32_t pb)
         mem_ptr = readmem32(pb+1);
         n = readmem32(pb+5);
         if (mem_ptr > 0xffff0000 || curtube == -1)
-            write_bytes_io(fp, mem_ptr, n);
+            mem_ptr = write_bytes_io(fp, mem_ptr, n);
         else
-            write_bytes_tube(fp, mem_ptr, n);
+            mem_ptr = write_bytes_tube(fp, mem_ptr, n);
         writemem32(pb+1, mem_ptr);
         writemem32(pb+5, 0);
         writemem32(pb+9, ftell(fp));
     }
-}
-
-static int read_bytes_io(FILE *fp, uint32_t addr, size_t bytes)
-{
-    char buffer[8192];
-    size_t nbytes;
-
-    while (bytes >= sizeof buffer) {
-        char *ptr = buffer;
-        if ((nbytes = fread(buffer, 1, sizeof buffer, fp)) <= 0)
-            return 1;
-        bytes -= nbytes;
-        while (nbytes--)
-            writemem(addr++, *ptr++);
-    }
-    while (bytes > 0) {
-        char *ptr = buffer;
-        if ((nbytes = fread(buffer, 1, bytes, fp)) <= 0)
-            return 1;
-        bytes -= nbytes;
-        while (nbytes--)
-            writemem(addr++, *ptr++);
-    }
-    return 0;
-}
-
-static int read_bytes_tube(FILE *fp, uint32_t addr, size_t bytes)
-{
-    char buffer[8192];
-    size_t nbytes;
-
-    while (bytes >= sizeof buffer) {
-        char *ptr = buffer;
-        if ((nbytes = fread(buffer, 1, sizeof buffer, fp)) <= 0)
-            return 1;
-        bytes -= nbytes;
-        while (nbytes--)
-            tube_writemem(addr++, *ptr++);
-    }
-    while (bytes > 0) {
-        char *ptr = buffer;
-        if ((nbytes = fread(buffer, 1, bytes, fp)) <= 0)
-            return 1;
-        bytes -= nbytes;
-        while (nbytes--)
-            tube_writemem(addr++, *ptr++);
-    }
-    return 0;
 }
 
 static int osgbpb_read(uint32_t pb)
@@ -2121,18 +2075,64 @@ static int osgbpb_read(uint32_t pb)
     FILE *fp;
     uint32_t mem_ptr, n;
     int status = 0;
+    char buffer[8192];
+    size_t nbytes;
 
     if ((fp = getfp_read(readmem(pb)))) {
         if (a == 0x03)
             fseek(fp, readmem32(pb+9), SEEK_SET);
         mem_ptr = readmem32(pb+1);
         n = readmem32(pb+5);
-        if (mem_ptr > 0xffff0000 || curtube == -1)
-            status = read_bytes_io(fp, mem_ptr, n);
-        else
-            status = read_bytes_tube(fp, mem_ptr, n);
+        if (mem_ptr > 0xffff0000 || curtube == -1) {
+            while (n >= sizeof buffer) {
+                char *ptr = buffer;
+                if ((nbytes = fread(buffer, 1, sizeof buffer, fp)) <= 0) {
+                    status = 1;
+                    break;
+                }
+                n -= nbytes;
+                while (nbytes--)
+                    writemem(mem_ptr++, *ptr++);
+            }
+            if (status == 0) {
+                while (n > 0) {
+                    char *ptr = buffer;
+                    if ((nbytes = fread(buffer, 1, n, fp)) <= 0) {
+                        status = 1;
+                        break;
+                    }
+                    n -= nbytes;
+                    while (nbytes--)
+                        writemem(mem_ptr++, *ptr++);
+                }
+            }
+        }
+        else {
+            while (n >= sizeof buffer) {
+                char *ptr = buffer;
+                if ((nbytes = fread(buffer, 1, sizeof buffer, fp)) <= 0) {
+                    status = 1;
+                    break;
+                }
+                n -= nbytes;
+                while (nbytes--)
+                    tube_writemem(mem_ptr++, *ptr++);
+            }
+            if (status == 0) {
+                while (n > 0) {
+                    char *ptr = buffer;
+                    if ((nbytes = fread(buffer, 1, n, fp)) <= 0) {
+                        status = 1;
+                        break;
+                    }
+                    n -= nbytes;
+                    while (nbytes--)
+                        tube_writemem(mem_ptr++, *ptr++);
+                }
+            }
+        }
         writemem32(pb+1, mem_ptr);
-        writemem32(pb+5, n+1);
+        writemem32(pb+5, n);
         writemem32(pb+9, ftell(fp));
     }
     return status;
@@ -3118,6 +3118,52 @@ static void osfsc(void)
  * ROM Service.  These functions are concerned with implementing
  * actions as a result of a ROM servce call.
  */
+
+static void read_bytes_io(FILE *fp, uint32_t addr, size_t bytes)
+{
+    char buffer[8192];
+    size_t nbytes;
+
+    while (bytes >= sizeof buffer) {
+        char *ptr = buffer;
+        if ((nbytes = fread(buffer, 1, sizeof buffer, fp)) <= 0)
+            return;
+        bytes -= nbytes;
+        while (nbytes--)
+            writemem(addr++, *ptr++);
+    }
+    while (bytes > 0) {
+        char *ptr = buffer;
+        if ((nbytes = fread(buffer, 1, bytes, fp)) <= 0)
+            return;
+        bytes -= nbytes;
+        while (nbytes--)
+            writemem(addr++, *ptr++);
+    }
+}
+
+static void read_bytes_tube(FILE *fp, uint32_t addr, size_t bytes)
+{
+    char buffer[8192];
+    size_t nbytes;
+
+    while (bytes >= sizeof buffer) {
+        char *ptr = buffer;
+        if ((nbytes = fread(buffer, 1, sizeof buffer, fp)) <= 0)
+            return;
+        bytes -= nbytes;
+        while (nbytes--)
+            tube_writemem(addr++, *ptr++);
+    }
+    while (bytes > 0) {
+        char *ptr = buffer;
+        if ((nbytes = fread(buffer, 1, bytes, fp)) <= 0)
+            return;
+        bytes -= nbytes;
+        while (nbytes--)
+            tube_writemem(addr++, *ptr++);
+    }
+}
 
 static void osword_discio(void)
 {
