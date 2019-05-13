@@ -2245,12 +2245,14 @@ static int osgbpb_list(uint32_t pb)
             status = 0;
             mem_ptr = readmem32(pb+1);
             n = readmem32(pb+5);
-            log_debug("vdfs: seq_ptr=%d, writing max %d entries starting %04X\n", seq_ptr, n, mem_ptr);
-            do {
-                log_debug("vdfs: writing acorn name %s\n", cat_ptr->acorn_fn);
+            log_debug("vdfs: seq_ptr=%d, writing max %d entries starting %04X, first=%s\n", seq_ptr, n, mem_ptr, cat_ptr->acorn_fn);
+            for (;;) {
                 writemem(mem_ptr++, strlen(cat_ptr->acorn_fn));
                 for (ptr = cat_ptr->acorn_fn; (ch = *ptr++); )
                     writemem(mem_ptr++, ch);
+                seq_ptr++;
+                if (--n == 0)
+                    break;
                 do
                     cat_ptr = cat_ptr->next;
                 while (cat_ptr && !(cat_ptr->attribs & ATTR_EXISTS));
@@ -2258,7 +2260,8 @@ static int osgbpb_list(uint32_t pb)
                     status = 1;
                     break;
                 }
-            } while (--n);
+                log_debug("vdfs: next=%s", cat_ptr->acorn_fn);
+            }
             log_debug("vdfs: finish at %04X\n", mem_ptr);
             writemem32(pb+5, n);
             writemem32(pb+9, seq_ptr);
