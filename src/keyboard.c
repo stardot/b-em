@@ -468,12 +468,165 @@ static uint8_t allegro2bbclogical[ALLEGRO_KEY_MAX] =
     0x40,   // 226  ALLEGRO_KEY_CAPSLOCK
 };
 
+#define A2B_SHIFT 0x100
+#define A2B_CTRL  0x200
+
+static uint16_t ascii2bbc[] =
+{
+    0x47|A2B_CTRL,  // 0x00 NUL (CTRL-@)
+    0x41|A2B_CTRL,  // 0x01 SOH (CTRL-A)
+    0x64|A2B_CTRL,  // 0x02 STX (CTRL-B)
+    0x52|A2B_CTRL,  // 0x03 ETX (CTRL-C)
+    0x32|A2B_CTRL,  // 0x04 EOT (CTRL-D)
+    0x22|A2B_CTRL,  // 0x05 ENQ (CTRL-E)
+    0x43|A2B_CTRL,  // 0x06 ACK (CTRL-F)
+    0x53|A2B_CTRL,  // 0x07 BEL (CTRL-G)
+    0x54|A2B_CTRL,  // 0x08 BS  (CTRL-H)
+    0x60,           // 0x09 HT  (CTRL-I)
+    0x49,           // 0x0a LF  (CTRL-J)
+    0x46|A2B_CTRL,  // 0x0b VT  (CTRL-K)
+    0x56|A2B_CTRL,  // 0x0c FF  (CTRL-L)
+    0x49,           // 0x0d CR  (CTRL-M)
+    0x55|A2B_CTRL,  // 0x0e SO  (CTRL-N)
+    0x36|A2B_CTRL,  // 0x0f SI  (CTRL-O)
+    0x37|A2B_CTRL,  // 0x10 DLE (CTRL-P)
+    0x10|A2B_CTRL,  // 0x11 DC1 (CTRL-Q, XON)
+    0x33|A2B_CTRL,  // 0x12 DC2 (CTRL-R)
+    0x51|A2B_CTRL,  // 0x13 DC3 (CTRL-S, XOFF)
+    0x23|A2B_CTRL,  // 0x14 DC4 (CTRL-T)
+    0x35|A2B_CTRL,  // 0x15 NAK (CTRL-U)
+    0x63|A2B_CTRL,  // 0x16 SYN (CTRL-V)
+    0x21|A2B_CTRL,  // 0x17 ETB (CTRL-W)
+    0x42|A2B_CTRL,  // 0x18 CAN (CTRL-X)
+    0x44|A2B_CTRL,  // 0x19 EM  (CTRL-Y)
+    0x61|A2B_CTRL,  // 0x1a SUB (CTRL-Z)
+    0x38,           // 0x1b ESC (CTRL-[)
+    0x48|A2B_CTRL,  // 0x1c FS  (CTRL-\)
+    0x58|A2B_CTRL,  // 0x1d GS  (CTRL-])
+    0x18|A2B_CTRL,  // 0x1e RS  (CTRL-^)`
+    0x28|A2B_CTRL,  // 0x1f US  (CTRL-_)
+    0x62,           // 0x20 SPC
+    0x30|A2B_SHIFT, // 0x21 !
+    0x31|A2B_SHIFT, // 0x22 "
+    0x11|A2B_SHIFT, // 0x23 #
+    0x12|A2B_SHIFT, // 0x24 $
+    0x13|A2B_SHIFT, // 0x25 %
+    0x34|A2B_SHIFT, // 0x26 &
+    0x24|A2B_SHIFT, // 0x27 '
+    0x15|A2B_SHIFT, // 0x28 (
+    0x26|A2B_SHIFT, // 0x29 )
+    0x48|A2B_SHIFT, // 0x2a *
+    0x57|A2B_SHIFT, // 0x2b +
+    0x66,           // 0x2c ,
+    0x17,           // 0x2d -
+    0x67,           // 0x2e .
+    0x68,           // 0x2f /
+    0x27,           // 0x30 0
+    0x30,           // 0x31 1
+    0x31,           // 0x32 2
+    0x11,           // 0x33 3
+    0x12,           // 0x34 4
+    0x13,           // 0x35 5
+    0x34,           // 0x36 6
+    0x24,           // 0x37 7
+    0x15,           // 0x38 8
+    0x26,           // 0x39 9
+    0x48,           // 0x3a *
+    0x57,           // 0x3b ;
+    0x66|A2B_SHIFT, // 0x3c <
+    0x17|A2B_SHIFT, // 0x3D =
+    0x67|A2B_SHIFT, // 0x3E >
+    0x68|A2B_SHIFT, // 0x3F ?
+    0x47,           // 0x40 @
+    0x41|A2B_SHIFT, // 0x41 A
+    0x64|A2B_SHIFT, // 0x42 B
+    0x52|A2B_SHIFT, // 0x43 C
+    0x32|A2B_SHIFT, // 0x44 D
+    0x22|A2B_SHIFT, // 0x45 E
+    0x43|A2B_SHIFT, // 0x46 F
+    0x53|A2B_SHIFT, // 0x47 G
+    0x54|A2B_SHIFT, // 0x48 H
+    0x25|A2B_SHIFT, // 0x49 I
+    0x45|A2B_SHIFT, // 0x4a J
+    0x46|A2B_SHIFT, // 0x4b K
+    0x56|A2B_SHIFT, // 0x4c L
+    0x65|A2B_SHIFT, // 0x4d M
+    0x55|A2B_SHIFT, // 0x4e N
+    0x36|A2B_SHIFT, // 0x4f O
+    0x37|A2B_SHIFT, // 0x50 P
+    0x10|A2B_SHIFT, // 0x51 Q
+    0x33|A2B_SHIFT, // 0x52 R
+    0x51|A2B_SHIFT, // 0x53 S
+    0x23|A2B_SHIFT, // 0x54 T
+    0x35|A2B_SHIFT, // 0x55 U
+    0x63|A2B_SHIFT, // 0x56 V
+    0x21|A2B_SHIFT, // 0x57 W
+    0x42|A2B_SHIFT, // 0x58 X
+    0x44|A2B_SHIFT, // 0x59 Y
+    0x61|A2B_SHIFT, // 0x5a Z
+    0x38,           // 0x5b [
+    0x78,           // 0x5c backslash
+    0x58,           // 0x5d ]
+    0x18,           // 0x5e ^
+    0x28,           // 0x5f _
+    0x28|A2B_SHIFT, // 0x60 £
+    0x41,           // 0x61 a
+    0x64,           // 0x62 b
+    0x52,           // 0x63 c
+    0x32,           // 0x64 d
+    0x22,           // 0x65 e
+    0x43,           // 0x66 f
+    0x53,           // 0x67 g
+    0x54,           // 0x68 h
+    0x25,           // 0x69 i
+    0x45,           // 0x6a j
+    0x46,           // 0x6b k
+    0x56,           // 0x6c l
+    0x65,           // 0x6d m
+    0x55,           // 0x6e n
+    0x36,           // 0x6f o
+    0x37,           // 0x70 p
+    0x10,           // 0x71 q
+    0x33,           // 0x72 r
+    0x51,           // 0x73 s
+    0x23,           // 0x74 t
+    0x35,           // 0x75 u
+    0x63,           // 0x76 v
+    0x21,           // 0x77 w
+    0x42,           // 0x78 x
+    0x44,           // 0x79 y
+    0x61,           // 0x7a z
+    0x47|A2B_SHIFT, // 0x7b {
+    0x78|A2B_SHIFT, // 0x7c |
+    0x58|A2B_SHIFT, // 0x7d }
+    0x18|A2B_SHIFT, // 0x7e ~
+    0x59            // 0x7f DEL
+};
+
 int keylookup[ALLEGRO_KEY_MAX];
 bool keyas = 0;
 bool keylogical = 0;
 
 static int keycol, keyrow;
 static int bbckey[16][16];
+
+typedef enum {
+    KP_IDLE,
+    KP_NEXT,
+    KP_SHIFT_DOWN,
+    KP_SHIFT_UP,
+    KP_DELAY1,
+    KP_CTRL_DOWN,
+    KP_CTRL_UP,
+    KP_CHAR,
+    KP_DELAY2,
+    KP_UP
+} kp_state_t;
+
+static kp_state_t kp_state = KP_IDLE;
+static unsigned char *clip_paste_str;
+static unsigned char *clip_paste_ptr;
+static uint16_t clip_paste_key;
 
 void key_clear(void)
 {
@@ -559,6 +712,99 @@ void key_down(int code)
 void key_up(int code)
 {
     set_key(code, 0);
+}
+
+void key_paste_start(char *str)
+{
+    if (str) {
+        log_debug("key_paste_start, str=%s", str);
+        clip_paste_str = clip_paste_ptr = (unsigned char *)str;
+        kp_state = KP_NEXT;
+    }
+}
+
+static void key_paste_ctrl(void)
+{
+    if ((clip_paste_key & A2B_CTRL) && !bbckey[0][1])
+        kp_state = KP_CTRL_DOWN;
+    else if (!(clip_paste_key & A2B_CTRL) && bbckey[0][1])
+        kp_state = KP_CTRL_UP;
+    else
+        kp_state = KP_CHAR;
+}
+
+void key_paste_poll(void)
+{
+    unsigned ch;
+    //log_debug("key_paste_poll: kp_state=%d", kp_state);
+
+    switch(kp_state) {
+        case KP_IDLE:
+            break;
+        case KP_NEXT:
+            if ((ch = *clip_paste_ptr++)) {
+                if (ch == 0xc2 && *clip_paste_ptr == 0xa3) {
+                    ch = 0x60; // convert UTF-8 pound into BBC pound.
+                    clip_paste_ptr++;
+                }
+                else if (ch == 0x0d && *clip_paste_ptr == 0x0a)
+                    clip_paste_ptr++;
+                log_debug("keybaord: clip_paste_poll ch=%02x", ch);
+                if (ch <= 127) {
+                    clip_paste_key = ascii2bbc[ch];
+                    if ((clip_paste_key & A2B_SHIFT) && !bbckey[0][0])
+                        kp_state = KP_SHIFT_DOWN;
+                    else if (!(clip_paste_key & A2B_SHIFT) && bbckey[0][0])
+                        kp_state = KP_SHIFT_UP;
+                    else
+                        key_paste_ctrl();
+                }
+            }
+            else {
+                bbckey[clip_paste_key & 15][clip_paste_key >> 4] = 0;
+                bbckey[0][0] = 0;
+                bbckey[0][1] = 0;
+                al_free(clip_paste_str);
+                clip_paste_str = clip_paste_ptr = NULL;
+                kp_state = KP_IDLE;
+            }
+            break;
+        case KP_SHIFT_DOWN:
+            bbckey[0][0] = 1;
+            key_update();
+            kp_state = KP_DELAY1;
+            break;
+        case KP_SHIFT_UP:
+            bbckey[0][0] = 0;
+            key_update();
+            kp_state = KP_DELAY1;
+            break;
+        case KP_DELAY1:
+            key_paste_ctrl();
+            break;
+        case KP_CTRL_DOWN:
+            bbckey[0][1] = 1;
+            key_update();
+            kp_state = KP_CHAR;
+            break;
+        case KP_CTRL_UP:
+            bbckey[0][1] = 1;
+            key_update();
+            kp_state = KP_CHAR;
+            break;
+        case KP_CHAR:
+            bbckey[clip_paste_key & 0x0f][(clip_paste_key & 0xf0) >> 4] = 1;
+            key_update();
+            kp_state = KP_DELAY2;
+            break;
+        case KP_DELAY2:
+            kp_state = KP_UP;
+            break;
+        case KP_UP:
+            bbckey[clip_paste_key & 0x0f][(clip_paste_key & 0xf0) >> 4] = 0;
+            key_update();
+            kp_state = KP_NEXT;
+    }
 }
 
 void key_scan(int row, int col) {

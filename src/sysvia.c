@@ -175,6 +175,7 @@ void sysvia_reset()
         sysvia.write_portB = sysvia_write_portB;
 
         sysvia.set_cb2 = sysvia_via_set_cb2; /*Lightpen*/
+        sysvia.timer_expire1 = key_paste_poll;
 
         sysvia.intnum = 1;
 }
