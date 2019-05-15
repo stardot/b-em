@@ -215,38 +215,6 @@ void os_paste_start(char *str)
     }
 }
 
-void os_paste_addc(int ch)
-{
-    static const char memerr[] = "6502: out of memory adding character to OS paste, character discarded";
-
-	log_debug("6502: paste addc, ch=%d", ch);
-
-    if (clip_paste_str) {
-        size_t len = strlen((char *)clip_paste_str);
-        int pos = clip_paste_ptr - clip_paste_str;
-        char *new_str = al_realloc(clip_paste_str, len+2);
-        if (new_str) {
-            clip_paste_str = (unsigned char *)new_str;
-            clip_paste_ptr = clip_paste_str + pos;
-            new_str[len] = ch;
-            new_str[len+1] = 0;
-        }
-        else
-            log_warn(memerr);
-    }
-    else {
-        char *new_str = al_malloc(2);
-        if (new_str) {
-            new_str[0] = ch;
-            new_str[1] = 0;
-            clip_paste_str = (unsigned char *)new_str;
-            clip_paste_ptr = clip_paste_str;
-        }
-        else
-            log_warn(memerr);
-    }
-}
-
 static void os_paste_remv(void)
 {
     int ch;

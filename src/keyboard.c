@@ -237,9 +237,19 @@ static uint8_t allegro2bbc[ALLEGRO_KEY_MAX] =
     0x40,   // 226  ALLEGRO_KEY_CAPSLOCK
 };
 
+// Mapping from Allegro to BBC keycodes for logical keyboard mode. We use two 
+// invalid keycodes to indicate special actions:
+// - 0xaa causes us to fake the necessary keypresses to type the ASCII character
+//   we got from the ALLEGRO_EVENT_KEY_CHAR event.
+// - 0xbb causes us to ignore the key.
+// Valid keycodes cause the logical keyboard code to press and release the key
+// for that keycode.
+//
+// Note that not all keys generate an ALLEGRO_EVENT_KEY_CHAR, so some of the
+// entries in this table can never be accessed.
 static uint8_t allegro2bbclogical[ALLEGRO_KEY_MAX] =
 {
-    0xaa,   // 0
+    0xbb,   // 0
     0x41,   // 1    ALLEGRO_KEY_A
     0x64,   // 2    ALLEGRO_KEY_B
     0x52,   // 3    ALLEGRO_KEY_C
@@ -296,10 +306,10 @@ static uint8_t allegro2bbclogical[ALLEGRO_KEY_MAX] =
     0x76,   // 53   ALLEGRO_KEY_F8
     0x77,   // 54   ALLEGRO_KEY_F9
     0x20,   // 55   ALLEGRO_KEY_F10
-    0xaa,   // 57   ALLEGRO_KEY_F11
+    0xbb,   // 57   ALLEGRO_KEY_F11
     0xaa,   // 58   ALLEGRO_KEY_F12
     0x70,   // 59   ALLEGRO_KEY_ESCAPE
-    0xaa,   // 60   ALLEGRO_KEY_TILDE
+    0xbb,   // 60   ALLEGRO_KEY_TILDE
     0xaa,   // 61   ALLEGRO_KEY_MINUS
     0xaa,   // 62   ALLEGRO_KEY_EQUALS
     0x59,   // 63   ALLEGRO_KEY_BACKSPACE
@@ -315,12 +325,12 @@ static uint8_t allegro2bbclogical[ALLEGRO_KEY_MAX] =
     0xaa,   // 73   ALLEGRO_KEY_FULLSTOP
     0xaa,   // 74   ALLEGRO_KEY_SLASH
     0xaa,   // 75   ALLEGRO_KEY_SPACE
-    0xaa,   // 76   ALLEGRO_KEY_INSERT
+    0xbb,   // 76   ALLEGRO_KEY_INSERT
     0x59,   // 77   ALLEGRO_KEY_DELETE
-    0xaa,   // 78   ALLEGRO_KEY_HOME
+    0xbb,   // 78   ALLEGRO_KEY_HOME
     0x69,   // 79   ALLEGRO_KEY_END
-    0xaa,   // 80   ALLEGRO_KEY_PGUP
-    0xaa,   // 81   ALLEGRO_KEY_PGDN
+    0xbb,   // 80   ALLEGRO_KEY_PGUP
+    0xbb,   // 81   ALLEGRO_KEY_PGDN
     0x19,   // 82   ALLEGRO_KEY_LEFT
     0x79,   // 83   ALLEGRO_KEY_RIGHT
     0x39,   // 84   ALLEGRO_KEY_UP
@@ -331,141 +341,141 @@ static uint8_t allegro2bbclogical[ALLEGRO_KEY_MAX] =
     0xaa,   // 89   ALLEGRO_KEY_PAD_PLUS
     0x59,   // 90   ALLEGRO_KEY_PAD_DELETE
     0xaa,   // 91   ALLEGRO_KEY_PAD_ENTER
-    0x4c,   // 92   ALLEGRO_KEY_PRINTSCREEN
-    0xaa,   // 93   ALLEGRO_KEY_PAUSE
-    0x4c,   // 94   ALLEGRO_KEY_ABNT_C1
-    0xaa,   // 95   ALLEGRO_KEY_YEN
-    0xaa,   // 96   ALLEGRO_KEY_KANA
-    0xaa,   // 97   ALLEGRO_KEY_CONVERT
-    0xaa,   // 98   ALLEGRO_KEY_NOCONVERT
-    0xaa,   // 99   ALLEGRO_KEY_AT
-    0xaa,   // 100  ALLEGRO_KEY_CIRCUMFLEX
-    0xaa,   // 101  ALLEGRO_KEY_COLON2
-    0xaa,   // 102  ALLEGRO_KEY_KANJI
-    0xaa,   // 103  ALLEGRO_KEY_PAD_EQUALS
-    0xaa,   // 104  ALLEGRO_KEY_BACKQUOTE
-    0xaa,   // 105  ALLEGRO_KEY_SEMICOLON2
-    0xaa,   // 106  ALLEGRO_KEY_COMMAND
-    0xaa,   // 107  ALLEGRO_KEY_BACK
-    0xaa,   // 108  ALLEGRO_KEY_VOLUME_UP
-    0xaa,   // 109  ALLEGRO_KEY_VOLUME_DOWN
-    0xaa,   // 110
-    0xaa,   // 111
-    0xaa,   // 112
-    0xaa,   // 113
-    0xaa,   // 114
-    0xaa,   // 115
-    0xaa,   // 116
-    0xaa,   // 117
-    0xaa,   // 118
-    0xaa,   // 119
-    0xaa,   // 120
-    0xaa,   // 121
-    0xaa,   // 122
-    0xaa,   // 123
-    0xaa,   // 124
-    0xaa,   // 125
-    0xaa,   // 126
-    0xaa,   // 127
-    0xaa,   // 128
-    0xaa,   // 129
-    0xaa,   // 130
-    0xaa,   // 131
-    0xaa,   // 132
-    0xaa,   // 133
-    0xaa,   // 134
-    0xaa,   // 135
-    0xaa,   // 136
-    0xaa,   // 137
-    0xaa,   // 138
-    0xaa,   // 139
-    0xaa,   // 140
-    0xaa,   // 141
-    0xaa,   // 142
-    0xaa,   // 143
-    0xaa,   // 144
-    0xaa,   // 145
-    0xaa,   // 146
-    0xaa,   // 147
-    0xaa,   // 148
-    0xaa,   // 149
-    0xaa,   // 150
-    0xaa,   // 151
-    0xaa,   // 152
-    0xaa,   // 153
-    0xaa,   // 154
-    0xaa,   // 155
-    0xaa,   // 156
-    0xaa,   // 157
-    0xaa,   // 158
-    0xaa,   // 159
-    0xaa,   // 160
-    0xaa,   // 161
-    0xaa,   // 162
-    0xaa,   // 163
-    0xaa,   // 164
-    0xaa,   // 165
-    0xaa,   // 166
-    0xaa,   // 167
-    0xaa,   // 168
-    0xaa,   // 169
-    0xaa,   // 170
-    0xaa,   // 171
-    0xaa,   // 172
-    0xaa,   // 173
-    0xaa,   // 174
-    0xaa,   // 175
-    0xaa,   // 176
-    0xaa,   // 177
-    0xaa,   // 178
-    0xaa,   // 179
-    0xaa,   // 180
-    0xaa,   // 181
-    0xaa,   // 182
-    0xaa,   // 183
-    0xaa,   // 184
-    0xaa,   // 185
-    0xaa,   // 186
-    0xaa,   // 187
-    0xaa,   // 188
-    0xaa,   // 189
-    0xaa,   // 190
-    0xaa,   // 191
-    0xaa,   // 192
-    0xaa,   // 193
-    0xaa,   // 194
-    0xaa,   // 195
-    0xaa,   // 196
-    0xaa,   // 197
-    0xaa,   // 198
-    0xaa,   // 199
-    0xaa,   // 200
-    0xaa,   // 201
-    0xaa,   // 202
-    0xaa,   // 203
-    0xaa,   // 204
-    0xaa,   // 205
-    0xaa,   // 206
-    0xaa,   // 207
-    0xaa,   // 208
-    0xaa,   // 209
-    0xaa,   // 210
-    0xaa,   // 211
-    0xaa,   // 212
-    0xaa,   // 213
-    0xaa,   // 214
-    0x00,   // 215  ALLEGRO_KEY_LSHIFT
-    0x00,   // 216  ALLEGRO_KEY_RSHIFT
-    0x01,   // 217  ALLEGRO_KEY_LCTRL
-    0x01,   // 218  ALLEGRO_KEY_RCTRL
-    0xaa,   // 219  ALLEGRO_KEY_ALT
-    0xaa,   // 220  ALLEGRO_KEY_ALTGR
-    0xaa,   // 221  ALLEGRO_KEY_LWIN
-    0xaa,   // 222  ALLEGRO_KEY_RWIN
-    0xaa,   // 223  ALLEGRO_KEY_MENU
-    0xaa,   // 224  ALLEGRO_KEY_SCROLLLOCK
-    0x71,   // 225  ALLEGRO_KEY_NUMLOCK
-    0x40,   // 226  ALLEGRO_KEY_CAPSLOCK
+    0xbb,   // 92   ALLEGRO_KEY_PRINTSCREEN
+    0xbb,   // 93   ALLEGRO_KEY_PAUSE
+    0xbb,   // 94   ALLEGRO_KEY_ABNT_C1
+    0xbb,   // 95   ALLEGRO_KEY_YEN
+    0xbb,   // 96   ALLEGRO_KEY_KANA
+    0xbb,   // 97   ALLEGRO_KEY_CONVERT
+    0xbb,   // 98   ALLEGRO_KEY_NOCONVERT
+    0xbb,   // 99   ALLEGRO_KEY_AT
+    0xbb,   // 100  ALLEGRO_KEY_CIRCUMFLEX
+    0xbb,   // 101  ALLEGRO_KEY_COLON2
+    0xbb,   // 102  ALLEGRO_KEY_KANJI
+    0xbb,   // 103  ALLEGRO_KEY_PAD_EQUALS
+    0xbb,   // 104  ALLEGRO_KEY_BACKQUOTE
+    0xbb,   // 105  ALLEGRO_KEY_SEMICOLON2
+    0xbb,   // 106  ALLEGRO_KEY_COMMAND
+    0xbb,   // 107  ALLEGRO_KEY_BACK
+    0xbb,   // 108  ALLEGRO_KEY_VOLUME_UP
+    0xbb,   // 109  ALLEGRO_KEY_VOLUME_DOWN
+    0xbb,   // 110
+    0xbb,   // 111
+    0xbb,   // 112
+    0xbb,   // 113
+    0xbb,   // 114
+    0xbb,   // 115
+    0xbb,   // 116
+    0xbb,   // 117
+    0xbb,   // 118
+    0xbb,   // 119
+    0xbb,   // 120
+    0xbb,   // 121
+    0xbb,   // 122
+    0xbb,   // 123
+    0xbb,   // 124
+    0xbb,   // 125
+    0xbb,   // 126
+    0xbb,   // 127
+    0xbb,   // 128
+    0xbb,   // 129
+    0xbb,   // 130
+    0xbb,   // 131
+    0xbb,   // 132
+    0xbb,   // 133
+    0xbb,   // 134
+    0xbb,   // 135
+    0xbb,   // 136
+    0xbb,   // 137
+    0xbb,   // 138
+    0xbb,   // 139
+    0xbb,   // 140
+    0xbb,   // 141
+    0xbb,   // 142
+    0xbb,   // 143
+    0xbb,   // 144
+    0xbb,   // 145
+    0xbb,   // 146
+    0xbb,   // 147
+    0xbb,   // 148
+    0xbb,   // 149
+    0xbb,   // 150
+    0xbb,   // 151
+    0xbb,   // 152
+    0xbb,   // 153
+    0xbb,   // 154
+    0xbb,   // 155
+    0xbb,   // 156
+    0xbb,   // 157
+    0xbb,   // 158
+    0xbb,   // 159
+    0xbb,   // 160
+    0xbb,   // 161
+    0xbb,   // 162
+    0xbb,   // 163
+    0xbb,   // 164
+    0xbb,   // 165
+    0xbb,   // 166
+    0xbb,   // 167
+    0xbb,   // 168
+    0xbb,   // 169
+    0xbb,   // 170
+    0xbb,   // 171
+    0xbb,   // 172
+    0xbb,   // 173
+    0xbb,   // 174
+    0xbb,   // 175
+    0xbb,   // 176
+    0xbb,   // 177
+    0xbb,   // 178
+    0xbb,   // 179
+    0xbb,   // 180
+    0xbb,   // 181
+    0xbb,   // 182
+    0xbb,   // 183
+    0xbb,   // 184
+    0xbb,   // 185
+    0xbb,   // 186
+    0xbb,   // 187
+    0xbb,   // 188
+    0xbb,   // 189
+    0xbb,   // 190
+    0xbb,   // 191
+    0xbb,   // 192
+    0xbb,   // 193
+    0xbb,   // 194
+    0xbb,   // 195
+    0xbb,   // 196
+    0xbb,   // 197
+    0xbb,   // 198
+    0xbb,   // 199
+    0xbb,   // 200
+    0xbb,   // 201
+    0xbb,   // 202
+    0xbb,   // 203
+    0xbb,   // 204
+    0xbb,   // 205
+    0xbb,   // 206
+    0xbb,   // 207
+    0xbb,   // 208
+    0xbb,   // 209
+    0xbb,   // 210
+    0xbb,   // 211
+    0xbb,   // 212
+    0xbb,   // 213
+    0xbb,   // 214
+    0xbb,   // 215  ALLEGRO_KEY_LSHIFT
+    0xbb,   // 216  ALLEGRO_KEY_RSHIFT
+    0xbb,   // 217  ALLEGRO_KEY_LCTRL
+    0xbb,   // 218  ALLEGRO_KEY_RCTRL
+    0xbb,   // 219  ALLEGRO_KEY_ALT
+    0xbb,   // 220  ALLEGRO_KEY_ALTGR
+    0xbb,   // 221  ALLEGRO_KEY_LWIN
+    0xbb,   // 222  ALLEGRO_KEY_RWIN
+    0xbb,   // 223  ALLEGRO_KEY_MENU
+    0xbb,   // 224  ALLEGRO_KEY_SCROLLLOCK
+    0xbb,   // 225  ALLEGRO_KEY_NUMLOCK
+    0xbb,   // 226  ALLEGRO_KEY_CAPSLOCK
 };
 
 #define A2B_SHIFT 0x100
@@ -596,7 +606,7 @@ static uint16_t ascii2bbc[] =
     0x42,           // 0x78 x
     0x44,           // 0x79 y
     0x61,           // 0x7a z
-    0x47|A2B_SHIFT, // 0x7b {
+    0x38|A2B_SHIFT, // 0x7b {
     0x78|A2B_SHIFT, // 0x7c |
     0x58|A2B_SHIFT, // 0x7d }
     0x18|A2B_SHIFT, // 0x7e ~
@@ -609,33 +619,28 @@ bool keylogical = 0;
 
 static int keycol, keyrow;
 static int bbckey[16][16];
+static int hostshift, hostctrl;
 
 typedef enum {
     KP_IDLE,
     KP_NEXT,
-    KP_SHIFT_DOWN,
-    KP_SHIFT_UP,
-    KP_DELAY1,
-    KP_CTRL_DOWN,
-    KP_CTRL_UP,
     KP_CHAR,
-    KP_DELAY2,
+    KP_DELAY,
     KP_UP
 } kp_state_t;
 
-static kp_state_t kp_state = KP_IDLE;
-static unsigned char *clip_paste_str;
-static unsigned char *clip_paste_ptr;
-static uint16_t clip_paste_key;
+// Fake vkey codes used in logical keyboard mode; VKEY_SHIFT_EVENT is used to indicate
+// the SHIFT key being pushed down, and VKEY_SHIFT_EVENT|1 is used to indicate it being
+// released, and similarly for VKEY_CTRL_EVENT.
+#define VKEY_SHIFT_EVENT (0xe0)
+#define VKEY_CTRL_EVENT  (0xf0)
 
-void key_clear(void)
-{
-    int c, r;
-    for (c = 0; c < 16; c++)
-        for (r = 0; r < 16; r++)
-            bbckey[c][r] = 0;
-    sysvia_set_ca2(0);
-}
+static kp_state_t kp_state = KP_IDLE;
+static unsigned char *key_paste_str;
+static unsigned char *key_paste_ptr;
+static bool key_paste_shift;
+static bool key_paste_ctrl;
+static uint8_t key_paste_vkey;
 
 static void key_update()
 {
@@ -675,20 +680,79 @@ int key_map(ALLEGRO_EVENT *event)
     return code;
 }
 
+static void key_paste_add_vkey(uint8_t vkey)
+{
+    size_t len;
+    int pos;
+
+    log_debug("keyboard: key_paste_add_vkey, vkey=&%02x", vkey);
+
+    if (key_paste_str) {
+        len = strlen((char *)key_paste_str);
+        pos = key_paste_ptr - key_paste_str;
+    }
+    else {
+        len = 0;
+        pos = 0;
+        kp_state = KP_NEXT;
+        key_paste_shift = bbckey[0][0];
+        key_paste_ctrl = bbckey[1][0];
+    }
+
+    unsigned char *new_str = al_realloc(key_paste_str, len+2);
+    if (new_str) {
+        key_paste_str = new_str;
+        key_paste_ptr = key_paste_str + pos;
+        new_str[len] = vkey;
+        new_str[len+1] = 0;
+    }
+    else
+        log_warn("keyboard: out of memory adding key to paste, key discarded");
+}
+
+static void key_paste_add_combo(uint8_t vkey, bool shift, bool ctrl)
+{
+    log_debug("keyboard: key_paste_add_combo vkey=&%02x, shift=%d, ctrl=%d", vkey, shift, ctrl);
+
+    // The following code won't work if we have a value other than 0 or 1; force
+    // this in case we're using "typedef int bool".
+    shift = !!shift;
+    ctrl = !!ctrl;
+
+    if (key_paste_shift != shift) {
+        key_paste_add_vkey(VKEY_SHIFT_EVENT | shift);
+        key_paste_shift = shift;
+    }
+    if (key_paste_ctrl != ctrl) {
+        key_paste_add_vkey(VKEY_CTRL_EVENT | ctrl);
+        key_paste_ctrl = ctrl;
+    }
+    if (vkey != 0xaa)
+        key_paste_add_vkey(vkey);
+}
+
 void key_char(ALLEGRO_EVENT *event)
 {
-    if (keylogical && allegro2bbclogical[event->keyboard.keycode] == 0xaa) {
-        int c = event->keyboard.unichar;
-        switch (c)
-        {
-            case 96:  // unicode backtick
-                break;
-            case 163: // unicode pound currency symbol
-                c = 96;
-            default: {
-                os_paste_addc(c);
+    if (keylogical) {
+        log_debug("keyboard: key_char keycode=%d, unichar=%d", event->keyboard.keycode, event->keyboard.unichar);
+        uint8_t vkey = allegro2bbclogical[event->keyboard.keycode];
+        if (vkey == 0xaa) {
+            int c = event->keyboard.unichar;
+            switch (c)
+            {
+                case 96:  // unicode backtick
+                    break;
+                case 163: // unicode pound currency symbol
+                    c = 96;
+                default:
+                    if (c <= 127) {
+                        uint16_t bbckey = ascii2bbc[c];
+                        key_paste_add_combo(bbckey & 0xff, bbckey & A2B_SHIFT, bbckey & A2B_CTRL);
+                    }
             }
         }
+        else if (vkey != 0xbb)
+            key_paste_add_combo(vkey, hostshift, hostctrl);
     }
 }
 
@@ -696,11 +760,30 @@ static void set_key(int code, int state)
 {
     unsigned vkey;
 
-    vkey = keylogical ? allegro2bbclogical[code] : allegro2bbc[code];
-    log_debug("keyboard: code=%d, vkey=%02X", code, vkey);
-    if (vkey != 0xaa) {
-        bbckey[vkey & 15][vkey >> 4] = state;
-        key_update();
+    // We need to track the current state of the host's SHIFT and CTRL keys;
+    // in logical keyboard mode these have only a loose connection with the
+    // emulated keyboard in bbckey[][].
+    bool shiftctrl = false;
+    if ((code == ALLEGRO_KEY_LSHIFT) || (code == ALLEGRO_KEY_RSHIFT)) {
+        hostshift = state;
+        shiftctrl = true;
+    }
+    else if ((code == ALLEGRO_KEY_LCTRL) || (code == ALLEGRO_KEY_RCTRL)) {
+        hostctrl = state;
+        shiftctrl = true;
+    }
+
+    if (!keylogical || (code == ALLEGRO_KEY_CAPSLOCK)) {
+        vkey = allegro2bbc[code];
+        log_debug("keyboard: code=%d, vkey=&%02X", code, vkey);
+        if (vkey != 0xaa) {
+            bbckey[vkey & 15][vkey >> 4] = state;
+            key_update();
+        }
+    }
+    else {
+        if (shiftctrl)
+            key_paste_add_combo(0xaa, hostshift, hostctrl);
     }
 }
 
@@ -714,94 +797,61 @@ void key_up(int code)
     set_key(code, 0);
 }
 
-void key_paste_start(char *str)
-{
-    if (str) {
-        log_debug("key_paste_start, str=%s", str);
-        clip_paste_str = clip_paste_ptr = (unsigned char *)str;
-        kp_state = KP_NEXT;
-    }
-}
-
-static void key_paste_ctrl(void)
-{
-    if ((clip_paste_key & A2B_CTRL) && !bbckey[0][1])
-        kp_state = KP_CTRL_DOWN;
-    else if (!(clip_paste_key & A2B_CTRL) && bbckey[0][1])
-        kp_state = KP_CTRL_UP;
-    else
-        kp_state = KP_CHAR;
-}
-
 void key_paste_poll(void)
 {
-    unsigned ch;
+    uint8_t vkey;
     //log_debug("key_paste_poll: kp_state=%d", kp_state);
 
     switch(kp_state) {
         case KP_IDLE:
             break;
         case KP_NEXT:
-            if ((ch = *clip_paste_ptr++)) {
-                if (ch == 0xc2 && *clip_paste_ptr == 0xa3) {
-                    ch = 0x60; // convert UTF-8 pound into BBC pound.
-                    clip_paste_ptr++;
-                }
-                else if (ch == 0x0d && *clip_paste_ptr == 0x0a)
-                    clip_paste_ptr++;
-                log_debug("keybaord: clip_paste_poll ch=%02x", ch);
-                if (ch <= 127) {
-                    clip_paste_key = ascii2bbc[ch];
-                    if ((clip_paste_key & A2B_SHIFT) && !bbckey[0][0])
-                        kp_state = KP_SHIFT_DOWN;
-                    else if (!(clip_paste_key & A2B_SHIFT) && bbckey[0][0])
-                        kp_state = KP_SHIFT_UP;
-                    else
-                        key_paste_ctrl();
+            if ((vkey = *key_paste_ptr++)) {
+                int col = 1;
+                log_debug("keyboard: clip_paste_poll vkey=&%02x", vkey);
+                key_paste_vkey = vkey;
+                switch (vkey) {
+                    case VKEY_SHIFT_EVENT:
+                    case VKEY_SHIFT_EVENT|1:
+                        col = 0;
+                    case VKEY_CTRL_EVENT:
+                    case VKEY_CTRL_EVENT|1:
+                        bbckey[col][0] = vkey & 1;
+                        key_update();
+                        kp_state = KP_NEXT;
+                        break;
+
+                    default:
+                        kp_state = KP_CHAR;
+                        break;
                 }
             }
             else {
-                bbckey[clip_paste_key & 15][clip_paste_key >> 4] = 0;
-                bbckey[0][0] = 0;
-                bbckey[0][1] = 0;
-                al_free(clip_paste_str);
-                clip_paste_str = clip_paste_ptr = NULL;
+                if (key_paste_vkey < VKEY_SHIFT_EVENT) {
+                    bbckey[key_paste_vkey & 0x0f][(key_paste_vkey & 0xf0) >> 4] = 0;
+                    key_update();
+                }
+                al_free(key_paste_str);
+                key_paste_str = key_paste_ptr = NULL;
                 kp_state = KP_IDLE;
+
+                // Now we've finished, make the emulated machine's SHIFT/CTRL
+                // state agree with the host's state. This doesn't cause an
+                // infinite loop because this is a no-op if the state already
+                // matches.
+                key_paste_add_combo(0xaa, hostshift, hostctrl);
             }
             break;
-        case KP_SHIFT_DOWN:
-            bbckey[0][0] = 1;
-            key_update();
-            kp_state = KP_DELAY1;
-            break;
-        case KP_SHIFT_UP:
-            bbckey[0][0] = 0;
-            key_update();
-            kp_state = KP_DELAY1;
-            break;
-        case KP_DELAY1:
-            key_paste_ctrl();
-            break;
-        case KP_CTRL_DOWN:
-            bbckey[0][1] = 1;
-            key_update();
-            kp_state = KP_CHAR;
-            break;
-        case KP_CTRL_UP:
-            bbckey[0][1] = 1;
-            key_update();
-            kp_state = KP_CHAR;
-            break;
         case KP_CHAR:
-            bbckey[clip_paste_key & 0x0f][(clip_paste_key & 0xf0) >> 4] = 1;
+            bbckey[key_paste_vkey & 0x0f][(key_paste_vkey & 0xf0) >> 4] = 1;
             key_update();
-            kp_state = KP_DELAY2;
+            kp_state = KP_DELAY;
             break;
-        case KP_DELAY2:
+        case KP_DELAY:
             kp_state = KP_UP;
             break;
         case KP_UP:
-            bbckey[clip_paste_key & 0x0f][(clip_paste_key & 0xf0) >> 4] = 0;
+            bbckey[key_paste_vkey & 0x0f][(key_paste_vkey & 0xf0) >> 4] = 0;
             key_update();
             kp_state = KP_NEXT;
     }
@@ -832,7 +882,7 @@ bool key_any_down(void)
 bool key_code_down(int code)
 {
     if (code < ALLEGRO_KEY_MAX) {
-        code = keylogical ? allegro2bbclogical[code] : allegro2bbc[code];
+        code = allegro2bbc[code];
         return bbckey[code & 0x0f][code >> 4];
     }
     return false;
