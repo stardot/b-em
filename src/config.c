@@ -253,6 +253,7 @@ void config_save(void)
         set_config_bool("disc", "vdfsenable", vdfs_enabled);
 
         set_config_bool(NULL, "key_as", keyas);
+        set_config_bool(NULL, "key_logical", keylogical);
 
         set_config_bool(NULL, "mouse_amx", mouse_amx);
 
