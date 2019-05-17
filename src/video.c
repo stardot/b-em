@@ -514,165 +514,167 @@ static inline void mode7_render(ALLEGRO_LOCKED_REGION *region, uint8_t dat)
     int mode7_flashx = mode7_flash, mode7_dblx = mode7_dbl;
     int *on;
 
-    if (mode7_need_new_lookup)
-        mode7_gen_nula_lookup();
+    if (scrx < (1280-32)) {
+        if (mode7_need_new_lookup)
+            mode7_gen_nula_lookup();
 
-    t = mode7_buf[0];
-    mode7_buf[0] = mode7_buf[1];
-    mode7_buf[1] = dat;
-    dat = t;
-    mode7_px[0] = mode7_p[0];
-    mode7_px[1] = mode7_p[1];
+        t = mode7_buf[0];
+        mode7_buf[0] = mode7_buf[1];
+        mode7_buf[1] = dat;
+        dat = t;
+        mode7_px[0] = mode7_p[0];
+        mode7_px[1] = mode7_p[1];
 
-    if (!mode7_dbl && mode7_nextdbl)
-        on = mode7_lookup[mode7_bg & 7][mode7_bg & 7];
-    if (dat == 255) {
-        for (c = 0; c < 16; c++)
-            put_pixel(region, scrx + c + 16, scry, colblack);
-        if (vid_linedbl) {
+        if (!mode7_dbl && mode7_nextdbl)
+            on = mode7_lookup[mode7_bg & 7][mode7_bg & 7];
+        if (dat == 255) {
             for (c = 0; c < 16; c++)
-                put_pixel(region, scrx + c + 16, scry + 1, colblack);
+                put_pixel(region, scrx + c + 16, scry, colblack);
+            if (vid_linedbl) {
+                for (c = 0; c < 16; c++)
+                    put_pixel(region, scrx + c + 16, scry + 1, colblack);
+            }
+            return;
         }
-        return;
-    }
 
-    if (dat < 0x20) {
-        switch (dat) {
-        case 1:
-        case 2:
-        case 3:
-        case 4:
-        case 5:
-        case 6:
-        case 7:
-            mode7_gfx = 0;
-            mode7_col = dat;
-            mode7_p[0] = mode7_chars;
-            mode7_p[1] = mode7_charsi;
-            holdclear = 1;
-            break;
-        case 8:
-            mode7_flash = 1;
-            break;
-        case 9:
-            mode7_flash = 0;
-            break;
-        case 12:
-        case 13:
-            mode7_dbl = dat & 1;
-            if (mode7_dbl)
-                mode7_wasdbl = 1;
-            break;
-        case 17:
-        case 18:
-        case 19:
-        case 20:
-        case 21:
-        case 22:
-        case 23:
-            mode7_gfx = 1;
-            mode7_col = dat & 7;
-            if (mode7_sep) {
-                mode7_p[0] = mode7_sepgraph;
-                mode7_p[1] = mode7_sepgraphi;
-            } else {
-                mode7_p[0] = mode7_graph;
-                mode7_p[1] = mode7_graphi;
+        if (dat < 0x20) {
+            switch (dat) {
+            case 1:
+            case 2:
+            case 3:
+            case 4:
+            case 5:
+            case 6:
+            case 7:
+                mode7_gfx = 0;
+                mode7_col = dat;
+                mode7_p[0] = mode7_chars;
+                mode7_p[1] = mode7_charsi;
+                holdclear = 1;
+                break;
+            case 8:
+                mode7_flash = 1;
+                break;
+            case 9:
+                mode7_flash = 0;
+                break;
+            case 12:
+            case 13:
+                mode7_dbl = dat & 1;
+                if (mode7_dbl)
+                    mode7_wasdbl = 1;
+                break;
+            case 17:
+            case 18:
+            case 19:
+            case 20:
+            case 21:
+            case 22:
+            case 23:
+                mode7_gfx = 1;
+                mode7_col = dat & 7;
+                if (mode7_sep) {
+                    mode7_p[0] = mode7_sepgraph;
+                    mode7_p[1] = mode7_sepgraphi;
+                } else {
+                    mode7_p[0] = mode7_graph;
+                    mode7_p[1] = mode7_graphi;
+                }
+                break;
+            case 24:
+                mode7_col = mcolx = mode7_bg;
+                break;
+            case 25:
+                if (mode7_gfx) {
+                    mode7_p[0] = mode7_graph;
+                    mode7_p[1] = mode7_graphi;
+                }
+                mode7_sep = 0;
+                break;
+            case 26:
+                if (mode7_gfx) {
+                    mode7_p[0] = mode7_sepgraph;
+                    mode7_p[1] = mode7_sepgraphi;
+                }
+                mode7_sep = 1;
+                break;
+            case 28:
+                mode7_bg = 0;
+                break;
+            case 29:
+                mode7_bg = mode7_col;
+                break;
+            case 30:
+                mode7_holdchar = 1;
+                break;
+            case 31:
+                holdoff = 1;
+                break;
             }
-            break;
-        case 24:
-            mode7_col = mcolx = mode7_bg;
-            break;
-        case 25:
-            if (mode7_gfx) {
-                mode7_p[0] = mode7_graph;
-                mode7_p[1] = mode7_graphi;
-            }
-            mode7_sep = 0;
-            break;
-        case 26:
-            if (mode7_gfx) {
-                mode7_p[0] = mode7_sepgraph;
-                mode7_p[1] = mode7_sepgraphi;
-            }
-            mode7_sep = 1;
-            break;
-        case 28:
-            mode7_bg = 0;
-            break;
-        case 29:
-            mode7_bg = mode7_col;
-            break;
-        case 30:
-            mode7_holdchar = 1;
-            break;
-        case 31:
-            holdoff = 1;
-            break;
+            if (mode7_holdchar) {
+                dat = mode7_heldchar;
+                if (dat >= 0x40 && dat < 0x60)
+                    dat = 32;
+                mode7_px[0] = mode7_heldp[0];
+                mode7_px[1] = mode7_heldp[1];
+            } else
+                dat = 0x20;
+            if (mode7_dblx != mode7_dbl)
+                dat = 32;           /*Double height doesn't respect held characters */
+        } else if (mode7_p[0] != mode7_chars) {
+            mode7_heldchar = dat;
+            mode7_heldp[0] = mode7_px[0];
+            mode7_heldp[1] = mode7_px[1];
         }
-        if (mode7_holdchar) {
-            dat = mode7_heldchar;
-            if (dat >= 0x40 && dat < 0x60)
-                dat = 32;
-            mode7_px[0] = mode7_heldp[0];
-            mode7_px[1] = mode7_heldp[1];
-        } else
-            dat = 0x20;
-        if (mode7_dblx != mode7_dbl)
-            dat = 32;           /*Double height doesn't respect held characters */
-    } else if (mode7_p[0] != mode7_chars) {
-        mode7_heldchar = dat;
-        mode7_heldp[0] = mode7_px[0];
-        mode7_heldp[1] = mode7_px[1];
-    }
 
-    if (mode7_dblx && !mode7_nextdbl)
-        t = ((dat - 0x20) * 160) + ((sc >> 1) * 16);
-    else if (mode7_dblx)
-        t = ((dat - 0x20) * 160) + ((sc >> 1) * 16) + (5 * 16);
-    else
-        t = ((dat - 0x20) * 160) + (sc * 16);
-
-    off = mode7_lookup[0][mode7_bg & 7][0];
-    if (!mode7_dbl && mode7_nextdbl)
-        on = mode7_lookup[mode7_bg & 7][mode7_bg & 7];
-    else
-        on = mode7_lookup[mcolx & 7][mode7_bg & 7];
-
-    for (c = 0; c < 16; c++) {
-        if (mode7_flashx && !mode7_flashon)
-            put_pixel(region, scrx + c + 16, scry, off);
+        if (mode7_dblx && !mode7_nextdbl)
+            t = ((dat - 0x20) * 160) + ((sc >> 1) * 16);
         else if (mode7_dblx)
-            put_pixel(region, scrx + c + 16, scry, on[mode7_px[sc & 1][t] & 15]);
+            t = ((dat - 0x20) * 160) + ((sc >> 1) * 16) + (5 * 16);
         else
-            put_pixel(region, scrx + c + 16, scry, on[mode7_px[vid_interlace & interlline][t] & 15]);
-        t++;
-    }
+            t = ((dat - 0x20) * 160) + (sc * 16);
 
-    if (vid_linedbl) {
-        t -= 16;
+        off = mode7_lookup[0][mode7_bg & 7][0];
+        if (!mode7_dbl && mode7_nextdbl)
+            on = mode7_lookup[mode7_bg & 7][mode7_bg & 7];
+        else
+            on = mode7_lookup[mcolx & 7][mode7_bg & 7];
+
         for (c = 0; c < 16; c++) {
             if (mode7_flashx && !mode7_flashon)
-                put_pixel(region, scrx + c + 16, scry + 1, off);
+                put_pixel(region, scrx + c + 16, scry, off);
             else if (mode7_dblx)
-                put_pixel(region, scrx + c + 16, scry + 1, on[mode7_px[sc & 1][t] & 15]);
+                put_pixel(region, scrx + c + 16, scry, on[mode7_px[sc & 1][t] & 15]);
             else
-                put_pixel(region, scrx + c + 16, scry + 1, on[mode7_px[1][t] & 15]);
+                put_pixel(region, scrx + c + 16, scry, on[mode7_px[vid_interlace & interlline][t] & 15]);
             t++;
         }
-    }
 
-    if ((scrx + 16) < firstx)
-        firstx = scrx + 16;
-    if ((scrx + 32) > lastx)
-        lastx = scrx + 32;
+        if (vid_linedbl) {
+            t -= 16;
+            for (c = 0; c < 16; c++) {
+                if (mode7_flashx && !mode7_flashon)
+                    put_pixel(region, scrx + c + 16, scry + 1, off);
+                else if (mode7_dblx)
+                    put_pixel(region, scrx + c + 16, scry + 1, on[mode7_px[sc & 1][t] & 15]);
+                else
+                    put_pixel(region, scrx + c + 16, scry + 1, on[mode7_px[1][t] & 15]);
+                t++;
+            }
+        }
 
-    if (holdoff) {
-        mode7_holdchar = 0;
-        mode7_heldchar = 32;
+        if ((scrx + 16) < firstx)
+            firstx = scrx + 16;
+        if ((scrx + 32) > lastx)
+            lastx = scrx + 32;
+
+        if (holdoff) {
+            mode7_holdchar = 0;
+            mode7_heldchar = 32;
+        }
+        if (holdclear)
+            mode7_heldchar = 32;
     }
-    if (holdclear)
-        mode7_heldchar = 32;
 }
 
 uint16_t vidbank;
@@ -994,7 +996,7 @@ void video_poll(int clocks, int timer_enable)
                     mode7_render(region, 255);
                 charsleft--;
 
-            } else if (scrx < 1280) {
+            } else if (scrx < (1280-16)) {
                 put_pixels(region, scrx, scry, (ula_ctrl & 0x10) ? 8 : 16, colblack);
                 if (vid_linedbl)
                     put_pixels(region, scrx, scry+1, (ula_ctrl & 0x10) ? 8 : 16, colblack);
@@ -1004,7 +1006,7 @@ void video_poll(int clocks, int timer_enable)
                         put_pixels(region, scrx + 16, scry+1, 16, colblack);
                 }
             }
-            if (cdraw && scrx < 1280) {
+            if (cdraw && scrx < (1280-16)) {
                 if (cursoron && (ula_ctrl & cursorlook[cdraw])) {
                     for (c = ((ula_ctrl & 0x10) ? 8 : 16); c >= 0; c--) {
                         nula_putpixel(region, scrx + c, scry, get_pixel(region, scrx + c, scry) ^ colwhite);
