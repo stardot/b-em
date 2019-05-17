@@ -918,6 +918,7 @@ prtextws    =   &A8
             stx     prtextws        ; set up address in ZP
             sty     prtextws+1
             lda     #&87            ; find screen mode.
+            jsr     OSNEWL
             jsr     OSBYTE
             cpy     #&00
             beq     wide0
@@ -987,7 +988,7 @@ prtextws    =   &A8
             equs    "  TYPE : display a file on screen", &0d
             equb    &00
 
-.help_txt_s equs    "Sideays RAM commands:", &0d
+.help_txt_s equs    "Sideways RAM commands:", &0d
             equs    "  ROMS", &0d
             equs    "  SRLOAD <fsp> <address> (<r#>) (Q)", &0d
             equs    "  SRSAVE <fsp> <start> <end> (<r#>) (Q)", &0d
@@ -1003,15 +1004,12 @@ prtextws    =   &A8
             tya
             pha
             jsr     help_title
-            jsr     OSNEWL
             ldx     #<help_txt_v
             ldy     #>help_txt_v
             jsr     pr_text_xy
-            jsr     OSNEWL
             ldx     #<help_txt_u
             ldy     #>help_txt_u
             jsr     pr_text_xy
-            jsr     OSNEWL
             ldx     #<help_txt_s
             ldy     #>help_txt_s
             jsr     pr_text_xy
