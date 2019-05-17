@@ -1036,7 +1036,7 @@ void video_poll(int clocks, int timer_enable)
                     mode7_render(region, 255);
                 charsleft--;
 
-            } else if (scrx < (1280-16)) {
+            } else if (scrx < (1280-32)) {
                 put_pixels(region, scrx, scry, (ula_ctrl & 0x10) ? 8 : 16, colblack);
                 if (vid_linedbl)
                     put_pixels(region, scrx, scry+1, (ula_ctrl & 0x10) ? 8 : 16, colblack);
