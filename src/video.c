@@ -132,6 +132,44 @@ static inline int get_pixel(ALLEGRO_LOCKED_REGION *region, int x, int y)
     return *((uint32_t *)((char *)region->data + region->pitch * y + x * region->pixel_size));
 }
 
+#ifdef PIXEL_BOUNDS_CHECK
+
+static inline void put_pixel_checked(ALLEGRO_LOCKED_REGION *region, int x, int y, uint32_t colour, int line)
+{
+    if (x < 0 || x > 1280)
+        log_debug("video: pixel out of bounds, x=%d at %d", x, line);
+    if (y < 0 || y > 800)
+        log_debug("video: pixel out of bounds, y=%d at %d", y, line);
+    *((uint32_t *)((char *)region->data + region->pitch * y + x * region->pixel_size)) = colour;
+}
+
+static inline void put_pixels_checked(ALLEGRO_LOCKED_REGION *region, int x, int y, int count, uint32_t colour, int line)
+{
+    char *ptr = (char *)region->data + region->pitch * y + x * region->pixel_size;
+    if (x < 0 || (x + count) > 1280)
+        log_debug("video: pixel out of bounds, x=%d at %d", x, line);
+    if (y < 0 || y > 800)
+        log_debug("video: pixel out of bounds, y=%d at %d", y, line);
+    while (count--) {
+        *(uint32_t *)ptr = colour;
+        ptr += region->pixel_size;
+    }
+}
+
+static inline void nula_putpixel_checked(ALLEGRO_LOCKED_REGION *region, int x, int y, uint32_t colour, int line)
+{
+    if (crtc_mode && (nula_horizontal_offset || nula_left_blank) && (x < nula_left_cut || x >= nula_left_edge + (crtc[1] * crtc_mode * 8)))
+        put_pixel_checked(region, x, y, colblack, line);
+    else if (x < 1280)
+        put_pixel_checked(region, x, y, colour, line);
+}
+
+#define put_pixel(region, x, y, colour) put_pixel_checked(region, x, y, colour, __LINE__)
+#define put_pixels(region, x, y, count, colour) put_pixels_checked(region, x, y, count, colour, __LINE__)
+#define nula_putpixel(region, x, y, colour) nula_putpixel_checked(region, x, y, colour, __LINE__)
+
+#else
+
 static inline void put_pixel(ALLEGRO_LOCKED_REGION *region, int x, int y, uint32_t colour)
 {
     *((uint32_t *)((char *)region->data + region->pitch * y + x * region->pixel_size)) = colour;
@@ -153,6 +191,8 @@ static inline void nula_putpixel(ALLEGRO_LOCKED_REGION *region, int x, int y, ui
     else if (x < 1280)
         put_pixel(region, x, y, colour);
 }
+
+#endif
 
 void nula_default_palette(void)
 {
