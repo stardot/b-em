@@ -1158,7 +1158,8 @@ void video_poll(int clocks, int timer_enable)
                 }
                 if (vc == crtc[7]) {
                     // Reached vertical sync position.
-                    if (!(crtc[8] & 1) && oldr8) {
+                    int intsync = crtc[8] & 1;
+                    if (!intsync && oldr8) {
                         ALLEGRO_COLOR black = al_map_rgb(0, 0, 0);
                         al_set_target_bitmap(b32);
                         al_clear_to_color(black);
@@ -1169,9 +1170,9 @@ void video_poll(int clocks, int timer_enable)
                     }
                     frameodd ^= 1;
                     if (frameodd)
-                        interline = (crtc[8] & 1);
-                    interlline = frameodd && (crtc[8] & 1);
-                    oldr8 = crtc[8] & 1;
+                        interline = intsync;
+                    interlline = frameodd && intsync;
+                    oldr8 = intsync;
                     if (vidclocks > 1024 && !ccount) {
                         video_doblit(crtc_mode, crtc[4]);
                         vid_cleared = 0;
