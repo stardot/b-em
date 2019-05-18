@@ -219,15 +219,17 @@ void nula_default_palette(void)
 void videoula_write(uint16_t addr, uint8_t val)
 {
     int c;
-    //log_debug("ULA write %04X %02X %i %i\n",addr,val,hc,vc);
     if (nula_disable)
         addr &= ~2;             // nuke additional NULA addresses
 
     switch (addr & 3) {
     case 0:
         {
-            //        printf("ULA write %04X %02X\n",addr,val);
+            // Video control register.
+            // log_debug("video: ULA write VCR from %04X: %02X %i %i\n",pc,val,hc,vc);
+
             if ((ula_ctrl ^ val) & 1) {
+                // Flashing colour control bit has changed.
                 if (val & 1) {
                     for (c = 0; c < 16; c++) {
                         if ((ula_palbak[c] & 8) && nula_flash[(ula_palbak[c] & 7) ^ 7])
@@ -254,7 +256,8 @@ void videoula_write(uint16_t addr, uint8_t val)
 
     case 1:
         {
-            // log_debug("ULA write %04X %02X\n",addr,val);
+            // Palette register.
+            // log_debug("video: ULA write palette from %04X: %02X map l=%x->p=%x %i %i\n",pc,val, val >> 4, (val & 0x0f) ^ 0x07, hc, vc);
             uint8_t code = val >> 4;
             ula_palbak[code] = val & 15;
             ula_pal[code] = nula_collook[(val & 15) ^ 7];
@@ -1125,6 +1128,7 @@ void video_poll(int clocks, int timer_enable)
                     sc = 0;
                 }
             } else if (sc == crtc[9] || ((crtc[8] & 3) == 3 && sc == (crtc[9] >> 1))) {
+                // Reached the bottom of a row of characters.
                 maback = ma;
                 sc = 0;
                 con = 0;
@@ -1136,9 +1140,10 @@ void video_poll(int clocks, int timer_enable)
                 oldvc = vc;
                 vc++;
                 vc &= 127;
-                if (vc == crtc[6])
+                if (vc == crtc[6]) // vertical displayed total.
                     vdispen = 0;
                 if (oldvc == crtc[4]) {
+                    // vertical total reached.
                     vc = 0;
                     vadj = crtc[5];
                     if (!vadj) {
@@ -1152,6 +1157,7 @@ void video_poll(int clocks, int timer_enable)
                         cursoron = frcount & cmask[(crtc[10] & 0x60) >> 5];
                 }
                 if (vc == crtc[7]) {
+                    // Reached vertical sync position.
                     if (!(crtc[8] & 1) && oldr8) {
                         ALLEGRO_COLOR black = al_map_rgb(0, 0, 0);
                         al_set_target_bitmap(b32);
