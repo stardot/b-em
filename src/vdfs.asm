@@ -100,6 +100,10 @@ prtextws    =   &A8
             equs    "(C) 2018 Steve Fosdick, GPL3", &00
             equd    0
 .banner     equs    "Virtual DFS", &00
+.msg_nclaim equs    "ADFS is not being claimed", &00
+.msg_claim  equs    "ADFS is being claimed", &00
+.msg_nopen  equs    "No open files",&0d,&0a,&00
+.msg_files  equs    "Chan Name       Mode Ptr      Ext",&0d,&0a,&00
 
 ; The dispatch table.  This needs to be in the same order as
 ; enum vdfs_action in the vdfs.c module.
@@ -127,6 +131,8 @@ prtextws    =   &A8
             equw    tube_explode    ; explode character set for tube.
             equw    osw7f_stat
             equw    break_type
+            equw    cmd_files       ; *FILES command.
+            equw    none_open       ; "No open files" message.
 .dispend
 
 ; Stubs to transfer control to the vdfs.c module.
@@ -209,15 +215,16 @@ prtextws    =   &A8
             equw    fsc
 }
 
-.prtitle
+.prtitle    ldx     #&00
+
+.prmsg
 {
-            ldx     #&00
-.loop       lda     banner,x
-            beq     done
-            jsr     OSWRCH
+            lda     banner,x
+.loop       jsr     OSWRCH
             inx
+            lda     banner,x
             bne     loop
-.done       rts
+            rts
 }
 
 ; Filing system boot.  This is called in response to ROM service
@@ -285,47 +292,57 @@ prtextws    =   &A8
             bne     loopd
 .nodfs      lda     #&25
             rts
-.vdfs_ent   equs    "VDFS    ", &80, &FF, &11
+.vdfs_ent   equs    "VDFS    ", &60, &7F, &11
 .adfs_ent   equs    "ADFS    ", &30, &3A, &08
 .dfs_ents   equs    "DISK    ", &11, &15, &04
             equs    "DISC    ", &11, &15, &04
 }
 
+; Filing system claim.  This prints info about which other filing
+; systems VDFS is claiming.
+
 .fs_claim
 {
             bit     port_flags
             bmi     adfs_yes
-            ldx     #&00
-            beq     adfs_msg
-.adfs_yes   ldx     #msg_yes-msg_no
-.adfs_msg   lda     msg_no,x
-            beq     adfs_done
-            jsr     OSWRCH
-            inx
+            ldx     #msg_nclaim-banner
             bne     adfs_msg
-.adfs_done  jsr     OSNEWL
+.adfs_yes   ldx     #msg_claim-banner
+.adfs_msg   jsr     prmsg
+            jsr     OSNEWL
             bit     port_flags
             bvs     dfs_yes
-            ldx     #&00
-            beq     dfs_msg
-.dfs_yes    ldx     #msg_yes-msg_no
-.dfs_msg    lda     msg_no+1,x
-            beq     done
-            jsr     OSWRCH
-            inx
+            ldx     #msg_nclaim-banner+1
             bne     dfs_msg
-.done       jsr     OSNEWL
+.dfs_yes    ldx     #msg_claim-banner+1
+.dfs_msg    jsr     prmsg
+            jsr     OSNEWL
             lda     #&00
             rts
-.msg_no     equs    "ADFS is not being claimed", &00
-.msg_yes    equs    "ADFS is being claimed", &00
 }
 
 ; Routines to list information about files.
 
-            macro   outcnt char
+            macro   outchr char
             lda     #char
             jsr     OSWRCH
+            endmacro
+
+            macro   outtwo char
+            outchr  char
+            jsr     OSWRCH
+            endmacro
+
+            macro   outspc
+            outchr  ' '
+            endmacro
+
+            macro   twospc
+            outtwo  ' '
+            endmacro
+
+            macro   outcnt char
+            outchr  char
             inx
             endmacro
 
@@ -367,6 +384,14 @@ prtextws    =   &A8
 .done       rts
 }
 
+.hexfour    lda     &0103,x
+            jsr     hexbyt
+            lda     &0102,x
+            jsr     hexbyt
+            lda     &0101,x
+            jsr     hexbyt
+            lda     &0100,x
+
 .hexbyt     pha
             lsr     A
             lsr     A
@@ -381,15 +406,10 @@ prtextws    =   &A8
             adc     #&06
 .ddig       jmp     OSWRCH
 
+
             macro   hexout addr
             lda     addr
             jsr     hexbyt
-            endmacro
-
-            macro   twospc
-            lda     #' '
-            jsr     OSWRCH
-            jsr     OSWRCH
             endmacro
 
 .pr_all     jsr     pr_basic
@@ -433,6 +453,7 @@ prtextws    =   &A8
             bpl     loop
             jmp     &0100
 .msg        brk
+            equb    &d6
             equs    "Not found"
             equb    &00
 .end
@@ -470,25 +491,20 @@ prtextws    =   &A8
             jsr     hexbyt
             lda     dmpadd
             jsr     hexbyt
-            lda     #' '
-            jsr     OSWRCH
+            outspc
             ldx     dmpcnt
 .getlp      jsr     OSBGET
             bcs     skip
             sta     &0100,X
             jsr     hexbyt
-            lda     #' '
-            jsr     OSWRCH
+            outspc
             dex
             bne     getlp
             clc
 .skip       php
             bcc     ascii
-.endlp      lda     #'*'
-            jsr     OSWRCH
-            jsr     OSWRCH
-            lda     #' '
-            jsr     OSWRCH
+.endlp      outtwo  '*'
+            outspc
             lda     #&00
             sta     &0100,X
             dex
@@ -518,8 +534,7 @@ prtextws    =   &A8
             inc     dmpadd+2
 .noinc      bit     &FF
             bpl     linlp
-.gotesc     lda     #&7E
-            jsr     OSWRCH
+.gotesc     outchr  &7E
 .eof        lda     #&00
             jmp     OSFIND
 }
@@ -538,8 +553,7 @@ prtextws    =   &A8
 .bcdnyb     and     #&0f
             bne     bcddig
             bcc     bcddig
-            lda     #' '
-            jsr     OSWRCH
+            outspc
             sec
             rts
 .bcddig     ora     #'0'
@@ -559,22 +573,18 @@ prtextws    =   &A8
             bne     notbar
             jsr     OSWRCH
 .notbar     jmp     OSWRCH
-.high       lda     #'|'
-            jsr     OSWRCH
-            lda     #'!'
-            jsr     OSWRCH
+.high       outchr  '|'
+            outchr  '!'
             txa
             and     #&7f
             tax
             jmp     high2
 .low        ora     #&40
             tax
-            lda     #'|'
-            jsr     OSWRCH
+            outchr  '|'
             txa
             jmp     OSWRCH
-.del        lda     #'|'
-            jsr     OSWRCH
+.del        outchr  '|'
             lda     #'?'
             jmp     OSWRCH
 }
@@ -620,8 +630,7 @@ prtextws    =   &A8
             lda     lineno
             clc
             jsr     bcdnyb
-            lda     #' '
-            jsr     OSWRCH
+            outspc
             txa
 .chrlp      cmp     #&0D
             beq     newlin
@@ -705,7 +714,7 @@ prtextws    =   &A8
             rts
 .gotrom     tax
             jsr     prinfo
-            jsr     space
+            outspc
             jsr     cparen
             jsr     rdcpyr
             jsr     prtitl
@@ -758,22 +767,17 @@ prtextws    =   &A8
             sta     copywr
             rts
 
-.prinfo     lda     #'R'
-            jsr     OSWRCH
-            lda     #'o'
-            jsr     OSWRCH
-            lda     #'m'
-            jsr     OSWRCH
-            jsr     space
+.prinfo     outchr  'R'
+            outchr  'o'
+            outchr  'm'
+            outspc
             lda     romid
             cmp     #&0A
             bcs     geten
-            lda     #'0'
-            jsr     OSWRCH
+            outchr  '0'
             lda     romid
             jmp     both
-.geten      lda     #'1'
-            jsr     OSWRCH
+.geten      outchr  '1'
             lda     romid
             sec
             sbc     #&0a
@@ -781,12 +785,10 @@ prtextws    =   &A8
             clc
             adc     #'0'
             jsr     OSWRCH
-            jsr     space
-            lda     #':'
-            jsr     OSWRCH
-            jsr     space
-            lda     #'('
-            jsr     OSWRCH
+            outspc
+            outchr  ':'
+            outspc
+            outchr  '('
             txa
             and     #&80
             beq     notsrv
@@ -802,7 +804,7 @@ prtextws    =   &A8
 .space      lda     #' '
 .islng      jmp     OSWRCH
 
-.prtitl     jsr     space
+.prtitl     outspc
             lda     #&09
             sta     &f6
             lda     #&80
@@ -851,8 +853,7 @@ prtextws    =   &A8
 .copyst     equs    ")C("
             equb    &00
 
-.rparen     lda     #'R'
-            jsr     OSWRCH
+.rparen     outchr  'R'
 .cparen     lda     #')'
             jmp     OSWRCH
 }
@@ -863,7 +864,7 @@ prtextws    =   &A8
 {
             jsr     OSNEWL
             ldx     #&ff
-            beq     start
+            bne     start
 .loop1      jsr     OSWRCH
 .start      inx
             lda     romtitle,x
@@ -917,8 +918,8 @@ prtextws    =   &A8
             pha
             stx     prtextws        ; set up address in ZP
             sty     prtextws+1
-            lda     #&87            ; find screen mode.
             jsr     OSNEWL
+            lda     #&87            ; find screen mode.
             jsr     OSBYTE
             cpy     #&00
             beq     wide0
@@ -935,10 +936,8 @@ prtextws    =   &A8
             inc     &a9
             bne     nloop
 .nlnarrow   jsr     OSNEWL          ; in narrow mode we treat an LF
-            lda     #' '            ; character as a newline followed
-            jsr     OSWRCH
-            jsr     OSWRCH
-            jmp     nnext
+            twospc                  ; character as a newline followed
+            jmp     nnext           ; by two spaces.
 .wide3      ldy     #&00
 .wide0      lda     (prtextws),y
             beq     done
@@ -1157,6 +1156,77 @@ prtextws    =   &A8
             sta     port_cmd
             rts
 }
+
+.cmd_files {
+            ldx     #msg_files-banner
+            jsr     prmsg
+.fileloop   lda     &0100           ; print the channel number.
+            jsr     hexbyt
+            outspc
+            jsr     OSWRCH
+            jsr     OSWRCH
+            ldx     #&00            ; print characters of the name.
+.charloop   lda     &0101,x
+            jsr     OSWRCH
+            inx
+            cpx     #&0a
+            bne     charloop
+            outspc
+            lda     #&20            ; test if open for writing.
+            bit     &010b
+            beq     openin
+            lda     #&10            ; test if open for reading.
+            bit     &010b
+            BNE     openup
+            lda     #'O'
+            ldx     #'U'
+            ldy     #'T'
+            bne     mode
+.openup     lda     #'U'
+            ldx     #'P'
+            bne     spcmode
+.openin     lda     #'I'
+            ldx     #'N'
+.spcmode    ldy     #' '
+.mode       jsr     OSWRCH
+            txa
+            jsr     OSWRCH
+            tya
+            jsr     OSWRCH
+            twospc
+            bit     &010b
+            bvs     isdir
+            ldx     #&0c
+            jsr     hexfour
+            outspc
+            ldx     #&10
+            jsr     hexfour
+.next       jsr     OSNEWL
+            lda     #&0b
+            sta     port_cmd
+            bcc     fileloop
+            lda     #&00
+            rts
+.isdir      jsr     prdir
+            ldx     #&03
+            lda     #' '
+.dirlp      jsr     OSWRCH
+            dex
+            bpl     dirlp
+            jsr     prdir
+            jmp     next
+.prdir      outchr  '<'
+            outchr  'D'
+            outchr  'I'
+            outchr  'R'
+            lda     #'>'
+            jmp     OSWRCH
+}
+
+.none_open  ldx     #msg_nopen-banner
+            jsr     prmsg
+            lda     #&00
+            rts
 
 .end
             save    "vdfs6", start, end

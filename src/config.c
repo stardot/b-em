@@ -120,7 +120,7 @@ void config_load(void)
         al_remove_config_key(bem_cfg, "", "tube6502speed");
     }
 
-    defaultwriteprot = get_config_int("disc", "defaultwriteprotect", 1);
+    defaultwriteprot = get_config_bool("disc", "defaultwriteprotect", 1);
 
     curmodel         = get_config_int(NULL, "model",         3);
     selecttube       = get_config_int(NULL, "tube",         -1);
