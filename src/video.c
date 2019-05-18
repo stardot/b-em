@@ -255,11 +255,11 @@ void videoula_write(uint16_t addr, uint8_t val)
     case 1:
         {
             // log_debug("ULA write %04X %02X\n",addr,val);
-            c = ula_palbak[val >> 4];
-            ula_palbak[val >> 4] = val & 15;
-            ula_pal[val >> 4] = nula_collook[(val & 15) ^ 7];
+            uint8_t code = val >> 4;
+            ula_palbak[code] = val & 15;
+            ula_pal[code] = nula_collook[(val & 15) ^ 7];
             if ((val & 8) && (ula_ctrl & 1) && nula_flash[val & 7])
-                ula_pal[val >> 4] = nula_collook[val & 15];
+                ula_pal[code] = nula_collook[val & 15];
         }
         break;
 
