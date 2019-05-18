@@ -1168,6 +1168,8 @@ void video_poll(int clocks, int timer_enable)
                         region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_READWRITE);
                     }
                     frameodd ^= 1;
+                    if (frameodd)
+                        interline = (crtc[8] & 1);
                     interlline = frameodd && (crtc[8] & 1);
                     oldr8 = crtc[8] & 1;
                     if (vidclocks > 1024 && !ccount) {
