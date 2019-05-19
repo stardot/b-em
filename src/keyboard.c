@@ -625,8 +625,7 @@ typedef enum {
     KP_IDLE,
     KP_NEXT,
     KP_DOWN,
-    KP_DELAY,
-    KP_UP
+    KP_DELAY
 } kp_state_t;
 
 // Extra vkey codes used in logical keyboard mode:
@@ -958,7 +957,11 @@ void key_paste_poll(void)
                         break;
 
                     case VKEY_UP:
-                        kp_state = KP_UP;
+                        vkey = *key_paste_ptr++;
+                        log_debug("keyboard: key_paste_poll up vkey=&%02x", vkey);
+                        bbckey[vkey & 15][vkey >> 4] = 0;
+                        key_update();
+                        kp_state = KP_NEXT;
                         break;
 
                     default:
@@ -989,13 +992,6 @@ void key_paste_poll(void)
         case KP_DELAY:
             kp_state = KP_NEXT;
             break;
-
-        case KP_UP:
-            vkey = *key_paste_ptr++;
-            log_debug("keyboard: key_paste_poll up vkey=&%02x", vkey);
-            bbckey[vkey & 15][vkey >> 4] = 0;
-            key_update();
-            kp_state = KP_NEXT;
     }
 }
 
