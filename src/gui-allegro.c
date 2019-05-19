@@ -1172,6 +1172,7 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             break;
         case IDM_KEY_LOGICAL:
             keylogical = !keylogical;
+            key_reset();
             break;
         case IDM_MOUSE_AMX:
             mouse_amx = !mouse_amx;

@@ -324,7 +324,7 @@ static uint8_t allegro2bbclogical[ALLEGRO_KEY_MAX] =
     0xaa,   // 72   ALLEGRO_KEY_COMMA
     0xaa,   // 73   ALLEGRO_KEY_FULLSTOP
     0xaa,   // 74   ALLEGRO_KEY_SLASH
-    0xaa,   // 75   ALLEGRO_KEY_SPACE
+    0x62,   // 75   ALLEGRO_KEY_SPACE
     0xbb,   // 76   ALLEGRO_KEY_INSERT
     0x59,   // 77   ALLEGRO_KEY_DELETE
     0xbb,   // 78   ALLEGRO_KEY_HOME
@@ -624,23 +624,46 @@ static int hostshift, hostctrl;
 typedef enum {
     KP_IDLE,
     KP_NEXT,
-    KP_CHAR,
+    KP_DOWN,
     KP_DELAY,
     KP_UP
 } kp_state_t;
 
-// Fake vkey codes used in logical keyboard mode; VKEY_SHIFT_EVENT is used to indicate
-// the SHIFT key being pushed down, and VKEY_SHIFT_EVENT|1 is used to indicate it being
-// released, and similarly for VKEY_CTRL_EVENT.
+// Extra vkey codes used in logical keyboard mode:
+// - VKEY_SHIFT_EVENT|1 indicates the SHIFT key being pushed down
+// - VKEY_SHIFT_EVENT indicates the SHIFT key being released
+// - VKEY_CTRL_EVENT is like VKEY_SHIFT_EVENT but for the CTRL key
+// - VKEY_DOWN is used before an ordinary keycode to indicate that key being
+//   pushed down
+// - VKEY_UP is used before an ordinary keycode to indicate that key being
+//   released
+#define VKEY_UP          (0xd0)
+#define VKEY_DOWN        (0xd1)
 #define VKEY_SHIFT_EVENT (0xe0)
 #define VKEY_CTRL_EVENT  (0xf0)
 
 static kp_state_t kp_state = KP_IDLE;
 static unsigned char *key_paste_str;
 static unsigned char *key_paste_ptr;
+static uint8_t key_paste_vkey_down;
 static bool key_paste_shift;
 static bool key_paste_ctrl;
-static uint8_t key_paste_vkey;
+
+void key_reset()
+{
+    int c, r;
+    for (c = 0; c < 16; c++)
+        for (r = 0; r < 16; r++)
+            bbckey[c][r] = 0;
+    sysvia_set_ca2(0);
+
+    kp_state = KP_IDLE;
+    key_paste_str = 0;
+    key_paste_ptr = 0;
+    key_paste_vkey_down = 0;
+    key_paste_shift = false;
+    key_paste_ctrl = false;
+}
 
 static void key_update()
 {
@@ -695,8 +718,6 @@ static void key_paste_add_vkey(uint8_t vkey)
         len = 0;
         pos = 0;
         kp_state = KP_NEXT;
-        key_paste_shift = bbckey[0][0];
-        key_paste_ctrl = bbckey[1][0];
     }
 
     unsigned char *new_str = al_realloc(key_paste_str, len+2);
@@ -710,6 +731,30 @@ static void key_paste_add_vkey(uint8_t vkey)
         log_warn("keyboard: out of memory adding key to paste, key discarded");
 }
 
+static void key_paste_add_vkey_up(uint8_t vkey)
+{
+    assert((vkey != 0x00) && (vkey != 0x01)); // not SHIFT or CTRL
+    assert(vkey == key_paste_vkey_down);
+    key_paste_add_vkey(VKEY_UP);
+    key_paste_add_vkey(vkey);
+    key_paste_vkey_down = 0;
+}
+
+static void key_paste_add_vkey_down(uint8_t vkey)
+{
+    assert((vkey != 0x00) && (vkey != 0x01)); // not SHIFT or CTRL
+    assert(key_paste_vkey_down == 0);
+    key_paste_add_vkey(VKEY_DOWN);
+    key_paste_add_vkey(vkey);
+    key_paste_vkey_down = vkey;
+}
+
+static bool key_is_down_logical(uint8_t vkey)
+{
+    assert(vkey != 0);
+    return (key_paste_vkey_down != 0) && (key_paste_vkey_down == vkey);
+}
+
 static void key_paste_add_combo(uint8_t vkey, bool shift, bool ctrl)
 {
     log_debug("keyboard: key_paste_add_combo vkey=&%02x, shift=%d, ctrl=%d", vkey, shift, ctrl);
@@ -719,41 +764,126 @@ static void key_paste_add_combo(uint8_t vkey, bool shift, bool ctrl)
     shift = !!shift;
     ctrl = !!ctrl;
 
-    if (key_paste_shift != shift) {
+    if (shift != key_paste_shift) {
         key_paste_add_vkey(VKEY_SHIFT_EVENT | shift);
         key_paste_shift = shift;
     }
-    if (key_paste_ctrl != ctrl) {
+
+    if (ctrl != key_paste_ctrl) {
         key_paste_add_vkey(VKEY_CTRL_EVENT | ctrl);
         key_paste_ctrl = ctrl;
     }
+
     if (vkey != 0xaa)
-        key_paste_add_vkey(vkey);
+        key_paste_add_vkey_down(vkey);
 }
 
+// Called on (derived) host key down and host key up events in logical keyboard
+// mode; unichar is only meaningful on key down events (state==1).
+static void set_key_logical(int keycode, int unichar, int state)
+{
+    static uint8_t keycode_to_vkey_map[ALLEGRO_KEY_MAX];
+
+    log_debug("keyboard: set_key_logical keycode=%d, unichar=%d, state=%d", keycode, unichar, state);
+
+    uint8_t vkey = allegro2bbclogical[keycode];
+    if (vkey == 0xbb) // ignore the key
+        return;
+
+    if (state) { // host key pressed
+        bool shift = hostshift;
+        bool ctrl = hostctrl;
+
+        if (vkey == 0xaa) { // type the ASCII character corresponding to the key
+            if (unichar == 96) // unicode backtick
+                return;
+            if (unichar == 163) // unicode pound currency symbol
+                unichar = 96; // Acorn pound currency symbol
+            uint16_t bbc_keys = ascii2bbc[unichar];
+            vkey = bbc_keys & 0xff;
+            shift = bbc_keys & A2B_SHIFT;
+            ctrl = bbc_keys & A2B_CTRL;
+            keycode_to_vkey_map[keycode] = vkey;
+        }
+
+        // If a key other than 'vkey' is pressed already, release it. This
+        // avoids having more keys pressed down than the OS can make sense of
+        // and is harmless because the key we're about to press will/should
+        // "take over" as the currently active key anyway. If 'vkey' is already
+        // pressed we leave it alone, so we don't interfere with any ongoing OS
+        // auto-repeat. (This shows up if you hold down 'A' and intermittently
+        // press and release SHIFT, for example.)
+        if (key_is_down_logical(vkey))
+            vkey = 0xaa;
+        else if (key_paste_vkey_down != 0)
+            key_paste_add_vkey_up(key_paste_vkey_down);
+
+        // Now press 'vkey' (if it's not the no-op value 0xaa). We also set the
+        // SHIFT and CTRL keys to the relevant state; we do this after releasing
+        // any existing key above (so we don't accidentally cause the OS to
+        // interpret the existing key with the new SHIFT/CTRL state) and before
+        // pressing the new key.
+        key_paste_add_combo(vkey, shift, ctrl); 
+    }
+    else { // host key released
+        if (vkey == 0xaa) {
+            // We translated the ASCII character into an emulated keypress when
+            // the host key was pressed; we need to release the same key now.
+            vkey = keycode_to_vkey_map[keycode];
+            assert(vkey != 0);
+            keycode_to_vkey_map[keycode] = 0;
+        }
+
+        if (key_is_down_logical(vkey))
+            key_paste_add_vkey_up(vkey);
+
+        // We don't need to do anything to the emulated machine's SHIFT/CTRL
+        // state now; no emulated keys (except maybe SHIFT/CTRL themselves) are
+        // down so they have no effect at the moment.
+        // set_logical_shift_ctrl_if_idle() will be called to update them
+        // later.
+    }
+}
+
+// Handle KEY_CHAR events in logical keyboard mode and turn them into "key down"
+// events sent to set_key_logical().
 void key_char(ALLEGRO_EVENT *event)
 {
+    static int last_unichar[ALLEGRO_KEY_MAX];
     if (keylogical) {
-        log_debug("keyboard: key_char keycode=%d, unichar=%d", event->keyboard.keycode, event->keyboard.unichar);
-        uint8_t vkey = allegro2bbclogical[event->keyboard.keycode];
-        if (vkey == 0xaa) {
-            int c = event->keyboard.unichar;
-            switch (c)
-            {
-                case 96:  // unicode backtick
-                    break;
-                case 163: // unicode pound currency symbol
-                    c = 96;
-                default:
-                    if (c <= 127) {
-                        uint16_t bbckey = ascii2bbc[c];
-                        key_paste_add_combo(bbckey & 0xff, bbckey & A2B_SHIFT, bbckey & A2B_CTRL);
-                    }
-            }
+        if (event->keyboard.keycode == ALLEGRO_KEY_F12)
+            return;
+
+        // KEY_CHAR events indicate if the event is for an auto-repeating key, and
+        // we ignore such events because we're passing key up/down events through
+        // to the emulated machine and its OS is handling auto-repeat. However, if
+        // a key is held down on the host but SHIFT is pressed then released, when
+        // the KEY_CHAR event comes through on SHIFT being released the unichar has
+        // changed but the repeat flag is still set. We want to consider such an
+        // event for changing the emulated machine's keyboard state, so we need to
+        // detect this happening and process such an event even if the repeat flag
+        // is set. (To see this happening, on a keyboard with ":" on SHIFT+";",
+        // hold down ";" and then intermittently press the SHIFT key.)
+        if (!event->keyboard.repeat ||
+            (event->keyboard.unichar != last_unichar[event->keyboard.keycode])) {
+            last_unichar[event->keyboard.keycode] = event->keyboard.unichar;
+            set_key_logical(event->keyboard.keycode, event->keyboard.unichar, 1);
         }
-        else if (vkey != 0xbb)
-            key_paste_add_combo(vkey, hostshift, hostctrl);
     }
+}
+
+// Set the emulated machine's SHIFT/CTRL state to match the host's state,
+// provided the host has no keys held down (if it does, KEY_CHAR events will
+// cause any necessary SHIFT/CTRL state to be passed through to the emulated
+// machine at the appropriate point) and there are no keyboard events waiting
+// to be passed through to the emulated machine (if there are, the current
+// state of the host's keyboard is irrelevant; this function will be called
+// again to pick up the then-current state when the pending keyboard events
+// have all been processed).
+static void set_logical_shift_ctrl_if_idle()
+{
+    if ((kp_state == KP_IDLE) && (key_paste_vkey_down == 0))
+        key_paste_add_combo(0xaa, hostshift, hostctrl);
 }
 
 static void set_key(int code, int state)
@@ -773,7 +903,7 @@ static void set_key(int code, int state)
         shiftctrl = true;
     }
 
-    if (!keylogical || (code == ALLEGRO_KEY_CAPSLOCK)) {
+    if (!keylogical || (code == ALLEGRO_KEY_CAPSLOCK) || (code == ALLEGRO_KEY_F12)) {
         vkey = allegro2bbc[code];
         log_debug("keyboard: code=%d, vkey=&%02X", code, vkey);
         if (vkey != 0xaa) {
@@ -783,7 +913,9 @@ static void set_key(int code, int state)
     }
     else {
         if (shiftctrl)
-            key_paste_add_combo(0xaa, hostshift, hostctrl);
+            set_logical_shift_ctrl_if_idle();
+        else if (state == 0)
+            set_key_logical(code, 0, state);
     }
 }
 
@@ -800,16 +932,16 @@ void key_up(int code)
 void key_paste_poll(void)
 {
     uint8_t vkey;
-    //log_debug("key_paste_poll: kp_state=%d", kp_state);
+    //log_debug("keyboard: key_paste_poll kp_state=%d", kp_state);
 
     switch(kp_state) {
         case KP_IDLE:
             break;
+
         case KP_NEXT:
             if ((vkey = *key_paste_ptr++)) {
                 int col = 1;
-                log_debug("keyboard: clip_paste_poll vkey=&%02x", vkey);
-                key_paste_vkey = vkey;
+                log_debug("keyboard: key_paste_poll next vkey=&%02x", vkey);
                 switch (vkey) {
                     case VKEY_SHIFT_EVENT:
                     case VKEY_SHIFT_EVENT|1:
@@ -821,16 +953,19 @@ void key_paste_poll(void)
                         kp_state = KP_NEXT;
                         break;
 
+                    case VKEY_DOWN:
+                        kp_state = KP_DOWN;
+                        break;
+
+                    case VKEY_UP:
+                        kp_state = KP_UP;
+                        break;
+
                     default:
-                        kp_state = KP_CHAR;
                         break;
                 }
             }
             else {
-                if (key_paste_vkey < VKEY_SHIFT_EVENT) {
-                    bbckey[key_paste_vkey & 0x0f][(key_paste_vkey & 0xf0) >> 4] = 0;
-                    key_update();
-                }
                 al_free(key_paste_str);
                 key_paste_str = key_paste_ptr = NULL;
                 kp_state = KP_IDLE;
@@ -839,19 +974,26 @@ void key_paste_poll(void)
                 // state agree with the host's state. This doesn't cause an
                 // infinite loop because this is a no-op if the state already
                 // matches.
-                key_paste_add_combo(0xaa, hostshift, hostctrl);
+                set_logical_shift_ctrl_if_idle();
             }
             break;
-        case KP_CHAR:
-            bbckey[key_paste_vkey & 0x0f][(key_paste_vkey & 0xf0) >> 4] = 1;
+
+        case KP_DOWN:
+            vkey = *key_paste_ptr++;
+            log_debug("keyboard: key_paste_poll down vkey=&%02x", vkey);
+            bbckey[vkey & 15][vkey >> 4] = 1;
             key_update();
             kp_state = KP_DELAY;
             break;
+
         case KP_DELAY:
-            kp_state = KP_UP;
+            kp_state = KP_NEXT;
             break;
+
         case KP_UP:
-            bbckey[key_paste_vkey & 0x0f][(key_paste_vkey & 0xf0) >> 4] = 0;
+            vkey = *key_paste_ptr++;
+            log_debug("keyboard: key_paste_poll up vkey=&%02x", vkey);
+            bbckey[vkey & 15][vkey >> 4] = 0;
             key_update();
             kp_state = KP_NEXT;
     }
@@ -872,18 +1014,26 @@ bool key_is_down(void) {
 
 bool key_any_down(void)
 {
-    for (int c = 0; c < 16; c++)
-        for (int r = 1; r < 16; r++)
-            if (bbckey[c][r])
-                return true;
-    return false;
+    if (!keylogical) {
+        for (int c = 0; c < 16; c++)
+            for (int r = 1; r < 16; r++)
+                if (bbckey[c][r])
+                    return true;
+        return false;
+    }
+    else
+        return key_paste_vkey_down != 0;
 }
 
 bool key_code_down(int code)
 {
     if (code < ALLEGRO_KEY_MAX) {
         code = allegro2bbc[code];
-        return bbckey[code & 0x0f][code >> 4];
+        assert((code != 0x00) && (code != 0x01)); // not SHIFT or CTRL
+        if (!keylogical)
+            return bbckey[code & 0x0f][code >> 4];
+        else
+            return (key_paste_vkey_down != 0) && (key_paste_vkey_down == code);
     }
     return false;
 }

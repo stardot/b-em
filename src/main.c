@@ -340,7 +340,7 @@ static void main_start_fullspeed(void)
 
 static void main_key_char(ALLEGRO_EVENT *event)
 {
-    log_debug("main: key char, code=%d, unichar=%d", event->keyboard.keycode, event->keyboard.unichar);
+    log_debug("main: key char, code=%d, unichar=%d, repeat=%d", event->keyboard.keycode, event->keyboard.unichar, event->keyboard.repeat);
     key_char(event);
 }
 
