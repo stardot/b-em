@@ -42,6 +42,7 @@ typedef struct {
 } menu_map_t;
 
 static ALLEGRO_MENU *disc_menu;
+static ALLEGRO_MENU *rom_menu;
 
 static inline int menu_id_num(menu_id_t id, int num)
 {
@@ -225,12 +226,14 @@ static ALLEGRO_MENU *create_rom_menu(void)
     menu =  al_create_menu();
     for (slot = ROM_NSLOT-1; slot >= 0; slot--) {
         gen_rom_label(slot, label);
+        log_debug("gui-allegro: create_rom_menu, slot %d label %s", slot, label);
         sub = al_create_menu();
         al_append_menu_item(sub, "Load...", menu_id_num(IDM_ROMS_LOAD, slot), 0, NULL, NULL);
         al_append_menu_item(sub, "Clear", menu_id_num(IDM_ROMS_CLEAR, slot), 0, NULL, NULL);
         add_checkbox_item(sub, "RAM", menu_id_num(IDM_ROMS_RAM, slot), rom_slots[slot].swram);
-        al_append_menu_item(menu, label, 0, 0, NULL, sub);
+        al_append_menu_item(menu, label, slot+1, 0, NULL, sub);
     }
+    rom_menu = menu;
     return menu;
 }
 
@@ -802,7 +805,6 @@ static void rom_load(ALLEGRO_EVENT *event)
     char tempname[PATH_MAX], label[ROM_LABEL_LEN];
     ALLEGRO_FILECHOOSER *chooser;
     ALLEGRO_DISPLAY *display;
-    ALLEGRO_MENU *menu;
 
     slot = menu_get_num(event);
     slotp = rom_slots + slot;
@@ -820,8 +822,7 @@ static void rom_load(ALLEGRO_EVENT *event)
                     mem_loadrom(slot, al_get_path_filename(path), al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP), 0);
                     al_destroy_path(path);
                     gen_rom_label(slot, label);
-                    menu = (ALLEGRO_MENU *)(event->user.data3);
-                    al_set_menu_item_caption(menu, slot-ROM_NSLOT+1, label);
+                    al_set_menu_item_caption(rom_menu, slot-ROM_NSLOT+1, label);
                 }
             }
         }
@@ -830,24 +831,22 @@ static void rom_load(ALLEGRO_EVENT *event)
 
 static void rom_clear(ALLEGRO_EVENT *event)
 {
-    ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
     int slot = menu_get_num(event);
     char label[ROM_LABEL_LEN];
 
     mem_clearrom(slot);
     gen_rom_label(slot, label);
-    al_set_menu_item_caption(menu, slot-ROM_NSLOT+1, label);
+    al_set_menu_item_caption(rom_menu, slot-ROM_NSLOT+1, label);
 }
 
 static void rom_ram_toggle(ALLEGRO_EVENT *event)
 {
-    ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
     int slot = menu_get_num(event);
     char label[ROM_LABEL_LEN];
 
     rom_slots[slot].swram = !rom_slots[slot].swram;
     gen_rom_label(slot, label);
-    al_set_menu_item_caption(menu, slot-ROM_NSLOT+1, label);
+    al_set_menu_item_caption(rom_menu, slot-ROM_NSLOT+1, label);
 }
 
 static void change_model(ALLEGRO_EVENT *event)
