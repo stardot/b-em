@@ -4,21 +4,24 @@
 #include <allegro5/allegro_font.h>
 #include <allegro5/allegro_primitives.h>
 
+int led_ticks = 0;
+
 static ALLEGRO_FONT *font;
 
 typedef struct {
     led_name_t led_name;
     const char *label;
     int index;
+    int turn_off_at;
 } led_details_t;
 
-static const led_details_t led_details[] = {
-    {LED_CASSETTE_MOTOR, "cassette\nmotor", 0},
-    {LED_CAPS_LOCK, "caps\nlock", 1},
-    {LED_SHIFT_LOCK, "shift\nlock", 2},
-    {LED_DRIVE_0, "Drive 0", 3},
-    {LED_DRIVE_1, "Drive 1", 4},
-    {LED_VDFS, "VDFS", 5}
+static led_details_t led_details[] = {
+    {LED_CASSETTE_MOTOR, "cassette\nmotor", 0, 0},
+    {LED_CAPS_LOCK, "caps\nlock", 1, 0},
+    {LED_SHIFT_LOCK, "shift\nlock", 2, 0},
+    {LED_DRIVE_0, "Drive 0", 3, 0},
+    {LED_DRIVE_1, "Drive 1", 4, 0},
+    {LED_VDFS, "VDFS", 5, 0}
 };
 
 static void draw_led(const led_details_t *led_details, bool b)
@@ -75,14 +78,41 @@ void led_init()
     // SFTODO;
 }
 
-void led_update(led_name_t led_name, bool b)
+extern int framesrun; // SFTODO BIT OF A HACK
+void led_update(led_name_t led_name, bool b, int ticks)
 {
     // SFTODO: INEFFICIENT!
     for (int i = 0; i < sizeof(led_details)/sizeof(led_details[0]); i++) {
         if (led_details[i].led_name == led_name) {
             draw_led(&led_details[i], b);
-            break;
+            if (!b || (ticks == 0))
+                led_details[i].turn_off_at = 0;
+            else {
+                led_details[i].turn_off_at = framesrun + ticks;
+                if ((led_ticks == 0) || (ticks < led_ticks))
+                    led_ticks = ticks;
+            }
+            return;
         }
     }
 }
 
+void led_timer_fired(void)
+{
+    printf("SFTODOX0!\n");
+    for (int i = 0; i < sizeof(led_details)/sizeof(led_details[0]); i++) {
+        if (led_details[i].turn_off_at != 0) {
+            if (framesrun >= led_details[i].turn_off_at) {
+                printf("SFTODOX1!\n");
+                draw_led(&led_details[i], false);
+                led_details[i].turn_off_at = 0;
+            }
+            else {
+                int ticks = led_details[i].turn_off_at - framesrun;
+                assert(ticks > 0); // SFTODO TEMP
+                if ((led_ticks == 0) || (ticks < led_ticks))
+                    led_ticks = ticks;
+            }
+        }
+    }
+}

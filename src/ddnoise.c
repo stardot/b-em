@@ -149,12 +149,15 @@ void ddnoise_spinup(void)
     ALLEGRO_SAMPLE *smp;
 
     log_debug("ddnoise: spinup");
+    int led_duration = LED_DRIVE_TICKS;
     if (sound_ddnoise && (smp = motorsmp[0])) {
         al_play_sample(smp, map_ddnoise_vol(), 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
         ddnoise_ticks = (50 * al_get_sample_length(smp)) / al_get_sample_frequency(smp);
+        led_duration = ddnoise_ticks;
         log_debug("ddnoise: head load sample to finish in %d ticks", ddnoise_ticks);
     }
-    led_update((curdrive == 0) ? LED_DRIVE_0 : LED_DRIVE_1, true);
+    // SFTODO led_update((curdrive == 0) ? LED_DRIVE_0 : LED_DRIVE_1, true, LED_DRIVE_TICKS);
+    led_update((curdrive == 0) ? LED_DRIVE_0 : LED_DRIVE_1, true, LED_DRIVE_TICKS);
 }
 
 void ddnoise_headdown(void)
@@ -179,5 +182,5 @@ void ddnoise_spindown(void)
         if ((smp = motorsmp[2]))
             al_play_sample(smp, map_ddnoise_vol(), 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
     }
-    led_update((curdrive == 0) ? LED_DRIVE_0 : LED_DRIVE_1, false);
+    // SFTODO led_update((curdrive == 0) ? LED_DRIVE_0 : LED_DRIVE_1, false, 0);
 }
