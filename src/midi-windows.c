@@ -37,7 +37,7 @@ void CALLBACK MidiInProc(HMIDIIN hMidiIn, UINT wMsg, DWORD dwInstance, DWORD dwP
 static void MidiOpenInInternal(UINT nMidiDevice) {
     MMRESULT rv;
 
-    if ((rv = midiInOpen(&hMusic4000MidiIn, nMidiDevice, (DWORD)(void*)MidiInProc, 0, CALLBACK_FUNCTION)) == MMSYSERR_NOERROR) {
+    if ((rv = midiInOpen(&hMusic4000MidiIn, nMidiDevice, (DWORD_PTR)(void*)MidiInProc, 0, CALLBACK_FUNCTION)) == MMSYSERR_NOERROR) {
         log_info("midi-windows: starting MIDI in device #%d, %s", nMidiDevice, szMusic4000InDevName);
         midiInStart(hMusic4000MidiIn);
     }
@@ -126,7 +126,7 @@ static void MidiOpenM2000Devs(void) {
         }
     } else
         log_warn("midi-windows: no MIDI output devices available for M2000");
-}    
+}
 
 void midi_init(void) {
     MidiOpenM400Dev();
@@ -173,7 +173,7 @@ void midi_send_msg(midi_dev_t *dev, uint8_t *msg, size_t size) {
     DWORD value = msg[0] | (msg[1] << 8) | (msg[2] << 16);
     MMRESULT res;
 
-    log_debug("midi-windows: midi_send_msg(%s, %.*s, %d)", dev->szDesc, size, msg, size);
+    log_debug("midi-windows: midi_send_msg(%s, %.*s, %d)", dev->szDesc, (int)size, msg, (int)size);
     if ((res = midiOutShortMsg(dev->hMidiOut, value)) != MMSYSERR_NOERROR)
         log_error("midi-windows: unable to send MIDI event on %s: %d", dev->szName, res);
 }
