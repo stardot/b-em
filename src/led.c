@@ -24,6 +24,7 @@ void led_init()
 
 static void draw_led(int i, bool b)
 {
+    const ALLEGRO_COLOR label_colour = al_map_rgb(128, 128, 128);
     const int box_width = 64;
     const int box_height = 32;
     const int led_width = 16;
@@ -45,7 +46,7 @@ static void draw_led(int i, bool b)
         const int text_height = al_get_font_ascent(font);
         const int text_y1 = y1 + led_region_height + (text_region_height - text_height) / 2;
         //al_draw_text(font, al_map_rgb(255, 255, 255), x1 + box_width / 2, y1 + led_region_height + text_region_height / 2, ALLEGRO_ALIGN_CENTRE, label);
-        al_draw_text(font, al_map_rgb(255, 255, 255), x1 + box_width / 2, text_y1, ALLEGRO_ALIGN_CENTRE, label);
+        al_draw_text(font, label_colour, x1 + box_width / 2, text_y1, ALLEGRO_ALIGN_CENTRE, label);
     }
     else {
         char *label1 = malloc(label_newline - label + 1);
@@ -55,8 +56,8 @@ static void draw_led(int i, bool b)
         const int text_height = al_get_font_line_height(font);
         const int line_space = 2;
         const int text_y1 = y1 + led_region_height + (text_region_height - 2 * text_height - line_space) / 2;
-        al_draw_text(font, al_map_rgb(255, 255, 255), x1 + box_width / 2, text_y1, ALLEGRO_ALIGN_CENTRE, label1);
-        al_draw_text(font, al_map_rgb(255, 255, 255), x1 + box_width / 2, text_y1 + text_height + line_space, ALLEGRO_ALIGN_CENTRE, label2);
+        al_draw_text(font, label_colour, x1 + box_width / 2, text_y1, ALLEGRO_ALIGN_CENTRE, label1);
+        al_draw_text(font, label_colour, x1 + box_width / 2, text_y1 + text_height + line_space, ALLEGRO_ALIGN_CENTRE, label2);
     }
     //al_draw_line(1.0, 5.0, 160.0, 2.0, color_red, 1.0);
 }
