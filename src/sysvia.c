@@ -6,6 +6,7 @@
 #include "cmos.h"
 #include "compactcmos.h"
 #include "keyboard.h"
+#include "led.h"
 #include "via.h"
 #include "sysvia.h"
 #include "sn76489.h"
@@ -102,6 +103,8 @@ static void sysvia_write_IC32(uint8_t val)
         {
                 if (!(IC32 & 0x40)) temp |= KB_CAPSLOCK_FLAG;
                 if (!(IC32 & 0x80)) temp |= KB_SCROLOCK_FLAG;
+                led_update(LED_CAPS_LOCK, temp & KB_CAPSLOCK_FLAG, 0);
+                led_update(LED_SHIFT_LOCK, temp & KB_SCROLOCK_FLAG, 0);
         }
         if (MASTER && !compactcmos) cmos_update(IC32, sdbval);
 }
