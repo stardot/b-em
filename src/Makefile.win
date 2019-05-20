@@ -2,14 +2,14 @@ VPATH = . resid-fp NS32016 darm
 
 CPP  = i686-w64-mingw32-g++
 CC   = i686-w64-mingw32-gcc
-WINDRES = windres.exe
+WINDRES = i686-w64-mingw32-windres
 
 # The following flags are used by PiTubeDirect Co Pros:
 #                BEM - fixes for compilation in B-Em envorinment
 #   INCLUDE_DEBUGGER - include the cpu_debug implementation
 # USE_MEMORY_POINTER - do not assume Co Pro memory starts at address 0
 
-COMMON_FLAGS = -O3 -Wall -I ../../allegro5/include -DBEM -DVERSION=\"Win32\" -DINCLUDE_DEBUGGER -DUSE_MEMORY_POINTER
+COMMON_FLAGS = -O3 -Wall -DBEM -DVERSION=\"$(VERSION)\" -DINCLUDE_DEBUGGER -DUSE_MEMORY_POINTER -I /usr/i686-w64-mingw32/include
 CFLAGS       = -std=gnu99 $(COMMON_FLAGS)
 CXXFLAGS     = $(COMMON_FLAGS)
 
@@ -97,6 +97,7 @@ NS32KOBJ = \
 
 SIDOBJ = \
     convolve.o \
+    convolve-sse.o \
     envelope.o \
     extfilt.o \
     filter.o \
@@ -113,7 +114,7 @@ SIDOBJ = \
     wave8580_PST.o \
     wave.o
 
-LIBS = -L ../../allegro5/lib -lz -lallegro_audio -lallegro_acodec -lallegro_primitives -lallegro_dialog -lallegro_image -lallegro_font -lallegro -mwindows -lgdi32 -lwinmm -lstdc++
+LIBS = -lz -lallegro_audio -lallegro_acodec -lallegro_primitives -lallegro_dialog -lallegro_image -lallegro_font -lallegro -mwindows -lgdi32 -lwinmm -lstdc++
 
 all : b-em.exe hdfmt.exe jstest.exe gtest.exe
 
@@ -130,7 +131,7 @@ clean :
 	$(CPP) $(CXXFLAGS) -c $<
 
 b-em.res: b-em.rc
-	$(WINDRES) -i b-em.rc --input-format=rc -o b-em.res -O coff
+	$(WINDRES) -i $< --input-format=rc -o b-em.res -O coff
 
 hdfmt.exe: hdfmt.c
 	$(CC) $(CFLAGS) -o hdfmt.exe hdfmt.c
