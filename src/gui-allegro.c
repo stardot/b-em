@@ -226,7 +226,6 @@ static ALLEGRO_MENU *create_rom_menu(void)
     menu =  al_create_menu();
     for (slot = ROM_NSLOT-1; slot >= 0; slot--) {
         gen_rom_label(slot, label);
-        log_debug("gui-allegro: create_rom_menu, slot %d label %s", slot, label);
         sub = al_create_menu();
         al_append_menu_item(sub, "Load...", menu_id_num(IDM_ROMS_LOAD, slot), 0, NULL, NULL);
         al_append_menu_item(sub, "Clear", menu_id_num(IDM_ROMS_CLEAR, slot), 0, NULL, NULL);
@@ -235,6 +234,18 @@ static ALLEGRO_MENU *create_rom_menu(void)
     }
     rom_menu = menu;
     return menu;
+}
+
+static void update_rom_menu(void)
+{
+    ALLEGRO_MENU *menu = rom_menu;
+    int slot;
+    char label[ROM_LABEL_LEN];
+
+    for (slot = ROM_NSLOT-1; slot >= 0; slot--) {
+        gen_rom_label(slot, label);
+        al_set_menu_item_caption(menu, slot-ROM_NSLOT+1, label);
+    }
 }
 
 static ALLEGRO_MENU *create_model_menu(void)
@@ -856,6 +867,7 @@ static void change_model(ALLEGRO_EVENT *event)
     oldmodel = curmodel;
     curmodel = menu_get_num(event);
     main_restart();
+    update_rom_menu();
 }
 
 static void change_tube(ALLEGRO_EVENT *event)
