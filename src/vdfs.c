@@ -28,6 +28,7 @@
 #include "6502.h"
 #include "disc.h"
 #include "keyboard.h"
+#include "led.h"
 #include "main.h"
 #include "mem.h"
 #include "model.h"
@@ -209,6 +210,11 @@ static uint8_t  reg_a;
 static uint8_t  fs_flags = 0xff;
 static uint8_t  fs_num   = 0x11;
 static uint16_t cmd_tail;
+
+static void show_activity()
+{
+    led_update(LED_VDFS, true, 10);
+}
 
 static uint16_t readmem16(uint16_t addr)
 {
@@ -875,6 +881,7 @@ static void write_back(vdfs_ent_t *ent)
 {
     FILE *fp;
 
+    show_activity();
     *ent->host_inf = '.'; // select .inf file.
     if ((fp = fopen(ent->host_path, "wt"))) {
         fprintf(fp, "%s %08X %08X %08X\n", ent->acorn_fn, ent->load_addr, ent->exec_addr, ent->length);
@@ -1567,6 +1574,7 @@ static void delete_inf(vdfs_ent_t *ent)
 
 static void delete_file(vdfs_ent_t *ent)
 {
+    show_activity();
     if (ent->attribs & ATTR_IS_DIR) {
         if (ent == cur_dir)
             adfs_error(err_delcsd);
@@ -1755,6 +1763,7 @@ static void osbget(void)
     FILE *fp;
 
     log_debug("vdfs: osbget(A=%02X, X=%02X, Y=%02X)", a, x, y);
+    show_activity();
     if ((fp = getfp_read(y))) {
         if ((ch = getc(fp)) != EOF) {
             a = ch;
@@ -1800,6 +1809,7 @@ static void osbput(void)
 
     log_debug("vdfs: osbput(A=%02X, X=%02X, Y=%02X)", a, x, y);
 
+    show_activity();
     if ((fp = getfp_write(y)))
         putc(a, fp);
 }
@@ -1875,6 +1885,7 @@ static void osfind(void)
         if (mode && ent) {
             log_debug("vdfs: osfind open host file %s in mode %s", ent->host_path, mode);
             if ((fp = fopen(ent->host_path, mode))) {
+                show_activity();
                 mark_extant(ent);
                 ent->attribs |= attribs; // file now exists.
                 vdfs_chan[channel].fp = fp;
@@ -1893,6 +1904,7 @@ static void osgbpb_write(uint32_t pb)
     uint32_t mem_ptr, n;
 
     if ((fp = getfp_write(readmem(pb)))) {
+        show_activity();
         if (a == 0x01)
             fseek(fp, readmem32(pb+9), SEEK_SET);
         mem_ptr = readmem32(pb+1);
@@ -1918,6 +1930,7 @@ static int osgbpb_read(uint32_t pb)
     int status = 0, ch;
 
     if ((fp = getfp_read(readmem(pb)))) {
+        show_activity();
         if (a == 0x03)
             fseek(fp, readmem32(pb+9), SEEK_SET);
         mem_ptr = readmem32(pb+1);
@@ -2206,6 +2219,7 @@ static void run_file(const char *err)
             if (ent->attribs & ATTR_IS_DIR)
                 adfs_error(err_wont);
             else if ((fp = fopen(ent->host_path, "rb"))) {
+                show_activity();
                 addr = ent->load_addr;
                 if (addr > 0xffff0000 || curtube == -1) {
                     log_debug("vdfs: run_file: writing to I/O proc memory at %08X", addr);

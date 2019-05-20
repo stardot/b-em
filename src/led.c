@@ -76,7 +76,6 @@ void led_init()
     // SFTODO THE FOLLOWING LOOP SEEMS TO HAVE NO EFFECT! - I THINK THE MAIN
     // CODE IS NOT DRAWING THE BITMAP UNTIL THE CURSOR MOVES OVER IT, THIS LOOP
     // ITSELF IS PROBABLY FINE
-    printf("SFTODO %p\n", led_bitmap);
     for (int i = 0; i < sizeof(led_details)/sizeof(led_details[0]); i++)
         draw_led(&led_details[i], false);
     // SFTODO;
