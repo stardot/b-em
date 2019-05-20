@@ -446,7 +446,6 @@ static void main_timer(ALLEGRO_EVENT *event)
         if (ddnoise_ticks > 0 && --ddnoise_ticks == 0)
             ddnoise_headdown();
 
-        printf("SFTODOQ0 %d\n", led_ticks);
         if (led_ticks > 0 && --led_ticks == 0)
             led_timer_fired();
 

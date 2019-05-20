@@ -14,7 +14,7 @@ typedef enum
     LED_MAX
 } led_name_t;
 
-#define LED_DRIVE_TICKS (50) // SFTODO!??!?
+#define LED_DRIVE_TICKS (10) // SFTODO!??!?
 
 void led_init(void);
 void led_update(led_name_t led_name, bool b, int ticks);

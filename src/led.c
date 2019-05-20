@@ -99,11 +99,9 @@ void led_update(led_name_t led_name, bool b, int ticks)
 
 void led_timer_fired(void)
 {
-    printf("SFTODOX0!\n");
     for (int i = 0; i < sizeof(led_details)/sizeof(led_details[0]); i++) {
         if (led_details[i].turn_off_at != 0) {
             if (framesrun >= led_details[i].turn_off_at) {
-                printf("SFTODOX1!\n");
                 draw_led(&led_details[i], false);
                 led_details[i].turn_off_at = 0;
             }
