@@ -73,6 +73,10 @@ void led_init()
     assert(font); // SFTODO: ERROR/DISABLE LEDS?? IF FONT IS NULL - ASSERT IS TEMP HACK
     // SFTODO: MIGHT BE NICE TO HAVE SET OF LEDS VARY BY MACHINE, EG MASTER HAS
     // NO CASSETTE MOTOR LED
+    // SFTODO THE FOLLOWING LOOP SEEMS TO HAVE NO EFFECT! - I THINK THE MAIN
+    // CODE IS NOT DRAWING THE BITMAP UNTIL THE CURSOR MOVES OVER IT, THIS LOOP
+    // ITSELF IS PROBABLY FINE
+    printf("SFTODO %p\n", led_bitmap);
     for (int i = 0; i < sizeof(led_details)/sizeof(led_details[0]); i++)
         draw_led(&led_details[i], false);
     // SFTODO;
