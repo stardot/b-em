@@ -6,23 +6,22 @@
 
 static ALLEGRO_FONT *font;
 
-static const char *leds[] = {
-    "Drive 0",
-    "Drive 1",
-    "VDFS",
-    "cassette\nmotor",
+typedef struct {
+    led_name_t led_name;
+    const char *label;
+    int index;
+} led_details_t;
+
+static const led_details_t led_details[] = {
+    {LED_CASSETTE_MOTOR, "cassette\nmotor", 0},
+    {LED_CAPS_LOCK, "caps\nlock", 1},
+    {LED_SHIFT_LOCK, "shift\nlock", 2},
+    {LED_DRIVE_0, "Drive 0", 3},
+    {LED_DRIVE_1, "Drive 1", 4},
+    {LED_VDFS, "VDFS", 5}
 };
 
-void led_init()
-{
-    al_init_primitives_addon();
-    al_init_font_addon();
-    font = al_create_builtin_font();
-    assert(font); // SFTODO: ERROR/DISABLE LEDS?? IF FONT IS NULL - ASSERT IS TEMP HACK
-    // SFTODO;
-}
-
-static void draw_led(int i, bool b)
+static void draw_led(const led_details_t *led_details, bool b)
 {
     const ALLEGRO_COLOR label_colour = al_map_rgb(128, 128, 128);
     const int box_width = 64;
@@ -31,12 +30,13 @@ static void draw_led(int i, bool b)
     const int led_height = 4;
     const int led_region_height = 12;
     const int text_region_height = box_height - led_region_height;
+    const int i = led_details->index;
     const int x1 = i * box_width;
     const int y1 = 0;
     const int led_x1 = x1 + (box_width - led_width) / 2;
     const int led_y1 = y1 + (led_region_height - led_height) / 2;
-    const char *label = leds[i];
-    al_set_target_bitmap(led);
+    const char *label = led_details->label;
+    al_set_target_bitmap(led_bitmap);
     al_draw_filled_rectangle(x1, y1, x1 + box_width - 1, y1 + box_height - 1, al_map_rgb(64,64,64));
     ALLEGRO_COLOR color_red = al_map_rgb(b ? 255 : 0, 0, 0);
     al_draw_filled_rectangle(led_x1, led_y1, led_x1 + led_width, led_y1 + led_height, color_red);
@@ -62,13 +62,27 @@ static void draw_led(int i, bool b)
     //al_draw_line(1.0, 5.0, 160.0, 2.0, color_red, 1.0);
 }
 
-void led_update(bool b)
+void led_init()
 {
-    al_clear_to_color(al_map_rgb(0, 0, 0));
-    draw_led(0, b);
-    draw_led(1, b);
-    draw_led(2, b);
-    draw_led(3, b);
-    // SFTODO!
+    al_init_primitives_addon();
+    al_init_font_addon();
+    font = al_create_builtin_font();
+    assert(font); // SFTODO: ERROR/DISABLE LEDS?? IF FONT IS NULL - ASSERT IS TEMP HACK
+    // SFTODO: MIGHT BE NICE TO HAVE SET OF LEDS VARY BY MACHINE, EG MASTER HAS
+    // NO CASSETTE MOTOR LED
+    for (int i = 0; i < sizeof(led_details)/sizeof(led_details[0]); i++)
+        draw_led(&led_details[i], false);
+    // SFTODO;
+}
+
+void led_update(led_name_t led_name, bool b)
+{
+    // SFTODO: INEFFICIENT!
+    for (int i = 0; i < sizeof(led_details)/sizeof(led_details[0]); i++) {
+        if (led_details[i].led_name == led_name) {
+            draw_led(&led_details[i], b);
+            break;
+        }
+    }
 }
 
