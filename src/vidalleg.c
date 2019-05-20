@@ -281,6 +281,7 @@ void video_doblit(bool non_ttx, uint8_t vtotal)
                 upscale_only(b, firstx, firsty << 1, lastx - firstx, (lasty - firsty) << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
             else
                 upscale_only(b, firstx, firsty, lastx - firstx, lasty - firsty, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
+            upscale_only(led, 0, 0, 800, 32, 0, 0, 800, 32); // SFTODO!!!
             region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_READWRITE);
         }
 

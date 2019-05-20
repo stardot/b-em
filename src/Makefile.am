@@ -65,6 +65,7 @@ b_em_SOURCES = \
 	joystick.c \
 	keyboard.c \
 	keydef-allegro.c \
+    led.c \
 	linux.c \
 	logging.c \
 	main.c \

@@ -741,6 +741,7 @@ int desktop_width, desktop_height;
 
 static ALLEGRO_DISPLAY *display;
 ALLEGRO_BITMAP *b, *b16, *b32;
+ALLEGRO_BITMAP *led;
 
 ALLEGRO_LOCKED_REGION *region;
 
@@ -763,6 +764,7 @@ ALLEGRO_DISPLAY *video_init(void)
     al_set_new_bitmap_flags(ALLEGRO_VIDEO_BITMAP);
     b16 = al_create_bitmap(832, 614);
     b32 = al_create_bitmap(1536, 800);
+    led = al_create_bitmap(832, 32); // SFTODO!!!
 
     colblack = 0xff000000;
     colwhite = 0xffffffff;

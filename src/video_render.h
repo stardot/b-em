@@ -2,6 +2,7 @@
 #define __INC_VIDEO_RENDER_H
 
 extern ALLEGRO_BITMAP *b, *b16, *b32;
+extern ALLEGRO_BITMAP *led;
 extern ALLEGRO_LOCKED_REGION *region;
 
 #define BORDER_NONE_X_START_GRA 336
@@ -53,6 +54,7 @@ void video_clearscreen(void);
 void video_set_window_size(void);
 void video_update_window_size(ALLEGRO_EVENT *event);
 void video_set_borders(int borders);
+void video_set_led(bool b);
 
 void video_close(void);
 

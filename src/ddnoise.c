@@ -5,8 +5,10 @@
 #include "b-em.h"
 #include "disc.h"
 #include "ddnoise.h"
+#include "led.h"
 #include "sound.h"
 #include "tapenoise.h"
+#include "video_render.h"
 
 int ddnoise_vol=3;
 int ddnoise_type=0;
@@ -152,6 +154,7 @@ void ddnoise_spinup(void)
         ddnoise_ticks = (50 * al_get_sample_length(smp)) / al_get_sample_frequency(smp);
         log_debug("ddnoise: head load sample to finish in %d ticks", ddnoise_ticks);
     }
+    led_update(true);
 }
 
 void ddnoise_headdown(void)
@@ -176,4 +179,5 @@ void ddnoise_spindown(void)
         if ((smp = motorsmp[2]))
             al_play_sample(smp, map_ddnoise_vol(), 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
     }
+    led_update(false);
 }
