@@ -1663,6 +1663,7 @@ static void osfile_load(uint32_t pb, vdfs_ent_t *ent)
         if (ent->attribs & ATTR_IS_DIR)
             adfs_error(err_wont);
         else if ((fp = fopen(ent->host_path, "rb"))) {
+            show_activity();
             if (readmem(pb+0x06) == 0)
                 addr = readmem32(pb+0x02);
             else

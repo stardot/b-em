@@ -2,6 +2,7 @@
   Allegro video code*/
 #include <allegro5/allegro_primitives.h>
 #include "b-em.h"
+#include "led.h"
 #include "pal.h"
 #include "serial.h"
 #include "tape.h"

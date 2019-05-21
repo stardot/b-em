@@ -2,6 +2,7 @@
 #define __INC_LED_H
 
 extern int led_ticks;
+extern ALLEGRO_BITMAP *led_bitmap;
 
 typedef enum
 {
@@ -14,7 +15,7 @@ typedef enum
     LED_MAX
 } led_name_t;
 
-#define LED_DRIVE_TICKS (10) // SFTODO!??!?
+#define LED_DRIVE_TICKS (10) // SFTODO!??!? DELETE
 
 void led_init(void);
 void led_update(led_name_t led_name, bool b, int ticks);

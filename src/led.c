@@ -6,6 +6,8 @@
 
 int led_ticks = 0;
 
+ALLEGRO_BITMAP *led_bitmap;
+
 static ALLEGRO_FONT *font;
 
 typedef struct {
@@ -67,6 +69,7 @@ static void draw_led(const led_details_t *led_details, bool b)
 
 void led_init()
 {
+    led_bitmap = al_create_bitmap(832, 32); // SFTODO!!!
     al_init_primitives_addon();
     al_init_font_addon();
     font = al_create_builtin_font();

@@ -2,7 +2,6 @@
 #define __INC_VIDEO_RENDER_H
 
 extern ALLEGRO_BITMAP *b, *b16, *b32;
-extern ALLEGRO_BITMAP *led_bitmap;
 extern ALLEGRO_LOCKED_REGION *region;
 
 #define BORDER_NONE_X_START_GRA 336
