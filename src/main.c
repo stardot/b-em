@@ -230,7 +230,7 @@ void main_init(int argc, char *argv[])
     mode7_makechars();
     al_init_image_addon();
 
-    led_init();
+    // SFTODO led_init();
 
     mem_init();
 
@@ -274,11 +274,13 @@ void main_init(int argc, char *argv[])
     model_init();
 
     midi_init();
+    //led_init(); // SFTODO!?
     main_reset();
 
     joystick_init(queue);
 
     gui_allegro_init(queue, display);
+    //led_init(); // SFTODO!?
 
     time_limit = 2.0 / 50.0;
     if (!(timer = al_create_timer(1.0 / 50.0))) {
@@ -310,6 +312,7 @@ void main_init(int argc, char *argv[])
         writeprot[0] = writeprot[1] = 1;
 
     debug_start();
+    //led_init(); // SFTODO!?
 }
 
 void main_restart()
@@ -465,6 +468,7 @@ void main_run()
     log_debug("main: about to start timer");
     al_start_timer(timer);
 
+    //led_init(); // SFTODO!?
     log_debug("main: entering main loop");
     while (!quitting) {
         al_wait_for_event(queue, &event);
