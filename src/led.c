@@ -41,6 +41,9 @@ static void draw_led(const led_details_t *led_details, bool b)
     if (!led_bitmap)
         return; // SFTODO!?
     al_set_target_bitmap(led_bitmap);
+    // SFTODO: PERHAPS HAVE A MORE SUBDUED RED SO THE CAPS LOCK LED (WHICH IS ON
+    // MOST OF THE TIME) IS NOT SO IN-YOUR-FACE. I WANT THE LED DISPLAY TO BE
+    // RELATIVELY UNINTRUSIVE, NOT COMPETE WITH THE EMULATED SCREEN.
     ALLEGRO_COLOR color = al_map_rgb(b ? 255 : 0, 0, 0);
     al_draw_filled_rectangle(led_x1, led_y1, led_x1 + led_width, led_y1 + led_height, color);
 }
@@ -55,7 +58,12 @@ static void draw_led_full(const led_details_t *led_details, bool b)
     if (!led_bitmap)
         return; // SFTODO!?
     al_set_target_bitmap(led_bitmap);
+#if 1
+    // SFTODO: THIS BOX IS MAINLY TO SHOW THE AREA OF EACH LED FOR DEBUGGING; I
+    // WILL PROBABLY JUST HAVE A PLAIN BLACK BACKGROUND (SO NOTHING TO DRAW
+    // HERE) IN FINAL VSN
     al_draw_filled_rectangle(x1, y1, x1 + BOX_WIDTH - 1, y1 + BOX_HEIGHT - 1, al_map_rgb(64,64,64));
+#endif
     draw_led(led_details, b);
     const char *label_newline = strchr(label, '\n');
     if (!label_newline) {
@@ -79,7 +87,8 @@ static void draw_led_full(const led_details_t *led_details, bool b)
 
 void led_init()
 {
-    led_bitmap = al_create_bitmap(832, 32); // SFTODO!!!
+    const int led_count = sizeof(led_details) / sizeof(led_details[0]);
+    led_bitmap = al_create_bitmap(led_count * BOX_WIDTH, BOX_HEIGHT);
     al_set_target_bitmap(led_bitmap);
     al_clear_to_color(al_map_rgb(0, 0, 64)); // sFTODO!?
     al_init_primitives_addon();
@@ -91,7 +100,7 @@ void led_init()
     // SFTODO THE FOLLOWING LOOP SEEMS TO HAVE NO EFFECT! - I THINK THE MAIN
     // CODE IS NOT DRAWING THE BITMAP UNTIL THE CURSOR MOVES OVER IT, THIS LOOP
     // ITSELF IS PROBABLY FINE
-    for (int i = 0; i < sizeof(led_details)/sizeof(led_details[0]); i++)
+    for (int i = 0; i < led_count; i++)
         draw_led_full(&led_details[i], false);
     // SFTODO;
 }

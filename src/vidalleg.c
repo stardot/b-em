@@ -283,9 +283,6 @@ void video_doblit(bool non_ttx, uint8_t vtotal)
                 upscale_only(b, firstx, firsty << 1, lastx - firstx, (lasty - firsty) << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
             else
                 upscale_only(b, firstx, firsty, lastx - firstx, lasty - firsty, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
-            //led_init(); // SFTODO!?
-            if (led_bitmap) // SFTODO!?
-                upscale_only(led_bitmap, 0, 0, 800, 32, 0, 0, 800, 32); // SFTODO!!!
             region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_READWRITE);
         }
 
@@ -303,6 +300,14 @@ void video_doblit(bool non_ttx, uint8_t vtotal)
             // fill the gap between the BBC image and the bottom of the screen.
             al_draw_filled_rectangle(0, scr_y_start + scr_y_size, winsizex, winsizey, black);
         }
+
+        // SFTODO: THE LEDS DON'T SCALE (POSSIBLY GOOD, NOT SURE) AND DON'T
+        // "CREATE" SPACE FOR THEMSELVES IF THERE ISN'T ENOUGH OF A BORDER.
+        //led_init(); // SFTODO!?
+        if (led_bitmap) // SFTODO!?
+            al_draw_scaled_bitmap(led_bitmap, 0, 0, al_get_bitmap_width(led_bitmap), al_get_bitmap_height(led_bitmap), (winsizex - al_get_bitmap_width(led_bitmap)) / 2, winsizey - al_get_bitmap_height(led_bitmap), al_get_bitmap_width(led_bitmap), al_get_bitmap_height(led_bitmap), 0);
+            // upscale_only(led_bitmap, 0, 0, 800, 32, 0, 0, 800, 32); // SFTODO!!!
+
         al_flip_display();
     }
     firstx = firsty = 65535;
