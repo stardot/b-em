@@ -936,7 +936,8 @@ static void change_ddnoise_dtype(ALLEGRO_EVENT *event)
     ddnoise_init();
 }
 
-static const char all_dext[] = "*.ssd;*.dsd;*.img;*.adf;*.ads;*.adm;*.adl;*.sdd;*.ddd;*.fdi";
+static const char all_dext[] = "*.ssd;*.dsd;*.img;*.adf;*.ads;*.adm;*.adl;*.sdd;*.ddd;*.fdi;"
+                               "*.SSD;*.DSD;*.IMG;*.ADF;*.ADS;*.ADM;*.ADL;*.SDD;*.DDD;*.FDI;";
 
 void gui_allegro_event(ALLEGRO_EVENT *event)
 {
