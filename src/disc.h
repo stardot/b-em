@@ -48,7 +48,7 @@ extern int fdc_time;
 extern int motorspin;
 extern int motoron;
 
-extern int defaultwriteprot;
+extern bool defaultwriteprot;
 extern ALLEGRO_PATH *discfns[NUM_DRIVES];
 
 extern int writeprot[NUM_DRIVES], fwriteprot[NUM_DRIVES];
