@@ -183,15 +183,13 @@ void main_init(int argc, char *argv[])
             if (vid_fskipmax > 9) vid_fskipmax = 9;
         }
         else if (argv[c][0] == '-' && (argv[c][1] == 's' || argv[c][1] == 'S'))
-            vid_scanlines = 1;
+            vid_dtype_user = VDT_SCANLINES;
         else if (!strcasecmp(argv[c], "-debug"))
             debug_core = 1;
         else if (!strcasecmp(argv[c], "-debugtube"))
             debug_tube = 1;
-        else if (argv[c][0] == '-' && (argv[c][1] == 'i' || argv[c][1] == 'I')) {
-            vid_interlace = 1;
-            vid_linedbl = vid_scanlines = 0;
-        }
+        else if (argv[c][0] == '-' && (argv[c][1] == 'i' || argv[c][1] == 'I'))
+            vid_dtype_user = VDT_INTERLACE;
         else if (tapenext) {
             if (tape_fn)
                 al_destroy_path(tape_fn);

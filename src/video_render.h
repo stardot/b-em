@@ -38,7 +38,14 @@ extern int winsizex, winsizey;
 
 extern int fullscreen;
 
-extern bool vid_linedbl, vid_interlace, vid_scanlines, vid_pal;
+extern enum vid_disptype {
+    VDT_SCALE,
+    VDT_INTERLACE,
+    VDT_SCANLINES,
+    VDT_LINEDOUBLE,
+} vid_dtype_user, vid_dtype_intern;
+
+extern bool vid_pal;
 extern int vid_fskipmax, vid_fullborders;
 extern bool vid_print_mode;
 
@@ -52,6 +59,7 @@ void video_toggle_fullscreen(void);
 void video_clearscreen(void);
 void video_set_window_size(void);
 void video_update_window_size(ALLEGRO_EVENT *event);
+void video_set_disptype(enum vid_disptype dtype);
 void video_set_borders(int borders);
 
 void video_close(void);

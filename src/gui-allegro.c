@@ -288,21 +288,20 @@ static ALLEGRO_MENU *create_tube_menu(void)
 }
 
 static const char *border_names[] = { "None", "Medium", "Full", NULL };
+static const char *vmode_names[] = { "Scaled", "Interlace", "Scanlines", "Line doubling", NULL };
 
 static ALLEGRO_MENU *create_video_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
     ALLEGRO_MENU *sub = al_create_menu();
-    add_checkbox_item(sub, "Line doubling", IDM_VIDEO_LINEDBL, vid_linedbl);
-    add_checkbox_item(sub, "Scan lines", IDM_VIDEO_SCANLINES, vid_scanlines);
-    add_checkbox_item(sub, "Interlaced", IDM_VIDEO_INTERLACED, vid_interlace);
+    add_radio_set(sub, vmode_names, IDM_VIDEO_DISPTYPE, vid_dtype_user);
     al_append_menu_item(menu, "Display type...", 0, 0, NULL, sub);
     sub = al_create_menu();
     add_radio_set(sub, border_names, IDM_VIDEO_BORDERS, vid_fullborders);
     al_append_menu_item(menu, "Borders...", 0, 0, NULL, sub);
     add_checkbox_item(menu, "Fullscreen", IDM_VIDEO_FULLSCR, fullscreen);
     add_checkbox_item(menu, "NuLA", IDM_VIDEO_NULA, !nula_disable);
-    add_checkbox_item(menu, "PAL Emulation", IDM_VIDEO_PAL, vid_pal);
+    add_checkbox_item(menu, "PAL Emulation", IDM_VIDEO_PAL, vid_dtype_user >= 4);
     return menu;
 }
 
@@ -890,33 +889,6 @@ static void change_tube_speed(ALLEGRO_EVENT *event)
     tube_updatespeed();
 }
 
-static void set_video_linedbl(ALLEGRO_EVENT *event)
-{
-    ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
-    vid_linedbl = 1;
-    vid_scanlines = vid_interlace = 0;
-    al_set_menu_item_flags(menu, IDM_VIDEO_SCANLINES, ALLEGRO_MENU_ITEM_CHECKBOX);
-    al_set_menu_item_flags(menu, IDM_VIDEO_INTERLACED, ALLEGRO_MENU_ITEM_CHECKBOX);
-}
-
-static void set_video_scanlines(ALLEGRO_EVENT *event)
-{
-    ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
-    vid_scanlines = 1;
-    vid_linedbl = vid_interlace = 0;
-    al_set_menu_item_flags(menu, IDM_VIDEO_LINEDBL, ALLEGRO_MENU_ITEM_CHECKBOX);
-    al_set_menu_item_flags(menu, IDM_VIDEO_INTERLACED, ALLEGRO_MENU_ITEM_CHECKBOX);
-}
-
-static void set_video_interlaced(ALLEGRO_EVENT *event)
-{
-    ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
-    vid_interlace = 1;
-    vid_linedbl = vid_scanlines = 0;
-    al_set_menu_item_flags(menu, IDM_VIDEO_LINEDBL, ALLEGRO_MENU_ITEM_CHECKBOX);
-    al_set_menu_item_flags(menu, IDM_VIDEO_SCANLINES, ALLEGRO_MENU_ITEM_CHECKBOX);
-}
-
 static void set_sid_type(ALLEGRO_EVENT *event)
 {
     cursid = radio_event_simple(event, cursid);
@@ -1066,14 +1038,8 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
         case IDM_TUBE_SPEED:
             change_tube_speed(event);
             break;
-        case IDM_VIDEO_LINEDBL:
-            set_video_linedbl(event);
-            break;
-        case IDM_VIDEO_SCANLINES:
-            set_video_scanlines(event);
-            break;
-        case IDM_VIDEO_INTERLACED:
-            set_video_interlaced(event);
+        case IDM_VIDEO_DISPTYPE:
+            video_set_disptype(radio_event_simple(event, vid_dtype_user));
             break;
         case IDM_VIDEO_BORDERS:
             video_set_borders(radio_event_simple(event, vid_fullborders));

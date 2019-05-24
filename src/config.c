@@ -143,11 +143,12 @@ void config_load(void)
 
     vid_fullborders  = get_config_int("video", "fullborders",   1);
 
-    c                = get_config_int("video", "displaymode",   3);
-    vid_scanlines    = (c == 2);
-    vid_interlace    = (c == 1) || (c == 5);
-    vid_linedbl      = (c == 3);
-    vid_pal          = (c == 4) || (c == 5);
+    c                = get_config_int("video", "displaymode",   0);
+    if (c >= 4) {
+        c -= 4;
+        vid_pal = 1;
+    }
+    video_set_disptype(c);
 
     fasttape         = get_config_bool("tape", "fasttape",      0);
 
@@ -243,7 +244,10 @@ void config_save(void)
         set_config_int("sound", "ddtype", ddnoise_type);
 
         set_config_int("video", "fullborders", vid_fullborders);
-        set_config_int("video", "displaymode", (vid_pal && vid_interlace) ? 5 : (vid_scanlines ? 2 : (vid_interlace ? 1 : (vid_linedbl ? 3 : (vid_pal ? 4 : 0)))));
+        c = vid_dtype_user;
+        if (vid_pal)
+            c += 4;
+        set_config_int("video", "displaymode", c);
 
         set_config_bool("tape", "fasttape", fasttape);
 
