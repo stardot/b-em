@@ -12,6 +12,7 @@ dlls='allegro-5.2.dll             allegro_acodec-5.2.dll
       OpenAL32.dll                zlib1.dll'
 
 dirs='ddnoise discs docs icon roms tapes'
+cmos='cmos350.bin cmosa.bin cmos.bin cmosc.bin'
 
 buildit() {
     dir="build-$1"
@@ -22,7 +23,7 @@ buildit() {
         do
             ln -s /usr/$2/bin/$dll $dir
         done
-        for item in $dirs b-em.cfg
+        for item in $dirs b-em.cfg $cmos
         do
             ln -s "../$item" "$dir/$item"
         done
