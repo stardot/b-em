@@ -729,8 +729,6 @@ static int oldr8;
 
 int firstx, firsty, lastx, lasty;
 
-int desktop_width, desktop_height;
-
 static ALLEGRO_DISPLAY *display;
 ALLEGRO_BITMAP *b, *b16, *b32;
 

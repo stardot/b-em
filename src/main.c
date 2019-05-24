@@ -154,8 +154,6 @@ void main_init(int argc, char *argv[])
     log_open();
     log_info("main: starting %s", VERSION_STR);
 
-    vid_fskipmax = 1;
-
     model_loadcfg();
 
     for (c = 1; c < argc; c++) {

@@ -10,7 +10,7 @@
 
 enum vid_disptype vid_dtype_user, vid_dtype_intern;
 bool vid_pal;
-int vid_fskipmax = 3;
+int vid_fskipmax = 1;
 int vid_fullborders = 1;
 
 static int fskipcount;
@@ -18,26 +18,10 @@ static int fskipcount;
 int vid_savescrshot = 0;
 char vid_scrshotname[260];
 
-int vid_clear = 0;
-
 int winsizex, winsizey;
 int scr_x_start, scr_x_size, scr_y_start, scr_y_size;
 
 bool vid_print_mode = false;
-
-void video_clearscreen()
-{
-    ALLEGRO_COLOR black = al_map_rgb(0, 0, 0);
-
-    al_set_target_bitmap(b16);
-    al_clear_to_color(black);
-    al_set_target_bitmap(b32);
-    al_clear_to_color(black);
-    al_set_target_backbuffer(al_get_current_display());
-    al_clear_to_color(black);
-    al_set_target_bitmap(b);
-    al_clear_to_color(black);
-}
 
 void video_close()
 {

@@ -32,7 +32,6 @@ extern ALLEGRO_LOCKED_REGION *region;
 #define BORDER_FULL_Y_END_TXT   308
 
 extern int firstx, firsty, lastx, lasty;
-extern int desktop_width, desktop_height;
 extern int scr_x_start, scr_x_size, scr_y_start, scr_y_size;
 extern int winsizex, winsizey;
 
@@ -56,7 +55,6 @@ void video_doblit(bool non_ttx, uint8_t vtotal);
 void video_enterfullscreen(void);
 void video_leavefullscreen(void);
 void video_toggle_fullscreen(void);
-void video_clearscreen(void);
 void video_set_window_size(void);
 void video_update_window_size(ALLEGRO_EVENT *event);
 void video_set_disptype(enum vid_disptype dtype);
