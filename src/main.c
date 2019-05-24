@@ -78,7 +78,6 @@ static ALLEGRO_EVENT_SOURCE evsrc;
 
 static ALLEGRO_DISPLAY *tmp_display;
 
-
 typedef enum {
     FSPEED_NONE,
     FSPEED_SELECTED,
@@ -349,7 +348,11 @@ static void main_start_fullspeed(void)
     al_emit_user_event(&evsrc, &event, NULL);
 }
 
-
+static void main_key_char(ALLEGRO_EVENT *event)
+{
+    log_debug("main: key char, code=%d, unichar=%d, repeat=%d", event->keyboard.keycode, event->keyboard.unichar, event->keyboard.repeat);
+    key_char(event);
+}
 
 static void main_key_down(ALLEGRO_EVENT *event)
 {
@@ -524,6 +527,9 @@ void main_run()
     while (!quitting) {
         al_wait_for_event(queue, &event);
         switch(event.type) {
+            case ALLEGRO_EVENT_KEY_CHAR:
+                main_key_char(&event);
+                break;
             case ALLEGRO_EVENT_KEY_DOWN:
                 main_key_down(&event);
                 break;

@@ -88,6 +88,7 @@ typedef enum {
 #endif
     IDM_KEY_REDEFINE,
     IDM_KEY_AS,
+    IDM_KEY_LOGICAL,
     IDM_MOUSE_AMX,
     IDM_JOYMAP,
     IDM_SPEED,
