@@ -299,6 +299,7 @@ static ALLEGRO_MENU *create_video_menu(void)
     sub = al_create_menu();
     add_radio_set(sub, border_names, IDM_VIDEO_BORDERS, vid_fullborders);
     al_append_menu_item(menu, "Borders...", 0, 0, NULL, sub);
+    al_append_menu_item(menu, "Reset Window Size", IDM_VIDEO_WINSIZE, 0, NULL, NULL);
     add_checkbox_item(menu, "Fullscreen", IDM_VIDEO_FULLSCR, fullscreen);
     add_checkbox_item(menu, "NuLA", IDM_VIDEO_NULA, !nula_disable);
     add_checkbox_item(menu, "PAL Emulation", IDM_VIDEO_PAL, vid_dtype_user >= 4);
@@ -1043,6 +1044,9 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             break;
         case IDM_VIDEO_BORDERS:
             video_set_borders(radio_event_simple(event, vid_fullborders));
+            break;
+        case IDM_VIDEO_WINSIZE:
+            video_set_borders(vid_fullborders);
             break;
         case IDM_VIDEO_FULLSCR:
             video_toggle_fullscreen();
