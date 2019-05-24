@@ -798,19 +798,17 @@ void video_set_disptype(enum vid_disptype dtype)
     vid_dtype_intern = dtype;
 }
 
-uint8_t cursorlook[7] = { 0, 0, 0, 0x80, 0x40, 0x20, 0x20 };
-int cdrawlook[4] = { 3, 2, 1, 0 };
+static const uint8_t cursorlook[7] = { 0, 0, 0, 0x80, 0x40, 0x20, 0x20 };
+static const int cdrawlook[4] = { 3, 2, 1, 0 };
 
-int cmask[4] = { 0, 0, 16, 32 };
+static const int cmask[4] = { 0, 0, 16, 32 };
 
-int lasthc0 = 0, lasthc;
-int olddispen;
-int oldlen;
-int ccount = 0;
+static int lasthc0 = 0, lasthc;
+static int ccount = 0;
 
-int vid_cleared;
+static int vid_cleared;
 
-int firstdispen = 0;
+static int firstdispen = 0;
 
 void video_reset()
 {
