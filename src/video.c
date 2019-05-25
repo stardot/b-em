@@ -35,11 +35,21 @@ static int vadj;
 uint16_t ma;
 static uint16_t maback;
 static int vdispen, dispen;
+static int crtc_mode;
 
 void crtc_reset()
 {
     hc = vc = sc = vadj = 0;
     crtc[9] = 10;
+}
+
+static void set_intern_dtype(enum vid_disptype dtype)
+{
+    if (crtc_mode == 0 && (crtc[8] & 1))
+        dtype = VDT_INTERLACE;
+    else if (dtype == VDT_INTERLACE && !(crtc[8] & 1))
+        dtype = VDT_SCALE;
+    vid_dtype_intern = dtype;
 }
 
 void crtc_write(uint16_t addr, uint8_t val)
@@ -52,11 +62,8 @@ void crtc_write(uint16_t addr, uint8_t val)
         crtc[crtc_i] = val;
         if (crtc_i == 6 && vc == val)
             vdispen = 0;
-        if (crtc_i == 8) {
-            vid_dtype_intern = vid_dtype_user;
-            if (!(val & 1) && vid_dtype_user == VDT_INTERLACE)
-                vid_dtype_intern = VDT_SCALE;
-        }
+        if (crtc_i == 8)
+            set_intern_dtype(vid_dtype_user);
     }
 }
 
@@ -107,7 +114,6 @@ uint8_t ula_ctrl;
 static int ula_pal[16];         // maps from actual physical colour to bitmap display
 uint8_t ula_palbak[16];         // palette RAM in orginal ULA maps actual colour to logical colour
 static int ula_mode;
-static int crtc_mode;
 int nula_collook[16];           // maps palette (logical) colours to 12-bit RGB
 
 static uint8_t table4bpp[4][256][16];
@@ -249,19 +255,13 @@ void videoula_write(uint16_t addr, uint8_t val)
             }
             ula_ctrl = val;
             ula_mode = (ula_ctrl >> 2) & 3;
-            if (val & 2) {
+            if (val & 2)
                 crtc_mode = 0;  // Teletext
-                vid_dtype_intern = VDT_INTERLACE;
-            }
-            else {
-                if (val & 0x10)
-                    crtc_mode = 1;  // High frequency
-                else
-                    crtc_mode = 2;  // Low frequency
-                vid_dtype_intern = vid_dtype_user;
-                if (vid_dtype_user == VDT_INTERLACE && !(crtc[8] & 1))
-                    vid_dtype_intern = VDT_SCALE;
-            }
+            else if (val & 0x10)
+                crtc_mode = 1;  // High frequency
+            else
+                crtc_mode = 2;  // Low frequency
+            set_intern_dtype(vid_dtype_user);
         }
         break;
 
@@ -799,9 +799,7 @@ ALLEGRO_DISPLAY *video_init(void)
 void video_set_disptype(enum vid_disptype dtype)
 {
     vid_dtype_user = dtype;
-    if (dtype == VDT_INTERLACE && !(crtc[8] & 1))
-        dtype = VDT_SCALE;
-    vid_dtype_intern = dtype;
+    set_intern_dtype(dtype);
 }
 
 static const uint8_t cursorlook[7] = { 0, 0, 0, 0x80, 0x40, 0x20, 0x20 };
