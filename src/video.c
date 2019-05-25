@@ -740,6 +740,8 @@ ALLEGRO_BITMAP *b, *b16, *b32;
 
 ALLEGRO_LOCKED_REGION *region;
 
+ALLEGRO_COLOR border_col;
+
 ALLEGRO_DISPLAY *video_init(void)
 {
     int c;
@@ -750,7 +752,7 @@ ALLEGRO_DISPLAY *video_init(void)
 #else
     al_set_new_display_flags(ALLEGRO_WINDOWED | ALLEGRO_RESIZABLE);
 #endif
-    video_set_window_size();
+    video_set_window_size(true);
     if ((display = al_create_display(winsizex, winsizey)) == NULL) {
         log_fatal("video: unable to create display");
         exit(1);
@@ -762,6 +764,7 @@ ALLEGRO_DISPLAY *video_init(void)
 
     colblack = 0xff000000;
     colwhite = 0xffffffff;
+    border_col = al_map_rgb(0, 0, 0);
 
     nula_default_palette();
 

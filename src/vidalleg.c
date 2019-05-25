@@ -33,7 +33,7 @@ void video_close()
 #ifdef WIN32
 static const int y_fudge = 0;
 #else
-static const int y_fudge = 19;
+static const int y_fudge = 28;
 #endif
 
 void video_enterfullscreen()
@@ -78,7 +78,7 @@ void video_enterfullscreen()
     }
 }
 
-void video_set_window_size(void)
+void video_set_window_size(bool fudge)
 {
     scr_x_start = 0;
     scr_y_start = 0;
@@ -97,14 +97,14 @@ void video_set_window_size(void)
             scr_y_size = (BORDER_FULL_Y_END_GRA - BORDER_FULL_Y_START_GRA) * 2;
     }
     winsizex = scr_x_size;
-    winsizey = scr_y_size + y_fudge;
+    winsizey = fudge ? scr_y_size + y_fudge : scr_y_size;
     log_debug("vidalleg: video_set_window_size, scr_x_size=%d, scr_y_size=%d, fudgedy=%d", scr_x_size, scr_y_size, winsizey);
 }
 
 void video_set_borders(int borders)
 {
     vid_fullborders = borders;
-    video_set_window_size();
+    video_set_window_size(false);
     al_resize_display(al_get_current_display(), winsizex, winsizey);
 }
 
@@ -143,13 +143,18 @@ void video_toggle_fullscreen(void)
     }
 }
 
-static inline void upscale_only(ALLEGRO_BITMAP *src, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh)
+static void upscale_only(ALLEGRO_BITMAP *src, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh)
 {
     al_set_target_backbuffer(al_get_current_display());
     if (dw > sw+10 || dh > sh+10)
         al_draw_scaled_bitmap(src, sx, sy, sw, sh, dx, dy, dw, dh, 0);
-    else
+    else {
         al_draw_bitmap_region(src, sx, sy, sw, sh, dx, dy, 0);
+        if (dw > sw)
+            al_draw_filled_rectangle(dx + sw, 0, dx + dw, dh, border_col);
+        if (dh > sh)
+            al_draw_filled_rectangle(0, dy + sh, dw, dy + dh, border_col);
+    }
 }
 
 static void line_double(void)
@@ -342,7 +347,7 @@ static inline void blit_screen(void)
             case VDT_SCANLINES:
                 al_unlock_bitmap(b);
                 al_set_target_bitmap(b16);
-                al_clear_to_color(al_map_rgb(0, 0,0));
+                al_clear_to_color(border_col);
                 for (int c = firsty; c < lasty; c++)
                     al_draw_bitmap_region(b, firstx, c, xsize, 1, 0, c << 1, 0);
                 upscale_only(b16, 0, firsty << 1, lastx - firstx, (lasty - firsty) << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
@@ -358,20 +363,18 @@ static inline void blit_screen(void)
 
 static inline void fill_pillarbox(void)
 {
-    ALLEGRO_COLOR black = al_map_rgb(0, 0, 0);
     // fill the gap between the left screen edge and the BBC image.
-    al_draw_filled_rectangle(0, 0, scr_x_start, scr_y_size, black);
+    al_draw_filled_rectangle(0, 0, scr_x_start, scr_y_size, border_col);
     // fill the gap between the BBC image and the right screen edge.
-    al_draw_filled_rectangle(scr_x_start + scr_x_size, 0, winsizex, winsizey, black);
+    al_draw_filled_rectangle(scr_x_start + scr_x_size, 0, winsizex, winsizey, border_col);
 }
 
 static inline void fill_letterbox(void)
 {
-    ALLEGRO_COLOR black = al_map_rgb(0, 0, 0);
     // fill the gap between the top of the screen and the BBC image.
-    al_draw_filled_rectangle(0, 0, scr_x_size, scr_y_start, black);
+    al_draw_filled_rectangle(0, 0, scr_x_size, scr_y_start, border_col);
     // fill the gap between the BBC image and the bottom of the screen.
-    al_draw_filled_rectangle(0, scr_y_start + scr_y_size, winsizex, winsizey, black);
+    al_draw_filled_rectangle(0, scr_y_start + scr_y_size, winsizex, winsizey, border_col);
 }
 
 void video_doblit(bool non_ttx, uint8_t vtotal)
