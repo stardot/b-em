@@ -249,13 +249,19 @@ void videoula_write(uint16_t addr, uint8_t val)
             }
             ula_ctrl = val;
             ula_mode = (ula_ctrl >> 2) & 3;
-            if (val & 2)
+            if (val & 2) {
                 crtc_mode = 0;  // Teletext
-            else if (val & 0x10)
-                crtc_mode = 1;  // High frequency
-            else
-                crtc_mode = 2;  // Low frequency
-            //                printf("ULAmode %i\n",ulamode);
+                vid_dtype_intern = VDT_INTERLACE;
+            }
+            else {
+                if (val & 0x10)
+                    crtc_mode = 1;  // High frequency
+                else
+                    crtc_mode = 2;  // Low frequency
+                vid_dtype_intern = vid_dtype_user;
+                if (vid_dtype_user == VDT_INTERLACE && !(crtc[8] & 1))
+                    vid_dtype_intern = VDT_SCALE;
+            }
         }
         break;
 
