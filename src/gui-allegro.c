@@ -302,7 +302,7 @@ static ALLEGRO_MENU *create_video_menu(void)
     al_append_menu_item(menu, "Reset Window Size", IDM_VIDEO_WINSIZE, 0, NULL, NULL);
     add_checkbox_item(menu, "Fullscreen", IDM_VIDEO_FULLSCR, fullscreen);
     add_checkbox_item(menu, "NuLA", IDM_VIDEO_NULA, !nula_disable);
-    add_checkbox_item(menu, "PAL Emulation", IDM_VIDEO_PAL, vid_dtype_user >= 4);
+    add_checkbox_item(menu, "PAL Emulation", IDM_VIDEO_PAL, vid_pal);
     return menu;
 }
 
