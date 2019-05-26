@@ -6,6 +6,7 @@
 #include <allegro5/allegro_acodec.h>
 #include <allegro5/allegro_image.h>
 #include <allegro5/allegro_native_dialog.h>
+#include <allegro5/allegro_primitives.h>
 
 #include "6502.h"
 #include "adc.h"
@@ -149,6 +150,7 @@ void main_init(int argc, char *argv[])
 
     al_init_native_dialog_addon();
     al_set_new_window_title(VERSION_STR);
+    al_init_primitives_addon();
 
     config_load();
     log_open();
