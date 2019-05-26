@@ -256,9 +256,7 @@ void main_init(int argc, char *argv[])
     tapenoise_init(queue);
 
     adc_init();
-#ifdef WIN32
     pal_init();
-#endif
     disc_init();
     fdi_init();
 
