@@ -272,7 +272,7 @@ struct cmdent {
 
 static uint8_t  reg_a;
 static uint8_t  fs_flags = 0;
-static uint8_t  fs_num   = FSNO_VDFS;
+static uint8_t  fs_num   = 0;
 static uint16_t cmd_tail;
 
 static uint16_t readmem16(uint16_t addr)
@@ -2863,24 +2863,13 @@ static void cmd_osw7f(uint16_t addr)
         adfs_error(err_badcmd);
 }
 
-static bool vdfs_selected(void)
-{
-    if (readmem(0x21f) == 0xff) { // FSC is an extended vector.
-        unsigned offset = readmem(0x21e);
-        if (offset <= 0x4e)
-            if (readmem(0xd9f + 2 + offset) == x) // extended vector has our ROM no.
-                return true;
-    }
-    return false;
-}
-
 static void select_vdfs(uint8_t fsno)
 {
-    fs_num = fsno;
-    if (!vdfs_selected()) {
+    if (!fs_num) {
         y = fsno;
         rom_dispatch(VDFS_ROM_FSSTART);
     }
+    fs_num = fsno;
 }
 
 static int mmb_parse_find(uint16_t addr, int ch)
@@ -3076,6 +3065,7 @@ static void osfsc(void)
                 rom_dispatch(VDFS_ROM_CAT);
             break;
         case 0x06: // new filesystem taking over.
+            fs_num = 0;
             break;
         case 0x09:
             if (cat_prep(x + (y << 8), cur_dir, "current"))
@@ -3252,6 +3242,8 @@ static void service(void)
     case 0x03: // filing system boot.
         if (vdfs_enabled && (!key_any_down() || key_code_down(ALLEGRO_KEY_S)))
             rom_dispatch(VDFS_ROM_FSBOOT);
+        else
+            fs_num = 0; // some other filing system.
         break;
     case 0x04: // unrecognised command.
         serv_cmd();
