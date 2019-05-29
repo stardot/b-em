@@ -3178,10 +3178,6 @@ static const struct cmdent ctab_always[] = {
     { "Print",   VDFS_ROM_PRINT   },
     { "Type",    VDFS_ROM_TYPE    },
     { "Roms",    VDFS_ROM_ROMS    },
-    { "SRLoad",  VDFS_ACT_SRLOAD  },
-    { "SRSave",  VDFS_ACT_SRSAVE  },
-    { "SRRead",  VDFS_ACT_SRREAD  },
-    { "SRWrite", VDFS_ACT_SRWRITE },
     { "DAbout",  VDFS_ACT_NOP     },
     { "Din",     VDFS_ACT_MMBDIN  }
 };
@@ -3192,7 +3188,11 @@ static const struct cmdent ctab_enabled[] = {
     { "FADFS",   VDFS_ACT_ADFS    },
     { "DISC",    VDFS_ACT_DISC    },
     { "DISK",    VDFS_ACT_DISC    },
-    { "FSclaim", VDFS_ACT_FSCLAIM }
+    { "FSclaim", VDFS_ACT_FSCLAIM },
+    { "SRLoad",  VDFS_ACT_SRLOAD  },
+    { "SRSave",  VDFS_ACT_SRSAVE  },
+    { "SRRead",  VDFS_ACT_SRREAD  },
+    { "SRWrite", VDFS_ACT_SRWRITE }
 };
 
 static void serv_cmd(void)
