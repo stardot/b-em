@@ -1399,9 +1399,11 @@ static uint16_t srp_romid(uint16_t addr, int16_t *romid)
         *romid = mem_findswram(ch - 'W');
     else if (ch >= 'w' && ch <= 'z')
         *romid = mem_findswram(ch - 'w');
-    else
+    else {
         *romid = -1;
-    return --addr;
+        addr--;
+    }
+    return addr;
 }
 
 static void srp_tail(uint16_t addr, uint8_t flag, uint16_t fnaddr, uint16_t start, uint16_t len)
