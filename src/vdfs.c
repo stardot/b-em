@@ -200,6 +200,7 @@ enum vdfs_action {
     VDFS_ROM_BREAK,
     VDFS_ROM_FILES,
     VDFS_ROM_NOPEN,
+    VDFS_ROM_OSW_TAIL,
     VDFS_ACT_NOP,
     VDFS_ACT_QUIT,
     VDFS_ACT_SRLOAD,
@@ -1406,7 +1407,7 @@ static uint16_t srp_romid(uint16_t addr, int16_t *romid)
     return addr;
 }
 
-static void srp_tail(uint16_t addr, uint8_t flag, uint16_t fnaddr, uint16_t start, uint16_t len)
+static bool srp_tail(uint16_t addr, uint8_t flag, uint16_t fnaddr, uint16_t start, uint16_t len)
 {
     int ch;
     int16_t romid;
@@ -1415,55 +1416,59 @@ static void srp_tail(uint16_t addr, uint8_t flag, uint16_t fnaddr, uint16_t star
     if (romid >= 0)
         flag &= ~0x40;
     if (fs_num) {
-        log_debug("vdfs: srp_tail - executing internally");
         exec_swr_fs(flag, fnaddr, romid, start, len);
         p.c = 0;
+        return true;
     } else {
+        uint16_t msw;
         p.c = 1;
-        writemem(0x70, flag);
-        writemem16(0x71, fnaddr);
-        writemem(0x73, romid);
-        writemem16(0x74, start);
-        writemem16(0x76, len);
-        writemem16(0x78, 0);
+        writemem(0x100, flag);
+        writemem16(0x101, fnaddr);
+        writemem(0x103, romid);
+        writemem16(0x104, start);
+        writemem16(0x106, len);
+        writemem16(0x108, 0);
         do
             ch = readmem(addr++);
         while (ch == ' ' || ch == '\t');
         if (ch == 'Q' || ch == 'q')
-            writemem16(0x7a, 0xffff);
+            msw = 0xffff;
         else
-            writemem16(0x7a, 0);
+            msw = 0;
+        writemem16(0x10a, msw);
+        log_debug("vdfs: srp_tail executing via OSWORD, flag=%d, fnaddr=%04X, romid=%d, start=%04X, len=%d, msw=%02X", flag, fnaddr, romid, start, len, msw);
+        a = 67;
+        x = 0;
+        y = 1;
+        rom_dispatch(VDFS_ROM_OSW_TAIL);
+        return false;
     }
 }
 
-static void cmd_srload(uint16_t addr)
+static bool cmd_srload(uint16_t addr)
 {
     uint16_t fnadd, start;
 
     if ((addr = srp_fn(addr, &fnadd))) {
-        log_debug("vdfs: cmd_srload fnaddr=%04X", fnadd);
-        if ((addr = srp_start(addr, &start))) {
-            log_debug("vdfs: cmd_srload start=%04X", start);
-            srp_tail(addr, 0xC0, fnadd, start, 0);
-            return;
-        }
+        if ((addr = srp_start(addr, &start)))
+            return srp_tail(addr, 0xC0, fnadd, start, 0);
     }
     adfs_error(err_badparms);
+    return true;
 }
 
-static void cmd_srsave(uint16_t addr)
+static bool cmd_srsave(uint16_t addr)
 {
     uint16_t fnadd, start, len;
 
     if ((addr = srp_fn(addr, &fnadd))) {
         if ((addr = srp_start(addr, &start))) {
-            if ((addr = srp_length(addr, start, &len))) {
-                srp_tail(addr, 0x40, fnadd, start, len);
-                return;
-            }
+            if ((addr = srp_length(addr, start, &len)))
+                return srp_tail(addr, 0x40, fnadd, start, len);
         }
     }
     adfs_error(err_badparms);
+    return true;
 }
 
 static void srcopy(uint16_t addr, uint8_t flags)
@@ -2943,11 +2948,9 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
         main_setquit();
         break;
     case VDFS_ACT_SRLOAD:
-        cmd_srload(addr);
-        break;
+        return cmd_srload(addr);
     case VDFS_ACT_SRSAVE:
-        cmd_srsave(addr);
-        break;
+        return cmd_srsave(addr);
     case VDFS_ACT_SRREAD:
         srcopy(addr, 0);
         break;
