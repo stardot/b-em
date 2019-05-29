@@ -3212,7 +3212,7 @@ static void serv_cmd(void)
             ent = lookup_cmd(ctab_enabled, ARRAY_SIZE(ctab_enabled), cmd);
         if (ent)
             if (vdfs_do(ent->act, addr))
-            a = 0;
+            `   a = 0;
     }
 }
 
