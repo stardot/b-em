@@ -199,6 +199,9 @@ prtextws    =   &A8
             iny
             cpx     #&0e
             bne     vecloop
+            pla
+            pha
+            sta     port_fsid
             lda     #&8f
             ldx     #&0f
             jsr     OSBYTE          ; Notify that vectors have changed
@@ -239,6 +242,7 @@ prtextws    =   &A8
             jsr     prtitle         ; announce the filing system
             jsr     OSNEWL
             jsr     OSNEWL
+            ldy     #fsno_vdfs
             jsr     fsstart         ; same setup as for call &12.
             pla
             bne     noboot          ; then maybe exec !BOOT.

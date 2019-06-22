@@ -2876,7 +2876,6 @@ static void select_vdfs(uint8_t fsno)
         y = fsno;
         rom_dispatch(VDFS_ROM_FSSTART);
     }
-    fs_num = fsno;
 }
 
 static int mmb_parse_find(uint16_t addr, int ch)
