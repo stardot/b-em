@@ -25,6 +25,7 @@
 #include "keyboard.h"
 #include "keydef-allegro.h"
 #include "main.h"
+#include "mc6809nc/mc6809.h"
 #include "mem.h"
 #include "mouse.h"
 #include "midi.h"
@@ -522,6 +523,7 @@ void main_close()
     z80_close();
     w65816_close();
     n32016_close();
+    mc6809nc_close();
     disc_close(0);
     disc_close(1);
     scsi_close();

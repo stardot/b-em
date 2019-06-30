@@ -184,7 +184,7 @@ static size_t dbg_reg_print(int which, char *buf, size_t bufsize) {
          } else {
             c = '0';
          }
-         
+
          *(buf + i) = *flagnameptr++;
          *(buf + i + 1) = c;
          *(buf + i + 2) = ' ';
@@ -197,14 +197,14 @@ static size_t dbg_reg_print(int which, char *buf, size_t bufsize) {
       }
       return i;
    } if (which == i_MOD) {
-      return snprintf(buf, bufsize, "%04"PRIx32, dbg_reg_get(which) & 0xFFFF);       
+      return snprintf(buf, bufsize, "%04"PRIx32, dbg_reg_get(which) & 0xFFFF);
    } else {
-      return snprintf(buf, bufsize, "%08"PRIx32, dbg_reg_get(which));       
+      return snprintf(buf, bufsize, "%08"PRIx32, dbg_reg_get(which));
    }
 };
 
 // Parse a value into a register.
-static void dbg_reg_parse(int which, char *strval) {
+static void dbg_reg_parse(int which, const char *strval) {
    uint32_t val = 0;
    sscanf(strval, "%"SCNx32, &val);
    dbg_reg_set(which, val);

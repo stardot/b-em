@@ -4,6 +4,16 @@
 #include "savestate.h"
 #include <stdbool.h>
 
+#define TUBE6502  1
+#define TUBEZ80   2
+#define TUBEARM   3
+#define TUBEX86   4
+#define TUBE65816 5
+#define TUBE32016 6
+#define TUBE6809  7
+
+extern int tube_type;
+
 typedef struct {
     const char *name;
     float multipler;
@@ -26,7 +36,10 @@ void (*tube_writemem)(uint32_t addr, uint8_t byte);
 void (*tube_exec)(void);
 void (*tube_proc_savestate)(ZFILE *zfp);
 void (*tube_proc_loadstate)(ZFILE *zfp);
+
 extern int tubecycles;
+static inline void tubeUseCycles(int c) {tubecycles -= c;}
+static inline int tubeContinueRunning() {return tubecycles > 0;}
 
 uint8_t tube_host_read(uint16_t addr);
 void    tube_host_write(uint16_t addr, uint8_t val);

@@ -396,7 +396,7 @@ static size_t dbg_z80_reg_print(int which, char *buf, size_t bufsize) {
     return snprintf(buf, bufsize, which <= REG_F ? "%02X" : "%04X", value);;
 }
 
-static void dbg_z80_reg_parse(int which, char *str) {
+static void dbg_z80_reg_parse(int which, const char *str) {
     uint32_t value = strtol(str, NULL, 16);
     dbg_z80_reg_set(which, value);
 }

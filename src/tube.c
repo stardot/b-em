@@ -21,6 +21,7 @@
 #define TUBEX86   4
 #define TUBE65816 5
 #define TUBE32016 6
+#define TUBE6809  7
 
 int tube_multipler = 1;
 int tube_speed_num = 0;

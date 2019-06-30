@@ -207,7 +207,7 @@ static size_t dbg_reg_print(int which, char *buf, size_t bufsize) {
     }
 }
 
-static void dbg_reg_parse(int which, char *str) {
+static void dbg_reg_parse(int which, const char *str) {
     uint32_t value = strtol(str, NULL, 16);
     dbg_reg_set(which, value);
 }
