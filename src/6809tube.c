@@ -27,15 +27,15 @@ uint8_t copro_mc6809nc_read(uint16_t addr)
 {
     uint8_t data = readmem(addr);
     if (mc6809nc_debug_enabled)
-      debug_memread(&mc6809nc_cpu_debug, addr, data, 1);
-   return data;
+        debug_memread(&mc6809nc_cpu_debug, addr, data, 1);
+    return data;
 }
 
 static void writemem(uint32_t addr, uint8_t data)
 {
     if ((addr & ~7) == 0xfee0) {
-      overlay_rom = 0;
-      tube_parasite_write(addr & 7, data);
+        overlay_rom = 0;
+        tube_parasite_write(addr & 7, data);
     }
     else
         copro_mc6809_ram[addr & 0xffff] = data;
@@ -43,9 +43,9 @@ static void writemem(uint32_t addr, uint8_t data)
 
 void copro_mc6809nc_write(uint16_t addr, uint8_t data)
 {
-   if (mc6809nc_debug_enabled)
-      debug_memwrite(&mc6809nc_cpu_debug, addr, data, 1);
-   writemem(addr, data);
+    if (mc6809nc_debug_enabled)
+        debug_memwrite(&mc6809nc_cpu_debug, addr, data, 1);
+    writemem(addr, data);
 }
 
 static void mc6809nc_savestate(ZFILE *zfp)
@@ -126,4 +126,3 @@ void mc6809nc_close()
         copro_mc6809_ram = NULL;
     }
 }
-
