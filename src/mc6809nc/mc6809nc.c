@@ -112,8 +112,6 @@ static inline void check_stack (void)
         /* TODO */
 }
 
-#define sim_error log_warn
-
 static inline void change_pc (unsigned newPC)
 {
   PC = newPC & 0xffff; /* [NAC HACK 2016Oct21] stop PC from going out of range. Crude.
@@ -312,7 +310,7 @@ static void indexed (void)                      /* note take 1 extra cycle */
           break;
         default:
           ea = 0;
-          sim_error ("invalid index post $%02X\n", post);
+          log_warn("invalid index post $%02X", post);
           break;
         }
     }
@@ -1475,7 +1473,7 @@ static void trap (void)
 
 static void cwai (void)
 {
-  sim_error ("CWAI - not supported yet!");
+  log_warn("mc6809nc: CWAI - not supported yet!");
 }
 
 static void sync (void)
@@ -1942,7 +1940,7 @@ void mc6809nc_execute(void)
                 st16 (S);
                 break;
               default:
-                sim_error ("invalid opcode (1) at %04x\n", iPC);
+                log_warn("mc6809nc: invalid opcode (1) at %04x", iPC);
                 break;
               }
           }
@@ -2017,7 +2015,7 @@ void mc6809nc_execute(void)
                 cpu_clk--;
                 break;
               default:
-                sim_error ("invalid opcode (2) at %04x\n", iPC);
+                log_warn ("mc6809nc: invalid opcode (2) at %04x", iPC);
                 break;
               }
           }
@@ -2942,7 +2940,7 @@ void mc6809nc_execute(void)
 
         default:
           cpu_clk -= 2;
-          sim_error ("invalid opcode '%02X'\n", opcode);
+          log_warn ("mc6809nc: invalid opcode '%02X'", opcode);
           PC = iPC;
           break;
         }
