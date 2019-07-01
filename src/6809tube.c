@@ -12,29 +12,24 @@ static int overlay_rom = 1;
 static uint8_t *copro_mc6809_ram = NULL;
 static uint8_t *copro_mc6809_rom;
 
-static int old_tube_int = 0;
-
-static void tube_6809_int(void)
+void tube_6809_int(int new_irq)
 {
-    if (tube_irq != old_tube_int) {
-        log_debug("6809tube: irq change, new=%02X, old=%02X", tube_irq, old_tube_int);
-        if ((tube_irq & 1) && !(old_tube_int & 1)) {
-            log_debug("6809tube: requesting FIRQ");
-            mc6809nc_request_firq(1);
-        }
-        else if (!(tube_irq & 1) && (old_tube_int & 1)) {
-            log_debug("6809tube: releasing FIRQ");
-            mc6809nc_release_firq(1);
-        }
-        if ((tube_irq & 2) && !(old_tube_int & 2)) {
-            log_debug("6809tube: requesting IRQ");
-            mc6809nc_request_irq(1);
-        }
-        else if (!(tube_irq & 2) && (old_tube_int & 2)) {
-            log_debug("6809tube: releasing IRQ");
-            mc6809nc_release_irq(1);
-        }
-        old_tube_int = tube_irq;
+    if ((new_irq & 1) && !(tube_irq & 1)) {
+        log_debug("6809tube: requesting FIRQ");
+        mc6809nc_request_firq(1);
+    }
+    else if (!(new_irq & 1) && (tube_irq & 1)) {
+        log_debug("6809tube: releasing FIRQ");
+        mc6809nc_release_firq(1);
+    }
+    if ((new_irq & 2) && !(tube_irq & 2)) {
+        log_debug("6809tube: requesting IRQ");
+        mc6809nc_request_irq(1);
+        tubecycles = 3;
+    }
+    else if (!(new_irq & 2) && (tube_irq & 2)) {
+        log_debug("6809tube: releasing IRQ");
+        mc6809nc_release_irq(1);
     }
 }
 
@@ -43,7 +38,6 @@ static uint8_t readmem(uint32_t addr)
     if ((addr & ~7) == 0xfee0) {
         uint8_t val = tube_parasite_read(addr & 7);
         overlay_rom = 0;
-        tube_6809_int();
         return val;
     }
     if ((addr & ~0x7FF) == 0xF800 && overlay_rom)
@@ -64,7 +58,6 @@ static void writemem(uint32_t addr, uint8_t data)
     if ((addr & ~7) == 0xfee0) {
         overlay_rom = 0;
         tube_parasite_write(addr & 7, data);
-        tube_6809_int();
     }
     else
         copro_mc6809_ram[addr & 0xffff] = data;

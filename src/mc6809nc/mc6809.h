@@ -60,12 +60,12 @@ extern void copro_mc6809nc_write(uint16_t addr, uint8_t data);
 #define fetch16()          (pc += 2, abs_read16(pc-2))
 
 extern bool tube_6809_init(FILE *romf);
+extern void tube_6809_int(int new_irq);
 
 /* 6809.c */
 extern void mc6809nc_execute(void);
 extern void mc6809nc_reset (void);
 extern void mc6809nc_close(void);
-
 
 extern void mc6809nc_request_irq (unsigned int source);
 extern void mc6809nc_release_irq (unsigned int source);
