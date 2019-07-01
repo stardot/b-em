@@ -22,21 +22,13 @@
 #include "mc6809.h"
 #include <stdarg.h>
 #include "../tube.h"
+#include "../6809tube.h"
 #include "../logging.h"
 
 #ifdef INCLUDE_DEBUGGER
 #include "mc6809_debug.h"
 #include "../cpu_debug.h"
 #endif
-
-#define E_FLAG 0x80
-#define F_FLAG 0x40
-#define H_FLAG 0x20
-#define I_FLAG 0x10
-#define N_FLAG 0x08
-#define Z_FLAG 0x04
-#define V_FLAG 0x02
-#define C_FLAG 0x01
 
 static unsigned X, Y, S, U, PC;
 static unsigned A, B, DP;

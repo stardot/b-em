@@ -23,11 +23,19 @@
 #ifndef M6809_H
 #define M6809_H
 
-#include <stdbool.h>
 #include <stdio.h>
 //#include <stdlib.h>
 //#include <string.h>
 #include <stdint.h>
+
+#define E_FLAG 0x80
+#define F_FLAG 0x40
+#define H_FLAG 0x20
+#define I_FLAG 0x10
+#define N_FLAG 0x08
+#define Z_FLAG 0x04
+#define V_FLAG 0x02
+#define C_FLAG 0x01
 
 typedef uint16_t target_addr_t;
 
@@ -40,9 +48,6 @@ extern int dump_cycles_on_success;
 extern const char *prog_name;
 
 long get_elapsed_realtime (void);
-
-extern uint8_t copro_mc6809nc_read(uint16_t addr);
-extern void copro_mc6809nc_write(uint16_t addr, uint8_t data);
 
 /* Primitive read/write macros */
 #define read8(addr)        copro_mc6809nc_read (addr)
@@ -58,9 +63,6 @@ extern void copro_mc6809nc_write(uint16_t addr, uint8_t data);
 
 #define fetch8()           abs_read8 (pc++)
 #define fetch16()          (pc += 2, abs_read16(pc-2))
-
-extern bool tube_6809_init(FILE *romf);
-extern void tube_6809_int(int new_irq);
 
 /* 6809.c */
 extern void mc6809nc_execute(void);

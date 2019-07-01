@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "../cpu_debug.h"
+#include "../6809tube.h"
 
 #include "mc6809.h"
 #include "mc6809_dis.h"

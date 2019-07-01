@@ -25,7 +25,7 @@
 #include "keyboard.h"
 #include "keydef-allegro.h"
 #include "main.h"
-#include "mc6809nc/mc6809.h"
+#include "6809tube.h"
 #include "mem.h"
 #include "mouse.h"
 #include "midi.h"

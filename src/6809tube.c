@@ -1,6 +1,7 @@
 #include "b-em.h"
 #include "tube.h"
 #include "model.h"
+#include "6809tube.h"
 #include "mc6809nc/mc6809_debug.h"
 #include "mc6809nc/mc6809.h"
 
@@ -141,7 +142,7 @@ bool tube_6809_init(FILE *romf)
     return false;
 }
 
-void mc6809nc_close()
+void mc6809nc_close(void)
 {
     if (copro_mc6809_ram) {
         free(copro_mc6809_ram);
