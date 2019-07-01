@@ -11,6 +11,7 @@
 #include "NS32016/mem32016.h"
 #include "6502tube.h"
 #include "65816.h"
+#include "6809tube.h"
 #include "arm.h"
 #include "x86_tube.h"
 #include "z80.h"

@@ -16,6 +16,7 @@
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.  */
 
 #include <stdarg.h>
+#include "../6809tube.h"
 #include "mc6809.h"
 
 typedef unsigned char tt_u8;
