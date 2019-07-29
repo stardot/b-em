@@ -4,15 +4,17 @@
 #include "savestate.h"
 #include <stdbool.h>
 
-#define TUBE6502  1
-#define TUBEZ80   2
-#define TUBEARM   3
-#define TUBEX86   4
-#define TUBE65816 5
-#define TUBE32016 6
-#define TUBE6809  7
+typedef enum {
+    TUBE6502,
+    TUBEZ80,
+    TUBEARM,
+    TUBEX86,
+    TUBE65816,
+    TUBE32016,
+    TUBE6809
+} tubetype;
 
-extern int tube_type;
+extern tubetype tube_type;
 
 typedef struct {
     const char *name;

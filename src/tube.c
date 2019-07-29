@@ -16,14 +16,6 @@
 #include "x86_tube.h"
 #include "z80.h"
 
-#define TUBE6502  1
-#define TUBEZ80   2
-#define TUBEARM   3
-#define TUBEX86   4
-#define TUBE65816 5
-#define TUBE32016 6
-#define TUBE6809  7
-
 int tube_multipler = 1;
 int tube_speed_num = 0;
 int tubecycles = 0;
@@ -46,7 +38,7 @@ tube_speed_t tube_speeds[NUM_TUBE_SPEEDS] =
 };
 
 int tube_irq=0;
-int tube_type=TUBEX86;
+tubetype tube_type=TUBEX86;
 
 static int tube_romin=1;
 
