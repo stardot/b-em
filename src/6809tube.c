@@ -6,8 +6,6 @@
 #include "mc6809nc/mc6809.h"
 
 #define MC6809_RAM_SIZE 0x10000
-#define MC6809_ROM_SIZE 0x00800
-#define MC6809_MEM_SIZE (MC6809_RAM_SIZE+MC6809_ROM_SIZE)
 
 static int overlay_rom = 1;
 static uint8_t *copro_mc6809_ram = NULL;
@@ -97,7 +95,8 @@ static void mc6809nc_savestate(ZFILE *zfp)
     bytes[13] = reg;
 
     savestate_zwrite(zfp, bytes, sizeof bytes);
-    savestate_zwrite(zfp, copro_mc6809_ram, MC6809_MEM_SIZE);
+    savestate_zwrite(zfp, copro_mc6809_ram, MC6809_RAM_SIZE);
+    savestate_zwrite(zfp, copro_mc6809_rom, tubes[curtube].rom_size);
 }
 
 static void mc6809nc_loadstate(ZFILE *zfp)
@@ -115,31 +114,29 @@ static void mc6809nc_loadstate(ZFILE *zfp)
     set_u((bytes[10] << 8) | bytes[11]);
     set_pc((bytes[12] << 8) | bytes[13]);
 
-    savestate_zread(zfp, copro_mc6809_ram, MC6809_MEM_SIZE);
+    savestate_zread(zfp, copro_mc6809_ram, MC6809_RAM_SIZE);
+    savestate_zread(zfp, copro_mc6809_rom, tubes[curtube].rom_size);;
 }
 
-bool tube_6809_init(FILE *romf)
+bool tube_6809_init(void *rom)
 {
     log_debug("mc6809nc: init");
     if (!copro_mc6809_ram) {
-        copro_mc6809_ram = malloc(MC6809_MEM_SIZE);
+        copro_mc6809_ram = malloc(MC6809_RAM_SIZE);
         if (!copro_mc6809_ram) {
-            log_error("mc6809: unable to allocate memory: %s", strerror(errno));
+            log_error("mc6809: unable to allocate RAM: %s", strerror(errno));
             return false;
         }
-        copro_mc6809_rom = copro_mc6809_ram + MC6809_RAM_SIZE;
     }
-    if (fread(copro_mc6809_rom, MC6809_ROM_SIZE, 1, romf) == 1) {
-        tube_type = TUBE6809;
-        tube_readmem = readmem;
-        tube_writemem = writemem;
-        tube_exec  = mc6809nc_execute;
-        tube_proc_savestate = mc6809nc_savestate;
-        tube_proc_loadstate = mc6809nc_loadstate;
-        mc6809nc_reset();
-        return true;
-    }
-    return false;
+    copro_mc6809_rom = rom;
+    tube_type = TUBE6809;
+    tube_readmem = readmem;
+    tube_writemem = writemem;
+    tube_exec  = mc6809nc_execute;
+    tube_proc_savestate = mc6809nc_savestate;
+    tube_proc_loadstate = mc6809nc_loadstate;
+    mc6809nc_reset();
+    return true;
 }
 
 void mc6809nc_close(void)

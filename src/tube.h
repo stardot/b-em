@@ -26,12 +26,7 @@ extern tube_speed_t tube_speeds[NUM_TUBE_SPEEDS];
 extern int tube_speed_num, tube_multipler;
 
 void tube_reset(void);
-bool tube_6502_init(FILE *romf);
-bool tube_arm_init(FILE *romf);
-bool tube_z80_init(FILE *romf);
-bool tube_x86_init(FILE *romf);
-bool tube_65816_init(FILE *romf);
-bool tube_32016_init(FILE *romf);
+bool tube_32016_init(void *rom);
 
 uint8_t (*tube_readmem)(uint32_t addr);
 void (*tube_writemem)(uint32_t addr, uint8_t byte);

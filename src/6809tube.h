@@ -8,7 +8,7 @@
 extern void tube_6809_int(int new_irq);
 extern uint8_t copro_mc6809nc_read(uint16_t addr);
 extern void copro_mc6809nc_write(uint16_t addr, uint8_t data);
-extern bool tube_6809_init(FILE *romf);
+extern bool tube_6809_init(void *rom);
 extern void mc6809nc_reset(void);
 extern void mc6809nc_close(void);
 

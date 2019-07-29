@@ -161,6 +161,7 @@ static void refillpipeline2();
 
 #define countbits(c) countbitstable[c]
 static int countbitstable[65536];
+
 void arm_reset()
 {
         int c,d,exec,data;
@@ -232,28 +233,12 @@ void arm_dumpregs()
 static uint32_t *armread[64];
 static uint32_t armmask[64];
 
-bool arm_init(FILE *romf)
-{
-        int c;
-        if (!armrom) armrom=(uint32_t *)malloc(ARM_ROM_SIZE);
-        if (!armram) armram=(uint32_t *)malloc(ARM_RAM_SIZE);
-        armromb=(uint8_t *)armrom;
-        armramb=(uint8_t *)armram;
-        if (fread(armromb, ARM_ROM_SIZE, 1, romf) != 1)
-            return false;
-        memcpy(armramb,armromb,ARM_ROM_SIZE);
-        for (c=0;c<64;c++) armread[c]=0;
-        for (c=0;c<4;c++) armread[c]=&armram[c*0x40000];
-        armread[48]=armrom;
-        for (c=0;c<64;c++) armmask[c]=0xFFFFF;
-        armmask[48]=0x3FFF;
-        return true;
-}
-
 void arm_close()
 {
-        if (armrom) free(armrom);
-        if (armram) free(armram);
+    if (armram) {
+        free(armram);
+        armram = NULL;
+    }
 }
 
 static unsigned char *save_regset(unsigned char *ptr, uint32_t *regs)
@@ -263,7 +248,7 @@ static unsigned char *save_regset(unsigned char *ptr, uint32_t *regs)
     return ptr;
 }
 
-void arm_savestate(ZFILE *zfp)
+static void arm_savestate(ZFILE *zfp)
 {
     unsigned char bytes[332], *ptr;
 
@@ -292,7 +277,7 @@ static unsigned char *load_regset(unsigned char *ptr, uint32_t *regs)
     return ptr;
 }
 
-void arm_loadstate(ZFILE *zfp)
+static void arm_loadstate(ZFILE *zfp)
 {
     unsigned char bytes[332], *ptr;
 
@@ -360,7 +345,7 @@ static inline uint8_t do_readarmb(uint32_t addr)
         exit(-1);*/
 }
 
-uint8_t readarmb(uint32_t addr)
+static uint8_t readarmb(uint32_t addr)
 {
     uint8_t v = do_readarmb(addr);
     if (arm_debug_enabled)
@@ -387,7 +372,7 @@ static inline void do_writearmb(uint32_t addr, uint8_t val)
         exit(-1);*/
 }
 
-void writearmb(uint32_t addr, uint8_t val)
+static void writearmb(uint32_t addr, uint8_t val)
 {
     if (arm_debug_enabled)
         debug_memwrite(&tubearm_cpu_debug, addr, val, 1);
@@ -654,6 +639,37 @@ cpu_debug_t tubearm_cpu_debug = {
    .get_instr_addr = arm_dbg_get_instr_addr,
    .trap_names     = arm_trap_names
 };
+
+bool arm_init(void *rom)
+{
+    if (!armram) {
+        armram = (uint32_t *)malloc(ARM_RAM_SIZE);
+        if (!armram) {
+            log_error("arm: unable to allocate ROM");
+            return false;
+        }
+    }
+    armramb=(uint8_t *)armram;
+    armrom = rom;
+    armromb = rom;
+    memcpy(armramb, armromb, ARM_ROM_SIZE);
+    for (int c = 0; c < 64; c++)
+        armread[c]=0;
+    for (int c = 0;c < 4; c++)
+        armread[c]=&armram[c*0x40000];
+    armread[48]=armrom;
+    for (int c = 0;c < 64; c++)
+        armmask[c]=0xFFFFF;
+    armmask[48]=0x3FFF;
+    tube_type = TUBEARM;
+    tube_readmem = readarmb;
+    tube_writemem = writearmb;
+    tube_exec  = arm_exec;
+    tube_proc_savestate = arm_savestate;
+    tube_proc_loadstate = arm_loadstate;
+    arm_reset();
+    return true;
+}
 
 /*****************************************************
  * CPU Implementation

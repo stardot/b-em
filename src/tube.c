@@ -66,7 +66,7 @@ void tube_updateints()
     if (tubeula.r1stat & 8 && (tubeula.ph3pos == 0 || tubeula.hp3pos > (tubeula.r1stat & 16) ? 1 : 0))
         new_irq |= 2;
 
-    if (curtube == TUBE6809 && new_irq != tube_irq)
+    if (tube_type == TUBE6809 && new_irq != tube_irq)
         tube_6809_int(new_irq);
 
     tube_irq = new_irq;
@@ -308,87 +308,12 @@ void tube_parasite_write(uint32_t addr, uint8_t val)
         tube_updateints();
 }
 
-bool tube_6502_init(FILE *romf)
-{
-    tube_type = TUBE6502;
-    if (tube_6502_init_cpu(romf)) {
-        tube_6502_reset();
-        tube_readmem = tube_6502_readmem;
-        tube_writemem = tube_6502_writemem;
-        tube_exec  = tube_6502_exec;
-        tube_proc_savestate = tube_6502_savestate;
-        tube_proc_loadstate = tube_6502_loadstate;
-        return true;
-    }
-    return false;
-}
-
 void tube_updatespeed()
 {
     tube_multipler = tube_speeds[tube_speed_num].multipler * tubes[curtube].speed_multiplier;
 }
 
-bool tube_arm_init(FILE *romf)
-{
-    tube_type = TUBEARM;
-    if (arm_init(romf)) {
-        arm_reset();
-        tube_readmem = readarmb;
-        tube_writemem = writearmb;
-        tube_exec  = arm_exec;
-        tube_proc_savestate = arm_savestate;
-        tube_proc_loadstate = arm_loadstate;
-        return true;
-    }
-    return false;
-}
-
-bool tube_z80_init(FILE *romf)
-{
-    tube_type = TUBEZ80;
-    if (z80_init(romf)) {
-        z80_reset();
-        tube_readmem = tube_z80_readmem;
-        tube_writemem = tube_z80_writemem;
-        tube_exec  = z80_exec;
-        tube_proc_savestate = z80_savestate;
-        tube_proc_loadstate = z80_loadstate;
-        return true;
-    }
-    return false;
-}
-
-bool tube_x86_init(FILE *romf)
-{
-    tube_type = TUBEX86;
-    if (x86_init(romf)) {
-        x86_reset();
-        tube_readmem = x86_readmem;
-        tube_writemem = x86_writemem;
-        tube_exec  = x86_exec;
-        tube_proc_savestate = x86_savestate;
-        tube_proc_loadstate = x86_loadstate;
-        return true;
-    }
-    return false;
-}
-
-bool tube_65816_init(FILE *romf)
-{
-    tube_type = TUBE65816;
-    if (w65816_init(romf)) {
-        w65816_reset();
-        tube_readmem = readmem65816;
-        tube_writemem = writemem65816;
-        tube_exec  = w65816_exec;
-        tube_proc_savestate = w65816_savestate;
-        tube_proc_loadstate = w65816_loadstate;
-        return true;
-    }
-    return false;
-}
-
-bool tube_32016_init(FILE *romf)
+bool tube_32016_init(void *rom)
 {
         tube_type = TUBE32016;
         n32016_init();

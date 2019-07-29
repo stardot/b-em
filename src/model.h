@@ -45,9 +45,10 @@ extern int model_count;
 typedef struct
 {
     char name[32];
-    bool (*init)(FILE *romf);
+    bool (*init)(void *rom);
     void (*reset)(void);
     cpu_debug_t *debug;
+    int  rom_size;
     char bootrom[16];
     int  speed_multiplier;
 } TUBE;
