@@ -29,90 +29,79 @@ static struct tm rtc_tm;
 static uint8_t cmos_data;
 
 static inline uint8_t bcd2bin(uint8_t value) {
-        return ((value >> 4) * 10) + (value & 0xf);
+    return ((value >> 4) * 10) + (value & 0xf);
 }
 
 static inline uint8_t bin_or_bcd(unsigned value) {
-        if (cmos[11] & 4)
-                return value; // binary
-        return ((value / 10) << 4) | (value % 10);
+    if (cmos[11] & 4)
+        return value; // binary
+    return ((value / 10) << 4) | (value % 10);
 }
 
 static inline unsigned guess_century(unsigned year) {
-        if (year < 80)
-                year += 100;
-        return year;
+    if (year < 80)
+        year += 100;
+    return year;
 }
 
 static uint8_t read_cmos_rtc(unsigned addr)
 {
-        time_t now;
-        struct tm *tp;
+    time_t now;
+    struct tm *tp;
 
-        time(&now);
-        if (rtc_epoc_ref)
-        {
-                // The RTC has been set since it was last read so convert
-                // the time components set back to seconds since an epoc.
+    time(&now);
+    if (rtc_epoc_ref) {
+        // The RTC has been set since it was last read so convert
+        // the time components set back to seconds since an epoc.
 
-                if (cmos[11] & 4 ) // Register B DM bit.
-                {
-                        // binary
-                        rtc_tm.tm_sec = cmos[0];
-                        rtc_tm.tm_min = cmos[2];
-                        rtc_tm.tm_hour = cmos[4];
-                        rtc_tm.tm_wday = cmos[6] - 1;
-                        rtc_tm.tm_mday = cmos[7];
-                        rtc_tm.tm_mon = cmos[8] - 1;
-                        rtc_tm.tm_year = guess_century(cmos[9]);
-                }
-                else
-                {
-                        // BCD mode.
-                        rtc_tm.tm_sec = bcd2bin(cmos[0]);
-                        rtc_tm.tm_min = bcd2bin(cmos[2]);
-                        rtc_tm.tm_hour = bcd2bin(cmos[4]);
-                        rtc_tm.tm_wday = bcd2bin(cmos[6] - 1);
-                        rtc_tm.tm_mday = bcd2bin(cmos[7]);
-                        rtc_tm.tm_mon = bcd2bin(cmos[8] - 1);
-                        rtc_tm.tm_year = guess_century(bcd2bin(cmos[9]));
-                }
-                rtc_epoc_adj = mktime(&rtc_tm) - now;
-                rtc_epoc_ref = 0;
-                rtc_last = 0;
+        if (cmos[11] & 4 ) { // Register B DM bit.
+            // binary
+            rtc_tm.tm_sec = cmos[0];
+            rtc_tm.tm_min = cmos[2];
+            rtc_tm.tm_hour = cmos[4];
+            rtc_tm.tm_wday = cmos[6] - 1;
+            rtc_tm.tm_mday = cmos[7];
+            rtc_tm.tm_mon = cmos[8] - 1;
+            rtc_tm.tm_year = guess_century(cmos[9]);
         }
-        now += rtc_epoc_adj;
-        if (now > rtc_last && (tp = localtime(&now)))
-        {
-                rtc_tm = *tp;
-                rtc_last = now;
+        else {
+            // BCD mode.
+            rtc_tm.tm_sec = bcd2bin(cmos[0]);
+            rtc_tm.tm_min = bcd2bin(cmos[2]);
+            rtc_tm.tm_hour = bcd2bin(cmos[4]);
+            rtc_tm.tm_wday = bcd2bin(cmos[6] - 1);
+            rtc_tm.tm_mday = bcd2bin(cmos[7]);
+            rtc_tm.tm_mon = bcd2bin(cmos[8] - 1);
+            rtc_tm.tm_year = guess_century(bcd2bin(cmos[9]));
         }
-        switch (addr)
-        {
-            case 0:
-                return bin_or_bcd(rtc_tm.tm_sec);
-                break;
-            case 2:
-                return bin_or_bcd(rtc_tm.tm_min);
-                break;
-            case 4:
-                return bin_or_bcd(rtc_tm.tm_hour);
-                break;
-            case 6:
-                return bin_or_bcd(rtc_tm.tm_wday + 1);
-                break;
-            case 7:
-                return bin_or_bcd(rtc_tm.tm_mday);
-                break;
-            case 8:
-                return bin_or_bcd(rtc_tm.tm_mon + 1);
-                break;
-            case 9:
-                return bin_or_bcd(rtc_tm.tm_year % 100);
-                break;
-            default:
-                return cmos[addr];
-        }
+        rtc_epoc_adj = mktime(&rtc_tm) - now;
+        rtc_epoc_ref = 0;
+        rtc_last = 0;
+    }
+    now += rtc_epoc_adj;
+    if (now > rtc_last && (tp = localtime(&now))) {
+        rtc_tm = *tp;
+        rtc_last = now;
+    }
+    switch (addr)
+    {
+        case 0:
+            return bin_or_bcd(rtc_tm.tm_sec);
+        case 2:
+            return bin_or_bcd(rtc_tm.tm_min);
+        case 4:
+            return bin_or_bcd(rtc_tm.tm_hour);
+        case 6:
+            return bin_or_bcd(rtc_tm.tm_wday + 1);
+        case 7:
+            return bin_or_bcd(rtc_tm.tm_mday);
+        case 8:
+            return bin_or_bcd(rtc_tm.tm_mon + 1);
+        case 9:
+            return bin_or_bcd(rtc_tm.tm_year % 100);
+        default:
+            return cmos[addr];
+    }
 }
 
 static uint8_t get_cmos(unsigned addr)
@@ -131,34 +120,33 @@ static void set_cmos(unsigned addr, uint8_t val)
 
 void cmos_update(uint8_t IC32, uint8_t sdbval)
 {
-        int cmos_strobe;
-        cmos_rw = IC32 & 2;
-        cmos_strobe = (IC32 & 4) ^ cmos_old;
-        cmos_old = IC32 & 4;
-//        log_debug("CMOS update %i %i %i\n",cmos_rw,cmos_strobe,cmos_old);
-        if (cmos_strobe && cmos_ena)
-        {
-                if (!cmos_rw && !(IC32 & 4)) /*Write triggered on low -> high on D*/
-                    set_cmos(cmos_addr, sdbval);
-                if (cmos_rw && (IC32 & 4))                   /*Read data output while D high*/
-                    cmos_data = get_cmos(cmos_addr);
-        }
+    int cmos_strobe;
+    cmos_rw = IC32 & 2;
+    cmos_strobe = (IC32 & 4) ^ cmos_old;
+    cmos_old = IC32 & 4;
+    // log_debug("CMOS update %i %i %i\n",cmos_rw,cmos_strobe,cmos_old);
+    if (cmos_strobe && cmos_ena) {
+        if (!cmos_rw && !(IC32 & 4))        /*Write triggered on low -> high on D*/
+            set_cmos(cmos_addr, sdbval);
+        if (cmos_rw && (IC32 & 4))          /*Read data output while D high*/
+            cmos_data = get_cmos(cmos_addr);
+    }
 }
 
 void cmos_writeaddr(uint8_t val)
 {
-        if (val&0x80) /*Latch address*/
-           cmos_addr = sdbval & 63;
-        cmos_ena = val & 0x40;
-//        log_debug("CMOS writeaddr %02X %02X %02X\n",val,sdbval,cmos_addr);
+    if (val&0x80) /*Latch address*/
+        cmos_addr = sdbval & 63;
+    cmos_ena = val & 0x40;
+    // log_debug("CMOS writeaddr %02X %02X %02X\n",val,sdbval,cmos_addr);
 }
 
 uint8_t cmos_read()
 {
-//        log_debug("CMOS read ORAnh %02X %02X %i %02X %i\n",cmos_addr,cmos[cmos_addr],cmos_ena,IC32,cmos_rw);
-        if (cmos_ena && (IC32 & 4) && cmos_rw) return cmos_data; /*To drive bus, CMOS must be enabled,
-                                                                   D must be high, RW must be high*/
-        return 0xff;
+    // log_debug("CMOS read ORAnh %02X %02X %i %02X %i\n",cmos_addr,cmos[cmos_addr],cmos_ena,IC32,cmos_rw);
+    if (cmos_ena && (IC32 & 4) && cmos_rw)  // To drive bus, CMOS must be enabled,
+        return cmos_data;                   // D must be high, RW must be high.
+    return 0xff;
 }
 
 void cmos_write_addr_integra(uint8_t val)
