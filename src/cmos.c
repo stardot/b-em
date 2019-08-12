@@ -161,17 +161,26 @@ void cmos_load(MODEL m) {
     ALLEGRO_PATH *path;
     const char *cpath;
 
-    if (!m.cmos[0]) return;
-    if (m.compact) compactcmos_load(m);
+    if (!m.cmos[0])
+        return;
+    if (m.compact)
+        compactcmos_load(m);
     else {
         memset(cmos, 0, sizeof cmos);
         rtc_epoc_ref = rtc_epoc_adj = 0;
         if ((path = find_cfg_file(m.cmos, ".bin"))) {
             cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
             if ((f = fopen(cpath, "rb"))) {
-                if (fread(cmos, sizeof cmos, 1, f) != 1)
-                    log_warn("cmos: cmos file %s read incompletely, some values will be zero", cpath);
+                size_t nbytes = fread(cmos, 1, sizeof cmos, f);
                 fclose(f);
+                if (nbytes < sizeof cmos)
+                    log_warn("cmos: cmos file %s read incompletely, some values will be zero", cpath);
+                if (nbytes >= 10) {
+                    /* Reload the Epoch to which system time can be
+                     * added from the date/time fields.
+                     */
+                    rtc_epoc_adj = cmos[0] | (cmos[2] << 8) | (cmos[4] << 16) | (cmos[6] << 24);
+                }
                 log_debug("cmos: loaded from %s", cpath);
             }
             else
@@ -188,13 +197,22 @@ void cmos_save(MODEL m) {
     ALLEGRO_PATH *path;
     const char *cpath;
 
-    if (!m.cmos[0]) return;
-    if (m.compact) compactcmos_save(m);
+    if (!m.cmos[0])
+        return;
+    if (m.compact)
+        compactcmos_save(m);
     else {
         if ((path = find_cfg_dest(m.cmos, ".bin"))) {
             cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
             if ((f = fopen(cpath, "wb"))) {
                 log_debug("cmos: saving to %s", cpath);
+                /* Save into the date/time fields of the CMOS RAM the
+                 * Epoch to which standard system time can be added
+                 */
+                cmos[0] = rtc_epoc_adj & 0xff;
+                cmos[2] = (rtc_epoc_adj >> 8) & 0xff;
+                cmos[4] = (rtc_epoc_adj >> 16) & 0xff;
+                cmos[6] = (rtc_epoc_adj >> 24) & 0xff;
                 fwrite(cmos, sizeof cmos, 1, f);
                 fclose(f);
             }
