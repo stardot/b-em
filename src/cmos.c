@@ -44,7 +44,7 @@ static inline unsigned guess_century(unsigned year) {
         return year;
 }
 
-static void read_cmos_rtc(void)
+static uint8_t read_cmos_rtc(unsigned addr)
 {
         time_t now;
         struct tm *tp;
@@ -87,32 +87,46 @@ static void read_cmos_rtc(void)
                 rtc_tm = *tp;
                 rtc_last = now;
         }
-        switch (cmos_addr)
+        switch (addr)
         {
             case 0:
-                cmos_data = bin_or_bcd(rtc_tm.tm_sec);
+                return bin_or_bcd(rtc_tm.tm_sec);
                 break;
             case 2:
-                cmos_data = bin_or_bcd(rtc_tm.tm_min);
+                return bin_or_bcd(rtc_tm.tm_min);
                 break;
             case 4:
-                cmos_data = bin_or_bcd(rtc_tm.tm_hour);
+                return bin_or_bcd(rtc_tm.tm_hour);
                 break;
             case 6:
-                cmos_data = bin_or_bcd(rtc_tm.tm_wday + 1);
+                return bin_or_bcd(rtc_tm.tm_wday + 1);
                 break;
             case 7:
-                cmos_data = bin_or_bcd(rtc_tm.tm_mday);
+                return bin_or_bcd(rtc_tm.tm_mday);
                 break;
             case 8:
-                cmos_data = bin_or_bcd(rtc_tm.tm_mon + 1);
+                return bin_or_bcd(rtc_tm.tm_mon + 1);
                 break;
             case 9:
-                cmos_data = bin_or_bcd(rtc_tm.tm_year % 100);
+                return bin_or_bcd(rtc_tm.tm_year % 100);
                 break;
             default:
-                cmos_data = cmos[cmos_addr];
+                return cmos[addr];
         }
+}
+
+static uint8_t get_cmos(unsigned addr)
+{
+    if ((addr <= 6 && !(addr & 1)) || (addr >= 7 && addr <= 9))
+        return read_cmos_rtc(addr);
+    return cmos[addr];
+}
+
+static void set_cmos(unsigned addr, uint8_t val)
+{
+    cmos[addr] = val;
+    if ((addr <= 6 && !(addr & 1)) || (addr >= 7 && addr <= 9))
+        time(&rtc_epoc_ref);
 }
 
 void cmos_update(uint8_t IC32, uint8_t sdbval)
@@ -125,18 +139,9 @@ void cmos_update(uint8_t IC32, uint8_t sdbval)
         if (cmos_strobe && cmos_ena)
         {
                 if (!cmos_rw && !(IC32 & 4)) /*Write triggered on low -> high on D*/
-                {
-                        cmos[cmos_addr] = sdbval;
-                        if (cmos_addr <= 9)
-                                time(&rtc_epoc_ref); // RTC: record the actual time this time was set.
-                }
+                    set_cmos(cmos_addr, sdbval);
                 if (cmos_rw && (IC32 & 4))                   /*Read data output while D high*/
-                {
-                        if (cmos_addr <= 9 )
-                                read_cmos_rtc();
-                        else
-                                cmos_data = cmos[cmos_addr];
-                }
+                    cmos_data = get_cmos(cmos_addr);
         }
 }
 
