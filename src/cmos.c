@@ -158,33 +158,34 @@ void cmos_write_addr_integra(uint8_t val)
 void cmos_write_data_integra(uint8_t val)
 {
     log_debug("cmos: write_data_integra, val=%02X", val);
-    cmos[cmos_addr] = val;
-    if (cmos_addr <= 9)
-        time(&rtc_epoc_ref);
+    set_cmos(cmos_addr, val);
 }
 
 static int uip_count = 0;
 
 uint8_t cmos_read_data_integra(void)
 {
-    if (cmos_addr <= 9 ) {
-        read_cmos_rtc();
-        log_debug("cmos: read_data_integra, return clock data %02X", cmos_data);
+    unsigned addr = cmos_addr;
+    uint8_t val;
+
+    if ((addr <= 6 && !(addr & 1)) || (addr >= 7 && addr <= 9)) {
+        val = read_cmos_rtc(addr);
+        log_debug("cmos: read_data_integra, return clock data %02X", val);
     }
     else {
-        cmos_data = cmos[cmos_addr];
-        if (cmos_addr == 0x0a) {
-            cmos_data &= 0x7f;
+        val = cmos[addr];
+        if (addr == 0x0a) {
+            val &= 0x7f;
             if (++uip_count == 100) {
-                cmos_data |= 0x80;
+                val |= 0x80;
                 uip_count = 0;
             }
             log_debug("cmos: read_data_integra, return register A %02X", cmos_data);
         }
         else
-            log_debug("cmos: integra, return RAM data %02X", cmos_data);
+            log_debug("cmos: read_data_integra, return RAM data %02X", cmos_data);
     }
-    return cmos_data;
+    return val;
 }
 
 void cmos_load(MODEL m) {
