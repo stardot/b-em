@@ -178,8 +178,8 @@ static ALLEGRO_MENU *create_tape_menu(void)
     ALLEGRO_MENU *speed = al_create_menu();
     int nflags, fflags;
     al_append_menu_item(menu, "Load tape...", IDM_TAPE_LOAD, 0, NULL, NULL);
-    al_append_menu_item(menu, "Rewind tape", IDM_TAPE_EJECT, 0, NULL, NULL);
-    al_append_menu_item(menu, "Eject tape", IDM_TAPE_REWIND, 0, NULL, NULL);
+    al_append_menu_item(menu, "Rewind tape", IDM_TAPE_REWIND, 0, NULL, NULL);
+    al_append_menu_item(menu, "Eject tape", IDM_TAPE_EJECT, 0, NULL, NULL);
     al_append_menu_item(menu, "Catalogue tape", IDM_TAPE_CAT, 0, NULL, NULL);
     if (fasttape) {
         nflags = ALLEGRO_MENU_ITEM_CHECKBOX;
