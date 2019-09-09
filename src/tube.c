@@ -143,7 +143,7 @@ void tube_host_write(uint16_t addr, uint8_t val)
             case 0: /*Register 1 stat*/
                 if (val & 0x80) tubeula.r1stat |=  (val&0x3F);
                 else            tubeula.r1stat &= ~(val&0x3F);
-                log_debug("tube: host write S1c=%02X->%02X", val, tubeula.r1stat);
+                log_debug("tube: host write S1=%02X->%02X", val, tubeula.r1stat);
                 tubeula.hstat[0] = (tubeula.hstat[0] & 0xC0) | (val & 0x3F);
                 break;
             case 1: /*Register 1*/
