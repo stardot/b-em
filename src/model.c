@@ -167,8 +167,11 @@ static void tube_init(void)
     FILE *romf;
 
     if (curtube!=-1) {
-        if (!tubes[curtube].bootrom[0]) // no boot ROM needed
+        if (!tubes[curtube].bootrom[0]) { // no boot ROM needed
             tubes[curtube].init(NULL);
+            tube_updatespeed();
+            tube_reset();
+        }
         else {
             if (!tube_dir)
                 tube_dir = al_create_path_for_directory("roms/tube");
