@@ -150,7 +150,7 @@ int main(int argc, char **argv)
                 }
                 else
                 {
-                        fprintf(stderr, "hdfmt: %s is not a valid size\n", argv[1]);
+                        fprintf(stderr, "hdfmt: %s is not a valid size\n", argv[2]);
                         status = 1;
                 }
         }
