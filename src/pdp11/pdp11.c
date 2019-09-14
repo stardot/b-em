@@ -110,7 +110,6 @@ void panic() {
    cpu.halted = 1;
 #ifndef TEST_MODE
    printstate();
-   while (1);
 #endif
 }
 
@@ -1458,12 +1457,14 @@ static void loop0() {
 }
 
 void pdp11_execute() {
-   uint16_t vec = setjmp(trapbuf);
-   if (vec == 0) {
-      loop0();
-   } else {
-      trapat(vec);
-   }
+    if (!cpu.halted) {
+        uint16_t vec = setjmp(trapbuf);
+        if (vec == 0) {
+            loop0();
+        } else {
+            trapat(vec);
+        }
+    }
 }
 
 void pdp11_switchmode(const bool newm) {
