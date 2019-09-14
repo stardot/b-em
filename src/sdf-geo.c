@@ -168,7 +168,7 @@ struct sdf_geometry sdf_geo_tab[] =
     { "ADFS-S",       SDF_SIDES_SINGLE,      SDF_DENS_DOUBLE, 40, 16,  256, new_adfs                },
     { "ADFS-M",       SDF_SIDES_SINGLE,      SDF_DENS_DOUBLE, 80, 16,  256, new_adfs                },
     { "ADFS-L",       SDF_SIDES_INTERLEAVED, SDF_DENS_DOUBLE, 80, 16,  256, new_adfs                },
-    { "ADFS-D",       SDF_SIDES_SEQUENTIAL,  SDF_DENS_DOUBLE, 80,  5, 1024, NULL                    },
+    { "ADFS-D",       SDF_SIDES_INTERLEAVED, SDF_DENS_DOUBLE, 80,  5, 1024, NULL                    },
     { "Acorn DFS",    SDF_SIDES_SINGLE,      SDF_DENS_SINGLE, 40, 10,  256, new_dfs_single          },
     { "Acorn DFS",    SDF_SIDES_INTERLEAVED, SDF_DENS_SINGLE, 40, 10,  256, new_dfs_interleaved     },
     { "Acorn DFS",    SDF_SIDES_SEQUENTIAL,  SDF_DENS_SINGLE, 40, 10,  256, NULL                    },
