@@ -31,3 +31,6 @@ src/jstest
 src/jstest.exe
 src/gtest
 src/gtest.exe
+src/fsmap
+src/hdfmt
+src/fdresize
