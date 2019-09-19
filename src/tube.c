@@ -343,7 +343,8 @@ void tube_reset(void)
         tubeula.ph3pos = 1;
         tubeula.r1stat = 0;
         tubeula.hstat[0] = tubeula.hstat[1] = tubeula.hstat[3] = 0x40;
-        tubeula.pstat[0] = tubeula.pstat[1] = tubeula.pstat[2] = tubeula.pstat[3] = 0x40;
+        tubeula.pstat[0] = 0x40;
+        tubeula.pstat[1] = tubeula.pstat[2] = tubeula.pstat[3] = 0x7f;
         tubeula.hstat[2] = 0xC0;
         tube_romin = 1;
 }
