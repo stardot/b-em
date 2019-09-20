@@ -64,36 +64,29 @@ void tube_updateints()
 
     if (((tubeula.r1stat & 2) && (tubeula.pstat[0] & 128)) || ((tubeula.r1stat & 4) && (tubeula.pstat[3] & 128))) {
         new_irq |= 1;
-        if (!(tube_irq & 1))
+        if (!(tube_irq & 1)) {
             log_debug("tube: parasite IRQ asserted");
+            if (tube_type == TUBEPDP11 && ((m_pdp11->PS >> 5) & 7) < 6)
+                pdp11_interrupt(0x84, 6);
+        }
     }
     else if (tube_irq & 1)
         log_debug("tube: parasite IRQ de-asserted");
 
     if (tubeula.r1stat & 8 && (tubeula.ph3pos == 0 || tubeula.hp3pos > (tubeula.r1stat & 16) ? 1 : 0)) {
         new_irq |= 2;
-        if (!(tube_irq & 2))
+        if (!(tube_irq & 2)) {
             log_debug("tube: parasite NMI asserted");
+            if (tube_type == TUBEPDP11)
+                pdp11_interrupt(0x80, 7);
+        }
     }
     else if (tube_irq & 2)
         log_debug("tube: parasite NMI de-asserted");
 
-    if (new_irq != tube_irq) {
-        switch(tube_type) {
-            case TUBE6809:
-                tube_6809_int(new_irq);
-                break;
-            case TUBEPDP11:
-                if (new_irq & 1 && !(tube_irq & 1))
-                    if (((m_pdp11->PS >> 5) & 7) < 6)
-                        pdp11_interrupt(0x84, 6);
-                if (new_irq & 2 && !(tube_irq & 2))
-                    pdp11_interrupt(0x80, 7);
-                break;
-            default:
-                break;
-        }
-    }
+    if (new_irq != tube_irq && tube_type == TUBE6809)
+        tube_6809_int(new_irq);
+
     tube_irq = new_irq;
 }
 
