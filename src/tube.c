@@ -62,10 +62,21 @@ void tube_updateints()
     if ((tubeula.r1stat & 1) && (tubeula.hstat[3] & 128))
         interrupt |= 8;
 
-    if (((tubeula.r1stat & 2) && (tubeula.pstat[0] & 128)) || ((tubeula.r1stat & 4) && (tubeula.pstat[3] & 128)))
+    if (((tubeula.r1stat & 2) && (tubeula.pstat[0] & 128)) || ((tubeula.r1stat & 4) && (tubeula.pstat[3] & 128))) {
         new_irq |= 1;
-    if (tubeula.r1stat & 8 && (tubeula.ph3pos == 0 || tubeula.hp3pos > (tubeula.r1stat & 16) ? 1 : 0))
+        if (!(tube_irq & 1))
+            log_debug("tube: parasite IRQ asserted");
+    }
+    else if (tube_irq & 1)
+        log_debug("tube: parasite IRQ de-asserted");
+
+    if (tubeula.r1stat & 8 && (tubeula.ph3pos == 0 || tubeula.hp3pos > (tubeula.r1stat & 16) ? 1 : 0)) {
         new_irq |= 2;
+        if (!(tube_irq & 2))
+            log_debug("tube: parasite NMI asserted");
+    }
+    else if (tube_irq & 2)
+        log_debug("tube: parasite NMI de-asserted");
 
     if (new_irq != tube_irq) {
         switch(tube_type) {
@@ -346,7 +357,8 @@ void tube_reset(void)
         tubeula.ph3pos = 1;
         tubeula.r1stat = 0;
         tubeula.hstat[0] = tubeula.hstat[1] = tubeula.hstat[3] = 0x40;
-        tubeula.pstat[0] = tubeula.pstat[1] = tubeula.pstat[2] = tubeula.pstat[3] = 0x40;
+        tubeula.pstat[0] = 0x40;
+        tubeula.pstat[1] = tubeula.pstat[2] = tubeula.pstat[3] = 0x7f;
         tubeula.hstat[2] = 0xC0;
         tube_romin = 1;
 }

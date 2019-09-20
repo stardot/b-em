@@ -1,6 +1,6 @@
 # Makefile.am for B-em
 
-bin_PROGRAMS = b-em jstest gtest
+bin_PROGRAMS = b-em hdfmt jstest gtest
 noinst_SCRIPTS = ../b-em
 CLEANFILES = $(noinst_SCRIPTS)
 
@@ -127,6 +127,8 @@ b_em_SOURCES = \
 if NO_TSEARCH
 b_em_SOURCES += tsearch.c
 endif
+
+hdfmt_SOURCES = hdfmt.c
 
 jstest_SOURCES = jstest.c
 
