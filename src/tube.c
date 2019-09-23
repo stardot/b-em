@@ -16,6 +16,7 @@
 #include "x86_tube.h"
 #include "z80.h"
 #include "pdp11/pdp11.h"
+#include "musahi/m68k.h"
 
 int tube_multipler = 1;
 int tube_speed_num = 0;
@@ -66,12 +67,19 @@ void tube_updateints()
         new_irq |= 1;
         if (!(tube_irq & 1)) {
             log_debug("tube: parasite IRQ asserted");
-            if (tube_type == TUBEPDP11 && ((m_pdp11->PS >> 5) & 7) < 6)
-                pdp11_interrupt(0x84, 6);
+            if (tube_type == TUBEPDP11) {
+                if (((m_pdp11->PS >> 5) & 7) < 6)
+                    pdp11_interrupt(0x84, 6);
+            }
+            else if (tube_type == TUBE68000)
+                m68k_set_virq(2, 1);
         }
     }
-    else if (tube_irq & 1)
+    else if (tube_irq & 1) {
         log_debug("tube: parasite IRQ de-asserted");
+        if (tube_type == TUBE68000)
+            m68k_set_virq(2, 0);
+    }
 
     if (tubeula.r1stat & 8 && (tubeula.ph3pos == 0 || tubeula.hp3pos > (tubeula.r1stat & 16) ? 1 : 0)) {
         new_irq |= 2;

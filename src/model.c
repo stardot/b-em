@@ -17,6 +17,7 @@
 #include "z80.h"
 #include "copro-pdp11.h"
 #include "pdp11/pdp11_debug.h"
+#include "mc68000tube.h"
 
 fdc_type_t fdc_type;
 bool BPLUS, x65c02, MASTER, MODELA, OS01, compactcmos;
@@ -64,7 +65,8 @@ TUBE tubes[NUM_TUBES]=
     {"32016",          tube_32016_init, n32016_reset,    &n32016_cpu_debug,    0x0000, "",                 8 },
     {"6502 External",  tube_6502_init,  tube_6502_reset, &tube6502_cpu_debug,  0x0800, "6502Tube",         3 },
     {"6809",           tube_6809_init,  mc6809nc_reset,  &mc6809nc_cpu_debug,  0x0800, "6809Tube",        16 },
-    {"PDP11",          tube_pdp11_init, copro_pdp11_rst, &pdp11_cpu_debug,     0x0800, "PDP11Tube",        2 }
+    {"PDP11",          tube_pdp11_init, copro_pdp11_rst, &pdp11_cpu_debug,     0x0800, "PDP11Tube",        2 },
+    {"68000",          tube_68000_init, tube_68000_rst,  &mc68000_cpu_debug,   0x8000, "CiscOS",           4 }
 };
 
 static fdc_type_t model_find_fdc(const char *name, const char *model)
