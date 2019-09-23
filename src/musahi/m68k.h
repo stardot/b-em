@@ -367,12 +367,12 @@ unsigned int m68k_is_valid_instruction(unsigned int instruction, unsigned int cp
 /* Disassemble 1 instruction using the epecified CPU type at pc.  Stores
  * disassembly in str_buff and returns the size of the instruction in bytes.
  */
-unsigned int m68k_disassemble(char* str_buff, unsigned int pc, unsigned int cpu_type);
+unsigned int m68k_disassemble(char* str_buff, unsigned bufsize, unsigned int pc, unsigned int cpu_type);
 
 /* Same as above but accepts raw opcode data directly rather than fetching
  * via the read/write interfaces.
  */
-unsigned int m68k_disassemble_raw(char* str_buff, unsigned int pc, const unsigned char* opdata, const unsigned char* argdata, unsigned int cpu_type);
+unsigned int m68k_disassemble_raw(char* str_buff, unsigned bufsize, unsigned int pc, const unsigned char* opdata, const unsigned char* argdata, unsigned int cpu_type);
 
 
 /* ======================================================================== */

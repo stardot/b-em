@@ -212,7 +212,7 @@ static void dbg_writemem(uint32_t addr, uint32_t value)
 static uint32_t dbg_disassemble(uint32_t addr, char *buf, size_t bufsize)
 {
     char *ptr = buf + snprintf(buf, bufsize, "%08X: ", addr);
-    unsigned isize = m68k_disassemble(ptr, addr, M68K_CPU_TYPE_68020);
+    unsigned isize = m68k_disassemble(ptr, bufsize-10, addr, M68K_CPU_TYPE_68020);
     return addr + isize;
 }
 

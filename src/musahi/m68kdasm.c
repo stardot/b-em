@@ -376,7 +376,7 @@ static char* make_signed_hex_str_32(uint val)
 /* make string of immediate value */
 static char* get_imm_str_s(uint size)
 {
-    static char str[15];
+    static char str[22];
     if(size == 0)
         sprintf(str, "#%s", make_signed_hex_str_8(read_imm_8()));
     else if(size == 1)
@@ -3440,7 +3440,7 @@ static void build_opcode_table(void)
 /* ======================================================================== */
 
 /* Disasemble one instruction at pc and store in str_buff */
-unsigned int m68k_disassemble(char* str_buff, unsigned int pc, unsigned int cpu_type)
+unsigned int m68k_disassemble(char* str_buff, unsigned int bufsize, unsigned int pc, unsigned int cpu_type)
 {
     if(!g_initialized)
     {
@@ -3482,25 +3482,25 @@ unsigned int m68k_disassemble(char* str_buff, unsigned int pc, unsigned int cpu_
     g_cpu_ir = read_imm_16();
     g_opcode_type = 0;
     g_instruction_table[g_cpu_ir]();
-    sprintf(str_buff, "%s%s", g_dasm_str, g_helper_str);
+    snprintf(str_buff, bufsize, "%s%s", g_dasm_str, g_helper_str);
     return COMBINE_OPCODE_FLAGS(g_cpu_pc - pc);
 }
 
 char* m68ki_disassemble_quick(unsigned int pc, unsigned int cpu_type)
 {
-    static char buff[100];
+    static char buff[200];
     buff[0] = 0;
-    m68k_disassemble(buff, pc, cpu_type);
+    m68k_disassemble(buff, sizeof buff, pc, cpu_type);
     return buff;
 }
 
-unsigned int m68k_disassemble_raw(char* str_buff, unsigned int pc, const unsigned char* opdata, const unsigned char* argdata, unsigned int cpu_type)
+unsigned int m68k_disassemble_raw(char* str_buff, unsigned buff_size, unsigned int pc, const unsigned char* opdata, const unsigned char* argdata, unsigned int cpu_type)
 {
     unsigned int result;
 
     g_rawop = opdata;
     g_rawbasepc = pc;
-    result = m68k_disassemble(str_buff, pc, cpu_type);
+    result = m68k_disassemble(str_buff, buff_size, pc, cpu_type);
     g_rawop = NULL;
     return result;
 }
