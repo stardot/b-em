@@ -118,7 +118,7 @@ void main_reset()
     else               tube_exec = NULL;
     tube_reset();
 
-    memset(ram, 0, 64 * 1024);
+    memset(ram, 0, RAM_SIZE);
 }
 
 static const char helptext[] =
@@ -376,6 +376,7 @@ static void main_key_down(ALLEGRO_EVENT *event)
             wd1770_reset();
             sid_reset();
             music5000_reset();
+            cmos_reset();
 
             if (curtube != -1)
                 tubes[curtube].reset();

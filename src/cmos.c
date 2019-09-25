@@ -179,6 +179,7 @@ uint8_t cmos_read_data_integra(void)
             if (++uip_count == 100) {
                 val |= 0x80;
                 uip_count = 0;
+                log_debug("cmos: read_data_integra, faking update");
             }
             log_debug("cmos: read_data_integra, return register A %02X", cmos_data);
         }
@@ -186,6 +187,12 @@ uint8_t cmos_read_data_integra(void)
             log_debug("cmos: read_data_integra, return RAM data %02X", cmos_data);
     }
     return val;
+}
+
+void cmos_reset(void)
+{
+    cmos[0xb] &= 0x87; /* clear bits in register B */
+    cmos[0xc] = 0;
 }
 
 void cmos_load(MODEL m) {
