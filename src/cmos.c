@@ -181,10 +181,10 @@ uint8_t cmos_read_data_integra(void)
                 uip_count = 0;
                 log_debug("cmos: read_data_integra, faking update");
             }
-            log_debug("cmos: read_data_integra, return register A %02X", cmos_data);
+            log_debug("cmos: read_data_integra, return register A %02X", val);
         }
         else
-            log_debug("cmos: read_data_integra, return RAM data %02X", cmos_data);
+            log_debug("cmos: read_data_integra, return RAM data %02X", val);
     }
     return val;
 }
