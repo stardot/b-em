@@ -168,7 +168,7 @@ struct sdf_geometry sdf_geo_tab[] =
     { "ADFS-S",       SDF_SIDES_SINGLE,      SDF_DENS_DOUBLE, 40, 16,  256, new_adfs                },
     { "ADFS-M",       SDF_SIDES_SINGLE,      SDF_DENS_DOUBLE, 80, 16,  256, new_adfs                },
     { "ADFS-L",       SDF_SIDES_INTERLEAVED, SDF_DENS_DOUBLE, 80, 16,  256, new_adfs                },
-    { "ADFS-D",       SDF_SIDES_SEQUENTIAL,  SDF_DENS_DOUBLE, 80,  5, 1024, NULL                    },
+    { "ADFS-D",       SDF_SIDES_INTERLEAVED, SDF_DENS_DOUBLE, 80,  5, 1024, NULL                    },
     { "Acorn DFS",    SDF_SIDES_SINGLE,      SDF_DENS_SINGLE, 40, 10,  256, new_dfs_single          },
     { "Acorn DFS",    SDF_SIDES_INTERLEAVED, SDF_DENS_SINGLE, 40, 10,  256, new_dfs_interleaved     },
     { "Acorn DFS",    SDF_SIDES_SEQUENTIAL,  SDF_DENS_SINGLE, 40, 10,  256, NULL                    },
@@ -286,6 +286,10 @@ static int32_t dfs_size(FILE *fp, long offset)
                     base += 8;
                     dirsize -= 8;
                     new_start = ((base[6] & 0x03) << 8) | base[7];
+                    if (new_start == 0) {
+                        log_debug("sdf: impossible start position");
+                        return -1;
+                    }
                     if (new_start > cur_start) {
                         log_debug("sdf: catalogue not sorted");
                         return -1;
@@ -326,10 +330,17 @@ static const struct sdf_geometry *find_geo_dfs(const char *fn, const char *ext, 
         }
         track_bytes = geo->sectors_per_track * geo->sector_size;
         side_bytes = track_bytes * geo->tracks;
-        if (fsize > side_bytes && dfs_size(fp, side_bytes) >= 3)
-            geo += 2; // sequential sided-version.
-        else if (!strcasecmp(ext, "dsd") || !strcasecmp(ext, "ddd"))
-            geo++;    // interleaved side version.
+        if (fsize > track_bytes) {
+            if (dfs_size(fp, track_bytes) >= 3) {
+                geo++;      // interleaved side version.
+                if (dfs_size(fp, side_bytes) >= 3 && strcasecmp(ext, "dsd") && strcasecmp(ext, "ddd"))
+                    geo++;  // sequential side version.
+            }
+            else if (dfs_size(fp, side_bytes) >= 3)
+                geo += 2;   // sequential side version.
+            else if (!strcasecmp(ext, "dsd") || !strcasecmp(ext, "ddd"))
+                geo++;      // interleaved side version.
+        }
         return geo;
     }
     return NULL;

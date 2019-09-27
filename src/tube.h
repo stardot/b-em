@@ -25,7 +25,6 @@ typedef struct {
 extern tube_speed_t tube_speeds[NUM_TUBE_SPEEDS];
 extern int tube_speed_num, tube_multipler;
 
-void tube_reset(void);
 bool tube_32016_init(void *rom);
 
 uint8_t (*tube_readmem)(uint32_t addr);

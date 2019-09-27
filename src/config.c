@@ -219,9 +219,12 @@ void config_save(void)
         set_config_path("disc", "disc0", discfns[0]);
         set_config_path("disc", "disc1", discfns[1]);
         set_config_string("disc", "mmb", mmb_fn);
-        set_config_path("tape", "tape", tape_fn);
-
         set_config_bool("disc", "defaultwriteprotect", defaultwriteprot);
+
+        if (tape_loaded)
+            al_set_config_value(bem_cfg, "tape", "tape", al_path_cstr(tape_fn, ALLEGRO_NATIVE_PATH_SEP));
+        else
+            al_remove_config_key(bem_cfg, "tape", "tape");
 
         set_config_int(NULL, "model", curmodel);
         set_config_int(NULL, "tube", selecttube);

@@ -4,6 +4,7 @@
 
 #include "6502.h"
 #include "ide.h"
+#include "config.h"
 #include "debugger.h"
 #include "ddnoise.h"
 #include "disc.h"
@@ -178,8 +179,8 @@ static ALLEGRO_MENU *create_tape_menu(void)
     ALLEGRO_MENU *speed = al_create_menu();
     int nflags, fflags;
     al_append_menu_item(menu, "Load tape...", IDM_TAPE_LOAD, 0, NULL, NULL);
-    al_append_menu_item(menu, "Rewind tape", IDM_TAPE_EJECT, 0, NULL, NULL);
-    al_append_menu_item(menu, "Eject tape", IDM_TAPE_REWIND, 0, NULL, NULL);
+    al_append_menu_item(menu, "Rewind tape", IDM_TAPE_REWIND, 0, NULL, NULL);
+    al_append_menu_item(menu, "Eject tape", IDM_TAPE_EJECT, 0, NULL, NULL);
     al_append_menu_item(menu, "Catalogue tape", IDM_TAPE_CAT, 0, NULL, NULL);
     if (fasttape) {
         nflags = ALLEGRO_MENU_ITEM_CHECKBOX;
@@ -239,12 +240,20 @@ static ALLEGRO_MENU *create_rom_menu(void)
 static void update_rom_menu(void)
 {
     ALLEGRO_MENU *menu = rom_menu;
-    int slot;
+    ALLEGRO_MENU *sub;
+    int slot, flags;
     char label[ROM_LABEL_LEN];
 
     for (slot = ROM_NSLOT-1; slot >= 0; slot--) {
         gen_rom_label(slot, label);
         al_set_menu_item_caption(menu, slot-ROM_NSLOT+1, label);
+        sub = al_find_menu(menu, slot+1);
+        if (sub) {
+            flags = rom_slots[slot].swram ? ALLEGRO_MENU_ITEM_CHECKBOX|ALLEGRO_MENU_ITEM_CHECKED : ALLEGRO_MENU_ITEM_CHECKBOX;
+            al_set_menu_item_flags(sub, menu_id_num(IDM_ROMS_RAM, slot), flags);
+        }
+        else
+            log_debug("gui-allegro: ROM sub-menu not found for slot %d", slot);
     }
 }
 
@@ -864,6 +873,7 @@ static void change_model(ALLEGRO_EVENT *event)
 {
     ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
     al_set_menu_item_flags(menu, menu_id_num(IDM_MODEL, curmodel), ALLEGRO_MENU_ITEM_CHECKBOX);
+    config_save();
     oldmodel = curmodel;
     curmodel = menu_get_num(event);
     main_restart();
