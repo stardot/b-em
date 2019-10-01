@@ -474,7 +474,7 @@ static inline void page_rom(int rom_no, int rom_sel, int start, int end)
 #define INTEGRA_MEMSEL 0x80
 #define INTEGRA_PRVEN  0x40
 
-static inline void write_romsel(int val)
+static void write_romsel(int val)
 {
     int ram1k = 0, ram4k = 0, ram8k = 0;
     int rom_no = val & 0x0f;
@@ -706,17 +706,24 @@ static void do_writemem(uint32_t addr, uint32_t val)
             break;
 
         case 0xFE34:
-            write_acccon(val);
+            if (MASTER || BPLUS)
+                write_acccon(val);
+            else
+                write_romsel(val);
             break;
 
         case 0xFE38:
             if (integra)
                 cmos_write_addr_integra(val);
+            else if (!MASTER && !BPLUS)
+                write_romsel(val);
             break;
 
         case 0xFE3C:
             if (integra)
                 cmos_write_data_integra(val);
+            else if (!MASTER && !BPLUS)
+                write_romsel(val);
             break;
 
         case 0xFE40:
