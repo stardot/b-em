@@ -381,5 +381,7 @@ void fdi_load(int drive, const char *fn)
         drives[drive].poll        = fdi_poll;
         drives[drive].format      = fdi_format;
         drives[drive].abort       = fdi_abort;
+        drives[drive].spinup      = NULL;
+        drives[drive].spindown    = NULL;
 }
 

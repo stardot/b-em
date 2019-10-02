@@ -86,6 +86,9 @@ void i8271_spinup()
         motoron = 1;
         motorspin = 0;
         ddnoise_spinup();
+        for (int i = 0; i < NUM_DRIVES; i++)
+            if (drives[i].spinup)
+                drives[i].spinup(i);
     }
 }
 
@@ -94,6 +97,9 @@ void i8271_spindown()
     if (motoron) {
         motoron = 0;
         ddnoise_spindown();
+        for (int i = 0; i < NUM_DRIVES; i++)
+            if (drives[i].spindown)
+                drives[i].spindown(i);
     }
     i8271.drvout &= ~DRIVESEL;
 }

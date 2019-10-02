@@ -72,6 +72,8 @@ void disc_init()
         drives[0].poll = drives[1].poll = 0;
         drives[0].seek = drives[1].seek = 0;
         drives[0].readsector = drives[1].readsector = 0;
+        drives[0].spinup = drives[1].spinup = 0;
+        drives[0].spindown = drives[1].spindown = 0;
         curdrive = 0;
 }
 
