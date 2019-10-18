@@ -493,9 +493,11 @@ void main_run()
                 gui_allegro_event(&event);
                 main_resume();
                 break;
+#ifndef HAVE_PULSE_SIMPLE_H
             case ALLEGRO_EVENT_AUDIO_STREAM_FRAGMENT:
                 music5000_streamfrag();
                 break;
+#endif
             case ALLEGRO_EVENT_DISPLAY_RESIZE:
                 video_update_window_size(&event);
                 break;

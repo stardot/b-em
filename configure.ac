@@ -1,8 +1,8 @@
 # configure.ac for B-em
 
 AC_INIT([B-em],
-	m4_esyscmd_s([utils/b-em-version-str.sh]),
-	[thomas@xteddy.org])
+    m4_esyscmd_s([utils/b-em-version-str.sh]),
+    [thomas@xteddy.org])
 
 AC_CONFIG_AUX_DIR(etc)
 AM_INIT_AUTOMAKE([-Wall -Werror foreign subdir-objects])
@@ -20,7 +20,7 @@ ISRELEASED="no"
 
 AC_MSG_CHECKING([whether to enable debugging])
 AC_ARG_ENABLE(debug,
-	      AC_HELP_STRING([--enable-debug], [build debug executable]))
+          AC_HELP_STRING([--enable-debug], [build debug executable]))
 
 CF_WARNINGS="-Wall -Wno-format-security"
 CFLAGS="$CFLAGS $CF_WARNINGS -std=gnu11 -D_GNU_SOURCE"
@@ -74,7 +74,7 @@ AC_CHECK_FUNCS([asprintf atexit floor memset mkdir pow rmdir sqrt stpcpy strcase
 # Check tsearch for tdestroy and include that for non-GNU systems.
 AC_CHECK_FUNC(tdestroy, found_tdestroy=yes, found_tdestroy=no)
 if test "x$found_tdestroy" = xyes; then
-	AC_DEFINE(HAVE_TDESTROY)
+    AC_DEFINE(HAVE_TDESTROY)
 fi
 
 AM_CONDITIONAL(NO_TSEARCH, [test x"$found_tdestroy" = xno ])
@@ -83,6 +83,11 @@ AM_CONDITIONAL(NO_TSEARCH, [test x"$found_tdestroy" = xno ])
 AC_CHECK_HEADERS(jack/jack.h alsa/asoundlib.h)
 AC_SEARCH_LIBS(jack_port_register,jack jack2)
 AC_CHECK_LIB(asound,snd_rawmidi_open)
+
+# Check for Pulse audio (Linux)
+AC_CHECK_HEADERS(pulse/simple.h pulse/error.h)
+AC_CHECK_LIB(pulse-simple,pa_simple_new)
+AC_CHECK_LIB(pulse,pa_strerror)
 
 AC_OUTPUT([Makefile src/Makefile])
 

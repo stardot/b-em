@@ -31,6 +31,13 @@
 #include "sound.h"
 #include "savestate.h"
 
+#ifdef HAVE_PULSE_SIMPLE_H
+
+#include <pulse/simple.h>
+#include <pulse/error.h>
+
+#endif
+
 #define I_WAVEFORM(n) ((n)*128)
 #define I_WFTOP (14*128)
 
@@ -68,11 +75,15 @@ static struct synth m5000, m3000;
 size_t buflen_m5 = BUFLEN_M5;
 FILE *music5000_fp;
 
+#ifdef HAVE_PULSE_SIMPLE_H
+static ALLEGRO_THREAD *m5000_thread;
+#else
 static ALLEGRO_VOICE *voice;
 static ALLEGRO_MIXER *mixer;
 static ALLEGRO_AUDIO_STREAM *stream;
-static bool rec_started;
+#endif
 
+static bool rec_started;
 static ushort antilogtable[128];
 
 static void synth_reset(struct synth *s)
@@ -152,34 +163,6 @@ void music5000_savestate(FILE *f) {
         synth_savestate(&m3000, f);
     } else
         putc('m', f);
-}
-
-void music5000_init(ALLEGRO_EVENT_QUEUE *queue)
-{
-    int n;
-
-    if ((voice = al_create_voice(FREQ_M5, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_2))) {
-        if ((mixer = al_create_mixer(FREQ_M5, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_2))) {
-            if (al_attach_mixer_to_voice(mixer, voice)) {
-                if ((stream = al_create_audio_stream(4, BUFLEN_M5, FREQ_M5, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_2))) {
-                    if (al_attach_audio_stream_to_mixer(stream, mixer)) {
-                        al_register_event_source(queue, al_get_audio_stream_event_source(stream));
-                        for (n = 0; n < 128; n++) {
-                            //12-bit antilog as per AM6070 datasheet
-                            int S = n & 15, C = n >> 4;
-                            antilogtable[n] = (ushort)(2 * (pow(2.0, C)*(S + 16.5) - 16.5));
-                        }
-                        music5000_reset();
-                    } else
-                        log_error("sound: unable to attach stream to mixer for Music 5000");
-                } else
-                    log_error("sound: unable to create stream for Music 5000");
-            } else
-                log_error("sound: unable to attach mixer to voice for Music 5000");
-        } else
-            log_error("sound: unable to create mixer for Music 5000");
-    } else
-        log_error("sound: unable to create voice for Music 5000");
 }
 
 FILE *music5000_rec_start(const char *filename)
@@ -505,20 +488,82 @@ static void music5000_fillbuf(int16_t *buffer, int len) {
     }
 }
 
-void music5000_streamfrag(void)
+static void calc_antilog(void)
 {
-    int16_t *buf;
-
-    // This function is called when a audio stream fragment available
-    // event is received in the main event handling loop but the event
-    // does not specify for which stream a new fragment has become
-    // available so we need to check if it is this one!
-
-    if (sound_music5000) {
-        if ((buf = al_get_audio_stream_fragment(stream))) {
-            music5000_fillbuf(buf, BUFLEN_M5);
-            al_set_audio_stream_fragment(stream, buf);
-            al_set_audio_stream_playing(stream, true);
-        }
+    for (int n = 0; n < 128; n++) {
+        //12-bit antilog as per AM6070 datasheet
+        int S = n & 15, C = n >> 4;
+        antilogtable[n] = (ushort)(2 * (pow(2.0, C)*(S + 16.5) - 16.5));
     }
 }
+
+#ifdef HAVE_PULSE_SIMPLE_H
+
+static void *m5000_thread_proc(ALLEGRO_THREAD *thread, void *udata)
+{
+    pa_simple *s;
+    pa_sample_spec ss;
+    int error;
+    int16_t *buf;
+    size_t bytes;
+
+    ss.format = PA_SAMPLE_S16LE;
+    ss.channels = 2;
+    ss.rate = FREQ_M5;
+
+    if ((s = pa_simple_new(NULL, "B-Em Music 5000", PA_STREAM_PLAYBACK, NULL, "Music", &ss, NULL, NULL, &error))) {
+        bytes = buflen_m5 * 2 * sizeof(int16_t);
+        if ((buf = malloc(bytes))) {
+            calc_antilog();
+            music5000_reset();
+            while (!al_get_thread_should_stop(thread)) {
+                music5000_fillbuf(buf, buflen_m5);
+                if (pa_simple_write(s, buf, bytes, &error) < 0)
+                    log_warn("music5000: unable to send Music 5000 samples: %s", pa_strerror(error));
+            }
+            if (pa_simple_drain(s, &error) < 0)
+                log_warn("music5000: unable to send Music 5000 samples: %s", pa_strerror(error));
+        }
+        else
+            log_error("music5000: no space for Music 5000 sound buffer");
+
+        pa_simple_free(s);
+    }
+    else
+        log_error("music5000: unable to connect to PulseAudio: %s", pa_strerror(error));
+    return NULL;
+}
+
+void music5000_init(ALLEGRO_EVENT_QUEUE *queue)
+{
+    if ((m5000_thread = al_create_thread(m5000_thread_proc, NULL)))
+        al_start_thread(m5000_thread);
+}
+
+#else
+
+void music5000_init(ALLEGRO_EVENT_QUEUE *queue)
+{
+    int n;
+
+    if ((voice = al_create_voice(FREQ_M5, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_2))) {
+        if ((mixer = al_create_mixer(FREQ_M5, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_2))) {
+            if (al_attach_mixer_to_voice(mixer, voice)) {
+                if ((stream = al_create_audio_stream(4, BUFLEN_M5, FREQ_M5, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_2))) {
+                    if (al_attach_audio_stream_to_mixer(stream, mixer)) {
+                        al_register_event_source(queue, al_get_audio_stream_event_source(stream));
+                        calc_antilog();
+                        music5000_reset();
+                    } else
+                        log_error("sound: unable to attach stream to mixer for Music 5000");
+                } else
+                    log_error("sound: unable to create stream for Music 5000");
+            } else
+                log_error("sound: unable to attach mixer to voice for Music 5000");
+        } else
+            log_error("sound: unable to create mixer for Music 5000");
+    } else
+        log_error("sound: unable to create voice for Music 5000");
+}
+
+#endif
