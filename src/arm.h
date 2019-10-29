@@ -14,14 +14,10 @@
 //void dumparmregs();
 //int databort;
 
-bool arm_init(FILE *romf);
+bool arm_init(void *rom);
 void arm_reset(void);
 void arm_exec(void);
 void arm_close(void);
-void arm_savestate(ZFILE *zfp);
-void arm_loadstate(ZFILE *zfp);
-uint8_t readarmb(uint32_t addr);
-void writearmb(uint32_t addr, uint8_t val);
 
 extern cpu_debug_t tubearm_cpu_debug;
 

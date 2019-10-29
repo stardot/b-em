@@ -4,6 +4,8 @@
 #include "model.h"
 #include "config.h"
 #include "cmos.h"
+#include "6809tube.h"
+#include "mc6809nc/mc6809_debug.h"
 #include "mem.h"
 #include "tube.h"
 #include "NS32016/32016.h"
@@ -52,13 +54,14 @@ extern cpu_debug_t n32016_cpu_debug;
 
 TUBE tubes[NUM_TUBES]=
 {
-    {"6502 Internal",  tube_6502_init,  tube_6502_reset, &tube6502_cpu_debug,  "6502Intern",       4 },
-    {"ARM",            tube_arm_init,   arm_reset,       &tubearm_cpu_debug,   "ARMeval_100",      4 },
-    {"Z80",            tube_z80_init,   z80_reset,       &tubez80_cpu_debug,   "Z80_122",          6 },
-    {"80186",          tube_x86_init,   x86_reset,       &tubex86_cpu_debug,   "BIOS",             8 },
-    {"65816",          tube_65816_init, w65816_reset,    &tube65816_cpu_debug, "ReCo6502ROM_816", 16 },
-    {"32016",          tube_32016_init, n32016_reset,    &n32016_cpu_debug,    "",                 8 },
-    {"6502 External",  tube_6502_init,  tube_6502_reset, &tube6502_cpu_debug,  "6502Tube",         3 }
+    {"6502 Internal",  tube_6502_init,  tube_6502_reset, &tube6502_cpu_debug,  0x0800, "6502Intern",       4 },
+    {"ARM",            arm_init,        arm_reset,       &tubearm_cpu_debug,   0x4000, "ARMeval_100",      4 },
+    {"Z80",            z80_init,        z80_reset,       &tubez80_cpu_debug,   0x1000, "Z80_122",          6 },
+    {"80186",          x86_init,        x86_reset,       &tubex86_cpu_debug,   0x4000, "BIOS",             8 },
+    {"65816",          w65816_init,     w65816_reset,    &tube65816_cpu_debug, 0x8000, "ReCo6502ROM_816", 16 },
+    {"32016",          tube_32016_init, n32016_reset,    &n32016_cpu_debug,    0x0000, "",                 8 },
+    {"6502 External",  tube_6502_init,  tube_6502_reset, &tube6502_cpu_debug,  0x0800, "6502Tube",         3 },
+    {"6809",           tube_6809_init,  mc6809nc_reset,  &mc6809nc_cpu_debug,  0x0800, "6809Tube",        16 }
 };
 
 static fdc_type_t model_find_fdc(const char *name, const char *model)
@@ -155,39 +158,53 @@ void model_check(void) {
     }
 }
 
+static void *tuberom = NULL;
+
 static void tube_init(void)
 {
     ALLEGRO_PATH *path;
     const char *cpath;
     FILE *romf;
-    bool res;
 
     if (curtube!=-1) {
-        if (!tubes[curtube].bootrom[0]) // no boot ROM needed
+        if (!tubes[curtube].bootrom[0]) { // no boot ROM needed
             tubes[curtube].init(NULL);
+            tube_updatespeed();
+            tube_reset();
+        }
         else {
             if (!tube_dir)
                 tube_dir = al_create_path_for_directory("roms/tube");
             if ((path = find_dat_file(tube_dir, tubes[curtube].bootrom, ".rom"))) {
                 cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
                 if ((romf = fopen(cpath, "rb"))) {
-                    res = tubes[curtube].init(romf);
-                    fclose(romf);
-                    if (res) {
-                        tube_updatespeed();
-                        tube_reset();
+                    int rom_size = tubes[curtube].rom_size;
+                    log_debug("model: rom_size=%X", rom_size);
+                    if (tuberom)
+                        free(tuberom);
+                    if ((tuberom = malloc(rom_size))) {
+                        log_debug("model: tuberom=%p, romf=%p", tuberom, romf);
+                        if (fread(tuberom, rom_size, 1, romf) == 1) {
+                            fclose(romf);
+                            if (tubes[curtube].init(tuberom)) {
+                                tube_updatespeed();
+                                tube_reset();
+                                return;
+                            }
+                        }
+                        else {
+                            log_error("model: error reading boot rom %s for tube %s: %s", cpath, tubes[curtube].name, strerror(errno));
+                            fclose(romf);
+                        }
                     }
-                    else {
-                        log_error("model: error reading boot rom %s for tube %s: %s", cpath, tubes[curtube].name, strerror(errno));
-                        curtube = -1;
-                    }
+                    else
+                        log_error("model: no space for ROM for tube %s", tubes[curtube].name);
                 } else
                     log_error("model: unable to open boot rom %s for tube %s: %s", cpath, tubes[curtube].name, strerror(errno));
                 al_destroy_path(path);
-            } else {
+            } else
                 log_error("model: boot rom %s for tube %s not found", tubes[curtube].bootrom, tubes[curtube].name);
-                curtube = -1;
-            }
+            curtube = -1;
         }
     }
 }

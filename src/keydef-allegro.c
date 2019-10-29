@@ -361,7 +361,6 @@ static void *keydef_thread(ALLEGRO_THREAD *thread, void *tdata)
     int mid_x, ok_x, can_x;
 
     if (!font) {
-        al_init_primitives_addon();
         al_init_font_addon();
         font = al_create_builtin_font();
         if (!font)

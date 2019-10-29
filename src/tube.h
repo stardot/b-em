@@ -4,6 +4,18 @@
 #include "savestate.h"
 #include <stdbool.h>
 
+typedef enum {
+    TUBE6502,
+    TUBEZ80,
+    TUBEARM,
+    TUBEX86,
+    TUBE65816,
+    TUBE32016,
+    TUBE6809
+} tubetype;
+
+extern tubetype tube_type;
+
 typedef struct {
     const char *name;
     float multipler;
@@ -13,20 +25,17 @@ typedef struct {
 extern tube_speed_t tube_speeds[NUM_TUBE_SPEEDS];
 extern int tube_speed_num, tube_multipler;
 
-void tube_reset(void);
-bool tube_6502_init(FILE *romf);
-bool tube_arm_init(FILE *romf);
-bool tube_z80_init(FILE *romf);
-bool tube_x86_init(FILE *romf);
-bool tube_65816_init(FILE *romf);
-bool tube_32016_init(FILE *romf);
+bool tube_32016_init(void *rom);
 
 uint8_t (*tube_readmem)(uint32_t addr);
 void (*tube_writemem)(uint32_t addr, uint8_t byte);
 void (*tube_exec)(void);
 void (*tube_proc_savestate)(ZFILE *zfp);
 void (*tube_proc_loadstate)(ZFILE *zfp);
+
 extern int tubecycles;
+static inline void tubeUseCycles(int c) {tubecycles -= c;}
+static inline int tubeContinueRunning() {return tubecycles > 0;}
 
 uint8_t tube_host_read(uint16_t addr);
 void    tube_host_write(uint16_t addr, uint8_t val);

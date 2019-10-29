@@ -219,7 +219,7 @@ static size_t dbg_reg_print(int which, char *buf, size_t bufsize)
     }
 }
 
-static void dbg_reg_parse(int which, char *str)
+static void dbg_reg_parse(int which, const char *str)
 {
     uint32_t value = strtol(str, NULL, 16);
     dbg_reg_set(which, value);
@@ -271,7 +271,7 @@ static uint32_t do_readmem65816(uint32_t a)
     return w65816ram[a];
 }
 
-uint8_t readmem65816(uint32_t addr)
+static uint8_t readmem65816(uint32_t addr)
 {
     uint32_t value = do_readmem65816(addr);
     if (dbg_w65816)
@@ -292,7 +292,7 @@ static uint16_t readmemw65816(uint32_t a)
 
 int endtimeslice;
 
-void do_writemem65816(uint32_t a, uint32_t v)
+static void do_writemem65816(uint32_t a, uint32_t v)
 {
     a &= w65816mask;
     cycles--;
@@ -337,7 +337,7 @@ void do_writemem65816(uint32_t a, uint32_t v)
     w65816ram[a] = v;
 }
 
-void writemem65816(uint32_t addr, uint8_t val)
+static void writemem65816(uint32_t addr, uint8_t val)
 {
     if (dbg_w65816)
         debug_memwrite(&tube65816_cpu_debug, addr, val, 1);
@@ -5600,21 +5600,10 @@ void w65816_reset(void)
     cycles = 0;
 }
 
-bool w65816_init(FILE * romf)
-{
-    if (!w65816rom)
-        w65816rom = malloc(W65816_ROM_SIZE);
-    if (!w65816ram)
-        w65816ram = malloc(W65816_RAM_SIZE);
-    return fread(w65816rom, 0x8000, 1, romf) == 1;
-}
-
 void w65816_close(void)
 {
     if (w65816ram)
         free(w65816ram);
-    if (w65816rom)
-        free(w65816rom);
 }
 
 static inline unsigned char *save_reg(unsigned char *ptr, reg * rp)
@@ -5624,7 +5613,7 @@ static inline unsigned char *save_reg(unsigned char *ptr, reg * rp)
     return ptr;
 }
 
-void w65816_savestate(ZFILE * zfp)
+static void w65816_savestate(ZFILE * zfp)
 {
     unsigned char bytes[38], *ptr;
 
@@ -5659,7 +5648,7 @@ static inline unsigned char *load_reg(unsigned char *ptr, reg * rp)
     return ptr;
 }
 
-void w65816_loadstate(ZFILE * zfp)
+static void w65816_loadstate(ZFILE * zfp)
 {
     unsigned char bytes[38], *ptr;
 
@@ -5685,6 +5674,26 @@ void w65816_loadstate(ZFILE * zfp)
     ptr = load_uint16(ptr, &toldpc);
     savestate_zread(zfp, w65816ram, W65816_RAM_SIZE);
     savestate_zread(zfp, w65816rom, W65816_ROM_SIZE);
+}
+
+bool w65816_init(void *rom)
+{
+    if (!w65816ram) {
+        w65816ram = malloc(W65816_RAM_SIZE);
+        if (!w65816ram) {
+            log_error("65816: unable to allocate RAM");
+            return false;
+        }
+    }
+    w65816rom = rom;
+    tube_type = TUBE65816;
+    tube_readmem = readmem65816;
+    tube_writemem = writemem65816;
+    tube_exec  = w65816_exec;
+    tube_proc_savestate = w65816_savestate;
+    tube_proc_loadstate = w65816_loadstate;
+    w65816_reset();
+    return true;
 }
 
 static void nmi65816(void)

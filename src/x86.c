@@ -331,7 +331,7 @@ static size_t x86_dbg_reg_print(int which, char *buf, size_t bufsize) {
 };
 
 // Parse a value into a register.
-static void x86_dbg_reg_parse(int which, char *strval) {
+static void x86_dbg_reg_parse(int which, const char *strval) {
    uint32_t val = 0;
    sscanf(strval, "%"SCNx32, &val);
    x86_dbg_reg_set(which, val);
@@ -615,19 +615,12 @@ void x86_reset()
         makemod1table();
 }
 
-bool x86_init(FILE *romf)
-{
-        if (!x86ram) x86ram=malloc(X86_RAM_SIZE);
-        if (!x86rom) x86rom=malloc(X86_ROM_SIZE);
-        x86makeznptable();
-        memset(x86ram,0,X86_RAM_SIZE);
-        return fread(x86rom, X86_ROM_SIZE, 1, romf) == 1;
-}
-
 void x86_close()
 {
-        if (x86rom) free(x86rom);
-        if (x86ram) free(x86ram);
+    if (x86ram) {
+        free(x86ram);
+        x86ram = NULL;
+    }
 }
 
 static unsigned char *save_seg(unsigned char *ptr, x86seg *seg)
@@ -639,7 +632,7 @@ static unsigned char *save_seg(unsigned char *ptr, x86seg *seg)
     return ptr;
 }
 
-void x86_savestate(ZFILE *zfp)
+static void x86_savestate(ZFILE *zfp)
 {
     unsigned char bytes[150], *ptr;
     int i;
@@ -686,7 +679,7 @@ static unsigned char *load_seg(unsigned char *ptr, x86seg *seg)
     return ptr;
 }
 
-void x86_loadstate(ZFILE *zfp)
+static void x86_loadstate(ZFILE *zfp)
 {
     unsigned char bytes[150], *ptr;
     int i;
@@ -722,6 +715,28 @@ void x86_loadstate(ZFILE *zfp)
     ptr = load_uint16(ptr, &oldcs);
     savestate_zread(zfp, x86ram, X86_RAM_SIZE);
     savestate_zread(zfp, x86rom, X86_ROM_SIZE);
+}
+
+bool x86_init(void *rom)
+{
+    if (!x86ram) {
+        x86ram = malloc(X86_RAM_SIZE);
+        if (!x86ram) {
+            log_error("x86: unable to allocate RAM");
+            return false;
+        }
+    }
+    x86rom = rom;
+    x86makeznptable();
+    memset(x86ram,0,X86_RAM_SIZE);
+    tube_type = TUBEX86;
+    tube_readmem = x86_readmem;
+    tube_writemem = x86_writemem;
+    tube_exec  = x86_exec;
+    tube_proc_savestate = x86_savestate;
+    tube_proc_loadstate = x86_loadstate;
+    x86_reset();
+    return true;
 }
 
 static void setznp8(uint8_t val)

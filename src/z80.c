@@ -32,9 +32,10 @@ static uint16_t pc,sp;
 static int iff1,iff2;
 static int z80int;
 static int im;
-static uint8_t z80ram[0x10000];
-static uint8_t z80rom[4096];
 
+#define Z80_RAM_SIZE 0x10000
+
+static uint8_t *z80ram, *z80rom;
 static int z80_oldnmi;
 
 #define N_FLAG 0x80
@@ -396,7 +397,7 @@ static size_t dbg_z80_reg_print(int which, char *buf, size_t bufsize) {
     return snprintf(buf, bufsize, which <= REG_F ? "%02X" : "%04X", value);;
 }
 
-static void dbg_z80_reg_parse(int which, char *str) {
+static void dbg_z80_reg_parse(int which, const char *str) {
     uint32_t value = strtol(str, NULL, 16);
     dbg_z80_reg_set(which, value);
 }
@@ -419,19 +420,15 @@ cpu_debug_t tubez80_cpu_debug = {
     .get_instr_addr = dbg_z80_get_instr_addr
 };
 
-bool z80_init(FILE *romf)
+void z80_close(void)
 {
-        if (fread(z80rom, 0x1000, 1, romf) != 1)
-            return false;
-        makeznptable();
-        return true;
+    if (z80ram) {
+        free(z80ram);
+        z80ram = NULL;
+    }
 }
 
-void z80_close()
-{
-}
-
-void z80_savestate(ZFILE *zfp)
+static void z80_savestate(ZFILE *zfp)
 {
     unsigned char bytes[44];
 
@@ -463,7 +460,7 @@ void z80_savestate(ZFILE *zfp)
     savestate_zwrite(zfp, z80rom, sizeof z80rom);
 }
 
-void z80_loadstate(ZFILE *zfp)
+static void z80_loadstate(ZFILE *zfp)
 {
     unsigned char bytes[44];
 
@@ -494,6 +491,27 @@ void z80_loadstate(ZFILE *zfp)
 
     savestate_zread(zfp, z80ram, sizeof z80ram);
     savestate_zread(zfp, z80rom, sizeof z80rom);
+}
+
+bool z80_init(void *rom)
+{
+    if (!z80ram) {
+        z80ram = malloc(Z80_RAM_SIZE);
+        if (!z80ram) {
+            log_error("z80: unable to allocate RAM");
+            return false;
+        }
+    }
+    z80rom = rom;
+    makeznptable();
+    tube_readmem = tube_z80_readmem;
+    tube_writemem = tube_z80_writemem;
+    tube_exec  = z80_exec;
+    tube_proc_savestate = z80_savestate;
+    tube_proc_loadstate = z80_loadstate;
+    tube_type = TUBEZ80;
+    z80_reset();
+    return true;
 }
 
 void z80_dumpregs()

@@ -1,6 +1,6 @@
 # Makefile.am for B-em
 
-bin_PROGRAMS = b-em jstest gtest
+bin_PROGRAMS = b-em hdfmt jstest gtest
 noinst_SCRIPTS = ../b-em
 CLEANFILES = $(noinst_SCRIPTS)
 
@@ -28,6 +28,7 @@ b_em_SOURCES = \
 	6502debug.c \
 	6502tube.c \
 	65816.c \
+    6809tube.c \
 	NS32016/32016.c \
 	NS32016/32016_debug.c \
 	NS32016/Decode.c \
@@ -67,6 +68,9 @@ b_em_SOURCES = \
 	keydef-allegro.c \
 	linux.c \
 	logging.c \
+    mc6809nc/mc6809nc.c \
+    mc6809nc/mc6809_debug.c \
+    mc6809nc/mc6809_dis.c \
 	main.c \
 	mem.c \
 	model.c \
@@ -120,6 +124,8 @@ b_em_SOURCES = \
 if NO_TSEARCH
 b_em_SOURCES += tsearch.c
 endif
+
+hdfmt_SOURCES = hdfmt.c
 
 jstest_SOURCES = jstest.c
 

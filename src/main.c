@@ -6,6 +6,7 @@
 #include <allegro5/allegro_acodec.h>
 #include <allegro5/allegro_image.h>
 #include <allegro5/allegro_native_dialog.h>
+#include <allegro5/allegro_primitives.h>
 
 #include "6502.h"
 #include "adc.h"
@@ -24,6 +25,7 @@
 #include "keyboard.h"
 #include "keydef-allegro.h"
 #include "main.h"
+#include "6809tube.h"
 #include "mem.h"
 #include "mouse.h"
 #include "midi.h"
@@ -149,12 +151,11 @@ void main_init(int argc, char *argv[])
 
     al_init_native_dialog_addon();
     al_set_new_window_title(VERSION_STR);
+    al_init_primitives_addon();
 
     config_load();
     log_open();
     log_info("main: starting %s", VERSION_STR);
-
-    vid_fskipmax = 1;
 
     model_loadcfg();
 
@@ -183,15 +184,13 @@ void main_init(int argc, char *argv[])
             if (vid_fskipmax > 9) vid_fskipmax = 9;
         }
         else if (argv[c][0] == '-' && (argv[c][1] == 's' || argv[c][1] == 'S'))
-            vid_scanlines = 1;
+            vid_dtype_user = VDT_SCANLINES;
         else if (!strcasecmp(argv[c], "-debug"))
             debug_core = 1;
         else if (!strcasecmp(argv[c], "-debugtube"))
             debug_tube = 1;
-        else if (argv[c][0] == '-' && (argv[c][1] == 'i' || argv[c][1] == 'I')) {
-            vid_interlace = 1;
-            vid_linedbl = vid_scanlines = 0;
-        }
+        else if (argv[c][0] == '-' && (argv[c][1] == 'i' || argv[c][1] == 'I'))
+            vid_dtype_user = VDT_INTERLACE;
         else if (tapenext) {
             if (tape_fn)
                 al_destroy_path(tape_fn);
@@ -258,9 +257,7 @@ void main_init(int argc, char *argv[])
     tapenoise_init(queue);
 
     adc_init();
-#ifdef WIN32
     pal_init();
-#endif
     disc_init();
     fdi_init();
 
@@ -526,6 +523,7 @@ void main_close()
     z80_close();
     w65816_close();
     n32016_close();
+    mc6809nc_close();
     disc_close(0);
     disc_close(1);
     scsi_close();
