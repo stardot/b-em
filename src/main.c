@@ -24,6 +24,7 @@
 #include "joystick.h"
 #include "keyboard.h"
 #include "keydef-allegro.h"
+#include "led.h"
 #include "main.h"
 #include "6809tube.h"
 #include "mem.h"
@@ -228,6 +229,8 @@ void main_init(int argc, char *argv[])
     mode7_makechars();
     al_init_image_addon();
 
+    // SFTODO led_init();
+
     mem_init();
 
     if (!(queue = al_create_event_queue())) {
@@ -268,11 +271,13 @@ void main_init(int argc, char *argv[])
     model_init();
 
     midi_init();
+    //led_init(); // SFTODO!?
     main_reset();
 
     joystick_init(queue);
 
     gui_allegro_init(queue, display);
+    //led_init(); // SFTODO!?
 
     time_limit = 2.0 / 50.0;
     if (!(timer = al_create_timer(1.0 / 50.0))) {
@@ -304,6 +309,7 @@ void main_init(int argc, char *argv[])
         writeprot[0] = writeprot[1] = 1;
 
     debug_start();
+    //led_init(); // SFTODO!?
 }
 
 void main_restart()
@@ -333,6 +339,12 @@ static void main_start_fullspeed(void)
     fullspeed = FSPEED_RUNNING;
     event.type = ALLEGRO_EVENT_TIMER;
     al_emit_user_event(&evsrc, &event, NULL);
+}
+
+static void main_key_char(ALLEGRO_EVENT *event)
+{
+    log_debug("main: key char, code=%d, unichar=%d, repeat=%d", event->keyboard.keycode, event->keyboard.unichar, event->keyboard.repeat);
+    key_char(event);
 }
 
 static void main_key_down(ALLEGRO_EVENT *event)
@@ -434,6 +446,9 @@ static void main_timer(ALLEGRO_EVENT *event)
         if (ddnoise_ticks > 0 && --ddnoise_ticks == 0)
             ddnoise_headdown();
 
+        if (led_ticks > 0 && --led_ticks == 0)
+            led_timer_fired();
+
         if (savestate_wantload)
             savestate_doload();
         if (savestate_wantsave)
@@ -450,10 +465,14 @@ void main_run()
     log_debug("main: about to start timer");
     al_start_timer(timer);
 
+    //led_init(); // SFTODO!?
     log_debug("main: entering main loop");
     while (!quitting) {
         al_wait_for_event(queue, &event);
         switch(event.type) {
+            case ALLEGRO_EVENT_KEY_CHAR:
+                main_key_char(&event);
+                break;
             case ALLEGRO_EVENT_KEY_DOWN:
                 main_key_down(&event);
                 break;

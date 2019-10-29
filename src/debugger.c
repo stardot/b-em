@@ -426,7 +426,7 @@ static void debug_paste(const char *iptr)
     char *str, *dptr;
 
     if ((ch = *iptr++)) {
-        if ((str = malloc(strlen(iptr) + 1))) {
+        if ((str = al_malloc(strlen(iptr) + 1))) {
             dptr = str;
             do {
                 if (ch == '|') {

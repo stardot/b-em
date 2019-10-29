@@ -2,6 +2,7 @@
   Allegro video code*/
 #include <allegro5/allegro_primitives.h>
 #include "b-em.h"
+#include "led.h"
 #include "pal.h"
 #include "serial.h"
 #include "tape.h"
@@ -382,6 +383,8 @@ void video_doblit(bool non_ttx, uint8_t vtotal)
     if (vid_savescrshot)
         save_screenshot();
 
+    if (!led_bitmap) led_init(); // SFTODO!? HORRIBLE HACK
+
     if (++fskipcount >= ((motor && fasttape) ? 5 : vid_fskipmax)) {
         lasty++;
         calc_limits(non_ttx, vtotal);
@@ -391,6 +394,13 @@ void video_doblit(bool non_ttx, uint8_t vtotal)
             fill_pillarbox();
         else if (scr_y_start > 0)
             fill_letterbox();
+
+        // SFTODO: THE LEDS DON'T SCALE (POSSIBLY GOOD, NOT SURE) AND DON'T
+        // "CREATE" SPACE FOR THEMSELVES IF THERE ISN'T ENOUGH OF A BORDER.
+        //led_init(); // SFTODO!?
+        if (led_bitmap) // SFTODO!?
+            al_draw_scaled_bitmap(led_bitmap, 0, 0, al_get_bitmap_width(led_bitmap), al_get_bitmap_height(led_bitmap), (winsizex - al_get_bitmap_width(led_bitmap)) / 2, winsizey - al_get_bitmap_height(led_bitmap), al_get_bitmap_width(led_bitmap), al_get_bitmap_height(led_bitmap), 0);
+
         al_flip_display();
     }
     firstx = firsty = 65535;

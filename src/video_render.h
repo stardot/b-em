@@ -60,6 +60,7 @@ void video_set_window_size(bool fudge);
 void video_update_window_size(ALLEGRO_EVENT *event);
 void video_set_disptype(enum vid_disptype dtype);
 void video_set_borders(int borders);
+void video_set_led(bool b);
 
 void video_close(void);
 
