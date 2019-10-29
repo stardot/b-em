@@ -6,7 +6,6 @@
 #include "cmos.h"
 #include "6809tube.h"
 #include "mc6809nc/mc6809_debug.h"
-#include "keyboard.h"
 #include "mem.h"
 #include "tube.h"
 #include "NS32016/32016.h"
@@ -231,7 +230,6 @@ void model_init()
     models[curmodel].romsetup->func();
     tube_init();
     cmos_load(models[curmodel]);
-    key_reset();
 }
 
 void model_savestate(FILE *f)
