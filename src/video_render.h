@@ -3,6 +3,7 @@
 
 extern ALLEGRO_BITMAP *b, *b16, *b32;
 extern ALLEGRO_LOCKED_REGION *region;
+extern ALLEGRO_COLOR border_col;
 
 #define BORDER_NONE_X_START_GRA 336
 #define BORDER_NONE_X_END_GRA   976
@@ -32,13 +33,19 @@ extern ALLEGRO_LOCKED_REGION *region;
 #define BORDER_FULL_Y_END_TXT   308
 
 extern int firstx, firsty, lastx, lasty;
-extern int desktop_width, desktop_height;
 extern int scr_x_start, scr_x_size, scr_y_start, scr_y_size;
 extern int winsizex, winsizey;
 
 extern int fullscreen;
 
-extern bool vid_linedbl, vid_interlace, vid_scanlines, vid_pal;
+extern enum vid_disptype {
+    VDT_SCALE,
+    VDT_INTERLACE,
+    VDT_SCANLINES,
+    VDT_LINEDOUBLE,
+} vid_dtype_user, vid_dtype_intern;
+
+extern bool vid_pal;
 extern int vid_fskipmax, vid_fullborders;
 extern bool vid_print_mode;
 
@@ -49,9 +56,9 @@ void video_doblit(bool non_ttx, uint8_t vtotal);
 void video_enterfullscreen(void);
 void video_leavefullscreen(void);
 void video_toggle_fullscreen(void);
-void video_clearscreen(void);
-void video_set_window_size(void);
+void video_set_window_size(bool fudge);
 void video_update_window_size(ALLEGRO_EVENT *event);
+void video_set_disptype(enum vid_disptype dtype);
 void video_set_borders(int borders);
 
 void video_close(void);

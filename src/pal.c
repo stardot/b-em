@@ -268,10 +268,8 @@ void pal_init(void)
 void pal_convert(int x1, int y1, int x2, int y2, int yoff)
 {
         int x, y;
-        int r, g, b;
-        int pixel;
-        float Y, U, V;
-        float signal;
+        uint32_t pixel;
+        float r, g, b, Y, U, V, signal;
         static int wt;
         float u_old[2][1536], v_old[2][1536];
         float u_filt[4], v_filt[4];
@@ -292,9 +290,9 @@ void pal_convert(int x1, int y1, int x2, int y2, int yoff)
                 for (x = x1; x < x2; x++)
                 {
                         pixel = get_pixel(region, x, y);
-                        r = (pixel >> 16) & 0xff;
-                        g = (pixel >> 8) & 0xff;
-                        b = pixel & 0xff;
+                        r = (float)((pixel >> 16) & 0xff);
+                        g = (float)((pixel >> 8) & 0xff);
+                        b = (float)(pixel & 0xff);
                         Y = vision_iir(0.299 * r + 0.587 * g + 0.114 * b);
                         U = -0.147 * r - 0.289 * g + 0.436 * b;
                         V = 0.615 * r - 0.515 * g - 0.100 * b;
@@ -309,12 +307,11 @@ void pal_convert(int x1, int y1, int x2, int y2, int yoff)
                         vo[0][x] = V;
                         U += uo[1][x];
                         V += vo[1][x];
-
                         wt++;
 
-                        r = Y + (1.140/8.0) * V;
-                        g = Y - (0.396/8.0) * U - (0.581/8.0) * V;
-                        b = Y + (2.029/8.0) * U;
+                        r = Y + (1.140/2.0) * V;
+                        g = Y - (0.396/2.0) * U - (0.581/8.0) * V;
+                        b = Y + (2.029/2.0) * U;
 
                         if (r > 255) r = 255;
                         if (r < 0)   r = 0;
@@ -323,7 +320,7 @@ void pal_convert(int x1, int y1, int x2, int y2, int yoff)
                         if (b > 255) b = 255;
                         if (b < 0)   b = 0;
 
-                        put_pixel(dr, x, y, 0xff000000|(r << 16)|(r << 8)|b);
+                        put_pixel(dr, x, y, 0xff000000|((uint32_t)r << 16)|((uint32_t)g << 8)|(uint32_t)b);
                 }
 
                 wt += (1024 - (x2 - x1));

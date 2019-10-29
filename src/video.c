@@ -35,11 +35,21 @@ static int vadj;
 uint16_t ma;
 static uint16_t maback;
 static int vdispen, dispen;
+static int crtc_mode;
 
 void crtc_reset()
 {
     hc = vc = sc = vadj = 0;
     crtc[9] = 10;
+}
+
+static void set_intern_dtype(enum vid_disptype dtype)
+{
+    if (crtc_mode == 0 && (crtc[8] & 1))
+        dtype = VDT_INTERLACE;
+    else if (dtype == VDT_INTERLACE && !(crtc[8] & 1))
+        dtype = VDT_SCALE;
+    vid_dtype_intern = dtype;
 }
 
 void crtc_write(uint16_t addr, uint8_t val)
@@ -52,6 +62,8 @@ void crtc_write(uint16_t addr, uint8_t val)
         crtc[crtc_i] = val;
         if (crtc_i == 6 && vc == val)
             vdispen = 0;
+        if (crtc_i == 8)
+            set_intern_dtype(vid_dtype_user);
     }
 }
 
@@ -102,7 +114,6 @@ uint8_t ula_ctrl;
 static int ula_pal[16];         // maps from actual physical colour to bitmap display
 uint8_t ula_palbak[16];         // palette RAM in orginal ULA maps actual colour to logical colour
 static int ula_mode;
-static int crtc_mode;
 int nula_collook[16];           // maps palette (logical) colours to 12-bit RGB
 
 static uint8_t table4bpp[4][256][16];
@@ -250,7 +261,7 @@ void videoula_write(uint16_t addr, uint8_t val)
                 crtc_mode = 1;  // High frequency
             else
                 crtc_mode = 2;  // Low frequency
-            //                printf("ULAmode %i\n",ulamode);
+            set_intern_dtype(vid_dtype_user);
         }
         break;
 
@@ -573,10 +584,6 @@ static inline void mode7_render(ALLEGRO_LOCKED_REGION *region, uint8_t dat)
         if (dat == 255) {
             for (c = 0; c < 16; c++)
                 put_pixel(region, scrx + c + 16, scry, colblack);
-            if (vid_linedbl) {
-                for (c = 0; c < 16; c++)
-                    put_pixel(region, scrx + c + 16, scry + 1, colblack);
-            }
             return;
         }
 
@@ -683,27 +690,15 @@ static inline void mode7_render(ALLEGRO_LOCKED_REGION *region, uint8_t dat)
         else
             on = mode7_lookup[mcolx & 7][mode7_bg & 7];
 
+        int interindex = (vid_dtype_intern == VDT_INTERLACE) && interlline;
         for (c = 0; c < 16; c++) {
             if (mode7_flashx && !mode7_flashon)
                 put_pixel(region, scrx + c + 16, scry, off);
             else if (mode7_dblx)
                 put_pixel(region, scrx + c + 16, scry, on[mode7_px[sc & 1][t] & 15]);
             else
-                put_pixel(region, scrx + c + 16, scry, on[mode7_px[vid_interlace & interlline][t] & 15]);
+                put_pixel(region, scrx + c + 16, scry, on[mode7_px[interindex][t] & 15]);
             t++;
-        }
-
-        if (vid_linedbl) {
-            t -= 16;
-            for (c = 0; c < 16; c++) {
-                if (mode7_flashx && !mode7_flashon)
-                    put_pixel(region, scrx + c + 16, scry + 1, off);
-                else if (mode7_dblx)
-                    put_pixel(region, scrx + c + 16, scry + 1, on[mode7_px[sc & 1][t] & 15]);
-                else
-                    put_pixel(region, scrx + c + 16, scry + 1, on[mode7_px[1][t] & 15]);
-                t++;
-            }
         }
 
         if ((scrx + 16) < firstx)
@@ -740,12 +735,12 @@ static int oldr8;
 
 int firstx, firsty, lastx, lasty;
 
-int desktop_width, desktop_height;
-
 static ALLEGRO_DISPLAY *display;
 ALLEGRO_BITMAP *b, *b16, *b32;
 
 ALLEGRO_LOCKED_REGION *region;
+
+ALLEGRO_COLOR border_col;
 
 ALLEGRO_DISPLAY *video_init(void)
 {
@@ -757,7 +752,7 @@ ALLEGRO_DISPLAY *video_init(void)
 #else
     al_set_new_display_flags(ALLEGRO_WINDOWED | ALLEGRO_RESIZABLE);
 #endif
-    video_set_window_size();
+    video_set_window_size(true);
     if ((display = al_create_display(winsizex, winsizey)) == NULL) {
         log_fatal("video: unable to create display");
         exit(1);
@@ -769,6 +764,7 @@ ALLEGRO_DISPLAY *video_init(void)
 
     colblack = 0xff000000;
     colwhite = 0xffffffff;
+    border_col = al_map_rgb(0, 0, 0);
 
     nula_default_palette();
 
@@ -803,20 +799,23 @@ ALLEGRO_DISPLAY *video_init(void)
     return display;
 }
 
+void video_set_disptype(enum vid_disptype dtype)
+{
+    vid_dtype_user = dtype;
+    set_intern_dtype(dtype);
+}
 
-uint8_t cursorlook[7] = { 0, 0, 0, 0x80, 0x40, 0x20, 0x20 };
-int cdrawlook[4] = { 3, 2, 1, 0 };
+static const uint8_t cursorlook[7] = { 0, 0, 0, 0x80, 0x40, 0x20, 0x20 };
+static const int cdrawlook[4] = { 3, 2, 1, 0 };
 
-int cmask[4] = { 0, 0, 16, 32 };
+static const int cmask[4] = { 0, 0, 16, 32 };
 
-int lasthc0 = 0, lasthc;
-int olddispen;
-int oldlen;
-int ccount = 0;
+static int lasthc0 = 0, lasthc;
+static int ccount = 0;
 
-int vid_cleared;
+static int vid_cleared;
 
-int firstdispen = 0;
+static int firstdispen = 0;
 
 void video_reset()
 {
@@ -880,10 +879,16 @@ void video_poll(int clocks, int timer_enable)
             }
         }
 
-        if (vid_interlace)
-            scry = (scry << 1) + interlline;
-        if (vid_linedbl)
-            scry <<= 1;
+        switch(vid_dtype_intern) {
+            case VDT_INTERLACE:
+                scry = (scry << 1) + interlline;
+                break;
+            case VDT_LINEDOUBLE:
+                scry <<= 1;
+            default:
+                break;
+        }
+
         if (dispen) {
             if (!((ma ^ (crtc[15] | (crtc[14] << 8))) & 0x3FFF) && con)
                 cdraw = cdrawlook[crtc[8] >> 6];
@@ -904,8 +909,6 @@ void video_poll(int clocks, int timer_enable)
                 if ((crtc[8] & 0x30) == 0x30 || ((sc & 8) && !(ula_ctrl & 2))) {
                     // Gaps between lines in modes 3 & 6.
                     put_pixels(region, scrx, scry, (ula_ctrl & 0x10) ? 8 : 16, colblack);
-                    if (vid_linedbl)
-                        put_pixels(region, scrx, scry+1, (ula_ctrl & 0x10) ? 8 : 16, colblack);
                 } else
                     switch (crtc_mode) {
                     case 0:
@@ -926,21 +929,15 @@ void video_poll(int clocks, int timer_enable)
                                         for (c = 0; c < 7; c++, pc += 0.75f) {
                                             int output = ula_pal[attribute | (dat >> (7 - (int) pc) & 1)];
                                             nula_putpixel(region, scrx + c, scry, output);
-                                            if (vid_linedbl)
-                                                nula_putpixel(region, scrx + c, scry + 1, output);
                                         }
                                         // Very loose approximation of the text attribute mode
                                         nula_putpixel(region, scrx + 7, scry, ula_pal[attribute]);
-                                        if (vid_linedbl)
-                                            nula_putpixel(region, scrx + 7, scry + 1, ula_pal[attribute]);
                                     } else {
                                         int attribute = ((dat & 3) << 2);
                                         float pc = 0.0f;
                                         for (c = 0; c < 8; c++, pc += 0.75f) {
                                             int output = ula_pal[attribute | (dat >> (7 - (int) pc) & 1)];
                                             nula_putpixel(region, scrx + c, scry, output);
-                                            if (vid_linedbl)
-                                                nula_putpixel(region, scrx + c, scry + 1, output);
                                         }
                                     }
                                 } else {
@@ -950,18 +947,11 @@ void video_poll(int clocks, int timer_enable)
                                         int a = 3 - ((int) pc) / 2;
                                         int output = ula_pal[attribute | ((dat >> (a + 3)) & 2) | ((dat >> a) & 1)];
                                         nula_putpixel(region, scrx + c, scry, output);
-                                        if (vid_linedbl)
-                                            nula_putpixel(region, scrx + c, scry + 1, output);
                                     }
                                 }
                             } else {
                                 for (c = 0; c < 8; c++) {
                                     nula_putpixel(region, scrx + c, scry, nula_palette_mode ? nula_collook[table4bpp[ula_mode][dat][c]] : ula_pal[table4bpp[ula_mode][dat][c]]);
-                                }
-                                if (vid_linedbl) {
-                                    for (c = 0; c < 8; c++) {
-                                        nula_putpixel(region, scrx + c, scry + 1, nula_palette_mode ? nula_collook[table4bpp[ula_mode][dat][c]] : ula_pal[table4bpp[ula_mode][dat][c]]);
-                                    }
                                 }
                             }
                         }
@@ -980,36 +970,22 @@ void video_poll(int clocks, int timer_enable)
                                     for (c = 0; c < 14; c++, pc += 0.375f) {
                                         int output = ula_pal[attribute | (dat >> (7 - (int) pc) & 1)];
                                         nula_putpixel(region, scrx + c, scry, output);
-                                        if (vid_linedbl)
-                                            nula_putpixel(region, scrx + c, scry + 1, output);
                                     }
 
                                     // Very loose approximation of the text attribute mode
                                     nula_putpixel(region, scrx + 14, scry, ula_pal[attribute]);
                                     nula_putpixel(region, scrx + 15, scry, ula_pal[attribute]);
-
-                                    if (vid_linedbl) {
-                                        nula_putpixel(region, scrx + 14, scry + 1, ula_pal[attribute]);
-                                        nula_putpixel(region, scrx + 15, scry + 1, ula_pal[attribute]);
-                                    }
                                 } else {
                                     int attribute = ((dat & 3) << 2);
                                     float pc = 0.0f;
                                     for (c = 0; c < 16; c++, pc += 0.375f) {
                                         int output = ula_pal[attribute | (dat >> (7 - (int) pc) & 1)];
                                         nula_putpixel(region, scrx + c, scry, output);
-                                        if (vid_linedbl)
-                                            nula_putpixel(region, scrx + c, scry + 1, output);
                                     }
                                 }
                             } else {
                                 for (c = 0; c < 16; c++) {
                                     nula_putpixel(region, scrx + c, scry, nula_palette_mode ? nula_collook[table4bpp[ula_mode][dat][c]] : ula_pal[table4bpp[ula_mode][dat][c]]);
-                                }
-                                if (vid_linedbl) {
-                                    for (c = 0; c < 16; c++) {
-                                        nula_putpixel(region, scrx + c, scry + 1, nula_palette_mode ? nula_collook[table4bpp[ula_mode][dat][c]] : ula_pal[table4bpp[ula_mode][dat][c]]);
-                                    }
                                 }
                             }
                         }
@@ -1019,11 +995,6 @@ void video_poll(int clocks, int timer_enable)
                     if (cursoron && (ula_ctrl & cursorlook[cdraw])) {
                         for (c = ((ula_ctrl & 0x10) ? 8 : 16); c >= 0; c--) {
                             nula_putpixel(region, scrx + c, scry, get_pixel(region, scrx + c, scry) ^ colwhite);
-                        }
-                        if (vid_linedbl) {
-                            for (c = ((ula_ctrl & 0x10) ? 8 : 16); c >= 0; c--) {
-                                nula_putpixel(region, scrx + c, scry + 1, get_pixel(region, scrx + c, scry + 1) ^ colwhite);
-                            }
                         }
                     }
                     cdraw++;
@@ -1041,23 +1012,13 @@ void video_poll(int clocks, int timer_enable)
 
             } else if (scrx < (1280-32)) {
                 put_pixels(region, scrx, scry, (ula_ctrl & 0x10) ? 8 : 16, colblack);
-                if (vid_linedbl)
-                    put_pixels(region, scrx, scry+1, (ula_ctrl & 0x10) ? 8 : 16, colblack);
-                if (!crtc_mode) {
+                if (!crtc_mode)
                     put_pixels(region, scrx + 16, scry, 16, colblack);
-                    if (vid_linedbl)
-                        put_pixels(region, scrx + 16, scry+1, 16, colblack);
-                }
             }
             if (cdraw && scrx < (1280-16)) {
                 if (cursoron && (ula_ctrl & cursorlook[cdraw])) {
                     for (c = ((ula_ctrl & 0x10) ? 8 : 16); c >= 0; c--) {
                         nula_putpixel(region, scrx + c, scry, get_pixel(region, scrx + c, scry) ^ colwhite);
-                    }
-                    if (vid_linedbl) {
-                        for (c = ((ula_ctrl & 0x10) ? 8 : 16); c >= 0; c--) {
-                            nula_putpixel(region, scrx + c, scry + 1, get_pixel(region, scrx + c, scry + 1) ^ colwhite);
-                        }
                     }
                 }
                 cdraw++;
@@ -1066,11 +1027,13 @@ void video_poll(int clocks, int timer_enable)
             }
         }
 
-        if (vid_linedbl)
-            scry >>= 1;
-        if (vid_interlace)
-            scry >>= 1;
-
+        switch(vid_dtype_intern) {
+            case VDT_INTERLACE:
+            case VDT_LINEDOUBLE:
+                scry >>= 1;
+            default:
+                break;
+        }
         if (hvblcount) {
             hvblcount--;
             if (!hvblcount && timer_enable)

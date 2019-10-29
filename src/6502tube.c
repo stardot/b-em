@@ -4,6 +4,7 @@
 #include <stdio.h>
 
 #include "b-em.h"
+#include "model.h"
 #include "tube.h"
 #include "6502tube.h"
 #include "6502debug.h"
@@ -13,9 +14,6 @@
 #define y tubey
 #define s tubesp
 #define pc tubepc
-
-// define this to trace execution to a file
-// #define TRACE_TUBE
 
 static int tube_6502_skipint;
 static int tube_6502_oldnmi;
@@ -31,50 +29,16 @@ static PREG tubep;
 static uint8_t *tubemem[0x101];
 static int tubememstat[0x101];
 static uint8_t *tuberam;
-static uint8_t tuberom[0x1000];
-
-#ifdef TRACE_TUBE
-static FILE *trace_fp;
-#endif
+static uint8_t *tuberom;
 
 #define TUBE_6502_RAM_SIZE 0x10000
 
-bool tube_6502_init_cpu(FILE *romf)
-{
-        int c;
-        if (!tuberam)
-                tuberam = (uint8_t *) malloc(TUBE_6502_RAM_SIZE);
-        memset(tuberam, 0, 0x10000);
-        for (c = 0x00; c < 0x100; c++)
-                tubemem[c] = (uint8_t *) (tuberam + (c << 8));
-        for (c = 0x00; c < 0x100; c++)
-                tubememstat[c] = 0;
-        for (c = 0xF0; c < 0x100; c++)
-                tubememstat[c] = 2;
-//        tubememstat[0xFE]=tubememstat[0xFF]=2;
-        tubemem[0x100] = tubemem[0];
-        tubememstat[0x100] = tubememstat[0];
-        return fread(tuberom+0x800, 0x800, 1, romf) == 1;
-#ifdef TRACE_TUBE
-        if ((trace_fp = fopen("6502tube.trace", "wb"))) {
-                fwrite("6502NMOS", 8, 1, trace_fp);
-                time_t secs;
-                time(&secs);
-                fwrite(&secs, sizeof(secs), 1, trace_fp);
-                puts("tube tracing enabled\n");
-        } else
-                fprintf(stderr, "tube6502: unable to open trace file: %m\n");
-#endif
-}
-
 void tube_6502_close()
 {
-#ifdef TRACE_TUBE
-        if (trace_fp)
-                fclose(trace_fp);
-#endif
-        if (tuberam)
-                free(tuberam);
+    if (tuberam) {
+        free(tuberam);
+        tuberam = NULL;
+    }
 }
 
 static int dbg_tube6502 = 0;
@@ -117,7 +81,7 @@ void tube_6502_savestate(ZFILE *zfp)
     savestate_zwrite(zfp, bytes, sizeof bytes);
     savestate_zwrite(zfp, tubememstat, sizeof tubememstat);
     savestate_zwrite(zfp, tuberam, TUBE_6502_RAM_SIZE);
-    savestate_zwrite(zfp, tuberom, sizeof tuberom);
+    savestate_zwrite(zfp, tuberom, tubes[curtube].rom_size);
 }
 
 static inline void unpack_flags(uint8_t flags) {
@@ -146,7 +110,7 @@ void tube_6502_loadstate(ZFILE *zfp)
 
     savestate_zread(zfp, tubememstat, sizeof tubememstat);
     savestate_zread(zfp, tuberam, TUBE_6502_RAM_SIZE);
-    savestate_zread(zfp, tuberom, sizeof tuberom);
+    savestate_zread(zfp, tuberom, tubes[curtube].rom_size);
 }
 
 static uint32_t dbg_reg_get(int which) {
@@ -207,7 +171,7 @@ static size_t dbg_reg_print(int which, char *buf, size_t bufsize) {
     }
 }
 
-static void dbg_reg_parse(int which, char *str) {
+static void dbg_reg_parse(int which, const char *str) {
     uint32_t value = strtol(str, NULL, 16);
     dbg_reg_set(which, value);
 }
@@ -268,11 +232,11 @@ static uint8_t tubereadmeml(uint16_t addr)
                 return temp;
         }
         if ((addr & ~0xFFF) == 0xF000 && tuberomin)
-                return tuberom[addr & 0xFFF];
+                return tuberom[addr & 0x7FF];
         return tuberam[addr];
 }
 
-uint8_t tube_6502_readmem(uint32_t addr) {
+static uint8_t tube_6502_readmem(uint32_t addr) {
     uint8_t hi = addr >> 8;
     return (tubememstat[hi]==2)?tubereadmeml(addr):tubemem[hi][addr&0xFF];
 }
@@ -296,7 +260,7 @@ static void tubewritememl(uint16_t addr, uint8_t val)
         tuberam[addr] = val;
 }
 
-void tube_6502_writemem(uint32_t addr, uint8_t byte) {
+static void tube_6502_writemem(uint32_t addr, uint8_t byte) {
     tubewritememl(addr, byte);
 }
 
@@ -328,6 +292,35 @@ void tube_6502_reset()
         tubep.i = 1;
         tube_irq = 0;
         tube_6502_skipint = 0;
+}
+
+bool tube_6502_init(void *rom)
+{
+    if (!tuberam) {
+        tuberam = (uint8_t *) malloc(TUBE_6502_RAM_SIZE);
+        if (!tuberam) {
+            log_error("6502tube: unable to allocate RAM");
+            return false;
+        }
+    }
+    memset(tuberam, 0, 0x10000);
+    tuberom = rom;
+    for (int c = 0x00; c < 0x100; c++)
+        tubemem[c] = (uint8_t *) (tuberam + (c << 8));
+    for (int c = 0x00; c < 0x100; c++)
+        tubememstat[c] = 0;
+    for (int c = 0xF0; c < 0x100; c++)
+        tubememstat[c] = 2;
+    tubemem[0x100] = tubemem[0];
+    tubememstat[0x100] = tubememstat[0];
+    tube_type = TUBE6502;
+    tube_readmem = tube_6502_readmem;
+    tube_writemem = tube_6502_writemem;
+    tube_exec  = tube_6502_exec;
+    tube_proc_savestate = tube_6502_savestate;
+    tube_proc_loadstate = tube_6502_loadstate;
+    tube_6502_reset();
+    return true;
 }
 
 static inline void setzn(uint8_t v)

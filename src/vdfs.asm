@@ -133,6 +133,7 @@ prtextws    =   &A8
             equw    break_type
             equw    cmd_files       ; *FILES command.
             equw    none_open       ; "No open files" message.
+            equw    osw_tail        ; finish a command with an OSWORD call.
 .dispend
 
 ; Stubs to transfer control to the vdfs.c module.
@@ -198,6 +199,9 @@ prtextws    =   &A8
             iny
             cpx     #&0e
             bne     vecloop
+            pla
+            pha
+            sta     port_fsid
             lda     #&8f
             ldx     #&0f
             jsr     OSBYTE          ; Notify that vectors have changed
@@ -238,6 +242,7 @@ prtextws    =   &A8
             jsr     prtitle         ; announce the filing system
             jsr     OSNEWL
             jsr     OSNEWL
+            ldy     #fsno_vdfs
             jsr     fsstart         ; same setup as for call &12.
             pla
             bne     noboot          ; then maybe exec !BOOT.
@@ -1228,5 +1233,9 @@ prtextws    =   &A8
             lda     #&00
             rts
 
+.osw_tail   jsr     OSWORD
+            lda     #&00
+            ldx     &f4
+            rts
 .end
             save    "vdfs6", start, end

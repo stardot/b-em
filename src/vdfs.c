@@ -200,6 +200,7 @@ enum vdfs_action {
     VDFS_ROM_BREAK,
     VDFS_ROM_FILES,
     VDFS_ROM_NOPEN,
+    VDFS_ROM_OSW_TAIL,
     VDFS_ACT_NOP,
     VDFS_ACT_QUIT,
     VDFS_ACT_SRLOAD,
@@ -272,7 +273,7 @@ struct cmdent {
 
 static uint8_t  reg_a;
 static uint8_t  fs_flags = 0;
-static uint8_t  fs_num   = FSNO_VDFS;
+static uint8_t  fs_num   = 0;
 static uint16_t cmd_tail;
 
 static uint16_t readmem16(uint16_t addr)
@@ -1399,12 +1400,14 @@ static uint16_t srp_romid(uint16_t addr, int16_t *romid)
         *romid = mem_findswram(ch - 'W');
     else if (ch >= 'w' && ch <= 'z')
         *romid = mem_findswram(ch - 'w');
-    else
+    else {
         *romid = -1;
-    return --addr;
+        addr--;
+    }
+    return addr;
 }
 
-static void srp_tail(uint16_t addr, uint8_t flag, uint16_t fnaddr, uint16_t start, uint16_t len)
+static bool srp_tail(uint16_t addr, uint8_t flag, uint16_t fnaddr, uint16_t start, uint16_t len)
 {
     int ch;
     int16_t romid;
@@ -1413,55 +1416,59 @@ static void srp_tail(uint16_t addr, uint8_t flag, uint16_t fnaddr, uint16_t star
     if (romid >= 0)
         flag &= ~0x40;
     if (fs_num) {
-        log_debug("vdfs: srp_tail - executing internally");
         exec_swr_fs(flag, fnaddr, romid, start, len);
         p.c = 0;
+        return true;
     } else {
+        uint16_t msw;
         p.c = 1;
-        writemem(0x70, flag);
-        writemem16(0x71, fnaddr);
-        writemem(0x73, romid);
-        writemem16(0x74, start);
-        writemem16(0x76, len);
-        writemem16(0x78, 0);
+        writemem(0x100, flag);
+        writemem16(0x101, fnaddr);
+        writemem(0x103, romid);
+        writemem16(0x104, start);
+        writemem16(0x106, len);
+        writemem16(0x108, 0);
         do
             ch = readmem(addr++);
         while (ch == ' ' || ch == '\t');
         if (ch == 'Q' || ch == 'q')
-            writemem16(0x7a, 0xffff);
+            msw = 0xffff;
         else
-            writemem16(0x7a, 0);
+            msw = 0;
+        writemem16(0x10a, msw);
+        log_debug("vdfs: srp_tail executing via OSWORD, flag=%d, fnaddr=%04X, romid=%d, start=%04X, len=%d, msw=%02X", flag, fnaddr, romid, start, len, msw);
+        a = 67;
+        x = 0;
+        y = 1;
+        rom_dispatch(VDFS_ROM_OSW_TAIL);
+        return false;
     }
 }
 
-static void cmd_srload(uint16_t addr)
+static bool cmd_srload(uint16_t addr)
 {
     uint16_t fnadd, start;
 
     if ((addr = srp_fn(addr, &fnadd))) {
-        log_debug("vdfs: cmd_srload fnaddr=%04X", fnadd);
-        if ((addr = srp_start(addr, &start))) {
-            log_debug("vdfs: cmd_srload start=%04X", start);
-            srp_tail(addr, 0xC0, fnadd, start, 0);
-            return;
-        }
+        if ((addr = srp_start(addr, &start)))
+            return srp_tail(addr, 0xC0, fnadd, start, 0);
     }
     adfs_error(err_badparms);
+    return true;
 }
 
-static void cmd_srsave(uint16_t addr)
+static bool cmd_srsave(uint16_t addr)
 {
     uint16_t fnadd, start, len;
 
     if ((addr = srp_fn(addr, &fnadd))) {
         if ((addr = srp_start(addr, &start))) {
-            if ((addr = srp_length(addr, start, &len))) {
-                srp_tail(addr, 0x40, fnadd, start, len);
-                return;
-            }
+            if ((addr = srp_length(addr, start, &len)))
+                return srp_tail(addr, 0x40, fnadd, start, len);
         }
     }
     adfs_error(err_badparms);
+    return true;
 }
 
 static void srcopy(uint16_t addr, uint8_t flags)
@@ -2863,21 +2870,9 @@ static void cmd_osw7f(uint16_t addr)
         adfs_error(err_badcmd);
 }
 
-static bool vdfs_selected(void)
-{
-    if (readmem(0x21f) == 0xff) { // FSC is an extended vector.
-        unsigned offset = readmem(0x21e);
-        if (offset <= 0x4e)
-            if (readmem(0xd9f + 2 + offset) == x) // extended vector has our ROM no.
-                return true;
-    }
-    return false;
-}
-
 static void select_vdfs(uint8_t fsno)
 {
-    fs_num = fsno;
-    if (!vdfs_selected()) {
+    if (!fs_num) {
         y = fsno;
         rom_dispatch(VDFS_ROM_FSSTART);
     }
@@ -2952,11 +2947,9 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
         main_setquit();
         break;
     case VDFS_ACT_SRLOAD:
-        cmd_srload(addr);
-        break;
+        return cmd_srload(addr);
     case VDFS_ACT_SRSAVE:
-        cmd_srsave(addr);
-        break;
+        return cmd_srsave(addr);
     case VDFS_ACT_SRREAD:
         srcopy(addr, 0);
         break;
@@ -3076,6 +3069,7 @@ static void osfsc(void)
                 rom_dispatch(VDFS_ROM_CAT);
             break;
         case 0x06: // new filesystem taking over.
+            fs_num = 0;
             break;
         case 0x09:
             if (cat_prep(x + (y << 8), cur_dir, "current"))
@@ -3183,10 +3177,6 @@ static const struct cmdent ctab_always[] = {
     { "Print",   VDFS_ROM_PRINT   },
     { "Type",    VDFS_ROM_TYPE    },
     { "Roms",    VDFS_ROM_ROMS    },
-    { "SRLoad",  VDFS_ACT_SRLOAD  },
-    { "SRSave",  VDFS_ACT_SRSAVE  },
-    { "SRRead",  VDFS_ACT_SRREAD  },
-    { "SRWrite", VDFS_ACT_SRWRITE },
     { "DAbout",  VDFS_ACT_NOP     },
     { "Din",     VDFS_ACT_MMBDIN  }
 };
@@ -3197,7 +3187,11 @@ static const struct cmdent ctab_enabled[] = {
     { "FADFS",   VDFS_ACT_ADFS    },
     { "DISC",    VDFS_ACT_DISC    },
     { "DISK",    VDFS_ACT_DISC    },
-    { "FSclaim", VDFS_ACT_FSCLAIM }
+    { "FSclaim", VDFS_ACT_FSCLAIM },
+    { "SRLoad",  VDFS_ACT_SRLOAD  },
+    { "SRSave",  VDFS_ACT_SRSAVE  },
+    { "SRRead",  VDFS_ACT_SRREAD  },
+    { "SRWrite", VDFS_ACT_SRWRITE }
 };
 
 static void serv_cmd(void)
@@ -3212,7 +3206,7 @@ static void serv_cmd(void)
             ent = lookup_cmd(ctab_enabled, ARRAY_SIZE(ctab_enabled), cmd);
         if (ent)
             if (vdfs_do(ent->act, addr))
-            a = 0;
+                a = 0;
     }
 }
 
@@ -3252,6 +3246,8 @@ static void service(void)
     case 0x03: // filing system boot.
         if (vdfs_enabled && (!key_any_down() || key_code_down(ALLEGRO_KEY_S)))
             rom_dispatch(VDFS_ROM_FSBOOT);
+        else
+            fs_num = 0; // some other filing system.
         break;
     case 0x04: // unrecognised command.
         serv_cmd();
