@@ -47,6 +47,7 @@ extern enum vid_disptype {
 
 extern bool vid_pal;
 extern int vid_fskipmax, vid_fullborders;
+extern int vid_ledlocation, vid_ledvisibility;
 extern bool vid_print_mode;
 
 extern int vid_savescrshot;

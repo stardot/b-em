@@ -14,6 +14,8 @@ enum vid_disptype vid_dtype_user, vid_dtype_intern;
 bool vid_pal;
 int vid_fskipmax = 1;
 int vid_fullborders = 1;
+int vid_ledlocation = 1; // SFTODO!? DEFAULT? LOAD/SAVE?
+int vid_ledvisibility = 1; // SFTODO!? DEFAULT? LOAD/SAVE?
 
 static int fskipcount;
 
