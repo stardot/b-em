@@ -9,6 +9,7 @@
 #include "video.h"
 #include "video_render.h"
 
+extern int framesrun; // SFTODO!?
 enum vid_disptype vid_dtype_user, vid_dtype_intern;
 bool vid_pal;
 int vid_fskipmax = 1;
@@ -398,8 +399,25 @@ void video_doblit(bool non_ttx, uint8_t vtotal)
         // SFTODO: THE LEDS DON'T SCALE (POSSIBLY GOOD, NOT SURE) AND DON'T
         // "CREATE" SPACE FOR THEMSELVES IF THERE ISN'T ENOUGH OF A BORDER.
         //led_init(); // SFTODO!?
-        if (led_bitmap) // SFTODO!?
-            al_draw_scaled_bitmap(led_bitmap, 0, 0, al_get_bitmap_width(led_bitmap), al_get_bitmap_height(led_bitmap), (winsizex - al_get_bitmap_width(led_bitmap)) / 2, winsizey - al_get_bitmap_height(led_bitmap), al_get_bitmap_width(led_bitmap), al_get_bitmap_height(led_bitmap), 0);
+        const int led_visible_for_frames = 50;
+        const int led_fade_frames = 10;
+        if (led_bitmap) { // SFTODO!?
+            int led_visible_frames_left = led_visible_for_frames - (framesrun - last_led_update_at);
+            if (false /* SFTODO: LEDS ALWAYS VISIBLE - MAKE CONFIGURABLE */ ||
+                led_visible_frames_left > 0) {
+#if 0 // SFTODO
+                al_draw_scaled_bitmap(led_bitmap, 0, 0, al_get_bitmap_width(led_bitmap), al_get_bitmap_height(led_bitmap), (winsizex - al_get_bitmap_width(led_bitmap)) / 2, winsizey - al_get_bitmap_height(led_bitmap), al_get_bitmap_width(led_bitmap), al_get_bitmap_height(led_bitmap), 0);
+#else
+                ALLEGRO_COLOR led_tint = al_map_rgb(255, 255, 255);
+                if (!false /* SFTODO LEDS ALWAYS VISIBLE */ && (led_visible_frames_left <= led_fade_frames)) {
+                    int i = (255 * led_visible_frames_left) / led_fade_frames;
+                    printf("SFTODO %d\n", i);
+                    led_tint = al_map_rgb(i, i, i);
+                }
+                al_draw_tinted_scaled_bitmap(led_bitmap, led_tint, 0, 0, al_get_bitmap_width(led_bitmap), al_get_bitmap_height(led_bitmap), (winsizex - al_get_bitmap_width(led_bitmap)) / 2, winsizey - al_get_bitmap_height(led_bitmap), al_get_bitmap_width(led_bitmap), al_get_bitmap_height(led_bitmap), 0);
+#endif
+            }
+        }
 
         al_flip_display();
     }

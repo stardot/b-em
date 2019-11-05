@@ -9,6 +9,7 @@
 #define LED_REGION_HEIGHT (12)
 
 int led_ticks = 0;
+int last_led_update_at = -10000;
 
 ALLEGRO_BITMAP *led_bitmap;
 
@@ -18,6 +19,7 @@ typedef struct {
     led_name_t led_name;
     const char *label;
     int index;
+    bool state;
     int turn_off_at;
 } led_details_t;
 
@@ -27,12 +29,12 @@ typedef struct {
 // MAYBE THEY SHOULD HAVE A SEPARATE LED EACH, AS WOULD BE THE CASE ON REAL
 // HARDWARE.
 static led_details_t led_details[] = {
-    {LED_CASSETTE_MOTOR, "cassette\nmotor", 0, 0},
-    {LED_CAPS_LOCK, "caps\nlock", 1, 0},
-    {LED_SHIFT_LOCK, "shift\nlock", 2, 0},
-    {LED_DRIVE_0, "drive 0", 3, 0},
-    {LED_DRIVE_1, "drive 1", 4, 0},
-    {LED_VDFS, "VDFS", 5, 0} // SFTODO: MIGHT BE NICE TO HIDE VDFS LED IF VDFS DISABLED
+    {LED_CASSETTE_MOTOR, "cassette\nmotor", 0, false, 0},
+    {LED_CAPS_LOCK, "caps\nlock", 1, false, 0},
+    {LED_SHIFT_LOCK, "shift\nlock", 2, false, 0},
+    {LED_DRIVE_0, "drive 0", 3, false, 0},
+    {LED_DRIVE_1, "drive 1", 4, false, 0},
+    {LED_VDFS, "VDFS", 5, false, 0} // SFTODO: MIGHT BE NICE TO HIDE VDFS LED IF VDFS DISABLED
 };
 
 static void draw_led(const led_details_t *led_details, bool b)
@@ -117,6 +119,10 @@ void led_update(led_name_t led_name, bool b, int ticks)
     for (int i = 0; i < sizeof(led_details)/sizeof(led_details[0]); i++) {
         if (led_details[i].led_name == led_name) {
             draw_led(&led_details[i], b);
+            if (b != led_details[i].state) {
+                last_led_update_at = framesrun;
+                led_details[i].state = b;
+            }
             if (!b || (ticks == 0))
                 led_details[i].turn_off_at = 0;
             else {
@@ -131,11 +137,18 @@ void led_update(led_name_t led_name, bool b, int ticks)
 
 void led_timer_fired(void)
 {
+    assert(false); // SFTODO: NEVER CALLED?
     for (int i = 0; i < sizeof(led_details)/sizeof(led_details[0]); i++) {
         if (led_details[i].turn_off_at != 0) {
             if (framesrun >= led_details[i].turn_off_at) {
+                // SFTODO: FACTOR OUT THE NEXT 6ISH LINES OF CODE - COMMON WITH led_update()
+                if (led_details[i].state != false) {
+                    last_led_update_at = framesrun;
+                    led_details[i].state = false;
+                }
                 draw_led(&led_details[i], false);
                 led_details[i].turn_off_at = 0;
+                // SFTODO? last_led_update_at = framesrun;
             }
             else {
                 int ticks = led_details[i].turn_off_at - framesrun;

@@ -2,6 +2,7 @@
 #define __INC_LED_H
 
 extern int led_ticks;
+extern int last_led_update_at;
 extern ALLEGRO_BITMAP *led_bitmap;
 
 typedef enum
