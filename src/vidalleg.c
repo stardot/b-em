@@ -402,14 +402,20 @@ void video_doblit(bool non_ttx, uint8_t vtotal)
         const int led_visible_for_frames = 50;
         const int led_fade_frames = 10;
         if (led_bitmap) { // SFTODO!?
-            int led_visible_frames_left = led_visible_for_frames - (framesrun - last_led_update_at);
-            if (false /* SFTODO: LEDS ALWAYS VISIBLE - MAKE CONFIGURABLE */ ||
-                led_visible_frames_left > 0) {
+            int led_visible_frames_left;
+            if (false /* SFTODO LEDS ALWAYS VISIBLE - CONFIG OPTION */)
+                led_visible_frames_left = INT_MAX;
+            else if (true /* SFTODO CONFIG OPTION */ && led_any_transient_led_on())
+                led_visible_frames_left = INT_MAX;
+            else
+                led_visible_frames_left = led_visible_for_frames - (framesrun - last_led_update_at);
+            if (led_visible_frames_left > 0) {
 #if 0 // SFTODO
                 al_draw_scaled_bitmap(led_bitmap, 0, 0, al_get_bitmap_width(led_bitmap), al_get_bitmap_height(led_bitmap), (winsizex - al_get_bitmap_width(led_bitmap)) / 2, winsizey - al_get_bitmap_height(led_bitmap), al_get_bitmap_width(led_bitmap), al_get_bitmap_height(led_bitmap), 0);
 #else
                 ALLEGRO_COLOR led_tint = al_map_rgb(255, 255, 255);
-                if (!false /* SFTODO LEDS ALWAYS VISIBLE */ && (led_visible_frames_left <= led_fade_frames)) {
+                printf("SFTODOX1 %d\n", led_any_transient_led_on());
+                if (led_visible_frames_left <= led_fade_frames) {
                     int i = (255 * led_visible_frames_left) / led_fade_frames;
                     printf("SFTODO %d\n", i);
                     led_tint = al_map_rgb(i, i, i);

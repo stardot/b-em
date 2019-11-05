@@ -18,6 +18,7 @@ static ALLEGRO_FONT *font;
 typedef struct {
     led_name_t led_name;
     const char *label;
+    bool transient;
     int index;
     bool state;
     int turn_off_at;
@@ -29,12 +30,12 @@ typedef struct {
 // MAYBE THEY SHOULD HAVE A SEPARATE LED EACH, AS WOULD BE THE CASE ON REAL
 // HARDWARE.
 static led_details_t led_details[] = {
-    {LED_CASSETTE_MOTOR, "cassette\nmotor", 0, false, 0},
-    {LED_CAPS_LOCK, "caps\nlock", 1, false, 0},
-    {LED_SHIFT_LOCK, "shift\nlock", 2, false, 0},
-    {LED_DRIVE_0, "drive 0", 3, false, 0},
-    {LED_DRIVE_1, "drive 1", 4, false, 0},
-    {LED_VDFS, "VDFS", 5, false, 0} // SFTODO: MIGHT BE NICE TO HIDE VDFS LED IF VDFS DISABLED
+    {LED_CASSETTE_MOTOR, "cassette\nmotor", false, 0, false, 0},
+    {LED_CAPS_LOCK, "caps\nlock", false, 1, false, 0},
+    {LED_SHIFT_LOCK, "shift\nlock", false, 2, false, 0},
+    {LED_DRIVE_0, "drive 0", true, 3, false, 0},
+    {LED_DRIVE_1, "drive 1", true, 4, false, 0},
+    {LED_VDFS, "VDFS", true, 5, false, 0} // SFTODO: MIGHT BE NICE TO HIDE VDFS LED IF VDFS DISABLED
 };
 
 static void draw_led(const led_details_t *led_details, bool b)
@@ -107,8 +108,10 @@ void led_init()
     // SFTODO THE FOLLOWING LOOP SEEMS TO HAVE NO EFFECT! - I THINK THE MAIN
     // CODE IS NOT DRAWING THE BITMAP UNTIL THE CURSOR MOVES OVER IT, THIS LOOP
     // ITSELF IS PROBABLY FINE
-    for (int i = 0; i < led_count; i++)
+    for (int i = 0; i < led_count; i++) {
         draw_led_full(&led_details[i], false);
+        led_details[i].state = false;
+    }
     // SFTODO;
 }
 
@@ -158,4 +161,12 @@ void led_timer_fired(void)
             }
         }
     }
+}
+
+bool led_any_transient_led_on(void)
+{
+    for (int i = 0; i < sizeof(led_details)/sizeof(led_details[0]); i++)
+        if (led_details[i].transient && led_details[i].state)
+            return true;
+    return false;
 }
