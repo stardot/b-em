@@ -112,6 +112,18 @@ void video_set_borders(int borders)
     al_resize_display(al_get_current_display(), winsizex, winsizey);
 }
 
+void video_set_led_location(int location)
+{
+    vid_ledlocation = location;
+    // SFTODO!
+}
+
+void video_set_led_visibility(int visibility)
+{
+    vid_ledvisibility = visibility;
+    // SFTODO!
+}
+
 void video_update_window_size(ALLEGRO_EVENT *event)
 {
     if (!fullscreen) {

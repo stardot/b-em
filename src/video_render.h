@@ -61,7 +61,9 @@ void video_set_window_size(bool fudge);
 void video_update_window_size(ALLEGRO_EVENT *event);
 void video_set_disptype(enum vid_disptype dtype);
 void video_set_borders(int borders);
-void video_set_led(bool b);
+void video_set_led_location(int location);
+void video_set_led_visibility(int visibility);
+//SFTODO: DELETE IF NOT USED void video_set_led(bool b); // SFTODO: IS THIS USED!?
 
 void video_close(void);
 

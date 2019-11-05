@@ -1066,10 +1066,10 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             nula_disable = !nula_disable;
             break;
         case IDM_VIDEO_LED_LOCATION:
-            // SFTODO!
+            video_set_led_location(radio_event_simple(event, vid_ledlocation));
             break;
         case IDM_VIDEO_LED_VISIBILITY:
-            // SFTODO!
+            video_set_led_visibility(radio_event_simple(event, vid_ledvisibility));
             break;
         case IDM_SOUND_INTERNAL:
             sound_internal = !sound_internal;
