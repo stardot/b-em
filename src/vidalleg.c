@@ -14,8 +14,8 @@ enum vid_disptype vid_dtype_user, vid_dtype_intern;
 bool vid_pal;
 int vid_fskipmax = 1;
 int vid_fullborders = 1;
-int vid_ledlocation = 1; // SFTODO!? DEFAULT? LOAD/SAVE?
-int vid_ledvisibility = 1; // SFTODO!? DEFAULT? LOAD/SAVE?
+int vid_ledlocation = 0;
+int vid_ledvisibility = 2;
 
 static int fskipcount;
 
@@ -121,7 +121,6 @@ void video_set_led_location(int location)
 void video_set_led_visibility(int visibility)
 {
     vid_ledvisibility = visibility;
-    // SFTODO!
 }
 
 void video_update_window_size(ALLEGRO_EVENT *event)
@@ -417,9 +416,9 @@ void video_doblit(bool non_ttx, uint8_t vtotal)
         const int led_fade_frames = 10;
         if (led_bitmap) { // SFTODO!?
             int led_visible_frames_left;
-            if (false /* SFTODO LEDS ALWAYS VISIBLE - CONFIG OPTION */)
+            if (vid_ledvisibility == 2 /* LEDs permanently visible */)
                 led_visible_frames_left = INT_MAX;
-            else if (true /* SFTODO CONFIG OPTION */ && led_any_transient_led_on())
+            else if (vid_ledvisibility == 1 /* LEDs visible when changed or transient LED lit */ && led_any_transient_led_on())
                 led_visible_frames_left = INT_MAX;
             else
                 led_visible_frames_left = led_visible_for_frames - (framesrun - last_led_update_at);
