@@ -24,6 +24,7 @@
 #include "joystick.h"
 #include "keyboard.h"
 #include "keydef-allegro.h"
+#include "led.h"
 #include "main.h"
 #include "6809tube.h"
 #include "mem.h"
@@ -433,6 +434,9 @@ static void main_timer(ALLEGRO_EVENT *event)
 
         if (ddnoise_ticks > 0 && --ddnoise_ticks == 0)
             ddnoise_headdown();
+
+        if (led_ticks > 0 && --led_ticks == 0)
+            led_timer_fired();
 
         if (savestate_wantload)
             savestate_doload();
