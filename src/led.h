@@ -1,6 +1,8 @@
 #ifndef __INC_LED_H
 #define __INC_LED_H
 
+#define LED_BOX_HEIGHT (32)
+
 extern int led_ticks;
 extern int last_led_update_at;
 extern ALLEGRO_BITMAP *led_bitmap;
