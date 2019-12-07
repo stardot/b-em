@@ -40,6 +40,7 @@ static const int y_fudge = 0;
 static const int y_fudge = 28;
 #endif
 
+// SFTODO: LED SUPPORT!
 void video_enterfullscreen()
 {
     ALLEGRO_DISPLAY *display;
@@ -147,13 +148,19 @@ void video_set_led_visibility(int visibility)
     vid_ledvisibility = visibility;
 }
 
+static int video_led_height(void)
+{
+    return (vid_ledlocation == 2 /* separate */) ? LED_BOX_HEIGHT : 0;
+}
+
 void video_update_window_size(ALLEGRO_EVENT *event)
 {
     if (!fullscreen) {
         scr_x_start = 0;
         scr_x_size = winsizex = event->display.width;
         scr_y_start = 0;
-        scr_y_size = winsizey = event->display.height;
+        winsizey = event->display.height;
+        scr_y_size = winsizey - video_led_height();
         log_debug("vidalleg: video_update_window_size, scr_x_size=%d, scr_y_size=%d", scr_x_size, scr_y_size);
     }
     al_acknowledge_resize(event->display.source);
@@ -168,7 +175,8 @@ void video_leavefullscreen(void)
     scr_x_start = 0;
     scr_x_size = winsizex = al_get_display_width(display);
     scr_y_start = 0;
-    scr_y_size = winsizey = al_get_display_height(display);
+    winsizey = al_get_display_height(display);
+    scr_y_size = winsizey - video_led_height();
 }
 
 void video_toggle_fullscreen(void)
@@ -459,6 +467,7 @@ void video_doblit(bool non_ttx, uint8_t vtotal)
                         printf("SFTODO %d\n", i);
                         led_tint = al_map_rgb(i, i, i);
                     }
+                    //fprintf(stderr, "SFTODOQ4 winsizey %d\n", winsizey);
                     al_draw_tinted_scaled_bitmap(led_bitmap, led_tint, 0, 0, al_get_bitmap_width(led_bitmap), al_get_bitmap_height(led_bitmap), (winsizex - al_get_bitmap_width(led_bitmap)) / 2, winsizey - al_get_bitmap_height(led_bitmap), al_get_bitmap_width(led_bitmap), al_get_bitmap_height(led_bitmap), 0);
 #endif
                 }
