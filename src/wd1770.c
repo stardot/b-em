@@ -1,4 +1,3 @@
-// SFTODO: NEED TO ADD LED SUPPORT TO 8271 EMULATION
 /*B-em v2.2 by Tom Walker
   1770 FDC emulation*/
 #include <stdio.h>
@@ -272,7 +271,6 @@ static void write_ctrl_master(uint8_t val)
     wd1770.ctrl = val;
     curdrive = (val & 2) ? 1 : 0;
     if (motoron) {
-        // SFTODO: IF THIS WORKS NEED SAME LOGIC FOR OTHER CONTROLLERS...
         led_update((curdrive == 0) ? LED_DRIVE_0 : LED_DRIVE_1, true, 0 /* SFTODO LED_DRIVE_TICKS */);
         led_update((curdrive == 0) ? LED_DRIVE_1 : LED_DRIVE_0, false, 0 /* SFTODO LED_DRIVE_TICKS */);
     }
