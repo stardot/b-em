@@ -300,9 +300,13 @@ void main_init(int argc, char *argv[])
         disc_load(0, discfns[0]);
     disc_load(1, discfns[1]);
     tape_load(tape_fn);
-    if (defaultwriteprot)
+    if (defaultwriteprot) {
         writeprot[0] = writeprot[1] = 1;
-
+        if (discfns[0])
+            gui_set_disc_wprot(0, true);
+        if (discfns[1])
+            gui_set_disc_wprot(1, true);
+    }
     debug_start();
 }
 

@@ -593,12 +593,16 @@ static void edit_print_clip(ALLEGRO_EVENT *event)
         prt_clip_str = al_ustr_dup(al_ustr_empty_string());
 }
 
+void gui_set_disc_wprot(int drive, bool enabled)
+{
+    al_set_menu_item_flags(disc_menu, menu_id_num(IDM_DISC_WPROT, drive), enabled ? ALLEGRO_MENU_ITEM_CHECKBOX|ALLEGRO_MENU_ITEM_CHECKED : ALLEGRO_MENU_ITEM_CHECKBOX);
+}
+
 static void disc_choose(ALLEGRO_EVENT *event, const char *opname, const char *exts, int flags)
 {
     ALLEGRO_FILECHOOSER *chooser;
     ALLEGRO_DISPLAY *display;
     ALLEGRO_PATH *apath;
-    ALLEGRO_MENU *menu;
     int drive;
     const char *fpath;
     char title[50];
@@ -661,14 +665,9 @@ static void disc_choose(ALLEGRO_EVENT *event, const char *opname, const char *ex
                     default:
                         break;
                 }
-                menu = (ALLEGRO_MENU *)(event->user.data3);
-                if (defaultwriteprot) {
+                if (defaultwriteprot)
                     writeprot[drive] = 1;
-                    al_set_menu_item_flags(menu, menu_id_num(IDM_DISC_WPROT, drive), ALLEGRO_MENU_ITEM_CHECKBOX|ALLEGRO_MENU_ITEM_CHECKED);
-                } else if (writeprot[drive])
-                    al_set_menu_item_flags(menu, menu_id_num(IDM_DISC_WPROT, drive), ALLEGRO_MENU_ITEM_CHECKBOX|ALLEGRO_MENU_ITEM_CHECKED);
-                else
-                    al_set_menu_item_flags(menu, menu_id_num(IDM_DISC_WPROT, drive), ALLEGRO_MENU_ITEM_CHECKBOX);
+                gui_set_disc_wprot(drive, writeprot[drive]);
             }
         }
         al_destroy_native_file_dialog(chooser);
