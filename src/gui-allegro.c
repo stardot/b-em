@@ -622,12 +622,13 @@ static void disc_choose(ALLEGRO_EVENT *event, const char *opname, const char *ex
                 discfns[drive] = path;
                 switch(menu_get_id(event)) {
                     case IDM_DISC_AUTOBOOT:
-                        disc_load(drive, path);
                         main_reset();
                         autoboot = 150;
-                        break;
+                        /* FALLTHROUGH */
                     case IDM_DISC_LOAD:
                         disc_load(drive, path);
+                        if (defaultwriteprot)
+                            writeprot[drive] = 1;
                         break;
                     case IDM_DISC_NEW_ADFS_S:
                         sdf_new_disc(drive, path, SDF_FMT_ADFS_S);
@@ -665,8 +666,6 @@ static void disc_choose(ALLEGRO_EVENT *event, const char *opname, const char *ex
                     default:
                         break;
                 }
-                if (defaultwriteprot)
-                    writeprot[drive] = 1;
                 gui_set_disc_wprot(drive, writeprot[drive]);
             }
         }
