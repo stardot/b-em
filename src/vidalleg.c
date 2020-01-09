@@ -127,20 +127,6 @@ void video_set_led_location(int location)
     vid_ledlocation = location;
     video_set_window_size(false);
     al_resize_display(al_get_current_display(), winsizex, winsizey);
-#if 0 // SFTODO: DELETE
-    switch (vid_ledlocation) {
-        case 0: // None
-            TODO;
-            break;
-        case 1: // Overlapped
-            TODO;
-            break;
-        case 2: // Separate
-            TODO;
-            break;
-    }
-#endif
-    // SFTODO!
 }
 
 void video_set_led_visibility(int visibility)
@@ -448,29 +434,25 @@ void video_doblit(bool non_ttx, uint8_t vtotal)
             //led_init(); // SFTODO!?
             const int led_visible_for_frames = 50;
             const int led_fade_frames = 10;
-            if (led_bitmap) { // SFTODO!?
-                int led_visible_frames_left;
-                if (vid_ledvisibility == 2 /* LEDs permanently visible */)
-                    led_visible_frames_left = INT_MAX;
-                else if (vid_ledvisibility == 1 /* LEDs visible when changed or transient LED lit */ && led_any_transient_led_on())
-                    led_visible_frames_left = INT_MAX;
-                else
-                    led_visible_frames_left = led_visible_for_frames - (framesrun - last_led_update_at);
-                if (led_visible_frames_left > 0) {
-#if 0 // SFTODO
-                    al_draw_scaled_bitmap(led_bitmap, 0, 0, al_get_bitmap_width(led_bitmap), al_get_bitmap_height(led_bitmap), (winsizex - al_get_bitmap_width(led_bitmap)) / 2, winsizey - al_get_bitmap_height(led_bitmap), al_get_bitmap_width(led_bitmap), al_get_bitmap_height(led_bitmap), 0);
-#else
-                    ALLEGRO_COLOR led_tint = al_map_rgb(255, 255, 255);
-                    //printf("SFTODOX1 %d\n", led_any_transient_led_on());
-                    if (led_visible_frames_left <= led_fade_frames) {
-                        int i = (255 * led_visible_frames_left) / led_fade_frames;
-                        printf("SFTODO %d\n", i);
-                        led_tint = al_map_rgb(i, i, i);
-                    }
-                    //fprintf(stderr, "SFTODOQ4 winsizey %d\n", winsizey);
-                    al_draw_tinted_scaled_bitmap(led_bitmap, led_tint, 0, 0, al_get_bitmap_width(led_bitmap), al_get_bitmap_height(led_bitmap), (winsizex - al_get_bitmap_width(led_bitmap)) / 2, winsizey - al_get_bitmap_height(led_bitmap), al_get_bitmap_width(led_bitmap), al_get_bitmap_height(led_bitmap), 0);
-#endif
+
+            int led_visible_frames_left;
+            if (vid_ledvisibility == 2 /* LEDs permanently visible */)
+                led_visible_frames_left = INT_MAX;
+            else if (vid_ledvisibility == 1 /* LEDs visible when changed or transient LED lit */ && led_any_transient_led_on())
+                led_visible_frames_left = INT_MAX;
+            else
+                led_visible_frames_left = led_visible_for_frames - (framesrun - last_led_update_at);
+
+            if (led_visible_frames_left > 0) {
+                ALLEGRO_COLOR led_tint = al_map_rgb(255, 255, 255);
+                //printf("SFTODOX1 %d\n", led_any_transient_led_on());
+                if (led_visible_frames_left <= led_fade_frames) {
+                    int i = (255 * led_visible_frames_left) / led_fade_frames;
+                    printf("SFTODO %d\n", i);
+                    led_tint = al_map_rgb(i, i, i);
                 }
+                //fprintf(stderr, "SFTODOQ4 winsizey %d\n", winsizey);
+                al_draw_tinted_scaled_bitmap(led_bitmap, led_tint, 0, 0, al_get_bitmap_width(led_bitmap), al_get_bitmap_height(led_bitmap), (winsizex - al_get_bitmap_width(led_bitmap)) / 2, winsizey - al_get_bitmap_height(led_bitmap), al_get_bitmap_width(led_bitmap), al_get_bitmap_height(led_bitmap), 0);
             }
         }
 
