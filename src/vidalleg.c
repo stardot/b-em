@@ -131,6 +131,9 @@ void video_set_led_location(int location)
 
 void video_set_led_visibility(int visibility)
 {
+    if (visibility == 1 /* LEDs visible when changed or transient LED lit */ && vid_ledvisibility == 2 /* LEDs permanently visible */)
+        last_led_update_at = framesrun;
+
     vid_ledvisibility = visibility;
 }
 
@@ -429,8 +432,6 @@ void video_doblit(bool non_ttx, uint8_t vtotal)
 
         // SFTODO: ALL THIS SHOULD BE IN A FUNCTION!
         if (vid_ledlocation != 0) { 
-            // SFTODO: THE LEDS DON'T SCALE (POSSIBLY GOOD, NOT SURE) AND DON'T
-            // "CREATE" SPACE FOR THEMSELVES IF THERE ISN'T ENOUGH OF A BORDER.
             //led_init(); // SFTODO!?
             const int led_visible_for_frames = 50;
             const int led_fade_frames = 10;
@@ -451,7 +452,7 @@ void video_doblit(bool non_ttx, uint8_t vtotal)
                     printf("SFTODO %d\n", i);
                     led_tint = al_map_rgb(i, i, i);
                 }
-                //fprintf(stderr, "SFTODOQ4 winsizey %d\n", winsizey);
+                fprintf(stderr, "SFTODOQ4 winsizey %d\n", winsizey);
                 al_draw_tinted_scaled_bitmap(led_bitmap, led_tint, 0, 0, al_get_bitmap_width(led_bitmap), al_get_bitmap_height(led_bitmap), (winsizex - al_get_bitmap_width(led_bitmap)) / 2, winsizey - al_get_bitmap_height(led_bitmap), al_get_bitmap_width(led_bitmap), al_get_bitmap_height(led_bitmap), 0);
             }
         }
