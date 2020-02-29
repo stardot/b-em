@@ -64,6 +64,10 @@ AC_TYPE_UINT32_T
 AC_TYPE_UINT64_T
 AC_TYPE_UINT8_T
 
+# DB: check if max_align_t is defined
+AC_CHECK_TYPES([max_align_t])
+
+
 # Checks for library functions.
 AC_FUNC_ALLOCA
 AC_FUNC_ERROR_AT_LINE
