@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
       <Configuration>Debug</Configuration>
@@ -14,18 +14,21 @@
     <ProjectGuid>{28E2DE55-0A88-47FA-92DC-3F96D72608F9}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>bem</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -39,9 +42,25 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
+    <Allegro_LibraryType>StaticMonolithRelease</Allegro_LibraryType>
+    <Allegro_AddonAudio>true</Allegro_AddonAudio>
+    <Allegro_AddonFont>true</Allegro_AddonFont>
+    <Allegro_AddonAcodec>true</Allegro_AddonAcodec>
+    <Allegro_AddonDialog>true</Allegro_AddonDialog>
+    <Allegro_AddonImage>true</Allegro_AddonImage>
+    <Allegro_AddonPrimitives>true</Allegro_AddonPrimitives>
+    <OutDir>$(SolutionDir)</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
+    <Allegro_LibraryType>StaticMonolithRelease</Allegro_LibraryType>
+    <Allegro_AddonAudio>true</Allegro_AddonAudio>
+    <Allegro_AddonFont>true</Allegro_AddonFont>
+    <Allegro_AddonAcodec>true</Allegro_AddonAcodec>
+    <Allegro_AddonDialog>true</Allegro_AddonDialog>
+    <Allegro_AddonImage>true</Allegro_AddonImage>
+    <Allegro_AddonPrimitives>true</Allegro_AddonPrimitives>
+    <OutDir>$(SolutionDir)</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -49,13 +68,14 @@
       </PrecompiledHeader>
       <WarningLevel>TurnOffAllWarnings</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>BEM;WIN32;INCLUDE_DEBUGGER;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <UndefinePreprocessorDefinitions>UNICODE;_UNICODE;%(UndefinePreprocessorDefinitions)</UndefinePreprocessorDefinitions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>alleg.lib;zlib.lib;OpenAL32.lib;alut.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>zlib.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>D:\msys64\home\Dominic\build\b-em\vs\b-em-master\packages\AllegroDeps.1.11.0\build\native\v141\win32\deps\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -66,7 +86,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>BEM;WIN32;INCLUDE_DEBUGGER;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <UndefinePreprocessorDefinitions>UNICODE;_UNICODE;%(UndefinePreprocessorDefinitions)</UndefinePreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
@@ -75,41 +95,72 @@
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>alleg.lib;zlib.lib;OpenAL32.lib;alut.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>zlib.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>MSVCRTD.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
+      <AdditionalLibraryDirectories>D:\msys64\home\Dominic\build\b-em\vs\b-em-master\packages\AllegroDeps.1.11.0\build\native\v141\win32\deps\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="32016.h" />
     <ClInclude Include="6502.h" />
+    <ClInclude Include="6502debug.h" />
     <ClInclude Include="6502tube.h" />
     <ClInclude Include="65816.h" />
+    <ClInclude Include="6809tube.h" />
     <ClInclude Include="acia.h" />
     <ClInclude Include="adc.h" />
-    <ClInclude Include="adf.h" />
     <ClInclude Include="arm.h" />
     <ClInclude Include="b-em.h" />
     <ClInclude Include="bbctext.h" />
     <ClInclude Include="cmos.h" />
     <ClInclude Include="compactcmos.h" />
     <ClInclude Include="compact_joystick.h" />
+    <ClInclude Include="compat_wrappers.h" />
     <ClInclude Include="config.h" />
+    <ClInclude Include="cpu_debug.h" />
     <ClInclude Include="csw.h" />
     <ClInclude Include="daa.h" />
+    <ClInclude Include="darm\armv7-tbl.h" />
+    <ClInclude Include="darm\darm-internal.h" />
+    <ClInclude Include="darm\darm-tbl.h" />
+    <ClInclude Include="darm\darm.h" />
+    <ClInclude Include="darm\thumb-tbl.h" />
+    <ClInclude Include="darm\thumb2-tbl.h" />
+    <ClInclude Include="darm\thumb2.h" />
     <ClInclude Include="ddnoise.h" />
     <ClInclude Include="debugger.h" />
     <ClInclude Include="disc.h" />
     <ClInclude Include="fdi.h" />
     <ClInclude Include="fdi2raw.h" />
+    <ClInclude Include="gui-allegro.h" />
     <ClInclude Include="i8271.h" />
     <ClInclude Include="ide.h" />
+    <ClInclude Include="joystick.h" />
     <ClInclude Include="keyboard.h" />
+    <ClInclude Include="keydef-allegro.h" />
+    <ClInclude Include="linux-gui.h" />
+    <ClInclude Include="logging.h" />
     <ClInclude Include="main.h" />
+    <ClInclude Include="mc6809nc\mc6809.h" />
+    <ClInclude Include="mc6809nc\mc6809_debug.h" />
+    <ClInclude Include="mc6809nc\mc6809_dis.h" />
     <ClInclude Include="mem.h" />
+    <ClInclude Include="midi.h" />
     <ClInclude Include="model.h" />
     <ClInclude Include="mouse.h" />
+    <ClInclude Include="music2000.h" />
+    <ClInclude Include="music4000.h" />
+    <ClInclude Include="music5000.h" />
+    <ClInclude Include="NS32016\32016.h" />
+    <ClInclude Include="NS32016\32016_debug.h" />
+    <ClInclude Include="NS32016\Decode.h" />
+    <ClInclude Include="NS32016\defs.h" />
+    <ClInclude Include="NS32016\mem32016.h" />
+    <ClInclude Include="NS32016\NSDis.h" />
+    <ClInclude Include="NS32016\Profile.h" />
+    <ClInclude Include="NS32016\Trap.h" />
     <ClInclude Include="pal.h" />
+    <ClInclude Include="paula.h" />
     <ClInclude Include="resid-fp\envelope.h" />
     <ClInclude Include="resid-fp\extfilt.h" />
     <ClInclude Include="resid-fp\filter.h" />
@@ -120,62 +171,93 @@
     <ClInclude Include="resid-fp\wave.h" />
     <ClInclude Include="resources.h" />
     <ClInclude Include="savestate.h" />
-    <ClInclude Include="scan2bbc.h" />
+    <ClInclude Include="scsi.h" />
+    <ClInclude Include="sdf.h" />
     <ClInclude Include="serial.h" />
     <ClInclude Include="sidtypes.h" />
     <ClInclude Include="sid_b-em.h" />
     <ClInclude Include="sn76489.h" />
     <ClInclude Include="sound.h" />
-    <ClInclude Include="soundopenal.h" />
-    <ClInclude Include="ssd.h" />
+    <ClInclude Include="sysacia.h" />
     <ClInclude Include="sysvia.h" />
     <ClInclude Include="tape.h" />
+    <ClInclude Include="tapecat-allegro.h" />
     <ClInclude Include="tapenoise.h" />
     <ClInclude Include="tube.h" />
     <ClInclude Include="uef.h" />
     <ClInclude Include="uservia.h" />
+    <ClInclude Include="vdfs.h" />
     <ClInclude Include="via.h" />
     <ClInclude Include="video.h" />
     <ClInclude Include="video_render.h" />
     <ClInclude Include="wd1770.h" />
-    <ClInclude Include="win.h" />
     <ClInclude Include="x86.h" />
     <ClInclude Include="x86_tube.h" />
     <ClInclude Include="z80.h" />
+    <ClInclude Include="z80dis.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="b-em.rc" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="32016.c" />
     <ClCompile Include="6502.c" />
+    <ClCompile Include="6502debug.c" />
     <ClCompile Include="6502tube.c" />
     <ClCompile Include="65816.c" />
+    <ClCompile Include="6809tube.c" />
     <ClCompile Include="acia.c" />
     <ClCompile Include="adc.c" />
-    <ClCompile Include="adf.c" />
     <ClCompile Include="arm.c" />
     <ClCompile Include="cmos.c" />
     <ClCompile Include="compactcmos.c" />
     <ClCompile Include="compact_joystick.c" />
+    <ClCompile Include="compat_wrappers.c" />
     <ClCompile Include="config.c" />
     <ClCompile Include="csw.c" />
+    <ClCompile Include="darm\armv7-tbl.c" />
+    <ClCompile Include="darm\armv7.c" />
+    <ClCompile Include="darm\darm-tbl.c" />
+    <ClCompile Include="darm\darm.c" />
+    <ClCompile Include="darm\thumb-tbl.c" />
+    <ClCompile Include="darm\thumb.c" />
+    <ClCompile Include="darm\thumb2-decoder.c" />
+    <ClCompile Include="darm\thumb2-tbl.c" />
+    <ClCompile Include="darm\thumb2.c" />
     <ClCompile Include="ddnoise.c" />
     <ClCompile Include="debugger.c" />
     <ClCompile Include="disc.c" />
     <ClCompile Include="fdi.c" />
     <ClCompile Include="fdi2raw.c" />
+    <ClCompile Include="gui-allegro.c" />
     <ClCompile Include="i8271.c" />
     <ClCompile Include="ide.c" />
+    <ClCompile Include="joystick.c" />
     <ClCompile Include="keyboard.c" />
+    <ClCompile Include="keydef-allegro.c" />
     <ClCompile Include="linux-gui.c" />
     <ClCompile Include="linux-keydefine.c" />
     <ClCompile Include="linux.c" />
+    <ClCompile Include="logging.c" />
     <ClCompile Include="main.c" />
+    <ClCompile Include="mc6809nc\mc6809nc.c" />
+    <ClCompile Include="mc6809nc\mc6809_debug.c" />
+    <ClCompile Include="mc6809nc\mc6809_dis.c" />
     <ClCompile Include="mem.c" />
+    <ClCompile Include="midi-windows.c" />
     <ClCompile Include="model.c" />
     <ClCompile Include="mouse.c" />
+    <ClCompile Include="music2000.c" />
+    <ClCompile Include="music4000.c" />
+    <ClCompile Include="music5000.c" />
+    <ClCompile Include="NS32016\32016.c" />
+    <ClCompile Include="NS32016\32016_debug.c" />
+    <ClCompile Include="NS32016\Decode.c" />
+    <ClCompile Include="NS32016\mem32016.c" />
+    <ClCompile Include="NS32016\NSDis.c" />
+    <ClCompile Include="NS32016\Profile.c" />
+    <ClCompile Include="NS32016\Trap.c" />
     <ClCompile Include="pal.c" />
+    <ClCompile Include="paula.c" />
     <ClCompile Include="resid-fp\convolve-sse.cc" />
     <ClCompile Include="resid-fp\convolve.cc" />
     <ClCompile Include="resid-fp\envelope.cc" />
@@ -195,31 +277,47 @@
     <ClCompile Include="resid-fp\wave8580__ST.cc" />
     <ClCompile Include="resid.cc" />
     <ClCompile Include="savestate.c" />
+    <ClCompile Include="scsi.c" />
+    <ClCompile Include="sdf-acc.c" />
+    <ClCompile Include="sdf-geo.c" />
     <ClCompile Include="serial.c" />
     <ClCompile Include="sn76489.c" />
     <ClCompile Include="sound.c" />
-    <ClCompile Include="soundopenal.c" />
-    <ClCompile Include="ssd.c" />
+    <ClCompile Include="sysacia.c" />
     <ClCompile Include="sysvia.c" />
     <ClCompile Include="tape.c" />
+    <ClCompile Include="tapecat-allegro.c" />
     <ClCompile Include="tapenoise.c" />
     <ClCompile Include="tube.c" />
     <ClCompile Include="uef.c" />
     <ClCompile Include="uservia.c" />
+    <ClCompile Include="vdfs.c" />
     <ClCompile Include="via.c" />
     <ClCompile Include="vidalleg.c" />
     <ClCompile Include="video.c" />
     <ClCompile Include="wd1770.c" />
-    <ClCompile Include="win-catalogue.c" />
-    <ClCompile Include="win-keydefine.c" />
     <ClCompile Include="win.c" />
     <ClCompile Include="x86.c" />
+    <ClCompile Include="x86dasm.c" />
     <ClCompile Include="Z80.c" />
+    <ClCompile Include="z80dis.c" />
   </ItemGroup>
   <ItemGroup>
     <None Include="b-em.ico" />
+    <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="..\packages\AllegroDeps.1.11.0\build\native\AllegroDeps.targets" Condition="Exists('..\packages\AllegroDeps.1.11.0\build\native\AllegroDeps.targets')" />
+    <Import Project="..\packages\Allegro.5.2.6\build\native\Allegro.targets" Condition="Exists('..\packages\Allegro.5.2.6\build\native\Allegro.targets')" />
+    <Import Project="..\packages\dirent.1.13.1\build\native\dirent.targets" Condition="Exists('..\packages\dirent.1.13.1\build\native\dirent.targets')" />
   </ImportGroup>
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\packages\AllegroDeps.1.11.0\build\native\AllegroDeps.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\AllegroDeps.1.11.0\build\native\AllegroDeps.targets'))" />
+    <Error Condition="!Exists('..\packages\Allegro.5.2.6\build\native\Allegro.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Allegro.5.2.6\build\native\Allegro.targets'))" />
+    <Error Condition="!Exists('..\packages\dirent.1.13.1\build\native\dirent.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\dirent.1.13.1\build\native\dirent.targets'))" />
+  </Target>
 </Project>

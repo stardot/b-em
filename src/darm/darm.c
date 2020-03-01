@@ -569,6 +569,18 @@ int darm_str2(const darm_t *d, darm_str_t *str, int lowercase)
     return 0;
 }
 
+//DB: to allow compile in non-gcc
+#ifndef __GNUC__
+unsigned __builtin_ctz(unsigned i) {
+    unsigned r = 0;
+    while (i & 1) {
+        i = i >> 1;
+        r++;
+    }
+    return r;
+}
+#endif
+
 int darm_reglist(uint16_t reglist, char *out)
 {
     char *base = out;
