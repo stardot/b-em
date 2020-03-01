@@ -1,11 +1,11 @@
 # Makefile.am for B-em
 
 bin_PROGRAMS = b-em hdfmt jstest gtest
-noinst_SCRIPTS = ../b-em
+noinst_SCRIPTS = ../b-em$(EXEEXT)
 CLEANFILES = $(noinst_SCRIPTS)
 
-../b-em: b-em
-	cp b-em ..
+../b-em$(EXEEXT): b-em$(EXEEXT)
+	cp b-em$(EXEEXT) ..
 
 amrefresh:
 
