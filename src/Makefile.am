@@ -101,6 +101,7 @@ b_em_SOURCES = \
 	vidalleg.c \
 	video.c \
 	wd1770.c \
+	win.c \
 	x86.c \
 	x86dasm.c \
 	resid-fp/convolve-sse.cc \

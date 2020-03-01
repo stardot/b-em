@@ -127,7 +127,7 @@ typedef void (*__action_fn_t) (const void *__nodep, VISIT __value, int __level);
  *    data this function should do nothing.  */
 typedef void (*__free_fn_t) (void *__nodep);
 
-#ifndef __CLANG_MAX_ALIGN_T_DEFINED
+#ifndef HAVE_MAX_ALIGN_T
 typedef long double max_align_t;
 #endif
 
