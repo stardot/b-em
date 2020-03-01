@@ -34,3 +34,9 @@ src/gtest.exe
 src/fsmap
 src/hdfmt
 src/fdresize
+packages/*
+src/Debug/*
+src/Release/*
+b-em.iobj
+b-em.ipdb
+b-em.iobj

@@ -291,9 +291,6 @@
     <ClInclude Include="mc6809nc\mc6809_dis.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="paula.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="b-em.rc">
@@ -599,9 +596,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="mc6809nc\mc6809nc.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="paula.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
