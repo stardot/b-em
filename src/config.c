@@ -133,6 +133,7 @@ void config_load(void)
     sound_ddnoise    = get_config_bool("sound", "sndddnoise",    true);
     sound_tape       = get_config_bool("sound", "sndtape",       false);
     sound_filter     = get_config_bool("sound", "soundfilter",   true);
+    sound_paula      = get_config_bool("sound", "soundpaula",    false);
 
     curwave          = get_config_int("sound", "soundwave",     0);
     sidmethod        = get_config_int("sound", "sidmethod",     0);
@@ -237,6 +238,7 @@ void config_save(void)
         set_config_bool("sound", "sndddnoise",  sound_ddnoise);
         set_config_bool("sound", "sndtape",     sound_tape);
         set_config_bool("sound", "soundfilter", sound_filter);
+        set_config_bool("sound", "soundpaula",  sound_paula);
 
         set_config_int("sound", "soundwave", curwave);
         set_config_int("sound", "sidmethod", sidmethod);
