@@ -477,7 +477,7 @@ void paula_fillbuf(int16_t *buffer, int len) {
 
         if (paula_fp)
             fput_samples(paula_fp, s);
-        *bufptr++ = s;
+        *bufptr++ += s;
     }
 }
 
