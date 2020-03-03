@@ -4,8 +4,8 @@
 #include "music4000.h"
 #include "midi-linux.h"
 #include "sound.h"
-#include <pthread.h>
-#include <unistd.h>
+//#include <pthread.h>
+//#include <unistd.h>
 
 midi_dev_t midi_music4000;
 midi_dev_t midi_music2000_out1;

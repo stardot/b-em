@@ -1,6 +1,8 @@
 #define BYTE_SWAP
 
-#if defined(WIN32) && !defined(BEM)
+//DB: not sure here took out the !BEM to allow compile in VS
+//#if defined(WIN32) && !defined(BEM)
+#if defined(WIN32) && !defined(__GNU_C__)
 #define SWAP16 _byteswap_ushort
 #define SWAP32 _byteswap_ulong
 #else

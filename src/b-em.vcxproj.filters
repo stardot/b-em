@@ -45,9 +45,6 @@
     <ClInclude Include="6502tube.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="32016.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="65816.h">
       <Filter>Source Files</Filter>
     </ClInclude>
@@ -55,9 +52,6 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="adc.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="adf.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="arm.h">
@@ -132,9 +126,6 @@
     <ClInclude Include="savestate.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="scan2bbc.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="serial.h">
       <Filter>Source Files</Filter>
     </ClInclude>
@@ -148,12 +139,6 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="sound.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="soundopenal.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ssd.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="sysvia.h">
@@ -186,9 +171,6 @@
     <ClInclude Include="wd1770.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="win.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="x86.h">
       <Filter>Source Files</Filter>
     </ClInclude>
@@ -197,6 +179,117 @@
     </ClInclude>
     <ClInclude Include="z80.h">
       <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="6502debug.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="6809tube.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="NS32016\32016.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="NS32016\32016_debug.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="NS32016\Decode.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="NS32016\defs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="NS32016\mem32016.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="NS32016\NSDis.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="NS32016\Profile.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="NS32016\Trap.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="z80dis.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="darm\darm.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="darm\armv7-tbl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="darm\darm-internal.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="darm\darm-tbl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="darm\thumb2.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="darm\thumb2-tbl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="darm\thumb-tbl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="compat_wrappers.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cpu_debug.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gui-allegro.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="joystick.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="keydef-allegro.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="linux-gui.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="logging.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="midi.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="music5000.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="music4000.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="music2000.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="scsi.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sdf.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sysacia.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="tapecat-allegro.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vdfs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mc6809nc\mc6809.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mc6809nc\mc6809_debug.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mc6809nc\mc6809_dis.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -211,9 +304,6 @@
     <ClCompile Include="6502tube.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="32016.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="65816.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -221,9 +311,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="adc.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="adf.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="arm.c">
@@ -307,12 +394,6 @@
     <ClCompile Include="sound.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="soundopenal.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ssd.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="sysvia.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -344,12 +425,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="win.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="win-catalogue.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="win-keydefine.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="x86.c">
@@ -409,10 +484,125 @@
     <ClCompile Include="resid-fp\wave.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="6502debug.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="6809tube.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="NS32016\32016.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="NS32016\32016_debug.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="NS32016\Decode.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="NS32016\mem32016.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="NS32016\NSDis.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="NS32016\Profile.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="NS32016\Trap.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="z80dis.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="darm\darm.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="darm\armv7.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="darm\armv7-tbl.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="darm\darm-tbl.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="darm\thumb.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="darm\thumb2.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="darm\thumb2-decoder.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="darm\thumb2-tbl.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="darm\thumb-tbl.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="compat_wrappers.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gui-allegro.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="joystick.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="keydef-allegro.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="logging.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="midi-windows.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="music2000.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="music5000.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="music4000.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="scsi.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sdf-acc.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sdf-geo.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sysacia.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="tapecat-allegro.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="vdfs.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="x86dasm.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="mc6809nc\mc6809_debug.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="mc6809nc\mc6809_dis.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="mc6809nc\mc6809nc.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="b-em.ico">
       <Filter>Source Files</Filter>
     </None>
+    <None Include="packages.config" />
   </ItemGroup>
 </Project>
