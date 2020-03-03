@@ -354,7 +354,7 @@ bool paula_read(uint16_t addr, uint8_t *val)
         return false;
 }
 
-static void fetch_sample(CHANNELREGS *curchan) {
+static void fetch_mem(CHANNELREGS *curchan) {
 
 
     //this is a very rough approximation of what really happens in terms of prioritisation
@@ -399,14 +399,14 @@ static void paula_update_3_5MHz()
         else {
             if (!curchan->act_prev)
             {
-                fetch_sample(curchan);
+                fetch_mem(curchan);
                 curchan->samper_ctr = curchan->period;
             }
             else if (curchan->samper_ctr == 0)
             {
-                fetch_sample(curchan);
-                curchan->samper_ctr = curchan->period;
                 curchan->data = curchan->data_next;
+                fetch_mem(curchan);
+                curchan->samper_ctr = curchan->period;
             }
             else
                 curchan->samper_ctr--;
