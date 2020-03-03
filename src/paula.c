@@ -64,7 +64,6 @@ typedef struct
     UINT8	peak;
 
     //internal registers
-    bool	clken_sam_next;
     bool	act_prev;
     UINT16	samper_ctr;
     INT8	data_next;
@@ -78,17 +77,13 @@ CHANNELREGS		ChannelRegs[NUM_CHANNELS];
 UINT8			ChannelSel;
 UINT8			Volume;
 
-#define H1M_RAM_CLK   8000000
 #define H1M_STREAM_RATE 31250
-#define H1M_CYCLES_PER_STREAM_SAMPLE H1M_RAM_CLK/H1M_STREAM_RATE
 
 #define H1M_PAULA_CLK 3547672
 #define H1M_PCLK_LIM  65536
-#define H1M_PCLK_A    (int)((((long long)H1M_PCLK_LIM) * ((long long)H1M_PAULA_CLK)) / (long long)H1M_RAM_CLK)
+#define H1M_PCLK_A    (int)((((long long)H1M_PCLK_LIM) * ((long long)H1M_PAULA_CLK)) / (long long)H1M_STREAM_RATE)
 
-UINT32 sample_clock_acc = 0; //sample clock accumulator - when this overflows do a sound sample
 UINT32 paula_clock_acc = 0; //paula clock acumulator - when this overflows do a Paula period
-
 
 
 void paula_reset(void)
@@ -359,81 +354,65 @@ bool paula_read(uint16_t addr, uint8_t *val)
         return false;
 }
 
-static void paula_update_8MHz()
-{
-    for (int i = 0; i < NUM_CHANNELS; i++)
-    {
-        CHANNELREGS *curchan = &ChannelRegs[i];
-        curchan->clken_sam_next = false;
-    }
-
-
-    //do this once every 3.5MhZ
-    paula_clock_acc += H1M_PCLK_A;
-    while (paula_clock_acc > H1M_PCLK_LIM)
-    {
-        paula_clock_acc -= H1M_PCLK_LIM;
-
-        for (int i = 0; i < NUM_CHANNELS; i++)
-        {
-            CHANNELREGS *curchan = &ChannelRegs[i];
-
-            if (!curchan->act) {
-                curchan->samper_ctr = 0;
-                curchan->clken_sam_next = 0;
-            }
-            else {
-                if (!curchan->act_prev)
-                {
-                    curchan->clken_sam_next = true;
-                    curchan->samper_ctr = curchan->period;
-                }
-                else if (curchan->samper_ctr == 0)
-                {
-                    curchan->clken_sam_next = true;
-                    curchan->samper_ctr = curchan->period;
-                    curchan->data = curchan->data_next;
-                }
-                else
-                    curchan->samper_ctr--;
-            }
-
-            curchan->act_prev = curchan->act;
-        }
-
-    }
-
+static void fetch_sample(CHANNELREGS *curchan) {
 
 
     //this is a very rough approximation of what really happens in terms of prioritisation
     //but should be close enough - normally data accesses that clash will be queued up
     //by intcon and could take many 8M cycles but here we just always deliver the data!
+    int addr = (((int)curchan->addr_bank) << 16) + (int)curchan->addr + (int)curchan->sam_ctr;
+    curchan->data_next = ChipRam[addr % RAM_SIZE];
+
+    if (curchan->sam_ctr == curchan->len)
+    {
+        if (curchan->repeat)
+        {
+            curchan->sam_ctr = curchan->repoff;
+        }
+        else
+        {
+            curchan->act = false;
+            curchan->sam_ctr = 0;
+        }
+    }
+    else
+    {
+        curchan->sam_ctr++;
+    }
+
+}
+
+
+
+static void paula_update_3_5MHz()
+{
+
+    //do this once every 3.5MhZ
+
     for (int i = 0; i < NUM_CHANNELS; i++)
     {
         CHANNELREGS *curchan = &ChannelRegs[i];
 
-        if (curchan->clken_sam_next)
-        {
-            int addr = (((int)curchan->addr_bank) << 16) + (int)curchan->addr + (int)curchan->sam_ctr;
-            curchan->data_next = ChipRam[addr % RAM_SIZE];
-
-            if (curchan->sam_ctr == curchan->len)
+        if (!curchan->act) {
+            curchan->samper_ctr = 0;
+        }
+        else {
+            if (!curchan->act_prev)
             {
-                if (curchan->repeat)
-                {
-                    curchan->sam_ctr = curchan->repoff;
-                }
-                else
-                {
-                    curchan->act = false;
-                    curchan->sam_ctr = 0;
-                }
+                fetch_sample(curchan);
+                curchan->samper_ctr = curchan->period;
+            }
+            else if (curchan->samper_ctr == 0)
+            {
+                fetch_sample(curchan);
+                curchan->samper_ctr = curchan->period;
+                curchan->data = curchan->data_next;
             }
             else
-            {
-                curchan->sam_ctr++;
-            }
+                curchan->samper_ctr--;
         }
+
+        curchan->act_prev = curchan->act;
     }
 
 }
@@ -450,18 +429,18 @@ static void fput_samples(FILE *fp, int16_t s)
 
 static int16_t paula_get_sample()
 {
-        int16_t sample = 0;
+    int16_t sample = 0;
 
-        for (int i = 0; i < NUM_CHANNELS; i++)
-        {
-            int snd_dat = (int)ChannelRegs[i].data * (int)(ChannelRegs[i].vol >> 2);
-            sample += snd_dat;
-            int snd_mag = ((snd_dat > 0) ? snd_dat : -snd_dat) >> 6;
-            if (snd_mag > ChannelRegs[i].peak)
-                ChannelRegs[i].peak = snd_mag;
-        }
+    for (int i = 0; i < NUM_CHANNELS; i++)
+    {
+        int snd_dat = (int)ChannelRegs[i].data * (int)(ChannelRegs[i].vol >> 2);
+        sample += snd_dat;
+        int snd_mag = ((snd_dat > 0) ? snd_dat : -snd_dat) >> 6;
+        if (snd_mag > ChannelRegs[i].peak)
+            ChannelRegs[i].peak = snd_mag;
+    }
 
-        return sample;
+    return sample;
 }
 
 // use sound rate of 31250
@@ -470,8 +449,10 @@ void paula_fillbuf(int16_t *buffer, int len) {
     int sample;
     int16_t *bufptr = buffer;
     for (sample = 0; sample < len; sample++) {
-        for (i = 0; i < 256; i++) {
-            paula_update_8MHz();
+        paula_clock_acc += H1M_PCLK_A;
+        while (paula_clock_acc > H1M_PCLK_LIM) {
+            paula_update_3_5MHz();
+            paula_clock_acc -= H1M_PCLK_LIM;
         }
         int16_t s = paula_get_sample();
 
