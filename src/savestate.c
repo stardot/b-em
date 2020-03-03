@@ -33,25 +33,36 @@ FILE *savestate_fp;
 
 void savestate_save(const char *name)
 {
-    char *name_copy;
+    size_t name_len;
+    char *name_copy, *ext;
 
     log_debug("savestate: save, name=%s", name);
     if (savestate_fp)
         log_error("savestate: an operation is already in progress");
     else if (curtube != -1 && !tube_proc_savestate)
         log_error("savestate: current tube processor does not support saving state");
-    else if ((savestate_fp = fopen(name, "wb"))) {
-        if ((name_copy = strdup(name))) {
-            if (savestate_name)
-                free(savestate_name);
-            savestate_name = name_copy;
-            savestate_wantsave = 1;
+    else {
+        name_len = strlen(name);
+        if ((name_copy = malloc(name_len + 5))) {
+            memcpy(name_copy, name, name_len+1);
+            if ((ext = strrchr(name_copy, '.'))) {
+                if (strcasecmp(ext, ".snp"))
+                    strcpy(ext, ".snp");
+            }
+            else
+                strcpy(name_copy + name_len, ".snp");
+            if ((savestate_fp = fopen(name_copy, "wb"))) {
+                if (savestate_name)
+                    free(savestate_name);
+                savestate_name = name_copy;
+                savestate_wantsave = 1;
+            }
+            else
+                log_error("savestate: unable to open %s for writing: %s", name, strerror(errno));
         }
         else
             log_error("savestate: out of memory copying filename");
     }
-    else
-        log_error("savestate: unable to open %s for writing: %s", name, strerror(errno));
 }
 
 void savestate_load(const char *name)
