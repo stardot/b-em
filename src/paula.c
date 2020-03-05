@@ -86,7 +86,7 @@ UINT8			Volume;
 UINT32 paula_clock_acc = 0; //paula clock acumulator - when this overflows do a Paula period
 
 
-void paula_reset(void)
+void paula_reset()
 {
     jimDev = 0;
     jimPage = 0;
@@ -445,7 +445,6 @@ static int16_t paula_get_sample()
 
 // use sound rate of 31250
 void paula_fillbuf(int16_t *buffer, int len) {
-    int i;
     int sample;
     int16_t *bufptr = buffer;
     for (sample = 0; sample < len; sample++) {

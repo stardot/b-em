@@ -13,6 +13,7 @@
 #include "mouse.h"
 #include "music2000.h"
 #include "music5000.h"
+#include "paula.h"
 #include "serial.h"
 #include "scsi.h"
 #include "sid_b-em.h"

@@ -31,6 +31,7 @@
 #include "midi.h"
 #include "music4000.h"
 #include "music5000.h"
+#include "paula.h"
 #include "pal.h"
 #include "savestate.h"
 #include "scsi.h"

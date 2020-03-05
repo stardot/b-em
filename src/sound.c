@@ -9,6 +9,7 @@
 #include "via.h"
 #include "uservia.h"
 #include "music5000.h"
+#include "paula.h"
 
 bool sound_internal = false, sound_beebsid = false, sound_dac = false;
 bool sound_ddnoise = false, sound_tape = false;
