@@ -50,32 +50,32 @@ typedef struct
 {
 
     //user facing registers
-    INT8	data;
-    UINT8	addr_bank;
-    UINT16	addr;
+    int8_t	    data;
+    uint8_t	    addr_bank;
+    uint16_t	addr;
 
-    UINT8   period_h_latch;
-    UINT16	period;
-    UINT16	len;
-    bool	act;
-    bool	repeat;
-    UINT8	vol;
-    UINT16	repoff;
-    UINT8	peak;
+    uint8_t     period_h_latch;
+    uint16_t	period;
+    uint16_t	len;
+    bool	    act;
+    bool	    repeat;
+    uint8_t	    vol;
+    uint16_t	repoff;
+    uint8_t	    peak;
 
     //internal registers
-    bool	act_prev;
-    UINT16	samper_ctr;
-    INT8	data_next;
-    UINT16	sam_ctr;
+    bool	    act_prev;
+    uint16_t	samper_ctr;
+    int8_t	    data_next;
+    uint16_t	sam_ctr;
 
 
 } CHANNELREGS;
 
-static UINT8	ChipRam[RAM_SIZE];
+static uint8_t	ChipRam[RAM_SIZE];
 CHANNELREGS		ChannelRegs[NUM_CHANNELS];
-UINT8			ChannelSel;
-UINT8			Volume;
+uint8_t			ChannelSel;
+uint8_t			Volume;
 
 #define H1M_STREAM_RATE 31250
 
@@ -275,7 +275,7 @@ bool paula_read(uint16_t addr, uint8_t *val)
             return true;
         }
         else if (addr == 0xfcfe) {
-            *val = (UINT8)jimPage;
+            *val = (uint8_t)jimPage;
             return true;
         }
         else if (addr == 0xfcfd) {
@@ -299,19 +299,19 @@ bool paula_read(uint16_t addr, uint8_t *val)
                     *val = ChannelRegs[ChannelSel].addr >> 8;
                     break;
                 case 3:
-                    *val = (UINT8)ChannelRegs[ChannelSel].addr;
+                    *val = (uint8_t)ChannelRegs[ChannelSel].addr;
                     break;
                 case 4:
                     *val = ChannelRegs[ChannelSel].period >> 8;
                     break;
                 case 5:
-                    *val = (UINT8)ChannelRegs[ChannelSel].period;
+                    *val = (uint8_t)ChannelRegs[ChannelSel].period;
                     break;
                 case 6:
                     *val = ChannelRegs[ChannelSel].len >> 8;
                     break;
                 case 7:
-                    *val = (UINT8)ChannelRegs[ChannelSel].len;
+                    *val = (uint8_t)ChannelRegs[ChannelSel].len;
                     break;
                 case 8:
                     *val = (ChannelRegs[ChannelSel].act ? 0x80 : 0x00) | (ChannelRegs[ChannelSel].repeat ? 0x01 : 0x00);
@@ -323,7 +323,7 @@ bool paula_read(uint16_t addr, uint8_t *val)
                     *val = ChannelRegs[ChannelSel].repoff >> 8;
                     break;
                 case 11:
-                    *val = (UINT8)ChannelRegs[ChannelSel].repoff;
+                    *val = (uint8_t)ChannelRegs[ChannelSel].repoff;
                     break;
                 case 12:
                     *val = ChannelRegs[ChannelSel].peak;
