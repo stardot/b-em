@@ -12,6 +12,7 @@ autom4te.cache/
 b-em
 b-em.exe
 b-em.res
+b-em.ilk
 config.log
 config.status
 configure
@@ -42,3 +43,5 @@ b-em.ipdb
 b-em.iobj
 b-em.pdb
 src/hdfmt.exe
+scsi/*
+
