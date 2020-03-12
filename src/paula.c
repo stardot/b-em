@@ -83,7 +83,7 @@ uint8_t			Volume;
 #define H1M_PCLK_LIM  65536
 #define H1M_PCLK_A    (int)((((long long)H1M_PCLK_LIM) * ((long long)H1M_PAULA_CLK)) / (long long)H1M_STREAM_RATE)
 
-UINT32 paula_clock_acc = 0; //paula clock acumulator - when this overflows do a Paula period
+uint32_t paula_clock_acc = 0; //paula clock acumulator - when this overflows do a Paula period
 
 
 void paula_reset()
