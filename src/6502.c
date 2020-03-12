@@ -292,11 +292,13 @@ static inline uint16_t read_zp_indirect(uint16_t zp)
 static uint32_t do_readmem(uint32_t addr)
 {
 
-        if (addr < 65536)
-            if (pc == addr)
-                fetchc[addr] = 31;
-            else
-                readc[addr] = 31;
+        if (addr >= 0x10000)
+            return 0xFF;
+
+        if (pc == addr)
+            fetchc[addr] = 31;
+        else
+            readc[addr] = 31;
 
         if (memstat[vis20k][addr >> 8])
                 return memlook[vis20k][addr >> 8][addr];
@@ -451,8 +453,10 @@ static void do_writemem(uint32_t addr, uint32_t val)
 {
         int c;
 
-        if (addr < 65536)
-            writec[addr] = 31;
+        if (addr >= 0x10000)
+            return;
+
+        writec[addr] = 31;
 
         c = memstat[vis20k][addr >> 8];
         if (c == 1) {
