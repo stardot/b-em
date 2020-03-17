@@ -16,6 +16,8 @@
 #include "x86_tube.h"
 #include "z80.h"
 
+#define CFG_SECT_LEN 20
+
 fdc_type_t fdc_type;
 bool BPLUS, x65c02, MASTER, MODELA, OS01, compactcmos;
 int curtube;
@@ -280,7 +282,7 @@ void model_loadstate(FILE *f)
 {
     int newmodel, i;
     MODEL model;
-    char *rom_setup, *fdc_name, *tube_name;
+    char *rom_setup, *fdc_name, *tube_name, *cfg_sect;
 
     newmodel   = savestate_load_var(f);
     model.name = savestate_load_str(f);
@@ -330,7 +332,13 @@ void model_loadstate(FILE *f)
                 log_fatal("model: out of memory in model_loadstate");
                 exit(1);
             }
-            models[curmodel] = model;
+            if (!(cfg_sect = malloc(CFG_SECT_LEN))) {
+                log_fatal("model: out of memory in model_loadstate");
+                exit(1);
+            }
+            snprintf(cfg_sect, CFG_SECT_LEN, "model_%d", i);
+            model.cfgsect = cfg_sect;
+            models[i] = model;
             log_debug("model: added savestate model at model #%d", curmodel);
         }
         else {

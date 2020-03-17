@@ -405,6 +405,7 @@ void sdf_new_disc(int drive, ALLEGRO_PATH *fn, enum sdf_disc_type dtype)
         else {
             cpath = al_path_cstr(fn, ALLEGRO_NATIVE_PATH_SEP);
             if ((f = fopen(cpath, "wb+"))) {
+                writeprot[drive] = 0;
                 geo->new_disc(f, geo);
                 sdf_mount(drive, cpath, f, geo);
             }
