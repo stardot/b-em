@@ -269,6 +269,7 @@ static void update_channels(struct synth *s)
             s->phaseRAM[i] = 0;
             // A slight differnce as modulation is still calculated in real hardware
             // but not here
+            modulate = 0;
         }
         else {
             int c4d, sign, sample;
