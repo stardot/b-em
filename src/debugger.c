@@ -1,6 +1,7 @@
 /*B-em v2.2 by Tom Walker
   Debugger*/
 
+#include <assert.h>
 #include <ctype.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -11,6 +12,7 @@
 #include "main.h"
 #include "model.h"
 #include "6502.h"
+#include "cintcode_tabs.h"
 
 #include <allegro5/allegro_primitives.h>
 
@@ -24,6 +26,12 @@ extern int fcount;
 static int vrefresh = 1;
 static FILE *trace_fp = NULL;
 static FILE *exec_fp = NULL;
+
+enum bcpl_mode {
+    BCPL_OFF,
+    BCPL_ON,
+    BCPL_CODE
+} bcpl_mode;
 
 static void close_trace()
 {
@@ -444,6 +452,136 @@ static void debug_paste(const char *iptr)
     }
 }
 
+static const char bcpl_on[]  = "BCPL mode turned on\n";
+static const char bcpl_off[] = "BCPL mode turned off\n";
+
+static void toggle_bcpl_mode(void) {
+    if (bcpl_mode == BCPL_OFF) {
+        bcpl_mode = BCPL_ON;
+        debug_out(bcpl_on, sizeof(bcpl_on)-1);
+    }
+    else {
+        bcpl_mode = BCPL_OFF;
+        debug_out(bcpl_off, sizeof(bcpl_off)-1);
+    }
+}
+
+static void hexnyb(char *dest, unsigned nyb)
+{
+    nyb &= 0x0f;
+    if (nyb >= 10)
+        *dest = 'A' + nyb - 10;
+    else
+        *dest = '0' + nyb;
+}
+
+static void hexbyte(char *dest, unsigned byte)
+{
+    hexnyb(dest, byte >> 4);
+    hexnyb(dest+1, byte);
+}
+
+static void hexword(char *dest, unsigned word)
+{
+    hexnyb(dest, word >> 12);
+    hexnyb(dest+1, word >> 8);
+    hexnyb(dest+2, word >> 4);
+    hexnyb(dest+3, word);
+}
+
+static void cintcode_one_reg(cpu_debug_t *cpu, char *dest, int name, unsigned addr)
+{
+    dest[0] = ' ';
+    dest[1] = name;
+    dest[2] = '=';
+    hexbyte(dest+3, cpu->memread(addr+1));
+    hexbyte(dest+5, cpu->memread(addr));
+}
+
+static void cintcode_regs(cpu_debug_t *cpu, char *dest)
+{
+    cintcode_one_reg(cpu, dest, 'A', 0x8);
+    cintcode_one_reg(cpu, dest+7, 'B', 0xa);
+    cintcode_one_reg(cpu, dest+14, 'C', 0xc);
+    cintcode_one_reg(cpu, dest+21, 'P', 0x4);
+}
+
+static uint32_t cintcode_dis(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t bufsize)
+{
+    // Layout.
+    // 0000000000111111111122222222223333
+    // 0123456789012345678901234567890123
+    // 9999: 99 99 99 OPCOD SELECTOUTPUT
+
+    uint8_t b1, b2;
+    uint8_t opcode;
+    uint16_t global = 0;
+    const cintcode_op *op;
+
+    assert(bufsize > 34);
+    hexword(buf, addr);
+    buf[4] = ':';
+    memset(buf+5, ' ', 29);
+    opcode = cpu->memread(addr++);
+    hexbyte(buf+6, opcode);
+    op = cintcode_ops + opcode;
+    memcpy(buf+15, op->mnemonic, strlen(op->mnemonic));
+
+    switch(op->cc_am) {
+        case CAM_IMP:
+            break;
+        case CAM_BYTE:
+            b1 = cpu->memread(addr++);
+            hexbyte(buf+9, b1);
+            hexbyte(buf+21, b1);
+            break;
+        case CAM_WORD:
+            b1 = cpu->memread(addr++);
+            b2 = cpu->memread(addr++);
+            hexbyte(buf+9, b1);
+            hexbyte(buf+12, b2);
+            hexbyte(buf+21, b1);
+            hexbyte(buf+23, b2);
+            break;
+        case CAM_BREL:
+        case CAM_BIND:
+            b1 = cpu->memread(addr++);
+            hexbyte(buf+9, b1);
+            hexword(buf+21, addr + b1 - 0x7e);
+            break;
+        case CAM_GLB2:
+            global += 256;
+            /* FALL THROUGH */
+        case CAM_GLB1:
+            global += 256;
+            /* FALL THROUGH */
+        case CAM_GLB0:
+            b1 = cpu->memread(addr++);
+            hexbyte(buf+9, b1);
+            global += b1;
+            if (global < CINTCODE_NGLOB)
+                memcpy(buf+21, cintocde_globs[global], strlen(cintocde_globs[global]));
+            else {
+                buf[21] = '0' + global / 100;
+                buf[22] = '0' + (global / 10) % 10;
+                buf[23] = '0' + global % 10;
+            }
+            break;
+    }
+    return addr;
+}
+
+static void cintcode_trace(cpu_debug_t *cpu)
+{
+    char buf[80];
+    uint32_t caddr = cpu->memread(6)|(cpu->memread(7)<<8);
+    cintcode_dis(cpu, caddr, buf, sizeof(buf));
+    cintcode_regs(cpu, buf+34);
+    buf[62] = '\n';
+    buf[63] = 0;
+    fwrite(buf, 63, 1, trace_fp);
+}
+
 void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 {
     int c, d, e, f;
@@ -519,6 +657,8 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                     clear_point(breakw, iptr, "Write breakpoint");
                 else if (!strcasecmp(ins, "bclear"))
                     clear_point(breakpoints, iptr, "Breakpoint");
+                else if (!strcasecmp(ins, "bcpl"))
+                    toggle_bcpl_mode();
                 break;
 
             case 'q':
@@ -775,22 +915,35 @@ void debug_iowrite(cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t size
     check_points(cpu, addr, value, size, breako, watcho, "output to");
 }
 
-void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
-    char buf[256];
+static void native_trace(cpu_debug_t *cpu, uint32_t addr)
+{
     size_t len;
-    int c, r, enter = 0;
+    int r;
     const char **np, *name;
+    char buf[256];
+
+    cpu->disassemble(addr, buf, sizeof buf);
+    fputs(buf, trace_fp);
+    *buf = ' ';
+
+    for (r = 0, np = cpu->reg_names; (name = *np++);) {
+        len = cpu->reg_print(r++, buf + 1, sizeof buf - 1);
+        fwrite(buf, len + 1, 1, trace_fp);
+    }
+    putc('\n', trace_fp);
+}
+
+void debug_preexec (cpu_debug_t *cpu, uint32_t addr)
+{
+    bool enter = false;
 
     if (trace_fp) {
-        cpu->disassemble(addr, buf, sizeof buf);
-        fputs(buf, trace_fp);
-        *buf = ' ';
-
-        for (r = 0, np = cpu->reg_names; (name = *np++);) {
-            len = cpu->reg_print(r++, buf + 1, sizeof buf - 1);
-            fwrite(buf, len + 1, 1, trace_fp);
+        if (bcpl_mode) {
+            if (addr == 0x416)
+                cintcode_trace(cpu);
         }
-        putc('\n', trace_fp);
+        else
+            native_trace(cpu, addr);
     }
 
     if (addr == tbreak) {
@@ -798,7 +951,7 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
         enter = 1;
     }
     else {
-        for (c = 0; c < NUM_BREAKPOINTS; c++) {
+        for (int c = 0; c < NUM_BREAKPOINTS; c++) {
             if (breakpoints[c] == addr) {
                 debug_outf("cpu %s: Break at %04X\n", cpu->cpu_name, addr);
                 if (contcount) {
