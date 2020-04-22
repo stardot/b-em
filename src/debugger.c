@@ -547,7 +547,7 @@ static uint32_t cintcode_dis(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
         case CAM_BIND:
             b1 = cpu->memread(addr++);
             hexbyte(buf+9, b1);
-            hexword(buf+21, addr + b1 - 0x7e);
+            hexword(buf+21, addr + b1 - 0x80);
             break;
         case CAM_GLB2:
             global += 256;
