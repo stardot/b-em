@@ -540,8 +540,8 @@ static uint32_t cintcode_dis(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
             b2 = cpu->memread(addr++);
             hexbyte(buf+9, b1);
             hexbyte(buf+12, b2);
-            hexbyte(buf+21, b1);
-            hexbyte(buf+23, b2);
+            hexbyte(buf+21, b2);
+            hexbyte(buf+23, b1);
             break;
         case CAM_BREL:
         case CAM_BIND:
