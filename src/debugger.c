@@ -571,11 +571,10 @@ static uint32_t cintcode_dis(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
     return addr;
 }
 
-static void cintcode_trace(cpu_debug_t *cpu)
+static void cintcode_trace(cpu_debug_t *cpu, uint32_t eaddr)
 {
     char buf[80];
-    uint32_t caddr = cpu->memread(6)|(cpu->memread(7)<<8);
-    cintcode_dis(cpu, caddr, buf, sizeof(buf));
+    cintcode_dis(cpu, eaddr, buf, sizeof(buf));
     cintcode_regs(cpu, buf+34);
     buf[62] = '\n';
     buf[63] = 0;
@@ -592,9 +591,17 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 
     main_pause();
     indebug = 1;
-    log_debug("debugger: about to call disassembler, addr=%04X", addr);
-    next_addr = cpu->disassemble(addr, ins, sizeof ins);
-    debug_out(ins, strlen(ins));
+    if (bcpl_mode) {
+        log_debug("debugger: calling BCPL disassembler for addr=%04X", addr);
+        next_addr = cintcode_dis(cpu, addr, ins, sizeof(ins));
+        ins[34] = '\n';
+        debug_out(ins, 35);
+    }
+    else {
+        log_debug("debugger: about to call disassembler, addr=%04X", addr);
+        next_addr = cpu->disassemble(addr, ins, sizeof ins);
+        debug_out(ins, strlen(ins));
+    }
     if (vrefresh)
         video_poll(CLOCKS_PER_FRAME, 0);
 
@@ -679,11 +686,20 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
             case 'D':
                 if (*iptr)
                     sscanf(iptr, "%X", (unsigned int *)&debug_disaddr);
-                for (c = 0; c < 12; c++) {
-                    debug_out("    ", 4);
-                    debug_disaddr = cpu->disassemble(debug_disaddr, ins, sizeof ins);
-                    debug_out(ins, strlen(ins));
-                    debug_out("\n", 1);
+                if (bcpl_mode) {
+                    for (int c = 0; c < 12; c++) {
+                        debug_disaddr = cintcode_dis(cpu, debug_disaddr, ins, sizeof ins);
+                        ins[34] = '\n';
+                        debug_out(ins, 35);
+                    }
+                }
+                else {
+                    for (int c = 0; c < 12; c++) {
+                        debug_out("    ", 4);
+                        debug_disaddr = cpu->disassemble(debug_disaddr, ins, sizeof ins);
+                        debug_out(ins, strlen(ins));
+                        debug_out("\n", 1);
+                    }
                 }
                 debug_lastcommand = 'd';
                 break;
@@ -771,7 +787,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                         debug_outf("    R9 =%02X  R10=%02X  R11=%02X  R12=%02X  R13=%02X  R14=%02X  R15=%02X  R16=%02X  R17=%02X\n", crtc[9], crtc[10], crtc[11], crtc[12], crtc[13], crtc[14], crtc[15], crtc[16], crtc[17]);
                         debug_outf("    VC=%i SC=%i HC=%i MA=%04X\n", vc, sc, hc, ma);
                     }
-                    if (!strncasecmp(iptr, "vidproc", 7)) {
+                    else if (!strncasecmp(iptr, "vidproc", 7)) {
                         debug_outf("    VIDPROC registers :\n");
                         debug_outf("    Control=%02X\n", ula_ctrl);
                         debug_outf("    Palette entries :\n");
@@ -785,14 +801,21 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                         debug_outf("    NULA registers :\n");
                         debug_outf("     Palette Mode=%01X  Horizontal Offset=%01X  Left Blank Size=%01X  Disable=%01X  Attribute Mode=%01X  Attribute Text=%01X\n", nula_palette_mode, nula_horizontal_offset, nula_left_blank, nula_disable, nula_attribute_mode, nula_attribute_text);
                     }
-                    if (!strncasecmp(iptr, "sound", 5)) {
+                    else if (!strncasecmp(iptr, "sound", 5)) {
                         debug_outf("    Sound registers :\n");
                         debug_outf("    Voice 0 frequency = %04X   volume = %i  control = %02X\n", sn_latch[0] >> 6, sn_vol[0], sn_noise);
                         debug_outf("    Voice 1 frequency = %04X   volume = %i\n", sn_latch[1] >> 6, sn_vol[1]);
                         debug_outf("    Voice 2 frequency = %04X   volume = %i\n", sn_latch[2] >> 6, sn_vol[2]);
                         debug_outf("    Voice 3 frequency = %04X   volume = %i\n", sn_latch[3] >> 6, sn_vol[3]);
                     }
-                } else {
+                }
+                else if (bcpl_mode) {
+                    debug_outf("    BCPL/CINTCODE registers\n");
+                    cintcode_regs(cpu, ins);
+                    ins[28] = '\n';
+                    debug_out(ins, 29);
+                }
+                else {
                     debug_outf("    registers for %s\n", cpu->cpu_name);
                     print_registers(cpu);
                 }
@@ -883,20 +906,35 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
     main_resume();
 }
 
-static inline void check_points(cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t size, int *break_tab, int *watch_tab, const char *desc)
+static void check_points(cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t size, int *break_tab, int *watch_tab, const char *desc)
 {
-    int c;
-    uint32_t iaddr;
-
-    for (c = 0; c < NUM_BREAKPOINTS; c++) {
+    for (int c = 0; c < NUM_BREAKPOINTS; c++) {
         if (break_tab[c] == addr) {
-            iaddr = cpu->get_instr_addr();
-            debug_outf("cpu %s: %04X: break on %s %04X, value=%X\n", cpu->cpu_name, iaddr, desc, addr, value);
+            const char *cc;
+            uint32_t iaddr;
+            if (bcpl_mode) {
+                cc = "CINTCODE ";
+                iaddr = cpu->memread(6)|(cpu->memread(7)<<8);
+            }
+            else {
+                cc = "";
+                iaddr = cpu->get_instr_addr();
+            }
+            debug_outf("cpu %s: %04X: %sbreak on %s %04X, value=%X\n", cpu->cpu_name, iaddr, cc, desc, addr, value);
             debugger_do(cpu, iaddr);
         }
         if (watch_tab[c] == addr) {
-            iaddr = cpu->get_instr_addr();
-            debug_outf("cpu %s: %04X: %s %04X, value=%0*X\n", cpu->cpu_name, iaddr, desc, addr, size*2, value);
+            const char *cc;
+            uint32_t iaddr;
+            if (bcpl_mode) {
+                cc = " (CINTCODE)";
+                iaddr = cpu->memread(6)|(cpu->memread(7)<<8);
+            }
+            else {
+                cc = "";
+                iaddr = cpu->get_instr_addr();
+            }
+            debug_outf("cpu %s: %04X: %s%s %04X, value=%0*X\n", cpu->cpu_name, iaddr, cc, desc, addr, size*2, value);
         }
     }
 }
@@ -938,24 +976,32 @@ static void native_trace(cpu_debug_t *cpu, uint32_t addr)
 void debug_preexec (cpu_debug_t *cpu, uint32_t addr)
 {
     bool enter = false;
+    uint32_t eaddr;
+    const char *cc;
 
-    if (trace_fp) {
-        if (bcpl_mode) {
-            if (addr == 0x416)
-                cintcode_trace(cpu);
-        }
-        else
+    if (bcpl_mode) {
+        if (addr != 0x416)
+            return;
+        eaddr = cpu->memread(6)|(cpu->memread(7)<<8);
+        cc = " (CINTCODE)";
+        if (trace_fp)
+            cintcode_trace(cpu, eaddr);
+    }
+    else {
+        eaddr = addr;
+        cc = "";
+        if (trace_fp)
             native_trace(cpu, addr);
     }
 
-    if (addr == tbreak) {
-        log_debug("debugger; enter for CPU %s on tbreak at %04X", cpu->cpu_name, addr);
+    if (eaddr == tbreak) {
+        log_debug("debugger; enter for CPU %s on tbreak at %04X%s", cpu->cpu_name, eaddr, cc);
         enter = 1;
     }
     else {
         for (int c = 0; c < NUM_BREAKPOINTS; c++) {
-            if (breakpoints[c] == addr) {
-                debug_outf("cpu %s: Break at %04X\n", cpu->cpu_name, addr);
+            if (breakpoints[c] == eaddr) {
+                debug_outf("cpu %s: Break at %04X%s\n", cpu->cpu_name, addr, cc);
                 if (contcount) {
                     contcount--;
                     return;
@@ -968,13 +1014,13 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr)
             debug_step--;
             if (debug_step)
                 return;
-            log_debug("debugger; enter for CPU %s on single-step at %04X", cpu->cpu_name, addr);
+            log_debug("debugger; enter for CPU %s on single-step at %04X%s", cpu->cpu_name, addr, cc);
             enter = 1;
         }
     }
     if (enter) {
         tbreak = -1;
-        debugger_do(cpu, addr);
+        debugger_do(cpu, eaddr);
     }
 }
 
