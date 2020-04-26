@@ -47,6 +47,8 @@ AC_CHECK_LIB([z], [gzopen])
 
 # Checks for header files.
 AC_CHECK_HEADERS([inttypes.h limits.h malloc.h stddef.h stdint.h stdlib.h string.h unistd.h])
+AC_CHECK_HEADER([allegro5/allegro.h],[],
+	[AC_MSG_FAILURE([The Allegro version 5 library is needed but not installed], 1)],[])
 
 AM_CONDITIONAL(OS_WIN, test "$host_os" = "win")
 
