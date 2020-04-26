@@ -4,8 +4,13 @@
 #include "music4000.h"
 #include "midi-linux.h"
 #include "sound.h"
-//#include <pthread.h>
-//#include <unistd.h>
+
+#if HAVE_ALSA_ASOUNDLIB_H
+// We only include these header files for ALSA since
+// they may not exist on non-POSIX platforms.
+# include <pthread.h>
+# include <unistd.h>
+#endif
 
 midi_dev_t midi_music4000;
 midi_dev_t midi_music2000_out1;
