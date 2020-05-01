@@ -9,6 +9,7 @@
 #include "mem.h"
 #include "model.h"
 #include "music5000.h"
+#include "paula.h"
 #include "savestate.h"
 #include "serial.h"
 #include "sn76489.h"
@@ -203,6 +204,7 @@ void savestate_dosave(void)
     save_sect('r', serial_savestate);
     save_sect('F', vdfs_savestate);
     save_sect('5', music5000_savestate);
+    save_sect('P', paula_savestate);
     if (curtube != -1) {
         save_sect('T', tube_ula_savestate);
         save_zlib('P', tube_proc_savestate);
@@ -231,6 +233,7 @@ static void load_state_one(void)
     serial_loadstate(savestate_fp);
     vdfs_loadstate(savestate_fp);
     music5000_loadstate(savestate_fp);
+    paula_loadstate(savestate_fp);
 
     log_debug("savestate: loaded V1 snapshot file");
 }

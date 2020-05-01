@@ -86,7 +86,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>USE_MEMORY_POINTER;BEM;WIN32;INCLUDE_DEBUGGER;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>VERSION=20b6862;USE_MEMORY_POINTER;BEM;WIN32;INCLUDE_DEBUGGER;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <UndefinePreprocessorDefinitions>UNICODE;_UNICODE;%(UndefinePreprocessorDefinitions)</UndefinePreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
@@ -160,6 +160,7 @@
     <ClInclude Include="NS32016\Profile.h" />
     <ClInclude Include="NS32016\Trap.h" />
     <ClInclude Include="pal.h" />
+    <ClInclude Include="paula.h" />
     <ClInclude Include="resid-fp\envelope.h" />
     <ClInclude Include="resid-fp\extfilt.h" />
     <ClInclude Include="resid-fp\filter.h" />
@@ -256,6 +257,7 @@
     <ClCompile Include="NS32016\Profile.c" />
     <ClCompile Include="NS32016\Trap.c" />
     <ClCompile Include="pal.c" />
+    <ClCompile Include="paula.c" />
     <ClCompile Include="resid-fp\convolve-sse.cc" />
     <ClCompile Include="resid-fp\convolve.cc" />
     <ClCompile Include="resid-fp\envelope.cc" />

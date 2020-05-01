@@ -31,6 +31,7 @@
 #include "midi.h"
 #include "music4000.h"
 #include "music5000.h"
+#include "paula.h"
 #include "pal.h"
 #include "savestate.h"
 #include "scsi.h"
@@ -113,6 +114,7 @@ void main_reset()
     sid_reset();
     music4000_reset();
     music5000_reset();
+    paula_reset();
     sn_init();
     if (curtube != -1) tubes[curtube].reset();
     else               tube_exec = NULL;
@@ -253,6 +255,7 @@ void main_init(int argc, char *argv[])
     sid_init();
     sid_settype(sidmethod, cursid);
     music5000_init(queue);
+    paula_init();
     ddnoise_init();
     tapenoise_init(queue);
 
@@ -379,6 +382,7 @@ static void main_key_down(ALLEGRO_EVENT *event)
             wd1770_reset();
             sid_reset();
             music5000_reset();
+            paula_reset();
 
             if (curtube != -1)
                 tubes[curtube].reset();

@@ -13,6 +13,7 @@
 #include "mouse.h"
 #include "music2000.h"
 #include "music5000.h"
+#include "paula.h"
 #include "serial.h"
 #include "scsi.h"
 #include "sid_b-em.h"
@@ -312,6 +313,15 @@ static uint32_t do_readmem(uint32_t addr)
                 }
         }
 
+        if (sound_paula) {
+            if (addr >= 0xFCFD && addr <= 0xFDFF) {
+                uint8_t r;
+                if (paula_read(addr, &r))
+                    return r;
+            }
+        }
+
+
         switch (addr & ~3) {
             case 0xFC08:
             case 0xFC0C:
@@ -493,6 +503,13 @@ static void do_writemem(uint32_t addr, uint32_t val)
         if (sound_music5000) {
            if (addr >= 0xFCFF && addr <= 0xFDFF) {
               music5000_write(addr, val);
+              //return -- removed DB need to write to all users of paging register
+           }
+        }
+        if (sound_paula)
+        {
+            if (addr >= 0xFCFD && addr <= 0xFDFF) {
+                paula_write(addr, val);
               return;
            }
         }
