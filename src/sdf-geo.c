@@ -193,7 +193,7 @@ const char *sdf_desc_sides(const struct sdf_geometry *geo)
         case SDF_SIDES_SINGLE:
             return "single-sided";
         case SDF_SIDES_SEQUENTIAL:
-            return "doubled-sided, sequential";
+            return "double-sided, sequential";
         case SDF_SIDES_INTERLEAVED:
             return "double-sided, interleaved";
         default:
@@ -273,55 +273,84 @@ static const struct sdf_geometry *find_geo_adfs(FILE *fp)
     return NULL;
 }
 
-static int32_t dfs_size(FILE *fp, long offset)
+static int32_t dfs_size(FILE *fp, long offset, long fsize)
 {
-    uint32_t dirsize, sects, cur_start, new_start;
-    uint8_t *base, sect[0x100];
-
-    log_debug("sdf: looking for DFS catalogue at offset %lx", offset);
-    if (fseek(fp, offset+0x100, SEEK_SET) >= 0) {
-        if (fread(sect, sizeof sect, 1, fp) == 1) {
-            dirsize = sect[5];
-            log_debug("sdf: DFS dirsize=%d bytes, %d entries", dirsize, dirsize / 8);
-            if (!(dirsize & 0x07) && dirsize <= (31 * 8)) {
-                sects = ((sect[6] & 0x07) << 8) | sect[7];
-                base = sect;
-                cur_start = UINT32_MAX;
-                // Check the files are sorted by decreasing start sector.
-                while (dirsize > 0) {
-                    base += 8;
-                    dirsize -= 8;
-                    new_start = ((base[6] & 0x03) << 8) | base[7];
-                    if (new_start == 0) {
-                        log_debug("sdf: impossible start position");
-                        return -1;
+    if (offset < (fsize + 0x200)) {
+        log_debug("sdf: looking for DFS catalogue at offset %lx", offset);
+        if (fseek(fp, offset+0x100, SEEK_SET) >= 0) {
+            uint8_t sect[0x100];
+            if (fread(sect, sizeof sect, 1, fp) == 1) {
+                uint32_t dirsize = sect[5];
+                log_debug("sdf: DFS dirsize=%d bytes, %d entries", dirsize, dirsize / 8);
+                if (!(dirsize & 0x07) && dirsize <= (31 * 8)) {
+                    uint32_t sects = ((sect[6] & 0x07) << 8) | sect[7];
+                    uint8_t *base = sect;
+                    uint32_t cur_start = UINT32_MAX;
+                    // Check the files are sorted by decreasing start sector.
+                    while (dirsize > 0) {
+                        base += 8;
+                        dirsize -= 8;
+                        uint32_t new_start = ((base[6] & 0x03) << 8) | base[7];
+                        if (new_start == 0) {
+                            log_debug("sdf: impossible start position");
+                            return -1;
+                        }
+                        if (new_start > cur_start) {
+                            log_debug("sdf: catalogue not sorted");
+                            return -1;
+                        }
+                        cur_start = new_start;
                     }
-                    if (new_start > cur_start) {
-                        log_debug("sdf: catalogue not sorted");
-                        return -1;
-                    }
-                    cur_start = new_start;
+                    log_debug("sdf: found DFS size as %d sectors", sects);
+                    return sects;
                 }
-                log_debug("sdf: found DFS size as %d sectors", sects);
-                return sects;
+                else
+                    log_debug("sdf: DFS dirsize not valid");
             }
             else
-                log_debug("sdf: DFS dirsize not valid");
+                log_debug("sdf: unable to read");
         }
         else
-            log_debug("sdf: unable to read");
+            log_debug("sdf: unable to seek: %s", strerror(errno));
     }
     else
-        log_debug("sdf: unable to seek: %s", strerror(errno));
+        log_debug("sdf: image file too small to read DFS catalogue at offset %lx", offset);
     return -1;
+}
+
+static bool is_tail(const char *ext)
+{
+    // Check file extension finishes 'sd' or 'dd' in either case.
+    int c = ext[1];
+    if (c == 's' || c == 'S' || c == 'd' || c == 'D') {
+        c = ext[2];
+        return (c == 'd' || c == 'D') && !ext[3];
+    }
+    return false;
+}
+
+static bool is_ssd(const char *ext)
+{
+    // Check file extension is 'ssd' or 'sdd' in either case.
+    int c = ext[0];
+    return (c == 's' || c == 'S') && is_tail(ext);
+}
+
+static bool is_dsd(const char *ext)
+{
+    // Check file extension is 'dsd' or 'ddd' in either case.
+    int c = ext[0];
+    return (c == 'd' || c == 'D') && is_tail(ext);
 }
 
 static const struct sdf_geometry *find_geo_dfs(const char *fn, const char *ext, FILE *fp, long fsize)
 {
-    int32_t sects, track_bytes, side_bytes;
-    const struct sdf_geometry *geo;
-
-    if ((sects = dfs_size(fp, 0)) >= 0) {
+    /* Work out the number of tracks and the number of sectors per
+     * track from the first side.
+     */
+    int32_t sects = dfs_size(fp, 0, fsize);
+    if (sects >= 0) {
+        const struct sdf_geometry *geo;
         if (sects <= (40 * 10))
             geo = sdf_geo_tab + SDF_FMT_DFS_10S_SIN_40T;
         else if (sects <= (80 * 10))
@@ -331,21 +360,29 @@ static const struct sdf_geometry *find_geo_dfs(const char *fn, const char *ext, 
         else if (sects <= (80 * 18))
             geo = sdf_geo_tab + SDF_FMT_DFS_18S_SIN_80T;
         else {
-            log_warn("sdf: sector count too high (%u) for %s", sects, fn);
+            log_debug("sdf: DFS sector count too high (%u) for %s", sects, fn);
             return NULL;
         }
-        track_bytes = geo->sectors_per_track * geo->sector_size;
-        side_bytes = track_bytes * geo->tracks;
-        if (fsize > track_bytes) {
-            if (dfs_size(fp, track_bytes) >= 3) {
-                geo++;      // interleaved side version.
-                if (dfs_size(fp, side_bytes) >= 3 && strcasecmp(ext, "dsd") && strcasecmp(ext, "ddd"))
+
+        int32_t track_bytes = geo->sectors_per_track * geo->sector_size;
+        int32_t side_bytes = track_bytes * geo->tracks;
+
+        if (is_ssd(ext)) {
+            /* An SSD file will usually be single-sided but there are
+             * some where the acronym has been interpreted as
+             * sequential-sided disk.
+             */
+            if (dfs_size(fp, side_bytes, fsize) >= 3)
+                geo += 2;   // sequential side version.
+        }
+        else if (is_dsd(ext)) {
+            geo++;          // interleaved side version.
+            int32_t size_int = dfs_size(fp, track_bytes, fsize);
+            if (size_int != sects) {
+                int32_t size_seq = dfs_size(fp, side_bytes, fsize);
+                if ((size_int >= 3 && size_seq == sects) || size_seq >= 3)
                     geo++;  // sequential side version.
             }
-            else if (dfs_size(fp, side_bytes) >= 3)
-                geo += 2;   // sequential side version.
-            else if (!strcasecmp(ext, "dsd") || !strcasecmp(ext, "ddd"))
-                geo++;      // interleaved side version.
         }
         return geo;
     }
