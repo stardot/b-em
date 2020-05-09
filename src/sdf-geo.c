@@ -217,31 +217,36 @@ const char *sdf_desc_dens(const struct sdf_geometry *geo)
 
 /* Geometry identification */
 
-static bool adfs_root_at(FILE *fp, long offset)
+static bool adfs_hugo_at(FILE *fp, long offset)
 {
     unsigned char hugo[4];
 
     if (fseek(fp, offset, SEEK_SET) == 0) {
         if (fread(hugo, sizeof hugo, 1, fp) == 1) {
             if (!memcmp(hugo, "Hugo", 4)) {
-                log_debug("sdf: found ADFS root at %lx", offset);
+                log_debug("sdf: found ADFS hugo at %lx", offset);
                 return true;
             }
         }
     }
+    log_debug("sdf: ADFS hugo not found at %lx", offset);
     return false;
 }
 
-static int32_t read_size24(FILE *fp, long offset)
+static int32_t adfs_get_size(FILE *fp)
 {
-    int32_t size;
-    unsigned char bytes[3];
-
-    if (fseek(fp, offset, SEEK_SET) == 0) {
-        if (fread(bytes, sizeof bytes, 1, fp) == 1) {
-            size = (bytes[2] << 16) | (bytes[1] << 8) | bytes[0];
-            log_debug("sdf: found ADFS total sectors as %u", size);
-            return size;
+    if (fseek(fp, 0, SEEK_SET) == 0) {
+        unsigned char twosect[0x200];
+        if (fread(twosect, sizeof twosect, 1, fp) == 1) {
+            uint8_t csum1 = adfs_checksum(twosect);
+            uint8_t csum2 = adfs_checksum(twosect+0x100);
+            log_debug("sdf: ADFS sector 0 checksum, calc=%02X, stored=%02X", csum1, twosect[0xff]);
+            log_debug("sdf: ADFS sector 1 checksum, calc=%02X, stored=%02X", csum2, twosect[0x1ff]);
+            if (csum1 == twosect[0xff] && csum2 == twosect[0x1ff]) {
+                int32_t size = (twosect[0xfe] << 16) | (twosect[0xfd] << 8) | twosect[0xfc];
+                log_debug("sdf: found ADFS total sectors as %u", size);
+                return size;
+            }
         }
     }
     return -1;
@@ -249,11 +254,10 @@ static int32_t read_size24(FILE *fp, long offset)
 
 static const struct sdf_geometry *find_geo_adfs(FILE *fp)
 {
-    int32_t size;
-
-    if (adfs_root_at(fp, 0x201)) {
+    if (adfs_hugo_at(fp, 0x201) && adfs_hugo_at(fp, 0x6fb)) {
         // ADFS format S, M or L
-        if ((size = read_size24(fp, 0xfc)) >= 0) {
+        int32_t size = adfs_get_size(fp);
+        if (size >= 0) {
             if (size <= (40*16))
                 return sdf_geo_tab + SDF_FMT_ADFS_S;
             else if (size <= (80*16))
@@ -262,8 +266,10 @@ static const struct sdf_geometry *find_geo_adfs(FILE *fp)
                 return sdf_geo_tab + SDF_FMT_ADFS_L;
         }
     }
-    else if (adfs_root_at(fp, 0x401))
-        return sdf_geo_tab + SDF_FMT_ADFS_D;
+    else if (adfs_hugo_at(fp, 0x401) && adfs_hugo_at(fp, 0xbfb)) {
+        if (adfs_get_size(fp) >= 0)
+            return sdf_geo_tab + SDF_FMT_ADFS_D;
+    }
     return NULL;
 }
 
