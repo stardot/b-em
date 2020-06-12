@@ -299,7 +299,7 @@ static void arm_loadstate(ZFILE *zfp)
     savestate_zread(zfp, armrom, ARM_ROM_SIZE);
 }
 
-int endtimeslice=0;
+static int endtimeslice=0;
 
 static inline uint32_t readarmfl(uint32_t addr)
 {

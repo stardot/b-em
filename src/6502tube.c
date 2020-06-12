@@ -246,7 +246,7 @@ static uint32_t do_readmem(uint32_t addr) {
     return (tubememstat[hi]==2)?tubereadmeml(addr):tubemem[hi][addr&0xFF];
 }
 
-int endtimeslice;
+static int endtimeslice;
 static void tubewritememl(uint16_t addr, uint8_t val)
 {
 //        log_debug("Tube writemem %04X %02X %04X\n",addr,val,pc);

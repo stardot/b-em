@@ -20,6 +20,12 @@ int tube_multipler = 1;
 int tube_speed_num = 0;
 int tubecycles = 0;
 
+uint8_t (*tube_readmem)(uint32_t addr);
+void (*tube_writemem)(uint32_t addr, uint8_t byte);
+void (*tube_exec)(void);
+void (*tube_proc_savestate)(ZFILE *zfp);
+void (*tube_proc_loadstate)(ZFILE *zfp);
+
 /*
  * The number of tube cycles to run for each core 6502 processor cycle
  * is calculated by mutliplying the multiplier in this table with the

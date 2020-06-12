@@ -5,15 +5,12 @@
 
 extern uint8_t a,x,y,s;
 extern uint16_t pc;
-extern uint16_t oldpc, oldoldpc, pc3;
 
 extern PREG p;
 
 extern int output;
 extern int interrupt;
 extern int nmi;
-
-extern uint8_t opcode;
 
 void m6502_reset(void);
 void m6502_exec(void);

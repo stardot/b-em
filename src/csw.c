@@ -91,8 +91,8 @@ void csw_close()
     }
 }
 
-int ffound, fdat;
-int infilenames;
+static int ffound, fdat;
+static int infilenames;
 static void csw_receive(uint8_t val)
 {
         csw_toneon--;
