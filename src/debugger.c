@@ -444,6 +444,38 @@ static void debug_paste(const char *iptr)
     }
 }
 
+static void save_points(FILE *sfp, const char *cmd, int *points)
+{
+    for (int c = 0; c < NUM_BREAKPOINTS; c++) {
+        int point = points[c];
+        if (point != -1)
+            fprintf(sfp, "%s %x\n", cmd, point);
+    }
+}
+
+static void debugger_save(char *iptr)
+{
+    char *eptr = strchr(iptr, '\n');
+    if (eptr)
+        *eptr = '\0';
+    FILE *sfp = fopen(iptr, "w");
+    if (sfp) {
+        save_points(sfp, "break", breakpoints);
+        save_points(sfp, "breakr", breakr);
+        save_points(sfp, "breakw", breakw);
+        save_points(sfp, "breaki", breaki);
+        save_points(sfp, "breako", breako);
+        save_points(sfp, "watchr", watchr);
+        save_points(sfp, "watchw", watchw);
+        save_points(sfp, "watchi", watchi);
+        save_points(sfp, "watcho", watcho);
+        debug_outf("Breakpoints saved to %s\n", iptr);
+        fclose(sfp);
+    }
+    else
+        debug_outf("unable to open '%s' for writing: %s\n", strerror(errno));
+}
+
 void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 {
     int c, d, e, f;
@@ -660,14 +692,21 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 
             case 's':
             case 'S':
-                if (*iptr)
-                    sscanf(iptr, "%i", &debug_step);
-                else
-                    debug_step = 1;
-                debug_lastcommand = 's';
-                indebug = 0;
-                main_resume();
-                return;
+                if (!strcasecmp(cmd, "save")) {
+                    if (*iptr)
+                        debugger_save(iptr);
+                    break;
+                }
+                else {
+                    if (*iptr)
+                        sscanf(iptr, "%i", &debug_step);
+                    else
+                        debug_step = 1;
+                    debug_lastcommand = 's';
+                    indebug = 0;
+                    main_resume();
+                    return;
+                }
 
             case 't':
             case 'T':
