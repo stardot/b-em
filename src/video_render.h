@@ -4,6 +4,9 @@
 extern ALLEGRO_BITMAP *b, *b16, *b32;
 extern ALLEGRO_LOCKED_REGION *region;
 extern ALLEGRO_COLOR border_col;
+extern ALLEGRO_THREAD *video_thread;
+extern ALLEGRO_MUTEX *video_mutex;
+extern ALLEGRO_COND *video_cond;
 
 #define BORDER_NONE_X_START_GRA 336
 #define BORDER_NONE_X_END_GRA   976
@@ -32,9 +35,9 @@ extern ALLEGRO_COLOR border_col;
 #define BORDER_FULL_Y_START_TXT   4
 #define BORDER_FULL_Y_END_TXT   308
 
-extern int firstx, firsty, lastx, lasty;
 extern int scr_x_start, scr_x_size, scr_y_start, scr_y_size;
 extern int winsizex, winsizey;
+extern int crtc_mode, vtotal;
 
 extern int fullscreen;
 
@@ -43,6 +46,7 @@ extern enum vid_disptype {
     VDT_INTERLACE,
     VDT_SCANLINES,
     VDT_LINEDOUBLE,
+    VDT_NONE,
 } vid_dtype_user, vid_dtype_intern;
 
 extern bool vid_pal;
@@ -52,7 +56,7 @@ extern bool vid_print_mode;
 extern int vid_savescrshot;
 extern char vid_scrshotname[260];
 
-void video_doblit(bool non_ttx, uint8_t vtotal);
+void *video_doblit(ALLEGRO_THREAD *thread, void *ptr);
 void video_enterfullscreen(void);
 void video_leavefullscreen(void);
 void video_toggle_fullscreen(void);

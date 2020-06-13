@@ -35,7 +35,7 @@ static int vadj;
 uint16_t ma;
 static uint16_t maback;
 static int vdispen, dispen;
-static int crtc_mode;
+int crtc_mode;
 
 void crtc_reset()
 {
@@ -700,12 +700,6 @@ static inline void mode7_render(ALLEGRO_LOCKED_REGION *region, uint8_t dat)
                 put_pixel(region, scrx + c + 16, scry, on[mode7_px[interindex][t] & 15]);
             t++;
         }
-
-        if ((scrx + 16) < firstx)
-            firstx = scrx + 16;
-        if ((scrx + 32) > lastx)
-            lastx = scrx + 32;
-
         if (holdoff) {
             mode7_holdchar = 0;
             mode7_heldchar = 32;
@@ -733,12 +727,12 @@ static int vidbytes = 0;
 
 static int oldr8;
 
-int firstx, firsty, lastx, lasty;
-
 static ALLEGRO_DISPLAY *display;
 ALLEGRO_BITMAP *b, *b16, *b32;
-
 ALLEGRO_LOCKED_REGION *region;
+ALLEGRO_THREAD *video_thread;
+ALLEGRO_MUTEX *video_mutex;
+ALLEGRO_COND *video_cond;
 
 ALLEGRO_COLOR border_col;
 
@@ -796,7 +790,27 @@ ALLEGRO_DISPLAY *video_init(void)
     al_set_target_bitmap(b);
     al_clear_to_color(al_map_rgb(0, 0,0));
     region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_READWRITE);
+
+    video_thread = al_create_thread(video_doblit, NULL);
+    video_mutex = al_create_mutex();
+    video_cond = al_create_cond();
+
+    al_start_thread(video_thread);
     return display;
+}
+
+void video_close()
+{
+    log_debug("video_close: joining video thread");
+    al_set_thread_should_stop(video_thread);
+    al_lock_mutex(video_mutex);
+    al_signal_cond(video_cond);
+    al_unlock_mutex(video_mutex);
+    al_join_thread(video_thread, NULL);
+    log_debug("video_close: video_thread joined");
+    al_destroy_bitmap(b32);
+    al_destroy_bitmap(b16);
+    al_destroy_bitmap(b);
 }
 
 void video_set_disptype(enum vid_disptype dtype)
@@ -847,6 +861,15 @@ static inline int is_free_run(void) {
     return 0;
 }
 
+static void start_blit(void)
+{
+    if (vid_dtype_user != VDT_NONE) {
+        al_lock_mutex(video_mutex);
+        al_signal_cond(video_cond);
+        al_unlock_mutex(video_mutex);
+    }
+}
+
 void video_poll(int clocks, int timer_enable)
 {
     int c, oldvc;
@@ -875,7 +898,7 @@ void video_poll(int clocks, int timer_enable)
             scry++;
             if (scry >= 384) {
                 scry = 0;
-                video_doblit(crtc_mode, crtc[4]);
+                start_blit();
             }
         }
 
@@ -916,10 +939,6 @@ void video_poll(int clocks, int timer_enable)
                         break;
                     case 1:
                         {
-                            if (scrx < firstx)
-                                firstx = scrx;
-                            if ((scrx + 8) > lastx)
-                                lastx = scrx + 8;
                             if (nula_attribute_mode && ula_mode > 1) {
                                 if (ula_mode == 3) {
                                     // 1bpp
@@ -958,10 +977,6 @@ void video_poll(int clocks, int timer_enable)
                         break;
                     case 2:
                         {
-                            if (scrx < firstx)
-                                firstx = scrx;
-                            if ((scrx + 16) > lastx)
-                                lastx = scrx + 16;
                             if (nula_attribute_mode && ula_mode > 1) {
                                 // In low frequency clock can only have 1bpp modes
                                 if (nula_attribute_text) {
@@ -1137,14 +1152,16 @@ void video_poll(int clocks, int timer_enable)
                     interlline = frameodd && intsync;
                     oldr8 = intsync;
                     if (vidclocks > 1024 && !ccount) {
-                        video_doblit(crtc_mode, crtc[4]);
+                        start_blit();
                         vid_cleared = 0;
                     } else if (vidclocks <= 1024 && !vid_cleared) {
                         vid_cleared = 1;
-                        al_unlock_bitmap(b);
-                        al_clear_to_color(al_map_rgb(0, 0, 0));
-                        region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_READWRITE);
-                        video_doblit(crtc_mode, crtc[4]);
+                        if (vid_dtype_user != VDT_NONE) {
+                            al_unlock_bitmap(b);
+                            al_clear_to_color(al_map_rgb(0, 0, 0));
+                            region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_READWRITE);
+                            start_blit();
+                        }
                     }
                     ccount++;
                     if (ccount == 10 || ((!motor || !fasttape) && !is_free_run()))
@@ -1185,13 +1202,6 @@ void video_poll(int clocks, int timer_enable)
             }
 
             dispen = vdispen;
-            if (dispen || vadj) {
-                if (scry < firsty)
-                    firsty = scry;
-                if ((scry + 1) > lasty)
-                    lasty = scry;
-            }
-
             firstdispen = 1;
             lasthc0 = 1;
         } else {

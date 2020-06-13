@@ -23,13 +23,6 @@ int scr_x_start, scr_x_size, scr_y_start, scr_y_size;
 
 bool vid_print_mode = false;
 
-void video_close()
-{
-    al_destroy_bitmap(b32);
-    al_destroy_bitmap(b16);
-    al_destroy_bitmap(b);
-}
-
 #ifdef WIN32
 static const int y_fudge = 0;
 #else
@@ -157,7 +150,7 @@ static void upscale_only(ALLEGRO_BITMAP *src, int sx, int sy, int sw, int sh, in
     }
 }
 
-static void line_double(void)
+static void line_double(int firsty, int lasty)
 {
     char *yptr1 = (char *)region->data + region->pitch * firsty * 2;
     char *yptr2 = yptr1 + region->pitch;
@@ -170,7 +163,7 @@ static void line_double(void)
     }
 }
 
-static inline void save_screenshot(void)
+static inline void save_screenshot(int firstx, int lastx, int firsty, int lasty)
 {
     vid_savescrshot--;
     if (!vid_savescrshot) {
@@ -201,10 +194,11 @@ static inline void save_screenshot(void)
                     }
                     break;
                 case VDT_LINEDOUBLE:
-                    line_double();
+                    line_double(firsty, lasty);
                     pal_convert(firstx, firsty << 1, lastx, lasty << 1, 1);
                     al_set_target_bitmap(scrshotb);
                     al_draw_bitmap_region(b32, firstx, firsty << 1, xsize, ysize << 1, 0, 0, 0);
+                case VDT_NONE:
                     break;
             }
         }
@@ -231,9 +225,10 @@ static inline void save_screenshot(void)
                     }
                     break;
                 case VDT_LINEDOUBLE:
-                    line_double();
+                    line_double(firsty, lasty);
                     al_unlock_bitmap(b);
                     al_draw_scaled_bitmap(b, firstx, firsty << 1, xsize, ysize << 1, 0, 0, xsize, ysize << 1, 0);
+                case VDT_NONE:
                     break;
             }
             region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_READWRITE);
@@ -243,66 +238,7 @@ static inline void save_screenshot(void)
     }
 }
 
-static inline void calc_limits(bool non_ttx, uint8_t vtotal)
-{
-    switch(vid_fullborders) {
-        case 0:
-            if (non_ttx) {
-                firstx = BORDER_NONE_X_START_GRA;
-                lastx  = BORDER_NONE_X_END_GRA;
-            }
-            else {
-                firstx = BORDER_NONE_X_START_TTX;
-                lastx  = BORDER_NONE_X_END_TTX;
-            }
-            if (vtotal > 30) {
-                firsty = BORDER_NONE_Y_START_GRA;
-                lasty  = BORDER_NONE_Y_END_GRA;
-            }
-            else {
-                firsty = BORDER_NONE_Y_START_TXT;
-                lasty  = BORDER_NONE_Y_END_TXT;
-            }
-            break;
-        case 1:
-            if (non_ttx) {
-                firstx = BORDER_MED_X_START_GRA;
-                lastx  = BORDER_MED_X_END_GRA;
-            }
-            else {
-                firstx = BORDER_MED_X_START_TTX;
-                lastx  = BORDER_MED_X_END_TTX;
-            }
-            if (vtotal > 30) {
-                firsty = BORDER_MED_Y_START_GRA;
-                lasty  = BORDER_MED_Y_END_GRA;
-            }
-            else {
-                firsty = BORDER_MED_Y_START_TXT;
-                lasty  = BORDER_MED_Y_END_TXT;
-            }
-            break;
-        case 2:
-            if (non_ttx) {
-                firstx = BORDER_FULL_X_START_GRA;
-                lastx  = BORDER_FULL_X_END_GRA;
-            }
-            else {
-                firstx = BORDER_FULL_X_START_TTX;
-                lastx  = BORDER_FULL_X_END_TTX;
-            }
-            if (vtotal > 30) {
-                firsty = BORDER_FULL_Y_START_GRA;
-                lasty  = BORDER_FULL_Y_END_GRA;
-            }
-            else {
-                firsty = BORDER_FULL_Y_START_TXT;
-                lasty  = BORDER_FULL_Y_END_TXT;
-            }
-    }
-}
-
-static inline void blit_screen(void)
+static inline void blit_screen(int firstx, int lastx, int firsty, int lasty)
 {
     int xsize = lastx - firstx;
     int ysize = lasty - firsty + 1;
@@ -327,9 +263,10 @@ static inline void blit_screen(void)
                 upscale_only(b16, 0, firsty << 1, xsize, ysize << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
                 break;
             case VDT_LINEDOUBLE:
-                line_double();
+                line_double(firsty, lasty);
                 pal_convert(firstx, firsty << 1, lastx, lasty << 1, 1);
                 upscale_only(b32, firstx, firsty << 1, xsize, ysize << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
+            case VDT_NONE:
                 break;
         }
     }
@@ -353,9 +290,11 @@ static inline void blit_screen(void)
                 upscale_only(b16, 0, firsty << 1, lastx - firstx, (lasty - firsty) << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
                 break;
             case VDT_LINEDOUBLE:
-                line_double();
+                line_double(firsty, lasty);
                 al_unlock_bitmap(b);
                 upscale_only(b, firstx, firsty << 1, xsize, ysize  << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
+            case VDT_NONE:
+                break;
         }
         region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_READWRITE);
     }
@@ -377,22 +316,86 @@ static inline void fill_letterbox(void)
     al_draw_filled_rectangle(0, scr_y_start + scr_y_size, winsizex, winsizey, border_col);
 }
 
-void video_doblit(bool non_ttx, uint8_t vtotal)
+void *video_doblit(ALLEGRO_THREAD *thread, void *ptr)
 {
-    if (vid_savescrshot)
-        save_screenshot();
+    log_debug("video_doblit: video thread started");
+    while (!al_get_thread_should_stop(thread)) {
+        int firstx, lastx, firsty, lasty;
+        al_lock_mutex(video_mutex);
+        al_wait_cond(video_cond, video_mutex);
+        al_unlock_mutex(video_mutex);
 
-    if (++fskipcount >= ((motor && fasttape) ? 5 : vid_fskipmax)) {
-        lasty++;
-        calc_limits(non_ttx, vtotal);
-        fskipcount = 0;
-        blit_screen();
-        if (scr_x_start > 0)
-            fill_pillarbox();
-        else if (scr_y_start > 0)
-            fill_letterbox();
-        al_flip_display();
+        switch(vid_fullborders) {
+            case 0:
+                if (crtc_mode) {
+                    firstx = BORDER_NONE_X_START_GRA;
+                    lastx  = BORDER_NONE_X_END_GRA;
+                }
+                else {
+                    firstx = BORDER_NONE_X_START_TTX;
+                    lastx  = BORDER_NONE_X_END_TTX;
+                }
+                if (crtc[4] > 30) {
+                    firsty = BORDER_NONE_Y_START_GRA;
+                    lasty  = BORDER_NONE_Y_END_GRA;
+                }
+                else {
+                    firsty = BORDER_NONE_Y_START_TXT;
+                    lasty  = BORDER_NONE_Y_END_TXT;
+                }
+                break;
+            case 1:
+                if (crtc_mode) {
+                    firstx = BORDER_MED_X_START_GRA;
+                    lastx  = BORDER_MED_X_END_GRA;
+                }
+                else {
+                    firstx = BORDER_MED_X_START_TTX;
+                    lastx  = BORDER_MED_X_END_TTX;
+                }
+                if (crtc[4] > 30) {
+                    firsty = BORDER_MED_Y_START_GRA;
+                    lasty  = BORDER_MED_Y_END_GRA;
+                }
+                else {
+                    firsty = BORDER_MED_Y_START_TXT;
+                    lasty  = BORDER_MED_Y_END_TXT;
+                }
+                break;
+            case 2:
+                if (crtc_mode) {
+                    firstx = BORDER_FULL_X_START_GRA;
+                    lastx  = BORDER_FULL_X_END_GRA;
+                }
+                else {
+                    firstx = BORDER_FULL_X_START_TTX;
+                    lastx  = BORDER_FULL_X_END_TTX;
+                }
+                if (crtc[4] > 30) {
+                    firsty = BORDER_FULL_Y_START_GRA;
+                    lasty  = BORDER_FULL_Y_END_GRA;
+                }
+                else {
+                    firsty = BORDER_FULL_Y_START_TXT;
+                    lasty  = BORDER_FULL_Y_END_TXT;
+                }
+            default:
+                firstx = lastx = firsty = lasty = 0;
+        }
+
+        if (vid_savescrshot)
+            save_screenshot(firstx, lastx, firsty, lasty);
+
+        if (++fskipcount >= ((motor && fasttape) ? 5 : vid_fskipmax)) {
+            fskipcount = 0;
+            blit_screen(firstx, lastx, firsty, lasty);
+            if (scr_x_start > 0)
+                fill_pillarbox();
+            else if (scr_y_start > 0)
+                fill_letterbox();
+            al_flip_display();
+        }
     }
-    firstx = firsty = 65535;
-    lastx  = lasty  = 0;
+    log_debug("video_doblit: video thread ending");
+    return NULL;
 }

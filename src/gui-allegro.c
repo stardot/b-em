@@ -288,7 +288,7 @@ static ALLEGRO_MENU *create_tube_menu(void)
 }
 
 static const char *border_names[] = { "None", "Medium", "Full", NULL };
-static const char *vmode_names[] = { "Scaled", "Interlace", "Scanlines", "Line doubling", NULL };
+static const char *vmode_names[] = { "Scaled", "Interlace", "Scanlines", "Line doubling", "None", NULL };
 
 static ALLEGRO_MENU *create_video_menu(void)
 {
