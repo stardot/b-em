@@ -19,6 +19,7 @@ int vid_savescrshot = 0;
 char vid_scrshotname[260];
 
 int winsizex, winsizey;
+int save_winsizex, save_winsizey;
 int scr_x_start, scr_x_size, scr_y_start, scr_y_size;
 
 bool vid_print_mode = false;
@@ -36,6 +37,8 @@ static const int y_fudge = 0;
 static const int y_fudge = 28;
 #endif
 
+
+
 void video_enterfullscreen()
 {
     ALLEGRO_DISPLAY *display;
@@ -44,7 +47,14 @@ void video_enterfullscreen()
     double aspect;
 
     display = al_get_current_display();
+    save_winsizex = al_get_display_width(display);
+    save_winsizey = al_get_display_height(display);
     if (al_set_display_flag(display, ALLEGRO_FULLSCREEN_WINDOW, true)) {
+
+        //no we really do mean it
+        al_set_display_flag(display, ALLEGRO_FULLSCREEN_WINDOW, false);
+        al_set_display_flag(display, ALLEGRO_FULLSCREEN_WINDOW, true);
+        
         black = al_map_rgb(0, 0, 0);
         winsizex = al_get_display_width(display);
         winsizey = al_get_display_height(display);
@@ -125,11 +135,18 @@ void video_leavefullscreen(void)
     ALLEGRO_DISPLAY *display;
 
     display = al_get_current_display();
+
+    //try and restore size to pre fullscreen size
+    al_resize_display(display, save_winsizex, save_winsizey);
+
     al_set_display_flag(display, ALLEGRO_FULLSCREEN_WINDOW, false);
     scr_x_start = 0;
     scr_x_size = winsizex = al_get_display_width(display);
     scr_y_start = 0;
     scr_y_size = winsizey = al_get_display_height(display);
+    
+    //video_set_borders(vid_fullborders);
+
 }
 
 void video_toggle_fullscreen(void)
