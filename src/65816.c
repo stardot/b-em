@@ -290,7 +290,7 @@ static uint16_t readmemw65816(uint32_t a)
     return value;
 }
 
-int endtimeslice;
+static int endtimeslice;
 
 static void do_writemem65816(uint32_t a, uint32_t v)
 {

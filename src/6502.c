@@ -133,6 +133,9 @@ static uint32_t do_readmem(uint32_t addr);
 static void     do_writemem(uint32_t addr, uint32_t val);
 static uint32_t dbg_disassemble(uint32_t addr, char *buf, size_t bufsize);
 
+static uint16_t pc3, oldpc, oldoldpc;
+static uint8_t opcode;
+
 static uint32_t dbg_get_instr_addr() {
     return oldpc;
 }
@@ -705,9 +708,6 @@ void writemem(uint16_t addr, uint8_t val)
 }
 
 int nmi, oldnmi, interrupt, takeint;
-
-uint16_t pc3, oldpc, oldoldpc;
-uint8_t opcode;
 
 void m6502_reset()
 {
