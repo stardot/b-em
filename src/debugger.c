@@ -364,6 +364,42 @@ static const char helptext[] =
     "    wlist      - list watchpoints\n"
     "    writem a v - write to memory, a = address, v = value\n";
 
+static char xdigs[] = "0123456789ABCDEF";
+
+size_t debug_print_8bit(uint32_t value, char *buf, size_t bufsize)
+{
+    if (bufsize >= 3) {
+        buf[2] = 0;
+        buf[0] = xdigs[(value >> 4) & 0x0f];
+        buf[1] = xdigs[value & 0x0f];
+    }
+    return 3;
+}
+
+size_t debug_print_16bit(uint32_t value, char *buf, size_t bufsize)
+{
+    if (bufsize >= 5) {
+        buf[4] = 0;
+        for (int i = 3; i >= 0; i--) {
+            buf[i] = xdigs[value & 0x0f];
+            value >>= 4;
+        }
+    }
+    return 5;
+}
+
+size_t debug_print_32bit(uint32_t value, char *buf, size_t bufsize)
+{
+    if (bufsize >= 9) {
+        buf[8] = 0;
+        for (int i = 7; i >= 0; i--) {
+            buf[i] = xdigs[value & 0x0f];
+            value >>= 4;
+        }
+    }
+    return 9;
+}
+
 static void print_registers(cpu_debug_t *cpu) {
     const char **np, *name;
     char buf[50];
@@ -385,8 +421,27 @@ static void set_point(int *table, char *arg, const char *desc)
     if (*arg) {
         for (c = 0; c < NUM_BREAKPOINTS; c++) {
             if (table[c] == -1) {
-                sscanf(arg, "%X", &table[c]);
-                debug_outf("    %s %i set to %04X\n", desc, c, table[c]);
+                char *end1;
+                uint32_t a = strtoul(arg, &end1, 16);
+                if (end1 > arg) {
+                    if (*end1++ == ':') {
+                        char *end2;
+                        uint32_t b = strtoul(end1, &end2, 16);
+                        if (end2 > end1) {
+                            a = (a << 16) | b;
+                            table[c] = a;
+                            debug_outf("    %s %i set to %04X\n", desc, c, a);
+                        }
+                        else
+                            debug_outf("invalid address %s\n", arg);
+                    }
+                    else {
+                        table[c] = a;
+                        debug_outf("    %s %i set to %04X\n", desc, c, a);
+                    }
+                }
+                else
+                    debug_outf("invalid address %s\n", arg);
                 return;
             }
         }
@@ -782,18 +837,21 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 
 static inline void check_points(cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t size, int *break_tab, int *watch_tab, const char *desc)
 {
-    int c;
-    uint32_t iaddr;
-
-    for (c = 0; c < NUM_BREAKPOINTS; c++) {
+    for (int c = 0; c < NUM_BREAKPOINTS; c++) {
         if (break_tab[c] == addr) {
-            iaddr = cpu->get_instr_addr();
-            debug_outf("cpu %s: %04X: break on %s %04X, value=%X\n", cpu->cpu_name, iaddr, desc, addr, value);
+            char addr_str[10], iaddr_str[10];
+            uint32_t iaddr = cpu->get_instr_addr();
+            cpu->print_addr(addr, addr_str, sizeof(addr_str));
+            cpu->print_addr(iaddr, iaddr_str, sizeof(iaddr_str));
+            debug_outf("cpu %s: %s: break on %s %s, value=%X\n", cpu->cpu_name, iaddr_str, desc, addr_str, value);
             debugger_do(cpu, iaddr);
         }
         if (watch_tab[c] == addr) {
-            iaddr = cpu->get_instr_addr();
-            debug_outf("cpu %s: %04X: %s %04X, value=%0*X\n", cpu->cpu_name, iaddr, desc, addr, size*2, value);
+            char addr_str[10], iaddr_str[10];
+            uint32_t iaddr = cpu->get_instr_addr();
+            cpu->print_addr(addr, addr_str, sizeof(addr_str));
+            cpu->print_addr(iaddr, iaddr_str, sizeof(iaddr_str));
+            debug_outf("cpu %s: %s: %s %s, value=%0*X\n", cpu->cpu_name, iaddr_str, desc, addr_str, size*2, value);
         }
     }
 }
@@ -839,12 +897,14 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
     else {
         for (c = 0; c < NUM_BREAKPOINTS; c++) {
             if (breakpoints[c] == addr) {
-                debug_outf("cpu %s: Break at %04X\n", cpu->cpu_name, addr);
+                char addr_str[10];
+                cpu->print_addr(addr, addr_str, sizeof(addr_str));
+                debug_outf("cpu %s: Break at %s\n", cpu->cpu_name, addr_str);
                 if (contcount) {
                     contcount--;
                     return;
                 }
-                log_debug("debugger; enter for CPU %s on breakpoint at %04X", cpu->cpu_name, addr);
+                log_debug("debugger; enter for CPU %s on breakpoint at %s", cpu->cpu_name, addr_str);
                 enter = 1;
             }
         }
@@ -865,6 +925,8 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
 void debug_trap(cpu_debug_t *cpu, uint32_t addr, int reason)
 {
     const char *desc = cpu->trap_names[reason];
-    debug_outf("cpu %s: %s at %04X\n", cpu->cpu_name, desc, addr);
+    char addr_str[10];
+    cpu->print_addr(addr, addr_str, sizeof(addr_str));
+    debug_outf("cpu %s: %s at %04X\n", cpu->cpu_name, desc, addr_str);
     debugger_do(cpu, addr);
 }

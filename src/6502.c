@@ -129,6 +129,24 @@ static void dbg_reg_parse(int which, const char *str) {
     dbg_reg_set(which, value);
 }
 
+static size_t dbg_print_addr(uint32_t addr, char *buf, size_t bufsize)
+{
+    if (bufsize >= 8) {
+        uint32_t msw = addr & 0xffff0000;
+        if (msw) {
+            debug_print_8bit(msw >> 16, buf, bufsize);
+            buf[2] = ':';
+        }
+        else {
+            buf[0] = ' ';
+            buf[1] = ' ';
+            buf[2] = ' ';
+        }
+        debug_print_16bit(addr & 0xffff, buf+3, bufsize-3);
+    }
+    return 8;
+}
+
 static uint32_t do_readmem(uint32_t addr);
 static void     do_writemem(uint32_t addr, uint32_t val);
 static uint32_t dbg_disassemble(uint32_t addr, char *buf, size_t bufsize);
@@ -154,7 +172,8 @@ cpu_debug_t core6502_cpu_debug = {
     .reg_print      = dbg_reg_print,
     .reg_parse      = dbg_reg_parse,
     .get_instr_addr = dbg_get_instr_addr,
-    .trap_names     = trap_names
+    .trap_names     = trap_names,
+    .print_addr     = dbg_print_addr
 };
 
 static uint32_t dbg_disassemble(uint32_t addr, char *buf, size_t bufsize) {
@@ -269,6 +288,13 @@ static void os_paste_cnpv(void)
     opcode = readmem(pc);
 }
 
+static inline uint32_t debug_addr(uint32_t addr)
+{
+    if ((addr & 0xc000) == 0x8000)
+        addr |= ram_fe30 << 16;
+    return addr;
+}
+
 static inline void fetch_opcode(void)
 {
     pc3 = oldoldpc;
@@ -277,7 +303,7 @@ static inline void fetch_opcode(void)
     vis20k = RAMbank[pc >> 12];
 
     if (dbg_core6502)
-        debug_preexec(&core6502_cpu_debug, pc);
+        debug_preexec(&core6502_cpu_debug, debug_addr(pc));
     if (pc == buf_remv && x == 0 && clip_paste_ptr)
         os_paste_remv();
     else if (pc == buf_cnpv && x == 0 && clip_paste_ptr)
@@ -294,9 +320,7 @@ static inline uint16_t read_zp_indirect(uint16_t zp)
 
 static uint32_t do_readmem(uint32_t addr)
 {
-
-        if (addr >= 0x10000)
-            return 0xFF;
+    addr &= 0xffff;
 
         if (pc == addr)
             fetchc[addr] = 31;
@@ -448,7 +472,7 @@ uint8_t readmem(uint16_t addr)
 {
     uint32_t value = do_readmem(addr);
     if (dbg_core6502)
-    debug_memread(&core6502_cpu_debug, addr, value, 1);
+        debug_memread(&core6502_cpu_debug, addr, debug_addr(value), 1);
     return value;
 }
 
@@ -456,8 +480,7 @@ static void do_writemem(uint32_t addr, uint32_t val)
 {
         int c;
 
-        if (addr >= 0x10000)
-            return;
+    addr &= 0xffff;
 
         writec[addr] = 31;
 
@@ -703,7 +726,7 @@ static void do_writemem(uint32_t addr, uint32_t val)
 void writemem(uint16_t addr, uint8_t val)
 {
     if (dbg_core6502)
-    debug_memwrite(&core6502_cpu_debug, addr, val, 1);
+        debug_memwrite(&core6502_cpu_debug, debug_addr(addr), val, 1);
     do_writemem(addr, val);
 }
 

@@ -196,5 +196,6 @@ cpu_debug_t mc6809nc_cpu_debug = {
    .reg_print      = dbg_reg_print,
    .reg_parse      = dbg_reg_parse,
    .get_instr_addr = dbg_get_instr_addr,
-   .trap_names     = dbg_trap_names
+   .trap_names     = dbg_trap_names,
+   .print_addr     = debug_print_16bit
 };
