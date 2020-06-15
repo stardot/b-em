@@ -702,32 +702,36 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 break;
 
             case 'r':
-                if (!strncmp(cmd, "reset", cmdlen)) {
+                if (cmdlen >= 3 && !strncmp(cmd, "reset", cmdlen)) {
                     main_reset();
                     debug_outf("Emulator reset\n");
                 } else if (*iptr) {
-                    if (!strncasecmp(iptr, "sysvia", 6)) {
+                    size_t arglen = strcspn(iptr, " \t\n");
+                    iptr[arglen] = 0;
+                    if (!strncasecmp(iptr, "sysvia", arglen)) {
                         debug_outf("    System VIA registers :\n");
                         debug_outf("    ORA  %02X ORB  %02X IRA %02X IRB %02X\n", sysvia.ora, sysvia.orb, sysvia.ira, sysvia.irb);
                         debug_outf("    DDRA %02X DDRB %02X ACR %02X PCR %02X\n", sysvia.ddra, sysvia.ddrb, sysvia.acr, sysvia.pcr);
                         debug_outf("    Timer 1 latch %04X   count %04X\n", sysvia.t1l / 2, (sysvia.t1c / 2) & 0xFFFF);
                         debug_outf("    Timer 2 latch %04X   count %04X\n", sysvia.t2l / 2, (sysvia.t2c / 2) & 0xFFFF);
                         debug_outf("    IER %02X IFR %02X\n", sysvia.ier, sysvia.ifr);
-                    } else if (!strncasecmp(iptr, "uservia", 7)) {
+                    }
+                    else if (!strncasecmp(iptr, "uservia", arglen)) {
                         debug_outf("    User VIA registers :\n");
                         debug_outf("    ORA  %02X ORB  %02X IRA %02X IRB %02X\n", uservia.ora, uservia.orb, uservia.ira, uservia.irb);
                         debug_outf("    DDRA %02X DDRB %02X ACR %02X PCR %02X\n", uservia.ddra, uservia.ddrb, uservia.acr, uservia.pcr);
                         debug_outf("    Timer 1 latch %04X   count %04X\n", uservia.t1l / 2, (uservia.t1c / 2) & 0xFFFF);
                         debug_outf("    Timer 2 latch %04X   count %04X\n", uservia.t2l / 2, (uservia.t2c / 2) & 0xFFFF);
                         debug_outf("    IER %02X IFR %02X\n", uservia.ier, uservia.ifr);
-                    } else if (!strncasecmp(iptr, "crtc", 4)) {
+                    }
+                    else if (!strncasecmp(iptr, "crtc", arglen)) {
                         debug_outf("    CRTC registers :\n");
                         debug_outf("    Index=%i\n", crtc_i);
                         debug_outf("    R0 =%02X  R1 =%02X  R2 =%02X  R3 =%02X  R4 =%02X  R5 =%02X  R6 =%02X  R7 =%02X  R8 =%02X\n", crtc[0], crtc[1], crtc[2], crtc[3], crtc[4], crtc[5], crtc[6], crtc[7], crtc[8]);
                         debug_outf("    R9 =%02X  R10=%02X  R11=%02X  R12=%02X  R13=%02X  R14=%02X  R15=%02X  R16=%02X  R17=%02X\n", crtc[9], crtc[10], crtc[11], crtc[12], crtc[13], crtc[14], crtc[15], crtc[16], crtc[17]);
                         debug_outf("    VC=%i SC=%i HC=%i MA=%04X\n", vc, sc, hc, ma);
                     }
-                    if (!strncasecmp(iptr, "vidproc", 7)) {
+                    else if (!strncasecmp(iptr, "vidproc", arglen)) {
                         debug_outf("    VIDPROC registers :\n");
                         debug_outf("    Control=%02X\n", ula_ctrl);
                         debug_outf("    Palette entries :\n");
@@ -741,7 +745,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                         debug_outf("    NULA registers :\n");
                         debug_outf("     Palette Mode=%01X  Horizontal Offset=%01X  Left Blank Size=%01X  Disable=%01X  Attribute Mode=%01X  Attribute Text=%01X\n", nula_palette_mode, nula_horizontal_offset, nula_left_blank, nula_disable, nula_attribute_mode, nula_attribute_text);
                     }
-                    if (!strncasecmp(iptr, "sound", 5)) {
+                    else if (!strncasecmp(iptr, "sound", arglen)) {
                         debug_outf("    Sound registers :\n");
                         debug_outf("    Voice 0 frequency = %04X   volume = %i  control = %02X\n", sn_latch[0] >> 6, sn_vol[0], sn_noise);
                         debug_outf("    Voice 1 frequency = %04X   volume = %i\n", sn_latch[1] >> 6, sn_vol[1]);
