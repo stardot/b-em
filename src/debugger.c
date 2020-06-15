@@ -557,7 +557,13 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
         }
         else {
             debug_out(">", 1);
-            debug_in(ins, 255);
+            if (!debug_in(ins, 255)) {
+                static const char msg[] = "\nTreating EOF on console as 'continue'\n";
+                debug_out(msg, sizeof(msg)-1);
+                indebug = 0;
+                main_resume();
+                return;
+            }
         }
 
         // Skip past any leading spaces.
@@ -830,9 +836,6 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 break;
         }
     }
-    fputs("\nTreating EOF on console as 'continue'\n", stdout);
-    indebug = 0;
-    main_resume();
 }
 
 static inline void check_points(cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t size, int *break_tab, int *watch_tab, const char *desc)
