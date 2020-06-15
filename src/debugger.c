@@ -590,7 +590,6 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
         }
         switch (*cmd) {
             case 'b':
-            case 'B':
                 if (!strncmp(cmd, "break", cmdlen))
                     set_point(breakpoints, iptr, "Breakpoint");
                 else if (!strncmp(cmd, "breaki", cmdlen))
@@ -621,12 +620,10 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 break;
 
             case 'q':
-            case 'Q':
                 main_setquit();
                 /* FALLTHOUGH */
 
             case 'c':
-            case 'C':
                 if (*iptr)
                     sscanf(iptr, "%d", &contcount);
                 debug_lastcommand = 'c';
@@ -635,7 +632,6 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 return;
 
             case 'd':
-            case 'D':
                 if (*iptr)
                     sscanf(iptr, "%X", (unsigned int *)&debug_disaddr);
                 for (c = 0; c < 12; c++) {
@@ -648,7 +644,6 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 break;
 
             case 'e':
-            case 'E':
                 if (!strncmp(cmd, "exec", cmdlen)) {
                     if (*iptr) {
                         char *eptr = strchr(iptr, '\n');
@@ -661,13 +656,11 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 break;
 
             case 'h':
-            case 'H':
             case '?':
                 debug_out(helptext, sizeof helptext - 1);
                 break;
 
             case 'm':
-            case 'M':
                 if (*iptr)
                     sscanf(iptr, "%X", (unsigned int *)&debug_memaddr);
                 for (c = 0; c < 16; c++) {
@@ -692,7 +685,6 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 break;
 
             case 'n':
-            case 'N':
                 tbreak = next_addr;
                 debug_lastcommand = 'n';
                 indebug = 0;
@@ -700,13 +692,11 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 return;
 
             case 'p':
-            case 'P':
                 if (!strncmp(cmd, "paste", cmdlen))
                     debug_paste(iptr);
                 break;
 
             case 'r':
-            case 'R':
                 if (!strncmp(cmd, "reset", cmdlen)) {
                     main_reset();
                     debug_outf("Emulator reset\n");
@@ -760,7 +750,6 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 break;
 
             case 's':
-            case 'S':
                 if (!strncmp(cmd, "save", cmdlen)) {
                     if (*iptr)
                         debugger_save(iptr);
@@ -778,7 +767,6 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 }
 
             case 't':
-            case 'T':
                 if (trace_fp)
                     fclose(trace_fp);
                 if (*iptr) {
@@ -794,7 +782,6 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 break;
 
             case 'v':
-            case 'V':
                 if (!strncmp(cmd, "vrefresh", cmdlen)) {
                     if (*iptr) {
                         if (!strncasecmp(iptr, "on", 2)) {
@@ -810,7 +797,6 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 break;
 
             case 'w':
-            case 'W':
                 if (!strncmp(cmd, "watchr", cmdlen))
                     set_point(watchr, iptr, "Read watchpoint");
                 else if (!strncmp(cmd, "watchw", cmdlen))
