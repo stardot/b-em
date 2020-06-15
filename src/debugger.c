@@ -548,6 +548,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
         char *iptr, *cmd;
         size_t cmdlen;
         int c;
+        bool badcmd = false;
 
         if (exec_fp) {
             if (!fgets(ins, sizeof ins, exec_fp)) {
@@ -617,6 +618,8 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                     clear_point(breakr, iptr, "Read breakpoint");
                 else if (!strncmp(cmd, "bclearw", cmdlen))
                     clear_point(breakw, iptr, "Write breakpoint");
+                else
+                    badcmd = true;
                 break;
 
             case 'q':
@@ -653,6 +656,8 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                             debug_outf("unable to open '%s': %s\n", iptr, strerror(errno));
                     }
                 }
+                else
+                    badcmd = true;
                 break;
 
             case 'h':
@@ -743,6 +748,8 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                         debug_outf("    Voice 2 frequency = %04X   volume = %i\n", sn_latch[2] >> 6, sn_vol[2]);
                         debug_outf("    Voice 3 frequency = %04X   volume = %i\n", sn_latch[3] >> 6, sn_vol[3]);
                     }
+                    else
+                        debug_outf("Register set %s not known\n", iptr);
                 } else {
                     debug_outf("    registers for %s\n", cpu->cpu_name);
                     print_registers(cpu);
