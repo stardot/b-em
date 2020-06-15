@@ -546,6 +546,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 
     for (;;) {
         char *iptr, *cmd;
+        size_t cmdlen;
         int c;
 
         if (exec_fp) {
@@ -571,9 +572,12 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
         if (c) {
             cmd = iptr;
             // Find the first space and terminate command name.
-            while (c && !isspace(c))
-                c = *++iptr;
+            while (c && !isspace(c)) {
+                *iptr++ = tolower(c);
+                c = *iptr;
+            }
             *iptr = '\0';
+            cmdlen = iptr - cmd;
             // Skip past any separating spaces.
             while (c && isspace(c))
                 c = *++iptr;
@@ -582,36 +586,38 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
             cmd = iptr = ins;
             *iptr++ = debug_lastcommand;
             *iptr = '\0';
+            cmdlen = 1;
         }
         switch (*cmd) {
             case 'b':
             case 'B':
-                if (!strcasecmp(cmd, "breaki"))
-                    set_point(breaki, iptr, "Input breakpoint");
-                else if (!strcasecmp(cmd, "breako"))
-                    set_point(breako, iptr, "Output breakpoint");
-                else if (!strcasecmp(cmd, "breakr"))
-                    set_point(breakr, iptr, "Read breakpoint");
-                else if (!strcasecmp(cmd, "breakw"))
-                    set_point(breakw, iptr, "Write breakpoint");
-                else if (!strcasecmp(cmd, "break"))
+                if (!strncmp(cmd, "break", cmdlen))
                     set_point(breakpoints, iptr, "Breakpoint");
-                else if (!strcasecmp(ins, "blist")) {
+                else if (!strncmp(cmd, "breaki", cmdlen))
+                    set_point(breaki, iptr, "Input breakpoint");
+                else if (!strncmp(cmd, "breako", cmdlen))
+                    set_point(breako, iptr, "Output breakpoint");
+                else if (!strncmp(cmd, "breakr", cmdlen))
+                    set_point(breakr, iptr, "Read breakpoint");
+                else if (!strncmp(cmd, "breakw", cmdlen))
+                    set_point(breakw, iptr, "Write breakpoint");
+                else if (!strncmp(ins, "blist", cmdlen)) {
                     list_points(breakpoints, "Breakpoint");
                     list_points(breakr, "Read breakpoint");
                     list_points(breakw, "Write breakpoint");
                     list_points(breaki, "Input breakpoint");
                     list_points(breako, "Output breakpoint");
-                } else if (!strcasecmp(cmd, "bcleari"))
-                    clear_point(breaki, iptr, "Input breakpoint");
-                else if (!strcasecmp(cmd, "bclearo"))
-                    clear_point(breako, iptr, "Output breakpoint");
-                else if (!strcasecmp(cmd, "bclearr"))
-                    clear_point(breakr, iptr, "Read breakpoint");
-                else if (!strcasecmp(cmd, "bclearw"))
-                    clear_point(breakw, iptr, "Write breakpoint");
-                else if (!strcasecmp(ins, "bclear"))
+                }
+                else if (!strncmp(ins, "bclear", cmdlen))
                     clear_point(breakpoints, iptr, "Breakpoint");
+                else if (!strncmp(cmd, "bcleari", cmdlen))
+                    clear_point(breaki, iptr, "Input breakpoint");
+                else if (!strncmp(cmd, "bclearo", cmdlen))
+                    clear_point(breako, iptr, "Output breakpoint");
+                else if (!strncmp(cmd, "bclearr", cmdlen))
+                    clear_point(breakr, iptr, "Read breakpoint");
+                else if (!strncmp(cmd, "bclearw", cmdlen))
+                    clear_point(breakw, iptr, "Write breakpoint");
                 break;
 
             case 'q':
@@ -643,7 +649,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 
             case 'e':
             case 'E':
-                if (!strcasecmp(cmd, "exec")) {
+                if (!strncmp(cmd, "exec", cmdlen)) {
                     if (*iptr) {
                         char *eptr = strchr(iptr, '\n');
                         if (eptr)
@@ -695,13 +701,13 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 
             case 'p':
             case 'P':
-                if (!strcasecmp(cmd, "paste"))
+                if (!strncmp(cmd, "paste", cmdlen))
                     debug_paste(iptr);
                 break;
 
             case 'r':
             case 'R':
-                if (!strcasecmp(cmd, "reset")) {
+                if (!strncmp(cmd, "reset", cmdlen)) {
                     main_reset();
                     debug_outf("Emulator reset\n");
                 } else if (*iptr) {
@@ -755,7 +761,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 
             case 's':
             case 'S':
-                if (!strcasecmp(cmd, "save")) {
+                if (!strncmp(cmd, "save", cmdlen)) {
                     if (*iptr)
                         debugger_save(iptr);
                     break;
@@ -789,7 +795,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 
             case 'v':
             case 'V':
-                if (!strcasecmp(cmd, "vrefresh")) {
+                if (!strncmp(cmd, "vrefresh", cmdlen)) {
                     if (*iptr) {
                         if (!strncasecmp(iptr, "on", 2)) {
                             debug_outf("Extra video refresh enabled\n");
@@ -805,29 +811,29 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 
             case 'w':
             case 'W':
-                if (!strcasecmp(cmd, "watchr"))
+                if (!strncmp(cmd, "watchr", cmdlen))
                     set_point(watchr, iptr, "Read watchpoint");
-                else if (!strcasecmp(cmd, "watchw"))
+                else if (!strncmp(cmd, "watchw", cmdlen))
                     set_point(watchw, iptr, "Write watchpoint");
-                else if (!strcasecmp(cmd, "watchi"))
+                else if (!strncmp(cmd, "watchi", cmdlen))
                     set_point(watchi, iptr, "Input watchpoint");
-                else if (!strcasecmp(cmd, "watcho"))
+                else if (!strncmp(cmd, "watcho", cmdlen))
                     set_point(watcho, iptr, "Output watchpoint");
-                else if (!strcasecmp(cmd, "wlist")) {
+                else if (!strncmp(cmd, "wlist", cmdlen)) {
                     list_points(watchr, "Read watchpoint");
                     list_points(watchw, "Write watchpoint");
                     list_points(watchi, "Input watchpoint");
                     list_points(watcho, "Output watchpoint");
                 }
-                if (!strcasecmp(cmd, "wclearr"))
+                if (!strncmp(cmd, "wclearr", cmdlen))
                     clear_point(watchr, iptr, "Read watchpoint");
-                else if (!strcasecmp(cmd, "wclearw"))
+                else if (!strncmp(cmd, "wclearw", cmdlen))
                     clear_point(watchw, iptr, "Write watchpoint");
-                else if (!strcasecmp(cmd, "wcleari"))
+                else if (!strncmp(cmd, "wcleari", cmdlen))
                     clear_point(watchi, iptr, "Input watchpoint");
-                else if (!strcasecmp(cmd, "wclearo"))
+                else if (!strncmp(cmd, "wclearo", cmdlen))
                     clear_point(watcho, iptr, "Output watchpoint");
-                else if (!strcasecmp(cmd, "writem")) {
+                else if (!strncmp(cmd, "writem", cmdlen)) {
                     if (*iptr) {
                         unsigned addr, value;
                         sscanf(iptr, "%X %X", &addr, &value);
