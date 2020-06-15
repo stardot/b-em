@@ -533,11 +533,8 @@ static void debugger_save(char *iptr)
 
 void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 {
-    int c, d, e, f;
-    uint8_t temp;
     uint32_t next_addr;
-    char dump[256], *dptr;
-    char ins[256], *iptr, *cmd, *eptr;
+    char ins[256];
 
     main_pause();
     indebug = 1;
@@ -548,6 +545,9 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
         video_poll(CLOCKS_PER_FRAME, 0);
 
     for (;;) {
+        char *iptr, *cmd;
+        int c;
+
         if (exec_fp) {
             if (!fgets(ins, sizeof ins, exec_fp)) {
                 fclose(exec_fp);
@@ -645,7 +645,8 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
             case 'E':
                 if (!strcasecmp(cmd, "exec")) {
                     if (*iptr) {
-                        if ((eptr = strchr(iptr, '\n')))
+                        char *eptr = strchr(iptr, '\n');
+                        if (eptr)
                             *eptr = 0;
                         if (!(exec_fp = fopen(iptr, "r")))
                             debug_outf("unable to open '%s': %s\n", iptr, strerror(errno));
@@ -664,13 +665,14 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 if (*iptr)
                     sscanf(iptr, "%X", (unsigned int *)&debug_memaddr);
                 for (c = 0; c < 16; c++) {
+                    char dump[256], *dptr;
                     debug_outf("    %04X : ", debug_memaddr);
-                    for (d = 0; d < 16; d++)
+                    for (int d = 0; d < 16; d++)
                         debug_outf("%02X ", cpu->memread(debug_memaddr + d));
                     debug_out("  ", 2);
                     dptr = dump;
-                    for (d = 0; d < 16; d++) {
-                        temp = cpu->memread(debug_memaddr + d);
+                    for (int d = 0; d < 16; d++) {
+                        uint32_t temp = cpu->memread(debug_memaddr + d);
                         if (temp < ' ' || temp >= 0x7f)
                             *dptr++ = '.';
                         else
@@ -774,7 +776,8 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 if (trace_fp)
                     fclose(trace_fp);
                 if (*iptr) {
-                    if ((eptr = strchr(iptr, '\n')))
+                    char *eptr = strchr(iptr, '\n');
+                    if (eptr)
                         *eptr = '\0';
                     if ((trace_fp = fopen(iptr, "a")))
                         debug_outf("Tracing to %s\n", iptr);
@@ -826,9 +829,10 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                     clear_point(watcho, iptr, "Output watchpoint");
                 else if (!strcasecmp(cmd, "writem")) {
                     if (*iptr) {
-                        sscanf(iptr, "%X %X", &e, &f);
-                        log_debug("debugger: writem %04X %04X\n", e, f);
-                        cpu->memwrite(e, f);
+                        unsigned addr, value;
+                        sscanf(iptr, "%X %X", &addr, &value);
+                        log_debug("debugger: writem %04X %04X\n", addr, value);
+                        cpu->memwrite(addr, value);
                         if (cpu == &core6502_cpu_debug && vrefresh)
                             video_poll(CLOCKS_PER_FRAME, 0);
                     }
