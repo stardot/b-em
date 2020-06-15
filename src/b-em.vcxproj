@@ -75,7 +75,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>zlib.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>D:\msys64\home\Dominic\build\b-em\vs\b-em-master\packages\AllegroDeps.1.11.0\build\native\v141\win32\deps\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\packages\AllegroDeps.1.11.0\build\native\v141\win32\deps\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -98,7 +98,7 @@
       <AdditionalDependencies>zlib.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>MSVCRTD.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
-      <AdditionalLibraryDirectories>D:\msys64\home\Dominic\build\b-em\vs\b-em-master\packages\AllegroDeps.1.11.0\build\native\v141\win32\deps\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\packages\AllegroDeps.1.11.0\build\native\v141\win32\deps\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -129,6 +129,7 @@
     <ClInclude Include="darm\thumb2.h" />
     <ClInclude Include="ddnoise.h" />
     <ClInclude Include="debugger.h" />
+    <ClInclude Include="debugger_symbols.h" />
     <ClInclude Include="disc.h" />
     <ClInclude Include="fdi.h" />
     <ClInclude Include="fdi2raw.h" />
@@ -224,6 +225,7 @@
     <ClCompile Include="darm\thumb2.c" />
     <ClCompile Include="ddnoise.c" />
     <ClCompile Include="debugger.c" />
+    <ClCompile Include="debugger_symbols.cpp" />
     <ClCompile Include="disc.c" />
     <ClCompile Include="fdi.c" />
     <ClCompile Include="fdi2raw.c" />

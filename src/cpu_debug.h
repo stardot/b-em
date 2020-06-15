@@ -5,8 +5,9 @@
 
 #include <stdlib.h>
 #include <inttypes.h>
+#include "debugger_symbols.h"
 
-typedef struct {
+typedef struct cpu_debug_t {
   const char *cpu_name;                                               // Name/model of CPU.
   int      (*debug_enable)(int newvalue);                             // enable/disable debugging on this CPU, returns previous value.
   uint32_t (*memread)(uint32_t addr);                                 // CPU's usual memory read function.
@@ -22,6 +23,7 @@ typedef struct {
   uint32_t (*get_instr_addr)();                                       // Returns the base address of the currently executing instruction
   const char **trap_names;                                            // Null terminated list of other reasons a CPU may trap to the debugger.
   size_t   (*print_addr)(uint32_t addr, char *buf, size_t bufsize);   // Print an address.
+  symbol_table *symbols;                                              // symbol table for storing symbolic addresses
 } cpu_debug_t;
 
 extern void debug_memread (cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t size);
