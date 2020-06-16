@@ -26,9 +26,6 @@ static int vrefresh = 1;
 static FILE *trace_fp = NULL;
 static FILE *exec_fp = NULL;
 
-#define SYM_MAX 32
-#define STRINGY(x) #x
-
 static void close_trace()
 {
     if (trace_fp) {
@@ -118,10 +115,9 @@ static HANDLE cinf, consf;
 
 static inline bool debug_in(char *buf, size_t bufsize)
 {
-    int c;
     DWORD len;
 
-    if ((c = ReadConsole(cinf, buf, bufsize, &len, NULL))) {
+    if (ReadConsole(cinf, buf, bufsize, &len, NULL)) {
         buf[len] = 0;
         log_debug("debugger: read console, len=%d, s=%s", (int)len, buf);
         return true;
@@ -461,7 +457,10 @@ static void set_sym(cpu_debug_t *cpu, const char *arg) {
 
         int n;
         char name[SYM_MAX + 1], rest[SYM_MAX + 1];
-        n = sscanf(arg, "%32[^= ] = %32s", name, rest);
+        
+        debug_outf("%s", "BOB" STRINGY(SYM_MAX) "PIE");
+        
+        n = sscanf(arg, "%" STRINGY(SYM_MAX) "[^= ] = %" STRINGY(SYM_MAX) "s", name, rest);
         const char *e;
         uint32_t addr;
         if (n == 2) 
@@ -470,7 +469,7 @@ static void set_sym(cpu_debug_t *cpu, const char *arg) {
 
         if (n == 2 && e != rest && strlen(name)) {
             char abuf[17];
-            cpu->print_addr(addr, abuf, 16);
+            cpu->print_addr(addr, abuf, 16, false);
 
             symbol_add(cpu->symbols, name, addr);
 
@@ -478,11 +477,11 @@ static void set_sym(cpu_debug_t *cpu, const char *arg) {
 
         }
         else {
-            debug_outf("Bad command");
+            debug_outf("Bad command\n");
         }
     }
     else {
-        debug_outf("no symbol table");
+        debug_outf("no symbol table\n");
     }
 
 }
@@ -552,7 +551,7 @@ static void list_points(cpu_debug_t *cpu, int *table, const char *desc)
    
     for (c = 0; c < NUM_BREAKPOINTS; c++)
         if (table[c] != -1) {
-            cpu->print_addr(table[c], addr, 16);
+            cpu->print_addr(table[c], addr, 16, false);
             if (symbol_find_by_addr(cpu->symbols, table[c], &sym))
                 debug_outf("    %s %i : %-8s (%s)\n", desc, c, addr, sym);
             else
@@ -616,6 +615,14 @@ static void debugger_save(char *iptr)
         debug_outf("unable to open '%s' for writing: %s\n", strerror(errno));
 }
 
+void trimnl(char *buf) {
+    int len = strlen(buf);
+
+    while (len >= 1 && (buf[len - 1] == '\r' || buf[len - 1] == '\n'))
+        buf[--len] = '\0';
+
+}
+
 void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 {
     int c, d, e, f;
@@ -645,6 +652,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
             debug_in(ins, 255);
         }
 
+        trimnl(ins);
         // Skip past any leading spaces.
         for (iptr = ins; (c = *iptr) && isspace(c); iptr++);
         if (c) {
@@ -709,9 +717,14 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 
             case 'd':
             case 'D':
+            {
+                const char *e;
                 if (*iptr)
-                    sscanf(iptr, "%X", (unsigned int *)&debug_disaddr);
+                    debug_disaddr = parse_address_with_romno(cpu, iptr, &e);
                 for (c = 0; c < 12; c++) {
+                    const char *sym;
+                    if (symbol_find_by_addr(cpu->symbols, debug_disaddr, &sym))
+                        debug_outf("%s:\n", sym);
                     debug_out("    ", 4);
                     debug_disaddr = cpu->disassemble(debug_disaddr, ins, sizeof ins);
                     debug_out(ins, strlen(ins));
@@ -719,7 +732,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 }
                 debug_lastcommand = 'd';
                 break;
-
+            }
             case 'e':
             case 'E':
                 if (!strcasecmp(cmd, "exec")) {
@@ -932,18 +945,18 @@ static inline void check_points(cpu_debug_t *cpu, uint32_t addr, uint32_t value,
 {
     for (int c = 0; c < NUM_BREAKPOINTS; c++) {
         if (break_tab[c] == addr) {
-            char addr_str[10], iaddr_str[10];
+            char addr_str[20 + SYM_MAX], iaddr_str[20 + SYM_MAX];
             uint32_t iaddr = cpu->get_instr_addr();
-            cpu->print_addr(addr, addr_str, sizeof(addr_str));
-            cpu->print_addr(iaddr, iaddr_str, sizeof(iaddr_str));
+            cpu->print_addr(addr, addr_str, sizeof(addr_str), true);
+            cpu->print_addr(iaddr, iaddr_str, sizeof(iaddr_str), true);
             debug_outf("cpu %s: %s: break on %s %s, value=%X\n", cpu->cpu_name, iaddr_str, desc, addr_str, value);
             debugger_do(cpu, iaddr);
         }
         if (watch_tab[c] == addr) {
             char addr_str[10], iaddr_str[10];
             uint32_t iaddr = cpu->get_instr_addr();
-            cpu->print_addr(addr, addr_str, sizeof(addr_str));
-            cpu->print_addr(iaddr, iaddr_str, sizeof(iaddr_str));
+            cpu->print_addr(addr, addr_str, sizeof(addr_str), true);
+            cpu->print_addr(iaddr, iaddr_str, sizeof(iaddr_str), true);
             debug_outf("cpu %s: %s: %s %s, value=%0*X\n", cpu->cpu_name, iaddr_str, desc, addr_str, size*2, value);
         }
     }
@@ -991,7 +1004,7 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
         for (c = 0; c < NUM_BREAKPOINTS; c++) {
             if (breakpoints[c] == addr) {
                 char addr_str[10];
-                cpu->print_addr(addr, addr_str, sizeof(addr_str));
+                cpu->print_addr(addr, addr_str, sizeof(addr_str), true);
                 debug_outf("cpu %s: Break at %s\n", cpu->cpu_name, addr_str);
                 if (contcount) {
                     contcount--;
@@ -1018,8 +1031,8 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
 void debug_trap(cpu_debug_t *cpu, uint32_t addr, int reason)
 {
     const char *desc = cpu->trap_names[reason];
-    char addr_str[10];
-    cpu->print_addr(addr, addr_str, sizeof(addr_str));
-    debug_outf("cpu %s: %s at %04X\n", cpu->cpu_name, desc, addr_str);
+    char addr_str[20 + SYM_MAX];
+    cpu->print_addr(addr, addr_str, sizeof(addr_str), true);
+    debug_outf("cpu %s: %s at %s\n", cpu->cpu_name, desc, addr_str);
     debugger_do(cpu, addr);
 }

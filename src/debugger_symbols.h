@@ -5,6 +5,11 @@
 
 #include <stdint.h>
 
+#define SYM_MAX 32
+#define STRINGY(x) STRINGY2(x)
+#define STRINGY2(x) #x
+
+
 typedef struct cpu_debug_t cpu_debug_t;
 
 // a bit of doding about to allow C to access CPP

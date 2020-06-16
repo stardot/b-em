@@ -37,7 +37,7 @@ void symbol_table::symbol_list(cpu_debug_t *cpu, void *debug_outf(const char *fm
         debug_outf("No symbols loaded");
     for (std::pair<std::string, uint32_t> element : map) {
         char addrstr[17];
-        cpu->print_addr(element.second, addrstr, 16);
+        cpu->print_addr(element.second, addrstr, 16, false);
         debug_outf("%s=%s\n", element.first.c_str(), addrstr);
     }
 }
@@ -53,7 +53,7 @@ void symbol_add(symbol_table *symtab, const char *name, uint32_t addr) {
 }
 bool symbol_find_by_addr(symbol_table *symtab, uint32_t addr, const char **ret) {
     std::string r;
-    if (symtab->find_by_addr(addr, r)) {
+    if (symtab && symtab->find_by_addr(addr, r)) {
         char *ret2 = (char *)malloc(r.length() + 1);
         memcpy(ret2, r.c_str(), r.length() + 1);
         *ret = ret2;

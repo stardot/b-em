@@ -22,7 +22,7 @@ typedef struct cpu_debug_t {
   void     (*reg_parse)(int which, const char *strval);               // Parse a value into a register.
   uint32_t (*get_instr_addr)();                                       // Returns the base address of the currently executing instruction
   const char **trap_names;                                            // Null terminated list of other reasons a CPU may trap to the debugger.
-  size_t   (*print_addr)(uint32_t addr, char *buf, size_t bufsize);   // Print an address.
+  size_t   (*print_addr)(uint32_t addr, char *buf, size_t bufsize, bool include_symbol);   // Print an address.
   symbol_table *symbols;                                              // symbol table for storing symbolic addresses
 } cpu_debug_t;
 

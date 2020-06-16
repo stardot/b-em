@@ -197,6 +197,9 @@ uint32_t dbg6502_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
     size_t len;
     addr_mode_t addr_mode;
 
+    char addr_buf[SYM_MAX + 10];
+    char op_buf[10];
+
     op = cpu->memread(addr);
     switch (model)
     {
@@ -217,17 +220,17 @@ uint32_t dbg6502_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
         exit(-1);
     }
     op_name = op_names[ni];
-    len = cpu->print_addr(addr, buf, bufsize);
-    buf[len-1] = ':';
-    buf[len++] = ' ';
-    buf += len;
-    bufsize -= len;
-    len = debug_print_8bit(op, buf, bufsize);
-    buf[len-1] = ' ';
-    if (len < bufsize) {
+    cpu->print_addr(addr, addr_buf, sizeof(addr_buf), false);
+    debug_print_8bit(op, op_buf, sizeof(op_buf));
+
+    len = snprintf(buf, bufsize, "%s: %s", addr_buf, op_buf);
+
     buf += len;
     bufsize -= len;
     addr++;
+
+    bool        lookforsym = false;
+    uint32_t    symaddr = 0;
 
     switch (addr_mode)
     {
@@ -262,34 +265,50 @@ uint32_t dbg6502_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
         case ZP:
             p1 = cpu->memread(addr++);
             snprintf(buf, bufsize, "%02X       %s %02X      ", p1, op_name, p1);
+            lookforsym = true;
+            symaddr = p1;
             break;
         case ZPX:
             p1 = cpu->memread(addr++);
             snprintf(buf, bufsize, "%02X       %s %02X,X    ", p1, op_name, p1);
+            lookforsym = true;
+            symaddr = p1;
             break;
         case ZPY:
             p1 = cpu->memread(addr++);
             snprintf(buf, bufsize, "%02X       %s %02X,Y    ", p1, op_name, p1);
+            lookforsym = true;
+            symaddr = p1;
             break;
         case IND:
             p1 = cpu->memread(addr++);
             snprintf(buf, bufsize, "%02X       %s (%02X)    ", p1, op_name, p1);
+            lookforsym = true;
+            symaddr = p1;
             break;
         case INDL:
             p1 = cpu->memread(addr++);
             snprintf(buf, bufsize, "%02X       %s [%02X]    ", p1, op_name, p1);
+            lookforsym = true;
+            symaddr = p1;
             break;
         case INDX:
             p1 = cpu->memread(addr++);
             snprintf(buf, bufsize, "%02X       %s (%02X,X)  ", p1, op_name, p1);
+            lookforsym = true;
+            symaddr = p1;
             break;
         case INDY:
             p1 = cpu->memread(addr++);
             snprintf(buf, bufsize, "%02X       %s (%02X),Y  ", p1, op_name, p1);
+            lookforsym = true;
+            symaddr = p1;
             break;
         case INDYL:
             p1 = cpu->memread(addr++);
             snprintf(buf, bufsize, "%02X       %s [%02X],Y  ", p1, op_name, p1);
+            lookforsym = true;
+            symaddr = p1;
             break;
         case SR:
             p1 = cpu->memread(addr++);
@@ -303,57 +322,84 @@ uint32_t dbg6502_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
             p1 = cpu->memread(addr++);
             p2 = cpu->memread(addr++);
             snprintf(buf, bufsize, "%02X %02X    %s %02X%02X    ", p1, p2, op_name, p2, p1);
+            lookforsym = true;
+            symaddr = p1 + p2 << 8;
             break;
         case ABSL:
             p1 = cpu->memread(addr++);
             p2 = cpu->memread(addr++);
             p3 = cpu->memread(addr++);
             snprintf(buf, bufsize, "%02X %02X %02X %s %02X%02X%02X  ", p1, p2, p3, op_name, p2, p1, p3);
+            lookforsym = true;
+            symaddr = p1 + p2 << 8 + p3 << 16;
             break;
         case ABSX:
             p1 = cpu->memread(addr++);
             p2 = cpu->memread(addr++);
             snprintf(buf, bufsize, "%02X %02X    %s %02X%02X,X  ", p1, p2, op_name, p2, p1);
+            lookforsym = true;
+            symaddr = p1 + p2 << 8;
             break;
         case ABSY:
             p1 = cpu->memread(addr++);
             p2 = cpu->memread(addr++);
             snprintf(buf, bufsize, "%02X %02X    %s %02X%02X,Y  ", p1, p2, op_name, p2, p1);
+            lookforsym = true;
+            symaddr = p1 + p2 << 8;
             break;
         case ABSXL:
             p1 = cpu->memread(addr++);
             p2 = cpu->memread(addr++);
             p3 = cpu->memread(addr++);
             snprintf(buf, bufsize, "%02X %02X %02X  %s %02X%02X%02X,X  ", p1, p2, p3, op_name, p2, p1, p3);
+            lookforsym = true;
+            symaddr = p1 + p2 << 8 + p3 << 16;
             break;
         case BM:
             p1 = cpu->memread(addr++);
             p2 = cpu->memread(addr++);
             snprintf(buf, bufsize, "%02X %02X    %s %02X,%02X   ", p1, p2, op_name, p1, p2);
+            lookforsym = true;
+            symaddr = p1 + p2 << 8;
             break;
         case IND16:
             p1 = cpu->memread(addr++);
             p2 = cpu->memread(addr++);
             snprintf(buf, bufsize, "%02X %02X    %s (%02X%02X)  ", p1, p2, op_name, p2, p1);
+            lookforsym = true;
+            symaddr = p1 + p2 << 8;
             break;
         case IND1X:
             p1 = cpu->memread(addr++);
             p2 = cpu->memread(addr++);
             snprintf(buf, bufsize, "%02X %02X    %s (%02X%02X,X)", p1, p2, op_name, p2, p1);
+            lookforsym = true;
+            symaddr = p1 + p2 << 8;
             break;
         case PCR:
             p1 = cpu->memread(addr++);
             temp = addr + (signed char)p1;
             snprintf(buf, bufsize, "%02X       %s %04X    ", p1, op_name, temp);
+            lookforsym = true;
+            symaddr = temp;
             break;
         case PCRL:
             p1 = cpu->memread(addr++);
             p2 = cpu->memread(addr++);
             temp = addr + ((signed char)p1 + (256*(signed char)p2));
             snprintf(buf, bufsize, "%02X %02X     %s %04X    ", p1, p2, op_name, temp);
-            break;
+            lookforsym = true;
+            symaddr = temp;
+            break;    
     }
+
+    const char *sym;
+    if (lookforsym && symbol_find_by_addr(cpu->symbols, symaddr, &sym))
+    {
+        int ll = strlen(buf);
+        snprintf(buf + ll, bufsize - ll, "(%s)", sym);
     }
+
     return addr;
 }
 
