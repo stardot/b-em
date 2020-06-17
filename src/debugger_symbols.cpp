@@ -5,7 +5,9 @@
 #include "cpu_debug.h"
 
 void symbol_table::add(std::string name, uint32_t addr) {
-    map.insert_or_assign(name, addr);
+    // my mingw doesn't support this    map.insert_or_assign(name, addr);
+    map.erase(name);
+    map.insert(std::pair<std::string, uint32_t>(name, addr));
 }
 
 bool symbol_table::find_by_addr(uint32_t addr, std::string &ret) {
