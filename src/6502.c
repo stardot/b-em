@@ -129,27 +129,27 @@ static void dbg_reg_parse(int which, const char *str) {
     dbg_reg_set(which, value);
 }
 
-static size_t dbg_print_addr(uint32_t addr, char *buf, size_t bufsize)
+static size_t dbg_print_addr(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t bufsize, bool include_symbols)
 {
-    if (bufsize >= 8) {
-        uint32_t msw = addr & 0xffff0000;
-        if (msw) {
-            debug_print_8bit(msw >> 16, buf, bufsize);
-            buf[2] = ':';
-        }
-        else {
-            buf[0] = ' ';
-            buf[1] = ' ';
-            buf[2] = ' ';
-        }
-        debug_print_16bit(addr & 0xffff, buf+3, bufsize-3);
+    int ret;
+    uint32_t msw = addr & 0xf0000000;
+    if (msw) {
+        ret = snprintf(buf, bufsize, "%1X:%04X", msw >> 28, addr & 0xFFFF);
     }
-    return 8;
+    else {
+        ret = snprintf(buf, bufsize, "%04X", addr & 0xFFFF);
+    }
+    if (ret > bufsize)
+        return bufsize;
+    else
+        return ret;
 }
 
 static uint32_t do_readmem(uint32_t addr);
 static void     do_writemem(uint32_t addr, uint32_t val);
-static uint32_t dbg_disassemble(uint32_t addr, char *buf, size_t bufsize);
+static uint32_t dbg_do_readmem(uint32_t addr);
+static void     dbg_do_writemem(uint32_t addr, uint32_t val);
+static uint32_t dbg_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t bufsize);
 
 static uint16_t pc3, oldpc, oldoldpc;
 static uint8_t opcode;
@@ -163,8 +163,8 @@ static const char *trap_names[] = { "BRK", NULL };
 cpu_debug_t core6502_cpu_debug = {
     .cpu_name       = "core6502",
     .debug_enable   = dbg_debug_enable,
-    .memread        = do_readmem,
-    .memwrite       = do_writemem,
+    .memread        = dbg_do_readmem,
+    .memwrite       = dbg_do_writemem,
     .disassemble    = dbg_disassemble,
     .reg_names      = dbg6502_reg_names,
     .reg_get        = dbg_reg_get,
@@ -176,8 +176,8 @@ cpu_debug_t core6502_cpu_debug = {
     .print_addr     = dbg_print_addr
 };
 
-static uint32_t dbg_disassemble(uint32_t addr, char *buf, size_t bufsize) {
-  return dbg6502_disassemble(&core6502_cpu_debug, addr, buf, bufsize, x65c02 ? M65C02 : M6502);
+static uint32_t dbg_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t bufsize) {
+  return dbg6502_disassemble(cpu, addr, buf, bufsize, x65c02 ? M65C02 : M6502);
 }
 
 int tubecycle;
@@ -290,8 +290,8 @@ static void os_paste_cnpv(void)
 
 static inline uint32_t debug_addr(uint32_t addr)
 {
-    if ((addr & 0xc000) == 0x8000)
-        addr |= ram_fe30 << 16;
+    if (addr >= 0x8000 && addr < 0xC000)
+        addr |= ram_fe30 << 28;
     return addr;
 }
 
@@ -316,6 +316,16 @@ static inline void fetch_opcode(void)
 static inline uint16_t read_zp_indirect(uint16_t zp)
 {
     return readmem(zp & 0xff) + (readmem((zp + 1) & 0xff) << 8);
+}
+
+static uint32_t dbg_do_readmem(uint32_t addr) {
+    uint32_t romno = addr & 0xF0000000;
+    addr = addr & 0xFFFF;
+    if (romno && addr >= 0x8000 && addr < 0xC000) {
+            return rom[(romno >> 14) + addr - 0x8000];
+    }
+    else
+        return do_readmem(addr);
 }
 
 static uint32_t do_readmem(uint32_t addr)
@@ -474,6 +484,17 @@ uint8_t readmem(uint16_t addr)
     if (dbg_core6502)
         debug_memread(&core6502_cpu_debug, addr, debug_addr(value), 1);
     return value;
+}
+
+static void dbg_do_writemem(uint32_t addr, uint32_t val) {
+    uint32_t romno = addr & 0xF0000000;
+    addr = addr & 0xFFFF;
+    if (romno && addr >= 0x8000 && addr < 0xC000) {
+        if (rom_slots[romno >> 28].swram)
+            rom[(romno >> 14) + addr - 0x8000] = (uint8_t)val;
+    }
+    else
+        return do_writemem(addr, val);
 }
 
 static void do_writemem(uint32_t addr, uint32_t val)

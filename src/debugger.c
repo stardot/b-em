@@ -403,6 +403,39 @@ size_t debug_print_32bit(uint32_t value, char *buf, size_t bufsize)
     return 9;
 }
 
+size_t debug_print_addr16(cpu_debug_t *cpu, uint32_t value, char *buf, size_t bufsize, bool include_symbol) {
+    const char *sym = NULL;
+    size_t ret;
+    if (!symbol_find_by_addr(cpu->symbols, value, &sym))
+        sym = NULL;
+    if (sym)
+        ret = snprintf(buf, bufsize, "%04X (%s)", value, sym);
+    else
+        ret = snprintf(buf, bufsize, "%04X", value);
+
+    if (ret > bufsize)
+        return bufsize;
+    else
+        return ret;
+}
+
+size_t debug_print_addr32(cpu_debug_t *cpu, uint32_t value, char *buf, size_t bufsize, bool include_symbol) {
+    const char *sym = NULL;
+    size_t ret;
+    if (!symbol_find_by_addr(cpu->symbols, value, &sym))
+        sym = NULL;
+    if (sym)
+        ret = snprintf(buf, bufsize, "%08X (%s)", value, sym);
+    else
+        ret = snprintf(buf, bufsize, "%08X", value);
+
+    if (ret > bufsize)
+        return bufsize;
+    else
+        return ret;
+}
+
+
 static void print_registers(cpu_debug_t *cpu) {
     const char **np, *name;
     char buf[50];
@@ -435,7 +468,7 @@ static uint32_t parse_address_with_romno(cpu_debug_t *cpu, char *arg, char **end
         char *end2;
         uint32_t b = strtoul(end1, &end2, 16);
         if (end2 > end1) {
-            a = (a << 16) | b;
+            a = (a << 28) | b;
             *endret = end2;
             return a;
         }
@@ -457,9 +490,7 @@ static void set_sym(cpu_debug_t *cpu, const char *arg) {
 
         int n;
         char name[SYM_MAX + 1], rest[SYM_MAX + 1];
-        
-        debug_outf("%s", "BOB" STRINGY(SYM_MAX) "PIE");
-        
+                
         n = sscanf(arg, "%" STRINGY(SYM_MAX) "[^= ] = %" STRINGY(SYM_MAX) "s", name, rest);
         const char *e;
         uint32_t addr;
@@ -469,7 +500,7 @@ static void set_sym(cpu_debug_t *cpu, const char *arg) {
 
         if (n == 2 && e != rest && strlen(name)) {
             char abuf[17];
-            cpu->print_addr(addr, abuf, 16, false);
+            cpu->print_addr(cpu, addr, abuf, 16, false);
 
             symbol_add(cpu->symbols, name, addr);
 
@@ -498,11 +529,15 @@ static void set_point(cpu_debug_t *cpu, int *table, char *arg, const char *desc)
         for (c = 0; c < NUM_BREAKPOINTS; c++) {
             if (table[c] == -1) {
                 char *end1;
-                a = parse_address_with_romno(cpu, arg, &end1);
+                uint32_t a = parse_address_with_romno(cpu, arg, &end1);
 
                 if (end1 > arg) {
                     table[c] = a;
-                    debug_outf("    %s %i set to %04X\n", desc, c, a);
+
+                    char addrbuf[16 + SYM_MAX];
+                    cpu->print_addr(cpu, a, addrbuf, sizeof(addrbuf), true);
+
+                    debug_outf("    %s %i set to %s\n", desc, c, addrbuf);
                 }
                 else
                     debug_outf("invalid address %s\n", arg);
@@ -547,15 +582,12 @@ static void list_points(cpu_debug_t *cpu, int *table, const char *desc)
     int c;
 
     const char **sym;
-    char addr[17];
+    char addr_buf[17 + SYM_MAX];
    
     for (c = 0; c < NUM_BREAKPOINTS; c++)
         if (table[c] != -1) {
-            cpu->print_addr(table[c], addr, 16, false);
-            if (symbol_find_by_addr(cpu->symbols, table[c], &sym))
-                debug_outf("    %s %i : %-8s (%s)\n", desc, c, addr, sym);
-            else
-                debug_outf("    %s %i : %-8s\n", desc, c, addr);
+            cpu->print_addr(cpu, table[c], addr_buf, sizeof(addr_buf), true);
+            debug_outf("    %s %i : %-8s\n", desc, c, addr_buf);
         }
 }
 
@@ -634,7 +666,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
     main_pause();
     indebug = 1;
     log_debug("debugger: about to call disassembler, addr=%04X", addr);
-    next_addr = cpu->disassemble(addr, ins, sizeof ins);
+    next_addr = cpu->disassemble(cpu, addr, ins, sizeof ins);
     debug_out(ins, strlen(ins));
     if (vrefresh)
         video_poll(CLOCKS_PER_FRAME, 0);
@@ -726,7 +758,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                     if (symbol_find_by_addr(cpu->symbols, debug_disaddr, &sym))
                         debug_outf("%s:\n", sym);
                     debug_out("    ", 4);
-                    debug_disaddr = cpu->disassemble(debug_disaddr, ins, sizeof ins);
+                    debug_disaddr = cpu->disassemble(cpu, debug_disaddr, ins, sizeof ins);
                     debug_out(ins, strlen(ins));
                     debug_out("\n", 1);
                 }
@@ -947,16 +979,16 @@ static inline void check_points(cpu_debug_t *cpu, uint32_t addr, uint32_t value,
         if (break_tab[c] == addr) {
             char addr_str[20 + SYM_MAX], iaddr_str[20 + SYM_MAX];
             uint32_t iaddr = cpu->get_instr_addr();
-            cpu->print_addr(addr, addr_str, sizeof(addr_str), true);
-            cpu->print_addr(iaddr, iaddr_str, sizeof(iaddr_str), true);
+            cpu->print_addr(cpu, addr, addr_str, sizeof(addr_str), true);
+            cpu->print_addr(cpu, iaddr, iaddr_str, sizeof(iaddr_str), true);
             debug_outf("cpu %s: %s: break on %s %s, value=%X\n", cpu->cpu_name, iaddr_str, desc, addr_str, value);
             debugger_do(cpu, iaddr);
         }
         if (watch_tab[c] == addr) {
             char addr_str[10], iaddr_str[10];
             uint32_t iaddr = cpu->get_instr_addr();
-            cpu->print_addr(addr, addr_str, sizeof(addr_str), true);
-            cpu->print_addr(iaddr, iaddr_str, sizeof(iaddr_str), true);
+            cpu->print_addr(cpu, addr, addr_str, sizeof(addr_str), true);
+            cpu->print_addr(cpu, iaddr, iaddr_str, sizeof(iaddr_str), true);
             debug_outf("cpu %s: %s: %s %s, value=%0*X\n", cpu->cpu_name, iaddr_str, desc, addr_str, size*2, value);
         }
     }
@@ -984,8 +1016,11 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
     int c, r, enter = 0;
     const char **np, *name;
 
+    if ((addr & 0xF000) == 0x8000)
+        addr = addr;
+
     if (trace_fp) {
-        cpu->disassemble(addr, buf, sizeof buf);
+        cpu->disassemble(cpu, addr, buf, sizeof buf);
         fputs(buf, trace_fp);
         *buf = ' ';
 
@@ -1004,7 +1039,7 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
         for (c = 0; c < NUM_BREAKPOINTS; c++) {
             if (breakpoints[c] == addr) {
                 char addr_str[10];
-                cpu->print_addr(addr, addr_str, sizeof(addr_str), true);
+                cpu->print_addr(cpu, addr, addr_str, sizeof(addr_str), true);
                 debug_outf("cpu %s: Break at %s\n", cpu->cpu_name, addr_str);
                 if (contcount) {
                     contcount--;
@@ -1032,7 +1067,7 @@ void debug_trap(cpu_debug_t *cpu, uint32_t addr, int reason)
 {
     const char *desc = cpu->trap_names[reason];
     char addr_str[20 + SYM_MAX];
-    cpu->print_addr(addr, addr_str, sizeof(addr_str), true);
+    cpu->print_addr(cpu, addr, addr_str, sizeof(addr_str), true);
     debug_outf("cpu %s: %s at %s\n", cpu->cpu_name, desc, addr_str);
     debugger_do(cpu, addr);
 }

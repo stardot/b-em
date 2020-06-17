@@ -638,7 +638,7 @@ cpu_debug_t tubearm_cpu_debug = {
    .reg_parse      = arm_dbg_reg_parse,
    .get_instr_addr = arm_dbg_get_instr_addr,
    .trap_names     = arm_trap_names,
-   .print_addr     = debug_print_32bit
+   .print_addr     = debug_print_addr32
 };
 
 bool arm_init(void *rom)

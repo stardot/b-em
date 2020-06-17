@@ -66,8 +66,8 @@ static void dbg_memwrite(uint32_t addr, uint32_t value) {
    write8(addr, value);
 };
 
-static uint32_t dbg_disassemble(uint32_t addr, char *buf, size_t bufsize) {
-   return mc6809_disassemble(addr, buf, bufsize);
+static uint32_t dbg_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t bufsize) {
+   return mc6809_disassemble(cpu, addr, buf, bufsize);
 };
 
 // Get a register - which is the index into the names above
@@ -197,5 +197,5 @@ cpu_debug_t mc6809nc_cpu_debug = {
    .reg_parse      = dbg_reg_parse,
    .get_instr_addr = dbg_get_instr_addr,
    .trap_names     = dbg_trap_names,
-   .print_addr     = debug_print_16bit
+   .print_addr     = debug_print_addr16
 };
