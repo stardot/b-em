@@ -18,6 +18,7 @@
 #include <stdarg.h>
 #include "../6809tube.h"
 #include "mc6809.h"
+#include "mc6809_dis.h"
 
 typedef unsigned char tt_u8;
 typedef signed char tt_s8;
@@ -934,7 +935,7 @@ static unsigned int disassemble(unsigned int addr)
    return addr + s;
 }
 
-uint32_t mc6809_disassemble(uint32_t addr, char *buf, size_t bufsize)
+uint32_t mc6809_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t bufsize)
 {
    stringInit(buf, bufsize);
    return disassemble(addr);

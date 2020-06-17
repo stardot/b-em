@@ -182,7 +182,7 @@ static uint32_t dbg_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size
 
 static uint16_t oldtpc, oldtpc2;
 
-static uint32_t dbg_get_instr_addr() {
+static uint32_t dbg_get_instr_addr(void) {
     return oldtpc;
 }
 

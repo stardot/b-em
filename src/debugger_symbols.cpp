@@ -32,7 +32,7 @@ bool symbol_table::find_by_name(std::string name, uint32_t &ret) {
 
 }
 
-void symbol_table::symbol_list(cpu_debug_t *cpu, void *debug_outf(const char *fmt, ...)) {
+void symbol_table::symbol_list(cpu_debug_t *cpu, debug_outf_t debug_outf) {
     if (length() == 0)
         debug_outf("No symbols loaded");
     for (std::pair<std::string, uint32_t> element : map) {
@@ -85,7 +85,7 @@ bool symbol_find_by_name(symbol_table *symtab, const char *name, uint32_t *addr,
     return symtab->find_by_name(n, *addr);
 }
 
-void symbol_list(symbol_table *symtab, cpu_debug_t *cpu, void *debug_outf(const char *fmt, ...))
+void symbol_list(symbol_table *symtab, cpu_debug_t *cpu, debug_outf_t debug_outf)
 {
     if (!symtab)
         debug_outf("No symbols loaded");

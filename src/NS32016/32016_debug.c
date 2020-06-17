@@ -210,7 +210,7 @@ static void dbg_reg_parse(int which, const char *strval) {
    dbg_reg_set(which, val);
 };
 
-static uint32_t dbg_get_instr_addr() {
+static uint32_t dbg_get_instr_addr(void) {
    return n32016_get_startpc();
 }
 

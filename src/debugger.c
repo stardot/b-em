@@ -406,7 +406,7 @@ size_t debug_print_32bit(uint32_t value, char *buf, size_t bufsize)
 size_t debug_print_addr16(cpu_debug_t *cpu, uint32_t value, char *buf, size_t bufsize, bool include_symbol) {
     const char *sym = NULL;
     size_t ret;
-    if (!symbol_find_by_addr(cpu->symbols, value, &sym))
+    if (!include_symbol || !symbol_find_by_addr(cpu->symbols, value, &sym))
         sym = NULL;
     if (sym)
         ret = snprintf(buf, bufsize, "%04X (%s)", value, sym);
@@ -422,7 +422,7 @@ size_t debug_print_addr16(cpu_debug_t *cpu, uint32_t value, char *buf, size_t bu
 size_t debug_print_addr32(cpu_debug_t *cpu, uint32_t value, char *buf, size_t bufsize, bool include_symbol) {
     const char *sym = NULL;
     size_t ret;
-    if (!symbol_find_by_addr(cpu->symbols, value, &sym))
+    if (!include_symbol || !symbol_find_by_addr(cpu->symbols, value, &sym))
         sym = NULL;
     if (sym)
         ret = snprintf(buf, bufsize, "%08X (%s)", value, sym);
@@ -451,7 +451,7 @@ static void print_registers(cpu_debug_t *cpu) {
 }
 
 
-static uint32_t parse_address_with_romno(cpu_debug_t *cpu, char *arg, char **endret) {
+static uint32_t parse_address_with_romno(cpu_debug_t *cpu, char *arg, const char **endret) {
     
     uint32_t a;
     //first see if there is a symbol
@@ -492,7 +492,7 @@ static void set_sym(cpu_debug_t *cpu, const char *arg) {
         char name[SYM_MAX + 1], rest[SYM_MAX + 1];
                 
         n = sscanf(arg, "%" STRINGY(SYM_MAX) "[^= ] = %" STRINGY(SYM_MAX) "s", name, rest);
-        const char *e;
+        char *e;
         uint32_t addr;
         if (n == 2) 
             addr = parse_address_with_romno(cpu, rest, &e);
@@ -518,7 +518,7 @@ static void set_sym(cpu_debug_t *cpu, const char *arg) {
 }
 
 static void list_syms(cpu_debug_t *cpu, const char *arg) {
-    symbol_list(cpu->symbols, cpu, debug_outf);
+    symbol_list(cpu->symbols, cpu, &debug_outf);
 }
 
 static void set_point(cpu_debug_t *cpu, int *table, char *arg, const char *desc)
@@ -581,7 +581,6 @@ static void list_points(cpu_debug_t *cpu, int *table, const char *desc)
 {
     int c;
 
-    const char **sym;
     char addr_buf[17 + SYM_MAX];
    
     for (c = 0; c < NUM_BREAKPOINTS; c++)

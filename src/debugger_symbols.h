@@ -10,6 +10,16 @@
 #define STRINGY2(x) #x
 
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef void(*debug_outf_t)(const char *fmt, ...);
+
+#ifdef __cplusplus
+}
+#endif
+
 typedef struct cpu_debug_t cpu_debug_t;
 
 // a bit of doding about to allow C to access CPP
@@ -26,7 +36,7 @@ typedef struct cpu_debug_t cpu_debug_t;
         bool find_by_name(std::string name, uint32_t &ret);
         int length() { return map.size(); }
 
-        void symbol_list(cpu_debug_t *cpu, void *debug_outf(const char *fmt, ...));
+        void symbol_list(cpu_debug_t *cpu, debug_outf_t debug_outf);
     };
 #else
     typedef struct symbol_table symbol_table;
@@ -38,12 +48,13 @@ typedef struct cpu_debug_t cpu_debug_t;
 #include <stdbool.h>
 #endif
 
-        symbol_table* symbol_new();
+
+        symbol_table* symbol_new(void);
         void symbol_free(symbol_table *symtab);
         void symbol_add(symbol_table *symtab, const char *name, uint32_t addr);
         bool symbol_find_by_addr(symbol_table *symtab, uint32_t addr, const char **ret);
         bool symbol_find_by_name(symbol_table *symtab, const char *name, uint32_t *addr, const char **endret);
-        void symbol_list(symbol_table *symtab, struct cpu_debug_t *cpu, void *debug_outf(const char *fmt, ...));
+        void symbol_list(symbol_table *symtab, struct cpu_debug_t *cpu, debug_outf_t debug_outf);
 
 #ifdef __cplusplus
     }

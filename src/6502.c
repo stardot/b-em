@@ -89,22 +89,22 @@ static void dbg_reg_set(int which, uint32_t value) {
     switch (which)
     {
     case REG_A:
-        a = value;
+        a = (uint8_t)value;
         break;
     case REG_X:
-        x = value;
+        x = (uint8_t)value;
         break;
     case REG_Y:
-        y = value;
+        y = (uint8_t)value;
         break;
     case REG_S:
-        s = value;
+        s = (uint8_t)value;
         break;
     case REG_P:
-        unpack_flags(value);
+        unpack_flags((uint8_t)value);
         break;
     case REG_PC:
-        pc = value;
+        pc = (uint16_t)value;
     default:
         log_warn("6502: attempt to get non-existent register");
     }
@@ -131,13 +131,26 @@ static void dbg_reg_parse(int which, const char *str) {
 
 static size_t dbg_print_addr(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t bufsize, bool include_symbols)
 {
-    int ret;
+    size_t ret;
     uint32_t msw = addr & 0xf0000000;
-    if (msw) {
-        ret = snprintf(buf, bufsize, "%1X:%04X", msw >> 28, addr & 0xFFFF);
+
+    const char *sym = NULL;
+
+    if (include_symbols && symbol_find_by_addr(cpu->symbols, addr, &sym)) {
+        if (msw) {
+            ret = snprintf(buf, bufsize, "%1X:%04X (%s)", msw >> 28, addr & 0xFFFF, sym);
+        }
+        else {
+            ret = snprintf(buf, bufsize, "%04X (%s)", addr & 0xFFFF, sym);
+        }
     }
     else {
-        ret = snprintf(buf, bufsize, "%04X", addr & 0xFFFF);
+        if (msw) {
+            ret = snprintf(buf, bufsize, "%1X:%04X", msw >> 28, addr & 0xFFFF);
+        }
+        else {
+            ret = snprintf(buf, bufsize, "%04X", addr & 0xFFFF);
+        }
     }
     if (ret > bufsize)
         return bufsize;
@@ -154,7 +167,7 @@ static uint32_t dbg_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size
 static uint16_t pc3, oldpc, oldoldpc;
 static uint8_t opcode;
 
-static uint32_t dbg_get_instr_addr() {
+static uint32_t dbg_get_instr_addr(void) {
     return oldpc;
 }
 
@@ -188,7 +201,7 @@ static int timetolive = 0;
 static int cycles;
 static int otherstuffcount = 0;
 static int romsel;
-static int ram4k, ram8k, ram12k, ram20k;
+static uint8_t ram4k, ram8k, ram12k, ram20k;
 
 static inline void polltime(int c)
 {
@@ -243,9 +256,9 @@ static void os_paste_remv(void)
 
     if (os_paste_ch >= 0) {
         if (p.v)
-            a = os_paste_ch;
+            a = (uint8_t)os_paste_ch;
         else {
-            a = y = os_paste_ch;
+            a = y = (uint8_t)os_paste_ch;
             os_paste_ch = -1;
         }
     }
@@ -270,7 +283,7 @@ static void os_paste_remv(void)
         if (p.v)
             a = os_paste_ch = ch;
         else
-            a = y = ch;
+            a = y = (uint8_t)ch;
     }
     p.c = 0;
     opcode = 0x60; // RTS
@@ -364,7 +377,7 @@ static uint32_t do_readmem(uint32_t addr)
         case 0xFC38:
         case 0xFC3C:
                 if (sound_beebsid)
-                        return sid_read(addr);
+                        return sid_read((uint16_t)addr);
                 break;
 
         case 0xFC40:
@@ -375,36 +388,36 @@ static uint32_t do_readmem(uint32_t addr)
         case 0xFC54:
         case 0xFC58:
                 if (scsi_enabled)
-                        return scsi_read(addr);
+                        return scsi_read((uint16_t)addr);
                 if (ide_enable)
-                        return ide_read(addr);
+                        return ide_read((uint16_t)addr);
                 break;
 
         case 0xFC5C:
-                return vdfs_read(addr);
+                return vdfs_read((uint16_t)addr);
                 break;
 
         case 0xFE00:
         case 0xFE04:
-                return crtc_read(addr);
+                return crtc_read((uint16_t)addr);
 
         case 0xFE08:
         case 0xFE0C:
-                return acia_read(&sysacia, addr);
+                return acia_read(&sysacia, (uint16_t)addr);
 
         case 0xFE10:
         case 0xFE14:
-                return serial_read(addr);
+                return serial_read((uint16_t)addr);
 
         case 0xFE18:
                 if (MASTER)
-                        return adc_read(addr);
+                        return adc_read((uint16_t)addr);
                 break;
 
         case 0xFE24:
         case 0xFE28:
                 if (MASTER)
-                        return wd1770_read(addr);
+                        return wd1770_read((uint16_t)addr);
                 break;
 
         case 0xFE34:
@@ -420,7 +433,7 @@ static uint32_t do_readmem(uint32_t addr)
         case 0xFE54:
         case 0xFE58:
         case 0xFE5C:
-                return sysvia_read(addr);
+                return sysvia_read((uint16_t)addr);
 
         case 0xFE60:
         case 0xFE64:
@@ -430,7 +443,7 @@ static uint32_t do_readmem(uint32_t addr)
         case 0xFE74:
         case 0xFE78:
         case 0xFE7C:
-                return uservia_read(addr);
+                return uservia_read((uint16_t)addr);
 
         case 0xFE80:
         case 0xFE84:
@@ -445,9 +458,9 @@ static uint32_t do_readmem(uint32_t addr)
                 case FDC_MASTER:
                     break;
                 case FDC_I8271:
-                    return i8271_read(addr);
+                    return i8271_read((uint16_t)addr);
                 default:
-                    return wd1770_read(addr);
+                    return wd1770_read((uint16_t)addr);
             }
             break;
 
@@ -460,7 +473,7 @@ static uint32_t do_readmem(uint32_t addr)
         case 0xFED8:
         case 0xFEDC:
                 if (!MASTER)
-                        return adc_read(addr);
+                        return adc_read((uint16_t)addr);
                 break;
 
         case 0xFEE0:
@@ -471,7 +484,7 @@ static uint32_t do_readmem(uint32_t addr)
         case 0xFEF4:
         case 0xFEF8:
         case 0xFEFC:
-                return tube_host_read(addr);
+                return tube_host_read((uint16_t)addr);
         }
         if (addr >= 0xFC00 && addr < 0xFE00)
                 return 0xFF;
@@ -482,8 +495,9 @@ uint8_t readmem(uint16_t addr)
 {
     uint32_t value = do_readmem(addr);
     if (dbg_core6502)
-        debug_memread(&core6502_cpu_debug, addr, debug_addr(value), 1);
-    return value;
+        debug_memread(&core6502_cpu_debug, debug_addr(addr), value, 1);
+        //TODO: check why?debug_memread(&core6502_cpu_debug, addr, debug_addr(value), 1);
+    return (uint8_t)value;
 }
 
 static void dbg_do_writemem(uint32_t addr, uint32_t val) {
@@ -494,7 +508,7 @@ static void dbg_do_writemem(uint32_t addr, uint32_t val) {
             rom[(romno >> 14) + addr - 0x8000] = (uint8_t)val;
     }
     else
-        return do_writemem(addr, val);
+        do_writemem(addr, val);
 }
 
 static void do_writemem(uint32_t addr, uint32_t val)
@@ -507,7 +521,7 @@ static void do_writemem(uint32_t addr, uint32_t val)
 
         c = memstat[vis20k][addr >> 8];
         if (c == 1) {
-                memlook[vis20k][addr >> 8][addr] = val;
+                memlook[vis20k][addr >> 8][addr] = (uint8_t)val;
                 switch(addr) {
                     case 0x022c:
                         buf_remv = (buf_remv & 0xff00) | val;
@@ -539,7 +553,7 @@ static void do_writemem(uint32_t addr, uint32_t val)
 
         if (sound_music5000) {
            if (addr >= 0xFCFF && addr <= 0xFDFF) {
-              music5000_write(addr, val);
+              music5000_write((uint16_t)addr, (uint8_t)val);
               return;
            }
         }
@@ -548,7 +562,7 @@ static void do_writemem(uint32_t addr, uint32_t val)
             case 0xFC08:
             case 0xFC0C:
                 if (sound_music5000)
-                    music2000_write(addr, val);
+                    music2000_write(addr, (uint8_t)val);
                 break;
         case 0xFC20:
         case 0xFC24:
@@ -559,7 +573,7 @@ static void do_writemem(uint32_t addr, uint32_t val)
         case 0xFC38:
         case 0xFC3C:
                 if (sound_beebsid)
-                        sid_write(addr, val);
+                        sid_write((uint16_t)addr, (uint8_t)val);
                 break;
 
         case 0xFC40:
@@ -570,53 +584,53 @@ static void do_writemem(uint32_t addr, uint32_t val)
         case 0xFC54:
         case 0xFC58:
                 if (scsi_enabled)
-                        scsi_write(addr, val);
+                        scsi_write((uint16_t)addr, (uint8_t)val);
                 else if (ide_enable)
-                        ide_write(addr, val);
+                        ide_write((uint16_t)addr, (uint8_t)val);
                 break;
 
         case 0xFC5C:
-                vdfs_write(addr, val);
+                vdfs_write((uint16_t)addr, (uint8_t)val);
                 break;
 
         case 0xFE00:
         case 0xFE04:
-                crtc_write(addr, val);
+                crtc_write((uint16_t)addr, (uint8_t)val);
                 break;
 
         case 0xFE08:
         case 0xFE0C:
-                acia_write(&sysacia, addr, val);
+                acia_write(&sysacia, (uint16_t)addr, (uint8_t)val);
                 break;
 
         case 0xFE10:
         case 0xFE14:
-                serial_write(addr, val);
+                serial_write((uint16_t)addr, (uint8_t)val);
                 break;
 
         case 0xFE18:
                 if (MASTER)
-                        adc_write(addr, val);
+                        adc_write((uint16_t)addr, (uint8_t)val);
                 break;
 
         case 0xFE20:
-                videoula_write(addr, val);
+                videoula_write((uint16_t)addr, (uint8_t)val);
                 break;
 
         case 0xFE24:
                 if (MASTER)
-                        wd1770_write(addr, val);
+                        wd1770_write((uint16_t)addr, (uint8_t)val);
                 else
-                        videoula_write(addr, val);
+                        videoula_write((uint16_t)addr, (uint8_t)val);
                 break;
 
         case 0xFE28:
                 if (MASTER)
-                        wd1770_write(addr, val);
+                        wd1770_write((uint16_t)addr, (uint8_t)val);
                 break;
 
         case 0xFE30:
-                ram_fe30 = val;
+                ram_fe30 = (uint8_t)val;
                 for (c = 128; c < 192; c++)
                         memlook[0][c] = memlook[1][c] =
                             &rom[(val & 15) << 14] - 0x8000;
@@ -641,17 +655,17 @@ static void do_writemem(uint32_t addr, uint32_t val)
                 break;
 
         case 0xFE34:
-                ram_fe34 = val;
+                ram_fe34 = (uint8_t)val;
                 if (BPLUS) {
-                        acccon = val;
-                        vidbank = (val & 0x80) << 8;
+                        acccon = (uint8_t)val;
+                        vidbank = (uint16_t)((val & 0x80) << 8);
                         if (val & 0x80)
                                 RAMbank[0xC] = RAMbank[0xD] = 1;
                         else
                                 RAMbank[0xC] = RAMbank[0xD] = 0;
                 }
                 if (MASTER) {
-                        acccon = val;
+                        acccon = (uint8_t)val;
                         ram8k = (val & 8);
                         ram20k = (val & 4);
                         vidbank = (val & 1) ? 0x8000 : 0;
@@ -685,7 +699,7 @@ static void do_writemem(uint32_t addr, uint32_t val)
         case 0xFE54:
         case 0xFE58:
         case 0xFE5C:
-                sysvia_write(addr, val);
+                sysvia_write((uint16_t)addr, (uint8_t)val);
                 break;
 
         case 0xFE60:
@@ -696,7 +710,7 @@ static void do_writemem(uint32_t addr, uint32_t val)
         case 0xFE74:
         case 0xFE78:
         case 0xFE7C:
-                uservia_write(addr, val);
+                uservia_write((uint16_t)addr, (uint8_t)val);
                 break;
 
         case 0xFE80:
@@ -712,10 +726,10 @@ static void do_writemem(uint32_t addr, uint32_t val)
                 case FDC_MASTER:
                     break;
                 case FDC_I8271:
-                    i8271_write(addr, val);
+                    i8271_write((uint16_t)addr, (uint8_t)val);
                     break;
                 default:
-                    wd1770_write(addr, val);
+                    wd1770_write((uint16_t)addr, (uint8_t)val);
             }
             break;
 
@@ -728,7 +742,7 @@ static void do_writemem(uint32_t addr, uint32_t val)
         case 0xFED8:
         case 0xFEDC:
                 if (!MASTER)
-                        adc_write(addr, val);
+                        adc_write((uint16_t)addr, (uint8_t)val);
                 break;
 
         case 0xFEE0:
@@ -739,7 +753,7 @@ static void do_writemem(uint32_t addr, uint32_t val)
         case 0xFEF4:
         case 0xFEF8:
         case 0xFEFC:
-                tube_host_write(addr, val);
+                tube_host_write((uint16_t)addr, (uint8_t)val);
                 break;
         }
 }
@@ -753,7 +767,7 @@ void writemem(uint16_t addr, uint8_t val)
 
 int nmi, oldnmi, interrupt, takeint;
 
-void m6502_reset()
+void m6502_reset(void)
 {
         int c;
         for (c = 0; c < 16; c++)
@@ -788,7 +802,7 @@ void m6502_reset()
         log_debug("PC : %04X\n", pc);
 }
 
-void dumpregs()
+void dumpregs(void)
 {
         log_debug("6502 registers :\n");
         log_debug("A=%02X X=%02X Y=%02X S=01%02X PC=%04X\n", a, x, y, s, pc);
@@ -798,7 +812,7 @@ void dumpregs()
         log_debug("ROMSEL %02X\n", romsel >> 14);
 }
 
-static inline uint16_t getsw()
+static inline uint16_t getsw(void)
 {
         uint16_t temp = readmem(pc);
         pc++;
@@ -1014,7 +1028,7 @@ static void branchcycles(int temp)
         }
 }
 
-void m6502_exec()
+void m6502_exec(void)
 {
         uint16_t addr;
         uint8_t temp;
@@ -1364,7 +1378,7 @@ void m6502_exec()
                         /*JSR*/ addr = getw();
                         pc--;
                         push(pc >> 8);
-                        push(pc);
+                        push((uint8_t)pc);
                         pc = addr;
                         polltime(5);
                         takeint = (interrupt && !p.i);
@@ -2195,7 +2209,7 @@ void m6502_exec()
                                 a >>= 1;
                                 if (tempi)
                                         a |= 0x80;
-                                setzn(tempi);
+                                setzn((uint8_t)tempi);
                                 p.c = 0;
                                 if ((a & 0xF) + (a & 1) > 5)
                                         a = (a & 0xF0) + ((a & 0xF) + 6);       /*Do broken fixup */
@@ -3792,7 +3806,7 @@ void m6502_exec()
         }
 }
 
-void m65c02_exec()
+void m65c02_exec(void)
 {
         uint16_t addr;
         uint8_t temp;
@@ -4042,7 +4056,7 @@ void m65c02_exec()
                         /*JSR*/ addr = getw();
                         pc--;
                         push(pc >> 8);
-                        push(pc);
+                        push((uint8_t)pc);
                         pc = addr;
                         polltime(5);
                         takeint = (interrupt && !p.i);
@@ -5565,10 +5579,12 @@ void m65c02_exec()
                         takeint = (interrupt && !p.i);
                         break;
 
+                        /* TODO: DB: was this intentionally excluded 
                         printf("Found bad opcode %02X\n", opcode);
                         dumpregs();
                         mem_dump();
                         exit(-1);
+                        */
                 }
 /*                if (output | 1)
                 {
@@ -5657,14 +5673,14 @@ void m6502_savestate(FILE * f)
 void m6502_loadstate(FILE * f)
 {
         uint8_t temp;
-        a = getc(f);
-        x = getc(f);
-        y = getc(f);
-        temp = getc(f);
+        a = (uint8_t)getc(f);
+        x = (uint8_t)getc(f);
+        y = (uint8_t)getc(f);
+        temp = (uint8_t)getc(f);
         unpack_flags(temp);
-        s = getc(f);
-        pc = getc(f);
-        pc |= (getc(f) << 8);
+        s = (uint8_t)getc(f);
+        pc = (uint8_t)getc(f);
+        pc |= (((uint8_t)getc(f)) << 8);
         nmi = getc(f);
         interrupt = getc(f);
         cycles = getc(f);
