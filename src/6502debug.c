@@ -220,7 +220,7 @@ uint32_t dbg6502_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
         exit(-1);
     }
     op_name = op_names[ni];
-    cpu->print_addr(addr, addr_buf, sizeof(addr_buf), false);
+    cpu->print_addr(cpu, addr, addr_buf, sizeof(addr_buf), false);
     debug_print_8bit(op, op_buf, sizeof(op_buf));
 
     len = snprintf(buf, bufsize, "%s: %s", addr_buf, op_buf);
