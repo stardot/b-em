@@ -9,7 +9,7 @@
 #include "uef.h"
 #include "tape.h"
 
-int tapelcount, tapellatch, pps;
+int pps;
 gzFile uef_f = NULL;
 
 int uef_toneon = 0;
@@ -50,9 +50,9 @@ void uef_close()
         }
 }
 
-int infilenames = 0;
-int uefloop = 0;
-uint8_t fdat;
+static int infilenames = 0;
+static int uefloop = 0;
+static uint8_t fdat;
 int ffound;
 static void uef_receive(uint8_t val)
 {
@@ -298,11 +298,11 @@ void uef_findfilenames()
         float bchunkf = uef_chunkf;
         uint8_t bdat  = fdat;
         if (!uef_f) return;
-        
+
         uef_inchunk  = 0; uef_chunkid = 0; uef_chunklen = 0;
         uef_chunkpos = 0; uef_chunkdatabits = 8; uef_intone = 0;
         uef_chunkf   = 0;
-        
+
         temp=gztell(uef_f);
         gzseek(uef_f, 12, SEEK_SET);
         uefloop = 0;
@@ -358,12 +358,12 @@ void uef_findfilenames()
 
                                 getuefbyte();
                                 getuefbyte();
-                                
+
                                 getuefbyte();
                                 tb = fdat;
                                 getuefbyte();
                                 skip = tb | (fdat << 8);
-                                
+
                                 fsize += skip;
 
                                 getuefbyte();

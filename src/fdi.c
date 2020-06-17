@@ -170,7 +170,7 @@ static void calccrc(uint8_t byte)
 	crc = (crc << 8) ^ CRCTable[(crc >> 8)^byte];
 }
 
-static void fdi_poll()
+static void fdi_poll(void)
 {
         int tempi, c;
         if (fdi_pos >= fdi_tracklen[fdi_drive][fdi_side][fdi_density])
@@ -339,7 +339,7 @@ static void fdi_poll()
         }
 }
 
-static void fdi_abort()
+static void fdi_abort(int drive)
 {
     fdi_inread = fdi_inwrite = fdi_inreadaddr = 0;
 }

@@ -58,6 +58,7 @@ b_em_SOURCES = \
 	csw.c \
 	ddnoise.c \
 	debugger.c \
+	debugger_symbols.cpp \
 	disc.c fdi.c \
 	fdi2raw.c \
 	gui-allegro.c\

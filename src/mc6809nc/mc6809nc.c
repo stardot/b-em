@@ -2963,7 +2963,7 @@ void mc6809nc_reset (void)
 
 void print_regs (void)
 {
-   char flags[9] = "        \0";
+   char flags[9] = "        ";
    if (get_cc() & C_FLAG) flags[0] = 'C';
    if (get_cc() & V_FLAG) flags[1] = 'V';
    if (get_cc() & Z_FLAG) flags[2] = 'Z';

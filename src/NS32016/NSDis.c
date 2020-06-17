@@ -842,7 +842,7 @@ static void Decode(uint32_t* pPC)
 }
 
 
-uint32_t n32016_disassemble(uint32_t addr, char *buf, size_t bufsize)
+uint32_t n32016_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t bufsize)
 {
    int i;
    uint32_t old = addr;

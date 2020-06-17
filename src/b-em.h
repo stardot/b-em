@@ -36,7 +36,7 @@ extern ALLEGRO_PATH *find_cfg_dest(const char *name, const char *ext);
 extern int joybutton[2];
 extern float joyaxes[4];
 
-void setquit();
+void setquit(void);
 
 void cataddname(char *s);
 
