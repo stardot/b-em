@@ -49,3 +49,4 @@ scsi/*
 *.sublime-workspace
 b-em.ilk
 build/
+enc_temp_folder/

@@ -556,7 +556,7 @@ static void clear_point(cpu_debug_t *cpu, int *table, char *arg, const char *des
     const char *p;
     e = parse_address_with_romno(cpu, arg, &p);
 
-    if (*p != e) {
+    if (*p != arg) {
         int ix = -1;
         //DB: changed this to search by address first then by index
         for (c = 0; c < NUM_BREAKPOINTS; c++) {
@@ -568,8 +568,8 @@ static void clear_point(cpu_debug_t *cpu, int *table, char *arg, const char *des
             ix = e;
 
         if (ix >= 0) {
-            debug_outf("    %s %i at %04X cleared\n", desc, c, table[c]);
-            table[c] = -1;
+            debug_outf("    %s %i at %04X cleared\n", desc, ix, table[ix]);
+            table[ix] = -1;
         }
 
 
