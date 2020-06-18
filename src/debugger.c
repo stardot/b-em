@@ -525,28 +525,33 @@ static void set_point(cpu_debug_t *cpu, int *table, char *arg, const char *desc)
 {
     int c;
 
-    if (*arg) {
+    const char *end1;
+    uint32_t a = parse_address_with_romno(cpu, arg, &end1);
+
+    char addrbuf[16 + SYM_MAX];
+    cpu->print_addr(cpu, a, addrbuf, sizeof(addrbuf), true);
+
+    if (end1 > arg) {
+
+        // check to see if already set
+        for (c = 0; c < NUM_BREAKPOINTS; c++) {
+            if (table[c] == a)
+            {
+                debug_outf("    %s %i already set to %s\n", desc, c, addrbuf);
+                return;
+            }
+        }
+
         for (c = 0; c < NUM_BREAKPOINTS; c++) {
             if (table[c] == -1) {
-                const char *end1;
-                uint32_t a = parse_address_with_romno(cpu, arg, &end1);
-
-                if (end1 > arg) {
-                    table[c] = a;
-
-                    char addrbuf[16 + SYM_MAX];
-                    cpu->print_addr(cpu, a, addrbuf, sizeof(addrbuf), true);
-
-                    debug_outf("    %s %i set to %s\n", desc, c, addrbuf);
-                }
-                else
-                    debug_outf("invalid address %s\n", arg);
+                table[c] = a;
+                debug_outf("    %s %i set to %s\n", desc, c, addrbuf);
                 return;
             }
         }
         debug_outf("    unable to set %s breakpoint, table full\n", desc);
     } else
-        debug_out("    missing parameter\n!", 24);
+        debug_out("    missing parameter or invalid address\n!", 24);
 }
 
 static void clear_point(cpu_debug_t *cpu, int *table, char *arg, const char *desc)
