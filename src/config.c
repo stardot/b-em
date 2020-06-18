@@ -156,6 +156,7 @@ void config_load(void)
     scsi_enabled     = get_config_bool("disc", "scsienable", 0);
     ide_enable       = get_config_bool("disc", "ideenable",     0);
     vdfs_enabled     = get_config_bool("disc", "vdfsenable", 0);
+    vdfs_cfg_root    = get_config_string("disc", "vdfs_root", 0);
 
     keyas            = get_config_bool(NULL, "key_as",        0);
     mouse_amx        = get_config_bool(NULL, "mouse_amx",     0);
@@ -259,6 +260,9 @@ void config_save(void)
         set_config_bool("disc", "scsienable", scsi_enabled);
         set_config_bool("disc", "ideenable", ide_enable);
         set_config_bool("disc", "vdfsenable", vdfs_enabled);
+        const char *vdfs_root = vdfs_get_root();
+        if (vdfs_root)
+            set_config_string("disc", "vdfs_root", vdfs_root);
 
         set_config_bool(NULL, "key_as", keyas);
 

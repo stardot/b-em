@@ -267,7 +267,7 @@ void main_init(int argc, char *argv[])
 
     scsi_init();
     ide_init();
-    vdfs_init();
+    vdfs_init(vdfs_cfg_root);
 
     model_init();
 
