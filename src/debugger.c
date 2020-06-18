@@ -492,7 +492,7 @@ static void set_sym(cpu_debug_t *cpu, const char *arg) {
         char name[SYM_MAX + 1], rest[SYM_MAX + 1];
                 
         n = sscanf(arg, "%" STRINGY(SYM_MAX) "[^= ] = %" STRINGY(SYM_MAX) "s", name, rest);
-        char *e;
+        const char *e;
         uint32_t addr;
         if (n == 2) 
             addr = parse_address_with_romno(cpu, rest, &e);
@@ -528,7 +528,7 @@ static void set_point(cpu_debug_t *cpu, int *table, char *arg, const char *desc)
     if (*arg) {
         for (c = 0; c < NUM_BREAKPOINTS; c++) {
             if (table[c] == -1) {
-                char *end1;
+                const char *end1;
                 uint32_t a = parse_address_with_romno(cpu, arg, &end1);
 
                 if (end1 > arg) {
