@@ -398,7 +398,8 @@ uint32_t dbg6502_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
     {
         if (symaddr >= 0x8000 && symaddr < 0xC000) {
             // add rom number, first see if we are disassembling a rom
-            symaddr = symaddr | addr & 0xF0000000;  // add in rom # if present
+
+            symaddr = symaddr | (addr & 0xF0000000);  // add in rom # if present
         }
 
         if (symbol_find_by_addr(cpu->symbols, symaddr, &sym))

@@ -1049,7 +1049,7 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
     else {
         for (c = 0; c < NUM_BREAKPOINTS; c++) {
             if (breakpoints[c] == addr) {
-                char addr_str[10];
+                char addr_str[16+SYM_MAX];
                 cpu->print_addr(cpu, addr, addr_str, sizeof(addr_str), true);
                 debug_outf("cpu %s: Break at %s\n", cpu->cpu_name, addr_str);
                 if (contcount) {
