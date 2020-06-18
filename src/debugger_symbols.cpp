@@ -1,4 +1,5 @@
 #include <ctype.h>
+#include <string.h>
 
 #include "debugger_symbols.h"
 
