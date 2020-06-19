@@ -23,6 +23,34 @@ bool symbol_table::find_by_addr(uint32_t addr, std::string &ret) {
     return false;
 }
 
+bool symbol_table::find_by_addr_near(uint32_t addr, uint32_t min, uint32_t max, uint32_t *addr_found, std::string &ret) {
+
+    bool matched = false;
+    uint32_t distance = 0;
+
+    for (std::pair<std::string, uint32_t> element : map) {
+        if (element.second >= min && element.second <= max)
+        {
+            if (matched)
+            {
+                uint32_t ndistance = (element.second <= addr) ? addr - element.second : element.second - addr;
+                if (ndistance < distance) {
+                    ret = element.first;
+                    *addr_found = element.second;
+                    distance = ndistance;
+                }
+
+            }
+            else {
+                matched = true;
+                distance = (element.second <= addr) ? addr - element.second : element.second - addr;
+                ret = element.first;
+                *addr_found = element.second;
+            }
+        }
+    }
+    return matched;
+}
 
 bool symbol_table::find_by_name(std::string name, uint32_t &ret) {
     std::map<std::string, uint32_t>::iterator i = map.find(name);
@@ -65,6 +93,19 @@ bool symbol_find_by_addr(symbol_table *symtab, uint32_t addr, const char **ret) 
     else
         return false;
 }
+
+bool symbol_find_by_addr_near(symbol_table *symtab, uint32_t addr, uint32_t min, uint32_t max, uint32_t *addr_found, const char **ret) {
+    std::string r;
+    if (symtab && symtab->find_by_addr_near(addr, min, max, addr_found, r)) {
+        char *ret2 = (char *)malloc(r.length() + 1);
+        memcpy(ret2, r.c_str(), r.length() + 1);
+        *ret = ret2;
+        return true;
+    }
+    else
+        return false;
+}
+
 
 //this will look for the first symbol (whitespace separated) in name, if a match is found *endret will point at the whitespace after 
 bool symbol_find_by_name(symbol_table *symtab, const char *name, uint32_t *addr, const char**endret) {

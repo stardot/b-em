@@ -144,6 +144,7 @@ static size_t dbg_print_addr(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
         else {
             ret = snprintf(buf, bufsize, "%04X (%s)", addr & 0xFFFF, sym);
         }
+        free(sym);
     }
     else {
         if (msw) {
@@ -153,6 +154,8 @@ static size_t dbg_print_addr(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
             ret = snprintf(buf, bufsize, "%04X", addr & 0xFFFF);
         }
     }
+
+
     if (ret > bufsize)
         return bufsize;
     else
