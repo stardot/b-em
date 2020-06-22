@@ -343,6 +343,18 @@ static const struct sdf_geometry *find_geo_dfs(const char *fn, const char *ext, 
         }
         return geo;
     }
+    else if (!strcasecmp(ext, "ddd")) {
+        if (fsize <= (2 * 80 * 16 * 256))
+            return sdf_geo_tab + SDF_FMT_DFS_16S_INT_80T;
+        else if (fsize <= (2 * 80 * 18 * 256))
+            return sdf_geo_tab + SDF_FMT_DFS_18S_INT_80T;
+    }
+    else if (!strcasecmp(ext, "sdd")) {
+        if (fsize <= (80 * 16 * 256))
+            return sdf_geo_tab + SDF_FMT_DFS_16S_SIN_80T;
+        else if (fsize <= (80 * 18 * 256))
+            return sdf_geo_tab + SDF_FMT_DFS_18S_SIN_80T;
+    }
     return NULL;
 }
 
