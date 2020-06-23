@@ -25,9 +25,13 @@ enum sdf_disc_type {
     SDF_FMT_DFS_10S_SIN_80T,
     SDF_FMT_DFS_10S_INT_80T,
     SDF_FMT_DFS_10S_SEQ_80T,
+    SDF_FMT_DFS_16S_SIN_40T,
+    SDF_FMT_DFS_16S_INT_40T,
     SDF_FMT_DFS_16S_SIN_80T,
     SDF_FMT_DFS_16S_INT_80T,
     SDF_FMT_DFS_16S_SEQ_80T,
+    SDF_FMT_DFS_18S_SIN_40T,
+    SDF_FMT_DFS_18S_INT_40T,
     SDF_FMT_DFS_18S_SIN_80T,
     SDF_FMT_DFS_18S_INT_80T,
     SDF_FMT_DFS_18S_SEQ_80T,
@@ -46,7 +50,7 @@ struct sdf_geometry {
     void (*new_disc)(FILE *f, const struct sdf_geometry *geo);
 };
 
-extern struct sdf_geometry sdf_geo_tab[];
+extern struct sdf_geometry sdf_geo_tab[SDF_FMT_MAX];
 extern char *mmb_fn;
 
 // In sdf-geo.c
@@ -68,7 +72,7 @@ int mmb_find(const char *name);
 
 
 //DB: bodge for VS
-#ifdef _MSC_VER 
+#ifdef _MSC_VER
 //not #if defined(_WIN32) || defined(_WIN64) because we have strncasecmp in mingw
 #define strncasecmp _strnicmp
 #define strcasecmp _stricmp
