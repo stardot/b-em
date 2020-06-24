@@ -132,11 +132,9 @@ static ALLEGRO_MENU *create_disc_new_menu(int drive)
     al_append_menu_item(menu, "ADFS, Single-sided, 80T (M)", menu_id_num(IDM_DISC_NEW_ADFS_M, drive), 0, NULL, NULL);
     al_append_menu_item(menu, "ADFS, Double-sided, 80T (L)", menu_id_num(IDM_DISC_NEW_ADFS_L, drive), 0, NULL, NULL);
     al_append_menu_item(menu, "Solidisk DDFS, Single-sided, 40T", menu_id_num(IDM_DISC_NEW_DFS_16S_SIN_40T, drive), 0, NULL, NULL);
-    al_append_menu_item(menu, "Solidisk DDFS, Double-sided, 40T", menu_id_num(IDM_DISC_NEW_DFS_16S_INT_40T, drive), 0, NULL, NULL);
     al_append_menu_item(menu, "Solidisk DDFS, Single-sided, 80T", menu_id_num(IDM_DISC_NEW_DFS_16S_SIN_80T, drive), 0, NULL, NULL);
     al_append_menu_item(menu, "Solidisk DDFS, Double-sided, 80T", menu_id_num(IDM_DISC_NEW_DFS_16S_INT_80T, drive), 0, NULL, NULL);
     al_append_menu_item(menu, "Watford DDFS, Single-sided, 40T", menu_id_num(IDM_DISC_NEW_DFS_18S_SIN_40T, drive), 0, NULL, NULL);
-    al_append_menu_item(menu, "Watford DDFS, Double-sided, 40T", menu_id_num(IDM_DISC_NEW_DFS_18S_INT_40T, drive), 0, NULL, NULL);
     al_append_menu_item(menu, "Watford DDFS, Single-sided, 80T", menu_id_num(IDM_DISC_NEW_DFS_18S_SIN_80T, drive), 0, NULL, NULL);
     al_append_menu_item(menu, "Watford DDFS, Double-sided, 80T", menu_id_num(IDM_DISC_NEW_DFS_18S_INT_80T, drive), 0, NULL, NULL);
     return menu;
@@ -635,49 +633,43 @@ static void disc_choose(ALLEGRO_EVENT *event, const char *opname, const char *ex
                             writeprot[drive] = 1;
                         break;
                     case IDM_DISC_NEW_ADFS_S:
-                        sdf_new_disc(drive, path, SDF_FMT_ADFS_S);
+                        sdf_new_disc(drive, path, &sdf_geometries.adfs_s);
                         break;
                     case IDM_DISC_NEW_ADFS_M:
-                        sdf_new_disc(drive, path, SDF_FMT_ADFS_M);
+                        sdf_new_disc(drive, path, &sdf_geometries.adfs_m);
                         break;
                     case IDM_DISC_NEW_ADFS_L:
-                        sdf_new_disc(drive, path, SDF_FMT_ADFS_L);
+                        sdf_new_disc(drive, path, &sdf_geometries.adfs_l);
                         break;
                     case IDM_DISC_NEW_DFS_10S_SIN_40T:
-                        sdf_new_disc(drive, path, SDF_FMT_DFS_10S_SIN_40T);
+                        sdf_new_disc(drive, path, &sdf_geometries.dfs_10s_sin_40t);
                         break;
                     case IDM_DISC_NEW_DFS_10S_INT_40T:
-                        sdf_new_disc(drive, path, SDF_FMT_DFS_10S_INT_40T);
+                        sdf_new_disc(drive, path, &sdf_geometries.dfs_10s_int_40t);
                         break;
                     case IDM_DISC_NEW_DFS_10S_SIN_80T:
-                        sdf_new_disc(drive, path, SDF_FMT_DFS_10S_SIN_80T);
+                        sdf_new_disc(drive, path, &sdf_geometries.dfs_10s_sin_80t);
                         break;
                     case IDM_DISC_NEW_DFS_10S_INT_80T:
-                        sdf_new_disc(drive, path, SDF_FMT_DFS_10S_INT_80T);
+                        sdf_new_disc(drive, path, &sdf_geometries.dfs_10s_int_80t);
                         break;
                     case IDM_DISC_NEW_DFS_16S_SIN_40T:
-                        sdf_new_disc(drive, path, SDF_FMT_DFS_16S_SIN_40T);
+                        sdf_new_disc(drive, path, &sdf_geometries.dfs_16s_sin_40t);
                         break;
                     case IDM_DISC_NEW_DFS_16S_SIN_80T:
-                        sdf_new_disc(drive, path, SDF_FMT_DFS_16S_SIN_80T);
-                        break;
-                    case IDM_DISC_NEW_DFS_16S_INT_40T:
-                        sdf_new_disc(drive, path, SDF_FMT_DFS_16S_INT_40T);
+                        sdf_new_disc(drive, path, &sdf_geometries.dfs_16s_sin_80t);
                         break;
                     case IDM_DISC_NEW_DFS_16S_INT_80T:
-                        sdf_new_disc(drive, path, SDF_FMT_DFS_16S_INT_80T);
+                        sdf_new_disc(drive, path, &sdf_geometries.dfs_16s_int_80t);
                         break;
                     case IDM_DISC_NEW_DFS_18S_SIN_40T:
-                        sdf_new_disc(drive, path, SDF_FMT_DFS_18S_SIN_40T);
+                        sdf_new_disc(drive, path, &sdf_geometries.dfs_18s_sin_40t);
                         break;
                     case IDM_DISC_NEW_DFS_18S_SIN_80T:
-                        sdf_new_disc(drive, path, SDF_FMT_DFS_18S_SIN_80T);
-                        break;
-                    case IDM_DISC_NEW_DFS_18S_INT_40T:
-                        sdf_new_disc(drive, path, SDF_FMT_DFS_18S_INT_40T);
+                        sdf_new_disc(drive, path, &sdf_geometries.dfs_18s_sin_80t);
                         break;
                     case IDM_DISC_NEW_DFS_18S_INT_80T:
-                        sdf_new_disc(drive, path, SDF_FMT_DFS_18S_INT_80T);
+                        sdf_new_disc(drive, path, &sdf_geometries.dfs_18s_int_80t);
                         break;
                     default:
                         break;
@@ -997,9 +989,7 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
         case IDM_DISC_NEW_DFS_18S_SIN_80T:
             disc_choose(event, "create in", "*.sdd", ALLEGRO_FILECHOOSER_SAVE);
             break;
-        case IDM_DISC_NEW_DFS_16S_INT_40T:
         case IDM_DISC_NEW_DFS_16S_INT_80T:
-        case IDM_DISC_NEW_DFS_18S_INT_40T:
         case IDM_DISC_NEW_DFS_18S_INT_80T:
             disc_choose(event, "create in", "*.ddd", ALLEGRO_FILECHOOSER_SAVE);
             break;
