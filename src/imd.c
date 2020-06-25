@@ -64,13 +64,22 @@ enum imd_state {
     ST_IDLE,
     ST_NOTFOUND,
     ST_READSECTOR,
-    ST_READCOMPR
+    ST_READCOMPR,
+    ST_READ_ADDR0,
+    ST_READ_ADDR1,
+    ST_READ_ADDR2,
+    ST_READ_ADDR3,
+    ST_READ_ADDR4,
+    ST_READ_ADDR5,
+    ST_READ_ADDR6
 };
 
 static enum imd_state state;
 static unsigned count;
 static int      imd_time;
 static unsigned char *data, cdata;
+struct imd_track *ra_trk;
+struct imd_sect  *ra_sect;
 
 static void imd_close(int drive)
 {
@@ -126,17 +135,16 @@ static int imd_verify(int drive, int track, int density)
     return 0;
 }
 
-static void imd_readsector(int drive, int sector, int track, int side, int density)
+static struct imd_track *imd_find_track(int drive, int track, int side, int density)
 {
-    if (state == ST_IDLE && drive >= 0 && drive < NUM_DRIVES) {
-        log_debug("imd: drive %d: readsector sector=%d, track=%d, side=%d, density=%d", drive, sector, track, side, density);
+    if (drive >= 0 && drive < NUM_DRIVES) {
         struct imd_file *imd = &imd_discs[drive];
         struct imd_track *trk = imd->track_cur;
         if (!trk) {
             log_debug("imd: drive %d: searching for track", drive);
             for (trk = imd->track_head; trk; trk = trk->next) {
                 log_debug("imd: drive %d: cyl %u<>%u, head %u<>%u", drive, trk->cylinder, imd->trackno, trk->head, side);
-                if (trk->cylinder == imd->trackno && trk->head == side) {
+                if (trk->cylinder == imd->trackno && trk->head == side && ((density && trk->mode >= 3) || (!density && trk->mode <= 2))) {
                     log_debug("imd: drive %d: found track", drive);
                     imd->track_cur = trk;
                     imd->headno = side;
@@ -144,6 +152,16 @@ static void imd_readsector(int drive, int sector, int track, int side, int densi
                 }
             }
         }
+        return trk;
+    }
+    return NULL;
+}
+
+static void imd_readsector(int drive, int sector, int track, int side, int density)
+{
+    log_debug("imd: drive %d: readsector sector=%d, track=%d, side=%d, density=%d", drive, sector, track, side, density);
+    if (state == ST_IDLE) {
+        struct imd_track *trk = imd_find_track(drive, track, side, density);
         if (trk) {
             log_debug("imd: drive %d: searching for sector", drive);
             for (struct imd_sect *sect = trk->sect_head; sect; sect = sect->next) {
@@ -164,9 +182,31 @@ static void imd_readsector(int drive, int sector, int track, int side, int densi
                 }
             }
         }
+        count = 500;
+        state = ST_NOTFOUND;
     }
-    count = 500;
-    state = ST_NOTFOUND;
+}
+
+static void imd_readaddress(int drive, int track, int side, int density)
+{
+    log_debug("imd: drive %d: readaddress track=%d, side=%d, density=%d", drive, track, side, density);
+    if (state == ST_IDLE) {
+        struct imd_track *trk = ra_trk;
+        if (trk && trk->cylinder == track && trk->head == side && ((density && trk->mode >= 3) || (!density && trk->mode <= 2))) {
+            if (!(ra_sect = ra_sect->next))
+                ra_sect = trk->sect_head;
+            state = ST_READ_ADDR0;
+        }
+        else if ((trk = imd_find_track(drive, track, side, density))) {
+            ra_trk = trk;
+            ra_sect = trk->sect_head;
+            state = ST_READ_ADDR0;
+        }
+        else {
+            count = 500;
+            state = ST_NOTFOUND;
+        }
+    }
 }
 
 static void imd_abort(int drive)
@@ -205,6 +245,41 @@ static void imd_poll(void)
                 fdc_finishread();
                 state = ST_IDLE;
             }
+            break;
+
+        case ST_READ_ADDR0:
+            fdc_data(ra_trk->cylinder);
+            state = ST_READ_ADDR1;
+            break;
+
+        case ST_READ_ADDR1:
+            fdc_data(ra_trk->head);
+            state = ST_READ_ADDR2;
+            break;
+
+        case ST_READ_ADDR2:
+            fdc_data(ra_sect->sectid);
+            state = ST_READ_ADDR3;
+            break;
+
+        case ST_READ_ADDR3:
+            fdc_data(ra_trk->sectsize);
+            state = ST_READ_ADDR4;
+            break;
+
+        case ST_READ_ADDR4:
+            fdc_data(0);
+            state = ST_READ_ADDR5;
+            break;
+
+        case ST_READ_ADDR5:
+            fdc_data(0);
+            state = ST_READ_ADDR6;
+            break;
+
+        case ST_READ_ADDR6:
+            state = ST_IDLE;
+            fdc_finishread();
             break;
     }
 }
@@ -382,12 +457,13 @@ void imd_load(int drive, const char *fn)
                 imd->trackno = 0;
                 imd_dump(imd);
                 writeprot[drive] = 1;
-                drives[drive].close      =  imd_close;
-                drives[drive].seek       =  imd_seek;
-                drives[drive].verify     =  imd_verify;
-                drives[drive].readsector =  imd_readsector;
-                drives[drive].poll       =  imd_poll;
-                drives[drive].abort      =  imd_abort;
+                drives[drive].close       = imd_close;
+                drives[drive].seek        = imd_seek;
+                drives[drive].verify      = imd_verify;
+                drives[drive].readsector  = imd_readsector;
+                drives[drive].readaddress = imd_readaddress;
+                drives[drive].poll        = imd_poll;
+                drives[drive].abort       = imd_abort;
                 return;
             }
         }
