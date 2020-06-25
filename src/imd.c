@@ -58,6 +58,7 @@ struct imd_file {
     long track0;
     int trackno;
     int headno;
+    bool dirty;
 } imd_discs[NUM_DRIVES];
 
 enum imd_state {
@@ -65,6 +66,10 @@ enum imd_state {
     ST_NOTFOUND,
     ST_READSECTOR,
     ST_READCOMPR,
+    ST_WRITEPROT,
+    ST_WRITESECTOR0,
+    ST_WRITESECTOR1,
+    ST_WRITESECTOR2,
     ST_READ_ADDR0,
     ST_READ_ADDR1,
     ST_READ_ADDR2,
@@ -78,12 +83,36 @@ static enum imd_state state;
 static unsigned count;
 static int      imd_time;
 static unsigned char *data, cdata;
-struct imd_track *ra_trk;
-struct imd_sect  *ra_sect;
+struct imd_track *cur_trk;
+struct imd_sect  *cur_sect;
 
-static void imd_close(int drive)
+static void imd_save(struct imd_file *imd)
 {
-    struct imd_file *imd = &imd_discs[drive];
+    fseek(imd->fp, imd->track0, SEEK_SET);
+    for (struct imd_track *trk = imd->track_head; trk; trk = trk->next) {
+        uint8_t buf[5+36];
+        buf[0] = trk->mode;
+        buf[1] = trk->cylinder;
+        buf[2] = trk->head;
+        buf[3] = trk->nsect;
+        buf[4] = trk->sectsize;
+        uint8_t *ptr = buf+5;
+        for (struct imd_sect *sect = trk->sect_head; sect; sect = sect->next)
+            *ptr++ = sect->sectid;
+        fwrite(buf, ptr-buf, 1, imd->fp);
+        for (struct imd_sect *sect = trk->sect_head; sect; sect = sect->next) {
+            putc(sect->mode, imd->fp);
+            if (sect->mode & 1)
+                fwrite(sect->data, sect->sectsize, 1, imd->fp);
+            else if (sect->mode)
+                putc(sect->data[0], imd->fp);
+        }
+    }
+    ftruncate(fileno(imd->fp), ftell(imd->fp));
+}
+
+static void imd_free(struct imd_file *imd)
+{
     struct imd_track *trk = imd->track_head;
     while (trk) {
         struct imd_track *trk_next = trk->next;
@@ -96,8 +125,18 @@ static void imd_close(int drive)
         free(trk);
         trk = trk_next;
     }
-    fclose(imd->fp);
-    imd->fp = NULL;
+}
+
+static void imd_close(int drive)
+{
+    if (drive >= 0 && drive < NUM_DRIVES) {
+        struct imd_file *imd = &imd_discs[drive];
+        if (imd->dirty)
+            imd_save(imd);
+        imd_free(imd);
+        fclose(imd->fp);
+        imd->fp = NULL;
+    }
 }
 
 static void imd_seek(int drive, int track)
@@ -157,29 +196,64 @@ static struct imd_track *imd_find_track(int drive, int track, int side, int dens
     return NULL;
 }
 
+static struct imd_sect *imd_find_sector(int drive, int track, int side, int sector, struct imd_track *trk)
+{
+    log_debug("imd: drive %d: searching for sector", drive);
+    for (struct imd_sect *sect = trk->sect_head; sect; sect = sect->next) {
+        log_debug("imd: drive %d: cyl %u<>%u, head %u<>%u, sectid %u<>%u", drive, sect->cylinder, track, sect->head, side, sect->sectid, sector);
+        if (sect->cylinder == track && sect->head == side && sect->sectid == sector)
+            return sect;
+    }
+    return NULL;
+}
+
 static void imd_readsector(int drive, int sector, int track, int side, int density)
 {
     log_debug("imd: drive %d: readsector sector=%d, track=%d, side=%d, density=%d", drive, sector, track, side, density);
     if (state == ST_IDLE) {
         struct imd_track *trk = imd_find_track(drive, track, side, density);
         if (trk) {
-            log_debug("imd: drive %d: searching for sector", drive);
-            for (struct imd_sect *sect = trk->sect_head; sect; sect = sect->next) {
-                log_debug("imd: drive %d: cyl %u<>%u, head %u<>%u, sectid %u<>%u", drive, sect->cylinder, track, sect->head, side, sect->sectid, sector);
-                if (sect->cylinder == track && sect->head == side && sect->sectid == sector) {
-                    count = sect->sectsize;
-                    if (sect->mode & 1) {
-                        log_debug("imd: drive %d: found full sector", drive);
-                        data = sect->data;
-                        state = ST_READSECTOR;
-                    }
-                    else {
-                        log_debug("imd: drive %d: found compressed sector", drive);
-                        cdata = sect->data[0];
-                        state = ST_READCOMPR;
-                    }
-                    return;
+            struct imd_sect *sect = imd_find_sector(drive, track, side, sector, trk);
+            if (sect) {
+                count = sect->sectsize;
+                if (sect->mode & 1) {
+                    log_debug("imd: drive %d: found full sector", drive);
+                    data = sect->data;
+                    state = ST_READSECTOR;
                 }
+                else {
+                    log_debug("imd: drive %d: found compressed sector", drive);
+                    cdata = sect->data[0];
+                    state = ST_READCOMPR;
+                }
+                return;
+            }
+        }
+        count = 500;
+        state = ST_NOTFOUND;
+    }
+}
+
+static void imd_writesector(int drive, int sector, int track, int side, int density)
+{
+    log_debug("imd: drive %d: writesector sector=%d, track=%d, side=%d, density=%d", drive, sector, track, side, density);
+    if (state == ST_IDLE) {
+        struct imd_track *trk = imd_find_track(drive, track, side, density);
+        if (trk) {
+            struct imd_sect *sect = imd_find_sector(drive, track, side, sector, trk);
+            if (sect) {
+                if (writeprot[drive]) {
+                    count = 1;
+                    state = ST_WRITEPROT;
+                }
+                else {
+                    cur_trk = trk;
+                    cur_sect = sect;
+                    count = sect->sectsize;
+                    imd_discs[drive].dirty = true;
+                    state = ST_WRITESECTOR0;
+                }
+                return;
             }
         }
         count = 500;
@@ -191,15 +265,15 @@ static void imd_readaddress(int drive, int track, int side, int density)
 {
     log_debug("imd: drive %d: readaddress track=%d, side=%d, density=%d", drive, track, side, density);
     if (state == ST_IDLE) {
-        struct imd_track *trk = ra_trk;
+        struct imd_track *trk = cur_trk;
         if (trk && trk->cylinder == track && trk->head == side && ((density && trk->mode >= 3) || (!density && trk->mode <= 2))) {
-            if (!(ra_sect = ra_sect->next))
-                ra_sect = trk->sect_head;
+            if (!(cur_sect = cur_sect->next))
+                cur_sect = trk->sect_head;
             state = ST_READ_ADDR0;
         }
         else if ((trk = imd_find_track(drive, track, side, density))) {
-            ra_trk = trk;
-            ra_sect = trk->sect_head;
+            cur_trk = trk;
+            cur_sect = trk->sect_head;
             state = ST_READ_ADDR0;
         }
         else {
@@ -212,6 +286,93 @@ static void imd_readaddress(int drive, int track, int side, int density)
 static void imd_abort(int drive)
 {
     state = ST_IDLE;
+}
+
+static void imd_poll_writesect0(void)
+{
+    int c = fdc_getdata(0);
+    if (c == -1)
+        log_warn("imd: data underrun on write");
+    else {
+        log_debug("imd: imd_poll_writesect0 c=%02X", c);
+        cdata = c;
+        count--;
+        state = ST_WRITESECTOR1;
+    }
+}
+
+static void imd_poll_writesect1(void)
+{
+    int c = fdc_getdata(--count == 0);
+    if (c == -1) {
+        log_warn("imd: data underrun on write");
+        count++;
+    }
+    else {
+        log_debug("imd: imd_poll_writesect1 c=%02X", c);
+        if (c != cdata) {
+            if (!(cur_sect->mode & 1)) {
+                log_debug("imd: imd_poll_writesect1 converting compressed sector");
+                struct imd_sect *new_sect = malloc(sizeof(struct imd_sect)+cur_sect->sectsize);
+                if (!new_sect) {
+                    log_error("imd: out of memory reallocating sector");
+                    fdc_datacrcerror();
+                    return;
+                }
+                if (cur_trk->sect_head == cur_sect)
+                    cur_trk->sect_head = new_sect;
+                if (cur_trk->sect_tail == cur_sect)
+                    cur_trk->sect_tail = new_sect;
+                struct imd_sect *next = cur_sect->next;
+                new_sect->next = next;
+                if (next)
+                    next->prev = new_sect;
+                struct imd_sect *prev = cur_sect->prev;
+                new_sect->prev = prev;
+                if (prev)
+                    prev->next = new_sect;
+                new_sect->sectsize = cur_sect->sectsize;
+                new_sect->mode     = cur_sect->mode | 1;
+                new_sect->cylinder = cur_sect->cylinder;
+                new_sect->head     = cur_sect->head;
+                new_sect->sectid   = cur_sect->sectid;
+                free(cur_sect);
+                cur_sect = new_sect;
+            }
+            unsigned used = cur_sect->sectsize - count - 1;
+            log_debug("imd: imd_poll_writesect1 used=%u", used);
+            memset(cur_sect->data, cdata, used);
+            data = cur_sect->data + used;
+            *data++ = c;
+            state = ST_WRITESECTOR2;
+            if (count == 0) {
+                fdc_finishread();
+                state = ST_IDLE;
+            }
+        }
+        else if (count == 0) {
+            fdc_finishread();
+            state = ST_IDLE;
+            cur_sect-> mode &= ~1;
+        }
+    }
+}
+
+static void imd_poll_writesect2(void)
+{
+    int c = fdc_getdata(--count == 0);
+    if (c == -1) {
+        log_warn("imd: data underrun on write");
+        count++;
+    }
+    else {
+        log_debug("imd: imd_poll_writesect2 c=%02X", c);
+        *data++ = c;
+        if (count == 0) {
+            fdc_finishread();
+            state = ST_IDLE;
+        }
+    }
 }
 
 static void imd_poll(void)
@@ -247,23 +408,41 @@ static void imd_poll(void)
             }
             break;
 
+        case ST_WRITEPROT:
+            log_debug("imd: poll, write protected during write sector");
+            fdc_writeprotect();
+            state = ST_IDLE;
+            break;
+
+        case ST_WRITESECTOR0:
+            imd_poll_writesect0();
+            break;
+
+        case ST_WRITESECTOR1:
+            imd_poll_writesect1();
+            break;
+
+        case ST_WRITESECTOR2:
+            imd_poll_writesect2();
+            break;
+
         case ST_READ_ADDR0:
-            fdc_data(ra_trk->cylinder);
+            fdc_data(cur_trk->cylinder);
             state = ST_READ_ADDR1;
             break;
 
         case ST_READ_ADDR1:
-            fdc_data(ra_trk->head);
+            fdc_data(cur_trk->head);
             state = ST_READ_ADDR2;
             break;
 
         case ST_READ_ADDR2:
-            fdc_data(ra_sect->sectid);
+            fdc_data(cur_sect->sectid);
             state = ST_READ_ADDR3;
             break;
 
         case ST_READ_ADDR3:
-            fdc_data(ra_trk->sectsize);
+            fdc_data(cur_trk->sectsize);
             state = ST_READ_ADDR4;
             break;
 
@@ -345,6 +524,7 @@ static bool imd_load_sectors(const char *fn, FILE *fp, struct imd_track *trk, in
             }
             sect->data[0] = byte;
         }
+        sect->prev = tail;
         if (tail)
             tail->next = sect;
         else
@@ -406,6 +586,7 @@ static bool imd_load_tracks(const char *fn, FILE *fp, struct imd_file *imd)
             goto failed;
         if (!imd_load_sectors(fn, fp, trk, trackno, &maps))
             goto failed;
+        trk->prev = tail;
         if (tail)
             tail->next = trk;
         else
@@ -442,10 +623,14 @@ void imd_load(int drive, const char *fn)
 {
     log_debug("imd: loading IMD image file '%s' into drive %d", fn, drive);
     if (drive >= 0 && drive < NUM_DRIVES) {
-        FILE *fp = fopen(fn, "rb");
+        int wprot = 0;
+        FILE *fp = fopen(fn, "rb+");
         if (!fp) {
-            log_error("Unable to open file '%s' for reading - %s", fn, strerror(errno));
-            return;
+            if (!(fp = fopen(fn, "rb"))) {
+                log_error("Unable to open file '%s' for reading - %s", fn, strerror(errno));
+                return;
+            }
+            wprot = 1;
         }
         long track0 = imd_check_hdr(fp);
         if (track0) {
@@ -456,11 +641,12 @@ void imd_load(int drive, const char *fn)
                 imd->track0 = track0;
                 imd->trackno = 0;
                 imd_dump(imd);
-                writeprot[drive] = 1;
+                writeprot[drive] = wprot;
                 drives[drive].close       = imd_close;
                 drives[drive].seek        = imd_seek;
                 drives[drive].verify      = imd_verify;
                 drives[drive].readsector  = imd_readsector;
+                drives[drive].writesector = imd_writesector;
                 drives[drive].readaddress = imd_readaddress;
                 drives[drive].poll        = imd_poll;
                 drives[drive].abort       = imd_abort;
