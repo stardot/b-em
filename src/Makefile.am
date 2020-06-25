@@ -63,6 +63,7 @@ b_em_SOURCES = \
 	gui-allegro.c\
 	i8271.c \
 	ide.c \
+	imd.c \
 	joystick.c \
 	keyboard.c \
 	keydef-allegro.c \

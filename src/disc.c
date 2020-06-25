@@ -6,6 +6,7 @@
 #include "fdi.h"
 #include "disc.h"
 #include "sdf.h"
+#include "imd.h"
 
 #include "ddnoise.h"
 
@@ -48,6 +49,11 @@ void disc_load(int drive, ALLEGRO_PATH *fn)
         if (strcasecmp(ext, "fdi") == 0) {
             log_debug("Loading %i: %s as FDI", drive, cpath);
             fdi_load(drive, cpath);
+            return;
+        }
+        if (strcasecmp(ext, "imd") == 0) {
+            log_debug("Loading %i: %s as IMD", drive, cpath);
+            imd_load(drive, cpath);
             return;
         }
     }
