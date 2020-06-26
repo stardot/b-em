@@ -251,6 +251,7 @@ static void imd_writesector(int drive, int sector, int track, int side, int dens
                     cur_sect = sect;
                     count = sect->sectsize;
                     imd_discs[drive].dirty = true;
+                    imd_time = -20;
                     state = ST_WRITESECTOR0;
                 }
                 return;
