@@ -413,27 +413,34 @@ const struct sdf_geometry *sdf_find_geo(const char *fn, const char *ext, FILE *f
 {
     const struct sdf_geometry *geo = NULL;
 
-    if (!strcasecmp(ext, "ads"))
-        geo = find_geo_adfs(fp, &sdf_geometries.adfs_s);
-    else if (!strcasecmp(ext, "adm"))
-        geo = find_geo_adfs(fp, &sdf_geometries.adfs_m);
-    else if (!strcasecmp(ext, "adl"))
-        geo = find_geo_adfs(fp, &sdf_geometries.adfs_l);
-    else if (!strcasecmp(ext, "adf"))
-        geo = find_geo_adfs(fp, NULL);
+    if (ext) {
+        if (!strcasecmp(ext, "ads"))
+            geo = find_geo_adfs(fp, &sdf_geometries.adfs_s);
+        else if (!strcasecmp(ext, "adm"))
+            geo = find_geo_adfs(fp, &sdf_geometries.adfs_m);
+        else if (!strcasecmp(ext, "adl"))
+            geo = find_geo_adfs(fp, &sdf_geometries.adfs_l);
+        else if (!strcasecmp(ext, "adf"))
+            geo = find_geo_adfs(fp, NULL);
+        else {
+            fseek(fp, 0, SEEK_END);
+            long fsize = ftell(fp);
+            if (!strcasecmp(ext, "ssd"))
+                geo = find_geo_dfs_ss(fn, fp, fsize);
+            else if (!strcasecmp(ext, "dsd"))
+                geo = find_geo_dfs_is(fn, fp, fsize);
+            else if (!strcasecmp(ext, "sdd"))
+                geo = find_geo_ddfs_ss(fn, fp, fsize);
+            else if (!strcasecmp(ext, "ddd"))
+                geo = find_geo_ddfs_is(fn, fp, fsize);
+            else
+                geo = find_geo_size(fp, fsize);
+        }
+    }
     else {
         fseek(fp, 0, SEEK_END);
         long fsize = ftell(fp);
-        if (!strcasecmp(ext, "ssd"))
-            geo = find_geo_dfs_ss(fn, fp, fsize);
-        else if (!strcasecmp(ext, "dsd"))
-            geo = find_geo_dfs_is(fn, fp, fsize);
-        else if (!strcasecmp(ext, "sdd"))
-            geo = find_geo_ddfs_ss(fn, fp, fsize);
-        else if (!strcasecmp(ext, "ddd"))
-            geo = find_geo_ddfs_is(fn, fp, fsize);
-        else
-            geo = find_geo_size(fp, fsize);
+        geo = find_geo_size(fp, fsize);
     }
     return geo;
 }
