@@ -107,7 +107,7 @@ static uint8_t am_cmos[256]=
 
 static int8_t op_nmos[256] =
 {
-/*       0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F */    
+/*       0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F */
 /*00*/  BRK,  ORA,  HLT,  SLO,  NOP,  ORA,  ASL,  SLO,  PHP,  ORA,  ASL,  ANC,  NOP,  ORA,  ASL,  SLO,
 /*10*/  BPL,  ORA,  HLT,  SLO,  NOP,  ORA,  ASL,  SLO,  CLC,  ORA,  NOP,  SLO,  NOP,  ORA,  ASL,  SLO,
 /*20*/  JSR,  AND,  HLT,  RLA,  BIT,  AND,  ROL,  RLA,  PLP,  AND,  ROL,  ANC,  BIT,  AND,  ROL,  RLA,
@@ -217,14 +217,20 @@ uint32_t dbg6502_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
         exit(-1);
     }
     op_name = op_names[ni];
-    len = snprintf(buf, bufsize, "%04X: %02X ", addr, op);
+    len = cpu->print_addr(addr, buf, bufsize);
+    buf[len-1] = ':';
+    buf[len++] = ' ';
+    buf += len;
+    bufsize -= len;
+    len = debug_print_8bit(op, buf, bufsize);
+    buf[len-1] = ' ';
     if (len < bufsize) {
-	buf += len;
-	bufsize -= len;
-	addr++;
+    buf += len;
+    bufsize -= len;
+    addr++;
 
-	switch (addr_mode)
-	{
+    switch (addr_mode)
+    {
         case IMP:
             snprintf(buf, bufsize, "         %s         ", op_name);
             break;
@@ -346,20 +352,20 @@ uint32_t dbg6502_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
             temp = addr + ((signed char)p1 + (256*(signed char)p2));
             snprintf(buf, bufsize, "%02X %02X     %s %04X    ", p1, p2, op_name, temp);
             break;
-	}
+    }
     }
     return addr;
 }
 
 size_t dbg6502_print_flags(PREG *pp, char *buf, size_t bufsize) {
     if (bufsize >= 6) {
-	*buf++ = p.n ? 'N' : ' ';
-	*buf++ = p.v ? 'V' : ' ';
-	*buf++ = p.d ? 'D' : ' ';
-	*buf++ = p.i ? 'I' : ' ';
-	*buf++ = p.z ? 'Z' : ' ';
-	*buf++ = p.c ? 'C' : ' ';
-	return 6;
+    *buf++ = p.n ? 'N' : ' ';
+    *buf++ = p.v ? 'V' : ' ';
+    *buf++ = p.d ? 'D' : ' ';
+    *buf++ = p.i ? 'I' : ' ';
+    *buf++ = p.z ? 'Z' : ' ';
+    *buf++ = p.c ? 'C' : ' ';
+    return 6;
     }
     return 0;
 }

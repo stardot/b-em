@@ -245,7 +245,8 @@ cpu_debug_t tube65816_cpu_debug = {
     .reg_set        = dbg_reg_set,
     .reg_print      = dbg_reg_print,
     .reg_parse      = dbg_reg_parse,
-    .get_instr_addr = dbg_get_instr_addr
+    .get_instr_addr = dbg_get_instr_addr,
+    .print_addr     = debug_print_16bit
 };
 
 static uint32_t dbg_disassemble(uint32_t addr, char *buf, size_t bufsize)

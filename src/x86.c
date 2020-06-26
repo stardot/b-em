@@ -189,24 +189,40 @@ static void x86_dbg_iowrite(uint32_t addr, uint32_t value) {
 #define MAXOPLEN 6
 int i386_dasm_one(char *buffer, uint32_t eip, int addr_size, int op_size);
 
+static size_t dbg_print_addr(uint32_t addr, char *buf, size_t bufsize)
+{
+    if (bufsize >= 9) {
+        uint32_t msw = addr & 0x0fff0000;
+        uint32_t lsw = addr & 0x0000ffff;
+        size_t len = debug_print_16bit(msw, buf, bufsize);
+        buf[len-1] = ':';
+        debug_print_16bit(lsw, buf+len, bufsize-len);
+    }
+    return 9;
+}
+
 static uint32_t x86_dbg_disassemble(uint32_t addr, char *buf, size_t bufsize) {
    char instr[100];
 
    int oplen = i386_dasm_one(instr, addr, 0, 0) & 0xffff;
    log_debug("x86: bdg_disassemble, oplen=%d", oplen);
-   int len = snprintf(buf, bufsize, "%06"PRIx32" ", addr);
-   buf += len;
-   bufsize -= len;
-   for (int i = 0; i < MAXOPLEN; i++) {
-      if (i < oplen) {
-         len = snprintf(buf, bufsize, "%02x ", readmemblx86(addr + i));
-      } else {
-         len = snprintf(buf, bufsize, "   ");
-      }
-      buf += len;
-      bufsize -= len;
+   size_t len = dbg_print_addr(addr, buf, bufsize);
+   if (len < bufsize) {
+        buf[len++] = ' ';
+        buf += len;
+        bufsize -= len;
+        for (int i = 0; i < MAXOPLEN; i++) {
+            if (i < oplen) {
+                len = snprintf(buf, bufsize, "%02x ", readmemblx86(addr + i));
+            }
+            else {
+                len = snprintf(buf, bufsize, "   ");
+            }
+            buf += len;
+            bufsize -= len;
+        }
+        strncpy(buf, instr, bufsize);
    }
-   strncpy(buf, instr, bufsize);
    return addr + oplen;
 }
 
@@ -354,7 +370,8 @@ cpu_debug_t tubex86_cpu_debug = {
    .reg_set        = x86_dbg_reg_set,
    .reg_print      = x86_dbg_reg_print,
    .reg_parse      = x86_dbg_reg_parse,
-   .get_instr_addr = x86_dbg_get_instr_addr
+   .get_instr_addr = x86_dbg_get_instr_addr,
+   .print_addr     = dbg_print_addr
 };
 
 #define pc x86pc
