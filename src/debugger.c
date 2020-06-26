@@ -454,7 +454,7 @@ static void set_point(cpu_debug_t *cpu, int *table, char *arg, const char *desc)
         debug_out("    missing parameter\n!", 24);
 }
 
-static void clear_point(int *table, char *arg, const char *desc)
+static void clear_point(cpu_debug_t *cpu, int *table, char *arg, const char *desc)
 {
     int c, e;
 
@@ -462,7 +462,9 @@ static void clear_point(int *table, char *arg, const char *desc)
         sscanf(arg, "%X", &e);
         for (c = 0; c < 8; c++) {
             if (table[c] == e || c == e) {
-                debug_outf("    %s %i at %04X cleared\n", desc, c, table[c]);
+                char addr_str[10];
+                cpu->print_addr(table[c], addr_str, sizeof(addr_str));
+                debug_outf("    %s %i at %s cleared\n", desc, c, addr_str);
                 table[c] = -1;
             }
         }
@@ -470,13 +472,15 @@ static void clear_point(int *table, char *arg, const char *desc)
         debug_out("    missing parameter\n!", 24);
 }
 
-static void list_points(int *table, const char *desc)
+static void list_points(cpu_debug_t *cpu, int *table, const char *desc)
 {
-    int c;
-
-    for (c = 0; c < NUM_BREAKPOINTS; c++)
-        if (table[c] != -1)
-            debug_outf("    %s %i : %04X\n", desc, c, table[c]);
+    for (int c = 0; c < NUM_BREAKPOINTS; c++) {
+        if (table[c] != -1) {
+            char addr_str[10];
+            cpu->print_addr(table[c], addr_str, sizeof(addr_str));
+            debug_outf("    %s %i : %s\n", desc, c, addr_str);
+        }
+    }
 }
 
 static void debug_paste(const char *iptr)
@@ -606,22 +610,22 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 else if (!strncmp(cmd, "breakw", cmdlen))
                     set_point(cpu, breakw, iptr, "Write breakpoint");
                 else if (!strncmp(ins, "blist", cmdlen)) {
-                    list_points(breakpoints, "Breakpoint");
-                    list_points(breakr, "Read breakpoint");
-                    list_points(breakw, "Write breakpoint");
-                    list_points(breaki, "Input breakpoint");
-                    list_points(breako, "Output breakpoint");
+                    list_points(cpu, breakpoints, "Breakpoint");
+                    list_points(cpu, breakr, "Read breakpoint");
+                    list_points(cpu, breakw, "Write breakpoint");
+                    list_points(cpu, breaki, "Input breakpoint");
+                    list_points(cpu, breako, "Output breakpoint");
                 }
                 else if (!strncmp(ins, "bclear", cmdlen))
-                    clear_point(breakpoints, iptr, "Breakpoint");
+                    clear_point(cpu, breakpoints, iptr, "Breakpoint");
                 else if (!strncmp(cmd, "bcleari", cmdlen))
-                    clear_point(breaki, iptr, "Input breakpoint");
+                    clear_point(cpu, breaki, iptr, "Input breakpoint");
                 else if (!strncmp(cmd, "bclearo", cmdlen))
-                    clear_point(breako, iptr, "Output breakpoint");
+                    clear_point(cpu, breako, iptr, "Output breakpoint");
                 else if (!strncmp(cmd, "bclearr", cmdlen))
-                    clear_point(breakr, iptr, "Read breakpoint");
+                    clear_point(cpu, breakr, iptr, "Read breakpoint");
                 else if (!strncmp(cmd, "bclearw", cmdlen))
-                    clear_point(breakw, iptr, "Write breakpoint");
+                    clear_point(cpu, breakw, iptr, "Write breakpoint");
                 else
                     badcmd = true;
                 break;
@@ -829,19 +833,19 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 else if (!strncmp(cmd, "watcho", cmdlen))
                     set_point(cpu, watcho, iptr, "Output watchpoint");
                 else if (!strncmp(cmd, "wlist", cmdlen)) {
-                    list_points(watchr, "Read watchpoint");
-                    list_points(watchw, "Write watchpoint");
-                    list_points(watchi, "Input watchpoint");
-                    list_points(watcho, "Output watchpoint");
+                    list_points(cpu, watchr, "Read watchpoint");
+                    list_points(cpu, watchw, "Write watchpoint");
+                    list_points(cpu, watchi, "Input watchpoint");
+                    list_points(cpu, watcho, "Output watchpoint");
                 }
                 else if (!strncmp(cmd, "wclearr", cmdlen))
-                    clear_point(watchr, iptr, "Read watchpoint");
+                    clear_point(cpu, watchr, iptr, "Read watchpoint");
                 else if (!strncmp(cmd, "wclearw", cmdlen))
-                    clear_point(watchw, iptr, "Write watchpoint");
+                    clear_point(cpu, watchw, iptr, "Write watchpoint");
                 else if (!strncmp(cmd, "wcleari", cmdlen))
-                    clear_point(watchi, iptr, "Input watchpoint");
+                    clear_point(cpu, watchi, iptr, "Input watchpoint");
                 else if (!strncmp(cmd, "wclearo", cmdlen))
-                    clear_point(watcho, iptr, "Output watchpoint");
+                    clear_point(cpu, watcho, iptr, "Output watchpoint");
                 else if (!strncmp(cmd, "writem", cmdlen)) {
                     if (*iptr) {
                         unsigned addr, value;
