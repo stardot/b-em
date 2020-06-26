@@ -414,7 +414,7 @@ static void print_registers(cpu_debug_t *cpu) {
     debug_out("\n", 1);
 }
 
-static void set_point(int *table, char *arg, const char *desc)
+static void set_point(cpu_debug_t *cpu, int *table, char *arg, const char *desc)
 {
     int c;
 
@@ -428,16 +428,20 @@ static void set_point(int *table, char *arg, const char *desc)
                         char *end2;
                         uint32_t b = strtoul(end1, &end2, 16);
                         if (end2 > end1) {
+                            char addr_str[10];
                             a = (a << 16) | b;
                             table[c] = a;
-                            debug_outf("    %s %i set to %04X\n", desc, c, a);
+                            cpu->print_addr(a, addr_str, sizeof(addr_str));
+                            debug_outf("    %s %i set to %s\n", desc, c, addr_str);
                         }
                         else
                             debug_outf("invalid address %s\n", arg);
                     }
                     else {
+                        char addr_str[10];
                         table[c] = a;
-                        debug_outf("    %s %i set to %04X\n", desc, c, a);
+                        cpu->print_addr(a, addr_str, sizeof(addr_str));
+                        debug_outf("    %s %i set to %s\n", desc, c, addr_str);
                     }
                 }
                 else
@@ -592,15 +596,15 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
         switch (*cmd) {
             case 'b':
                 if (!strncmp(cmd, "break", cmdlen))
-                    set_point(breakpoints, iptr, "Breakpoint");
+                    set_point(cpu, breakpoints, iptr, "Breakpoint");
                 else if (!strncmp(cmd, "breaki", cmdlen))
-                    set_point(breaki, iptr, "Input breakpoint");
+                    set_point(cpu, breaki, iptr, "Input breakpoint");
                 else if (!strncmp(cmd, "breako", cmdlen))
-                    set_point(breako, iptr, "Output breakpoint");
+                    set_point(cpu, breako, iptr, "Output breakpoint");
                 else if (!strncmp(cmd, "breakr", cmdlen))
-                    set_point(breakr, iptr, "Read breakpoint");
+                    set_point(cpu, breakr, iptr, "Read breakpoint");
                 else if (!strncmp(cmd, "breakw", cmdlen))
-                    set_point(breakw, iptr, "Write breakpoint");
+                    set_point(cpu, breakw, iptr, "Write breakpoint");
                 else if (!strncmp(ins, "blist", cmdlen)) {
                     list_points(breakpoints, "Breakpoint");
                     list_points(breakr, "Read breakpoint");
@@ -817,13 +821,13 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 
             case 'w':
                 if (!strncmp(cmd, "watchr", cmdlen))
-                    set_point(watchr, iptr, "Read watchpoint");
+                    set_point(cpu, watchr, iptr, "Read watchpoint");
                 else if (!strncmp(cmd, "watchw", cmdlen))
-                    set_point(watchw, iptr, "Write watchpoint");
+                    set_point(cpu, watchw, iptr, "Write watchpoint");
                 else if (!strncmp(cmd, "watchi", cmdlen))
-                    set_point(watchi, iptr, "Input watchpoint");
+                    set_point(cpu, watchi, iptr, "Input watchpoint");
                 else if (!strncmp(cmd, "watcho", cmdlen))
-                    set_point(watcho, iptr, "Output watchpoint");
+                    set_point(cpu, watcho, iptr, "Output watchpoint");
                 else if (!strncmp(cmd, "wlist", cmdlen)) {
                     list_points(watchr, "Read watchpoint");
                     list_points(watchw, "Write watchpoint");
