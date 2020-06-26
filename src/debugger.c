@@ -841,7 +841,12 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                     }
                 }
                 break;
+            default:
+                badcmd = true;
         }
+        if (badcmd)
+            debug_out("Bad command\n", 12);
+
     }
 }
 
