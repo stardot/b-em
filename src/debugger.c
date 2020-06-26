@@ -761,7 +761,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 break;
 
             case 's':
-                if (!strncmp(cmd, "save", cmdlen)) {
+                if (cmdlen >= 2 && !strncmp(cmd, "save", cmdlen)) {
                     if (*iptr)
                         debugger_save(iptr);
                     break;
