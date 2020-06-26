@@ -699,6 +699,8 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
             case 'p':
                 if (!strncmp(cmd, "paste", cmdlen))
                     debug_paste(iptr);
+                else
+                    badcmd = true;
                 break;
 
             case 'r':
@@ -778,18 +780,22 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 }
 
             case 't':
-                if (trace_fp)
-                    fclose(trace_fp);
-                if (*iptr) {
-                    char *eptr = strchr(iptr, '\n');
-                    if (eptr)
-                        *eptr = '\0';
-                    if ((trace_fp = fopen(iptr, "a")))
-                        debug_outf("Tracing to %s\n", iptr);
-                    else
-                        debug_outf("Unable to open trace file '%s' for append: %s\n", iptr, strerror(errno));
-                } else
-                    debug_outf("Trace file closed");
+                if (!strncmp(cmd, "paste", cmdlen)) {
+                    if (trace_fp)
+                        fclose(trace_fp);
+                    if (*iptr) {
+                        char *eptr = strchr(iptr, '\n');
+                        if (eptr)
+                            *eptr = '\0';
+                        if ((trace_fp = fopen(iptr, "a")))
+                            debug_outf("Tracing to %s\n", iptr);
+                        else
+                            debug_outf("Unable to open trace file '%s' for append: %s\n", iptr, strerror(errno));
+                    } else
+                        debug_outf("Trace file closed");
+                }
+                else
+                    badcmd = true;
                 break;
 
             case 'v':
@@ -805,6 +811,8 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                         }
                     }
                 }
+                else
+                    badcmd = true;
                 break;
 
             case 'w':
@@ -822,7 +830,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                     list_points(watchi, "Input watchpoint");
                     list_points(watcho, "Output watchpoint");
                 }
-                if (!strncmp(cmd, "wclearr", cmdlen))
+                else if (!strncmp(cmd, "wclearr", cmdlen))
                     clear_point(watchr, iptr, "Read watchpoint");
                 else if (!strncmp(cmd, "wclearw", cmdlen))
                     clear_point(watchw, iptr, "Write watchpoint");
@@ -840,6 +848,8 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                             video_poll(CLOCKS_PER_FRAME, 0);
                     }
                 }
+                else
+                    badcmd = true;
                 break;
             default:
                 badcmd = true;
