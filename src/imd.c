@@ -111,7 +111,6 @@ static uint8_t wt_headid;
 static uint8_t wt_sectid;
 static uint8_t wt_sectsz;
 
-
 /*
  * This function write the IMD file in memory back to the disc file.
  * it does not re-write the comment at the start of the file but
@@ -523,7 +522,7 @@ static void imd_poll_writesect1(void)
         else if (count == 0) {
             fdc_finishread();
             state = ST_IDLE;
-            cur_sect-> mode &= ~1;
+            cur_sect->mode &= ~1;
         }
     }
 }
