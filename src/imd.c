@@ -5,6 +5,20 @@
  * and implements the ImageDisk floppy disc image format.  ImageDisk
  * is an open, high-level, self-describing format that can deal with
  * non-standard ID fields, deleted data and CRC errors.
+ *
+ * Because this file format was designed more for archive use than
+ * for use in an emulator and uses compressed sectors the whole image
+ * is read when a disc is loaded and written back when the disc is
+ * closed/ejected.
+ *
+ * While in memory the data is stored in three levels.  Each drive,
+ * i.e. image file has an imd_file structure which contains the head
+ * and tail pointers to a doubly linked list of tracks.  Each track
+ * is stored in an imd_track structure which contains some track level
+ * attributes and the head and tail pointers to a doubly linked list
+ * of sectors which are each stored in a imd_sect structure.
+ */
+
  */
 
 #include "b-em.h"
@@ -85,6 +99,13 @@ static unsigned char *data, cdata;
 struct imd_track *cur_trk;
 struct imd_sect  *cur_sect;
 
+/*
+ * This function write the IMD file in memory back to the disc file.
+ * it does not re-write the comment at the start of the file but
+ * rewrites everything else and truncates any remaining junk from
+ * the end of the file.
+ */
+
 static void imd_save(struct imd_file *imd)
 {
     fseek(imd->fp, imd->track0, SEEK_SET);
@@ -110,6 +131,10 @@ static void imd_save(struct imd_file *imd)
     ftruncate(fileno(imd->fp), ftell(imd->fp));
 }
 
+/* This function traverses the linked lists of tracks and sectors
+ * freeing the elements of each list.
+ */
+
 static void imd_free(struct imd_file *imd)
 {
     struct imd_track *trk = imd->track_head;
@@ -126,6 +151,11 @@ static void imd_free(struct imd_file *imd)
     }
 }
 
+/* This function is called when a disc image is being closed, either
+ * when the emulator is being shut down or the disc is being ejected
+ * from the virtual disc drive.
+ */
+
 static void imd_close(int drive)
 {
     if (drive >= 0 && drive < NUM_DRIVES) {
@@ -137,6 +167,11 @@ static void imd_close(int drive)
         imd->fp = NULL;
     }
 }
+
+/* This function implements the seek command, i.e. it moves the
+ * virtual head to the specified cylinder.  It does not check that
+ * the ID fields match this track number.
+ */
 
 static void imd_seek(int drive, int track)
 {
@@ -150,6 +185,11 @@ static void imd_seek(int drive, int track)
         }
     }
 }
+
+/* This function implements the seek command, i.e. checks that the ID
+ * fields do match the cylinder the head is positioned on.  This check
+ * only examines the first sector it can find on either surface.
+ */
 
 static int imd_verify(int drive, int track, int density)
 {
@@ -173,6 +213,11 @@ static int imd_verify(int drive, int track, int density)
     return 0;
 }
 
+/* This is an internal function to find a track prior to reading from
+ * it or writing to it. This has to search the list for IDs rather
+ * than counting as tracks in the image file can be in any order.
+ */
+
 static struct imd_track *imd_find_track(int drive, int track, int side, int density)
 {
     if (drive >= 0 && drive < NUM_DRIVES) {
@@ -195,6 +240,11 @@ static struct imd_track *imd_find_track(int drive, int track, int side, int dens
     return NULL;
 }
 
+/* This is an internal function to find a sector prior to reading from
+ * it or writing to it. This has to search the list for IDs rather
+ * than counting as sectors can be skewed or interleaved.
+ */
+
 static struct imd_sect *imd_find_sector(int drive, int track, int side, int sector, struct imd_track *trk)
 {
     log_debug("imd: drive %d: searching for sector", drive);
@@ -205,6 +255,11 @@ static struct imd_sect *imd_find_sector(int drive, int track, int side, int sect
     }
     return NULL;
 }
+
+/* This function implements the start of a readsector command, i.e. it
+ * sets things up so that data is transferred to the FDC via the
+ * imd_poll function and associated state machine.
+ */
 
 static void imd_readsector(int drive, int sector, int track, int side, int density)
 {
@@ -232,6 +287,11 @@ static void imd_readsector(int drive, int sector, int track, int side, int densi
         state = ST_NOTFOUND;
     }
 }
+
+/* This function implements the start of a writesector command, i.e. it
+ * sets things up so that data is transferred from the FDC via the
+ * imd_poll function and associated state machine.
+ */
 
 static void imd_writesector(int drive, int sector, int track, int side, int density)
 {
@@ -261,6 +321,11 @@ static void imd_writesector(int drive, int sector, int track, int side, int dens
     }
 }
 
+/* This function implements the start of a readaddress command, i.e.
+ * it sets things up so that the ID header fields are fed to the FDC
+ * via the imd_poll function and associated state machine.
+ */
+
 static void imd_readaddress(int drive, int track, int side, int density)
 {
     log_debug("imd: drive %d: readaddress track=%d, side=%d, density=%d", drive, track, side, density);
@@ -283,10 +348,17 @@ static void imd_readaddress(int drive, int track, int side, int density)
     }
 }
 
+/* This function aborts an operation in progress.
+ */
+
 static void imd_abort(int drive)
 {
     state = ST_IDLE;
 }
+
+/* This function is part of the state machine to implement the write
+ * sector command and handles the first byte written.
+ */
 
 static void imd_poll_writesect0(void)
 {
@@ -300,6 +372,13 @@ static void imd_poll_writesect0(void)
         state = ST_WRITESECTOR1;
     }
 }
+
+/* This function is part of the state machine to implement the write
+ * sector command and handles the second and subsequents bytes of
+ * as long as they match the first, i.e. the sector is compressed.
+ * If a different byte is recieved it switches to an uncompressed
+ * sector format.
+ */
 
 static void imd_poll_writesect1(void)
 {
@@ -319,6 +398,7 @@ static void imd_poll_writesect1(void)
                     fdc_datacrcerror();
                     return;
                 }
+                /* Link the new sector into the list in place of the old */
                 if (cur_trk->sect_head == cur_sect)
                     cur_trk->sect_head = new_sect;
                 if (cur_trk->sect_tail == cur_sect)
@@ -358,6 +438,11 @@ static void imd_poll_writesect1(void)
     }
 }
 
+/* This function is part of the state machine to implement the write
+ * sector command and handles the third and subsequent bytes once a
+ * switch to an uncompressed sector has been made.
+ */
+
 static void imd_poll_writesect2(void)
 {
     int c = fdc_getdata(--count == 0);
@@ -374,6 +459,10 @@ static void imd_poll_writesect2(void)
         }
     }
 }
+
+/* This function is called on a timer and carries out the transfer
+ * operations set up by the other functions.
+ */
 
 static void imd_poll(void)
 {
@@ -463,6 +552,11 @@ static void imd_poll(void)
     }
 }
 
+/* This function checks that the file is a valid IMD file, skips over
+ * the ASCII comments and returns the offset to the first track or zero
+ * if the file is not valid.
+ */
+
 static long imd_check_hdr(FILE *fp)
 {
     char hdr[30];
@@ -486,6 +580,10 @@ static void imd_sect_err(const char *fn, FILE *fp, int trackno, int sectno)
     const char *msg = ferror(fp) ? strerror(errno) : "unexpected EOF";
     log_error("Disc image '%s' track %d, sector %d: %s", fn, trackno, sectno, msg);
 }
+
+/* This function loads the sectors of one track from the file and
+ * assembles them into a doubly linked list.
+ */
 
 static bool imd_load_sectors(const char *fn, FILE *fp, struct imd_track *trk, int trackno, struct imd_maps *mp)
 {
@@ -544,6 +642,10 @@ failed:
     return false;
 }
 
+/* This function loads one map, i.e. a set of bytes, one per sector
+ * containing some sector ID header field.
+ */
+
 static bool imd_load_map(const char *fn, FILE *fp, size_t nsect, uint8_t map[IMD_MAX_SECTS], int trackno, const char *which)
 {
     if (fread(map, nsect, 1, fp) == 1)
@@ -552,6 +654,10 @@ static bool imd_load_map(const char *fn, FILE *fp, size_t nsect, uint8_t map[IMD
     log_error("Disc image '%s' track %d: error reading %s map: %s", fn, trackno, which, msg);
     return false;
 }
+
+/* This function loads the tracks from the file and assembles them
+ * into a doubly linked list.
+ */
 
 static bool imd_load_tracks(const char *fn, FILE *fp, struct imd_file *imd)
 {
@@ -607,6 +713,10 @@ failed:
     return false;
 }
 
+/* This function is for debugging and writes a readable version of the
+ * ID fields for the linked lists in memory to the log file.
+ */
+
 static void imd_dump(struct imd_file *imd)
 {
 #ifdef _DEBUG
@@ -618,6 +728,10 @@ static void imd_dump(struct imd_file *imd)
     }
 #endif
 }
+
+/* This function loads an IMD and, if successful, sets up the function
+ * pointer for the various functions in the FDC to file interface.
+ */
 
 void imd_load(int drive, const char *fn)
 {
