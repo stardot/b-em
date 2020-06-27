@@ -411,7 +411,10 @@ static void imd_writetrack(int drive, int track, int side, int density)
                     return;
                 }
                 trk->next = NULL;
-                trk->prev = imd->track_tail;
+                if (imd->track_tail)
+                    trk->prev = imd->track_tail;
+                else
+                    imd->track_head = trk;
                 imd->track_tail = trk;
             }
             else {
