@@ -47,7 +47,6 @@ struct imd_track {
     uint8_t head;
     uint8_t nsect;
     uint8_t sectsize;
-    struct imd_sect *sects[IMD_MAX_SECTS];
 };
 
 struct imd_file {
