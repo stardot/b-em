@@ -214,8 +214,9 @@ static void write_1770(uint16_t addr, uint8_t val)
 
         case 0xF: /*Write track*/
             log_debug("wd1770: write track side=%d track=%d dens=%d, ctrl=%d\n", wd1770.curside, wd1770.track, wd1770.density, wd1770.ctrl);
-            wd1770.status = 0x80 | 0x1;
-            disc_format(curdrive, wd1770.track, wd1770.curside, wd1770.density);
+            wd1770.status = 0x83;
+            nmi |= 2;
+            disc_writetrack(curdrive, wd1770.track, wd1770.curside, wd1770.density);
             break;
 
         default:
@@ -468,7 +469,7 @@ void wd1770_callback()
     case 0xD: /* force interrupt */
         break;
 
-    case 0xF: /*Write tracl*/
+    case 0xF: /*Write track */
         wd1770.status = 0x80;
         wd1770_setspindown();
         if (nmi_on_completion[fdc_type - FDC_ACORN])

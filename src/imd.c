@@ -19,8 +19,6 @@
  * of sectors which are each stored in a imd_sect structure.
  */
 
- */
-
 #include "b-em.h"
 #include "disc.h"
 #include "imd.h"
@@ -89,7 +87,17 @@ enum imd_state {
     ST_READ_ADDR3,
     ST_READ_ADDR4,
     ST_READ_ADDR5,
-    ST_READ_ADDR6
+    ST_READ_ADDR6,
+    ST_WRTRACK_INITIAL,
+    ST_WRTRACK_CYLID,
+    ST_WRTRACK_HEADID,
+    ST_WRTRACK_SECTID,
+    ST_WRTRACK_SECTSZ,
+    ST_WRTRACK_HDRCRC,
+    ST_WRTRACK_DATA0,
+    ST_WRTRACK_DATA1,
+    ST_WRTRACK_DATA2,
+    ST_WRTRACK_DATACRC
 };
 
 static enum imd_state state;
@@ -98,6 +106,11 @@ static int      imd_time;
 static unsigned char *data, cdata;
 struct imd_track *cur_trk;
 struct imd_sect  *cur_sect;
+static uint8_t wt_cylid;
+static uint8_t wt_headid;
+static uint8_t wt_sectid;
+static uint8_t wt_sectsz;
+
 
 /*
  * This function write the IMD file in memory back to the disc file.
@@ -131,8 +144,24 @@ static void imd_save(struct imd_file *imd)
     ftruncate(fileno(imd->fp), ftell(imd->fp));
 }
 
-/* This function traverses the linked lists of tracks and sectors
- * freeing the elements of each list.
+/*
+ * This function traverses the linked lists of sectors freeing the
+ * elements.
+ */
+
+static void imd_free_sectors(struct imd_track *trk)
+{
+    struct imd_sect *sect = trk->sect_head;
+    while (sect) {
+        struct imd_sect *sect_next = sect->next;
+        free(sect);
+        sect = sect_next;
+    }
+}
+
+/*
+ * This function traverses the linked lists of tracks freeing the
+ * elements.
  */
 
 static void imd_free(struct imd_file *imd)
@@ -140,18 +169,14 @@ static void imd_free(struct imd_file *imd)
     struct imd_track *trk = imd->track_head;
     while (trk) {
         struct imd_track *trk_next = trk->next;
-        struct imd_sect *sect = trk->sect_head;
-        while (sect) {
-            struct imd_sect *sect_next = sect->next;
-            free(sect);
-            sect = sect_next;
-        }
+        imd_free_sectors(trk);
         free(trk);
         trk = trk_next;
     }
 }
 
-/* This function is called when a disc image is being closed, either
+/*
+ * This function is called when a disc image is being closed, either
  * when the emulator is being shut down or the disc is being ejected
  * from the virtual disc drive.
  */
@@ -168,7 +193,8 @@ static void imd_close(int drive)
     }
 }
 
-/* This function implements the seek command, i.e. it moves the
+/*
+ * This function implements the seek command, i.e. it moves the
  * virtual head to the specified cylinder.  It does not check that
  * the ID fields match this track number.
  */
@@ -186,7 +212,8 @@ static void imd_seek(int drive, int track)
     }
 }
 
-/* This function implements the seek command, i.e. checks that the ID
+/*
+ * This function implements the seek command, i.e. checks that the ID
  * fields do match the cylinder the head is positioned on.  This check
  * only examines the first sector it can find on either surface.
  */
@@ -213,7 +240,8 @@ static int imd_verify(int drive, int track, int density)
     return 0;
 }
 
-/* This is an internal function to find a track prior to reading from
+/*
+ * This is an internal function to find a track prior to reading from
  * it or writing to it. This has to search the list for IDs rather
  * than counting as tracks in the image file can be in any order.
  */
@@ -240,7 +268,8 @@ static struct imd_track *imd_find_track(int drive, int track, int side, int dens
     return NULL;
 }
 
-/* This is an internal function to find a sector prior to reading from
+/*
+ * This is an internal function to find a sector prior to reading from
  * it or writing to it. This has to search the list for IDs rather
  * than counting as sectors can be skewed or interleaved.
  */
@@ -256,7 +285,8 @@ static struct imd_sect *imd_find_sector(int drive, int track, int side, int sect
     return NULL;
 }
 
-/* This function implements the start of a readsector command, i.e. it
+/*
+ * This function implements the start of a readsector command, i.e. it
  * sets things up so that data is transferred to the FDC via the
  * imd_poll function and associated state machine.
  */
@@ -288,7 +318,8 @@ static void imd_readsector(int drive, int sector, int track, int side, int densi
     }
 }
 
-/* This function implements the start of a writesector command, i.e. it
+/*
+ * This function implements the start of a writesector command, i.e. it
  * sets things up so that data is transferred from the FDC via the
  * imd_poll function and associated state machine.
  */
@@ -321,7 +352,8 @@ static void imd_writesector(int drive, int sector, int track, int side, int dens
     }
 }
 
-/* This function implements the start of a readaddress command, i.e.
+/*
+ * This function implements the start of a readaddress command, i.e.
  * it sets things up so that the ID header fields are fed to the FDC
  * via the imd_poll function and associated state machine.
  */
@@ -348,7 +380,67 @@ static void imd_readaddress(int drive, int track, int side, int density)
     }
 }
 
-/* This function aborts an operation in progress.
+/*
+ * This begins a write track command which us used by the WD1770
+ * rather than the i2871.
+ */
+
+static void imd_writetrack(int drive, int track, int side, int density)
+{
+    if (drive >= 0 && drive < NUM_DRIVES) {
+        if (writeprot[drive]) {
+            count = 1;
+            state = ST_WRITEPROT;
+            return;
+        }
+        struct imd_file *imd = &imd_discs[drive];
+        struct imd_track *trk = imd->track_head;
+        while (trk) {
+            if (trk->cylinder == track && trk->head == side) {
+                imd_free_sectors(trk);
+                break;
+            }
+            trk = trk->next;
+        }
+        if (!trk) {
+            if (track >= 0 && track < 80) {
+                trk = malloc(sizeof(struct imd_track));
+                if (!trk) {
+                    log_error("imd: out of memory allocating new track");
+                    count = 1;
+                    state = ST_WRITEPROT;
+                    return;
+                }
+                trk->next = NULL;
+                trk->prev = imd->track_tail;
+                imd->track_tail = trk;
+            }
+            else {
+                count = 500;
+                state = ST_NOTFOUND;
+                return;
+            }
+        }
+        trk->sect_head = NULL;
+        trk->sect_tail = NULL;
+        trk->mode      = density ? 0x05 : 0x02;
+        trk->cylinder  = track;
+        trk->head      = side;
+        trk->nsect     = 0; // placeholder.
+        trk->sectsize  = 0; // placeholder.
+        cur_trk = trk;
+        cur_sect = NULL;
+        state = ST_WRTRACK_INITIAL;
+        imd_time = -20;
+        count = 60; // 30;
+        return;
+    }
+    count = 500;
+    state = ST_NOTFOUND;
+}
+
+/*
+ * This function aborts an operation in progress.
  */
 
 static void imd_abort(int drive)
@@ -356,24 +448,24 @@ static void imd_abort(int drive)
     state = ST_IDLE;
 }
 
-/* This function is part of the state machine to implement the write
+/*
+ * This function is part of the state machine to implement the write
  * sector command and handles the first byte written.
  */
 
 static void imd_poll_writesect0(void)
 {
-    int c = fdc_getdata(0);
-    if (c == -1)
-        log_warn("imd: data underrun on write");
-    else {
-        log_debug("imd: imd_poll_writesect0 c=%02X", c);
-        cdata = c;
+    int b = fdc_getdata(0);
+    log_debug("imd: imd_poll_writesect0 byte=%02X", b);
+    if (b != -1) {
+        cdata = b;
         count--;
         state = ST_WRITESECTOR1;
     }
 }
 
-/* This function is part of the state machine to implement the write
+/*
+ * This function is part of the state machine to implement the write
  * sector command and handles the second and subsequents bytes of
  * as long as they match the first, i.e. the sector is compressed.
  * If a different byte is recieved it switches to an uncompressed
@@ -382,14 +474,12 @@ static void imd_poll_writesect0(void)
 
 static void imd_poll_writesect1(void)
 {
-    int c = fdc_getdata(--count == 0);
-    if (c == -1) {
-        log_warn("imd: data underrun on write");
+    int b = fdc_getdata(--count == 0);
+    log_debug("imd: imd_poll_writesect1 byte=%02X", b);
+    if (b == -1)
         count++;
-    }
     else {
-        log_debug("imd: imd_poll_writesect1 c=%02X", c);
-        if (c != cdata) {
+        if (b != cdata) {
             if (!(cur_sect->mode & 1)) {
                 log_debug("imd: imd_poll_writesect1 converting compressed sector");
                 struct imd_sect *new_sect = malloc(sizeof(struct imd_sect)+cur_sect->sectsize);
@@ -423,7 +513,7 @@ static void imd_poll_writesect1(void)
             log_debug("imd: imd_poll_writesect1 used=%u", used);
             memset(cur_sect->data, cdata, used);
             data = cur_sect->data + used;
-            *data++ = c;
+            *data++ = b;
             state = ST_WRITESECTOR2;
             if (count == 0) {
                 fdc_finishread();
@@ -438,7 +528,8 @@ static void imd_poll_writesect1(void)
     }
 }
 
-/* This function is part of the state machine to implement the write
+/*
+ * This function is part of the state machine to implement the write
  * sector command and handles the third and subsequent bytes once a
  * switch to an uncompressed sector has been made.
  */
@@ -451,7 +542,7 @@ static void imd_poll_writesect2(void)
         count++;
     }
     else {
-        log_debug("imd: imd_poll_writesect2 c=%02X", c);
+        log_debug("imd: imd_poll_writesect2 byte=%02X", c);
         *data++ = c;
         if (count == 0) {
             fdc_finishread();
@@ -460,7 +551,236 @@ static void imd_poll_writesect2(void)
     }
 }
 
-/* This function is called on a timer and carries out the transfer
+/*
+ * This function is part of the state machine to implement the write
+ * track command and allocates a new sector which is then linked into
+ * the list for the current track, i.e. the one being assembled.
+ */
+
+static struct imd_sect *imd_poll_wrtrack_new_sect(size_t size, unsigned mode)
+{
+    struct imd_sect *new_sect = malloc(size);
+    if (new_sect) {
+        new_sect->next = NULL;
+        if (cur_trk->sect_tail) {
+            new_sect->prev = cur_trk->sect_tail;
+            cur_trk->sect_tail->next = new_sect;
+        }
+        else {
+            new_sect->prev = NULL;
+            cur_trk->sect_head = new_sect;
+        }
+        cur_trk->sect_tail = new_sect;
+        cur_trk->nsect++;
+        if (wt_sectsz > cur_trk->sectsize)
+            cur_trk->sectsize = wt_sectsz;
+        new_sect->sectsize = (128 << wt_sectsz);
+        new_sect->mode     = mode;
+        new_sect->cylinder = wt_cylid;
+        new_sect->head     = wt_headid;
+        new_sect->sectid   = wt_sectid;
+        return new_sect;
+    }
+    else {
+        log_error("imd: out of memory allocating sector during write track");
+        count = 1;
+        state = ST_WRITEPROT;
+        return NULL;
+    }
+}
+
+/*
+ * This function is part of the state machine to implement the write
+ * track command and implements the initial state which is waiting
+ * for the ID address mark.  If this does not arrive within a
+ * reasonable number of bytes we conclude the last sector has been
+ * received.
+ */
+
+static void imd_poll_wrtrack_initial(void)
+{
+    int b = fdc_getdata(0);
+    log_debug("imd: imd_poll_wrtrack_initial, byte=%02X, count=%u", b, count);
+    if (b == 0xfe || b == 0xfc)
+        state = ST_WRTRACK_CYLID;
+    else if (--count == 0) {
+        fdc_finishread();
+        state = ST_IDLE;
+        cur_trk = NULL;
+    }
+}
+
+/*
+ * This function is part of the state machine to implement the write
+ * track command and implements a state which captures the cylinder
+ * ID from the ID header.
+ */
+
+static void imd_poll_wrtrack_cylid(void)
+{
+    int b = fdc_getdata(0);
+    log_debug("imd: imd_poll_wrtrack_cylid byte=%02X", b);
+    if (b != -1) {
+        wt_cylid = b;
+        state = ST_WRTRACK_HEADID;
+    }
+}
+
+/*
+ * This function is part of the state machine to implement the write
+ * track command and implements a state which captures the head ID
+ * from the ID header.
+ */
+
+static void imd_poll_wrtrack_headid(void)
+{
+    int b = fdc_getdata(0);
+    log_debug("imd: imd_poll_wrtrack_headid byte=%02X", b);
+    if (b != -1) {
+        wt_headid = b;
+        state = ST_WRTRACK_SECTID;
+    }
+}
+
+/*
+ * This function is part of the state machine to implement the write
+ * track command and implements a state which captures the sector ID
+ * from the ID header.
+ */
+
+static void imd_poll_wrtrack_sectid(void)
+{
+    int b = fdc_getdata(0);
+    log_debug("imd: imd_poll_wrtrack_sectid byte=%02X", b);
+    if (b != -1) {
+        wt_sectid = b;
+        state = ST_WRTRACK_SECTSZ;
+    }
+}
+
+/*
+ * This function is part of the state machine to implement the write
+ * track command and implements a state which captures the sector
+ * size code from the ID header.
+ */
+
+static void imd_poll_wrtrack_sectsz(void)
+{
+    int b = fdc_getdata(0);
+    log_debug("imd: imd_poll_wrtrack_sectsz byte=%02X", b);
+    if (b != -1) {
+        wt_sectsz = b;
+        state = ST_WRTRACK_HDRCRC;
+        log_debug("imd: id header cyl=%u, head=%u, sect=%u, size=%u", wt_cylid, wt_headid, wt_sectid, wt_sectsz);
+    }
+}
+
+/*
+ * This function is part of the state machine to implement the write
+ * track command and implements a state which waits for the request
+ * to generate the header CRC.
+ */
+
+static void imd_poll_wrtrack_hdrcrc(void)
+{
+    int b = fdc_getdata(0);
+    log_debug("imd: imd_poll_wrtrack_hdrcrc byte=%02X", b);
+    if (b == 0xfb)
+        state = ST_WRTRACK_DATA0;
+}
+
+/*
+ * This function is part of the state machine to implement the write
+ * track command and implements a state which receives the
+ * first byte of the sector data.
+ */
+
+static void imd_poll_wrtrack_data0(void)
+{
+    int b = fdc_getdata(0);
+    log_debug("imd: imd_poll_wrtrack_data0 byte=%02X", b);
+    if (b != -1) {
+        cdata = b;
+        count = (128 << wt_sectsz) - 1;
+        state = ST_WRTRACK_DATA1;
+    }
+}
+
+/*
+ * This function is part of the state machine to implement the write
+ * track command and implements a state which receives the second
+ * and subsequent bytes of the sector data until either a byte is
+ * received that is not the same as the first one or until a
+ * full sector has been received.
+ */
+
+static void imd_poll_wrtrack_data1(void)
+{
+    int b = fdc_getdata(0);
+    log_debug("imd: imd_poll_wrtrack_data1 byte=%02X, count=%d", b, count);
+    if (b != -1) {
+        if (b == cdata) {
+            if (--count == 0) { // complete, compressed sector.
+                struct imd_sect *new_sect = imd_poll_wrtrack_new_sect(sizeof(struct imd_sect), 0x02);
+                if (new_sect) {
+                    new_sect->data[0] = cdata;
+                    state = ST_WRTRACK_DATACRC;
+                }
+            }
+        }
+        else {
+            log_debug("imd: imd_poll_wrtrack_data1 switching to non-compressed");
+            struct imd_sect *new_sect = imd_poll_wrtrack_new_sect(sizeof(struct imd_sect)+ (128 << wt_sectsz), 0x01);
+            if (new_sect) {
+                unsigned used = (128 << wt_sectsz) - count - 1;
+                log_debug("imd: imd_poll_wrtrack_data1 used=%u", used);
+                memset(new_sect->data, cdata, used);
+                data = new_sect->data + used;
+                *data++ = b;
+                cur_sect = new_sect;
+                state = ST_WRTRACK_DATA2;
+                if (--count == 0)
+                    state = ST_WRTRACK_DATACRC;
+            }
+        }
+    }
+}
+
+/*
+ * This function is part of the state machine to implement the write
+ * track command and implements a state which receives further bytes
+ * after switch has already been made to an uncompressed sector.
+ */
+
+static void imd_poll_wrtrack_data2(void)
+{
+    int b = fdc_getdata(0);
+    if (b != -1) {
+        log_debug("imd: imd_poll_wrtrack_data2 byte=%02X", b);
+        *data++ = b;
+        if (--count == 0)
+            state = ST_WRTRACK_DATACRC;
+    }
+}
+
+/*
+ * This function is part of the state machine to implement the write
+ * track command and implements a state which waits for the byte
+ * requesting the data CRC be generated.
+ */
+
+static void imd_poll_wrtrack_datacrc(void)
+{
+    int b = fdc_getdata(0);
+    log_debug("imd: imd_poll_wrtrack_datacrc byte=%02X", b);
+    if (b == 0xf7) {
+        state = ST_WRTRACK_INITIAL;
+        count = 60; //30;
+    }
+}
+
+/*
+ * This function is called on a timer and carries out the transfer
  * operations set up by the other functions.
  */
 
@@ -549,10 +869,50 @@ static void imd_poll(void)
             state = ST_IDLE;
             fdc_finishread();
             break;
+
+        case ST_WRTRACK_INITIAL:
+            imd_poll_wrtrack_initial();
+            break;
+
+        case ST_WRTRACK_CYLID:
+            imd_poll_wrtrack_cylid();
+            break;
+
+        case ST_WRTRACK_HEADID:
+            imd_poll_wrtrack_headid();
+            break;
+
+        case ST_WRTRACK_SECTID:
+            imd_poll_wrtrack_sectid();
+            break;
+
+        case ST_WRTRACK_SECTSZ:
+            imd_poll_wrtrack_sectsz();
+            break;
+
+        case ST_WRTRACK_HDRCRC:
+            imd_poll_wrtrack_hdrcrc();
+            break;
+
+        case ST_WRTRACK_DATA0:
+            imd_poll_wrtrack_data0();
+            break;
+
+        case ST_WRTRACK_DATA1:
+            imd_poll_wrtrack_data1();
+            break;
+
+        case ST_WRTRACK_DATA2:
+            imd_poll_wrtrack_data2();
+            break;
+
+        case ST_WRTRACK_DATACRC:
+            imd_poll_wrtrack_datacrc();
     }
 }
 
-/* This function checks that the file is a valid IMD file, skips over
+/*
+ * This function checks that the file is a valid IMD file, skips over
  * the ASCII comments and returns the offset to the first track or zero
  * if the file is not valid.
  */
@@ -581,7 +941,8 @@ static void imd_sect_err(const char *fn, FILE *fp, int trackno, int sectno)
     log_error("Disc image '%s' track %d, sector %d: %s", fn, trackno, sectno, msg);
 }
 
-/* This function loads the sectors of one track from the file and
+/*
+ * This function loads the sectors of one track from the file and
  * assembles them into a doubly linked list.
  */
 
@@ -642,7 +1003,8 @@ failed:
     return false;
 }
 
-/* This function loads one map, i.e. a set of bytes, one per sector
+/*
+ * This function loads one map, i.e. a set of bytes, one per sector
  * containing some sector ID header field.
  */
 
@@ -655,7 +1017,8 @@ static bool imd_load_map(const char *fn, FILE *fp, size_t nsect, uint8_t map[IMD
     return false;
 }
 
-/* This function loads the tracks from the file and assembles them
+/*
+ * This function loads the tracks from the file and assembles them
  * into a doubly linked list.
  */
 
@@ -713,7 +1076,8 @@ failed:
     return false;
 }
 
-/* This function is for debugging and writes a readable version of the
+/*
+ * This function is for debugging and writes a readable version of the
  * ID fields for the linked lists in memory to the log file.
  */
 
@@ -729,7 +1093,8 @@ static void imd_dump(struct imd_file *imd)
 #endif
 }
 
-/* This function loads an IMD and, if successful, sets up the function
+/*
+ * This function loads an IMD and, if successful, sets up the function
  * pointer for the various functions in the FDC to file interface.
  */
 
@@ -764,6 +1129,7 @@ void imd_load(int drive, const char *fn)
                 drives[drive].readaddress = imd_readaddress;
                 drives[drive].poll        = imd_poll;
                 drives[drive].abort       = imd_abort;
+                drives[drive].writetrack  = imd_writetrack;
                 return;
             }
         }
