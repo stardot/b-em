@@ -523,6 +523,7 @@ static void imd_poll_writesect1(void)
             }
         }
         else if (count == 0) {
+            cur_sect->data[0] = cdata;
             fdc_finishread();
             state = ST_IDLE;
             cur_sect->mode &= ~1;
