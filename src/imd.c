@@ -434,7 +434,7 @@ static void imd_writetrack(int drive, int track, int side, int density)
         cur_sect = NULL;
         state = ST_WRTRACK_INITIAL;
         imd_time = -20;
-        count = 60; // 30;
+        count = 120; //density ? 120 : 30;
         return;
     }
     count = 500;
@@ -604,7 +604,7 @@ static void imd_poll_wrtrack_initial(void)
 {
     int b = fdc_getdata(0);
     log_debug("imd: imd_poll_wrtrack_initial, byte=%02X, count=%u", b, count);
-    if (b == 0xfe || b == 0xfc)
+    if (b == 0xfe)
         state = ST_WRTRACK_CYLID;
     else if (--count == 0) {
         fdc_finishread();
@@ -778,7 +778,7 @@ static void imd_poll_wrtrack_datacrc(void)
     log_debug("imd: imd_poll_wrtrack_datacrc byte=%02X", b);
     if (b == 0xf7) {
         state = ST_WRTRACK_INITIAL;
-        count = 60; //30;
+        count = 120;
     }
 }
 
