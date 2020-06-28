@@ -535,6 +535,24 @@ static void imd_poll_writesect0(void)
  * sector format.
  */
 
+static unsigned mode_compressed(unsigned mode)
+{
+    if (mode == 0)
+        return 2;
+    if (mode & 1)
+        return mode+1;
+    return mode;
+}
+
+static unsigned mode_full(unsigned mode)
+{
+    if (mode == 0)
+        return 2;
+    if (mode & 1)
+        return mode;
+    return mode-1;
+}
+
 static void imd_poll_writesect1(void)
 {
     int b = fdc_getdata(--count == 0);
@@ -565,7 +583,7 @@ static void imd_poll_writesect1(void)
                 if (prev)
                     prev->next = new_sect;
                 new_sect->sectsize = cur_sect->sectsize;
-                new_sect->mode     = cur_sect->mode | 1;
+                new_sect->mode     = mode_full(cur_sect->mode);
                 new_sect->cylinder = cur_sect->cylinder;
                 new_sect->head     = cur_sect->head;
                 new_sect->sectid   = cur_sect->sectid;
@@ -587,7 +605,7 @@ static void imd_poll_writesect1(void)
             cur_sect->data[0] = cdata;
             fdc_finishread();
             state = ST_IDLE;
-            cur_sect->mode &= ~1;
+            cur_sect->mode = mode_compressed(cur_sect->mode);
         }
     }
 }
