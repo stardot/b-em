@@ -1,7 +1,7 @@
 /*B-em v2.2 by Tom Walker
   FDI disc support
   Interfaces with fdi2raw.c*/
-  
+
 #include <stdio.h>
 #include <stdint.h>
 #include "b-em.h"
@@ -127,12 +127,12 @@ static void fdi_readaddress(int drive, int track, int side, int density)
         fdi_readpos    = 0;
 }
 
-static void fdi_format(int drive, int track, int side, int density)
+static void fdi_format(int drive, int track, int side, unsigned par2)
 {
         fdi_revs = 0;
         fdi_track   = track;
         fdi_side    = side;
-        fdi_density = density;
+        fdi_density = 0;
         fdi_drive   = drive;
 //        printf("Format %i %i %i\n",drive,side,track);
 

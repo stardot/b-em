@@ -424,28 +424,19 @@ static void i8271_callback()
                 break;
 
             case 0x23: /*Format*/
-                if (!i8271.phase)
-                {
-                        i8271.curtrack[curdrive] = i8271.params[0];
-                        disc_writesector(curdrive, i8271.cursector, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, 0);
-                        i8271.phase = 1;
-
-                        i8271.status = 0x8C;
-                        i8271.result = 0;
-                        i8271_NMI();
-                        return;
+                if (!i8271.phase) {
+                    log_debug("i8271: callback for format, initiate");
+                    i8271.curtrack[curdrive] = i8271.params[0];
+                    disc_format(curdrive, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, i8271.params[2]);
+                    i8271.status = 0x8C;
+                    i8271.phase = 1;
                 }
-                if (i8271.phase == 2)
-                {
-                        i8271.status = 0x18;
-                        i8271.result = 0;
-                        i8271_NMI();
-                        i8271_setspindown();
-                        i8271_verify=0;
-                        return;
+                else {
+                    log_debug("i8271: callback for format, completed");
+                    i8271.status = 0x18;
+                    i8271.result = 0;
                 }
-                disc_format(curdrive, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, 0);
-                i8271.phase = 2;
+                i8271_NMI();
                 break;
 
             case 0x29: /*Seek*/

@@ -10,7 +10,7 @@ typedef struct
         void (*readsector)(int drive, int sector, int track, int side, int density);
         void (*writesector)(int drive, int sector, int track, int side, int density);
         void (*readaddress)(int drive, int track, int side, int density);
-        void (*format)(int drive, int track, int side, int density);
+        void (*format)(int drive, int track, int side, unsigned par2);
         void (*writetrack)(int drive, int track, int side, int density);
         void (*poll)(void);
         void (*abort)(int drive);

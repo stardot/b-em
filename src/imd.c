@@ -89,6 +89,10 @@ enum imd_state {
     ST_READ_ADDR4,
     ST_READ_ADDR5,
     ST_READ_ADDR6,
+    ST_FORMAT_CYLID,
+    ST_FORMAT_HEADID,
+    ST_FORMAT_SECTID,
+    ST_FORMAT_SECTSZ,
     ST_WRTRACK_INITIAL,
     ST_WRTRACK_CYLID,
     ST_WRTRACK_HEADID,
@@ -396,17 +400,17 @@ static void imd_readaddress(int drive, int track, int side, int density)
 }
 
 /*
- * This begins a write track command which us used by the WD1770
- * rather than the i2871.
+ * This function does the common set up for the i8271 format command
+ * and the WD1770 write track command.
  */
 
-static void imd_writetrack(int drive, int track, int side, int density)
+static bool imd_begin_format(int drive, int track, int side, int density)
 {
     if (drive >= 0 && drive < NUM_DRIVES) {
         if (writeprot[drive]) {
             count = 1;
             state = ST_WRITEPROT;
-            return;
+            return false;
         }
         struct imd_file *imd = &imd_discs[drive];
         struct imd_track *trk = imd->track_head;
@@ -424,11 +428,12 @@ static void imd_writetrack(int drive, int track, int side, int density)
                     log_error("imd: out of memory allocating new track");
                     count = 1;
                     state = ST_WRITEPROT;
-                    return;
+                    return false;
                 }
                 trk->next = NULL;
+                trk->prev = imd->track_tail;
                 if (imd->track_tail)
-                    trk->prev = imd->track_tail;
+                    imd->track_tail->next = trk;
                 else
                     imd->track_head = trk;
                 imd->track_tail = trk;
@@ -436,7 +441,7 @@ static void imd_writetrack(int drive, int track, int side, int density)
             else {
                 count = 500;
                 state = ST_NOTFOUND;
-                return;
+                return false;
             }
         }
         trk->sect_head = NULL;
@@ -444,17 +449,45 @@ static void imd_writetrack(int drive, int track, int side, int density)
         trk->mode      = density ? 0x05 : 0x02;
         trk->cylinder  = track;
         trk->head      = side;
-        trk->nsect     = 0; // placeholder.
-        trk->sectsize  = 0; // placeholder.
         cur_trk = trk;
         cur_sect = NULL;
-        state = ST_WRTRACK_INITIAL;
         imd_time = -20;
         count = 120;
-        return;
+        return true;
     }
     count = 500;
     state = ST_NOTFOUND;
+    return false;
+}
+
+/*
+ * This begins a format command which used by the i8271 rather than
+ * the WD1770.  The difference is that the i8271 sends only ID fields.
+ */
+
+static void imd_format(int drive, int track, int side, unsigned par2)
+{
+    if (imd_begin_format(drive, track, side, 0)) {
+        unsigned nsect = par2 & 0x1f;
+        cur_trk->nsect = nsect;
+        cur_trk->sectsize  = par2 >> 5;
+        count = nsect;
+        state = ST_FORMAT_CYLID;
+    }
+}
+
+/*
+ * This begins a write track command which us used by the WD1770 rather
+ * than the i2871.  Unlike the i8271, the WD1770 sends the whole track.
+ */
+
+static void imd_writetrack(int drive, int track, int side, int density)
+{
+    if (imd_begin_format(drive, track, side, density)) {
+        cur_trk->nsect = 0;
+        cur_trk->sectsize = 0xfe;
+        state = ST_WRTRACK_INITIAL;
+    }
 }
 
 /*
@@ -572,12 +605,13 @@ static void imd_poll_writesect2(void)
 }
 
 /*
- * This function is part of the state machine to implement the write
- * track command and allocates a new sector which is then linked into
- * the list for the current track, i.e. the one being assembled.
+ * This function allocates a new sector during disc formatting and
+ * links it into the list for the current track, i.e. the one being
+ * assembled.  As this list starts empty the new sector is always
+ * linked to the tail.
  */
 
-static struct imd_sect *imd_poll_wrtrack_new_sect(size_t size, unsigned mode)
+static struct imd_sect *imd_poll_new_sect(size_t size)
 {
     struct imd_sect *new_sect = malloc(size);
     if (new_sect) {
@@ -591,22 +625,86 @@ static struct imd_sect *imd_poll_wrtrack_new_sect(size_t size, unsigned mode)
             cur_trk->sect_head = new_sect;
         }
         cur_trk->sect_tail = new_sect;
+        return new_sect;
+    }
+    else {
+        log_error("imd: out of memory allocating sector during formatting");
+        count = 1;
+        state = ST_WRITEPROT;
+        return NULL;
+    }
+}
+
+static void imd_poll_format_cylid(void)
+{
+    struct imd_sect *new_sect = imd_poll_new_sect(sizeof(struct imd_sect));
+    if (new_sect) {
+        int cylid = fdc_getdata(0);
+        log_debug("imd: imd_poll_format_cylid, cylid=%02X, count=%u", cylid, count);
+        new_sect->cylinder = cylid;
+        new_sect->mode = 0x02;
+        new_sect->data[0]  = 0xe5;
+        cur_sect = new_sect;
+        state = ST_FORMAT_HEADID;
+    }
+}
+
+static void imd_poll_format_headid(void)
+{
+    int headid = fdc_getdata(0);
+    log_debug("imd: imd_poll_format_headid, headid=%02X, count=%u", headid, count);
+    cur_sect->head = headid;
+    state = ST_FORMAT_SECTID;
+}
+
+static void imd_poll_format_sectid(void)
+{
+    int sectid = fdc_getdata(0);
+    log_debug("imd: imd_poll_format_sectid, sectid=%02X, count=%u", sectid, count);
+    cur_sect->sectid = sectid;
+    state = ST_FORMAT_SECTSZ;
+}
+
+static void imd_dump(struct imd_file *imd);
+
+static void imd_poll_format_sectsz(void)
+{
+    int sectsz = fdc_getdata(--count == 0);
+    log_debug("imd: imd_poll_format_sectsz, sectsz=%02X, count=%u", sectsz, count);
+    if (sectsz != cur_trk->sectsize)
+        cur_trk->sectsize = 0xff;
+    cur_sect->sectsize = 128 << sectsz;
+    if (count)
+        state = ST_FORMAT_CYLID;
+    else {
+        fdc_finishread();
+        state = ST_IDLE;
+        imd_dump(&imd_discs[0]);
+    }
+}
+
+/*
+ * This function is part of the state machine to implement the write
+ * track command and allocates a new sector which is then linked into
+ * the list for the current track, i.e. the one being assembled.
+ */
+
+static struct imd_sect *imd_poll_wrtrack_new_sect(size_t size, unsigned mode)
+{
+    struct imd_sect *new_sect = imd_poll_new_sect(size);
+    if (new_sect) {
         cur_trk->nsect++;
-        if (wt_sectsz > cur_trk->sectsize)
+        if (cur_trk->sectsize == 0xfe)
             cur_trk->sectsize = wt_sectsz;
+        else if (wt_sectsz != cur_trk->sectsize)
+            cur_trk->sectsize = 0xff;
         new_sect->sectsize = (128 << wt_sectsz);
         new_sect->mode     = mode;
         new_sect->cylinder = wt_cylid;
         new_sect->head     = wt_headid;
         new_sect->sectid   = wt_sectid;
-        return new_sect;
     }
-    else {
-        log_error("imd: out of memory allocating sector during write track");
-        count = 1;
-        state = ST_WRITEPROT;
-        return NULL;
-    }
+    return new_sect;
 }
 
 /*
@@ -890,6 +988,22 @@ static void imd_poll(void)
             fdc_finishread();
             break;
 
+        case ST_FORMAT_CYLID:
+            imd_poll_format_cylid();
+            break;
+
+        case ST_FORMAT_HEADID:
+            imd_poll_format_headid();
+            break;
+
+        case ST_FORMAT_SECTID:
+            imd_poll_format_sectid();
+            break;
+
+        case ST_FORMAT_SECTSZ:
+            imd_poll_format_sectsz();
+            break;
+
         case ST_WRTRACK_INITIAL:
             imd_poll_wrtrack_initial();
             break;
@@ -1151,6 +1265,7 @@ void imd_load(int drive, const char *fn)
                 drives[drive].readsector  = imd_readsector;
                 drives[drive].writesector = imd_writesector;
                 drives[drive].readaddress = imd_readaddress;
+                drives[drive].format      = imd_format;
                 drives[drive].poll        = imd_poll;
                 drives[drive].abort       = imd_abort;
                 drives[drive].writetrack  = imd_writetrack;
