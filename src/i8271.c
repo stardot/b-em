@@ -10,15 +10,15 @@
 #include "disc.h"
 #include "model.h"
 
-void i8271_callback();
-void i8271_data(uint8_t dat);
-void i8271_spindown();
-void i8271_finishread();
-void i8271_notfound();
-void i8271_datacrcerror();
-void i8271_headercrcerror();
-void i8271_writeprotect();
-int  i8271_getdata(int last);
+static void i8271_callback();
+static void i8271_data(uint8_t dat);
+static void i8271_spindown();
+static void i8271_finishread();
+static void i8271_notfound();
+static void i8271_datacrcerror();
+static void i8271_headercrcerror();
+static void i8271_writeprotect();
+static int  i8271_getdata(int last);
 
 static int bytenum;
 static int i8271_verify = 0;
@@ -89,7 +89,7 @@ void i8271_spinup()
     }
 }
 
-void i8271_spindown()
+static void i8271_spindown()
 {
     if (motoron) {
         motoron = 0;
@@ -332,7 +332,7 @@ void i8271_write(uint16_t addr, uint8_t val)
         }
 }
 
-void i8271_callback()
+static void i8271_callback()
 {
         fdc_time = 0;
 //        printf("Callback 8271 - command %02X\n",i8271.command);
@@ -468,7 +468,7 @@ void i8271_callback()
         }
 }
 
-void i8271_data(uint8_t dat)
+static void i8271_data(uint8_t dat)
 {
         if (i8271_verify) return;
         i8271.data = dat;
@@ -479,12 +479,12 @@ void i8271_data(uint8_t dat)
         bytenum++;
 }
 
-void i8271_finishread()
+static void i8271_finishread()
 {
         fdc_time = 200;
 }
 
-void i8271_notfound()
+static void i8271_notfound()
 {
         i8271.result = 0x18;
         i8271.status = 0x18;
@@ -493,7 +493,7 @@ void i8271_notfound()
 //        printf("Not found 8271\n");
 }
 
-void i8271_datacrcerror()
+static void i8271_datacrcerror()
 {
         i8271.result = 0x0E;
         i8271.status = 0x18;
@@ -502,7 +502,7 @@ void i8271_datacrcerror()
 //        printf("CRCdat 8271\n");
 }
 
-void i8271_headercrcerror()
+static void i8271_headercrcerror()
 {
         i8271.result = 0x0C;
         i8271.status = 0x18;
@@ -511,7 +511,7 @@ void i8271_headercrcerror()
 //        printf("CRChead 8271\n");
 }
 
-int i8271_getdata(int last)
+static int i8271_getdata(int last)
 {
 //        printf("Disc get data %i\n",bytenum);
         bytenum++;
@@ -526,7 +526,7 @@ int i8271_getdata(int last)
         return i8271.data;
 }
 
-void i8271_writeprotect()
+static void i8271_writeprotect()
 {
         i8271.result = 0x12;
         i8271.status = 0x18;
