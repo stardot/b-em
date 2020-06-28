@@ -25,20 +25,23 @@ struct
 {
     uint8_t command, sector, track, status, data;
     uint8_t ctrl;
-    int curside,curtrack;
+    int curside;
     int density;
     int written;
     int stepdir;
+    int target_track;
     uint8_t in_gap;
 } wd1770;
 
-static uint8_t nmi_on_completion[5] = {
+static const uint8_t nmi_on_completion[5] = {
     1, // WD1770_ACORN
     1, // WD1770_MASTER
     0, // WD1770_OPUS
     0, // WD1770_SOLIDISK
     1  // WD1770_WATFORD
 };
+
+static const unsigned step_times[4] = { 6000, 12000, 20000, 30000 };
 
 static int bytenum;
 
@@ -93,7 +96,17 @@ static void short_spindown(void)
     fdc_time = 0;
 }
 
-#define track0 (wd1770.curtrack ? 0 : 4)
+#define track0 (wd1770.track ? 0 : 4)
+
+static void wd1770_seek(unsigned cmd, int track)
+{
+    if (track < 0)
+        track = 0;
+    wd1770.target_track = track;
+    wd1770.status = 0xa1 | track0;
+    disc_seek(curdrive, track);
+    fdc_time = step_times[cmd & 3];
+}
 
 static int data_count = 0;
 
@@ -119,62 +132,46 @@ static void begin_write_sector(const char *variant)
     wd1770.written = 0;
 }
 
-static void write_1770(uint16_t addr, uint8_t val)
+static void wd1770_cmd(unsigned val)
 {
-    switch (addr & 0x03)
-    {
-    case 0:
-        nmi &= ~1;
-        if (wd1770.status & 1 && (val >> 4) != 0xD) {
+    nmi &= ~1;
+    unsigned op = val >> 4;
+    if (op != 0x0d) {
+        if (wd1770.status & 1) {
             log_debug("wd1770: command %02X rejected", val);
             return;
         }
-        if ((val >> 4) != 0xD)/* && !(val&8)) */
-            wd1770_spinup();
-        switch (val >> 4)
-        {
+        wd1770_spinup();
+    }
+    switch (op) {
         case 0x0: /*Restore*/
             log_debug("wd1770: restore");
-            wd1770.curtrack = 0;
-            wd1770.status = 0x80 | 0x21 | track0;
-            disc_seek(curdrive, 0);
+            wd1770_seek(val, 0);
             break;
 
         case 0x1: /*Seek*/
-            log_debug("wd1770: seek track=%02d\n", wd1770.track);
-            wd1770.curtrack = wd1770.data;
-            wd1770.status = 0x80 | 0x21 | track0;
-            disc_seek(curdrive, wd1770.curtrack);
+            log_debug("wd1770: seek track from %02d to %02d\n", wd1770.track, wd1770.data);
+            wd1770_seek(val, wd1770.data);
             break;
 
         case 0x2:
         case 0x3: /*Step*/
             log_debug("wd1770: step");
-            wd1770.status = 0x80 | 0x21 | track0;
-            wd1770.curtrack += wd1770.stepdir;
-            if (wd1770.curtrack < 0)
-                wd1770.curtrack = 0;
-            disc_seek(curdrive, wd1770.curtrack);
+            wd1770_seek(val, wd1770.track + wd1770.stepdir);
             break;
 
         case 0x4:
         case 0x5: /*Step in*/
             log_debug("wd1770: step in");
-            wd1770.status = 0x80 | 0x21 | track0;
-            wd1770.curtrack++;
-            disc_seek(curdrive, wd1770.curtrack);
             wd1770.stepdir = 1;
+            wd1770_seek(val, wd1770.track + wd1770.stepdir);
             break;
 
         case 0x6:
         case 0x7: /*Step out*/
             log_debug("wd1770: step out");
-            wd1770.status = 0x80 | 0x21 | track0;
-            wd1770.curtrack--;
-            if (wd1770.curtrack < 0)
-                wd1770.curtrack = 0;
-            disc_seek(curdrive, wd1770.curtrack);
             wd1770.stepdir = -1;
+            wd1770_seek(val, wd1770.track + wd1770.stepdir);
             break;
 
         case 0x8: /*Read sector*/
@@ -200,8 +197,7 @@ static void write_1770(uint16_t addr, uint8_t val)
             bytenum = 0;
             break;
 
-        case 0xD: /*Force interrupt*/
-            log_debug("wd1770: force interrupt");
+        case 0xD:
             disc_abort(curdrive);
             if (wd1770.status & 0x01)
                 wd1770.status &= ~1;
@@ -226,8 +222,16 @@ static void write_1770(uint16_t addr, uint8_t val)
             wd1770.status = 0x90;
             short_spindown();
             break;
-        }
-        wd1770.command = val;
+     }
+     wd1770.command = val;
+}
+
+static void write_1770(uint16_t addr, uint8_t val)
+{
+    switch (addr & 0x03)
+    {
+    case 0:
+        wd1770_cmd(val);
         break;
 
     case 1: // Track register
@@ -410,11 +414,12 @@ void wd1770_callback()
     case 3: /*Step*/
     case 5: /*Step in*/
     case 7: /*Step out*/
-        wd1770.track = wd1770.curtrack;
+        wd1770.track = wd1770.target_track;
+        // FALLTHROUGH
     case 2: /*Step*/
     case 4: /*Step in*/
     case 6: /*Step out*/
-        if (wd1770.command & 0x04 && !disc_verify(curdrive, wd1770.curtrack, wd1770.density))
+        if (wd1770.command & 0x04 && !disc_verify(curdrive, wd1770.track, wd1770.density))
             wd1770.status = 0x90 | track0;
         else
             wd1770.status = 0x80 | track0;

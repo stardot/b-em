@@ -69,6 +69,7 @@ struct imd_file {
     long track0;
     int trackno;
     int headno;
+    uint8_t maxcyl;
     bool dirty;
 } imd_discs[NUM_DRIVES];
 
@@ -203,6 +204,8 @@ static void imd_seek(int drive, int track)
     if (state == ST_IDLE && drive >= 0 && drive < NUM_DRIVES) {
         log_debug("imd: drive %d: seek to track %d", drive, track);
         struct imd_file *imd = &imd_discs[drive];
+        if (track > imd->maxcyl)
+            track = imd->maxcyl;
         if (track != imd->trackno) {
             imd->track_cur = NULL;
             imd->trackno = track;
@@ -212,15 +215,24 @@ static void imd_seek(int drive, int track)
 }
 
 /*
- * This function implements the seek command, i.e. checks that the ID
- * fields do match the cylinder the head is positioned on.  This check
- * only examines the first sector it can find on either surface.
+ * Function to test if the mode of the specified track (FM/MFM) matches
+ * the density requested from the controller.
+ */
+
+static int imd_density_ok(struct imd_track *trk, int density)
+{
+    return (density && trk->mode >= 3) || (!density && trk->mode <= 2);
+}
+
+/*
+ * This function implements the verify command, i.e. checks that the
+ * ID fields do match the cylinder the head is positioned on.  This
+ * check only examines the first sector it can find on either surface.
  */
 
 static int imd_verify(int drive, int track, int density)
 {
     if (state == ST_IDLE && drive >= 0 && drive < NUM_DRIVES) {
-        log_debug("sdf: drive %d: verify track=%d, density=%d", drive, track, density);
         struct imd_file *imd = &imd_discs[drive];
         struct imd_track *trk = imd->track_cur;
         if (!trk) {
@@ -234,7 +246,9 @@ static int imd_verify(int drive, int track, int density)
                 }
             }
         }
-        return trk && trk->sect_head->cylinder == track && ((density && trk->mode >= 3) || (!density && trk->mode <= 2));
+        int res = trk && trk->sect_head->cylinder == track && imd_density_ok(trk, density);
+        log_debug("imd: drive %d: verify result=%d", drive, res);
+        return res;
     }
     return 0;
 }
@@ -250,11 +264,13 @@ static struct imd_track *imd_find_track(int drive, int track, int side, int dens
     if (drive >= 0 && drive < NUM_DRIVES) {
         struct imd_file *imd = &imd_discs[drive];
         struct imd_track *trk = imd->track_cur;
-        if (!trk) {
+        if (!trk || !imd_density_ok(trk, density)) {
             log_debug("imd: drive %d: searching for track", drive);
+            if (track > imd->maxcyl)
+                track = imd->maxcyl;
             for (trk = imd->track_head; trk; trk = trk->next) {
                 log_debug("imd: drive %d: cyl %u<>%u, head %u<>%u", drive, trk->cylinder, imd->trackno, trk->head, side);
-                if (trk->cylinder == imd->trackno && trk->head == side && ((density && trk->mode >= 3) || (!density && trk->mode <= 2))) {
+                if (trk->cylinder == track && trk->head == side && imd_density_ok(trk, density)) {
                     log_debug("imd: drive %d: found track", drive);
                     imd->track_cur = trk;
                     imd->headno = side;
@@ -362,7 +378,7 @@ static void imd_readaddress(int drive, int track, int side, int density)
     log_debug("imd: drive %d: readaddress track=%d, side=%d, density=%d", drive, track, side, density);
     if (state == ST_IDLE) {
         struct imd_track *trk = cur_trk;
-        if (trk && trk->cylinder == track && trk->head == side && ((density && trk->mode >= 3) || (!density && trk->mode <= 2))) {
+        if (trk && trk->cylinder == track && trk->head == side && imd_density_ok(trk, density)) {
             if (!(cur_sect = cur_sect->next))
                 cur_sect = trk->sect_head;
             state = ST_READ_ADDR0;
@@ -434,7 +450,7 @@ static void imd_writetrack(int drive, int track, int side, int density)
         cur_sect = NULL;
         state = ST_WRTRACK_INITIAL;
         imd_time = -20;
-        count = 120; //density ? 120 : 30;
+        count = 120;
         return;
     }
     count = 500;
@@ -447,6 +463,7 @@ static void imd_writetrack(int drive, int track, int side, int density)
 
 static void imd_abort(int drive)
 {
+    log_debug("imd: abort in state %u", state);
     state = ST_IDLE;
 }
 
@@ -1031,6 +1048,7 @@ static bool imd_load_tracks(const char *fn, FILE *fp, struct imd_file *imd)
     struct imd_track *tail = NULL;
     unsigned trackno = 0;
     uint8_t hdr[5];
+    imd->maxcyl  = 0;
     while (fread(hdr, sizeof(hdr), 1, fp) == 1) {
         log_debug("imd: header for track %d: %02X %02X %02X %02X %02X", trackno, hdr[0], hdr[1], hdr[2], hdr[3], hdr[4]);
         struct imd_track *trk = malloc(sizeof(struct imd_track));
@@ -1047,6 +1065,8 @@ static bool imd_load_tracks(const char *fn, FILE *fp, struct imd_file *imd)
             log_error("Disc image '%s' track %d has too many sectors", fn, trackno);
             goto failed;
         }
+        if (trk->cylinder > imd->maxcyl)
+            imd->maxcyl = trk->cylinder;
         struct imd_maps maps;
         if (!imd_load_map(fn, fp, trk->nsect, maps.snum_map, trackno, "sector ID"))
             goto failed;
@@ -1093,6 +1113,7 @@ static void imd_dump(struct imd_file *imd)
         for (struct imd_sect *sect = trk->sect_head; sect; sect = sect->next)
             log_debug("imd: sector mode=%02X, cylinder=%u, head=%u, sectid=%u, sectsize=%u", sect->mode, sect->cylinder, sect->head, sect->sectid, sect->sectsize);
     }
+    log_debug("imd: maximum cylinder=%u", imd->maxcyl);
 #endif
 }
 
