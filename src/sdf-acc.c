@@ -39,7 +39,10 @@ typedef enum {
     ST_READ_ADDR4,
     ST_READ_ADDR5,
     ST_READ_ADDR6,
-    ST_FORMAT
+    ST_FORMAT_CYLID,
+    ST_FORMAT_HEADID,
+    ST_FORMAT_SECTID,
+    ST_FORMAT_SECTSZ
 } state_t;
 
 state_t state = ST_IDLE;
@@ -220,17 +223,17 @@ static void sdf_readaddress(int drive, int track, int side, int density)
     }
 }
 
-static void sdf_format(int drive, int track, int side, int density)
+static void sdf_format(int drive, int track, int side, unsigned par2)
 {
     const struct sdf_geometry *geo;
 
-    if (state == ST_IDLE && (geo = check_seek(drive, 0, track, side, density))) {
+    if (state == ST_IDLE && (geo = check_seek(drive, 0, track, side, 0))) {
         sdf_drive = drive;
         sdf_side = side;
         sdf_track = track;
         sdf_sector = 0;
-        count = 500;
-        state = ST_FORMAT;
+        count = par2 & 0x1f; // sectors per track.
+        state = ST_FORMAT_CYLID;
     }
 }
 
@@ -255,7 +258,9 @@ static void sdf_poll()
             break;
 
         case ST_READSECTOR:
-            fdc_data(getc(sdf_fp[sdf_drive]));
+            if ((c = getc(sdf_fp[sdf_drive])) == EOF)
+                c = 0xe5;
+            fdc_data(c);
             if (--count == 0) {
                 fdc_finishread();
                 state = ST_IDLE;
@@ -324,23 +329,42 @@ static void sdf_poll()
                 sdf_sector = 0;
             break;
 
-        case ST_FORMAT:
+        case ST_FORMAT_CYLID:
             if (writeprot[sdf_drive]) {
-                log_debug("sdf: poll, write protected during write track");
+                log_debug("sdf: poll, write protected during format");
                 fdc_writeprotect();
                 state = ST_IDLE;
                 break;
             }
-            if (--count == 0) {
-                putc(0, sdf_fp[sdf_drive]);
-                if (++sdf_sector >= geometry[sdf_drive]->sectors_per_track) {
-                    state = ST_IDLE;
-                    fdc_finishread();
-                    break;
-                }
-                io_seek(geometry[sdf_drive], sdf_drive, sdf_sector, sdf_track, sdf_side);
-                count = 500;
+            fdc_getdata(0); // discard cylinder ID.
+            state = ST_FORMAT_HEADID;
+            break;
+
+        case ST_FORMAT_HEADID:
+            fdc_getdata(0); // discard head ID.
+            state = ST_FORMAT_SECTID;
+            break;
+
+        case ST_FORMAT_SECTID:
+            fdc_getdata(0); // discard sector ID
+            state = ST_FORMAT_SECTSZ;
+            break;
+
+        case ST_FORMAT_SECTSZ:
+            fdc_getdata(--count == 0);  // discard sector size.
+            log_debug("imd: poll format secsz, count=%d, sector=%d", count, sdf_sector);
+            if (sdf_sector < geometry[sdf_drive]->sectors_per_track) {
+                log_debug("imd: poll format secsz, filling at offset %lu", ftell(sdf_fp[sdf_drive]));
+                for (unsigned i = 0; i < geometry[sdf_drive]->sector_size; i++)
+                    putc(0xe5, sdf_fp[sdf_drive]);
+                sdf_sector++;
             }
+            if (count == 0) {
+                state = ST_IDLE;
+                fdc_finishread();
+            }
+            else
+                state = ST_FORMAT_CYLID;
             break;
     }
 }
