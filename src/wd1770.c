@@ -63,6 +63,8 @@ void wd1770_reset()
         fdc_writeprotect   = wd1770_writeprotect;
         fdc_getdata        = wd1770_getdata;
         motorspin = 45000;
+        if (motoron)
+            wd1770.status |= 0x80;
     }
 }
 
@@ -203,7 +205,7 @@ static void wd1770_cmd(unsigned val)
                 wd1770.status &= ~1;
             else
                 wd1770.status = 0x80 | 0x20 | track0;
-            if (((val & 0xc) || (wd1770.command >> 4) == 0xB) && nmi_on_completion[fdc_type - FDC_ACORN])
+            if (((val & 0xc) || (wd1770.command & 0xf0) == 0xb0) && nmi_on_completion[fdc_type - FDC_ACORN])
                 nmi = 1;
             wd1770_setspindown();
             break;
@@ -459,7 +461,7 @@ void wd1770_callback()
         } else {
             log_debug("wd1770: multi-sector write, inter-sector gap");
             wd1770.in_gap = 1;
-            fdc_time = 5000;
+            fdc_time = 5000; //
         }
         break;
 
