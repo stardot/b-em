@@ -494,9 +494,20 @@ static void imd_writetrack(int drive, int track, int side, int density)
  * This function aborts an operation in progress.
  */
 
+const char abort_write_msg[] = "imd: abort while writing in state %s, corruption likely";
+
 static void imd_abort(int drive)
 {
-    log_debug("imd: abort in state %u", state);
+    switch(state) {
+        case ST_WRITESECTOR1:
+            log_warn(abort_write_msg, "ST_WRITESECTOR1");
+            break;
+        case ST_WRITESECTOR2:
+            log_warn(abort_write_msg, "ST_WRITESECTOR2");
+            break;
+        default:
+            log_debug("imd: abort in state %u", state);
+    }
     state = ST_IDLE;
 }
 
