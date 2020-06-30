@@ -410,11 +410,11 @@ uint32_t dbg6502_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
         {
             int ll = strlen(buf);
             if (symaddr_found < symaddr)
-                snprintf(buf + ll, bufsize - ll, "(%s+%d)", sym, symaddr - symaddr_found);
+                snprintf(buf + ll, bufsize - ll, "\\ (%s+%d)", sym, symaddr - symaddr_found);
             else if (symaddr_found < symaddr)
-                snprintf(buf + ll, bufsize - ll, "(%s-%d)", sym, symaddr_found - symaddr);
+                snprintf(buf + ll, bufsize - ll, "\\ (%s-%d)", sym, symaddr_found - symaddr);
             else
-                snprintf(buf + ll, bufsize - ll, "(%s)", sym);
+                snprintf(buf + ll, bufsize - ll, "\\ (%s)", sym);
             free(sym);
         }
 

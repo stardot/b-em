@@ -293,7 +293,7 @@
     </ClInclude>
     <ClInclude Include="paula.h">
       <Filter>Header Files</Filter>
-    </ClInclude>.
+    </ClInclude>
     <ClInclude Include="debugger_symbols.h">
       <Filter>Header Files</Filter>
     </ClInclude>

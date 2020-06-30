@@ -139,10 +139,10 @@ static size_t dbg_print_addr(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
 
     if (include_symbols && symbol_find_by_addr(cpu->symbols, addr, &sym)) {
         if (msw) {
-            ret = snprintf(buf, bufsize, "%1X:%04X (%s)", msw >> 28, addr & 0xFFFF, sym);
+            ret = snprintf(buf, bufsize, "%1X:%04X \\ (%s)", msw >> 28, addr & 0xFFFF, sym);
         }
         else {
-            ret = snprintf(buf, bufsize, "%04X (%s)", addr & 0xFFFF, sym);
+            ret = snprintf(buf, bufsize, "%04X \\ (%s)", addr & 0xFFFF, sym);
         }
         free(sym);
     }
