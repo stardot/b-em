@@ -4,6 +4,7 @@
 #include <ctype.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "cpu_debug.h"
 #include "debugger.h"
@@ -1038,6 +1039,12 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
 
     if (trace_fp) {
         cpu->disassemble(cpu, addr, buf, sizeof buf);
+
+        char *sym = strchr(buf, '\\');
+        if (sym) {
+            *(sym++) = '\0';
+        }
+
         fputs(buf, trace_fp);
         *buf = ' ';
 
@@ -1045,6 +1052,13 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
             len = cpu->reg_print(r++, buf + 1, sizeof buf - 1);
             fwrite(buf, len + 1, 1, trace_fp);
         }
+
+        if (sym)
+        {
+            fputs(" \\", trace_fp);
+            fputs(sym, trace_fp);
+        }
+
         putc('\n', trace_fp);
     }
 
