@@ -82,7 +82,7 @@ void symbol_free(symbol_table *symtab) {
 void symbol_add(symbol_table *symtab, const char *name, uint32_t addr) {
     symtab->add(name, addr);
 }
-bool symbol_find_by_addr(symbol_table *symtab, uint32_t addr, const char **ret) {
+bool symbol_find_by_addr(symbol_table *symtab, uint32_t addr, char **ret) {
     std::string r;
     if (symtab && symtab->find_by_addr(addr, r)) {
         char *ret2 = (char *)malloc(r.length() + 1);
@@ -94,7 +94,7 @@ bool symbol_find_by_addr(symbol_table *symtab, uint32_t addr, const char **ret) 
         return false;
 }
 
-bool symbol_find_by_addr_near(symbol_table *symtab, uint32_t addr, uint32_t min, uint32_t max, uint32_t *addr_found, const char **ret) {
+bool symbol_find_by_addr_near(symbol_table *symtab, uint32_t addr, uint32_t min, uint32_t max, uint32_t *addr_found, char **ret) {
     std::string r;
     if (symtab && symtab->find_by_addr_near(addr, min, max, addr_found, r)) {
         char *ret2 = (char *)malloc(r.length() + 1);

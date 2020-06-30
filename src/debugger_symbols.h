@@ -54,8 +54,8 @@ typedef struct cpu_debug_t cpu_debug_t;
         symbol_table* symbol_new(void);
         void symbol_free(symbol_table *symtab);
         void symbol_add(symbol_table *symtab, const char *name, uint32_t addr);
-        bool symbol_find_by_addr(symbol_table *symtab, uint32_t addr, const char **ret);
-        bool symbol_find_by_addr_near(symbol_table *symtab, uint32_t addr, uint32_t min, uint32_t max, uint32_t *addr_found, const char **ret);
+        bool symbol_find_by_addr(symbol_table *symtab, uint32_t addr, char **ret);
+        bool symbol_find_by_addr_near(symbol_table *symtab, uint32_t addr, uint32_t min, uint32_t max, uint32_t *addr_found, char **ret);
         bool symbol_find_by_name(symbol_table *symtab, const char *name, uint32_t *addr, const char **endret);
         void symbol_list(symbol_table *symtab, struct cpu_debug_t *cpu, debug_outf_t debug_outf);
 

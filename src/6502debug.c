@@ -396,7 +396,7 @@ uint32_t dbg6502_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
             break;    
     }
 
-    const char *sym = NULL;
+    char *sym = NULL;
     if (lookforsym)
     {
         if (symaddr >= 0x8000 && symaddr < 0xC000) {
