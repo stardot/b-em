@@ -9,10 +9,12 @@
 #include "via.h"
 #include "uservia.h"
 #include "music5000.h"
+#include "paula.h"
 
 bool sound_internal = false, sound_beebsid = false, sound_dac = false;
 bool sound_ddnoise = false, sound_tape = false;
 bool sound_music5000 = false, sound_filter = false;
+bool sound_paula = false;
 
 static ALLEGRO_VOICE *voice;
 static ALLEGRO_MIXER *mixer;
@@ -68,6 +70,8 @@ void sound_poll(void)
             sid_fillbuf(sound_buffer + sound_pos, 2);
         if (sound_internal)
             sn_fillbuf(sound_buffer + sound_pos, 2);
+        if (sound_paula)
+            paula_fillbuf(sound_buffer + sound_pos, 2);
         if (sound_dac) {
             sound_buffer[sound_pos]     += (((int)lpt_dac - 0x80) * 32);
             sound_buffer[sound_pos + 1] += (((int)lpt_dac - 0x80) * 32);

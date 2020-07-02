@@ -10,14 +10,14 @@
 #include "disc.h"
 #include "model.h"
 
-void i8271_callback();
+void i8271_callback(void);
 void i8271_data(uint8_t dat);
-void i8271_spindown();
-void i8271_finishread();
-void i8271_notfound();
-void i8271_datacrcerror();
-void i8271_headercrcerror();
-void i8271_writeprotect();
+void i8271_spindown(void);
+void i8271_finishread(void);
+void i8271_notfound(void);
+void i8271_datacrcerror(void);
+void i8271_headercrcerror(void);
+void i8271_writeprotect(void);
 int  i8271_getdata(int last);
 
 static int bytenum;
@@ -80,7 +80,7 @@ static void i8271_NMI()
 }
 
 
-void i8271_spinup()
+void i8271_spinup(void)
 {
     if (!motoron) {
         motoron = 1;
@@ -89,7 +89,7 @@ void i8271_spinup()
     }
 }
 
-void i8271_spindown()
+void i8271_spindown(void)
 {
     if (motoron) {
         motoron = 0;
@@ -98,7 +98,7 @@ void i8271_spindown()
     i8271.drvout &= ~DRIVESEL;
 }
 
-void i8271_setspindown()
+void i8271_setspindown(void)
 {
     motorspin = 45000;
 }
@@ -332,7 +332,7 @@ void i8271_write(uint16_t addr, uint8_t val)
         }
 }
 
-void i8271_callback()
+void i8271_callback(void)
 {
         fdc_time = 0;
 //        printf("Callback 8271 - command %02X\n",i8271.command);
@@ -461,10 +461,12 @@ void i8271_callback()
 
             case 0xFF: break;
 
-                default: break;
+            default: break;
+                /* TODO: DB: check is this the intent?
                 printf("Unknown 8271 command %02X 3\n", i8271.command);
                 dumpregs();
                 exit(-1);
+                */
         }
 }
 
@@ -479,12 +481,12 @@ void i8271_data(uint8_t dat)
         bytenum++;
 }
 
-void i8271_finishread()
+void i8271_finishread(void)
 {
         fdc_time = 200;
 }
 
-void i8271_notfound()
+void i8271_notfound(void)
 {
         i8271.result = 0x18;
         i8271.status = 0x18;
@@ -493,7 +495,7 @@ void i8271_notfound()
 //        printf("Not found 8271\n");
 }
 
-void i8271_datacrcerror()
+void i8271_datacrcerror(void)
 {
         i8271.result = 0x0E;
         i8271.status = 0x18;
@@ -502,7 +504,7 @@ void i8271_datacrcerror()
 //        printf("CRCdat 8271\n");
 }
 
-void i8271_headercrcerror()
+void i8271_headercrcerror(void)
 {
         i8271.result = 0x0C;
         i8271.status = 0x18;
@@ -526,7 +528,7 @@ int i8271_getdata(int last)
         return i8271.data;
 }
 
-void i8271_writeprotect()
+void i8271_writeprotect(void)
 {
         i8271.result = 0x12;
         i8271.status = 0x18;

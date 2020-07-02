@@ -52,6 +52,7 @@
 #include <sys/stat.h>
 
 bool vdfs_enabled = 0;
+const char *vdfs_cfg_root = NULL;
 
 /*
  * The definition of the VDFS entry that follows is the key data
@@ -1043,12 +1044,15 @@ const char *vdfs_get_root(void)
 
 // Initialise the VDFS module.
 
-void vdfs_init(void)
+void vdfs_init(const char *root)
 {
-    char *root;
-
     scan_seq = 0;
-    if ((root = getenv("BEM_VDFS_ROOT")) == NULL)
+    const char *env = getenv("BEM_VDFS_ROOT");
+    if (env)
+    {
+        root = env; //environment variable wins
+    }
+    if (!root)
         root = ".";
     vdfs_new_root(root, &root_dir);
     root_dir.parent = cur_dir = lib_dir = cat_dir = prev_dir = &root_dir;

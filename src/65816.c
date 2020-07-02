@@ -227,7 +227,7 @@ static void dbg_reg_parse(int which, const char *str)
 
 static uint32_t do_readmem65816(uint32_t addr);
 static void do_writemem65816(uint32_t addr, uint32_t val);
-static uint32_t dbg_disassemble(uint32_t addr, char *buf, size_t bufsize);
+static uint32_t dbg_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t bufsize);
 
 static uint32_t dbg_get_instr_addr(void)
 {
@@ -245,12 +245,13 @@ cpu_debug_t tube65816_cpu_debug = {
     .reg_set        = dbg_reg_set,
     .reg_print      = dbg_reg_print,
     .reg_parse      = dbg_reg_parse,
-    .get_instr_addr = dbg_get_instr_addr
+    .get_instr_addr = dbg_get_instr_addr,
+    .print_addr     = debug_print_addr16
 };
 
-static uint32_t dbg_disassemble(uint32_t addr, char *buf, size_t bufsize)
+static uint32_t dbg_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t bufsize)
 {
-    return dbg6502_disassemble(&tube65816_cpu_debug, addr, buf, bufsize, W65816);
+    return dbg6502_disassemble(cpu, addr, buf, bufsize, W65816);
 }
 
 static uint32_t do_readmem65816(uint32_t a)

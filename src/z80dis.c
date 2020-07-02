@@ -459,7 +459,7 @@ static uint32_t disassemble(uint32_t addr, const char **ptr, char *ibuf) {
     return addr;
 }
 
-uint32_t z80_disassemble(uint32_t addr, char *buf, size_t bufsize) {
+uint32_t z80_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t bufsize) {
     uint32_t naddr, oaddr;
     const int width=18;
     char ibuf[IBUF_SIZE];
