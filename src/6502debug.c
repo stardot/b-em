@@ -426,13 +426,13 @@ uint32_t dbg6502_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
 
 size_t dbg6502_print_flags(PREG *pp, char *buf, size_t bufsize) {
     if (bufsize >= 6) {
-    *buf++ = pp->n ? 'N' : ' ';
-    *buf++ = pp->v ? 'V' : ' ';
-    *buf++ = pp->d ? 'D' : ' ';
-    *buf++ = pp->i ? 'I' : ' ';
-    *buf++ = pp->z ? 'Z' : ' ';
-    *buf++ = pp->c ? 'C' : ' ';
-    return 6;
+		*buf++ = pp->n ? 'N' : ' ';
+		*buf++ = pp->v ? 'V' : ' ';
+		*buf++ = pp->d ? 'D' : ' ';
+		*buf++ = pp->i ? 'I' : ' ';
+		*buf++ = pp->z ? 'Z' : ' ';
+		*buf++ = pp->c ? 'C' : ' ';
+		return 6;
     }
     return 0;
 }

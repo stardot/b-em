@@ -372,7 +372,8 @@ cpu_debug_t tubex86_cpu_debug = {
    .reg_print      = x86_dbg_reg_print,
    .reg_parse      = x86_dbg_reg_parse,
    .get_instr_addr = x86_dbg_get_instr_addr,
-   .print_addr     = dbg_print_addr
+   .print_addr     = dbg_print_addr,
+   .parse_addr     = debug_parse_addr
 };
 
 #define pc x86pc

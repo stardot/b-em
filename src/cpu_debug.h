@@ -23,6 +23,7 @@ typedef struct cpu_debug_t {
   uint32_t (*get_instr_addr)(void);                                   // Returns the base address of the currently executing instruction
   const char **trap_names;                                            // Null terminated list of other reasons a CPU may trap to the debugger.
   size_t   (*print_addr)(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t bufsize, bool include_symbol);   // Print an address.
+  uint32_t (*parse_addr)(cpu_debug_t *cpu, const char *arg, const char **endret); // Parse an address.
   symbol_table *symbols;                                              // symbol table for storing symbolic addresses
 } cpu_debug_t;
 
@@ -39,5 +40,7 @@ extern size_t debug_print_32bit(uint32_t addr, char *buf, size_t bufsize);
 
 extern size_t debug_print_addr16(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t bufsize, bool include_symbol);
 extern size_t debug_print_addr32(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t bufsize, bool include_symbol);
+
+extern uint32_t debug_parse_addr(cpu_debug_t *cpu, const char *arg, const char **endret);
 
 #endif

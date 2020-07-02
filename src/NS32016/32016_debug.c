@@ -226,6 +226,7 @@ cpu_debug_t n32016_cpu_debug = {
    .reg_print      = dbg_reg_print,
    .reg_parse      = dbg_reg_parse,
    .get_instr_addr = dbg_get_instr_addr,
-   .print_addr     = debug_print_addr32
+   .print_addr     = debug_print_addr32,
+   .parse_addr     = debug_parse_addr
 };
 

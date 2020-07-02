@@ -162,6 +162,33 @@ static size_t dbg_print_addr(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
         return ret;
 }
 
+static uint32_t parse_address_with_romno(cpu_debug_t *cpu, const char *arg, const char **endret)
+{
+    char *end1;
+    uint32_t a = strtoul(arg, &end1, 16);
+    if (end1 == arg) {
+        *endret = (char *)arg;
+        return -1;
+    }
+    if (*end1++ == ':') {
+        char *end2;
+        uint32_t b = strtoul(end1, &end2, 16);
+        if (end2 > end1) {
+            a = (a << 28) | b;
+            *endret = end2;
+            return a;
+        }
+        else {
+            *endret = (char *)arg;
+            return -1;
+        }
+    }
+    else {
+        *endret = end1;
+        return a;
+    }
+}
+
 static uint32_t do_readmem(uint32_t addr);
 static void     do_writemem(uint32_t addr, uint32_t val);
 static uint32_t dbg_do_readmem(uint32_t addr);
@@ -190,7 +217,8 @@ cpu_debug_t core6502_cpu_debug = {
     .reg_parse      = dbg_reg_parse,
     .get_instr_addr = dbg_get_instr_addr,
     .trap_names     = trap_names,
-    .print_addr     = dbg_print_addr
+    .print_addr     = dbg_print_addr,
+    .parse_addr     = parse_address_with_romno
 };
 
 static uint32_t dbg_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t bufsize) {
@@ -5598,7 +5626,7 @@ void m65c02_exec(void)
                         takeint = (interrupt && !p.i);
                         break;
 
-                        /* TODO: DB: was this intentionally excluded 
+                        /* TODO: DB: was this intentionally excluded
                         printf("Found bad opcode %02X\n", opcode);
                         dumpregs();
                         mem_dump();
