@@ -26,6 +26,7 @@ typedef struct cpu_debug_t cpu_debug_t;
 #ifdef __cplusplus
 
 #include <map>
+#include <string>
 
     class symbol_compare {
     public:

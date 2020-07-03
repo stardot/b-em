@@ -4,6 +4,7 @@
 #include <ctype.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "cpu_debug.h"
 #include "debugger.h"
@@ -408,8 +409,9 @@ size_t debug_print_addr16(cpu_debug_t *cpu, uint32_t value, char *buf, size_t bu
     size_t ret;
     if (!include_symbol || !symbol_find_by_addr(cpu->symbols, value, &sym))
         sym = NULL;
-    if (sym)
+    if (sym) {
         ret = snprintf(buf, bufsize, "%04X (%s)", value, sym);
+    }
     else
         ret = snprintf(buf, bufsize, "%04X", value);
 
@@ -424,8 +426,9 @@ size_t debug_print_addr32(cpu_debug_t *cpu, uint32_t value, char *buf, size_t bu
     size_t ret;
     if (!include_symbol || !symbol_find_by_addr(cpu->symbols, value, &sym))
         sym = NULL;
-    if (sym)
+    if (sym) {
         ret = snprintf(buf, bufsize, "%08X (%s)", value, sym);
+    }
     else
         ret = snprintf(buf, bufsize, "%08X", value);
 
@@ -492,7 +495,7 @@ static void set_sym(cpu_debug_t *cpu, const char *arg) {
         char name[SYM_MAX + 1], rest[SYM_MAX + 1];
                 
         n = sscanf(arg, "%" STRINGY(SYM_MAX) "[^= ] = %" STRINGY(SYM_MAX) "s", name, rest);
-        char *e;
+        const char *e;
         uint32_t addr;
         if (n == 2) 
             addr = parse_address_with_romno(cpu, rest, &e);
@@ -525,28 +528,33 @@ static void set_point(cpu_debug_t *cpu, int *table, char *arg, const char *desc)
 {
     int c;
 
-    if (*arg) {
+    const char *end1;
+    uint32_t a = parse_address_with_romno(cpu, arg, &end1);
+
+    char addrbuf[16 + SYM_MAX];
+    cpu->print_addr(cpu, a, addrbuf, sizeof(addrbuf), true);
+
+    if (end1 > arg) {
+
+        // check to see if already set
+        for (c = 0; c < NUM_BREAKPOINTS; c++) {
+            if (table[c] == a)
+            {
+                debug_outf("    %s %i already set to %s\n", desc, c, addrbuf);
+                return;
+            }
+        }
+
         for (c = 0; c < NUM_BREAKPOINTS; c++) {
             if (table[c] == -1) {
-                char *end1;
-                uint32_t a = parse_address_with_romno(cpu, arg, &end1);
-
-                if (end1 > arg) {
-                    table[c] = a;
-
-                    char addrbuf[16 + SYM_MAX];
-                    cpu->print_addr(cpu, a, addrbuf, sizeof(addrbuf), true);
-
-                    debug_outf("    %s %i set to %s\n", desc, c, addrbuf);
-                }
-                else
-                    debug_outf("invalid address %s\n", arg);
+                table[c] = a;
+                debug_outf("    %s %i set to %s\n", desc, c, addrbuf);
                 return;
             }
         }
         debug_outf("    unable to set %s breakpoint, table full\n", desc);
     } else
-        debug_out("    missing parameter\n!", 24);
+        debug_out("    missing parameter or invalid address\n!", 24);
 }
 
 static void clear_point(cpu_debug_t *cpu, int *table, char *arg, const char *desc)
@@ -556,7 +564,7 @@ static void clear_point(cpu_debug_t *cpu, int *table, char *arg, const char *des
     const char *p;
     e = parse_address_with_romno(cpu, arg, &p);
 
-    if (*p != e) {
+    if (p != arg) {
         int ix = -1;
         //DB: changed this to search by address first then by index
         for (c = 0; c < NUM_BREAKPOINTS; c++) {
@@ -564,12 +572,19 @@ static void clear_point(cpu_debug_t *cpu, int *table, char *arg, const char *des
                 ix = c;
             }
         }
-        if (ix == -1 && e < NUM_BREAKPOINTS)
+        if (ix == -1 && e < NUM_BREAKPOINTS && table[e] != -1)
             ix = e;
 
         if (ix >= 0) {
-            debug_outf("    %s %i at %04X cleared\n", desc, c, table[c]);
-            table[c] = -1;
+
+            char addrbuf[16 + SYM_MAX];
+            cpu->print_addr(cpu, table[ix], addrbuf, sizeof(addrbuf), true);
+
+            debug_outf("    %s %i at %s cleared\n", desc, ix, addrbuf);
+            table[ix] = -1;
+        }
+        else {
+            debug_outf("    Can't find that breakpoint\n");
         }
 
 
@@ -1021,6 +1036,12 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
 
     if (trace_fp) {
         cpu->disassemble(cpu, addr, buf, sizeof buf);
+
+        char *sym = strchr(buf, '\\');
+        if (sym) {
+            *(sym++) = '\0';
+        }
+
         fputs(buf, trace_fp);
         *buf = ' ';
 
@@ -1028,6 +1049,13 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
             len = cpu->reg_print(r++, buf + 1, sizeof buf - 1);
             fwrite(buf, len + 1, 1, trace_fp);
         }
+
+        if (sym)
+        {
+            fputs(" \\", trace_fp);
+            fputs(sym, trace_fp);
+        }
+
         putc('\n', trace_fp);
     }
 
@@ -1038,7 +1066,7 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
     else {
         for (c = 0; c < NUM_BREAKPOINTS; c++) {
             if (breakpoints[c] == addr) {
-                char addr_str[10];
+                char addr_str[16+SYM_MAX];
                 cpu->print_addr(cpu, addr, addr_str, sizeof(addr_str), true);
                 debug_outf("cpu %s: Break at %s\n", cpu->cpu_name, addr_str);
                 if (contcount) {

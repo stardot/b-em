@@ -15,6 +15,7 @@
 #include "model.h"
 #include "mouse.h"
 #include "music5000.h"
+#include "paula.h"
 #include "savestate.h"
 #include "sid_b-em.h"
 #include "scsi.h"
@@ -108,6 +109,7 @@ static ALLEGRO_MENU *create_file_menu(void)
     al_append_menu_item(menu, "Save Screenshot...", IDM_FILE_SCREEN_SHOT, 0, NULL, NULL);
     add_checkbox_item(menu, "Print to file", IDM_FILE_PRINT, prt_fp);
     add_checkbox_item(menu, "Record Music 5000 to file", IDM_FILE_M5000, music5000_fp);
+    add_checkbox_item(menu, "Record Paula to file", IDM_FILE_PAULAREC, paula_fp);
     al_append_menu_item(menu, "Exit", IDM_FILE_EXIT, 0, NULL, NULL);
     return menu;
 }
@@ -349,6 +351,7 @@ static ALLEGRO_MENU *create_sound_menu(void)
     add_checkbox_item(menu, "Internal sound chip",   IDM_SOUND_INTERNAL,  sound_internal);
     add_checkbox_item(menu, "BeebSID",               IDM_SOUND_BEEBSID,   sound_beebsid);
     add_checkbox_item(menu, "Music 5000",            IDM_SOUND_MUSIC5000, sound_music5000);
+    add_checkbox_item(menu, "Paula",                 IDM_SOUND_PAULA,     sound_paula);
     add_checkbox_item(menu, "Printer port DAC",      IDM_SOUND_DAC,       sound_dac);
     add_checkbox_item(menu, "Disc drive noise",      IDM_SOUND_DDNOISE,   sound_ddnoise);
     add_checkbox_item(menu, "Tape noise",            IDM_SOUND_TAPE,      sound_tape);
@@ -578,6 +581,26 @@ static void m5000_rec(ALLEGRO_EVENT *event)
         al_destroy_native_file_dialog(chooser);
     }
 }
+
+static void paula_rec(ALLEGRO_EVENT *event)
+{
+    ALLEGRO_FILECHOOSER *chooser;
+    ALLEGRO_DISPLAY *display;
+
+    if (paula_fp)
+        paula_rec_stop();
+    else if ((chooser = al_create_native_file_dialog(savestate_name, "Record Paula to file", "*.wav", ALLEGRO_FILECHOOSER_SAVE))) {
+        display = (ALLEGRO_DISPLAY *)(event->user.data2);
+        while (al_show_native_file_dialog(display, chooser)) {
+            if (al_get_native_file_dialog_count(chooser) <= 0)
+                break;
+            if (paula_rec_start(al_get_native_file_dialog_path(chooser, 0)))
+                break;
+        }
+        al_destroy_native_file_dialog(chooser);
+    }
+}
+
 
 static void edit_print_clip(ALLEGRO_EVENT *event)
 {
@@ -934,6 +957,9 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
         case IDM_FILE_M5000:
             m5000_rec(event);
             break;
+        case IDM_FILE_PAULAREC:
+            paula_rec(event);
+            break;
         case IDM_FILE_EXIT:
             quitting = true;
             break;
@@ -1063,6 +1089,9 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             break;
         case IDM_SOUND_MUSIC5000:
             sound_music5000 = !sound_music5000;
+            break;
+        case IDM_SOUND_PAULA:
+            sound_paula = !sound_paula;
             break;
         case IDM_SOUND_DAC:
             sound_dac = !sound_dac;

@@ -13,6 +13,7 @@
 #include "mouse.h"
 #include "music2000.h"
 #include "music5000.h"
+#include "paula.h"
 #include "serial.h"
 #include "scsi.h"
 #include "sid_b-em.h"
@@ -134,15 +135,16 @@ static size_t dbg_print_addr(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
     size_t ret;
     uint32_t msw = addr & 0xf0000000;
 
-    const char *sym = NULL;
+    char *sym = NULL;
 
     if (include_symbols && symbol_find_by_addr(cpu->symbols, addr, &sym)) {
         if (msw) {
-            ret = snprintf(buf, bufsize, "%1X:%04X (%s)", msw >> 28, addr & 0xFFFF, sym);
+            ret = snprintf(buf, bufsize, "%1X:%04X \\ (%s)", msw >> 28, addr & 0xFFFF, sym);
         }
         else {
-            ret = snprintf(buf, bufsize, "%04X (%s)", addr & 0xFFFF, sym);
+            ret = snprintf(buf, bufsize, "%04X \\ (%s)", addr & 0xFFFF, sym);
         }
+        free(sym);
     }
     else {
         if (msw) {
@@ -152,6 +154,8 @@ static size_t dbg_print_addr(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
             ret = snprintf(buf, bufsize, "%04X", addr & 0xFFFF);
         }
     }
+
+
     if (ret > bufsize)
         return bufsize;
     else
@@ -362,6 +366,15 @@ static uint32_t do_readmem(uint32_t addr)
                 }
         }
 
+        if (sound_paula) {
+            if (addr >= 0xFCFD && addr <= 0xFDFF) {
+                uint8_t r;
+                if (paula_read(addr, &r))
+                    return r;
+            }
+        }
+
+
         switch (addr & ~3) {
             case 0xFC08:
             case 0xFC0C:
@@ -554,7 +567,13 @@ static void do_writemem(uint32_t addr, uint32_t val)
         if (sound_music5000) {
            if (addr >= 0xFCFF && addr <= 0xFDFF) {
               music5000_write((uint16_t)addr, (uint8_t)val);
-              return;
+              //return -- removed DB need to write to all users of paging register
+           }
+        }
+        if (sound_paula)
+        {
+            if (addr >= 0xFCFD && addr <= 0xFDFF) {
+                paula_write(addr, val);
            }
         }
 

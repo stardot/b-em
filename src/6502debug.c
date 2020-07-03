@@ -378,15 +378,18 @@ uint32_t dbg6502_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
             break;
         case PCR:
             p1 = cpu->memread(addr++);
-            temp = addr + (signed char)p1;
+            temp = (signed char)p1;
+            temp += addr;
             snprintf(buf, bufsize, "%02X       %s %04X    ", p1, op_name, temp);
             lookforsym = true;
             symaddr = temp;
             break;
         case PCRL:
+
             p1 = cpu->memread(addr++);
             p2 = cpu->memread(addr++);
-            temp = addr + ((signed char)p1 + (256*(signed char)p2));
+            temp = (int16_t)((uint16_t)p1 | (uint16_t)p2 <<8);
+            temp += addr;
             snprintf(buf, bufsize, "%02X %02X     %s %04X    ", p1, p2, op_name, temp);
             lookforsym = true;
             symaddr = temp;
