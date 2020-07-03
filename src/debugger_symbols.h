@@ -27,6 +27,11 @@ typedef struct cpu_debug_t cpu_debug_t;
 
 #include <map>
 
+    class symbol_compare {
+    public:
+        bool operator()(const char *a, const char *b) const { return strcmp(a, b) < 0; };
+    };
+
     class symbol_entry {
     private:
         char *symbol;
@@ -49,21 +54,21 @@ typedef struct cpu_debug_t cpu_debug_t;
             if (symbol)
                 free(symbol);
         }
-        uint32_t getAddr() { return addr; }
-        const char *getSymbol() { return symbol; }
+        uint32_t getAddr() const { return addr; }
+        const char *getSymbol() const { return symbol; }
     };
 
     class symbol_table {
     private:
-        std::map<const char *, symbol_entry> map;
+        std::map<const char *, symbol_entry, symbol_compare> map;
     public:
         void add(const char *symbol, uint32_t addr);
-        bool find_by_addr(uint32_t addr, const char *&ret);
-        bool find_by_name(const char *name, uint32_t &ret);
-        bool find_by_addr_near(uint32_t addr, uint32_t min, uint32_t max, uint32_t *addr_found, const char *&ret);
-        int length() { return map.size(); }
+        bool find_by_addr(uint32_t addr, const char *&ret) const;
+        bool find_by_name(const char *name, uint32_t &ret) const;
+        bool find_by_addr_near(uint32_t addr, uint32_t min, uint32_t max, uint32_t *addr_found, const char *&ret) const;
+        int length() const { return map.size(); }
 
-        void symbol_list(cpu_debug_t *cpu, debug_outf_t debug_outf);
+        void symbol_list(cpu_debug_t *cpu, debug_outf_t debug_outf) const;
     };
 #else
     typedef struct symbol_table symbol_table;

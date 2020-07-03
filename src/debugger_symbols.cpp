@@ -13,7 +13,7 @@ void symbol_table::add(const char *name, uint32_t addr) {
     map.insert({ e.getSymbol(), std::move(e) });
 }
 
-bool symbol_table::find_by_addr(uint32_t addr, const char * &ret) {
+bool symbol_table::find_by_addr(uint32_t addr, const char * &ret) const {
     // quick and dirty lookup
     for (auto &element : map) {
         if (element.second.getAddr() == addr)
@@ -25,7 +25,7 @@ bool symbol_table::find_by_addr(uint32_t addr, const char * &ret) {
     return false;
 }
 
-bool symbol_table::find_by_addr_near(uint32_t addr, uint32_t min, uint32_t max, uint32_t *addr_found, const char *&ret) {
+bool symbol_table::find_by_addr_near(uint32_t addr, uint32_t min, uint32_t max, uint32_t *addr_found, const char *&ret) const {
 
     bool matched = false;
     uint32_t distance = 0;
@@ -54,7 +54,7 @@ bool symbol_table::find_by_addr_near(uint32_t addr, uint32_t min, uint32_t max, 
     return matched;
 }
 
-bool symbol_table::find_by_name(const char * name, uint32_t &ret) {
+bool symbol_table::find_by_name(const char * name, uint32_t &ret) const {
     auto i = map.find(name);
     if (i != map.end())
     {
@@ -65,7 +65,7 @@ bool symbol_table::find_by_name(const char * name, uint32_t &ret) {
 
 }
 
-void symbol_table::symbol_list(cpu_debug_t *cpu, debug_outf_t debug_outf) {
+void symbol_table::symbol_list(cpu_debug_t *cpu, debug_outf_t debug_outf) const {
     if (length() == 0)
         debug_outf("No symbols loaded");
     for (auto &element : map) {
