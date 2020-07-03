@@ -27,13 +27,40 @@ typedef struct cpu_debug_t cpu_debug_t;
 
 #include <map>
 
+    class symbol_entry {
+    private:
+        char *symbol;
+        uint32_t addr;
+    public:
+        symbol_entry(const char *_symbol, uint32_t _addr) {
+            symbol = (char *)malloc(strlen(_symbol) + 1);
+            if (symbol) {
+                strcpy(symbol, _symbol);
+            }
+            addr = _addr;
+        }
+        symbol_entry(const symbol_entry &) = delete;
+        symbol_entry(symbol_entry &&other) {
+            this->addr = other.addr;
+            this->symbol = other.symbol;
+            other.symbol = NULL;
+        }
+        ~symbol_entry() {
+            if (symbol)
+                free(symbol);
+        }
+        uint32_t getAddr() { return addr; }
+        const char *getSymbol() { return symbol; }
+    };
+
     class symbol_table {
     private:
-        std::map<std::string, uint32_t> map;
+        std::map<const char *, symbol_entry> map;
     public:
-        void add(std::string name, uint32_t addr);
-        bool find_by_addr(uint32_t addr, std::string &ret);
-        bool find_by_name(std::string name, uint32_t &ret);
+        void add(const char *symbol, uint32_t addr);
+        bool find_by_addr(uint32_t addr, const char *&ret);
+        bool find_by_name(const char *name, uint32_t &ret);
+        bool find_by_addr_near(uint32_t addr, uint32_t min, uint32_t max, uint32_t *addr_found, const char *&ret);
         int length() { return map.size(); }
 
         void symbol_list(cpu_debug_t *cpu, debug_outf_t debug_outf);
@@ -53,6 +80,7 @@ typedef struct cpu_debug_t cpu_debug_t;
         void symbol_free(symbol_table *symtab);
         void symbol_add(symbol_table *symtab, const char *name, uint32_t addr);
         bool symbol_find_by_addr(symbol_table *symtab, uint32_t addr, const char **ret);
+        bool symbol_find_by_addr_near(symbol_table *symtab, uint32_t addr, uint32_t min, uint32_t max, uint32_t *addr_found, const char **ret);
         bool symbol_find_by_name(symbol_table *symtab, const char *name, uint32_t *addr, const char **endret);
         void symbol_list(symbol_table *symtab, struct cpu_debug_t *cpu, debug_outf_t debug_outf);
 

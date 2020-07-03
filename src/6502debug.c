@@ -393,11 +393,26 @@ uint32_t dbg6502_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
             break;    
     }
 
-    const char *sym;
-    if (lookforsym && symbol_find_by_addr(cpu->symbols, symaddr, &sym))
+    const char *sym = NULL;
+    if (lookforsym)
     {
-        int ll = strlen(buf);
-        snprintf(buf + ll, bufsize - ll, "(%s)", sym);
+        if (symaddr >= 0x8000 && symaddr < 0xC000) {
+            // add rom number, first see if we are disassembling a rom
+
+            symaddr = symaddr | (addr & 0xF0000000);  // add in rom # if present
+        }
+
+        uint32_t symaddr_found;
+        if (symbol_find_by_addr_near(cpu->symbols, symaddr, symaddr-10, symaddr+10, &symaddr_found, &sym))
+        {
+            int ll = strlen(buf);
+            if (symaddr_found < symaddr)
+                snprintf(buf + ll, bufsize - ll, "\\ (%s+%d)", sym, symaddr - symaddr_found);
+            else if (symaddr_found < symaddr)
+                snprintf(buf + ll, bufsize - ll, "\\ (%s-%d)", sym, symaddr_found - symaddr);
+            else
+                snprintf(buf + ll, bufsize - ll, "\\ (%s)", sym);
+        }
     }
 
     return addr;

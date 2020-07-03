@@ -754,8 +754,9 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                     debug_disaddr = parse_address_with_romno(cpu, iptr, &e);
                 for (c = 0; c < 12; c++) {
                     const char *sym;
-                    if (symbol_find_by_addr(cpu->symbols, debug_disaddr, &sym))
+                    if (symbol_find_by_addr(cpu->symbols, debug_disaddr, &sym)) {
                         debug_outf("%s:\n", sym);
+                    }
                     debug_out("    ", 4);
                     debug_disaddr = cpu->disassemble(cpu, debug_disaddr, ins, sizeof ins);
                     debug_out(ins, strlen(ins));
