@@ -406,7 +406,7 @@ uint32_t dbg6502_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
         }
 
         uint32_t symaddr_found;
-        if (symbol_find_by_addr_near(cpu->symbols, symaddr, symaddr-10, symaddr+10, &symaddr_found, &sym))
+        if (symbol_find_by_addr_near(cpu->symbols, symaddr, (symaddr <= 10)?0:symaddr-10, (symaddr <= 0xFFFFFFF5)?symaddr+10:0xFFFFFFFF, &symaddr_found, &sym))
         {
             int ll = strlen(buf);
             if (symaddr_found < symaddr)

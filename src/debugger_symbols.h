@@ -33,6 +33,12 @@ typedef struct cpu_debug_t cpu_debug_t;
         bool operator()(const char *a, const char *b) const { return strcmp(a, b) < 0; };
     };
 
+    //we need to sort backwards as we want upper_bound to return the lower address and favour address < the one we search for in addr near
+    class symbol_addr_compare {
+    public:
+        bool operator()(uint32_t a, uint32_t b) const { return a > b; }
+    };
+
     class symbol_entry {
     private:
         char *symbol;
@@ -61,12 +67,14 @@ typedef struct cpu_debug_t cpu_debug_t;
 
     class symbol_table {
     private:
-        std::map<const char *, symbol_entry, symbol_compare> map;
+        std::map<const char *, symbol_entry*, symbol_compare> map;
+        std::multimap<uint32_t, symbol_entry*, symbol_addr_compare> byaddrmap;
     public:
+        ~symbol_table();
         void add(const char *symbol, uint32_t addr);
         bool find_by_addr(uint32_t addr, const char *&ret) const;
         bool find_by_name(const char *name, uint32_t &ret) const;
-        bool find_by_addr_near(uint32_t addr, uint32_t min, uint32_t max, uint32_t *addr_found, const char *&ret) const;
+        bool find_by_addr_near(uint32_t addr, uint32_t min, uint32_t max, uint32_t &addr_found, const char *&ret) const;
         int length() const { return map.size(); }
 
         void symbol_list(cpu_debug_t *cpu, debug_outf_t debug_outf) const;
