@@ -603,6 +603,17 @@ static void paula_rec(ALLEGRO_EVENT *event)
     }
 }
 
+static void edit_paste_start(ALLEGRO_EVENT *event)
+{
+    ALLEGRO_DISPLAY *display = (ALLEGRO_DISPLAY *)(event->user.data2);
+    char *text = al_get_clipboard_text(display);
+    if (!text) {
+        sleep(1);  // try again - Allegro bug.
+        text = al_get_clipboard_text(display);
+    }
+    if (text)
+        os_paste_start(text);
+}
 
 static void edit_print_clip(ALLEGRO_EVENT *event)
 {
@@ -1010,7 +1021,7 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             quitting = true;
             break;
         case IDM_EDIT_PASTE:
-            os_paste_start(al_get_clipboard_text((ALLEGRO_DISPLAY *)(event->user.data2)));
+            edit_paste_start(event);
             break;
         case IDM_EDIT_COPY:
             edit_print_clip(event);
