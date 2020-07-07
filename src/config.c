@@ -176,7 +176,7 @@ void config_load(void)
 
 void set_config_int(const char *sect, const char *key, int value)
 {
-    char buf[10];
+    char buf[11];
 
     snprintf(buf, sizeof buf, "%d", value);
     al_set_config_value(bem_cfg, sect, key, buf);
@@ -257,7 +257,8 @@ void config_save(void)
         if (vid_pal)
             c += 4;
         set_config_int("video", "displaymode", c);
-        set_config_int("video", "ledlocation", vid_ledlocation);
+        if (vid_ledlocation >= 0)
+            set_config_int("video", "ledlocation", vid_ledlocation);
         set_config_int("video", "ledvisibility", vid_ledvisibility);
 
         set_config_bool("tape", "fasttape", fasttape);
