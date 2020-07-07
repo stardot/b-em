@@ -800,6 +800,7 @@ static int scan_dir(vdfs_entry *dir)
         log_debug("vdfs: using cached dir info for %s", dir->host_path);
         return 0;
     }
+    show_activity();
 
     if ((dp = opendir(dir->host_path))) {
         // Mark all previos entries deleted but leave them in the list.
