@@ -274,7 +274,7 @@ void config_save(void)
 
         set_config_bool(NULL, "mouse_amx", mouse_amx);
 
-        for (c = 0; c < 128; c++) {
+        for (int c = 0; c < ALLEGRO_KEY_MAX; c++) {
             snprintf(t, sizeof t, "key_define_%03i", c);
             if (keylookup[c] == c)
                 al_remove_config_key(bem_cfg, "user_keyboard", t);
