@@ -98,10 +98,9 @@ static void sysvia_write_IC32(uint8_t val)
 
         scrsize = ((IC32 & 0x10) ? 2 : 0) | ((IC32 & 0x20) ? 1 : 0);
 
-    if ((IC32 & 0x40) != (oldIC32 & 0x40))
-        led_update(LED_CAPS_LOCK, !(IC32 & 0x40), 0);
-    if ((IC32 & 0x80) != (oldIC32 & 0x80))
-        led_update(LED_SHIFT_LOCK, !(IC32 & 0x80), 0);
+    log_debug("sysvia: IC32=%02X", IC32);
+    led_update(LED_CAPS_LOCK, !(IC32 & 0x40), 0);
+    led_update(LED_SHIFT_LOCK, !(IC32 & 0x80), 0);
     if (MASTER && !compactcmos)
         cmos_update(IC32, sdbval);
 }
