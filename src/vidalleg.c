@@ -433,7 +433,7 @@ static void render_leds(void)
             if (led_visible_frames_left > 0) {
                 if (led_visible_frames_left <= led_fade_frames) {
                     int i = (255 * led_visible_frames_left) / led_fade_frames;
-                    led_tint = al_map_rgba(255, 255, 255, i);
+                    led_tint = al_map_rgba(i, i, i, i);
                 }
                 else
                     led_tint = al_map_rgb(255, 255, 255);
