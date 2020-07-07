@@ -6,6 +6,7 @@
 #include "cmos.h"
 #include "compactcmos.h"
 #include "keyboard.h"
+#include "led.h"
 #include "via.h"
 #include "sysvia.h"
 #include "sn76489.h"
@@ -84,7 +85,6 @@ static void sysvia_update_sdb()
 static void sysvia_write_IC32(uint8_t val)
 {
         uint8_t oldIC32 = IC32;
-        int temp = 0;
 
         if (val & 8)
            IC32 |=  (1 << (val & 7));
@@ -98,12 +98,12 @@ static void sysvia_write_IC32(uint8_t val)
 
         scrsize = ((IC32 & 0x10) ? 2 : 0) | ((IC32 & 0x20) ? 1 : 0);
 
-        if ((IC32 & 0xC0) != (oldIC32 & 0xC0))
-        {
-                if (!(IC32 & 0x40)) temp |= KB_CAPSLOCK_FLAG;
-                if (!(IC32 & 0x80)) temp |= KB_SCROLOCK_FLAG;
-        }
-        if (MASTER && !compactcmos) cmos_update(IC32, sdbval);
+    if ((IC32 & 0x40) != (oldIC32 & 0x40))
+        led_update(LED_CAPS_LOCK, !(IC32 & 0x40), 0);
+    if ((IC32 & 0x80) != (oldIC32 & 0x80))
+        led_update(LED_SHIFT_LOCK, !(IC32 & 0x80), 0);
+    if (MASTER && !compactcmos)
+        cmos_update(IC32, sdbval);
 }
 
 void sysvia_write_portA(uint8_t val)
