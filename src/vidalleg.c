@@ -110,15 +110,8 @@ void video_set_window_size(bool fudge)
     }
     winsizex = scr_x_size;
     winsizey = fudge ? scr_y_size + y_fudge : scr_y_size;
-    fprintf(stderr, "SFTODOA1 %d\n", vid_ledlocation);
-    switch (vid_ledlocation) { // SFTODO: JUST DO 'IF == 2' IF CASE 0 & 1 DO NOTHING
-        case 0: // None
-        case 1: // Overlapped
-            break;
-        case 2: // Separate
-            winsizey += LED_BOX_HEIGHT;
-            break;
-    }
+    if (vid_ledlocation == 2) // Separate - LEDs have extra window space at the bottom.
+        winsizey += LED_BOX_HEIGHT;
     log_debug("vidalleg: video_set_window_size, scr_x_size=%d, scr_y_size=%d, fudgedy=%d", scr_x_size, scr_y_size, winsizey);
 }
 
@@ -424,6 +417,37 @@ static inline void fill_letterbox(void)
     al_draw_filled_rectangle(0, scr_y_start + scr_y_size, winsizex, winsizey, border_col);
 }
 
+static void render_leds(void)
+{
+    ALLEGRO_COLOR led_tint = al_map_rgb(0, 0, 0);
+    if (vid_ledlocation != 0) {
+        //led_init(); // SFTODO!?
+        const int led_visible_for_frames = 50;
+        const int led_fade_frames = 10;
+
+        int led_visible_frames_left;
+        if (vid_ledvisibility == 2 /* LEDs permanently visible */)
+            led_visible_frames_left = INT_MAX;
+        else if (vid_ledvisibility == 1 /* LEDs visible when changed or transient LED lit */ && led_any_transient_led_on())
+            led_visible_frames_left = INT_MAX;
+        else
+            led_visible_frames_left = led_visible_for_frames - (framesrun - last_led_update_at);
+
+        if (led_visible_frames_left > 0) {
+            //printf("SFTODOX1 %d\n", led_any_transient_led_on());
+            if (led_visible_frames_left <= led_fade_frames) {
+                int i = (255 * led_visible_frames_left) / led_fade_frames;
+                printf("SFTODO %d\n", i);
+                led_tint = al_map_rgb(i, i, i);
+            }
+            else
+                led_tint = al_map_rgb(255, 255, 255);
+            //fprintf(stderr, "SFTODOQ4 winsizey %d\n", winsizey);
+        }
+    }
+    al_draw_tinted_scaled_bitmap(led_bitmap, led_tint, 0, 0, al_get_bitmap_width(led_bitmap), al_get_bitmap_height(led_bitmap), (winsizex - al_get_bitmap_width(led_bitmap)) / 2, winsizey - al_get_bitmap_height(led_bitmap), al_get_bitmap_width(led_bitmap), al_get_bitmap_height(led_bitmap), 0);
+}
+
 void video_doblit(bool non_ttx, uint8_t vtotal)
 {
     if (vid_savescrshot)
@@ -441,35 +465,7 @@ void video_doblit(bool non_ttx, uint8_t vtotal)
         else if (scr_y_start > 0)
             fill_letterbox();
 
-        // SFTODO: ALL THIS SHOULD BE IN A FUNCTION!
-        ALLEGRO_COLOR led_tint = al_map_rgb(0, 0, 0);
-        if (vid_ledlocation != 0) {
-            //led_init(); // SFTODO!?
-            const int led_visible_for_frames = 50;
-            const int led_fade_frames = 10;
-
-            int led_visible_frames_left;
-            if (vid_ledvisibility == 2 /* LEDs permanently visible */)
-                led_visible_frames_left = INT_MAX;
-            else if (vid_ledvisibility == 1 /* LEDs visible when changed or transient LED lit */ && led_any_transient_led_on())
-                led_visible_frames_left = INT_MAX;
-            else
-                led_visible_frames_left = led_visible_for_frames - (framesrun - last_led_update_at);
-
-            if (led_visible_frames_left > 0) {
-                //printf("SFTODOX1 %d\n", led_any_transient_led_on());
-                if (led_visible_frames_left <= led_fade_frames) {
-                    int i = (255 * led_visible_frames_left) / led_fade_frames;
-                    printf("SFTODO %d\n", i);
-                    led_tint = al_map_rgb(i, i, i);
-                }
-                else
-                    led_tint = al_map_rgb(255, 255, 255);
-                fprintf(stderr, "SFTODOQ4 winsizey %d\n", winsizey);
-            }
-        }
-        al_draw_tinted_scaled_bitmap(led_bitmap, led_tint, 0, 0, al_get_bitmap_width(led_bitmap), al_get_bitmap_height(led_bitmap), (winsizex - al_get_bitmap_width(led_bitmap)) / 2, winsizey - al_get_bitmap_height(led_bitmap), al_get_bitmap_width(led_bitmap), al_get_bitmap_height(led_bitmap), 0);
-
+        render_leds();
         al_flip_display();
     }
     firstx = firsty = 65535;

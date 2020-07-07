@@ -278,9 +278,11 @@ static uint8_t  fs_flags = 0;
 static uint8_t  fs_num   = 0;
 static uint16_t cmd_tail;
 
-// SFTODO: I think we should show activity for some if not all metadata reads; I
-// just got a bit confused at the VDFS LED not coming on when I typed "*.", I
-// thought it was broken.
+/* Function to light an LED during VDFS activity.  This is only called
+ * when VDFS has to go to the host OS.  When it answers meta data
+ * queries from its internal data structures the LED is not lit.
+ */
+
 static void show_activity()
 {
     led_update(LED_VDFS, true, 10);
