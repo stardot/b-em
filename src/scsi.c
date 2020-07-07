@@ -31,7 +31,6 @@ Offset  Description                 Access
 +02     write select                W
 +03     write irq enable            W
 
-
 */
 
 #include <errno.h>
@@ -44,6 +43,7 @@ Offset  Description                 Access
 #include "main.h"
 #include "scsi.h"
 #include "6502.h"
+#include "led.h"
 
 #define SCSI_INT_NUM 16
 
@@ -521,7 +521,8 @@ static void Execute(void)
 				scsi.lun, scsi.cmd[0], scsi.cmd[1], scsi.cmd[2], scsi.cmd[3], scsi.cmd[4], scsi.cmd[5], scsi.cmd[6], scsi.cmd[7], scsi.cmd[8], scsi.cmd[9], scsi.phase, pc);
 	}
 
-	//LEDs.HDisc[scsi.lun] = 1;
+    log_debug("scsi: turning on LED");
+    led_update(LED_HDISK, 1, 20);
 
 	switch (scsi.cmd[0]) {
 		case 0x00 :

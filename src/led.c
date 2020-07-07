@@ -34,7 +34,8 @@ static led_details_t led_details[] = {
     {LED_SHIFT_LOCK, "shift\nlock", false, 2, false, 0},
     {LED_DRIVE_0, "drive 0", true, 3, false, 0},
     {LED_DRIVE_1, "drive 1", true, 4, false, 0},
-    {LED_VDFS, "VDFS", true, 5, false, 0} // SFTODO: MIGHT BE NICE TO HIDE VDFS LED IF VDFS DISABLED
+    {LED_HDISK, "hard\ndisc", true, 5, false, 0 },
+    {LED_VDFS, "VDFS", true, 6, false, 0} // SFTODO: MIGHT BE NICE TO HIDE VDFS LED IF VDFS DISABLED
 };
 
 static void draw_led(const led_details_t *led_details, bool b)
