@@ -144,6 +144,9 @@ void config_load(void)
 
     vid_fullborders  = get_config_int("video", "fullborders",   1);
 
+    vid_ledlocation  = get_config_int("video", "ledlocation",   0);
+    vid_ledvisibility = get_config_int("video", "ledvisibility", 2);
+
     c                = get_config_int("video", "displaymode",   0);
     if (c >= 4) {
         c -= 4;
@@ -254,6 +257,8 @@ void config_save(void)
         if (vid_pal)
             c += 4;
         set_config_int("video", "displaymode", c);
+        set_config_int("video", "ledlocation", vid_ledlocation);
+        set_config_int("video", "ledvisibility", vid_ledvisibility);
 
         set_config_bool("tape", "fasttape", fasttape);
 

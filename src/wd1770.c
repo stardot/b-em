@@ -7,6 +7,7 @@
 #include "6502.h"
 #include "wd1770.h"
 #include "disc.h"
+#include "led.h"
 #include "model.h"
 
 #define ABS(x) (((x)>0)?(x):-(x))
@@ -69,6 +70,7 @@ void wd1770_spinup()
     if (!motoron) {
         motoron = 1;
         motorspin = 0;
+        led_update((curdrive == 0) ? LED_DRIVE_0 : LED_DRIVE_1, true, 0 /* SFTODO LED_DRIVE_TICKS */);
         ddnoise_spinup();
     }
 }
@@ -78,6 +80,8 @@ void wd1770_spindown()
     wd1770.status &= ~0x80;
     if (motoron) {
         motoron = 0;
+        led_update(LED_DRIVE_0, false, 0);
+        led_update(LED_DRIVE_1, false, 0);
         ddnoise_spindown();
     }
 }
@@ -266,6 +270,10 @@ static void write_ctrl_master(uint8_t val)
         wd1770_reset();
     wd1770.ctrl = val;
     curdrive = (val & 2) ? 1 : 0;
+    if (motoron) {
+        led_update((curdrive == 0) ? LED_DRIVE_0 : LED_DRIVE_1, true, 0 /* SFTODO LED_DRIVE_TICKS */);
+        led_update((curdrive == 0) ? LED_DRIVE_1 : LED_DRIVE_0, false, 0 /* SFTODO LED_DRIVE_TICKS */);
+    }
     wd1770.curside =  (wd1770.ctrl & 0x10) ? 1 : 0;
     wd1770.density = !(wd1770.ctrl & 0x20);
 }

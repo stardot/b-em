@@ -8,6 +8,7 @@
 #include "ddnoise.h"
 #include "i8271.h"
 #include "disc.h"
+#include "led.h"
 #include "model.h"
 
 void i8271_callback(void);
@@ -85,6 +86,7 @@ void i8271_spinup(void)
     if (!motoron) {
         motoron = 1;
         motorspin = 0;
+        led_update((curdrive == 0) ? LED_DRIVE_0 : LED_DRIVE_1, true, 0 /* SFTODO LED_DRIVE_TICKS */);
         ddnoise_spinup();
     }
 }
@@ -93,6 +95,8 @@ void i8271_spindown(void)
 {
     if (motoron) {
         motoron = 0;
+        led_update(LED_DRIVE_0, false, 0);
+        led_update(LED_DRIVE_1, false, 0);
         ddnoise_spindown();
     }
     i8271.drvout &= ~DRIVESEL;
@@ -180,6 +184,10 @@ void i8271_write(uint16_t addr, uint8_t val)
                         i8271.drvout |= val & DRIVESEL;
                 }
                 curdrive = (val & 0x80) ? 1 : 0;
+                if (motoron) {
+                        led_update((curdrive == 0) ? LED_DRIVE_0 : LED_DRIVE_1, true, 0 /* SFTODO LED_DRIVE_TICKS */);
+                        led_update((curdrive == 0) ? LED_DRIVE_1 : LED_DRIVE_0, false, 0 /* SFTODO LED_DRIVE_TICKS */);
+                }
                 i8271.paramnum = 0;
                 i8271.paramreq = i8271_getparams();
                 i8271.status = 0x80;

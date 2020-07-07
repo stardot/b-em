@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include "b-em.h"
+#include "led.h"
 #include "serial.h"
 #include "sysacia.h"
 #include "tape.h"
@@ -18,6 +19,7 @@ void serial_reset()
         /*Dunno what happens to this on reset*/
         serial_reg = serial_transmit_rate = serial_recive_rate=0;
         motor=0;
+        led_update(LED_CASSETTE_MOTOR, false, 0);
 }
 
 void serial_write(uint16_t addr, uint8_t val)
@@ -26,7 +28,8 @@ void serial_write(uint16_t addr, uint8_t val)
         serial_transmit_rate = val & 0x7;
         serial_recive_rate = (val >> 3) & 0x7;
         if (motor != (val & 0x80))
-           tapenoise_motorchange(val>>7);
+            tapenoise_motorchange(val>>7);
+        led_update(LED_CASSETTE_MOTOR, val & 0x80, 0);
         motor = (val & 0x80) && tape_loaded;
         if (val & 0x40)
         {
