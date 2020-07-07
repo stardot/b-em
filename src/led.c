@@ -114,7 +114,7 @@ void led_init()
 extern int framesrun; // SFTODO BIT OF A HACK
 void led_update(led_name_t led_name, bool b, int ticks)
 {
-    if (vid_ledlocation >= 0) {
+    if (vid_ledlocation > 0) {
         // SFTODO: INEFFICIENT!
         for (int i = 0; i < sizeof(led_details)/sizeof(led_details[0]); i++) {
             if (led_details[i].led_name == led_name) {
@@ -138,7 +138,7 @@ void led_update(led_name_t led_name, bool b, int ticks)
 
 void led_timer_fired(void)
 {
-    if (vid_ledlocation >= 0) {
+    if (vid_ledlocation > 0) {
         for (int i = 0; i < sizeof(led_details)/sizeof(led_details[0]); i++) {
             if (led_details[i].turn_off_at != 0) {
                 if (framesrun >= led_details[i].turn_off_at) {
