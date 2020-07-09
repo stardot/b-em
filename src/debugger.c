@@ -1035,6 +1035,11 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
         addr = addr;
 
     if (trace_fp) {
+        const char *symlbl;
+        if (symbol_find_by_addr(cpu->symbols, addr, &symlbl)) {
+            fputs(symlbl, trace_fp);
+            fputs(":\n", trace_fp);
+        }
         cpu->disassemble(cpu, addr, buf, sizeof buf);
 
         char *sym = strchr(buf, '\\');
@@ -1042,6 +1047,7 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
             *(sym++) = '\0';
         }
 
+        fputs("\t", trace_fp);
         fputs(buf, trace_fp);
         *buf = ' ';
 
