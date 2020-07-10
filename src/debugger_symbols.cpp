@@ -5,71 +5,98 @@
 
 #include "cpu_debug.h"
 
-void symbol_table::add(std::string name, uint32_t addr) {
-    // my mingw doesn't support this    map.insert_or_assign(name, addr);
-    map.erase(name);
-    map.insert(std::pair<std::string, uint32_t>(name, addr));
+symbol_table::~symbol_table() {
+    for (auto it = map.begin(); it != map.end(); it++) {
+        delete it->second;
+    }
+    map.clear();
+    byaddrmap.clear();
 }
 
-bool symbol_table::find_by_addr(uint32_t addr, std::string &ret) {
+void symbol_table::add(const char *name, uint32_t addr) {
+    auto it = map.find(name);
+    symbol_entry *ent = nullptr;
+    if (it != map.end()) {
+        ent = it->second;
+        map.erase(it);
+    }
+    if (ent) {
+        auto i = byaddrmap.begin();
+        while (i != byaddrmap.end())
+            if (i->second == ent)
+                byaddrmap.erase(i++);
+            else
+                i++;
+    }
+    symbol_entry *e = new symbol_entry(name, addr);
+    map.insert({ e->getSymbol(), e });
+    byaddrmap.insert({ e->getAddr(), e });
+}
+
+bool symbol_table::find_by_addr(uint32_t addr, const char * &ret) const {
     // quick and dirty lookup
-    for (std::pair<std::string, uint32_t> element : map) {
-        if (element.second == addr)
-        {
-            ret = element.first;
-            return true;
-        }
+    auto it = byaddrmap.find(addr);
+    if (it != byaddrmap.end()) {
+        ret = it->second->getSymbol();
+        return true;
     }
-    return false;
+    else
+        return false;
+
 }
 
-bool symbol_table::find_by_addr_near(uint32_t addr, uint32_t min, uint32_t max, uint32_t *addr_found, std::string &ret) {
+inline uint32_t addr_distance(uint32_t a, uint32_t b)
+{
+    return (a <= b) ? b - a : a - b;
+}
 
-    bool matched = false;
-    uint32_t distance = 0;
+bool symbol_table::find_by_addr_near(uint32_t addr, uint32_t min, uint32_t max, uint32_t &addr_found, const char * &ret) const {
 
-    for (std::pair<std::string, uint32_t> element : map) {
-        if (element.second >= min && element.second <= max)
-        {
-            if (matched)
-            {
-                uint32_t ndistance = (element.second <= addr) ? addr - element.second : element.second - addr;
-                if (ndistance < distance) {
-                    ret = element.first;
-                    *addr_found = element.second;
-                    distance = ndistance;
-                }
+    auto it = byaddrmap.upper_bound(addr);
 
-            }
-            else {
+    if (it == byaddrmap.end())
+        return false;
+
+    uint32_t distance;
+    bool matched = it->first >= min;
+    if (matched)
+    {
+        ret = it->second->getSymbol();
+        addr_found = it->first;
+    }
+    if (it != byaddrmap.begin())
+    {
+        it--;
+        if (it->first <= max) {
+            if (!matched || addr_distance(addr_found, addr) >= addr_distance(it->first, addr)) {
+                ret = it->second->getSymbol();
+                addr_found = it->first;
                 matched = true;
-                distance = (element.second <= addr) ? addr - element.second : element.second - addr;
-                ret = element.first;
-                *addr_found = element.second;
             }
         }
     }
+
     return matched;
 }
 
-bool symbol_table::find_by_name(std::string name, uint32_t &ret) {
-    std::map<std::string, uint32_t>::iterator i = map.find(name);
+bool symbol_table::find_by_name(const char * name, uint32_t &ret) const {
+    auto i = map.find(name);
     if (i != map.end())
     {
-        ret = i->second;
+        ret = i->second->getAddr();
         return true;
     }
     return false;
 
 }
 
-void symbol_table::symbol_list(cpu_debug_t *cpu, debug_outf_t debug_outf) {
+void symbol_table::symbol_list(cpu_debug_t *cpu, debug_outf_t debug_outf) const {
     if (length() == 0)
         debug_outf("No symbols loaded");
-    for (std::pair<std::string, uint32_t> element : map) {
+    for (auto &element : byaddrmap) {
         char addrstr[17];
-        cpu->print_addr(cpu, element.second, addrstr, 16, false);
-        debug_outf("%s=%s\n", element.first.c_str(), addrstr);
+        cpu->print_addr(cpu, element.second->getAddr(), addrstr, 16, false);
+        debug_outf("%s=%s\n", element.second->getSymbol(), addrstr);
     }
 }
 
@@ -82,28 +109,12 @@ void symbol_free(symbol_table *symtab) {
 void symbol_add(symbol_table *symtab, const char *name, uint32_t addr) {
     symtab->add(name, addr);
 }
-bool symbol_find_by_addr(symbol_table *symtab, uint32_t addr, char **ret) {
-    std::string r;
-    if (symtab && symtab->find_by_addr(addr, r)) {
-        char *ret2 = (char *)malloc(r.length() + 1);
-        memcpy(ret2, r.c_str(), r.length() + 1);
-        *ret = ret2;
-        return true;
-    }
-    else
-        return false;
+bool symbol_find_by_addr(symbol_table *symtab, uint32_t addr, const char **ret) {
+    return symtab && symtab->find_by_addr(addr, *ret);
 }
 
-bool symbol_find_by_addr_near(symbol_table *symtab, uint32_t addr, uint32_t min, uint32_t max, uint32_t *addr_found, char **ret) {
-    std::string r;
-    if (symtab && symtab->find_by_addr_near(addr, min, max, addr_found, r)) {
-        char *ret2 = (char *)malloc(r.length() + 1);
-        memcpy(ret2, r.c_str(), r.length() + 1);
-        *ret = ret2;
-        return true;
-    }
-    else
-        return false;
+bool symbol_find_by_addr_near(symbol_table *symtab, uint32_t addr, uint32_t min, uint32_t max, uint32_t *addr_found, const char **ret) {
+    return symtab && symtab->find_by_addr_near(addr, min, max, *addr_found, *ret);
 }
 
 
@@ -124,7 +135,11 @@ bool symbol_find_by_name(symbol_table *symtab, const char *name, uint32_t *addr,
     if (i == 0)
         return false;
 
-    std::string n(p, i);
+    char *n = (char *)malloc(i + 1);
+    if (!n)
+        return false;
+    strncpy(n, p, i);
+    n[i] = '\0';
     *endret = p + i;
     return symtab->find_by_name(n, *addr);
 }

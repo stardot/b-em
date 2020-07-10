@@ -49,4 +49,5 @@ scsi/*
 *.sublime-workspace
 b-em.ilk
 build/
+b-em-mg.exe
 enc_temp_folder/
