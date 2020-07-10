@@ -405,13 +405,12 @@ size_t debug_print_32bit(uint32_t value, char *buf, size_t bufsize)
 }
 
 size_t debug_print_addr16(cpu_debug_t *cpu, uint32_t value, char *buf, size_t bufsize, bool include_symbol) {
-    char *sym = NULL;
+    const char *sym = NULL;
     size_t ret;
     if (!include_symbol || !symbol_find_by_addr(cpu->symbols, value, &sym))
         sym = NULL;
     if (sym) {
         ret = snprintf(buf, bufsize, "%04X (%s)", value, sym);
-        free(sym);
     }
     else
         ret = snprintf(buf, bufsize, "%04X", value);
@@ -423,13 +422,12 @@ size_t debug_print_addr16(cpu_debug_t *cpu, uint32_t value, char *buf, size_t bu
 }
 
 size_t debug_print_addr32(cpu_debug_t *cpu, uint32_t value, char *buf, size_t bufsize, bool include_symbol) {
-    char *sym = NULL;
+    const char *sym = NULL;
     size_t ret;
     if (!include_symbol || !symbol_find_by_addr(cpu->symbols, value, &sym))
         sym = NULL;
     if (sym) {
         ret = snprintf(buf, bufsize, "%08X (%s)", value, sym);
-        free(sym);
     }
     else
         ret = snprintf(buf, bufsize, "%08X", value);
@@ -781,10 +779,9 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                     debug_disaddr = parse_address_with_romno(cpu, iptr, &e);
                 }
                 for (c = 0; c < 12; c++) {
-                    char *sym;
+                    const char *sym;
                     if (symbol_find_by_addr(cpu->symbols, debug_disaddr, &sym)) {
                         debug_outf("%s:\n", sym);
-                        free(sym);
                     }
                     debug_out("    ", 4);
                     debug_disaddr = cpu->disassemble(cpu, debug_disaddr, ins, sizeof ins);
@@ -1058,6 +1055,11 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
         addr = addr;
 
     if (trace_fp) {
+        const char *symlbl;
+        if (symbol_find_by_addr(cpu->symbols, addr, &symlbl)) {
+            fputs(symlbl, trace_fp);
+            fputs(":\n", trace_fp);
+        }
         cpu->disassemble(cpu, addr, buf, sizeof buf);
 
         char *sym = strchr(buf, '\\');
@@ -1065,6 +1067,7 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
             *(sym++) = '\0';
         }
 
+        fputs("\t", trace_fp);
         fputs(buf, trace_fp);
         *buf = ' ';
 

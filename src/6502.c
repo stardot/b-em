@@ -135,7 +135,7 @@ static size_t dbg_print_addr(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
     size_t ret;
     uint32_t msw = addr & 0xf0000000;
 
-    char *sym = NULL;
+    const char *sym = NULL;
 
     if (include_symbols && symbol_find_by_addr(cpu->symbols, addr, &sym)) {
         if (msw) {
@@ -144,7 +144,6 @@ static size_t dbg_print_addr(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
         else {
             ret = snprintf(buf, bufsize, "%04X \\ (%s)", addr & 0xFFFF, sym);
         }
-        free(sym);
     }
     else {
         if (msw) {
