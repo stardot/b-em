@@ -27,10 +27,25 @@ static int vrefresh = 1;
 static FILE *trace_fp = NULL;
 static FILE *exec_fp = NULL;
 
+/*
+ * As writing to the trace file is performance critical, and as the
+ * CPU thread is the only one that will be writing it, try to use the
+ * unlocked versions of the stdio output functions but fall back to
+ * the standard versions if the unlocked versions are not available.
+ */
+
+#ifndef _POSIX_C_SOURCE
+#define putc_unlocked   putc
+#define fwrite_unlocked fwrite
+#endif
+#ifndef _GNU_SOURCE
+#define fputs_unlocked  fputs
+#endif
+
 static void close_trace()
 {
     if (trace_fp) {
-        fputs("Trace finished due to emulator quit\n", trace_fp);
+        fputs_unlocked("Trace finished due to emulator quit\n", trace_fp);
         fclose(trace_fp);
     }
 }
@@ -318,7 +333,7 @@ static int contcount = 0;
 void debug_reset()
 {
     if (trace_fp) {
-        fputs("Processor reset!\n", trace_fp);
+        fputs_unlocked("Processor reset!\n", trace_fp);
         fflush(trace_fp);
     }
 }
@@ -1057,8 +1072,8 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
     if (trace_fp) {
         const char *symlbl;
         if (symbol_find_by_addr(cpu->symbols, addr, &symlbl)) {
-            fputs(symlbl, trace_fp);
-            fputs(":\n", trace_fp);
+            fputs_unlocked(symlbl, trace_fp);
+            fputs_unlocked(":\n", trace_fp);
         }
         cpu->disassemble(cpu, addr, buf, sizeof buf);
 
@@ -1067,22 +1082,21 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
             *(sym++) = '\0';
         }
 
-        fputs("\t", trace_fp);
-        fputs(buf, trace_fp);
+        putc_unlocked('\t', trace_fp);
+        fputs_unlocked(buf, trace_fp);
         *buf = ' ';
 
         for (r = 0, np = cpu->reg_names; (name = *np++);) {
             len = cpu->reg_print(r++, buf + 1, sizeof buf - 1);
-            fwrite(buf, len + 1, 1, trace_fp);
+            fwrite_unlocked(buf, len + 1, 1, trace_fp);
         }
 
         if (sym)
         {
-            fputs(" \\", trace_fp);
-            fputs(sym, trace_fp);
+            fputs_unlocked(" \\", trace_fp);
+            fputs_unlocked(sym, trace_fp);
         }
-
-        putc('\n', trace_fp);
+        putc_unlocked('\n', trace_fp);
     }
 
     if (addr == tbreak) {
