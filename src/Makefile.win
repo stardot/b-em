@@ -55,6 +55,7 @@ OBJ = \
     music4000.o \
     music5000.o \
     pal.o \
+    paula.o \
     savestate.o \
     scsi.o \
     sdf-acc.o \
