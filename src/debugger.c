@@ -27,29 +27,6 @@ static int vrefresh = 1;
 static FILE *trace_fp = NULL;
 static FILE *exec_fp = NULL;
 
-/*
- * As writing to the trace file is performance critical, and as the
- * CPU thread is the only one that will be writing it, try to use the
- * unlocked versions of the stdio output functions but fall back to
- * the standard versions if the unlocked versions are not available.
- */
-
-#ifndef _POSIX_C_SOURCE
-#define putc_unlocked   putc
-#define fwrite_unlocked fwrite
-#endif
-#ifndef _GNU_SOURCE
-#define fputs_unlocked  fputs
-#endif
-
-static void close_trace()
-{
-    if (trace_fp) {
-        fputs_unlocked("Trace finished due to emulator quit\n", trace_fp);
-        fclose(trace_fp);
-    }
-}
-
 static ALLEGRO_THREAD  *mem_thread;
 
 static void *mem_thread_proc(ALLEGRO_THREAD *thread, void *data)
@@ -126,6 +103,17 @@ static void debug_memview_close(void)
 #include <wingdi.h>
 #include <process.h>
 
+/*
+ * Writing to the trace file is performance critical but only happens
+ * from the CPU thread.  Use the unlocked version of the stdio output
+ * functions where possible.  Windows calls the unlocked functions by
+ * a different name from POSIX.
+ */
+
+#define putc_unlocked   putc_nolock
+#define fputs_unlocked  fputs_nolock
+#define fwrite_unlocked fwrite_nolock
+
 static int debug_cons = 0;
 static HANDLE cinf, consf;
 
@@ -195,6 +183,21 @@ static void debug_cons_close(void)
 
 #else
 
+/*
+ * As writing to the trace file is performance critical, and as the
+ * CPU thread is the only one that will be writing it, try to use the
+ * unlocked versions of the stdio output functions but fall back to
+ * the standard versions if the unlocked versions are not available.
+ */
+
+#ifndef _POSIX_C_SOURCE
+#define putc_unlocked   putc
+#define fwrite_unlocked fwrite
+#endif
+#ifndef _GNU_SOURCE
+#define fputs_unlocked  fputs
+#endif
+
 static inline bool debug_in(char *buf, size_t bufsize)
 {
     return fgets(buf, bufsize, stdin);
@@ -230,6 +233,14 @@ static inline void debug_cons_close(void) {}
 #include "video.h"
 #include "sn76489.h"
 #include "model.h"
+
+static void close_trace()
+{
+    if (trace_fp) {
+        fputs_unlocked("Trace finished due to emulator quit\n", trace_fp);
+        fclose(trace_fp);
+    }
+}
 
 void debug_kill()
 {
