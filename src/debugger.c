@@ -919,7 +919,10 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
             case 't':
             case 'T':
                 if (trace_fp)
+                {
                     fclose(trace_fp);
+                    trace_fp = NULL;
+                }
                 if (*iptr) {
                     if ((eptr = strchr(iptr, '\n')))
                         *eptr = '\0';
