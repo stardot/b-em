@@ -29,28 +29,28 @@ static uint16_t CRCTable[256];
 
 static void fdi_setupcrc(uint16_t poly, uint16_t rvalue)
 {
-	int c = 256, bc;
-	uint16_t crctemp;
+    int c = 256, bc;
+    uint16_t crctemp;
 
-	while(c--)
-	{
-		crctemp = c << 8;
-		bc = 8;
+    while(c--)
+    {
+        crctemp = c << 8;
+        bc = 8;
 
-		while(bc--)
-		{
-			if(crctemp & 0x8000)
-			{
-				crctemp = (crctemp << 1) ^ poly;
-			}
-			else
-			{
-				crctemp <<= 1;
-			}
-		}
+        while(bc--)
+        {
+            if(crctemp & 0x8000)
+            {
+                crctemp = (crctemp << 1) ^ poly;
+            }
+            else
+            {
+                crctemp <<= 1;
+            }
+        }
 
-		CRCTable[c] = crctemp;
-	}
+        CRCTable[c] = crctemp;
+    }
 }
 
 static void fdi_seek(int drive, int track)
@@ -167,7 +167,7 @@ static uint16_t crc;
 
 static void calccrc(uint8_t byte)
 {
-	crc = (crc << 8) ^ CRCTable[(crc >> 8)^byte];
+    crc = (crc << 8) ^ CRCTable[(crc >> 8)^byte];
 }
 
 static void fdi_poll()
@@ -185,7 +185,7 @@ static void fdi_poll()
         if (fdi_inwrite)
         {
                 fdi_inwrite=0;
-                fdc_writeprotect();
+                fdc_finishio(FDC_WRITE_PROTECT);
                 return;
         }
         if (!fdi_inread && !fdi_inreadaddr) return;
@@ -195,7 +195,7 @@ static void fdi_poll()
                 if (fdi_revs == 3)
                 {
 //                        printf("Not found!\n");
-                        fdc_notfound();
+                        fdc_finishio(FDC_NOT_FOUND);
                         fdi_inread = fdi_inreadaddr = 0;
                         return;
                 }
@@ -227,9 +227,9 @@ static void fdi_poll()
                                                         if (fdi_inreadaddr)
                                                         {
                                                                 fdc_data(fdi_sector);
-                                                                fdc_finishread();
+                                                                fdc_finishio(FDC_SUCCESS);
                                                         }
-                                                        else             fdc_headercrcerror();
+                                                        else             fdc_finishio(FDC_HEADER_CRC_ERR);
                                                         return;
                                                 }
                                                 if (fdi_sectordat[0] == fdi_track && fdi_sectordat[2] == fdi_sector && fdi_inread && !fdi_inreadaddr)
@@ -241,7 +241,7 @@ static void fdi_poll()
                                                 }
                                                 if (fdi_inreadaddr)
                                                 {
-                                                        fdc_finishread();
+                                                        fdc_finishio(FDC_SUCCESS);
                                                         fdi_inreadaddr = 0;
                                                 }
                                         }
@@ -263,14 +263,13 @@ static void fdi_poll()
 //                                                printf("Data CRC error : %02X %02X %02X %02X %i %04X %02X%02X %i\n",crc>>8,crc&0xFF,sectorcrc[0],sectorcrc[1],fdipos,crc,sectorcrc[0],sectorcrc[1],ftracklen[0][0][fdidensity]);
                                                 inreadop = 0;
                                                 fdc_data(decodefm(lastfdidat[1]));
-                                                fdc_finishread();
-                                                fdc_datacrcerror();
+                                                fdc_finishio(FDC_DATA_CRC_ERR);
                                                 readdatapoll = 0;
                                                 return;
                                         }
 //                                        printf("End of FDI read %02X %02X %02X %02X\n",crc>>8,crc&0xFF,sectorcrc[0],sectorcrc[1]);
                                         fdc_data(decodefm(lastfdidat[1]));
-                                        fdc_finishread();
+                                        fdc_finishio(FDC_SUCCESS);
                                 }
                                 else if (lastfdidat[1] != 0)
                                    fdc_data(decodefm(lastfdidat[1]));
@@ -365,10 +364,10 @@ void fdi_load(int drive, const char *fn)
         writeprot[drive] = fwriteprot[drive] = 1;
         fdi_f[drive] = fopen(fn, "rb");
         if (!fdi_f[drive])
-	{
-		log_warn("fdi: unable to open FDI disc image '%s': %s", fn, strerror(errno));
-		return;
-	}
+    {
+        log_warn("fdi: unable to open FDI disc image '%s': %s", fn, strerror(errno));
+        return;
+    }
         fdi_h[drive] = fdi2raw_header(fdi_f[drive]);
 //        if (!fdih[drive]) printf("Failed to load!\n");
         fdi_lasttrack[drive] = fdi2raw_get_last_track(fdi_h[drive]);

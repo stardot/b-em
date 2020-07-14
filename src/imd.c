@@ -566,7 +566,7 @@ static void imd_poll_writesect1(void)
                 struct imd_sect *new_sect = malloc(sizeof(struct imd_sect)+cur_sect->sectsize);
                 if (!new_sect) {
                     log_error("imd: out of memory reallocating sector");
-                    fdc_datacrcerror();
+                    fdc_finishio(FDC_DATA_CRC_ERR);
                     return;
                 }
                 /* Link the new sector into the list in place of the old */
@@ -597,13 +597,13 @@ static void imd_poll_writesect1(void)
             *data++ = b;
             state = ST_WRITESECTOR2;
             if (count == 0) {
-                fdc_finishread();
+                fdc_finishio(0);
                 state = ST_IDLE;
             }
         }
         else if (count == 0) {
             cur_sect->data[0] = cdata;
-            fdc_finishread();
+            fdc_finishio(0);
             state = ST_IDLE;
             cur_sect->mode = mode_compressed(cur_sect->mode);
         }
@@ -627,7 +627,7 @@ static void imd_poll_writesect2(void)
         log_debug("imd: imd_poll_writesect2 byte=%02X", c);
         *data++ = c;
         if (count == 0) {
-            fdc_finishread();
+            fdc_finishio(0);
             state = ST_IDLE;
         }
     }
@@ -706,7 +706,7 @@ static void imd_poll_format_sectsz(void)
     if (count)
         state = ST_FORMAT_CYLID;
     else {
-        fdc_finishread();
+        fdc_finishio(0);
         state = ST_IDLE;
         imd_dump(&imd_discs[0]);
     }
@@ -751,7 +751,7 @@ static void imd_poll_wrtrack_initial(void)
     if (b == 0xfe)
         state = ST_WRTRACK_CYLID;
     else if (--count == 0) {
-        fdc_finishread();
+        fdc_finishio(0);
         state = ST_IDLE;
         cur_trk = NULL;
     }
@@ -943,7 +943,7 @@ static void imd_poll(void)
 
         case ST_NOTFOUND:
             if (--count == 0) {
-                fdc_notfound();
+                fdc_finishio(FDC_NOT_FOUND);
                 state = ST_IDLE;
             }
             break;
@@ -951,7 +951,7 @@ static void imd_poll(void)
         case ST_READSECTOR:
             fdc_data(*data++);
             if (--count == 0) {
-                fdc_finishread();
+                fdc_finishio(0);
                 state = ST_IDLE;
             }
             break;
@@ -959,14 +959,14 @@ static void imd_poll(void)
         case ST_READCOMPR:
             fdc_data(cdata);
             if (--count == 0) {
-                fdc_finishread();
+                fdc_finishio(0);
                 state = ST_IDLE;
             }
             break;
 
         case ST_WRITEPROT:
             log_debug("imd: poll, write protected during write sector");
-            fdc_writeprotect();
+            fdc_finishio(FDC_WRITE_PROTECT);
             state = ST_IDLE;
             break;
 
@@ -1014,7 +1014,7 @@ static void imd_poll(void)
 
         case ST_READ_ADDR6:
             state = ST_IDLE;
-            fdc_finishread();
+            fdc_finishio(0);
             break;
 
         case ST_FORMAT_CYLID:

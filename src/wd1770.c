@@ -14,11 +14,6 @@
 void wd1770_callback();
 void wd1770_data(uint8_t dat);
 void wd1770_spindown();
-void wd1770_finishread();
-void wd1770_notfound();
-void wd1770_datacrcerror();
-void wd1770_headercrcerror();
-void wd1770_writeprotect();
 int  wd1770_getdata(int last);
 
 struct
@@ -45,6 +40,22 @@ static const unsigned step_times[4] = { 6000, 12000, 20000, 30000 };
 
 static int bytenum;
 
+static void short_spindown(void)
+{
+    motorspin = 15000;
+    fdc_time = 0;
+}
+
+static void wd1770_finishio(unsigned flags)
+{
+    wd1770.status = 0x80 | flags;
+    nmi = nmi_on_completion[fdc_type - FDC_ACORN];
+    if (flags)
+        short_spindown();
+    else
+        fdc_time = 200;
+}
+
 void wd1770_reset()
 {
     nmi = 0;
@@ -56,11 +67,7 @@ void wd1770_reset()
         fdc_callback       = wd1770_callback;
         fdc_data           = wd1770_data;
         fdc_spindown       = wd1770_spindown;
-        fdc_finishread     = wd1770_finishread;
-        fdc_notfound       = wd1770_notfound;
-        fdc_datacrcerror   = wd1770_datacrcerror;
-        fdc_headercrcerror = wd1770_headercrcerror;
-        fdc_writeprotect   = wd1770_writeprotect;
+        fdc_finishio       = wd1770_finishio;
         fdc_getdata        = wd1770_getdata;
         motorspin = 45000;
         if (motoron)
@@ -90,12 +97,6 @@ void wd1770_spindown()
 void wd1770_setspindown()
 {
     motorspin = 45000;
-}
-
-static void short_spindown(void)
-{
-    motorspin = 15000;
-    fdc_time = 0;
 }
 
 #define track0 (wd1770.track ? 0 : 4)
@@ -494,36 +495,6 @@ void wd1770_data(uint8_t dat)
     }
 }
 
-void wd1770_finishread()
-{
-    log_debug("wd1770: data i/o finished");
-    fdc_time = 200;
-}
-
-void wd1770_notfound()
-{
-    log_debug("wd1770: not found");
-    nmi |= nmi_on_completion[fdc_type - FDC_ACORN];
-    wd1770.status = 0x90;
-    short_spindown();
-}
-
-void wd1770_datacrcerror()
-{
-    log_debug("wd1770: data CRC error");
-    nmi = nmi_on_completion[fdc_type - FDC_ACORN];
-    wd1770.status = 0x88;
-    short_spindown();
-}
-
-void wd1770_headercrcerror()
-{
-    log_debug("wd1770: header CRC error");
-    nmi = nmi_on_completion[fdc_type - FDC_ACORN];
-    wd1770.status = 0x98;
-    short_spindown();
-}
-
 int wd1770_getdata(int last)
 {
     //log_debug("wd1770: disc get data");
@@ -538,12 +509,4 @@ int wd1770_getdata(int last)
     }
     wd1770.written = 0;
     return wd1770.data;
-}
-
-void wd1770_writeprotect()
-{
-    fdc_time = 0;
-    nmi = nmi_on_completion[fdc_type - FDC_ACORN];
-    wd1770.status = 0xC0;
-    wd1770_setspindown();
 }

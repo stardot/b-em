@@ -252,7 +252,7 @@ static void sdf_poll()
 
         case ST_NOTFOUND:
             if (--count == 0) {
-                fdc_notfound();
+                fdc_finishio(FDC_NOT_FOUND);
                 state = ST_IDLE;
             }
             break;
@@ -262,7 +262,7 @@ static void sdf_poll()
                 c = 0xe5;
             fdc_data(c);
             if (--count == 0) {
-                fdc_finishread();
+                fdc_finishio(0);
                 state = ST_IDLE;
             }
             break;
@@ -270,7 +270,7 @@ static void sdf_poll()
         case ST_WRITESECTOR:
             if (writeprot[sdf_drive]) {
                 log_debug("sdf: poll, write protected during write sector");
-                fdc_writeprotect();
+                fdc_finishio(FDC_WRITE_PROTECT);
                 state = ST_IDLE;
                 break;
             }
@@ -281,7 +281,7 @@ static void sdf_poll()
             } else {
                 putc(c, sdf_fp[sdf_drive]);
                 if (count == 0) {
-                    fdc_finishread();
+                    fdc_finishio(0);
                     state = ST_IDLE;
                 }
             }
@@ -323,7 +323,7 @@ static void sdf_poll()
 
         case ST_READ_ADDR6:
             state = ST_IDLE;
-            fdc_finishread();
+            fdc_finishio(FDC_WRITE_PROTECT);
             sdf_sector++;
             if (sdf_sector == geometry[sdf_drive]->sectors_per_track)
                 sdf_sector = 0;
@@ -332,7 +332,7 @@ static void sdf_poll()
         case ST_FORMAT_CYLID:
             if (writeprot[sdf_drive]) {
                 log_debug("sdf: poll, write protected during format");
-                fdc_writeprotect();
+                fdc_finishio(FDC_WRITE_PROTECT);
                 state = ST_IDLE;
                 break;
             }
@@ -361,7 +361,7 @@ static void sdf_poll()
             }
             if (count == 0) {
                 state = ST_IDLE;
-                fdc_finishread();
+                fdc_finishio(0);
             }
             else
                 state = ST_FORMAT_CYLID;

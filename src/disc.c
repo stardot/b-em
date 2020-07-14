@@ -27,11 +27,7 @@ int motoron;
 void (*fdc_callback)();
 void (*fdc_data)(uint8_t dat);
 void (*fdc_spindown)();
-void (*fdc_finishread)();
-void (*fdc_notfound)();
-void (*fdc_datacrcerror)();
-void (*fdc_headercrcerror)();
-void (*fdc_writeprotect)();
+void (*fdc_finishio)();
 int  (*fdc_getdata)(int last);
 
 void disc_load(int drive, ALLEGRO_PATH *fn)
@@ -88,7 +84,7 @@ void disc_poll()
         {
                 disc_notfound--;
                 if (!disc_notfound)
-                   fdc_notfound();
+                   fdc_finishio(FDC_NOT_FOUND);
         }
 }
 

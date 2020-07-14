@@ -13,11 +13,6 @@
 static void i8271_callback();
 static void i8271_data(uint8_t dat);
 static void i8271_spindown();
-static void i8271_finishread();
-static void i8271_notfound();
-static void i8271_datacrcerror();
-static void i8271_headercrcerror();
-static void i8271_writeprotect();
 static int  i8271_getdata(int last);
 
 static int bytenum;
@@ -45,6 +40,42 @@ struct
         uint8_t drvout;
 } i8271;
 
+static void short_spindown(void)
+{
+    motorspin = 15000;
+    fdc_time = 0;
+}
+
+static void i8271_NMI(void)
+{
+    if (i8271.status & 8)
+        nmi = 1;
+    else
+        nmi = 0;
+}
+
+static void i8271_finishio(unsigned flags)
+{
+    unsigned result = 0;
+    if (flags & FDC_HEADER_CRC_ERR)
+        result = 0x0c;
+    else if (flags & FDC_DATA_CRC_ERR)
+        result = 0x0e;
+    else if (flags & FDC_NOT_FOUND)
+        result = 0x18;
+    else if (flags & FDC_WRITE_PROTECT)
+        result = 0x12;
+    if (!result) {
+        if (flags & FDC_DELETED_DATA)
+            result |= 0x20;
+        fdc_time = 200;
+    }
+    else
+        short_spindown();
+    i8271.result = result;
+    i8271_NMI();
+}
+
 void i8271_reset()
 {
         if (fdc_type == FDC_I8271)
@@ -52,11 +83,14 @@ void i8271_reset()
                 fdc_callback       = i8271_callback;
                 fdc_data           = i8271_data;
                 fdc_spindown       = i8271_spindown;
+                fdc_finishio       = i8271_finishio;
+                /*
                 fdc_finishread     = i8271_finishread;
                 fdc_notfound       = i8271_notfound;
                 fdc_datacrcerror   = i8271_datacrcerror;
                 fdc_headercrcerror = i8271_headercrcerror;
                 fdc_writeprotect   = i8271_writeprotect;
+                * */
                 fdc_getdata        = i8271_getdata;
                 motorspin = 45000;
         }
@@ -68,17 +102,6 @@ void i8271_reset()
         i8271.command = 0xFF;
         i8271.realtrack[0] = i8271.realtrack[1] = 0;
 }
-
-static void i8271_NMI()
-{
-        if (i8271.status & 8)
-        {
-                nmi = 1;
-//                printf("NMI\n");
-        }
-        else                nmi = 0;
-}
-
 
 void i8271_spinup()
 {
@@ -101,12 +124,6 @@ static void i8271_spindown()
 void i8271_setspindown()
 {
     motorspin = 45000;
-}
-
-static void short_spindown(void)
-{
-    motorspin = 15000;
-    fdc_time = 0;
 }
 
 int params[][2]=
@@ -470,38 +487,6 @@ static void i8271_data(uint8_t dat)
         bytenum++;
 }
 
-static void i8271_finishread()
-{
-        fdc_time = 200;
-}
-
-static void i8271_notfound()
-{
-        i8271.result = 0x18;
-        i8271.status = 0x18;
-        i8271_NMI();
-        short_spindown();
-//        printf("Not found 8271\n");
-}
-
-static void i8271_datacrcerror()
-{
-        i8271.result = 0x0E;
-        i8271.status = 0x18;
-        i8271_NMI();
-        short_spindown();
-//        printf("CRCdat 8271\n");
-}
-
-static void i8271_headercrcerror()
-{
-        i8271.result = 0x0C;
-        i8271.status = 0x18;
-        i8271_NMI();
-        short_spindown();
-//        printf("CRChead 8271\n");
-}
-
 static int i8271_getdata(int last)
 {
 //        printf("Disc get data %i\n",bytenum);
@@ -515,12 +500,4 @@ static int i8271_getdata(int last)
         }
         i8271.written = 0;
         return i8271.data;
-}
-
-static void i8271_writeprotect()
-{
-        i8271.result = 0x12;
-        i8271.status = 0x18;
-        i8271_NMI();
-        short_spindown();
 }
