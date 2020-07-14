@@ -164,7 +164,7 @@ static vdfs_open_file vdfs_chan[NUM_CHANNELS];
  *    it sets the 6502 PC to an address found in a dispatch table
  *    within the ROM itself.
  *
- *    The lowered numbered actions, with ROM in the name, are indexes
+ *    The lower numbered actions, with ROM in the name, are indexes
  *    into this dispatch table.  These values can be passed to the
  *    rom_dispatch function or to vdfs_do function.  These values
  *    must match the entries in the dispatch table in vdfs.asm
@@ -203,6 +203,7 @@ enum vdfs_action {
     VDFS_ROM_FILES,
     VDFS_ROM_NOPEN,
     VDFS_ROM_OSW_TAIL,
+    VDFS_ROM_CLOSEALL,
     VDFS_ACT_NOP,
     VDFS_ACT_QUIT,
     VDFS_ACT_SRLOAD,
@@ -1986,7 +1987,7 @@ static void osfind(void)
     if (a == 0) {   // close file.
         channel = y;
         if (channel == 0)
-            close_all();
+            rom_dispatch(VDFS_ROM_CLOSEALL);
         else {
             channel -= MIN_CHANNEL;
             if (channel >= 0 && channel < NUM_CHANNELS)
@@ -3096,6 +3097,10 @@ static void osfsc(void)
         case 0x06: // new filesystem taking over.
             fs_num = 0;
             break;
+        case 0x07:
+            x = MIN_CHANNEL;
+            y = MIN_CHANNEL + NUM_CHANNELS;
+            break;
         case 0x09:
             if (cat_prep(x + (y << 8), cur_dir, "current"))
                 rom_dispatch(VDFS_ROM_EX);
@@ -3325,6 +3330,7 @@ static inline void dispatch(uint8_t value)
         case 0x09: check_ram(); break;
         case 0x0a: startup();   break;
         case 0x0b: files_nxt(); break;
+        case 0x0c: close_all(); break;
         default: log_warn("vdfs: function code %d not recognised\n", value);
     }
 }
