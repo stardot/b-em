@@ -49,10 +49,12 @@ static void short_spindown(void)
 
 static void wd1770_finishio(unsigned flags)
 {
-    wd1770.status = 0x80 | flags;
-    nmi = nmi_on_completion[fdc_type - FDC_ACORN];
-    if (flags)
+    log_debug("wd1770: finishio, old_status=%02X, flags=%02X", wd1770.status, flags);
+    wd1770.status |= flags;
+    if (flags & (FDC_NOT_FOUND|FDC_WRITE_PROTECT)) {
         short_spindown();
+        nmi = nmi_on_completion[fdc_type - FDC_ACORN];
+    }
     else
         fdc_time = 200;
 }
@@ -213,6 +215,13 @@ static void wd1770_cmd(unsigned val)
             if (((val & 0xc) || (wd1770.command & 0xf0) == 0xb0) && nmi_on_completion[fdc_type - FDC_ACORN])
                 nmi = 1;
             wd1770_setspindown();
+            break;
+
+        case 0xE: /* read track */
+            log_debug("wd1770: read track side=%d track=%d dens=%d, ctrl=%d\n", wd1770.curside, wd1770.track, wd1770.density, wd1770.ctrl);
+            wd1770.status = 0x83;
+            nmi |= 2;
+            disc_readtrack(curdrive, wd1770.track, wd1770.curside, wd1770.density);
             break;
 
         case 0xF: /*Write track*/
@@ -440,7 +449,7 @@ void wd1770_callback()
         break;
 
     case 8: /*Read sector*/
-        wd1770.status = 0x80;
+        wd1770.status &= ~0x01;
         wd1770_setspindown();
         if (nmi_on_completion[fdc_type - FDC_ACORN])
             nmi |= 1;
