@@ -515,6 +515,29 @@ static void imd_abort(int drive)
 }
 
 /*
+ * This function is part of the state machine to implement the read
+ * sector command and works out which flags should be returned to
+ * the FDC on completion.
+ */
+
+static unsigned imd_poll_sect_flags(void)
+{
+    switch(cur_sect->mode) {
+        case 3:
+        case 4:
+            return FDC_DELETED_DATA;
+        case 5:
+        case 6:
+            return FDC_DATA_CRC_ERR;
+        case 7:
+        case 8:
+            return FDC_DELETED_DATA|FDC_DATA_CRC_ERR;
+        default:
+            return FDC_SUCCESS;
+    }
+}
+
+/*
  * This function is part of the state machine to implement the write
  * sector command and handles the first byte written.
  *
@@ -983,7 +1006,7 @@ static void imd_poll(void)
         case ST_READSECTOR:
             fdc_data(*data++);
             if (--count == 0) {
-                fdc_finishio(0);
+                fdc_finishio(imd_poll_sect_flags());
                 state = ST_IDLE;
             }
             break;
@@ -991,7 +1014,7 @@ static void imd_poll(void)
         case ST_READCOMPR:
             fdc_data(cdata);
             if (--count == 0) {
-                fdc_finishio(0);
+                fdc_finishio(imd_poll_sect_flags());
                 state = ST_IDLE;
             }
             break;
