@@ -45,3 +45,10 @@ b-em.pdb
 src/hdfmt.exe
 scsi/*
 src/sdf2imd
+*.exe
+*.sublime-project
+*.sublime-workspace
+b-em.ilk
+build/
+b-em-mg.exe
+enc_temp_folder/

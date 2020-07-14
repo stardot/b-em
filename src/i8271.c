@@ -8,6 +8,7 @@
 #include "ddnoise.h"
 #include "i8271.h"
 #include "disc.h"
+#include "led.h"
 #include "model.h"
 
 static void i8271_callback();
@@ -103,11 +104,12 @@ void i8271_reset()
         i8271.realtrack[0] = i8271.realtrack[1] = 0;
 }
 
-void i8271_spinup()
+static void i8271_spinup(void)
 {
     if (!motoron) {
         motoron = 1;
         motorspin = 0;
+        led_update((curdrive == 0) ? LED_DRIVE_0 : LED_DRIVE_1, true, 0 /* SFTODO LED_DRIVE_TICKS */);
         ddnoise_spinup();
     }
 }
@@ -116,12 +118,14 @@ static void i8271_spindown()
 {
     if (motoron) {
         motoron = 0;
+        led_update(LED_DRIVE_0, false, 0);
+        led_update(LED_DRIVE_1, false, 0);
         ddnoise_spindown();
     }
     i8271.drvout &= ~DRIVESEL;
 }
 
-void i8271_setspindown()
+void i8271_setspindown(void)
 {
     motorspin = 45000;
 }
@@ -197,6 +201,10 @@ void i8271_write(uint16_t addr, uint8_t val)
                         i8271.drvout |= val & DRIVESEL;
                 }
                 curdrive = (val & 0x80) ? 1 : 0;
+                if (motoron) {
+                        led_update((curdrive == 0) ? LED_DRIVE_0 : LED_DRIVE_1, true, 0 /* SFTODO LED_DRIVE_TICKS */);
+                        led_update((curdrive == 0) ? LED_DRIVE_1 : LED_DRIVE_0, false, 0 /* SFTODO LED_DRIVE_TICKS */);
+                }
                 i8271.paramnum = 0;
                 i8271.paramreq = i8271_getparams();
                 i8271.status = 0x80;
@@ -349,7 +357,7 @@ void i8271_write(uint16_t addr, uint8_t val)
         }
 }
 
-static void i8271_callback()
+static void i8271_callback(void)
 {
         fdc_time = 0;
 //        printf("Callback 8271 - command %02X\n",i8271.command);
@@ -469,10 +477,12 @@ static void i8271_callback()
 
             case 0xFF: break;
 
-                default: break;
+            default: break;
+                /* TODO: DB: check is this the intent?
                 printf("Unknown 8271 command %02X 3\n", i8271.command);
                 dumpregs();
                 exit(-1);
+                */
         }
 }
 

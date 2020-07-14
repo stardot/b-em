@@ -24,6 +24,7 @@
 #include "joystick.h"
 #include "keyboard.h"
 #include "keydef-allegro.h"
+#include "led.h"
 #include "main.h"
 #include "6809tube.h"
 #include "mem.h"
@@ -31,6 +32,7 @@
 #include "midi.h"
 #include "music4000.h"
 #include "music5000.h"
+#include "paula.h"
 #include "pal.h"
 #include "savestate.h"
 #include "scsi.h"
@@ -74,6 +76,9 @@ static ALLEGRO_TIMER *timer;
 static ALLEGRO_EVENT_QUEUE *queue;
 static ALLEGRO_EVENT_SOURCE evsrc;
 
+static ALLEGRO_DISPLAY *tmp_display;
+
+
 typedef enum {
     FSPEED_NONE,
     FSPEED_SELECTED,
@@ -114,6 +119,7 @@ void main_reset()
     sid_reset();
     music4000_reset();
     music5000_reset();
+    paula_reset();
     sn_init();
     if (curtube != -1) tubes[curtube].reset();
     else               tube_exec = NULL;
@@ -254,6 +260,7 @@ void main_init(int argc, char *argv[])
     sid_init();
     sid_settype(sidmethod, cursid);
     music5000_init(queue);
+    paula_init();
     ddnoise_init();
     tapenoise_init(queue);
 
@@ -264,7 +271,7 @@ void main_init(int argc, char *argv[])
 
     scsi_init();
     ide_init();
-    vdfs_init();
+    vdfs_init(vdfs_cfg_root);
 
     model_init();
 
@@ -272,6 +279,8 @@ void main_init(int argc, char *argv[])
     main_reset();
 
     joystick_init(queue);
+
+    tmp_display = display;
 
     gui_allegro_init(queue, display);
 
@@ -399,6 +408,7 @@ static void main_key_down(ALLEGRO_EVENT *event)
             wd1770_reset();
             sid_reset();
             music5000_reset();
+            paula_reset();
 
             if (curtube != -1)
                 tubes[curtube].reset();
@@ -449,9 +459,15 @@ void lost_focus() {
     alt_down = false;
 }
 
+double prev_time = 0;
+int execs = 0;
+double spd = 0;
+
 static void main_timer(ALLEGRO_EVENT *event)
 {
-    double delay = al_get_time() - event->any.timestamp;
+    double now = al_get_time();
+    double delay = now - event->any.timestamp;
+
     if (delay < time_limit) {
         if (autoboot)
             autoboot--;
@@ -461,9 +477,13 @@ static void main_timer(ALLEGRO_EVENT *event)
             m65c02_exec();
         else
             m6502_exec();
+        execs++;
 
         if (ddnoise_ticks > 0 && --ddnoise_ticks == 0)
             ddnoise_headdown();
+
+        if (led_ticks > 0 && --led_ticks == 0)
+            led_timer_fired();
 
         if (savestate_wantload)
             savestate_doload();
@@ -471,6 +491,24 @@ static void main_timer(ALLEGRO_EVENT *event)
             savestate_dosave();
         if (fullspeed == FSPEED_RUNNING)
             al_emit_user_event(&evsrc, event, NULL);
+
+        if (now - prev_time > 0.1) {
+
+            double speed = execs * 40000 / (now - prev_time);
+
+            if (spd < 0.01)
+                spd = 100.0 * speed / 2000000;
+            else
+                spd = spd * 0.75 + 0.25 * (100.0 * speed / 2000000);
+
+
+            char buf[120];
+            snprintf(buf, 120, "%s %.3fMHz %.1f%%", VERSION_STR, speed / 1000000, spd);
+            al_set_window_title(tmp_display, buf);
+
+            execs = 0;
+            prev_time = now;
+        }
     }
 }
 

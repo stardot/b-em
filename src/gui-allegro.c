@@ -15,6 +15,7 @@
 #include "model.h"
 #include "mouse.h"
 #include "music5000.h"
+#include "paula.h"
 #include "savestate.h"
 #include "sid_b-em.h"
 #include "scsi.h"
@@ -108,6 +109,7 @@ static ALLEGRO_MENU *create_file_menu(void)
     al_append_menu_item(menu, "Save Screenshot...", IDM_FILE_SCREEN_SHOT, 0, NULL, NULL);
     add_checkbox_item(menu, "Print to file", IDM_FILE_PRINT, prt_fp);
     add_checkbox_item(menu, "Record Music 5000 to file", IDM_FILE_M5000, music5000_fp);
+    add_checkbox_item(menu, "Record Paula to file", IDM_FILE_PAULAREC, paula_fp);
     al_append_menu_item(menu, "Exit", IDM_FILE_EXIT, 0, NULL, NULL);
     return menu;
 }
@@ -291,6 +293,8 @@ static ALLEGRO_MENU *create_tube_menu(void)
 
 static const char *border_names[] = { "None", "Medium", "Full", NULL };
 static const char *vmode_names[] = { "Scaled", "Interlace", "Scanlines", "Line doubling", NULL };
+static const char *led_location_names[] = { "None", "Overlapped", "Separate", NULL };
+static const char *led_visibility_names[] = { "When changed", "When changed or transient", "Always", NULL };
 
 static ALLEGRO_MENU *create_video_menu(void)
 {
@@ -305,6 +309,12 @@ static ALLEGRO_MENU *create_video_menu(void)
     add_checkbox_item(menu, "Fullscreen", IDM_VIDEO_FULLSCR, fullscreen);
     add_checkbox_item(menu, "NuLA", IDM_VIDEO_NULA, !nula_disable);
     add_checkbox_item(menu, "PAL Emulation", IDM_VIDEO_PAL, vid_pal);
+    sub = al_create_menu();
+    al_append_menu_item(menu, "LED location...", 0, 0, NULL, sub);
+    add_radio_set(sub, led_location_names, IDM_VIDEO_LED_LOCATION, vid_ledlocation);
+    sub = al_create_menu();
+    al_append_menu_item(menu, "LED visibility...", 0, 0, NULL, sub);
+    add_radio_set(sub, led_visibility_names, IDM_VIDEO_LED_VISIBILITY, vid_ledvisibility);
     return menu;
 }
 
@@ -351,6 +361,7 @@ static ALLEGRO_MENU *create_sound_menu(void)
     add_checkbox_item(menu, "Internal sound chip",   IDM_SOUND_INTERNAL,  sound_internal);
     add_checkbox_item(menu, "BeebSID",               IDM_SOUND_BEEBSID,   sound_beebsid);
     add_checkbox_item(menu, "Music 5000",            IDM_SOUND_MUSIC5000, sound_music5000);
+    add_checkbox_item(menu, "Paula",                 IDM_SOUND_PAULA,     sound_paula);
     add_checkbox_item(menu, "Printer port DAC",      IDM_SOUND_DAC,       sound_dac);
     add_checkbox_item(menu, "Disc drive noise",      IDM_SOUND_DDNOISE,   sound_ddnoise);
     add_checkbox_item(menu, "Tape noise",            IDM_SOUND_TAPE,      sound_tape);
@@ -579,6 +590,37 @@ static void m5000_rec(ALLEGRO_EVENT *event)
         }
         al_destroy_native_file_dialog(chooser);
     }
+}
+
+static void paula_rec(ALLEGRO_EVENT *event)
+{
+    ALLEGRO_FILECHOOSER *chooser;
+    ALLEGRO_DISPLAY *display;
+
+    if (paula_fp)
+        paula_rec_stop();
+    else if ((chooser = al_create_native_file_dialog(savestate_name, "Record Paula to file", "*.wav", ALLEGRO_FILECHOOSER_SAVE))) {
+        display = (ALLEGRO_DISPLAY *)(event->user.data2);
+        while (al_show_native_file_dialog(display, chooser)) {
+            if (al_get_native_file_dialog_count(chooser) <= 0)
+                break;
+            if (paula_rec_start(al_get_native_file_dialog_path(chooser, 0)))
+                break;
+        }
+        al_destroy_native_file_dialog(chooser);
+    }
+}
+
+static void edit_paste_start(ALLEGRO_EVENT *event)
+{
+    ALLEGRO_DISPLAY *display = (ALLEGRO_DISPLAY *)(event->user.data2);
+    char *text = al_get_clipboard_text(display);
+    if (!text) {
+        sleep(1);  // try again - Allegro bug.
+        text = al_get_clipboard_text(display);
+    }
+    if (text)
+        os_paste_start(text);
 }
 
 static void edit_print_clip(ALLEGRO_EVENT *event)
@@ -980,11 +1022,14 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
         case IDM_FILE_M5000:
             m5000_rec(event);
             break;
+        case IDM_FILE_PAULAREC:
+            paula_rec(event);
+            break;
         case IDM_FILE_EXIT:
             quitting = true;
             break;
         case IDM_EDIT_PASTE:
-            os_paste_start(al_get_clipboard_text((ALLEGRO_DISPLAY *)(event->user.data2)));
+            edit_paste_start(event);
             break;
         case IDM_EDIT_COPY:
             edit_print_clip(event);
@@ -1103,6 +1148,12 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
         case IDM_VIDEO_NULA:
             nula_disable = !nula_disable;
             break;
+        case IDM_VIDEO_LED_LOCATION:
+            video_set_led_location(radio_event_simple(event, vid_ledlocation));
+            break;
+        case IDM_VIDEO_LED_VISIBILITY:
+            video_set_led_visibility(radio_event_simple(event, vid_ledvisibility));
+            break;
         case IDM_SOUND_INTERNAL:
             sound_internal = !sound_internal;
             break;
@@ -1111,6 +1162,9 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             break;
         case IDM_SOUND_MUSIC5000:
             sound_music5000 = !sound_music5000;
+            break;
+        case IDM_SOUND_PAULA:
+            sound_paula = !sound_paula;
             break;
         case IDM_SOUND_DAC:
             sound_dac = !sound_dac;

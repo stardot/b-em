@@ -483,7 +483,7 @@ static void arm_dbg_memwrite(uint32_t addr, uint32_t val)
     do_writearmb(addr, val);
 }
 
-static uint32_t arm_dbg_disassemble(uint32_t addr, char *buf, size_t bufsize) {
+static uint32_t arm_dbg_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t bufsize) {
    uint32_t instr = do_readarml(addr);
    int len = snprintf(buf, bufsize, "%08"PRIx32" %08"PRIx32" ", addr, instr);
    buf += len;
@@ -619,7 +619,7 @@ static void arm_dbg_reg_parse(int which, const char *strval) {
    arm_dbg_reg_set(which, val);
 };
 
-static uint32_t arm_dbg_get_instr_addr() {
+static uint32_t arm_dbg_get_instr_addr(void) {
     return PC;
 }
 
@@ -638,7 +638,7 @@ cpu_debug_t tubearm_cpu_debug = {
    .reg_parse      = arm_dbg_reg_parse,
    .get_instr_addr = arm_dbg_get_instr_addr,
    .trap_names     = arm_trap_names,
-   .print_addr     = debug_print_32bit
+   .print_addr     = debug_print_addr32
 };
 
 bool arm_init(void *rom)

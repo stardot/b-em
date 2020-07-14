@@ -35,7 +35,7 @@ extern void (*tube_proc_loadstate)(ZFILE *zfp);
 
 extern int tubecycles;
 static inline void tubeUseCycles(int c) {tubecycles -= c;}
-static inline int tubeContinueRunning() {return tubecycles > 0;}
+static inline int tubeContinueRunning(void) {return tubecycles > 0;}
 
 uint8_t tube_host_read(uint16_t addr);
 void    tube_host_write(uint16_t addr, uint8_t val);

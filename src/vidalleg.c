@@ -2,16 +2,20 @@
   Allegro video code*/
 #include <allegro5/allegro_primitives.h>
 #include "b-em.h"
+#include "led.h"
 #include "pal.h"
 #include "serial.h"
 #include "tape.h"
 #include "video.h"
 #include "video_render.h"
 
+extern int framesrun; // SFTODO!?
 enum vid_disptype vid_dtype_user, vid_dtype_intern;
 bool vid_pal;
 int vid_fskipmax = 1;
 int vid_fullborders = 1;
+int vid_ledlocation = 0;
+int vid_ledvisibility = 2;
 
 static int fskipcount;
 
@@ -37,8 +41,6 @@ static const int y_fudge = 0;
 static const int y_fudge = 28;
 #endif
 
-
-
 void video_enterfullscreen()
 {
     ALLEGRO_DISPLAY *display;
@@ -54,7 +56,7 @@ void video_enterfullscreen()
         //no we really do mean it
         al_set_display_flag(display, ALLEGRO_FULLSCREEN_WINDOW, false);
         al_set_display_flag(display, ALLEGRO_FULLSCREEN_WINDOW, true);
-        
+
         black = al_map_rgb(0, 0, 0);
         winsizex = al_get_display_width(display);
         winsizey = al_get_display_height(display);
@@ -108,6 +110,8 @@ void video_set_window_size(bool fudge)
     }
     winsizex = scr_x_size;
     winsizey = fudge ? scr_y_size + y_fudge : scr_y_size;
+    if (vid_ledlocation == 2) // Separate - LEDs have extra window space at the bottom.
+        winsizey += LED_BOX_HEIGHT;
     log_debug("vidalleg: video_set_window_size, scr_x_size=%d, scr_y_size=%d, fudgedy=%d", scr_x_size, scr_y_size, winsizey);
 }
 
@@ -118,13 +122,34 @@ void video_set_borders(int borders)
     al_resize_display(al_get_current_display(), winsizex, winsizey);
 }
 
+void video_set_led_location(int location)
+{
+    vid_ledlocation = location;
+    video_set_window_size(false);
+    al_resize_display(al_get_current_display(), winsizex, winsizey);
+}
+
+void video_set_led_visibility(int visibility)
+{
+    if (visibility == 1 /* LEDs visible when changed or transient LED lit */ && vid_ledvisibility == 2 /* LEDs permanently visible */)
+        last_led_update_at = framesrun;
+
+    vid_ledvisibility = visibility;
+}
+
+static int video_led_height(void)
+{
+    return (vid_ledlocation == 2 /* separate */) ? LED_BOX_HEIGHT : 0;
+}
+
 void video_update_window_size(ALLEGRO_EVENT *event)
 {
     if (!fullscreen) {
         scr_x_start = 0;
         scr_x_size = winsizex = event->display.width;
         scr_y_start = 0;
-        scr_y_size = winsizey = event->display.height;
+        winsizey = event->display.height;
+        scr_y_size = winsizey - video_led_height();
         log_debug("vidalleg: video_update_window_size, scr_x_size=%d, scr_y_size=%d", scr_x_size, scr_y_size);
     }
     al_acknowledge_resize(event->display.source);
@@ -143,10 +168,8 @@ void video_leavefullscreen(void)
     scr_x_start = 0;
     scr_x_size = winsizex = al_get_display_width(display);
     scr_y_start = 0;
-    scr_y_size = winsizey = al_get_display_height(display);
-    
-    //video_set_borders(vid_fullborders);
-
+    winsizey = al_get_display_height(display);
+    scr_y_size = winsizey - video_led_height();
 }
 
 void video_toggle_fullscreen(void)
@@ -394,10 +417,38 @@ static inline void fill_letterbox(void)
     al_draw_filled_rectangle(0, scr_y_start + scr_y_size, winsizex, winsizey, border_col);
 }
 
+static void render_leds(void)
+{
+    ALLEGRO_COLOR led_tint = al_map_rgba(0, 0, 0, 0);
+    if (vid_ledlocation > 0) {
+        float w = al_get_bitmap_width(led_bitmap);
+        float h = al_get_bitmap_height(led_bitmap);
+        if (vid_ledvisibility == 2 || led_any_transient_led_on())
+            al_draw_scaled_bitmap(led_bitmap, 0, 0, w, h, (winsizex-w)/2, winsizey-h, w, h, 0);
+        else {
+            const int led_visible_for_frames = 50;
+            const int led_fade_frames = 25;
+
+            int led_visible_frames_left = led_visible_for_frames - (framesrun - last_led_update_at);
+            if (led_visible_frames_left > 0) {
+                if (led_visible_frames_left <= led_fade_frames) {
+                    int i = (255 * led_visible_frames_left) / led_fade_frames;
+                    led_tint = al_map_rgba(i, i, i, i);
+                }
+                else
+                    led_tint = al_map_rgb(255, 255, 255);
+            }
+            al_draw_tinted_scaled_bitmap(led_bitmap, led_tint, 0, 0, w, h, (winsizex-w)/2, winsizey-h, w, h, 0);
+        }
+    }
+}
+
 void video_doblit(bool non_ttx, uint8_t vtotal)
 {
     if (vid_savescrshot)
         save_screenshot();
+
+    if (!led_bitmap) led_init(); // SFTODO!? HORRIBLE HACK
 
     if (++fskipcount >= ((motor && fasttape) ? 5 : vid_fskipmax)) {
         lasty++;
@@ -408,6 +459,8 @@ void video_doblit(bool non_ttx, uint8_t vtotal)
             fill_pillarbox();
         else if (scr_y_start > 0)
             fill_letterbox();
+
+        render_leds();
         al_flip_display();
     }
     firstx = firsty = 65535;

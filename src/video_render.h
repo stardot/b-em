@@ -47,6 +47,7 @@ extern enum vid_disptype {
 
 extern bool vid_pal;
 extern int vid_fskipmax, vid_fullborders;
+extern int vid_ledlocation, vid_ledvisibility;
 extern bool vid_print_mode;
 
 extern int vid_savescrshot;
@@ -60,6 +61,9 @@ void video_set_window_size(bool fudge);
 void video_update_window_size(ALLEGRO_EVENT *event);
 void video_set_disptype(enum vid_disptype dtype);
 void video_set_borders(int borders);
+void video_set_led_location(int location);
+void video_set_led_visibility(int visibility);
+//SFTODO: DELETE IF NOT USED void video_set_led(bool b); // SFTODO: IS THIS USED!?
 
 void video_close(void);
 

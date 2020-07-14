@@ -78,8 +78,8 @@ static void dbg_memwrite(uint32_t addr, uint32_t value) {
    write_x8_internal(addr, value);
 };
 
-static uint32_t dbg_disassemble(uint32_t addr, char *buf, size_t bufsize) {
-   return n32016_disassemble(addr, buf, bufsize);
+static uint32_t dbg_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t bufsize) {
+   return n32016_disassemble(cpu, addr, buf, bufsize);
 };
 
 // Get a register - which is the index into the names above
@@ -210,7 +210,7 @@ static void dbg_reg_parse(int which, const char *strval) {
    dbg_reg_set(which, val);
 };
 
-static uint32_t dbg_get_instr_addr() {
+static uint32_t dbg_get_instr_addr(void) {
    return n32016_get_startpc();
 }
 
@@ -226,6 +226,6 @@ cpu_debug_t n32016_cpu_debug = {
    .reg_print      = dbg_reg_print,
    .reg_parse      = dbg_reg_parse,
    .get_instr_addr = dbg_get_instr_addr,
-   .print_addr     = debug_print_32bit
+   .print_addr     = debug_print_addr32
 };
 

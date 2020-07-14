@@ -418,7 +418,7 @@ cpu_debug_t tubez80_cpu_debug = {
     .reg_print      = dbg_z80_reg_print,
     .reg_parse      = dbg_z80_reg_parse,
     .get_instr_addr = dbg_z80_get_instr_addr,
-    .print_addr     = debug_print_16bit
+    .print_addr     = debug_print_addr16
 };
 
 void z80_close(void)
