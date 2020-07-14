@@ -117,7 +117,7 @@ static uint8_t wt_sectid;
 static uint8_t wt_sectsz;
 
 /*
- * This function write the IMD file in memory back to the disc file.
+ * This function writes the IMD file in memory back to the disc file.
  * it does not re-write the comment at the start of the file but
  * rewrites everything else and truncates any remaining junk from
  * the end of the file.
@@ -127,7 +127,7 @@ static void imd_save(struct imd_file *imd)
 {
     fseek(imd->fp, imd->track0, SEEK_SET);
     for (struct imd_track *trk = imd->track_head; trk; trk = trk->next) {
-        uint8_t buf[5+36];
+        uint8_t buf[5+IMD_MAX_SECTS];
         buf[0] = trk->mode;
         buf[1] = trk->cylinder;
         buf[2] = trk->head;
@@ -261,6 +261,9 @@ static int imd_verify(int drive, int track, int density)
  * This is an internal function to find a track prior to reading from
  * it or writing to it. This has to search the list for IDs rather
  * than counting as tracks in the image file can be in any order.
+ *
+ * Note that this searches for the physical cylinder ID which is not
+ * the same as the cylinder encoded within sector headers.
  */
 
 static struct imd_track *imd_find_track(int drive, int track, int side, int density)
@@ -514,6 +517,10 @@ static void imd_abort(int drive)
 /*
  * This function is part of the state machine to implement the write
  * sector command and handles the first byte written.
+ *
+ * At this stage we do not know if this should be a compressed sector
+ * i.e. one with all the bytes having the same value, or a normal
+ * sector where they may be different.
  */
 
 static void imd_poll_writesect0(void)
@@ -528,11 +535,11 @@ static void imd_poll_writesect0(void)
 }
 
 /*
- * This function is part of the state machine to implement the write
- * sector command and handles the second and subsequents bytes of
- * as long as they match the first, i.e. the sector is compressed.
- * If a different byte is recieved it switches to an uncompressed
- * sector format.
+ * The imd_poll_writesect1 function is part of the state machine to
+ * implement the write sector command and handles the second and
+ * subsequents bytes of as long as they match the first, i.e. the
+ * sector is compressed.  If a different byte is recieved it switches
+ * to an uncompressed sector format.
  */
 
 static unsigned mode_compressed(unsigned mode)
@@ -664,6 +671,13 @@ static struct imd_sect *imd_poll_new_sect(size_t size)
     }
 }
 
+/*
+ * This function is part of the state machine to implement the format
+ * command as used by the i8271.  It reveives the cylinder ID of the
+ * next sector to be formatted, creates a new sector and records the
+ * ID within it.
+ */
+
 static void imd_poll_format_cylid(void)
 {
     struct imd_sect *new_sect = imd_poll_new_sect(sizeof(struct imd_sect));
@@ -678,6 +692,12 @@ static void imd_poll_format_cylid(void)
     }
 }
 
+/*
+ * This function is part of the state machine to implement the format
+ * command as used by the i8271.  It reveives and records the head
+ * ID  of the sector being formatted.
+ */
+
 static void imd_poll_format_headid(void)
 {
     int headid = fdc_getdata(0);
@@ -685,6 +705,12 @@ static void imd_poll_format_headid(void)
     cur_sect->head = headid;
     state = ST_FORMAT_SECTID;
 }
+
+/*
+ * This function is part of the state machine to implement the format
+ * command as used by the i8271.  It reveives and records the sector
+ * ID  of the sector being formatted.
+ */
 
 static void imd_poll_format_sectid(void)
 {
@@ -695,6 +721,12 @@ static void imd_poll_format_sectid(void)
 }
 
 static void imd_dump(struct imd_file *imd);
+
+/*
+ * This function is part of the state machine to implement the format
+ * command as used by the i8271.  It reveives and records the logical
+ * sector size of the sector being formatted.
+ */
 
 static void imd_poll_format_sectsz(void)
 {
@@ -807,8 +839,8 @@ static void imd_poll_wrtrack_sectid(void)
 
 /*
  * This function is part of the state machine to implement the write
- * track command and implements a state which captures the sector
- * size code from the ID header.
+ * track command and implements a state which captures the logical
+ * sector size code from the ID header.
  */
 
 static void imd_poll_wrtrack_sectsz(void)
@@ -896,7 +928,7 @@ static void imd_poll_wrtrack_data1(void)
 /*
  * This function is part of the state machine to implement the write
  * track command and implements a state which receives further bytes
- * after switch has already been made to an uncompressed sector.
+ * after a switch has already been made to an uncompressed sector.
  */
 
 static void imd_poll_wrtrack_data2(void)
@@ -927,8 +959,8 @@ static void imd_poll_wrtrack_datacrc(void)
 }
 
 /*
- * This function is called on a timer and carries out the transfer
- * operations set up by the other functions.
+ * This function is called on a timer and uses a state machine to
+ * carry out the transfer operations set up by other functions.
  */
 
 static void imd_poll(void)
@@ -1076,8 +1108,8 @@ static void imd_poll(void)
 
 /*
  * This function checks that the file is a valid IMD file, skips over
- * the ASCII comments and returns the offset to the first track or zero
- * if the file is not valid.
+ * the ASCII comments and returns the offset to the first track, or
+ * zero if the file is not valid.
  */
 
 static long imd_check_hdr(FILE *fp)
@@ -1167,7 +1199,7 @@ failed:
 }
 
 /*
- * This function loads one map, i.e. a set of bytes, one per sector
+ * This function loads one map, i.e. a set of bytes, one per sector,
  * containing some sector ID header field.
  */
 
@@ -1261,8 +1293,9 @@ static void imd_dump(struct imd_file *imd)
 }
 
 /*
- * This function loads an IMD and, if successful, sets up the function
- * pointer for the various functions in the FDC to file interface.
+ * This function loads an IMD file and, if successful, sets up the
+ * function pointers for the various functions in the FDC to file
+ * interface.
  */
 
 void imd_load(int drive, const char *fn)
