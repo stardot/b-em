@@ -679,6 +679,10 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 
     main_pause();
     indebug = 1;
+    const char *sym;
+    if (symbol_find_by_addr(cpu->symbols, addr, &sym)) {
+        debug_outf("%s:\n", sym);
+    }
     log_debug("debugger: about to call disassembler, addr=%04X", addr);
     next_addr = cpu->disassemble(cpu, addr, ins, sizeof ins);
     debug_out(ins, strlen(ins));
