@@ -322,6 +322,7 @@ static void imd_readsector(int drive, int sector, int track, int side, int densi
             struct imd_sect *sect = imd_find_sector(drive, track, side, sector, trk);
             if (sect) {
                 count = sect->sectsize;
+                cur_sect = sect;
                 if (sect->mode & 1) {
                     log_debug("imd: drive %d: found full sector", drive);
                     data = sect->data;
@@ -926,6 +927,7 @@ static void imd_poll_wrtrack_data1(void)
                 struct imd_sect *new_sect = imd_poll_wrtrack_new_sect(sizeof(struct imd_sect), 0x02);
                 if (new_sect) {
                     new_sect->data[0] = cdata;
+                    cur_sect = new_sect;
                     state = ST_WRTRACK_DATACRC;
                 }
             }
