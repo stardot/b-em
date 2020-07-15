@@ -134,9 +134,34 @@ static void imd_save(struct imd_file *imd)
         buf[3] = trk->nsect;
         buf[4] = trk->sectsize;
         uint8_t *ptr = buf+5;
-        for (struct imd_sect *sect = trk->sect_head; sect; sect = sect->next)
+        bool cylmap = false;
+        bool headmap = false;
+        for (struct imd_sect *sect = trk->sect_head; sect; sect = sect->next) {
             *ptr++ = sect->sectid;
+            if (sect->cylinder != trk->cylinder)
+                cylmap = true;
+            if (sect->head != trk->head)
+                headmap = true;
+        }
         fwrite(buf, ptr-buf, 1, imd->fp);
+        if (cylmap) {
+            ptr = buf;
+            for (struct imd_sect *sect = trk->sect_head; sect; sect = sect->next)
+                *ptr++ = sect->cylinder;
+            fwrite(buf, ptr-buf, 1, imd->fp);
+        }
+        if (headmap) {
+            ptr = buf;
+            for (struct imd_sect *sect = trk->sect_head; sect; sect = sect->next)
+                *ptr++ = sect->head;
+            fwrite(buf, ptr-buf, 1, imd->fp);
+        }
+        if (trk->sectsize == 0xff) {
+            ptr = buf;
+            for (struct imd_sect *sect = trk->sect_head; sect; sect = sect->next)
+                *ptr++ = sect->sectsize;
+            fwrite(buf, ptr-buf, 1, imd->fp);
+        }
         for (struct imd_sect *sect = trk->sect_head; sect; sect = sect->next) {
             putc(sect->mode, imd->fp);
             if (sect->mode & 1)
@@ -1259,7 +1284,7 @@ static bool imd_load_tracks(const char *fn, FILE *fp, struct imd_file *imd)
         }
         trk->mode     = hdr[0];
         trk->cylinder = hdr[1];
-        trk->head     = hdr[2];
+        trk->head     = hdr[2] & ~0xc0;
         trk->nsect    = hdr[3];
         trk->sectsize = hdr[4];
         if (trk->nsect > IMD_MAX_SECTS) {
@@ -1271,9 +1296,9 @@ static bool imd_load_tracks(const char *fn, FILE *fp, struct imd_file *imd)
         struct imd_maps maps;
         if (!imd_load_map(fn, fp, trk->nsect, maps.snum_map, trackno, "sector ID"))
             goto failed;
-        if ((trk->head & 0x80) && !imd_load_map(fn, fp, trk->nsect, maps.cyl_map, trackno, "cyclinder"))
+        if ((hdr[2] & 0x80) && !imd_load_map(fn, fp, trk->nsect, maps.cyl_map, trackno, "cyclinder"))
             goto failed;
-        if ((trk->head & 0x40) && !imd_load_map(fn, fp, trk->nsect, maps.head_map, trackno, "head"))
+        if ((hdr[2] & 0x40) && !imd_load_map(fn, fp, trk->nsect, maps.head_map, trackno, "head"))
             goto failed;
         if ((trk->sectsize == 0xff) && !imd_load_map(fn, fp, trk->nsect, maps.ssize_map, trackno, "sector size"))
             goto failed;
