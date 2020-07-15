@@ -32,11 +32,11 @@ struct imd_sect;
 struct imd_sect {
     struct imd_sect *next;
     struct imd_sect *prev;
-    uint16_t sectsize;
     uint8_t  mode;
     uint8_t  cylinder;
     uint8_t  head;
     uint8_t  sectid;
+    uint8_t  sectsize;
     unsigned char data[1];
 };
 
@@ -140,7 +140,7 @@ static void imd_save(struct imd_file *imd)
         for (struct imd_sect *sect = trk->sect_head; sect; sect = sect->next) {
             putc(sect->mode, imd->fp);
             if (sect->mode & 1)
-                fwrite(sect->data, sect->sectsize, 1, imd->fp);
+                fwrite(sect->data, 128 << sect->sectsize, 1, imd->fp);
             else if (sect->mode)
                 putc(sect->data[0], imd->fp);
         }
@@ -321,7 +321,7 @@ static void imd_readsector(int drive, int sector, int track, int side, int densi
         if (trk) {
             struct imd_sect *sect = imd_find_sector(drive, track, side, sector, trk);
             if (sect) {
-                count = sect->sectsize;
+                count = 128 << sect->sectsize;
                 cur_sect = sect;
                 if (sect->mode & 1) {
                     log_debug("imd: drive %d: found full sector", drive);
@@ -362,7 +362,7 @@ static void imd_writesector(int drive, int sector, int track, int side, int dens
                 else {
                     cur_trk = trk;
                     cur_sect = sect;
-                    count = sect->sectsize;
+                    count = 128 << sect->sectsize;
                     imd_discs[drive].dirty = true;
                     imd_time = -20;
                     state = ST_WRITESECTOR0;
@@ -594,7 +594,7 @@ static void imd_poll_writesect1(void)
         if (b != cdata) {
             if (!(cur_sect->mode & 1)) {
                 log_debug("imd: imd_poll_writesect1 converting compressed sector");
-                struct imd_sect *new_sect = malloc(sizeof(struct imd_sect)+cur_sect->sectsize);
+                struct imd_sect *new_sect = malloc(sizeof(struct imd_sect)+(128 << cur_sect->sectsize));
                 if (!new_sect) {
                     log_error("imd: out of memory reallocating sector");
                     fdc_finishio(FDC_DATA_CRC_ERR);
@@ -621,7 +621,7 @@ static void imd_poll_writesect1(void)
                 free(cur_sect);
                 cur_sect = new_sect;
             }
-            unsigned used = cur_sect->sectsize - count - 1;
+            unsigned used = (128 << cur_sect->sectsize) - count - 1;
             log_debug("imd: imd_poll_writesect1 used=%u", used);
             memset(cur_sect->data, cdata, used);
             data = cur_sect->data + used;
@@ -758,7 +758,7 @@ static void imd_poll_format_sectsz(void)
     log_debug("imd: imd_poll_format_sectsz, sectsz=%02X, count=%u", sectsz, count);
     if (sectsz != cur_trk->sectsize)
         cur_trk->sectsize = 0xff;
-    cur_sect->sectsize = 128 << sectsz;
+    cur_sect->sectsize = sectsz;
     if (count)
         state = ST_FORMAT_CYLID;
     else {
@@ -783,7 +783,7 @@ static struct imd_sect *imd_poll_wrtrack_new_sect(size_t size, unsigned mode)
             cur_trk->sectsize = wt_sectsz;
         else if (wt_sectsz != cur_trk->sectsize)
             cur_trk->sectsize = 0xff;
-        new_sect->sectsize = (128 << wt_sectsz);
+        new_sect->sectsize = wt_sectsz;
         new_sect->mode     = mode;
         new_sect->cylinder = wt_cylid;
         new_sect->head     = wt_headid;
@@ -1171,13 +1171,14 @@ static bool imd_load_sectors(const char *fn, FILE *fp, struct imd_track *trk, in
     struct imd_sect *head = NULL;
     struct imd_sect *tail = NULL;
     for (int sectno = 0; sectno < trk->nsect; sectno++) {
-        size_t ssize = 128 << ((trk->sectsize == 0xff) ? mp->ssize_map[sectno] : trk->sectsize);
+        unsigned ssize = (trk->sectsize == 0xff) ? mp->ssize_map[sectno] : trk->sectsize;
+        size_t bytes = 128 << ssize;
         int mode = getc(fp);
         if (mode == EOF) {
             imd_sect_err(fn, fp, trackno, sectno);
             goto failed;
         }
-        struct imd_sect *sect = malloc((mode & 1) ? sizeof(struct imd_sect) + ssize : sizeof(struct imd_sect));
+        struct imd_sect *sect = malloc((mode & 1) ? sizeof(struct imd_sect) + bytes : sizeof(struct imd_sect));
         if (!sect) {
             log_error("Disc image '%s' track %d, sector %d: %s", fn, trackno, sectno, "out of memory");
             goto failed;
@@ -1190,7 +1191,7 @@ static bool imd_load_sectors(const char *fn, FILE *fp, struct imd_track *trk, in
         if (mode == 0)
             sect->data[0] = 0;
         else if (mode & 1) {
-            if (fread(sect->data, ssize, 1, fp) != 1) {
+            if (fread(sect->data, bytes, 1, fp) != 1) {
                 imd_sect_err(fn, fp, trackno, sectno);
                 goto failed;
             }
@@ -1311,7 +1312,7 @@ static void imd_dump(struct imd_file *imd)
     for (struct imd_track *trk = imd->track_head; trk; trk = trk->next) {
         log_debug("imd: track mode=%02X, cylinder=%u, head=%02X, nsect=%u, sectsize=%02X", trk->mode, trk->cylinder, trk->head, trk->nsect, trk->sectsize);
         for (struct imd_sect *sect = trk->sect_head; sect; sect = sect->next)
-            log_debug("imd: sector mode=%02X, cylinder=%u, head=%u, sectid=%u, sectsize=%u", sect->mode, sect->cylinder, sect->head, sect->sectid, sect->sectsize);
+            log_debug("imd: sector mode=%02X, cylinder=%u, head=%u, sectid=%u, sectsize=%02X", sect->mode, sect->cylinder, sect->head, sect->sectid, sect->sectsize);
     }
     log_debug("imd: maximum cylinder=%u", imd->maxcyl);
 #endif
