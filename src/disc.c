@@ -139,6 +139,14 @@ void disc_writetrack(int drive, int track, int side, int density)
         disc_format(drive, track, side, density);
 }
 
+void disc_readtrack(int drive, int track, int side, int density)
+{
+    if (drives[drive].readtrack)
+        drives[drive].readtrack(drive, track, side, density);
+    else
+       disc_notfound = 10000;
+}
+
 void disc_abort(int drive)
 {
         if (drives[drive].abort)

@@ -12,6 +12,7 @@ typedef struct
         void (*readaddress)(int drive, int track, int side, int density);
         void (*format)(int drive, int track, int side, unsigned par2);
         void (*writetrack)(int drive, int track, int side, int density);
+        void (*readtrack)(int drive, int track, int side, int density);
         void (*poll)(void);
         void (*abort)(int drive);
         int (*verify)(int drive, int track, int density);
@@ -31,6 +32,7 @@ void disc_writesector(int drive, int sector, int track, int side, int density);
 void disc_readaddress(int drive, int track, int side, int density);
 void disc_format(int drive, int track, int side, int density);
 void disc_writetrack(int drive, int track, int side, int density);
+void disc_readtrack(int drive, int track, int side, int density);
 void disc_abort(int drive);
 int disc_verify(int drive, int track, int density);
 

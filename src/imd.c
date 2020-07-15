@@ -102,7 +102,20 @@ enum imd_state {
     ST_WRTRACK_DATA0,
     ST_WRTRACK_DATA1,
     ST_WRTRACK_DATA2,
-    ST_WRTRACK_DATACRC
+    ST_WRTRACK_DATACRC,
+    ST_RDTRACK_GAP0F,
+    ST_RDTRACK_GAP00,
+    ST_RDTRACK_IDFE,
+    ST_RDTRACK_CYLID,
+    ST_RDTRACK_HEADID,
+    ST_RDTRACK_SECTID,
+    ST_RDTRACK_SECTSZ,
+    ST_RDTRACK_HDR_CRC,
+    ST_RDTRACK_GAP1F,
+    ST_RDTRACK_GAP10,
+    ST_RDTRACK_DATA,
+    ST_RDTRACK_CDATA,
+    ST_RDTRACK_DATA_CRC
 };
 
 static enum imd_state state;
@@ -516,6 +529,24 @@ static void imd_writetrack(int drive, int track, int side, int density)
         cur_trk->nsect = 0;
         cur_trk->sectsize = 0xfe;
         state = ST_WRTRACK_INITIAL;
+    }
+}
+
+/* This is the read track command as used by the WD1770 rather than
+ * the i2871.  This sends the whole track including gaps and IDs.
+ */
+
+static void imd_readtrack(int drive, int track, int side, int density)
+{
+    struct imd_track *trk = imd_find_track(drive, track, side, density);
+    if (trk) {
+        cur_sect = trk->sect_head;
+        count = 16;
+        state = ST_RDTRACK_GAP0F;
+    }
+    else {
+        count = 500;
+        state = ST_NOTFOUND;
     }
 }
 
@@ -1153,6 +1184,109 @@ static void imd_poll(void)
 
         case ST_WRTRACK_DATACRC:
             imd_poll_wrtrack_datacrc();
+            break;
+
+        case ST_RDTRACK_GAP0F:
+            fdc_data(0xff);
+            if (--count == 0) {
+                count = 6;
+                state = ST_RDTRACK_GAP00;
+            }
+            break;
+
+        case ST_RDTRACK_GAP00:
+            fdc_data(0x00);
+            if (--count == 0)
+                state = ST_RDTRACK_IDFE;
+            break;
+
+        case ST_RDTRACK_IDFE:
+            fdc_data(0xFE);
+            state = ST_RDTRACK_CYLID;
+            break;
+
+        case ST_RDTRACK_CYLID:
+            fdc_data(cur_sect->cylinder);
+            state = ST_RDTRACK_HEADID;
+            break;
+
+        case ST_RDTRACK_HEADID:
+            fdc_data(cur_sect->head);
+            state = ST_RDTRACK_SECTID;
+            break;
+
+        case ST_RDTRACK_SECTID:
+            fdc_data(cur_sect->sectid);
+            state = ST_RDTRACK_SECTID;
+            break;
+
+        case ST_RDTRACK_SECTSZ:
+            fdc_data(cur_sect->sectsize);
+            count = 2;
+            state = ST_RDTRACK_HDR_CRC;
+            break;
+
+        case ST_RDTRACK_HDR_CRC:
+            fdc_data(0);
+            if (--count == 0) {
+                count = 11;
+                state = ST_RDTRACK_GAP1F;
+            }
+            break;
+
+        case ST_RDTRACK_GAP1F:
+            fdc_data(0xff);
+            if (--count == 0) {
+                count = 5;
+                state = ST_RDTRACK_GAP10;
+            }
+            break;
+
+        case ST_RDTRACK_GAP10:
+            fdc_data(0x00);
+            if (--count == 0) {
+                count = 128 << cur_sect->sectsize;
+                if (cur_sect->mode & 1) {
+                    data = cur_sect->data;
+                    state = ST_RDTRACK_DATA;
+                }
+                else {
+                    cdata = cur_sect->data[0];
+                    state = ST_RDTRACK_CDATA;
+                }
+            }
+            break;
+
+        case ST_RDTRACK_DATA:
+            fdc_data(*data++);
+            if (--count == 0) {
+                count = 2;
+                state = ST_RDTRACK_DATA_CRC;
+            }
+            break;
+
+        case ST_RDTRACK_CDATA:
+            fdc_data(cdata);
+            if (--count == 0) {
+                count = 2;
+                state = ST_RDTRACK_DATA_CRC;
+            }
+            break;
+
+        case ST_RDTRACK_DATA_CRC:
+            fdc_data(0);
+            if (--count == 0) {
+                cur_sect = cur_sect->next;
+                if (cur_sect) {
+                    count = 18;
+                    state = ST_RDTRACK_GAP0F;
+                }
+                else {
+                    fdc_finishio(0);
+                    state = ST_IDLE;
+                }
+            }
+            break;
     }
 }
 
@@ -1382,6 +1516,7 @@ void imd_load(int drive, const char *fn)
                 drives[drive].poll        = imd_poll;
                 drives[drive].abort       = imd_abort;
                 drives[drive].writetrack  = imd_writetrack;
+                drives[drive].readtrack   = imd_readtrack;
                 return;
             }
         }
