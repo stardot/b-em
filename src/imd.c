@@ -603,7 +603,7 @@ static unsigned mode_compressed(unsigned mode)
 static unsigned mode_full(unsigned mode)
 {
     if (mode == 0)
-        return 2;
+        return 1;
     if (mode & 1)
         return mode;
     return mode-1;
