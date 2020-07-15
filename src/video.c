@@ -994,7 +994,7 @@ void video_poll(int clocks, int timer_enable)
                 if (cdraw) {
                     if (cursoron && (ula_ctrl & cursorlook[cdraw])) {
                         for (c = ((ula_ctrl & 0x10) ? 8 : 16); c >= 0; c--) {
-                            nula_putpixel(region, scrx + c, scry, get_pixel(region, scrx + c, scry) ^ colwhite);
+                            nula_putpixel(region, scrx + c, scry, get_pixel(region, scrx + c, scry) ^ 0x00ffffff);
                         }
                     }
                     cdraw++;
