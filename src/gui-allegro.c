@@ -996,7 +996,7 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
         case IDM_ZERO:
             break;
         case IDM_FILE_RESET:
-            nula_default_palette();
+            nula_reset();
             main_restart();
             break;
         case IDM_FILE_LOAD_STATE:
