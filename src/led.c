@@ -23,19 +23,17 @@ typedef struct {
     int turn_off_at;
 } led_details_t;
 
-// SFTODO: WE NEED AN LED FOR HARD DRIVE - DO WE WANT ONE FOR SCSI AND ONE FOR
-// IDE? IF WE CAN ONLY HAVE ONE TYPE OF HARD DRIVE INSTALLED AT A TIME WE
-// PROBABLY DON'T NEED THIS. IF WE CAN HAVE EG MULTIPLE DRIVES OF THE SAME TYPE
-// MAYBE THEY SHOULD HAVE A SEPARATE LED EACH, AS WOULD BE THE CASE ON REAL
-// HARDWARE.
 static led_details_t led_details[LED_MAX] = {
     { /* LED_CASSETTE_MOTOR */ "cassette\nmotor", false, 0, false, 0 },
     { /* LED_CAPS_LOCK      */ "caps\nlock",      false, 1, false, 0 },
     { /* LED_SHIFT_LOCK     */ "shift\nlock",     false, 2, false, 0 },
     { /* LED_DRIVE_0        */ "drive 0",         true,  3, false, 0 },
     { /* LED_DRIVE_1        */ "drive 1",         true,  4, false, 0 },
-    { /* LED_HARD_DISK      */ "hard\ndisc",      true,  5, false, 0 },
-    { /* LED_VDFS           */ "VDFS",            true,  6, false, 0 }
+    { /* LED_HARD_DISK_0    */ "hard\ndisc 0",    true,  5, false, 0 },
+    { /* LED_HARD_DISK_1    */ "hard\ndisc 1",    true,  6, false, 0 },
+    { /* LED_HARD_DISK_2    */ "hard\ndisc 2",    true,  7, false, 0 },
+    { /* LED_HARD_DISK_3    */ "hard\ndisc 3",    true,  8, false, 0 },
+    { /* LED_VDFS           */ "VDFS",            true,  9, false, 0 }
 };
 
 static void draw_led(const led_details_t *led_details, bool b)

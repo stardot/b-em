@@ -14,7 +14,10 @@ typedef enum
     LED_SHIFT_LOCK,
     LED_DRIVE_0,
     LED_DRIVE_1,
-    LED_HDISK,
+    LED_HARD_DISK_0,
+    LED_HARD_DISK_1,
+    LED_HARD_DISK_2,
+    LED_HARD_DISK_3,
     LED_VDFS,
     LED_MAX
 } led_name_t;
