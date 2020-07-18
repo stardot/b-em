@@ -896,6 +896,8 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                         debug_outf("    Voice 2 frequency = %04X   volume = %i\n", sn_latch[2] >> 6, sn_vol[2]);
                         debug_outf("    Voice 3 frequency = %04X   volume = %i\n", sn_latch[3] >> 6, sn_vol[3]);
                     }
+                    else if (!strncasecmp(iptr, "ram", arglen))
+                       debug_outf("    System RAM registers :\n    ROMSEL=%02X ram4k=%02X ram8k=%02X ram12k=%02X ram20k=%02X vidbank=%04X\n", romsel>>14, ram4k, ram8k, ram12k, ram20k, vidbank);
                     else
                         debug_outf("Register set %s not known\n", iptr);
                 } else {

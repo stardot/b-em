@@ -203,8 +203,8 @@ static int timetolive = 0;
 
 static int cycles;
 static int otherstuffcount = 0;
-static int romsel;
-static uint8_t ram4k, ram8k, ram12k, ram20k;
+int romsel;
+uint8_t ram4k, ram8k, ram12k, ram20k;
 
 static inline void polltime(int c)
 {
@@ -5597,7 +5597,7 @@ void m65c02_exec(void)
                         takeint = (interrupt && !p.i);
                         break;
 
-                        /* TODO: DB: was this intentionally excluded 
+                        /* TODO: DB: was this intentionally excluded
                         printf("Found bad opcode %02X\n", opcode);
                         dumpregs();
                         mem_dump();
