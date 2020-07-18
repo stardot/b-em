@@ -276,15 +276,38 @@ static void key_update()
     sysvia_set_ca2(0);
 }
 
+static const int map_keypad[] = {
+    /* ALLEGRO_KEY_PAD_0 */ ALLEGRO_KEY_INSERT,
+    /* ALLEGRO_KEY_PAD_1 */ ALLEGRO_KEY_END,
+    /* ALLEGRO_KEY_PAD_2 */ ALLEGRO_KEY_DOWN,
+    /* ALLEGRO_KEY_PAD_3 */ ALLEGRO_KEY_PGDN,
+    /* ALLEGRO_KEY_PAD_4 */ ALLEGRO_KEY_LEFT,
+    /* ALLEGRO_KEY_PAD_5 */ ALLEGRO_KEY_PAD_5,
+    /* ALLEGRO_KEY_PAD_6 */ ALLEGRO_KEY_RIGHT,
+    /* ALLEGRO_KEY_PAD_7 */ ALLEGRO_KEY_HOME,
+    /* ALLEGRO_KEY_PAD_8 */ ALLEGRO_KEY_UP,
+    /* ALLEGRO_KEY_PAD_9 */ ALLEGRO_KEY_PGUP
+};
+
 int key_map(ALLEGRO_EVENT *event)
 {
     int code = event->keyboard.keycode;
     if (code < ALLEGRO_KEY_MAX) {
-        if (keyas && code == ALLEGRO_KEY_A)
-            code = ALLEGRO_KEY_CAPSLOCK;
+        if (code == ALLEGRO_KEY_A) {
+            if (keyas)
+                code = ALLEGRO_KEY_CAPSLOCK;
+        }
+        else if (code >= ALLEGRO_KEY_PAD_0 && code <= ALLEGRO_KEY_PAD_9) {
+            ALLEGRO_KEYBOARD_STATE kstate;
+            al_get_keyboard_state(&kstate);
+            bool kd = al_key_down(&kstate, ALLEGRO_KEY_NUMLOCK);
+            log_debug("key_map: kd=%d", kd);
+            if (!kd)
+                code = map_keypad[code-ALLEGRO_KEY_PAD_0];
+        }
         code = keylookup[code];
     }
-    log_debug("keyboard: mapping %d to %d", event->keyboard.keycode, code);
+    log_debug("keyboard: unichar=%d, mapping %d to %d", event->keyboard.unichar, event->keyboard.keycode, code);
     return code;
 }
 
