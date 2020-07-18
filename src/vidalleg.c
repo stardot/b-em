@@ -3,13 +3,13 @@
 #include <allegro5/allegro_primitives.h>
 #include "b-em.h"
 #include "led.h"
+#include "main.h"
 #include "pal.h"
 #include "serial.h"
 #include "tape.h"
 #include "video.h"
 #include "video_render.h"
 
-extern int framesrun; // SFTODO!?
 enum vid_disptype vid_dtype_user, vid_dtype_intern;
 bool vid_pal;
 int vid_fskipmax = 1;

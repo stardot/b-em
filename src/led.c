@@ -1,4 +1,5 @@
 #include "b-em.h"
+#include "main.h"
 #include "led.h"
 #include "video_render.h"
 #include <allegro5/allegro_font.h>
@@ -15,7 +16,6 @@ ALLEGRO_BITMAP *led_bitmap;
 static ALLEGRO_FONT *font;
 
 typedef struct {
-    led_name_t led_name;
     const char *label;
     bool transient;
     int index;
@@ -28,14 +28,14 @@ typedef struct {
 // PROBABLY DON'T NEED THIS. IF WE CAN HAVE EG MULTIPLE DRIVES OF THE SAME TYPE
 // MAYBE THEY SHOULD HAVE A SEPARATE LED EACH, AS WOULD BE THE CASE ON REAL
 // HARDWARE.
-static led_details_t led_details[] = {
-    {LED_CASSETTE_MOTOR, "cassette\nmotor", false, 0, false, 0},
-    {LED_CAPS_LOCK, "caps\nlock", false, 1, false, 0},
-    {LED_SHIFT_LOCK, "shift\nlock", false, 2, false, 0},
-    {LED_DRIVE_0, "drive 0", true, 3, false, 0},
-    {LED_DRIVE_1, "drive 1", true, 4, false, 0},
-    {LED_HDISK, "hard\ndisc", true, 5, false, 0 },
-    {LED_VDFS, "VDFS", true, 6, false, 0} // SFTODO: MIGHT BE NICE TO HIDE VDFS LED IF VDFS DISABLED
+static led_details_t led_details[LED_MAX] = {
+    { /* LED_CASSETTE_MOTOR */ "cassette\nmotor", false, 0, false, 0 },
+    { /* LED_CAPS_LOCK      */ "caps\nlock",      false, 1, false, 0 },
+    { /* LED_SHIFT_LOCK     */ "shift\nlock",     false, 2, false, 0 },
+    { /* LED_DRIVE_0        */ "drive 0",         true,  3, false, 0 },
+    { /* LED_DRIVE_1        */ "drive 1",         true,  4, false, 0 },
+    { /* LED_HARD_DISK      */ "hard\ndisc",      true,  5, false, 0 },
+    { /* LED_VDFS           */ "VDFS",            true,  6, false, 0 }
 };
 
 static void draw_led(const led_details_t *led_details, bool b)
@@ -111,27 +111,20 @@ void led_init(void)
         vid_ledlocation = -1;
 }
 
-extern int framesrun; // SFTODO BIT OF A HACK
 void led_update(led_name_t led_name, bool b, int ticks)
 {
-    if (vid_ledlocation > 0) {
-        // SFTODO: INEFFICIENT!
-        for (int i = 0; i < sizeof(led_details)/sizeof(led_details[0]); i++) {
-            if (led_details[i].led_name == led_name) {
-                draw_led(&led_details[i], b);
-                if (b != led_details[i].state) {
-                    last_led_update_at = framesrun;
-                    led_details[i].state = b;
-                }
-                if (!b || (ticks == 0))
-                    led_details[i].turn_off_at = 0;
-                else {
-                    led_details[i].turn_off_at = framesrun + ticks;
-                    if ((led_ticks == 0) || (ticks < led_ticks))
-                        led_ticks = ticks;
-                }
-                return;
-            }
+    if (vid_ledlocation > 0 && led_name < LED_MAX) {
+        draw_led(&led_details[led_name], b);
+        if (b != led_details[led_name].state) {
+            last_led_update_at = framesrun;
+            led_details[led_name].state = b;
+        }
+        if (!b || (ticks == 0))
+            led_details[led_name].turn_off_at = 0;
+        else {
+            led_details[led_name].turn_off_at = framesrun + ticks;
+            if ((led_ticks == 0) || (ticks < led_ticks))
+                led_ticks = ticks;
         }
     }
 }
@@ -142,18 +135,17 @@ void led_timer_fired(void)
         for (int i = 0; i < sizeof(led_details)/sizeof(led_details[0]); i++) {
             if (led_details[i].turn_off_at != 0) {
                 if (framesrun >= led_details[i].turn_off_at) {
-                    // SFTODO: FACTOR OUT THE NEXT 6ISH LINES OF CODE - COMMON WITH led_update()
+                    led_update(i, false, 0);
                     if (led_details[i].state != false) {
                         last_led_update_at = framesrun;
                         led_details[i].state = false;
+                        draw_led(&led_details[i], false);
                     }
-                    draw_led(&led_details[i], false);
                     led_details[i].turn_off_at = 0;
-                    // SFTODO? last_led_update_at = framesrun;
                 }
                 else {
                     int ticks = led_details[i].turn_off_at - framesrun;
-                    assert(ticks > 0); // SFTODO TEMP
+                    assert(ticks > 0);
                     if ((led_ticks == 0) || (ticks < led_ticks))
                         led_ticks = ticks;
                 }

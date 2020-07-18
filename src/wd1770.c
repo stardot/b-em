@@ -70,7 +70,7 @@ void wd1770_spinup()
     if (!motoron) {
         motoron = 1;
         motorspin = 0;
-        led_update((curdrive == 0) ? LED_DRIVE_0 : LED_DRIVE_1, true, 0 /* SFTODO LED_DRIVE_TICKS */);
+        led_update((curdrive == 0) ? LED_DRIVE_0 : LED_DRIVE_1, true, 0);
         ddnoise_spinup();
     }
 }
@@ -271,8 +271,8 @@ static void write_ctrl_master(uint8_t val)
     wd1770.ctrl = val;
     curdrive = (val & 2) ? 1 : 0;
     if (motoron) {
-        led_update((curdrive == 0) ? LED_DRIVE_0 : LED_DRIVE_1, true, 0 /* SFTODO LED_DRIVE_TICKS */);
-        led_update((curdrive == 0) ? LED_DRIVE_1 : LED_DRIVE_0, false, 0 /* SFTODO LED_DRIVE_TICKS */);
+        led_update((curdrive == 0) ? LED_DRIVE_0 : LED_DRIVE_1, true, 0);
+        led_update((curdrive == 0) ? LED_DRIVE_1 : LED_DRIVE_0, false, 0);
     }
     wd1770.curside =  (wd1770.ctrl & 0x10) ? 1 : 0;
     wd1770.density = !(wd1770.ctrl & 0x20);
