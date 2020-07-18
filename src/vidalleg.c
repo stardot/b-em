@@ -448,8 +448,6 @@ void video_doblit(bool non_ttx, uint8_t vtotal)
     if (vid_savescrshot)
         save_screenshot();
 
-    if (!led_bitmap) led_init(); // SFTODO!? HORRIBLE HACK
-
     if (++fskipcount >= ((motor && fasttape) ? 5 : vid_fskipmax)) {
         lasty++;
         calc_limits(non_ttx, vtotal);

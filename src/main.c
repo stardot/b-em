@@ -234,6 +234,7 @@ void main_init(int argc, char *argv[])
     display = video_init();
     mode7_makechars();
     al_init_image_addon();
+    led_init();
 
     mem_init();
 

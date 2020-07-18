@@ -93,14 +93,14 @@ static void draw_led_full(const led_details_t *led_details, bool b)
     }
 }
 
-void led_init()
+void led_init(void)
 {
     const int led_count = sizeof(led_details) / sizeof(led_details[0]);
+    al_init_primitives_addon();
+    al_init_font_addon();
     led_bitmap = al_create_bitmap(led_count * LED_BOX_WIDTH, LED_BOX_HEIGHT);
     al_set_target_bitmap(led_bitmap);
     al_clear_to_color(al_map_rgb(0, 0, 64)); // sFTODO!?
-    al_init_primitives_addon();
-    al_init_font_addon();
     if ((font = al_create_builtin_font())) {
         for (int i = 0; i < led_count; i++) {
             draw_led_full(&led_details[i], false);
