@@ -30,6 +30,8 @@
  *
 */
 
+/* This keymap is used for physical mode. */
+
 static uint8_t allegro2bbc[ALLEGRO_KEY_MAX] =
 {
     0xaa,   // 0
@@ -678,9 +680,8 @@ static bool key_paste_ctrl;
 
 void key_reset()
 {
-    int c, r;
-    for (c = 0; c < 16; c++)
-        for (r = 0; r < 16; r++)
+    for (int c = 0; c < 16; c++)
+        for (int r = 0; r < 16; r++)
             bbckey[c][r] = 0;
     sysvia_set_ca2(0);
 
@@ -694,10 +695,9 @@ void key_reset()
 
 static void key_update()
 {
-    int c,d;
     if (IC32 & 8) {
-        for (d = 0; d < ((MASTER) ? 13 : 10); d++) {
-            for (c = 1; c < 8; c++) {
+        for (int d = 0; d < ((MASTER) ? 13 : 10); d++) {
+            for (int c = 1; c < 8; c++) {
                 if (bbckey[d][c]) {
                     sysvia_set_ca2(1);
                     return;
@@ -707,7 +707,7 @@ static void key_update()
     }
     else {
         if (keycol < ((MASTER) ? 13 : 10)) {
-            for (c = 1; c < 8; c++) {
+            for (int c = 1; c < 8; c++) {
                 if (bbckey[keycol][c]) {
                     sysvia_set_ca2(1);
                     return;
@@ -762,6 +762,7 @@ static void key_paste_add_vkey(uint8_t vkey1, uint8_t vkey2)
     // unlikely, and has the more practical benefit that the user can't type
     // ahead so much that there's a significant amount of activity after they
     // actually stop typing.
+
     size_t vkeys_left = key_paste_ptr ? (key_paste_str_size - (key_paste_ptr - key_paste_str)) : 0;
     if ((vkey1 == VKEY_DOWN) && (vkeys_left >= KEY_PASTE_THRESHOLD)) {
         log_debug("keyboard: discarding key down as buffer over threshold");
@@ -865,6 +866,7 @@ static void set_key_logical(int keycode, int unichar, int state)
         // pressed we leave it alone, so we don't interfere with any ongoing OS
         // auto-repeat. (This shows up if you hold down 'A' and intermittently
         // press and release SHIFT, for example.)
+
         if (key_is_down_logical(vkey))
             vkey = 0xaa;
         else if (key_paste_vkey_down != 0)
@@ -875,6 +877,7 @@ static void set_key_logical(int keycode, int unichar, int state)
         // any existing key above (so we don't accidentally cause the OS to
         // interpret the existing key with the new SHIFT/CTRL state) and before
         // pressing the new key.
+
         key_paste_add_combo(vkey, shift, ctrl);
     }
     else { // host key released
@@ -936,6 +939,7 @@ void key_char(ALLEGRO_EVENT *event)
 // state of the host's keyboard is irrelevant; this function will be called
 // again to pick up the then-current state when the pending keyboard events
 // have all been processed).
+
 static void set_logical_shift_ctrl_if_idle()
 {
     if ((kp_state == KP_IDLE) && (key_paste_vkey_down == 0))
@@ -1069,12 +1073,12 @@ bool key_is_down(void) {
 bool key_any_down(void)
 {
     if (!keylogical) {
-    for (int c = 0; c < 16; c++)
-        for (int r = 1; r < 16; r++)
-            if (bbckey[c][r])
-                return true;
-    return false;
-}
+        for (int c = 0; c < 16; c++)
+            for (int r = 1; r < 16; r++)
+                if (bbckey[c][r])
+                    return true;
+        return false;
+    }
     else
         return key_paste_vkey_down != 0;
 }
@@ -1085,7 +1089,7 @@ bool key_code_down(int code)
         code = allegro2bbc[code];
         assert((code != 0x00) && (code != 0x01)); // not SHIFT or CTRL
         if (!keylogical)
-        return bbckey[code & 0x0f][code >> 4];
+            return bbckey[code & 0x0f][code >> 4];
         else
             return (key_paste_vkey_down != 0) && (key_paste_vkey_down == code);
     }
