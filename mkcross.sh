@@ -30,6 +30,7 @@ buildit() {
     fi
     export CC="$2-gcc"
     export CPP="$2-g++"
+    export CXX="$2-g++"
     export WINDRES="$2-windres"
     cd $dir
     make -j2 -e -f ../src/Makefile.win b-em.exe
