@@ -616,10 +616,12 @@ static void edit_paste_start(ALLEGRO_EVENT *event)
 {
     ALLEGRO_DISPLAY *display = (ALLEGRO_DISPLAY *)(event->user.data2);
     char *text = al_get_clipboard_text(display);
+#ifndef WIN32
     if (!text) {
         sleep(1);  // try again - Allegro bug.
         text = al_get_clipboard_text(display);
     }
+#endif
     if (text)
         os_paste_start(text);
 }

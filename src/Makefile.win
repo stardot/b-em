@@ -36,6 +36,7 @@ OBJ = \
     csw.o \
     ddnoise.o \
     debugger.o \
+    debugger_symbols.o \
     disc.o \
     fdi2raw.o \
     fdi.o \
@@ -55,6 +56,7 @@ OBJ = \
     music4000.o \
     music5000.o \
     pal.o \
+    paula.o \
     savestate.o \
     scsi.o \
     sdf-acc.o \

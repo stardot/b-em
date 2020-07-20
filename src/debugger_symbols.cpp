@@ -57,7 +57,6 @@ bool symbol_table::find_by_addr_near(uint32_t addr, uint32_t min, uint32_t max, 
     if (it == byaddrmap.end())
         return false;
 
-    uint32_t distance;
     bool matched = it->first >= min;
     if (matched)
     {
@@ -118,7 +117,7 @@ bool symbol_find_by_addr_near(symbol_table *symtab, uint32_t addr, uint32_t min,
 }
 
 
-//this will look for the first symbol (whitespace separated) in name, if a match is found *endret will point at the whitespace after 
+//this will look for the first symbol (whitespace separated) in name, if a match is found *endret will point at the whitespace after
 bool symbol_find_by_name(symbol_table *symtab, const char *name, uint32_t *addr, const char**endret) {
 
     if (symtab == NULL)
