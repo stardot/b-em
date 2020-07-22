@@ -419,7 +419,6 @@ static inline void fill_letterbox(void)
 
 static void render_leds(void)
 {
-    ALLEGRO_COLOR led_tint = al_map_rgba(0, 0, 0, 0);
     if (vid_ledlocation > LED_LOC_NONE) {
         float w = al_get_bitmap_width(led_bitmap);
         float h = al_get_bitmap_height(led_bitmap);
@@ -428,6 +427,7 @@ static void render_leds(void)
             al_draw_scaled_bitmap(led_bitmap, 0, 0, w, h, (winsizex-w)/2, winsizey-h, w, h, 0);
         }
         else {
+            ALLEGRO_COLOR led_tint;
             const int led_visible_for_frames = 50;
             const int led_fade_frames = 25;
 
@@ -437,11 +437,13 @@ static void render_leds(void)
                 if (led_visible_frames_left <= led_fade_frames) {
                     int i = (255 * led_visible_frames_left) / led_fade_frames;
                     log_debug("led: tint, i=%d", i);
-                    led_tint = al_map_rgba(i, i, i, i);
+                    led_tint = al_map_rgba(i, i, i, vid_ledlocation == LED_LOC_SEPARATE ? 255 : i);
                 }
                 else
                     led_tint = al_map_rgb(255, 255, 255);
             }
+            else if (vid_ledlocation == LED_LOC_SEPARATE)
+                led_tint = al_map_rgba(0, 0, 0, 255);
             al_draw_tinted_scaled_bitmap(led_bitmap, led_tint, 0, 0, w, h, (winsizex-w)/2, winsizey-h, w, h, 0);
         }
     }
