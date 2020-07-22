@@ -442,8 +442,8 @@ static void render_leds(void)
                 else
                     led_tint = al_map_rgb(255, 255, 255);
             }
-            else if (vid_ledlocation == LED_LOC_SEPARATE)
-                led_tint = al_map_rgba(0, 0, 0, 255);
+            else
+                led_tint = al_map_rgba(0, 0, 0, vid_ledlocation == LED_LOC_SEPARATE ? 255 : 0);
             al_draw_tinted_scaled_bitmap(led_bitmap, led_tint, 0, 0, w, h, (winsizex-w)/2, winsizey-h, w, h, 0);
         }
     }
