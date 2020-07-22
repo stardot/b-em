@@ -106,12 +106,12 @@ void led_init(void)
         }
     }
     else
-        vid_ledlocation = -1;
+        vid_ledlocation = LED_LOC_UNDEFINED;
 }
 
 void led_update(led_name_t led_name, bool b, int ticks)
 {
-    if (vid_ledlocation > 0 && led_name < LED_MAX) {
+    if (vid_ledlocation > LED_LOC_NONE && led_name < LED_MAX) {
         draw_led(&led_details[led_name], b);
         if (b != led_details[led_name].state) {
             last_led_update_at = framesrun;
@@ -129,7 +129,7 @@ void led_update(led_name_t led_name, bool b, int ticks)
 
 void led_timer_fired(void)
 {
-    if (vid_ledlocation > 0) {
+    if (vid_ledlocation > LED_LOC_NONE) {
         for (int i = 0; i < sizeof(led_details)/sizeof(led_details[0]); i++) {
             if (led_details[i].turn_off_at != 0) {
                 if (framesrun >= led_details[i].turn_off_at) {
