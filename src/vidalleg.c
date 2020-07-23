@@ -422,7 +422,7 @@ static void render_leds(void)
     if (vid_ledlocation > LED_LOC_NONE) {
         float w = al_get_bitmap_width(led_bitmap);
         float h = al_get_bitmap_height(led_bitmap);
-        if (vid_ledvisibility == LED_VIS_ALWAYS || led_any_transient_led_on()) {
+        if (vid_ledvisibility == LED_VIS_ALWAYS || (vid_ledvisibility == LED_VIS_TRANSIENT && led_any_transient_led_on())) {
             log_debug("led: drawing non-faded bitmap");
             al_draw_scaled_bitmap(led_bitmap, 0, 0, w, h, (winsizex-w)/2, winsizey-h, w, h, 0);
         }
