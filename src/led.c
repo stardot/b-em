@@ -112,8 +112,8 @@ void led_init(void)
 void led_update(led_name_t led_name, bool b, int ticks)
 {
     if (vid_ledlocation > LED_LOC_NONE && led_name < LED_MAX) {
-        draw_led(&led_details[led_name], b);
         if (b != led_details[led_name].state) {
+            draw_led(&led_details[led_name], b);
             last_led_update_at = framesrun;
             led_details[led_name].state = b;
         }
