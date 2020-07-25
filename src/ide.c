@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include "b-em.h"
 #include "ide.h"
+#include "led.h"
 
 bool ide_enable;
 int ide_count;
@@ -114,6 +115,7 @@ void ide_write(uint16_t addr, uint8_t val)
                 ide.drive = (val >> 4) & 1;
                 return;
             case 0x7: /*Command register*/
+                led_update(LED_HARD_DISK_0+ide.drive, 1, 20);
                 ide.command = val;
                 ide.error = 0;
 //                log_debug("IDE command %02X\n",val);

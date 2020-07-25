@@ -1146,6 +1146,7 @@ void video_poll(int clocks, int timer_enable)
                     } else if (vidclocks <= 1024 && !vid_cleared) {
                         vid_cleared = 1;
                         al_unlock_bitmap(b);
+                        al_set_target_bitmap(b);
                         al_clear_to_color(al_map_rgb(0, 0, 0));
                         region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_READWRITE);
                         video_doblit(crtc_mode, crtc[4]);

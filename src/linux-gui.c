@@ -1327,5 +1327,6 @@ void gui_enter()
         while (key[KEY_F11]) rest(100);
 
         video_clearscreen();
+        //led_init(); // SFTODO!?
 }
 #endif

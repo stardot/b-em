@@ -246,7 +246,7 @@ void os_paste_start(char *str)
 {
     if (str) {
         if (clip_paste_str)
-            free(clip_paste_str);
+            al_free(clip_paste_str);
         clip_paste_str = clip_paste_ptr = (unsigned char *)str;
         os_paste_ch = -1;
         log_debug("6502: paste start, clip_paste_str=%p", clip_paste_str);

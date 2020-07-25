@@ -611,7 +611,7 @@ static void debug_paste(const char *iptr)
     char *str, *dptr;
 
     if ((ch = *iptr++)) {
-        if ((str = malloc(strlen(iptr) + 1))) {
+        if ((str = al_malloc(strlen(iptr) + 1))) {
             dptr = str;
             do {
                 if (ch == '|') {
@@ -676,6 +676,10 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 
     main_pause();
     indebug = 1;
+    const char *sym;
+    if (symbol_find_by_addr(cpu->symbols, addr, &sym)) {
+        debug_outf("%s:\n", sym);
+    }
     log_debug("debugger: about to call disassembler, addr=%04X", addr);
     next_addr = cpu->disassemble(cpu, addr, ins, sizeof ins);
     debug_out(ins, strlen(ins));
@@ -939,7 +943,10 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 }
             case 't':
                 if (trace_fp)
+                {
                     fclose(trace_fp);
+                    trace_fp = NULL;
+                }
                 if (*iptr) {
                     char *eptr = strchr(iptr, '\n');
                     if (eptr)
