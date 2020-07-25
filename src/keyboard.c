@@ -10,12 +10,12 @@
  * 4 to 10 line decoder.  Row lines are pulled up with resistors and
  * fed both to an eight input NAND gate to generate an interrupt and
  * to a 74LS251 multiplex allows the row lines to be read.
- *
+ * 
  * The diagram in The Advanced User Guide is slighly misleading
  * because the bits as seen by the 74LS251 do not match the rows shown
  * in the diagram.  From a software perspective the keybaord looks
  * like this:
- *
+ * 
  *       0x00      0x01  0x02  0x03 0x04 0x05 0x06 0x07 0x08 0x09
  * 0x00  Shift     Ctrl  <------- starup up DIP swicthes ------->
  * 0x10  Q         3     4     5    f4   8    f7   =-   ~^   Left
@@ -25,7 +25,7 @@
  * 0x50  ShiftLck  S     C     G    H    N    L    ;+   ]}   Delete
  * 0x60  Tab       Z     SPC   V    B    M    <,   >.   /?   Copy
  * 0x70  ESC       f1    f2    f3   f5   f6   f8   f9   \    Right
- *
+ * 
 */
 
 static uint8_t allegro2bbc[ALLEGRO_KEY_MAX] =
@@ -300,30 +300,12 @@ static void key_update()
     sysvia_set_ca2(0);
 }
 
-static const int padlookup[10] =
-{
-    ALLEGRO_KEY_INSERT, /* Key Pad 0 */
-    ALLEGRO_KEY_END,    /* Key Pad 1 */
-    ALLEGRO_KEY_DOWN,   /* Key Pad 2 */
-    ALLEGRO_KEY_PGDN,   /* Key Pad 3 */
-    ALLEGRO_KEY_LEFT,   /* Key Pad 4 */
-    ALLEGRO_KEY_PAD_5,  /* Key Pad 5 (no change) */
-    ALLEGRO_KEY_RIGHT,  /* Key Pad 6 */
-    ALLEGRO_KEY_HOME,   /* Key Pad 7 */
-    ALLEGRO_KEY_UP,     /* Key Pad 8 */
-    ALLEGRO_KEY_PGUP,   /* Key Pad 9 */
-};
-
 int key_map(ALLEGRO_EVENT *event)
 {
     int code = event->keyboard.keycode;
     if (code < ALLEGRO_KEY_MAX) {
-        if (code == ALLEGRO_KEY_A) {
-            if (keyas)
-                code = ALLEGRO_KEY_CAPSLOCK;
-        }
-        else if (code >= ALLEGRO_KEY_PAD_0 && code <= ALLEGRO_KEY_PAD_9 && !(event->keyboard.modifiers & ALLEGRO_KEYMOD_NUMLOCK))
-            code = padlookup[code-ALLEGRO_KEY_PAD_0];
+        if (keyas && code == ALLEGRO_KEY_A)
+            code = ALLEGRO_KEY_CAPSLOCK;
         code = keylookup[code];
     }
     log_debug("keyboard: mapping %d to %d", event->keyboard.keycode, code);
