@@ -34,7 +34,7 @@ void serial_write(uint16_t addr, uint8_t val)
             led_update(LED_CASSETTE_MOTOR, 1, 0);
             motor = tape_loaded;
         }
-        else if (!new_motor) {
+        else if (!new_motor && motor) {
             log_debug("serial: cassette motor off");
             tapenoise_motorchange(0);
             motor = 0;

@@ -24,7 +24,7 @@ typedef struct {
 } led_details_t;
 
 static led_details_t led_details[LED_MAX] = {
-    { /* LED_CASSETTE_MOTOR */ "cassette\nmotor", false, 0, false, 0 },
+    { /* LED_CASSETTE_MOTOR */ "cassette\nmotor", true,  0, false, 0 },
     { /* LED_CAPS_LOCK      */ "caps\nlock",      false, 1, false, 0 },
     { /* LED_SHIFT_LOCK     */ "shift\nlock",     false, 2, false, 0 },
     { /* LED_DRIVE_0        */ "drive 0",         true,  3, false, 0 },
