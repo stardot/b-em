@@ -205,7 +205,7 @@ static inline void nula_putpixel(ALLEGRO_LOCKED_REGION *region, int x, int y, ui
 
 #endif
 
-void nula_default_palette(void)
+static void nula_default_palette(void)
 {
     nula_collook[0]  = 0xff000000; // black
     nula_collook[1]  = 0xffff0000; // red
@@ -225,6 +225,23 @@ void nula_default_palette(void)
     nula_collook[15] = 0xffffffff; // white
 
     mode7_need_new_lookup = 1;
+}
+
+void nula_reset(void)
+{
+    // Reset NULA
+    nula_palette_mode = 0;
+    nula_horizontal_offset = 0;
+    nula_left_blank = 0;
+    nula_attribute_mode = 0;
+    nula_attribute_text = 0;
+
+    // Reset palette
+    nula_default_palette();
+
+    // Reset flash
+    for (int c = 0; c < 8; c++)
+        nula_flash[c] = 1;
 }
 
 void videoula_write(uint16_t addr, uint8_t val)
@@ -296,20 +313,7 @@ void videoula_write(uint16_t addr, uint8_t val)
                 break;
 
             case 4:
-                // Reset NULA
-                nula_palette_mode = 0;
-                nula_horizontal_offset = 0;
-                nula_left_blank = 0;
-                nula_attribute_mode = 0;
-                nula_attribute_text = 0;
-
-                // Reset palette
-                nula_default_palette();
-
-                // Reset flash
-                for (c = 0; c < 8; c++) {
-                    nula_flash[c] = 1;
-                }
+                nula_reset();
                 break;
 
             case 5:
@@ -994,7 +998,7 @@ void video_poll(int clocks, int timer_enable)
                 if (cdraw) {
                     if (cursoron && (ula_ctrl & cursorlook[cdraw])) {
                         for (c = ((ula_ctrl & 0x10) ? 8 : 16); c >= 0; c--) {
-                            nula_putpixel(region, scrx + c, scry, get_pixel(region, scrx + c, scry) ^ colwhite);
+                            nula_putpixel(region, scrx + c, scry, get_pixel(region, scrx + c, scry) ^ 0x00ffffff);
                         }
                     }
                     cdraw++;
@@ -1142,6 +1146,7 @@ void video_poll(int clocks, int timer_enable)
                     } else if (vidclocks <= 1024 && !vid_cleared) {
                         vid_cleared = 1;
                         al_unlock_bitmap(b);
+                        al_set_target_bitmap(b);
                         al_clear_to_color(al_map_rgb(0, 0, 0));
                         region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_READWRITE);
                         video_doblit(crtc_mode, crtc[4]);

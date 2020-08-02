@@ -234,6 +234,7 @@ void main_init(int argc, char *argv[])
     display = video_init();
     mode7_makechars();
     al_init_image_addon();
+    led_init();
 
     mem_init();
 
@@ -482,6 +483,12 @@ static void main_timer(ALLEGRO_EVENT *event)
         if (ddnoise_ticks > 0 && --ddnoise_ticks == 0)
             ddnoise_headdown();
 
+        if (tapeledcount) {
+            if (--tapeledcount == 0 && !motor) {
+                log_debug("main: delayed cassette motor LED off");
+                led_update(LED_CASSETTE_MOTOR, 0, 0);
+            }
+        }
         if (led_ticks > 0 && --led_ticks == 0)
             led_timer_fired();
 

@@ -109,7 +109,7 @@ static void i8271_spinup(void)
     if (!motoron) {
         motoron = 1;
         motorspin = 0;
-        led_update((curdrive == 0) ? LED_DRIVE_0 : LED_DRIVE_1, true, 0 /* SFTODO LED_DRIVE_TICKS */);
+        led_update((curdrive == 0) ? LED_DRIVE_0 : LED_DRIVE_1, true, 0);
         ddnoise_spinup();
     }
 }
@@ -202,8 +202,8 @@ void i8271_write(uint16_t addr, uint8_t val)
                 }
                 curdrive = (val & 0x80) ? 1 : 0;
                 if (motoron) {
-                        led_update((curdrive == 0) ? LED_DRIVE_0 : LED_DRIVE_1, true, 0 /* SFTODO LED_DRIVE_TICKS */);
-                        led_update((curdrive == 0) ? LED_DRIVE_1 : LED_DRIVE_0, false, 0 /* SFTODO LED_DRIVE_TICKS */);
+                    led_update((curdrive == 0) ? LED_DRIVE_0 : LED_DRIVE_1, true, 0);
+                    led_update((curdrive == 0) ? LED_DRIVE_1 : LED_DRIVE_0, false, 0);
                 }
                 i8271.paramnum = 0;
                 i8271.paramreq = i8271_getparams();

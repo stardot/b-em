@@ -673,6 +673,10 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 
     main_pause();
     indebug = 1;
+    const char *sym;
+    if (symbol_find_by_addr(cpu->symbols, addr, &sym)) {
+        debug_outf("%s:\n", sym);
+    }
     log_debug("debugger: about to call disassembler, addr=%04X", addr);
     next_addr = cpu->disassemble(cpu, addr, ins, sizeof ins);
     debug_out(ins, strlen(ins));
@@ -895,6 +899,8 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                         debug_outf("    Voice 2 frequency = %04X   volume = %i\n", sn_latch[2] >> 6, sn_vol[2]);
                         debug_outf("    Voice 3 frequency = %04X   volume = %i\n", sn_latch[3] >> 6, sn_vol[3]);
                     }
+                    else if (!strncasecmp(iptr, "ram", arglen))
+                       debug_outf("    System RAM registers :\n    ROMSEL=%02X ram4k=%02X ram8k=%02X ram12k=%02X ram20k=%02X vidbank=%04X\n", romsel>>14, ram4k, ram8k, ram12k, ram20k, vidbank);
                     else
                         debug_outf("Register set %s not known\n", iptr);
                 } else {
@@ -936,8 +942,10 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 }
             case 't':
                 if (!strncmp(cmd, "paste", cmdlen)) {
-                    if (trace_fp)
+                    if (trace_fp) {
                         fclose(trace_fp);
+                        trace_fp = NULL;
+                    }
                     if (*iptr) {
                         char *eptr = strchr(iptr, '\n');
                         if (eptr)

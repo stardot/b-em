@@ -522,7 +522,7 @@ static void Execute(void)
 	}
 
     log_debug("scsi: turning on LED");
-    led_update(LED_HDISK, 1, 20);
+    led_update(LED_HARD_DISK_0 + scsi.lun, 1, 20);
 
 	switch (scsi.cmd[0]) {
 		case 0x00 :
