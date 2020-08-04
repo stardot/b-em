@@ -4,6 +4,7 @@
 #include "b-em.h"
 #include "gui-allegro.h"
 #include "fdi.h"
+#include "hfe.h"
 #include "disc.h"
 #include "sdf.h"
 
@@ -48,6 +49,11 @@ void disc_load(int drive, ALLEGRO_PATH *fn)
         if (strcasecmp(ext, "fdi") == 0) {
             log_debug("Loading %i: %s as FDI", drive, cpath);
             fdi_load(drive, cpath);
+            return;
+        }
+        if (strcasecmp(ext, "hfe") == 0) {
+            log_debug("Loading %i: %s as HFE", drive, cpath);
+            hfe_load(drive, cpath);
             return;
         }
     }
