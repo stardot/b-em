@@ -302,6 +302,8 @@ static ALLEGRO_MENU *create_tube_menu(void)
 
 static const char *border_names[] = { "None", "Medium", "Full", NULL };
 static const char *vmode_names[] = { "Scaled", "Interlace", "Scanlines", "Line doubling", NULL };
+static const char *led_location_names[] = { "None", "Overlapped", "Separate", NULL };
+static const char *led_visibility_names[] = { "When changed", "When changed or transient", "Always", NULL };
 
 static ALLEGRO_MENU *create_video_menu(void)
 {
@@ -316,6 +318,12 @@ static ALLEGRO_MENU *create_video_menu(void)
     add_checkbox_item(menu, "Fullscreen", IDM_VIDEO_FULLSCR, fullscreen);
     add_checkbox_item(menu, "NuLA", IDM_VIDEO_NULA, !nula_disable);
     add_checkbox_item(menu, "PAL Emulation", IDM_VIDEO_PAL, vid_pal);
+    sub = al_create_menu();
+    al_append_menu_item(menu, "LED location...", 0, 0, NULL, sub);
+    add_radio_set(sub, led_location_names, IDM_VIDEO_LED_LOCATION, vid_ledlocation);
+    sub = al_create_menu();
+    al_append_menu_item(menu, "LED visibility...", 0, 0, NULL, sub);
+    add_radio_set(sub, led_visibility_names, IDM_VIDEO_LED_VISIBILITY, vid_ledvisibility);
     return menu;
 }
 
@@ -1155,6 +1163,12 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             break;
         case IDM_VIDEO_NULA:
             nula_disable = !nula_disable;
+            break;
+        case IDM_VIDEO_LED_LOCATION:
+            video_set_led_location(radio_event_simple(event, vid_ledlocation));
+            break;
+        case IDM_VIDEO_LED_VISIBILITY:
+            video_set_led_visibility(radio_event_simple(event, vid_ledvisibility));
             break;
         case IDM_SOUND_INTERNAL:
             sound_internal = !sound_internal;

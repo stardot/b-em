@@ -46,6 +46,7 @@ OBJ = \
     joystick.o\
     keyboard.o \
     keydef-allegro.o \
+    led.o \
     logging.o \
     main.o \
     mem.o \

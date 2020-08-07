@@ -37,6 +37,7 @@
 #include "6502.h"
 #include "disc.h"
 #include "keyboard.h"
+#include "led.h"
 #include "main.h"
 #include "mem.h"
 #include "model.h"
@@ -277,6 +278,16 @@ static uint8_t  reg_a;
 static uint8_t  fs_flags = 0;
 static uint8_t  fs_num   = 0;
 static uint16_t cmd_tail;
+
+/* Function to light an LED during VDFS activity.  This is only called
+ * when VDFS has to go to the host OS.  When it answers meta data
+ * queries from its internal data structures the LED is not lit.
+ */
+
+static void show_activity()
+{
+    led_update(LED_VDFS, true, 10);
+}
 
 static uint16_t readmem16(uint16_t addr)
 {
@@ -792,6 +803,7 @@ static int scan_dir(vdfs_entry *dir)
         log_debug("vdfs: using cached dir info for %s", dir->host_path);
         return 0;
     }
+    show_activity();
 
     if ((dp = opendir(dir->host_path))) {
         // Mark all previos entries deleted but leave them in the list.
@@ -932,6 +944,7 @@ static void write_back(vdfs_entry *ent)
 {
     FILE *fp;
 
+    show_activity();
     *ent->host_inf = '.'; // select .inf file.
     if ((fp = fopen(ent->host_path, "wt"))) {
         if (ent->dfs_dir) {
@@ -1700,6 +1713,7 @@ static void delete_inf(vdfs_entry *ent)
 
 static void delete_file(vdfs_entry *ent)
 {
+    show_activity();
     if (ent->attribs & ATTR_IS_DIR) {
         if (ent == cur_dir)
             adfs_error(err_delcsd);
@@ -1815,6 +1829,7 @@ static void osfile_load(uint32_t pb, const char *path)
         if (ent->attribs & ATTR_IS_DIR)
             adfs_error(err_wont);
         else if ((fp = fopen(ent->host_path, "rb"))) {
+            show_activity();
             if (readmem(pb+0x06) == 0)
                 addr = readmem32(pb+0x02);
             else
@@ -1906,6 +1921,7 @@ static void osbget(void)
     FILE *fp;
 
     log_debug("vdfs: osbget(A=%02X, X=%02X, Y=%02X)", a, x, y);
+    show_activity();
     if ((fp = getfp_read(y))) {
         if ((ch = getc(fp)) != EOF) {
             a = ch;
@@ -1952,6 +1968,7 @@ static void osbput(void)
 
     log_debug("vdfs: osbput(A=%02X, X=%02X, Y=%02X)", a, x, y);
 
+    show_activity();
     if ((fp = getfp_write(y)))
         putc(a, fp);
 }
@@ -2040,6 +2057,7 @@ static void osfind(void)
         if (mode && ent) {
             log_debug("vdfs: osfind open host file %s in mode %s", ent->host_path, mode);
             if ((fp = fopen(ent->host_path, mode))) {
+                show_activity();
                 ent->attribs |= attribs | ATTR_EXISTS; // file now exists.
                 scan_attr(ent, ent->u.file.load_addr, ent->u.file.exec_addr);
                 vdfs_chan[channel].fp = fp;
@@ -2059,6 +2077,7 @@ static void osgbpb_write(uint32_t pb)
     size_t bytes;
 
     if ((fp = getfp_write(readmem(pb)))) {
+        show_activity();
         if (a == 0x01)
             fseek(fp, readmem32(pb+9), SEEK_SET);
         mem_ptr = readmem32(pb+1);
@@ -2114,6 +2133,7 @@ static int osgbpb_read(uint32_t pb)
     size_t undone = 0;
 
     if ((fp = getfp_read(readmem(pb)))) {
+        show_activity();
         if (a == 0x03)
             fseek(fp, readmem32(pb+9), SEEK_SET);
         mem_ptr = readmem32(pb+1);
@@ -2469,6 +2489,7 @@ static void run_file(const char *err)
             if (ent->attribs & ATTR_IS_DIR)
                 adfs_error(err_wont);
             else if ((fp = fopen(ent->host_path, "rb"))) {
+                show_activity();
                 addr = ent->u.file.load_addr;
                 if (addr > 0xffff0000 || curtube == -1) {
                     log_debug("vdfs: run_file: writing to I/O proc memory at %08X", addr);

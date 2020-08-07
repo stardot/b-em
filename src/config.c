@@ -78,6 +78,31 @@ const char *get_config_string(const char *sect, const char *key, const char *sva
     return sval;
 }
 
+ALLEGRO_COLOR get_config_colour(const char *sect, const char *key, ALLEGRO_COLOR cdefault)
+{
+    if (bem_cfg) {
+        const char *str = al_get_config_value(bem_cfg, sect, key);
+        if (str) {
+            if (*str == '#') {
+                unsigned long col = strtoul(str+1, NULL, 16);
+                unsigned r = (col >> 16) & 0xff;
+                unsigned g = (col >> 8) & 0xff;
+                unsigned b = col & 0xff;
+                log_debug("config: get_config_colour, sect=%s, key=%s, hex, r=%u, g=%u, b=%u", sect, key, r, g, b);
+                return al_map_rgb(r, g, b);
+            }
+            else {
+                unsigned r, g, b;
+                if (sscanf(str, "%u,%u,%u", &r, &g, &b) == 3) {
+                    log_debug("config: get_config_colour, sect=%s, key=%s, decimal, r=%u, g=%u, b=%u", sect, key, r, g, b);
+                    return al_map_rgb(r, g, b);
+                }
+            }
+        }
+    }
+    return cdefault;
+}
+
 void config_load(void)
 {
     ALLEGRO_PATH *path;
@@ -144,6 +169,9 @@ void config_load(void)
 
     vid_fullborders  = get_config_int("video", "fullborders",   1);
 
+    vid_ledlocation  = get_config_int("video", "ledlocation",   0);
+    vid_ledvisibility = get_config_int("video", "ledvisibility", 2);
+
     c                = get_config_int("video", "displaymode",   0);
     if (c >= 4) {
         c -= 4;
@@ -173,7 +201,7 @@ void config_load(void)
 
 void set_config_int(const char *sect, const char *key, int value)
 {
-    char buf[10];
+    char buf[11];
 
     snprintf(buf, sizeof buf, "%d", value);
     al_set_config_value(bem_cfg, sect, key, buf);
@@ -254,6 +282,9 @@ void config_save(void)
         if (vid_pal)
             c += 4;
         set_config_int("video", "displaymode", c);
+        if (vid_ledlocation >= 0)
+            set_config_int("video", "ledlocation", vid_ledlocation);
+        set_config_int("video", "ledvisibility", vid_ledvisibility);
 
         set_config_bool("tape", "fasttape", fasttape);
 
@@ -268,7 +299,7 @@ void config_save(void)
 
         set_config_bool(NULL, "mouse_amx", mouse_amx);
 
-        for (c = 0; c < 128; c++) {
+        for (int c = 0; c < ALLEGRO_KEY_MAX; c++) {
             snprintf(t, sizeof t, "key_define_%03i", c);
             if (keylookup[c] == c)
                 al_remove_config_key(bem_cfg, "user_keyboard", t);
