@@ -1,4 +1,5 @@
 #include "b-em.h"
+#include "config.h"
 #include "main.h"
 #include "led.h"
 #include "video_render.h"
@@ -14,6 +15,7 @@ int last_led_update_at = -10000;
 ALLEGRO_BITMAP *led_bitmap;
 
 static ALLEGRO_FONT *font;
+static ALLEGRO_COLOR black;
 
 typedef struct {
     const char *label;
@@ -21,19 +23,21 @@ typedef struct {
     int index;
     bool state;
     int turn_off_at;
+    char cfgcol[8];
+    ALLEGRO_COLOR colour;
 } led_details_t;
 
 static led_details_t led_details[LED_MAX] = {
-    { /* LED_CASSETTE_MOTOR */ "cassette\nmotor", true,  0, false, 0 },
-    { /* LED_CAPS_LOCK      */ "caps\nlock",      false, 1, false, 0 },
-    { /* LED_SHIFT_LOCK     */ "shift\nlock",     false, 2, false, 0 },
-    { /* LED_DRIVE_0        */ "drive 0",         true,  3, false, 0 },
-    { /* LED_DRIVE_1        */ "drive 1",         true,  4, false, 0 },
-    { /* LED_HARD_DISK_0    */ "hard\ndisc 0",    true,  5, false, 0 },
-    { /* LED_HARD_DISK_1    */ "hard\ndisc 1",    true,  6, false, 0 },
-    { /* LED_HARD_DISK_2    */ "hard\ndisc 2",    true,  7, false, 0 },
-    { /* LED_HARD_DISK_3    */ "hard\ndisc 3",    true,  8, false, 0 },
-    { /* LED_VDFS           */ "VDFS",            true,  9, false, 0 }
+    { /* LED_CASSETTE_MOTOR */ "cassette\nmotor", true,  0, false, 0, "cass"    },
+    { /* LED_CAPS_LOCK      */ "caps\nlock",      false, 1, false, 0, "capslk"  },
+    { /* LED_SHIFT_LOCK     */ "shift\nlock",     false, 2, false, 0, "shiftlk" },
+    { /* LED_DRIVE_0        */ "drive 0",         true,  3, false, 0, "drive0"  },
+    { /* LED_DRIVE_1        */ "drive 1",         true,  4, false, 0, "drive1"  },
+    { /* LED_HARD_DISK_0    */ "hard\ndisc 0",    true,  5, false, 0, "hd0"     },
+    { /* LED_HARD_DISK_1    */ "hard\ndisc 1",    true,  6, false, 0, "hd1"     },
+    { /* LED_HARD_DISK_2    */ "hard\ndisc 2",    true,  7, false, 0, "hd2"     },
+    { /* LED_HARD_DISK_3    */ "hard\ndisc 3",    true,  8, false, 0, "hd3"     },
+    { /* LED_VDFS           */ "VDFS",            true,  9, false, 0, "vdfs"    }
 };
 
 static void draw_led(const led_details_t *led_details, bool b)
@@ -50,8 +54,7 @@ static void draw_led(const led_details_t *led_details, bool b)
     // SFTODO: PERHAPS HAVE A MORE SUBDUED RED SO THE CAPS LOCK LED (WHICH IS ON
     // MOST OF THE TIME) IS NOT SO IN-YOUR-FACE. I WANT THE LED DISPLAY TO BE
     // RELATIVELY UNINTRUSIVE, NOT COMPETE WITH THE EMULATED SCREEN.
-    ALLEGRO_COLOR color = al_map_rgb(b ? 255 : 0, 0, 0);
-    al_draw_filled_rectangle(led_x1, led_y1, led_x1 + led_width, led_y1 + led_height, color);
+    al_draw_filled_rectangle(led_x1, led_y1, led_x1 + led_width, led_y1 + led_height, b ? led_details->colour : black);
 }
 
 static void draw_led_full(const led_details_t *led_details, bool b)
@@ -100,13 +103,17 @@ void led_init(void)
     al_set_target_bitmap(led_bitmap);
     al_clear_to_color(al_map_rgb(0, 0, 64)); // sFTODO!?
     if ((font = al_create_builtin_font())) {
+        ALLEGRO_COLOR dcol = get_config_colour("leds", "default", al_map_rgb(255, 0, 0));
+        black = al_map_rgb(0, 0, 0);
         for (int i = 0; i < led_count; i++) {
+            led_details[i].colour = get_config_colour("leds", led_details[i].cfgcol, dcol);
             draw_led_full(&led_details[i], false);
             led_details[i].state = false;
         }
     }
     else
         vid_ledlocation = LED_LOC_UNDEFINED;
+    
 }
 
 void led_update(led_name_t led_name, bool b, int ticks)
