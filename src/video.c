@@ -32,7 +32,7 @@ int crtc_i;
 
 int hc, vc, sc;
 static int vadj;
-uint16_t ma;
+uint16_t ma, ttxbank;
 static uint16_t maback;
 static int vdispen, dispen;
 static int crtc_mode;
@@ -64,6 +64,8 @@ void crtc_write(uint16_t addr, uint8_t val)
             vdispen = 0;
         if (crtc_i == 8)
             set_intern_dtype(vid_dtype_user);
+        else if (crtc_i == 12)
+            ttxbank = MASTER ? 0x7c00 : 0x3C00 | ((val & 0x8) << 11);
     }
 }
 
@@ -898,7 +900,7 @@ void video_poll(int clocks, int timer_enable)
                 cdraw = cdrawlook[crtc[8] >> 6];
 
             if (ma & 0x2000)
-                dat = ram[0x7C00 | (ma & 0x3FF) | vidbank];
+                dat = ram[ttxbank | (ma & 0x3FF) | vidbank];
             else {
                 if ((crtc[8] & 3) == 3)
                     addr = (ma << 3) | ((sc & 3) << 1) | interlline;
@@ -1146,6 +1148,7 @@ void video_poll(int clocks, int timer_enable)
                     } else if (vidclocks <= 1024 && !vid_cleared) {
                         vid_cleared = 1;
                         al_unlock_bitmap(b);
+                        al_set_target_bitmap(b);
                         al_clear_to_color(al_map_rgb(0, 0, 0));
                         region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_READWRITE);
                         video_doblit(crtc_mode, crtc[4]);
