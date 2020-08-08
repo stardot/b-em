@@ -48,8 +48,7 @@ static void draw_led(const led_details_t *led_details, bool b)
     const int led_height = 4;
     const int led_x1 = x1 + (LED_BOX_WIDTH - led_width) / 2;
     const int led_y1 = y1 + (LED_REGION_HEIGHT - led_height) / 2;
-    if (!led_bitmap)
-        return; // SFTODO!?
+    assert(led_bitmap);
     al_set_target_bitmap(led_bitmap);
     // SFTODO: PERHAPS HAVE A MORE SUBDUED RED SO THE CAPS LOCK LED (WHICH IS ON
     // MOST OF THE TIME) IS NOT SO IN-YOUR-FACE. I WANT THE LED DISPLAY TO BE
@@ -64,8 +63,7 @@ static void draw_led_full(const led_details_t *led_details, bool b)
     const int x1 = led_details->index * LED_BOX_WIDTH;
     const int y1 = 0;
     const char *label = led_details->label;
-    if (!led_bitmap)
-        return; // SFTODO!?
+    assert(led_bitmap);
     al_set_target_bitmap(led_bitmap);
 #if 1
     // SFTODO: THIS BOX IS MAINLY TO SHOW THE AREA OF EACH LED FOR DEBUGGING; I
@@ -99,21 +97,21 @@ void led_init(void)
     const int led_count = sizeof(led_details) / sizeof(led_details[0]);
     al_init_primitives_addon();
     al_init_font_addon();
-    led_bitmap = al_create_bitmap(led_count * LED_BOX_WIDTH, LED_BOX_HEIGHT);
-    al_set_target_bitmap(led_bitmap);
-    al_clear_to_color(al_map_rgb(0, 0, 64)); // sFTODO!?
-    if ((font = al_create_builtin_font())) {
-        ALLEGRO_COLOR dcol = get_config_colour("leds", "default", al_map_rgb(255, 0, 0));
-        black = al_map_rgb(0, 0, 0);
-        for (int i = 0; i < led_count; i++) {
-            led_details[i].colour = get_config_colour("leds", led_details[i].cfgcol, dcol);
-            draw_led_full(&led_details[i], false);
-            led_details[i].state = false;
+    if ((led_bitmap = al_create_bitmap(led_count * LED_BOX_WIDTH, LED_BOX_HEIGHT))) {
+        al_set_target_bitmap(led_bitmap);
+        al_clear_to_color(al_map_rgb(0, 0, 64));
+        if ((font = al_create_builtin_font())) {
+            ALLEGRO_COLOR dcol = get_config_colour("leds", "default", al_map_rgb(255, 0, 0));
+            black = al_map_rgb(0, 0, 0);
+            for (int i = 0; i < led_count; i++) {
+                led_details[i].colour = get_config_colour("leds", led_details[i].cfgcol, dcol);
+                draw_led_full(&led_details[i], false);
+                led_details[i].state = false;
+            }
+            return;
         }
     }
-    else
-        vid_ledlocation = LED_LOC_UNDEFINED;
-    
+    vid_ledlocation = LED_LOC_UNDEFINED;
 }
 
 void led_update(led_name_t led_name, bool b, int ticks)
