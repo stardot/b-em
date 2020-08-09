@@ -134,6 +134,7 @@ prtextws    =   &A8
             equw    cmd_files       ; *FILES command.
             equw    none_open       ; "No open files" message.
             equw    osw_tail        ; finish a command with an OSWORD call.
+            equw    close_all
 .dispend
 
 ; Stubs to transfer control to the vdfs.c module.
@@ -1236,6 +1237,19 @@ prtextws    =   &A8
 .osw_tail   jsr     OSWORD
             lda     #&00
             ldx     &f4
+            rts
+
+.close_all  txa                     ; Only need to save X as we know
+            pha                     ; both A and Y are zero.
+            lda     #&77            ; Close EXEC and SPOOL files.
+            jsr     OSBYTE
+            pla
+            tax
+            lda     #&00
+            tay
+            sta     port_a
+            lda     #&0c
+            sta     port_cmd
             rts
 .end
             save    "vdfs6", start, end

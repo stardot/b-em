@@ -390,28 +390,20 @@ void sdf_load(int drive, const char *fn, const char *ext)
     }
 }
 
-void sdf_new_disc(int drive, ALLEGRO_PATH *fn, enum sdf_disc_type dtype)
+void sdf_new_disc(int drive, ALLEGRO_PATH *fn, const struct sdf_geometry *geo)
 {
-    const struct sdf_geometry *geo;
-    const char *cpath;
-    FILE *f;
-
-    if (dtype > SDF_FMT_MAX)
-        log_error("sdf: drive %d: inavlid disc type %d for new disc", drive, dtype);
+    if (!geo->new_disc)
+        log_error("sdf: drive %d: creation of file disc type %s not supported", drive, geo->name);
     else {
-        geo = sdf_geo_tab + dtype;
-        if (!geo->new_disc)
-            log_error("sdf: drive %d: creation of file disc type %s (%d) not supported", drive, geo->name, dtype);
-        else {
-            cpath = al_path_cstr(fn, ALLEGRO_NATIVE_PATH_SEP);
-            if ((f = fopen(cpath, "wb+"))) {
-                writeprot[drive] = 0;
-                geo->new_disc(f, geo);
-                sdf_mount(drive, cpath, f, geo);
-            }
-            else
-                log_error("sdf: drive %d: unable to open disk image %s for writing: %s", drive, cpath, strerror(errno));
+        const char *cpath = al_path_cstr(fn, ALLEGRO_NATIVE_PATH_SEP);
+        FILE *f = fopen(cpath, "wb+");
+        if (f) {
+            writeprot[drive] = 0;
+            geo->new_disc(f, geo);
+            sdf_mount(drive, cpath, f, geo);
         }
+        else
+            log_error("sdf: drive %d: unable to open disk image %s for writing: %s", drive, cpath, strerror(errno));
     }
 }
 
@@ -441,13 +433,13 @@ void mmb_load(char *fn)
     if (mmb_fp) {
         fclose(mmb_fp);
         if (sdf_fp[1] == mmb_fp) {
-            sdf_mount(1, fn, fp, &sdf_geo_tab[SDF_FMT_DFS_10S_SEQ_80T]);
+            sdf_mount(1, fn, fp, &sdf_geometries.dfs_10s_seq_80t);
             writeprot[1] = writeprot[0];
             mmb_offset[1][0] = MMB_CAT_SIZE;
             mmb_offset[1][1] = MMB_CAT_SIZE + 10 * 256 * 80;
         }
     }
-    sdf_mount(0, fn, fp, &sdf_geo_tab[SDF_FMT_DFS_10S_SEQ_80T]);
+    sdf_mount(0, fn, fp, &sdf_geometries.dfs_10s_seq_80t);
     mmb_offset[0][0] = MMB_CAT_SIZE;
     mmb_offset[0][1] = MMB_CAT_SIZE + 10 * 256 * 80;
     mmb_fp = fp;
@@ -518,7 +510,7 @@ void mmb_pick(int drive, int disc)
 
     if (sdf_fp[drive] != mmb_fp) {
         disc_close(drive);
-        sdf_mount(drive, mmb_fn, mmb_fp, &sdf_geo_tab[SDF_FMT_DFS_10S_SEQ_80T]);
+        sdf_mount(drive, mmb_fn, mmb_fp, &sdf_geometries.dfs_10s_seq_80t);
     }
     mmb_offset[drive][side] = MMB_CAT_SIZE + 10 * 256 * 80 * disc;
     if (fdc_spindown)

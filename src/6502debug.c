@@ -107,7 +107,7 @@ static uint8_t am_cmos[256]=
 
 static int8_t op_nmos[256] =
 {
-/*       0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F */    
+/*       0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F */
 /*00*/  BRK,  ORA,  HLT,  SLO,  NOP,  ORA,  ASL,  SLO,  PHP,  ORA,  ASL,  ANC,  NOP,  ORA,  ASL,  SLO,
 /*10*/  BPL,  ORA,  HLT,  SLO,  NOP,  ORA,  ASL,  SLO,  CLC,  ORA,  NOP,  SLO,  NOP,  ORA,  ASL,  SLO,
 /*20*/  JSR,  AND,  HLT,  RLA,  BIT,  AND,  ROL,  RLA,  PLP,  AND,  ROL,  ANC,  BIT,  AND,  ROL,  RLA,
@@ -197,6 +197,9 @@ uint32_t dbg6502_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
     size_t len;
     addr_mode_t addr_mode;
 
+    char addr_buf[SYM_MAX + 10];
+    char op_buf[10];
+
     op = cpu->memread(addr);
     switch (model)
     {
@@ -217,14 +220,20 @@ uint32_t dbg6502_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
         exit(-1);
     }
     op_name = op_names[ni];
-    len = snprintf(buf, bufsize, "%04X: %02X ", addr, op);
-    if (len < bufsize) {
-	buf += len;
-	bufsize -= len;
-	addr++;
+    cpu->print_addr(cpu, addr, addr_buf, sizeof(addr_buf), false);
+    debug_print_8bit(op, op_buf, sizeof(op_buf));
 
-	switch (addr_mode)
-	{
+    len = snprintf(buf, bufsize, "%s: %s", addr_buf, op_buf);
+
+    buf += len;
+    bufsize -= len;
+    addr++;
+
+    bool        lookforsym = false;
+    uint32_t    symaddr = 0;
+
+    switch (addr_mode)
+    {
         case IMP:
             snprintf(buf, bufsize, "         %s         ", op_name);
             break;
@@ -256,34 +265,50 @@ uint32_t dbg6502_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
         case ZP:
             p1 = cpu->memread(addr++);
             snprintf(buf, bufsize, "%02X       %s %02X      ", p1, op_name, p1);
+            lookforsym = true;
+            symaddr = p1;
             break;
         case ZPX:
             p1 = cpu->memread(addr++);
             snprintf(buf, bufsize, "%02X       %s %02X,X    ", p1, op_name, p1);
+            lookforsym = true;
+            symaddr = p1;
             break;
         case ZPY:
             p1 = cpu->memread(addr++);
             snprintf(buf, bufsize, "%02X       %s %02X,Y    ", p1, op_name, p1);
+            lookforsym = true;
+            symaddr = p1;
             break;
         case IND:
             p1 = cpu->memread(addr++);
             snprintf(buf, bufsize, "%02X       %s (%02X)    ", p1, op_name, p1);
+            lookforsym = true;
+            symaddr = p1;
             break;
         case INDL:
             p1 = cpu->memread(addr++);
             snprintf(buf, bufsize, "%02X       %s [%02X]    ", p1, op_name, p1);
+            lookforsym = true;
+            symaddr = p1;
             break;
         case INDX:
             p1 = cpu->memread(addr++);
             snprintf(buf, bufsize, "%02X       %s (%02X,X)  ", p1, op_name, p1);
+            lookforsym = true;
+            symaddr = p1;
             break;
         case INDY:
             p1 = cpu->memread(addr++);
             snprintf(buf, bufsize, "%02X       %s (%02X),Y  ", p1, op_name, p1);
+            lookforsym = true;
+            symaddr = p1;
             break;
         case INDYL:
             p1 = cpu->memread(addr++);
             snprintf(buf, bufsize, "%02X       %s [%02X],Y  ", p1, op_name, p1);
+            lookforsym = true;
+            symaddr = p1;
             break;
         case SR:
             p1 = cpu->memread(addr++);
@@ -297,69 +322,114 @@ uint32_t dbg6502_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
             p1 = cpu->memread(addr++);
             p2 = cpu->memread(addr++);
             snprintf(buf, bufsize, "%02X %02X    %s %02X%02X    ", p1, p2, op_name, p2, p1);
+            lookforsym = true;
+            symaddr = p1 + (p2 << 8);
             break;
         case ABSL:
             p1 = cpu->memread(addr++);
             p2 = cpu->memread(addr++);
             p3 = cpu->memread(addr++);
             snprintf(buf, bufsize, "%02X %02X %02X %s %02X%02X%02X  ", p1, p2, p3, op_name, p2, p1, p3);
+            lookforsym = true;
+            symaddr = p1 + (p2 << 8) + (p3 << 16);
             break;
         case ABSX:
             p1 = cpu->memread(addr++);
             p2 = cpu->memread(addr++);
             snprintf(buf, bufsize, "%02X %02X    %s %02X%02X,X  ", p1, p2, op_name, p2, p1);
+            lookforsym = true;
+            symaddr = p1 + (p2 << 8);
             break;
         case ABSY:
             p1 = cpu->memread(addr++);
             p2 = cpu->memread(addr++);
             snprintf(buf, bufsize, "%02X %02X    %s %02X%02X,Y  ", p1, p2, op_name, p2, p1);
+            lookforsym = true;
+            symaddr = p1 + (p2 << 8);
             break;
         case ABSXL:
             p1 = cpu->memread(addr++);
             p2 = cpu->memread(addr++);
             p3 = cpu->memread(addr++);
             snprintf(buf, bufsize, "%02X %02X %02X  %s %02X%02X%02X,X  ", p1, p2, p3, op_name, p2, p1, p3);
+            lookforsym = true;
+            symaddr = p1 + (p2 << 8) + (p3 << 16);
             break;
         case BM:
             p1 = cpu->memread(addr++);
             p2 = cpu->memread(addr++);
             snprintf(buf, bufsize, "%02X %02X    %s %02X,%02X   ", p1, p2, op_name, p1, p2);
+            lookforsym = true;
+            symaddr = p1 + (p2 << 8);
             break;
         case IND16:
             p1 = cpu->memread(addr++);
             p2 = cpu->memread(addr++);
             snprintf(buf, bufsize, "%02X %02X    %s (%02X%02X)  ", p1, p2, op_name, p2, p1);
+            lookforsym = true;
+            symaddr = p1 + (p2 << 8);
             break;
         case IND1X:
             p1 = cpu->memread(addr++);
             p2 = cpu->memread(addr++);
             snprintf(buf, bufsize, "%02X %02X    %s (%02X%02X,X)", p1, p2, op_name, p2, p1);
+            lookforsym = true;
+            symaddr = p1 + (p2 << 8);
             break;
         case PCR:
             p1 = cpu->memread(addr++);
-            temp = addr + (signed char)p1;
+            temp = (signed char)p1;
+            temp += addr;
             snprintf(buf, bufsize, "%02X       %s %04X    ", p1, op_name, temp);
+            lookforsym = true;
+            symaddr = temp;
             break;
         case PCRL:
+
             p1 = cpu->memread(addr++);
             p2 = cpu->memread(addr++);
-            temp = addr + ((signed char)p1 + (256*(signed char)p2));
+            temp = (int16_t)((uint16_t)p1 | (uint16_t)p2 <<8);
+            temp += addr;
             snprintf(buf, bufsize, "%02X %02X     %s %04X    ", p1, p2, op_name, temp);
-            break;
-	}
+            lookforsym = true;
+            symaddr = temp;
+            break;    
     }
+
+    const char *sym = NULL;
+    if (lookforsym)
+    {
+        if (symaddr >= 0x8000 && symaddr < 0xC000) {
+            // add rom number, first see if we are disassembling a rom
+
+            symaddr = symaddr | (addr & 0xF0000000);  // add in rom # if present
+        }
+
+        uint32_t symaddr_found;
+        if (symbol_find_by_addr_near(cpu->symbols, symaddr, (symaddr <= 10)?0:symaddr-10, (symaddr <= 0xFFFFFFF5)?symaddr+10:0xFFFFFFFF, &symaddr_found, &sym))
+        {
+            int ll = strlen(buf);
+            if (symaddr_found < symaddr)
+                snprintf(buf + ll, bufsize - ll, "\\ (%s+%d)", sym, symaddr - symaddr_found);
+            else if (symaddr_found < symaddr)
+                snprintf(buf + ll, bufsize - ll, "\\ (%s-%d)", sym, symaddr_found - symaddr);
+            else
+                snprintf(buf + ll, bufsize - ll, "\\ (%s)", sym);
+        }
+    }
+
     return addr;
 }
 
 size_t dbg6502_print_flags(PREG *pp, char *buf, size_t bufsize) {
     if (bufsize >= 6) {
-	*buf++ = p.n ? 'N' : ' ';
-	*buf++ = p.v ? 'V' : ' ';
-	*buf++ = p.d ? 'D' : ' ';
-	*buf++ = p.i ? 'I' : ' ';
-	*buf++ = p.z ? 'Z' : ' ';
-	*buf++ = p.c ? 'C' : ' ';
-	return 6;
+    *buf++ = pp->n ? 'N' : ' ';
+    *buf++ = pp->v ? 'V' : ' ';
+    *buf++ = pp->d ? 'D' : ' ';
+    *buf++ = pp->i ? 'I' : ' ';
+    *buf++ = pp->z ? 'Z' : ' ';
+    *buf++ = pp->c ? 'C' : ' ';
+    return 6;
     }
     return 0;
 }

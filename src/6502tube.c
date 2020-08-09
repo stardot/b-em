@@ -178,11 +178,11 @@ static void dbg_reg_parse(int which, const char *str) {
 
 static uint32_t do_readmem(uint32_t addr);
 static void     do_writemem(uint32_t addr, uint32_t value);
-static uint32_t dbg_disassemble(uint32_t addr, char *buf, size_t bufsize);
+static uint32_t dbg_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t bufsize);
 
 static uint16_t oldtpc, oldtpc2;
 
-static uint32_t dbg_get_instr_addr() {
+static uint32_t dbg_get_instr_addr(void) {
     return oldtpc;
 }
 
@@ -197,11 +197,12 @@ cpu_debug_t tube6502_cpu_debug = {
     .reg_set        = dbg_reg_set,
     .reg_print      = dbg_reg_print,
     .reg_parse      = dbg_reg_parse,
-    .get_instr_addr = dbg_get_instr_addr
+    .get_instr_addr = dbg_get_instr_addr,
+    .print_addr     = debug_print_addr16
 };
 
-static uint32_t dbg_disassemble(uint32_t addr, char *buf, size_t bufsize) {
-    return dbg6502_disassemble(&tube6502_cpu_debug, addr, buf, bufsize, M6502);
+static uint32_t dbg_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t bufsize) {
+    return dbg6502_disassemble(cpu, addr, buf, bufsize, M6502);
 }
 
 #undef printf
@@ -246,7 +247,7 @@ static uint32_t do_readmem(uint32_t addr) {
     return (tubememstat[hi]==2)?tubereadmeml(addr):tubemem[hi][addr&0xFF];
 }
 
-int endtimeslice;
+static int endtimeslice;
 static void tubewritememl(uint16_t addr, uint8_t val)
 {
 //        log_debug("Tube writemem %04X %02X %04X\n",addr,val,pc);

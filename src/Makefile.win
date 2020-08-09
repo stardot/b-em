@@ -1,17 +1,14 @@
-VPATH = . resid-fp NS32016 darm
-
-CPP  = i686-w64-mingw32-g++
-CC   = i686-w64-mingw32-gcc
-WINDRES = i686-w64-mingw32-windres
+VPATH = . resid-fp NS32016 darm mc6809nc
 
 # The following flags are used by PiTubeDirect Co Pros:
 #                BEM - fixes for compilation in B-Em envorinment
 #   INCLUDE_DEBUGGER - include the cpu_debug implementation
 # USE_MEMORY_POINTER - do not assume Co Pro memory starts at address 0
 
-COMMON_FLAGS = -O3 -Wall -DBEM -DVERSION=\"$(VERSION)\" -DINCLUDE_DEBUGGER -DUSE_MEMORY_POINTER -I /usr/i686-w64-mingw32/include
+COMMON_FLAGS = -O3 -Wall -DBEM -DVERSION=\"$(VERSION)\" -DINCLUDE_DEBUGGER -DUSE_MEMORY_POINTER -I /usr/i686-w64-mingw32/include $(ALLEGRO_INC)
 CFLAGS       = -std=gnu99 $(COMMON_FLAGS)
 CXXFLAGS     = $(COMMON_FLAGS)
+LDFLAGS	     = $(ALLEGRO_LIB)
 
 OBJ = \
     6502.o \
@@ -39,6 +36,7 @@ OBJ = \
     csw.o \
     ddnoise.o \
     debugger.o \
+    debugger_symbols.o \
     disc.o \
     fdi2raw.o \
     fdi.o \
@@ -48,6 +46,7 @@ OBJ = \
     joystick.o\
     keyboard.o \
     keydef-allegro.o \
+    led.o \
     logging.o \
     main.o \
     mem.o \
@@ -58,6 +57,7 @@ OBJ = \
     music4000.o \
     music5000.o \
     pal.o \
+    paula.o \
     savestate.o \
     scsi.o \
     sdf-acc.o \
@@ -84,8 +84,7 @@ OBJ = \
     x86dasm.o \
     z80.o \
     z80dis.o \
-    resid.o \
-    b-em.res
+    resid.o
 
 NS32KOBJ = \
     32016.o \
@@ -122,7 +121,7 @@ LIBS = -lz -lallegro_audio -lallegro_acodec -lallegro_primitives -lallegro_dialo
 all : b-em.exe hdfmt.exe jstest.exe gtest.exe
 
 b-em.exe: $(OBJ) $(SIDOBJ) $(NS32KOBJ) $(MC6809OBJ)
-	$(CC) $(OBJ) $(SIDOBJ) $(NS32KOBJ) $(MC6809OBJ) -o "b-em.exe" $(LIBS)
+	$(CC) $(LDFLAGS) $(OBJ) $(SIDOBJ) $(NS32KOBJ) $(MC6809OBJ) -o "b-em.exe" $(LIBS)
 
 clean :
 	del *.o *.exe *.res
@@ -137,12 +136,12 @@ b-em.res: b-em.rc
 	$(WINDRES) -i $< --input-format=rc -o b-em.res -O coff
 
 hdfmt.exe: hdfmt.c
-	$(CC) $(CFLAGS) -o hdfmt.exe hdfmt.c
+	$(CC) $(CFLAGS) $(LDFLAGS) -o hdfmt.exe hdfmt.c
 
 jstest.exe: jstest.c
-	$(CC) $(CFLAGS) -o jstest $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o jstest $(LIBS) -lallegro_main
 
 GTEST_OBJ = gtest.o sdf-geo.o sdf-acc.o
 
 gtest.exe: $(GTEST_OBJ)
-	$(CC) $(CFLAGS) -o gtest $(GTEST_OBJ)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o gtest $(GTEST_OBJ)

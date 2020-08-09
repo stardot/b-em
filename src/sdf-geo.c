@@ -156,28 +156,25 @@ static void new_adfs(FILE *f, const struct sdf_geometry *geo)
 
 /*
  * Table of disc geometries.
- *
- * The order of the entries in this table is contained to match the
- * order of the enum sdf_disc_type and all DFS types must occur as
- * a set of threee geometries in the order single-sided, interleaved
- * sides and sequential sides.
  */
 
-struct sdf_geometry sdf_geo_tab[] =
-{
+const struct sdf_geometry_set sdf_geometries = {
     { "ADFS-S",       SDF_SIDES_SINGLE,      SDF_DENS_DOUBLE, 40, 16,  256, new_adfs                },
     { "ADFS-M",       SDF_SIDES_SINGLE,      SDF_DENS_DOUBLE, 80, 16,  256, new_adfs                },
     { "ADFS-L",       SDF_SIDES_INTERLEAVED, SDF_DENS_DOUBLE, 80, 16,  256, new_adfs                },
     { "ADFS-D",       SDF_SIDES_INTERLEAVED, SDF_DENS_DOUBLE, 80,  5, 1024, NULL                    },
     { "Acorn DFS",    SDF_SIDES_SINGLE,      SDF_DENS_SINGLE, 40, 10,  256, new_dfs_single          },
     { "Acorn DFS",    SDF_SIDES_INTERLEAVED, SDF_DENS_SINGLE, 40, 10,  256, new_dfs_interleaved     },
-    { "Acorn DFS",    SDF_SIDES_SEQUENTIAL,  SDF_DENS_SINGLE, 40, 10,  256, NULL                    },
     { "Acorn DFS",    SDF_SIDES_SINGLE,      SDF_DENS_SINGLE, 80, 10,  256, new_dfs_single          },
     { "Acorn DFS",    SDF_SIDES_INTERLEAVED, SDF_DENS_SINGLE, 80, 10,  256, new_dfs_interleaved     },
     { "Acorn DFS",    SDF_SIDES_SEQUENTIAL,  SDF_DENS_SINGLE, 80, 10,  256, NULL                    },
+    { "Solidisk",     SDF_SIDES_SINGLE,      SDF_DENS_DOUBLE, 40, 16,  256, new_stl_single          },
+    { "Solidisk",     SDF_SIDES_INTERLEAVED, SDF_DENS_DOUBLE, 40, 16,  256, new_stl_interleaved     },
     { "Solidisk",     SDF_SIDES_SINGLE,      SDF_DENS_DOUBLE, 80, 16,  256, new_stl_single          },
     { "Solidisk",     SDF_SIDES_INTERLEAVED, SDF_DENS_DOUBLE, 80, 16,  256, new_stl_interleaved     },
     { "Solidisk",     SDF_SIDES_SEQUENTIAL,  SDF_DENS_DOUBLE, 80, 16,  256, NULL                    },
+    { "Watford/Opus", SDF_SIDES_SINGLE,      SDF_DENS_DOUBLE, 40, 18,  256, new_watford_single      },
+    { "Watford/Opus", SDF_SIDES_INTERLEAVED, SDF_DENS_DOUBLE, 40, 18,  256, new_watford_interleaved },
     { "Watford/Opus", SDF_SIDES_SINGLE,      SDF_DENS_DOUBLE, 80, 18,  256, new_watford_single      },
     { "Watford/Opus", SDF_SIDES_INTERLEAVED, SDF_DENS_DOUBLE, 80, 18,  256, new_watford_interleaved },
     { "Watford/Opus", SDF_SIDES_SEQUENTIAL,  SDF_DENS_DOUBLE, 80, 18,  256, NULL                    },
@@ -247,24 +244,23 @@ static int32_t read_size24(FILE *fp, long offset)
     return -1;
 }
 
-static const struct sdf_geometry *find_geo_adfs(FILE *fp)
+static const struct sdf_geometry *find_geo_adfs(FILE *fp, const struct sdf_geometry *dflt)
 {
-    int32_t size;
-
     if (adfs_root_at(fp, 0x201)) {
         // ADFS format S, M or L
-        if ((size = read_size24(fp, 0xfc)) >= 0) {
+        int32_t size = read_size24(fp, 0xfc);
+        if (size >= 0) {
             if (size <= (40*16))
-                return sdf_geo_tab + SDF_FMT_ADFS_S;
+                return &sdf_geometries.adfs_s;
             else if (size <= (80*16))
-                return sdf_geo_tab + SDF_FMT_ADFS_M;
+                return &sdf_geometries.adfs_m;
             else
-                return sdf_geo_tab + SDF_FMT_ADFS_L;
+                return &sdf_geometries.adfs_l;
         }
     }
     else if (adfs_root_at(fp, 0x401))
-        return sdf_geo_tab + SDF_FMT_ADFS_D;
-    return NULL;
+        return &sdf_geometries.adfs_d;
+    return dflt;
 }
 
 static int32_t dfs_size(FILE *fp, long offset)
@@ -310,40 +306,87 @@ static int32_t dfs_size(FILE *fp, long offset)
     return -1;
 }
 
-static const struct sdf_geometry *find_geo_dfs(const char *fn, const char *ext, FILE *fp, long fsize)
+static const struct sdf_geometry *find_geo_dfs_ss(const char *fn, FILE *fp, long fsize)
 {
-    int32_t sects, track_bytes, side_bytes;
     const struct sdf_geometry *geo;
-
-    if ((sects = dfs_size(fp, 0)) >= 0) {
+    int32_t sects = dfs_size(fp, 0);
+    if (sects > 0) {
         if (sects <= (40 * 10))
-            geo = sdf_geo_tab + SDF_FMT_DFS_10S_SIN_40T;
+            geo = &sdf_geometries.dfs_10s_sin_40t;
         else if (sects <= (80 * 10))
-            geo = sdf_geo_tab + SDF_FMT_DFS_10S_SIN_80T;
-        else if (sects <= (80 * 16))
-            geo = sdf_geo_tab + SDF_FMT_DFS_16S_SIN_80T;
-        else if (sects <= (80 * 18))
-            geo = sdf_geo_tab + SDF_FMT_DFS_18S_SIN_80T;
+            geo = &sdf_geometries.dfs_10s_sin_80t;
         else {
             log_warn("sdf: sector count too high (%u) for %s", sects, fn);
             return NULL;
         }
-        track_bytes = geo->sectors_per_track * geo->sector_size;
-        side_bytes = track_bytes * geo->tracks;
-        if (fsize > track_bytes) {
-            if (dfs_size(fp, track_bytes) >= 3) {
-                geo++;      // interleaved side version.
-                if (dfs_size(fp, side_bytes) >= 3 && strcasecmp(ext, "dsd") && strcasecmp(ext, "ddd"))
-                    geo++;  // sequential side version.
-            }
-            else if (dfs_size(fp, side_bytes) >= 3)
-                geo += 2;   // sequential side version.
-            else if (!strcasecmp(ext, "dsd") || !strcasecmp(ext, "ddd"))
-                geo++;      // interleaved side version.
-        }
-        return geo;
+        uint32_t side_bytes = geo->tracks * geo->sectors_per_track * geo->sector_size;
+        if (fsize > side_bytes)
+            geo += 2;
     }
-    return NULL;
+    else if (fsize <= (40 * 10 * 256))
+        geo = &sdf_geometries.dfs_10s_sin_40t;
+    else if (fsize <= (80 * 10 * 256))
+        geo = &sdf_geometries.dfs_10s_sin_80t;
+    else if (fsize <= (2 * 80 * 10 * 256))
+        geo = &sdf_geometries.dfs_10s_seq_80t;
+    return geo;
+}
+
+static const struct sdf_geometry *find_geo_dfs_is(const char *fn, FILE *fp, long fsize)
+{
+    int32_t sects = dfs_size(fp, 0);
+    if (sects > 0) {
+        if (sects <= (40 * 10))
+            return &sdf_geometries.dfs_10s_int_40t;
+        else if (sects <= (80 * 10))
+            return &sdf_geometries.dfs_10s_int_80t;
+        else {
+            log_warn("sdf: sector count too high (%u) for %s", sects, fn);
+            return NULL;
+        }
+    }
+    else if (fsize <= (2 * 40 * 10 * 256))
+        return &sdf_geometries.dfs_10s_int_40t;
+    else if (fsize <= (2 * 80 * 10 * 256))
+        return &sdf_geometries.dfs_10s_int_80t;
+    else
+        return NULL;
+}
+
+static const struct sdf_geometry *find_geo_ddfs_ss(const char *fn, FILE *fp, long fsize)
+{
+    if (fsize <= (40 * 16 * 256))
+        return &sdf_geometries.dfs_16s_sin_40t;
+    else if (fsize <= (40 * 18 * 256))
+        return &sdf_geometries.dfs_18s_sin_40t;
+    else if (fsize <= (80 * 16 * 256))
+        return &sdf_geometries.dfs_16s_sin_80t;
+    else if (fsize <= (80 * 18 * 256))
+        return &sdf_geometries.dfs_18s_sin_80t;
+    else if (fsize <= (2 * 80 * 16 * 256))
+        return &sdf_geometries.dfs_16s_seq_80t;
+    else if (fsize <= (2 * 80 * 18 * 256))
+        return &sdf_geometries.dfs_18s_seq_80t;
+    else {
+        log_warn("sdf: file '%s' is too big to be a DD disc image (size=%ld)", fn, fsize);
+        return NULL;
+    }
+}
+
+static const struct sdf_geometry *find_geo_ddfs_is(const char *fn, FILE *fp, long fsize)
+{
+    if (fsize <= (2 * 40 * 16 * 256))
+        return &sdf_geometries.dfs_16s_int_40t;
+    else if (fsize <= (2 * 40 * 18 * 256))
+        return &sdf_geometries.dfs_18s_int_40t;
+    else if (fsize <= (2 * 80 * 16 * 256))
+        return &sdf_geometries.dfs_16s_int_80t;
+    else if (fsize <= (2 * 80 * 18 * 256))
+        return &sdf_geometries.dfs_18s_int_80t;
+    else {
+        log_warn("sdf: file '%s' is too big to be a DD disc image (size=%ld)", fn, fsize);
+        return NULL;
+    }
 }
 
 static const struct sdf_geometry *find_geo_size(FILE *fp, long fsize)
@@ -351,31 +394,53 @@ static const struct sdf_geometry *find_geo_size(FILE *fp, long fsize)
     switch(fsize)
     {
     case 800*1024: // 800k ADFS/DOS - 80*2*5*1024
-        return sdf_geo_tab + SDF_FMT_ADFS_D;
+        return &sdf_geometries.adfs_d;
     case 640*1024: // 640k ADFS/DOS - 80*2*16*256
-        return sdf_geo_tab + SDF_FMT_ADFS_L;
+        return &sdf_geometries.adfs_l;
     case 720*1024: // 720k DOS - 80*2*9*512
-        return sdf_geo_tab + SDF_FMT_DOS720K;
+        return &sdf_geometries.dos_720k;
     case 360*1024: // 360k DOS - 40*2*9*512
-        return sdf_geo_tab + SDF_FMT_DOS360K;
+        return &sdf_geometries.dos_360k;
     case 200*1024: // 200k DFS - 80*1*10*256
-        return sdf_geo_tab + SDF_FMT_DFS_10S_SIN_80T;
+        return &sdf_geometries.dfs_10s_sin_80t;
     case 400*1024: // 400k DFS - 80*2*10*256
-        return sdf_geo_tab + SDF_FMT_DFS_10S_INT_80T;
+        return &sdf_geometries.dfs_10s_int_80t;
     }
     return NULL;
 }
 
 const struct sdf_geometry *sdf_find_geo(const char *fn, const char *ext, FILE *fp)
 {
-    long fsize;
-    const struct sdf_geometry *geo;
+    const struct sdf_geometry *geo = NULL;
 
-    if ((geo = find_geo_adfs(fp)) == NULL) {
+    if (ext) {
+        if (!strcasecmp(ext, "ads"))
+            geo = find_geo_adfs(fp, &sdf_geometries.adfs_s);
+        else if (!strcasecmp(ext, "adm"))
+            geo = find_geo_adfs(fp, &sdf_geometries.adfs_m);
+        else if (!strcasecmp(ext, "adl"))
+            geo = find_geo_adfs(fp, &sdf_geometries.adfs_l);
+        else if (!strcasecmp(ext, "adf"))
+            geo = find_geo_adfs(fp, NULL);
+        else {
+            fseek(fp, 0, SEEK_END);
+            long fsize = ftell(fp);
+            if (!strcasecmp(ext, "ssd"))
+                geo = find_geo_dfs_ss(fn, fp, fsize);
+            else if (!strcasecmp(ext, "dsd"))
+                geo = find_geo_dfs_is(fn, fp, fsize);
+            else if (!strcasecmp(ext, "sdd"))
+                geo = find_geo_ddfs_ss(fn, fp, fsize);
+            else if (!strcasecmp(ext, "ddd"))
+                geo = find_geo_ddfs_is(fn, fp, fsize);
+            else
+                geo = find_geo_size(fp, fsize);
+        }
+    }
+    else {
         fseek(fp, 0, SEEK_END);
-        fsize = ftell(fp);
-        if ((geo = find_geo_dfs(fn, ext, fp, fsize)) == NULL)
-            geo = find_geo_size(fp, fsize);
+        long fsize = ftell(fp);
+        geo = find_geo_size(fp, fsize);
     }
     return geo;
 }

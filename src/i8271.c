@@ -8,16 +8,17 @@
 #include "ddnoise.h"
 #include "i8271.h"
 #include "disc.h"
+#include "led.h"
 #include "model.h"
 
-void i8271_callback();
+void i8271_callback(void);
 void i8271_data(uint8_t dat);
-void i8271_spindown();
-void i8271_finishread();
-void i8271_notfound();
-void i8271_datacrcerror();
-void i8271_headercrcerror();
-void i8271_writeprotect();
+void i8271_spindown(void);
+void i8271_finishread(void);
+void i8271_notfound(void);
+void i8271_datacrcerror(void);
+void i8271_headercrcerror(void);
+void i8271_writeprotect(void);
 int  i8271_getdata(int last);
 
 static int bytenum;
@@ -80,25 +81,28 @@ static void i8271_NMI()
 }
 
 
-void i8271_spinup()
+void i8271_spinup(void)
 {
     if (!motoron) {
         motoron = 1;
         motorspin = 0;
+        led_update((curdrive == 0) ? LED_DRIVE_0 : LED_DRIVE_1, true, 0);
         ddnoise_spinup();
     }
 }
 
-void i8271_spindown()
+void i8271_spindown(void)
 {
     if (motoron) {
         motoron = 0;
+        led_update(LED_DRIVE_0, false, 0);
+        led_update(LED_DRIVE_1, false, 0);
         ddnoise_spindown();
     }
     i8271.drvout &= ~DRIVESEL;
 }
 
-void i8271_setspindown()
+void i8271_setspindown(void)
 {
     motorspin = 45000;
 }
@@ -180,6 +184,10 @@ void i8271_write(uint16_t addr, uint8_t val)
                         i8271.drvout |= val & DRIVESEL;
                 }
                 curdrive = (val & 0x80) ? 1 : 0;
+                if (motoron) {
+                    led_update((curdrive == 0) ? LED_DRIVE_0 : LED_DRIVE_1, true, 0);
+                    led_update((curdrive == 0) ? LED_DRIVE_1 : LED_DRIVE_0, false, 0);
+                }
                 i8271.paramnum = 0;
                 i8271.paramreq = i8271_getparams();
                 i8271.status = 0x80;
@@ -332,7 +340,7 @@ void i8271_write(uint16_t addr, uint8_t val)
         }
 }
 
-void i8271_callback()
+void i8271_callback(void)
 {
         fdc_time = 0;
 //        printf("Callback 8271 - command %02X\n",i8271.command);
@@ -461,10 +469,12 @@ void i8271_callback()
 
             case 0xFF: break;
 
-                default: break;
+            default: break;
+                /* TODO: DB: check is this the intent?
                 printf("Unknown 8271 command %02X 3\n", i8271.command);
                 dumpregs();
                 exit(-1);
+                */
         }
 }
 
@@ -479,12 +489,12 @@ void i8271_data(uint8_t dat)
         bytenum++;
 }
 
-void i8271_finishread()
+void i8271_finishread(void)
 {
         fdc_time = 200;
 }
 
-void i8271_notfound()
+void i8271_notfound(void)
 {
         i8271.result = 0x18;
         i8271.status = 0x18;
@@ -493,7 +503,7 @@ void i8271_notfound()
 //        printf("Not found 8271\n");
 }
 
-void i8271_datacrcerror()
+void i8271_datacrcerror(void)
 {
         i8271.result = 0x0E;
         i8271.status = 0x18;
@@ -502,7 +512,7 @@ void i8271_datacrcerror()
 //        printf("CRCdat 8271\n");
 }
 
-void i8271_headercrcerror()
+void i8271_headercrcerror(void)
 {
         i8271.result = 0x0C;
         i8271.status = 0x18;
@@ -526,7 +536,7 @@ int i8271_getdata(int last)
         return i8271.data;
 }
 
-void i8271_writeprotect()
+void i8271_writeprotect(void)
 {
         i8271.result = 0x12;
         i8271.status = 0x18;

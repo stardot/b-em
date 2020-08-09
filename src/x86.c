@@ -189,24 +189,41 @@ static void x86_dbg_iowrite(uint32_t addr, uint32_t value) {
 #define MAXOPLEN 6
 int i386_dasm_one(char *buffer, uint32_t eip, int addr_size, int op_size);
 
-static uint32_t x86_dbg_disassemble(uint32_t addr, char *buf, size_t bufsize) {
+static size_t dbg_print_addr(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t bufsize, bool include_symbols)
+{
+    //TODO: DB: symbol lookup
+    if (bufsize >= 9) {
+        uint32_t msw = addr & 0x0fff0000;
+        uint32_t lsw = addr & 0x0000ffff;
+        size_t len = debug_print_16bit(msw, buf, bufsize);
+        buf[len-1] = ':';
+        debug_print_16bit(lsw, buf+len, bufsize-len);
+    }
+    return 9;
+}
+
+static uint32_t x86_dbg_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t bufsize) {
    char instr[100];
 
    int oplen = i386_dasm_one(instr, addr, 0, 0) & 0xffff;
    log_debug("x86: bdg_disassemble, oplen=%d", oplen);
-   int len = snprintf(buf, bufsize, "%06"PRIx32" ", addr);
-   buf += len;
-   bufsize -= len;
-   for (int i = 0; i < MAXOPLEN; i++) {
-      if (i < oplen) {
-         len = snprintf(buf, bufsize, "%02x ", readmemblx86(addr + i));
-      } else {
-         len = snprintf(buf, bufsize, "   ");
-      }
-      buf += len;
-      bufsize -= len;
+   size_t len = dbg_print_addr(cpu, addr, buf, bufsize, false);
+   if (len < bufsize) {
+        buf[len++] = ' ';
+        buf += len;
+        bufsize -= len;
+        for (int i = 0; i < MAXOPLEN; i++) {
+            if (i < oplen) {
+                len = snprintf(buf, bufsize, "%02x ", readmemblx86(addr + i));
+            }
+            else {
+                len = snprintf(buf, bufsize, "   ");
+            }
+            buf += len;
+            bufsize -= len;
+        }
+        strncpy(buf, instr, bufsize);
    }
-   strncpy(buf, instr, bufsize);
    return addr + oplen;
 }
 
@@ -354,7 +371,8 @@ cpu_debug_t tubex86_cpu_debug = {
    .reg_set        = x86_dbg_reg_set,
    .reg_print      = x86_dbg_reg_print,
    .reg_parse      = x86_dbg_reg_parse,
-   .get_instr_addr = x86_dbg_get_instr_addr
+   .get_instr_addr = x86_dbg_get_instr_addr,
+   .print_addr     = dbg_print_addr
 };
 
 #define pc x86pc
@@ -388,13 +406,13 @@ r16(/r)                    AX    CX    DX    BX    SP    BP    SI    DI
 r32(/r)                    EAX   ECX   EDX   EBX   ESP   EBP   ESI   EDI
 /digit (Opcode)            0     1     2     3     4     5     6     7
 REG =                      000   001   010   011   100   101   110   111
-  ÚÄÄÄAddress
+  ÃšÃ„Ã„Ã„Address
 disp8 denotes an 8-bit displacement following the ModR/M byte, to be
 sign-extended and added to the index. disp16 denotes a 16-bit displacement
 following the ModR/M byte, to be added to the index. Default segment
 register is SS for the effective addresses containing a BP index, DS for
 other effective addresses.
-            ÄÄ¿ ÚMod R/M¿ ÚÄÄÄÄÄÄÄÄModR/M Values in HexadecimalÄÄÄÄÄÄÄÄ¿
+            Ã„Ã„Â¿ ÃšMod R/MÂ¿ ÃšÃ„Ã„Ã„Ã„Ã„Ã„Ã„Ã„ModR/M Values in HexadecimalÃ„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Â¿
 
 [BX + SI]            000   00    08    10    18    20    28    30    38
 [BX + DI]            001   01    09    11    19    21    29    31    39

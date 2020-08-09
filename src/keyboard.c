@@ -4,6 +4,30 @@
 #include "keyboard.h"
 #include "model.h"
 
+/*
+ * The BBC micro keyboard is a fairly standard matrix.  Column lines
+ * are activated by decoding the output of a 74LS163 counter with a
+ * 4 to 10 line decoder.  Row lines are pulled up with resistors and
+ * fed both to an eight input NAND gate to generate an interrupt and
+ * to a 74LS251 multiplex allows the row lines to be read.
+ * 
+ * The diagram in The Advanced User Guide is slighly misleading
+ * because the bits as seen by the 74LS251 do not match the rows shown
+ * in the diagram.  From a software perspective the keybaord looks
+ * like this:
+ * 
+ *       0x00      0x01  0x02  0x03 0x04 0x05 0x06 0x07 0x08 0x09
+ * 0x00  Shift     Ctrl  <------- starup up DIP swicthes ------->
+ * 0x10  Q         3     4     5    f4   8    f7   =-   ~^   Left
+ * 0x20  f0        W     E     T    7    I    9    0    £    Down
+ * 0x30  1         2     D     R    6    U    O    P    [{   Up
+ * 0x40  CapsLck   A     X     F    Y    J    K    @    :*   Return
+ * 0x50  ShiftLck  S     C     G    H    N    L    ;+   ]}   Delete
+ * 0x60  Tab       Z     SPC   V    B    M    <,   >.   /?   Copy
+ * 0x70  ESC       f1    f2    f3   f5   f6   f8   f9   \    Right
+ * 
+*/
+
 static uint8_t allegro2bbc[ALLEGRO_KEY_MAX] =
 {
     0xaa,   // 0
@@ -116,24 +140,24 @@ static uint8_t allegro2bbc[ALLEGRO_KEY_MAX] =
     0x50,   // 107  ALLEGRO_KEY_BACK
     0xaa,   // 108  ALLEGRO_KEY_VOLUME_UP
     0xaa,   // 109  ALLEGRO_KEY_VOLUME_DOWN
-    0xaa,   // 110
-    0xaa,   // 111
-    0xaa,   // 112
-    0xaa,   // 113
-    0xaa,   // 114
-    0xaa,   // 115
-    0xaa,   // 116
-    0xaa,   // 117
-    0xaa,   // 118
-    0xaa,   // 119
-    0xaa,   // 120
-    0xaa,   // 121
-    0xaa,   // 122
-    0xaa,   // 123
-    0xaa,   // 124
-    0xaa,   // 125
-    0xaa,   // 126
-    0xaa,   // 127
+    0xaa,   // 110  ALLEGRO_KEY_SEARCH
+    0xaa,   // 111  ALLEGRO_KEY_DPAD_CENTER
+    0xaa,   // 112  ALLEGRO_KEY_BUTTON_X
+    0xaa,   // 113  ALLEGRO_KEY_BUTTON_Y
+    0xaa,   // 114  ALLEGRO_KEY_DPAD_UP
+    0xaa,   // 115  ALLEGRO_KEY_DPAD_DOWN
+    0xaa,   // 116  ALLEGRO_KEY_DPAD_LEFT
+    0xaa,   // 117  ALLEGRO_KEY_DPAD_RIGHT
+    0xaa,   // 118  ALLEGRO_KEY_SELECT
+    0xaa,   // 119  ALLEGRO_KEY_START
+    0xaa,   // 120  ALLEGRO_KEY_BUTTON_L1
+    0xaa,   // 121  ALLEGRO_KEY_BUTTON_R1
+    0xaa,   // 122  ALLEGRO_KEY_BUTTON_L2
+    0xaa,   // 123  ALLEGRO_KEY_BUTTON_R2
+    0xaa,   // 124  ALLEGRO_KEY_BUTTON_A
+    0xaa,   // 125  ALLEGRO_KEY_BUTTON_B
+    0xaa,   // 126  ALLEGRO_KEY_THUMBL
+    0xaa,   // 127  ALLEGRO_KEY_THUMBR
     0xaa,   // 128
     0xaa,   // 129
     0xaa,   // 130

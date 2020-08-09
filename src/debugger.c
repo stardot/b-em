@@ -4,6 +4,7 @@
 #include <ctype.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "cpu_debug.h"
 #include "debugger.h"
@@ -11,6 +12,7 @@
 #include "main.h"
 #include "model.h"
 #include "6502.h"
+#include "debugger_symbols.h"
 
 #include <allegro5/allegro_primitives.h>
 
@@ -114,10 +116,9 @@ static HANDLE cinf, consf;
 
 static inline bool debug_in(char *buf, size_t bufsize)
 {
-    int c;
     DWORD len;
 
-    if ((c = ReadConsole(cinf, buf, bufsize, &len, NULL))) {
+    if (ReadConsole(cinf, buf, bufsize, &len, NULL)) {
         buf[len] = 0;
         log_debug("debugger: read console, len=%d, s=%s", (int)len, buf);
         return true;
@@ -351,6 +352,9 @@ static const char helptext[] =
     "    r sound    - print Sound registers\n"
     "    reset      - reset emulated machine\n"
     "    s [n]      - step n instructions (or 1 if no parameter)\n"
+    "    symbol name=[rom:]addr\n"
+    "               - add debugger symbol\n"
+    "    symlist    - list all symbols\n"
     "    trace fn   - trace disassembly/registers to file, close file if no fn\n"
     "    vrefresh t - extra video refresh on entering debugger.  t=on or off\n"
     "    watchr n   - watch reads from address n\n"
@@ -363,6 +367,77 @@ static const char helptext[] =
     "    wclearo n  - clear output watchpoint n or output watchpoint at n\n"
     "    wlist      - list watchpoints\n"
     "    writem a v - write to memory, a = address, v = value\n";
+
+static char xdigs[] = "0123456789ABCDEF";
+
+size_t debug_print_8bit(uint32_t value, char *buf, size_t bufsize)
+{
+    if (bufsize >= 3) {
+        buf[2] = 0;
+        buf[0] = xdigs[(value >> 4) & 0x0f];
+        buf[1] = xdigs[value & 0x0f];
+    }
+    return 3;
+}
+
+size_t debug_print_16bit(uint32_t value, char *buf, size_t bufsize)
+{
+    if (bufsize >= 5) {
+        buf[4] = 0;
+        for (int i = 3; i >= 0; i--) {
+            buf[i] = xdigs[value & 0x0f];
+            value >>= 4;
+        }
+    }
+    return 5;
+}
+
+size_t debug_print_32bit(uint32_t value, char *buf, size_t bufsize)
+{
+    if (bufsize >= 9) {
+        buf[8] = 0;
+        for (int i = 7; i >= 0; i--) {
+            buf[i] = xdigs[value & 0x0f];
+            value >>= 4;
+        }
+    }
+    return 9;
+}
+
+size_t debug_print_addr16(cpu_debug_t *cpu, uint32_t value, char *buf, size_t bufsize, bool include_symbol) {
+    const char *sym = NULL;
+    size_t ret;
+    if (!include_symbol || !symbol_find_by_addr(cpu->symbols, value, &sym))
+        sym = NULL;
+    if (sym) {
+        ret = snprintf(buf, bufsize, "%04X (%s)", value, sym);
+    }
+    else
+        ret = snprintf(buf, bufsize, "%04X", value);
+
+    if (ret > bufsize)
+        return bufsize;
+    else
+        return ret;
+}
+
+size_t debug_print_addr32(cpu_debug_t *cpu, uint32_t value, char *buf, size_t bufsize, bool include_symbol) {
+    const char *sym = NULL;
+    size_t ret;
+    if (!include_symbol || !symbol_find_by_addr(cpu->symbols, value, &sym))
+        sym = NULL;
+    if (sym) {
+        ret = snprintf(buf, bufsize, "%08X (%s)", value, sym);
+    }
+    else
+        ret = snprintf(buf, bufsize, "%08X", value);
+
+    if (ret > bufsize)
+        return bufsize;
+    else
+        return ret;
+}
+
 
 static void print_registers(cpu_debug_t *cpu) {
     const char **np, *name;
@@ -378,46 +453,156 @@ static void print_registers(cpu_debug_t *cpu) {
     debug_out("\n", 1);
 }
 
-static void set_point(int *table, char *arg, const char *desc)
+
+static uint32_t parse_address_with_romno(cpu_debug_t *cpu, char *arg, const char **endret) {
+
+    uint32_t a;
+    //first see if there is a symbol
+    if (symbol_find_by_name(cpu->symbols, arg, &a, endret))
+        return a;
+
+    char *end1;
+    a = strtoul(arg, &end1, 16);
+    if (end1 == arg) {
+        *endret = arg;
+        return -1;
+    }
+    if (*end1++ == ':') {
+        char *end2;
+        uint32_t b = strtoul(end1, &end2, 16);
+        if (end2 > end1) {
+            a = (a << 28) | b;
+            *endret = end2;
+            return a;
+        }
+        else {
+            *endret = arg;
+            return -1;
+        }
+    }
+    else {
+        *endret = end1;
+        return a;
+    }
+}
+
+static void set_sym(cpu_debug_t *cpu, const char *arg) {
+    if (!cpu->symbols)
+        cpu->symbols = symbol_new();
+    if (cpu->symbols) {
+
+        int n;
+        char name[SYM_MAX + 1], rest[SYM_MAX + 1];
+
+        n = sscanf(arg, "%" STRINGY(SYM_MAX) "[^= ] = %" STRINGY(SYM_MAX) "s", name, rest);
+        const char *e;
+        uint32_t addr;
+        if (n == 2)
+            addr = parse_address_with_romno(cpu, rest, &e);
+
+
+        if (n == 2 && e != rest && strlen(name)) {
+            char abuf[17];
+            cpu->print_addr(cpu, addr, abuf, 16, false);
+
+            symbol_add(cpu->symbols, name, addr);
+
+            debug_outf("SYMBOL %s set to %s\n", name, abuf);
+
+        }
+        else {
+            debug_outf("Bad command\n");
+        }
+    }
+    else {
+        debug_outf("no symbol table\n");
+    }
+
+}
+
+static void list_syms(cpu_debug_t *cpu, const char *arg) {
+    symbol_list(cpu->symbols, cpu, &debug_outf);
+}
+
+static void set_point(cpu_debug_t *cpu, int *table, char *arg, const char *desc)
 {
     int c;
 
-    if (*arg) {
+    const char *end1;
+    uint32_t a = parse_address_with_romno(cpu, arg, &end1);
+
+    char addrbuf[16 + SYM_MAX];
+    cpu->print_addr(cpu, a, addrbuf, sizeof(addrbuf), true);
+
+    if (end1 > arg) {
+
+        // check to see if already set
+        for (c = 0; c < NUM_BREAKPOINTS; c++) {
+            if (table[c] == a)
+            {
+                debug_outf("    %s %i already set to %s\n", desc, c, addrbuf);
+                return;
+            }
+        }
+
         for (c = 0; c < NUM_BREAKPOINTS; c++) {
             if (table[c] == -1) {
-                sscanf(arg, "%X", &table[c]);
-                debug_outf("    %s %i set to %04X\n", desc, c, table[c]);
+                table[c] = a;
+                debug_outf("    %s %i set to %s\n", desc, c, addrbuf);
                 return;
             }
         }
         debug_outf("    unable to set %s breakpoint, table full\n", desc);
     } else
-        debug_out("    missing parameter\n!", 24);
+        debug_out("    missing parameter or invalid address\n!", 24);
 }
 
-static void clear_point(int *table, char *arg, const char *desc)
+static void clear_point(cpu_debug_t *cpu, int *table, char *arg, const char *desc)
 {
     int c, e;
 
-    if (*arg) {
-        sscanf(arg, "%X", &e);
-        for (c = 0; c < 8; c++) {
-            if (table[c] == e || c == e) {
-                debug_outf("    %s %i at %04X cleared\n", desc, c, table[c]);
-                table[c] = -1;
+    const char *p;
+    e = parse_address_with_romno(cpu, arg, &p);
+
+    if (p != arg) {
+        int ix = -1;
+        //DB: changed this to search by address first then by index
+        for (c = 0; c < NUM_BREAKPOINTS; c++) {
+            if (table[c] == e) {
+                ix = c;
             }
         }
+        if (ix == -1 && e < NUM_BREAKPOINTS && table[e] != -1)
+            ix = e;
+
+        if (ix >= 0) {
+
+            char addrbuf[16 + SYM_MAX];
+            cpu->print_addr(cpu, table[ix], addrbuf, sizeof(addrbuf), true);
+
+            debug_outf("    %s %i at %s cleared\n", desc, ix, addrbuf);
+            table[ix] = -1;
+        }
+        else {
+            debug_outf("    Can't find that breakpoint\n");
+        }
+
+
     } else
         debug_out("    missing parameter\n!", 24);
 }
 
-static void list_points(int *table, const char *desc)
+static void list_points(cpu_debug_t *cpu, int *table, const char *desc)
 {
     int c;
 
+    char addr_buf[17 + SYM_MAX];
+
     for (c = 0; c < NUM_BREAKPOINTS; c++)
-        if (table[c] != -1)
-            debug_outf("    %s %i : %04X\n", desc, c, table[c]);
+        if (table[c] != -1) {
+            cpu->print_addr(cpu, table[c], addr_buf, sizeof(addr_buf), true);
+            debug_outf("    %s %i : %-8s\n", desc, c, addr_buf);
+        }
 }
 
 static void debug_paste(const char *iptr)
@@ -426,7 +611,7 @@ static void debug_paste(const char *iptr)
     char *str, *dptr;
 
     if ((ch = *iptr++)) {
-        if ((str = malloc(strlen(iptr) + 1))) {
+        if ((str = al_malloc(strlen(iptr) + 1))) {
             dptr = str;
             do {
                 if (ch == '|') {
@@ -444,23 +629,69 @@ static void debug_paste(const char *iptr)
     }
 }
 
+static void save_points(FILE *sfp, const char *cmd, int *points)
+{
+    for (int c = 0; c < NUM_BREAKPOINTS; c++) {
+        int point = points[c];
+        if (point != -1)
+            fprintf(sfp, "%s %x\n", cmd, point);
+    }
+}
+
+static void debugger_save(char *iptr)
+{
+    char *eptr = strchr(iptr, '\n');
+    if (eptr)
+        *eptr = '\0';
+    FILE *sfp = fopen(iptr, "w");
+    if (sfp) {
+        save_points(sfp, "break", breakpoints);
+        save_points(sfp, "breakr", breakr);
+        save_points(sfp, "breakw", breakw);
+        save_points(sfp, "breaki", breaki);
+        save_points(sfp, "breako", breako);
+        save_points(sfp, "watchr", watchr);
+        save_points(sfp, "watchw", watchw);
+        save_points(sfp, "watchi", watchi);
+        save_points(sfp, "watcho", watcho);
+        debug_outf("Breakpoints saved to %s\n", iptr);
+        fclose(sfp);
+    }
+    else
+        debug_outf("unable to open '%s' for writing: %s\n", strerror(errno));
+}
+
+void trimnl(char *buf) {
+    int len = strlen(buf);
+
+    while (len >= 1 && (buf[len - 1] == '\r' || buf[len - 1] == '\n'))
+        buf[--len] = '\0';
+
+}
+
 void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 {
-    int c, d, e, f;
-    uint8_t temp;
     uint32_t next_addr;
-    char dump[256], *dptr;
-    char ins[256], *iptr, *cmd, *eptr;
+    char ins[256];
 
     main_pause();
     indebug = 1;
+    const char *sym;
+    if (symbol_find_by_addr(cpu->symbols, addr, &sym)) {
+        debug_outf("%s:\n", sym);
+    }
     log_debug("debugger: about to call disassembler, addr=%04X", addr);
-    next_addr = cpu->disassemble(addr, ins, sizeof ins);
+    next_addr = cpu->disassemble(cpu, addr, ins, sizeof ins);
     debug_out(ins, strlen(ins));
     if (vrefresh)
         video_poll(CLOCKS_PER_FRAME, 0);
 
     for (;;) {
+        char *iptr, *cmd;
+        size_t cmdlen;
+        int c;
+        bool badcmd = false;
+
         if (exec_fp) {
             if (!fgets(ins, sizeof ins, exec_fp)) {
                 fclose(exec_fp);
@@ -470,17 +701,27 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
         }
         else {
             debug_out(">", 1);
-            debug_in(ins, 255);
+            if (!debug_in(ins, 255)) {
+                static const char msg[] = "\nTreating EOF on console as 'continue'\n";
+                debug_out(msg, sizeof(msg)-1);
+                indebug = 0;
+                main_resume();
+                return;
+            }
         }
 
+        trimnl(ins);
         // Skip past any leading spaces.
         for (iptr = ins; (c = *iptr) && isspace(c); iptr++);
         if (c) {
             cmd = iptr;
             // Find the first space and terminate command name.
-            while (c && !isspace(c))
-                c = *++iptr;
+            while (c && !isspace(c)) {
+                *iptr++ = tolower(c);
+                c = *iptr;
+            }
             *iptr = '\0';
+            cmdlen = iptr - cmd;
             // Skip past any separating spaces.
             while (c && isspace(c))
                 c = *++iptr;
@@ -489,45 +730,46 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
             cmd = iptr = ins;
             *iptr++ = debug_lastcommand;
             *iptr = '\0';
+            cmdlen = 1;
         }
         switch (*cmd) {
             case 'b':
-            case 'B':
-                if (!strcasecmp(cmd, "breaki"))
-                    set_point(breaki, iptr, "Input breakpoint");
-                else if (!strcasecmp(cmd, "breako"))
-                    set_point(breako, iptr, "Output breakpoint");
-                else if (!strcasecmp(cmd, "breakr"))
-                    set_point(breakr, iptr, "Read breakpoint");
-                else if (!strcasecmp(cmd, "breakw"))
-                    set_point(breakw, iptr, "Write breakpoint");
-                else if (!strcasecmp(cmd, "break"))
-                    set_point(breakpoints, iptr, "Breakpoint");
-                else if (!strcasecmp(ins, "blist")) {
-                    list_points(breakpoints, "Breakpoint");
-                    list_points(breakr, "Read breakpoint");
-                    list_points(breakw, "Write breakpoint");
-                    list_points(breaki, "Input breakpoint");
-                    list_points(breako, "Output breakpoint");
-                } else if (!strcasecmp(cmd, "bcleari"))
-                    clear_point(breaki, iptr, "Input breakpoint");
-                else if (!strcasecmp(cmd, "bclearo"))
-                    clear_point(breako, iptr, "Output breakpoint");
-                else if (!strcasecmp(cmd, "bclearr"))
-                    clear_point(breakr, iptr, "Read breakpoint");
-                else if (!strcasecmp(cmd, "bclearw"))
-                    clear_point(breakw, iptr, "Write breakpoint");
-                else if (!strcasecmp(ins, "bclear"))
-                    clear_point(breakpoints, iptr, "Breakpoint");
+                if (!strncmp(cmd, "break", cmdlen))
+                    set_point(cpu, breakpoints, iptr, "Breakpoint");
+                else if (!strncmp(cmd, "breaki", cmdlen))
+                    set_point(cpu, breaki, iptr, "Input breakpoint");
+                else if (!strncmp(cmd, "breako", cmdlen))
+                    set_point(cpu, breako, iptr, "Output breakpoint");
+                else if (!strncmp(cmd, "breakr", cmdlen))
+                    set_point(cpu, breakr, iptr, "Read breakpoint");
+                else if (!strncmp(cmd, "breakw", cmdlen))
+                    set_point(cpu, breakw, iptr, "Write breakpoint");
+                else if (!strncmp(ins, "blist", cmdlen)) {
+                    list_points(cpu, breakpoints, "Breakpoint");
+                    list_points(cpu, breakr, "Read breakpoint");
+                    list_points(cpu, breakw, "Write breakpoint");
+                    list_points(cpu, breaki, "Input breakpoint");
+                    list_points(cpu, breako, "Output breakpoint");
+                }
+                else if (!strncmp(ins, "bclear", cmdlen))
+                    clear_point(cpu, breakpoints, iptr, "Breakpoint");
+                else if (!strncmp(cmd, "bcleari", cmdlen))
+                    clear_point(cpu, breaki, iptr, "Input breakpoint");
+                else if (!strncmp(cmd, "bclearo", cmdlen))
+                    clear_point(cpu, breako, iptr, "Output breakpoint");
+                else if (!strncmp(cmd, "bclearr", cmdlen))
+                    clear_point(cpu, breakr, iptr, "Read breakpoint");
+                else if (!strncmp(cmd, "bclearw", cmdlen))
+                    clear_point(cpu, breakw, iptr, "Write breakpoint");
+                else
+                    badcmd = true;
                 break;
 
             case 'q':
-            case 'Q':
                 main_setquit();
                 /* FALLTHOUGH */
 
             case 'c':
-            case 'C':
                 if (*iptr)
                     sscanf(iptr, "%d", &contcount);
                 debug_lastcommand = 'c';
@@ -536,48 +778,53 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 return;
 
             case 'd':
-            case 'D':
-                if (*iptr)
-                    sscanf(iptr, "%X", (unsigned int *)&debug_disaddr);
+                if (*iptr) {
+                    const char *e;
+                    debug_disaddr = parse_address_with_romno(cpu, iptr, &e);
+                }
                 for (c = 0; c < 12; c++) {
+                    const char *sym;
+                    if (symbol_find_by_addr(cpu->symbols, debug_disaddr, &sym)) {
+                        debug_outf("%s:\n", sym);
+                    }
                     debug_out("    ", 4);
-                    debug_disaddr = cpu->disassemble(debug_disaddr, ins, sizeof ins);
+                    debug_disaddr = cpu->disassemble(cpu, debug_disaddr, ins, sizeof ins);
                     debug_out(ins, strlen(ins));
                     debug_out("\n", 1);
                 }
                 debug_lastcommand = 'd';
                 break;
-
             case 'e':
-            case 'E':
-                if (!strcasecmp(cmd, "exec")) {
+                if (!strncmp(cmd, "exec", cmdlen)) {
                     if (*iptr) {
-                        if ((eptr = strchr(iptr, '\n')))
+                        char *eptr = strchr(iptr, '\n');
+                        if (eptr)
                             *eptr = 0;
                         if (!(exec_fp = fopen(iptr, "r")))
                             debug_outf("unable to open '%s': %s\n", iptr, strerror(errno));
                     }
                 }
+                else
+                    badcmd = true;
                 break;
 
             case 'h':
-            case 'H':
             case '?':
                 debug_out(helptext, sizeof helptext - 1);
                 break;
 
             case 'm':
-            case 'M':
                 if (*iptr)
                     sscanf(iptr, "%X", (unsigned int *)&debug_memaddr);
                 for (c = 0; c < 16; c++) {
+                    char dump[256], *dptr;
                     debug_outf("    %04X : ", debug_memaddr);
-                    for (d = 0; d < 16; d++)
+                    for (int d = 0; d < 16; d++)
                         debug_outf("%02X ", cpu->memread(debug_memaddr + d));
                     debug_out("  ", 2);
                     dptr = dump;
-                    for (d = 0; d < 16; d++) {
-                        temp = cpu->memread(debug_memaddr + d);
+                    for (int d = 0; d < 16; d++) {
+                        uint32_t temp = cpu->memread(debug_memaddr + d);
                         if (temp < ' ' || temp >= 0x7f)
                             *dptr++ = '.';
                         else
@@ -591,7 +838,6 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 break;
 
             case 'n':
-            case 'N':
                 tbreak = next_addr;
                 debug_lastcommand = 'n';
                 indebug = 0;
@@ -599,39 +845,41 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 return;
 
             case 'p':
-            case 'P':
-                if (!strcasecmp(cmd, "paste"))
+                if (!strncmp(cmd, "paste", cmdlen))
                     debug_paste(iptr);
                 break;
 
             case 'r':
-            case 'R':
-                if (!strcasecmp(cmd, "reset")) {
+                if (cmdlen >= 3 && !strncmp(cmd, "reset", cmdlen)) {
                     main_reset();
                     debug_outf("Emulator reset\n");
                 } else if (*iptr) {
-                    if (!strncasecmp(iptr, "sysvia", 6)) {
+                    size_t arglen = strcspn(iptr, " \t\n");
+                    iptr[arglen] = 0;
+                    if (!strncasecmp(iptr, "sysvia", arglen)) {
                         debug_outf("    System VIA registers :\n");
                         debug_outf("    ORA  %02X ORB  %02X IRA %02X IRB %02X\n", sysvia.ora, sysvia.orb, sysvia.ira, sysvia.irb);
                         debug_outf("    DDRA %02X DDRB %02X ACR %02X PCR %02X\n", sysvia.ddra, sysvia.ddrb, sysvia.acr, sysvia.pcr);
                         debug_outf("    Timer 1 latch %04X   count %04X\n", sysvia.t1l / 2, (sysvia.t1c / 2) & 0xFFFF);
                         debug_outf("    Timer 2 latch %04X   count %04X\n", sysvia.t2l / 2, (sysvia.t2c / 2) & 0xFFFF);
                         debug_outf("    IER %02X IFR %02X\n", sysvia.ier, sysvia.ifr);
-                    } else if (!strncasecmp(iptr, "uservia", 7)) {
+                    }
+                    else if (!strncasecmp(iptr, "uservia", arglen)) {
                         debug_outf("    User VIA registers :\n");
                         debug_outf("    ORA  %02X ORB  %02X IRA %02X IRB %02X\n", uservia.ora, uservia.orb, uservia.ira, uservia.irb);
                         debug_outf("    DDRA %02X DDRB %02X ACR %02X PCR %02X\n", uservia.ddra, uservia.ddrb, uservia.acr, uservia.pcr);
                         debug_outf("    Timer 1 latch %04X   count %04X\n", uservia.t1l / 2, (uservia.t1c / 2) & 0xFFFF);
                         debug_outf("    Timer 2 latch %04X   count %04X\n", uservia.t2l / 2, (uservia.t2c / 2) & 0xFFFF);
                         debug_outf("    IER %02X IFR %02X\n", uservia.ier, uservia.ifr);
-                    } else if (!strncasecmp(iptr, "crtc", 4)) {
+                    }
+                    else if (!strncasecmp(iptr, "crtc", arglen)) {
                         debug_outf("    CRTC registers :\n");
                         debug_outf("    Index=%i\n", crtc_i);
                         debug_outf("    R0 =%02X  R1 =%02X  R2 =%02X  R3 =%02X  R4 =%02X  R5 =%02X  R6 =%02X  R7 =%02X  R8 =%02X\n", crtc[0], crtc[1], crtc[2], crtc[3], crtc[4], crtc[5], crtc[6], crtc[7], crtc[8]);
                         debug_outf("    R9 =%02X  R10=%02X  R11=%02X  R12=%02X  R13=%02X  R14=%02X  R15=%02X  R16=%02X  R17=%02X\n", crtc[9], crtc[10], crtc[11], crtc[12], crtc[13], crtc[14], crtc[15], crtc[16], crtc[17]);
                         debug_outf("    VC=%i SC=%i HC=%i MA=%04X\n", vc, sc, hc, ma);
                     }
-                    if (!strncasecmp(iptr, "vidproc", 7)) {
+                    else if (!strncasecmp(iptr, "vidproc", arglen)) {
                         debug_outf("    VIDPROC registers :\n");
                         debug_outf("    Control=%02X\n", ula_ctrl);
                         debug_outf("    Palette entries :\n");
@@ -645,13 +893,17 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                         debug_outf("    NULA registers :\n");
                         debug_outf("     Palette Mode=%01X  Horizontal Offset=%01X  Left Blank Size=%01X  Disable=%01X  Attribute Mode=%01X  Attribute Text=%01X\n", nula_palette_mode, nula_horizontal_offset, nula_left_blank, nula_disable, nula_attribute_mode, nula_attribute_text);
                     }
-                    if (!strncasecmp(iptr, "sound", 5)) {
+                    else if (!strncasecmp(iptr, "sound", arglen)) {
                         debug_outf("    Sound registers :\n");
                         debug_outf("    Voice 0 frequency = %04X   volume = %i  control = %02X\n", sn_latch[0] >> 6, sn_vol[0], sn_noise);
                         debug_outf("    Voice 1 frequency = %04X   volume = %i\n", sn_latch[1] >> 6, sn_vol[1]);
                         debug_outf("    Voice 2 frequency = %04X   volume = %i\n", sn_latch[2] >> 6, sn_vol[2]);
                         debug_outf("    Voice 3 frequency = %04X   volume = %i\n", sn_latch[3] >> 6, sn_vol[3]);
                     }
+                    else if (!strncasecmp(iptr, "ram", arglen))
+                       debug_outf("    System RAM registers :\n    ROMSEL=%02X ram4k=%02X ram8k=%02X ram12k=%02X ram20k=%02X vidbank=%04X\n", romsel>>14, ram4k, ram8k, ram12k, ram20k, vidbank);
+                    else
+                        debug_outf("Register set %s not known\n", iptr);
                 } else {
                     debug_outf("    registers for %s\n", cpu->cpu_name);
                     print_registers(cpu);
@@ -659,22 +911,45 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 break;
 
             case 's':
-            case 'S':
-                if (*iptr)
-                    sscanf(iptr, "%i", &debug_step);
-                else
-                    debug_step = 1;
-                debug_lastcommand = 's';
-                indebug = 0;
-                main_resume();
-                return;
-
+                if (cmdlen > 1) {
+                    if (!strncmp(cmd, "symbol", cmdlen)) {
+                        if (*iptr)
+                            set_sym(cpu, iptr);
+                        break;
+                    }
+                    else if (!strncmp(cmd, "symlist", cmdlen)) {
+                        list_syms(cpu, iptr);
+                        break;
+                    }
+                    else if (!strncmp(cmd, "save", cmdlen)) {
+                        if (*iptr)
+                            debugger_save(iptr);
+                        break;
+                    }
+                    else {
+                        badcmd = true;
+                        break;
+                    }
+                }
+                else {
+                    if (*iptr)
+                        sscanf(iptr, "%i", &debug_step);
+                    else
+                        debug_step = 1;
+                    debug_lastcommand = 's';
+                    indebug = 0;
+                    main_resume();
+                    return;
+                }
             case 't':
-            case 'T':
                 if (trace_fp)
+                {
                     fclose(trace_fp);
+                    trace_fp = NULL;
+                }
                 if (*iptr) {
-                    if ((eptr = strchr(iptr, '\n')))
+                    char *eptr = strchr(iptr, '\n');
+                    if (eptr)
                         *eptr = '\0';
                     if ((trace_fp = fopen(iptr, "a")))
                         debug_outf("Tracing to %s\n", iptr);
@@ -685,8 +960,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 break;
 
             case 'v':
-            case 'V':
-                if (!strcasecmp(cmd, "vrefresh")) {
+                if (!strncmp(cmd, "vrefresh", cmdlen)) {
                     if (*iptr) {
                         if (!strncasecmp(iptr, "on", 2)) {
                             debug_outf("Extra video refresh enabled\n");
@@ -701,60 +975,65 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 break;
 
             case 'w':
-            case 'W':
-                if (!strcasecmp(cmd, "watchr"))
-                    set_point(watchr, iptr, "Read watchpoint");
-                else if (!strcasecmp(cmd, "watchw"))
-                    set_point(watchw, iptr, "Write watchpoint");
-                else if (!strcasecmp(cmd, "watchi"))
-                    set_point(watchi, iptr, "Input watchpoint");
-                else if (!strcasecmp(cmd, "watcho"))
-                    set_point(watcho, iptr, "Output watchpoint");
-                else if (!strcasecmp(cmd, "wlist")) {
-                    list_points(watchr, "Read watchpoint");
-                    list_points(watchw, "Write watchpoint");
-                    list_points(watchi, "Input watchpoint");
-                    list_points(watcho, "Output watchpoint");
+                if (!strncmp(cmd, "watchr", cmdlen))
+                    set_point(cpu, watchr, iptr, "Read watchpoint");
+                else if (!strncmp(cmd, "watchw", cmdlen))
+                    set_point(cpu, watchw, iptr, "Write watchpoint");
+                else if (!strncmp(cmd, "watchi", cmdlen))
+                    set_point(cpu, watchi, iptr, "Input watchpoint");
+                else if (!strncmp(cmd, "watcho", cmdlen))
+                    set_point(cpu, watcho, iptr, "Output watchpoint");
+                else if (!strncmp(cmd, "wlist", cmdlen)) {
+                    list_points(cpu, watchr, "Read watchpoint");
+                    list_points(cpu, watchw, "Write watchpoint");
+                    list_points(cpu, watchi, "Input watchpoint");
+                    list_points(cpu, watcho, "Output watchpoint");
                 }
-                if (!strcasecmp(cmd, "wclearr"))
-                    clear_point(watchr, iptr, "Read watchpoint");
-                else if (!strcasecmp(cmd, "wclearw"))
-                    clear_point(watchw, iptr, "Write watchpoint");
-                else if (!strcasecmp(cmd, "wcleari"))
-                    clear_point(watchi, iptr, "Input watchpoint");
-                else if (!strcasecmp(cmd, "wclearo"))
-                    clear_point(watcho, iptr, "Output watchpoint");
-                else if (!strcasecmp(cmd, "writem")) {
+                if (!strncmp(cmd, "wclearr", cmdlen))
+                    clear_point(cpu, watchr, iptr, "Read watchpoint");
+                else if (!strncmp(cmd, "wclearw", cmdlen))
+                    clear_point(cpu, watchw, iptr, "Write watchpoint");
+                else if (!strncmp(cmd, "wcleari", cmdlen))
+                    clear_point(cpu, watchi, iptr, "Input watchpoint");
+                else if (!strncmp(cmd, "wclearo", cmdlen))
+                    clear_point(cpu, watcho, iptr, "Output watchpoint");
+                else if (!strncmp(cmd, "writem", cmdlen)) {
                     if (*iptr) {
-                        sscanf(iptr, "%X %X", &e, &f);
-                        log_debug("debugger: writem %04X %04X\n", e, f);
-                        cpu->memwrite(e, f);
+                        unsigned addr, value;
+                        sscanf(iptr, "%X %X", &addr, &value);
+                        log_debug("debugger: writem %04X %04X\n", addr, value);
+                        cpu->memwrite(addr, value);
                         if (cpu == &core6502_cpu_debug && vrefresh)
                             video_poll(CLOCKS_PER_FRAME, 0);
                     }
                 }
                 break;
+            default:
+                badcmd = true;
         }
+        if (badcmd)
+            debug_out("Bad command\n", 12);
+
     }
-    fputs("\nTreating EOF on console as 'continue'\n", stdout);
-    indebug = 0;
-    main_resume();
 }
 
 static inline void check_points(cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t size, int *break_tab, int *watch_tab, const char *desc)
 {
-    int c;
-    uint32_t iaddr;
-
-    for (c = 0; c < NUM_BREAKPOINTS; c++) {
+    for (int c = 0; c < NUM_BREAKPOINTS; c++) {
         if (break_tab[c] == addr) {
-            iaddr = cpu->get_instr_addr();
-            debug_outf("cpu %s: %04X: break on %s %04X, value=%X\n", cpu->cpu_name, iaddr, desc, addr, value);
+            char addr_str[20 + SYM_MAX], iaddr_str[20 + SYM_MAX];
+            uint32_t iaddr = cpu->get_instr_addr();
+            cpu->print_addr(cpu, addr, addr_str, sizeof(addr_str), true);
+            cpu->print_addr(cpu, iaddr, iaddr_str, sizeof(iaddr_str), true);
+            debug_outf("cpu %s: %s: break on %s %s, value=%X\n", cpu->cpu_name, iaddr_str, desc, addr_str, value);
             debugger_do(cpu, iaddr);
         }
         if (watch_tab[c] == addr) {
-            iaddr = cpu->get_instr_addr();
-            debug_outf("cpu %s: %04X: %s %04X, value=%0*X\n", cpu->cpu_name, iaddr, desc, addr, size*2, value);
+            char addr_str[10], iaddr_str[10];
+            uint32_t iaddr = cpu->get_instr_addr();
+            cpu->print_addr(cpu, addr, addr_str, sizeof(addr_str), true);
+            cpu->print_addr(cpu, iaddr, iaddr_str, sizeof(iaddr_str), true);
+            debug_outf("cpu %s: %s: %s %s, value=%0*X\n", cpu->cpu_name, iaddr_str, desc, addr_str, size*2, value);
         }
     }
 }
@@ -781,8 +1060,23 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
     int c, r, enter = 0;
     const char **np, *name;
 
+    if ((addr & 0xF000) == 0x8000)
+        addr = addr;
+
     if (trace_fp) {
-        cpu->disassemble(addr, buf, sizeof buf);
+        const char *symlbl;
+        if (symbol_find_by_addr(cpu->symbols, addr, &symlbl)) {
+            fputs(symlbl, trace_fp);
+            fputs(":\n", trace_fp);
+        }
+        cpu->disassemble(cpu, addr, buf, sizeof buf);
+
+        char *sym = strchr(buf, '\\');
+        if (sym) {
+            *(sym++) = '\0';
+        }
+
+        fputs("\t", trace_fp);
         fputs(buf, trace_fp);
         *buf = ' ';
 
@@ -790,6 +1084,13 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
             len = cpu->reg_print(r++, buf + 1, sizeof buf - 1);
             fwrite(buf, len + 1, 1, trace_fp);
         }
+
+        if (sym)
+        {
+            fputs(" \\", trace_fp);
+            fputs(sym, trace_fp);
+        }
+
         putc('\n', trace_fp);
     }
 
@@ -800,12 +1101,14 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
     else {
         for (c = 0; c < NUM_BREAKPOINTS; c++) {
             if (breakpoints[c] == addr) {
-                debug_outf("cpu %s: Break at %04X\n", cpu->cpu_name, addr);
+                char addr_str[16+SYM_MAX];
+                cpu->print_addr(cpu, addr, addr_str, sizeof(addr_str), true);
+                debug_outf("cpu %s: Break at %s\n", cpu->cpu_name, addr_str);
                 if (contcount) {
                     contcount--;
                     return;
                 }
-                log_debug("debugger; enter for CPU %s on breakpoint at %04X", cpu->cpu_name, addr);
+                log_debug("debugger; enter for CPU %s on breakpoint at %s", cpu->cpu_name, addr_str);
                 enter = 1;
             }
         }
@@ -826,6 +1129,8 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
 void debug_trap(cpu_debug_t *cpu, uint32_t addr, int reason)
 {
     const char *desc = cpu->trap_names[reason];
-    debug_outf("cpu %s: %s at %04X\n", cpu->cpu_name, desc, addr);
+    char addr_str[20 + SYM_MAX];
+    cpu->print_addr(cpu, addr, addr_str, sizeof(addr_str), true);
+    debug_outf("cpu %s: %s at %s\n", cpu->cpu_name, desc, addr_str);
     debugger_do(cpu, addr);
 }

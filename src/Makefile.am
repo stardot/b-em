@@ -58,6 +58,7 @@ b_em_SOURCES = \
 	csw.c \
 	ddnoise.c \
 	debugger.c \
+	debugger_symbols.cpp \
 	disc.c fdi.c \
 	fdi2raw.c \
 	gui-allegro.c\
@@ -66,6 +67,7 @@ b_em_SOURCES = \
 	joystick.c \
 	keyboard.c \
 	keydef-allegro.c \
+	led.c \
 	linux.c \
 	logging.c \
     mc6809nc/mc6809nc.c \
@@ -79,6 +81,7 @@ b_em_SOURCES = \
 	music2000.c \
 	music4000.c \
 	music5000.c \
+	paula.c \
 	pal.c\
 	resid.cc \
 	savestate.c \

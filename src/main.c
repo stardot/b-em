@@ -24,6 +24,7 @@
 #include "joystick.h"
 #include "keyboard.h"
 #include "keydef-allegro.h"
+#include "led.h"
 #include "main.h"
 #include "6809tube.h"
 #include "mem.h"
@@ -31,6 +32,7 @@
 #include "midi.h"
 #include "music4000.h"
 #include "music5000.h"
+#include "paula.h"
 #include "pal.h"
 #include "savestate.h"
 #include "scsi.h"
@@ -68,10 +70,14 @@ int autoboot=0;
 int joybutton[2];
 float joyaxes[4];
 int emuspeed = 4;
+bool alt_down = false;
 
 static ALLEGRO_TIMER *timer;
 static ALLEGRO_EVENT_QUEUE *queue;
 static ALLEGRO_EVENT_SOURCE evsrc;
+
+static ALLEGRO_DISPLAY *tmp_display;
+
 
 typedef enum {
     FSPEED_NONE,
@@ -113,6 +119,7 @@ void main_reset()
     sid_reset();
     music4000_reset();
     music5000_reset();
+    paula_reset();
     sn_init();
     if (curtube != -1) tubes[curtube].reset();
     else               tube_exec = NULL;
@@ -227,6 +234,7 @@ void main_init(int argc, char *argv[])
     display = video_init();
     mode7_makechars();
     al_init_image_addon();
+    led_init();
 
     mem_init();
 
@@ -253,6 +261,7 @@ void main_init(int argc, char *argv[])
     sid_init();
     sid_settype(sidmethod, cursid);
     music5000_init(queue);
+    paula_init();
     ddnoise_init();
     tapenoise_init(queue);
 
@@ -263,7 +272,7 @@ void main_init(int argc, char *argv[])
 
     scsi_init();
     ide_init();
-    vdfs_init();
+    vdfs_init(vdfs_cfg_root);
 
     model_init();
 
@@ -271,6 +280,8 @@ void main_init(int argc, char *argv[])
     main_reset();
 
     joystick_init(queue);
+
+    tmp_display = display;
 
     gui_allegro_init(queue, display);
 
@@ -338,6 +349,8 @@ static void main_start_fullspeed(void)
     al_emit_user_event(&evsrc, &event, NULL);
 }
 
+
+
 static void main_key_down(ALLEGRO_EVENT *event)
 {
     ALLEGRO_KEYBOARD_STATE kstate;
@@ -361,13 +374,30 @@ static void main_key_down(ALLEGRO_EVENT *event)
                 al_stop_timer(timer);
                 bempause = true;
             }
-        case ALLEGRO_KEY_ENTER:
+//DB: this is just plain annoying if you alt-tab out of b-em then tab back enter (without alt) will toggle fullscreen and get in a mess
+//changed to F11! This appears to be a problem generally with Allegro as it maintains its own key state but doesn't receive events
+//when it is not focussed.
+/*        case ALLEGRO_KEY_ENTER:
             al_get_keyboard_state(&kstate);
             if (al_key_down(&kstate, ALLEGRO_KEY_ALT)) {
                 video_toggle_fullscreen();
                 return;
             }
             break;
+*/
+        case ALLEGRO_KEY_ENTER:
+            al_get_keyboard_state(&kstate);
+            if (alt_down) {
+                video_toggle_fullscreen();
+                return;
+            }
+            break;
+        case ALLEGRO_KEY_ALT:
+            alt_down = true;
+            break;
+        case ALLEGRO_KEY_F11:
+            video_toggle_fullscreen();
+            return;
         case ALLEGRO_KEY_F10:
             if (debug_core || debug_tube)
                 debug_step = 1;
@@ -379,6 +409,7 @@ static void main_key_down(ALLEGRO_EVENT *event)
             wd1770_reset();
             sid_reset();
             music5000_reset();
+            paula_reset();
 
             if (curtube != -1)
                 tubes[curtube].reset();
@@ -415,15 +446,29 @@ static void main_key_up(ALLEGRO_EVENT *event)
                     fullspeed = FSPEED_SELECTED;
             }
             break;
+        case ALLEGRO_KEY_ALT:
+            alt_down = false;
+            break;
     }
     if (fullspeed == FSPEED_SELECTED)
         main_start_fullspeed();
     key_up(code);
 }
 
+void lost_focus() {
+    //force alt down to false;
+    alt_down = false;
+}
+
+double prev_time = 0;
+int execs = 0;
+double spd = 0;
+
 static void main_timer(ALLEGRO_EVENT *event)
 {
-    double delay = al_get_time() - event->any.timestamp;
+    double now = al_get_time();
+    double delay = now - event->any.timestamp;
+
     if (delay < time_limit) {
         if (autoboot)
             autoboot--;
@@ -433,9 +478,19 @@ static void main_timer(ALLEGRO_EVENT *event)
             m65c02_exec();
         else
             m6502_exec();
+        execs++;
 
         if (ddnoise_ticks > 0 && --ddnoise_ticks == 0)
             ddnoise_headdown();
+
+        if (tapeledcount) {
+            if (--tapeledcount == 0 && !motor) {
+                log_debug("main: delayed cassette motor LED off");
+                led_update(LED_CASSETTE_MOTOR, 0, 0);
+            }
+        }
+        if (led_ticks > 0 && --led_ticks == 0)
+            led_timer_fired();
 
         if (savestate_wantload)
             savestate_doload();
@@ -443,6 +498,24 @@ static void main_timer(ALLEGRO_EVENT *event)
             savestate_dosave();
         if (fullspeed == FSPEED_RUNNING)
             al_emit_user_event(&evsrc, event, NULL);
+
+        if (now - prev_time > 0.1) {
+
+            double speed = execs * 40000 / (now - prev_time);
+
+            if (spd < 0.01)
+                spd = 100.0 * speed / 2000000;
+            else
+                spd = spd * 0.75 + 0.25 * (100.0 * speed / 2000000);
+
+
+            char buf[120];
+            snprintf(buf, 120, "%s %.3fMHz %.1f%%", VERSION_STR, speed / 1000000, spd);
+            al_set_window_title(tmp_display, buf);
+
+            execs = 0;
+            prev_time = now;
+        }
     }
 }
 
@@ -500,6 +573,9 @@ void main_run()
                 break;
             case ALLEGRO_EVENT_DISPLAY_RESIZE:
                 video_update_window_size(&event);
+                break;
+            case ALLEGRO_EVENT_DISPLAY_SWITCH_OUT:
+                lost_focus();
                 break;
         }
     }

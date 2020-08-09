@@ -5,7 +5,6 @@
 
 extern uint8_t a,x,y,s;
 extern uint16_t pc;
-extern uint16_t oldpc, oldoldpc, pc3;
 
 extern PREG p;
 
@@ -13,7 +12,8 @@ extern int output;
 extern int interrupt;
 extern int nmi;
 
-extern uint8_t opcode;
+extern int romsel;
+extern uint8_t ram4k, ram8k, ram12k, ram20k;
 
 void m6502_reset(void);
 void m6502_exec(void);

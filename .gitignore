@@ -44,4 +44,10 @@ b-em.iobj
 b-em.pdb
 src/hdfmt.exe
 scsi/*
-
+*.exe
+*.sublime-project
+*.sublime-workspace
+b-em.ilk
+build/
+b-em-mg.exe
+enc_temp_folder/
