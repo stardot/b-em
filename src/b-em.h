@@ -23,6 +23,22 @@
 #define strcasecmp  _stricmp
 #define strncasecmp _strnicmp
 
+#define fflush_unlocked _fflush_nolock
+#define getc_unlocked   _getc_nolock
+#define putc_unlocked   _putc_nolock
+#define fread_unlocked  _fread_nolock
+#define fwrite_unlocked _fwrite_nolock
+
+#else
+
+#ifdef WIN32
+#define fflush_unlocked fflush
+#define getc_unlocked   getc
+#define putc_unlocked   putc
+#define fread_unlocked  fread
+#define fwrite_unlocked fwrite
+#endif
+
 #endif
 
 #include "logging.h"

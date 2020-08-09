@@ -91,16 +91,16 @@ void music5000_reset(void)
 
 static void synth_loadstate(struct synth *s, FILE *f)
 {
-    fread(&s->sleft, sizeof s->sleft, 1, f);
-    fread(&s->sright, sizeof s->sright, 1, f);
-    fread(s->phaseRAM, sizeof s->phaseRAM, 1, f);
-    fread(s->ram, sizeof s->ram, 1, f);
+    fread_unlocked(&s->sleft, sizeof s->sleft, 1, f);
+    fread_unlocked(&s->sright, sizeof s->sright, 1, f);
+    fread_unlocked(s->phaseRAM, sizeof s->phaseRAM, 1, f);
+    fread_unlocked(s->ram, sizeof s->ram, 1, f);
 }
 
 void music5000_loadstate(FILE *f) {
     int ch, pc;
 
-    if ((ch = getc(f)) != EOF) {
+    if ((ch = getc_unlocked(f)) != EOF) {
         if (ch == 'M') {
             sound_music5000 = true;
             pc = savestate_load_var(f);
@@ -119,20 +119,20 @@ void music5000_loadstate(FILE *f) {
 
 static void synth_savestate(struct synth *s, FILE *f)
 {
-    fwrite(&s->sleft, sizeof s->sleft, 1, f);
-    fwrite(&s->sright, sizeof s->sright, 1, f);
-    fwrite(s->phaseRAM, sizeof s->phaseRAM, 1, f);
-    fwrite(s->ram, sizeof s->ram, 1, f);
+    fwrite_unlocked(&s->sleft, sizeof s->sleft, 1, f);
+    fwrite_unlocked(&s->sright, sizeof s->sright, 1, f);
+    fwrite_unlocked(s->phaseRAM, sizeof s->phaseRAM, 1, f);
+    fwrite_unlocked(s->ram, sizeof s->ram, 1, f);
 }
 
 void music5000_savestate(FILE *f) {
     if (sound_music5000) {
-        putc('M', f);
+        putc_unlocked('M', f);
         savestate_save_var(9, f);
         synth_savestate(&m5000, f);
         synth_savestate(&m3000, f);
     } else
-        putc('m', f);
+        putc_unlocked('m', f);
 }
 
 void music5000_init(ALLEGRO_EVENT_QUEUE *queue)
@@ -170,7 +170,7 @@ FILE *music5000_rec_start(const char *filename)
     FILE *fp = fopen(filename, "wb");
     if (fp) {
         fseek(fp, 44, SEEK_SET);
-        fwrite(zeros, 6, 1, fp);
+        fwrite_unlocked(zeros, 6, 1, fp);
         music5000_fp = fp;
         rec_started = false;
     }
@@ -181,10 +181,10 @@ FILE *music5000_rec_start(const char *filename)
 
 static void fput32le(uint32_t v, FILE *fp)
 {
-    putc(v & 0xff, fp);
-    putc((v >> 8) & 0xff, fp);
-    putc((v >> 16) & 0xff, fp);
-    putc((v >> 24) & 0xff, fp);
+    putc_unlocked(v & 0xff, fp);
+    putc_unlocked((v >> 8) & 0xff, fp);
+    putc_unlocked((v >> 16) & 0xff, fp);
+    putc_unlocked((v >> 24) & 0xff, fp);
 }
 
 void music5000_rec_stop(void)
@@ -205,9 +205,9 @@ void music5000_rec_stop(void)
     FILE *fp = music5000_fp;
     long size = ftell(fp) - 8;
     fseek(fp, 0, SEEK_SET);
-    fwrite("RIFF", 4, 1, fp);
+    fwrite_unlocked("RIFF", 4, 1, fp);
     fput32le(size, fp);
-    fwrite(wavfmt, sizeof wavfmt, 1, fp);
+    fwrite_unlocked(wavfmt, sizeof wavfmt, 1, fp);
     size -= 36;
     fput32le(size, fp);        // data size.
     fclose(fp);
@@ -346,7 +346,7 @@ static void fput_samples(FILE *fp, int sl, int sr)
         bytes[3] = sr << 6;
         bytes[4] = sr >> 2;
         bytes[5] = sr >> 10;
-        fwrite(bytes, 6, 1, fp);
+        fwrite_unlocked(bytes, 6, 1, fp);
         rec_started = true;
     }
 }
