@@ -745,7 +745,7 @@ static const int map_keypad[] = {
     /* ALLEGRO_KEY_PAD_9 */ ALLEGRO_KEY_PGUP
 };
 
-int key_map(ALLEGRO_EVENT *event)
+int key_map(const ALLEGRO_EVENT *event)
 {
     int keycode = event->keyboard.keycode;
     int mapcode = keycode;
@@ -986,30 +986,29 @@ void key_down(int code)
     /* in keypad mode, processing of keypad keys is delayed until the KEY_CHAR event */
 }
 
+static int last_unichar[ALLEGRO_KEY_MAX];
+
 void key_up(int code)
 {
-    if (code >= ALLEGRO_KEY_PAD_0 && code <= ALLEGRO_KEY_PAD_9 && keypad) {
-        /* This PC numeric keypad key may have been mapped to a Master
-         * keypad key or a cursor movement key.  Release whichever of
-         * the two mappings is down.
-         */
-        unsigned vkey = allegro2bbc[code];
-        if (!bbckey[vkey & 15][vkey >> 4])
+    if (code >= ALLEGRO_KEY_PAD_0 && code <= ALLEGRO_KEY_PAD_9 && keypad)
+        if (last_unichar[code] < '0' || last_unichar[code] > '9')
             code = map_keypad[code-ALLEGRO_KEY_PAD_0];
-    }
     set_key(code, 0);
 }
 
-// Handle KEY_CHAR events in logical keyboard mode and turn them into "key down"
-// events sent to set_key_logical().
+/*
+ * Handle KEY_CHAR events.  This serves two purposes.  In logical
+ * keyboard mode all keystrokes are processed here and turned into
+ * "key down" events sent to set_key_logical().  Even in physical
+ * keyboard mode, if PC/XT keypad support is enabled, keys from the
+ * PC keypad are procesed here to see if they should generate a number
+ * or a cursor movement.
+ */
 
-void key_char(ALLEGRO_EVENT *event)
+void key_char(const ALLEGRO_EVENT *event)
 {
-    static int last_unichar[ALLEGRO_KEY_MAX];
-    if (keylogical) {
-        if (event->keyboard.keycode == ALLEGRO_KEY_F12)
-            return;
-
+    int keycode = event->keyboard.keycode;
+    if (keylogical && keycode != ALLEGRO_KEY_F12) {
         // KEY_CHAR events indicate if the event is for an auto-repeating key, and
         // we ignore such events because we're passing key up/down events through
         // to the emulated machine and its OS is handling auto-repeat. However, if
@@ -1021,23 +1020,18 @@ void key_char(ALLEGRO_EVENT *event)
         // is set. (To see this happening, on a keyboard with ":" on SHIFT+";",
         // hold down ";" and then intermittently press the SHIFT key.)
         if (!event->keyboard.repeat ||
-            (event->keyboard.unichar != last_unichar[event->keyboard.keycode])) {
-            last_unichar[event->keyboard.keycode] = event->keyboard.unichar;
-            set_key_logical(event->keyboard.keycode, event->keyboard.unichar, 1);
+            (event->keyboard.unichar != last_unichar[keycode])) {
+            int unichar = event->keyboard.unichar;
+            last_unichar[keycode] = unichar;
+            if (keycode >= ALLEGRO_KEY_PAD_0 && keycode <= ALLEGRO_KEY_PAD_9 && (unichar < '0' || unichar > '9') && keypad)
+                keycode = map_keypad[keycode-ALLEGRO_KEY_PAD_0];
+            set_key_logical(keycode, unichar, 1);
         }
     }
-    else if (keypad && !event->keyboard.repeat) {
-        int code = event->keyboard.keycode;
-        if (code >= ALLEGRO_KEY_PAD_0 && code <= ALLEGRO_KEY_PAD_9) {
-            /* This is a keypres from the numeric keypad and processing
-             * was delayed until here so we can see if the keypad on
-             * the host is generating numbers or cursor movement.
-             */
-            int unichar = event->keyboard.unichar;
-            if (unichar < '0' || unichar > '9')
-                code = map_keypad[code-ALLEGRO_KEY_PAD_0];
-            set_key(code, 1);
-        }
+    else if (keycode >= ALLEGRO_KEY_PAD_0 && keycode <= ALLEGRO_KEY_PAD_9 && keypad) {
+        int unichar = event->keyboard.unichar;
+        last_unichar[keycode] = unichar;
+        set_key(keycode, 1);
     }
 }
 
