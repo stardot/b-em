@@ -1,11 +1,12 @@
 #include "b-em.h"
+#include "led.h"
 #include "tape.h"
 #include "serial.h"
 #include "tapenoise.h"
 #include "uef.h"
 #include "csw.h"
 
-int tapelcount,tapellatch;
+int tapelcount,tapellatch,tapeledcount;
 
 bool tape_loaded = false;
 bool fasttape = false;

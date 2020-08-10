@@ -37,7 +37,7 @@
 
 /* This keymap is used for physical mode. */
 
-static uint8_t allegro2bbc[ALLEGRO_KEY_MAX] =
+static const uint8_t allegro2bbc[ALLEGRO_KEY_MAX] =
 {
     0xaa,   // 0
     0x41,   // 1    ALLEGRO_KEY_A
@@ -651,8 +651,9 @@ static uint16_t ascii2bbc[] =
 };
 
 int keylookup[ALLEGRO_KEY_MAX];
-bool keyas = 0;
-bool keylogical = 0;
+bool keyas  = false;
+bool keypad = false;
+bool keylogical = false;
 
 static int keycol, keyrow;
 static int bbckey[16][16];
@@ -705,11 +706,12 @@ void key_reset()
 
 static void key_update()
 {
+    int maxcol = (MASTER) ? 13 : 10;
     if (IC32 & 8) {
         /* autoscan mode */
-        for (int d = 0; d < ((MASTER) ? 13 : 10); d++) {
-            for (int c = 1; c < 8; c++) {
-                if (bbckey[d][c]) {
+        for (int col = 0; col < maxcol; col++) {
+            for (int row = 1; row < 8; row++) {
+                if (bbckey[col][row]) {
                     sysvia_set_ca2(1);
                     return;
                 }
@@ -718,9 +720,9 @@ static void key_update()
     }
     else {
         /* scan specific key mode */
-        if (keycol < ((MASTER) ? 13 : 10)) {
-            for (int c = 1; c < 8; c++) {
-                if (bbckey[keycol][c]) {
+        if (keycol < maxcol) {
+            for (int row = 1; row < 8; row++) {
+                if (bbckey[keycol][row]) {
                     sysvia_set_ca2(1);
                     return;
                 }
@@ -729,6 +731,19 @@ static void key_update()
     }
     sysvia_set_ca2(0);
 }
+
+static const int map_keypad[] = {
+    /* ALLEGRO_KEY_PAD_0 */ ALLEGRO_KEY_INSERT,
+    /* ALLEGRO_KEY_PAD_1 */ ALLEGRO_KEY_END,
+    /* ALLEGRO_KEY_PAD_2 */ ALLEGRO_KEY_DOWN,
+    /* ALLEGRO_KEY_PAD_3 */ ALLEGRO_KEY_PGDN,
+    /* ALLEGRO_KEY_PAD_4 */ ALLEGRO_KEY_LEFT,
+    /* ALLEGRO_KEY_PAD_5 */ ALLEGRO_KEY_PAD_5,
+    /* ALLEGRO_KEY_PAD_6 */ ALLEGRO_KEY_RIGHT,
+    /* ALLEGRO_KEY_PAD_7 */ ALLEGRO_KEY_HOME,
+    /* ALLEGRO_KEY_PAD_8 */ ALLEGRO_KEY_UP,
+    /* ALLEGRO_KEY_PAD_9 */ ALLEGRO_KEY_PGUP
+};
 
 int key_map(ALLEGRO_EVENT *event)
 {
@@ -993,7 +1008,7 @@ static void set_key(int code, int state)
 
 void key_down(int code)
 {
-    set_key(code, 1);
+        set_key(code, 1);
 }
 
 void key_up(int code)

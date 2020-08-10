@@ -27,10 +27,19 @@ void serial_write(uint16_t addr, uint8_t val)
         serial_reg = val;
         serial_transmit_rate = val & 0x7;
         serial_recive_rate = (val >> 3) & 0x7;
-        if (motor != (val & 0x80))
-            tapenoise_motorchange(val>>7);
-        led_update(LED_CASSETTE_MOTOR, val & 0x80, 0);
-        motor = (val & 0x80) && tape_loaded;
+        int new_motor = val & 0x80;
+        if (new_motor && !motor) {
+            log_debug("serial: cassette motor on");
+            tapenoise_motorchange(1);
+            led_update(LED_CASSETTE_MOTOR, 1, 0);
+            motor = tape_loaded;
+        }
+        else if (!new_motor && motor) {
+            log_debug("serial: cassette motor off");
+            tapenoise_motorchange(0);
+            motor = 0;
+            tapeledcount = 2;
+        }
         if (val & 0x40)
         {
             /*RS423*/

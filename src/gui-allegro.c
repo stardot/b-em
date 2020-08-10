@@ -625,10 +625,12 @@ static void edit_paste_start(ALLEGRO_EVENT *event)
 {
     ALLEGRO_DISPLAY *display = (ALLEGRO_DISPLAY *)(event->user.data2);
     char *text = al_get_clipboard_text(display);
+#ifndef WIN32
     if (!text) {
         sleep(1);  // try again - Allegro bug.
         text = al_get_clipboard_text(display);
     }
+#endif
     if (text)
         os_paste_start(text);
 }
@@ -959,6 +961,10 @@ static void rom_ram_toggle(ALLEGRO_EVENT *event)
 static void change_model(ALLEGRO_EVENT *event)
 {
     ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
+    if (curmodel == menu_get_num(event)) {
+        al_set_menu_item_flags(menu, menu_id_num(IDM_MODEL, curmodel), ALLEGRO_MENU_ITEM_CHECKBOX|ALLEGRO_MENU_ITEM_CHECKED);
+        return;
+    }
     al_set_menu_item_flags(menu, menu_id_num(IDM_MODEL, curmodel), ALLEGRO_MENU_ITEM_CHECKBOX);
     config_save();
     oldmodel = curmodel;

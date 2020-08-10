@@ -78,6 +78,31 @@ const char *get_config_string(const char *sect, const char *key, const char *sva
     return sval;
 }
 
+ALLEGRO_COLOR get_config_colour(const char *sect, const char *key, ALLEGRO_COLOR cdefault)
+{
+    if (bem_cfg) {
+        const char *str = al_get_config_value(bem_cfg, sect, key);
+        if (str) {
+            if (*str == '#') {
+                unsigned long col = strtoul(str+1, NULL, 16);
+                unsigned r = (col >> 16) & 0xff;
+                unsigned g = (col >> 8) & 0xff;
+                unsigned b = col & 0xff;
+                log_debug("config: get_config_colour, sect=%s, key=%s, hex, r=%u, g=%u, b=%u", sect, key, r, g, b);
+                return al_map_rgb(r, g, b);
+            }
+            else {
+                unsigned r, g, b;
+                if (sscanf(str, "%u,%u,%u", &r, &g, &b) == 3) {
+                    log_debug("config: get_config_colour, sect=%s, key=%s, decimal, r=%u, g=%u, b=%u", sect, key, r, g, b);
+                    return al_map_rgb(r, g, b);
+                }
+            }
+        }
+    }
+    return cdefault;
+}
+
 void config_load(void)
 {
     ALLEGRO_PATH *path;
@@ -168,6 +193,7 @@ void config_load(void)
 
     buflen_m5        = get_config_int("sound", "buflen_music5000", BUFLEN_M5);
 
+    keypad = get_config_bool("user_keyboard", "keypad", false);
     for (c = 0; c < ALLEGRO_KEY_MAX; c++) {
         sprintf(s, "key_define_%03i", c);
         keylookup[c] = get_config_int("user_keyboard", s, c);

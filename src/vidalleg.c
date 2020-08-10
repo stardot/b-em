@@ -14,8 +14,8 @@ enum vid_disptype vid_dtype_user, vid_dtype_intern;
 bool vid_pal;
 int vid_fskipmax = 1;
 int vid_fullborders = 1;
-int vid_ledlocation = 0;
-int vid_ledvisibility = 2;
+int vid_ledlocation = LED_LOC_NONE;
+int vid_ledvisibility = LED_VIS_ALWAYS;
 
 static int fskipcount;
 
@@ -110,7 +110,7 @@ void video_set_window_size(bool fudge)
     }
     winsizex = scr_x_size;
     winsizey = fudge ? scr_y_size + y_fudge : scr_y_size;
-    if (vid_ledlocation == 2) // Separate - LEDs have extra window space at the bottom.
+    if (vid_ledlocation == LED_LOC_SEPARATE) // Separate - LEDs have extra window space at the bottom.
         winsizey += LED_BOX_HEIGHT;
     log_debug("vidalleg: video_set_window_size, scr_x_size=%d, scr_y_size=%d, fudgedy=%d", scr_x_size, scr_y_size, winsizey);
 }
@@ -131,7 +131,7 @@ void video_set_led_location(int location)
 
 void video_set_led_visibility(int visibility)
 {
-    if (visibility == 1 /* LEDs visible when changed or transient LED lit */ && vid_ledvisibility == 2 /* LEDs permanently visible */)
+    if (visibility == LED_VIS_TRANSIENT && vid_ledvisibility == LED_VIS_ALWAYS)
         last_led_update_at = framesrun;
 
     vid_ledvisibility = visibility;
@@ -139,7 +139,7 @@ void video_set_led_visibility(int visibility)
 
 static int video_led_height(void)
 {
-    return (vid_ledlocation == 2 /* separate */) ? LED_BOX_HEIGHT : 0;
+    return (vid_ledlocation == LED_LOC_SEPARATE) ? LED_BOX_HEIGHT : 0;
 }
 
 void video_update_window_size(ALLEGRO_EVENT *event)
@@ -419,25 +419,31 @@ static inline void fill_letterbox(void)
 
 static void render_leds(void)
 {
-    ALLEGRO_COLOR led_tint = al_map_rgba(0, 0, 0, 0);
-    if (vid_ledlocation > 0) {
+    if (vid_ledlocation > LED_LOC_NONE) {
         float w = al_get_bitmap_width(led_bitmap);
         float h = al_get_bitmap_height(led_bitmap);
-        if (vid_ledvisibility == 2 || led_any_transient_led_on())
+        if (vid_ledvisibility == LED_VIS_ALWAYS || (vid_ledvisibility == LED_VIS_TRANSIENT && led_any_transient_led_on())) {
+            log_debug("led: drawing non-faded bitmap");
             al_draw_scaled_bitmap(led_bitmap, 0, 0, w, h, (winsizex-w)/2, winsizey-h, w, h, 0);
+        }
         else {
+            ALLEGRO_COLOR led_tint;
             const int led_visible_for_frames = 50;
             const int led_fade_frames = 25;
 
             int led_visible_frames_left = led_visible_for_frames - (framesrun - last_led_update_at);
             if (led_visible_frames_left > 0) {
+                log_debug("led: visible frames left=%d", led_visible_frames_left);
                 if (led_visible_frames_left <= led_fade_frames) {
                     int i = (255 * led_visible_frames_left) / led_fade_frames;
-                    led_tint = al_map_rgba(i, i, i, i);
+                    log_debug("led: tint, i=%d", i);
+                    led_tint = al_map_rgba(i, i, i, vid_ledlocation == LED_LOC_SEPARATE ? 255 : i);
                 }
                 else
                     led_tint = al_map_rgb(255, 255, 255);
             }
+            else
+                led_tint = al_map_rgba(0, 0, 0, vid_ledlocation == LED_LOC_SEPARATE ? 255 : 0);
             al_draw_tinted_scaled_bitmap(led_bitmap, led_tint, 0, 0, w, h, (winsizex-w)/2, winsizey-h, w, h, 0);
         }
     }
