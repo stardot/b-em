@@ -33,7 +33,7 @@
  *
 */
 
-static uint8_t allegro2bbc[ALLEGRO_KEY_MAX] =
+static const uint8_t allegro2bbc[ALLEGRO_KEY_MAX] =
 {
     0xaa,   // 0
     0x41,   // 1    ALLEGRO_KEY_A
@@ -281,12 +281,12 @@ void key_clear(void)
 
 static void key_update()
 {
-    int c,d;
+    int maxcol = (MASTER) ? 13 : 10;
     if (IC32 & 8) {
         /* autoscan mode */
-        for (d = 0; d < ((MASTER) ? 13 : 10); d++) {
-            for (c = 1; c < 8; c++) {
-                if (bbckey[d][c]) {
+        for (int col = 0; col < maxcol; col++) {
+            for (int row = 1; row < 8; row++) {
+                if (bbckey[col][row]) {
                     sysvia_set_ca2(1);
                     return;
                 }
@@ -295,9 +295,9 @@ static void key_update()
     }
     else {
         /* scan specific key mode */
-        if (keycol < ((MASTER) ? 13 : 10)) {
-            for (c = 1; c < 8; c++) {
-                if (bbckey[keycol][c]) {
+        if (keycol < maxcol) {
+            for (int row = 1; row < 8; row++) {
+                if (bbckey[keycol][row]) {
                     sysvia_set_ca2(1);
                     return;
                 }
