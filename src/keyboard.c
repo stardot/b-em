@@ -768,7 +768,7 @@ static void key_paste_add_vkey(uint8_t vkey1, uint8_t vkey2)
         if (key_paste_ptr > key_paste_str) {
             log_debug("keyboard: key_paste_add_vkey moving down");
             size_t vkeys_left = key_paste_str_size - (key_paste_ptr - key_paste_str);
-            memcpy(key_paste_str, key_paste_ptr, vkeys_left);
+            memmove(key_paste_str, key_paste_ptr, vkeys_left);
             key_paste_ptr = key_paste_str;
             key_paste_str_size = vkeys_left;
         }
