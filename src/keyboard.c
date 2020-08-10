@@ -328,12 +328,7 @@ int key_map(ALLEGRO_EVENT *event)
             if (keyas)
                 code = ALLEGRO_KEY_CAPSLOCK;
         }
-        else if (code >= ALLEGRO_KEY_PAD_0 && code <= ALLEGRO_KEY_PAD_9) {
-            ALLEGRO_KEYBOARD_STATE kstate;
-            al_get_keyboard_state(&kstate);
-            bool kd = al_key_down(&kstate, ALLEGRO_KEY_NUMLOCK);
-            log_debug("key_map: kd=%d", kd);
-            if (!kd)
+        else if (code >= ALLEGRO_KEY_PAD_0 && code <= ALLEGRO_KEY_PAD_9 && !(event->keyboard.modifiers & ALLEGRO_KEYMOD_NUMLOCK))
                 code = map_keypad[code-ALLEGRO_KEY_PAD_0];
         }
         code = keylookup[code];
