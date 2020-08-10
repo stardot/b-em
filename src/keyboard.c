@@ -5,27 +5,32 @@
 #include "model.h"
 
 /*
- * The BBC micro keyboard is a fairly standard matrix.  Column lines
- * are activated by decoding the output of a 74LS163 counter with a
- * 4 to 10 line decoder.  Row lines are pulled up with resistors and
- * fed both to an eight input NAND gate to generate an interrupt and
- * to a 74LS251 multiplex allows the row lines to be read.
- * 
- * The diagram in The Advanced User Guide is slighly misleading
- * because the bits as seen by the 74LS251 do not match the rows shown
- * in the diagram.  From a software perspective the keybaord looks
- * like this:
- * 
- *       0x00      0x01  0x02  0x03 0x04 0x05 0x06 0x07 0x08 0x09
+ * The BBC micro keyboard is a fairly standard matrix.  On the Model B,
+ * column lines are activated by decoding the output of a 74LS163
+ * counter with a 4 to 10 line decoder.  Row lines are pulled up with
+ * resistors and fed both to an eight input NAND gate to generate an
+ * interrupt and to a 74LS251 multiplexer which allows the row lines
+ * to be read.
+ *
+ * The Master adds an extra three columns to the matrix to handle the
+ * numeric keymap.  In the diagram below columns 0x00-0x09 are common
+ * to the Model B and the Master while 0x0a-0x0c are Master-only.
+ *
+ * The diagram in the original version of The Advanced User Guide is
+ * slighly misleading because the bits as seen by the 74LS251 do not
+ * match the rows shown in the diagram.  From a software perspective
+ * the keybaord looks like this:
+ *
+ *       0x00      0x01  0x02  0x03 0x04 0x05 0x06 0x07 0x08 0x09    0x0a   0x0b   0x0c
  * 0x00  Shift     Ctrl  <------- starup up DIP swicthes ------->
- * 0x10  Q         3     4     5    f4   8    f7   =-   ~^   Left
- * 0x20  f0        W     E     T    7    I    9    0    £    Down
- * 0x30  1         2     D     R    6    U    O    P    [{   Up
- * 0x40  CapsLck   A     X     F    Y    J    K    @    :*   Return
- * 0x50  ShiftLck  S     C     G    H    N    L    ;+   ]}   Delete
- * 0x60  Tab       Z     SPC   V    B    M    <,   >.   /?   Copy
- * 0x70  ESC       f1    f2    f3   f5   f6   f8   f9   \    Right
- * 
+ * 0x10  Q         3     4     5    f4   8    f7   =-   ~^   Left    KP 6   KP 7
+ * 0x20  f0        W     E     T    7    I    9    0    £    Down    KP 8   KP 9
+ * 0x30  1         2     D     R    6    U    O    P    [{   Up      KP +   KP -   KP Return
+ * 0x40  CapsLck   A     X     F    Y    J    K    @    :*   Return  KP /   KP Del KP .
+ * 0x50  ShiftLck  S     C     G    H    N    L    ;+   ]}   Delete  KP #   KP *   KP ,
+ * 0x60  Tab       Z     SPC   V    B    M    <,   >.   /?   Copy    KP 0   KP 1   KP 3
+ * 0x70  ESC       f1    f2    f3   f5   f6   f8   f9   \    Right   KP 4   KP 4   KP 2
+ *
 */
 
 static uint8_t allegro2bbc[ALLEGRO_KEY_MAX] =
@@ -278,6 +283,7 @@ static void key_update()
 {
     int c,d;
     if (IC32 & 8) {
+        /* autoscan mode */
         for (d = 0; d < ((MASTER) ? 13 : 10); d++) {
             for (c = 1; c < 8; c++) {
                 if (bbckey[d][c]) {
@@ -288,6 +294,7 @@ static void key_update()
         }
     }
     else {
+        /* scan specific key mode */
         if (keycol < ((MASTER) ? 13 : 10)) {
             for (c = 1; c < 8; c++) {
                 if (bbckey[keycol][c]) {
