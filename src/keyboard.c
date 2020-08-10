@@ -265,7 +265,8 @@ static const uint8_t allegro2bbc[ALLEGRO_KEY_MAX] =
 };
 
 int keylookup[ALLEGRO_KEY_MAX];
-bool keyas = 0;
+bool keyas  = false;
+bool keypad = false;
 
 static int keycol, keyrow;
 static int bbckey[16][16];
@@ -328,9 +329,8 @@ int key_map(ALLEGRO_EVENT *event)
             if (keyas)
                 code = ALLEGRO_KEY_CAPSLOCK;
         }
-        else if (code >= ALLEGRO_KEY_PAD_0 && code <= ALLEGRO_KEY_PAD_9 && !(event->keyboard.modifiers & ALLEGRO_KEYMOD_NUMLOCK))
+        else if (code >= ALLEGRO_KEY_PAD_0 && code <= ALLEGRO_KEY_PAD_9 && keypad && !(event->keyboard.modifiers & ALLEGRO_KEYMOD_NUMLOCK))
                 code = map_keypad[code-ALLEGRO_KEY_PAD_0];
-        }
         code = keylookup[code];
     }
     log_debug("keyboard: unichar=%d, mapping %d to %d", event->keyboard.unichar, event->keyboard.keycode, code);

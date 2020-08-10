@@ -192,6 +192,7 @@ void config_load(void)
 
     buflen_m5        = get_config_int("sound", "buflen_music5000", BUFLEN_M5);
 
+    keypad = get_config_bool("user_keyboard", "keypad", false);
     for (c = 0; c < ALLEGRO_KEY_MAX; c++) {
         sprintf(s, "key_define_%03i", c);
         keylookup[c] = get_config_int("user_keyboard", s, c);
