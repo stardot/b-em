@@ -188,12 +188,13 @@ void config_load(void)
 
     keyas            = get_config_bool(NULL, "key_as",        0);
     keylogical       = get_config_bool(NULL, "key_logical",   0);
+    keypad           = get_config_bool(NULL, "keypad", false);
     mouse_amx        = get_config_bool(NULL, "mouse_amx",     0);
     kbdips           = get_config_int(NULL, "kbdips", 0);
 
     buflen_m5        = get_config_int("sound", "buflen_music5000", BUFLEN_M5);
 
-    keypad = get_config_bool("user_keyboard", "keypad", false);
+
     for (c = 0; c < ALLEGRO_KEY_MAX; c++) {
         sprintf(s, "key_define_%03i", c);
         keylookup[c] = get_config_int("user_keyboard", s, c);
@@ -299,6 +300,7 @@ void config_save(void)
 
         set_config_bool(NULL, "key_as", keyas);
         set_config_bool(NULL, "key_logical", keylogical);
+        set_config_bool(NULL, "keypad", keypad);
 
         set_config_bool(NULL, "mouse_amx", mouse_amx);
 
