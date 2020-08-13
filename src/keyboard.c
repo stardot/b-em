@@ -754,7 +754,7 @@ int key_map(const ALLEGRO_EVENT *event)
             mapcode = ALLEGRO_KEY_CAPSLOCK;
         mapcode = keylookup[mapcode];
     }
-    log_debug("keyboard: mapping %d to %d", keycode, mapcode);
+    log_debug("keyboard: mapping %d:%s to %d:%s", keycode, al_keycode_to_name(keycode), mapcode, al_keycode_to_name(mapcode));
     return mapcode;
 }
 
@@ -965,7 +965,7 @@ static void set_key(int code, int state)
 
     if (!keylogical || (code == ALLEGRO_KEY_CAPSLOCK) || (code == ALLEGRO_KEY_F12)) {
         vkey = allegro2bbc[code];
-        log_debug("keyboard: code=%d, vkey=&%02X", code, vkey);
+        log_debug("keyboard: set_key code=%d, vkey=&%02X, state=%d", code, vkey, state);
         if (vkey != 0xaa) {
             bbckey[vkey & 15][vkey >> 4] = state;
             key_update();
@@ -1008,30 +1008,32 @@ void key_up(int code)
 void key_char(const ALLEGRO_EVENT *event)
 {
     int keycode = event->keyboard.keycode;
-    if (keylogical && keycode != ALLEGRO_KEY_F12) {
-        // KEY_CHAR events indicate if the event is for an auto-repeating key, and
-        // we ignore such events because we're passing key up/down events through
-        // to the emulated machine and its OS is handling auto-repeat. However, if
-        // a key is held down on the host but SHIFT is pressed then released, when
-        // the KEY_CHAR event comes through on SHIFT being released the unichar has
-        // changed but the repeat flag is still set. We want to consider such an
-        // event for changing the emulated machine's keyboard state, so we need to
-        // detect this happening and process such an event even if the repeat flag
-        // is set. (To see this happening, on a keyboard with ":" on SHIFT+";",
-        // hold down ";" and then intermittently press the SHIFT key.)
-        if (!event->keyboard.repeat ||
-            (event->keyboard.unichar != last_unichar[keycode])) {
-            int unichar = event->keyboard.unichar;
-            last_unichar[keycode] = unichar;
-            if (keycode >= ALLEGRO_KEY_PAD_0 && keycode <= ALLEGRO_KEY_PAD_9 && (unichar < '0' || unichar > '9') && keypad)
-                keycode = map_keypad[keycode-ALLEGRO_KEY_PAD_0];
-            set_key_logical(keycode, unichar, 1);
-        }
-    }
-    else if (keycode >= ALLEGRO_KEY_PAD_0 && keycode <= ALLEGRO_KEY_PAD_9 && keypad) {
-        int unichar = event->keyboard.unichar;
+    int unichar = event->keyboard.unichar;
+
+    /* KEY_CHAR events indicate if the event is for an auto-repeating
+     * key, and we ignore such events because we're passing key up/down
+     * events through to the emulated machine and its OS is handling
+     * auto-repeat.
+     *
+     * However, if a key is held down on the host but SHIFT is pressed
+     * then released, when the KEY_CHAR event comes through on SHIFT
+     * being released the unichar has changed but the repeat flag is
+     * still set. We want to consider such an event for changing the
+     * emulated machine's keyboard state, so we need to detect this
+     * happening and process such an event even if the repeat flag
+     * is set. (To see this happening, on a keyboard with ":" on
+     * SHIFT+";", hold down ";" and then intermittently press the
+     * SHIFT key.)
+     */
+    if (!event->keyboard.repeat || unichar != last_unichar[keycode]) {
         last_unichar[keycode] = unichar;
-        set_key(keycode, 1);
+        /* Translate the numeric keypad? */
+        if (keycode >= ALLEGRO_KEY_PAD_0 && keycode <= ALLEGRO_KEY_PAD_9 && (unichar < '0' || unichar > '9') && keypad)
+            keycode = map_keypad[keycode-ALLEGRO_KEY_PAD_0];
+        if (keylogical && keycode != ALLEGRO_KEY_F12)
+            set_key_logical(keycode, unichar, 1);
+        else if (keypad)
+            set_key(keycode, 1);
     }
 }
 
