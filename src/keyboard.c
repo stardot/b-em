@@ -1025,15 +1025,19 @@ void key_char(const ALLEGRO_EVENT *event)
      * SHIFT+";", hold down ";" and then intermittently press the
      * SHIFT key.)
      */
-    if (!event->keyboard.repeat || unichar != last_unichar[keycode]) {
+    if ((!event->keyboard.repeat || unichar != last_unichar[keycode]) && keycode != ALLEGRO_KEY_F12) {
         last_unichar[keycode] = unichar;
         /* Translate the numeric keypad? */
-        if (keycode >= ALLEGRO_KEY_PAD_0 && keycode <= ALLEGRO_KEY_PAD_9 && (unichar < '0' || unichar > '9') && keypad)
-            keycode = map_keypad[keycode-ALLEGRO_KEY_PAD_0];
-        if (keylogical && keycode != ALLEGRO_KEY_F12)
+        if (keycode >= ALLEGRO_KEY_PAD_0 && keycode <= ALLEGRO_KEY_PAD_9 && keypad) {
+            if  (unichar < '0' || unichar > '9')
+                keycode = map_keypad[keycode-ALLEGRO_KEY_PAD_0];
+            if (keylogical)
+                set_key_logical(keycode, unichar, 1);
+            else
+                set_key(keycode, 1);
+        }
+        else if (keylogical)
             set_key_logical(keycode, unichar, 1);
-        else if (keypad)
-            set_key(keycode, 1);
     }
 }
 
