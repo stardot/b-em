@@ -62,10 +62,10 @@ void crtc_write(uint16_t addr, uint8_t val)
         crtc[crtc_i] = val;
         if (crtc_i == 6 && vc == val)
             vdispen = 0;
-        if (crtc_i == 8)
+        else if (crtc_i == 8)
             set_intern_dtype(vid_dtype_user);
         else if (crtc_i == 12)
-            ttxbank = MASTER ? 0x7c00 : 0x3C00 | ((val & 0x8) << 11);
+            ttxbank = (MASTER|BPLUS) ? 0x7c00 : 0x3C00 | ((val & 0x8) << 11);
     }
 }
 
