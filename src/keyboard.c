@@ -981,7 +981,7 @@ static void set_key(int code, int state)
 
 void key_down(int code)
 {
-    if (code < ALLEGRO_KEY_PAD_0 || code > ALLEGRO_KEY_PAD_9 || !keypad)
+    if (code < ALLEGRO_KEY_PAD_0 || code > ALLEGRO_KEY_PAD_9)
         set_key(code, 1);
     /* in keypad mode, processing of keypad keys is delayed until the KEY_CHAR event */
 }
@@ -990,7 +990,7 @@ static int last_unichar[ALLEGRO_KEY_MAX];
 
 void key_up(int code)
 {
-    if (code >= ALLEGRO_KEY_PAD_0 && code <= ALLEGRO_KEY_PAD_9 && keypad)
+    if (code >= ALLEGRO_KEY_PAD_0 && code <= ALLEGRO_KEY_PAD_9 && (keypad || keylogical))
         if (last_unichar[code] < '0' || last_unichar[code] > '9')
             code = map_keypad[code-ALLEGRO_KEY_PAD_0];
     set_key(code, 0);
@@ -1028,8 +1028,8 @@ void key_char(const ALLEGRO_EVENT *event)
     if ((!event->keyboard.repeat || unichar != last_unichar[keycode]) && keycode != ALLEGRO_KEY_F12) {
         last_unichar[keycode] = unichar;
         /* Translate the numeric keypad? */
-        if (keycode >= ALLEGRO_KEY_PAD_0 && keycode <= ALLEGRO_KEY_PAD_9 && keypad) {
-            if  (unichar < '0' || unichar > '9')
+        if (keycode >= ALLEGRO_KEY_PAD_0 && keycode <= ALLEGRO_KEY_PAD_9) {
+            if  ((unichar < '0' || unichar > '9') && (keypad||keylogical))
                 keycode = map_keypad[keycode-ALLEGRO_KEY_PAD_0];
             if (keylogical)
                 set_key_logical(keycode, unichar, 1);
