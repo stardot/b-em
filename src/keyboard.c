@@ -1013,18 +1013,26 @@ void key_down_event(const ALLEGRO_EVENT *event)
     }
 }
 
-int key_map_keypad(const ALLEGRO_EVENT *event)
+static int map_keypad_intern(int keycode, int unichar)
 {
-    int keycode = event->keyboard.keycode;
-    if (keycode >= ALLEGRO_KEY_PAD_0 && keycode <= ALLEGRO_KEY_PAD_9 && (keypad || keylogical)) {
-        int unichar = event->keyboard.unichar;
-        if (unichar < '0' || unichar > '9') {
+    if (keypad || keylogical) {
+        if (keycode >= ALLEGRO_KEY_PAD_0 && keycode <= ALLEGRO_KEY_PAD_9 && (unichar < '0' || unichar > '9')) {
             int newcode = map_keypad[keycode-ALLEGRO_KEY_PAD_0];
+            log_debug("keyboard: mapping keypad key %d:%s to %d:%s", keycode, al_keycode_to_name(keycode), newcode, al_keycode_to_name(newcode));
+            return newcode;
+        }
+        else if (keycode == ALLEGRO_KEY_PAD_DELETE && unichar == '.') {
+            int newcode = ALLEGRO_KEY_FULLSTOP;
             log_debug("keyboard: mapping keypad key %d:%s to %d:%s", keycode, al_keycode_to_name(keycode), newcode, al_keycode_to_name(newcode));
             return newcode;
         }
     }
     return keycode;
+}
+
+int key_map_keypad(const ALLEGRO_EVENT *event)
+{
+    return map_keypad_intern(event->keyboard.keycode, event->keyboard.unichar);
 }
 
 void key_char_event(const ALLEGRO_EVENT *event)
@@ -1034,12 +1042,8 @@ void key_char_event(const ALLEGRO_EVENT *event)
     log_debug("keyboard: key char event, keycode=%d:%s, unichar=%d", keycode, al_keycode_to_name(keycode), unichar);
     if ((!event->keyboard.repeat || unichar != last_unichar[keycode]) && keycode < ALLEGRO_KEY_MAX) {
         last_unichar[keycode] = unichar;
-        if (keycode >= ALLEGRO_KEY_PAD_0 && keycode <= ALLEGRO_KEY_PAD_9 && (unichar < '0' || unichar > '9') && (keypad || keylogical)) {
-            int newcode = map_keypad[keycode-ALLEGRO_KEY_PAD_0];
-            log_debug("keyboard: mapping keypad key %d:%s to %d:%s", keycode, al_keycode_to_name(keycode), newcode, al_keycode_to_name(newcode));
-            keycode = newcode;
-        }
-        else if (keycode == ALLEGRO_KEY_A && keyas && !keylogical)
+        keycode = map_keypad_intern(keycode, unichar);
+        if (keycode == ALLEGRO_KEY_A && keyas && !keylogical)
             keycode = ALLEGRO_KEY_CAPSLOCK;
         for (int act = 0; act < KEY_ACTION_MAX; act++) {
             log_debug("keyboard: checking key action %d:%s codes %d<>%d, alt %d<>%d", act, keyact_const[act].name, keycode, keyactions[act].keycode, hostalt, keyactions[act].altstate);
@@ -1086,8 +1090,7 @@ void key_up_event(const ALLEGRO_EVENT *event)
             }
             if (shiftctrl && keylogical)
                 set_logical_shift_ctrl_if_idle();
-            if (keycode >= ALLEGRO_KEY_PAD_0 && keycode <= ALLEGRO_KEY_PAD_9 && (unichar < '0' || unichar > '9') && (keypad || keylogical))
-                keycode = map_keypad[keycode-ALLEGRO_KEY_PAD_0];
+            keycode = map_keypad_intern(keycode, unichar);
             for (int act = 0; act < KEY_ACTION_MAX; act++) {
                 log_debug("keyboard: checking key action %d:%s codes %d<>%d, alt %d<>%d", act, keyact_const[act].name, keycode, keyactions[act].keycode, hostalt, keyactions[act].altstate);
                 if (keycode == keyactions[act].keycode && keyactions[act].altstate == hostalt) {
