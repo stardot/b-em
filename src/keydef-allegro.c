@@ -9,15 +9,14 @@ typedef enum {
     COL_BLACK,
     COL_GREY,
     COL_RED,
-    COL_GREEN
 } key_col_t;
 
 typedef struct {
     uint16_t x, y, w, h;
     key_col_t col;
-    char cap[12];
-    char name[12];
-    uint8_t keycode;
+    char cap[7];
+    char name[11];
+    int keycode;
 } key_cap_t;
 
 typedef struct {
@@ -32,199 +31,232 @@ typedef enum {
     ST_DONE
 } state_t;
 
-#define BBC_NKEY 78
+#define BBC_NKEY 74
 
 static const key_cap_t kcaps_bbc[BBC_NKEY] = {
-    {  82,  10,  28,  28, COL_RED,   "F0",          "F0",          0x20 },
-    { 114,  10,  28,  28, COL_RED,   "F1",          "F1",          0x71 },
-    { 146,  10,  28,  28, COL_RED,   "F2",          "F2",          0x72 },
-    { 178,  10,  28,  28, COL_RED,   "F3",          "F3",          0x73 },
-    { 210,  10,  28,  28, COL_RED,   "F4",          "F4",          0x14 },
-    { 242,  10,  28,  28, COL_RED,   "F5",          "F5",          0x74 },
-    { 274,  10,  28,  28, COL_RED,   "F6",          "F6",          0x75 },
-    { 306,  10,  28,  28, COL_RED,   "F7",          "F7",          0x16 },
-    { 338,  10,  28,  28, COL_RED,   "F8",          "F8",          0x76 },
-    { 370,  10,  28,  28, COL_RED,   "F9",          "F9",          0x77 },
-    { 402,  10,  28,  28, COL_BLACK, "BRK",         "Break",       0xff },
-    {  10,  42,  28,  28, COL_BLACK, "ESC",         "Escape",      0x70 },
-    {  42,  42,  28,  28, COL_BLACK, "1",           "1",           0x30 },
-    {  74,  42,  28,  28, COL_BLACK, "2",           "2",           0x31 },
-    { 106,  42,  28,  28, COL_BLACK, "3",           "3",           0x11 },
-    { 138,  42,  28,  28, COL_BLACK, "4",           "4",           0x12 },
-    { 170,  42,  28,  28, COL_BLACK, "5",           "5",           0x13 },
-    { 202,  42,  28,  28, COL_BLACK, "6",           "6",           0x34 },
-    { 234,  42,  28,  28, COL_BLACK, "7",           "7",           0x24 },
-    { 266,  42,  28,  28, COL_BLACK, "8",           "8",           0x15 },
-    { 298,  42,  28,  28, COL_BLACK, "9",           "9",           0x26 },
-    { 330,  42,  28,  28, COL_BLACK, "0",           "0",           0x27 },
-    { 362,  42,  28,  28, COL_BLACK, "=",           "=",           0x17 },
-    { 394,  42,  28,  28, COL_BLACK, "^",           "^",           0x18 },
-    { 426,  42,  28,  28, COL_BLACK, "\\",          "\\",          0x78 },
-    { 458,  42,  28,  28, COL_GREY,  "LFT",         "Left",        0x19 },
-    { 490,  42,  28,  28, COL_GREY,  "RGT",         "Right",       0x79 },
-    {  10,  74,  44,  28, COL_BLACK, "TAB",         "Tab",         0x60 },
-    {  58,  74,  28,  28, COL_BLACK, "Q",           "Q",           0x10 },
-    {  90,  74,  28,  28, COL_BLACK, "W",           "W",           0x21 },
-    { 122,  74,  28,  28, COL_BLACK, "E",           "E",           0x22 },
-    { 154,  74,  28,  28, COL_BLACK, "R",           "R",           0x33 },
-    { 186,  74,  28,  28, COL_BLACK, "T",           "T",           0x23 },
-    { 218,  74,  28,  28, COL_BLACK, "Y",           "Y",           0x44 },
-    { 250,  74,  28,  28, COL_BLACK, "U",           "U",           0x35 },
-    { 282,  74,  28,  28, COL_BLACK, "I",           "I",           0x25 },
-    { 314,  74,  28,  28, COL_BLACK, "O",           "O",           0x36 },
-    { 346,  74,  28,  28, COL_BLACK, "P",           "P",           0x37 },
-    { 378,  74,  28,  28, COL_BLACK, "@",           "@",           0x47 },
-    { 410,  74,  28,  28, COL_BLACK, "[",           "[",           0x38 },
-    { 442,  74,  28,  28, COL_BLACK, "_",           "_",           0x28 },
-    { 474,  74,  28,  28, COL_GREY,  "UP",          "Up",          0x39 },
-    { 506,  74,  28,  28, COL_GREY,  "DWN",         "Down",        0x29 },
-    {  10, 106,  28,  28, COL_BLACK, "CLK",         "Caps Lock",   0x40 },
-    {  42, 106,  28,  28, COL_BLACK, "CTL",         "CTRL",        0x01 },
-    {  74, 106,  28,  28, COL_BLACK, "A",           "A",           0x41 },
-    { 106, 106,  28,  28, COL_BLACK, "S",           "S",           0x51 },
-    { 138, 106,  28,  28, COL_BLACK, "D",           "D",           0x32 },
-    { 170, 106,  28,  28, COL_BLACK, "F",           "F",           0x43 },
-    { 202, 106,  28,  28, COL_BLACK, "G",           "G",           0x53 },
-    { 234, 106,  28,  28, COL_BLACK, "H",           "H",           0x54 },
-    { 266, 106,  28,  28, COL_BLACK, "J",           "J",           0x45 },
-    { 298, 106,  28,  28, COL_BLACK, "K",           "K",           0x46 },
-    { 330, 106,  28,  28, COL_BLACK, "L",           "L",           0x56 },
-    { 362, 106,  28,  28, COL_BLACK, ";",           ";",           0x57 },
-    { 394, 106,  28,  28, COL_BLACK, ":",           ":",           0x48 },
-    { 426, 106,  28,  28, COL_BLACK, "]",           "]",           0x58 },
-    { 458, 106,  60,  28, COL_BLACK, "RET",         "Return",      0x49 },
-    {  10, 138,  28,  28, COL_BLACK, "SLK",         "Shift Lock",  0x50 },
-    {  42, 138,  44,  28, COL_BLACK, "SHIFT",       "Shift",       0x00 },
-    {  90, 138,  28,  28, COL_BLACK, "Z",           "Z",           0x61 },
-    { 122, 138,  28,  28, COL_BLACK, "X",           "X",           0x42 },
-    { 154, 138,  28,  28, COL_BLACK, "C",           "C",           0x52 },
-    { 186, 138,  28,  28, COL_BLACK, "V",           "V",           0x63 },
-    { 218, 138,  28,  28, COL_BLACK, "B",           "B",           0x64 },
-    { 250, 138,  28,  28, COL_BLACK, "N",           "N",           0x55 },
-    { 282, 138,  28,  28, COL_BLACK, "M",           "M",           0x65 },
-    { 314, 138,  28,  28, COL_BLACK, ",",           ",",           0x66 },
-    { 346, 138,  28,  28, COL_BLACK, ".",           ".",           0x67 },
-    { 378, 138,  28,  28, COL_BLACK, "/",           "/",           0x68 },
-    { 410, 138,  44,  28, COL_BLACK, "SHIFT",       "Shift",       0x00 },
-    { 458, 138,  28,  28, COL_BLACK, "DEL",         "Delete",      0x59 },
-    { 490, 138,  28,  28, COL_GREY,  "CPY",         "Copy",        0x69 },
-    { 122, 170, 256,  28, COL_BLACK, "SPACE",       "Space",       0x62 },
-
-    {  70, 218,  96,  28, COL_GREEN, "Full Speed",  "Full Speed",  0xfe },
-    { 170, 218,  96,  28, COL_GREEN, "Pause",       "Pause",       0xfd },
-    { 270, 218,  96,  28, COL_GREEN, "Full Screen", "Full Screen", 0xfc },
-    { 370, 218,  96,  28, COL_GREEN, "Debug Break", "Debug Break", 0xfb }
+    {  82,  10,  28,  28, COL_RED,   "F0",     "F0",         ALLEGRO_KEY_F1         },
+    { 114,  10,  28,  28, COL_RED,   "F1",     "F1",         ALLEGRO_KEY_F2         },
+    { 146,  10,  28,  28, COL_RED,   "F2",     "F2",         ALLEGRO_KEY_F3         },
+    { 178,  10,  28,  28, COL_RED,   "F3",     "F3",         ALLEGRO_KEY_F4         },
+    { 210,  10,  28,  28, COL_RED,   "F4",     "F4",         ALLEGRO_KEY_F5         },
+    { 242,  10,  28,  28, COL_RED,   "F5",     "F5",         ALLEGRO_KEY_F6         },
+    { 274,  10,  28,  28, COL_RED,   "F6",     "F6",         ALLEGRO_KEY_F7         },
+    { 306,  10,  28,  28, COL_RED,   "F7",     "F7",         ALLEGRO_KEY_F8         },
+    { 338,  10,  28,  28, COL_RED,   "F8",     "F8",         ALLEGRO_KEY_F9         },
+    { 370,  10,  28,  28, COL_RED,   "F9",     "F9",         ALLEGRO_KEY_F10        },
+    { 402,  10,  28,  28, COL_BLACK, "BRK",    "Break",      ALLEGRO_KEY_F12        },
+    {  10,  42,  28,  28, COL_BLACK, "ESC",    "Escape",     ALLEGRO_KEY_ESCAPE     },
+    {  42,  42,  28,  28, COL_BLACK, "1",      "1",          ALLEGRO_KEY_1          },
+    {  74,  42,  28,  28, COL_BLACK, "2",      "2",          ALLEGRO_KEY_2          },
+    { 106,  42,  28,  28, COL_BLACK, "3",      "3",          ALLEGRO_KEY_3          },
+    { 138,  42,  28,  28, COL_BLACK, "4",      "4",          ALLEGRO_KEY_4          },
+    { 170,  42,  28,  28, COL_BLACK, "5",      "5",          ALLEGRO_KEY_5          },
+    { 202,  42,  28,  28, COL_BLACK, "6",      "6",          ALLEGRO_KEY_6          },
+    { 234,  42,  28,  28, COL_BLACK, "7",      "7",          ALLEGRO_KEY_7          },
+    { 266,  42,  28,  28, COL_BLACK, "8",      "8",          ALLEGRO_KEY_8          },
+    { 298,  42,  28,  28, COL_BLACK, "9",      "9",          ALLEGRO_KEY_9          },
+    { 330,  42,  28,  28, COL_BLACK, "0",      "0",          ALLEGRO_KEY_0          },
+    { 362,  42,  28,  28, COL_BLACK, "=",      "=",          ALLEGRO_KEY_MINUS      },
+    { 394,  42,  28,  28, COL_BLACK, "^",      "^",          ALLEGRO_KEY_EQUALS     },
+    { 426,  42,  28,  28, COL_BLACK, "\\",     "\\",         ALLEGRO_KEY_BACKSLASH2 },
+    { 458,  42,  28,  28, COL_GREY,  "LFT",    "Left",       ALLEGRO_KEY_LEFT       },
+    { 490,  42,  28,  28, COL_GREY,  "RGT",    "Right",      ALLEGRO_KEY_RIGHT      },
+    {  10,  74,  44,  28, COL_BLACK, "TAB",    "Tab",        ALLEGRO_KEY_TAB        },
+    {  58,  74,  28,  28, COL_BLACK, "Q",      "Q",          ALLEGRO_KEY_Q          },
+    {  90,  74,  28,  28, COL_BLACK, "W",      "W",          ALLEGRO_KEY_W          },
+    { 122,  74,  28,  28, COL_BLACK, "E",      "E",          ALLEGRO_KEY_E          },
+    { 154,  74,  28,  28, COL_BLACK, "R",      "R",          ALLEGRO_KEY_R          },
+    { 186,  74,  28,  28, COL_BLACK, "T",      "T",          ALLEGRO_KEY_T          },
+    { 218,  74,  28,  28, COL_BLACK, "Y",      "Y",          ALLEGRO_KEY_Y          },
+    { 250,  74,  28,  28, COL_BLACK, "U",      "U",          ALLEGRO_KEY_U          },
+    { 282,  74,  28,  28, COL_BLACK, "I",      "I",          ALLEGRO_KEY_I          },
+    { 314,  74,  28,  28, COL_BLACK, "O",      "O",          ALLEGRO_KEY_O          },
+    { 346,  74,  28,  28, COL_BLACK, "P",      "P",          ALLEGRO_KEY_P          },
+    { 378,  74,  28,  28, COL_BLACK, "@",      "@",          ALLEGRO_KEY_OPENBRACE  },
+    { 410,  74,  28,  28, COL_BLACK, "[",      "[",          ALLEGRO_KEY_CLOSEBRACE },
+    { 442,  74,  28,  28, COL_BLACK, "_",      "_",          ALLEGRO_KEY_TILDE      },
+    { 474,  74,  28,  28, COL_GREY,  "UP",     "Up",         ALLEGRO_KEY_UP         },
+    { 506,  74,  28,  28, COL_GREY,  "DWN",    "Down",       ALLEGRO_KEY_DOWN       },
+    {  10, 106,  28,  28, COL_BLACK, "CLK",    "Caps Lock",  ALLEGRO_KEY_CAPSLOCK   },
+    {  42, 106,  28,  28, COL_BLACK, "CTL",    "CTRL",       ALLEGRO_KEY_LCTRL      },
+    {  74, 106,  28,  28, COL_BLACK, "A",      "A",          ALLEGRO_KEY_A          },
+    { 106, 106,  28,  28, COL_BLACK, "S",      "S",          ALLEGRO_KEY_S          },
+    { 138, 106,  28,  28, COL_BLACK, "D",      "D",          ALLEGRO_KEY_D          },
+    { 170, 106,  28,  28, COL_BLACK, "F",      "F",          ALLEGRO_KEY_F          },
+    { 202, 106,  28,  28, COL_BLACK, "G",      "G",          ALLEGRO_KEY_G          },
+    { 234, 106,  28,  28, COL_BLACK, "H",      "H",          ALLEGRO_KEY_H          },
+    { 266, 106,  28,  28, COL_BLACK, "J",      "J",          ALLEGRO_KEY_J          },
+    { 298, 106,  28,  28, COL_BLACK, "K",      "K",          ALLEGRO_KEY_K          },
+    { 330, 106,  28,  28, COL_BLACK, "L",      "L",          ALLEGRO_KEY_L          },
+    { 362, 106,  28,  28, COL_BLACK, ";",      ";",          ALLEGRO_KEY_SEMICOLON  },
+    { 394, 106,  28,  28, COL_BLACK, ":",      ":",          ALLEGRO_KEY_QUOTE      },
+    { 426, 106,  28,  28, COL_BLACK, "]",      "]",          ALLEGRO_KEY_BACKSLASH  },
+    { 458, 106,  60,  28, COL_BLACK, "RET",    "Return",     ALLEGRO_KEY_ENTER      },
+    {  10, 138,  28,  28, COL_BLACK, "SLK",    "Shift Lock", ALLEGRO_KEY_PAD_EQUALS },
+    {  42, 138,  44,  28, COL_BLACK, "SHIFT",  "Shift",      ALLEGRO_KEY_LSHIFT     },
+    {  90, 138,  28,  28, COL_BLACK, "Z",      "Z",          ALLEGRO_KEY_Z          },
+    { 122, 138,  28,  28, COL_BLACK, "X",      "X",          ALLEGRO_KEY_X          },
+    { 154, 138,  28,  28, COL_BLACK, "C",      "C",          ALLEGRO_KEY_C          },
+    { 186, 138,  28,  28, COL_BLACK, "V",      "V",          ALLEGRO_KEY_V          },
+    { 218, 138,  28,  28, COL_BLACK, "B",      "B",          ALLEGRO_KEY_B          },
+    { 250, 138,  28,  28, COL_BLACK, "N",      "N",          ALLEGRO_KEY_N          },
+    { 282, 138,  28,  28, COL_BLACK, "M",      "M",          ALLEGRO_KEY_M          },
+    { 314, 138,  28,  28, COL_BLACK, ",",      ",",          ALLEGRO_KEY_COMMA      },
+    { 346, 138,  28,  28, COL_BLACK, ".",      ".",          ALLEGRO_KEY_FULLSTOP   },
+    { 378, 138,  28,  28, COL_BLACK, "/",      "/",          ALLEGRO_KEY_SLASH      },
+    { 410, 138,  44,  28, COL_BLACK, "SHIFT",  "Shift",      ALLEGRO_KEY_RSHIFT     },
+    { 458, 138,  28,  28, COL_BLACK, "DEL",    "Delete",     ALLEGRO_KEY_DELETE     },
+    { 490, 138,  28,  28, COL_GREY,  "CPY",    "Copy",       ALLEGRO_KEY_END        },
+    { 122, 170, 256,  28, COL_BLACK, "SPACE",  "Space",      ALLEGRO_KEY_SPACE      }
 };
 
-static const key_dlg_t bbc_kbd_dlg = { kcaps_bbc, kcaps_bbc + BBC_NKEY, 538, 304 };
+static const key_dlg_t bbc_kbd_dlg = { kcaps_bbc, kcaps_bbc + BBC_NKEY, 538, 256 };
 
-#define MASTER_NKEY 97
+#define MASTER_NKEY 93
 
 static const key_cap_t kcaps_master[MASTER_NKEY] = {
-    {  50,  10,  28,  28, COL_RED,   "F0",          "F0",          0x20 },
-    {  82,  10,  28,  28, COL_RED,   "F1",          "F1",          0x71 },
-    { 114,  10,  28,  28, COL_RED,   "F2",          "F2",          0x72 },
-    { 146,  10,  28,  28, COL_RED,   "F3",          "F3",          0x73 },
-    { 178,  10,  28,  28, COL_RED,   "F4",          "F4",          0x14 },
-    { 210,  10,  28,  28, COL_RED,   "F5",          "F5",          0x74 },
-    { 242,  10,  28,  28, COL_RED,   "F6",          "F6",          0x75 },
-    { 274,  10,  28,  28, COL_RED,   "F7",          "F7",          0x16 },
-    { 306,  10,  28,  28, COL_RED,   "F8",          "F8",          0x76 },
-    { 338,  10,  28,  28, COL_RED,   "F9",          "F9",          0x77 },
-    { 370,  10,  28,  28, COL_BLACK, "BRK",         "Break",       0xff },
-    {  10,  42,  28,  28, COL_BLACK, "ESC",         "Escape",      0x70 },
-    {  42,  42,  28,  28, COL_BLACK, "1",           "1",           0x30 },
-    {  74,  42,  28,  28, COL_BLACK, "2",           "2",           0x31 },
-    { 106,  42,  28,  28, COL_BLACK, "3",           "3",           0x11 },
-    { 138,  42,  28,  28, COL_BLACK, "4",           "4",           0x12 },
-    { 170,  42,  28,  28, COL_BLACK, "5",           "5",           0x13 },
-    { 202,  42,  28,  28, COL_BLACK, "6",           "6",           0x34 },
-    { 234,  42,  28,  28, COL_BLACK, "7",           "7",           0x24 },
-    { 266,  42,  28,  28, COL_BLACK, "8",           "8",           0x15 },
-    { 298,  42,  28,  28, COL_BLACK, "9",           "9",           0x26 },
-    { 330,  42,  28,  28, COL_BLACK, "0",           "0",           0x27 },
-    { 362,  42,  28,  28, COL_BLACK, "=",           "=",           0x17 },
-    { 394,  42,  28,  28, COL_BLACK, "^",           "^",           0x18 },
-    { 426,  42,  28,  28, COL_BLACK, "\\",          "\\",          0x78 },
-    { 458,  42,  28,  28, COL_GREY,  "LFT",         "Left",        0x19 },
-    { 490,  42,  28,  28, COL_GREY,  "RGT",         "Right",       0x79 },
-    {  10,  74,  44,  28, COL_BLACK, "TAB",         "Tab",         0x60 },
-    {  58,  74,  28,  28, COL_BLACK, "Q",           "Q",           0x10 },
-    {  90,  74,  28,  28, COL_BLACK, "W",           "W",           0x21 },
-    { 122,  74,  28,  28, COL_BLACK, "E",           "E",           0x22 },
-    { 154,  74,  28,  28, COL_BLACK, "R",           "R",           0x33 },
-    { 186,  74,  28,  28, COL_BLACK, "T",           "T",           0x23 },
-    { 218,  74,  28,  28, COL_BLACK, "Y",           "Y",           0x44 },
-    { 250,  74,  28,  28, COL_BLACK, "U",           "U",           0x35 },
-    { 282,  74,  28,  28, COL_BLACK, "I",           "I",           0x25 },
-    { 314,  74,  28,  28, COL_BLACK, "O",           "O",           0x36 },
-    { 346,  74,  28,  28, COL_BLACK, "P",           "P",           0x37 },
-    { 378,  74,  28,  28, COL_BLACK, "@",           "@",           0x47 },
-    { 410,  74,  28,  28, COL_BLACK, "[",           "[",           0x38 },
-    { 442,  74,  28,  28, COL_BLACK, "_",           "_",           0x28 },
-    { 474,  10,  28,  28, COL_GREY,  "UP",          "UP",          0x39 },
-    { 474,  74,  28,  28, COL_GREY,  "DWN",         "DOWN",        0x29 },
-    {  10, 106,  28,  28, COL_BLACK, "CLK",         "CAPS LOCK",   0x40 },
-    {  42, 106,  28,  28, COL_BLACK, "CTL",         "CTRL",        0x01 },
-    {  74, 106,  28,  28, COL_BLACK, "A",           "A",           0x41 },
-    { 106, 106,  28,  28, COL_BLACK, "S",           "S",           0x51 },
-    { 138, 106,  28,  28, COL_BLACK, "D",           "D",           0x32 },
-    { 170, 106,  28,  28, COL_BLACK, "F",           "F",           0x43 },
-    { 202, 106,  28,  28, COL_BLACK, "G",           "G",           0x53 },
-    { 234, 106,  28,  28, COL_BLACK, "H",           "H",           0x54 },
-    { 266, 106,  28,  28, COL_BLACK, "J",           "J",           0x45 },
-    { 298, 106,  28,  28, COL_BLACK, "K",           "K",           0x46 },
-    { 330, 106,  28,  28, COL_BLACK, "L",           "L",           0x56 },
-    { 362, 106,  28,  28, COL_BLACK, ";",           ";",           0x57 },
-    { 394, 106,  28,  28, COL_BLACK, ":",           ":",           0x48 },
-    { 426, 106,  28,  28, COL_BLACK, "]",           "]",           0x58 },
-    { 458, 106,  60,  28, COL_BLACK, "RET",         "Return",      0x49 },
-    {  10, 138,  28,  28, COL_BLACK, "SLK",         "Shift Lock",  0x50 },
-    {  42, 138,  44,  28, COL_BLACK, "SHIFT",       "Shift",       0x00 },
-    {  90, 138,  28,  28, COL_BLACK, "Z",           "Z",           0x61 },
-    { 122, 138,  28,  28, COL_BLACK, "X",           "X",           0x42 },
-    { 154, 138,  28,  28, COL_BLACK, "C",           "C",           0x52 },
-    { 186, 138,  28,  28, COL_BLACK, "V",           "V",           0x63 },
-    { 218, 138,  28,  28, COL_BLACK, "B",           "B",           0x64 },
-    { 250, 138,  28,  28, COL_BLACK, "N",           "N",           0x55 },
-    { 282, 138,  28,  28, COL_BLACK, "M",           "M",           0x65 },
-    { 314, 138,  28,  28, COL_BLACK, ",",           ",",           0x66 },
-    { 346, 138,  28,  28, COL_BLACK, ".",           ".",           0x67 },
-    { 378, 138,  28,  28, COL_BLACK, "/",           "/",           0x68 },
-    { 410, 138,  44,  28, COL_BLACK, "SHIFT",       "Shift",       0x00 },
-    { 458, 138,  28,  28, COL_BLACK, "DEL",         "Delete",      0x59 },
-    { 490, 138,  28,  28, COL_GREY,  "CPY",         "Copy",        0x69 },
-    { 122, 170, 256,  28, COL_BLACK, "SPACE",       "Space",       0x62 },
+    {  50,  10,  28,  28, COL_RED,   "F0",     "F0",         ALLEGRO_KEY_F1         },
+    {  82,  10,  28,  28, COL_RED,   "F1",     "F1",         ALLEGRO_KEY_F2         },
+    { 114,  10,  28,  28, COL_RED,   "F2",     "F2",         ALLEGRO_KEY_F3         },
+    { 146,  10,  28,  28, COL_RED,   "F3",     "F3",         ALLEGRO_KEY_F4         },
+    { 178,  10,  28,  28, COL_RED,   "F4",     "F4",         ALLEGRO_KEY_F5         },
+    { 210,  10,  28,  28, COL_RED,   "F5",     "F5",         ALLEGRO_KEY_F6         },
+    { 242,  10,  28,  28, COL_RED,   "F6",     "F6",         ALLEGRO_KEY_F7         },
+    { 274,  10,  28,  28, COL_RED,   "F7",     "F7",         ALLEGRO_KEY_F8         },
+    { 306,  10,  28,  28, COL_RED,   "F8",     "F8",         ALLEGRO_KEY_F9         },
+    { 338,  10,  28,  28, COL_RED,   "F9",     "F9",         ALLEGRO_KEY_F10        },
+    { 370,  10,  28,  28, COL_BLACK, "BRK",    "Break",      ALLEGRO_KEY_F12        },
+    {  10,  42,  28,  28, COL_BLACK, "ESC",    "Escape",     ALLEGRO_KEY_ESCAPE     },
+    {  42,  42,  28,  28, COL_BLACK, "1",      "1",          ALLEGRO_KEY_1          },
+    {  74,  42,  28,  28, COL_BLACK, "2",      "2",          ALLEGRO_KEY_2          },
+    { 106,  42,  28,  28, COL_BLACK, "3",      "3",          ALLEGRO_KEY_3          },
+    { 138,  42,  28,  28, COL_BLACK, "4",      "4",          ALLEGRO_KEY_4          },
+    { 170,  42,  28,  28, COL_BLACK, "5",      "5",          ALLEGRO_KEY_5          },
+    { 202,  42,  28,  28, COL_BLACK, "6",      "6",          ALLEGRO_KEY_6          },
+    { 234,  42,  28,  28, COL_BLACK, "7",      "7",          ALLEGRO_KEY_7          },
+    { 266,  42,  28,  28, COL_BLACK, "8",      "8",          ALLEGRO_KEY_8          },
+    { 298,  42,  28,  28, COL_BLACK, "9",      "9",          ALLEGRO_KEY_9          },
+    { 330,  42,  28,  28, COL_BLACK, "0",      "0",          ALLEGRO_KEY_0          },
+    { 362,  42,  28,  28, COL_BLACK, "=",      "=",          ALLEGRO_KEY_MINUS      },
+    { 394,  42,  28,  28, COL_BLACK, "^",      "^",          ALLEGRO_KEY_EQUALS     },
+    { 426,  42,  28,  28, COL_BLACK, "\\",     "\\",         ALLEGRO_KEY_BACKSLASH2 },
+    { 458,  42,  28,  28, COL_GREY,  "LFT",    "Left",       ALLEGRO_KEY_LEFT       },
+    { 490,  42,  28,  28, COL_GREY,  "RGT",    "Right",      ALLEGRO_KEY_RIGHT      },
+    {  10,  74,  44,  28, COL_BLACK, "TAB",    "Tab",        ALLEGRO_KEY_TAB        },
+    {  58,  74,  28,  28, COL_BLACK, "Q",      "Q",          ALLEGRO_KEY_Q          },
+    {  90,  74,  28,  28, COL_BLACK, "W",      "W",          ALLEGRO_KEY_W          },
+    { 122,  74,  28,  28, COL_BLACK, "E",      "E",          ALLEGRO_KEY_E          },
+    { 154,  74,  28,  28, COL_BLACK, "R",      "R",          ALLEGRO_KEY_R          },
+    { 186,  74,  28,  28, COL_BLACK, "T",      "T",          ALLEGRO_KEY_T          },
+    { 218,  74,  28,  28, COL_BLACK, "Y",      "Y",          ALLEGRO_KEY_Y          },
+    { 250,  74,  28,  28, COL_BLACK, "U",      "U",          ALLEGRO_KEY_U          },
+    { 282,  74,  28,  28, COL_BLACK, "I",      "I",          ALLEGRO_KEY_I          },
+    { 314,  74,  28,  28, COL_BLACK, "O",      "O",          ALLEGRO_KEY_O          },
+    { 346,  74,  28,  28, COL_BLACK, "P",      "P",          ALLEGRO_KEY_P          },
+    { 378,  74,  28,  28, COL_BLACK, "@",      "@",          ALLEGRO_KEY_OPENBRACE  },
+    { 410,  74,  28,  28, COL_BLACK, "[",      "[",          ALLEGRO_KEY_CLOSEBRACE },
+    { 442,  74,  28,  28, COL_BLACK, "_",      "_",          ALLEGRO_KEY_TILDE      },
+    { 474,  10,  28,  28, COL_GREY,  "UP",     "UP",         ALLEGRO_KEY_UP         },
+    { 474,  74,  28,  28, COL_GREY,  "DWN",    "DOWN",       ALLEGRO_KEY_DOWN       },
+    {  10, 106,  28,  28, COL_BLACK, "CLK",    "CAPS LOCK",  ALLEGRO_KEY_CAPSLOCK   },
+    {  42, 106,  28,  28, COL_BLACK, "CTL",    "CTRL",       ALLEGRO_KEY_LCTRL      },
+    {  74, 106,  28,  28, COL_BLACK, "A",      "A",          ALLEGRO_KEY_A          },
+    { 106, 106,  28,  28, COL_BLACK, "S",      "S",          ALLEGRO_KEY_S          },
+    { 138, 106,  28,  28, COL_BLACK, "D",      "D",          ALLEGRO_KEY_D          },
+    { 170, 106,  28,  28, COL_BLACK, "F",      "F",          ALLEGRO_KEY_F          },
+    { 202, 106,  28,  28, COL_BLACK, "G",      "G",          ALLEGRO_KEY_G          },
+    { 234, 106,  28,  28, COL_BLACK, "H",      "H",          ALLEGRO_KEY_H          },
+    { 266, 106,  28,  28, COL_BLACK, "J",      "J",          ALLEGRO_KEY_J          },
+    { 298, 106,  28,  28, COL_BLACK, "K",      "K",          ALLEGRO_KEY_K          },
+    { 330, 106,  28,  28, COL_BLACK, "L",      "L",          ALLEGRO_KEY_L          },
+    { 362, 106,  28,  28, COL_BLACK, ";",      ";",          ALLEGRO_KEY_SEMICOLON  },
+    { 394, 106,  28,  28, COL_BLACK, ":",      ":",          ALLEGRO_KEY_QUOTE      },
+    { 426, 106,  28,  28, COL_BLACK, "]",      "]",          ALLEGRO_KEY_BACKSLASH  },
+    { 458, 106,  60,  28, COL_BLACK, "RET",    "Return",     ALLEGRO_KEY_ENTER      },
+    {  10, 138,  28,  28, COL_BLACK, "SLK",    "Shift Lock", ALLEGRO_KEY_PAD_EQUALS },
+    {  42, 138,  44,  28, COL_BLACK, "SHIFT",  "Shift",      ALLEGRO_KEY_LSHIFT     },
+    {  90, 138,  28,  28, COL_BLACK, "Z",      "Z",          ALLEGRO_KEY_Z          },
+    { 122, 138,  28,  28, COL_BLACK, "X",      "X",          ALLEGRO_KEY_X          },
+    { 154, 138,  28,  28, COL_BLACK, "C",      "C",          ALLEGRO_KEY_C          },
+    { 186, 138,  28,  28, COL_BLACK, "V",      "V",          ALLEGRO_KEY_V          },
+    { 218, 138,  28,  28, COL_BLACK, "B",      "B",          ALLEGRO_KEY_B          },
+    { 250, 138,  28,  28, COL_BLACK, "N",      "N",          ALLEGRO_KEY_N          },
+    { 282, 138,  28,  28, COL_BLACK, "M",      "M",          ALLEGRO_KEY_M          },
+    { 314, 138,  28,  28, COL_BLACK, ",",      ",",          ALLEGRO_KEY_COMMA      },
+    { 346, 138,  28,  28, COL_BLACK, ".",      ".",          ALLEGRO_KEY_FULLSTOP   },
+    { 378, 138,  28,  28, COL_BLACK, "/",      "/",          ALLEGRO_KEY_SLASH      },
+    { 410, 138,  44,  28, COL_BLACK, "SHIFT",  "Shift",      ALLEGRO_KEY_RSHIFT     },
+    { 458, 138,  28,  28, COL_BLACK, "DEL",    "Delete",     ALLEGRO_KEY_DELETE     },
+    { 490, 138,  28,  28, COL_GREY,  "CPY",    "Copy",       ALLEGRO_KEY_END        },
+    { 122, 170, 256,  28, COL_BLACK, "SPACE",  "Space",      ALLEGRO_KEY_SPACE,     },
 
-    { 538,  10,  28,  28, COL_BLACK, "+",           "+",           0x3a },
-    { 570,  10,  28,  28, COL_BLACK, "-",           "-",           0x3b },
-    { 602,  10,  28,  28, COL_BLACK, "/",           "/",           0x4a },
-    { 634,  10,  28,  28, COL_BLACK, "*",           "*",           0x5b },
-    { 538,  42,  28,  28, COL_BLACK, "7",           "7",           0x1b },
-    { 570,  42,  28,  28, COL_BLACK, "8",           "8",           0x2a },
-    { 602,  42,  28,  28, COL_BLACK, "9",           "9",           0x2b },
-    { 634,  42,  28,  28, COL_BLACK, "#",           "#",           0x5a },
-    { 538,  74,  28,  28, COL_BLACK, "4",           "4",           0x7a },
-    { 570,  74,  28,  28, COL_BLACK, "5",           "5",           0x7b },
-    { 602,  74,  28,  28, COL_BLACK, "6",           "6",           0x1a },
-    { 634,  74,  28,  28, COL_BLACK, "DEL",         "Delete",      0x4b },
-    { 538, 106,  28,  28, COL_BLACK, "1",           "1",           0x6b },
-    { 570, 106,  28,  28, COL_BLACK, "2",           "2",           0x7c },
-    { 602, 106,  28,  28, COL_BLACK, "3",           "3",           0x6c },
-    { 634, 106,  28,  28, COL_BLACK, ",",           ",",           0x5c },
-    { 538, 138,  28,  28, COL_BLACK, "0",           "0",           0x6a },
-    { 570, 138,  28,  28, COL_BLACK, ".",           ".",           0x4c },
-    { 602, 138,  60,  28, COL_BLACK, "RETURN",      "Return",      0x3c },
-
-    { 116, 218,  96,  28, COL_GREEN, "Full Speed",  "Full Speed",  0xfe },
-    { 216, 218,  96,  28, COL_GREEN, "Pause",       "Pause",       0xfd },
-    { 316, 218,  96,  28, COL_GREEN, "Full Screen", "Full Screen", 0xfc },
-    { 416, 218,  96,  28, COL_GREEN, "Debug Break", "Debug Break", 0xfb }
+    { 538,  10,  28,  28, COL_BLACK, "+",      "+",          ALLEGRO_KEY_PAD_PLUS,  },
+    { 570,  10,  28,  28, COL_BLACK, "-",      "-",          ALLEGRO_KEY_PAD_MINUS, },
+    { 602,  10,  28,  28, COL_BLACK, "/",      "/",          ALLEGRO_KEY_PAD_SLASH, },
+    { 634,  10,  28,  28, COL_BLACK, "*",      "*",          ALLEGRO_KEY_PAD_ASTERISK, },
+    { 538,  42,  28,  28, COL_BLACK, "7",      "7",          ALLEGRO_KEY_PAD_7,     },
+    { 570,  42,  28,  28, COL_BLACK, "8",      "8",          ALLEGRO_KEY_PAD_8,     },
+    { 602,  42,  28,  28, COL_BLACK, "9",      "9",          ALLEGRO_KEY_PAD_9,     },
+    { 634,  42,  28,  28, COL_BLACK, "#",      "#",          ALLEGRO_KEY_DOWN,      },
+    { 538,  74,  28,  28, COL_BLACK, "4",      "4",          ALLEGRO_KEY_PAD_4,     },
+    { 570,  74,  28,  28, COL_BLACK, "5",      "5",          ALLEGRO_KEY_PAD_5,     },
+    { 602,  74,  28,  28, COL_BLACK, "6",      "6",          ALLEGRO_KEY_PAD_6,     },
+    { 634,  74,  28,  28, COL_BLACK, "DEL",    "Delete",     ALLEGRO_KEY_PAD_DELETE },
+    { 538, 106,  28,  28, COL_BLACK, "1",      "1",          ALLEGRO_KEY_PAD_1,     },
+    { 570, 106,  28,  28, COL_BLACK, "2",      "2",          ALLEGRO_KEY_PAD_2,     },
+    { 602, 106,  28,  28, COL_BLACK, "3",      "3",          ALLEGRO_KEY_PAD_3,     },
+    { 634, 106,  28,  28, COL_BLACK, ",",      ",",          ALLEGRO_KEY_HOME,      },
+    { 538, 138,  28,  28, COL_BLACK, "0",      "0",          ALLEGRO_KEY_PAD_0,     },
+    { 570, 138,  28,  28, COL_BLACK, ".",      ".",          ALLEGRO_KEY_PGDN,      },
+    { 602, 138,  60,  28, COL_BLACK, "RETURN", "Return",     ALLEGRO_KEY_PAD_ENTER  }
 };
 
-static const key_dlg_t master_kbd_dlg = { kcaps_master, kcaps_master + MASTER_NKEY, 676, 304 };
+static const key_dlg_t master_kbd_dlg = { kcaps_master, kcaps_master + MASTER_NKEY, 676, 256 };
 
-#define BTNS_Y    266
+static const char *allegro_std_key_names[] =
+{
+    "A",               "B",               "C",               "D",
+    "E",               "F",               "G",               "H",
+    "I",               "J",               "K",               "L",
+    "M",               "N",               "O",               "P",
+    "Q",               "R",               "S",               "T",
+    "U",               "V",               "W",               "X",
+    "Y",               "Z",               "0",               "1",
+    "2",               "3",               "4",               "5",
+    "6",               "7",               "8",               "9",
+    "Keypad 0",        "Keypad 1",        "Keypad 2",        "Keypad 3",
+    "Keypad 4",        "Keypad 5",        "Keypad 6",        "Keypad 7",
+    "Keypad 8",        "Keypad 9",        "F1",              "F2",
+    "F3",              "F4",              "F5",              "F6",
+    "F7",              "F8",              "F9",              "F10",
+    "F11",             "F12",             "Escape",          "Tilde",
+    "Minus",           "Equals",          "Backspace",       "Tab",
+    "Open brace",      "Close brace",     "Enter",           "Semicolon",
+    "Quote",           "Backslash",       "Backslash 2",     "Comma",
+    "Full stop",       "Slash",           "Space",           "Insert",
+    "Delete",          "Home",            "End",             "Page Up",
+    "Page Down",       "Left",            "Right",           "Up",
+    "Down",            "Keypad Slash",    "Keypad Asterisk", "Keypad Minus",
+    "Keypad Plus",     "Keypad Delete",   "Keypad Enter",    "Print Screen",
+    "Pause",           "ABNT_C1",         "Yen",             "Kana",
+    "Convert",         "No Convert",      "AT",              "Circumflex",
+    "Colon 2"          "Kanji",           "Keypad Equals",   "Back quote",
+    "Semicolon 2",     "Command",         "Back",            "Volume Up",
+    "Volume Down",     "Search",          "Dpad Centre",     "Button X",
+    "Button Y",        "Dpad Up",         "Dpad Down",       "Dpad Left",
+    "Dpad Right",      "Select",          "Start",           "Button L1",
+    "Button R1",       "Button L2",       "Button R2",       "Button A",
+    "Button B",        "Thumb L",         "Thumb R",         "Unknown"
+};
+
+static const char *allegro_mod_key_names[] =
+{
+    "Left Shift",      "Right Shift",     "Left Ctrl",       "Right Ctrl",
+    "Alt",             "Alt Gr",          "Left Windows",    "Right Windows",
+    "Menu",            "Scroll lock",     "Num Lock",        "Caps Lock"
+};
+
+#define BTNS_Y    218
 #define BTNS_W     60
 #define BTNS_H     28
 #define BTN_OK_X  201
@@ -241,7 +273,7 @@ static void draw_button(int x, int y, int w, int h, ALLEGRO_COLOR bcol, ALLEGRO_
 
 static void draw_keyboard(const key_dlg_t *key_dlg, int ok_x, int can_x)
 {
-    ALLEGRO_COLOR black, grey, white, red, brown, navy, green;
+    ALLEGRO_COLOR black, grey, white, red, brown, navy;
     const key_cap_t *kptr;
 
     black = al_map_rgb(  0,   0,   0);
@@ -250,7 +282,6 @@ static void draw_keyboard(const key_dlg_t *key_dlg, int ok_x, int can_x)
     brown = al_map_rgb( 64,  32,  32);
     red   = al_map_rgb(255,  64,  64);
     navy  = al_map_rgb( 32,  32,  64);
-    green = al_map_rgb(  0,  127,  0);
     al_clear_to_color(brown);
     for (kptr = key_dlg->captab; kptr < key_dlg->capend; kptr++) {
         switch(kptr->col) {
@@ -263,9 +294,6 @@ static void draw_keyboard(const key_dlg_t *key_dlg, int ok_x, int can_x)
             case COL_BLACK:
                 draw_button(kptr->x, kptr->y, kptr->w, kptr->h, black, white, kptr->cap);
                 break;
-            case COL_GREEN:
-                draw_button(kptr->x, kptr->y, kptr->w, kptr->h, green, white, kptr->cap);
-                break;
         }
     }
     draw_button(ok_x, BTNS_Y, BTNS_W, BTNS_H, navy, white, "OK");
@@ -273,7 +301,16 @@ static void draw_keyboard(const key_dlg_t *key_dlg, int ok_x, int can_x)
     al_flip_display();
 }
 
-static void redef_message(const key_dlg_t *key_dlg, const key_cap_t *kptr, uint8_t *keylookcpy)
+static const char *allegro_key_name(int keycode)
+{
+    if (keycode >= 1 && keycode <= ALLEGRO_KEY_UNKNOWN)
+        return allegro_std_key_names[keycode-1];
+    if (keycode >= ALLEGRO_KEY_MODIFIERS && keycode <= ALLEGRO_KEY_MAX)
+        return allegro_mod_key_names[keycode-ALLEGRO_KEY_MODIFIERS];
+    return "Unknown";
+}
+
+static void redef_message(const key_dlg_t *key_dlg, const key_cap_t *kptr, int *keylookcpy)
 {
     int mid_x  = key_dlg->disp_x/2;
     int left_x = mid_x-200;
@@ -282,7 +319,8 @@ static void redef_message(const key_dlg_t *key_dlg, const key_cap_t *kptr, uint8
     ALLEGRO_COLOR navy = al_map_rgb( 32,  32,  64);
     ALLEGRO_COLOR white = al_map_rgb(255, 255, 255);
     char s[1024], *p;
-    int size, remain, count;
+    int size, remain, code, count;
+    const char *fmt;
 
     log_debug("keydef-allegro: BBC key %s (%s), code %d clicked", kptr->cap, kptr->name, kptr->keycode);
 
@@ -293,19 +331,12 @@ static void redef_message(const key_dlg_t *key_dlg, const key_cap_t *kptr, uint8
     p = s + size;
     remain = sizeof s - size;
     count = 0;
-    int actcode = 0xff - kptr->keycode;
-    if (actcode >= 0) {
-        const char *fmt = keyactions[actcode].altstate ? "Alt-%s" : "%s";
-        snprintf(p, remain, fmt, al_keycode_to_name(keyactions[actcode].keycode));
-    }
-    else {
-        for (int code = 0; remain > 0 && code < ALLEGRO_KEY_MAX; code++) {
-            if (keylookcpy[code] == kptr->keycode) {
-                const char *fmt = count == 0 ? " %s" : ", %s";
-                size = snprintf(p, remain, fmt, al_keycode_to_name(code));
-                p += size;
-                remain -= size;
-            }
+    for (code = 0; remain > 0 && code < ALLEGRO_KEY_MAX; code++) {
+        if (keylookcpy[code] == kptr->keycode) {
+            fmt = count == 0 ? " %s" : ", %s";
+            size = snprintf(p, remain, fmt, allegro_key_name(code));
+            p += size;
+            remain -= size;
         }
     }
     al_draw_text(font, white, left_x+24, top_y+32, ALLEGRO_ALIGN_LEFT, s);
@@ -325,11 +356,9 @@ static void *keydef_thread(ALLEGRO_THREAD *thread, void *tdata)
     ALLEGRO_EVENT_QUEUE *queue;
     ALLEGRO_EVENT event;
     state_t state;
-    uint8_t keylookcpy[ALLEGRO_KEY_MAX];
-    struct key_act_lookup keyactioncpy[KEY_ACTION_MAX];
+    int keylookcpy[ALLEGRO_KEY_MAX];
     const key_cap_t *kptr = NULL;
     int mid_x, ok_x, can_x;
-    bool alt_down = false;
 
     if (!font) {
         al_init_font_addon();
@@ -350,8 +379,7 @@ static void *keydef_thread(ALLEGRO_THREAD *thread, void *tdata)
             ok_x = mid_x-3-BTNS_W;
             can_x = mid_x+3;
             state = ST_BBC_KEY;
-            memcpy(keylookcpy, keylookup, ALLEGRO_KEY_MAX);
-            memcpy(keyactioncpy, keyactions, KEY_ACTION_MAX * sizeof(struct key_act_lookup));
+            memcpy(keylookcpy, keylookup, ALLEGRO_KEY_MAX * sizeof(int));
             draw_keyboard(key_dlg, ok_x, can_x);
             while (state != ST_DONE) {
                 al_wait_for_event(queue, &event);
@@ -359,8 +387,7 @@ static void *keydef_thread(ALLEGRO_THREAD *thread, void *tdata)
                     case ALLEGRO_EVENT_MOUSE_BUTTON_DOWN:
                         if (mouse_within(&event, ok_x, BTNS_Y, BTNS_W, BTNS_H)) {
                             // Ok button clicked.
-                            memcpy(keylookup, keylookcpy, ALLEGRO_KEY_MAX);
-                            memcpy(keyactions, keyactioncpy, KEY_ACTION_MAX * sizeof(struct key_act_lookup));
+                            memcpy(keylookup, keylookcpy, ALLEGRO_KEY_MAX * sizeof(int));
                             state = ST_DONE;
                         }
                         else if (mouse_within(&event, can_x, BTNS_Y, BTNS_W, BTNS_H)) {
@@ -384,37 +411,15 @@ static void *keydef_thread(ALLEGRO_THREAD *thread, void *tdata)
                         }
                         break;
                     case ALLEGRO_EVENT_DISPLAY_CLOSE:
-                        memcpy(keylookup, keylookcpy, ALLEGRO_KEY_MAX);
-                        memcpy(keyactions, keyactioncpy, KEY_ACTION_MAX * sizeof(struct key_act_lookup));
+                        memcpy(keylookup, keylookcpy, ALLEGRO_KEY_MAX * sizeof(int));
                         state = ST_DONE;
                         break;
                     case ALLEGRO_EVENT_KEY_DOWN:
-                        if (event.keyboard.keycode == ALLEGRO_KEY_ALT || event.keyboard.keycode == ALLEGRO_KEY_ALTGR) {
-                            log_debug("keydef-allegro: alt down");
-                            alt_down = true;
-                        }
-                        break;
-                    case ALLEGRO_EVENT_KEY_CHAR:
                         if (state == ST_PC_KEY) {
-                            int keycode = key_map_keypad(&event);
-                            int actcode = 0xff - kptr->keycode;
-                            if (actcode >= 0) {
-                                log_debug("keydef-allegro: mapping allegro code %d:%s to action#%d:%s, alt=%d", keycode, al_keycode_to_name(keycode), actcode, kptr->name, alt_down);
-                                keyactioncpy[actcode].keycode = keycode;
-                                keyactioncpy[actcode].altstate = alt_down;
-                            }
-                            else {
-                                log_debug("keydef-allegro: mapping allegro code %d:%s to BBC code %02x", keycode, al_keycode_to_name(keycode), kptr->keycode);
-                                keylookcpy[event.keyboard.keycode] = kptr->keycode;
-                            }
+                            log_debug("keydef-allegro: mapping %d to %d", event.keyboard.keycode, kptr->keycode);
+                            keylookcpy[event.keyboard.keycode] = kptr->keycode;
                             state = ST_BBC_KEY;
                             draw_keyboard(key_dlg, ok_x, can_x);
-                        }
-                        break;
-                    case ALLEGRO_EVENT_KEY_UP:
-                        if (event.keyboard.keycode == ALLEGRO_KEY_ALT || event.keyboard.keycode == ALLEGRO_KEY_ALTGR) {
-                            log_debug("keydef-allegro: alt up");
-                            alt_down = false;
                         }
                 }
             }

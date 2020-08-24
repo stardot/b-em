@@ -375,7 +375,7 @@ void joystick_axis(ALLEGRO_EVENT *event)
     }
 }
 
-static void joystick_button(ALLEGRO_EVENT *event, bool value, void (*key_func)(uint8_t bbckey))
+static void joystick_button(ALLEGRO_EVENT *event, bool value, void (*key_func)(int keycode))
 {
     joystick_map_t *js;
     js_btn_map_t *btn;

@@ -1,11 +1,9 @@
 #include "b-em.h"
-#include "main.h"
 #include "via.h"
 #include "sysvia.h"
 #include "keyboard.h"
 #include "model.h"
 #include "6502.h"
-#include "video_render.h"
 #include <ctype.h>
 
 /*
@@ -23,7 +21,7 @@
  * The diagram in the original version of The Advanced User Guide is
  * slighly misleading because the bits as seen by the 74LS251 do not
  * match the rows shown in the diagram.  From a software perspective
- * the keyboard looks like this:
+ * the keybaord looks like this:
  *
  *       0x00      0x01  0x02  0x03 0x04 0x05 0x06 0x07 0x08 0x09    0x0a   0x0b   0x0c
  * 0x00  Shift     Ctrl  <------- starup up DIP swicthes ------->
@@ -33,13 +31,13 @@
  * 0x40  CapsLck   A     X     F    Y    J    K    @    :*   Return  KP /   KP Del KP .
  * 0x50  ShiftLck  S     C     G    H    N    L    ;+   ]}   Delete  KP #   KP *   KP ,
  * 0x60  Tab       Z     SPC   V    B    M    <,   >.   /?   Copy    KP 0   KP 1   KP 3
- * 0x70  ESC       f1    f2    f3   f5   f6   f8   f9   \    Right   KP 4   KP 5   KP 2
+ * 0x70  ESC       f1    f2    f3   f5   f6   f8   f9   \    Right   KP 4   KP 4   KP 2
  *
 */
 
 /* This keymap is used for physical mode. */
 
-const uint8_t key_allegro2bbc[ALLEGRO_KEY_MAX] =
+static const uint8_t allegro2bbc[ALLEGRO_KEY_MAX] =
 {
     0xaa,   // 0
     0x41,   // 1    ALLEGRO_KEY_A
@@ -281,7 +279,7 @@ const uint8_t key_allegro2bbc[ALLEGRO_KEY_MAX] =
 // Note that not all keys generate an ALLEGRO_EVENT_KEY_CHAR, so some
 // of the entries in this table can never be accessed.
 
-static const uint8_t allegro2bbclogical[ALLEGRO_KEY_MAX] =
+static uint8_t allegro2bbclogical[ALLEGRO_KEY_MAX] =
 {
     0xbb,   // 0
     0x41,   // 1    ALLEGRO_KEY_A
@@ -652,37 +650,14 @@ static uint16_t ascii2bbc[] =
     0x59            // 0x7f DEL
 };
 
-static int keycol, keyrow;
-static int bbcmaxtrix[16][16];
-static int hostshift, hostctrl, hostalt;
-
-static void debug_break(void)
-{
-    if (debug_core || debug_tube)
-        debug_step = 1;
-}
-
-static void stop_full_speed(void)
-{
-    main_stop_fullspeed(hostshift);
-}
-
-static void do_nothing(void) {}
-
-const struct key_act_const keyact_const[KEY_ACTION_MAX] = {
-    { "break",        ALLEGRO_KEY_F12,   false, main_key_break,          do_nothing      },
-    { "full-Speed",   ALLEGRO_KEY_PGUP,  false, main_start_fullspeed,    stop_full_speed },
-    { "pause",        ALLEGRO_KEY_PGDN,  false, main_key_pause,          do_nothing      },
-    { "full-screen1", ALLEGRO_KEY_F11,   false, video_toggle_fullscreen, do_nothing      },
-    { "debug-break",  ALLEGRO_KEY_F10,   false, debug_break,             do_nothing      },
-    { "full-screen2", ALLEGRO_KEY_ENTER, true,  video_toggle_fullscreen, do_nothing      }
-};
-
-uint8_t keylookup[ALLEGRO_KEY_MAX];
-struct key_act_lookup keyactions[KEY_ACTION_MAX];
+int keylookup[ALLEGRO_KEY_MAX];
 bool keyas  = false;
 bool keypad = false;
 bool keylogical = false;
+
+static int keycol, keyrow;
+static int bbckey[16][16];
+static int hostshift, hostctrl;
 
 typedef enum {
     KP_IDLE,
@@ -713,13 +688,12 @@ static unsigned char *key_paste_ptr;
 static uint8_t key_paste_vkey_down;
 static bool key_paste_shift;
 static bool key_paste_ctrl;
-static int last_unichar[ALLEGRO_KEY_MAX];
 
 void key_reset()
 {
     for (int c = 0; c < 16; c++)
         for (int r = 0; r < 16; r++)
-            bbcmaxtrix[c][r] = 0;
+            bbckey[c][r] = 0;
     sysvia_set_ca2(0);
 
     kp_state = KP_IDLE;
@@ -730,24 +704,6 @@ void key_reset()
     key_paste_ctrl = false;
 }
 
-void key_init(void)
-{
-    memcpy(keylookup, key_allegro2bbc, sizeof(key_allegro2bbc));
-    for (int i =0; i < KEY_ACTION_MAX; i++) {
-        keyactions[i].keycode = keyact_const[i].keycode;
-        keyactions[i].altstate = keyact_const[i].altstate;
-    }
-    key_reset();
-}
-
-void key_lost_focus(void)
-{
-    key_reset();
-    hostshift = false;
-    hostctrl = false;
-    hostalt = false;
-}
-
 static void key_update()
 {
     int maxcol = (MASTER) ? 13 : 10;
@@ -755,7 +711,7 @@ static void key_update()
         /* autoscan mode */
         for (int col = 0; col < maxcol; col++) {
             for (int row = 1; row < 8; row++) {
-                if (bbcmaxtrix[col][row]) {
+                if (bbckey[col][row]) {
                     sysvia_set_ca2(1);
                     return;
                 }
@@ -766,7 +722,7 @@ static void key_update()
         /* scan specific key mode */
         if (keycol < maxcol) {
             for (int row = 1; row < 8; row++) {
-                if (bbcmaxtrix[keycol][row]) {
+                if (bbckey[keycol][row]) {
                     sysvia_set_ca2(1);
                     return;
                 }
@@ -788,6 +744,19 @@ static const int map_keypad[] = {
     /* ALLEGRO_KEY_PAD_8 */ ALLEGRO_KEY_UP,
     /* ALLEGRO_KEY_PAD_9 */ ALLEGRO_KEY_PGUP
 };
+
+int key_map(const ALLEGRO_EVENT *event)
+{
+    int keycode = event->keyboard.keycode;
+    int mapcode = keycode;
+    if (mapcode < ALLEGRO_KEY_MAX) {
+        if (mapcode == ALLEGRO_KEY_A && keyas)
+            mapcode = ALLEGRO_KEY_CAPSLOCK;
+        mapcode = keylookup[mapcode];
+    }
+    log_debug("keyboard: mapping %d:%s to %d:%s", keycode, al_keycode_to_name(keycode), mapcode, al_keycode_to_name(mapcode));
+    return mapcode;
+}
 
 static void key_paste_add_vkey(uint8_t vkey1, uint8_t vkey2)
 {
@@ -977,129 +946,98 @@ static void set_logical_shift_ctrl_if_idle()
         key_paste_add_combo(0xaa, hostshift, hostctrl);
 }
 
-void key_down(uint8_t bbckey)
+static void set_key(int code, int state)
 {
-    if (bbckey != 0xaa) {
-        log_debug("keyboard: BBC key down %02x", bbckey);
-        bbcmaxtrix[bbckey & 15][bbckey >> 4] = true;
-        key_update();
-    }
-}
+    unsigned vkey;
 
-void key_down_event(const ALLEGRO_EVENT *event)
-{
-    int keycode = event->keyboard.keycode;
-    log_debug("keyboard: key down event, keycode=%d:%s", keycode, al_keycode_to_name(keycode));
-    if (keycode == ALLEGRO_KEY_ALT || keycode == ALLEGRO_KEY_ALTGR)
-        hostalt = true;
-    else if (keycode == ALLEGRO_KEY_CAPSLOCK)
-            key_down(keylookup[keycode]);
+    // We need to track the current state of the host's SHIFT and CTRL keys;
+    // in logical keyboard mode these have only a loose connection with the
+    // emulated keyboard in bbckey[][].
+    bool shiftctrl = false;
+    if ((code == ALLEGRO_KEY_LSHIFT) || (code == ALLEGRO_KEY_RSHIFT)) {
+        hostshift = state;
+        shiftctrl = true;
+    }
+    else if ((code == ALLEGRO_KEY_LCTRL) || (code == ALLEGRO_KEY_RCTRL)) {
+        hostctrl = state;
+        shiftctrl = true;
+    }
+
+    if (!keylogical || (code == ALLEGRO_KEY_CAPSLOCK) || (code == ALLEGRO_KEY_F12)) {
+        vkey = allegro2bbc[code];
+        log_debug("keyboard: set_key code=%d, vkey=&%02X, state=%d", code, vkey, state);
+        if (vkey != 0xaa) {
+            bbckey[vkey & 15][vkey >> 4] = state;
+            key_update();
+        }
+    }
     else {
-        bool shiftctrl = false;
-        if (keycode == ALLEGRO_KEY_LSHIFT || keycode == ALLEGRO_KEY_RSHIFT) {
-            hostshift = true;
-            shiftctrl = true;
-        }
-        else if (keycode == ALLEGRO_KEY_LCTRL || keycode == ALLEGRO_KEY_RCTRL) {
-            hostctrl = true;
-            shiftctrl = true;
-        }
-        if (shiftctrl) {
-            if (keylogical)
-                set_logical_shift_ctrl_if_idle();
-            else
-                key_down(keylookup[keycode]);
-        }
+        if (shiftctrl)
+            set_logical_shift_ctrl_if_idle();
+        else if (state == 0)
+            set_key_logical(code, 0, state);
     }
 }
 
-int key_map_keypad(const ALLEGRO_EVENT *event)
+void key_down(int code)
 {
-    int keycode = event->keyboard.keycode;
-    if (keycode >= ALLEGRO_KEY_PAD_0 && keycode <= ALLEGRO_KEY_PAD_9 && (keypad || keylogical)) {
-        int unichar = event->keyboard.unichar;
-        if (unichar < '0' || unichar > '9') {
-            int newcode = map_keypad[keycode-ALLEGRO_KEY_PAD_0];
-            log_debug("keyboard: mapping keypad key %d:%s to %d:%s", keycode, al_keycode_to_name(keycode), newcode, al_keycode_to_name(newcode));
-            return newcode;
-        }
-    }
-    return keycode;
+    if (code < ALLEGRO_KEY_PAD_0 || code > ALLEGRO_KEY_PAD_9)
+        set_key(code, 1);
+    /* in keypad mode, processing of keypad keys is delayed until the KEY_CHAR event */
 }
 
-void key_char_event(const ALLEGRO_EVENT *event)
+static int last_unichar[ALLEGRO_KEY_MAX];
+
+void key_up(int code)
+{
+    if (code >= ALLEGRO_KEY_PAD_0 && code <= ALLEGRO_KEY_PAD_9 && (keypad || keylogical))
+        if (last_unichar[code] < '0' || last_unichar[code] > '9')
+            code = map_keypad[code-ALLEGRO_KEY_PAD_0];
+    set_key(code, 0);
+}
+
+/*
+ * Handle KEY_CHAR events.  This serves two purposes.  In logical
+ * keyboard mode all keystrokes are processed here and turned into
+ * "key down" events sent to set_key_logical().  Even in physical
+ * keyboard mode, if PC/XT keypad support is enabled, keys from the
+ * PC keypad are procesed here to see if they should generate a number
+ * or a cursor movement.
+ */
+
+void key_char(const ALLEGRO_EVENT *event)
 {
     int keycode = event->keyboard.keycode;
     int unichar = event->keyboard.unichar;
-    log_debug("keyboard: key char event, keycode=%d:%s, unichar=%d", keycode, al_keycode_to_name(keycode), unichar);
-    if ((!event->keyboard.repeat || unichar != last_unichar[keycode]) && keycode < ALLEGRO_KEY_MAX) {
+
+    /* KEY_CHAR events indicate if the event is for an auto-repeating
+     * key, and we ignore such events because we're passing key up/down
+     * events through to the emulated machine and its OS is handling
+     * auto-repeat.
+     *
+     * However, if a key is held down on the host but SHIFT is pressed
+     * then released, when the KEY_CHAR event comes through on SHIFT
+     * being released the unichar has changed but the repeat flag is
+     * still set. We want to consider such an event for changing the
+     * emulated machine's keyboard state, so we need to detect this
+     * happening and process such an event even if the repeat flag
+     * is set. (To see this happening, on a keyboard with ":" on
+     * SHIFT+";", hold down ";" and then intermittently press the
+     * SHIFT key.)
+     */
+    if ((!event->keyboard.repeat || unichar != last_unichar[keycode]) && keycode != ALLEGRO_KEY_F12) {
         last_unichar[keycode] = unichar;
-        if (keycode >= ALLEGRO_KEY_PAD_0 && keycode <= ALLEGRO_KEY_PAD_9 && (unichar < '0' || unichar > '9') && (keypad || keylogical)) {
-            int newcode = map_keypad[keycode-ALLEGRO_KEY_PAD_0];
-            log_debug("keyboard: mapping keypad key %d:%s to %d:%s", keycode, al_keycode_to_name(keycode), newcode, al_keycode_to_name(newcode));
-            keycode = newcode;
-        }
-        else if (keycode == ALLEGRO_KEY_A && keyas && !keylogical)
-            keycode = ALLEGRO_KEY_CAPSLOCK;
-        for (int act = 0; act < KEY_ACTION_MAX; act++) {
-            log_debug("keyboard: checking key action %d:%s codes %d<>%d, alt %d<>%d", act, keyact_const[act].name, keycode, keyactions[act].keycode, hostalt, keyactions[act].altstate);
-            if (keycode == keyactions[act].keycode && keyactions[act].altstate == hostalt) {
-                keyact_const[act].downfunc();
-                return;
-            }
-        }
-        if (keylogical)
-            set_key_logical(keycode, unichar, true);
-        else
-            key_down(keylookup[keycode]);
-    }
-}
-
-void key_up(uint8_t bbckey)
-{
-    if (bbckey != 0xaa) {
-        log_debug("keyboard: BBC key up %02x", bbckey);
-        bbcmaxtrix[bbckey & 15][bbckey >> 4] = false;
-        key_update();
-    }
-}
-
-void key_up_event(const ALLEGRO_EVENT *event)
-{
-    int keycode = event->keyboard.keycode;
-    log_debug("keyboard: key up event, keycode=%d:%s", keycode, al_keycode_to_name(keycode));
-    if (keycode < ALLEGRO_KEY_MAX) {
-        if (keycode == ALLEGRO_KEY_ALT || keycode == ALLEGRO_KEY_ALTGR)
-            hostalt = false;
-        else if (keycode == ALLEGRO_KEY_CAPSLOCK)
-            key_up(keylookup[keycode]);
-        else {
-            int unichar = last_unichar[keycode];
-            bool shiftctrl = false;
-            if (keycode == ALLEGRO_KEY_LSHIFT || keycode == ALLEGRO_KEY_RSHIFT) {
-                hostshift = false;
-                shiftctrl = true;
-            }
-            else if (keycode == ALLEGRO_KEY_LCTRL || keycode == ALLEGRO_KEY_RCTRL) {
-                hostctrl = false;
-                shiftctrl = true;
-            }
-            if (shiftctrl && keylogical)
-                set_logical_shift_ctrl_if_idle();
-            if (keycode >= ALLEGRO_KEY_PAD_0 && keycode <= ALLEGRO_KEY_PAD_9 && (unichar < '0' || unichar > '9') && (keypad || keylogical))
+        /* Translate the numeric keypad? */
+        if (keycode >= ALLEGRO_KEY_PAD_0 && keycode <= ALLEGRO_KEY_PAD_9) {
+            if  ((unichar < '0' || unichar > '9') && (keypad||keylogical))
                 keycode = map_keypad[keycode-ALLEGRO_KEY_PAD_0];
-            for (int act = 0; act < KEY_ACTION_MAX; act++) {
-                log_debug("keyboard: checking key action %d:%s codes %d<>%d, alt %d<>%d", act, keyact_const[act].name, keycode, keyactions[act].keycode, hostalt, keyactions[act].altstate);
-                if (keycode == keyactions[act].keycode && keyactions[act].altstate == hostalt) {
-                    keyact_const[act].upfunc();
-                    return;
-                }
-            }
             if (keylogical)
-                set_key_logical(keycode, unichar, false);
+                set_key_logical(keycode, unichar, 1);
             else
-                key_up(keylookup[keycode]);
+                set_key(keycode, 1);
         }
+        else if (keylogical)
+            set_key_logical(keycode, unichar, 1);
     }
 }
 
@@ -1123,7 +1061,7 @@ void key_paste_poll(void)
                         col = 0;
                     case VKEY_CTRL_EVENT:
                     case VKEY_CTRL_EVENT|1:
-                        bbcmaxtrix[col][0] = vkey & 1;
+                        bbckey[col][0] = vkey & 1;
                         key_update();
                         kp_state = KP_NEXT;
                         break;
@@ -1135,7 +1073,7 @@ void key_paste_poll(void)
                     case VKEY_UP:
                         vkey = *key_paste_ptr++;
                         log_debug("keyboard: key_paste_poll up vkey=&%02x", vkey);
-                        bbcmaxtrix[vkey & 15][vkey >> 4] = 0;
+                        bbckey[vkey & 15][vkey >> 4] = 0;
                         key_update();
                         kp_state = KP_NEXT;
                         break;
@@ -1160,7 +1098,7 @@ void key_paste_poll(void)
         case KP_DOWN:
             vkey = *key_paste_ptr++;
             log_debug("keyboard: key_paste_poll down vkey=&%02x", vkey);
-            bbcmaxtrix[vkey & 15][vkey >> 4] = 1;
+            bbckey[vkey & 15][vkey >> 4] = 1;
             key_update();
             kp_state = KP_DELAY;
             break;
@@ -1181,7 +1119,7 @@ bool key_is_down(void) {
     if (keyrow == 0 && keycol >= 2 && keycol <= 9)
         return kbdips & (1 << (9 - keycol));
     else
-        return bbcmaxtrix[keycol][keyrow];
+        return bbckey[keycol][keyrow];
 }
 
 bool key_any_down(void)
@@ -1189,7 +1127,7 @@ bool key_any_down(void)
     if (!keylogical) {
         for (int c = 0; c < 16; c++)
             for (int r = 1; r < 16; r++)
-                if (bbcmaxtrix[c][r])
+                if (bbckey[c][r])
                     return true;
         return false;
     }
@@ -1200,10 +1138,10 @@ bool key_any_down(void)
 bool key_code_down(int code)
 {
     if (code < ALLEGRO_KEY_MAX) {
-        code = key_allegro2bbc[code];
+        code = allegro2bbc[code];
         assert((code != 0x00) && (code != 0x01)); // not SHIFT or CTRL
         if (!keylogical)
-            return bbcmaxtrix[code & 0x0f][code >> 4];
+            return bbckey[code & 0x0f][code >> 4];
         else
             return (key_paste_vkey_down != 0) && (key_paste_vkey_down == code);
     }
