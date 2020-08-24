@@ -653,7 +653,7 @@ static uint16_t ascii2bbc[] =
 };
 
 static int keycol, keyrow;
-static int bbcmaxtrix[16][16];
+static int bbcmatrix[16][16];
 static int hostshift, hostctrl, hostalt;
 
 static void debug_break(void)
@@ -719,7 +719,7 @@ void key_reset()
 {
     for (int c = 0; c < 16; c++)
         for (int r = 0; r < 16; r++)
-            bbcmaxtrix[c][r] = 0;
+            bbcmatrix[c][r] = 0;
     sysvia_set_ca2(0);
 
     kp_state = KP_IDLE;
@@ -755,7 +755,7 @@ static void key_update()
         /* autoscan mode */
         for (int col = 0; col < maxcol; col++) {
             for (int row = 1; row < 8; row++) {
-                if (bbcmaxtrix[col][row]) {
+                if (bbcmatrix[col][row]) {
                     sysvia_set_ca2(1);
                     return;
                 }
@@ -766,7 +766,7 @@ static void key_update()
         /* scan specific key mode */
         if (keycol < maxcol) {
             for (int row = 1; row < 8; row++) {
-                if (bbcmaxtrix[keycol][row]) {
+                if (bbcmatrix[keycol][row]) {
                     sysvia_set_ca2(1);
                     return;
                 }
@@ -981,7 +981,7 @@ void key_down(uint8_t bbckey)
 {
     if (bbckey != 0xaa) {
         log_debug("keyboard: BBC key down %02x", bbckey);
-        bbcmaxtrix[bbckey & 15][bbckey >> 4] = true;
+        bbcmatrix[bbckey & 15][bbckey >> 4] = true;
         key_update();
     }
 }
@@ -1059,7 +1059,7 @@ void key_up(uint8_t bbckey)
 {
     if (bbckey != 0xaa) {
         log_debug("keyboard: BBC key up %02x", bbckey);
-        bbcmaxtrix[bbckey & 15][bbckey >> 4] = false;
+        bbcmatrix[bbckey & 15][bbckey >> 4] = false;
         key_update();
     }
 }
@@ -1123,7 +1123,7 @@ void key_paste_poll(void)
                         col = 0;
                     case VKEY_CTRL_EVENT:
                     case VKEY_CTRL_EVENT|1:
-                        bbcmaxtrix[col][0] = vkey & 1;
+                        bbcmatrix[col][0] = vkey & 1;
                         key_update();
                         kp_state = KP_NEXT;
                         break;
@@ -1135,7 +1135,7 @@ void key_paste_poll(void)
                     case VKEY_UP:
                         vkey = *key_paste_ptr++;
                         log_debug("keyboard: key_paste_poll up vkey=&%02x", vkey);
-                        bbcmaxtrix[vkey & 15][vkey >> 4] = 0;
+                        bbcmatrix[vkey & 15][vkey >> 4] = 0;
                         key_update();
                         kp_state = KP_NEXT;
                         break;
@@ -1160,7 +1160,7 @@ void key_paste_poll(void)
         case KP_DOWN:
             vkey = *key_paste_ptr++;
             log_debug("keyboard: key_paste_poll down vkey=&%02x", vkey);
-            bbcmaxtrix[vkey & 15][vkey >> 4] = 1;
+            bbcmatrix[vkey & 15][vkey >> 4] = 1;
             key_update();
             kp_state = KP_DELAY;
             break;
@@ -1181,7 +1181,7 @@ bool key_is_down(void) {
     if (keyrow == 0 && keycol >= 2 && keycol <= 9)
         return kbdips & (1 << (9 - keycol));
     else
-        return bbcmaxtrix[keycol][keyrow];
+        return bbcmatrix[keycol][keyrow];
 }
 
 bool key_any_down(void)
@@ -1189,7 +1189,7 @@ bool key_any_down(void)
     if (!keylogical) {
         for (int c = 0; c < 16; c++)
             for (int r = 1; r < 16; r++)
-                if (bbcmaxtrix[c][r])
+                if (bbcmatrix[c][r])
                     return true;
         return false;
     }
@@ -1203,7 +1203,7 @@ bool key_code_down(int code)
         code = key_allegro2bbc[code];
         assert((code != 0x00) && (code != 0x01)); // not SHIFT or CTRL
         if (!keylogical)
-            return bbcmaxtrix[code & 0x0f][code >> 4];
+            return bbcmatrix[code & 0x0f][code >> 4];
         else
             return (key_paste_vkey_down != 0) && (key_paste_vkey_down == code);
     }
