@@ -422,7 +422,7 @@ b-em [discimage|tapeimage|snapshot] [-u name.uef] [-mx] [-tx] [-i] [-c] [-fx] [-
 
 `-fasttape` - speeds up tape access
 
-`-spx` - emlation speed where x is 0 to 9 (default = 4)
+`-spx` - emulation speed where x is 0 to 9 (default = 4)
 
 
 IDE Hard Discs
