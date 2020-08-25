@@ -139,6 +139,7 @@ static const char helptext[] =
     "-Fx             - set maximum video frames skipped\n"
     "-s              - scanlines display mode\n"
     "-i              - interlace display mode\n"
+    "-spx             - Emulation speed x from 0 to 9 (default 4)\n"
     "-debug          - start debugger\n"
     "-debugtube      - start debugging tube processor\n\n";
 
@@ -170,9 +171,14 @@ void main_init(int argc, char *argv[])
     model_loadcfg();
 
     for (c = 1; c < argc; c++) {
-        if (!strcasecmp(argv[c], "--help")) {
+        if (!strcasecmp(argv[c], "--help") || !strcasecmp(argv[c], "-?") || !strcasecmp(argv[c], "-h")) {
             fwrite(helptext, sizeof helptext-1, 1, stdout);
             exit(1);
+        }
+        else if (!strncasecmp(argv[c], "-sp", 3)) {
+            sscanf(&argv[c][3], "%i", &emuspeed);
+            if(!(emuspeed < NUM_EMU_SPEEDS))
+                emuspeed = 4;
         }
         else if (!strcasecmp(argv[c], "-tape"))
             tapenext = 2;
@@ -316,6 +322,7 @@ void main_init(int argc, char *argv[])
         gui_set_disc_wprot(0, writeprot[0]);
     if (discfns[1])
         gui_set_disc_wprot(1, writeprot[1]);
+    main_setspeed(emuspeed);        
     debug_start();
 }
 
