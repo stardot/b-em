@@ -1,7 +1,7 @@
 #ifndef __INC_MAIN_H
 #define __INC_MAIN_H
 
-#define NUM_EMU_SPEEDS   12
+#define NUM_EMU_SPEEDS   10
 #define EMU_SPEED_FULL   255
 #define EMU_SPEED_PAUSED 254
 

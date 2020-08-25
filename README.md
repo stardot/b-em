@@ -366,7 +366,7 @@ Command Line Options
 ====================
 
 ```
-b-em [discimage|tapeimage|snapshot] [-u name.uef] [-mx] [-tx] [-i] [-c] [-fx]
+b-em [discimage|tapeimage|snapshot] [-u name.uef] [-mx] [-tx] [-i] [-c] [-fx] [-spx]
 ```
 
 `discimage` name.ssd/dsd/adf/adl/img etc.
@@ -421,6 +421,8 @@ b-em [discimage|tapeimage|snapshot] [-u name.uef] [-mx] [-tx] [-i] [-c] [-fx]
 `-fx` - set frameskip to x (1-9, 1=no skip)
 
 `-fasttape` - speeds up tape access
+
+`-spx` - emlation speed where x is 0 to 9 (default = 4)
 
 
 IDE Hard Discs
