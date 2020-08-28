@@ -759,6 +759,8 @@ ALLEGRO_DISPLAY *video_init(void)
     al_set_new_display_flags(ALLEGRO_WINDOWED | ALLEGRO_RESIZABLE);
 #endif
     video_set_window_size(true);
+
+    al_set_new_display_option(ALLEGRO_VSYNC, 2, ALLEGRO_SUGGEST);
     if ((display = al_create_display(winsizex, winsizey)) == NULL) {
         log_fatal("video: unable to create display");
         exit(1);
