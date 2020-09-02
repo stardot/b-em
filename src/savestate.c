@@ -204,7 +204,7 @@ void savestate_dosave(void)
     save_sect('r', serial_savestate);
     save_sect('F', vdfs_savestate);
     save_sect('5', music5000_savestate);
-    save_sect('P', paula_savestate);
+    save_sect('p', paula_savestate);
     if (curtube != -1) {
         save_sect('T', tube_ula_savestate);
         save_zlib('P', tube_proc_savestate);
@@ -233,7 +233,6 @@ static void load_state_one(void)
     serial_loadstate(savestate_fp);
     vdfs_loadstate(savestate_fp);
     music5000_loadstate(savestate_fp);
-    paula_loadstate(savestate_fp);
 
     log_debug("savestate: loaded V1 snapshot file");
 }
@@ -342,6 +341,8 @@ static void load_state_two(void)
                 if (tube_proc_loadstate)
                     load_zlib(size, tube_proc_loadstate);
                 break;
+            case 'p':
+                paula_loadstate(savestate_fp);
         }
         end = ftell(savestate_fp);
         if (end == start) {
