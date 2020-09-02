@@ -52,21 +52,25 @@ static void set_intern_dtype(enum vid_disptype dtype)
     vid_dtype_intern = dtype;
 }
 
+static void crtc_setreg(int reg, uint8_t val)
+{
+    val &= crtc_mask[reg];
+    crtc[reg] = val;
+    if (crtc_i == 6 && vc == val)
+        vdispen = 0;
+    else if (reg == 8)
+        set_intern_dtype(vid_dtype_user);
+    else if (reg == 12)
+        ttxbank = (MASTER|BPLUS) ? 0x7c00 : 0x3C00 | ((val & 0x8) << 11);
+}
+
 void crtc_write(uint16_t addr, uint8_t val)
 {
 //        log_debug("Write CRTC %04X %02X %04X\n",addr,val,pc);
     if (!(addr & 1))
         crtc_i = val & 31;
-    else {
-        val &= crtc_mask[crtc_i];
-        crtc[crtc_i] = val;
-        if (crtc_i == 6 && vc == val)
-            vdispen = 0;
-        else if (crtc_i == 8)
-            set_intern_dtype(vid_dtype_user);
-        else if (crtc_i == 12)
-            ttxbank = (MASTER|BPLUS) ? 0x7c00 : 0x3C00 | ((val & 0x8) << 11);
-    }
+    else
+        crtc_setreg(crtc_i, val);
 }
 
 uint8_t crtc_read(uint16_t addr)
@@ -84,8 +88,7 @@ void crtc_latchpen()
 
 void crtc_savestate(FILE * f)
 {
-    int c;
-    for (c = 0; c < 18; c++)
+    for (int c = 0; c < 18; c++)
         putc(crtc[c], f);
     putc(vc, f);
     putc(sc, f);
@@ -94,6 +97,7 @@ void crtc_savestate(FILE * f)
     putc(ma >> 8, f);
     putc(maback, f);
     putc(maback >> 8, f);
+
 }
 
 void crtc_loadstate(FILE * f)
@@ -108,6 +112,9 @@ void crtc_loadstate(FILE * f)
     ma |= getc(f) << 8;
     maback = getc(f);
     maback |= getc(f) << 8;
+    crtc_setreg(6, crtc[6]);
+    crtc_setreg(8, crtc[8]);
+    crtc_setreg(12, crtc[12]);
 }
 
 
@@ -758,6 +765,9 @@ ALLEGRO_DISPLAY *video_init(void)
 #else
     al_set_new_display_flags(ALLEGRO_WINDOWED | ALLEGRO_RESIZABLE);
 #endif
+    al_set_new_display_option(ALLEGRO_VSYNC, 2, ALLEGRO_REQUIRE);
+    log_debug("video: vsync=%d", al_get_new_display_option(ALLEGRO_VSYNC, &temp));
+
     video_set_window_size(true);
     if ((display = al_create_display(winsizex, winsizey)) == NULL) {
         log_fatal("video: unable to create display");
