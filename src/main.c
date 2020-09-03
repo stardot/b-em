@@ -140,7 +140,7 @@ static const char helptext[] =
     "-Fx             - set maximum video frames skipped\n"
     "-s              - scanlines display mode\n"
     "-i              - interlace display mode\n"
-    "-spx             - Emulation speed x from 0 to 9 (default 4)\n"
+    "-spx            - Emulation speed x from 0 to 9 (default 4)\n"
     "-debug          - start debugger\n"
     "-debugtube      - start debugging tube processor\n\n";
 
