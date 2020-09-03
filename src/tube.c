@@ -46,8 +46,6 @@ tube_speed_t tube_speeds[NUM_TUBE_SPEEDS] =
 int tube_irq=0;
 tubetype tube_type=TUBEX86;
 
-static int tube_romin=1;
-
 #define PH1_SIZE 24
 
 struct
@@ -211,12 +209,7 @@ uint8_t tube_parasite_read(uint32_t addr)
         switch (addr & 7)
         {
             case 0: /*Register 1 stat*/
-                if (tube_romin)
-                {
-                        if (tube_type == TUBE6502 || tube_type == TUBE65816)
-                           tube_6502_mapoutrom();
-                        tube_romin = 0;
-                }
+                tube_6502_rom_in = false;
                 temp = tubeula.pstat[0] | tubeula.r1stat;
                 break;
             case 1: /*Register 1*/
@@ -352,20 +345,17 @@ void tube_reset(void)
         tubeula.pstat[0] = 0x40;
         tubeula.pstat[1] = tubeula.pstat[2] = tubeula.pstat[3] = 0x7f;
         tubeula.hstat[2] = 0xC0;
-        tube_romin = 1;
 }
 
 void tube_ula_savestate(FILE *f)
 {
-    putc(tube_romin, f);
+    putc(tube_6502_rom_in, f);
     fwrite(&tubeula, sizeof tubeula, 1, f);
 }
 
 void tube_ula_loadstate(FILE *f)
 {
-    tube_romin = getc(f);
-    if (!tube_romin && (tube_type == TUBE6502 || tube_type == TUBE65816))
-        tube_6502_mapoutrom();
+    tube_6502_rom_in = getc(f);
     fread(&tubeula, sizeof tubeula, 1, f);
     tube_updateints();
 }

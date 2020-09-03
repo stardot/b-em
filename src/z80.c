@@ -54,13 +54,17 @@ static int ins=0;
 static uint8_t znptable[256],znptablenv[256],znptable16[65536];
 static uint8_t intreg;
 
-static int tuberomin;
+static bool z80_rom_in = true;
 static int dbg_tube_z80 = 0;
 
 static inline uint8_t z80_do_readmem(uint16_t a)
 {
-    if (a>=0x8000) tuberomin=0;
-    if (tuberomin && a<0x1000) return z80rom[a&0xFFF];
+    if (a >= 0x8000) {
+        z80_rom_in = false;
+        return z80ram[a];
+    }
+    else if (a < 0x1000 && z80_rom_in)
+        return z80rom[a&0xFFF];
     return z80ram[a];
 }
 
@@ -114,14 +118,15 @@ static void z80out(uint16_t a, uint8_t v)
 
 static uint8_t z80in(uint16_t a)
 {
-        if ((a&0xFF)<8)
-        {
-//                printf("Z80 read tube %04X\n",a);
-                if ((a&0xFF)==2) tuberomin=1;
-                if ((a&0xFF)==6) tuberomin=0;
-                return tube_parasite_read(a);
-        }
-        return 0;
+    uint8_t io_addr = a & 0xff;
+    if (io_addr < 8) {
+        if (io_addr == 2)
+            z80_rom_in = true;
+        else if (io_addr == 6)
+            z80_rom_in = false;
+        return tube_parasite_read(a);
+    }
+    return 0;
 }
 
 static inline void setzn(uint8_t v)
@@ -454,7 +459,7 @@ static void z80_savestate(ZFILE *zfp)
     bytes[36] = cycles >> 16; bytes[37] = cycles >> 24;
     bytes[38] = ins;          bytes[39] = ins >> 8;
     bytes[40] = ins >> 16;    bytes[41] = ins >> 24;
-    bytes[42] = tuberomin;    bytes[43] = intreg;
+    bytes[42] = z80_rom_in;   bytes[43] = intreg;
 
     savestate_zwrite(zfp, bytes, sizeof bytes);
     savestate_zwrite(zfp, z80ram, sizeof z80ram);
@@ -488,7 +493,7 @@ static void z80_loadstate(ZFILE *zfp)
     cycles |= bytes[36] << 16; cycles |= bytes[37] << 24;
     ins     = bytes[38];       ins    |= bytes[39] << 8;
     ins    |= bytes[40] << 16; ins    |= bytes[41] << 24;
-    tuberomin = bytes[42];     intreg  = bytes[43];
+    z80_rom_in = bytes[42];    intreg  = bytes[43];
 
     savestate_zread(zfp, z80ram, sizeof z80ram);
     savestate_zread(zfp, z80rom, sizeof z80rom);
@@ -536,7 +541,7 @@ void z80_reset()
 {
         pc=0;
 //        atexit(z80_mem_dump);
-        tuberomin=1;
+    z80_rom_in = true;
 }
 
 static uint16_t oopc,opc;
@@ -3061,7 +3066,7 @@ void z80_exec()
                         sp--; z80_writemem(sp,pc>>8);
                         sp--; z80_writemem(sp,pc&0xFF);
                         pc=0x66;
-                        tuberomin=1;
+                        z80_rom_in = true;
 //                        printf("PC now %04X\n",pc);
                         z80int=enterint=0;
                         cycles+=11;

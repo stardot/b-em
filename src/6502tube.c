@@ -31,6 +31,8 @@ static int tubememstat[0x101];
 static uint8_t *tuberam;
 static uint8_t *tuberom;
 
+bool tube_6502_rom_in = true;
+
 #define TUBE_6502_RAM_SIZE 0x10000
 
 void tube_6502_close()
@@ -216,25 +218,15 @@ static uint32_t dbg_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size
         log_debug("Status : %c%c%c%c%c%c\n",(tubep.n)?'N':' ',(tubep.v)?'V':' ',(tubep.d)?'D':' ',(tubep.i)?'I':' ',(tubep.z)?'Z':' ',(tubep.c)?'C':' ');
 }*/
 
-static int tuberomin = 1;
-void tube_6502_mapoutrom()
-{
-        tuberomin = 0;
-}
-
 #define polltime(c) { tubecycles-=c; }
 
 static uint8_t tubereadmeml(uint16_t addr)
 {
-        uint8_t temp;
-        if ((addr & ~7) == 0xFEF8) {
-                temp = tube_parasite_read(addr);
-//                log_debug("Read tube  %04X %02X %04X\n",addr,temp,pc);
-                return temp;
-        }
-        if ((addr & ~0xFFF) == 0xF000 && tuberomin)
-                return tuberom[addr & 0x7FF];
-        return tuberam[addr];
+    if ((addr & ~7) == 0xFEF8)
+        return tube_parasite_read(addr);
+    if ((addr & ~0xFFF) == 0xF000 && tube_6502_rom_in)
+        return tuberom[addr & 0x7FF];
+    return tuberam[addr];
 }
 
 static uint8_t tube_6502_readmem(uint32_t addr) {
@@ -288,7 +280,7 @@ static void writemem(uint32_t addr, uint32_t value) {
 
 void tube_6502_reset()
 {
-        tuberomin = 1;
+    tube_6502_rom_in = true;
         pc = readmem(0xFFFC) | (readmem(0xFFFD) << 8);
         tubep.i = 1;
         tube_irq = 0;
