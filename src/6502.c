@@ -201,7 +201,7 @@ int tubecycle;
 int output = 0;
 static int timetolive = 0;
 
-static int cycles;
+int cycles;
 static int otherstuffcount = 0;
 int romsel;
 uint8_t ram4k, ram8k, ram12k, ram20k;
@@ -5671,38 +5671,35 @@ void m65c02_exec(void)
 
 void m6502_savestate(FILE * f)
 {
-        uint8_t temp;
-        putc(a, f);
-        putc(x, f);
-        putc(y, f);
-        temp = pack_flags(0x30);
-        putc(temp, f);
-        putc(s, f);
-        putc(pc & 0xFF, f);
-        putc(pc >> 8, f);
-        putc(nmi, f);
-        putc(interrupt, f);
-        putc(cycles, f);
-        putc(cycles >> 8, f);
-        putc(cycles >> 16, f);
-        putc(cycles >> 24, f);
+    unsigned char bytes[13];
+
+    bytes[0] = a;
+    bytes[1] = x;
+    bytes[2] = y;
+    bytes[3] = pack_flags(0x30);
+    bytes[4] = s;
+    bytes[5] = pc & 0xFF;
+    bytes[6] = pc >> 8;
+    bytes[7] = nmi;
+    bytes[8] = interrupt;
+    bytes[9] = cycles;
+    bytes[10] = cycles >> 8;
+    bytes[11] = cycles >> 16;
+    bytes[12] = cycles >> 24;
+    fwrite(bytes, sizeof(bytes), 1, f);
 }
 
 void m6502_loadstate(FILE * f)
 {
-        uint8_t temp;
-        a = (uint8_t)getc(f);
-        x = (uint8_t)getc(f);
-        y = (uint8_t)getc(f);
-        temp = (uint8_t)getc(f);
-        unpack_flags(temp);
-        s = (uint8_t)getc(f);
-        pc = (uint8_t)getc(f);
-        pc |= (((uint8_t)getc(f)) << 8);
-        nmi = getc(f);
-        interrupt = getc(f);
-        cycles = getc(f);
-        cycles |= (getc(f) << 8);
-        cycles |= (getc(f) << 16);
-        cycles |= (getc(f) << 24);
+    unsigned char bytes[13];
+    fread(bytes, sizeof(bytes), 1, f);
+    a = bytes[0];
+    x = bytes[1];
+    y = bytes[2];
+    unpack_flags(bytes[3]);
+    s = bytes[4];
+    pc = bytes[5] | (bytes[6] << 8);
+    nmi = bytes[7];
+    interrupt = bytes[8];
+    cycles = bytes[9] | (bytes[10] << 8) | (bytes[11] << 16) | (bytes[12] << 24);
 }

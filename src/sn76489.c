@@ -22,7 +22,7 @@ int curwave = 0;
 
 static float volslog[16] =
 {
-	0.00000f, 0.59715f, 0.75180f, 0.94650f,
+    0.00000f, 0.59715f, 0.75180f, 0.94650f,
         1.19145f, 1.50000f, 1.88835f, 2.37735f,
         2.99295f, 3.76785f, 4.74345f, 5.97165f,
         7.51785f, 9.46440f, 11.9194f, 15.0000f
@@ -36,13 +36,13 @@ static float volslog[16] =
 static int16_t snwaves[5][32] =
 {
         {
-	         127,  127,  127,  127,  127,  127,  127,  127,  127,  127,  127,  127,  127,  127,  127,  127,
+             127,  127,  127,  127,  127,  127,  127,  127,  127,  127,  127,  127,  127,  127,  127,  127,
                 -127, -127, -127, -127, -127, -127, -127, -127, -127, -127, -127, -127, -127, -127, -127, -127
 
         },
         {
-	        -120, -112, -104, -96, -88, -80, -72, -64, -56, -48, -40, -32, -24, -16,  -8,   0,
-	           8,   16,   24,  32,  40,  48,  56,  64,  72,  80,  88,  96, 104, 112, 120, 127
+            -120, -112, -104, -96, -88, -80, -72, -64, -56, -48, -40, -32, -24, -16,  -8,   0,
+               8,   16,   24,  32,  40,  48,  56,  64,  72,  80,  88,  96, 104, 112, 120, 127
         },
         {
                  16,  32,  48,  64,  80,  96,  112,  128,  112,  96,  80,  64,  48,  32,  16, 0,
@@ -233,20 +233,25 @@ void sn_write(uint8_t data)
 
 void sn_savestate(FILE *f)
 {
-        fwrite(sn_latch, 16, 1, f);
-        fwrite(sn_count, 16, 1, f);
-        fwrite(sn_stat,  16, 1, f);
-        fwrite(sn_vol,   4,  1, f);
-        putc(sn_noise, f);
-        putc(sn_shift, f); putc(sn_shift >> 8, f);
+    unsigned char bytes[3];
+    fwrite(sn_latch, 16, 1, f);
+    fwrite(sn_count, 16, 1, f);
+    fwrite(sn_stat,  16, 1, f);
+    fwrite(sn_vol,   4,  1, f);
+    bytes[0] = sn_noise;
+    bytes[1] = sn_shift;
+    bytes[2] = sn_shift >> 8;
+    fwrite(bytes, sizeof(bytes), 1, f);
 }
 
 void sn_loadstate(FILE *f)
 {
-        fread(sn_latch, 16, 1, f);
-        fread(sn_count, 16, 1, f);
-        fread(sn_stat,  16, 1, f);
-        fread(sn_vol,   4,  1, f);
-        sn_noise = getc(f);
-        sn_shift = getc(f); sn_shift |= getc(f) << 8;
+    unsigned char bytes[3];
+    fread(sn_latch, 16, 1, f);
+    fread(sn_count, 16, 1, f);
+    fread(sn_stat,  16, 1, f);
+    fread(sn_vol,   4,  1, f);
+    fread(bytes, sizeof(bytes), 1, f);
+    sn_noise = bytes[0];
+    sn_shift = bytes[1] | (bytes[2] << 8);
 }

@@ -23,7 +23,7 @@ static inline int rx_int(ACIA *acia) {
 
 static inline int tx_int(ACIA *acia) {
     return (acia->status_reg & TXD_REG_EMP) && ((acia->control_reg & 0x60) == 0x20);
-}    
+}
 
 static void acia_updateint(ACIA *acia) {
     if (rx_int(acia) || tx_int(acia))
@@ -101,12 +101,18 @@ void acia_receive(ACIA *acia, uint8_t val) { /*Called when the acia recives some
     acia_updateint(acia);
 }
 
-void acia_savestate(ACIA *acia, FILE *f) {
-    putc(acia->control_reg, f);
-    putc(acia->status_reg, f);
+void acia_savestate(ACIA *acia, FILE *f)
+{
+    unsigned char bytes[2];
+    bytes[0] = acia->control_reg;
+    bytes[1] = acia->status_reg;
+    fwrite(bytes, sizeof(bytes), 1, f);
 }
 
-void acia_loadstate(ACIA *acia, FILE *f) {
-    acia->control_reg = getc(f);
-    acia->status_reg = getc(f);
+void acia_loadstate(ACIA *acia, FILE *f)
+{
+    unsigned char bytes[2];
+    fread(bytes, sizeof(bytes), 1, f);
+    acia->control_reg = bytes[0];
+    acia->status_reg = bytes[1];
 }

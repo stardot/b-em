@@ -237,6 +237,7 @@ void model_init()
 
 void model_savestate(FILE *f)
 {
+    unsigned char bytes[6];
     MODEL *model = models + curmodel;
     savestate_save_var(curmodel, f);
     savestate_save_str(model->name, f);
@@ -244,12 +245,13 @@ void model_savestate(FILE *f)
     savestate_save_str(model->cmos, f);
     savestate_save_str(model->romsetup->name, f);
     savestate_save_str(fdc_names[model->fdc_type], f);
-    putc(model->x65c02, f);
-    putc(model->bplus, f);
-    putc(model->master, f);
-    putc(model->modela, f);
-    putc(model->os01, f);
-    putc(model->compact, f);
+    bytes[0] = model->x65c02;
+    bytes[1] = model->bplus;
+    bytes[2] = model->master;
+    bytes[3] = model->modela;
+    bytes[4] = model->os01;
+    bytes[5] = model->compact;
+    fwrite(bytes, sizeof(bytes), 1, f);
     if (model->tube >= 0) {
         putc(1, f);
         savestate_save_str(tubes[model->tube].name, f);
@@ -283,8 +285,7 @@ void model_loadstate(FILE *f)
 {
     int newmodel, i;
     MODEL model;
-    char *rom_setup, *fdc_name, *tube_name, *cfg_sect;
-
+    char *rom_setup, *fdc_name, *tube_name, *cfg_sect, bytes[7];
     newmodel   = savestate_load_var(f);
     model.name = savestate_load_str(f);
     model.os   = savestate_load_str(f);
@@ -293,14 +294,15 @@ void model_loadstate(FILE *f)
     model.romsetup = model_find_romsetup(rom_setup, model.name);
     fdc_name = savestate_load_str(f);
     model.fdc_type = model_find_fdc(fdc_name, model.name);
-    model.x65c02  = getc(f);
-    model.bplus   = getc(f);
-    model.master  = getc(f);
-    model.modela  = getc(f);
-    model.os01    = getc(f);
-    model.compact = getc(f);
+    fread(bytes, sizeof(bytes), 1, f);
+    model.x65c02  = bytes[0];
+    model.bplus   = bytes[1];
+    model.master  = bytes[2];
+    model.modela  = bytes[3];
+    model.os01    = bytes[4];
+    model.compact = bytes[5];
 
-    switch(getc(f)) {
+    switch(bytes[6]) {
         case 1:
             tube_name = savestate_load_str(f);
             model.tube = model_find_tube(tube_name, model.name);
