@@ -425,8 +425,8 @@ void videoula_loadstate(FILE * f)
         videoula_write(1, getc(f) | (c << 4));
     for (c = 0; c < 16; c++) {
         red = getc(f);
-        blu = getc(f);
         grn = getc(f);
+        blu = getc(f);
         alp = getc(f);
         nula_collook[c] = (alp << 24) | (red << 16) | (grn << 8) | blu;
     }
