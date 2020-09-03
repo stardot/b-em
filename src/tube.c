@@ -364,6 +364,8 @@ void tube_ula_savestate(FILE *f)
 void tube_ula_loadstate(FILE *f)
 {
     tube_romin = getc(f);
+    if (!tube_romin && (tube_type == TUBE6502 || tube_type == TUBE65816))
+        tube_6502_mapoutrom();
     fread(&tubeula, sizeof tubeula, 1, f);
     tube_updateints();
 }
