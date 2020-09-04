@@ -72,6 +72,9 @@ void wd1770_spinup()
         motorspin = 0;
         led_update((curdrive == 0) ? LED_DRIVE_0 : LED_DRIVE_1, true, 0);
         ddnoise_spinup();
+        for (int i = 0; i < NUM_DRIVES; i++)
+            if (drives[i].spinup)
+                drives[i].spinup(i);
     }
 }
 
@@ -83,6 +86,9 @@ void wd1770_spindown()
         led_update(LED_DRIVE_0, false, 0);
         led_update(LED_DRIVE_1, false, 0);
         ddnoise_spindown();
+        for (int i = 0; i < NUM_DRIVES; i++)
+            if (drives[i].spindown)
+                drives[i].spindown(i);
     }
 }
 

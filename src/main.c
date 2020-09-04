@@ -78,7 +78,6 @@ static ALLEGRO_EVENT_SOURCE evsrc;
 
 static ALLEGRO_DISPLAY *tmp_display;
 
-
 typedef enum {
     FSPEED_NONE,
     FSPEED_SELECTED,
@@ -125,7 +124,7 @@ void main_reset()
     else               tube_exec = NULL;
     tube_reset();
 
-    memset(ram, 0, 64 * 1024);
+    memset(ram, 0, RAM_SIZE);
 }
 
 static const char helptext[] =
@@ -323,7 +322,7 @@ void main_init(int argc, char *argv[])
         gui_set_disc_wprot(0, writeprot[0]);
     if (discfns[1])
         gui_set_disc_wprot(1, writeprot[1]);
-    main_setspeed(emuspeed);        
+    main_setspeed(emuspeed);
     debug_start();
 }
 
@@ -355,8 +354,6 @@ static void main_start_fullspeed(void)
     event.type = ALLEGRO_EVENT_TIMER;
     al_emit_user_event(&evsrc, &event, NULL);
 }
-
-
 
 static void main_key_down(ALLEGRO_EVENT *event)
 {
