@@ -19,7 +19,7 @@
 #define CFG_SECT_LEN 20
 
 fdc_type_t fdc_type;
-bool BPLUS, x65c02, MASTER, MODELA, OS01, compactcmos;
+bool BPLUS, x65c02, MASTER, MODELA, OS01, compactcmos, integra;
 int curtube;
 int oldmodel, model_count;
 MODEL *models;
@@ -135,6 +135,7 @@ void model_loadcfg(void)
             ptr->modela  = get_config_bool(sect, "modela",  false);
             ptr->os01    = get_config_bool(sect, "os01",    false);
             ptr->compact = get_config_bool(sect, "compact", false);
+            ptr->integra = get_config_bool(sect, "integra", false);
             ptr->os      = get_config_string(sect, "os", "os12");
             ptr->cmos    = get_config_string(sect, "cmos", "");
             ptr->romsetup = model_find_romsetup(get_config_string(sect, "romsetup", "swram"), ptr->name);
@@ -226,6 +227,7 @@ void model_init()
     x65c02      = models[curmodel].x65c02;
     MASTER      = models[curmodel].master;
     MODELA      = models[curmodel].modela;
+    integra     = models[curmodel].integra;
     OS01        = models[curmodel].os01;
     compactcmos = models[curmodel].compact;
 
@@ -278,6 +280,7 @@ static bool model_cmp(int modelno, MODEL *nmodel)
            tmodel->master   == nmodel->master      &&
            tmodel->modela   == nmodel->modela      &&
            tmodel->compact  == nmodel->compact     &&
+           tmodel->integra  == nmodel->integra     &&
            tmodel->tube     == nmodel->tube;
 }
 

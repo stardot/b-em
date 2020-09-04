@@ -350,6 +350,52 @@ static void sdf_abort(int drive)
     state = ST_IDLE;
 }
 
+static void sdf_lock(int drive, FILE *fp, int ltype)
+{
+#ifndef WIN32
+#ifdef linux
+#define LOCK_WAIT F_OFD_SETLKW
+#else
+#define LOCK_WAIT F_SETLKW
+#endif
+    int res;
+    struct flock fl;
+    int fd = fileno(fp);
+
+    fl.l_type = ltype;
+    fl.l_whence = SEEK_SET;
+    fl.l_start = 0;
+    fl.l_len = 0;
+    fl.l_pid = 0;
+
+    do {
+        if (!(res = fcntl(fd, LOCK_WAIT, &fl))) {
+            log_debug("sdf: lock operation %d successful for drive %d", ltype, drive);
+            return;
+        }
+    } while (errno == EINTR);
+    log_warn("sdf: lock failure on drive %d", drive);
+#endif
+}
+
+static void sdf_spinup(int drive)
+{
+    FILE *fp = sdf_fp[drive];
+    log_debug("sdf: spinup drive %d", drive);
+    if (fp)
+        sdf_lock(drive, fp, F_WRLCK);
+}
+
+static void sdf_spindown(int drive)
+{
+    FILE *fp = sdf_fp[drive];
+    log_debug("sdf: spindown drive %d", drive);
+    if (fp) {
+        fflush(fp);
+        sdf_lock(drive, fp, F_UNLCK);
+    }
+}
+
 static void sdf_mount(int drive, const char *fn, FILE *fp, const struct sdf_geometry *geo)
 {
     sdf_fp[drive] = fp;
@@ -367,6 +413,9 @@ static void sdf_mount(int drive, const char *fn, FILE *fp, const struct sdf_geom
     drives[drive].poll        = sdf_poll;
     drives[drive].format      = sdf_format;
     drives[drive].abort       = sdf_abort;
+    drives[drive].spinup      = sdf_spinup;
+    drives[drive].spindown    = sdf_spindown;
+
 }
 
 void sdf_load(int drive, const char *fn, const char *ext)

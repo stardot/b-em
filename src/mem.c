@@ -27,7 +27,6 @@ void mem_init() {
     ram = (uint8_t *)malloc(RAM_SIZE);
     rom = (uint8_t *)malloc(ROM_NSLOT * ROM_SIZE);
     os  = (uint8_t *)malloc(ROM_SIZE);
-    memset(ram, 0, RAM_SIZE);
     os_dir  = al_create_path_for_directory("roms/os");
     rom_dir = al_create_path_for_directory("roms/general");
 }

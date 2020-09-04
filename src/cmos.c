@@ -87,25 +87,18 @@ static uint8_t read_cmos_rtc(unsigned addr)
     {
         case 0:
             return bin_or_bcd(rtc_tm.tm_sec);
-            break;
         case 2:
             return bin_or_bcd(rtc_tm.tm_min);
-            break;
         case 4:
             return bin_or_bcd(rtc_tm.tm_hour);
-            break;
         case 6:
             return bin_or_bcd(rtc_tm.tm_wday + 1);
-            break;
         case 7:
             return bin_or_bcd(rtc_tm.tm_mday);
-            break;
         case 8:
             return bin_or_bcd(rtc_tm.tm_mon + 1);
-            break;
         case 9:
             return bin_or_bcd(rtc_tm.tm_year % 100);
-            break;
         default:
             return cmos[addr];
     }
@@ -133,9 +126,9 @@ void cmos_update(uint8_t IC32, uint8_t sdbval)
     cmos_old = IC32 & 4;
     // log_debug("CMOS update %i %i %i\n",cmos_rw,cmos_strobe,cmos_old);
     if (cmos_strobe && cmos_ena) {
-        if (!cmos_rw && !(IC32 & 4))    /*Write triggered on low -> high on D*/
+        if (!cmos_rw && !(IC32 & 4))        /*Write triggered on low -> high on D*/
             set_cmos(cmos_addr, sdbval);
-        if (cmos_rw && (IC32 & 4))      /*Read data output while D high*/
+        if (cmos_rw && (IC32 & 4))          /*Read data output while D high*/
             cmos_data = get_cmos(cmos_addr);
     }
 }
@@ -152,8 +145,54 @@ uint8_t cmos_read()
 {
     // log_debug("CMOS read ORAnh %02X %02X %i %02X %i\n",cmos_addr,cmos[cmos_addr],cmos_ena,IC32,cmos_rw);
     if (cmos_ena && (IC32 & 4) && cmos_rw)  // To drive bus, CMOS must be enabled,
-        return cmos_data;                   // D must be high, RW must be high
+        return cmos_data;                   // D must be high, RW must be high.
     return 0xff;
+}
+
+void cmos_write_addr_integra(uint8_t val)
+{
+    log_debug("cmos: write_addr_integra, val=%02X", val);
+    cmos_addr = val & 63;
+}
+
+void cmos_write_data_integra(uint8_t val)
+{
+    log_debug("cmos: write_data_integra, val=%02X", val);
+    set_cmos(cmos_addr, val);
+}
+
+static int uip_count = 0;
+
+uint8_t cmos_read_data_integra(void)
+{
+    unsigned addr = cmos_addr;
+    uint8_t val;
+
+    if ((addr <= 6 && !(addr & 1)) || (addr >= 7 && addr <= 9)) {
+        val = read_cmos_rtc(addr);
+        log_debug("cmos: read_data_integra, return clock data %02X", val);
+    }
+    else {
+        val = cmos[addr];
+        if (addr == 0x0a) {
+            val &= 0x7f;
+            if (++uip_count == 100) {
+                val |= 0x80;
+                uip_count = 0;
+                log_debug("cmos: read_data_integra, faking update");
+            }
+            log_debug("cmos: read_data_integra, return register A %02X", val);
+        }
+        else
+            log_debug("cmos: read_data_integra, return RAM data %02X", val);
+    }
+    return val;
+}
+
+void cmos_reset(void)
+{
+    cmos[0xb] &= 0x87; /* clear bits in register B */
+    cmos[0xc] = 0;
 }
 
 void cmos_load(MODEL m) {

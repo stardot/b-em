@@ -1,7 +1,7 @@
 /*B-em v2.2 by Tom Walker
   FDI disc support
   Interfaces with fdi2raw.c*/
-  
+
 #include <stdio.h>
 #include <stdint.h>
 #include "b-em.h"
@@ -29,28 +29,28 @@ static uint16_t CRCTable[256];
 
 static void fdi_setupcrc(uint16_t poly, uint16_t rvalue)
 {
-	int c = 256, bc;
-	uint16_t crctemp;
+    int c = 256, bc;
+    uint16_t crctemp;
 
-	while(c--)
-	{
-		crctemp = c << 8;
-		bc = 8;
+    while(c--)
+    {
+        crctemp = c << 8;
+        bc = 8;
 
-		while(bc--)
-		{
-			if(crctemp & 0x8000)
-			{
-				crctemp = (crctemp << 1) ^ poly;
-			}
-			else
-			{
-				crctemp <<= 1;
-			}
-		}
+        while(bc--)
+        {
+            if(crctemp & 0x8000)
+            {
+                crctemp = (crctemp << 1) ^ poly;
+            }
+            else
+            {
+                crctemp <<= 1;
+            }
+        }
 
-		CRCTable[c] = crctemp;
-	}
+        CRCTable[c] = crctemp;
+    }
 }
 
 static void fdi_seek(int drive, int track)
@@ -167,7 +167,7 @@ static uint16_t crc;
 
 static void calccrc(uint8_t byte)
 {
-	crc = (crc << 8) ^ CRCTable[(crc >> 8)^byte];
+    crc = (crc << 8) ^ CRCTable[(crc >> 8)^byte];
 }
 
 static void fdi_poll(void)
@@ -364,11 +364,10 @@ void fdi_load(int drive, const char *fn)
 {
         writeprot[drive] = fwriteprot[drive] = 1;
         fdi_f[drive] = fopen(fn, "rb");
-        if (!fdi_f[drive])
-	{
-		log_warn("fdi: unable to open FDI disc image '%s': %s", fn, strerror(errno));
-		return;
-	}
+        if (!fdi_f[drive])  {
+            log_warn("fdi: unable to open FDI disc image '%s': %s", fn, strerror(errno));
+            return;
+        }
         fdi_h[drive] = fdi2raw_header(fdi_f[drive]);
 //        if (!fdih[drive]) printf("Failed to load!\n");
         fdi_lasttrack[drive] = fdi2raw_get_last_track(fdi_h[drive]);
@@ -382,5 +381,7 @@ void fdi_load(int drive, const char *fn)
         drives[drive].poll        = fdi_poll;
         drives[drive].format      = fdi_format;
         drives[drive].abort       = fdi_abort;
+        drives[drive].spinup      = NULL;
+        drives[drive].spindown    = NULL;
 }
 

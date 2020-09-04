@@ -13,7 +13,7 @@ extern int interrupt;
 extern int nmi;
 
 extern int romsel;
-extern uint8_t ram4k, ram8k, ram12k, ram20k;
+extern uint8_t ram1k, ram4k, ram8k;
 
 void m6502_reset(void);
 void m6502_exec(void);
