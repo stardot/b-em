@@ -15,6 +15,8 @@
 #include "wd1770.h"
 #include "x86_tube.h"
 #include "z80.h"
+#include "copro-pdp11.h"
+#include "pdp11/pdp11_debug.h"
 
 #define CFG_SECT_LEN 20
 
@@ -64,7 +66,8 @@ TUBE tubes[NUM_TUBES]=
     {"32016",          tube_32016_init, n32016_reset,    &n32016_cpu_debug,    0x0000, "",                 8 },
     {"6502 External",  tube_6502_init,  tube_6502_reset, &tube6502_cpu_debug,  0x0800, "6502Tube",         3 },
     {"6809",           tube_6809_init,  mc6809nc_reset,  &mc6809nc_cpu_debug,  0x0800, "6809Tube",        16 },
-    {"Z80 ROM 2.00",   z80_init,        z80_reset,       &tubez80_cpu_debug,   0x1000, "Z80_200",          6 }
+    {"Z80 ROM 2.00",   z80_init,        z80_reset,       &tubez80_cpu_debug,   0x1000, "Z80_200",          6 },
+    {"PDP11",          tube_pdp11_init, copro_pdp11_rst, &pdp11_cpu_debug,     0x0800, "PDP11Tube",        2 }
 };
 
 static fdc_type_t model_find_fdc(const char *name, const char *model)
