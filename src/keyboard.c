@@ -989,7 +989,7 @@ void key_down(uint8_t bbckey)
 void key_down_event(const ALLEGRO_EVENT *event)
 {
     int keycode = event->keyboard.keycode;
-    log_debug("keyboard: key down event, keycode=%d:%s", keycode, al_keycode_to_name(keycode));
+    log_debug("keyboard: key down event, keycode=%d:%s, modifiers=%04X", keycode, al_keycode_to_name(keycode), event->keyboard.modifiers);
     if (keycode == ALLEGRO_KEY_ALT || keycode == ALLEGRO_KEY_ALTGR)
         hostalt = true;
     else if (keycode == ALLEGRO_KEY_CAPSLOCK)
@@ -1071,7 +1071,7 @@ void key_up(uint8_t bbckey)
 void key_up_event(const ALLEGRO_EVENT *event)
 {
     int keycode = event->keyboard.keycode;
-    log_debug("keyboard: key up event, keycode=%d:%s", keycode, al_keycode_to_name(keycode));
+    log_debug("keyboard: key up event, keycode=%d:%s, modifiers=%04X", keycode, al_keycode_to_name(keycode), event->keyboard.modifiers);
     if (keycode < ALLEGRO_KEY_MAX) {
         if (keycode == ALLEGRO_KEY_ALT || keycode == ALLEGRO_KEY_ALTGR)
             hostalt = false;
