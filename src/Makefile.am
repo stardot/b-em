@@ -55,6 +55,7 @@ b_em_SOURCES = \
 	compactcmos.c \
 	compat_wrappers.c \
 	config.c \
+    copro-pdp11.c \
 	csw.c \
 	ddnoise.c \
 	debugger.c \
@@ -96,6 +97,8 @@ b_em_SOURCES = \
 	tape.c \
 	tapecat-allegro.c \
 	tapenoise.c \
+    pdp11/pdp11.c \
+    pdp11/pdp11_debug.c \
 	tube.c \
 	uef.c \
 	uservia.c \
