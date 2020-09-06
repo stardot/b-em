@@ -8,6 +8,27 @@
 #include "mem.h"
 #include "model.h"
 
+/* Layout of the 64K of host RAM pointed to by the 'ram' pointer:
+ *
+ * 0x0000 -> 0x7fff  Normal RAM, as per BBC B.
+ * 0x8000 -> 0xafff  Spare 12K from shadow mode
+ * 0xb000 -> 0xffff  20K Shadow screen memory.
+ *
+ * How the "Spare 12K" is allocated depends on the model:
+ *
+ * B+:
+ *     0x8000 -> 0xafff - short sideways bank.
+ *
+ * Master:
+ *     0x8000 -> 0x8fff - high VDU workspace (mapped at 0x8000).
+ *     0x9000 -> 0xffff - filing system RAM  (mapped at 0xc000).
+ *
+ * Integra:
+ *     0x8000 -> 0x83ff - 1K bank at 0x8000.
+ *     0x8000 -> 0x8fff - 4K bank at 0x8000 (superset of above).
+ *     0x9000 -> 0xafff - 8K bank at 0x9000.
+ */
+
 uint8_t *ram, *rom, *os;
 uint8_t ram_fe30, ram_fe34;
 
