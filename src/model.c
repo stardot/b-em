@@ -234,7 +234,7 @@ void model_init()
     mem_clearroms();
     models[curmodel].romsetup->func();
     tube_init();
-    cmos_load(models[curmodel]);
+    cmos_load(&models[curmodel]);
 }
 
 void model_savestate(FILE *f)

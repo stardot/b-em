@@ -195,19 +195,20 @@ void cmos_reset(void)
     cmos[0xc] = 0;
 }
 
-void cmos_load(MODEL m) {
+void cmos_load(const MODEL *m)
+{
     FILE *f;
     ALLEGRO_PATH *path;
     const char *cpath;
 
-    if (!m.cmos[0])
+    if (!m->cmos[0])
         return;
-    if (m.compact)
+    if (m->compact)
         compactcmos_load(m);
     else {
         memset(cmos, 0, sizeof cmos);
         rtc_epoc_ref = rtc_epoc_adj = 0;
-        if ((path = find_cfg_file(m.cmos, ".bin"))) {
+        if ((path = find_cfg_file(m->cmos, ".bin"))) {
             cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
             if ((f = fopen(cpath, "rb"))) {
                 size_t nbytes = fread(cmos, 1, sizeof cmos, f);
@@ -227,21 +228,21 @@ void cmos_load(MODEL m) {
             al_destroy_path(path);
         }
         else
-            log_warn("cmos: CMOS file %s not found", m.cmos);
+            log_warn("cmos: CMOS file %s not found", m->cmos);
     }
 }
 
-void cmos_save(MODEL m) {
+void cmos_save(const MODEL *m) {
     FILE *f;
     ALLEGRO_PATH *path;
     const char *cpath;
 
-    if (!m.cmos[0])
+    if (!m->cmos[0])
         return;
-    if (m.compact)
+    if (m->compact)
         compactcmos_save(m);
     else {
-        if ((path = find_cfg_dest(m.cmos, ".bin"))) {
+        if ((path = find_cfg_dest(m->cmos, ".bin"))) {
             cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
             if ((f = fopen(cpath, "wb"))) {
                 log_debug("cmos: saving to %s", cpath);
@@ -259,6 +260,6 @@ void cmos_save(MODEL m) {
                 log_error("unable to save CMOS file %s: %s", cpath, strerror(errno));
             al_destroy_path(path);
         } else
-            log_error("unable to save CMOS file %s: no suitable destination", m.cmos);
+            log_error("unable to save CMOS file %s: no suitable destination", m->cmos);
     }
 }

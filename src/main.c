@@ -329,7 +329,7 @@ void main_init(int argc, char *argv[])
 void main_restart()
 {
     main_pause();
-    cmos_save(models[oldmodel]);
+    cmos_save(&models[oldmodel]);
 
     model_init();
     main_reset();
@@ -544,7 +544,7 @@ void main_close()
     debug_kill();
 
     config_save();
-    cmos_save(models[curmodel]);
+    cmos_save(&models[curmodel]);
 
     midi_close();
     mem_close();
