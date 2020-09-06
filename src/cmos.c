@@ -13,12 +13,21 @@
 #include <errno.h>
 #include <stdio.h>
 #include "b-em.h"
+#include "mem.h"
 #include "via.h"
 #include "sysvia.h"
 #include "model.h"
 #include "cmos.h"
 #include "compactcmos.h"
 #include <time.h>
+
+static const char integra_magic[] = "B-Em Integra-B CMOS 1";
+
+struct cmos_integra {
+    char magic[32];
+    uint8_t cmos[64];
+    char slots[16];
+};
 
 static uint8_t cmos[64];
 
@@ -195,6 +204,33 @@ void cmos_reset(void)
     cmos[0xc] = 0;
 }
 
+static size_t load_integra(FILE *f, const char *fn)
+{
+    struct cmos_integra ci;
+    if (fread(&ci, sizeof(ci), 1, f) != 1)
+        log_error("cmos: error reading header/RTC from file '%s'", fn);
+    else if (memcmp(ci.magic, integra_magic, sizeof(integra_magic)))
+        log_error("cmos: file '%s' is not an integra CMOS file", fn);
+    else {
+        memcpy(cmos, ci.cmos, sizeof(cmos));
+        if (fread(ram + 0x8000, 0x3000, 1, f) != 1)
+            log_error("cmos: error reading private RAM from file '%s'", fn);
+        else {
+            for (int slot = 0; slot < ROM_NSLOT; slot++) {
+                if (ci.slots[slot]) {
+                    if (rom_slots[slot].swram) {
+                        if (fread(rom + slot * ROM_SIZE, ROM_SIZE, 1, f) != 1)
+                            log_error("cmos: error reading slot #%dfrom file '%s'", slot, fn);
+                    }
+                    else
+                        fseek(f, ROM_SIZE, SEEK_CUR); // Skip as slot is ROM.
+                }
+            }
+        }
+    }
+    return sizeof(cmos);
+}
+
 void cmos_load(const MODEL *m)
 {
     FILE *f;
@@ -211,7 +247,7 @@ void cmos_load(const MODEL *m)
         if ((path = find_cfg_file(m->cmos, ".bin"))) {
             cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
             if ((f = fopen(cpath, "rb"))) {
-                size_t nbytes = fread(cmos, 1, sizeof cmos, f);
+                size_t nbytes = m->integra ? load_integra(f, cpath) : fread(cmos, 1, sizeof cmos, f);
                 fclose(f);
                 if (nbytes < sizeof cmos)
                     log_warn("cmos: cmos file %s read incompletely, some values will be zero", cpath);
@@ -230,6 +266,29 @@ void cmos_load(const MODEL *m)
         else
             log_warn("cmos: CMOS file %s not found", m->cmos);
     }
+}
+
+static bool rom_is_used(uint8_t *rom)
+{
+    uint8_t *end = rom + ROM_SIZE;
+    while (rom < end)
+        if (*rom++)
+            return true;
+    return false;
+}
+
+static void save_integra(FILE *f)
+{
+    struct cmos_integra ci;
+    memcpy(ci.magic, integra_magic, sizeof(integra_magic));
+    memcpy(ci.cmos, cmos, sizeof(cmos));
+    for (int slot = 0; slot < ROM_NSLOT; slot++)
+        ci.slots[slot] = rom_slots[slot].swram && rom_is_used(rom + slot);
+    fwrite(&ci, sizeof(ci), 1, f);
+    fwrite(ram + 0x8000, 0x3000, 1, f); // 12K private RAM.
+    for (int slot = 0; slot < ROM_NSLOT; slot++)
+        if (ci.slots[slot])
+            fwrite(rom + slot * ROM_SIZE, ROM_SIZE, 1, f);
 }
 
 void cmos_save(const MODEL *m) {
@@ -253,7 +312,10 @@ void cmos_save(const MODEL *m) {
                 cmos[2] = (rtc_epoc_adj >> 8) & 0xff;
                 cmos[4] = (rtc_epoc_adj >> 16) & 0xff;
                 cmos[6] = (rtc_epoc_adj >> 24) & 0xff;
-                fwrite(cmos, sizeof cmos, 1, f);
+                if (m->integra)
+                    save_integra(f);
+                else
+                    fwrite(cmos, sizeof cmos, 1, f);
                 fclose(f);
             }
             else
