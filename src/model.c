@@ -256,6 +256,8 @@ void model_savestate(FILE *f)
     bytes[3] = model->modela;
     bytes[4] = model->os01;
     bytes[5] = model->compact;
+    if (model->integra)
+        bytes[0] |= 0x80;
     fwrite(bytes, sizeof(bytes), 1, f);
     if (model->tube >= 0) {
         putc(1, f);
@@ -301,7 +303,8 @@ void model_loadstate(FILE *f)
     fdc_name = savestate_load_str(f);
     model.fdc_type = model_find_fdc(fdc_name, model.name);
     fread(bytes, sizeof(bytes), 1, f);
-    model.x65c02  = bytes[0];
+    model.x65c02  = bytes[0] & 0x01;
+    model.integra = (bytes[0] & 0x80) ? 1 : 0;
     model.bplus   = bytes[1];
     model.master  = bytes[2];
     model.modela  = bytes[3];
