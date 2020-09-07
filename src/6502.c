@@ -929,7 +929,8 @@ void m6502_reset(void)
                 memlook[0][c] = memlook[1][c] = os - 0xC000;
         memstat[0][0xFC] = memstat[0][0xFD] = memstat[0][0xFE] = 0;
         memstat[1][0xFC] = memstat[1][0xFD] = memstat[1][0xFE] = 0;
-
+        ram_fe30 = 0;
+        ram_fe34 = 0;
         cycles = 0;
 
         pc = readmem(0xFFFC) | (readmem(0xFFFD) << 8);
