@@ -10,6 +10,7 @@
 #include "debugger.h"
 #include "b-em.h"
 #include "main.h"
+#include "mem.h"
 #include "model.h"
 #include "6502.h"
 #include "debugger_symbols.h"
@@ -901,7 +902,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                         debug_outf("    Voice 3 frequency = %04X   volume = %i\n", sn_latch[3] >> 6, sn_vol[3]);
                     }
                     else if (!strncasecmp(iptr, "ram", arglen))
-                       debug_outf("    System RAM registers :\n    ROMSEL=%02X ram1k=%02X ram4k=%02X ram8k=%02X vidbank=%04X\n", romsel>>14, ram1k, ram4k, ram8k, vidbank);
+                       debug_outf("    System RAM registers :\n    ROMSEL=%02X ACCCON=%02X(%s%s%s%s %c%c%c%c)\n    ram1k=%02X ram4k=%02X ram8k=%02X vidbank=%02X\n", ram_fe30, ram_fe34, (ram_fe34 & 0x80) ? "IRR" : "---", (ram_fe34 & 0x40) ? "TST" : "---", (ram_fe34 & 0x20) ? "IFJ" : "---", (ram_fe34 & 0x10) ? "ITU" : "---", (ram_fe34 & 0x08) ? 'Y' : '-', (ram_fe34 & 0x04) ? 'X' : '-', (ram_fe34 & 0x02) ? 'E' : '-', (ram_fe34 & 0x01) ? 'D' : '-', ram1k, ram4k, ram8k, vidbank);
                     else
                         debug_outf("Register set %s not known\n", iptr);
                 } else {
