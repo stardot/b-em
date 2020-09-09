@@ -54,7 +54,7 @@ typedef struct
     int  speed_multiplier;
 } TUBE;
 
-#define NUM_TUBES 10
+#define NUM_TUBES 11
 extern TUBE tubes[NUM_TUBES];
 
 extern int curmodel, curtube, oldmodel, selecttube;
