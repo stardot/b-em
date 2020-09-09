@@ -34,7 +34,8 @@ static uint8_t *tuberom;
 
 bool tube_6502_rom_in = true;
 
-#define TUBE_6502_RAM_SIZE 0x10000
+#define TUBE_6502_RAM_SIZE    0x10000
+#define TURBO_6502_RAM_SIZE 0x1000000
 
 void tube_6502_close()
 {
@@ -371,7 +372,7 @@ bool tube_6502_init(void *rom)
 
 bool tube_6502_iturb(void *rom)
 {
-    if (common_init(rom, TUBE_6502_RAM_SIZE)) {
+    if (common_init(rom, TURBO_6502_RAM_SIZE)) {
         read_zp_indirect_y = read_zp_iy_normal;
         write_zp_indirect_y = write_zp_iy_normal;
         return true;
