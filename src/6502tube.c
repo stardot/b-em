@@ -42,6 +42,7 @@ void tube_6502_close()
     if (tuberam) {
         free(tuberam);
         tuberam = NULL;
+        tuberamsize = 0;
     }
 }
 
@@ -84,7 +85,7 @@ void tube_6502_savestate(ZFILE *zfp)
     bytes[8] = pc >> 8;
     savestate_zwrite(zfp, bytes, sizeof bytes);
     savestate_zwrite(zfp, tubememstat, sizeof tubememstat);
-    savestate_zwrite(zfp, tuberam, TUBE_6502_RAM_SIZE);
+    savestate_zwrite(zfp, tuberam, tuberamsize);
     savestate_zwrite(zfp, tuberom, tubes[curtube].rom_size);
 }
 
@@ -113,7 +114,7 @@ void tube_6502_loadstate(ZFILE *zfp)
     pc |= bytes[8] << 8;
 
     savestate_zread(zfp, tubememstat, sizeof tubememstat);
-    savestate_zread(zfp, tuberam, TUBE_6502_RAM_SIZE);
+    savestate_zread(zfp, tuberam, tuberamsize);
     savestate_zread(zfp, tuberom, tubes[curtube].rom_size);
 }
 
@@ -292,8 +293,10 @@ void tube_6502_reset()
 static bool common_init(void *rom, size_t memsize)
 {
     if (tuberamsize != memsize) {
-        if (tuberam)
+        if (tuberam) {
             free(tuberam);
+            tuberamsize = 0;
+        }
         tuberam = (uint8_t *) malloc(memsize);
         if (!tuberam) {
             log_error("6502tube: unable to allocate RAM");
