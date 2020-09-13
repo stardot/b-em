@@ -17,9 +17,11 @@
   Implement the functions not yet implemented (i.e., remove the calls
   to abort()).
 
-  Advance bit position in track for the non-selected drive only while
-  the drive motor is on.
+  Discard track data when the motor "spins down" so that the emulator
+  can pick up changes to the HFE file (though this may also require us
+  to re-read the header as well).
 */
+#undef _NDEBUG
 #include <inttypes.h>
 #include <limits.h>
 #include <stdbool.h>
@@ -127,6 +129,9 @@ enum
   };
 
 enum { SECTOR_ACCEPT_ANY = -1 };
+enum { NO_TRACK = -1 };
+typedef void (*scan_setup_fn)(int);
+
 struct sector_address
 {
   int track;
@@ -201,7 +206,7 @@ struct hfe_poll_state
   /* Current CRC value.  We only update this when reading data and
      not, for example, when we're searching for a sync or an address
      mark. */
-  unsigned char crc[2];
+  unsigned short crc;
 
   /* number of bytes in the sector we are going to read */
   unsigned int sector_bytes_to_read;
@@ -232,6 +237,8 @@ struct hfe_info
   /* Data concerning the image file */
   struct picfileformatheader header;
   int hfe_version;		/* supported versions: 1, 3 */
+
+  int current_track;
   unsigned char *track_data;
   size_t track_data_bytes;
 
@@ -355,10 +362,12 @@ static void start_op(int drive, bool mfm, enum ReadOpType op_type, const char *o
 }
 
 static void start_sector_op(int drive, bool mfm, enum ReadOpType op_type,
-			    struct sector_address addr, const char *op_name)
+			    struct sector_address addr, const char *op_name,
+			    scan_setup_fn scan_setup)
 {
   start_op(drive, mfm, op_type, op_name);
   hfe_info[drive]->state.target = addr;
+  scan_setup(drive);
 }
 
 static void clear_op_state(struct hfe_poll_state* state)
@@ -396,11 +405,10 @@ static void abandon_op_notfound(int drive)
 
 static void abandon_op_badclock(int drive)
 {
-  log_warn("hfe: drive %d reporting bad clock data", drive);
+  log_warn("hfe: drive %d reporting bad clock data at bit position %ld of track %d",
+	   drive, hfe_info[drive]->state.track_bit_pos, hfe_info[drive]->current_track);
   abandon_op(drive);
 }
-
-
 
 void hfe_init()
 {
@@ -431,10 +439,12 @@ static void hfe_close(int drive)
 		   drive, hfe_info[drive]->state.current_op_name);
 	  clear_op_state(&hfe_info[drive]->state);
 	}
+      hfe_info[drive]->current_track = NO_TRACK;
       if (hfe_info[drive]->track_data)
 	{
 	  free(hfe_info[drive]->track_data);
 	  hfe_info[drive]->track_data = NULL;
+
 	}
       hfe_info[drive]->track_data_bytes = 0;
       free(hfe_info[drive]);
@@ -786,6 +796,8 @@ static void hfe_seek(int drive, int track)
       free(hfe_info[drive]->track_data);
       hfe_info[drive]->track_data = NULL;
     }
+
+  hfe_info[drive]->current_track = track;
   hfe_info[drive]->track_data = trackbits;
   hfe_info[drive]->track_data_bytes = track_len;
   printf("hfe: loaded %lu bytes of data for drive %d track %d at %p\n",
@@ -793,48 +805,6 @@ static void hfe_seek(int drive, int track)
 	 drive,
 	 track,
 	 hfe_info[drive]->track_data);
-}
-
-static void hfe_readsector(int drive, int sector, int track, int side, int density)
-{
-  printf("hfe: drive %d: readsector track %d side %d sector %d (%s)\n",
-	 drive, track, side, sector, (density ? "MFM" : "FM"));
-  struct sector_address addr;
-  addr.track = track;
-  addr.side = side;
-  addr.sector = sector;
-  start_sector_op(drive, density, OP_READ_ADDR_FOR_SECTOR, addr, "readsector");
-}
-
-static void hfe_writesector(int drive, int sector, int track, int side, int density)
-{
-  printf("hfe: drive %d: writesector track %d side %d sector %d (%s)\n",
-	 drive, track, side, sector, (density ? "MFM" : "FM"));
-  /* TODO: implement me. */
-  abort();
-}
-
-static void hfe_readaddress(int drive, int track, int side, int density)
-{
-  printf("hfe: drive %d: readaddress track %d side %d (%s)\n",
-	 drive, track, side, (density ? "MFM" : "FM"));
-  struct sector_address addr;
-  addr.track = track;
-  addr.side = side;
-  addr.sector = SECTOR_ACCEPT_ANY;
-  start_sector_op(drive, density, OP_READ_JUST_ADDR, addr, "readaddress");
-}
-
-static void crc_byte(int drive, unsigned char value)
-{
-  abort();
-}
-
-static void crc_reset(int drive)
-{
-  /* CCITT CRC-16 is initialised with 0xFFFF. */
-  hfe_info[drive]->state.crc[0] = 0xFF;
-  hfe_info[drive]->state.crc[1] = 0xFF;
 }
 
 static void set_up_for_sector_read(int drive, size_t sector_bytes_to_read)
@@ -973,10 +943,77 @@ static void set_up_for_sector_id_scan(int drive)
   state->bits_avail_to_decode = 0;
 }
 
+static void hfe_readsector(int drive, int sector, int track, int side, int density)
+{
+  printf("hfe: drive %d: readsector track %d side %d sector %d (%s)\n",
+	 drive, track, side, sector, (density ? "MFM" : "FM"));
+  struct sector_address addr;
+  addr.track = track;
+  addr.side = side;
+  addr.sector = sector;
+  start_sector_op(drive, density, OP_READ_ADDR_FOR_SECTOR, addr, "readsector",
+  set_up_for_sector_id_scan);
+}
+
+static void hfe_writesector(int drive, int sector, int track, int side, int density)
+{
+  printf("hfe: drive %d: writesector track %d side %d sector %d (%s)\n",
+	 drive, track, side, sector, (density ? "MFM" : "FM"));
+  /* TODO: implement me. */
+  abort();
+}
+
+static void hfe_readaddress(int drive, int track, int side, int density)
+{
+  printf("hfe: drive %d: readaddress track %d side %d (%s)\n",
+	 drive, track, side, (density ? "MFM" : "FM"));
+  struct sector_address addr;
+  addr.track = track;
+  addr.side = side;
+  addr.sector = SECTOR_ACCEPT_ANY;
+  start_sector_op(drive, density, OP_READ_JUST_ADDR, addr, "readaddress",
+  set_up_for_sector_id_scan);
+}
+
+unsigned long crc_cycle(unsigned long crc)
+{
+  /* Our polynomial is 0x10000 + (0x810<<1) + 1 = 0x11021 This CRC
+     is known as CRC16-CCITT.
+
+     When computing CRCs for use in reading disc tracks
+     (i.e. CCITT_CRC16), we initialise the cec_ state to 0xFFFF, as
+     required for CRC16-CCIT.
+
+     Some implementations instead initialise to 0xCDB4, but that's
+     just because the MFM track format's A1 bytes are not being fed to
+     the CRC, so they initialise the CRC calculation as if this had
+     already been done. */
+  if (crc & 32768)
+    return  (((crc ^ 0x0810) & 32767) << 1) + 1;
+  else
+    return crc << 1;
+}
+
+static void crc_byte(struct hfe_poll_state* state, unsigned char value)
+{
+  state->crc ^= value << 8;
+  for(int k = 0; k < 8; k++)
+    state->crc = crc_cycle(state->crc);
+}
+
+static void crc_reset(int drive)
+{
+  /* CCITT CRC-16 is initialised with 0xFFFF. */
+  hfe_info[drive]->state.crc = 0xFFFF;
+}
+
 static void handle_sector_id_byte(int drive, unsigned char value)
 {
-  crc_byte(drive, value);
   struct hfe_poll_state *state = &hfe_info[drive]->state;
+  log_warn("hfe: drive %d: handling sector ID byte with bytes_to_read=%lu "
+	   "and current_op_name=%s\n",
+	   drive, (unsigned long)state->bytes_to_read, state->current_op_name);
+  crc_byte(state, value);
   const size_t sector_address_bytes_read = SECTOR_ADDR_BYTES - state->bytes_to_read;
   switch (sector_address_bytes_read)
     {
@@ -984,12 +1021,15 @@ static void handle_sector_id_byte(int drive, unsigned char value)
       if (value != 0xFE)
 	{
 	  /* unexpected address mark. */
-	  log_warn("hfe: unexpected sector ID address mark %u", (unsigned int)value);
+	  log_warn("hfe: unexpected sector ID address mark %u\n", (unsigned int)value);
 	  set_up_for_sector_id_scan(drive);
+	  return;
 	}
+      printf("hfe: drive %d: read address mark for sector id", drive);
       return;
 
     case 1: 		       /* track (cylinder) */
+      printf("hfe: drive %d: sector id: track is %d\n", drive, value);
       if (value != state->target.track)
 	{
 	  log_warn("hfe: found sector address for track %u when looking for track %d",
@@ -999,6 +1039,7 @@ static void handle_sector_id_byte(int drive, unsigned char value)
       return;
 
     case 2:		       /* side (head) */
+      printf("hfe: drive %d: sector id: side is %d\n", drive, value);
       if (value != state->target.track)
 	{
 	  log_warn("hfe: found sector address for side %u when looking for side %d",
@@ -1008,6 +1049,7 @@ static void handle_sector_id_byte(int drive, unsigned char value)
       return;
 
     case 3:		       /* sector (record) */
+      printf("hfe: drive %d: sector id: sector is %d\n", drive, value);
       if (state->target.sector == SECTOR_ACCEPT_ANY ||
 	  state->target.sector == value)
 	{
@@ -1027,22 +1069,36 @@ static void handle_sector_id_byte(int drive, unsigned char value)
     case 4:		       /* size code */
       /* The extra 2 bytes here are the CRC. */
       state->sector_bytes_to_read = 2u + (1u << (value + 7u));
+      printf("hfe: drive %d: sector id: size code is %d (%lu bytes)\n",
+	     drive, value, (unsigned long)(state->sector_bytes_to_read - 2u));
       break;
 
     case 5:		       /* first CRC byte */
+      printf("hfe: drive %d: sector id: first CRC byte is 0x%02X\n",
+	     drive, (unsigned int)value);
       break;
 
     case 6:		       /* second CRC byte */
-      if (state->crc[0] || state->crc[1])
+      printf("hfe: drive %d: sector id: second CRC byte is 0x%02X\n",
+	     drive, (unsigned int)value);
+      if (state->crc)
 	{
 	  /* CRC mismatch. */
-	  log_warn("hfe: CRC mismatch; CRC found 0x%02X%02X, expected 0x00",
-		   (unsigned int)state->crc[0],
-		   (unsigned int)state->crc[1]);
+	  log_warn("hfe: CRC mismatch; CRC found 0x%04X, expected 0x00",
+		   (unsigned int)state->crc);
 	  set_up_for_sector_id_scan(drive);
 	}
-      /* CRC was correct, and the sector address matched; set up to read the sector. */
-      set_up_for_sector_read(drive, state->sector_bytes_to_read);
+      if (state->current_op == OP_READ_ADDR_FOR_SECTOR)
+	{
+	  /* CRC was correct, and the sector address matched; set up to read the sector. */
+	  state->current_op = OP_READ_SECTOR;
+	  set_up_for_sector_read(drive, state->sector_bytes_to_read);
+	}
+      break;
+
+    default:
+      printf("hfe: drive %d: sector id: unexpected byte position %lu\n",
+	     drive, (unsigned long)sector_address_bytes_read);
       break;
     }
 }
@@ -1071,14 +1127,57 @@ static bool get_next_bit(int drive, bool *end)
   return this_bit;
 }
 
+static void handle_badclock(int drive)
+{
+  struct hfe_poll_state *state = &hfe_info[drive]->state;
+  switch (state->current_op)
+    {
+    case OP_NOT_READING:
+      log_error("hfe: drive %d: reported bad clock, but no operation is in progress",
+		drive);
+      return;
+
+    case OP_READ_JUST_ADDR:
+      fdc_finishread();
+      break;
+
+    case OP_READ_ADDR_FOR_SECTOR:
+    case OP_READ_SECTOR:
+      fdc_headercrcerror();
+      break;
+    }
+  abandon_op_badclock(drive);
+}
+
 static void hfe_poll_drive(int drive, bool is_selected)
 {
   if (NULL == hfe_info[drive] || NULL == hfe_info[drive]->track_data)
     {
       return;
     }
-
   struct hfe_poll_state *state = &hfe_info[drive]->state;
+
+  /* Valid states for the state machine:
+     Idle (current_op == OP_NOT_READING)
+     Scanning for an address mark (scan_mask != 0)
+     Reading clocked data (bytes_to_read > 0)
+  */
+  assert(state->current_op == OP_NOT_READING ||
+	 state->scan_mask != 0 ||
+	 state->bytes_to_read > 0);
+
+  if (!state->motor_running)
+    {
+      assert(state->current_op == OP_NOT_READING);
+      return;
+    }
+
+  /* The motor can still be running if there is no operation in
+     progress, because an operation completed (or failed) but the motor
+     didn't get turned off yet.  Either way, we advance our bit position
+     over time, as if there were a physical floppy disc rotating past a
+     physical read head. */
+
   bool end = false;
   const int this_bit = get_next_bit(drive, &end);
   if (!is_selected)
@@ -1088,19 +1187,26 @@ static void hfe_poll_drive(int drive, bool is_selected)
   if (end)
     {
       /* the 'disc' completed a revolution */
-      log_warn("hfe: drive %d has completed a full revolution "
-	       "(%d revs so far for this operation, which is %s)",
-	       drive, state->revolutions_this_op, state->current_op_name);
-
-      /* Perhaps we should clear state->bits_avail_to_decode also.  If
-	 we could be confident that the floppy index hole coincides
-	 with the beginning of the HFE track data, this would
-	 certainly be the right thing to do.
-       */
-      if (state->current_op != OP_NOT_READING)
+      if (state->current_op == OP_NOT_READING)
 	{
+	  log_warn("hfe: drive %d has completed a full revolution "
+		   "(the motor is still on despite there being no "
+		   "current I/O operation)",
+		   drive);
+	}
+      else
+	{
+	  log_warn("hfe: drive %d has completed a full revolution "
+		   "(%d revs so far for this operation, which is %s)",
+		   drive, state->revolutions_this_op, state->current_op_name);
 	  /* A read operation is still in progress when we reached the
-	     end of the track. */
+	     end of the track.
+
+	     Perhaps we should clear state->bits_avail_to_decode also.  If
+	     we could be confident that the floppy index hole coincides
+	     with the beginning of the HFE track data, this would
+	     certainly be the right thing to do.
+	  */
 	  if (++state->revolutions_this_op == OP_REV_LIMIT)
 	    {
 	      /* We failed to find the data we wanted (e.g. we're
@@ -1108,6 +1214,9 @@ static void hfe_poll_drive(int drive, bool is_selected)
 	      abandon_op_notfound(drive);
 	      return;
 	    }
+	}
+      if (state->current_op != OP_NOT_READING)
+	{
 	}
     }
 
@@ -1120,13 +1229,17 @@ static void hfe_poll_drive(int drive, bool is_selected)
   state->shift_register <<= 1;
   state->shift_register |= this_bit;
 
-  if (!state->bytes_to_read)
+  if (state->current_op == OP_NOT_READING)
     {
       return;
     }
 
   if (state->scan_mask)
     {
+      /* If we're scanning for an address mark, we must want to read
+	 some data once we've found the address mark. */
+      assert(state->bytes_to_read > 0);
+
       /* We're looking for an address mark. */
       if ((state->shift_register & state->scan_mask) != state->scan_value)
 	{
@@ -1146,14 +1259,11 @@ static void hfe_poll_drive(int drive, bool is_selected)
 	     that we just read the A1 address mark intro bytes.
 	     The CRC is computed over the A1 bytes and the rest of
 	     the sector address. */
-	  crc_byte(drive, 0xA1);
-	  crc_byte(drive, 0xA1);
-	  crc_byte(drive, 0xA1);
+	  crc_byte(state, 0xA1);
+	  crc_byte(state, 0xA1);
+	  crc_byte(state, 0xA1);
 	}
-      if (state->current_op == OP_READ_ADDR_FOR_SECTOR || state->current_op == OP_READ_JUST_ADDR)
-	{
-	  state->bytes_to_read = SECTOR_ADDR_BYTES;
-	}
+
       /* start decoding data (either the sector ID the sector (record)
 	 data itself). */
       state->bits_avail_to_decode = 16;
@@ -1201,7 +1311,8 @@ static void hfe_poll_drive(int drive, bool is_selected)
   unsigned int value = 0;
   unsigned int prev_data_bit = (state->shift_register & (1u << 16)) >> 16;
   unsigned int mask = 1 << 15;
-  while (mask)
+  assert (state->bits_avail_to_decode == 16);
+  while (state->bits_avail_to_decode--)
     {
       const bool clock = state->shift_register & mask;
       mask >>= 1;
@@ -1212,9 +1323,7 @@ static void hfe_poll_drive(int drive, bool is_selected)
       const bool mfm_expected_clock = (prev_data_bit || data) ? 0 : 1;
       if (clock != (state->mfm_mode ? mfm_expected_clock : true))
 	{
-	  /* XXX: bad clock data should not cause the operation to be abandoned. */
-	  abandon_op_badclock(drive);
-	  state->bits_avail_to_decode = 0;
+	  handle_badclock(drive);
 	  return;
 	}
       value <<= 1;
@@ -1223,7 +1332,6 @@ static void hfe_poll_drive(int drive, bool is_selected)
 	  value |= 1;
 	}
     }
-  state->bits_avail_to_decode = 0;
 
   /* If the current op is readaddr or readsector we need to pass the
    * byte we read to fdc_read().  Otherwise (OP_READ_ADDR_FOR_SECTOR)
@@ -1282,13 +1390,14 @@ static void init_hfe_poll_state(struct hfe_poll_state *p)
   p->bytes_to_read = 0;
   /* When we start using the CRC computation, we initialise it to some
      other value, but that happens elsewhere. */
-  p->crc[0] = p->crc[1] = 0;
+  p->crc = 0;
   p->shift_register = 0;
   p->scan_value = p->scan_mask = 0;
 }
 
 static void init_hfe_info(struct hfe_info *p)
 {
+  p->current_track = NO_TRACK;
   p->track_data = NULL;
   p->track_data_bytes = 0;
   init_hfe_poll_state(&p->state);
