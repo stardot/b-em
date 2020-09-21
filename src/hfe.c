@@ -234,6 +234,9 @@ struct hfe_poll_state
 
 struct hfe_info
 {
+  /* The open image file. */
+  FILE *fp;
+
   /* Data concerning the image file */
   struct picfileformatheader header;
   int hfe_version;		/* supported versions: 1, 3 */
@@ -252,13 +255,31 @@ struct track_data_pos
   unsigned long len;
 };
 
-enum { HFE_DRIVES = 2 };
+enum { HFE_DRIVES = 2 };	/* please keep consistent with drives[] in disc.c. */
 enum { OP_REV_LIMIT = 3 };
 enum { SECTOR_ADDR_BYTES = 6 };
 
-static FILE *hfe_f[HFE_DRIVES];
 static struct hfe_info  *hfe_info[HFE_DRIVES];
 static int hfe_selected_drive;
+
+
+void dump_memory(unsigned char *p, size_t len, size_t location)
+{
+  enum { STRIDE = 32 };
+  while (len)
+    {
+      int bytes_to_dump = (len > STRIDE) ? STRIDE : len;
+      printf("%08lX ", (unsigned long)location);
+      location += bytes_to_dump;
+
+      while (bytes_to_dump--)
+	{
+	  printf("%02X", (unsigned)*p++);
+	}
+      printf("\n");
+    }
+}
+
 
 static unsigned short le_word(const unsigned char** pp)
 {
@@ -417,7 +438,6 @@ void hfe_init()
   int d;
   for (d = 0; d < HFE_DRIVES; ++d)
     {
-      hfe_f[d] = NULL;
       hfe_info[d] = NULL;
     }
 }
@@ -426,13 +446,13 @@ void hfe_init()
 static void hfe_close(int drive)
 {
   printf("hfe: drive %d: close\n", drive);
-  if (hfe_f[drive])
-    {
-      fclose(hfe_f[drive]);
-      hfe_f[drive] = NULL;
-    }
   if (hfe_info[drive])
     {
+      if (hfe_info[drive]->fp)
+	{
+	  fclose(hfe_info[drive]->fp);
+	  hfe_info[drive]->fp = NULL;
+	}
       if (hfe_info[drive]->state.current_op != OP_NOT_READING)
 	{
 	  log_warn("hfe: drive %d: closing with in-progress operation (%s)",
@@ -523,7 +543,7 @@ static bool hfe_locate_track_data(int drive, int track, struct track_data_pos* w
   unsigned char lutbuf[4];
   const long pos = 512 + track * 4L; /* XXX: should use header.track_list_offset? */
   log_debug("hfe: LUT entry for track %d is at offset %lu", track, pos);
-  if (!hfe_read_at_pos(hfe_f[drive], pos, sizeof(lutbuf), lutbuf, err))
+  if (!hfe_read_at_pos(hfe_info[drive]->fp, pos, sizeof(lutbuf), lutbuf, err))
     return false;
   if (!decode_lut_entry(lutbuf, where, err))
     return false;
@@ -720,7 +740,7 @@ static bool hfe_read_track_data(int drive, int track, int side, unsigned long po
       free(in);
       return false;
     }
-  if (!hfe_read_at_pos(hfe_f[drive], pos, len, in, err))
+  if (!hfe_read_at_pos(hfe_info[drive]->fp, pos, len, in, err))
     {
       if (!err)
 	log_error("hfe: short read on track data for drive %d track %d", drive, track);
@@ -758,7 +778,7 @@ static void hfe_seek(int drive, int track)
   size_t track_len = 0;
 
   printf("hfe: drive %d seek to track %d\n", drive, track);
-  if (NULL == hfe_f[drive])
+  if (NULL == hfe_info[drive]->fp)
     {
       log_warn("hfe: seek on unoccupied drive %d track %d", drive, track);
       return;
@@ -791,6 +811,7 @@ static void hfe_seek(int drive, int track)
       hfe_undiagnosed_failure(drive);
       return;
     }
+  dump_memory(trackbits, track_len, 0);
   if (hfe_info[drive]->track_data)
     {
       free(hfe_info[drive]->track_data);
@@ -1395,11 +1416,12 @@ static void init_hfe_poll_state(struct hfe_poll_state *p)
   p->scan_value = p->scan_mask = 0;
 }
 
-static void init_hfe_info(struct hfe_info *p)
+static void init_hfe_info(struct hfe_info *p, FILE *f)
 {
   p->current_track = NO_TRACK;
   p->track_data = NULL;
   p->track_data_bytes = 0;
+  p->fp = f;
   init_hfe_poll_state(&p->state);
 }
 
@@ -1433,26 +1455,27 @@ void hfe_load(int drive, const char *fn)
 {
   printf("hfe: drive %d: loading file %s\n", drive, fn);
   writeprot[drive] = fwriteprot[drive] = 1;
-  hfe_f[drive] = fopen(fn, "rb");
-  if (!hfe_f[drive])
-    {
-      log_warn("hfe: unable to open HFE disc image '%s': %s", fn, strerror(errno));
-      return;
-    }
+  {
+    FILE *f = fopen(fn, "rb");
+    if (!f)
+      {
+	log_warn("hfe: unable to open HFE disc image '%s': %s", fn, strerror(errno));
+	return;
+      }
 
-  free(hfe_info[drive]);
+    free(hfe_info[drive]);
 
-  hfe_info[drive] = malloc(sizeof(*hfe_info[drive]));
-  init_hfe_info(hfe_info[drive]);
+    hfe_info[drive] = malloc(sizeof(*hfe_info[drive]));
+    init_hfe_info(hfe_info[drive], f);
+  }
 
-  if (!hfe_decode_header(hfe_f[drive], fn, hfe_info[drive]))
+  if (!hfe_decode_header(hfe_info[drive]->fp, fn, hfe_info[drive]))
     {
       log_warn("hfe: HFE disc image '%s' has an invalid header", fn);
       /* unwind the initialization. */
       free(hfe_info[drive]);
+      fclose(hfe_info[drive]->fp);
       hfe_info[drive] = NULL;
-      fclose(hfe_f[drive]);
-      hfe_f[drive] = NULL;
       return;
     }
   drives[drive].close       = hfe_close;
