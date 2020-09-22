@@ -1171,6 +1171,7 @@ static void handle_sector_id_byte(int drive, unsigned char value, bool yield_byt
 static void handle_sector_data_byte(int drive, unsigned char value)
 {
   struct hfe_poll_state *state = &hfe_info[drive]->state;
+  crc_byte(state, value);
   unsigned long offset = state->sector_bytes_to_read - state->bytes_to_read;
   if (offset == 0)
     {
@@ -1212,7 +1213,6 @@ static void handle_sector_data_byte(int drive, unsigned char value)
 	   "bytes_to_read=%3lu and current_op_name=%s\n",
 	   drive, offset-1uL, (unsigned)value,
 	   (unsigned long)state->bytes_to_read, state->current_op_name);
-  crc_byte(state, value);
   /* We pass the sector data but not the CRC bytes to the FDC. */
   if (state->bytes_to_read > 2)
     {
@@ -1220,14 +1220,15 @@ static void handle_sector_data_byte(int drive, unsigned char value)
     }
   if (--state->bytes_to_read == 0)
     {
+      fdc_finishread();
       if (state->crc)
 	{
+	  fdc_datacrcerror();
 	  log_warn("hfe: drive %d: side %d track %2d sector %d: "
 		   "CRC error on sector data: got 0x%02X, expected 0x00",
 		   drive, state->target.side, state->target.track,
 		   state->target.sector, (unsigned)state->crc);
 	}
-      fdc_finishread();
       clear_op_state(state);
     }
 }
