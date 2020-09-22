@@ -30,6 +30,8 @@
 #include "disc.h"
 #include "hfe.h"
 
+#undef DUMP_TRACK
+
 #define UCHAR_BIT CHAR_BIT
 
 /* HFE_FMT_MODE...: constants from the HFE file format.
@@ -267,7 +269,7 @@ enum { SECTOR_ADDR_BYTES = 7 /* includes address mark */ };
 static struct hfe_info  *hfe_info[HFE_DRIVES];
 static int hfe_selected_drive;
 
-
+#ifdef DUMP_TRACK
 void dump_memory(unsigned char *p, size_t len, size_t location)
 {
   enum { STRIDE = 32 };
@@ -285,7 +287,7 @@ void dump_memory(unsigned char *p, size_t len, size_t location)
       printf("\n");
     }
 }
-
+#endif
 
 static unsigned short le_word(const unsigned char** pp)
 {
@@ -817,7 +819,9 @@ static void hfe_seek(int drive, int track)
       hfe_undiagnosed_failure(drive);
       return;
     }
+#ifdef DUMP_TRACK
   dump_memory(trackbits, track_len, 0);
+#endif
   if (hfe_info[drive]->track_data)
     {
       free(hfe_info[drive]->track_data);
@@ -1069,7 +1073,7 @@ static void handle_sector_id_byte(int drive, unsigned char value, bool yield_byt
       break;
 
     case 2:		       /* side (head) */
-      ok = (value == state->target.track);
+      ok = (value == state->target.side);
       printf("hfe: drive %d: sector id: side is %d\n", drive, value);
       if (!ok)
 	{
@@ -1098,10 +1102,10 @@ static void handle_sector_id_byte(int drive, unsigned char value, bool yield_byt
       break;
 
     case 4:		       /* size code */
-      /* The extra 2 bytes here are the CRC. */
-      state->sector_bytes_to_read = 2u + (1u << (value + 7u));
+      /* The extra 3 bytes here are the address mark and twi bytes of CRC. */
+      state->sector_bytes_to_read = 3u + (1u << (value + 7u));
       printf("hfe: drive %d: sector id: size code is %d (%lu bytes)\n",
-	     drive, value, (unsigned long)(state->sector_bytes_to_read - 2u));
+	     drive, value, (unsigned long)(state->sector_bytes_to_read - 3u));
       ok = true;
       break;
 
@@ -1166,8 +1170,66 @@ static void handle_sector_id_byte(int drive, unsigned char value, bool yield_byt
 
 static void handle_sector_data_byte(int drive, unsigned char value)
 {
-  // struct hfe_poll_state *state = &hfe_info[drive].state;
-  abort();
+  struct hfe_poll_state *state = &hfe_info[drive]->state;
+  unsigned long offset = state->sector_bytes_to_read - state->bytes_to_read;
+  if (offset == 0)
+    {
+      /* This is the address mark. */
+      if (value == ADDRESS_MARK_DATA_REC)
+	{
+	  /* All good.  We don't pass this byte back to the FDC, so
+	     just note that we read it already and return. */
+	  --state->bytes_to_read;
+	  return;
+	}
+
+      if (value == ADDRESS_MARK_CONTROL_REC)
+	{
+	  log_warn("hfe: drive %d: side %d track %2d sector %d: "
+		   "foud a control record; scanning again for the same "
+		   "address.\n",
+		   drive, state->target.side, state->target.track,
+		   state->target.sector);
+	}
+      else
+	{
+	  log_warn("hfe: drive %d: side %d track %2d sector %d: "
+		   "unexpected address mark 0x%02X; scanning again "
+		   "for the same address.\n",
+		   drive, state->target.side, state->target.track,
+		   state->target.sector, (unsigned)value);
+	}
+      /* We need to go back to scanning for a sector.  The address
+	 and density setting will be unchanged since we're still
+	 scanning for the same sector that we were before. */
+      start_sector_op(drive, state->mfm_mode, OP_READ_ADDR_FOR_SECTOR,
+		      state->target, "readsector",
+		      set_up_for_sector_id_scan);
+      return;
+    }
+
+  log_warn("hfe: drive %d: handling sector data byte %3lu=0x%02X with "
+	   "bytes_to_read=%3lu and current_op_name=%s\n",
+	   drive, offset-1uL, (unsigned)value,
+	   (unsigned long)state->bytes_to_read, state->current_op_name);
+  crc_byte(state, value);
+  /* We pass the sector data but not the CRC bytes to the FDC. */
+  if (state->bytes_to_read > 2)
+    {
+      fdc_data(value);
+    }
+  if (--state->bytes_to_read == 0)
+    {
+      if (state->crc)
+	{
+	  log_warn("hfe: drive %d: side %d track %2d sector %d: "
+		   "CRC error on sector data: got 0x%02X, expected 0x00",
+		   drive, state->target.side, state->target.track,
+		   state->target.sector, (unsigned)state->crc);
+	}
+      fdc_finishread();
+      clear_op_state(state);
+    }
 }
 
 static bool get_next_bit(int drive, bool *end)
