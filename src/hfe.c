@@ -195,6 +195,11 @@ struct hfe_poll_state
    */
   int bits_avail_to_decode;
 
+  /* When ignore_clocking is non-zero, we ignore and "incorrect" clock
+     bits for this many clock bits.  We do this when we just his an
+     address mark, as they have an "incorrect" clock bit in FM. */
+  int ignore_clocking;
+
   /* When bytes_to_read > 0, we read |bits_avail_to_decode| bits to
      obtain a byte.  That byte is passed to fdc_data.  When
      bytes_to_read==0, hfe_poll causes us to advance our position in
@@ -257,7 +262,7 @@ struct track_data_pos
 
 enum { HFE_DRIVES = 2 };	/* please keep consistent with drives[] in disc.c. */
 enum { OP_REV_LIMIT = 3 };
-enum { SECTOR_ADDR_BYTES = 6 };
+enum { SECTOR_ADDR_BYTES = 7 /* includes address mark */ };
 
 static struct hfe_info  *hfe_info[HFE_DRIVES];
 static int hfe_selected_drive;
@@ -275,6 +280,7 @@ void dump_memory(unsigned char *p, size_t len, size_t location)
       while (bytes_to_dump--)
 	{
 	  printf("%02X", (unsigned)*p++);
+	  --len;
 	}
       printf("\n");
     }
@@ -593,7 +599,7 @@ static size_t hfe_copy_bits(int version, int encoding,
 {
   /* I don't know how HFE_FMT_ENC_EMU_FM_ENCODING differs from
      HFE_FMT_ENC_ISOIBM_FM_ENCODING */
-  int take_this_bit = (encoding != HFE_FMT_ENC_ISOIBM_MFM_ENCODING);
+  int take_this_bit = (encoding != HFE_FMT_ENC_ISOIBM_FM_ENCODING);
   int got_bits = 0;
   unsigned char out = 0;
   bool hfe3 = version == 3;
@@ -754,7 +760,7 @@ static bool hfe_read_track_data(int drive, int track, int side, unsigned long po
     {
       (*bytes_read) += hfe_copy_bits(hfe_info[drive]->hfe_version,
 				     encoding, drive, track,
-				     in + begin, 256, out);
+				     in + begin, 256, out + (*bytes_read));
     }
   *result = out;
   return true;
@@ -1028,8 +1034,9 @@ static void crc_reset(int drive)
   hfe_info[drive]->state.crc = 0xFFFF;
 }
 
-static void handle_sector_id_byte(int drive, unsigned char value)
+static void handle_sector_id_byte(int drive, unsigned char value, bool yield_byte)
 {
+  bool ok = true;
   struct hfe_poll_state *state = &hfe_info[drive]->state;
   log_warn("hfe: drive %d: handling sector ID byte with bytes_to_read=%lu "
 	   "and current_op_name=%s\n",
@@ -1039,69 +1046,78 @@ static void handle_sector_id_byte(int drive, unsigned char value)
   switch (sector_address_bytes_read)
     {
     case 0:		       /* address mark */
-      if (value != 0xFE)
+      ok = (value == 0xFE);
+      if (ok)
+	{
+	  printf("hfe: drive %d: read address mark for sector id\n", drive);
+	}
+      else
 	{
 	  /* unexpected address mark. */
 	  log_warn("hfe: unexpected sector ID address mark %u\n", (unsigned int)value);
-	  set_up_for_sector_id_scan(drive);
-	  return;
 	}
-      printf("hfe: drive %d: read address mark for sector id", drive);
-      return;
+      break;
 
     case 1: 		       /* track (cylinder) */
       printf("hfe: drive %d: sector id: track is %d\n", drive, value);
-      if (value != state->target.track)
+      ok = (value == state->target.track);
+      if (!ok)
 	{
 	  log_warn("hfe: found sector address for track %u when looking for track %d",
 		   (unsigned int)value, state->target.track);
-	  set_up_for_sector_id_scan(drive);
 	}
-      return;
+      break;
 
     case 2:		       /* side (head) */
+      ok = (value == state->target.track);
       printf("hfe: drive %d: sector id: side is %d\n", drive, value);
-      if (value != state->target.track)
+      if (!ok)
 	{
 	  log_warn("hfe: found sector address for side %u when looking for side %d",
 		   (unsigned int)value, state->target.side);
-	  set_up_for_sector_id_scan(drive);
 	}
-      return;
+      break;
 
     case 3:		       /* sector (record) */
       printf("hfe: drive %d: sector id: sector is %d\n", drive, value);
-      if (state->target.sector == SECTOR_ACCEPT_ANY ||
-	  state->target.sector == value)
+      ok = (state->target.sector == SECTOR_ACCEPT_ANY ||
+	    state->target.sector == value);
+      if (ok)
 	{
-	  /* OK, but we defer setting up for actually reading the
-	     sector until we have read and verified the CRC.  That
-	     also ensures that we will have read the size code,
-	     too. */
+	  /* That's good news, but we defer setting up for actually
+	     reading the sector until we have read and verified the
+	     CRC.  That also ensures that we will have read the size
+	     code, too. So, there is nothing to do here. */
 	}
       else
 	{
 	  /* This also is normal, but the next sector is not the one
-	     we want. */
-	  set_up_for_sector_id_scan(drive);
+	     we want. We reset the sector id scan in the !ok
+	     conditinal below, so there is nothing to do here.*/
 	}
-      return;
+      break;
 
     case 4:		       /* size code */
       /* The extra 2 bytes here are the CRC. */
       state->sector_bytes_to_read = 2u + (1u << (value + 7u));
       printf("hfe: drive %d: sector id: size code is %d (%lu bytes)\n",
 	     drive, value, (unsigned long)(state->sector_bytes_to_read - 2u));
+      ok = true;
       break;
 
     case 5:		       /* first CRC byte */
       printf("hfe: drive %d: sector id: first CRC byte is 0x%02X\n",
 	     drive, (unsigned int)value);
+      ok = true;
       break;
 
     case 6:		       /* second CRC byte */
       printf("hfe: drive %d: sector id: second CRC byte is 0x%02X\n",
 	     drive, (unsigned int)value);
+      if (yield_byte)
+	{
+	  fdc_data(value);
+	}
       if (state->crc)
 	{
 	  /* CRC mismatch. */
@@ -1115,12 +1131,35 @@ static void handle_sector_id_byte(int drive, unsigned char value)
 	  state->current_op = OP_READ_SECTOR;
 	  set_up_for_sector_read(drive, state->sector_bytes_to_read);
 	}
-      break;
+      /* We already dispatched the byte and perhaps reset for the next oprtation,
+         so we're done. */
+      return;
 
     default:
       printf("hfe: drive %d: sector id: unexpected byte position %lu\n",
 	     drive, (unsigned long)sector_address_bytes_read);
+      ok = false;
+      yield_byte = false;
       break;
+    }
+  --state->bytes_to_read;
+  if (yield_byte)
+    {
+      fdc_data(value);
+      if (state->bytes_to_read == 0)
+	{
+	  fdc_finishread();
+	}
+    }
+  if (state->bytes_to_read == 0)
+    {
+      /* For the OP_READ_ADDR_FOR_SECTOR case we already set
+	 current_op=OP_READ_SECTOR and returned. */
+      clear_op_state(state);
+    }
+  if (!ok)
+    {
+      set_up_for_sector_id_scan(drive);
     }
 }
 
@@ -1270,8 +1309,8 @@ static void hfe_poll_drive(int drive, bool is_selected)
 	  return;
 	}
       printf("hfe: scanner matched: found %08" PRIx64
-	     "which matches value %08" PRIx64
-	     "with mask %08" PRIx64 "\n",
+	     " which matches value %08" PRIx64
+	     " with mask %08" PRIx64 "\n",
 	     state->shift_register, state->scan_value, state->scan_mask);
       crc_reset(drive);
       if (state->mfm_mode)
@@ -1292,10 +1331,16 @@ static void hfe_poll_drive(int drive, bool is_selected)
       /* We continue on to the de-clocking code, because in all cases
 	 we have in the bottom 16 bits of shift_register the encoded
 	 address mark itself. */
+      /* In FM, one of the clock bits of the address mark will be zero
+	 which would normally be incorrect, so we need to ignore that
+	 "clock error" below. */
+      state->ignore_clocking = state->mfm_mode ? 0 : 8;
     }
-
-  if (state->bits_avail_to_decode++ < 16)
-    return;
+  else
+    {
+      if (++state->bits_avail_to_decode < 16)
+	return;
+    }
 
   /*
      An FM or MFM encoded byte occupies 16 bits on the disc, and looks
@@ -1332,20 +1377,29 @@ static void hfe_poll_drive(int drive, bool is_selected)
   unsigned int value = 0;
   unsigned int prev_data_bit = (state->shift_register & (1u << 16)) >> 16;
   unsigned int mask = 1 << 15;
-  assert (state->bits_avail_to_decode == 16);
-  while (state->bits_avail_to_decode--)
+
+  while (state->bits_avail_to_decode > 1)
     {
       const bool clock = state->shift_register & mask;
       mask >>= 1;
+      --state->bits_avail_to_decode;
       const bool data = state->shift_register & mask;
       mask >>= 1;
-      /* The clock bit in MFM encoding is data-dependent, but the
-	 clock bit in FM is always 1. */
-      const bool mfm_expected_clock = (prev_data_bit || data) ? 0 : 1;
-      if (clock != (state->mfm_mode ? mfm_expected_clock : true))
+      --state->bits_avail_to_decode;
+      if (state->ignore_clocking)
 	{
-	  handle_badclock(drive);
-	  return;
+	  --state->ignore_clocking;
+	}
+      else
+	{
+	  /* The clock bit in MFM encoding is data-dependent, but the
+	     clock bit in FM is always 1. */
+	  const bool mfm_expected_clock = (prev_data_bit || data) ? 0 : 1;
+	  if (clock != (state->mfm_mode ? mfm_expected_clock : true))
+	    {
+	      handle_badclock(drive);
+	      return;
+	    }
 	}
       value <<= 1;
       if (data)
@@ -1354,19 +1408,21 @@ static void hfe_poll_drive(int drive, bool is_selected)
 	}
     }
 
-  /* If the current op is readaddr or readsector we need to pass the
-   * byte we read to fdc_read().  Otherwise (OP_READ_ADDR_FOR_SECTOR)
-   * we just try to match the address we're reading against the
-   * address we're looking for */
+  assert(state->bytes_to_read > 0);
   switch (state->current_op)
     {
     case OP_READ_ADDR_FOR_SECTOR:
-    case OP_READ_JUST_ADDR:
-      handle_sector_id_byte(drive, value);
+      handle_sector_id_byte(drive, value, false);
       break;
+
+    case OP_READ_JUST_ADDR:
+      handle_sector_id_byte(drive, value, true);
+      break;
+
     case OP_READ_SECTOR:
       handle_sector_data_byte(drive, value);
       break;
+
     case OP_NOT_READING:
       assert(state->current_op != OP_NOT_READING);
       break;
