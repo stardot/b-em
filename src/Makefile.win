@@ -1,5 +1,5 @@
-VPATH = . resid-fp NS32016 darm mc6809nc pdp11
-
+VPATH = . resid-fp NS32016 darm mc6809nc pdp11 musahi
+\\\\x\
 CPP  = i686-w64-mingw32-g++
 CC   = i686-w64-mingw32-gcc
 WINDRES = i686-w64-mingw32-windres
@@ -125,12 +125,18 @@ PDP11OBJ = \
     pdp11_debug.o \
     copro-pdp11.o
 
+M68000OBJ = \
+    mc68000tube.o \
+    m68kops.o \
+    m68kcpu.o \
+    m68kdasm.o
+
 LIBS = -lz -lallegro_audio -lallegro_acodec -lallegro_primitives -lallegro_dialog -lallegro_image -lallegro_font -lallegro -mwindows -lgdi32 -lwinmm -lstdc++
 
 all : b-em.exe hdfmt.exe jstest.exe gtest.exe
 
-b-em.exe: $(OBJ) $(SIDOBJ) $(NS32KOBJ) $(MC6809OBJ) $(PDP11OBJ)
-	$(CC) $(LDFLAGS) $(OBJ) $(SIDOBJ) $(NS32KOBJ) $(MC6809OBJ)  $(PDP11OBJ) -o "b-em.exe" $(LIBS)
+b-em.exe: $(OBJ) $(SIDOBJ) $(NS32KOBJ) $(MC6809OBJ) $(PDP11OBJ)  $(M68000OBJ)
+	$(CC) $(LDFLAGS) $(OBJ) $(SIDOBJ) $(NS32KOBJ) $(MC6809OBJ) $(PDP11OBJ) $(M68000OBJ) -o "b-em.exe" $(LIBS)
 
 clean :
 	del *.o *.exe *.res

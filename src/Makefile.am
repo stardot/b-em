@@ -71,6 +71,10 @@ b_em_SOURCES = \
 	led.c \
 	linux.c \
 	logging.c \
+    musahi/m68kcpu.c \
+    musahi/m68kops.c \
+    musahi/m68kdasm.c \
+    mc68000tube.c \
     mc6809nc/mc6809nc.c \
     mc6809nc/mc6809_debug.c \
     mc6809nc/mc6809_dis.c \
