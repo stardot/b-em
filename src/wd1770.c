@@ -526,8 +526,10 @@ static void wd1770_fault(uint8_t flags, const char *desc)
     wd1770.status |= flags;
     if (nmi_on_completion[fdc_type - FDC_ACORN])
         fdc_time = 200;
-    else
+    else {
         short_spindown();
+        wd1770.status &= 0xfe;
+    }
 }
 
 void wd1770_notfound()
