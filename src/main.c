@@ -18,6 +18,7 @@
 #include "debugger.h"
 #include "disc.h"
 #include "fdi.h"
+#include "hfe.h"
 #include "gui-allegro.h"
 #include "i8271.h"
 #include "ide.h"
@@ -276,6 +277,7 @@ void main_init(int argc, char *argv[])
     pal_init();
     disc_init();
     fdi_init();
+    hfe_init();
 
     scsi_init();
     ide_init();
