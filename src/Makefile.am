@@ -63,6 +63,7 @@ b_em_SOURCES = \
 	disc.c fdi.c \
 	fdi2raw.c \
 	gui-allegro.c\
+	hfe.c \
 	i8271.c \
 	ide.c \
 	joystick.c \
