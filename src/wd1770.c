@@ -496,7 +496,7 @@ void wd1770_callback()
         break;
 
     case 0xF: /*Write tracl*/
-        wd1770.status &= 0x01;
+        wd1770.status &= 0xfe;
         wd1770_setspindown();
         if (nmi_on_completion[fdc_type - FDC_ACORN])
             nmi |= 1;
