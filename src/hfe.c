@@ -95,7 +95,7 @@ struct picfileformatheader
   unsigned short bitRate;
   unsigned short floppyRPM;
   unsigned char floppyinterfacemode;
-  unsigned char v1_dnu_v3_write_protected; // in v1, unused, in v3, write_protected
+  unsigned char v1_dnu_v3_write_protected; /* in v1, unused, in v3, write_protected */
   unsigned short track_list_offset;
   unsigned char write_allowed;
   unsigned char single_step;
@@ -160,31 +160,36 @@ struct hfe_poll_state
 
   /* current_op_name gives a human-readable name for the current operation
      and is not owned by this struct (i.e. should not be freed when an
-     instance of this struct is freed. */
+     instance of this struct is freed). */
   const char *current_op_name;
 
   /* When current_op == ROP_READ_ADDR_FOR_SECTOR or ROP_READ_JUST_ADDR,
      target contains the sector address we're looking for. */
   struct sector_address target;
 
+  /* poll_calls_until_next_action counts down from poll_calls_per_bit;
+     see the explanation for poll_calls_per_bit for the purpose served
+     by this. */
+  int poll_calls_until_next_action;
+
   /* When true, motor is spun up. */
   bool motor_running;
 
   /* When true, mfm_mode indicates that we're doing I/O on an
-     MFM-encoded track.  This affects how we decode address marks
-     (e.g. because there are signalling bytes only present on MFM
-     tracks) but it also affects how we interpret the stream of bits
-     coming out of the HFE file (since in FM mode, alternate bits in
-     the HFE file are ignored.
+     MFM-encoded track.  This affects how we decode address marks.
 
-     mfm_mode is (or should be) set from function parameters in
-     hfe_readsector, hfe_readaddress. If they were implemented, also
-     hfe_format, hfe_writesector.
+     mfm_mode is set from function parameters in hfe_readsector,
+     hfe_readaddress. If they were implemented, also hfe_format,
+     hfe_writesector.
 
      Alternate bits are not significant (& are ignored) when decodng
      an FM-encoded track in HFE, but this is a property of the file
      format, not the mode of the FDC.  Therefore we deal with that in
-     hfe_copy_bits(), not hfe_poll().
+     hfe_copy_bits(), not hfe_poll().  The data rate for MFM is twice
+     that of FM, and poll_calls_per_bit models that for us.  The value
+     of poll_calls_per_bit should not depend on mfm_mode, because
+     mfm_mode describes how the FDC interprets the track data, not how
+     often cells in the track pass under the simulated read head).
   */
   bool mfm_mode;
 
@@ -209,7 +214,7 @@ struct hfe_poll_state
   /* When bytes_to_read > 0, we read |bits_avail_to_decode| bits to
      obtain a byte.  That byte is passed to fdc_data.  When
      bytes_to_read==0, hfe_poll causes us to advance our position in
-     the track data (as if the disc was spinning) but not to offer
+     the track data (as if the disc were spinning) but not to offer
      data to the FDC.
   */
   size_t bytes_to_read;
@@ -255,6 +260,30 @@ struct hfe_info
   int current_track;
   unsigned char *track_data;
   size_t track_data_bytes;
+
+  /* b-em calls our poll function every 16 clock cycles.  With a 2MHz
+     clock that's 1.25e5 Hz (i.e. every 8 microseconds).  The floppy
+     revolves at 300 RPM.  The total number of poll calls per
+     revolution of the floppy is therefore 1.25e5 * (60/300) = 25000.
+
+     An HFE track usually contains roughly 25000 bit values.  Hence
+     for MFM we should yield one bit per poll call (of course we
+     collect them together into bytes before passing them to
+     fdc_data()).
+
+     For FM though, we already discarded half the bits in
+     hfe_copy_bits, so on average we should yield about one bit every
+     other poll call.  To do that, we set poll_calls_per_bit to 2.
+
+     Note that the setting of poll_calls_per_bit does not depend on
+     whether the FDC is in MFM or FM more; poll_calls_per_bit models
+     what's on the disc track, not what the FDC is doing.
+
+     A perhaps more straightforward way to look at this is that
+     setting poll_calls_per_bit=2 ensures that the data rate of an FM
+     track is correctly half that of MFM.
+  */
+  int poll_calls_per_bit;
 
   /* Data concerning the I/O state machine */
   struct hfe_poll_state state;
@@ -484,6 +513,7 @@ static void hfe_close(int drive)
 
         }
       hfe_info[drive]->track_data_bytes = 0;
+      hfe_info[drive]->poll_calls_per_bit = 1;
       free(hfe_info[drive]);
       log_debug("hfe: drive %d: hfe_close setting hfe_info[%d] to NULL", drive, drive);
       hfe_info[drive] = NULL;
@@ -502,7 +532,7 @@ static void hfe_undiagnosed_failure(int drive)
 /* read_at_pos reads |len| bytes from position |pos| in file |f|.
  *
  * If there is an error, false is returned and |*err| is set to the errno value.
- * If there is a short read, false is returnes and |*err| is 0.
+ * If there is a short read, false is returned and |*err| is 0.
  *   In the short-read case there is no way for the caller to tell how many
  *   bytes at |buf| are valid.
  * If there is no error, true is returned.
@@ -750,7 +780,9 @@ unsigned char encoding_of_track(int drive, int side, int track)
   return h->track_encoding;
 }
 
-static bool hfe_read_track_data(int drive, int track, int side, unsigned long pos, unsigned long len,
+static bool hfe_read_track_data(int drive, int track, int side,
+                                unsigned long pos, unsigned long len,
+                                unsigned char encoding,
                                 unsigned char **result, size_t *bytes_read, int *err)
 {
   /* The track data consists of a 256-byte block of data for side 0
@@ -758,7 +790,6 @@ static bool hfe_read_track_data(int drive, int track, int side, unsigned long po
      256 byte block of data for side 0, and one for side 1, and so
      on. */
   enum { side_block_size = 256 };
-  const unsigned char encoding = encoding_of_track(drive, side, track);
   unsigned long begin;
   unsigned char *out, *in;
   in = malloc(len);
@@ -834,8 +865,9 @@ static void hfe_seek(int drive, int track)
       return;
     }
   log_debug("hfe: drive %d: track %d data: %lu bytes at %lu", drive, track, where.len, where.pos);
+  const unsigned char encoding = encoding_of_track(drive, side, track);
   if (!hfe_read_track_data(drive, track, side, where.pos, where.len,
-                           &trackbits, &track_len, &err))
+                           encoding, &trackbits, &track_len, &err))
     {
       hfe_track_load_failed(drive, track, err);
       hfe_undiagnosed_failure(drive);
@@ -853,6 +885,7 @@ static void hfe_seek(int drive, int track)
   hfe_info[drive]->current_track = track;
   hfe_info[drive]->track_data = trackbits;
   hfe_info[drive]->track_data_bytes = track_len;
+  hfe_info[drive]->poll_calls_per_bit = encoding ? 1 : 2;
   log_debug("hfe: seek: loaded %lu bytes of data for drive %d track %d at %p",
             hfe_info[drive]->track_data_bytes,
             drive,
@@ -908,8 +941,8 @@ static void set_up_for_sector_read(int drive, size_t sector_bytes_to_read)
          0xF8 -> 0xF56A
          0xFB -> 0xF56F
 
-         But, (0xF56A & 0xF56F) == 0xF56A, so we scan for that.
-         check what we got.  0xA == binary 1010
+         But, (0xF56A & 0xF56F) == 0xF56A, so we scan for that
+         and check what we got.  0xA == binary 1010
       */
       state->scan_value = 0x0000AAAAAAAAF56A;
       state->scan_mask  = 0x0000FFFFFFFFFFFA;
@@ -918,6 +951,11 @@ static void set_up_for_sector_read(int drive, size_t sector_bytes_to_read)
          scan_value/scan_mask so there is no need to check
          state->shift_register_prevbits for FM-encoded tracks. */
     }
+  /*
+    handle_sector_data_byte() will check the sector address mark value
+    (part of which we didn't check when scanning for the address mark
+    because some of the bits in the bottom nibble of scan_mask are 0).
+  */
   state->bytes_to_read = sector_bytes_to_read;
 }
 
@@ -1124,8 +1162,9 @@ static void handle_sector_id_byte(int drive, unsigned char value, bool yield_byt
         {
           /* That's good news, but we defer setting up for actually
              reading the sector until we have read and verified the
-             CRC.  That also ensures that we will have read the size
-             code, too. So, there is nothing to do here. */
+             CRC (since for example there might be data corruption in
+             the sector id).  That also ensures that we will have read
+             the size code, too. So, there is nothing to do here. */
         }
       else
         {
@@ -1187,12 +1226,10 @@ static void handle_sector_id_byte(int drive, unsigned char value, bool yield_byt
       return;
 
     default:
-      /* This is just a warning since however the input data was
-         created, we need to handle the situation; this is not a
-         failure in the emulator. */
-      log_warn("hfe: drive %d track %d: sector id has unexpected byte position %lu",
-               drive, hfe_info[drive]->current_track,
-               (unsigned long)sector_address_bytes_read);
+      /* state->bytes_to_read must have been set to a weird value. */
+      log_error("hfe: drive %d track %d: sector id has unexpected byte position %lu",
+                drive, hfe_info[drive]->current_track,
+                (unsigned long)sector_address_bytes_read);
       ok = false;
       yield_byte = false;
       break;
@@ -1256,6 +1293,9 @@ static void handle_sector_data_byte(int drive, unsigned char value)
         }
       else
         {
+          /* This can (in principle) happen because the scan_mask
+             value we used to scan for the address mark had some zero
+             bits in the least significant nibble. */
           log_warn("hfe: drive %d: side %d track %2d sector %d: "
                    "unexpected address mark 0x%02X; scanning again "
                    "for the same address.",
@@ -1353,7 +1393,16 @@ static void hfe_poll_drive(int drive, bool is_selected)
     {
       return;
     }
+
   struct hfe_poll_state *state = &hfe_info[drive]->state;
+  if (--state->poll_calls_until_next_action)
+    {
+      return;
+    }
+  else
+    {
+      state->poll_calls_until_next_action = hfe_info[drive]->poll_calls_per_bit;
+    }
 
   if (state->current_op == WOP_WRITE_SECTOR
       || state->current_op == WOP_FORMAT)
@@ -1484,8 +1533,8 @@ static void hfe_poll_drive(int drive, bool is_selected)
           crc_byte(state, 0xA1);
         }
 
-      /* start decoding data (either the sector ID the sector (record)
-         data itself). */
+      /* Start decoding data, either the sector ID or the sector
+         (record) data itself. */
       state->bits_avail_to_decode = 16;
       state->scan_mask = 0;
       /* We continue on to the de-clocking code, because in all cases
@@ -1530,12 +1579,13 @@ static void hfe_poll_drive(int drive, bool is_selected)
      if we get to here we know the clock bits are supposed to be
      correct.
 
-     The bottom 16 bits of shift_register encode 8 bits, so
-     shift_register & (1 << 15) is the first clock bit.  Hence
-     shift_register & (1 << 16) is the previous data bit.
+     The bottom 16 bits of shift_register encode 8 data bits and 8
+     clock bits.
+     shift_register & (1 << 15) is the first clock bit
+     shift_register & (1 << 16) is the previous data bit
   */
-  unsigned int value = 0;
   unsigned int prev_data_bit = (state->shift_register & (1u << 16)) >> 16;
+  unsigned int value = 0;
   unsigned int mask = 1 << 15;
 
   while (state->bits_avail_to_decode > 1)
@@ -1630,10 +1680,12 @@ static void hfe_abort(int drive)
     }
 }
 
-static void init_hfe_poll_state(struct hfe_poll_state *p)
+static void init_hfe_poll_state(struct hfe_poll_state *p,
+                                int poll_calls_per_bit)
 {
   p->current_op = OP_IDLE;
   p->motor_running = false;
+  p->poll_calls_until_next_action = poll_calls_per_bit;
   p->current_op_name = "(initialized, no current operation)";
   p->target.sector = p->target.track = p->target.side = 0;
   p->mfm_mode = false;
@@ -1654,7 +1706,7 @@ static void init_hfe_info(struct hfe_info *p, FILE *f)
   p->track_data = NULL;
   p->track_data_bytes = 0;
   p->fp = f;
-  init_hfe_poll_state(&p->state);
+  init_hfe_poll_state(&p->state, p->poll_calls_per_bit);
 }
 
 static void hfe_spinup(int drive)
@@ -1668,6 +1720,7 @@ static void hfe_spinup(int drive)
       log_debug("hfe: drive %d: spin up", drive);
     }
   hfe_info[drive]->state.motor_running = true;
+  hfe_info[drive]->state.poll_calls_until_next_action = hfe_info[drive]->poll_calls_per_bit;
 }
 
 static void hfe_spindown(int drive)
