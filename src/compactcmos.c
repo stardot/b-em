@@ -33,13 +33,13 @@ static int cmos_rw;
 static uint8_t cmos_addr = 0;
 static uint8_t cmos_ram[256];
 
-void compactcmos_load(MODEL m) {
+void compactcmos_load(const MODEL *m) {
     FILE *cmosf;
     ALLEGRO_PATH *path;
     const char *cpath;
 
     memset(cmos_ram, 0, 128);
-    if ((path = find_cfg_file(m.cmos, ".bin"))) {
+    if ((path = find_cfg_file(m->cmos, ".bin"))) {
         cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
         if ((cmosf = fopen(cpath, "rb"))) {
             if (fread(cmos_ram, 128, 1, cmosf) != 1)
@@ -52,7 +52,7 @@ void compactcmos_load(MODEL m) {
         al_destroy_path(path);
     }
     else
-        log_error("compactcmos: unable to find CMOS file %s", m.cmos);
+        log_error("compactcmos: unable to find CMOS file %s", m->cmos);
 }
 
 void compactcmos_save(MODEL m) {

@@ -32,7 +32,7 @@ int crtc_i;
 
 int hc, vc, sc;
 static int vadj;
-uint16_t ma;
+uint16_t ma, ttxbank;
 static uint16_t maback;
 static int vdispen, dispen;
 static int crtc_mode;
@@ -52,19 +52,25 @@ static void set_intern_dtype(enum vid_disptype dtype)
     vid_dtype_intern = dtype;
 }
 
+static void crtc_setreg(int reg, uint8_t val)
+{
+    val &= crtc_mask[reg];
+    crtc[reg] = val;
+    if (crtc_i == 6 && vc == val)
+        vdispen = 0;
+    else if (reg == 8)
+        set_intern_dtype(vid_dtype_user);
+    else if (reg == 12)
+        ttxbank = (MASTER|BPLUS) ? 0x7c00 : 0x3C00 | ((val & 0x8) << 11);
+}
+
 void crtc_write(uint16_t addr, uint8_t val)
 {
 //        log_debug("Write CRTC %04X %02X %04X\n",addr,val,pc);
     if (!(addr & 1))
         crtc_i = val & 31;
-    else {
-        val &= crtc_mask[crtc_i];
-        crtc[crtc_i] = val;
-        if (crtc_i == 6 && vc == val)
-            vdispen = 0;
-        if (crtc_i == 8)
-            set_intern_dtype(vid_dtype_user);
-    }
+    else
+        crtc_setreg(crtc_i, val);
 }
 
 uint8_t crtc_read(uint16_t addr)
@@ -82,30 +88,30 @@ void crtc_latchpen()
 
 void crtc_savestate(FILE * f)
 {
-    int c;
-    for (c = 0; c < 18; c++)
-        putc(crtc[c], f);
-    putc(vc, f);
-    putc(sc, f);
-    putc(hc, f);
-    putc(ma, f);
-    putc(ma >> 8, f);
-    putc(maback, f);
-    putc(maback >> 8, f);
+    uint8_t bytes[25];
+    for (int c = 0; c < 18; c++)
+        bytes[c] = crtc[c];
+    bytes[18] = vc;
+    bytes[19] = sc;
+    bytes[20] = hc;
+    bytes[21] = ma;
+    bytes[22] = ma >> 8;
+    bytes[23] = maback;
+    bytes[24] = maback >> 8;
+    fwrite(bytes, sizeof(bytes), 1, f);
 }
 
 void crtc_loadstate(FILE * f)
 {
-    int c;
-    for (c = 0; c < 18; c++)
-        crtc[c] = getc(f);
-    vc = getc(f);
-    sc = getc(f);
-    hc = getc(f);
-    ma = getc(f);
-    ma |= getc(f) << 8;
-    maback = getc(f);
-    maback |= getc(f) << 8;
+    uint8_t bytes[25];
+    fread(bytes, sizeof(bytes), 1, f);
+    vc = bytes[18];
+    sc = bytes[19];
+    hc = bytes[20];
+    ma = bytes[21] | (bytes[22] << 8);
+    maback = bytes[23] | (bytes[24] << 8);
+    for (int c = 0; c < 18; c++)
+        crtc_setreg(c, bytes[c]);
 }
 
 
@@ -382,55 +388,51 @@ void videoula_write(uint16_t addr, uint8_t val)
 
 void videoula_savestate(FILE * f)
 {
-    int c;
-    uint32_t v;
-
-    putc(ula_ctrl, f);
-    for (c = 0; c < 16; c++)
-        putc(ula_palbak[c], f);
-    for (c = 0; c < 16; c++) {
-        v = nula_collook[c];
-        putc(((v >> 16) & 0xff), f); // red
-        putc(((v >> 8) & 0xff), f);  // green
-        putc((v & 0xff), f);         // blue
-        putc(((v >> 24) & 0xff), f); // alpha
+    unsigned char bytes[97], *ptr = bytes;
+    *ptr++ = ula_ctrl;
+    for (int c = 0; c < 16; c++)
+        *ptr++ = ula_palbak[c];
+    for (int c = 0; c < 16; c++) {
+        uint32_t v = nula_collook[c];
+        *ptr++ = (v >> 16) & 0xff; // red
+        *ptr++ = (v >> 8) & 0xff;  // green
+        *ptr++ = v & 0xff;         // blue
+        *ptr++ = (v >> 24) & 0xff; // alpha
     }
-    putc(nula_pal_write_flag, f);
-    putc(nula_pal_first_byte, f);
-    for (c = 0; c < 8; c++)
-        putc(nula_flash[c], f);
-    putc(nula_palette_mode, f);
-    putc(nula_horizontal_offset, f);
-    putc(nula_left_blank, f);
-    putc(nula_disable, f);
-    putc(nula_attribute_mode, f);
-    putc(nula_attribute_text, f);
+    *ptr++ = nula_pal_write_flag;
+    *ptr++ = nula_pal_first_byte;
+    for (int c = 0; c < 8; c++)
+        *ptr++ = nula_flash[c];
+    *ptr++ = nula_palette_mode;
+    *ptr++ = nula_horizontal_offset;
+    *ptr++ = nula_left_blank;
+    *ptr++ = nula_disable;
+    *ptr++ = nula_attribute_mode;
+    *ptr++ = nula_attribute_text;
+    fwrite(bytes, ptr-bytes, 1, f);
 }
 
 void videoula_loadstate(FILE * f)
 {
-    int c;
-    uint8_t red, grn, blu, alp;
-    videoula_write(0, getc(f));
-    for (c = 0; c < 16; c++)
-        videoula_write(1, getc(f) | (c << 4));
-    for (c = 0; c < 16; c++) {
-        red = getc(f);
-        blu = getc(f);
-        grn = getc(f);
-        alp = getc(f);
-        nula_collook[c] = (alp << 24) | (red << 16) | (grn << 8) | blu;
+    unsigned char bytes[97], *ptr = bytes;
+    fread(bytes, sizeof(bytes), 1, f);
+    videoula_write(0, *ptr++);
+    for (int c = 0; c < 16; c++)
+        videoula_write(1, *ptr++ | (c << 4));
+    for (int c= 0; c < 16; c++) {
+        nula_collook[c] = (ptr[3] << 24) | (ptr[0] << 16) | (ptr[1] << 8) | ptr[2];
+        ptr += 4;
     }
-    nula_pal_write_flag = getc(f);
-    nula_pal_first_byte = getc(f);
-    for (c = 0; c < 8; c++)
-        nula_flash[c] = getc(f);
-    nula_palette_mode = getc(f);
-    nula_horizontal_offset = getc(f);
-    nula_left_blank = getc(f);
-    nula_disable = getc(f);
-    nula_attribute_mode = getc(f);
-    nula_attribute_text = getc(f);
+    nula_pal_write_flag = *ptr++;
+    nula_pal_first_byte = *ptr++;
+    for (int c = 0; c < 8; c++)
+        nula_flash[c] = *ptr++;
+    nula_palette_mode = *ptr++;
+    nula_horizontal_offset = *ptr++;
+    nula_left_blank = *ptr++;
+    nula_disable = *ptr++;
+    nula_attribute_mode = *ptr++;
+    nula_attribute_text = *ptr++;
 }
 
 /*Mode 7 (SAA5050)*/
@@ -756,7 +758,12 @@ ALLEGRO_DISPLAY *video_init(void)
 #else
     al_set_new_display_flags(ALLEGRO_WINDOWED | ALLEGRO_RESIZABLE);
 #endif
+    al_set_new_display_option(ALLEGRO_VSYNC, 2, ALLEGRO_REQUIRE);
+    log_debug("video: vsync=%d", al_get_new_display_option(ALLEGRO_VSYNC, &temp));
+
     video_set_window_size(true);
+
+    al_set_new_display_option(ALLEGRO_VSYNC, 2, ALLEGRO_SUGGEST);
     if ((display = al_create_display(winsizex, winsizey)) == NULL) {
         log_fatal("video: unable to create display");
         exit(1);
@@ -898,7 +905,7 @@ void video_poll(int clocks, int timer_enable)
                 cdraw = cdrawlook[crtc[8] >> 6];
 
             if (ma & 0x2000)
-                dat = ram[0x7C00 | (ma & 0x3FF) | vidbank];
+                dat = ram[ttxbank | (ma & 0x3FF) | vidbank];
             else {
                 if ((crtc[8] & 3) == 3)
                     addr = (ma << 3) | ((sc & 3) << 1) | interlline;
@@ -1209,26 +1216,25 @@ void video_poll(int clocks, int timer_enable)
 
 void video_savestate(FILE * f)
 {
-    putc(scrx, f);
-    putc(scrx >> 8, f);
-    putc(scry, f);
-    putc(scry >> 8, f);
-    putc(oddclock, f);
-    putc(vidclocks, f);
-    putc(vidclocks >> 8, f);
-    putc(vidclocks >> 16, f);
-    putc(vidclocks >> 24, f);
+    unsigned char bytes[9];
+    bytes[0] = scrx;
+    bytes[1] = scrx >> 8;
+    bytes[2] = scry;
+    bytes[3] = scry >> 8;
+    bytes[4] = oddclock;
+    bytes[5] = vidclocks;
+    bytes[6] = vidclocks >> 8;
+    bytes[7] = vidclocks >> 16;
+    bytes[8] = vidclocks >> 24;
+    fwrite(bytes, sizeof(bytes), 1, f);
 }
 
 void video_loadstate(FILE * f)
 {
-    scrx = getc(f);
-    scrx |= getc(f) << 8;
-    scry = getc(f);
-    scry |= getc(f) << 8;
-    oddclock = getc(f);
-    vidclocks = getc(f);
-    vidclocks = getc(f) << 8;
-    vidclocks = getc(f) << 16;
-    vidclocks = getc(f) << 24;
+    unsigned char bytes[9];
+    fread(bytes, sizeof(bytes), 1, f);
+    scrx = bytes[0] | (bytes[1] << 8);
+    scry = bytes[2] | (bytes[3] << 8);
+    oddclock = bytes[4];
+    vidclocks = bytes[5] | (bytes[6] << 8) | (bytes[7] << 16) | (bytes[8] << 24);
 }

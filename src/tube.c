@@ -15,6 +15,8 @@
 #include "arm.h"
 #include "x86_tube.h"
 #include "z80.h"
+#include "pdp11/pdp11.h"
+#include "musahi/m68k.h"
 
 int tube_multipler = 1;
 int tube_speed_num = 0;
@@ -46,8 +48,6 @@ tube_speed_t tube_speeds[NUM_TUBE_SPEEDS] =
 int tube_irq=0;
 tubetype tube_type=TUBEX86;
 
-static int tube_romin=1;
-
 #define PH1_SIZE 24
 
 struct
@@ -69,21 +69,34 @@ void tube_updateints()
 
     if (((tubeula.r1stat & 2) && (tubeula.pstat[0] & 128)) || ((tubeula.r1stat & 4) && (tubeula.pstat[3] & 128))) {
         new_irq |= 1;
-        if (!(tube_irq & 1))
+        if (!(tube_irq & 1)) {
             log_debug("tube: parasite IRQ asserted");
+            if (tube_type == TUBEPDP11) {
+                if (((m_pdp11->PS >> 5) & 7) < 6)
+                    pdp11_interrupt(0x84, 6);
+            }
+            else if (tube_type == TUBE68000)
+                m68k_set_virq(2, 1);
+        }
     }
-    else if (tube_irq & 1)
+    else if (tube_irq & 1) {
         log_debug("tube: parasite IRQ de-asserted");
+        if (tube_type == TUBE68000)
+            m68k_set_virq(2, 0);
+    }
 
     if (tubeula.r1stat & 8 && (tubeula.ph3pos == 0 || tubeula.hp3pos > (tubeula.r1stat & 16) ? 1 : 0)) {
         new_irq |= 2;
-        if (!(tube_irq & 2))
+        if (!(tube_irq & 2)) {
             log_debug("tube: parasite NMI asserted");
+            if (tube_type == TUBEPDP11)
+                pdp11_interrupt(0x80, 7);
+        }
     }
     else if (tube_irq & 2)
         log_debug("tube: parasite NMI de-asserted");
 
-    if (tube_type == TUBE6809 && new_irq != tube_irq)
+    if (new_irq != tube_irq && tube_type == TUBE6809)
         tube_6809_int(new_irq);
 
     tube_irq = new_irq;
@@ -211,12 +224,7 @@ uint8_t tube_parasite_read(uint32_t addr)
         switch (addr & 7)
         {
             case 0: /*Register 1 stat*/
-                if (tube_romin)
-                {
-                        if (tube_type == TUBE6502 || tube_type == TUBE65816)
-                           tube_6502_mapoutrom();
-                        tube_romin = 0;
-                }
+                tube_6502_rom_in = false;
                 temp = tubeula.pstat[0] | tubeula.r1stat;
                 break;
             case 1: /*Register 1*/
@@ -352,18 +360,17 @@ void tube_reset(void)
         tubeula.pstat[0] = 0x40;
         tubeula.pstat[1] = tubeula.pstat[2] = tubeula.pstat[3] = 0x7f;
         tubeula.hstat[2] = 0xC0;
-        tube_romin = 1;
 }
 
 void tube_ula_savestate(FILE *f)
 {
-    putc(tube_romin, f);
+    putc(tube_6502_rom_in, f);
     fwrite(&tubeula, sizeof tubeula, 1, f);
 }
 
 void tube_ula_loadstate(FILE *f)
 {
-    tube_romin = getc(f);
+    tube_6502_rom_in = getc(f);
     fread(&tubeula, sizeof tubeula, 1, f);
     tube_updateints();
 }

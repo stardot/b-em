@@ -15,11 +15,14 @@
 #include "wd1770.h"
 #include "x86_tube.h"
 #include "z80.h"
+#include "copro-pdp11.h"
+#include "pdp11/pdp11_debug.h"
+#include "mc68000tube.h"
 
 #define CFG_SECT_LEN 20
 
 fdc_type_t fdc_type;
-bool BPLUS, x65c02, MASTER, MODELA, OS01, compactcmos;
+bool BPLUS, x65c02, MASTER, MODELA, OS01, compactcmos, integra;
 int curtube;
 int oldmodel, model_count;
 MODEL *models;
@@ -64,7 +67,10 @@ TUBE tubes[NUM_TUBES]=
     {"32016",          tube_32016_init, n32016_reset,    &n32016_cpu_debug,    0x0000, "",                 8 },
     {"6502 External",  tube_6502_init,  tube_6502_reset, &tube6502_cpu_debug,  0x0800, "6502Tube",         3 },
     {"6809",           tube_6809_init,  mc6809nc_reset,  &mc6809nc_cpu_debug,  0x0800, "6809Tube",        16 },
-    {"Z80 ROM 2.00",   z80_init,        z80_reset,       &tubez80_cpu_debug,   0x1000, "Z80_200",          6 }
+    {"Z80 ROM 2.00",   z80_init,        z80_reset,       &tubez80_cpu_debug,   0x1000, "Z80_200",          6 },
+    {"PDP11",          tube_pdp11_init, copro_pdp11_rst, &pdp11_cpu_debug,     0x0800, "PDP11Tube",        2 },
+    {"6502 Turbo",     tube_6502_iturb, tube_6502_reset, &tube6502_cpu_debug,  0x0800, "6502Turbo",        4 },
+    {"68000",          tube_68000_init, tube_68000_rst,  &mc68000_cpu_debug,   0x8000, "CiscOS",           4 }
 };
 
 static fdc_type_t model_find_fdc(const char *name, const char *model)
@@ -135,6 +141,7 @@ void model_loadcfg(void)
             ptr->modela  = get_config_bool(sect, "modela",  false);
             ptr->os01    = get_config_bool(sect, "os01",    false);
             ptr->compact = get_config_bool(sect, "compact", false);
+            ptr->integra = get_config_bool(sect, "integra", false);
             ptr->os      = get_config_string(sect, "os", "os12");
             ptr->cmos    = get_config_string(sect, "cmos", "");
             ptr->romsetup = model_find_romsetup(get_config_string(sect, "romsetup", "swram"), ptr->name);
@@ -226,17 +233,19 @@ void model_init()
     x65c02      = models[curmodel].x65c02;
     MASTER      = models[curmodel].master;
     MODELA      = models[curmodel].modela;
+    integra     = models[curmodel].integra;
     OS01        = models[curmodel].os01;
     compactcmos = models[curmodel].compact;
 
     mem_clearroms();
     models[curmodel].romsetup->func();
     tube_init();
-    cmos_load(models[curmodel]);
+    cmos_load(&models[curmodel]);
 }
 
 void model_savestate(FILE *f)
 {
+    unsigned char bytes[6];
     MODEL *model = models + curmodel;
     savestate_save_var(curmodel, f);
     savestate_save_str(model->name, f);
@@ -244,12 +253,15 @@ void model_savestate(FILE *f)
     savestate_save_str(model->cmos, f);
     savestate_save_str(model->romsetup->name, f);
     savestate_save_str(fdc_names[model->fdc_type], f);
-    putc(model->x65c02, f);
-    putc(model->bplus, f);
-    putc(model->master, f);
-    putc(model->modela, f);
-    putc(model->os01, f);
-    putc(model->compact, f);
+    bytes[0] = model->x65c02;
+    bytes[1] = model->bplus;
+    bytes[2] = model->master;
+    bytes[3] = model->modela;
+    bytes[4] = model->os01;
+    bytes[5] = model->compact;
+    if (model->integra)
+        bytes[0] |= 0x80;
+    fwrite(bytes, sizeof(bytes), 1, f);
     if (model->tube >= 0) {
         putc(1, f);
         savestate_save_str(tubes[model->tube].name, f);
@@ -276,6 +288,7 @@ static bool model_cmp(int modelno, MODEL *nmodel)
            tmodel->master   == nmodel->master      &&
            tmodel->modela   == nmodel->modela      &&
            tmodel->compact  == nmodel->compact     &&
+           tmodel->integra  == nmodel->integra     &&
            tmodel->tube     == nmodel->tube;
 }
 
@@ -283,8 +296,7 @@ void model_loadstate(FILE *f)
 {
     int newmodel, i;
     MODEL model;
-    char *rom_setup, *fdc_name, *tube_name, *cfg_sect;
-
+    char *rom_setup, *fdc_name, *tube_name, *cfg_sect, bytes[7];
     newmodel   = savestate_load_var(f);
     model.name = savestate_load_str(f);
     model.os   = savestate_load_str(f);
@@ -293,14 +305,16 @@ void model_loadstate(FILE *f)
     model.romsetup = model_find_romsetup(rom_setup, model.name);
     fdc_name = savestate_load_str(f);
     model.fdc_type = model_find_fdc(fdc_name, model.name);
-    model.x65c02  = getc(f);
-    model.bplus   = getc(f);
-    model.master  = getc(f);
-    model.modela  = getc(f);
-    model.os01    = getc(f);
-    model.compact = getc(f);
+    fread(bytes, sizeof(bytes), 1, f);
+    model.x65c02  = bytes[0] & 0x01;
+    model.integra = (bytes[0] & 0x80) ? 1 : 0;
+    model.bplus   = bytes[1];
+    model.master  = bytes[2];
+    model.modela  = bytes[3];
+    model.os01    = bytes[4];
+    model.compact = bytes[5];
 
-    switch(getc(f)) {
+    switch(bytes[6]) {
         case 1:
             tube_name = savestate_load_str(f);
             model.tube = model_find_tube(tube_name, model.name);

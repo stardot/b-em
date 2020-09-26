@@ -36,6 +36,7 @@ typedef struct
     uint8_t modela:1;
     uint8_t os01:1;
     uint8_t compact:1;
+    uint8_t integra:1;
     int tube;
 } MODEL;
 
@@ -53,12 +54,12 @@ typedef struct
     int  speed_multiplier;
 } TUBE;
 
-#define NUM_TUBES 9
+#define NUM_TUBES 12
 extern TUBE tubes[NUM_TUBES];
 
 extern int curmodel, curtube, oldmodel, selecttube;
 extern fdc_type_t fdc_type;
-extern bool BPLUS, x65c02, MASTER, MODELA, OS01, compactcmos;
+extern bool BPLUS, x65c02, MASTER, MODELA, OS01, compactcmos, integra;
 
 void model_loadcfg(void);
 void model_check(void);

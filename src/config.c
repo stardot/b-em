@@ -78,11 +78,35 @@ const char *get_config_string(const char *sect, const char *key, const char *sva
     return sval;
 }
 
+ALLEGRO_COLOR get_config_colour(const char *sect, const char *key, ALLEGRO_COLOR cdefault)
+{
+    if (bem_cfg) {
+        const char *str = al_get_config_value(bem_cfg, sect, key);
+        if (str) {
+            if (*str == '#') {
+                unsigned long col = strtoul(str+1, NULL, 16);
+                unsigned r = (col >> 16) & 0xff;
+                unsigned g = (col >> 8) & 0xff;
+                unsigned b = col & 0xff;
+                log_debug("config: get_config_colour, sect=%s, key=%s, hex, r=%u, g=%u, b=%u", sect, key, r, g, b);
+                return al_map_rgb(r, g, b);
+            }
+            else {
+                unsigned r, g, b;
+                if (sscanf(str, "%u,%u,%u", &r, &g, &b) == 3) {
+                    log_debug("config: get_config_colour, sect=%s, key=%s, decimal, r=%u, g=%u, b=%u", sect, key, r, g, b);
+                    return al_map_rgb(r, g, b);
+                }
+            }
+        }
+    }
+    return cdefault;
+}
+
 void config_load(void)
 {
     ALLEGRO_PATH *path;
     const char *cpath, *p;
-    char s[16];
     int c;
 
     if ((path = find_cfg_file("b-em", ".cfg"))) {
@@ -162,14 +186,39 @@ void config_load(void)
     vdfs_cfg_root    = get_config_string("disc", "vdfs_root", 0);
 
     keyas            = get_config_bool(NULL, "key_as",        0);
+    keylogical       = get_config_bool(NULL, "key_logical",   0);
+    keypad           = get_config_bool(NULL, "keypad", false);
     mouse_amx        = get_config_bool(NULL, "mouse_amx",     0);
     kbdips           = get_config_int(NULL, "kbdips", 0);
 
     buflen_m5        = get_config_int("sound", "buflen_music5000", BUFLEN_M5);
 
+    for (int act = 0; act < KEY_ACTION_MAX; act++) {
+        const char *str = al_get_config_value(bem_cfg, "key_actions", keyact_const[act].name);
+        if (str) {
+            const char *sep = strchr(str, ',');
+            size_t size = sep ? sep - str : strlen(str);
+            int keycode = -1;
+            for (int kc = 0; kc < ALLEGRO_KEY_MAX; kc++) {
+                if (!strncmp(al_keycode_to_name(kc), str, size)) {
+                    keycode = kc;
+                    break;
+                }
+            }
+            if (keycode >= 0) {
+                keyactions[act].keycode = keycode;
+                keyactions[act].altstate = (sep && !strcmp(sep, ",down"));
+            }
+        }
+    }
+
     for (c = 0; c < ALLEGRO_KEY_MAX; c++) {
-        sprintf(s, "key_define_%03i", c);
-        keylookup[c] = get_config_int("user_keyboard", s, c);
+        const char *str = al_get_config_value(bem_cfg, "user_keyboard", al_keycode_to_name(c));
+        if (str) {
+            unsigned bbckey = strtoul(str, NULL, 16);
+            if (bbckey)
+                keylookup[c] = bbckey;
+        }
     }
     midi_load_config();
 }
@@ -207,7 +256,6 @@ void config_save(void)
 {
     ALLEGRO_PATH *path;
     const char *cpath;
-    char t[20];
     int c;
 
     if ((path = find_cfg_dest("b-em", ".cfg"))) {
@@ -271,15 +319,28 @@ void config_save(void)
             set_config_string("disc", "vdfs_root", vdfs_root);
 
         set_config_bool(NULL, "key_as", keyas);
+        set_config_bool(NULL, "key_logical", keylogical);
+        set_config_bool(NULL, "keypad", keypad);
 
         set_config_bool(NULL, "mouse_amx", mouse_amx);
 
+        for (int c = 0; c < KEY_ACTION_MAX; c++) {
+            if (keyactions[c].keycode == keyact_const[c].keycode && keyactions[c].altstate == keyact_const[c].altstate)
+                al_remove_config_key(bem_cfg, "key_actions", keyact_const[c].name);
+            else {
+                char buf[20];
+                snprintf(buf, sizeof(buf), "%s,%s", al_keycode_to_name(keyactions[c].keycode), keyactions[c].altstate ? "down" : "up");
+                al_set_config_value(bem_cfg, "key_actions", keyact_const[c].name, buf);
+            }
+        }
         for (int c = 0; c < ALLEGRO_KEY_MAX; c++) {
-            snprintf(t, sizeof t, "key_define_%03i", c);
-            if (keylookup[c] == c)
-                al_remove_config_key(bem_cfg, "user_keyboard", t);
-            else
-                set_config_int("user_keyboard", t, keylookup[c]);
+            if (keylookup[c] == key_allegro2bbc[c])
+                al_remove_config_key(bem_cfg, "user_keyboard", al_keycode_to_name(c));
+            else {
+                char buf[11];
+                snprintf(buf, sizeof(buf), "%02x", keylookup[c]);
+                al_set_config_value(bem_cfg, "user_keyboard", al_keycode_to_name(c), buf);
+            }
         }
         midi_save_config();
         log_debug("config: saving config to %s", cpath);

@@ -1,7 +1,7 @@
 #ifndef __INC_MAIN_H
 #define __INC_MAIN_H
 
-#define NUM_EMU_SPEEDS   12
+#define NUM_EMU_SPEEDS   10
 #define EMU_SPEED_FULL   255
 #define EMU_SPEED_PAUSED 254
 
@@ -27,6 +27,11 @@ void main_pause(void);
 void main_resume(void);
 void main_setspeed(int speed);
 void main_setquit(void);
+void main_start_fullspeed(void);
+void main_stop_fullspeed(bool hostshift);
+
+void main_key_break(void);
+void main_key_pause(void);
 
 void main_cleardrawit(void);
 void main_setmouse(void);

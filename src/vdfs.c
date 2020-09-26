@@ -1173,7 +1173,6 @@ static void ss_save_dir2(vdfs_entry *ent, FILE *f)
 
 void vdfs_savestate(FILE *f)
 {
-
     putc(vdfs_enabled ? 'V' : 'v', f);
     ss_save_dir1(cur_dir, f);
     ss_save_dir2(lib_dir, f);

@@ -7,6 +7,10 @@
 #include <inttypes.h>
 #include "debugger_symbols.h"
 
+#define WIDTH_8BITS  0
+#define WIDTH_16BITS 1
+#define WIDTH_32BITS 2
+
 typedef struct cpu_debug_t {
   const char *cpu_name;                                               // Name/model of CPU.
   int      (*debug_enable)(int newvalue);                             // enable/disable debugging on this CPU, returns previous value.
@@ -22,6 +26,9 @@ typedef struct cpu_debug_t {
   void     (*reg_parse)(int which, const char *strval);               // Parse a value into a register.
   uint32_t (*get_instr_addr)(void);                                   // Returns the base address of the currently executing instruction
   const char **trap_names;                                            // Null terminated list of other reasons a CPU may trap to the debugger.
+  const int mem_width;                                                // Width of value returned from memread(): 0=8-bit, 1=16-bit, 2=32-bit
+  const int io_width;                                                 // Width of value returned from  ioread(): 0=8-bit, 1=16-bit, 2=32-bit
+  const int default_base;                                             // Allows a co pro to override the default base of 16
   size_t   (*print_addr)(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t bufsize, bool include_symbol);   // Print an address.
   symbol_table *symbols;                                              // symbol table for storing symbolic addresses
 } cpu_debug_t;

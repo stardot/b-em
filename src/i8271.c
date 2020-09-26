@@ -11,11 +11,6 @@
 #include "led.h"
 #include "model.h"
 
-static void i8271_callback();
-static void i8271_data(uint8_t dat);
-static void i8271_spindown();
-static int  i8271_getdata(int last);
-
 static int bytenum;
 static int i8271_verify = 0;
 
@@ -55,55 +50,6 @@ static void i8271_NMI(void)
         nmi = 0;
 }
 
-static void i8271_finishio(unsigned flags)
-{
-    unsigned result = 0;
-    if (flags & FDC_HEADER_CRC_ERR)
-        result = 0x0c;
-    else if (flags & FDC_DATA_CRC_ERR)
-        result = 0x0e;
-    else if (flags & FDC_NOT_FOUND)
-        result = 0x18;
-    else if (flags & FDC_WRITE_PROTECT)
-        result = 0x12;
-    if (!result) {
-        if (flags & FDC_DELETED_DATA)
-            result |= 0x20;
-        fdc_time = 200;
-    }
-    else
-        short_spindown();
-    i8271.result = result;
-    i8271_NMI();
-}
-
-void i8271_reset()
-{
-        if (fdc_type == FDC_I8271)
-        {
-                fdc_callback       = i8271_callback;
-                fdc_data           = i8271_data;
-                fdc_spindown       = i8271_spindown;
-                fdc_finishio       = i8271_finishio;
-                /*
-                fdc_finishread     = i8271_finishread;
-                fdc_notfound       = i8271_notfound;
-                fdc_datacrcerror   = i8271_datacrcerror;
-                fdc_headercrcerror = i8271_headercrcerror;
-                fdc_writeprotect   = i8271_writeprotect;
-                * */
-                fdc_getdata        = i8271_getdata;
-                motorspin = 45000;
-        }
-        i8271.paramnum = i8271.paramreq = 0;
-        i8271.status = 0;
-//        printf("Reset 8271\n");
-        fdc_time = 0;
-        i8271.curtrack[0] = i8271.curtrack[1] = 0;
-        i8271.command = 0xFF;
-        i8271.realtrack[0] = i8271.realtrack[1] = 0;
-}
-
 static void i8271_spinup(void)
 {
     if (!motoron) {
@@ -111,6 +57,9 @@ static void i8271_spinup(void)
         motorspin = 0;
         led_update((curdrive == 0) ? LED_DRIVE_0 : LED_DRIVE_1, true, 0);
         ddnoise_spinup();
+        for (int i = 0; i < NUM_DRIVES; i++)
+            if (drives[i].spinup)
+                drives[i].spinup(i);
     }
 }
 
@@ -121,6 +70,9 @@ static void i8271_spindown()
         led_update(LED_DRIVE_0, false, 0);
         led_update(LED_DRIVE_1, false, 0);
         ddnoise_spindown();
+        for (int i = 0; i < NUM_DRIVES; i++)
+            if (drives[i].spindown)
+                drives[i].spindown(i);
     }
     i8271.drvout &= ~DRIVESEL;
 }
@@ -488,16 +440,61 @@ static void i8271_callback(void)
 
 static void i8271_data(uint8_t dat)
 {
-        if (i8271_verify) return;
-        i8271.data = dat;
-        i8271.status = 0x8C;
-        i8271.result = 0;
-        i8271_NMI();
-//        printf("%02X : Data %02X\n",bytenum,dat);
-        bytenum++;
+    if (i8271_verify)
+        return;
+    i8271.data = dat;
+    i8271.status = 0x8C;
+    i8271.result = 0;
+    i8271_NMI();
+    bytenum++;
 }
 
-static int i8271_getdata(int last)
+static void i8271_finishread(bool deleted)
+{
+    fdc_time = 200;
+    if (deleted)
+        i8271.result |= 0x20;
+}
+
+static void i8271_notfound(void)
+{
+    log_debug("i8271: not found");
+    i8271.result = 0x18;
+    i8271.status = 0x18;
+    i8271_NMI();
+    short_spindown();
+}
+
+static void i8271_datacrcerror(bool deleted)
+{
+    log_debug("i8271: data CRC error");
+    i8271.result = 0x0E;
+    if (deleted)
+        i8271.result |= 0x20;
+    i8271.status = 0x18;
+    i8271_NMI();
+    short_spindown();
+}
+
+static void i8271_headercrcerror(void)
+{
+    log_debug("i8271: header CRC error");
+    i8271.result = 0x0C;
+    i8271.status = 0x18;
+    i8271_NMI();
+    short_spindown();
+}
+
+static void i8271_writeprotect(void)
+{
+    log_debug("i8271: write-protect");
+    i8271.result = 0x12;
+    i8271.status = 0x18;
+    i8271_NMI();
+    short_spindown();
+}
+
+int i8271_getdata(int last)
 {
 //        printf("Disc get data %i\n",bytenum);
         bytenum++;
@@ -510,4 +507,27 @@ static int i8271_getdata(int last)
         }
         i8271.written = 0;
         return i8271.data;
+}
+
+void i8271_reset()
+{
+    if (fdc_type == FDC_I8271) {
+        fdc_callback       = i8271_callback;
+        fdc_data           = i8271_data;
+        fdc_spindown       = i8271_spindown;
+        fdc_finishread     = i8271_finishread;
+        fdc_notfound       = i8271_notfound;
+        fdc_datacrcerror   = i8271_datacrcerror;
+        fdc_headercrcerror = i8271_headercrcerror;
+        fdc_writeprotect   = i8271_writeprotect;
+        fdc_getdata        = i8271_getdata;
+        motorspin = 45000;
+    }
+    i8271.paramnum = i8271.paramreq = 0;
+    i8271.status = 0;
+    log_debug("i8271: reset 8271");
+    fdc_time = 0;
+    i8271.curtrack[0] = i8271.curtrack[1] = 0;
+    i8271.command = 0xFF;
+    i8271.realtrack[0] = i8271.realtrack[1] = 0;
 }

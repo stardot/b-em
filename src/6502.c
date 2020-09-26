@@ -10,6 +10,7 @@
 #include "ide.h"
 #include "mem.h"
 #include "model.h"
+#include "cmos.h"
 #include "mouse.h"
 #include "music2000.h"
 #include "music5000.h"
@@ -201,10 +202,9 @@ int tubecycle;
 int output = 0;
 static int timetolive = 0;
 
-static int cycles;
+int cycles;
 static int otherstuffcount = 0;
 int romsel;
-uint8_t ram4k, ram8k, ram12k, ram20k;
 
 static inline void polltime(int c)
 {
@@ -234,6 +234,7 @@ static int RAMbank[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 static uint8_t *memlook[2][256];
 static int memstat[2][256];
 static int vis20k = 0;
+uint8_t ram1k, ram4k, ram8k;
 
 static uint8_t acccon;
 
@@ -437,6 +438,10 @@ static uint32_t do_readmem(uint32_t addr)
                         return acccon;
                 break;
 
+        case 0xFE3C:
+            if (integra)
+                return cmos_read_data_integra();
+
         case 0xFE40:
         case 0xFE44:
         case 0xFE48:
@@ -523,6 +528,162 @@ static void dbg_do_writemem(uint32_t addr, uint32_t val) {
         do_writemem(addr, val);
 }
 
+static inline void shadow_mem(int enabled)
+{
+    uint8_t *base = enabled ? ram + 0x8000 : ram;
+    for (int c = 0x30; c < 0x80; c++)
+        memlook[0][c] = base;
+}
+
+static inline void page_rom(int rom_no, int rom_sel, int start, int end)
+{
+    int memtype = rom_slots[rom_no].swram ? 1 : 2;
+    uint8_t *base = rom + rom_sel - 0x8000;
+    for (int c = start; c < end; c++) {
+        memlook[0][c] = memlook[1][c] = base;
+        memstat[0][c] = memstat[1][c] = memtype;
+    }
+}
+
+#define INTEGRA_SHEN   0x80
+#define INTEGRA_PRVS1  0x40
+#define INTEGRA_PRVS4  0x20
+#define INTEGRA_PRVS8  0x10
+
+#define INTEGRA_MEMSEL 0x80
+#define INTEGRA_PRVEN  0x40
+
+static void write_romsel(int val)
+{
+    ram1k = ram4k = ram8k = 0;
+    int rom_no = val & 0x0f;
+    romsel = rom_no << 14;
+    page_rom(rom_no, romsel, 0x80, 0xc0);
+    if (MASTER)
+        ram4k = val & 0x80;
+    else if (BPLUS)
+        ram4k = ram8k = (val & 0x80);
+    else if (integra) {
+        if ((val ^ ram_fe30) & INTEGRA_MEMSEL)
+            shadow_mem(!(val & INTEGRA_MEMSEL) && (ram_fe34 & INTEGRA_SHEN));
+        if (val & INTEGRA_PRVEN) {
+            ram8k = ram_fe34 & INTEGRA_PRVS8;
+            ram4k = ram_fe34 & INTEGRA_PRVS4;
+            ram1k = ram_fe34 & INTEGRA_PRVS1;
+        }
+    }
+    RAMbank[0xA] = ram8k;
+    if (ram4k) {
+        for (int c = 0x80; c < 0x90; c++) {
+            memlook[0][c] = memlook[1][c] = ram;
+            memstat[0][c] = memstat[1][c] = 1;
+        }
+    }
+    else if (ram1k) {
+        for (int c = 0x80; c < 0x84; c++) {
+            memlook[0][c] = memlook[1][c] = ram;
+            memstat[0][c] = memstat[1][c] = 1;
+        }
+    }
+    if (ram8k) {
+        for (int c = 0x90; c < 0xb0; c++) {
+            memlook[0][c] = memlook[1][c] = ram;
+            memstat[0][c] = memstat[1][c] = 1;
+        }
+    }
+    ram_fe30 = val;
+}
+
+static void write_acccon_master(int val)
+{
+    acccon = val;
+    int changes = val ^ ram_fe34;
+    vidbank = (val & 1) ? 0x8000 : 0;
+    if (val & 2)
+        RAMbank[0xC] = RAMbank[0xD] = 1;
+    else
+        RAMbank[0xC] = RAMbank[0xD] = 0;
+    if (changes & 4)
+        shadow_mem(val & 4);
+    if (changes & 8) {
+        if (val & 8) { /* 8K filing system RAM */
+            uint8_t *base = ram - 0x3000;
+            for (int c = 0xc0; c < 0xe0; c++) {
+                memlook[0][c] = memlook[1][c] = base;
+                memstat[0][c] = memstat[1][c] = 1;
+            }
+        }
+        else {
+            uint8_t *base = os - 0xC000;
+            for (int c = 0xc0; c < 0xe0; c++) {
+                memlook[0][c] = memlook[1][c] = base;
+                memstat[0][c] = memstat[1][c] = 2;
+            }
+        }
+    }
+}
+
+static void write_acccon_bplus(int val)
+{
+    acccon = val;
+    vidbank = (val & 0x80) << 8;
+    if (val & 0x80)
+        RAMbank[0xC] = RAMbank[0xD] = 1;
+    else
+        RAMbank[0xC] = RAMbank[0xD] = 0;
+}
+
+static void write_acccon_integra(int val)
+{
+    int changes = val ^ ram_fe34;
+    if (changes & INTEGRA_SHEN)
+        shadow_mem((val & INTEGRA_SHEN) && !(ram_fe30 & INTEGRA_MEMSEL));
+    if (changes & (INTEGRA_PRVS1|INTEGRA_PRVS4|INTEGRA_PRVS8)) {
+        if (val & INTEGRA_PRVS4) {
+            for (int c = 0x80; c < 0x90; c++) {
+                memlook[0][c] = memlook[1][c] = ram;
+                memstat[0][c] = memstat[1][c] = 1;
+            }
+        }
+        else if (val & INTEGRA_PRVS1) {
+            for (int c = 0x80; c < 0x84; c++) {
+                memlook[0][c] = memlook[1][c] = ram;
+                memstat[0][c] = memstat[1][c] = 1;
+            }
+            page_rom(ram_fe30 & 0x0f, romsel, 0x84, 0x90);
+        }
+        else
+            page_rom(ram_fe30 & 0x0f, romsel, 0x80, 0x90);
+
+        if (val & INTEGRA_PRVS8) {
+            for (int c = 0x90; c < 0xb0; c++) {
+                memlook[0][c] = memlook[1][c] = ram;
+                memstat[0][c] = memstat[1][c] = 1;
+            }
+        }
+        else
+            page_rom(ram_fe30 & 0x0f, romsel, 0x90, 0xb0);
+    }
+}
+
+static void write_fe34(int val)
+{
+    if (MASTER) {
+        write_acccon_master(val);
+        ram_fe34 = val;
+    }
+    else if (BPLUS) {
+        write_acccon_bplus(val);
+        ram_fe34 = val;
+    }
+    else if (integra) {
+        write_acccon_integra(val);
+        ram_fe34 = val;
+    }
+    else
+        write_romsel(val);
+}
+
 static void do_writemem(uint32_t addr, uint32_t val)
 {
         int c;
@@ -533,7 +694,7 @@ static void do_writemem(uint32_t addr, uint32_t val)
 
         c = memstat[vis20k][addr >> 8];
         if (c == 1) {
-                memlook[vis20k][addr >> 8][addr] = (uint8_t)val;
+            memlook[vis20k][addr >> 8][addr] = (uint8_t)val;
                 switch(addr) {
                     case 0x022c:
                         buf_remv = (buf_remv & 0xff00) | val;
@@ -648,66 +809,26 @@ static void do_writemem(uint32_t addr, uint32_t val)
                 break;
 
         case 0xFE30:
-                ram_fe30 = (uint8_t)val;
-                for (c = 128; c < 192; c++)
-                        memlook[0][c] = memlook[1][c] =
-                            &rom[(val & 15) << 14] - 0x8000;
-                for (c = 128; c < 192; c++)
-                        memstat[0][c] = memstat[1][c] = rom_slots[val & 15].swram ? 1 : 2;
-                romsel = (val & 15) << 14;
-                ram4k = ((val & 0x80) && MASTER);
-                ram12k = ((val & 0x80) && BPLUS);
-                RAMbank[0xA] = ram12k;
-                if (ram4k) {
-                        for (c = 128; c < 144; c++)
-                                memlook[0][c] = memlook[1][c] = ram;
-                        for (c = 128; c < 144; c++)
-                                memstat[0][c] = memstat[1][c] = 1;
-                }
-                if (ram12k) {
-                        for (c = 128; c < 176; c++)
-                                memlook[0][c] = memlook[1][c] = ram;
-                        for (c = 128; c < 176; c++)
-                                memstat[0][c] = memstat[1][c] = 1;
-                }
-                break;
+            write_romsel(val);
+            break;
 
         case 0xFE34:
-                ram_fe34 = (uint8_t)val;
-                if (BPLUS) {
-                        acccon = (uint8_t)val;
-                        vidbank = (uint16_t)((val & 0x80) << 8);
-                        if (val & 0x80)
-                                RAMbank[0xC] = RAMbank[0xD] = 1;
-                        else
-                                RAMbank[0xC] = RAMbank[0xD] = 0;
-                }
-                if (MASTER) {
-                        acccon = (uint8_t)val;
-                        ram8k = (val & 8);
-                        ram20k = (val & 4);
-                        vidbank = (val & 1) ? 0x8000 : 0;
-                        if (val & 2)
-                                RAMbank[0xC] = RAMbank[0xD] = 1;
-                        else
-                                RAMbank[0xC] = RAMbank[0xD] = 0;
-                        for (c = 48; c < 128; c++)
-                                memlook[0][c] = ram + ((ram20k) ? 32768 : 0);
-                        if (ram8k) {
-                                for (c = 192; c < 224; c++)
-                                        memlook[0][c] = memlook[1][c] =
-                                            ram - 0x3000;
-                                for (c = 192; c < 224; c++)
-                                        memstat[0][c] = memstat[1][c] = 1;
-                        } else {
-                                for (c = 192; c < 224; c++)
-                                        memlook[0][c] = memlook[1][c] =
-                                            os - 0xC000;
-                                for (c = 192; c < 224; c++)
-                                        memstat[0][c] = memstat[1][c] = 2;
-                        }
-                }
-                break;
+            write_fe34(val);
+            break;
+
+        case 0xFE38:
+            if (integra)
+                cmos_write_addr_integra(val);
+            else if (!MASTER && !BPLUS)
+                write_romsel(val);
+            break;
+
+        case 0xFE3C:
+            if (integra)
+                cmos_write_data_integra(val);
+            else if (!MASTER && !BPLUS)
+                write_romsel(val);
+            break;
 
         case 0xFE40:
         case 0xFE44:
@@ -808,9 +929,9 @@ void m6502_reset(void)
                 memlook[0][c] = memlook[1][c] = os - 0xC000;
         memstat[0][0xFC] = memstat[0][0xFD] = memstat[0][0xFE] = 0;
         memstat[1][0xFC] = memstat[1][0xFD] = memstat[1][0xFE] = 0;
-
+        ram_fe30 = 0;
+        ram_fe34 = 0;
         cycles = 0;
-        ram4k = ram8k = ram12k = ram20k = 0;
 
         pc = readmem(0xFFFC) | (readmem(0xFFFD) << 8);
         p.i = 1;
@@ -5671,38 +5792,35 @@ void m65c02_exec(void)
 
 void m6502_savestate(FILE * f)
 {
-        uint8_t temp;
-        putc(a, f);
-        putc(x, f);
-        putc(y, f);
-        temp = pack_flags(0x30);
-        putc(temp, f);
-        putc(s, f);
-        putc(pc & 0xFF, f);
-        putc(pc >> 8, f);
-        putc(nmi, f);
-        putc(interrupt, f);
-        putc(cycles, f);
-        putc(cycles >> 8, f);
-        putc(cycles >> 16, f);
-        putc(cycles >> 24, f);
+    unsigned char bytes[13];
+
+    bytes[0] = a;
+    bytes[1] = x;
+    bytes[2] = y;
+    bytes[3] = pack_flags(0x30);
+    bytes[4] = s;
+    bytes[5] = pc & 0xFF;
+    bytes[6] = pc >> 8;
+    bytes[7] = nmi;
+    bytes[8] = interrupt;
+    bytes[9] = cycles;
+    bytes[10] = cycles >> 8;
+    bytes[11] = cycles >> 16;
+    bytes[12] = cycles >> 24;
+    fwrite(bytes, sizeof(bytes), 1, f);
 }
 
 void m6502_loadstate(FILE * f)
 {
-        uint8_t temp;
-        a = (uint8_t)getc(f);
-        x = (uint8_t)getc(f);
-        y = (uint8_t)getc(f);
-        temp = (uint8_t)getc(f);
-        unpack_flags(temp);
-        s = (uint8_t)getc(f);
-        pc = (uint8_t)getc(f);
-        pc |= (((uint8_t)getc(f)) << 8);
-        nmi = getc(f);
-        interrupt = getc(f);
-        cycles = getc(f);
-        cycles |= (getc(f) << 8);
-        cycles |= (getc(f) << 16);
-        cycles |= (getc(f) << 24);
+    unsigned char bytes[13];
+    fread(bytes, sizeof(bytes), 1, f);
+    a = bytes[0];
+    x = bytes[1];
+    y = bytes[2];
+    unpack_flags(bytes[3]);
+    s = bytes[4];
+    pc = bytes[5] | (bytes[6] << 8);
+    nmi = bytes[7];
+    interrupt = bytes[8];
+    cycles = bytes[9] | (bytes[10] << 8) | (bytes[11] << 16) | (bytes[12] << 24);
 }

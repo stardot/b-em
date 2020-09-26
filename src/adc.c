@@ -60,18 +60,22 @@ void adc_init()
 
 void adc_savestate(FILE *f)
 {
-        putc(adc_status,f);
-        putc(adc_low,f);
-        putc(adc_high,f);
-        putc(adc_latch,f);
-        putc(adc_time,f);
+    unsigned char bytes[5];
+    bytes[0] = adc_status;
+    bytes[1] = adc_low;
+    bytes[2] = adc_high;
+    bytes[3] = adc_latch;
+    bytes[4] = adc_time;
+    fwrite(bytes, sizeof(bytes), 1, f);
 }
 
 void adc_loadstate(FILE *f)
 {
-        adc_status = getc(f);
-        adc_low    = getc(f);
-        adc_high   = getc(f);
-        adc_latch  = getc(f);
-        adc_time   = getc(f);
+    unsigned char bytes[5];
+    fread(bytes, sizeof(bytes), 1, f);
+    adc_status = bytes[0];
+    adc_low    = bytes[1];
+    adc_high   = bytes[2];
+    adc_latch  = bytes[3];
+    adc_time   = bytes[4];
 }

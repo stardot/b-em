@@ -4,6 +4,7 @@
 #include "b-em.h"
 #include "gui-allegro.h"
 #include "fdi.h"
+#include "hfe.h"
 #include "disc.h"
 #include "sdf.h"
 #include "imd.h"
@@ -27,7 +28,11 @@ int motoron;
 void (*fdc_callback)();
 void (*fdc_data)(uint8_t dat);
 void (*fdc_spindown)();
-void (*fdc_finishio)();
+void (*fdc_finishread)(bool deleted);
+void (*fdc_notfound)();
+void (*fdc_datacrcerror)(bool deleted);
+void (*fdc_headercrcerror)();
+void (*fdc_writeprotect)();
 int  (*fdc_getdata)(int last);
 
 void disc_load(int drive, ALLEGRO_PATH *fn)
@@ -45,6 +50,11 @@ void disc_load(int drive, ALLEGRO_PATH *fn)
         if (strcasecmp(ext, "fdi") == 0) {
             log_debug("Loading %i: %s as FDI", drive, cpath);
             fdi_load(drive, cpath);
+            return;
+        }
+        if (strcasecmp(ext, "hfe") == 0) {
+            log_debug("Loading %i: %s as HFE", drive, cpath);
+            hfe_load(drive, cpath);
             return;
         }
         if (strcasecmp(ext, "imd") == 0) {
@@ -74,6 +84,8 @@ void disc_init()
         drives[0].poll = drives[1].poll = 0;
         drives[0].seek = drives[1].seek = 0;
         drives[0].readsector = drives[1].readsector = 0;
+        drives[0].spinup = drives[1].spinup = 0;
+        drives[0].spindown = drives[1].spindown = 0;
         curdrive = 0;
 }
 
@@ -84,7 +96,7 @@ void disc_poll()
         {
                 disc_notfound--;
                 if (!disc_notfound)
-                   fdc_finishio(FDC_NOT_FOUND);
+                   fdc_notfound();
         }
 }
 

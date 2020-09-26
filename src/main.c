@@ -18,6 +18,7 @@
 #include "debugger.h"
 #include "disc.h"
 #include "fdi.h"
+#include "hfe.h"
 #include "gui-allegro.h"
 #include "i8271.h"
 #include "ide.h"
@@ -78,7 +79,6 @@ static ALLEGRO_EVENT_SOURCE evsrc;
 
 static ALLEGRO_DISPLAY *tmp_display;
 
-
 typedef enum {
     FSPEED_NONE,
     FSPEED_SELECTED,
@@ -124,8 +124,6 @@ void main_reset()
     if (curtube != -1) tubes[curtube].reset();
     else               tube_exec = NULL;
     tube_reset();
-
-    memset(ram, 0, 64 * 1024);
 }
 
 static const char helptext[] =
@@ -140,6 +138,7 @@ static const char helptext[] =
     "-Fx             - set maximum video frames skipped\n"
     "-s              - scanlines display mode\n"
     "-i              - interlace display mode\n"
+    "-spx            - Emulation speed x from 0 to 9 (default 4)\n"
     "-debug          - start debugger\n"
     "-debugtube      - start debugging tube processor\n\n";
 
@@ -159,7 +158,11 @@ void main_init(int argc, char *argv[])
     al_init_native_dialog_addon();
     al_set_new_window_title(VERSION_STR);
     al_init_primitives_addon();
-
+    if (!al_install_keyboard()) {
+        log_fatal("main: unable to install keyboard");
+        exit(1);
+    }
+    key_init();
     config_load();
     log_open();
     log_info("main: starting %s", VERSION_STR);
@@ -167,9 +170,14 @@ void main_init(int argc, char *argv[])
     model_loadcfg();
 
     for (c = 1; c < argc; c++) {
-        if (!strcasecmp(argv[c], "--help")) {
+        if (!strcasecmp(argv[c], "--help") || !strcasecmp(argv[c], "-?") || !strcasecmp(argv[c], "-h")) {
             fwrite(helptext, sizeof helptext-1, 1, stdout);
             exit(1);
+        }
+        else if (!strncasecmp(argv[c], "-sp", 3)) {
+            sscanf(&argv[c][3], "%i", &emuspeed);
+            if(!(emuspeed < NUM_EMU_SPEEDS))
+                emuspeed = 4;
         }
         else if (!strcasecmp(argv[c], "-tape"))
             tapenext = 2;
@@ -269,6 +277,7 @@ void main_init(int argc, char *argv[])
     pal_init();
     disc_init();
     fdi_init();
+    hfe_init();
 
     scsi_init();
     ide_init();
@@ -294,10 +303,6 @@ void main_init(int argc, char *argv[])
     al_init_user_event_source(&evsrc);
     al_register_event_source(queue, &evsrc);
 
-    if (!al_install_keyboard()) {
-        log_fatal("main: umable to install keyboard");
-        exit(1);
-    }
     al_register_event_source(queue, al_get_keyboard_event_source());
 
     oldmodel = curmodel;
@@ -317,13 +322,14 @@ void main_init(int argc, char *argv[])
         gui_set_disc_wprot(0, writeprot[0]);
     if (discfns[1])
         gui_set_disc_wprot(1, writeprot[1]);
+    main_setspeed(emuspeed);
     debug_start();
 }
 
 void main_restart()
 {
     main_pause();
-    cmos_save(models[oldmodel]);
+    cmos_save(&models[oldmodel]);
 
     model_init();
     main_reset();
@@ -338,121 +344,66 @@ void main_cleardrawit()
     fcount = 0;
 }
 
-static void main_start_fullspeed(void)
+void main_start_fullspeed(void)
 {
-    ALLEGRO_EVENT event;
+    if (fullspeed != FSPEED_RUNNING) {
+        ALLEGRO_EVENT event;
 
-    log_debug("main: starting full-speed");
-    al_stop_timer(timer);
-    fullspeed = FSPEED_RUNNING;
-    event.type = ALLEGRO_EVENT_TIMER;
-    al_emit_user_event(&evsrc, &event, NULL);
+        log_debug("main: starting full-speed");
+        al_stop_timer(timer);
+        fullspeed = FSPEED_RUNNING;
+        event.type = ALLEGRO_EVENT_TIMER;
+        al_emit_user_event(&evsrc, &event, NULL);
+    }
 }
 
-
-
-static void main_key_down(ALLEGRO_EVENT *event)
+void main_stop_fullspeed(bool hostshift)
 {
-    ALLEGRO_KEYBOARD_STATE kstate;
-    int code = key_map(event);
-
-    log_debug("main: key down, code=%d, fullspeed=%d", event->keyboard.keycode, fullspeed);
-
-    switch(code) {
-        case ALLEGRO_KEY_PGUP:
-            if (fullspeed != FSPEED_RUNNING)
-                main_start_fullspeed();
-            break;
-        case ALLEGRO_KEY_PGDN:
-            if (bempause) {
-                if (emuspeed != EMU_SPEED_PAUSED) {
-                    bempause = false;
-                    if (emuspeed != EMU_SPEED_FULL)
-                        al_start_timer(timer);
-                }
-            } else {
-                al_stop_timer(timer);
-                bempause = true;
-            }
-//DB: this is just plain annoying if you alt-tab out of b-em then tab back enter (without alt) will toggle fullscreen and get in a mess
-//changed to F11! This appears to be a problem generally with Allegro as it maintains its own key state but doesn't receive events
-//when it is not focussed.
-/*        case ALLEGRO_KEY_ENTER:
-            al_get_keyboard_state(&kstate);
-            if (al_key_down(&kstate, ALLEGRO_KEY_ALT)) {
-                video_toggle_fullscreen();
-                return;
-            }
-            break;
-*/
-        case ALLEGRO_KEY_ENTER:
-            al_get_keyboard_state(&kstate);
-            if (alt_down) {
-                video_toggle_fullscreen();
-                return;
-            }
-            break;
-        case ALLEGRO_KEY_ALT:
-            alt_down = true;
-            break;
-        case ALLEGRO_KEY_F11:
-            video_toggle_fullscreen();
-            return;
-        case ALLEGRO_KEY_F10:
-            if (debug_core || debug_tube)
-                debug_step = 1;
-            break;
-        case ALLEGRO_KEY_F12:
-            m6502_reset();
-            video_reset();
-            i8271_reset();
-            wd1770_reset();
-            sid_reset();
-            music5000_reset();
-            paula_reset();
-
-            if (curtube != -1)
-                tubes[curtube].reset();
-            tube_reset();
-            break;
-        default:
-            if (fullspeed == FSPEED_RUNNING) {
-                fullspeed = FSPEED_SELECTED;
-                if (emuspeed != EMU_SPEED_PAUSED)
-                    al_start_timer(timer);
-            }
+    if (emuspeed != EMU_SPEED_FULL) {
+        if (!hostshift) {
+            log_debug("main: stopping fullspeed (PgUp)");
+            if (fullspeed == FSPEED_RUNNING && emuspeed != EMU_SPEED_PAUSED)
+                al_start_timer(timer);
+            fullspeed = FSPEED_NONE;
+        }
+        else
+            fullspeed = FSPEED_SELECTED;
     }
-    key_down(code);
 }
 
-static void main_key_up(ALLEGRO_EVENT *event)
+void main_key_break(void)
 {
-    ALLEGRO_KEYBOARD_STATE kstate;
-    int code = key_map(event);
+    m6502_reset();
+    video_reset();
+    i8271_reset();
+    wd1770_reset();
+    sid_reset();
+    music5000_reset();
+    paula_reset();
 
-    log_debug("main: key up, code=%d, fullspeed=%d", event->keyboard.keycode, fullspeed);
+    if (curtube != -1)
+        tubes[curtube].reset();
+    tube_reset();
+}
 
-    switch(code) {
-        case ALLEGRO_KEY_PGUP:
-            if (emuspeed != EMU_SPEED_FULL) {
-                al_get_keyboard_state(&kstate);
-                if (!al_key_down(&kstate, ALLEGRO_KEY_LSHIFT) && !al_key_down(&kstate, ALLEGRO_KEY_RSHIFT)) {
-                    log_debug("main: stopping fullspeed (PgUp)");
-                    if (fullspeed == FSPEED_RUNNING && emuspeed != EMU_SPEED_PAUSED)
-                        al_start_timer(timer);
-                    fullspeed = FSPEED_NONE;
-                }
-                else
-                    fullspeed = FSPEED_SELECTED;
-            }
-            break;
-        case ALLEGRO_KEY_ALT:
-            alt_down = false;
-            break;
-    }
-    if (fullspeed == FSPEED_SELECTED)
+void main_key_fullspeed(void)
+{
+    if (fullspeed != FSPEED_RUNNING)
         main_start_fullspeed();
-    key_up(code);
+}
+
+void main_key_pause(void)
+{
+    if (bempause) {
+        if (emuspeed != EMU_SPEED_PAUSED) {
+            bempause = false;
+            if (emuspeed != EMU_SPEED_FULL)
+                al_start_timer(timer);
+        }
+    } else {
+        al_stop_timer(timer);
+        bempause = true;
+    }
 }
 
 void lost_focus() {
@@ -531,10 +482,13 @@ void main_run()
         al_wait_for_event(queue, &event);
         switch(event.type) {
             case ALLEGRO_EVENT_KEY_DOWN:
-                main_key_down(&event);
+                key_down_event(&event);
+                break;
+            case ALLEGRO_EVENT_KEY_CHAR:
+                key_char_event(&event);
                 break;
             case ALLEGRO_EVENT_KEY_UP:
-                main_key_up(&event);
+                key_up_event(&event);
                 break;
             case ALLEGRO_EVENT_MOUSE_AXES:
                 mouse_axes(&event);
@@ -590,7 +544,7 @@ void main_close()
     debug_kill();
 
     config_save();
-    cmos_save(models[curmodel]);
+    cmos_save(&models[curmodel]);
 
     midi_close();
     mem_close();

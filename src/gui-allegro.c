@@ -439,6 +439,8 @@ static ALLEGRO_MENU *create_keyboard_menu(void)
     ALLEGRO_MENU *menu = al_create_menu();
     al_append_menu_item(menu, "Remap Keyboard", IDM_KEY_REDEFINE, 0, NULL, NULL);
     add_checkbox_item(menu, "Map CAPS/CTRL to A/S", IDM_KEY_AS, keyas);
+    add_checkbox_item(menu, "Logical keyboard", IDM_KEY_LOGICAL, keylogical);
+    add_checkbox_item(menu, "PC/XT Keypad Mode", IDM_KEY_PAD, keypad);
     return menu;
 }
 
@@ -960,6 +962,10 @@ static void rom_ram_toggle(ALLEGRO_EVENT *event)
 static void change_model(ALLEGRO_EVENT *event)
 {
     ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
+    if (curmodel == menu_get_num(event)) {
+        al_set_menu_item_flags(menu, menu_id_num(IDM_MODEL, curmodel), ALLEGRO_MENU_ITEM_CHECKBOX|ALLEGRO_MENU_ITEM_CHECKED);
+        return;
+    }
     al_set_menu_item_flags(menu, menu_id_num(IDM_MODEL, curmodel), ALLEGRO_MENU_ITEM_CHECKBOX);
     config_save();
     oldmodel = curmodel;
@@ -1262,6 +1268,13 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             break;
         case IDM_KEY_AS:
             keyas = !keyas;
+            break;
+        case IDM_KEY_LOGICAL:
+            keylogical = !keylogical;
+            key_reset();
+            break;
+        case IDM_KEY_PAD:
+            keypad = !keypad;
             break;
         case IDM_MOUSE_AMX:
             mouse_amx = !mouse_amx;

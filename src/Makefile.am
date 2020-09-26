@@ -55,6 +55,7 @@ b_em_SOURCES = \
 	compactcmos.c \
 	compat_wrappers.c \
 	config.c \
+    copro-pdp11.c \
 	csw.c \
 	ddnoise.c \
 	debugger.c \
@@ -62,6 +63,7 @@ b_em_SOURCES = \
 	disc.c fdi.c \
 	fdi2raw.c \
 	gui-allegro.c\
+	hfe.c \
 	i8271.c \
 	ide.c \
 	imd.c \
@@ -71,6 +73,10 @@ b_em_SOURCES = \
 	led.c \
 	linux.c \
 	logging.c \
+    musahi/m68kcpu.c \
+    musahi/m68kops.c \
+    musahi/m68kdasm.c \
+    mc68000tube.c \
     mc6809nc/mc6809nc.c \
     mc6809nc/mc6809_debug.c \
     mc6809nc/mc6809_dis.c \
@@ -97,6 +103,8 @@ b_em_SOURCES = \
 	tape.c \
 	tapecat-allegro.c \
 	tapenoise.c \
+    pdp11/pdp11.c \
+    pdp11/pdp11_debug.c \
 	tube.c \
 	uef.c \
 	uservia.c \

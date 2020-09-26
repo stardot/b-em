@@ -29,15 +29,20 @@ static PREG tubep;
 static uint8_t *tubemem[0x101];
 static int tubememstat[0x101];
 static uint8_t *tuberam;
+static size_t tuberamsize;
 static uint8_t *tuberom;
 
-#define TUBE_6502_RAM_SIZE 0x10000
+bool tube_6502_rom_in = true;
+
+#define TUBE_6502_RAM_SIZE    0x10000
+#define TURBO_6502_RAM_SIZE 0x1000000
 
 void tube_6502_close()
 {
     if (tuberam) {
         free(tuberam);
         tuberam = NULL;
+        tuberamsize = 0;
     }
 }
 
@@ -80,7 +85,7 @@ void tube_6502_savestate(ZFILE *zfp)
     bytes[8] = pc >> 8;
     savestate_zwrite(zfp, bytes, sizeof bytes);
     savestate_zwrite(zfp, tubememstat, sizeof tubememstat);
-    savestate_zwrite(zfp, tuberam, TUBE_6502_RAM_SIZE);
+    savestate_zwrite(zfp, tuberam, tuberamsize);
     savestate_zwrite(zfp, tuberom, tubes[curtube].rom_size);
 }
 
@@ -109,7 +114,7 @@ void tube_6502_loadstate(ZFILE *zfp)
     pc |= bytes[8] << 8;
 
     savestate_zread(zfp, tubememstat, sizeof tubememstat);
-    savestate_zread(zfp, tuberam, TUBE_6502_RAM_SIZE);
+    savestate_zread(zfp, tuberam, tuberamsize);
     savestate_zread(zfp, tuberom, tubes[curtube].rom_size);
 }
 
@@ -216,25 +221,15 @@ static uint32_t dbg_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size
         log_debug("Status : %c%c%c%c%c%c\n",(tubep.n)?'N':' ',(tubep.v)?'V':' ',(tubep.d)?'D':' ',(tubep.i)?'I':' ',(tubep.z)?'Z':' ',(tubep.c)?'C':' ');
 }*/
 
-static int tuberomin = 1;
-void tube_6502_mapoutrom()
-{
-        tuberomin = 0;
-}
-
 #define polltime(c) { tubecycles-=c; }
 
 static uint8_t tubereadmeml(uint16_t addr)
 {
-        uint8_t temp;
-        if ((addr & ~7) == 0xFEF8) {
-                temp = tube_parasite_read(addr);
-//                log_debug("Read tube  %04X %02X %04X\n",addr,temp,pc);
-                return temp;
-        }
-        if ((addr & ~0xFFF) == 0xF000 && tuberomin)
-                return tuberom[addr & 0x7FF];
-        return tuberam[addr];
+    if ((addr & ~7) == 0xFEF8)
+        return tube_parasite_read(addr);
+    if ((addr & ~0xFFF) == 0xF000 && tube_6502_rom_in)
+        return tuberom[addr & 0x7FF];
+    return tuberam[addr];
 }
 
 static uint8_t tube_6502_readmem(uint32_t addr) {
@@ -288,23 +283,28 @@ static void writemem(uint32_t addr, uint32_t value) {
 
 void tube_6502_reset()
 {
-        tuberomin = 1;
+    tube_6502_rom_in = true;
         pc = readmem(0xFFFC) | (readmem(0xFFFD) << 8);
         tubep.i = 1;
         tube_irq = 0;
         tube_6502_skipint = 0;
 }
 
-bool tube_6502_init(void *rom)
+static bool common_init(void *rom, size_t memsize)
 {
-    if (!tuberam) {
-        tuberam = (uint8_t *) malloc(TUBE_6502_RAM_SIZE);
+    if (tuberamsize != memsize) {
+        if (tuberam) {
+            free(tuberam);
+            tuberamsize = 0;
+        }
+        tuberam = (uint8_t *) malloc(memsize);
         if (!tuberam) {
             log_error("6502tube: unable to allocate RAM");
             return false;
         }
+        tuberamsize = memsize;
     }
-    memset(tuberam, 0, 0x10000);
+    memset(tuberam, 0, memsize);
     tuberom = rom;
     for (int c = 0x00; c < 0x100; c++)
         tubemem[c] = (uint8_t *) (tuberam + (c << 8));
@@ -322,6 +322,65 @@ bool tube_6502_init(void *rom)
     tube_proc_loadstate = tube_6502_loadstate;
     tube_6502_reset();
     return true;
+}
+
+static uint8_t read_zp_iy_normal(uint8_t zp)
+{
+    uint16_t addr1 = read_zp_indirect(zp);
+    uint16_t addr2 = addr1 + y;
+    if ((addr1 & 0xFF00) ^ (addr2 & 0xFF00))
+        polltime(1);
+    return readmem(addr2);
+}
+
+static void write_zp_iy_normal(uint8_t zp, uint8_t val)
+{
+    uint16_t addr1 = read_zp_indirect(zp);
+    uint16_t addr2 = addr1 + y;
+    if ((addr1 & 0xFF00) ^ (addr2 & 0xFF00))
+        polltime(1);
+    writemem(addr2, val);
+}
+
+static uint8_t read_zp_ip_turbo(uint8_t zp)
+{
+    uint32_t addr1 = readmem(zp) | (readmem(zp+1) << 8) | ((readmem(0x300+zp) & 0x03) << 24);
+    uint32_t addr2 = addr1 + y;
+    if ((addr1 & 0xFF00) ^ (addr2 & 0xFF00))
+        polltime(1);
+    return readmem(addr2);
+}
+
+static void write_zp_iy_turbo(uint8_t zp, uint8_t val)
+{
+    uint32_t addr1 = readmem(zp) | (readmem(zp+1) << 8) | ((readmem(0x300+zp) & 0x03) << 24);
+    uint32_t addr2 = addr2 = addr1 + y;
+    if ((addr1 & 0xFF00) ^ (addr2 & 0xFF00))
+        polltime(1);
+    writemem(addr2, val);
+}
+
+static uint8_t (*read_zp_indirect_y)(uint8_t zp);
+static void (*write_zp_indirect_y)(uint8_t zp, uint8_t val);
+
+bool tube_6502_init(void *rom)
+{
+    if (common_init(rom, TUBE_6502_RAM_SIZE)) {
+        read_zp_indirect_y = read_zp_ip_turbo;
+        write_zp_indirect_y = write_zp_iy_turbo;
+        return true;
+    }
+    return false;
+}
+
+bool tube_6502_iturb(void *rom)
+{
+    if (common_init(rom, TURBO_6502_RAM_SIZE)) {
+        read_zp_indirect_y = read_zp_iy_normal;
+        write_zp_indirect_y = write_zp_iy_normal;
+        return true;
+    }
+    return false;
 }
 
 static inline void setzn(uint8_t v)
@@ -603,12 +662,7 @@ void tube_6502_exec()
                         break;
 
                 case 0x11:      /*ORA (),y */
-                        temp = readmem(pc);
-                        pc++;
-                        addr = read_zp_indirect(temp);
-                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
-                                polltime(1);
-                        a |= readmem(addr + y);
+                        a |= read_zp_indirect_y(readmem(pc++));
                         setzn(a);
                         polltime(5);
                         break;
@@ -837,12 +891,7 @@ void tube_6502_exec()
                         break;
 
                 case 0x31:      /*AND (),y */
-                        temp = readmem(pc);
-                        pc++;
-                        addr = read_zp_indirect(temp);
-                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
-                                polltime(1);
-                        a &= readmem(addr + y);
+                        a &= read_zp_indirect_y(readmem(pc++));
                         setzn(a);
                         polltime(5);
                         break;
@@ -1055,12 +1104,7 @@ void tube_6502_exec()
                         break;
 
                 case 0x51:      /*EOR (),y */
-                        temp = readmem(pc);
-                        pc++;
-                        addr = read_zp_indirect(temp);
-                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
-                                polltime(1);
-                        a ^= readmem(addr + y);
+                        a ^= read_zp_indirect_y(readmem(pc++));
                         setzn(a);
                         polltime(5);
                         break;
@@ -1259,13 +1303,7 @@ void tube_6502_exec()
                         break;
 
                 case 0x71:      /*ADC (),y */
-                        temp = readmem(pc);
-                        pc++;
-                        addr = read_zp_indirect(temp);
-                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
-                                polltime(1);
-                        temp = readmem(addr + y);
-                        adc_cmos(temp);
+                        adc_cmos(read_zp_indirect_y(readmem(pc++)));
                         polltime(5);
                         break;
 
@@ -1466,10 +1504,7 @@ void tube_6502_exec()
                         break;
 
                 case 0x91:      /*STA (),y */
-                        temp = readmem(pc);
-                        pc++;
-                        addr = read_zp_indirect(temp) + y;
-                        writemem(addr, a);
+                        write_zp_indirect_y(readmem(pc++), a);
                         polltime(6);
                         break;
 
@@ -1658,12 +1693,7 @@ void tube_6502_exec()
                         break;
 
                 case 0xB1:      /*LDA (),y */
-                        temp = readmem(pc);
-                        pc++;
-                        addr = read_zp_indirect(temp);
-                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
-                                polltime(1);
-                        a = readmem(addr + y);
+                        a = read_zp_indirect_y(readmem(pc++));
                         setzn(a);
                         polltime(5);
                         break;
@@ -1870,12 +1900,7 @@ void tube_6502_exec()
                         break;
 
                 case 0xD1:      /*CMP (),y */
-                        temp = readmem(pc);
-                        pc++;
-                        addr = read_zp_indirect(temp);
-                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
-                                polltime(1);
-                        temp = readmem(addr + y);
+                        temp = read_zp_indirect_y(readmem(pc++));
                         setzn(a - temp);
                         tubep.c = (a >= temp);
                         polltime(5);
@@ -2062,13 +2087,7 @@ void tube_6502_exec()
                         break;
 
                 case 0xF1:      /*SBC (),y */
-                        temp = readmem(pc);
-                        pc++;
-                        addr = read_zp_indirect(temp);
-                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
-                                polltime(1);
-                        temp = readmem(addr + y);
-                        sbc_cmos(temp);
+                        sbc_cmos(read_zp_indirect_y(readmem(pc++)));
                         polltime(5);
                         break;
 
