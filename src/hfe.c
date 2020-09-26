@@ -301,6 +301,10 @@ enum { SECTOR_ADDR_BYTES = 7 /* includes address mark */ };
 
 static struct hfe_info  *hfe_info[HFE_DRIVES];
 static int hfe_selected_drive;
+/* We issue a "write operations are not supported" warning only
+   once. */
+static bool write_warning_issued = false;
+
 
 #ifdef DUMP_TRACK
 void dump_memory(unsigned char *p, size_t len, size_t location)
@@ -474,7 +478,7 @@ static void abandon_op_badclock(int drive)
 
 void hfe_init()
 {
-  log_warn("hfe: init");
+  log_info("hfe: init");
   hfe_selected_drive = 0;
   int d;
   for (d = 0; d < HFE_DRIVES; ++d)
@@ -1048,7 +1052,7 @@ static void hfe_readsector(int drive, int sector, int track, int side, int densi
 
 static void hfe_writesector(int drive, int sector, int track, int side, int density)
 {
-  log_warn("hfe: drive %d: writesector track %d side %d sector %d (%s)",
+  log_info("hfe: drive %d: writesector track %d side %d sector %d (%s)",
            drive, track, side, sector, (density ? "MFM" : "FM"));
   struct sector_address addr;
   addr.track = track;
@@ -1133,8 +1137,8 @@ static void handle_sector_id_byte(int drive, unsigned char value, bool yield_byt
 
     case 1:                    /* track (cylinder) */
       ok = (value == state->target.track);
-      log_debug("hfe: drive %d: sector id: track is %d (match? %s)",
-                drive, value, (ok ? "yes" : "no"));
+      log_debug("hfe: drive %d: sector id: track is %d, want %d (match? %s)",
+                drive, value, state->target.track, (ok ? "yes" : "no"));
       if (!ok)
         {
           log_warn("hfe: found sector address for track %u when looking for track %d",
@@ -1144,8 +1148,8 @@ static void handle_sector_id_byte(int drive, unsigned char value, bool yield_byt
 
     case 2:                    /* side (head) */
       ok = (value == state->target.side);
-      log_debug("hfe: drive %d: sector id: side is %d (match? %s)",
-                drive, value, (ok ? "yes" : "no"));
+      log_debug("hfe: drive %d: sector id: side is %d, want %d (match? %s)",
+                drive, value, state->target.side, (ok ? "yes" : "no"));
       if (!ok)
         {
           log_warn("hfe: found sector address for side %u when looking for side %d",
@@ -1154,10 +1158,18 @@ static void handle_sector_id_byte(int drive, unsigned char value, bool yield_byt
       break;
 
     case 3:                    /* sector (record) */
-      ok = (state->target.sector == SECTOR_ACCEPT_ANY ||
-            state->target.sector == value);
-      log_debug("hfe: drive %d: sector id: sector is %d (match? %s)",
-                drive, value, (ok ? "yes" : "no"));
+      if (state->target.sector == SECTOR_ACCEPT_ANY)
+        {
+          ok = true;
+          log_debug("hfe: drive %d: sector id: sector is %d, want any",
+                    drive, value);
+        }
+      else
+        {
+          ok = (state->target.sector == value);
+          log_debug("hfe: drive %d: sector id: sector is %d, want %d (match? %s)",
+                    drive, value, state->target.sector, (ok ? "yes" : "no"));
+        }
       if (ok)
         {
           /* That's good news, but we defer setting up for actually
@@ -1258,10 +1270,13 @@ static void handle_sector_id_byte(int drive, unsigned char value, bool yield_byt
     }
   if (!ok)
     {
-      log_warn("hfe: drive %d: resuming scanning for a sector address mark "
-               "for side %d track %d sector %d (current op %s)",
-               drive, state->target.side, state->target.track,
-               state->target.sector, state->current_op_name);
+      /* This is routine (for example we come here when we read the
+         sector address for some other sector than the one we're
+         looking for). */
+      log_debug("hfe: drive %d: resuming scanning for a sector address mark "
+                "for side %d track %d sector %d (current op %s)",
+                drive, state->target.side, state->target.track,
+                state->target.sector, state->current_op_name);
       set_up_for_sector_id_scan(drive);
     }
 }
@@ -1410,8 +1425,12 @@ static void hfe_poll_drive(int drive, bool is_selected)
       /* We deliberately don't verify the invariant here, because bytes_to_read
          is likely not going to have a useful value if we do manage to complete
          a scan for the sector id. */
-      log_warn("hfe: drive %d: write operations are not yet supported (current_op_name=%s)",
-               drive, state->current_op_name);
+      if (!write_warning_issued)
+        {
+          log_warn("hfe: drive %d: write operations are not yet supported (current_op_name=%s) (this warning is generated only once)",
+                   drive, state->current_op_name);
+          write_warning_issued = true;
+        }
       fdc_writeprotect();
       clear_op_state(state);
       return;
@@ -1639,8 +1658,8 @@ static void hfe_poll_drive(int drive, bool is_selected)
 
     case WOP_FORMAT:
     case WOP_WRITE_SECTOR:
-      log_error("hfe: drive %d: address mark scan complete, "
-                "but write operations are not yet supported (current_op_name=%s)",
+      log_error("hfe: drive %d: address mark scan complete "
+                "(current_op_name=%s)",
                 drive, state->current_op_name);
       fdc_writeprotect();
       clear_op_state(state);
