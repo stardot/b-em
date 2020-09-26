@@ -1404,7 +1404,7 @@ static void handle_badclock(int drive)
 
 static void hfe_poll_drive(int drive, bool is_selected)
 {
-  if (NULL == hfe_info[drive] || NULL == hfe_info[drive]->track_data)
+  if (NULL == hfe_info[drive]->track_data)
     {
       return;
     }
@@ -1672,8 +1672,11 @@ static void hfe_poll(void)
   int d;
   for (d = 0; d < HFE_DRIVES; ++d)
     {
-      const bool is_selected = d==hfe_selected_drive;
-      hfe_poll_drive(d, is_selected);
+      if (hfe_info[d])
+	{
+	  const bool is_selected = d==hfe_selected_drive;
+	  hfe_poll_drive(d, is_selected);
+	}
     }
 }
 
