@@ -94,7 +94,7 @@ static int data_count = 0;
 
 static void begin_read_sector(const char *variant)
 {
-    log_debug("wd1770: begin read %s sector drive=%d side=%d track=%d sector=%d dens=%d", variant, curdrive, wd1770.curside, wd1770.track, wd1770.sector, wd1770.density);
+    log_debug("wd1770: %s read sector drive=%d side=%d track=%d sector=%d dens=%d", variant, curdrive, wd1770.curside, wd1770.track, wd1770.sector, wd1770.density);
     data_count = 0;
     wd1770.status = 0x80 | 0x1;
     wd1770.in_gap = 0;
@@ -104,7 +104,7 @@ static void begin_read_sector(const char *variant)
 
 static void begin_write_sector(const char *variant)
 {
-    log_debug("wd1770: begin write %s sector drive=%d side=%d track=%d sector=%d dens=%d", variant, curdrive, wd1770.curside, wd1770.track, wd1770.sector, wd1770.density);
+    log_debug("wd1770: %s write sector drive=%d side=%d track=%d sector=%d dens=%d", variant, curdrive, wd1770.curside, wd1770.track, wd1770.sector, wd1770.density);
     wd1770.status = 0x80 | 0x1;
     disc_writesector(curdrive, wd1770.sector, wd1770.track, wd1770.curside, wd1770.density);
     bytenum = 0;
@@ -150,19 +150,19 @@ static void wd1770_cmd(uint8_t val)
             break;
 
         case 0x8: /*Read sector*/
-            begin_read_sector("single");
+            begin_read_sector("begin single");
             break;
 
         case 0x9: /* read multiple sectors*/
-            begin_read_sector("multiple");
+            begin_read_sector("begin multiple");
             break;
 
         case 0xA: /*Write sector*/
-            begin_write_sector("single");
+            begin_write_sector("begin single");
             break;
 
         case 0xB: /*write multiple sectors */
-            begin_write_sector("multiple");
+            begin_write_sector("begin multiple");
             break;
 
         case 0xC: /*Read address*/
@@ -473,8 +473,10 @@ static void wd1770_callback()
 void wd1770_data(uint8_t dat)
 {
     if (wd1770.status & 0x01) {
-        if (wd1770.status & 0x02)  // Register already full.
+        if (wd1770.status & 0x02) { // Register already full.
+            log_debug("wd1770: data overrun, %02X discarded", dat);
             wd1770.status |= 0x04; // Set lost data (overrun).
+        }
         else {
             wd1770.data = dat;
             wd1770.status |= 0x02;
