@@ -20,7 +20,7 @@ struct
     int curtrack;
     int density;
     int stepdir;
-    uint8_t in_gap;
+    uint8_t cmd_started, in_gap;
 } wd1770;
 
 static const uint8_t nmi_on_completion[5] = {
@@ -112,96 +112,23 @@ static void begin_write_sector(const char *variant)
     wd1770.status |= 2;
 }
 
-static void wd1770_cmd(uint8_t val)
-{
-    unsigned cmd = val >> 4;
-    if (cmd != 0x0d) {
-        if (wd1770.status & 1) {
-            log_warn("wd1770: attempt to write %s register with %02X when device busy rejected", "command", val);
-            return;
-        }
-        wd1770_spinup();
-    }
-    nmi &= ~1;
-    switch(cmd) {
-        case 0x0: /*Restore*/
-            wd1770_begin_seek(cmd, "restore", 0);
-            break;
-
-        case 0x1: /*Seek*/
-            wd1770_begin_seek(cmd, "seek", wd1770.data);
-            break;
-
-        case 0x2:
-        case 0x3: /*Step*/
-            wd1770_begin_seek(cmd, "step", wd1770.curtrack + wd1770.stepdir);
-            break;
-
-        case 0x4:
-        case 0x5: /*Step in*/
-            wd1770.stepdir = 1;
-            wd1770_begin_seek(cmd, "step in", wd1770.curtrack+1);
-            break;
-
-        case 0x6:
-        case 0x7: /*Step out*/
-            wd1770.stepdir = -1;
-            wd1770_begin_seek(cmd, "step out", wd1770.curtrack-1);
-            break;
-
-        case 0x8: /*Read sector*/
-            begin_read_sector("begin single");
-            break;
-
-        case 0x9: /* read multiple sectors*/
-            begin_read_sector("begin multiple");
-            break;
-
-        case 0xA: /*Write sector*/
-            begin_write_sector("begin single");
-            break;
-
-        case 0xB: /*write multiple sectors */
-            begin_write_sector("begin multiple");
-            break;
-
-        case 0xC: /*Read address*/
-            log_debug("wd1770: read address side=%d track=%d dens=%d", wd1770.curside, wd1770.track, wd1770.density);
-            wd1770.status = 0x80 | 0x1;
-            disc_readaddress(curdrive, wd1770.track, wd1770.curside, wd1770.density);
-            bytenum = 0;
-            break;
-
-        case 0xD:
-            log_debug("wd1770: force interrupt, status=%02X", wd1770.status);
-            disc_abort(curdrive);
-            fdc_time = 100;
-            break;
-
-        case 0xE: /* read track */
-            log_debug("wd1770: read track side=%d track=%d dens=%d, ctrl=%d\n", wd1770.curside, wd1770.track, wd1770.density, wd1770.ctrl);
-            wd1770.status = 0x83;
-            nmi |= 2;
-            disc_readtrack(curdrive, wd1770.track, wd1770.curside, wd1770.density);
-            break;
-
-        case 0xF: /*Write track*/
-            log_debug("wd1770: write track side=%d track=%d dens=%d, ctrl=%d\n", wd1770.curside, wd1770.track, wd1770.density, wd1770.ctrl);
-            wd1770.status = 0x83;
-            nmi |= 2;
-            disc_writetrack(curdrive, wd1770.track, wd1770.curside, wd1770.density);
-            break;
-     }
-     wd1770.oldcmd = wd1770.command;
-     wd1770.command = val;
-}
-
 static void write_1770(uint16_t addr, uint8_t val)
 {
     switch (addr & 0x03)
     {
     case 0: // Command register.
-        wd1770_cmd(val);
+        if ((val & 0xf0) != 0xd0) {
+            if (wd1770.status & 1) {
+                log_warn("wd1770: attempt to write %s register with %02X when device busy rejected", "command", val);
+                break;
+            }
+            wd1770_spinup();
+        }
+        nmi &= ~1;
+        wd1770.status |= 0x01;
+        wd1770.cmd_started = 0;
+        wd1770.command = val;
+        fdc_time = 32;
         break;
 
     case 1: // Track register
@@ -391,30 +318,27 @@ static void wd1770_completed(void)
         nmi |= 1;
 }
 
-static void wd1770_callback()
+static void wd1770_cmd_next(unsigned cmd)
 {
-    log_debug("wd1770: fdc callback %02X",wd1770.command);
-    fdc_time = 0;
-    switch (wd1770.command >> 4)
-    {
-    case 0: /*Restore*/
-    case 1: /*Seek*/
-    case 3: /*Step*/
-    case 5: /*Step in*/
-    case 7: /*Step out*/
-        wd1770.track = wd1770.curtrack;
-        // FALLTHROUGH
-    case 2: /*Step*/
-    case 4: /*Step in*/
-    case 6: /*Step out*/
-        if (wd1770.command & 0x04 && !disc_verify(curdrive, wd1770.track, wd1770.density))
-            wd1770.status = 0x90 | track0;
-        else
-            wd1770.status = 0x80 | track0;
-        wd1770_setspindown();
-        if (nmi_on_completion[fdc_type - FDC_ACORN])
-            nmi |= 1;
-        break;
+    switch(cmd >> 4) {
+        case 0x0: /*Restore*/
+        case 0x1: /*Seek*/
+        case 0x3: /*Step*/
+        case 0x5: /*Step in*/
+        case 0x7: /*Step out*/
+            wd1770.track = wd1770.curtrack;
+            // FALLTHROUGH
+        case 0x2: /*Step*/
+        case 0x4: /*Step in*/
+        case 0x6: /*Step out*/
+            if (cmd & 0x04 && !disc_verify(curdrive, wd1770.track, wd1770.density))
+                wd1770.status = 0x90 | track0;
+            else
+                wd1770.status = 0x80 | track0;
+            wd1770_setspindown();
+            if (nmi_on_completion[fdc_type - FDC_ACORN])
+                nmi |= 1;
+            break;
 
         case 0x8: /* Read sector */
         case 0xA: /* Write sector*/
@@ -423,39 +347,95 @@ static void wd1770_callback()
             wd1770_completed();
             break;
 
-    case 9:
-        if (wd1770.status & 0x58)
+        case 0x9:
+            if (wd1770.status & 0x58)
+                wd1770_completed();
+            else if (wd1770.in_gap) {
+                wd1770.sector++;
+                begin_read_sector("continue multiple");
+            }
+            else {
+                log_debug("wd1770: multi-sector read, inter-sector gap");
+                wd1770.in_gap = 1;
+                fdc_time = 5000;
+            }
+            break;
+
+        case 0xB:
+            if (wd1770.status & 0x58)
+                wd1770_completed();
+            else if (wd1770.in_gap) {
+                wd1770.sector++;
+                begin_write_sector("continue multiple");
+            }
+            else {
+                log_debug("wd1770: multi-sector write, inter-sector gap");
+                wd1770.in_gap = 1;
+                fdc_time = 5000;
+            }
+            break;
+
+        case 0xC: /*Read address*/
             wd1770_completed();
-        else if (wd1770.in_gap) {
-            wd1770.sector++;
-            begin_read_sector("continue multiple");
-        } else {
-            log_debug("wd1770: multi-sector read, inter-sector gap");
-            wd1770.in_gap = 1;
-            fdc_time = 5000;
-        }
-        break;
+            wd1770.sector = wd1770.track;
+            break;
+    }
+}
 
-    case 0xB:
-        if (wd1770.status & 0x58)
-            wd1770_completed();
-        else if (wd1770.in_gap) {
-            wd1770.sector++;
-            begin_write_sector("continue multiple");
-        } else {
-            log_debug("wd1770: multi-sector write, inter-sector gap");
-            wd1770.in_gap = 1;
-            fdc_time = 5000;
-        }
-        break;
+static void wd1770_cmd_start(unsigned cmd)
+{
+    switch(cmd >> 4) {
+        case 0x0: /*Restore*/
+            wd1770_begin_seek(cmd, "restore", 0);
+            break;
 
-    case 0xC: /*Read address*/
-        wd1770_completed();
-        wd1770.sector = wd1770.track;
-        break;
+        case 0x1: /*Seek*/
+            wd1770_begin_seek(cmd, "seek", wd1770.data);
+            break;
 
-        case 0xD: /* force interrupt */
-            log_debug("wd1770: callback for force-interrupt");
+        case 0x2:
+        case 0x3: /*Step*/
+            wd1770_begin_seek(cmd, "step", wd1770.curtrack + wd1770.stepdir);
+            break;
+
+        case 0x4:
+        case 0x5: /*Step in*/
+            wd1770.stepdir = 1;
+            wd1770_begin_seek(cmd, "step in", wd1770.curtrack+1);
+            break;
+
+        case 0x6:
+        case 0x7: /*Step out*/
+            wd1770.stepdir = -1;
+            wd1770_begin_seek(cmd, "step out", wd1770.curtrack-1);
+            break;
+
+        case 0x8: /*Read sector*/
+            begin_read_sector("begin single");
+            break;
+
+        case 0x9: /* read multiple sectors*/
+            begin_read_sector("begin multiple");
+            break;
+
+        case 0xA: /*Write sector*/
+            begin_write_sector("begin single");
+            break;
+
+        case 0xB: /*write multiple sectors */
+            begin_write_sector("begin multiple");
+            break;
+
+        case 0xC: /*Read address*/
+            log_debug("wd1770: read address side=%d track=%d dens=%d", wd1770.curside, wd1770.track, wd1770.density);
+            wd1770.status = 0x80 | 0x1;
+            disc_readaddress(curdrive, wd1770.track, wd1770.curside, wd1770.density);
+            bytenum = 0;
+            break;
+
+        case 0xD:
+            log_debug("wd1770: force interrupt, status=%02X", wd1770.status);
+            disc_abort(curdrive);
             if (wd1770.status & 0x01)
                 wd1770.status &= ~1;
             else
@@ -466,6 +446,34 @@ static void wd1770_callback()
                 //nmi |= 2;
             wd1770_setspindown();
             break;
+
+        case 0xE: /* read track */
+            log_debug("wd1770: read track side=%d track=%d dens=%d, ctrl=%d\n", wd1770.curside, wd1770.track, wd1770.density, wd1770.ctrl);
+            wd1770.status = 0x83;
+            nmi |= 2;
+            disc_readtrack(curdrive, wd1770.track, wd1770.curside, wd1770.density);
+            break;
+
+        case 0xF: /*Write track*/
+            log_debug("wd1770: write track side=%d track=%d dens=%d, ctrl=%d\n", wd1770.curside, wd1770.track, wd1770.density, wd1770.ctrl);
+            wd1770.status = 0x83;
+            nmi |= 2;
+            disc_writetrack(curdrive, wd1770.track, wd1770.curside, wd1770.density);
+            break;
+    }
+    wd1770.oldcmd = wd1770.command;
+    wd1770.cmd_started = 1;
+}
+
+static void wd1770_callback()
+{
+    log_debug("wd1770: fdc callback for cmd %02X", wd1770.command);
+    fdc_time = 0;
+    if (wd1770.cmd_started)
+        wd1770_cmd_next(wd1770.command);
+    else {
+        wd1770.cmd_started = 1;
+        wd1770_cmd_start(wd1770.command);
     }
 }
 
