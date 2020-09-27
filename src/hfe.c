@@ -617,75 +617,87 @@ static size_t hfe_copy_bits(int version, int encoding,
   bool hfe3 = version == 3;
   size_t in_offset = 0;
   size_t out_bytes = 0;
+  unsigned char current_opcode = 0;
 
   while (in_offset < in_bytes)
     {
+      assert(current_opcode != HFE_OPCODE_NOP);
+      assert(current_opcode != HFE_OPCODE_SETINDEX);
+
       int skipbits = 0;
       unsigned char in = src[in_offset++];
-      if (hfe3 && hfe_is_hfe3_opcode(in))
+
+      if (current_opcode)
+	{
+	  switch (current_opcode)
+	    {
+	    case HFE_OPCODE_SKIPBITS:
+	      {
+		if (in_offset >= in_bytes)
+		  {
+		    hfe_warn_of_premature_stream_end("SKIPBITS");
+		    continue;
+		  }
+		skipbits = in;
+	      }
+	      break;
+
+	    case HFE_OPCODE_RAND:
+	      in = hfe_random_byte();
+	      break;
+
+	    case HFE_OPCODE_NOP:
+	    case HFE_OPCODE_SETINDEX:
+	      {
+		log_warn("hfe: drive %d track %d: HFE3 opcode 0x%X was incorrectly retained (this is a logic error); returning a short track",
+			 drive, track, current_opcode);
+		return out_bytes;
+	      }
+
+	    default:
+	      {
+		log_warn("hfe: drive %d track %d contains an invalid HFE3 opcode 0x%X; returning a short track",
+			 drive, track, current_opcode);
+		return out_bytes;
+	      }
+	    }
+	}
+      else if (hfe3 && hfe_is_hfe3_opcode(in))
         {
-          switch (in)
-            {
-            case HFE_OPCODE_NOP:
-              continue;         // just consume the opcode.
+	  switch (in & HFE_OPCODE_MASK)
+	    {
+	    case HFE_OPCODE_NOP:
+	      current_opcode = 0;  /* takes no argument, so nothing more to do. */
+	      continue;
 
-            case HFE_OPCODE_SETINDEX:
-              /* For now, we ignore this (i.e. we consume the opcode
-                 but do nothing about it).
+	    case HFE_OPCODE_SETINDEX:
+	      /* For now, we ignore this (i.e. we consume the opcode
+		 but do nothing about it).
 
-                 It's not clear how we would need to use it.  I don't
-                 know what the interface to the rest of B-EM would be
-                 used to report this information anyway.
+		 It's not clear how we would need to use it.  In a
+		 physical floppy, detection of the index mark tells us
+		 we've seen the whole track.  That allows us for
+		 example to know when to give up searching for a
+		 sector.  But we have a finite amount of input data
+		 anyway, so we won't loop forever even if we don't
+		 know where in the bitsteam the index mark is.
+	      */
+	      current_opcode = 0;  /* takes no argument */
+	      continue;
 
-                 In a physical floppy, detection of the index mark
-                 tells us we've seen the whole track (and e.g. allows
-                 us to know when to give up searching for a sector in
-                 the track data.  But we have a finite amount of input
-                 data anyway, so we won't loop forever even if we
-                 don't know where in the bitsteam the index mark is.
-              */
-              continue;
-
-            case HFE_OPCODE_SETBITRATE:
-              /* We only care about the sector contents, so ignore the
-                 change in bit rate. */
-              if (in_offset >= in_bytes)
-                {
-                  hfe_warn_of_premature_stream_end("SETBITRATE");
-                  continue;
-                }
-              ++in_offset;      /* consume the bit-rate byte */
-              continue;
-
-            case HFE_OPCODE_SKIPBITS:
-              {
-                if (in_offset >= in_bytes)
-                  {
-                    hfe_warn_of_premature_stream_end("SKIPBITS");
-                    continue;
-                  }
-                skipbits = src[in_offset++];
-                if (in_offset >= in_bytes)
-                  {
-                    hfe_warn_of_premature_stream_end("SKIPBITS");
-                    continue;
-                  }
-                in = src[in_offset++];  /* the byte in which to skip some bits. */
-              }
-              break;
-
-            case HFE_OPCODE_RAND:
-              in = hfe_random_byte();
-              break;
-
-            default:
-              {
-                log_warn("hfe: drive %d track %d contains an invalid HFE3 opcode 0x%X; returning a short track",
-                         drive, track, (unsigned int)in);
-                return out_bytes;
-              }
-            }
+	    default:
+	      current_opcode = in & HFE_OPCODE_MASK;
+	      /* Collect argument next time around the loop and
+		 operate on it. */
+	      continue;
+	    }
+	  /*NOTREACHED*/
+	  abort();
         }
+      else
+	{
+	  current_opcode = 0;
+	}
 
       for (int bitnum = 0; bitnum < 8; ++bitnum)
         {
