@@ -12,11 +12,6 @@
 
 #define ABS(x) (((x)>0)?(x):-(x))
 
-void wd1770_callback();
-void wd1770_data(uint8_t dat);
-void wd1770_spindown();
-int  wd1770_getdata(int last);
-
 struct
 {
     uint8_t command, sector, track, status, data;
@@ -61,7 +56,7 @@ void wd1770_spinup()
     }
 }
 
-void wd1770_spindown()
+static void wd1770_spindown()
 {
     wd1770.status &= ~0x80;
     if (motoron) {
@@ -395,7 +390,7 @@ uint8_t wd1770_read(uint16_t addr)
     return 0xFE;
 }
 
-void wd1770_callback()
+static void wd1770_callback()
 {
     log_debug("wd1770: fdc callback %02X",wd1770.command);
     fdc_time = 0;
@@ -463,8 +458,8 @@ void wd1770_callback()
         wd1770.sector = wd1770.track;
         break;
 
-    case 0xD: /* force interrupt */
-        break;
+        case 0xD: /* force interrupt */
+            break;
 
     case 0xF: /*Write track */
         wd1770.status &= 0xfe;
@@ -488,7 +483,7 @@ void wd1770_data(uint8_t dat)
     }
 }
 
-void wd1770_finishread(bool deleted)
+static void wd1770_finishread(bool deleted)
 {
     log_debug("wd1770: data i/o finished, deleted=%u, nmi=%02X", deleted, nmi);
     wd1770.status &= 0x83;
@@ -509,22 +504,22 @@ static void wd1770_fault(uint8_t flags, const char *desc)
     }
 }
 
-void wd1770_notfound()
+static void wd1770_notfound()
 {
     wd1770_fault(0x10, "not found");
 }
 
-void wd1770_datacrcerror(bool deleted)
+static void wd1770_datacrcerror(bool deleted)
 {
     wd1770_fault(deleted ? 0x28: 0x08, "data CRC error");
 }
 
-void wd1770_headercrcerror()
+static void wd1770_headercrcerror()
 {
     wd1770_fault(0x18, "header CRC error");
 }
 
-int wd1770_getdata(int last)
+static int wd1770_getdata(int last)
 {
     if (wd1770.status & 0x02) {
         log_debug("wd1770: getdata: no data in register (underrun)");
