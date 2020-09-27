@@ -390,6 +390,14 @@ uint8_t wd1770_read(uint16_t addr)
     return 0xFE;
 }
 
+static void wd1770_completed(void)
+{
+    wd1770.status &= 0xfe;
+    wd1770_setspindown();
+    if (nmi_on_completion[fdc_type - FDC_ACORN])
+        nmi |= 1;
+}
+
 static void wd1770_callback()
 {
     log_debug("wd1770: fdc callback %02X",wd1770.command);
@@ -415,15 +423,17 @@ static void wd1770_callback()
             nmi |= 1;
         break;
 
-    case 8: /*Read sector*/
-        wd1770.status &= 0xfe;
-        wd1770_setspindown();
-        if (nmi_on_completion[fdc_type - FDC_ACORN])
-            nmi |= 1;
-        break;
+        case 0x8: /* Read sector */
+        case 0xA: /* Write sector*/
+        case 0xE: /* Read track  */
+        case 0xF: /* Write track */
+            wd1770_completed();
+            break;
 
     case 9:
-        if (wd1770.in_gap) {
+        if (wd1770.status & 0x58)
+            wd1770_completed();
+        else if (wd1770.in_gap) {
             wd1770.sector++;
             begin_read_sector("continue multiple");
         } else {
@@ -432,41 +442,27 @@ static void wd1770_callback()
             fdc_time = 5000;
         }
         break;
-    case 0xA: /*Write sector*/
-        wd1770.status &= 0xfe;
-        wd1770_setspindown();
-        if (nmi_on_completion[fdc_type - FDC_ACORN])
-            nmi |= 1;
-        break;
 
     case 0xB:
-        if (wd1770.in_gap) {
+        if (wd1770.status & 0x58)
+            wd1770_completed();
+        else if (wd1770.in_gap) {
             wd1770.sector++;
             begin_write_sector("continue multiple");
         } else {
             log_debug("wd1770: multi-sector write, inter-sector gap");
             wd1770.in_gap = 1;
-            fdc_time = 5000; //
+            fdc_time = 5000;
         }
         break;
 
     case 0xC: /*Read address*/
-        wd1770.status &= 0xfe;
-        wd1770_setspindown();
-        if (nmi_on_completion[fdc_type - FDC_ACORN])
-            nmi |= 1;
+        wd1770_completed();
         wd1770.sector = wd1770.track;
         break;
 
         case 0xD: /* force interrupt */
             break;
-
-    case 0xF: /*Write track */
-        wd1770.status &= 0xfe;
-        wd1770_setspindown();
-        if (nmi_on_completion[fdc_type - FDC_ACORN])
-            nmi |= 1;
-        break;
     }
 }
 
