@@ -14,7 +14,7 @@
 
 struct
 {
-    uint8_t command, sector, track, status, data;
+    uint8_t command, oldcmd, sector, track, status, data;
     uint8_t ctrl;
     int curside;
     int curtrack;
@@ -175,15 +175,7 @@ static void wd1770_cmd(uint8_t val)
         case 0xD:
             log_debug("wd1770: force interrupt, status=%02X", wd1770.status);
             disc_abort(curdrive);
-            if (wd1770.status & 0x01)
-                wd1770.status &= ~1;
-            else
-                wd1770.status = 0x80 | 0x20 | track0;
-            if ((val & 0xc) && nmi_on_completion[fdc_type - FDC_ACORN])
-                nmi |= 1;
-            if ((wd1770.command >> 4) == 0xB)
-                nmi |= 2;
-            wd1770_setspindown();
+            fdc_time = 100;
             break;
 
         case 0xE: /* read track */
@@ -200,6 +192,7 @@ static void wd1770_cmd(uint8_t val)
             disc_writetrack(curdrive, wd1770.track, wd1770.curside, wd1770.density);
             break;
      }
+     wd1770.oldcmd = wd1770.command;
      wd1770.command = val;
 }
 
@@ -462,6 +455,16 @@ static void wd1770_callback()
         break;
 
         case 0xD: /* force interrupt */
+            log_debug("wd1770: callback for force-interrupt");
+            if (wd1770.status & 0x01)
+                wd1770.status &= ~1;
+            else
+                wd1770.status = 0x80 | 0x20 | track0;
+            if ((wd1770.oldcmd & 0xc) && nmi_on_completion[fdc_type - FDC_ACORN])
+                nmi |= 1;
+            //if ((wd1770.oldcmd >> 4) == 0xB)
+                //nmi |= 2;
+            wd1770_setspindown();
             break;
     }
 }
