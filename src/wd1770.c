@@ -96,7 +96,7 @@ static void begin_read_sector(const char *variant)
 {
     log_debug("wd1770: %s read sector drive=%d side=%d track=%d sector=%d dens=%d", variant, curdrive, wd1770.curside, wd1770.track, wd1770.sector, wd1770.density);
     data_count = 0;
-    wd1770.status = 0x80 | 0x1;
+    wd1770.status = 0x81;
     wd1770.in_gap = 0;
     disc_readsector(curdrive, wd1770.sector, wd1770.track, wd1770.curside, wd1770.density);
     bytenum = 0;
@@ -105,11 +105,11 @@ static void begin_read_sector(const char *variant)
 static void begin_write_sector(const char *variant)
 {
     log_debug("wd1770: %s write sector drive=%d side=%d track=%d sector=%d dens=%d", variant, curdrive, wd1770.curside, wd1770.track, wd1770.sector, wd1770.density);
-    wd1770.status = 0x80 | 0x1;
+    wd1770.status = 0x83;
+    wd1770.in_gap = 0;
     disc_writesector(curdrive, wd1770.sector, wd1770.track, wd1770.curside, wd1770.density);
     bytenum = 0;
     nmi |= 2;
-    wd1770.status |= 2;
 }
 
 static void write_1770(uint16_t addr, uint8_t val)
@@ -122,10 +122,11 @@ static void write_1770(uint16_t addr, uint8_t val)
                 log_warn("wd1770: attempt to write %s register with %02X when device busy rejected", "command", val);
                 break;
             }
+            wd1770.status |= 0x01;
             wd1770_spinup();
         }
+        log_debug("wd1770: write command register, cmd=%02X", val);
         nmi &= ~1;
-        wd1770.status |= 0x01;
         wd1770.cmd_started = 0;
         wd1770.command = val;
         fdc_time = 32;
@@ -340,8 +341,8 @@ static void wd1770_cmd_next(unsigned cmd)
                 nmi |= 1;
             break;
 
-        case 0x8: /* Read sector */
-        case 0xA: /* Write sector*/
+        case 0x8: /* Read single sector */
+        case 0xA: /* Write single sector*/
         case 0xE: /* Read track  */
         case 0xF: /* Write track */
             wd1770_completed();
@@ -378,6 +379,18 @@ static void wd1770_cmd_next(unsigned cmd)
         case 0xC: /*Read address*/
             wd1770_completed();
             wd1770.sector = wd1770.track;
+            break;
+
+        case 0xD:
+            if (wd1770.status & 0x01)
+                wd1770.status &= ~1;
+            else
+                wd1770.status = 0x80 | 0x20 | track0;
+            if ((wd1770.oldcmd & 0xc) && nmi_on_completion[fdc_type - FDC_ACORN])
+                nmi |= 1;
+            //if ((wd1770.oldcmd >> 4) == 0xB)
+                //nmi |= 2;
+            wd1770_setspindown();
             break;
     }
 }
@@ -436,15 +449,7 @@ static void wd1770_cmd_start(unsigned cmd)
         case 0xD:
             log_debug("wd1770: force interrupt, status=%02X", wd1770.status);
             disc_abort(curdrive);
-            if (wd1770.status & 0x01)
-                wd1770.status &= ~1;
-            else
-                wd1770.status = 0x80 | 0x20 | track0;
-            if ((wd1770.oldcmd & 0xc) && nmi_on_completion[fdc_type - FDC_ACORN])
-                nmi |= 1;
-            //if ((wd1770.oldcmd >> 4) == 0xB)
-                //nmi |= 2;
-            wd1770_setspindown();
+            fdc_time = 200;
             break;
 
         case 0xE: /* read track */
@@ -551,10 +556,10 @@ static void wd1770_writeprotect()
 
 void wd1770_reset()
 {
-    nmi = 0;
-    wd1770.status = motoron ? 0x80 : 0x00;
-    motorspin = 0;
     log_debug("wd1770: reset 1770");
+    nmi = 0;
+    wd1770.status = 0;
+    motorspin = 0;
     fdc_time = 0;
     if (fdc_type >= FDC_ACORN) {
         fdc_callback       = wd1770_callback;
