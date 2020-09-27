@@ -323,7 +323,7 @@ static void sdf_poll()
 
         case ST_READ_ADDR6:
             state = ST_IDLE;
-            fdc_writeprotect();
+            fdc_finishread(false);
             sdf_sector++;
             if (sdf_sector == geometry[sdf_drive]->sectors_per_track)
                 sdf_sector = 0;
