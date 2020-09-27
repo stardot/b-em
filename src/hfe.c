@@ -662,76 +662,76 @@ static size_t hfe_copy_bits(int version, int encoding,
       unsigned char in = src[in_offset++];
 
       if (current_opcode)
-	{
-	  switch (current_opcode)
-	    {
-	    case HFE_OPCODE_SKIPBITS:
-	      {
-		if (in_offset >= in_bytes)
-		  {
-		    hfe_warn_of_premature_stream_end("SKIPBITS");
-		    continue;
-		  }
-		skipbits = in;
-	      }
-	      break;
+        {
+          switch (current_opcode)
+            {
+            case HFE_OPCODE_SKIPBITS:
+              {
+                if (in_offset >= in_bytes)
+                  {
+                    hfe_warn_of_premature_stream_end("SKIPBITS");
+                    continue;
+                  }
+                skipbits = in;
+              }
+              break;
 
-	    case HFE_OPCODE_RAND:
-	      in = hfe_random_byte();
-	      break;
+            case HFE_OPCODE_RAND:
+              in = hfe_random_byte();
+              break;
 
-	    case HFE_OPCODE_NOP:
-	    case HFE_OPCODE_SETINDEX:
-	      {
-		log_warn("hfe: drive %d track %d: HFE3 opcode 0x%X was incorrectly retained (this is a logic error); returning a short track",
-			 drive, track, current_opcode);
-		return out_bytes;
-	      }
+            case HFE_OPCODE_NOP:
+            case HFE_OPCODE_SETINDEX:
+              {
+                log_warn("hfe: drive %d track %d: HFE3 opcode 0x%X was incorrectly retained (this is a logic error); returning a short track",
+                         drive, track, current_opcode);
+                return out_bytes;
+              }
 
-	    default:
-	      {
-		log_warn("hfe: drive %d track %d contains an invalid HFE3 opcode 0x%X; returning a short track",
-			 drive, track, current_opcode);
-		return out_bytes;
-	      }
-	    }
-	}
+            default:
+              {
+                log_warn("hfe: drive %d track %d contains an invalid HFE3 opcode 0x%X; returning a short track",
+                         drive, track, current_opcode);
+                return out_bytes;
+              }
+            }
+        }
       else if (hfe3 && hfe_is_hfe3_opcode(in))
         {
-	  switch (in & HFE_OPCODE_MASK)
-	    {
-	    case HFE_OPCODE_NOP:
-	      current_opcode = 0;  /* takes no argument, so nothing more to do. */
-	      continue;
+          switch (in & HFE_OPCODE_MASK)
+            {
+            case HFE_OPCODE_NOP:
+              current_opcode = 0;  /* takes no argument, so nothing more to do. */
+              continue;
 
-	    case HFE_OPCODE_SETINDEX:
-	      /* For now, we ignore this (i.e. we consume the opcode
-		 but do nothing about it).
+            case HFE_OPCODE_SETINDEX:
+              /* For now, we ignore this (i.e. we consume the opcode
+                 but do nothing about it).
 
-		 It's not clear how we would need to use it.  In a
-		 physical floppy, detection of the index mark tells us
-		 we've seen the whole track.  That allows us for
-		 example to know when to give up searching for a
-		 sector.  But we have a finite amount of input data
-		 anyway, so we won't loop forever even if we don't
-		 know where in the bitsteam the index mark is.
-	      */
-	      current_opcode = 0;  /* takes no argument */
-	      continue;
+                 It's not clear how we would need to use it.  In a
+                 physical floppy, detection of the index mark tells us
+                 we've seen the whole track.  That allows us for
+                 example to know when to give up searching for a
+                 sector.  But we have a finite amount of input data
+                 anyway, so we won't loop forever even if we don't
+                 know where in the bitsteam the index mark is.
+              */
+              current_opcode = 0;  /* takes no argument */
+              continue;
 
-	    default:
-	      current_opcode = in & HFE_OPCODE_MASK;
-	      /* Collect argument next time around the loop and
-		 operate on it. */
-	      continue;
-	    }
-	  /*NOTREACHED*/
-	  abort();
+            default:
+              current_opcode = in & HFE_OPCODE_MASK;
+              /* Collect argument next time around the loop and
+                 operate on it. */
+              continue;
+            }
+          /*NOTREACHED*/
+          abort();
         }
       else
-	{
-	  current_opcode = 0;
-	}
+        {
+          current_opcode = 0;
+        }
 
       for (int bitnum = 0; bitnum < 8; ++bitnum)
         {
@@ -1676,10 +1676,10 @@ static void hfe_poll(void)
   for (d = 0; d < HFE_DRIVES; ++d)
     {
       if (hfe_info[d])
-	{
-	  const bool is_selected = d==hfe_selected_drive;
-	  hfe_poll_drive(d, is_selected);
-	}
+        {
+          const bool is_selected = d==hfe_selected_drive;
+          hfe_poll_drive(d, is_selected);
+        }
     }
 }
 
