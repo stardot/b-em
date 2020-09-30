@@ -27,6 +27,8 @@ extern int fcount;
 static int vrefresh = 1;
 static FILE *trace_fp = NULL;
 static FILE *exec_fp = NULL;
+static FILE *af = NULL;
+static bool os_trace = false;
 
 static void close_trace()
 {
@@ -220,6 +222,8 @@ static inline void debug_cons_close(void) {}
 void debug_kill()
 {
     close_trace();
+    if (af)
+        fclose(af);
     debug_memview_close();
     debug_cons_close();
 }
@@ -667,6 +671,124 @@ void trimnl(char *buf) {
 
 }
 
+static void debug_ost_copystr(cpu_debug_t *cpu, uint32_t addr, char dest[256])
+{
+    int i = 0;
+    while (i < 256) {
+        int ch = cpu->memread(addr++);
+        if (ch == 0x0d)
+            break;
+        dest[i++] = ch;
+    }
+    dest[i] = 0;
+}
+
+static uint32_t debug_read32(cpu_debug_t *cpu, uint32_t addr)
+{
+    return cpu->memread(addr) | (cpu->memread(addr+1) << 8) | (cpu->memread(addr+2) << 16) | (cpu->memread(addr+3) << 24);
+}
+
+static void debug_ost_oscli(cpu_debug_t *cpu, FILE *fp)
+{
+    char cmd[256];
+    debug_ost_copystr(cpu, (y << 8) | x, cmd);
+    fprintf(fp, "OSCLI(\"%s\")\n", cmd);
+}
+
+static void debug_ost_osfile(cpu_debug_t *cpu, FILE *fp)
+{
+    char fn[256];
+    uint32_t pb = (y << 8) | x;
+    debug_ost_copystr(cpu, cpu->memread(pb) | (cpu->memread(pb+1) << 8), fn);
+    fprintf(fp, "OSFILE(%02X, \"%s\", %08X, %08X, %08X, %08X)\n", a, fn, debug_read32(cpu, pb+2), debug_read32(cpu, pb+6), debug_read32(cpu, pb+10), debug_read32(cpu, pb+14));
+}
+
+static void debug_ost_osargs(cpu_debug_t *cpu, FILE *fp)
+{
+    if (y == 0 || a != 1)
+        fprintf(fp, "OSARGS(%02X, %02X)\n", (unsigned)a, (unsigned)y);
+    else
+        fprintf(fp, "OSARGS(%02X, %02X, %04X)\n", (unsigned)a, (unsigned)y, debug_read32(cpu, x));
+}
+
+static void debug_ost_osgbpb(cpu_debug_t *cpu, FILE *fp)
+{
+    uint32_t pb = (y << 8) | x;
+    fprintf(fp, "OSGBPB(%02X, %02X, %08X, %08X, %08X)\n", (unsigned)a, cpu->memread(pb), debug_read32(cpu, pb+1), debug_read32(cpu, pb+5), debug_read32(cpu, pb+9));
+}
+
+static void debug_ost_osfind(cpu_debug_t *cpu, FILE *fp)
+{
+    if (a == 0)
+        fprintf(fp, "OSFIND(%02X, %02X)\n", (unsigned)a, (unsigned)y);
+    else {
+        char fn[256];
+        debug_ost_copystr(cpu, (y << 8) | x, fn);
+        fprintf(fp, "OSFIND(%02X, \"%s\")\n", (unsigned)a, fn);
+    }
+}
+
+static void debug_ostrace(cpu_debug_t *cpu, uint32_t addr, FILE *fp)
+{
+    switch(addr) {
+        default:
+            return;
+        case 0xfff7: // OSCLI
+            debug_ost_oscli(cpu, fp);
+            break;
+        case 0xfff4: // OSBYTE
+            fprintf(fp, "OSBYTE(%02X, %02X, %02X)\n", (unsigned)a, (unsigned)x, (unsigned)y);
+            break;
+        case 0xfff1: // OSWORD
+            fprintf(fp, "OSWORD(%02X, %02X%02X)\n", (unsigned)a, (unsigned)y, (unsigned)x);
+            break;
+        case 0xffee: // OSWRCH
+            fprintf(fp, "OSWRCH(%02X)\n", (unsigned)a);
+            break;
+        case 0xffe0: // OSRDCH
+            fputs("OSRDCH\n", fp);
+            break;
+        case 0xffdd: // OSFILE
+            debug_ost_osfile(cpu, fp);
+            break;
+        case 0xffda: // OSARGS
+            debug_ost_osargs(cpu, fp);
+            break;
+        case 0xffd7: // OSBGET
+            fprintf(fp, "OSBGET(%02X, %02X)\n", (unsigned)y, (unsigned)a);
+            break;
+        case 0xffd4: // OSBPUT
+            fprintf(fp, "OSBPUT(%02X)\n", (unsigned)y);
+            break;
+        case 0xffd1: // OSGBPB
+            debug_ost_osgbpb(cpu, fp);
+            break;
+        case 0xffce: // OSFIND
+            debug_ost_osfind(cpu, fp);
+            break;
+        case 0xffcb: // NVWRCH
+            fprintf(fp, "NVWRCH(%02X)\n", (unsigned)a);
+            break;
+        case 0xffc8: // NVRDCH
+            fputs("NVRDCH\n", fp);
+            break;
+        case 0xffc5: // GSREAD
+            fputs("GSREAD\n", fp);
+            break;
+        case 0xffc2: // GSINIT
+            fputs("GSINIT\n", fp);
+            break;
+        case 0xffbf: // OSEVEN
+            fprintf(fp, "OSEVEN(%02X, %02X)\n", (unsigned)y, (unsigned)a);
+            break;
+        case 0xffbc: // VDUCHR
+            fprintf(fp, "OSWRCH(%02X)\n", (unsigned)a);
+            break;
+    }
+    //= cpu->memread(0x0100+s+1) | (cpu->memread(0x0100+s+2) << 8);
+    //fprintf(fp, "return to %04X\n", retadd);
+}
+
 void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 {
     uint32_t next_addr;
@@ -731,6 +853,23 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
             cmdlen = 1;
         }
         switch (*cmd) {
+            case 'a':
+                if (af) {
+                    fclose(af);
+                    af = NULL;
+                }
+                if (*iptr) {
+                    char *eptr = strchr(iptr, '\n');
+                    if (eptr)
+                        *eptr = '\0';
+                    if ((af = fopen(iptr, "w")))
+                        debug_outf("Tracing AMPLE to %s\n", iptr);
+                    else
+                        debug_outf("Unable to open trace file '%s' for append: %s\n", iptr, strerror(errno));
+                } else
+                    debug_outf("AMPLE trace file closed");
+                break;
+
             case 'b':
                 if (!strncmp(cmd, "break", cmdlen))
                     set_point(cpu, breakpoints, iptr, "Breakpoint");
@@ -841,6 +980,21 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 indebug = 0;
                 main_resume();
                 return;
+
+            case 'o':
+                if (!strncmp(cmd, "ostrace", cmdlen)) {
+                    if (os_trace) {
+                        debug_outf("OS call tracing disabled");
+                        os_trace = false;
+                    }
+                    else {
+                        debug_outf("OS call tracing enabled");
+                        os_trace = true;
+                    }
+                }
+                else
+                    badcmd = true;
+                break;;
 
             case 'p':
                 if (!strncmp(cmd, "paste", cmdlen))
@@ -1061,14 +1215,99 @@ void debug_iowrite(cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t size
     check_points(cpu, addr, value, size, breako, watcho, "output to");
 }
 
+static char ample_mnemonics[256][10] =
+{
+    /* 00 */ "         ", "         ", "         ", "         ",
+    /* 04 */ "         ", "         ", "         ", "         ",
+    /* 08 */ "         ", "         ", "         ", "         ",
+    /* 0C */ "PUSHIB   ", "         ", "         ", "BRA1     ",
+    /* 10 */ "CALLMC2  ", "?R?      ", "GVAR     ", ")ELSE(   ",
+    /* 14 */ "         ", "BRA2     ", ")UNTIL(  ", "IF(      ",
+    /* 18 */ "UNLESS(  ", "UNLESS(  ", "LDI02    ", "         ",
+    /* 1C */ "         ", "TEST0    ", "'        ", ")P       ",
+    /* 20 */ "] (RET)  ", "         ", "         ", "         ",
+    /* 24 */ "         ", "         ", "         ", "PNUM     ",
+    /* 28 */ "         ", "         ", ")IF      ", "REP(     ",
+    /* 2C */ ")ACT     ", "         ", "         ", "         ",
+    /* 30 */ "         ", "         ", "FOR(     ", "         ",
+    /* 34 */ "INDEX    ", "COUNT    ", ")FOR     ", "         ",
+    /* 38 */ "         ", "#2       ", "#11      ", "#12      ",
+    /* 3C */ "#212     ", "#2121    ", "#213     ", "#+       ",
+    /* 40 */ "#-       ", "#* (2)   ", "#/ (2)   ", "#!       ",
+    /* 44 */ "#B!      ", "#B?      ", "#?       ", "SIGN     ",
+    /* 48 */ "NOT      ", "#<       ", "#<=      ", "#B12     ",
+    /* 4C */ "AND      ", "OR       ", "XOR      ", "CODE     ",
+    /* 50 */ "#OUT     ", "EOL      ", "SPC      ", "EVERY    ",
+    /* 54 */ "$+       ", "$REV     ", "ASC      ", "LEN      ",
+    /* 58 */ "$CHR     ", "         ", "         ", "         ",
+    /* 5C */ "$OUT     ", "NL       ", "         ", "$2       ",
+    /* 60 */ "         ", "         ", "         ", "^        ",
+    /* 64 */ "X        ", "/        ", "ACT      ", "\\        ",
+    /* 68 */ "+        ", "-        ", "=        ", ",        ",
+    /* 6C */ ";        ", "FAST     ", "DISPLAY  ", "|        ",
+    /* 70 */ "         ", ")        ", "         ", "         ",
+    /* 74 */ "         ", "         ", "         ", "         ",
+    /* 78 */ "         ", "         ", "         ", "         ",
+    /* 7C */ "         ", "         ", "         ", "         ",
+    /* 80 */ "         ", "         ", "CKSUM    ", "ARRAY    ",
+    /* 84 */ "FCOPY    ", "FVAR     ", "FRAME    ", "FRAME!   ",
+    /* 88 */ "FRAME?   ", "         ", "MVAL     ", "VOICE!   ",
+    /* 8C */ "         ", "ON       ", "PUSH54   ", "OFF      ",
+    /* 90 */ "         ", "#+!      ", "#>       ", "#=       ",
+    /* 94 */ "MAX      ", "MIN      ", "$12      ", "$-       ",
+    /* 98 */ "VAL      ", "         ", "         ", "         ",
+    /* 9C */ "         ", "         ", "         ", "         ",
+    /* A0 */ "         ", "         ", "         ", "         ",
+    /* A4 */ "IDLE     ", "ACT(     ", "&VAL     ", "OSCLI    ",
+    /* A8 */ "         ", "         ", "#*       ", "#/       ",
+    /* AC */ "RAND     ", "RAND!    ", "RANDL    ", "$STR     ",
+    /* B0 */ "&$STR    ", "NOUT     ", "&NOUT    ", "$PAD     ",
+    /* B4 */ "$STRIP   ", "SP       ", "ALIGN    ", "MODE     ",
+    /* B8 */ "         ", "         ", "QKEY     ", "'L       ",
+    /* BC */ "#IN      ", "$IN      ", "         ", "         ",
+    /* C0 */ "UNUSED   ", "VOICE    ", "RVOICES  ", "VOICES   ",
+    /* C4 */ "DURATION ", "WIND     ", "PAUSE    ", "=T       ",
+    /* C8 */ "-T       ", "+T       ", "QTIME    ", "c        ",
+    /* CC */ "C        ", "d        ", "D        ", "e        ",
+    /* D0 */ "E        ", "f        ", "F        ", "g        ",
+    /* D4 */ "G        ", "a        ", "A        ", "b        ",
+    /* D8 */ "B        ", "K(       ", ")K       ", ":        ",
+    /* DC */ "!        ", "         ", "BAR      ", "^;       ",
+    /* E0 */ "=L       ", "+L       ", "-L       ", "///      ",
+    /* E4 */ "SIMPLEACT", "SCORE    ", "P(       ", "~        ",
+    /* E8 */ "HALT     ", "GO       ", "SHARE    ", "STOP     ",
+    /* EC */ "         ", "READY    ", "         ", "         ",
+    /* F0 */ "         ", "         ", "twords   ", "DIM      ",
+    /* F4 */ "         ", "         ", "         ", "         ",
+    /* F8 */ "         ", "         ", "         ", "         ",
+    /* FC */ "         ", "         ", "         ", "         "
+};
+
+static int debug_ample(cpu_debug_t *cpu, uint32_t addr)
+{
+    if (addr == 0x20008fe1) {
+        unsigned aadd = cpu->memread(0x16) | (cpu->memread(0x17) << 8);
+        unsigned romadd = cpu->memread((0x8bae)+a) | (cpu->memread((0x8cae)+a) << 8);
+        unsigned stackbase = cpu->memread(0x4d) | (cpu->memread(0x4e) << 8);
+        unsigned asp = cpu->memread(0x1a);
+        fprintf(af, "%04X: %02x %s %04X %02X", aadd, a, ample_mnemonics[a], romadd, asp);
+        for (unsigned i = asp; i >= 2; i -= 2)
+            fprintf(af, " %04X", cpu->memread(stackbase + i - 2) | (cpu->memread(stackbase + i - 1) << 8));
+        putc('\n', af);
+    }
+    else if (addr >= 0xffbc)
+        debug_ostrace(cpu, addr, af);
+    return 0;
+}
+
 void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
     char buf[256];
     size_t len;
     int c, r, enter = 0;
     const char **np, *name;
 
-    if ((addr & 0xF000) == 0x8000)
-        addr = addr;
+    if (af)
+        enter = debug_ample(cpu, addr);
 
     if (trace_fp) {
         const char *symlbl;
@@ -1100,6 +1339,9 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
 
         putc('\n', trace_fp);
     }
+
+    if (os_trace && addr >= 0xffbc)
+        debug_ostrace(cpu, addr, stdout);
 
     if (addr == tbreak) {
         log_debug("debugger; enter for CPU %s on tbreak at %04X", cpu->cpu_name, addr);
