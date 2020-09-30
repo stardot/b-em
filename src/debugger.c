@@ -1220,7 +1220,7 @@ static char ample_mnemonics[256][10] =
     /* 00 */ "         ", "         ", "         ", "         ",
     /* 04 */ "         ", "         ", "         ", "         ",
     /* 08 */ "         ", "         ", "         ", "         ",
-    /* 0C */ "PUSHIB   ", "         ", "         ", "BRA1     ",
+    /* 0C */ "PUSHIB   ", "         ", "$IMM     ", "BRA1     ",
     /* 10 */ "CALLMC2  ", "?R?      ", "GVAR     ", ")ELSE(   ",
     /* 14 */ "         ", "BRA2     ", ")UNTIL(  ", "IF(      ",
     /* 18 */ "UNLESS(  ", "UNLESS(  ", "LDI02    ", "         ",
@@ -1293,6 +1293,16 @@ static int debug_ample(cpu_debug_t *cpu, uint32_t addr)
         fprintf(af, "%04X: %02x %s %04X %02X", aadd, a, ample_mnemonics[a], romadd, asp);
         for (unsigned i = asp; i >= 2; i -= 2)
             fprintf(af, " %04X", cpu->memread(stackbase + i - 2) | (cpu->memread(stackbase + i - 1) << 8));
+        fputs("\n\t", af);
+        unsigned ssp = cpu->memread(0x18);
+        unsigned ptr = 0x409 + cpu->memread(0x15);
+        while (ssp-- > 0) {
+            unsigned slen = cpu->memread(0x489+ssp);
+            putc('"', af);
+            while (slen--)
+                putc(cpu->memread(--ptr), af);
+            fputs("\",", af);
+        }
         putc('\n', af);
     }
     else if (addr >= 0xffbc)
