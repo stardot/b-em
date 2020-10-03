@@ -942,7 +942,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                     return;
                 }
             case 't':
-                if (!strncmp(cmd, "paste", cmdlen)) {
+                if (!strncmp(cmd, "trace", cmdlen)) {
                     if (trace_fp) {
                         fclose(trace_fp);
                         trace_fp = NULL;
