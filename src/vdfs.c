@@ -2169,11 +2169,18 @@ static void osgbpb_get_dir(uint32_t pb, vdfs_entry *dir, const char *which)
 
     if (check_valid_dir(dir, which)) {
         mem_ptr = readmem32(pb+1);
-        writemem(mem_ptr++, 1);   // length of drive number.
-        writemem(mem_ptr++, '0'); // drive number.
-        writemem(mem_ptr++, strlen(dir->acorn_fn));
-        for (ptr = dir->acorn_fn; (ch = *ptr++); )
-            writemem(mem_ptr++, ch);
+        if (mem_ptr > 0xffff0000 || curtube == -1) {
+            writemem(mem_ptr++, 0); // length of drive number.
+            writemem(mem_ptr++, strlen(dir->acorn_fn));
+            for (ptr = dir->acorn_fn; (ch = *ptr++); )
+                writemem(mem_ptr++, ch);
+        }
+        else {
+            tube_writemem(mem_ptr++, 0);   // length of drive number.
+            tube_writemem(mem_ptr++, strlen(dir->acorn_fn));
+            for (ptr = dir->acorn_fn; (ch = *ptr++); )
+                tube_writemem(mem_ptr++, ch);
+        }
     }
 }
 
