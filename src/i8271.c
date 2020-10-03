@@ -38,6 +38,7 @@ struct
 
 static void short_spindown(void)
 {
+    log_debug("i8271: short_spindown, motoron=%d", motoron);
     motorspin = 15000;
     fdc_time = 0;
 }
@@ -52,9 +53,10 @@ static void i8271_NMI(void)
 
 static void i8271_spinup(void)
 {
+    log_debug("i8271: spinup, motoron=%d", motoron);
+    motorspin = 0;
     if (!motoron) {
         motoron = 1;
-        motorspin = 0;
         led_update((curdrive == 0) ? LED_DRIVE_0 : LED_DRIVE_1, true, 0);
         ddnoise_spinup();
         for (int i = 0; i < NUM_DRIVES; i++)
@@ -65,6 +67,7 @@ static void i8271_spinup(void)
 
 static void i8271_spindown()
 {
+    log_debug("i8271: spindown, motoron=%d", motoron);
     if (motoron) {
         motoron = 0;
         led_update(LED_DRIVE_0, false, 0);
@@ -79,6 +82,7 @@ static void i8271_spindown()
 
 void i8271_setspindown(void)
 {
+    log_debug("i8271: set spindown");
     motorspin = 45000;
 }
 
@@ -108,7 +112,7 @@ uint8_t i8271_read(uint16_t addr)
         switch (addr & 7)
         {
             case 0: /*Status register*/
-                log_debug("i8271: Read status reg %04X %02X\n",pc,i8271.status);
+                //log_debug("i8271: Read status reg %04X %02X\n",pc,i8271.status);
                 return i8271.status;
             case 1: /*Result register*/
                 log_debug("i8271: Read result reg %04X %02X\n",pc,i8271.result);
@@ -205,8 +209,9 @@ void i8271_write(uint16_t addr, uint8_t val)
                                 i8271.cursector = i8271.params[1];
                                 i8271_spinup();
                                 i8271.phase = 0;
-                                if (i8271.curtrack[curdrive] != i8271.params[0]) i8271_seek();
-                                else                                             fdc_time = 200;
+                                if (i8271.curtrack[curdrive] != i8271.params[0])
+                                    i8271_seek();
+                                fdc_time = 200;
                                 break;
                             case 0x1F: /*Verify sector*/
                                 i8271.sectorsleft = i8271.params[2] & 31;
@@ -312,7 +317,7 @@ void i8271_write(uint16_t addr, uint8_t val)
 static void i8271_callback(void)
 {
         fdc_time = 0;
-//        printf("Callback 8271 - command %02X\n",i8271.command);
+        log_debug("i8271: fdc_callback, cmd=%02X", i8271.command);
         switch (i8271.command)
         {
             case 0x0B: /*Write*/
@@ -451,6 +456,7 @@ static void i8271_data(uint8_t dat)
 
 static void i8271_finishread(bool deleted)
 {
+    log_debug("i8271: finishread, deleted=%d", deleted);
     fdc_time = 200;
     if (deleted)
         i8271.result |= 0x20;
