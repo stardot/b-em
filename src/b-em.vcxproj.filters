@@ -249,9 +249,6 @@
     <ClInclude Include="keydef-allegro.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="linux-gui.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="logging.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -295,6 +292,24 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="debugger_symbols.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="led.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="hfe.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="imd.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="copro-pdp11.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pdp11\pdp11.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pdp11\pdp11_debug.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -359,15 +374,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="keyboard.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="linux.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="linux-gui.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="linux-keydefine.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="main.c">
@@ -608,6 +614,24 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="debugger_symbols.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="led.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="hfe.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="imd.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="copro-pdp11.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="pdp11\pdp11.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="pdp11\pdp11_debug.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

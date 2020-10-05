@@ -129,6 +129,15 @@ static uint8_t wt_headid;
 static uint8_t wt_sectid;
 static uint8_t wt_sectsz;
 
+#ifdef WIN32
+// https://stackoverflow.com/a/19932364/433626
+int ftruncate(int fd, off_t length) {
+    HANDLE handle = (HANDLE) _get_osfhandle(_fileno(fd));
+    SetFilePointer(handle, length, 0, FILE_BEGIN);
+    SetEndOfFile(handle);
+}
+#endif
+
 /*
  * This function writes the IMD file in memory back to the disc file.
  * it does not re-write the comment at the start of the file but

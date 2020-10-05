@@ -70,7 +70,9 @@ TUBE tubes[NUM_TUBES]=
     {"Z80 ROM 2.00",   z80_init,        z80_reset,       &tubez80_cpu_debug,   0x1000, "Z80_200",          6 },
     {"PDP11",          tube_pdp11_init, copro_pdp11_rst, &pdp11_cpu_debug,     0x0800, "PDP11Tube",        2 },
     {"6502 Turbo",     tube_6502_iturb, tube_6502_reset, &tube6502_cpu_debug,  0x0800, "6502Turbo",        4 },
+#ifdef M68K
     {"68000",          tube_68000_init, tube_68000_rst,  &mc68000_cpu_debug,   0x8000, "CiscOS",           4 }
+#endif
 };
 
 static fdc_type_t model_find_fdc(const char *name, const char *model)
