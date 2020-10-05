@@ -376,7 +376,6 @@ static void sdf_abort(int drive)
 
 static void sdf_lock(int drive, FILE *fp, int ltype)
 {
-#ifndef WIN32
 #ifdef linux
 #define LOCK_WAIT F_OFD_SETLKW
 #else
@@ -399,15 +398,16 @@ static void sdf_lock(int drive, FILE *fp, int ltype)
         }
     } while (errno == EINTR);
     log_warn("sdf: lock failure on drive %d", drive);
-#endif
 }
 
 static void sdf_spinup(int drive)
 {
     FILE *fp = sdf_fp[drive];
     log_debug("sdf: spinup drive %d", drive);
+#ifndef WIN32
     if (fp)
         sdf_lock(drive, fp, F_WRLCK);
+#endif
 }
 
 static void sdf_spindown(int drive)
@@ -416,7 +416,9 @@ static void sdf_spindown(int drive)
     log_debug("sdf: spindown drive %d", drive);
     if (fp) {
         fflush(fp);
+#ifndef WIN32
         sdf_lock(drive, fp, F_UNLCK);
+#endif
     }
 }
 
