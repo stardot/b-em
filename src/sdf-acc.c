@@ -406,18 +406,22 @@ static void sdf_spinup(int drive)
 {
     FILE *fp = sdf_fp[drive];
     log_debug("sdf: spinup drive %d", drive);
+#ifndef WIN32
     if (fp)
         sdf_lock(drive, fp, F_WRLCK);
+#endif
 }
 
 static void sdf_spindown(int drive)
 {
     FILE *fp = sdf_fp[drive];
     log_debug("sdf: spindown drive %d", drive);
+#ifndef WIN32
     if (fp) {
         fflush(fp);
         sdf_lock(drive, fp, F_UNLCK);
     }
+#endif
 }
 
 static void sdf_mount(int drive, const char *fn, FILE *fp, const struct sdf_geometry *geo)

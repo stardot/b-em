@@ -14,21 +14,21 @@
     <ProjectGuid>{28E2DE55-0A88-47FA-92DC-3F96D72608F9}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>bem</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -70,6 +70,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>VERSION="vsX";USE_MEMORY_POINTER;BEM;WIN32;INCLUDE_DEBUGGER;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <UndefinePreprocessorDefinitions>UNICODE;_UNICODE;%(UndefinePreprocessorDefinitions)</UndefinePreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\packages\Allegro.5.2.6\build\native\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -89,6 +90,7 @@
       <PreprocessorDefinitions>VERSION="vsX";USE_MEMORY_POINTER;BEM;WIN32;INCLUDE_DEBUGGER;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <UndefinePreprocessorDefinitions>UNICODE;_UNICODE;%(UndefinePreprocessorDefinitions)</UndefinePreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <AdditionalIncludeDirectories>..\packages\Allegro.5.2.6\build\native\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -117,6 +119,7 @@
     <ClInclude Include="compact_joystick.h" />
     <ClInclude Include="compat_wrappers.h" />
     <ClInclude Include="config.h" />
+    <ClInclude Include="copro-pdp11.h" />
     <ClInclude Include="cpu_debug.h" />
     <ClInclude Include="csw.h" />
     <ClInclude Include="daa.h" />
@@ -134,12 +137,14 @@
     <ClInclude Include="fdi.h" />
     <ClInclude Include="fdi2raw.h" />
     <ClInclude Include="gui-allegro.h" />
+    <ClInclude Include="hfe.h" />
     <ClInclude Include="i8271.h" />
     <ClInclude Include="ide.h" />
+    <ClInclude Include="imd.h" />
     <ClInclude Include="joystick.h" />
     <ClInclude Include="keyboard.h" />
     <ClInclude Include="keydef-allegro.h" />
-    <ClInclude Include="linux-gui.h" />
+    <ClInclude Include="led.h" />
     <ClInclude Include="logging.h" />
     <ClInclude Include="main.h" />
     <ClInclude Include="mc6809nc\mc6809.h" />
@@ -162,6 +167,8 @@
     <ClInclude Include="NS32016\Trap.h" />
     <ClInclude Include="pal.h" />
     <ClInclude Include="paula.h" />
+    <ClInclude Include="pdp11\pdp11.h" />
+    <ClInclude Include="pdp11\pdp11_debug.h" />
     <ClInclude Include="resid-fp\envelope.h" />
     <ClInclude Include="resid-fp\extfilt.h" />
     <ClInclude Include="resid-fp\filter.h" />
@@ -214,6 +221,7 @@
     <ClCompile Include="compact_joystick.c" />
     <ClCompile Include="compat_wrappers.c" />
     <ClCompile Include="config.c" />
+    <ClCompile Include="copro-pdp11.c" />
     <ClCompile Include="csw.c" />
     <ClCompile Include="darm\armv7-tbl.c" />
     <ClCompile Include="darm\armv7.c" />
@@ -231,14 +239,14 @@
     <ClCompile Include="fdi.c" />
     <ClCompile Include="fdi2raw.c" />
     <ClCompile Include="gui-allegro.c" />
+    <ClCompile Include="hfe.c" />
     <ClCompile Include="i8271.c" />
     <ClCompile Include="ide.c" />
+    <ClCompile Include="imd.c" />
     <ClCompile Include="joystick.c" />
     <ClCompile Include="keyboard.c" />
     <ClCompile Include="keydef-allegro.c" />
-    <ClCompile Include="linux-gui.c" />
-    <ClCompile Include="linux-keydefine.c" />
-    <ClCompile Include="linux.c" />
+    <ClCompile Include="led.c" />
     <ClCompile Include="logging.c" />
     <ClCompile Include="main.c" />
     <ClCompile Include="mc6809nc\mc6809nc.c" />
@@ -260,6 +268,8 @@
     <ClCompile Include="NS32016\Trap.c" />
     <ClCompile Include="pal.c" />
     <ClCompile Include="paula.c" />
+    <ClCompile Include="pdp11\pdp11.c" />
+    <ClCompile Include="pdp11\pdp11_debug.c" />
     <ClCompile Include="resid-fp\convolve-sse.cc" />
     <ClCompile Include="resid-fp\convolve.cc" />
     <ClCompile Include="resid-fp\envelope.cc" />
