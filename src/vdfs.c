@@ -75,6 +75,8 @@ const char *vdfs_cfg_root = NULL;
 
 #define MAX_FILE_NAME    10
 #define MAX_ACORN_PATH   256
+#define MAX_TITLE        19
+#define MAX_INF_LINE     80
 
 // These are Acorn standard attributes
 
@@ -124,6 +126,8 @@ struct vdfs_entry {
             time_t     scan_mtime;
             unsigned   scan_seq;
             bool       sorted;
+            char       boot_opt;
+            char       title[MAX_TITLE+1];
         } dir;
     } u;
 };
@@ -224,6 +228,7 @@ enum vdfs_action {
     VDFS_ACT_LIB,
     VDFS_ACT_RENAME,
     VDFS_ACT_RESCAN,
+    VDFS_ACT_TITLE,
     VDFS_ACT_VDFS,
     VDFS_ACT_ADFS,
     VDFS_ACT_DISC,
@@ -589,21 +594,17 @@ static void scan_attr(vdfs_entry *ent, uint32_t load_addr, uint32_t exec_addr)
     log_debug("vdfs: scan_attr: acorn=%s, host=%s, attr=%04X, load=%08X, exec=%08X\n", ent->acorn_fn, ent->host_fn, ent->attribs, load_addr, exec_addr);
 }
 
-static void scan_entry(vdfs_entry *ent)
+static const char *scan_inf_start(vdfs_entry *ent, char inf_line[MAX_INF_LINE])
 {
     FILE *fp;
-    uint32_t load_addr = 0, exec_addr = 0;
-
-    // open and parse .inf file
     *ent->host_inf = '.';
     fp = fopen(ent->host_path, "rt");
     *ent->host_inf = '\0';
     if (fp) {
-        char inf_line[80];
-        const char *lptr = fgets(inf_line, sizeof inf_line, fp);
+        const char *lptr = fgets(inf_line, MAX_INF_LINE, fp);
         fclose(fp);
         if (lptr) {
-            int ic, ch, nyb;
+            int ic, ch;
             char *ptr = ent->acorn_fn;
             char *end = ptr + MAX_FILE_NAME;
 
@@ -625,22 +626,33 @@ static void scan_entry(vdfs_entry *ent)
             }
             if (ptr < end)
                 *ptr = '\0';
+            return lptr;
+        }
+    }
+    return NULL;
+}
 
-            // Parse load address.
-            while (ch == ' ' || ch == '\t')
-                ch = *lptr++;
-            while ((nyb = hex2nyb(ch)) >= 0) {
-                load_addr = (load_addr << 4) | nyb;
-                ch = *lptr++;
-            }
+static void scan_entry(vdfs_entry *ent)
+{
+    uint32_t load_addr = 0, exec_addr = 0;
+    char inf_line[MAX_INF_LINE];
+    const char *lptr = scan_inf_start(ent, inf_line);
+    if (lptr) {
+        int ch, nyb;
+        // Parse load address.
+        while ((ch = *lptr++) == ' ' || ch == '\t')
+            ;
+        while ((nyb = hex2nyb(ch)) >= 0) {
+            load_addr = (load_addr << 4) | nyb;
+            ch = *lptr++;
+        }
 
-            // Parse exec address.
-            while (ch == ' ' || ch == '\t')
-                ch = *lptr++;
-            while ((nyb = hex2nyb(ch)) >= 0) {
-                exec_addr = (exec_addr << 4) | nyb;
-                ch = *lptr++;
-            }
+        // Parse exec address.
+        while (ch == ' ' || ch == '\t')
+            ch = *lptr++;
+        while ((nyb = hex2nyb(ch)) >= 0) {
+            exec_addr = (exec_addr << 4) | nyb;
+            ch = *lptr++;
         }
     }
     if (ent->acorn_fn[0] == '\0')
@@ -801,12 +813,66 @@ static bool is_inf(const char *path)
     return ptr && (ptr[1] == 'I' || ptr[1] == 'i') && (ptr[2] == 'N' || ptr[2] == 'n') && (ptr[3] == 'F' || ptr[3] == 'f') && !ptr[4];
 }
 
+static void scan_dir_host(vdfs_entry *dir, DIR *dp)
+{
+    struct dirent *dep;
+
+    // Mark all previos entries deleted but leave them in the list.
+    for (vdfs_entry *ent = dir->u.dir.children; ent; ent = ent->next)
+        ent->attribs &= (ATTR_IS_DIR|ATTR_OPEN_READ|ATTR_OPEN_WRITE);
+
+    // Go through the entries in the host dir, find each in the
+    // list and mark it as extant, if found, or create a new
+    // entry if not.
+    while ((dep = readdir(dp))) {
+        if (*(dep->d_name) != '.') {
+            if (!is_inf(dep->d_name)) {
+                vdfs_entry *ent = host_search(dir, dep->d_name);
+                if (ent)
+                    scan_entry(ent);
+                else if (!(ent = new_entry(dir, dep->d_name)))
+                    break;
+            }
+        }
+    }
+}
+
+static void scan_dir_inf(vdfs_entry *dir)
+{
+    char inf_line[MAX_INF_LINE];
+    unsigned opt = 0;
+    dir->u.dir.title[0] = 0;
+    const char *lptr = scan_inf_start(dir, inf_line);
+    if (lptr) {
+        int ch, nyb;
+        // Parse options.
+        while ((ch = *lptr++) == ' ' || ch == '\t')
+            ;
+        while ((nyb = hex2nyb(ch)) >= 0) {
+            opt = (opt << 4) | nyb;
+            ch = *lptr++;
+        }
+
+        // Parse title.
+        char *ptr = dir->u.dir.title;
+        char *end = ptr + MAX_TITLE;
+        while (ch == ' ' || ch == '\t')
+            ch = *lptr++;
+        while (ptr < end && ch && ch != '\n' && ch != '\r') {
+            *ptr++ = ch;
+            ch = *lptr++;
+        }
+        while (ptr < end)
+            *ptr++ = ' ';
+        *ptr = 0;
+    }
+    dir->u.dir.boot_opt = opt;
+}
+
 static int scan_dir(vdfs_entry *dir)
 {
     DIR  *dp;
     struct stat stb;
-    struct dirent *dep;
-    vdfs_entry *ent;
 
     // Has this been scanned sufficiently recently already?
 
@@ -819,24 +885,9 @@ static int scan_dir(vdfs_entry *dir)
     show_activity();
 
     if ((dp = opendir(dir->host_path))) {
-        // Mark all previos entries deleted but leave them in the list.
-        for (ent = dir->u.dir.children; ent; ent = ent->next)
-            ent->attribs &= (ATTR_IS_DIR|ATTR_OPEN_READ|ATTR_OPEN_WRITE);
-
-        // Go through the entries in the host dir, find each in the
-        // list and mark it as extant, if found, or create a new
-        // entry if not.
-        while ((dep = readdir(dp))) {
-            if (*(dep->d_name) != '.') {
-                if (!is_inf(dep->d_name)) {
-                    if ((ent = host_search(dir, dep->d_name)))
-                        scan_entry(ent);
-                    else if (!(ent = new_entry(dir, dep->d_name)))
-                        break;
-                }
-            }
-        }
+        scan_dir_host(dir, dp);
         closedir(dp);
+        scan_dir_inf(dir);
         dir->u.dir.scan_seq = scan_seq;
         dir->u.dir.scan_mtime = stb.st_mtime;
         return 0;
@@ -985,10 +1036,8 @@ static void write_back(vdfs_entry *ent)
             putc(ent->dfs_dir, fp);
             putc('.', fp);
         }
-        if (ent->attribs & ATTR_IS_DIR) {
-            fputs(ent->acorn_fn, fp);
-            putc('\n', fp);
-        }
+        if (ent->attribs & ATTR_IS_DIR)
+            fprintf(fp, "%s %02X %s\n", ent->acorn_fn, ent->u.dir.boot_opt, ent->u.dir.title);
         else
             fprintf(fp, "%s %08X %08X\n", ent->acorn_fn, ent->u.file.load_addr, ent->u.file.exec_addr);
         fclose(fp);
@@ -2524,6 +2573,14 @@ static void cmd_lib_dfs(uint16_t addr)
         dfs_lib = dir;
 }
 
+static void cmd_title(uint16_t addr)
+{
+    if (check_valid_dir(cur_dir, "current")) {
+        parse_name(cur_dir->u.dir.title, sizeof(cur_dir->u.dir.title), addr);
+        write_back(cur_dir);
+    }
+}
+
 static void run_file(const char *err)
 {
     uint16_t addr;
@@ -2646,7 +2703,7 @@ const struct cmdent ctab_filing[] = {
     { "OSW7f",   VDFS_ACT_OSW7F   },
     { "REname",  VDFS_ACT_RENAME  },
     { "REScan",  VDFS_ACT_RESCAN  },
-    { "TItle",   VDFS_ACT_NOP     },
+    { "TItle",   VDFS_ACT_TITLE   },
     { "VErify",  VDFS_ACT_NOP     },
     { "WIpe",    VDFS_ACT_NOP     }
 };
@@ -3087,6 +3144,9 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
     case VDFS_ACT_RESCAN:
         scan_seq++;
         break;
+    case VDFS_ACT_TITLE:
+        cmd_title(addr);
+        break;
     case VDFS_ACT_VDFS:
         select_vdfs(FSNO_VDFS);
         break;
@@ -3134,6 +3194,17 @@ static void osfsc_cmd(void)
     run_file(err_badcmd);
 }
 
+static void osfsc_opt(void)
+{
+    if (x == 4) {
+        if (check_valid_dir(cur_dir, "current")) {
+            cur_dir->u.dir.boot_opt = y;
+            write_back(cur_dir);
+        }
+    }
+    else
+        log_debug("vdfs: osfsc unimplemented option %d,%d", x, y);
+}
 
 static void osfsc(void)
 {
@@ -3143,6 +3214,9 @@ static void osfsc(void)
 
     p.c = 0;
     switch(a) {
+        case 0x00:
+            osfsc_opt();
+            break;
         case 0x01: // check EOF
             if ((fp = getfp_read(x)))
                 x = feof(fp) ? 0xff : 0x00;
@@ -3328,6 +3402,20 @@ static void serv_help(void)
 
 static uint8_t save_y;
 
+static void serv_boot(void)
+{
+    if (vdfs_enabled && (!key_any_down() || key_code_down(ALLEGRO_KEY_S))) {
+        vdfs_entry *dir = cur_dir;
+        if (check_valid_dir(dir, "current")) {
+            scan_dir(dir);
+            a = dir->u.dir.boot_opt;
+            rom_dispatch(VDFS_ROM_FSBOOT);
+        }
+    }
+    else
+        fs_num = 0; // some other filing system.
+}
+
 static void service(void)
 {
     log_debug("vdfs: rom service a=%02X, x=%02X, y=%02X", a, x, y);
@@ -3338,10 +3426,7 @@ static void service(void)
         rom_dispatch(VDFS_ROM_BREAK);
         break;
     case 0x03: // filing system boot.
-        if (vdfs_enabled && (!key_any_down() || key_code_down(ALLEGRO_KEY_S)))
-            rom_dispatch(VDFS_ROM_FSBOOT);
-        else
-            fs_num = 0; // some other filing system.
+        serv_boot();
         break;
     case 0x04: // unrecognised command.
         serv_cmd();

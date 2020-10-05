@@ -238,6 +238,7 @@ prtextws    =   &A8
 
 .fsboot
 {
+            pha                     ; save the OPT 4 setting.
             tya                     ; save the boot flag.
             pha
             jsr     prtitle         ; announce the filing system
@@ -246,11 +247,15 @@ prtextws    =   &A8
             ldy     #fsno_vdfs
             jsr     fsstart         ; same setup as for call &12.
             pla
-            bne     noboot          ; then maybe exec !BOOT.
+            bne     noboot1         ; then maybe exec !BOOT.
+            pla                     ; get back OPT 4
+            beq     noboot2
+            cmp     #&03
+            bne     notexec
             lda     #&40
             ldx     #<name
             ldy     #>name
-            jsr     OSFIND
+            jsr     find            ; Call the VDFS OSFIND.
             cmp     #&00
             bne     found
             rts
@@ -258,9 +263,45 @@ prtextws    =   &A8
             ldy     #&00            ; Set as the current EXEC file.
             lda     #&C6
             jsr     OSBYTE
-.noboot     lda     #&00
+            lda     #&00
+.noboot2    rts
+.noboot1    pla
+.notrun     lda     #&00
             rts
 .name       equs    "!BOOT",&0d
+.notexec    ldx     #<name
+            ldy     #>name
+            stx     &b0             ; set up OSFILE control block.
+            sty     &b1
+            pha                     ; save OPT 4.
+            lda     #&ff
+            sta     &b6             ; flag to use file's own load address.
+            ldx     #&B0
+            ldy     #&00
+            jsr     file            ; Call the VDFS OSFILE
+            pla
+            cmp     #&02
+            bne     notrun
+            lda     &b8             ; exec address bits 16-23
+            cmp     #&ff
+            bne     tube
+            lda     &b9             ; exec address bits 24-31
+            cmp     #&ff
+            bne     tube
+.notube     jmp     (&b6)           ; start execution.
+.tube       lda     #&ea            ; check for tube processor.
+            ldx     #&00
+            ldy     #&ff
+            jsr     OSBYTE
+            cpx     #&00
+            beq     notube
+.tube_exec  lda     #&D1            ; claim the tube.
+            jsr     &0406
+            bcc     tube_exec
+            lda     #&04            ; start executation at the 32 bit
+            ldx     #&b6            ; execution address from the OSFILE
+            ldy     #&00            ; control block.
+            jmp     &0406
 }
 
 ; Filing system info.  This is in response to ROM service call
