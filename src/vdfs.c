@@ -2349,8 +2349,7 @@ static int osgbpb_list(uint32_t pb)
 {
     uint32_t seq_ptr, mem_ptr, n;
     vdfs_entry *cat_ptr;
-    int status, ch;
-    char *ptr;
+    int status;
 
     if (check_valid_dir(cur_dir, "current")) {
         seq_ptr = readmem32(pb+9);
@@ -2367,9 +2366,7 @@ static int osgbpb_list(uint32_t pb)
             n = readmem32(pb+5);
             log_debug("vdfs: seq_ptr=%d, writing max %d entries starting %04X, first=%s\n", seq_ptr, n, mem_ptr, cat_ptr->acorn_fn);
             for (;;) {
-                writemem(mem_ptr++, strlen(cat_ptr->acorn_fn));
-                for (ptr = cat_ptr->acorn_fn; (ch = *ptr++); )
-                    writemem(mem_ptr++, ch);
+                mem_ptr = write_len_str(mem_ptr, cat_ptr->acorn_fn);
                 seq_ptr++;
                 if (--n == 0)
                     break;
