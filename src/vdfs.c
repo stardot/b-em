@@ -294,6 +294,7 @@ static uint16_t cmd_tail;
  */
 
 static vdfs_entry *(*find_entry)(const char *filename, vdfs_entry *key, vdfs_entry *dir, int dfsdir);
+static void (*osgbpb_get_dir)(uint32_t pb, vdfs_entry *dir, int dfsdir);
 static void (*cmd_dir)(uint16_t addr);
 static void (*cmd_lib)(uint16_t addr);
 
@@ -669,6 +670,7 @@ static void init_entry(vdfs_entry *ent)
     ent->host_fn = ".";
     ent->acorn_fn[0] = '\0';
     ent->acorn_fn[MAX_FILE_NAME] = '\0';
+    ent->dfs_dir = '$';
     ent->attribs = 0;
 }
 
@@ -1125,7 +1127,8 @@ void vdfs_set_root(const char *root)
     if (vdfs_new_root(root, &new_root)) {
         vdfs_close();
         root_dir = new_root;
-        root_dir.parent = cur_dir = lib_dir = prev_dir = cat_dir = &root_dir;
+        root_dir.parent = cur_dir = prev_dir = cat_dir = &root_dir;
+        lib_dir = find_entry_adfs("Lib", &new_root, &root_dir, dfs_dir);
         scan_seq++;
     } else if (new_root.host_path)
         free(new_root.host_path);
@@ -1847,8 +1850,11 @@ static void osfile_cdir(const char *path)
         } else {
             parent = key.parent;
             if (parent && parent->attribs & ATTR_EXISTS) {
-                if ((ent = add_new_file(key.parent, &key)))
+                if ((ent = add_new_file(key.parent, &key))) {
+                    ent->u.dir.boot_opt = 0;
+                    ent->u.dir.title[0] = 0;
                     create_dir(ent);
+                }
             } else {
                 log_debug("vdfs: attempt to create dir %s in non-existent directory", key.acorn_fn);
                 adfs_error(err_notfound);
@@ -2208,52 +2214,56 @@ static int osgbpb_read(uint32_t pb)
     return undone;
 }
 
+static uint32_t write_len_str(uint32_t mem_ptr, const char *str)
+{
+    size_t len = strlen(str);
+    if (mem_ptr > 0xffff0000 || curtube == -1) {
+        writemem(mem_ptr++, len);
+        for (const char *ptr = str, *end = str + len; ptr < end; )
+            writemem(mem_ptr++, *ptr++);
+    }
+    else {
+        tube_writemem(mem_ptr++, len);
+        for (const char *ptr = str, *end = str + len; ptr < end; )
+            tube_writemem(mem_ptr++, *ptr++);
+    }
+    return mem_ptr;
+}
+
 static void osgbpb_get_title(uint32_t pb)
 {
     if (check_valid_dir(cur_dir, "current")) {
-        int ch;
         uint32_t mem_ptr = readmem32(pb+1);
         const char *title = cur_dir->u.dir.title;
         if (!*title)
             title = cur_dir->acorn_fn;
+        mem_ptr = write_len_str(mem_ptr, title);
         if (mem_ptr > 0xffff0000 || curtube == -1) {
-            writemem(mem_ptr++, strlen(title));
-            for (const char *ptr = title; (ch = *ptr++); )
-                writemem(mem_ptr++, ch);
             writemem(mem_ptr++, cur_dir->u.dir.boot_opt);
             writemem(mem_ptr, 0);   // drive is always 0.
         }
         else {
-            tube_writemem(mem_ptr++, strlen(title));
-            for (const char *ptr = title; (ch = *ptr++); )
-                tube_writemem(mem_ptr++, ch);
             tube_writemem(mem_ptr++, cur_dir->u.dir.boot_opt);
             tube_writemem(mem_ptr, 0);   // drive is always 0.
         }
     }
 }
 
-static void osgbpb_get_dir(uint32_t pb, vdfs_entry *dir, const char *which)
+static void osgbpb_get_dir_adfs(uint32_t pb, vdfs_entry *dir, int dfsdir)
 {
-    uint32_t mem_ptr;
-    char *ptr;
-    int ch;
+    uint32_t mem_ptr = readmem32(pb+1);
+    mem_ptr = write_len_str(mem_ptr, "");
+    write_len_str(mem_ptr, dir ? dir->acorn_fn : "Unset");
+}
 
-    if (check_valid_dir(dir, which)) {
-        mem_ptr = readmem32(pb+1);
-        if (mem_ptr > 0xffff0000 || curtube == -1) {
-            writemem(mem_ptr++, 0); // length of drive number.
-            writemem(mem_ptr++, strlen(dir->acorn_fn));
-            for (ptr = dir->acorn_fn; (ch = *ptr++); )
-                writemem(mem_ptr++, ch);
-        }
-        else {
-            tube_writemem(mem_ptr++, 0);   // length of drive number.
-            tube_writemem(mem_ptr++, strlen(dir->acorn_fn));
-            for (ptr = dir->acorn_fn; (ch = *ptr++); )
-                tube_writemem(mem_ptr++, ch);
-        }
-    }
+static void osgbpb_get_dir_dfs(uint32_t pb, vdfs_entry *dir, int dfsdir)
+{
+    uint32_t mem_ptr = readmem32(pb+1);
+    char tmp[2];
+    tmp[0] = dfsdir;
+    tmp[1] = 0;
+    mem_ptr = write_len_str(mem_ptr, "0");
+    write_len_str(mem_ptr, tmp);
 }
 
 static void acorn_sort(vdfs_entry *dir)
@@ -2405,11 +2415,11 @@ static void osgbpb(void)
             break;
 
         case 0x06: // get current dir
-            osgbpb_get_dir(pb, cur_dir, "current");
+            osgbpb_get_dir(pb, cur_dir, dfs_dir);
             break;
 
         case 0x07: // get library dir.
-            osgbpb_get_dir(pb, lib_dir, "library");
+            osgbpb_get_dir(pb, lib_dir, dfs_lib);
             break;
 
         case 0x08: // list files in current directory.
@@ -2562,20 +2572,20 @@ static int parse_dfs_dir(uint16_t addr)
     if (ch == 0x0d || ch == ' ' || ch == '\t')
         return dir;
     adfs_error(err_baddir);
-    return -1;
+    return 0;
 }
 
 static void cmd_dir_dfs(uint16_t addr)
 {
     int dir = parse_dfs_dir(addr);
-    if (dir >= 0)
+    if (dir > 0)
         dfs_dir = dir;
 }
 
 static void cmd_lib_dfs(uint16_t addr)
 {
     int dir = parse_dfs_dir(addr);
-    if (dir >= 0)
+    if (dir > 0)
         dfs_lib = dir;
 }
 
@@ -3010,21 +3020,31 @@ static void cmd_osw7f(uint16_t addr)
         adfs_error(err_badcmd);
 }
 
+static void vdfs_dfs_mode(void)
+{
+    fs_flags |= DFS_MODE;
+    find_entry = find_entry_dfs;
+    osgbpb_get_dir = osgbpb_get_dir_dfs;
+    cmd_dir = cmd_dir_dfs;
+    cmd_lib = cmd_lib_dfs;
+}
+
+static void vdfs_adfs_mode(void)
+{
+    fs_flags &= ~DFS_MODE;
+    find_entry = find_entry_adfs;
+    osgbpb_get_dir = osgbpb_get_dir_adfs;
+    cmd_dir = cmd_dir_adfs;
+    cmd_lib = cmd_lib_adfs;
+}
+
 static void select_vdfs(uint8_t fsno)
 {
     log_debug("vdfs: select_vdfs, fsno=%d", fsno);
-    if (fsno == FSNO_DFS) {
-        fs_flags |= DFS_MODE;
-        find_entry = find_entry_dfs;
-        cmd_dir = cmd_dir_dfs;
-        cmd_lib = cmd_lib_dfs;
-    }
-    else {
-        fs_flags &= ~DFS_MODE;
-        find_entry = find_entry_adfs;
-        cmd_dir = cmd_dir_adfs;
-        cmd_lib = cmd_lib_adfs;
-    }
+    if (fsno == FSNO_DFS)
+        vdfs_dfs_mode();
+    else
+        vdfs_adfs_mode();
     if (!fs_num) {
         y = fsno;
         rom_dispatch(VDFS_ROM_FSSTART);
@@ -3531,6 +3551,7 @@ void vdfs_write(uint16_t addr, uint8_t value)
 
 void vdfs_init(const char *root)
 {
+    vdfs_entry key;
     scan_seq = 0;
     const char *env = getenv("BEM_VDFS_ROOT");
     if (env)
@@ -3538,9 +3559,9 @@ void vdfs_init(const char *root)
     if (!root)
         root = ".";
     vdfs_new_root(root, &root_dir);
-    root_dir.parent = cur_dir = lib_dir = cat_dir = prev_dir = &root_dir;
+    root_dir.parent = cur_dir = prev_dir = cat_dir = &root_dir;
+    lib_dir = find_entry_adfs("Lib", &key, &root_dir, dfs_dir);
+    dfs_dir = dfs_lib = '$';
     scan_seq++;
-    find_entry = find_entry_adfs;
-    cmd_dir = cmd_dir_adfs;
-    cmd_lib = cmd_lib_adfs;
+    vdfs_adfs_mode();
 }
