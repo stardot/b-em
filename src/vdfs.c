@@ -862,8 +862,6 @@ static void scan_dir_inf(vdfs_entry *dir)
             *ptr++ = ch;
             ch = *lptr++;
         }
-        while (ptr < end)
-            *ptr++ = ' ';
         *ptr = 0;
     }
     dir->u.dir.boot_opt = opt;
@@ -916,7 +914,6 @@ static uint16_t parse_name(char *str, size_t size, uint16_t addr)
         *ptr++ = ch & 0x7f;
         ch = readmem(addr++);
     }
-
     *ptr = '\0';
     return addr;
 }
@@ -2213,17 +2210,26 @@ static int osgbpb_read(uint32_t pb)
 
 static void osgbpb_get_title(uint32_t pb)
 {
-    uint32_t mem_ptr;
-    char *ptr;
-    int ch;
-
     if (check_valid_dir(cur_dir, "current")) {
-        mem_ptr = pb;
-        writemem(mem_ptr++, strlen(cur_dir->acorn_fn));
-        for (ptr = cur_dir->acorn_fn; (ch = *ptr++); )
-            writemem(mem_ptr++, ch);
-        writemem(mem_ptr++, 0); // no start-up option.
-        writemem(mem_ptr, 0);   // drive is always 0.
+        int ch;
+        uint32_t mem_ptr = readmem32(pb+1);
+        const char *title = cur_dir->u.dir.title;
+        if (!*title)
+            title = cur_dir->acorn_fn;
+        if (mem_ptr > 0xffff0000 || curtube == -1) {
+            writemem(mem_ptr++, strlen(title));
+            for (const char *ptr = title; (ch = *ptr++); )
+                writemem(mem_ptr++, ch);
+            writemem(mem_ptr++, cur_dir->u.dir.boot_opt);
+            writemem(mem_ptr, 0);   // drive is always 0.
+        }
+        else {
+            tube_writemem(mem_ptr++, strlen(title));
+            for (const char *ptr = title; (ch = *ptr++); )
+                tube_writemem(mem_ptr++, ch);
+            tube_writemem(mem_ptr++, cur_dir->u.dir.boot_opt);
+            tube_writemem(mem_ptr, 0);   // drive is always 0.
+        }
     }
 }
 
