@@ -295,6 +295,7 @@ static uint16_t cmd_tail;
 
 static vdfs_entry *(*find_entry)(const char *filename, vdfs_entry *key, vdfs_entry *dir, int dfsdir);
 static void (*osgbpb_get_dir)(uint32_t pb, vdfs_entry *dir, int dfsdir);
+static void (*cat_get_dir)(vdfs_entry *dir, int dfsdir);
 static void (*cmd_dir)(uint16_t addr);
 static void (*cmd_lib)(uint16_t addr);
 
@@ -2855,6 +2856,25 @@ static void cat_title(void)
     writemem(mem_ptr++, 0);
 }
 
+static void cat_get_dir_adfs(vdfs_entry *ent, int dfsdir)
+{
+    uint32_t mem_ptr = 0x100;
+    const char *ptr = ent ? ent->acorn_fn : "Unset";
+    int ch;
+    while ((ch = *ptr++))
+        writemem(mem_ptr++, ch);
+    writemem(mem_ptr, 0);
+}
+
+static void cat_get_dir_dfs(vdfs_entry *ent, int dfsdir)
+{
+    writemem(0x100, ':');
+    writemem(0x101, '0');
+    writemem(0x102, '.');
+    writemem(0x103, dfsdir);
+    writemem(0x104, 0);
+}
+
 static uint16_t gcopy_fn(vdfs_entry *ent, uint16_t mem_ptr)
 {
     uint16_t mem_end = mem_ptr + MAX_FILE_NAME;
@@ -3039,6 +3059,7 @@ static void vdfs_dfs_mode(void)
     fs_flags |= DFS_MODE;
     find_entry = find_entry_dfs;
     osgbpb_get_dir = osgbpb_get_dir_dfs;
+    cat_get_dir = cat_get_dir_dfs;
     cmd_dir = cmd_dir_dfs;
     cmd_lib = cmd_lib_dfs;
 }
@@ -3048,6 +3069,7 @@ static void vdfs_adfs_mode(void)
     fs_flags &= ~DFS_MODE;
     find_entry = find_entry_adfs;
     osgbpb_get_dir = osgbpb_get_dir_adfs;
+    cat_get_dir = cat_get_dir_adfs;
     cmd_dir = cmd_dir_adfs;
     cmd_lib = cmd_lib_adfs;
 }
@@ -3523,6 +3545,8 @@ static inline void dispatch(uint8_t value)
         case 0x0a: startup();   break;
         case 0x0b: files_nxt(); break;
         case 0x0c: close_all(); break;
+        case 0x0d: cat_get_dir(cur_dir, dfs_dir); break;
+        case 0x0e: cat_get_dir(lib_dir, dfs_lib); break;
         default: log_warn("vdfs: function code %d not recognised\n", value);
     }
 }

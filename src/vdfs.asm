@@ -513,6 +513,34 @@ prtextws    =   &A8
             jmp     opt_done
 .opt_hex    jsr     hexbyt
 .opt_done   jsr     OSNEWL
+            ldx     #msg_dir-banner ; print "Dir. "
+            jsr     prmsg
+            lda     #&0d            ; get the directory as text.
+            sta     port_cmd
+            ldx     #&00
+            lda     &0100           ; is there one?
+            beq     nodir
+.cat_dirlp  jsr     OSWRCH
+            inx
+            lda     &0100,x
+            bne     cat_dirlp
+.nodir      lda     #' '            ; pad to 20 characters.
+.dir_pad    jsr     OSWRCH
+            inx
+            cpx     #&0f
+            bne     dir_pad
+            ldx     #msg_lib-banner ; print "Dir. "
+            jsr     prmsg
+            lda     #&0e            ; get the directory as text.
+            sta     port_cmd
+            lda     &0100           ; is there one?
+            beq     nolib
+            ldx     #&00
+.cat_liblp  jsr     OSWRCH
+            inx
+            lda     &0100,x
+            bne     cat_liblp
+.nolib      jsr     OSNEWL
             jsr     OSNEWL
             jmp     dir_files
 
