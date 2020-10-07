@@ -374,6 +374,7 @@ static void sdf_abort(int drive)
     state = ST_IDLE;
 }
 
+#ifndef WIN32
 static void sdf_lock(int drive, FILE *fp, int ltype)
 {
 #ifdef linux
@@ -399,6 +400,7 @@ static void sdf_lock(int drive, FILE *fp, int ltype)
     } while (errno == EINTR);
     log_warn("sdf: lock failure on drive %d", drive);
 }
+#endif
 
 static void sdf_spinup(int drive)
 {

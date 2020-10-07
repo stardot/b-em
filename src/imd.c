@@ -192,6 +192,7 @@ static void imd_save(struct imd_file *imd)
                 putc(sect->data[0], imd->fp);
         }
     }
+    fflush(imd->fp);
     ftruncate(fileno(imd->fp), ftell(imd->fp));
 }
 

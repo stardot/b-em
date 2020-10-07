@@ -186,6 +186,9 @@ static uint32_t do_readmem(uint32_t addr)
 
 static int endtimeslice;
 
+static void disable_turbo(void);
+static void enable_turbo(void);
+
 static void do_writemem(uint32_t addr, uint32_t value)
 {
     if ((addr & ~7) == 0xFEF8) {
@@ -194,6 +197,12 @@ static void do_writemem(uint32_t addr, uint32_t value)
         return;
     }
     tuberam[addr] = value;
+    if (addr == 0xfef0 && tuberamsize > 0x1000) {
+        if (value & 0x80)
+            enable_turbo();
+        else
+            disable_turbo();
+    }
 }
 
 static uint32_t dbg_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t bufsize);
@@ -363,13 +372,26 @@ static void (*write_zp_indirect_y)(uint8_t zp, uint8_t val);
 static uint8_t (*read_zp_indirect_nr)(uint8_t zp);
 static void (*write_zp_indirect_nr)(uint8_t zp, uint8_t val);
 
+static void disable_turbo(void)
+{
+    read_zp_indirect_y = read_zp_iy_normal;
+    write_zp_indirect_y = write_zp_iy_normal;
+    read_zp_indirect_nr = read_zp_nr_normal;
+    write_zp_indirect_nr = write_zp_nr_normal;
+}
+
+static void enable_turbo(void)
+{
+    read_zp_indirect_y = read_zp_iy_turbo;
+    write_zp_indirect_y = write_zp_iy_turbo;
+    read_zp_indirect_nr = read_zp_nr_turbo;
+    write_zp_indirect_nr = write_zp_nr_turbo;
+}
+
 bool tube_6502_init(void *rom)
 {
     if (common_init(rom, TUBE_6502_RAM_SIZE)) {
-        read_zp_indirect_y = read_zp_iy_normal;
-        write_zp_indirect_y = write_zp_iy_normal;
-        read_zp_indirect_nr = read_zp_nr_normal;
-        write_zp_indirect_nr = write_zp_nr_normal;
+        disable_turbo();
         return true;
     }
     return false;
@@ -378,10 +400,7 @@ bool tube_6502_init(void *rom)
 bool tube_6502_iturb(void *rom)
 {
     if (common_init(rom, TURBO_6502_RAM_SIZE)) {
-        read_zp_indirect_y = read_zp_iy_turbo;
-        write_zp_indirect_y = write_zp_iy_turbo;
-        read_zp_indirect_nr = read_zp_nr_turbo;
-        write_zp_indirect_nr = write_zp_nr_turbo;
+        enable_turbo();
         return true;
     }
     return false;
