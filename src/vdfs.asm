@@ -477,8 +477,51 @@ prtextws    =   &A8
             hexout  &0114
             jmp     OSNEWL
 
+.option     equs    "Option: ",0
+.opt_none   equs    "0 (None)",0
+.opt_load   equs    "1 (Load)",0
+.opt_run    equs    "2 (Run)",0
+.opt_exec   equs    "3 (Exec)",0
+.opt_tab    equb    opt_none-option
+            equb    opt_load-option
+            equb    opt_run-option
+            equb    opt_exec-option
+.opt_msg    lda     option,x
+.opt_loop   jsr     OSWRCH
+            inx
+            lda     option,x
+            bne     opt_loop
+            rts
+
+.dir_cat    lda     &0101           ; Is there a title?
+            beq     notitle
+            ldx     #&00
+.title_lp   jsr     OSWRCH          ; print the title.
+            inx
+            lda     &0101,x
+            bne     title_lp
+            lda     #' '            ; pad out to 20 characters.
+.title_pad  jsr     OSWRCH
+            inx
+            cpx     #&14
+            bcc     title_pad
+.notitle    ldx     #&00            ; print "Option: "
+            jsr     opt_msg
+            lda     &0100           ; get boot option.
+            cmp     #&04
+            bcs     opt_hex
+            tax
+            lda     opt_tab,x
+            tax
+            jsr     opt_msg
+            jmp     opt_done
+.opt_hex    jsr     hexbyt
+.opt_done   jsr     OSNEWL
+            jsr     OSNEWL
+            jmp     dir_files
+
 .cat_loop   jsr     pr_basic
-.dir_cat    lda     #&08
+.dir_files  lda     #&08
             sta     port_cmd
             bcc     cat_loop
             jmp     OSNEWL

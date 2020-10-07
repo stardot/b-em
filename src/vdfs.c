@@ -2838,6 +2838,23 @@ static bool cat_prep(uint16_t addr, vdfs_entry *def_dir, int dfsdir, const char 
     return false;
 }
 
+static void cat_title(void)
+{
+    uint32_t mem_ptr = 0x100;
+    if (cat_dir) {
+        int ch;
+        const char *ptr = cat_dir->u.dir.title;
+        if (!*ptr)
+            ptr = cat_dir->acorn_fn;
+        writemem(mem_ptr++, cat_dir->u.dir.boot_opt);
+        while ((ch = *ptr++))
+            writemem(mem_ptr++, ch);
+    }
+    else
+        writemem(mem_ptr++, 0);
+    writemem(mem_ptr++, 0);
+}
+
 static uint16_t gcopy_fn(vdfs_entry *ent, uint16_t mem_ptr)
 {
     uint16_t mem_end = mem_ptr + MAX_FILE_NAME;
@@ -3152,6 +3169,7 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
         break;
     case VDFS_ACT_LCAT:
         cat_prep(addr, lib_dir, dfs_lib, "library");
+        cat_title();
         rom_dispatch(VDFS_ROM_CAT);
         break;
     case VDFS_ACT_LEX:
@@ -3252,8 +3270,10 @@ static void osfsc(void)
             osfsc_cmd();
             break;
         case 0x05:
-            if (cat_prep(x + (y << 8), cur_dir, dfs_dir, "current"))
+            if (cat_prep(x + (y << 8), cur_dir, dfs_dir, "current")) {
+                cat_title();
                 rom_dispatch(VDFS_ROM_CAT);
+            }
             break;
         case 0x06: // new filesystem taking over.
             fs_num = 0;
