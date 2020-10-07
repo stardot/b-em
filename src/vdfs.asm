@@ -104,6 +104,13 @@ prtextws    =   &A8
 .msg_claim  equs    "ADFS is being claimed", &00
 .msg_nopen  equs    "No open files",&0d,&0a,&00
 .msg_files  equs    "Chan Name       Mode Ptr      Ext",&0d,&0a,&00
+.msg_option equs    "Option: ",0
+.msg_off    equs    "0 (Off)",0
+.msg_load   equs    "1 (Load)",0
+.msg_run    equs    "2 (Run)",0
+.msg_exec   equs    "3 (Exec)",0
+.msg_dir    equs    "Dir. ", 0
+.msg_lib    equs    "Lib. ", 0
 
 ; The dispatch table.  This needs to be in the same order as
 ; enum vdfs_action in the vdfs.c module.
@@ -477,21 +484,10 @@ prtextws    =   &A8
             hexout  &0114
             jmp     OSNEWL
 
-.option     equs    "Option: ",0
-.opt_none   equs    "0 (None)",0
-.opt_load   equs    "1 (Load)",0
-.opt_run    equs    "2 (Run)",0
-.opt_exec   equs    "3 (Exec)",0
-.opt_tab    equb    opt_none-option
-            equb    opt_load-option
-            equb    opt_run-option
-            equb    opt_exec-option
-.opt_msg    lda     option,x
-.opt_loop   jsr     OSWRCH
-            inx
-            lda     option,x
-            bne     opt_loop
-            rts
+.opt_tab    equb    msg_off-banner
+            equb    msg_load-banner
+            equb    msg_run-banner
+            equb    msg_exec-banner
 
 .dir_cat    lda     &0101           ; Is there a title?
             beq     notitle
@@ -505,15 +501,15 @@ prtextws    =   &A8
             inx
             cpx     #&14
             bcc     title_pad
-.notitle    ldx     #&00            ; print "Option: "
-            jsr     opt_msg
+.notitle    ldx     #msg_option-banner
+            jsr     prmsg           ; print "Option: "
             lda     &0100           ; get boot option.
             cmp     #&04
             bcs     opt_hex
             tax
             lda     opt_tab,x
             tax
-            jsr     opt_msg
+            jsr     prmsg
             jmp     opt_done
 .opt_hex    jsr     hexbyt
 .opt_done   jsr     OSNEWL
