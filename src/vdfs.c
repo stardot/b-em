@@ -1,6 +1,6 @@
 /*
  * VDFS for B-EM
- * Steve Fosdick 2016-2018
+ * Steve Fosdick 2016-2020
  *
  * This module implements the host part of a Virtual Disk Filing
  * System, one in which a part of filing system of the host is
@@ -2806,6 +2806,16 @@ static void fsclaim(uint16_t addr)
     adfs_error(err_badparms);
 }
 
+/*
+ * Functions used in the implementation of the *CAT, *EX, *INFO and
+ * *LCAT commands.  To avoid needing to allocate workspace on the guest
+ * each of these transfers a small amount of information from the VDFS
+ * internal structures to temporary space on the guest, the guest prints
+ * that information and this is repeated until the command is complete.
+ */
+
+#define CAT_TMP 0x100
+
 static vdfs_entry *cat_ent;
 
 static bool cat_prep(uint16_t addr, vdfs_entry *def_dir, int dfsdir, const char *dir_desc)
@@ -2841,7 +2851,7 @@ static bool cat_prep(uint16_t addr, vdfs_entry *def_dir, int dfsdir, const char 
 
 static void cat_title(void)
 {
-    uint32_t mem_ptr = 0x100;
+    uint32_t mem_ptr = CAT_TMP;
     if (cat_dir) {
         int ch;
         const char *ptr = cat_dir->u.dir.title;
@@ -2858,7 +2868,7 @@ static void cat_title(void)
 
 static void cat_get_dir_adfs(vdfs_entry *ent, int dfsdir)
 {
-    uint32_t mem_ptr = 0x100;
+    uint32_t mem_ptr = CAT_TMP;
     const char *ptr = ent ? ent->acorn_fn : "Unset";
     int ch;
     while ((ch = *ptr++))
@@ -2868,11 +2878,11 @@ static void cat_get_dir_adfs(vdfs_entry *ent, int dfsdir)
 
 static void cat_get_dir_dfs(vdfs_entry *ent, int dfsdir)
 {
-    writemem(0x100, ':');
-    writemem(0x101, '0');
-    writemem(0x102, '.');
-    writemem(0x103, dfsdir);
-    writemem(0x104, 0);
+    writemem(CAT_TMP, ':');
+    writemem(CAT_TMP+1, '0');
+    writemem(CAT_TMP+2, '.');
+    writemem(CAT_TMP+3, dfsdir);
+    writemem(CAT_TMP+4, 0);
 }
 
 static uint16_t gcopy_fn(vdfs_entry *ent, uint16_t mem_ptr)
@@ -2890,7 +2900,7 @@ static uint16_t gcopy_fn(vdfs_entry *ent, uint16_t mem_ptr)
 
 static void gcopy_attr(vdfs_entry *ent)
 {
-    uint16_t mem_ptr = gcopy_fn(ent, 0x100);
+    uint16_t mem_ptr = gcopy_fn(ent, CAT_TMP);
     writemem16(mem_ptr, ent->attribs);
     write_file_attr(mem_ptr, ent);
 }
@@ -2928,7 +2938,7 @@ static int chan_seq = 0;
 
 static void gcopy_open(vdfs_entry *ent)
 {
-    writemem(0x100, MIN_CHANNEL + chan_seq);
+    writemem(CAT_TMP, MIN_CHANNEL + chan_seq);
     uint16_t mem_ptr = gcopy_fn(ent, 0x101);
     writemem(mem_ptr++, ent->attribs >> 8);
     FILE *fp = vdfs_chan[chan_seq].fp;

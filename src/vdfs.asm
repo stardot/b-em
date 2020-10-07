@@ -46,6 +46,10 @@ port_fsid   =   &FC5D               ; filing system ID.
 port_cmd    =   &FC5E               ; execute actions on host.
 port_a      =   &FC5F               ; store A ready for command.
 
+; Base of some temporary space used during *CAT, *EX, *INFO, *LCAT
+
+cat_tmp     =   &0100
+
 ; OS entry points.
 
 OSCLI       =   &FFF7
@@ -411,7 +415,7 @@ prtextws    =   &A8
 .pr_basic
 {
             ldx     #&00            ; print characters of the name.
-.loop       lda     &0100,x
+.loop       lda     cat_tmp,x
             jsr     OSWRCH
             inx
             cpx     #&0a
@@ -438,13 +442,13 @@ prtextws    =   &A8
 .done       rts
 }
 
-.hexfour    lda     &0103,x
+.hexfour    lda     cat_tmp+3,x
             jsr     hexbyt
-            lda     &0102,x
+            lda     cat_tmp+2,x
             jsr     hexbyt
-            lda     &0101,x
+            lda     cat_tmp+1,x
             jsr     hexbyt
-            lda     &0100,x
+            lda     cat_tmp,x
 
 .hexbyt     pha
             lsr     A
@@ -503,7 +507,7 @@ prtextws    =   &A8
             bcc     title_pad
 .notitle    ldx     #msg_option-banner
             jsr     prmsg           ; print "Option: "
-            lda     &0100           ; get boot option.
+            lda     cat_tmp         ; get boot option.
             cmp     #&04
             bcs     opt_hex
             tax
@@ -518,11 +522,11 @@ prtextws    =   &A8
             lda     #&0d            ; get the directory as text.
             sta     port_cmd
             ldx     #&00
-            lda     &0100           ; is there one?
+            lda     cat_tmp         ; is there one?
             beq     nodir
 .cat_dirlp  jsr     OSWRCH
             inx
-            lda     &0100,x
+            lda     cat_tmp,x
             bne     cat_dirlp
 .nodir      lda     #' '            ; pad to 20 characters.
 .dir_pad    jsr     OSWRCH
@@ -533,12 +537,12 @@ prtextws    =   &A8
             jsr     prmsg
             lda     #&0e            ; get the directory as text.
             sta     port_cmd
-            lda     &0100           ; is there one?
+            lda     cat_tmp         ; is there one?
             beq     nolib
             ldx     #&00
 .cat_liblp  jsr     OSWRCH
             inx
-            lda     &0100,x
+            lda     cat_tmp,x
             bne     cat_liblp
 .nolib      jsr     OSNEWL
             jsr     OSNEWL
@@ -1274,7 +1278,7 @@ prtextws    =   &A8
 .cmd_files {
             ldx     #msg_files-banner
             jsr     prmsg
-.fileloop   lda     &0100           ; print the channel number.
+.fileloop   lda     cat_tmp         ; print the channel number.
             jsr     hexbyt
             outspc
             jsr     OSWRCH
