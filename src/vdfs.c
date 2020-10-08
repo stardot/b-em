@@ -2946,14 +2946,14 @@ static void cat_next_adfs(void)
 
 static void cat_next_dfsdir(void)
 {
-    while (cat_ent && !(cat_ent->attribs & ATTR_EXISTS) && cat_ent->dfs_dir != dfs_dir)
+    while (cat_ent && (!(cat_ent->attribs & ATTR_EXISTS) || cat_ent->dfs_dir != dfs_dir))
         cat_ent = cat_ent->next;
     cat_next_tail();
 }
 
 static void cat_next_dfsnot(void)
 {
-    while (cat_ent && !(cat_ent->attribs & ATTR_EXISTS) && cat_ent->dfs_dir == dfs_dir)
+    while (cat_ent && (!(cat_ent->attribs & ATTR_EXISTS) || cat_ent->dfs_dir == dfs_dir))
         cat_ent = cat_ent->next;
     cat_next_tail();
 }
