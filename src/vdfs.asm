@@ -412,19 +412,17 @@ prtextws    =   &A8
 .notset
             endmacro
 
-.pr_basic
-{
-            ldx     #&00
-            lda     #&20            ; DFS mode?
-            bit     port_flags
-            beq     nodfsdir
+.pr_dfs     ldx     #&00
             lda     cat_tmp         ; print DFS directory.
             jsr     OSWRCH
             inx
             lda     cat_tmp+1
             jsr     OSWRCH
             inx
-.nodfsdir   ldy     #&02            ; print characters of the name.
+
+.pr_basic
+{
+            ldy     #&02            ; print characters of the name.
 .loop       lda     cat_tmp,y
             jsr     OSWRCH
             inx
@@ -440,15 +438,19 @@ prtextws    =   &A8
 .notdir     pr_attr &08, 'L'
             pr_attr &02, 'W'
             pr_attr &01, 'R'
-            lda     #&20            ; DFS mode?
-            bit     port_flags
-            bne     noother         ; Don't print the permissions for
-            outcnt  '/'             ; others in DFS mode as there is
-            pr_attr &20, 'w'        ; no room.
+            rts
+}
+
+.pr_others  outcnt  '/'
+            pr_attr &20, 'w'
             pr_attr &10, 'r'
+            rts
+
+.pr_pad
+{
             cpx     #&14
             bcs     done
-.noother    lda     #' '
+            lda     #' '
 .spcloop    jsr     OSWRCH
             inx
             cpx     #&14
@@ -484,7 +486,10 @@ prtextws    =   &A8
             jsr     hexbyt
             endmacro
 
-.pr_all     jsr     pr_basic
+.pr_all     ldx     #&00
+            jsr     pr_basic
+            jsr     pr_others
+            jsr     pr_pad
             twospc
             hexout  &0111
             hexout  &0110
@@ -565,13 +570,17 @@ prtextws    =   &A8
             beq     adfs_cat
             bne     dfs_cat
 
-.cat_loop   jsr     pr_basic
+.cat_loop   ldx     #&00
+            jsr     pr_basic
+            jsr     pr_others
+            jsr     pr_pad
 .adfs_cat   lda     #&0c
             sta     port_cmd
             bcc     cat_loop
             jmp     OSNEWL
 
-.dfs_lp1    jsr     pr_basic
+.dfs_lp1    jsr     pr_dfs
+            jsr     pr_pad
 .dfs_cat    lda     #&0d            ; fetch one directory entry.
             sta     port_cmd
             bcc     dfs_lp1         ; end of entries, to 2nd pass.
@@ -580,19 +589,29 @@ prtextws    =   &A8
             lda     #&0f            ; rewind to first entry again.
             sta     port_cmd
             bcs     dfs_done
-.dfs_lp2    jsr     pr_basic
+.dfs_lp2    jsr     pr_dfs
+            jsr     pr_pad
             lda     #&0e            ; fetch one directory entry.
             sta     port_cmd
             bcc     dfs_lp2
 .dfs_done   jmp     OSNEWL
 
-.ex_loop    jsr     pr_all
-.dir_ex     lda     #&0c
+.dir_ex     lda     #&20            ; DFS mode?
+            bit     port_flags
+            bne     ex_dfs
+            beq     ex_adfs
+
+.ex_adfs_lp jsr     pr_all
+.ex_adfs    lda     #&0c
             sta     port_cmd
-            bcc     ex_loop
+            bcc     ex_adfs_lp
             rts
 
-.file_info  rts
+.ex_dfs_lp  jsr     pr_all
+.ex_dfs     lda     #&0d
+            sta     port_cmd
+            bcc     ex_dfs_lp
+            rts
 
 .not_found
 {
