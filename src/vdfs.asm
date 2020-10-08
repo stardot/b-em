@@ -533,7 +533,7 @@ prtextws    =   &A8
 .opt_done   jsr     OSNEWL
             ldx     #msg_dir-banner ; print "Dir. "
             jsr     prmsg
-            lda     #&0d            ; get the directory as text.
+            lda     #&10            ; get the directory as text.
             sta     port_cmd
             ldx     #&00
             lda     cat_tmp         ; is there one?
@@ -547,9 +547,9 @@ prtextws    =   &A8
             inx
             cpx     #&0f
             bne     dir_pad
-            ldx     #msg_lib-banner ; print "Dir. "
+            ldx     #msg_lib-banner ; print "Lib. "
             jsr     prmsg
-            lda     #&0e            ; get the directory as text.
+            lda     #&11            ; get the library as text.
             sta     port_cmd
             lda     cat_tmp         ; is there one?
             beq     nolib
@@ -560,16 +560,34 @@ prtextws    =   &A8
             bne     cat_liblp
 .nolib      jsr     OSNEWL
             jsr     OSNEWL
-            jmp     dir_files
+            lda     #&20            ; DFS mode?
+            bit     port_flags
+            beq     adfs_cat
+            bne     dfs_cat
 
 .cat_loop   jsr     pr_basic
-.dir_files  lda     #&08
+.adfs_cat   lda     #&0c
             sta     port_cmd
             bcc     cat_loop
             jmp     OSNEWL
 
+.dfs_lp1    jsr     pr_basic
+.dfs_cat    lda     #&0d            ; fetch one directory entry.
+            sta     port_cmd
+            bcc     dfs_lp1         ; end of entries, to 2nd pass.
+            jsr     OSNEWL
+            jsr     OSNEWL
+            lda     #&0f            ; rewind to first entry again.
+            sta     port_cmd
+            bcs     dfs_done
+.dfs_lp2    jsr     pr_basic
+            lda     #&0e            ; fetch one directory entry.
+            sta     port_cmd
+            bcc     dfs_lp2
+.dfs_done   jmp     OSNEWL
+
 .ex_loop    jsr     pr_all
-.dir_ex     lda     #&08
+.dir_ex     lda     #&0c
             sta     port_cmd
             bcc     ex_loop
             rts
@@ -834,7 +852,7 @@ prtextws    =   &A8
             jsr     OSNEWL
             ldy     #&0f
 .rmloop     sty     romid
-            lda     #&09
+            lda     #&08
             sta     port_cmd
             bcs     gotram
             lda     (romtab),y
@@ -1284,7 +1302,7 @@ prtextws    =   &A8
             ldy     #&ff
             jsr     OSBYTE
             stx     port_a
-            lda     #&0a
+            lda     #&09
             sta     port_cmd
             rts
 }
@@ -1298,17 +1316,17 @@ prtextws    =   &A8
             jsr     OSWRCH
             jsr     OSWRCH
             ldx     #&00            ; print characters of the name.
-.charloop   lda     &0101,x
+.charloop   lda     &0103,x
             jsr     OSWRCH
             inx
             cpx     #&0a
             bne     charloop
             outspc
             lda     #&20            ; test if open for writing.
-            bit     &010b
+            bit     &010d
             beq     openin
             lda     #&10            ; test if open for reading.
-            bit     &010b
+            bit     &010d
             BNE     openup
             lda     #'O'
             ldx     #'U'
@@ -1326,15 +1344,15 @@ prtextws    =   &A8
             tya
             jsr     OSWRCH
             twospc
-            bit     &010b
+            bit     &010d
             bvs     isdir
-            ldx     #&0c
+            ldx     #&0e
             jsr     hexfour
             outspc
-            ldx     #&10
+            ldx     #&12
             jsr     hexfour
 .next       jsr     OSNEWL
-            lda     #&0b
+            lda     #&0a
             sta     port_cmd
             bcc     fileloop
             lda     #&00
@@ -1374,7 +1392,7 @@ prtextws    =   &A8
             lda     #&00
             tay
             sta     port_a
-            lda     #&0c
+            lda     #&0b
             sta     port_cmd
             rts
 .end

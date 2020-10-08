@@ -2926,10 +2926,8 @@ static void gcopy_attr(vdfs_entry *ent)
     write_file_attr(mem_ptr, ent);
 }
 
-static void cat_next(void)
+static void cat_next_tail(void)
 {
-    while (cat_ent && !(cat_ent->attribs & ATTR_EXISTS))
-        cat_ent = cat_ent->next;
     if (cat_ent) {
         gcopy_attr(cat_ent);
         cat_ent = cat_ent->next;
@@ -2937,6 +2935,33 @@ static void cat_next(void)
     }
     else
         p.c = 1;
+}
+
+static void cat_next_adfs(void)
+{
+    while (cat_ent && !(cat_ent->attribs & ATTR_EXISTS))
+        cat_ent = cat_ent->next;
+    cat_next_tail();
+}
+
+static void cat_next_dfsdir(void)
+{
+    while (cat_ent && !(cat_ent->attribs & ATTR_EXISTS) && cat_ent->dfs_dir != dfs_dir)
+        cat_ent = cat_ent->next;
+    cat_next_tail();
+}
+
+static void cat_next_dfsnot(void)
+{
+    while (cat_ent && !(cat_ent->attribs & ATTR_EXISTS) && cat_ent->dfs_dir == dfs_dir)
+        cat_ent = cat_ent->next;
+    cat_next_tail();
+}
+
+static void cat_dfs_rewind(void)
+{
+    cat_ent = cat_dir->u.dir.children;
+    cat_next_dfsnot();
 }
 
 static void file_info(uint16_t addr)
@@ -3571,13 +3596,16 @@ static inline void dispatch(uint8_t value)
         case 0x05: osgbpb();    break;
         case 0x06: osfind();    break;
         case 0x07: osfsc();     break;
-        case 0x08: cat_next();  break;
-        case 0x09: check_ram(); break;
-        case 0x0a: startup();   break;
-        case 0x0b: files_nxt(); break;
-        case 0x0c: close_all(); break;
-        case 0x0d: cat_get_dir(cur_dir, dfs_dir); break;
-        case 0x0e: cat_get_dir(lib_dir, dfs_lib); break;
+        case 0x08: check_ram(); break;
+        case 0x09: startup();   break;
+        case 0x0a: files_nxt(); break;
+        case 0x0b: close_all(); break;
+        case 0x0c: cat_next_adfs();   break;
+        case 0x0d: cat_next_dfsdir(); break;
+        case 0x0e: cat_next_dfsnot(); break;
+        case 0x0f: cat_dfs_rewind();  break;
+        case 0x10: cat_get_dir(cur_dir, dfs_dir); break;
+        case 0x11: cat_get_dir(lib_dir, dfs_lib); break;
         default: log_warn("vdfs: function code %d not recognised\n", value);
     }
 }
