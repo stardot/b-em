@@ -106,6 +106,12 @@ const char *vdfs_cfg_root = NULL;
 
 typedef struct vdfs_entry vdfs_entry;
 
+typedef enum {
+    SORT_NONE,
+    SORT_ADFS,
+    SORT_DFS
+} sort_type;
+
 struct vdfs_entry {
     vdfs_entry *parent;
     vdfs_entry *next;
@@ -125,7 +131,7 @@ struct vdfs_entry {
             vdfs_entry *children;
             time_t     scan_mtime;
             unsigned   scan_seq;
-            bool       sorted;
+            sort_type  sorted;
             char       boot_opt;
             char       title[MAX_TITLE+1];
         } dir;
@@ -558,7 +564,7 @@ static void scan_attr(vdfs_entry *ent, uint32_t load_addr, uint32_t exec_addr)
                 ent->u.dir.children = NULL;
                 ent->u.dir.scan_mtime = 0;
                 ent->u.dir.scan_seq = 0;
-                ent->u.dir.sorted = false;
+                ent->u.dir.sorted = SORT_NONE;
             }
         }
         else {
@@ -788,7 +794,7 @@ static vdfs_entry *new_entry(vdfs_entry *dir, const char *host_fn)
             }
             ent->next = dir->u.dir.children;
             dir->u.dir.children = ent;
-            dir->u.dir.sorted = false;
+            dir->u.dir.sorted = SORT_NONE;
             log_debug("vdfs: new_entry: returing new entry %p\n", ent);
             return ent;
         }
@@ -1014,7 +1020,7 @@ static vdfs_entry *add_new_file(vdfs_entry *dir, vdfs_entry *ent)
         if (make_host_path(new_ent, host_fn)) {
             new_ent->next = dir->u.dir.children;
             dir->u.dir.children = new_ent;
-            dir->u.dir.sorted = false;
+            dir->u.dir.sorted = SORT_NONE;
             return new_ent;
         }
         free(new_ent);
@@ -1083,7 +1089,7 @@ void vdfs_close(void)
     if ((ptr = root_dir.u.dir.children)) {
         free_entry(ptr);
         root_dir.u.dir.children = NULL;
-        root_dir.u.dir.sorted = false;
+        root_dir.u.dir.sorted = SORT_NONE;
     }
 }
 
@@ -2269,79 +2275,86 @@ static void osgbpb_get_dir_dfs(uint32_t pb, vdfs_entry *dir, int dfsdir)
 
 static void acorn_sort(vdfs_entry *dir)
 {
-    vdfs_entry *p, *q, *e, *list, *tail;
-    int insize, nmerges, psize, qsize;
+    vdfs_entry *list = dir->u.dir.children;
+    if (list) {
+        sort_type sort_reqd = fs_flags & DFS_MODE ? SORT_DFS : SORT_ADFS;
+        if (dir->u.dir.sorted != sort_reqd) {
+            /* Linked LIst sort from Simon Tatum */
+            int insize = 1;
+            while (1) {
+                int nmerges = 0;
+                vdfs_entry *p = list;
+                vdfs_entry *tail = list = NULL;
 
-    if (!dir->u.dir.sorted && (list = dir->u.dir.children)) {
-        insize = 1;
-        while (1) {
-            p = list;
-            list = tail = NULL;
-            nmerges = 0;
-
-            while (p) {
-                nmerges++; /* there exists a merge to be done */
-                q = p;
-                /* step `insize' places along from p */
-                psize = 0;
-                do {
-                    if (psize >= insize)
-                        break;
-                    psize++;
-                    q = q->next;
-                } while (q);
-                /* if q hasn't fallen off end, we have two lists to merge */
-                qsize = insize;
-
-                /* now we have two lists; merge them */
-                while (psize > 0 || (qsize > 0 && q)) {
-                    /* decide whether next element of merge comes from p or q */
-                    if (psize == 0) {
-                        /* p is empty; e must come from q. */
-                        e = q;
+                while (p) {
+                    vdfs_entry *q = p;
+                    int psize= 0., qsize;
+                    nmerges++; /* there exists a merge to be done */
+                    /* step `insize' places along from p */
+                    do {
+                        if (psize >= insize)
+                            break;
+                        psize++;
                         q = q->next;
-                        qsize--;
+                    } while (q);
+                    /* if q hasn't fallen off end, we have two lists to merge */
+                    qsize = insize;
+
+                    /* now we have two lists; merge them */
+                    while (psize > 0 || (qsize > 0 && q)) {
+                        vdfs_entry *e;
+                        /* decide whether next element of merge comes from p or q */
+                        if (psize == 0) {
+                            /* p is empty; e must come from q. */
+                            e = q;
+                            q = q->next;
+                            qsize--;
+                        }
+                        else if (qsize == 0 || !q) {
+                            /* q is empty; e must come from p. */
+                            e = p;
+                            p = p->next;
+                            psize--;
+                        }
+                        else {
+                            int res = (sort_reqd == SORT_DFS) ? p->dfs_dir - q->dfs_dir : 0;
+                            if (!res)
+                                res = vdfs_cmp(p->acorn_fn, q->acorn_fn, MAX_FILE_NAME);
+                            if (res <= 0) {
+                                /* First element of p is lower (or same);
+                                * e must come from p. */
+                                e = p;
+                                p = p->next;
+                                psize--;
+                            }
+                            else {
+                                /* First element of q is lower; e must come from q. */
+                                e = q;
+                                q = q->next;
+                                qsize--;
+                            }
+                        }
+                        /* add the next element to the merged list */
+                        if (tail)
+                            tail->next = e;
+                        else
+                            list = e;
+                        tail = e;
                     }
-                    else if (qsize == 0 || !q) {
-                        /* q is empty; e must come from p. */
-                        e = p;
-                        p = p->next;
-                        psize--;
-                    }
-                    else if (vdfs_cmp(p->acorn_fn, q->acorn_fn, MAX_FILE_NAME) <= 0) {
-                        /* First element of p is lower (or same);
-                        * e must come from p. */
-                        e = p;
-                        p = p->next;
-                        psize--;
-                    }
-                    else {
-                        /* First element of q is lower; e must come from q. */
-                        e = q;
-                        q = q->next;
-                        qsize--;
-                    }
-                    /* add the next element to the merged list */
-                    if (tail)
-                        tail->next = e;
-                    else
-                        list = e;
-                    tail = e;
+                    /* now p has stepped `insize' places along, and q has too */
+                    p = q;
                 }
-                /* now p has stepped `insize' places along, and q has too */
-                p = q;
-            }
-            tail->next = NULL;
+                tail->next = NULL;
 
-            /* If we have done only one merge, we're finished. */
-            if (nmerges <= 1) {  /* allow for nmerges==0, the empty list case */
-                dir->u.dir.children = list;
-                dir->u.dir.sorted = true;
-                return;
+                /* If we have done only one merge, we're finished. */
+                if (nmerges <= 1) {  /* allow for nmerges==0, the empty list case */
+                    dir->u.dir.children = list;
+                    dir->u.dir.sorted = sort_reqd;
+                    return;
+                }
+                /* Otherwise repeat, merging lists twice the size */
+                insize *= 2;
             }
-
-            /* Otherwise repeat, merging lists twice the size */
-            insize *= 2;
         }
     }
 }
@@ -2644,7 +2657,7 @@ static void rename_tail(vdfs_entry *old_ent, vdfs_entry *new_ent)
             new_ent->u.dir.scan_mtime = old_ent->u.dir.scan_mtime;
             new_ent->u.dir.sorted     = old_ent->u.dir.sorted;
             old_ent->u.dir.children   = NULL;
-            old_ent->u.dir.sorted     = false;
+            old_ent->u.dir.sorted     = SORT_NONE;
         }
         else {
             new_ent->attribs |= ATTR_EXISTS;
@@ -2887,10 +2900,18 @@ static void cat_get_dir_dfs(vdfs_entry *ent, int dfsdir)
 
 static uint16_t gcopy_fn(vdfs_entry *ent, uint16_t mem_ptr)
 {
-    uint16_t mem_end = mem_ptr + MAX_FILE_NAME;
+    uint16_t mem_end = mem_ptr + MAX_FILE_NAME+2;
     const char *ptr = ent->acorn_fn;
     int ch;
 
+    if (ent->dfs_dir == dfs_dir) {
+        writemem(mem_ptr++, ' ');
+        writemem(mem_ptr++, ' ');
+    }
+    else {
+        writemem(mem_ptr++, ent->dfs_dir);
+        writemem(mem_ptr++, '.');
+    }
     while (mem_ptr < mem_end && (ch = *ptr++))
         writemem(mem_ptr++, ch);
     while (mem_ptr < mem_end)

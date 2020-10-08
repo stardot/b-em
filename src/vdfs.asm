@@ -406,7 +406,7 @@ prtextws    =   &A8
 
             macro   pr_attr mask, char
             lda     #mask
-            bit     &010a
+            bit     &010c
             beq     notset
             outcnt  char
 .notset
@@ -414,27 +414,41 @@ prtextws    =   &A8
 
 .pr_basic
 {
-            ldx     #&00            ; print characters of the name.
-.loop       lda     cat_tmp,x
+            ldx     #&00
+            lda     #&20            ; DFS mode?
+            bit     port_flags
+            beq     nodfsdir
+            lda     cat_tmp         ; print DFS directory.
             jsr     OSWRCH
             inx
-            cpx     #&0a
+            lda     cat_tmp+1
+            jsr     OSWRCH
+            inx
+.nodfsdir   ldy     #&02            ; print characters of the name.
+.loop       lda     cat_tmp,y
+            jsr     OSWRCH
+            inx
+            iny
+            cpy     #&0b
             bne     loop
             outcnt  ' '
             jsr     OSWRCH
             inx
-            bit     &010b           ; test most significant byte of
+            bit     &010d           ; test most significant byte of
             bvc     notdir          ; attributes for the directory flag.
             outcnt  'D'
 .notdir     pr_attr &08, 'L'
             pr_attr &02, 'W'
             pr_attr &01, 'R'
-            outcnt  '/'
-            pr_attr &20, 'w'
+            lda     #&20            ; DFS mode?
+            bit     port_flags
+            bne     noother         ; Don't print the permissions for
+            outcnt  '/'             ; others in DFS mode as there is
+            pr_attr &20, 'w'        ; no room.
             pr_attr &10, 'r'
             cpx     #&14
             bcs     done
-            lda     #' '
+.noother    lda     #' '
 .spcloop    jsr     OSWRCH
             inx
             cpx     #&14
@@ -472,20 +486,20 @@ prtextws    =   &A8
 
 .pr_all     jsr     pr_basic
             twospc
-            hexout  &010f
-            hexout  &010e
-            hexout  &010d
-            hexout  &010c
-            twospc
-            hexout  &0113
-            hexout  &0112
             hexout  &0111
             hexout  &0110
+            hexout  &010f
+            hexout  &010e
             twospc
-            hexout  &0117
-            hexout  &0116
             hexout  &0115
             hexout  &0114
+            hexout  &0113
+            hexout  &0112
+            twospc
+            hexout  &0119
+            hexout  &0118
+            hexout  &0117
+            hexout  &0116
             jmp     OSNEWL
 
 .opt_tab    equb    msg_off-banner
