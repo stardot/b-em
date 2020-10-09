@@ -551,7 +551,7 @@ static void adfs_hosterr(int errnum)
 
 // Populate a VDFS entry from host information.
 
-static void scan_attr(vdfs_entry *ent, uint32_t load_addr, uint32_t exec_addr)
+static void scan_attr(vdfs_entry *ent)
 {
     struct stat stb;
 
@@ -566,6 +566,8 @@ static void scan_attr(vdfs_entry *ent, uint32_t load_addr, uint32_t exec_addr)
                 ent->u.dir.scan_mtime = 0;
                 ent->u.dir.scan_seq = 0;
                 ent->u.dir.sorted = SORT_NONE;
+                ent->u.dir.boot_opt = 0;
+                ent->u.dir.title[0] = 0;
             }
         }
         else {
@@ -574,8 +576,8 @@ static void scan_attr(vdfs_entry *ent, uint32_t load_addr, uint32_t exec_addr)
                 ent->attribs &= ~ATTR_IS_DIR;
                 free_entry(ent->u.dir.children);
             }
-            ent->u.file.load_addr = load_addr;
-            ent->u.file.exec_addr = exec_addr;
+            ent->u.file.load_addr = 0;
+            ent->u.file.exec_addr = 0;
             ent->u.file.length = stb.st_size;
         }
 #ifdef WIN32
@@ -600,7 +602,7 @@ static void scan_attr(vdfs_entry *ent, uint32_t load_addr, uint32_t exec_addr)
             ent->attribs |= ATTR_OTHR_EXEC;
 #endif
     }
-    log_debug("vdfs: scan_attr: acorn=%s, host=%s, attr=%04X, load=%08X, exec=%08X\n", ent->acorn_fn, ent->host_fn, ent->attribs, load_addr, exec_addr);
+    log_debug("vdfs: scan_attr: acorn=%s, host=%s, attr=%04X\n", ent->acorn_fn, ent->host_fn, ent->attribs);
 }
 
 static const char *scan_inf_start(vdfs_entry *ent, char inf_line[MAX_INF_LINE])
@@ -641,13 +643,13 @@ static const char *scan_inf_start(vdfs_entry *ent, char inf_line[MAX_INF_LINE])
     return NULL;
 }
 
-static void scan_entry(vdfs_entry *ent)
+static void scan_inf_file(vdfs_entry *ent)
 {
-    uint32_t load_addr = 0, exec_addr = 0;
     char inf_line[MAX_INF_LINE];
+    int ch, nyb;
+    uint32_t load_addr = 0, exec_addr = 0;
     const char *lptr = scan_inf_start(ent, inf_line);
     if (lptr) {
-        int ch, nyb;
         // Parse load address.
         while ((ch = *lptr++) == ' ' || ch == '\t')
             ;
@@ -664,11 +666,49 @@ static void scan_entry(vdfs_entry *ent)
             ch = *lptr++;
         }
     }
+    ent->u.file.load_addr = load_addr;
+    ent->u.file.exec_addr = exec_addr;
+}
+
+static void scan_inf_dir(vdfs_entry *dir)
+{
+    char inf_line[MAX_INF_LINE];
+    unsigned opt = 0;
+    dir->u.dir.title[0] = 0;
+    const char *lptr = scan_inf_start(dir, inf_line);
+    if (lptr) {
+        int ch, nyb;
+        // Parse options.
+        while ((ch = *lptr++) == ' ' || ch == '\t')
+            ;
+        while ((nyb = hex2nyb(ch)) >= 0) {
+            opt = (opt << 4) | nyb;
+            ch = *lptr++;
+        }
+
+        // Parse title.
+        char *ptr = dir->u.dir.title;
+        char *end = ptr + MAX_TITLE;
+        while (ch == ' ' || ch == '\t')
+            ch = *lptr++;
+        while (ptr < end && ch && ch != '\n' && ch != '\r') {
+            *ptr++ = ch;
+            ch = *lptr++;
+        }
+        *ptr = 0;
+    }
+    dir->u.dir.boot_opt = opt;
+}
+
+static void scan_entry(vdfs_entry *ent)
+{
+    scan_attr(ent);
+    if (ent->attribs & ATTR_IS_DIR)
+        scan_inf_dir(ent);
+    else
+        scan_inf_file(ent);
     if (ent->acorn_fn[0] == '\0')
         hst2bbc(ent->host_fn, ent->acorn_fn);
-
-    // stat the real file.
-    scan_attr(ent, load_addr, exec_addr);
 }
 
 static void init_entry(vdfs_entry *ent)
@@ -847,36 +887,6 @@ static void scan_dir_host(vdfs_entry *dir, DIR *dp)
     }
 }
 
-static void scan_dir_inf(vdfs_entry *dir)
-{
-    char inf_line[MAX_INF_LINE];
-    unsigned opt = 0;
-    dir->u.dir.title[0] = 0;
-    const char *lptr = scan_inf_start(dir, inf_line);
-    if (lptr) {
-        int ch, nyb;
-        // Parse options.
-        while ((ch = *lptr++) == ' ' || ch == '\t')
-            ;
-        while ((nyb = hex2nyb(ch)) >= 0) {
-            opt = (opt << 4) | nyb;
-            ch = *lptr++;
-        }
-
-        // Parse title.
-        char *ptr = dir->u.dir.title;
-        char *end = ptr + MAX_TITLE;
-        while (ch == ' ' || ch == '\t')
-            ch = *lptr++;
-        while (ptr < end && ch && ch != '\n' && ch != '\r') {
-            *ptr++ = ch;
-            ch = *lptr++;
-        }
-        *ptr = 0;
-    }
-    dir->u.dir.boot_opt = opt;
-}
-
 static int scan_dir(vdfs_entry *dir)
 {
     DIR  *dp;
@@ -895,7 +905,7 @@ static int scan_dir(vdfs_entry *dir)
     if ((dp = opendir(dir->host_path))) {
         scan_dir_host(dir, dp);
         closedir(dp);
-        scan_dir_inf(dir);
+        scan_inf_dir(dir);
         dir->u.dir.scan_seq = scan_seq;
         dir->u.dir.scan_mtime = stb.st_mtime;
         return 0;
@@ -1062,7 +1072,7 @@ static void close_file(int channel)
         if ((fp = vdfs_chan[channel].fp)) {
             fclose(fp);
             vdfs_chan[channel].fp = NULL;
-            scan_attr(ent, ent->u.file.load_addr, ent->u.file.exec_addr);
+            scan_attr(ent);
         }
         ent->attribs &= ~(ATTR_OPEN_READ|ATTR_OPEN_WRITE);
         write_back(ent);
@@ -1340,7 +1350,9 @@ static void exec_swr_fs(uint8_t flags, uint16_t fname, int8_t romid, uint32_t st
                             fclose(fp);
                             load_add = 0xff008000 | (romid << 16) | start;
                             ent->attribs |= ATTR_EXISTS;
-                            scan_attr(ent, load_add, load_add);
+                            scan_attr(ent);
+                            ent->u.file.load_addr = load_add;
+                            ent->u.file.exec_addr = load_add;
                             write_back(ent);
                         } else
                             log_warn("vdfs: unable to create file '%s': %s\n", ent->host_fn, strerror(errno));
@@ -1708,7 +1720,9 @@ static void osfile_write(uint32_t pb, const char *path, uint32_t (*callback)(FIL
             end_addr = readmem32(pb+0x0e);
             callback(fp, start_addr, end_addr - start_addr);
             fclose(fp);
-            scan_attr(ent, readmem32(pb+0x02), readmem32(pb+0x06));
+            scan_attr(ent);
+            ent->u.file.load_addr = readmem32(pb+0x02);
+            ent->u.file.exec_addr = readmem32(pb+0x06);
             write_back(ent);
             writemem32(pb+0x0a, ent->u.file.length);
             writemem32(pb+0x0e, ent->attribs);
@@ -1833,7 +1847,7 @@ static void create_dir(vdfs_entry *ent)
 #endif
     if (res == 0) {
         ent->attribs |= ATTR_EXISTS;
-        scan_attr(ent, 0, 0);
+        scan_attr(ent);
         a = 2;
     }
     else {
@@ -2135,7 +2149,7 @@ static void osfind(void)
             if ((fp = fopen(ent->host_path, mode))) {
                 show_activity();
                 ent->attribs |= attribs | ATTR_EXISTS; // file now exists.
-                scan_attr(ent, ent->u.file.load_addr, ent->u.file.exec_addr);
+                scan_attr(ent);
                 vdfs_chan[channel].fp = fp;
                 vdfs_chan[channel].ent = ent;
                 a = MIN_CHANNEL + channel;
