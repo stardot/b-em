@@ -2830,6 +2830,7 @@ static void fsclaim(uint16_t addr)
 #define CAT_TMP 0x100
 
 static vdfs_entry *cat_ent;
+static int cat_dfs;
 
 static bool cat_prep(uint16_t addr, vdfs_entry *def_dir, int dfsdir, const char *dir_desc)
 {
@@ -2856,6 +2857,8 @@ static bool cat_prep(uint16_t addr, vdfs_entry *def_dir, int dfsdir, const char 
         if (!scan_dir(cat_dir)) {
             acorn_sort(cat_dir);
             cat_ent = cat_dir->u.dir.children;
+            cat_dfs = dfsdir;
+            log_debug("vdfs: cat_prep, cat_dfs set to %c", cat_dfs);
             return true;
         }
     }
@@ -2904,11 +2907,13 @@ static uint16_t gcopy_fn(vdfs_entry *ent, uint16_t mem_ptr)
     const char *ptr = ent->acorn_fn;
     int ch;
 
-    if (ent->dfs_dir == dfs_dir) {
+    if (ent->dfs_dir == cat_dfs) {
+        log_debug("vdfs: gcopy_fn, same DFS directory file");
         writemem(mem_ptr++, ' ');
         writemem(mem_ptr++, ' ');
     }
     else {
+        log_debug("vdfs: gcopy_fn, different DFS directory file");
         writemem(mem_ptr++, ent->dfs_dir);
         writemem(mem_ptr++, '.');
     }
@@ -2946,15 +2951,20 @@ static void cat_next_adfs(void)
 
 static void cat_next_dfsdir(void)
 {
-    while (cat_ent && (!(cat_ent->attribs & ATTR_EXISTS) || cat_ent->dfs_dir != dfs_dir))
+    while (cat_ent && (!(cat_ent->attribs & ATTR_EXISTS) || cat_ent->dfs_dir != cat_dfs))
+    {
+        log_debug("vdfs: cat_next_dfsdir skipping %c.%s", cat_ent->dfs_dir, cat_ent->acorn_fn);
         cat_ent = cat_ent->next;
+    }
     cat_next_tail();
 }
 
 static void cat_next_dfsnot(void)
 {
-    while (cat_ent && (!(cat_ent->attribs & ATTR_EXISTS) || cat_ent->dfs_dir == dfs_dir))
+    while (cat_ent && (!(cat_ent->attribs & ATTR_EXISTS) || cat_ent->dfs_dir == cat_dfs)) {
+        log_debug("vdfs: cat_next_dfsnot skipping %c.%s", cat_ent->dfs_dir, cat_ent->acorn_fn);
         cat_ent = cat_ent->next;
+    }
     cat_next_tail();
 }
 
@@ -3246,7 +3256,7 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
             file_info(addr);
         break;
     case VDFS_ACT_LCAT:
-        cat_prep(addr, lib_dir, dfs_lib, "library");
+        cat_prep(addr, (fs_flags & DFS_MODE) ? cur_dir : lib_dir, dfs_lib, "library");
         cat_title();
         rom_dispatch(VDFS_ROM_CAT);
         break;
