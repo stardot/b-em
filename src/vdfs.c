@@ -301,6 +301,7 @@ static uint16_t cmd_tail;
 
 static vdfs_entry *(*find_entry)(const char *filename, vdfs_entry *key, vdfs_entry *dir, int dfsdir);
 static void (*osgbpb_get_dir)(uint32_t pb, vdfs_entry *dir, int dfsdir);
+static bool (*cat_prep)(uint16_t addr, vdfs_entry *dir, int dfsdir, const char *dir_desc);
 static void (*cat_get_dir)(vdfs_entry *dir, int dfsdir);
 static void (*cmd_dir)(uint16_t addr);
 static void (*cmd_lib)(uint16_t addr);
@@ -2273,13 +2274,12 @@ static void osgbpb_get_dir_dfs(uint32_t pb, vdfs_entry *dir, int dfsdir)
     write_len_str(mem_ptr, tmp);
 }
 
-static void acorn_sort(vdfs_entry *dir)
+static void acorn_sort(vdfs_entry *dir, sort_type sort_reqd)
 {
     vdfs_entry *list = dir->u.dir.children;
     if (list) {
-        sort_type sort_reqd = fs_flags & DFS_MODE ? SORT_DFS : SORT_ADFS;
         if (dir->u.dir.sorted != sort_reqd) {
-            /* Linked LIst sort from Simon Tatum */
+            /* Linked List sort from Simon Tatum */
             int insize = 1;
             while (1) {
                 int nmerges = 0;
@@ -2368,7 +2368,7 @@ static int osgbpb_list(uint32_t pb)
     if (check_valid_dir(cur_dir, "current")) {
         seq_ptr = readmem32(pb+9);
         if (seq_ptr == 0)
-            acorn_sort(cur_dir);
+            acorn_sort(cur_dir, (fs_flags & DFS_MODE) ? SORT_DFS : SORT_ADFS);
         n = seq_ptr;
         for (cat_ptr = cur_dir->u.dir.children; cat_ptr; cat_ptr = cat_ptr->next)
             if (cat_ptr->attribs & ATTR_EXISTS)
@@ -2579,8 +2579,10 @@ static int parse_dfs_dir(uint16_t addr)
         ch = readmem(addr++);
     while (ch == ' ' || ch == '\t');
     dir = ch;
-    ch = readmem(addr++);
-    if (ch == 0x0d || ch == ' ' || ch == '\t')
+    do
+        ch = readmem(addr++);
+    while (ch == ' ' || ch == '\t');
+    if (ch == '\r')
         return dir;
     adfs_error(err_baddir);
     return 0;
@@ -2832,18 +2834,18 @@ static void fsclaim(uint16_t addr)
 static vdfs_entry *cat_ent;
 static int cat_dfs;
 
-static bool cat_prep(uint16_t addr, vdfs_entry *def_dir, int dfsdir, const char *dir_desc)
+static bool cat_prep_adfs(uint16_t addr, vdfs_entry *dir, int dfsdir, const char *dir_desc)
 {
     vdfs_entry *ent, key;
     char path[MAX_ACORN_PATH];
 
-    if (check_valid_dir(def_dir, dir_desc)) {
+    if (check_valid_dir(dir, dir_desc)) {
         parse_name(path, sizeof path, addr);
         if (*path) {
-            ent = find_entry(path, &key, def_dir, dfsdir);
+            ent = find_entry(path, &key, dir, dfsdir);
             if (ent && ent->attribs & ATTR_EXISTS) {
                 if (ent->attribs & ATTR_IS_DIR) {
-                    cat_dir = ent;
+                    dir = ent;
                 } else {
                     adfs_error(err_baddir);
                     return false;
@@ -2852,15 +2854,42 @@ static bool cat_prep(uint16_t addr, vdfs_entry *def_dir, int dfsdir, const char 
                 adfs_error(err_notfound);
                 return false;
             }
-        } else
-            cat_dir = def_dir;
-        if (!scan_dir(cat_dir)) {
-            acorn_sort(cat_dir);
-            cat_ent = cat_dir->u.dir.children;
+        }
+        if (!scan_dir(dir)) {
+            acorn_sort(dir, SORT_ADFS);
+            cat_dir = dir;
+            cat_ent = dir->u.dir.children;
             cat_dfs = dfsdir;
-            log_debug("vdfs: cat_prep, cat_dfs set to %c", cat_dfs);
             return true;
         }
+    }
+    return false;
+}
+
+static bool cat_prep_dfs(uint16_t addr, vdfs_entry *dir, int dfsdir, const char *dir_desc)
+{
+    int ch;
+    do
+        ch = readmem(addr++);
+    while (ch == ' ' || ch == '\t');
+    if (ch != '\r') {
+        dfsdir = ch;
+        do
+            ch = readmem(addr++);
+        while (ch == ' ' || ch == '\t');
+        if (ch != '\r') {
+            adfs_error(err_baddir);
+            return false;
+        }
+    }
+    if (!dir)
+        dir = cur_dir;
+    if (!scan_dir(dir)) {
+        acorn_sort(dir, SORT_DFS);
+        cat_dir = dir;
+        cat_ent = dir->u.dir.children;
+        cat_dfs = dfsdir;
+        return true;
     }
     return false;
 }
@@ -3125,6 +3154,7 @@ static void vdfs_dfs_mode(void)
     fs_flags |= DFS_MODE;
     find_entry = find_entry_dfs;
     osgbpb_get_dir = osgbpb_get_dir_dfs;
+    cat_prep = cat_prep_dfs;
     cat_get_dir = cat_get_dir_dfs;
     cmd_dir = cmd_dir_dfs;
     cmd_lib = cmd_lib_dfs;
@@ -3135,6 +3165,7 @@ static void vdfs_adfs_mode(void)
     fs_flags &= ~DFS_MODE;
     find_entry = find_entry_adfs;
     osgbpb_get_dir = osgbpb_get_dir_adfs;
+    cat_prep = cat_prep_adfs;
     cat_get_dir = cat_get_dir_adfs;
     cmd_dir = cmd_dir_adfs;
     cmd_lib = cmd_lib_adfs;
