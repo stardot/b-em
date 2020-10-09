@@ -567,7 +567,19 @@ prtextws    =   &A8
             jsr     OSNEWL
             lda     #&20            ; DFS mode?
             bit     port_flags
-            beq     adfs_cat
+            bne     dfs_cat
+
+            lda     #&0c            ; Fetch the first entry.
+            sta     port_cmd
+            bcs     cat_done
+.cat_loop   ldx     #&00
+            jsr     pr_basic
+            jsr     pr_others
+            jsr     pr_pad
+.adfs_cat   lda     #&0c            ; Fetch the next entry.
+            sta     port_cmd
+            bcc     cat_loop
+            jmp     OSNEWL
 
             lda     #&0d            ; fetch one directory entry.
             sta     port_cmd
@@ -581,14 +593,14 @@ prtextws    =   &A8
             jsr     OSNEWL
 .dfs_none1  lda     #&0f            ; rewind to first entry again.
             sta     port_cmd
-            bcs     dfs_done
+            bcs     cat_done
 .dfs_lp2    jsr     pr_dfs
             jsr     pr_pad
             lda     #&0e            ; fetch one directory entry.
             sta     port_cmd
             bcc     dfs_lp2
             jmp     OSNEWL
-.dfs_done   rts
+.cat_done   rts
 
 .dir_ex     lda     #&20            ; DFS mode?
             bit     port_flags
@@ -600,15 +612,6 @@ prtextws    =   &A8
             sta     port_cmd
             bcc     ex_adfs_lp
             rts
-
-.cat_loop   ldx     #&00
-            jsr     pr_basic
-            jsr     pr_others
-            jsr     pr_pad
-.adfs_cat   lda     #&0c
-            sta     port_cmd
-            bcc     cat_loop
-            jmp     OSNEWL
 
 .ex_dfs_lp  jsr     pr_all
 .ex_dfs     lda     #&0d
