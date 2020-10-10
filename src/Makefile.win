@@ -45,8 +45,10 @@ OBJ = \
     fdi2raw.o \
     fdi.o \
     gui-allegro.o \
+    hfe.o \
     i8271.o \
     ide.o \
+    imd.o \
     joystick.o\
     keyboard.o \
     keydef-allegro.o \
