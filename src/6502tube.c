@@ -197,7 +197,7 @@ static void do_writemem(uint32_t addr, uint32_t value)
         return;
     }
     tuberam[addr] = value;
-    if (addr == 0xfef0 && tuberamsize > 0x1000) {
+    if (addr == 0xfef0 && tuberamsize > 0x10000) {
         if (value & 0x80)
             enable_turbo();
         else
