@@ -63,7 +63,7 @@ static const char op_names[113][4] = {
     "WDM", "XBA", "XCE"
 };
 
-static int8_t op_cmos[256] =
+static const uint8_t op_cmos[256] =
 {
 /*       0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F */
 /*00*/  BRK,  ORA,  UND,  UND,  TSB,  ORA,  ASL,  UND,  PHP,  ORA,  ASL,  UND,  TSB,  ORA,  ASL,  UND,
@@ -84,7 +84,7 @@ static int8_t op_cmos[256] =
 /*F0*/  BEQ,  SBC,  SBC,  UND,  UND,  SBC,  INC,  UND,  SED,  SBC,  PLX,  UND,  UND,  SBC,  INC,  UND,
  };
 
-static uint8_t am_cmos[256]=
+static const uint8_t am_cmos[256]=
 {
 /*       0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F */
 /*00*/  IMP,  INDX, IMP,  IMP,  ZP,   ZP,   ZP,   IMP,  IMP,  IMM,  IMPA, IMP,  ABS,  ABS,  ABS,  IMP,
@@ -105,7 +105,7 @@ static uint8_t am_cmos[256]=
 /*F0*/  PCR,  INDY, IND,  IMP,  ZP,   ZPX,  ZPX,  IMP,  IMP,  ABSY, IMP,  IMP,  ABS,  ABSX, ABSX, IMP,
 };
 
-static int8_t op_nmos[256] =
+static const uint8_t op_nmos[256] =
 {
 /*       0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F */
 /*00*/  BRK,  ORA,  HLT,  SLO,  NOP,  ORA,  ASL,  SLO,  PHP,  ORA,  ASL,  ANC,  NOP,  ORA,  ASL,  SLO,
@@ -126,7 +126,7 @@ static int8_t op_nmos[256] =
 /*F0*/  BEQ,  SBC,  HLT,  ISB,  NOP,  SBC,  INC,  ISB,  SED,  SBC,  NOP,  ISB,  NOP,  SBC,  INC,  ISB
 };
 
-static int8_t am_nmos[256] =
+static const uint8_t am_nmos[256] =
 {
 /*       0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F */
 /*00*/  IMP,  INDX, IMP,  INDX, ZP,   ZP,   ZP,   ZP,   IMP,  IMM,  IMPA, IMM,  ABS,  ABS,  ABS,  ABS,
@@ -147,7 +147,7 @@ static int8_t am_nmos[256] =
 /*F0*/  PCR,  INDY, IMP,  INDY, ZPX,  ZPX,  ZPX,  ZPX,  IMP,  ABSY, IMP,  ABSY, ABSX, ABSX, ABSX, ABSX,
 };
 
-static int8_t op_816[256] =
+static const uint8_t op_816[256] =
 {
 /*       0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F */
 /*00*/  BRK,  ORA,  COP,  ORA,  TSB,  ORA,  ASL,  ORA,  PHP,  ORA,  ASL,  PHD,  TSB,  ORA,  ASL,  ORA,
@@ -168,7 +168,7 @@ static int8_t op_816[256] =
 /*F0*/  BEQ,  SBC,  SBC,  SBC,  PEA,  SBC,  INC,  SBC,  SED,  SBC,  PLX,  XCE,  JSR,  SBC,  INC,  SBC
 };
 
-static uint8_t am_816[256]=
+static const uint8_t am_816[256]=
 {
 /*       0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F */
 /*00*/  IMP,  INDX, IMM,  SR,   ZP,   ZP,   ZP,   INDL, IMP,  IMV,  IMPA, IMP,  ABS,  ABS,  ABS,  ABSL,
@@ -393,7 +393,7 @@ uint32_t dbg6502_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
             snprintf(buf, bufsize, "%02X %02X     %s %04X    ", p1, p2, op_name, temp);
             lookforsym = true;
             symaddr = temp;
-            break;    
+            break;
     }
 
     const char *sym = NULL;
