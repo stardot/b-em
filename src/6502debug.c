@@ -33,6 +33,8 @@ typedef enum {
     SR,     // Stack relative (65816 only)
     SRY,    // Stack relative indirect indexed (by Y).
     BM,     // Block moves (65816 only)
+    BITC,   // Bit change (set/reset) as used by RMB, SMB
+    BITB    // Branch on bit set/reset (BBR, BBS.)
 } addr_mode_t;
 
 typedef enum {
@@ -46,10 +48,10 @@ typedef enum {
     SAX,   SBC,   SBX,   SEC,   SED,   SEI,   SEP,   SHA,   SHS,   SHX,   SHY,
     SLO,   SRE,   STA,   STP,   STX,   STY,   STZ,   TAX,   TAY,   TCD,   TCS,
     TDC,   TRB,   TSB,   TSC,   TSX,   TXA,   TXS,   TXY,   TYA,   TYX,   WAI,
-    WDM,   XBA,   XCE
+    WDM,   XBA,   XCE,   RMB,   SMB,   BBR,   BBS
 } op_t;
 
-static const char op_names[113][4] = {
+static const char op_names[117][4] = {
     "---", "ADC", "ANC", "AND", "ANE", "ARR", "ASL", "ASR", "BCC", "BCS", "BEQ",
     "BIT", "BMI", "BNE", "BPL", "BRA", "BRK", "BRL", "BVC", "BVS", "CLC", "CLD",
     "CLI", "CLV", "CMP", "COP", "CPX", "CPY", "DCP", "DEC", "DEX", "DEY", "EOR",
@@ -60,49 +62,49 @@ static const char op_names[113][4] = {
     "SAX", "SBC", "SBX", "SEC", "SED", "SEI", "SEP", "SHA", "SHS", "SHX", "SHY",
     "SLO", "SRE", "STA", "STP", "STX", "STY", "STZ", "TAX", "TAY", "TCD", "TCS",
     "TDC", "TRB", "TSB", "TSC", "TSX", "TXA", "TXS", "TXY", "TYA", "TYX", "WAI",
-    "WDM", "XBA", "XCE"
+    "WDM", "XBA", "XCE", "RMB", "SMB", "BBR", "BBS"
 };
 
 static const uint8_t op_cmos[256] =
 {
 /*       0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F */
-/*00*/  BRK,  ORA,  UND,  UND,  TSB,  ORA,  ASL,  UND,  PHP,  ORA,  ASL,  UND,  TSB,  ORA,  ASL,  UND,
-/*10*/  BPL,  ORA,  ORA,  UND,  TRB,  ORA,  ASL,  UND,  CLC,  ORA,  INC,  UND,  TRB,  ORA,  ASL,  UND,
-/*20*/  JSR,  AND,  UND,  UND,  BIT,  AND,  ROL,  UND,  PLP,  AND,  ROL,  UND,  BIT,  AND,  ROL,  UND,
-/*30*/  BMI,  AND,  AND,  UND,  BIT,  AND,  ROL,  UND,  SEC,  AND,  DEC,  UND,  BIT,  AND,  ROL,  UND,
-/*40*/  RTI,  EOR,  UND,  UND,  UND,  EOR,  LSR,  UND,  PHA,  EOR,  LSR,  UND,  JMP,  EOR,  LSR,  UND,
-/*50*/  BVC,  EOR,  EOR,  UND,  UND,  EOR,  LSR,  UND,  CLI,  EOR,  PHY,  UND,  UND,  EOR,  LSR,  UND,
-/*60*/  RTS,  ADC,  UND,  UND,  STZ,  ADC,  ROR,  UND,  PLA,  ADC,  ROR,  UND,  JMP,  ADC,  ROR,  UND,
-/*70*/  BVS,  ADC,  ADC,  UND,  STZ,  ADC,  ROR,  UND,  SEI,  ADC,  PLY,  UND,  JMP,  ADC,  ROR,  UND,
-/*80*/  BRA,  STA,  UND,  UND,  STY,  STA,  STX,  UND,  DEY,  BIT,  TXA,  UND,  STY,  STA,  STX,  UND,
-/*90*/  BCC,  STA,  STA,  UND,  STY,  STA,  STX,  UND,  TYA,  STA,  TXS,  UND,  STZ,  STA,  STZ,  UND,
-/*A0*/  LDY,  LDA,  LDX,  UND,  LDY,  LDA,  LDX,  UND,  TAY,  LDA,  TAX,  UND,  LDY,  LDA,  LDX,  UND,
-/*B0*/  BCS,  LDA,  LDA,  UND,  LDY,  LDA,  LDX,  UND,  CLV,  LDA,  TSX,  UND,  LDY,  LDA,  LDX,  UND,
-/*C0*/  CPY,  CMP,  UND,  UND,  CPY,  CMP,  DEC,  UND,  INY,  CMP,  DEX,  WAI,  CPY,  CMP,  DEC,  UND,
-/*D0*/  BNE,  CMP,  CMP,  UND,  UND,  CMP,  DEC,  UND,  CLD,  CMP,  PHX,  STP,  UND,  CMP,  DEC,  UND,
-/*E0*/  CPX,  SBC,  UND,  UND,  CPX,  SBC,  INC,  UND,  INX,  SBC,  NOP,  UND,  CPX,  SBC,  INC,  UND,
-/*F0*/  BEQ,  SBC,  SBC,  UND,  UND,  SBC,  INC,  UND,  SED,  SBC,  PLX,  UND,  UND,  SBC,  INC,  UND,
- };
+/*00*/  BRK,  ORA,  UND,  UND,  TSB,  ORA,  ASL,  RMB,  PHP,  ORA,  ASL,  UND,  TSB,  ORA,  ASL,  BBR,
+/*10*/  BPL,  ORA,  ORA,  UND,  TRB,  ORA,  ASL,  RMB,  CLC,  ORA,  INC,  UND,  TRB,  ORA,  ASL,  BBR,
+/*20*/  JSR,  AND,  UND,  UND,  BIT,  AND,  ROL,  RMB,  PLP,  AND,  ROL,  UND,  BIT,  AND,  ROL,  BBR,
+/*30*/  BMI,  AND,  AND,  UND,  BIT,  AND,  ROL,  RMB,  SEC,  AND,  DEC,  UND,  BIT,  AND,  ROL,  BBR,
+/*40*/  RTI,  EOR,  UND,  UND,  UND,  EOR,  LSR,  RMB,  PHA,  EOR,  LSR,  UND,  JMP,  EOR,  LSR,  BBR,
+/*50*/  BVC,  EOR,  EOR,  UND,  UND,  EOR,  LSR,  RMB,  CLI,  EOR,  PHY,  UND,  UND,  EOR,  LSR,  BBR,
+/*60*/  RTS,  ADC,  UND,  UND,  STZ,  ADC,  ROR,  RMB,  PLA,  ADC,  ROR,  UND,  JMP,  ADC,  ROR,  BBR,
+/*70*/  BVS,  ADC,  ADC,  UND,  STZ,  ADC,  ROR,  RMB,  SEI,  ADC,  PLY,  UND,  JMP,  ADC,  ROR,  BBR,
+/*80*/  BRA,  STA,  UND,  UND,  STY,  STA,  STX,  SMB,  DEY,  BIT,  TXA,  UND,  STY,  STA,  STX,  BBS,
+/*90*/  BCC,  STA,  STA,  UND,  STY,  STA,  STX,  SMB,  TYA,  STA,  TXS,  UND,  STZ,  STA,  STZ,  BBS,
+/*A0*/  LDY,  LDA,  LDX,  UND,  LDY,  LDA,  LDX,  SMB,  TAY,  LDA,  TAX,  UND,  LDY,  LDA,  LDX,  BBS,
+/*B0*/  BCS,  LDA,  LDA,  UND,  LDY,  LDA,  LDX,  SMB,  CLV,  LDA,  TSX,  UND,  LDY,  LDA,  LDX,  BBS,
+/*C0*/  CPY,  CMP,  UND,  UND,  CPY,  CMP,  DEC,  SMB,  INY,  CMP,  DEX,  WAI,  CPY,  CMP,  DEC,  BBS,
+/*D0*/  BNE,  CMP,  CMP,  UND,  UND,  CMP,  DEC,  SMB,  CLD,  CMP,  PHX,  STP,  UND,  CMP,  DEC,  BBS,
+/*E0*/  CPX,  SBC,  UND,  UND,  CPX,  SBC,  INC,  SMB,  INX,  SBC,  NOP,  UND,  CPX,  SBC,  INC,  BBS,
+/*F0*/  BEQ,  SBC,  SBC,  UND,  UND,  SBC,  INC,  SMB,  SED,  SBC,  PLX,  UND,  UND,  SBC,  INC,  BBS,
+};
 
 static const uint8_t am_cmos[256]=
 {
-/*       0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F */
-/*00*/  IMP,  INDX, IMP,  IMP,  ZP,   ZP,   ZP,   IMP,  IMP,  IMM,  IMPA, IMP,  ABS,  ABS,  ABS,  IMP,
-/*10*/  PCR,  INDY, IND,  IMP,  ZP,   ZPX,  ZPX,  IMP,  IMP,  ABSY, IMPA, IMP,  ABS,  ABSX, ABSX, IMP,
-/*20*/  ABS,  INDX, IMP,  IMP,  ZP,   ZP,   ZP,   IMP,  IMP,  IMM,  IMPA, IMP,  ABS,  ABS,  ABS,  IMP,
-/*30*/  PCR,  INDY, IND,  IMP,  ZPX,  ZPX,  ZPX,  IMP,  IMP,  ABSY, IMPA, IMP,  ABSX, ABSX, ABSX, IMP,
-/*40*/  IMP,  INDX, IMP,  IMP,  ZP,   ZP,   ZP,   IMP,  IMP,  IMM,  IMPA, IMP,  ABS,  ABS,  ABS,  IMP,
-/*50*/  PCR,  INDY, IND,  IMP,  ZP,   ZPX,  ZPX,  IMP,  IMP,  ABSY, IMP,  IMP,  ABS,  ABSX, ABSX, IMP,
-/*60*/  IMP,  INDX, IMP,  IMP,  ZP,   ZP,   ZP,   IMP,  IMP,  IMM,  IMPA, IMP,  IND16,ABS,  ABS,  IMP,
-/*70*/  PCR,  INDY, IND,  IMP,  ZPX,  ZPX,  ZPX,  IMP,  IMP,  ABSY, IMP,  IMP,  IND1X,ABSX, ABSX, IMP,
-/*80*/  PCR,  INDX, IMP,  IMP,  ZP,   ZP,   ZP,   IMP,  IMP,  IMM,  IMP,  IMP,  ABS,  ABS,  ABS,  IMP,
-/*90*/  PCR,  INDY, IND,  IMP,  ZPX,  ZPX,  ZPY,  IMP,  IMP,  ABSY, IMP,  IMP,  ABS,  ABSX, ABSX, IMP,
-/*A0*/  IMM,  INDX, IMM,  IMP,  ZP,   ZP,   ZP,   IMP,  IMP,  IMM,  IMP,  IMP,  ABS,  ABS,  ABS,  IMP,
-/*B0*/  PCR,  INDY, IND,  IMP,  ZPX,  ZPX,  ZPY,  IMP,  IMP,  ABSY, IMP,  IMP,  ABSX, ABSX, ABSY, IMP,
-/*C0*/  IMM,  INDX, IMP,  IMP,  ZP,   ZP,   ZP,   IMP,  IMP,  IMM,  IMP,  IMP,  ABS,  ABS,  ABS,  IMP,
-/*D0*/  PCR,  INDY, IND,  IMP,  ZP,   ZPX,  ZPX,  IMP,  IMP,  ABSY, IMP,  IMP,  ABS,  ABSX, ABSX, IMP,
-/*E0*/  IMM,  INDX, IMP,  IMP,  ZP,   ZP,   ZP,   IMP,  IMP,  IMM,  IMP,  IMP,  ABS,  ABS,  ABS,  IMP,
-/*F0*/  PCR,  INDY, IND,  IMP,  ZP,   ZPX,  ZPX,  IMP,  IMP,  ABSY, IMP,  IMP,  ABS,  ABSX, ABSX, IMP,
+/*       0     1     2     3     4     5     6     7      8     9     A     B     C     D     E     F */
+/*00*/  IMP,  INDX, IMP,  IMP,  ZP,   ZP,   ZP,   BITC,  IMP,  IMM,  IMPA, IMP,  ABS,  ABS,  ABS,  BITB,
+/*10*/  PCR,  INDY, IND,  IMP,  ZP,   ZPX,  ZPX,  BITC,  IMP,  ABSY, IMPA, IMP,  ABS,  ABSX, ABSX, BITB,
+/*20*/  ABS,  INDX, IMP,  IMP,  ZP,   ZP,   ZP,   BITC,  IMP,  IMM,  IMPA, IMP,  ABS,  ABS,  ABS,  BITB,
+/*30*/  PCR,  INDY, IND,  IMP,  ZPX,  ZPX,  ZPX,  BITC,  IMP,  ABSY, IMPA, IMP,  ABSX, ABSX, ABSX, BITB,
+/*40*/  IMP,  INDX, IMP,  IMP,  ZP,   ZP,   ZP,   BITC,  IMP,  IMM,  IMPA, IMP,  ABS,  ABS,  ABS,  BITB,
+/*50*/  PCR,  INDY, IND,  IMP,  ZP,   ZPX,  ZPX,  BITC,  IMP,  ABSY, IMP,  IMP,  ABS,  ABSX, ABSX, BITB,
+/*60*/  IMP,  INDX, IMP,  IMP,  ZP,   ZP,   ZP,   BITC,  IMP,  IMM,  IMPA, IMP,  IND16,ABS,  ABS,  BITB,
+/*70*/  PCR,  INDY, IND,  IMP,  ZPX,  ZPX,  ZPX,  BITC,  IMP,  ABSY, IMP,  IMP,  IND1X,ABSX, ABSX, BITB,
+/*80*/  PCR,  INDX, IMP,  IMP,  ZP,   ZP,   ZP,   BITC,  IMP,  IMM,  IMP,  IMP,  ABS,  ABS,  ABS,  BITB,
+/*90*/  PCR,  INDY, IND,  IMP,  ZPX,  ZPX,  ZPY,  BITC,  IMP,  ABSY, IMP,  IMP,  ABS,  ABSX, ABSX, BITB,
+/*A0*/  IMM,  INDX, IMM,  IMP,  ZP,   ZP,   ZP,   BITC,  IMP,  IMM,  IMP,  IMP,  ABS,  ABS,  ABS,  BITB,
+/*B0*/  PCR,  INDY, IND,  IMP,  ZPX,  ZPX,  ZPY,  BITC,  IMP,  ABSY, IMP,  IMP,  ABSX, ABSX, ABSY, BITB,
+/*C0*/  IMM,  INDX, IMP,  IMP,  ZP,   ZP,   ZP,   BITC,  IMP,  IMM,  IMP,  IMP,  ABS,  ABS,  ABS,  BITB,
+/*D0*/  PCR,  INDY, IND,  IMP,  ZP,   ZPX,  ZPX,  BITC,  IMP,  ABSY, IMP,  IMP,  ABS,  ABSX, ABSX, BITB,
+/*E0*/  IMM,  INDX, IMP,  IMP,  ZP,   ZP,   ZP,   BITC,  IMP,  IMM,  IMP,  IMP,  ABS,  ABS,  ABS,  BITB,
+/*F0*/  PCR,  INDY, IND,  IMP,  ZP,   ZPX,  ZPX,  BITC,  IMP,  ABSY, IMP,  IMP,  ABS,  ABSX, ABSX, BITB,
 };
 
 static const uint8_t op_nmos[256] =
@@ -385,12 +387,26 @@ uint32_t dbg6502_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
             symaddr = temp;
             break;
         case PCRL:
-
             p1 = cpu->memread(addr++);
             p2 = cpu->memread(addr++);
             temp = (int16_t)((uint16_t)p1 | (uint16_t)p2 <<8);
             temp += addr;
             snprintf(buf, bufsize, "%02X %02X     %s %04X    ", p1, p2, op_name, temp);
+            lookforsym = true;
+            symaddr = temp;
+            break;
+        case BITC:
+            p1 = cpu->memread(addr++);
+            snprintf(buf, bufsize, "%02X       %s%x %02X", p1, op_name, (op & 0x70) >> 4, p1);
+            lookforsym = true;
+            symaddr = p1;
+            break;
+        case BITB:
+            p1 = cpu->memread(addr++);
+            p2 = cpu->memread(addr++);
+            temp = (signed char)p2;
+            temp += addr;
+            snprintf(buf, bufsize, "%02X %02X     %s%x %02X,%04X", p1, p2, op_name, (op & 0x70) >> 4, p1, temp);
             lookforsym = true;
             symaddr = temp;
             break;
