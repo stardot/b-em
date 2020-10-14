@@ -572,6 +572,7 @@ void tube_6502_exec()
                         push(pack_flags(0x30));
                         pc = readmem(0xFFFE) | (readmem(0xFFFF) << 8);
                         tubep.i = 1;
+                        tubep.d = 0;
                         polltime(7);
                         break;
 
