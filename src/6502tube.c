@@ -545,6 +545,7 @@ void tube_6502_exec()
 {
         uint8_t opcode;
         uint16_t addr;
+        uint16_t tempw;
         uint8_t temp;
         int tempi;
         int8_t offset;
@@ -582,6 +583,17 @@ void tube_6502_exec()
                         setzn(a);
                         polltime(6);
                         break;
+
+                case 0x02:  /* NOP, 2 bytes, 2 cycles. */
+                case 0x22:
+                case 0x42:
+                case 0x62:
+                case 0x82:
+                case 0xc2:
+                case 0xe2:
+                    (void)readmem(pc++);
+                    polltime(2);
+                    break;
 
                 case 0x04:      /*TSB zp */
                         addr = readmem(pc);
@@ -664,7 +676,6 @@ void tube_6502_exec()
                         temp <<= 1;
                         setzn(temp);
                         writemem(addr, temp);
-                        polltime(6);
                         break;
 
                 case 0x0F:
@@ -769,14 +780,15 @@ void tube_6502_exec()
                         break;
 
                 case 0x1E:      /*ASL abs,x */
-                        addr = getw();
-                        addr += x;
+                    tempw = getw();
+                    addr = tempw + x;
+                    tempw = (tempw & 0xff00) ^ (addr & 0xff00) ? 1 : 0;
                         temp = readmem(addr);
                         tubep.c = temp & 0x80;
                         temp <<= 1;
                         writemem(addr, temp);
                         setzn(temp);
-                        polltime(7);
+                        polltime(6+tempw);
                         break;
 
                 case 0x1F:
@@ -1001,8 +1013,9 @@ void tube_6502_exec()
                         break;
 
                 case 0x3E:      /*ROL abs,x */
-                        addr = getw();
-                        addr += x;
+                    tempw = getw();
+                    addr = tempw + x;
+                    tempw = (tempw & 0xff00) ^ (addr & 0xff00) ? 1 : 0;
                         temp = readmem(addr);
                         tempi = tubep.c;
                         tubep.c = temp & 0x80;
@@ -1011,7 +1024,7 @@ void tube_6502_exec()
                                 temp |= 1;
                         writemem(addr, temp);
                         setzn(temp);
-                        polltime(7);
+                        polltime(6+tempw);
                         break;
 
                 case 0x3F:
@@ -1033,6 +1046,11 @@ void tube_6502_exec()
                         setzn(a);
                         polltime(6);
                         break;
+
+                case 0x44: /* NOP */
+                    (void)readmem(pc++);
+                    polltime(3);
+                    break;
 
                 case 0x45:      /*EOR zp */
                         addr = readmem(pc);
@@ -1100,7 +1118,6 @@ void tube_6502_exec()
                         temp >>= 1;
                         setzn(temp);
                         writemem(addr, temp);
-                        polltime(6);
                         break;
 
                 case 0x4F:
@@ -1131,6 +1148,13 @@ void tube_6502_exec()
                         setzn(a);
                         polltime(5);
                         break;
+
+                case 0x54: /* NOP */
+                case 0xd4:
+                case 0xf4:
+                    (void)readmem(pc++);
+                    polltime(4);
+                    break;
 
                 case 0x55:      /*EOR zp,x */
                         addr = readmem(pc);
@@ -1174,6 +1198,12 @@ void tube_6502_exec()
                         polltime(3);
                         break;
 
+                case 0x5c: /* NOP */
+                    (void)readmem(pc++);
+                    (void)readmem(pc++);
+                    polltime(8);
+                    break;
+
                 case 0x5D:      /*EOR abs,x */
                         addr = getw();
                         if ((addr & 0xFF00) ^ ((addr + x) & 0xFF00))
@@ -1184,14 +1214,15 @@ void tube_6502_exec()
                         break;
 
                 case 0x5E:      /*LSR abs,x */
-                        addr = getw();
-                        addr += x;
+                    tempw = getw();
+                    addr = tempw + x;
+                    tempw = (tempw & 0xff00) ^ (addr & 0xff00) ? 1 : 0;
                         temp = readmem(addr);
                         tubep.c = temp & 1;
                         temp >>= 1;
                         writemem(addr, temp);
                         setzn(temp);
-                        polltime(7);
+                        polltime(6+tempw);
                         break;
 
                 case 0x5F:
@@ -1368,12 +1399,12 @@ void tube_6502_exec()
                         break;
 
                 case 0x79:      /*ADC abs,y */
-                        addr = getw();
-                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
-                                polltime(1);
-                        temp = readmem(addr + y);
+                    tempw = getw();
+                    addr = tempw + y;
+                    tempw = (tempw & 0xff00) ^ (addr & 0xff00) ? 1 : 0;
+                        temp = readmem(addr);
                         adc_cmos(temp);
-                        polltime(4);
+                        polltime(4+tempw);
                         break;
 
                 case 0x7A:
@@ -1390,17 +1421,18 @@ void tube_6502_exec()
                         break;
 
                 case 0x7D:      /*ADC abs,x */
-                        addr = getw();
-                        if ((addr & 0xFF00) ^ ((addr + x) & 0xFF00))
-                                polltime(1);
-                        temp = readmem(addr + x);
+                    tempw = getw();
+                    addr = tempw + x;
+                    tempw = (tempw & 0xff00) ^ (addr & 0xff00) ? 1 : 0;
+                        temp = readmem(addr);
                         adc_cmos(temp);
-                        polltime(4);
+                        polltime(4+tempw);
                         break;
 
                 case 0x7E:      /*ROR abs,x */
-                        addr = getw();
-                        addr += x;
+                    tempw = getw();
+                    addr = tempw + x;
+                    tempw = (tempw & 0xff00) ^ (addr & 0xff00) ? 1 : 0;
                         temp = readmem(addr);
                         tempi = tubep.c;
                         tubep.c = temp & 1;
@@ -1409,7 +1441,7 @@ void tube_6502_exec()
                                 temp |= 0x80;
                         writemem(addr, temp);
                         setzn(temp);
-                        polltime(7);
+                        polltime(6+tempw);
                         break;
 
                 case 0x7F:
@@ -1958,6 +1990,13 @@ void tube_6502_exec()
                         polltime(3);
                         break;
 
+                case 0xdc: /* NOP */
+                case 0xfc:
+                    (void)readmem(pc++);
+                    (void)readmem(pc++);
+                    polltime(4);
+                    break;
+
                 case 0xDD:      /*CMP abs,x */
                         addr = getw();
                         if ((addr & 0xFF00) ^ ((addr + x) & 0xFF00))
@@ -2102,7 +2141,7 @@ void tube_6502_exec()
                         pc++;
                         temp = tuberam[(addr + x) & 0xFF];
                         sbc_cmos(temp);
-                        polltime(3);
+                        polltime(4);
                         break;
 
                 case 0xF6:      /*INC zp,x */
@@ -2123,10 +2162,10 @@ void tube_6502_exec()
                         break;
 
                 case 0xF9:      /*SBC abs,y */
-                        addr = getw();
-                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
-                                polltime(1);
-                        temp = readmem(addr + y);
+                    tempw = getw();
+                    addr = tempw + y;
+                    tempw = (tempw & 0xff00) ^ (addr & 0xff00) ? 1 : 0;
+                        temp = readmem(addr);
                         sbc_cmos(temp);
                         polltime(4);
                         break;
@@ -2138,12 +2177,12 @@ void tube_6502_exec()
                         break;
 
                 case 0xFD:      /*SBC abs,x */
-                        addr = getw();
-                        if ((addr & 0xFF00) ^ ((addr + x) & 0xFF00))
-                                polltime(1);
-                        temp = readmem(addr + x);
+                    tempw = getw();
+                    addr = tempw + x;
+                    tempw = (tempw & 0xff00) ^ (addr & 0xff00) ? 1 : 0;
+                        temp = readmem(addr);
                         sbc_cmos(temp);
-                        polltime(4);
+                        polltime(4+tempw);
                         break;
 
                 case 0xFE:      /*INC abs,x */
@@ -2160,22 +2199,8 @@ void tube_6502_exec()
                         break;
 
                 default:
-                        switch (opcode & 0xF) {
-                        case 0x3:
-                        case 0x7:
-                        case 0xB:
-                        case 0xF:
-                        case 0xA:
-                                break;
-                        case 0x2:
-                        case 0x4:
-                                pc++;
-                                break;
-                        case 0xC:
-                                pc += 2;
-                                break;
-                        }
-                        break;
+                    polltime(1);
+                    break;
                 }
                 if ((tube_irq & 2) && !tube_6502_oldnmi) {
                         push(pc >> 8);
