@@ -258,7 +258,6 @@ static uint32_t do_readmem65816(uint32_t a)
 {
     uint8_t temp;
     a &= w65816mask;
-    cycles--;
     if ((a & ~7) == 0xFEF8) {
         temp = tube_parasite_read(a);
         return temp;
@@ -275,6 +274,7 @@ static uint32_t do_readmem65816(uint32_t a)
 static uint8_t readmem65816(uint32_t addr)
 {
     uint32_t value = do_readmem65816(addr);
+    cycles--;
     if (dbg_w65816)
         debug_memread(&tube65816_cpu_debug, addr, value, 1);
     return value;
@@ -296,7 +296,6 @@ static int endtimeslice;
 static void do_writemem65816(uint32_t a, uint32_t v)
 {
     a &= w65816mask;
-    cycles--;
     if ((a & ~7) == 0xFEF0) {
         switch (v & 7) {
             case 0:
@@ -342,6 +341,7 @@ static void writemem65816(uint32_t addr, uint8_t val)
 {
     if (dbg_w65816)
         debug_memwrite(&tube65816_cpu_debug, addr, val, 1);
+    cycles--;
     do_writemem65816(addr, val);
 }
 
@@ -350,6 +350,7 @@ static void writememw65816(uint32_t a, uint16_t v)
     if (dbg_w65816)
         debug_memwrite(&tube65816_cpu_debug, a, v, 2);
     a &= w65816mask;
+    cycles -= 2;
     do_writemem65816(a, v);
     do_writemem65816(a + 1, v >> 8);
 }
@@ -372,18 +373,24 @@ static inline uint32_t absolute(void)
     return temp | dbr;
 }
 
-static inline uint32_t absolutex(void)
+static uint32_t absolutex(void)
 {
-    uint32_t temp = (readmemw(pbr | pc)) + x.w + dbr;
+    uint32_t addr1 = dbr + readmemw(pbr | pc);
+    uint32_t addr2 = addr1 + x.w;
+    if (!p.ex || (addr1 & 0xffff00) ^ (addr2 & 0xffff00))
+        --cycles;
     pc += 2;
-    return temp;
+    return addr2;
 }
 
-static inline uint32_t absolutey(void)
+static uint32_t absolutey(void)
 {
-    uint32_t temp = (readmemw(pbr | pc)) + y.w + dbr;
+    uint32_t addr1 = dbr + readmemw(pbr | pc);
+    uint32_t addr2 = addr1 + y.w;
+    if (!p.ex || (addr1 & 0xffff00) ^ (addr2 & 0xffff00))
+        --cycles;
     pc += 2;
-    return temp;
+    return addr2;
 }
 
 static inline uint32_t absolutelong(void)
@@ -486,19 +493,25 @@ static inline uint32_t indirecty(void)
     return (readmemw(addr)) + y.w + dbr;
 }
 
-static inline uint32_t indirectyE(void)
+static uint32_t indirectyE(void)
 {
-    uint32_t addr;
+    uint32_t addr1, addr2;
     uint8_t imm = readmem(pbr | pc++);
     if (imm == 0xff) {
-        addr = readmem((dp + imm) & 0xffff);
-        addr |= readmem(dp) << 8;
+        /* Fetching the two bytes of the indirect address wraps within the page */
+        addr1 = readmem((dp + imm) & 0xffff);
+        addr1 |= readmem(dp) << 8;
     }
     else {
-        addr = (imm + dp) & 0xFFFF;
-        addr = (readmemw(addr) + y.w + dbr) & 0xffff;
+        /* The indirect address is two bytes fetched normally. */
+        addr1 = (imm + dp) & 0xFFFF;
+        addr1 = readmemw(addr1);
     }
-    return addr;
+    addr1 += dbr;
+    addr2 = addr1 + y.w;
+    if (!p.ex || (addr1 & 0xffff00) ^ (addr2 & 0xffff00))
+        --cycles;
+    return addr2 & 0xffff;
 }
 
 static inline uint32_t sindirecty(void)
