@@ -225,7 +225,7 @@ uint32_t dbg6502_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
     cpu->print_addr(cpu, addr, addr_buf, sizeof(addr_buf), false);
     debug_print_8bit(op, op_buf, sizeof(op_buf));
 
-    len = snprintf(buf, bufsize, "%s: %s", addr_buf, op_buf);
+    len = snprintf(buf, bufsize, "%s: %s ", addr_buf, op_buf);
 
     buf += len;
     bufsize -= len;
@@ -248,20 +248,20 @@ uint32_t dbg6502_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
             break;
         case IMV:
             p1 = cpu->memread(addr++);
-            if (w65816p.m)
+            if (w65816p.m || w65816p.e)
                 snprintf(buf, bufsize, "%02X       %s #%02X     ", p1, op_name, p1);
             else {
                 p2 = cpu->memread(addr++);
-                snprintf(buf, bufsize, "%02X %02X     %s #%02X%02X     ", p1, p2, op_name, p1, p2);
+                snprintf(buf, bufsize, "%02X %02X    %s #%02X%02X     ", p1, p2, op_name, p1, p2);
             }
             break;
         case IMX:
             p1 = cpu->memread(addr++);
-            if (w65816p.ex)
+            if (w65816p.ex || w65816p.e)
                 snprintf(buf, bufsize, "%02X       %s #%02X     ", p1, op_name, p1);
             else {
                 p2 = cpu->memread(addr++);
-                snprintf(buf, bufsize, "%02X %02X     %s #%02X%02X     ", p1, p2, op_name, p1, p2);
+                snprintf(buf, bufsize, "%02X %02X    %s #%02X%02X     ", p1, p2, op_name, p1, p2);
             }
             break;
         case ZP:
