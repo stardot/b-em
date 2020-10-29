@@ -136,7 +136,7 @@ static void Status(void)
 
 static bool DiscTestUnitReady(unsigned char *buf)
 {
-    log_debug("scsi lun %d: test unit ready\n", scsi.lun);
+    log_debug("scsi lun %d: test unit ready", scsi.lun);
     if (SCSIDisc[scsi.lun] == NULL)
         return false;
     return true;
@@ -181,7 +181,7 @@ static int DiscRequestSense(unsigned char *cdb, unsigned char *buf)
             break;
     }
 
-    log_debug("scsi: request sense returning %d for sector %d\n", size, scsi.sector);
+    log_debug("scsi lun %d: request sense returning %d for sector %d", scsi.lun, size, scsi.sector);
     scsi.code = 0x00;
     scsi.sector = 0x00;
 
@@ -216,7 +216,7 @@ static bool DiscFormat(unsigned char *buf)
     char name[50];
     FILE *dat;
 
-    log_debug("scsi lun %d: format\n", scsi.lun);
+    log_debug("scsi lun %d: format", scsi.lun);
     snprintf(name, sizeof(name), "scsi/scsi%d.dat", scsi.lun);
     if ((dat = fopen(name, "wb+"))) {
         if (SCSIDisc[scsi.lun])
@@ -248,7 +248,7 @@ static void Format(void)
 
 static int ReadSector(unsigned char *buf, int block)
 {
-    log_debug("scsi lun %d: read sector %d\n", scsi.lun, block);
+    log_debug("scsi lun %d: read sector %d", scsi.lun, block);
     if (SCSIDisc[scsi.lun] == NULL)
         return 0;
     fseek(SCSIDisc[scsi.lun], block * 256, SEEK_SET);
@@ -267,11 +267,11 @@ static void Read6(void)
     record <<= 8;
     record |= scsi.cmd[3];
     scsi.blocks = scsi.cmd[4];
-    log_debug("read6: record=%d, blocks=%d\n", record, scsi.blocks);
+    log_debug("scsi lun %d: read6, record=%d, blocks=%d", scsi.lun, record, scsi.blocks);
     if (scsi.blocks == 0)
         scsi.blocks = 0x100;
     scsi.length = ReadSector(scsi.buffer, record);
-    log_debug("read6: length=%d\n", scsi.length);
+    log_debug("scsi lun %d: read6, length=%d", scsi.lun, scsi.length);
 
     if (scsi.length <= 0) {
         scsi.status = (scsi.lun << 5) | 0x02;
@@ -296,7 +296,7 @@ static void Read6(void)
 
 static bool WriteSector(unsigned char *buf, int block)
 {
-    log_debug("scsi lun %d: write sector %d\n", scsi.lun, block);
+    log_debug("scsi lun %d: write sector %d", scsi.lun, block);
     if (SCSIDisc[scsi.lun] == NULL)
         return false;
 
@@ -386,13 +386,13 @@ static bool DiscStartStop(unsigned char *buf)
     FILE *f;
 
     if (buf[4] & 0x02) {
-        log_debug("scsi lun %d: eject\n", scsi.lun);
+        log_debug("scsi lun %d: eject", scsi.lun);
         // Eject Disc
         if ((f = SCSIDisc[scsi.lun]))
             fflush(f);
     }
     else
-        log_debug("scsi lun %d: start\n", scsi.lun);
+        log_debug("scsi lun %d: start", scsi.lun);
     return true;
 }
 
@@ -443,7 +443,7 @@ static int DiscModeSense(unsigned char *cdb, unsigned char *buf)
     // lz    = buf[20];
 
     fclose(f);
-    log_debug("scsi lun %d: mode sense, returning %d\n", scsi.lun, size);
+    log_debug("scsi lun %d: mode sense, returning %d", scsi.lun, size);
     return size;
 }
 
@@ -474,7 +474,7 @@ static bool DiscVerify(unsigned char *buf)
 {
     int sector;
 
-    log_debug("scsi lun %d: verify\n", scsi.lun);
+    log_debug("scsi lun %d: verify", scsi.lun);
 
     sector = scsi.cmd[1] & 0x1f;
     sector <<= 8;
@@ -513,13 +513,13 @@ static void Execute(void)
     scsi.lun = (scsi.cmd[1]) >> 5;
 
     if (scsi.cmd[0] <= 0x1f) {
-        log_debug("scsi lun %d: Execute 0x%02x, Param 1=0x%02x, Param 2=0x%02x, Param 3=0x%02x, Param 4=0x%02x, Param 5=0x%02x, Phase = %d, PC = 0x%04x\n", scsi.lun, scsi.cmd[0], scsi.cmd[1], scsi.cmd[2], scsi.cmd[3], scsi.cmd[4], scsi.cmd[5], scsi.phase, pc);
+        log_debug("scsi lun %d: Execute 0x%02x, Param 1=0x%02x, Param 2=0x%02x, Param 3=0x%02x, Param 4=0x%02x, Param 5=0x%02x, Phase = %d, PC = 0x%04x", scsi.lun, scsi.cmd[0], scsi.cmd[1], scsi.cmd[2], scsi.cmd[3], scsi.cmd[4], scsi.cmd[5], scsi.phase, pc);
     }
     else {
-        log_debug("scsi lun %d: Execute 0x%02x, Param 1=0x%02x, Param 2=0x%02x, Param 3=0x%02x, Param 4=0x%02x, Param 5=0x%02x, Param 6=0x%02x, Param 7=0x%02x, Param 8=0x%02x, Param 9=0x%02x, Phase = %d, PC = 0x%04x\n", scsi.lun, scsi.cmd[0], scsi.cmd[1], scsi.cmd[2], scsi.cmd[3], scsi.cmd[4], scsi.cmd[5], scsi.cmd[6], scsi.cmd[7], scsi.cmd[8], scsi.cmd[9], scsi.phase, pc);
+        log_debug("scsi lun %d: Execute 0x%02x, Param 1=0x%02x, Param 2=0x%02x, Param 3=0x%02x, Param 4=0x%02x, Param 5=0x%02x, Param 6=0x%02x, Param 7=0x%02x, Param 8=0x%02x, Param 9=0x%02x, Phase = %d, PC = 0x%04x", scsi.lun, scsi.cmd[0], scsi.cmd[1], scsi.cmd[2], scsi.cmd[3], scsi.cmd[4], scsi.cmd[5], scsi.cmd[6], scsi.cmd[7], scsi.cmd[8], scsi.cmd[9], scsi.phase, pc);
     }
 
-    log_debug("scsi: turning on LED");
+    log_debug("scsi lun %d: turning on LED", scsi.lun);
     led_update(LED_HARD_DISK_0 + scsi.lun, 1, 20);
 
     switch (scsi.cmd[0]) {
@@ -676,7 +676,7 @@ static void WriteData(int data)
 
 void scsi_write(uint16_t addr, uint8_t value)
 {
-    //log_debug("scsi_write: addr=%02x, value=%02X, phase=%d\n", addr, value, scsi.phase);
+    //log_debug("scsi_write: addr=%02x, value=%02X, phase=%d", addr, value, scsi.phase);
 
     switch (addr & 0x03) {
         case 0x00:
@@ -693,13 +693,13 @@ void scsi_write(uint16_t addr, uint8_t value)
         case 0x03:
             scsi.sel = true;
             if (value == 0xff) {
-                log_debug("set interrupt\n");
+                log_debug("scsi lun %d: set interrupt", scsi.lun);
                 scsi.irq = true;
                 interrupt |= 1 << (SCSI_INT_NUM);
                 scsi.status = 0x00;
             }
             else {
-                log_debug("clear interrupt\n");
+                log_debug("scsi lun %d: clear interrupt", scsi.lun);
                 scsi.irq = false;
                 interrupt &= ~(1 << (SCSI_INT_NUM));
             }
@@ -799,7 +799,7 @@ uint8_t scsi_read(uint16_t addr)
             break;
     }
 
-    //log_debug("scsi_read: addr=%02x, value=%02X, phase=%d\n", addr, data, scsi.phase);
+    //log_debug("scsi_read: addr=%02x, value=%02X, phase=%d", addr, data, scsi.phase);
 
     return data;
 }
