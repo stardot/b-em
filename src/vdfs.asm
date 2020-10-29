@@ -427,7 +427,7 @@ prtextws    =   &A8
             jsr     OSWRCH
             inx
             iny
-            cpy     #&0b
+            cpy     #&0c
             bne     loop
             outcnt  ' '
             jsr     OSWRCH
