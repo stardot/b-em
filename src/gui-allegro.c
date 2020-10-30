@@ -814,14 +814,18 @@ static void disc_toggle_ide(ALLEGRO_EVENT *event)
 {
     ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
 
-    if (ide_enable)
+    if (ide_enable) {
+        ide_close();
         ide_enable = false;
+    }
     else {
-        ide_enable = true;
         if (scsi_enabled) {
+            scsi_close();
             scsi_enabled = false;
             al_set_menu_item_flags(menu, IDM_DISC_HARD_SCSI, ALLEGRO_MENU_ITEM_CHECKBOX);
         }
+        ide_enable = true;
+        ide_init();
     }
 }
 
@@ -829,14 +833,18 @@ static void disc_toggle_scsi(ALLEGRO_EVENT *event)
 {
     ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
 
-    if (scsi_enabled)
+    if (scsi_enabled) {
+        scsi_close();
         scsi_enabled = false;
+    }
     else {
-        scsi_enabled = true;
         if (ide_enable) {
+            ide_close();
             ide_enable = false;
             al_set_menu_item_flags(menu, IDM_DISC_HARD_IDE, ALLEGRO_MENU_ITEM_CHECKBOX);
         }
+        scsi_enabled = true;
+        scsi_init();
     }
 }
 
