@@ -432,6 +432,18 @@ static void dbg_z80_reg_set(int which, uint32_t value)
 static size_t dbg_z80_reg_print(int which, char *buf, size_t bufsize)
 {
     uint32_t value = dbg_z80_reg_get(which);
+    if (which == REG_F && bufsize >= 9) {
+        buf[0] = value & 0x80 ? 'S' : '-';
+        buf[1] = value & 0x40 ? 'Z' : '-';
+        buf[2] = value & 0x20 ? 'Y' : '-';
+        buf[3] = value & 0x10 ? 'H' : '-';
+        buf[4] = value & 0x08 ? 'X' : '-';
+        buf[5] = value & 0x04 ? 'V' : '-';
+        buf[6] = value & 0x02 ? 'N' : '-';
+        buf[7] = value & 0x01 ? 'C' : '-';
+        buf[8] = 0;
+        return 8;
+    }
     return snprintf(buf, bufsize, which <= REG_F ? "%02X" : "%04X", value);
 }
 
