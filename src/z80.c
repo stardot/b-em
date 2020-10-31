@@ -38,7 +38,9 @@ static int z80_oldnmi;
 
 #define N_FLAG 0x80
 #define Z_FLAG 0x40
+#define Y_FLAG 0x20
 #define H_FLAG 0x10
+#define X_FLAG 0x08
 #define P_FLAG 0x04
 #define V_FLAG 0x04
 #define S_FLAG 0x02
