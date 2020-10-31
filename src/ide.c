@@ -115,6 +115,7 @@ void ide_write(uint16_t addr, uint8_t val)
                 ide.drive = (val >> 4) & 1;
                 return;
             case 0x7: /*Command register*/
+                log_debug("ide: command=%02X", val);
                 led_update(LED_HARD_DISK_0+ide.drive, 1, 20);
                 ide.command = val;
                 ide.error = 0;
@@ -244,6 +245,7 @@ void ide_callback()
                 return;
             case 0x20: /*Read sectors*/
                 addr = ((((ide.cylinder * ide.hpc) + ide.head) * ide.spt) + (ide.sector)) * 256;
+                log_debug("ide: read sector, cylinder=%u, hpc=%u, head=%u, spt=%u, sector=%u, addr=%u", ide.cylinder, ide.hpc, ide.head, ide.spt, ide.sector, addr);
                 fseek(hdfile[ide.drive], addr, SEEK_SET);
                 memset(ide_buffer, 0, 512);
                 if (fread(ide_buffer2, 256, 1, hdfile[ide.drive]) != 1 && ferror(hdfile[ide.drive])) {
@@ -259,6 +261,7 @@ void ide_callback()
                 return;
             case 0x30: /*Write sector*/
                 addr = ((((ide.cylinder * ide.hpc) + ide.head) * ide.spt) + (ide.sector)) * 256;
+                log_debug("ide: write sector, cylinder=%u, hpc=%u, head=%u, spt=%u, sector=%u, addr=%u", ide.cylinder, ide.hpc, ide.head, ide.spt, ide.sector, addr);
                 fseek(hdfile[ide.drive], addr, SEEK_SET);
                 for (c = 0; c < 256; c++) ide_buffer2[c] = ide_bufferb[c << 1];
                 fwrite(ide_buffer2, 256, 1, hdfile[ide.drive]);

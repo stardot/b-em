@@ -26,7 +26,7 @@ Boston, MA  02110-1301, USA.
 /*
 
 Offset  Description                 Access
-+00     data						R/W
++00     data                        R/W
 +01     read status                 R
 +02     write select                W
 +03     write irq enable            W
@@ -50,844 +50,857 @@ Offset  Description                 Access
 bool scsi_enabled = false;
 
 typedef enum {
-	busfree,
-	selection,
-	command,
-	execute,
-	scsiread,
-	scsiwrite,
-	status,
-	message
+    busfree,
+    selection,
+    command,
+    execute,
+    scsiread,
+    scsiwrite,
+    status,
+    message
 } phase_t;
 
-#define false 0
-#define true  1
-#define FALSE 0
-#define TRUE  1
-
 typedef struct {
-	phase_t phase;
-	bool sel;
-	bool msg;
-	bool cd;
-	bool io;
-	bool bsy;
-	bool req;
-	bool irq;
-	unsigned char cmd[10];
-	int status;
-	int message;
-	unsigned char buffer[0x800];
-	int blocks;
-	int next;
-	int offset;
-	int length;
-	int lastwrite;
-	int lun;
-	int code;
-	int sector;
+    phase_t phase;
+    bool sel;
+    bool msg;
+    bool cd;
+    bool io;
+    bool bsy;
+    bool req;
+    bool irq;
+    unsigned char cmd[10];
+    int status;
+    int message;
+    unsigned char buffer[0x800];
+    int blocks;
+    int next;
+    int offset;
+    int length;
+    int lastwrite;
+    int lun;
+    int code;
+    int sector;
 } scsi_t;
+
+typedef struct scsi_disc scsidisc;
+
+struct scsi_disc {
+    bool (*ReadSector)(scsidisc *disc, unsigned char *buf, unsigned block);
+    bool (*WriteSector)(scsidisc *disc, unsigned char *buf, unsigned block);
+    ALLEGRO_PATH *path;
+    FILE *dat_fp, *dsc_fp;
+    unsigned blocks;
+    unsigned char geom[33];
+};
 
 #define SCSI_DRIVES 4
 
 static scsi_t scsi;
-static FILE *SCSIDisc[SCSI_DRIVES] = {0};
-static int SCSISize[SCSI_DRIVES];
+static scsidisc SCSIDisc[SCSI_DRIVES];
+
+static inline unsigned CalcSector(unsigned char *cmd)
+{
+    return ((scsi.cmd[1] & 0x1f) << 16) | (scsi.cmd[2] << 8) | scsi.cmd[3];
+}
 
 static void BusFree(void)
 {
-	scsi.msg = false;
-	scsi.cd = false;
-	scsi.io = false;
-	scsi.bsy = false;
-	scsi.req = false;
-	scsi.irq = false;
+    scsi.msg = false;
+    scsi.cd = false;
+    scsi.io = false;
+    scsi.bsy = false;
+    scsi.req = false;
+    scsi.irq = false;
 
-	scsi.phase = busfree;
-
-	//LEDs.HDisc[0] = 0;
-	//LEDs.HDisc[1] = 0;
-	//LEDs.HDisc[2] = 0;
-	//LEDs.HDisc[3] = 0;
+    scsi.phase = busfree;
 }
 
 static void Selection(int data)
 {
-	scsi.bsy = true;
-	scsi.phase = selection;
+    scsi.bsy = true;
+    scsi.phase = selection;
 }
 
 static void Command(void)
 {
-	scsi.phase = command;
+    scsi.phase = command;
 
-	scsi.io = false;
-	scsi.cd = true;
-	scsi.msg = false;
+    scsi.io = false;
+    scsi.cd = true;
+    scsi.msg = false;
 
-	scsi.offset = 0;
-	scsi.length = 6;
+    scsi.offset = 0;
+    scsi.length = 6;
 }
 
 static void Status(void)
 {
-	scsi.phase = status;
+    scsi.phase = status;
 
-	scsi.io = true;
-	scsi.cd = true;
-	scsi.req = true;
+    scsi.io = true;
+    scsi.cd = true;
+    scsi.req = true;
 }
 
 static bool DiscTestUnitReady(unsigned char *buf)
 {
-        log_debug("scsi lun %d: test unit ready\n", scsi.lun);
-	if (SCSIDisc[scsi.lun] == NULL) return false;
-	return true;
+    log_debug("scsi lun %d: test unit ready", scsi.lun);
+    if (SCSIDisc[scsi.lun].dat_fp == NULL)
+        return false;
+    return true;
 }
 
 static void TestUnitReady(void)
 {
-	bool status;
+    bool status;
 
-	status = DiscTestUnitReady(scsi.cmd);
-	if (status) {
-		scsi.status = (scsi.lun << 5) | 0x00;
-		scsi.message = 0x00;
-	} else {
-		scsi.status = (scsi.lun << 5) | 0x02;
-		scsi.message = 0x00;
-	}
-	Status();
+    status = DiscTestUnitReady(scsi.cmd);
+    if (status) {
+        scsi.status = (scsi.lun << 5) | 0x00;
+        scsi.message = 0x00;
+    }
+    else {
+        scsi.status = (scsi.lun << 5) | 0x02;
+        scsi.message = 0x00;
+    }
+    Status();
 }
 
 static int DiscRequestSense(unsigned char *cdb, unsigned char *buf)
 {
-	int size;
+    int size;
 
-	size = cdb[4];
-	if (size == 0)
-		size = 4;
+    size = cdb[4];
+    if (size == 0)
+        size = 4;
 
-	switch (scsi.code) {
-		case 0x00 :
-			buf[0] = 0x00;
-			buf[1] = 0x00;
-			buf[2] = 0x00;
-			buf[3] = 0x00;
-			break;
-		case 0x21 :
-			buf[0] = 0x21;
-			buf[1] = (scsi.sector >> 16) & 0xff;
-			buf[2] = (scsi.sector >> 8) & 0xff;
-			buf[3] = (scsi.sector & 0xff);
-			break;
-	}
+    switch (scsi.code) {
+        case 0x00:
+            buf[0] = 0x00;
+            buf[1] = 0x00;
+            buf[2] = 0x00;
+            buf[3] = 0x00;
+            break;
+        case 0x21:
+            buf[0] = 0x21;
+            buf[1] = (scsi.sector >> 16) & 0xff;
+            buf[2] = (scsi.sector >> 8) & 0xff;
+            buf[3] = (scsi.sector & 0xff);
+            break;
+    }
 
-        log_debug("scsi: request sense returning %d for sector %d\n", size, scsi.sector);
-	scsi.code = 0x00;
-	scsi.sector = 0x00;
+    log_debug("scsi lun %d: request sense returning %d for sector %d", scsi.lun, size, scsi.sector);
+    scsi.code = 0x00;
+    scsi.sector = 0x00;
 
-	return size;
+    return size;
 }
 
 static void RequestSense(void)
 {
-	scsi.length = DiscRequestSense(scsi.cmd, scsi.buffer);
+    scsi.length = DiscRequestSense(scsi.cmd, scsi.buffer);
 
-	if (scsi.length > 0) {
-		scsi.offset = 0;
-		scsi.blocks = 1;
-		scsi.phase = scsiread;
-		scsi.io = TRUE;
-		scsi.cd = FALSE;
+    if (scsi.length > 0) {
+        scsi.offset = 0;
+        scsi.blocks = 1;
+        scsi.phase = scsiread;
+        scsi.io = true;
+        scsi.cd = false;
 
-		scsi.status = (scsi.lun << 5) | 0x00;
-		scsi.message = 0x00;
+        scsi.status = (scsi.lun << 5) | 0x00;
+        scsi.message = 0x00;
 
-		scsi.req = true;
-	}
-	else
-	{
-		scsi.status = (scsi.lun << 5) | 0x02;
-		scsi.message = 0x00;
-		Status();
-	}
+        scsi.req = true;
+    }
+    else {
+        scsi.status = (scsi.lun << 5) | 0x02;
+        scsi.message = 0x00;
+        Status();
+    }
 }
 
 static bool DiscFormat(unsigned char *buf)
 {
+    scsidisc *sd = &SCSIDisc[scsi.lun];
+    ALLEGRO_PATH *path = sd->path;
+    const char *cpath;
+    if (path)
+        al_set_path_extension(path, ".dat");
+    else {
         char name[50];
-        FILE *dat;
-
-        log_debug("scsi lun %d: format\n", scsi.lun);
-        snprintf(name, sizeof(name), "scsi/scsi%d.dat", scsi.lun);
-        if ((dat = fopen(name, "wb+")))
-        {
-                if (SCSIDisc[scsi.lun])
-                        fclose(SCSIDisc[scsi.lun]);
-                SCSIDisc[scsi.lun] = dat;
-                return true;
+        snprintf(name, sizeof(name), "scsi/scsi%d", scsi.lun);
+        path = find_cfg_dest(name, ".dat");
+        if (!path) {
+            log_error("scsi lun %d: unable to find destination for %s", scsi.lun, name);
+            return false;
         }
-        else
-        {
-                log_warn("scsi lun %d: unable to open/truncate data file %s: %s", scsi.lun, name, strerror(errno));
-                return false;
-        }
+        sd->path = path;
+    }
+    cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+    if (sd->dat_fp)
+        fclose(sd->dat_fp);
+    if (!(sd->dat_fp = fopen(cpath, "wb+"))) {
+        log_error("scsi lun %d: unable to open %s: %s", scsi.lun, cpath, strerror(errno));
+        return false;
+    }
+    return true;
 }
 
 static void Format(void)
 {
-	bool status;
+    bool status;
 
-	status = DiscFormat(scsi.cmd);
-	if (status) {
-		scsi.status = (scsi.lun << 5) | 0x00;
-		scsi.message = 0x00;
-	} else {
-		scsi.status = (scsi.lun << 5) | 0x02;
-		scsi.message = 0x00;
-	}
-	Status();
+    status = DiscFormat(scsi.cmd);
+    if (status) {
+        scsi.status = (scsi.lun << 5) | 0x00;
+        scsi.message = 0x00;
+    }
+    else {
+        scsi.status = (scsi.lun << 5) | 0x02;
+        scsi.message = 0x00;
+    }
+    Status();
 }
 
-static int ReadSector(unsigned char *buf, int block)
+static bool ReadWriteNone(scsidisc *sd, unsigned char *buf, unsigned block)
 {
-    log_debug("scsi lun %d: read sector %d\n", scsi.lun, block);
-    if (SCSIDisc[scsi.lun] == NULL)
-        return 0;
-    fseek(SCSIDisc[scsi.lun], block * 256, SEEK_SET);
-    if (fread(buf, 256, 1, SCSIDisc[scsi.lun]) != 1 && ferror(SCSIDisc[scsi.lun]))
-        return -1;
-    return 256;
+    return false;
+}
+
+static bool ReadSectorSimple(scsidisc *sd, unsigned char *buf, unsigned block)
+{
+    log_debug("scsi lun %d: read sector %u", scsi.lun, block);
+    if (fseek(sd->dat_fp, block * 256, SEEK_SET))
+        return false;
+    if (fread(buf, 256, 1, sd->dat_fp) != 1 && ferror(sd->dat_fp)) {
+        log_warn("scsi lun %d: read error: %s", scsi.lun, strerror(errno));
+        return false;
+    }
+    return true;
+}
+
+static bool ReadSectorPadded(scsidisc *sd, unsigned char *buf, unsigned block)
+{
+    unsigned char padbuf[512];
+    unsigned char *end = padbuf + sizeof(padbuf);
+    if (fseek(sd->dat_fp, block * sizeof(padbuf), SEEK_SET))
+        return false;
+    if (fread(padbuf, sizeof(padbuf), 1, sd->dat_fp) != 1 && ferror(sd->dat_fp)) {
+        log_warn("scsi lun %d: read error: %s", scsi.lun, strerror(errno));
+        return false;
+    }
+    for (unsigned char *ptr = padbuf; ptr < end; ptr += 2)
+        *buf++ = *ptr;
+    return true;
 }
 
 static void Read6(void)
 {
-	int record;
+    scsidisc *sd = &SCSIDisc[scsi.lun];
+    unsigned sector = CalcSector(scsi.cmd);
+    scsi.blocks = scsi.cmd[4];
+    log_debug("scsi lun %d: read6, sector=%u, blocks=%d", scsi.lun, sector, scsi.blocks);
+    if (scsi.blocks == 0)
+        scsi.blocks = 0x100;
+    if (sd->ReadSector(sd, scsi.buffer, sector)) {
+        scsi.status = (scsi.lun << 5) | 0x00;
+        scsi.message = 0x00;
 
-	record = scsi.cmd[1] & 0x1f;
-	record <<= 8;
-	record |= scsi.cmd[2];
-	record <<= 8;
-	record |= scsi.cmd[3];
-	scsi.blocks = scsi.cmd[4];
-        log_debug("read6: record=%d, blocks=%d\n", record, scsi.blocks);
-	if (scsi.blocks == 0)
-		scsi.blocks = 0x100;
-	scsi.length = ReadSector(scsi.buffer, record);
-        log_debug("read6: length=%d\n", scsi.length);
+        scsi.length = 256;
+        scsi.offset = 0;
+        scsi.next = sector + 1;
 
-	if (scsi.length <= 0) {
-		scsi.status = (scsi.lun << 5) | 0x02;
-		scsi.message = 0x00;
-		Status();
-		return;
-	}
+        scsi.phase = scsiread;
+        scsi.io = true;
+        scsi.cd = false;
 
-	scsi.status = (scsi.lun << 5) | 0x00;
-	scsi.message = 0x00;
-
-	scsi.offset = 0;
-	scsi.next = record + 1;
-
-	scsi.phase = scsiread;
-	scsi.io = true;
-	scsi.cd = false;
-
-	scsi.req = true;
-    autoboot = 0;
+        scsi.req = true;
+        autoboot = 0;
+    }
+    else {
+        scsi.status = (scsi.lun << 5) | 0x02;
+        scsi.message = 0x00;
+        Status();
+    }
 }
 
-static bool WriteSector(unsigned char *buf, int block)
+static bool WriteSectorSimple(scsidisc *sd, unsigned char *buf, unsigned block)
 {
-        log_debug("scsi lun %d: write sector %d\n", scsi.lun, block);
-	if (SCSIDisc[scsi.lun] == NULL) return false;
+    log_debug("scsi lun %d: write sector %d", scsi.lun, block);
+    if (fseek(sd->dat_fp, block * 256, SEEK_SET))
+        return false;
+    if (fwrite(buf, 256, 1, sd->dat_fp) != 1) {
+        log_warn("scsi lun %d: write error: %s", scsi.lun, strerror(errno));
+        return false;
+    }
+    return true;
+}
 
-        fseek(SCSIDisc[scsi.lun], block * 256, SEEK_SET);
-
-	fwrite(buf, 256, 1, SCSIDisc[scsi.lun]);
-
-	return true;
+static bool WriteSectorPadded(scsidisc *sd, unsigned char *buf, unsigned block)
+{
+    unsigned char padbuf[512];
+    unsigned char *end = padbuf + sizeof(padbuf);
+    log_debug("scsi lun %d: write sector %d", scsi.lun, block);
+    if (fseek(sd->dat_fp, block * sizeof(padbuf), SEEK_SET))
+        return false;
+    for (unsigned char *ptr = padbuf; ptr < end; ptr += 2)
+        *ptr = *buf++;
+    if (fwrite(padbuf, sizeof(padbuf), 1, sd->dat_fp) != 1) {
+        log_warn("scsi lun %d: write error: %s", scsi.lun, strerror(errno));
+        return false;
+    }
+    return true;
 }
 
 static void Write6(void)
 {
-	int record;
+    scsi.blocks = scsi.cmd[4];
+    if (scsi.blocks == 0)
+        scsi.blocks = 0x100;
 
-	record = scsi.cmd[1] & 0x1f;
-	record <<= 8;
-	record |= scsi.cmd[2];
-	record <<= 8;
-	record |= scsi.cmd[3];
-	scsi.blocks = scsi.cmd[4];
-	if (scsi.blocks == 0)
-		scsi.blocks = 0x100;
+    scsi.length = 256;
 
-	scsi.length = 256;
+    scsi.status = (scsi.lun << 5) | 0x00;
+    scsi.message = 0x00;
 
-	scsi.status = (scsi.lun << 5) | 0x00;
-	scsi.message = 0x00;
+    scsi.next = CalcSector(scsi.cmd) + 1;
+    scsi.offset = 0;
 
-	scsi.next = record + 1;
-	scsi.offset = 0;
+    scsi.phase = scsiwrite;
+    scsi.cd = false;
 
-	scsi.phase = scsiwrite;
-	scsi.cd = false;
-
-	scsi.req = true;
+    scsi.req = true;
 }
 
 static void Translate(void)
 {
-	int record;
+    scsi.buffer[0] = scsi.cmd[3];
+    scsi.buffer[1] = scsi.cmd[2];
+    scsi.buffer[2] = scsi.cmd[1] & 0x1f;
+    scsi.buffer[3] = 0x00;
 
-	record = scsi.cmd[1] & 0x1f;
-	record <<= 8;
-	record |= scsi.cmd[2];
-	record <<= 8;
-	record |= scsi.cmd[3];
+    scsi.length = 4;
 
-	scsi.buffer[0] = scsi.cmd[3];
-	scsi.buffer[1] = scsi.cmd[2];
-	scsi.buffer[2] = scsi.cmd[1] & 0x1f;
-	scsi.buffer[3] = 0x00;
+    scsi.offset = 0;
+    scsi.blocks = 1;
+    scsi.phase = scsiread;
+    scsi.io = true;
+    scsi.cd = false;
 
-	scsi.length = 4;
+    scsi.status = (scsi.lun << 5) | 0x00;
+    scsi.message = 0x00;
 
-	scsi.offset = 0;
-	scsi.blocks = 1;
-	scsi.phase = scsiread;
-	scsi.io = TRUE;
-	scsi.cd = FALSE;
-
-	scsi.status = (scsi.lun << 5) | 0x00;
-	scsi.message = 0x00;
-
-	scsi.req = true;
+    scsi.req = true;
 }
 
 static void ModeSelect(void)
 {
 
-	scsi.length = scsi.cmd[4];
-	scsi.blocks = 1;
+    scsi.length = scsi.cmd[4];
+    scsi.blocks = 1;
 
-	scsi.status = (scsi.lun << 5) | 0x00;
-	scsi.message = 0x00;
+    scsi.status = (scsi.lun << 5) | 0x00;
+    scsi.message = 0x00;
 
-	scsi.next = 0;
-	scsi.offset = 0;
+    scsi.next = 0;
+    scsi.offset = 0;
 
-	scsi.phase = scsiwrite;
-	scsi.cd = false;
+    scsi.phase = scsiwrite;
+    scsi.cd = false;
 
-	scsi.req = true;
+    scsi.req = true;
 }
 
 static bool DiscStartStop(unsigned char *buf)
 {
-        FILE *f;
-
-	if (buf[4] & 0x02) {
-                log_debug("scsi lun %d: eject\n", scsi.lun);
-// Eject Disc
-                if ((f = SCSIDisc[scsi.lun]))
-                        fflush(f);
-	} else
-                log_debug("scsi lun %d: start\n", scsi.lun);
-	return true;
+    if (buf[4] & 0x02) {
+        // Eject Disc
+        FILE *fp = SCSIDisc[scsi.lun].dat_fp;
+        log_debug("scsi lun %d: eject", scsi.lun);
+        if (fp)
+            fflush(fp);
+    }
+    else
+        log_debug("scsi lun %d: start", scsi.lun);
+    return true;
 }
 
 static void StartStop(void)
 {
-	bool status;
+    bool status;
 
-	status = DiscStartStop(scsi.cmd);
-	if (status) {
-		scsi.status = (scsi.lun << 5) | 0x00;
-		scsi.message = 0x00;
-	} else {
-		scsi.status = (scsi.lun << 5) | 0x02;
-		scsi.message = 0x00;
-	}
-	Status();
+    status = DiscStartStop(scsi.cmd);
+    if (status) {
+        scsi.status = (scsi.lun << 5) | 0x00;
+        scsi.message = 0x00;
+    }
+    else {
+        scsi.status = (scsi.lun << 5) | 0x02;
+        scsi.message = 0x00;
+    }
+    Status();
 }
 
 static int DiscModeSense(unsigned char *cdb, unsigned char *buf)
 {
-	FILE *f;
-
-	int size;
-
-	char buff[256];
-
-	if (SCSIDisc[scsi.lun] == NULL) return 0;
-
-	sprintf(buff, "scsi/scsi%d.dsc", scsi.lun);
-
-	f = fopen(buff, "rb");
-
-	if (f == NULL) return 0;
-
-	size = cdb[4];
-	if (size == 0)
-		size = 22;
-
-	size = (int)fread(buf, 1, size, f);
-
-// heads = buf[15];
-// cyl   = buf[13] * 256 + buf[14];
-// step  = buf[21];
-// rwcc  = buf[16] * 256 + buf[17];
-// lz    = buf[20];
-
-	fclose(f);
-        log_debug("scsi lun %d: mode sense, returning %d\n", scsi.lun, size);
-	return size;
+    scsidisc *sd = &SCSIDisc[scsi.lun];
+    int size = cdb[4];
+    if (size == 0)
+        size = 22;
+    if (size > sizeof(sd->geom))
+        size = sizeof(sd->geom);
+    memcpy(buf, sd->geom, sizeof(sd->geom));
+    return size;
 }
 
 static void ModeSense(void)
 {
-	scsi.length = DiscModeSense(scsi.cmd, scsi.buffer);
+    scsi.length = DiscModeSense(scsi.cmd, scsi.buffer);
 
-	if (scsi.length > 0) {
-		scsi.offset = 0;
-		scsi.blocks = 1;
-		scsi.phase = scsiread;
-		scsi.io = TRUE;
-		scsi.cd = FALSE;
+    if (scsi.length > 0) {
+        scsi.offset = 0;
+        scsi.blocks = 1;
+        scsi.phase = scsiread;
+        scsi.io = true;
+        scsi.cd = false;
 
-		scsi.status = (scsi.lun << 5) | 0x00;
-		scsi.message = 0x00;
+        scsi.status = (scsi.lun << 5) | 0x00;
+        scsi.message = 0x00;
 
-		scsi.req = true;
-	}
-	else
-	{
-		scsi.status = (scsi.lun << 5) | 0x02;
-		scsi.message = 0x00;
-		Status();
-	}
-}
-
-static bool DiscVerify(unsigned char *buf)
-
-{
-	int sector;
-
-        log_debug("scsi lun %d: verify\n", scsi.lun);
-
-        sector = scsi.cmd[1] & 0x1f;
-	sector <<= 8;
-	sector |= scsi.cmd[2];
-	sector <<= 8;
-	sector |= scsi.cmd[3];
-
-	if (sector >= SCSISize[scsi.lun])
-	{
-		scsi.code = 0x21;
-		scsi.sector = sector;
-		return false;
-	}
-
-	return true;
+        scsi.req = true;
+    }
+    else {
+        scsi.status = (scsi.lun << 5) | 0x02;
+        scsi.message = 0x00;
+        Status();
+    }
 }
 
 static void Verify(void)
 {
-	bool status;
-
-	status = DiscVerify(scsi.cmd);
-	if (status) {
-		scsi.status = (scsi.lun << 5) | 0x00;
-		scsi.message = 0x00;
-	} else {
-		scsi.status = (scsi.lun << 5) | 0x02;
-		scsi.message = 0x00;
-	}
-	Status();
+    int sector = CalcSector(scsi.cmd);
+    if (sector < SCSIDisc[scsi.lun].blocks)
+        scsi.status = (scsi.lun << 5) | 0x00;
+    else {
+        scsi.code = 0x21;
+        scsi.sector = sector;
+        scsi.status = (scsi.lun << 5) | 0x02;
+        scsi.message = 0x00;
+    }
+    scsi.message = 0x00;
+    Status();
 }
 
 static void Execute(void)
 {
-	scsi.phase = execute;
-	scsi.lun = (scsi.cmd[1]) >> 5;
+    scsi.phase = execute;
+    scsi.lun = (scsi.cmd[1]) >> 5;
 
-	if (scsi.cmd[0] <= 0x1f) {
-		log_debug("scsi lun %d: Execute 0x%02x, Param 1=0x%02x, Param 2=0x%02x, Param 3=0x%02x, Param 4=0x%02x, Param 5=0x%02x, Phase = %d, PC = 0x%04x\n",
-				scsi.lun, scsi.cmd[0], scsi.cmd[1], scsi.cmd[2], scsi.cmd[3], scsi.cmd[4], scsi.cmd[5], scsi.phase, pc);
-	} else {
-		log_debug("scsi lun %d: Execute 0x%02x, Param 1=0x%02x, Param 2=0x%02x, Param 3=0x%02x, Param 4=0x%02x, Param 5=0x%02x, Param 6=0x%02x, Param 7=0x%02x, Param 8=0x%02x, Param 9=0x%02x, Phase = %d, PC = 0x%04x\n",
-				scsi.lun, scsi.cmd[0], scsi.cmd[1], scsi.cmd[2], scsi.cmd[3], scsi.cmd[4], scsi.cmd[5], scsi.cmd[6], scsi.cmd[7], scsi.cmd[8], scsi.cmd[9], scsi.phase, pc);
-	}
+    if (scsi.cmd[0] <= 0x1f) {
+        log_debug("scsi lun %d: Execute 0x%02x, Param 1=0x%02x, Param 2=0x%02x, Param 3=0x%02x, Param 4=0x%02x, Param 5=0x%02x, Phase = %d, PC = 0x%04x", scsi.lun, scsi.cmd[0], scsi.cmd[1], scsi.cmd[2], scsi.cmd[3], scsi.cmd[4], scsi.cmd[5], scsi.phase, pc);
+    }
+    else {
+        log_debug("scsi lun %d: Execute 0x%02x, Param 1=0x%02x, Param 2=0x%02x, Param 3=0x%02x, Param 4=0x%02x, Param 5=0x%02x, Param 6=0x%02x, Param 7=0x%02x, Param 8=0x%02x, Param 9=0x%02x, Phase = %d, PC = 0x%04x", scsi.lun, scsi.cmd[0], scsi.cmd[1], scsi.cmd[2], scsi.cmd[3], scsi.cmd[4], scsi.cmd[5], scsi.cmd[6], scsi.cmd[7], scsi.cmd[8], scsi.cmd[9], scsi.phase, pc);
+    }
 
-    log_debug("scsi: turning on LED");
+    log_debug("scsi lun %d: turning on LED", scsi.lun);
     led_update(LED_HARD_DISK_0 + scsi.lun, 1, 20);
 
-	switch (scsi.cmd[0]) {
-		case 0x00 :
-			TestUnitReady();
-			return;
-		case 0x03 :
-			RequestSense();
-			return;
-		case 0x04 :
-			Format();
-			return;
-		case 0x08 :
-			Read6();
-			return;
-		case 0x0a :
-			Write6();
-			return;
-		case 0x0f :
-			Translate();
-			return;
-		case 0x15 :
-			ModeSelect();
-			return;
-		case 0x1a :
-			ModeSense();
-			return;
-		case 0x1b :
-			StartStop();
-			return;
-		case 0x2f :
-			Verify();
-			return;
-	}
+    switch (scsi.cmd[0]) {
+        case 0x00:
+            TestUnitReady();
+            return;
+        case 0x03:
+            RequestSense();
+            return;
+        case 0x04:
+            Format();
+            return;
+        case 0x08:
+            Read6();
+            return;
+        case 0x0a:
+            Write6();
+            return;
+        case 0x0f:
+            Translate();
+            return;
+        case 0x15:
+            ModeSelect();
+            return;
+        case 0x1a:
+            ModeSense();
+            return;
+        case 0x1b:
+            StartStop();
+            return;
+        case 0x2f:
+            Verify();
+            return;
+    }
 
-	scsi.status = (scsi.lun << 5) | 0x02;
-	scsi.message = 0x00;
-	Status();
+    scsi.status = (scsi.lun << 5) | 0x02;
+    scsi.message = 0x00;
+    Status();
 }
 
 static bool WriteGeometory(unsigned char *buf)
 {
-	FILE *f;
-
-	char buff[256];
-
-	if (SCSIDisc[scsi.lun] == NULL) return false;
-
-	sprintf(buff, "scsi/scsi%d.dsc", scsi.lun);
-
-	f = fopen(buff, "wb");
-
-	if (f == NULL) return false;
-
-	fwrite(buf, 22, 1, f);
-
-	fclose(f);
-
-	return true;
+    scsidisc *sd = &SCSIDisc[scsi.lun];
+    FILE *fp = sd->dsc_fp;
+    if (!fp)
+        return false;
+    if (fseek(fp, 0, SEEK_SET))
+        return false;
+    if (fwrite(buf, 22, 1, fp) != 1)
+        return false;
+    return true;
 }
 
 static void WriteData(int data)
 {
+    scsidisc *sd;
 
-	scsi.lastwrite = data;
+    scsi.lastwrite = data;
 
-	switch (scsi.phase)
-	{
-		case busfree :
-			if (scsi.sel) {
-				Selection(data);
-			}
-			return;
+    switch (scsi.phase) {
+        case busfree:
+            if (scsi.sel) {
+                Selection(data);
+            }
+            return;
 
-		case selection :
-			if (!scsi.sel) {
-				Command();
-				return;
-			}
-			break;
+        case selection:
+            if (!scsi.sel) {
+                Command();
+                return;
+            }
+            break;
 
-		case command :
-			scsi.cmd[scsi.offset] = data;
-			if (scsi.offset == 0) {
-				if ((data >= 0x20) && (data <= 0x3f)) {
-					scsi.length = 10;
-				}
-			}
-			scsi.offset++;
-			scsi.length--;
-			scsi.req = false;
+        case command:
+            scsi.cmd[scsi.offset] = data;
+            if (scsi.offset == 0) {
+                if ((data >= 0x20) && (data <= 0x3f)) {
+                    scsi.length = 10;
+                }
+            }
+            scsi.offset++;
+            scsi.length--;
+            scsi.req = false;
 
-			if (scsi.length == 0) {
-				Execute();
-				return;
-			}
-			return;
+            if (scsi.length == 0) {
+                Execute();
+                return;
+            }
+            return;
 
-		case scsiwrite :
-			scsi.buffer[scsi.offset] = data;
-			scsi.offset++;
-			scsi.length--;
-			scsi.req = false;
+        case scsiwrite:
+            scsi.buffer[scsi.offset] = data;
+            scsi.offset++;
+            scsi.length--;
+            scsi.req = false;
 
-			if (scsi.length > 0)
-				return;
+            if (scsi.length > 0)
+                return;
 
-			switch (scsi.cmd[0]) {
-				case 0x0a :
-				case 0x15 :
-				case 0x2a :
-				case 0x2e :
-					break;
-				default :
-					Status();
-					return;
-			}
-
-			switch (scsi.cmd[0]) {
-				case 0x0a :
-					if (!WriteSector(scsi.buffer, scsi.next - 1)) {
-						scsi.status = (scsi.lun << 5) | 0x02;
-						scsi.message = 0;
-						Status();
-						return;
-					}
-					break;
-				case 0x15 :
-					if (!WriteGeometory(scsi.buffer)) {
-						scsi.status = (scsi.lun << 5) | 0x02;
-						scsi.message = 0;
-						Status();
-						return;
-					}
-					break;
-			}
-
-			scsi.blocks--;
-
-			if (scsi.blocks == 0) {
-				Status();
-				return;
-			}
-			scsi.length = 256;
-			scsi.next++;
-			scsi.offset = 0;
-			return;
+            switch (scsi.cmd[0]) {
+                case 0x0a:
+                case 0x15:
+                case 0x2a:
+                case 0x2e:
+                    break;
                 default:
-                        log_warn("scsi: invalid phase %d in WriteData", scsi.phase);
-	}
-	BusFree();
+                    Status();
+                    return;
+            }
+
+            switch (scsi.cmd[0]) {
+                case 0x0a:
+                    sd = &SCSIDisc[scsi.lun];
+                    if (!sd->WriteSector(sd, scsi.buffer, scsi.next - 1)) {
+                        scsi.status = (scsi.lun << 5) | 0x02;
+                        scsi.message = 0;
+                        Status();
+                        return;
+                    }
+                    break;
+                case 0x15:
+                    if (!WriteGeometory(scsi.buffer)) {
+                        scsi.status = (scsi.lun << 5) | 0x02;
+                        scsi.message = 0;
+                        Status();
+                        return;
+                    }
+                    break;
+            }
+
+            scsi.blocks--;
+
+            if (scsi.blocks == 0) {
+                Status();
+                return;
+            }
+            scsi.length = 256;
+            scsi.next++;
+            scsi.offset = 0;
+            return;
+        default:
+            log_warn("scsi: invalid phase %d in WriteData", scsi.phase);
+    }
+    BusFree();
 }
 
 void scsi_write(uint16_t addr, uint8_t value)
 {
-        //log_debug("scsi_write: addr=%02x, value=%02X, phase=%d\n", addr, value, scsi.phase);
+    //log_debug("scsi_write: addr=%02x, value=%02X, phase=%d", addr, value, scsi.phase);
 
-        switch (addr & 0x03)
-        {
-                case 0x00:
-                        scsi.sel = true;
-                        WriteData(value);
-                        break;
-                case 0x01:
-                        scsi.sel = true;
-                        break;
-                case 0x02:
-                        scsi.sel = false;
-                        WriteData(value);
-			break;
-		case 0x03:
-			scsi.sel = true;
-                        if (value == 0xff)
-                        {
-                                log_debug("set interrupt\n");
-                                scsi.irq = true;
-                                interrupt |= 1 << (SCSI_INT_NUM);
-                                scsi.status = 0x00;
-                        }
-                        else
-                        {
-                                log_debug("clear interrupt\n");
-                                scsi.irq = false;
-                                interrupt &= ~(1 << (SCSI_INT_NUM));
-                        }
-			break;
-        }
+    switch (addr & 0x03) {
+        case 0x00:
+            scsi.sel = true;
+            WriteData(value);
+            break;
+        case 0x01:
+            scsi.sel = true;
+            break;
+        case 0x02:
+            scsi.sel = false;
+            WriteData(value);
+            break;
+        case 0x03:
+            scsi.sel = true;
+            if (value == 0xff) {
+                log_debug("scsi lun %d: set interrupt", scsi.lun);
+                scsi.irq = true;
+                interrupt |= 1 << (SCSI_INT_NUM);
+                scsi.status = 0x00;
+            }
+            else {
+                log_debug("scsi lun %d: clear interrupt", scsi.lun);
+                scsi.irq = false;
+                interrupt &= ~(1 << (SCSI_INT_NUM));
+            }
+            break;
+    }
 }
 
 static void Message(void)
 {
-	scsi.phase = message;
+    scsi.phase = message;
 
-	scsi.msg = true;
-	scsi.req = true;
+    scsi.msg = true;
+    scsi.req = true;
 }
 
 static int ReadData(void)
 {
-	int data;
+    scsidisc *sd;
+    int data;
 
-	switch (scsi.phase)
-	{
-		case status :
-			data = scsi.status;
-			scsi.req = false;
-			Message();
-			return data;
+    switch (scsi.phase) {
+        case status:
+            data = scsi.status;
+            scsi.req = false;
+            Message();
+            return data;
 
-		case message :
-			data = scsi.message;
-			scsi.req = false;
-			BusFree();
-			return data;
+        case message:
+            data = scsi.message;
+            scsi.req = false;
+            BusFree();
+            return data;
 
-		case scsiread :
-			data = scsi.buffer[scsi.offset];
-			scsi.offset++;
-			scsi.length--;
-			scsi.req = false;
+        case scsiread:
+            data = scsi.buffer[scsi.offset];
+            scsi.offset++;
+            scsi.length--;
+            scsi.req = false;
 
-			if (scsi.length == 0) {
-				scsi.blocks--;
-				if (scsi.blocks == 0) {
-					Status();
-					return data;
-				}
+            if (scsi.length == 0) {
+                scsi.blocks--;
+                if (scsi.blocks == 0) {
+                    Status();
+                    return data;
+                }
+                sd = &SCSIDisc[scsi.lun];
+                if (sd->ReadSector(sd, scsi.buffer, scsi.next)) {
+                    scsi.length = 256;
+                    scsi.offset = 0;
+                    scsi.next++;
+                }
+                else {
+                    scsi.status = (scsi.lun << 5) | 0x02;
+                    scsi.message = 0x00;
+                    Status();
+                }
+            }
+            return data;
+        case selection:
+            break;
+        default:
+            log_warn("scsi: invalid phase %d in ReadData", scsi.phase);
+    }
 
-				scsi.length = ReadSector(scsi.buffer, scsi.next);
-				if (scsi.length <= 0) {
-					scsi.status = (scsi.lun << 5) | 0x02;
-					scsi.message = 0x00;
-					Status();
-					return data;
-				}
-				scsi.offset = 0;
-				scsi.next++;
-			}
-			return data;
-                case selection:
-			break;
-                default:
-                        log_warn("scsi: invalid phase %d in ReadData", scsi.phase);
-	}
+    if (scsi.phase == busfree)
+        return scsi.lastwrite;
 
-	if (scsi.phase == busfree)
-		return scsi.lastwrite;
-
-	BusFree();
-	return scsi.lastwrite;
+    BusFree();
+    return scsi.lastwrite;
 }
 
 uint8_t scsi_read(uint16_t addr)
 {
+    int data = 0xff;
 
-        int data = 0xff;
+    switch (addr & 0x03) {
+        case 0x00:              // Data Register
+            data = ReadData();
+            break;
+        case 0x01:              // Status Register
+            data = 0x20;        // Hmmm.. don't know why req has to always be active ? If start at 0x00, ADFS lock up on entry
+            if (scsi.cd)
+                data |= 0x80;
+            if (scsi.io)
+                data |= 0x40;
+            if (scsi.req)
+                data |= 0x20;
+            if (scsi.irq)
+                data |= 0x10;
+            if (scsi.bsy)
+                data |= 0x02;
+            if (scsi.msg)
+                data |= 0x01;
+            break;
+        case 0x02:
+            break;
+        case 0x03:
+            break;
+    }
 
-        switch (addr & 0x03)
-        {
-                case 0x00 :         // Data Register
-                        data = ReadData();
-                        break;
-                case 0x01:			// Status Register
-                        data = 0x20;	// Hmmm.. don't know why req has to always be active ? If start at 0x00, ADFS lock up on entry
-                        if (scsi.cd) data |= 0x80;
-                        if (scsi.io) data |= 0x40;
-                        if (scsi.req) data |= 0x20;
-                        if (scsi.irq) data |= 0x10;
-                        if (scsi.bsy) data |= 0x02;
-                        if (scsi.msg) data |= 0x01;
-                        break;
-                case 0x02:
-                        break;
-                case 0x03:
-                        break;
-        }
+    //log_debug("scsi_read: addr=%02x, value=%02X, phase=%d", addr, data, scsi.phase);
 
-	//log_debug("scsi_read: addr=%02x, value=%02X, phase=%d\n", addr, data, scsi.phase);
-
-        return data;
+    return data;
 }
 
 void scsi_reset(void)
 {
-	scsi.code = 0x00;
-	scsi.sector = 0x00;
-        BusFree();
+    scsi.code = 0x00;
+    scsi.sector = 0x00;
+    BusFree();
 }
 
-static void scsi_init_lun(int lun)
+static bool scsi_check_adfs(FILE *fp, unsigned off1, unsigned off2, const char *pattern, size_t len)
 {
-        int size, cyl;
-        FILE *dat, *dsc;
-        char name[50], geom[22];
-        ALLEGRO_PATH *path;
-        const char *cpath;
+    char id1[10], id2[10];
+    if (fseek(fp, off1, SEEK_SET))
+        return false;
+    if (fread(id1, len, 1, fp) != 1)
+        return false;
+    if (memcmp(id1+1, pattern, len-1))
+        return false;
+    if (fseek(fp, off2, SEEK_SET))
+        return false;
+    if (fread(id2, len, 1, fp) != 1)
+        return false;
+    if (memcmp(id1, id2, len))
+        return false;
+    return true;
+}
 
-        SCSISize[lun] = 0;
-        snprintf(name, sizeof(name), "scsi/scsi%d", lun);
-        if ((path = find_cfg_file(name, ".dat"))) {
-            cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
-            if ((dat = fopen(cpath, "rb+"))) {
-                al_set_path_extension(path, ".dsc");
-                cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
-                if ((dsc = fopen(cpath, "rb+")))
-                {
-                        if (fread(geom, sizeof geom, 1, dsc) == 1)
-                        {
-                                // heads = buf[15];
-                                // cyl   = buf[13] * 256 + buf[14];
-                                // Number of sectors on disk = heads * cyls * 33
+static void scsi_select_simple(scsidisc *sd, int lun, const char *cpath, const char *msg)
+{
+    log_info("scsi lun %d: %s %s", lun, cpath, msg);
+    sd->ReadSector  = ReadSectorSimple;
+    sd->WriteSector = WriteSectorSimple;
+}
 
-                                SCSISize[lun] = geom[15] * (geom[13] * 256 + geom[14]) * 33;
-                        }
-                        else
-                                log_error("scsi lun %d: corrupt dsc file %s", lun, name);
-                        fclose(dsc);
-                }
-                else
-                        log_warn("scsi lun %d: unable to open dsc file %s: %s", lun, cpath, strerror(errno));
-                if (SCSISize[lun] == 0)
-                {
-                        SCSISize[lun] = size = fseek(dat, 0, SEEK_END);
-                        if ((dsc = fopen(name, "wb")))
-                        {
-                                cyl = 1 + ((size - 1) / (33 * 255));
-                                geom[13] = cyl % 256;
-                                geom[14] = cyl / 256;
-                                geom[15] = 255;
-                                if (fwrite(geom, sizeof geom, 1, dsc) != 1)
-                                        log_warn("scsi lun %d: unable to write to dsc file %s: %s", lun, name, strerror(errno));
-                                fclose(dsc);
-                        }
-                }
-                SCSIDisc[lun] = dat;
-            }
+static void scsi_select_padded(scsidisc *sd, int lun, const char *cpath, const char *msg)
+{
+    log_info("scsi lun %d: %s %s", lun, cpath, msg);
+    sd->ReadSector  = ReadSectorPadded;
+    sd->WriteSector = WriteSectorPadded;
+}
+
+static void scsi_init_lun(scsidisc *sd, int lun)
+{
+    ALLEGRO_PATH *path;
+    char name[50];
+    sd->ReadSector  = ReadWriteNone;
+    sd->WriteSector = ReadWriteNone;
+    sd->dat_fp = sd->dsc_fp = NULL;
+    sd->blocks = 0;
+    snprintf(name, sizeof(name), "scsi/scsi%d", lun);
+    if ((path = find_cfg_file(name, ".dat"))) {
+        sd->path = path;
+        const char *cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+        FILE *fp = fopen(cpath, "rb+");
+        if (fp) {
+            if (scsi_check_adfs(fp, 0x200, 0x6fa, "Hugo", 5))
+                scsi_select_simple(sd, lun, cpath, "detected as simple (SCSI) format");
+            else if (scsi_check_adfs(fp, 0x400, 0xdf4, "\0H\0u\0g\0o", 10))
+                scsi_select_padded(sd, lun, cpath, "detected as padded (IDE) format");
             else
-                log_error("scsi lun %d: unable to open data file %s: %s", lun, cpath, strerror(errno));
-            al_destroy_path(path);
-        } else
-            log_warn("scsi lun %d: no disc file %s found", lun, name);
+                scsi_select_simple(sd, lun, cpath, "selected as simple (SCSI) format by default");
+            sd->dat_fp = fp;
+            al_set_path_extension(path, ".dsc");
+            cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+            if ((fp = fopen(cpath, "rb+"))) {
+                if (fread(sd->geom, 1, sizeof(sd->geom), fp) >= 22) {
+                    unsigned heads = sd->geom[15];
+                    unsigned cyls = (sd->geom[13] << 8) | sd->geom[14];
+                    sd->blocks = heads * cyls * 33;
+                    sd->dsc_fp = fp;
+                }
+                else {
+                    log_warn("scsi lun %d: short geometry file %s", lun, cpath);
+                    fclose(fp);
+                }
+            }
+            if (sd->blocks == 0) {
+                unsigned bytes, cyl;
+                fseek(sd->dat_fp, 0, SEEK_END);
+                bytes = ftell(sd->dat_fp);
+                memset(sd->geom, 0, sizeof(sd->geom));
+                cyl = 1 + ((bytes - 1) / (33 * 255));
+                sd->geom[13] = cyl >> 8;
+                sd->geom[14] = cyl & 0xff;
+                sd->geom[15] = 255;
+                if ((fp = fopen(cpath, "wb+"))) {
+                    fwrite(sd->geom, sizeof(sd->geom), 1, fp);
+                    fflush(fp);
+                    sd->dsc_fp = fp;
+                }
+            }
+        }
+        else
+            log_error("scsi lun %d: unable to open data file %s: %s", lun, cpath, strerror(errno));
+    }
+    else
+        log_warn("scsi lun %d: no disc file %s found", lun, name);
 }
 
 void scsi_init(void)
 {
-        int i;
-
-        if (scsi_enabled)
-        {
-                for (i = 0; i < SCSI_DRIVES; i++)
-                        scsi_init_lun(i);
-                scsi_reset();
-        }
+    if (scsi_enabled)
+        for (int lun = 0; lun < SCSI_DRIVES; lun++)
+            scsi_init_lun(&SCSIDisc[lun], lun);
 }
 
 void scsi_close(void)
 {
-        int i;
-        FILE *f;
-
-        for (i = 0; i < SCSI_DRIVES; i++)
-        {
-                if ((f = SCSIDisc[i]))
-                {
-                        fclose(f);
-                        SCSIDisc[i] = NULL;
-                }
+    for (int lun = 0; lun < SCSI_DRIVES; lun++) {
+        scsidisc *sd = &SCSIDisc[lun];
+        if (sd->dat_fp) {
+            fclose(sd->dat_fp);
+            sd->dat_fp = NULL;
         }
+        if (sd->dsc_fp) {
+            fclose(sd->dsc_fp);
+            sd->dsc_fp = NULL;
+        }
+        if (sd->path) {
+            al_destroy_path(sd->path);
+            sd->path= NULL;
+        }
+    }
 }
