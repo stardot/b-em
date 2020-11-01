@@ -3882,7 +3882,7 @@ void z80_exec(void)
                         if (addr & 0x80)
                             addr |= 0xFF00;
                         cycles += 3;
-                        temp = z80_readmem(ix.w + addr);
+                        af.b.h &= z80_readmem(ix.w + addr);
                         setand(af.b.h);
                         cycles += 8;
                         break;
@@ -3902,7 +3902,7 @@ void z80_exec(void)
                         if (addr & 0x80)
                             addr |= 0xFF00;
                         cycles += 3;
-                        temp = z80_readmem(ix.w + addr);
+                        af.b.h ^= z80_readmem(ix.w + addr);
                         setzn(af.b.h);
                         cycles += 8;
                         break;
@@ -3922,7 +3922,7 @@ void z80_exec(void)
                         if (addr & 0x80)
                             addr |= 0xFF00;
                         cycles += 3;
-                        temp = z80_readmem(ix.w + addr);
+                        af.b.h |= z80_readmem(ix.w + addr);
                         setzn(af.b.h);
                         cycles += 8;
                         break;
