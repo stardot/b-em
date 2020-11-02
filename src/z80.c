@@ -1009,7 +1009,7 @@ void z80_exec(void)
                 cycles += 3;
                 break;
             case 0x37:          /*SCF*/
-                af.b.l |= C_FLAG;
+                af.b.l = (af.b.l & ~(N_FLAG | H_FLAG)) | C_FLAG;
                 cycles += 4;
                 break;
             case 0x38:          /*JR C */
@@ -1058,7 +1058,7 @@ void z80_exec(void)
                 cycles += 3;
                 break;
             case 0x3F:          /*CCF*/
-                af.b.l = (af.b.l & ~H_FLAG) | ((af.b.l & C_FLAG) << 4);
+                af.b.l = (af.b.l & ~(H_FLAG | N_FLAG)) | ((af.b.l & C_FLAG) << 4);
                 af.b.l ^= C_FLAG;
                 cycles += 4;
                 break;
