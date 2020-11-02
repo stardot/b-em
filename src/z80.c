@@ -36,14 +36,14 @@ static int im;
 static uint8_t *z80ram, *z80rom;
 static int z80_oldnmi;
 
-#define N_FLAG 0x80
+#define S_FLAG 0x80
 #define Z_FLAG 0x40
 #define Y_FLAG 0x20
 #define H_FLAG 0x10
 #define X_FLAG 0x08
 #define P_FLAG 0x04
 #define V_FLAG 0x04
-#define S_FLAG 0x02
+#define N_FLAG 0x02
 #define C_FLAG 0x01
 
 static int cycles;
@@ -135,14 +135,14 @@ static uint8_t z80in(uint16_t a)
 static inline void setzn(uint8_t v)
 {
     af.b.l = znptable[v];
-/*        af.b.l&=~(N_FLAG|Z_FLAG|V_FLAG|0x28|C_FLAG);
+/*        af.b.l&=~(S_FLAG|Z_FLAG|V_FLAG|0x28|C_FLAG);
         af.b.l|=znptable[v];*/
 }
 
 static inline void setand(uint8_t v)
 {
     af.b.l = znptable[v] | H_FLAG;
-/*        af.b.l&=~(N_FLAG|Z_FLAG|V_FLAG|0x28|C_FLAG);
+/*        af.b.l&=~(S_FLAG|Z_FLAG|V_FLAG|0x28|C_FLAG);
         af.b.l|=znptable[v];*/
 }
 
@@ -158,14 +158,14 @@ static inline void setbit2(uint8_t v, uint8_t v2)
 
 static inline void setznc(uint8_t v)
 {
-    af.b.l &= ~(N_FLAG | Z_FLAG | V_FLAG | 0x28);
+    af.b.l &= ~(S_FLAG | Z_FLAG | V_FLAG | 0x28);
     af.b.l |= znptable[v];
 }
 
 static inline void z80_setadd(uint8_t a, uint8_t b)
 {
     uint8_t r = a + b;
-    af.b.l = (r) ? ((r & 0x80) ? N_FLAG : 0) : Z_FLAG;
+    af.b.l = (r) ? ((r & 0x80) ? S_FLAG : 0) : Z_FLAG;
     af.b.l |= (r & 0x28);       /* undocumented flag bits 5+3 */
     if ((r & 0x0f) < (a & 0x0f))
         af.b.l |= H_FLAG;
@@ -177,7 +177,7 @@ static inline void z80_setadd(uint8_t a, uint8_t b)
 
 static inline void setinc(uint8_t v)
 {
-    af.b.l &= ~(N_FLAG | Z_FLAG | V_FLAG | 0x28 | H_FLAG);
+    af.b.l &= ~(S_FLAG | Z_FLAG | V_FLAG | 0x28 | H_FLAG);
     af.b.l |= znptablenv[(v + 1) & 0xFF];
     if (v == 0x7F)
         af.b.l |= V_FLAG;
@@ -189,8 +189,8 @@ static inline void setinc(uint8_t v)
 
 static inline void setdec(uint8_t v)
 {
-    af.b.l &= ~(N_FLAG | Z_FLAG | V_FLAG | 0x28 | H_FLAG);
-    af.b.l |= znptablenv[(v - 1) & 0xFF] | S_FLAG;
+    af.b.l &= ~(S_FLAG | Z_FLAG | V_FLAG | 0x28 | H_FLAG);
+    af.b.l |= znptablenv[(v - 1) & 0xFF] | N_FLAG;
     if (v == 0x80)
         af.b.l |= V_FLAG;
     else
@@ -203,7 +203,7 @@ static inline void setadc(uint8_t a, uint8_t b)
 {
     uint8_t r = a + b + (af.b.l & C_FLAG);
     if (af.b.l & C_FLAG) {
-        af.b.l = (r) ? ((r & 0x80) ? N_FLAG : 0) : Z_FLAG;
+        af.b.l = (r) ? ((r & 0x80) ? S_FLAG : 0) : Z_FLAG;
         af.b.l |= (r & 0x28);   /* undocumented flag bits 5+3 */
         if ((r & 0x0f) <= (a & 0x0f))
             af.b.l |= H_FLAG;
@@ -213,7 +213,7 @@ static inline void setadc(uint8_t a, uint8_t b)
             af.b.l |= V_FLAG;
     }
     else {
-        af.b.l = (r) ? ((r & 0x80) ? N_FLAG : 0) : Z_FLAG;
+        af.b.l = (r) ? ((r & 0x80) ? S_FLAG : 0) : Z_FLAG;
         af.b.l |= (r & 0x28);   /* undocumented flag bits 5+3 */
         if ((r & 0x0f) < (a & 0x0f))
             af.b.l |= H_FLAG;
@@ -229,7 +229,7 @@ static inline void setadc16(uint16_t a, uint16_t b)
     uint32_t r = a + b + (af.b.l & 1);
     af.b.l = (((a ^ r ^ b) >> 8) & H_FLAG) |
         ((r >> 16) & C_FLAG) |
-        ((r >> 8) & (N_FLAG | 0x28)) |
+        ((r >> 8) & (S_FLAG | 0x28)) |
         ((r & 0xffff) ? 0 : Z_FLAG) |
         (((b ^ a ^ 0x8000) & (b ^ r) & 0x8000) >> 13);
 }
@@ -237,7 +237,7 @@ static inline void setadc16(uint16_t a, uint16_t b)
 static inline void z80_setadd16(uint16_t a, uint16_t b)
 {
     uint32_t r = a + b;
-    af.b.l = (af.b.l & (N_FLAG | Z_FLAG | V_FLAG)) |
+    af.b.l = (af.b.l & (S_FLAG | Z_FLAG | V_FLAG)) |
         (((a ^ r ^ b) >> 8) & H_FLAG) |
         ((r >> 16) & C_FLAG) | ((r >> 8) & 0x28);
 }
@@ -246,7 +246,7 @@ static inline void setsbc(uint8_t a, uint8_t b)
 {
     uint8_t r = a - (b + (af.b.l & C_FLAG));
     if (af.b.l & C_FLAG) {
-        af.b.l = S_FLAG | ((r) ? ((r & 0x80) ? N_FLAG : 0) : Z_FLAG);
+        af.b.l = N_FLAG | ((r) ? ((r & 0x80) ? S_FLAG : 0) : Z_FLAG);
         af.b.l |= (r & 0x28);   /* undocumented flag bits 5+3 */
         if ((r & 0x0f) >= (a & 0x0f))
             af.b.l |= H_FLAG;
@@ -256,7 +256,7 @@ static inline void setsbc(uint8_t a, uint8_t b)
             af.b.l |= V_FLAG;
     }
     else {
-        af.b.l = S_FLAG | ((r) ? ((r & 0x80) ? N_FLAG : 0) : Z_FLAG);
+        af.b.l = N_FLAG | ((r) ? ((r & 0x80) ? S_FLAG : 0) : Z_FLAG);
         af.b.l |= (r & 0x28);   /* undocumented flag bits 5+3 */
         if ((r & 0x0f) > (a & 0x0f))
             af.b.l |= H_FLAG;
@@ -270,9 +270,9 @@ static inline void setsbc(uint8_t a, uint8_t b)
 static inline void setsbc16(uint16_t a, uint16_t b)
 {
     uint32_t r = a - b - (af.b.l & C_FLAG);
-    af.b.l = (((a ^ r ^ b) >> 8) & H_FLAG) | S_FLAG |
+    af.b.l = (((a ^ r ^ b) >> 8) & H_FLAG) | N_FLAG |
         ((r >> 16) & C_FLAG) |
-        ((r >> 8) & (N_FLAG | 0x28)) |
+        ((r >> 8) & (S_FLAG | 0x28)) |
         ((r & 0xffff) ? 0 : Z_FLAG) | (((b ^ a) & (a ^ r) & 0x8000) >> 13);
 }
 
@@ -280,7 +280,7 @@ static inline void setcpED(uint8_t a, uint8_t b)
 {
     uint8_t r = a - b;
     af.b.l &= C_FLAG;
-    af.b.l |= S_FLAG | ((r) ? ((r & 0x80) ? N_FLAG : 0) : Z_FLAG);
+    af.b.l |= N_FLAG | ((r) ? ((r & 0x80) ? S_FLAG : 0) : Z_FLAG);
     af.b.l |= (b & 0x28);       /* undocumented flag bits 5+3 */
     if ((r & 0x0f) > (a & 0x0f))
         af.b.l |= H_FLAG;
@@ -291,7 +291,7 @@ static inline void setcpED(uint8_t a, uint8_t b)
 static inline void setcp(uint8_t a, uint8_t b)
 {
     uint8_t r = a - b;
-    af.b.l = S_FLAG | ((r) ? ((r & 0x80) ? N_FLAG : 0) : Z_FLAG);
+    af.b.l = N_FLAG | ((r) ? ((r & 0x80) ? S_FLAG : 0) : Z_FLAG);
     af.b.l |= (b & 0x28);       /* undocumented flag bits 5+3 */
     if ((r & 0x0f) > (a & 0x0f))
         af.b.l |= H_FLAG;
@@ -304,7 +304,7 @@ static inline void setcp(uint8_t a, uint8_t b)
 static inline void z80_setsub(uint8_t a, uint8_t b)
 {
     uint8_t r = a - b;
-    af.b.l = S_FLAG | ((r) ? ((r & 0x80) ? N_FLAG : 0) : Z_FLAG);
+    af.b.l = N_FLAG | ((r) ? ((r & 0x80) ? S_FLAG : 0) : Z_FLAG);
     af.b.l |= (r & 0x28);       /* undocumented flag bits 5+3 */
     if ((r & 0x0f) > (a & 0x0f))
         af.b.l |= H_FLAG;
@@ -326,7 +326,7 @@ static void makeznptable()
                 f++;
             e >>= 1;
         }
-        d = c ? (c & N_FLAG) : Z_FLAG;
+        d = c ? (c & S_FLAG) : Z_FLAG;
         d |= (c & 0x28);
         d |= (f & 1) ? 0 : V_FLAG;
 /*                if (!(f&1))
@@ -608,9 +608,9 @@ void z80_dumpregs()
     log_debug("AF'=%04X BC'=%04X DE'=%04X HL'=%04X IR=%04X\n", saf.w,
               sbc.w, sde.w, shl.w, ir.w);
     log_debug("%c%c%c%c%c%c   PC =%04X SP =%04X\n",
-              (af.b.l & N_FLAG) ? 'N' : ' ', (af.b.l & Z_FLAG) ? 'Z' : ' ',
+              (af.b.l & S_FLAG) ? 'N' : ' ', (af.b.l & Z_FLAG) ? 'Z' : ' ',
               (af.b.l & H_FLAG) ? 'H' : ' ', (af.b.l & V_FLAG) ? 'V' : ' ',
-              (af.b.l & S_FLAG) ? 'S' : ' ', (af.b.l & C_FLAG) ? 'C' : ' ',
+              (af.b.l & N_FLAG) ? 'S' : ' ', (af.b.l & C_FLAG) ? 'C' : ' ',
               pc, sp);
     log_debug("%i ins  IFF1=%i IFF2=%i  %04X %04X\n", ins, iff1, iff2, opc,
               oopc);
@@ -903,7 +903,7 @@ void z80_exec(void)
                     addr |= 256;
                 if (af.b.l & H_FLAG)
                     addr |= 512;
-                if (af.b.l & S_FLAG)
+                if (af.b.l & N_FLAG)
                     addr |= 1024;
                 af.w = DAATable[addr];
                 cycles += 4;
@@ -959,7 +959,7 @@ void z80_exec(void)
                 break;
             case 0x2F:          /*CPL*/
                 af.b.h ^= 0xFF;
-                af.b.l |= (H_FLAG | S_FLAG);
+                af.b.l |= (H_FLAG | N_FLAG);
                 cycles += 4;
                 break;
             case 0x30:          /*JR NC */
@@ -4666,7 +4666,7 @@ void z80_exec(void)
                         z80_writemem(de.w, temp);
                         de.w++;
                         bc.w--;
-                        af.b.l &= ~(H_FLAG | S_FLAG | V_FLAG);
+                        af.b.l &= ~(H_FLAG | N_FLAG | V_FLAG);
                         if (bc.w)
                             af.b.l |= V_FLAG;
                         cycles += 5;
@@ -4687,13 +4687,13 @@ void z80_exec(void)
                         temp = z80in(bc.w);
                         cycles += 3;
                         z80_writemem(hl.w++, temp);
-                        af.b.l |= N_FLAG;
+                        af.b.l |= S_FLAG;
                         bc.b.h--;
                         if (!bc.b.h)
                             af.b.l |= Z_FLAG;
                         else
                             af.b.l &= ~Z_FLAG;
-                        af.b.l |= S_FLAG;
+                        af.b.l |= N_FLAG;
                         cycles += 4;
                         break;
                     case 0xA3:          /*OUTI*/
@@ -4706,7 +4706,7 @@ void z80_exec(void)
                             af.b.l |= Z_FLAG;
                         else
                             af.b.l &= ~Z_FLAG;
-                        af.b.l |= S_FLAG;
+                        af.b.l |= N_FLAG;
                         cycles += 4;
                         break;
                     case 0xA8:          /*LDD*/
@@ -4716,7 +4716,7 @@ void z80_exec(void)
                         z80_writemem(de.w, temp);
                         de.w--;
                         bc.w--;
-                        af.b.l &= ~(H_FLAG | S_FLAG | V_FLAG);
+                        af.b.l &= ~(H_FLAG | N_FLAG | V_FLAG);
                         if (bc.w)
                             af.b.l |= V_FLAG;
                         cycles += 5;
@@ -4731,7 +4731,7 @@ void z80_exec(void)
                             af.b.l |= Z_FLAG;
                         else
                             af.b.l &= ~Z_FLAG;
-                        af.b.l |= S_FLAG;
+                        af.b.l |= N_FLAG;
                         cycles += 4;
                         break;
                     case 0xB0:          /*LDIR*/
@@ -4745,7 +4745,7 @@ void z80_exec(void)
                             pc -= 2;
                             cycles += 5;
                         }
-                        af.b.l &= ~(H_FLAG | S_FLAG | V_FLAG);
+                        af.b.l &= ~(H_FLAG | N_FLAG | V_FLAG);
                         cycles += 5;
                         break;
                     case 0xB1:          /*CPIR*/
@@ -4774,7 +4774,7 @@ void z80_exec(void)
                             pc -= 2;
                             cycles += 5;
                         }
-                        af.b.l &= ~(H_FLAG | S_FLAG | V_FLAG);
+                        af.b.l &= ~(H_FLAG | N_FLAG | V_FLAG);
                         cycles += 5;
                         break;
                     case 0xB9:          /*CPDR*/
@@ -4816,7 +4816,7 @@ void z80_exec(void)
                 break;
             case 0xF0:          /*RET P */
                 cycles += 5;
-                if (!(af.b.l & N_FLAG)) {
+                if (!(af.b.l & S_FLAG)) {
                     pc = z80_readmem(sp);
                     sp++;
                     cycles += 3;
@@ -4840,7 +4840,7 @@ void z80_exec(void)
                 cycles += 3;
                 addr |= (z80_readmem(pc + 1) << 8);
                 pc += 2;
-                if (!(af.b.l & N_FLAG))
+                if (!(af.b.l & S_FLAG))
                     pc = addr;
                 cycles += 3;
                 break;
@@ -4854,7 +4854,7 @@ void z80_exec(void)
                 cycles += 3;
                 addr |= (z80_readmem(pc + 1) << 8);
                 pc += 2;
-                if (!(af.b.l & N_FLAG)) {
+                if (!(af.b.l & S_FLAG)) {
                     cycles += 4;
                     sp--;
                     z80_writemem(sp, pc >> 8);
@@ -4895,7 +4895,7 @@ void z80_exec(void)
                 break;
             case 0xF8:          /*RET M */
                 cycles += 5;
-                if (af.b.l & N_FLAG) {
+                if (af.b.l & S_FLAG) {
                     pc = z80_readmem(sp);
                     sp++;
                     cycles += 3;
@@ -4914,7 +4914,7 @@ void z80_exec(void)
                 cycles += 3;
                 addr |= (z80_readmem(pc + 1) << 8);
                 pc += 2;
-                if (af.b.l & N_FLAG)
+                if (af.b.l & S_FLAG)
                     pc = addr;
                 cycles += 3;
                 break;
@@ -4928,7 +4928,7 @@ void z80_exec(void)
                 cycles += 3;
                 addr |= (z80_readmem(pc + 1) << 8);
                 pc += 2;
-                if (af.b.l & N_FLAG) {
+                if (af.b.l & S_FLAG) {
                     cycles += 4;
                     sp--;
                     z80_writemem(sp, pc >> 8);
