@@ -4019,6 +4019,19 @@ noprefix:
                                 z80_writemem(addr + ix.w, temp);
                                 cycles += 3;
                                 break;
+                            case 0x36:          /*SLL (IX+nn) */
+                                cycles += 5;
+                                temp = z80_readmem(addr + ix.w);
+                                tempc = temp & 0x80;
+                                temp <<= 1;
+                                temp |= 1;
+                                setzn(temp);
+                                if (tempc)
+                                    af.b.l |= C_FLAG;
+                                cycles += 4;
+                                z80_writemem(addr + ix.w, temp);
+                                cycles += 3;
+                                break;
                             case 0x3E:          /*SRL (IX+nn) */
                                 cycles += 5;
                                 temp = z80_readmem(addr + ix.w);
@@ -5494,6 +5507,18 @@ noprefix:
                                 z80_writemem(addr + iy.w, temp);
                                 cycles += 3;
                                 break;
+                            case 0x26:          /*SLA (IY+nn) */
+                                cycles += 5;
+                                temp = z80_readmem(addr + iy.w);
+                                tempc = temp & 0x80;
+                                temp <<= 1;
+                                setzn(temp);
+                                if (tempc)
+                                    af.b.l |= C_FLAG;
+                                cycles += 4;
+                                z80_writemem(addr + iy.w, temp);
+                                cycles += 3;
+                                break;
                             case 0x2E:          /*SRA (IY+nn) */
                                 cycles += 5;
                                 temp = z80_readmem(addr + iy.w);
@@ -5501,6 +5526,31 @@ noprefix:
                                 temp >>= 1;
                                 if (temp & 0x40)
                                     temp |= 0x80;
+                                setzn(temp);
+                                if (tempc)
+                                    af.b.l |= C_FLAG;
+                                cycles += 4;
+                                z80_writemem(addr + iy.w, temp);
+                                cycles += 3;
+                                break;
+                            case 0x36:          /*SLL (IY+nn) */
+                                cycles += 5;
+                                temp = z80_readmem(addr + iy.w);
+                                tempc = temp & 0x80;
+                                temp <<= 1;
+                                temp |= 1;
+                                setzn(temp);
+                                if (tempc)
+                                    af.b.l |= C_FLAG;
+                                cycles += 4;
+                                z80_writemem(addr + iy.w, temp);
+                                cycles += 3;
+                                break;
+                            case 0x3E:          /*SRL (IY+nn) */
+                                cycles += 5;
+                                temp = z80_readmem(addr + iy.w);
+                                tempc = temp & 1;
+                                temp >>= 1;
                                 setzn(temp);
                                 if (tempc)
                                     af.b.l |= C_FLAG;
