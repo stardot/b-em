@@ -652,6 +652,7 @@ void z80_exec(void)
         tempc = af.b.l & C_FLAG;
         opcode = z80_readmem(pc++);
         ir.b.l = ((ir.b.l + 1) & 0x7F) | (ir.b.l & 0x80);
+noprefix:
         switch (opcode) {
             case 0x00:          /*NOP*/
                 cycles += 4;
@@ -4237,8 +4238,8 @@ void z80_exec(void)
                         cycles += 6;
                         break;
                     default:
-                        log_debug("z80: invalid DD opcode %02X", opcode);
-                        break;
+                        log_debug("z80: spurious DD prefix on opcode %02X", opcode);
+                        goto noprefix;
                 }
                 break;
             case 0xDE:          /*SBC A,nn */
@@ -5711,8 +5712,8 @@ void z80_exec(void)
                         cycles += 6;
                         break;
                     default:
-                        log_debug("z80: invalid FD-prefix opcode %02X", opcode);
-                        break;
+                        log_debug("z80: spurious FD prefix on opcode %02X", opcode);
+                        goto noprefix;
                 }
                 break;
             case 0xFE:          /*CP nn */
