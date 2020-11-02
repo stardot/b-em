@@ -687,6 +687,7 @@ noprefix:
                 cycles += 3;
                 break;
             case 0x07:          /*RLCA*/
+                af.b.l &= ~(H_FLAG | S_FLAG);
                 temp = af.b.h & 0x80;
                 af.b.h <<= 1;
                 if (temp)
@@ -732,6 +733,7 @@ noprefix:
                 cycles += 3;
                 break;
             case 0x0F:          /*RRCA*/
+                af.b.l &= ~(H_FLAG | S_FLAG);
                 temp = af.b.h & 1;
                 af.b.h >>= 1;
                 if (temp)
@@ -785,6 +787,7 @@ noprefix:
                 cycles += 3;
                 break;
             case 0x17:          /*RLA*/
+                af.b.l &= ~(H_FLAG | S_FLAG);
                 temp = af.b.h & 0x80;
                 af.b.h <<= 1;
                 if (tempc)
@@ -833,6 +836,7 @@ noprefix:
                 cycles += 3;
                 break;
             case 0x1F:          /*RRA*/
+                af.b.l &= ~(H_FLAG | S_FLAG);
                 temp = af.b.h & 1;
                 af.b.h >>= 1;
                 if (tempc)
@@ -4583,6 +4587,7 @@ noprefix:
                         break;
                     case 0x67:          /*RRD*/
                         cycles += 4;
+                        af.b.l &= ~(H_FLAG | S_FLAG);
                         addr = z80_readmem(hl.w) | ((af.b.h & 0xF) << 8);
                         addr = (addr >> 4) | ((addr << 8) & 0xF00);
                         cycles += 3;
@@ -4603,6 +4608,7 @@ noprefix:
                         break;
                     case 0x6F:          /*RLD*/
                         cycles += 4;
+                        af.b.l &= ~(H_FLAG | S_FLAG);
                         addr = z80_readmem(hl.w) | ((af.b.h & 0xF) << 8);
                         addr = ((addr << 4) & 0xFF0) | (addr >> 8);
                         cycles += 3;
