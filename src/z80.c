@@ -288,8 +288,6 @@ static inline void setcpED(uint8_t a, uint8_t b)
     af.b.l |= (b & 0x28);       /* undocumented flag bits 5+3 */
     if ((r & 0x0f) > (a & 0x0f))
         af.b.l |= H_FLAG;
-    if ((b ^ a) & (a ^ r) & 0x80)
-        af.b.l |= V_FLAG;
 }
 
 static inline void setcp(uint8_t a, uint8_t b)
@@ -4724,6 +4722,17 @@ noprefix:
                             af.b.l |= V_FLAG;
                         cycles += 5;
                         break;
+                    case 0xA9:          /*CPD*/
+                        cycles += 4;
+                        temp = z80_readmem(hl.w--);
+                        bc.w--;
+                        setcpED(af.b.h, temp);
+                        if (bc.w)
+                            af.b.l |= V_FLAG;
+                        else
+                            af.b.l &= ~V_FLAG;
+                        cycles += 8;
+                        break;
                     case 0xAB:          /*OUTD*/
                         cycles += 5;
                         temp = z80_readmem(hl.w--);
@@ -4756,13 +4765,14 @@ noprefix:
                         temp = z80_readmem(hl.w++);
                         bc.w--;
                         setcpED(af.b.h, temp);
+                        if (bc.w)
+                            af.b.l |= V_FLAG;
+                        else
+                            af.b.l &= ~V_FLAG;
                         if (bc.w && (af.b.h != temp)) {
                             pc -= 2;
                             cycles += 13;
-                            af.b.l &= ~V_FLAG;
-                        }
-                        else {
-                            af.b.l |= V_FLAG;
+                        } else {
                             cycles += 8;
                         }
                         break;
@@ -4785,13 +4795,14 @@ noprefix:
                         temp = z80_readmem(hl.w--);
                         bc.w--;
                         setcpED(af.b.h, temp);
+                        if (bc.w)
+                            af.b.l |= V_FLAG;
+                        else
+                            af.b.l &= ~V_FLAG;
                         if (bc.w && (af.b.h != temp)) {
                             pc -= 2;
                             cycles += 13;
-                            af.b.l &= ~V_FLAG;
-                        }
-                        else {
-                            af.b.l |= V_FLAG;
+                        } else {
                             cycles += 8;
                         }
                         break;
