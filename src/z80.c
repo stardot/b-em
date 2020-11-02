@@ -177,7 +177,7 @@ static inline void z80_setadd(uint8_t a, uint8_t b)
 
 static inline void setinc(uint8_t v)
 {
-    af.b.l &= ~(N_FLAG | Z_FLAG | V_FLAG | 0x28 | H_FLAG);
+    af.b.l &= ~(N_FLAG | Z_FLAG | V_FLAG | 0x28 | H_FLAG | S_FLAG);
     af.b.l |= znptable[(v + 1) & 0xFF];
     if (v == 0x7F)
         af.b.l |= V_FLAG;
@@ -684,6 +684,7 @@ void z80_exec(void)
                 cycles += 3;
                 break;
             case 0x07:          /*RLCA*/
+                af.b.l &= ~(H_FLAG | S_FLAG);
                 temp = af.b.h & 0x80;
                 af.b.h <<= 1;
                 if (temp)
@@ -731,6 +732,7 @@ void z80_exec(void)
                 cycles += 3;
                 break;
             case 0x0F:          /*RRCA*/
+                af.b.l &= ~(H_FLAG | S_FLAG);
                 temp = af.b.h & 1;
                 af.b.h >>= 1;
                 if (temp)
@@ -786,6 +788,7 @@ void z80_exec(void)
                 cycles += 3;
                 break;
             case 0x17:          /*RLA*/
+                af.b.l &= ~(H_FLAG | S_FLAG);
                 temp = af.b.h & 0x80;
                 af.b.h <<= 1;
                 if (tempc)
@@ -836,6 +839,7 @@ void z80_exec(void)
                 cycles += 3;
                 break;
             case 0x1F:          /*RRA*/
+                af.b.l &= ~(H_FLAG | S_FLAG);
                 temp = af.b.h & 1;
                 af.b.h >>= 1;
                 if (tempc)
@@ -1019,6 +1023,7 @@ void z80_exec(void)
                 cycles += 3;
                 break;
             case 0x37:          /*SCF*/
+                af.b.l &= ~(H_FLAG | S_FLAG);
                 af.b.l |= C_FLAG;
                 cycles += 4;
                 break;
@@ -1070,6 +1075,8 @@ void z80_exec(void)
                 cycles += 3;
                 break;
             case 0x3F:          /*CCF*/
+                af.b.l &= ~(H_FLAG | S_FLAG);
+                af.b.l |= (af.b.l & 1) << 4;
                 af.b.l ^= C_FLAG;
                 cycles += 4;
                 break;
@@ -4586,6 +4593,7 @@ void z80_exec(void)
                         break;
                     case 0x67:          /*RRD*/
                         cycles += 4;
+                        af.b.l &= ~(H_FLAG | S_FLAG);
                         addr = z80_readmem(hl.w) | ((af.b.h & 0xF) << 8);
                         addr = (addr >> 4) | ((addr << 8) & 0xF00);
                         cycles += 3;
@@ -4606,6 +4614,7 @@ void z80_exec(void)
                         break;
                     case 0x6F:          /*RLD*/
                         cycles += 4;
+                        af.b.l &= ~(H_FLAG | S_FLAG);
                         addr = z80_readmem(hl.w) | ((af.b.h & 0xF) << 8);
                         addr = ((addr << 4) & 0xFF0) | (addr >> 8);
                         cycles += 3;
