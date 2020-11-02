@@ -1070,6 +1070,7 @@ void z80_exec(void)
                 cycles += 3;
                 break;
             case 0x3F:          /*CCF*/
+                af.b.l = (af.b.l & ~H_FLAG) | ((af.b.l & C_FLAG) << 4);
                 af.b.l ^= C_FLAG;
                 cycles += 4;
                 break;
