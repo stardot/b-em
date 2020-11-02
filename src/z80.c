@@ -177,7 +177,7 @@ static inline void z80_setadd(uint8_t a, uint8_t b)
 
 static inline void setinc(uint8_t v)
 {
-    af.b.l &= ~(S_FLAG | Z_FLAG | V_FLAG | 0x28 | H_FLAG);
+    af.b.l &= ~(S_FLAG | Z_FLAG | V_FLAG | 0x28 | H_FLAG | N_FLAG);
     af.b.l |= znptablenv[(v + 1) & 0xFF];
     if (v == 0x7F)
         af.b.l |= V_FLAG;
