@@ -175,28 +175,32 @@ static inline void z80_setadd(uint8_t a, uint8_t b)
         af.b.l |= V_FLAG;
 }
 
-static inline void setinc(uint8_t v)
+static inline uint8_t setinc(uint8_t v)
 {
+    uint8_t res = (v + 1) & 0xff;
     af.b.l &= ~(S_FLAG | Z_FLAG | V_FLAG | 0x28 | H_FLAG | N_FLAG);
-    af.b.l |= znptablenv[(v + 1) & 0xFF];
+    af.b.l |= znptablenv[res];
     if (v == 0x7F)
         af.b.l |= V_FLAG;
     else
         af.b.l &= ~V_FLAG;
     if (((v & 0xF) + 1) & 0x10)
         af.b.l |= H_FLAG;
+    return res;
 }
 
-static inline void setdec(uint8_t v)
+static inline uint8_t setdec(uint8_t v)
 {
+    uint8_t res = (v - 1) & 0xff;
     af.b.l &= ~(S_FLAG | Z_FLAG | V_FLAG | 0x28 | H_FLAG);
-    af.b.l |= znptablenv[(v - 1) & 0xFF] | N_FLAG;
+    af.b.l |= znptablenv[res] | N_FLAG;
     if (v == 0x80)
         af.b.l |= V_FLAG;
     else
         af.b.l &= ~V_FLAG;
     if (!(v & 8) && ((v - 1) & 8))
         af.b.l |= H_FLAG;
+    return res;
 }
 
 static inline void setadc(uint8_t a, uint8_t b)
@@ -669,13 +673,11 @@ void z80_exec(void)
                 cycles += 6;
                 break;
             case 0x04:          /*INC B */
-                setinc(bc.b.h);
-                bc.b.h++;
+                bc.b.h = setinc(bc.b.h);
                 cycles += 4;
                 break;
             case 0x05:          /*DEC B */
-                setdec(bc.b.h);
-                bc.b.h--;
+                bc.b.h = setdec(bc.b.h);
                 cycles += 4;
                 break;
             case 0x06:          /*LD B,nn */
@@ -716,13 +718,11 @@ void z80_exec(void)
                 cycles += 6;
                 break;
             case 0x0C:          /*INC C */
-                setinc(bc.b.l);
-                bc.b.l++;
+                bc.b.l = setinc(bc.b.l);
                 cycles += 4;
                 break;
             case 0x0D:          /*DEC C */
-                setdec(bc.b.l);
-                bc.b.l--;
+                bc.b.l = setdec(bc.b.l);
                 cycles += 4;
                 break;
             case 0x0E:          /*LD C,nn */
@@ -771,13 +771,11 @@ void z80_exec(void)
                 cycles += 6;
                 break;
             case 0x14:          /*INC D */
-                setinc(de.b.h);
-                de.b.h++;
+                de.b.h = setinc(de.b.h);
                 cycles += 4;
                 break;
             case 0x15:          /*DEC D */
-                setdec(de.b.h);
-                de.b.h--;
+                de.b.h = setdec(de.b.h);
                 cycles += 4;
                 break;
             case 0x16:          /*LD D,nn */
@@ -821,13 +819,11 @@ void z80_exec(void)
                 cycles += 6;
                 break;
             case 0x1C:          /*INC E */
-                setinc(de.b.l);
-                de.b.l++;
+                de.b.l = setinc(de.b.l);
                 cycles += 4;
                 break;
             case 0x1D:          /*DEC E */
-                setdec(de.b.l);
-                de.b.l--;
+                de.b.l = setdec(de.b.l);
                 cycles += 4;
                 break;
             case 0x1E:          /*LD E,nn */
@@ -883,13 +879,11 @@ void z80_exec(void)
                 cycles += 6;
                 break;
             case 0x24:          /*INC H */
-                setinc(hl.b.h);
-                hl.b.h++;
+                hl.b.h = setinc(hl.b.h);
                 cycles += 4;
                 break;
             case 0x25:          /*DEC H */
-                setdec(hl.b.h);
-                hl.b.h--;
+                hl.b.h = setdec(hl.b.h);
                 cycles += 4;
                 break;
             case 0x26:          /*LD H,nn */
@@ -943,13 +937,11 @@ void z80_exec(void)
                 cycles += 6;
                 break;
             case 0x2C:          /*INC L */
-                setinc(hl.b.l);
-                hl.b.l++;
+                hl.b.l = setinc(hl.b.l);
                 cycles += 4;
                 break;
             case 0x2D:          /*DEC L */
-                setdec(hl.b.l);
-                hl.b.l--;
+                hl.b.l = setdec(hl.b.l);
                 cycles += 4;
                 break;
             case 0x2E:          /*LD L,nn */
@@ -997,18 +989,16 @@ void z80_exec(void)
                 break;
             case 0x34:          /*INC (HL) */
                 cycles += 4;
-                temp = z80_readmem(hl.w);
-                setinc(temp);
+                temp = setinc(z80_readmem(hl.w));
                 cycles += 3;
-                z80_writemem(hl.w, temp + 1);
+                z80_writemem(hl.w, temp);
                 cycles += 3;
                 break;
             case 0x35:          /*DEC (HL) */
                 cycles += 4;
-                temp = z80_readmem(hl.w);
-                setdec(temp);
+                temp = setdec(z80_readmem(hl.w));
                 cycles += 3;
-                z80_writemem(hl.w, temp - 1);
+                z80_writemem(hl.w, temp);
                 cycles += 3;
                 break;
             case 0x36:          /*LD (HL),nn */
@@ -1055,13 +1045,11 @@ void z80_exec(void)
                 cycles += 6;
                 break;
             case 0x3C:          /*INC A */
-                setinc(af.b.h);
-                af.b.h++;
+                af.b.h = setinc(af.b.h);
                 cycles += 4;
                 break;
             case 0x3D:          /*DEC A */
-                setdec(af.b.h);
-                af.b.h--;
+                af.b.h = setdec(af.b.h);
                 cycles += 4;
                 break;
             case 0x3E:          /*LD A,nn */
@@ -3485,13 +3473,11 @@ void z80_exec(void)
                         cycles += 6;
                         break;
                     case 0x24:          /*INC IXh */
-                        setinc(ix.b.h);
-                        ix.b.h++;
+                        ix.b.h = setinc(ix.b.h);
                         cycles += 4;
                         break;
                     case 0x25:          /*DEC IXh */
-                        setdec(ix.b.h);
-                        ix.b.h--;
+                        ix.b.h = setdec(ix.b.h);
                         cycles += 4;
                         break;
                     case 0x26:          /*LD IXh,nn */
@@ -3521,13 +3507,11 @@ void z80_exec(void)
                         cycles += 6;
                         break;
                     case 0x2C:          /*INC IXl */
-                        setinc(ix.b.l);
-                        ix.b.l++;
+                        ix.b.l = setinc(ix.b.l);
                         cycles += 4;
                         break;
                     case 0x2D:          /*DEC IXl */
-                        setdec(ix.b.l);
-                        ix.b.l--;
+                        ix.b.l = setdec(ix.b.l);
                         cycles += 4;
                         break;
                     case 0x2E:          /*LD IXl,nn */
@@ -3542,10 +3526,9 @@ void z80_exec(void)
                             addr |= 0xFF00;
                         addr += ix.w;
                         cycles += 3;
-                        temp = z80_readmem(addr);
-                        setinc(temp);
+                        temp = setinc(z80_readmem(addr));
                         cycles += 5;
-                        z80_writemem(addr, temp + 1);
+                        z80_writemem(addr, temp);
                         cycles += 7;
                         break;
                     case 0x35:          /*DEC (IX+nn) */
@@ -3555,10 +3538,9 @@ void z80_exec(void)
                             addr |= 0xFF00;
                         addr += ix.w;
                         cycles += 3;
-                        temp = z80_readmem(addr);
-                        setdec(temp);
+                        temp = setdec(z80_readmem(addr));
                         cycles += 5;
-                        z80_writemem(addr, temp - 1);
+                        z80_writemem(addr, temp);
                         cycles += 7;
                         break;
                     case 0x36:          /*LD (IX+nn),nn */
@@ -4981,13 +4963,11 @@ void z80_exec(void)
                         cycles += 6;
                         break;
                     case 0x24:          /*INC IYh */
-                        setinc(iy.b.h);
-                        iy.b.h++;
+                        iy.b.h = setinc(iy.b.h);
                         cycles += 4;
                         break;
                     case 0x25:          /*DEC IYh */
-                        setdec(iy.b.h);
-                        iy.b.h--;
+                        iy.b.h = setdec(iy.b.h);
                         cycles += 4;
                         break;
                     case 0x26:          /*LD IYh,nn */
@@ -5017,13 +4997,11 @@ void z80_exec(void)
                         cycles += 6;
                         break;
                     case 0x2C:          /*INC IYl */
-                        setinc(iy.b.l);
-                        iy.b.l++;
+                        iy.b.l = setinc(iy.b.l);
                         cycles += 4;
                         break;
                     case 0x2D:          /*DEC IYl */
-                        setdec(iy.b.l);
-                        iy.b.l--;
+                        iy.b.l = setdec(iy.b.l);
                         cycles += 4;
                         break;
                     case 0x2E:          /*LD IYl,nn */
@@ -5038,10 +5016,9 @@ void z80_exec(void)
                             addr |= 0xFF00;
                         addr += iy.w;
                         cycles += 3;
-                        temp = z80_readmem(addr);
-                        setinc(temp);
+                        temp = setinc(z80_readmem(addr));
                         cycles += 5;
-                        z80_writemem(addr, temp + 1);
+                        z80_writemem(addr, temp);
                         cycles += 7;
                         break;
                     case 0x35:          /*DEC (IY+nn) */
@@ -5051,10 +5028,9 @@ void z80_exec(void)
                             addr |= 0xFF00;
                         addr += iy.w;
                         cycles += 3;
-                        temp = z80_readmem(addr);
-                        setdec(temp);
+                        temp = setdec(z80_readmem(addr));
                         cycles += 5;
-                        z80_writemem(addr, temp - 1);
+                        z80_writemem(addr, temp);
                         cycles += 7;
                         break;
                     case 0x36:          /*LD (IY+nn),nn */
