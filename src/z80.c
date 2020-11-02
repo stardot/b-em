@@ -633,7 +633,7 @@ static uint16_t oopc, opc;
 
 void z80_exec(void)
 {
-    uint8_t opcode, temp;
+    uint8_t opcode, temp, temp2;
     uint16_t addr;
     int enterint = 0;
 
@@ -3991,12 +3991,12 @@ void z80_exec(void)
                             case 0x16:          /*RL (IX+nn) */
                                 cycles += 5;
                                 temp = z80_readmem(addr + ix.w);
-                                addr = temp & 0x80;
+                                temp2 = temp & 0x80;
                                 temp <<= 1;
                                 if (tempc)
                                     temp |= 1;
                                 setzn(temp);
-                                if (addr)
+                                if (temp2)
                                     af.b.l |= C_FLAG;
                                 cycles += 4;
                                 z80_writemem(addr + ix.w, temp);
@@ -4005,12 +4005,12 @@ void z80_exec(void)
                             case 0x1E:          /*RR (IX+nn) */
                                 cycles += 5;
                                 temp = z80_readmem(addr + ix.w);
-                                addr = temp & 1;
+                                temp2 = temp & 1;
                                 temp >>= 1;
                                 if (tempc)
                                     temp |= 0x80;
                                 setzn(temp);
-                                if (addr)
+                                if (temp2)
                                     af.b.l |= C_FLAG;
                                 cycles += 4;
                                 z80_writemem(addr + ix.w, temp);
@@ -5513,12 +5513,12 @@ void z80_exec(void)
                             case 0x16:          /*RL (IY+nn) */
                                 cycles += 5;
                                 temp = z80_readmem(addr + iy.w);
-                                addr = temp & 0x80;
+                                temp2 = temp & 0x80;
                                 temp <<= 1;
                                 if (tempc)
                                     temp |= 1;
                                 setzn(temp);
-                                if (addr)
+                                if (temp2)
                                     af.b.l |= C_FLAG;
                                 cycles += 4;
                                 z80_writemem(addr + iy.w, temp);
@@ -5527,12 +5527,12 @@ void z80_exec(void)
                             case 0x1E:          /*RR (IY+nn) */
                                 cycles += 5;
                                 temp = z80_readmem(addr + iy.w);
-                                addr = temp & 1;
+                                temp2 = temp & 1;
                                 temp >>= 1;
                                 if (tempc)
                                     temp |= 0x80;
                                 setzn(temp);
-                                if (addr)
+                                if (temp2)
                                     af.b.l |= C_FLAG;
                                 cycles += 4;
                                 z80_writemem(addr + iy.w, temp);
