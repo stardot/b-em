@@ -431,21 +431,28 @@ static void dbg_z80_reg_set(int which, uint32_t value)
     }
 }
 
-static size_t dbg_z80_reg_print(int which, char *buf, size_t bufsize)
+static size_t z80_decode_flags(uint32_t flags, char *buf, size_t bufsize)
 {
-    uint32_t value = dbg_z80_reg_get(which);
-    if (which == REG_F && bufsize >= 9) {
-        buf[0] = value & 0x80 ? 'S' : '-';
-        buf[1] = value & 0x40 ? 'Z' : '-';
-        buf[2] = value & 0x20 ? 'Y' : '-';
-        buf[3] = value & 0x10 ? 'H' : '-';
-        buf[4] = value & 0x08 ? 'X' : '-';
-        buf[5] = value & 0x04 ? 'V' : '-';
-        buf[6] = value & 0x02 ? 'N' : '-';
-        buf[7] = value & 0x01 ? 'C' : '-';
+    if (bufsize >= 9) {
+        buf[0] = flags & 0x80 ? 'S' : '-';
+        buf[1] = flags & 0x40 ? 'Z' : '-';
+        buf[2] = flags & 0x20 ? 'Y' : '-';
+        buf[3] = flags & 0x10 ? 'H' : '-';
+        buf[4] = flags & 0x08 ? 'X' : '-';
+        buf[5] = flags & 0x04 ? 'V' : '-';
+        buf[6] = flags & 0x02 ? 'N' : '-';
+        buf[7] = flags & 0x01 ? 'C' : '-';
         buf[8] = 0;
         return 8;
     }
+    return 0;
+}
+
+static size_t dbg_z80_reg_print(int which, char *buf, size_t bufsize)
+{
+    uint32_t value = dbg_z80_reg_get(which);
+    if (which == REG_F)
+        return z80_decode_flags(value, buf, bufsize);
     return snprintf(buf, bufsize, which <= REG_F ? "%02X" : "%04X", value);
 }
 
@@ -605,15 +612,13 @@ bool z80_init(void *rom)
 
 void z80_dumpregs()
 {
+    char buf[9];
     log_debug("AF =%04X BC =%04X DE =%04X HL =%04X IX=%04X IY=%04X\n",
               af.w, bc.w, de.w, hl.w, ix.w, iy.w);
     log_debug("AF'=%04X BC'=%04X DE'=%04X HL'=%04X IR=%04X\n", saf.w,
               sbc.w, sde.w, shl.w, ir.w);
-    log_debug("%c%c%c%c%c%c   PC =%04X SP =%04X\n",
-              (af.b.l & S_FLAG) ? 'N' : ' ', (af.b.l & Z_FLAG) ? 'Z' : ' ',
-              (af.b.l & H_FLAG) ? 'H' : ' ', (af.b.l & V_FLAG) ? 'V' : ' ',
-              (af.b.l & N_FLAG) ? 'S' : ' ', (af.b.l & C_FLAG) ? 'C' : ' ',
-              pc, sp);
+    z80_decode_flags(af.b.l, buf, sizeof(buf));
+    log_debug("%s   PC =%04X SP =%04X\n", buf, pc, sp);
     log_debug("%i ins  IFF1=%i IFF2=%i  %04X %04X\n", ins, iff1, iff2, opc,
               oopc);
 }
