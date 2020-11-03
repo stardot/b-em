@@ -59,11 +59,7 @@ static int dbg_tube_z80 = 0;
 
 static inline uint8_t z80_do_readmem(uint16_t a)
 {
-    if (a >= 0x8000) {
-        z80_rom_in = false;
-        return z80ram[a];
-    }
-    else if (a < 0x1000 && z80_rom_in)
+    if (a < 0x1000 && z80_rom_in)
         return z80rom[a & 0xFFF];
     return z80ram[a];
 }
@@ -110,26 +106,14 @@ static void dbg_z80_writemem(uint32_t addr, uint32_t value)
     z80_writemem(addr & 0xffff, value);
 }
 
-int endtimeslice;
-static void z80out(uint16_t a, uint8_t v)
+static inline void z80out(uint16_t a, uint8_t v)
 {
-    if ((a & 0xFF) < 8) {
-        tube_parasite_write(a, v);
-        endtimeslice = 1;
-    }
+    tube_parasite_write(a, v);
 }
 
-static uint8_t z80in(uint16_t a)
+static inline uint8_t z80in(uint16_t a)
 {
-    uint8_t io_addr = a & 0xff;
-    if (io_addr < 8) {
-        if (io_addr == 2)
-            z80_rom_in = true;
-        else if (io_addr == 6)
-            z80_rom_in = false;
-        return tube_parasite_read(a);
-    }
-    return 0;
+    return tube_parasite_read(a);
 }
 
 static inline void setzn(uint8_t v)
@@ -650,6 +634,8 @@ void z80_exec(void)
         if ((tube_irq & 1) && iff1)
             enterint = 1;
         cycles = 0;
+        if (pc & 0x8000)
+            z80_rom_in = false;
         if (dbg_tube_z80)
             debug_preexec(&tubez80_cpu_debug, pc);
         tempc = af.b.l & C_FLAG;
