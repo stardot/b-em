@@ -1700,7 +1700,7 @@ static uint32_t cfile_callback(FILE *fp, uint32_t start_addr, size_t bytes)
 
 static void osfile_write(uint32_t pb, const char *path, uint32_t (*callback)(FILE *fp, uint32_t addr, size_t bytes))
 {
-    vdfs_entry *ent, key;
+    vdfs_entry *ent;
     FILE *fp;
     uint32_t start_addr, end_addr;
 
@@ -1708,19 +1708,20 @@ static void osfile_write(uint32_t pb, const char *path, uint32_t (*callback)(FIL
         vdfs_findres res;
         if ((ent = find_entry(path, &res, cur_dir, dfs_dir))) {
             if (ent->attribs & (ATTR_OPEN_READ|ATTR_OPEN_WRITE)) {
-                log_debug("vdfs: attempt to save file %s which is already open via OSFIND", key.acorn_fn);
+                log_debug("vdfs: attempt to save file %s which is already open via OSFIND", res.acorn_fn);
                 adfs_error(err_isopen);
                 return;
             }
             if (ent->attribs & ATTR_EXISTS) {
                 if (ent->attribs & ATTR_IS_DIR) {
-                    log_debug("vdfs: attempt to create file %s over an existing dir", key.acorn_fn);
+                    log_debug("vdfs: attempt to create file %s over an existing dir", res.acorn_fn);
                     adfs_error(err_direxist);
                     return;
                 }
             }
         }
-        else if (!key.parent) {
+        else if (!res.parent) {
+            log_debug("vdfs: osfile_write, no parent into which to create new file");
             adfs_error(res.errmsg);
             return;
         }
