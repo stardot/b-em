@@ -2654,7 +2654,7 @@ static void run_file(const char *err)
         char path[MAX_ACORN_PATH];
         cmd_tail = parse_name(path, sizeof path, (y << 8) | x);
         ent = find_entry(path, &res, cur_dir, dfs_dir);
-        if (!(ent && ent->attribs & ATTR_EXISTS))
+        if (!(ent && ent->attribs & ATTR_EXISTS) && lib_dir)
             ent = find_entry(path, &res, lib_dir, dfs_lib);
         if (ent && ent->attribs & ATTR_EXISTS) {
             if (ent->attribs & ATTR_IS_DIR)
