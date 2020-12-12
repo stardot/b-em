@@ -69,6 +69,7 @@
 #define IDM_TUBE_6502        41051
 #define IDM_TUBE_Z80         41053
 #define IDM_TUBE_65816       41055
+#define IDM_TUBE_65816_DOSSY 41057
 #define IDM_TUBE_32016       41056
 #define IDM_TUBES_4          41060
 #define IDM_TUBES_8          41061

@@ -52,3 +52,5 @@ b-em.ilk
 build/
 b-em-mg.exe
 enc_temp_folder/
+src/b-em.aps
+*.bak

@@ -204,6 +204,7 @@ BEGIN
                                 MENUITEM "&32mhz", IDM_TUBES_32
                                 MENUITEM "&64mhz", IDM_TUBES_64
                         END
+                        MENUITEM "65816 Dossy",IDM_TUBE_65816_DOSSY
                 END
                 MENUITEM "ROMs", IDM_ROM_CONFIG
                 POPUP "&Video"
