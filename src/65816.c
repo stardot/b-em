@@ -1033,6 +1033,11 @@ static void xce(void)
 {
     int temp = p.c;
     p.c = p.e;
+    if (temp == 1 || p.e == 1)
+    {
+        p.m = 1;
+        p.ex = 1;
+    }
     p.e = temp;
     readmem(pbr | pc);
     updatecpumode();
@@ -5594,8 +5599,6 @@ static void updatecpumode(void)
     if (p.e) {
         mode = 4;
         x.b.h = y.b.h = 0;
-        p.m = 1;
-        p.ex = 1;
     } else {
         mode = 0;
         if (!p.m)
