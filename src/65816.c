@@ -5708,11 +5708,11 @@ static void w65816_loadstate(ZFILE * zfp)
 }
 
 bool w65816_init_recoco(void *rom) {
-    w65816_init(rom, 0x00);
+    return w65816_init(rom, 0x00);
 }
 
 bool w65816_init_dossy(void *rom) {
-    w65816_init(rom, 0x01);
+    return w65816_init(rom, 0x01);
 }
 
 bool w65816_init(void *rom, uint8_t nativeVectBank)
