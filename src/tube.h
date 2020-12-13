@@ -13,7 +13,8 @@ typedef enum {
     TUBE32016,
     TUBE6809,
     TUBEPDP11,
-    TUBE68000
+    TUBE68000,
+    TUBE65816Dossy
 } tubetype;
 
 extern tubetype tube_type;

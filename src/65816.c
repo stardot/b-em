@@ -13,6 +13,9 @@
 
 static uint8_t *w65816ram, *w65816rom;
 
+// The bank number to load any native vectors from
+static uint8_t w65816nvb = 0x00;
+
 /*Registers*/
 typedef union {
     uint16_t w;
@@ -57,7 +60,7 @@ static int def = 1, divider = 0, banking = 0, banknum = 0;
 static uint32_t w65816mask = 0xFFFF;
 static uint16_t toldpc;
 
-static const char *dbg65816_reg_names[] = { "AB", "X", "Y", "S", "P", "PC", "DP", "DB", "PB", NULL };
+static const char *dbg65816_reg_names[] = { "AB", "X", "Y", "S", "P", "PC", "DP", "DB", "PB", "E", NULL };
 
 static int dbg_w65816 = 0;
 
@@ -152,6 +155,8 @@ static uint32_t dbg_reg_get(int which)
             return dbr;
         case REG_PB:
             return pbr;
+        case REG_E:
+            return w65816p.e;
         default:
             log_warn("65816: attempt to get non-existent register");
             return 0;
@@ -188,6 +193,9 @@ static void dbg_reg_set(int which, uint32_t value)
         case REG_PB:
             pbr = value;
             break;
+        case REG_E:
+            w65816p.e = value?1:0;
+            break;
         default:
             log_warn("65816: attempt to set non-existent register");
     }
@@ -214,6 +222,8 @@ static size_t dbg_reg_print(int which, char *buf, size_t bufsize)
     switch (which) {
         case REG_P:
             return dbg65816_print_flags(buf, bufsize);
+        case REG_E:
+            return snprintf(buf, bufsize, "%01X", dbg_reg_get(which));
         default:
             return snprintf(buf, bufsize, "%04X", dbg_reg_get(which));
     }
@@ -1023,6 +1033,11 @@ static void xce(void)
 {
     int temp = p.c;
     p.c = p.e;
+    if (temp == 1 || p.e == 1)
+    {
+        p.m = 1;
+        p.ex = 1;
+    }
     p.e = temp;
     readmem(pbr | pc);
     updatecpumode();
@@ -4218,7 +4233,7 @@ static void op_brk(void)
     writemem(s.w--, pc >> 8);
     writemem(s.w--, pc & 0xFF);
     writemem(s.w--, pack_flags());
-    pc = readmemw(0xFFE6);
+    pc = readmemw((w65816nvb << 16) | 0xFFE6);
     pbr = 0;
     p.i = 1;
     p.d = 0;
@@ -4243,7 +4258,7 @@ static void cop(void)
     writemem(s.w--, pc >> 8);
     writemem(s.w--, pc & 0xFF);
     writemem(s.w--, pack_flags());
-    pc = readmemw(0xFFE4);
+    pc = readmemw((w65816nvb << 16) | 0xFFE4);
     pbr = 0;
     p.i = 1;
     p.d = 0;
@@ -5599,10 +5614,12 @@ static void updatecpumode(void)
 void w65816_reset(void)
 {
     def = 1;
-    if (def || (banking & 4))
-        w65816mask = 0xFFFF;
-    else
-        w65816mask = 0x7FFFF;
+    // This test is rather academic as def is 1 at this point
+    //if (def || (banking & 4))
+    //    w65816mask = 0xFFFF;
+    //else
+    //    w65816mask = 0x7FFFF;
+    w65816mask = 0xFFFF;
     pbr = dbr = 0;
     s.w = 0x1FF;
     set_cpu_mode(4);
@@ -5690,7 +5707,15 @@ static void w65816_loadstate(ZFILE * zfp)
     savestate_zread(zfp, w65816rom, W65816_ROM_SIZE);
 }
 
-bool w65816_init(void *rom)
+bool w65816_init_recoco(void *rom) {
+    w65816_init(rom, 0x00);
+}
+
+bool w65816_init_dossy(void *rom) {
+    w65816_init(rom, 0x01);
+}
+
+bool w65816_init(void *rom, uint8_t nativeVectBank)
 {
     if (!w65816ram) {
         w65816ram = malloc(W65816_RAM_SIZE);
@@ -5700,6 +5725,7 @@ bool w65816_init(void *rom)
         }
     }
     w65816rom = rom;
+    w65816nvb = nativeVectBank;
     tube_type = TUBE65816;
     tube_readmem = readmem65816;
     tube_writemem = writemem65816;
@@ -5723,7 +5749,7 @@ static void nmi65816(void)
         writemem(s.w--, pc >> 8);
         writemem(s.w--, pc & 0xFF);
         writemem(s.w--, pack_flags());
-        pc = readmemw(0xFFEA);
+        pc = readmemw((w65816nvb << 16) | 0xFFEA);
         pbr = 0;
         p.i = 1;
         p.d = 0;
@@ -5759,7 +5785,7 @@ static void irq65816(void)
         writemem(s.w--, pc >> 8);
         writemem(s.w--, pc & 0xFF);
         writemem(s.w--, pack_flags());
-        pc = readmemw(0xFFEE);
+        pc = readmemw((w65816nvb << 16) | 0xFFEE);
         pbr = 0;
         p.i = 1;
         p.d = 0;

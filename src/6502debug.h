@@ -26,7 +26,8 @@ enum register_numbers {
     REG_PC,
     REG_DP,
     REG_DB,
-    REG_PB
+    REG_PB,
+    REG_E
 };
 
 extern const char *dbg6502_reg_names[];

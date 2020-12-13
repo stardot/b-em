@@ -63,7 +63,7 @@ TUBE tubes[NUM_TUBES]=
     {"ARM",            arm_init,        arm_reset,       &tubearm_cpu_debug,   0x4000, "ARMeval_100",      4 },
     {"Z80",            z80_init,        z80_reset,       &tubez80_cpu_debug,   0x1000, "Z80_122",          6 },
     {"80186",          x86_init,        x86_reset,       &tubex86_cpu_debug,   0x4000, "BIOS",             8 },
-    {"65816",          w65816_init,     w65816_reset,    &tube65816_cpu_debug, 0x8000, "ReCo6502ROM_816", 16 },
+    {"65816",          w65816_init_recoco,     w65816_reset,    &tube65816_cpu_debug, 0x8000, "ReCo6502ROM_816", 16 },
     {"32016",          tube_32016_init, n32016_reset,    &n32016_cpu_debug,    0x0000, "",                 8 },
     {"6502 External",  tube_6502_init,  tube_6502_reset, &tube6502_cpu_debug,  0x0800, "6502Tube",         3 },
     {"6809",           tube_6809_init,  mc6809nc_reset,  &mc6809nc_cpu_debug,  0x0800, "6809Tube",        16 },
@@ -71,8 +71,9 @@ TUBE tubes[NUM_TUBES]=
     {"PDP11",          tube_pdp11_init, copro_pdp11_rst, &pdp11_cpu_debug,     0x0800, "PDP11Tube",        2 },
     {"6502 Turbo",     tube_6502_iturb, tube_6502_reset, &tube6502_cpu_debug,  0x0800, "6502Turbo",        4 },
 #ifdef M68K
-    {"68000",          tube_68000_init, tube_68000_rst,  &mc68000_cpu_debug,   0x8000, "CiscOS",           4 }
+    {"68000",          tube_68000_init, tube_68000_rst,  &mc68000_cpu_debug,   0x8000, "CiscOS",           4 },
 #endif
+    {"65816Dossy",     w65816_init_dossy,     w65816_reset,    &tube65816_cpu_debug, 0x8000, "Dossy_816",       16 }
 };
 
 static fdc_type_t model_find_fdc(const char *name, const char *model)

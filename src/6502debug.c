@@ -185,9 +185,9 @@ static const uint8_t am_816[256]=
 /*90*/  PCR,  INDY, IND,  SRY,  ZPX,  ZPX,  ZPY,  INDYL,IMP,  ABSY, IMP,  IMP,  ABS,  ABSX, ABSX, ABSXL,
 /*A0*/  IMX,  INDX, IMX,  SR,   ZP,   ZP,   ZP,   INDL, IMP,  IMV,  IMP,  IMP,  ABS,  ABS,  ABS,  ABSL,
 /*B0*/  PCR,  INDY, IND,  SRY,  ZPX,  ZPX,  ZPY,  INDYL,IMP,  ABSY, IMP,  IMP,  ABSX, ABSX, ABSY, ABSXL,
-/*C0*/  IMX,  INDX, IMV,  SR,   ZP,   ZP,   ZP,   INDL, IMP,  IMV,  IMP,  IMP,  ABS,  ABS,  ABS,  ABSL,
-/*D0*/  PCR,  INDY, IND,  SRY,  IMP,  ZPX,  ZPX,  INDYL,IMP,  ABSY, IMP,  IMP,  ABSL, IND16,ABSX, ABSXL,
-/*E0*/  IMX,  INDX, IMV,  SR,   ZP,   ZP,   ZP,   INDL, IMP,  IMV,  IMP,  IMP,  ABS,  ABS,  ABS,  ABSL,
+/*C0*/  IMX,  INDX, IMM,  SR,   ZP,   ZP,   ZP,   INDL, IMP,  IMV,  IMP,  IMP,  ABS,  ABS,  ABS,  ABSL,
+/*D0*/  PCR,  INDY, IND,  SRY,  IMP,  ZPX,  ZPX,  INDYL,IMP,  ABSY, IMP,  IMP,  ABSL, ABSX, ABSX, ABSXL,
+/*E0*/  IMX,  INDX, IMM,  SR,   ZP,   ZP,   ZP,   INDL, IMP,  IMV,  IMP,  IMP,  ABS,  ABS,  ABS,  ABSL,
 /*F0*/  PCR,  INDY, IND,  SRY,  IMP,  ZPX,  ZPX,  INDYL,IMP,  ABSY, IMP,  IMP,  ABSX, ABSX, ABSX, ABSXL
 };
 
@@ -252,7 +252,7 @@ uint32_t dbg6502_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
                 snprintf(buf, bufsize, "%02X       %s #%02X     ", p1, op_name, p1);
             else {
                 p2 = cpu->memread(addr++);
-                snprintf(buf, bufsize, "%02X %02X    %s #%02X%02X     ", p1, p2, op_name, p1, p2);
+                snprintf(buf, bufsize, "%02X %02X    %s #%02X%02X     ", p1, p2, op_name, p2, p1);
             }
             break;
         case IMX:
@@ -261,7 +261,7 @@ uint32_t dbg6502_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
                 snprintf(buf, bufsize, "%02X       %s #%02X     ", p1, op_name, p1);
             else {
                 p2 = cpu->memread(addr++);
-                snprintf(buf, bufsize, "%02X %02X    %s #%02X%02X     ", p1, p2, op_name, p1, p2);
+                snprintf(buf, bufsize, "%02X %02X    %s #%02X%02X     ", p1, p2, op_name, p2, p1);
             }
             break;
         case ZP:
