@@ -676,55 +676,89 @@ static void scan_inf_file(vdfs_entry *ent)
     ent->u.file.exec_addr = exec_addr;
 }
 
+static unsigned scan_inf_dir_new(const char *lptr, const char *eptr, char *title)
+{
+    unsigned opt = 0;
+    do {
+        const char *sptr = eptr - 3;
+        if (sptr >= lptr && !strncasecmp(sptr, "OPT=", 4)) {
+            int ch, nyb;
+            // Parse options.
+            while ((ch = *++eptr) == ' ' || ch == '\t')
+                ;
+            while ((nyb = hex2nyb(ch)) >= 0) {
+                opt = (opt << 4) | nyb;
+                ch = *++eptr;
+            }
+        }
+        else {
+            sptr = eptr - 5;
+            if (sptr >= lptr && !strncasecmp(sptr, "TITLE=", 6)) {
+                // Parse title.
+                char *ptr = title;
+                char *end = title + MAX_TITLE;
+                int ch, quote= 0;
+
+                do
+                    ch = *++eptr;
+                while (ch == ' ' || ch == '\t');
+
+                if (ch == '"') {
+                    quote = 1;
+                    ch = *++eptr;
+                }
+                while (ptr < end && ch && ch != '\n' && (ch != '"' || !quote) && ((ch != ' ' && ch != '\t') || quote)) {
+                    *ptr++ = ch & 0x7f;
+                    ch = *++eptr;
+                }
+                *ptr = '\0';
+            }
+            else
+                ++eptr;
+        }
+        lptr = eptr;
+        eptr = strchr(lptr, '=');
+    }
+    while (eptr);
+    return opt;
+}
+
+static unsigned scan_inf_dir_old(const char *lptr, char *title)
+{
+    unsigned opt = 0;
+    // Old .inf format for directories.
+    int ch, nyb;
+    // Parse options.
+    while ((ch = *lptr++) == ' ' || ch == '\t')
+        ;
+    while ((nyb = hex2nyb(ch)) >= 0) {
+        opt = (opt << 4) | nyb;
+        ch = *lptr++;
+    }
+    while (ch == ' ' || ch == '\t')
+        ch = *lptr++;
+    char *ptr = title;
+    char *end = title + MAX_TITLE;
+    while (ptr < end && ch && ch != '\n') {
+        *ptr++ = ch & 0x7f;
+        ch = *lptr++;
+    }
+    *ptr = '\0';
+    return opt;
+}
+
 static void scan_inf_dir(vdfs_entry *dir)
 {
     char inf_line[MAX_INF_LINE];
-    unsigned opt = 0;
     dir->u.dir.title[0] = 0;
     const char *lptr = scan_inf_start(dir, inf_line);
     if (lptr) {
-        const char *eptr;
-        while ((eptr = strchr(lptr, '='))) {
-            const char *sptr = eptr - 3;
-            if (sptr >= lptr && !strncasecmp(sptr, "OPT=", 4)) {
-                int ch, nyb;
-                // Parse options.
-                while ((ch = *++eptr) == ' ' || ch == '\t')
-                    ;
-                while ((nyb = hex2nyb(ch)) >= 0) {
-                    opt = (opt << 4) | nyb;
-                    ch = *++eptr;
-                }
-            }
-            else {
-                sptr = eptr - 5;
-                if (sptr >= lptr && !strncasecmp(sptr, "TITLE=", 6)) {
-                    // Parse title.
-                    char *ptr = dir->u.dir.title;
-                    char *end = dir->u.dir.title + MAX_TITLE;
-                    int ch, quote= 0;
-
-                    do
-                        ch = *++eptr;
-                    while (ch == ' ' || ch == '\t');
-
-                    if (ch == '"') {
-                        quote = 1;
-                        ch = *++eptr;
-                    }
-                    while (ptr < end && ch && ch != '\n' && (ch != '"' || !quote) && ((ch != ' ' && ch != '\t') || quote)) {
-                        *ptr++ = ch & 0x7f;
-                        ch = *++eptr;
-                    }
-                    *ptr = '\0';
-                }
-                else
-                    ++eptr;
-            }
-            lptr = eptr;
-        }
+        const char *eptr = strchr(lptr, '=');
+        if (eptr)
+            dir->u.dir.boot_opt = scan_inf_dir_new(lptr, eptr, dir->u.dir.title);
+        else
+            dir->u.dir.boot_opt = scan_inf_dir_old(lptr, dir->u.dir.title);
     }
-    dir->u.dir.boot_opt = opt;
 }
 
 static void scan_entry(vdfs_entry *ent)
