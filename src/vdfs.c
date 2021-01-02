@@ -2577,7 +2577,8 @@ static vdfs_entry *lookup_dir(uint16_t addr)
     if (check_valid_dir(cur_dir, "current")) {
         vdfs_entry *ent;
         vdfs_findres res;
-        char path[MAX_ACORN_PATH];        parse_name(path, sizeof path, addr);
+        char path[MAX_ACORN_PATH];
+        parse_name(path, sizeof path, addr);
         ent = find_entry(path, &res, cur_dir, dfs_dir);
         if (ent && ent->attribs & ATTR_EXISTS) {
             if (ent->attribs & ATTR_IS_DIR)
