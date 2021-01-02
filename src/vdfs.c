@@ -936,11 +936,12 @@ static uint16_t parse_name(char *str, size_t size, uint16_t addr)
         quote = 1;
         ch = readmem(addr++);
     }
-    while (ptr < end && ch != '\r' && (ch != '"' || !quote) && (ch != ' ' || quote)) {
+    while (ptr < end && !(ch == '\r' || ch == ' ' || ch == '\t' || (ch == '"' && quote))) {
         *ptr++ = ch & 0x7f;
         ch = readmem(addr++);
     }
     *ptr = '\0';
+    log_debug("vdfs: parse_name: name=%s", str);
     return addr;
 }
 
@@ -2642,7 +2643,25 @@ static void cmd_lib_dfs(uint16_t addr)
 static void cmd_title(uint16_t addr)
 {
     if (check_valid_dir(cur_dir, "current")) {
-        parse_name(cur_dir->u.dir.title, sizeof(cur_dir->u.dir.title), addr);
+        char *ptr = cur_dir->u.dir.title;
+        char *end = cur_dir->u.dir.title + sizeof(cur_dir->u.dir.title) - 1;
+        int ch, quote= 0;
+
+        log_debug("vdfs: cmd_title: addr=%04x\n", addr);
+        do
+            ch = readmem(addr++);
+        while (ch == ' ' || ch == '\t');
+
+        if (ch == '"') {
+            quote = 1;
+            ch = readmem(addr++);
+        }
+        while (ptr < end && ch != '\r' && (ch != '"' || !quote) && (ch != ' ' || quote)) {
+            *ptr++ = ch & 0x7f;
+            ch = readmem(addr++);
+        }
+        *ptr = '\0';
+        log_debug("vdfs: cmd_title: name=%s\n", cur_dir->u.dir.title);
         write_back(cur_dir);
     }
 }
