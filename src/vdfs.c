@@ -683,25 +683,46 @@ static void scan_inf_dir(vdfs_entry *dir)
     dir->u.dir.title[0] = 0;
     const char *lptr = scan_inf_start(dir, inf_line);
     if (lptr) {
-        int ch, nyb;
-        // Parse options.
-        while ((ch = *lptr++) == ' ' || ch == '\t')
-            ;
-        while ((nyb = hex2nyb(ch)) >= 0) {
-            opt = (opt << 4) | nyb;
-            ch = *lptr++;
-        }
+        const char *eptr;
+        while ((eptr = strchr(lptr, '='))) {
+            const char *sptr = eptr - 3;
+            if (sptr >= lptr && !strncasecmp(sptr, "OPT=", 4)) {
+                int ch, nyb;
+                // Parse options.
+                while ((ch = *++eptr) == ' ' || ch == '\t')
+                    ;
+                while ((nyb = hex2nyb(ch)) >= 0) {
+                    opt = (opt << 4) | nyb;
+                    ch = *++eptr;
+                }
+            }
+            else {
+                sptr = eptr - 5;
+                if (sptr >= lptr && !strncasecmp(sptr, "TITLE=", 6)) {
+                    // Parse title.
+                    char *ptr = dir->u.dir.title;
+                    char *end = dir->u.dir.title + MAX_TITLE;
+                    int ch, quote= 0;
 
-        // Parse title.
-        char *ptr = dir->u.dir.title;
-        char *end = ptr + MAX_TITLE;
-        while (ch == ' ' || ch == '\t')
-            ch = *lptr++;
-        while (ptr < end && ch && ch != '\n' && ch != '\r') {
-            *ptr++ = ch;
-            ch = *lptr++;
+                    do
+                        ch = *++eptr;
+                    while (ch == ' ' || ch == '\t');
+
+                    if (ch == '"') {
+                        quote = 1;
+                        ch = *++eptr;
+                    }
+                    while (ptr < end && ch && ch != '\n' && (ch != '"' || !quote) && ((ch != ' ' && ch != '\t') || quote)) {
+                        *ptr++ = ch & 0x7f;
+                        ch = *++eptr;
+                    }
+                    *ptr = '\0';
+                }
+                else
+                    ++eptr;
+            }
+            lptr = eptr;
         }
-        *ptr = 0;
     }
     dir->u.dir.boot_opt = opt;
 }
@@ -1061,14 +1082,14 @@ static void write_back(vdfs_entry *ent)
     show_activity();
     *ent->host_inf = '.'; // select .inf file.
     if ((fp = fopen(ent->host_path, "wt"))) {
-        if (ent->dfs_dir) {
-            putc(ent->dfs_dir, fp);
-            putc('.', fp);
+        if (ent->attribs & ATTR_IS_DIR) {
+            const char *fmt = "%s OPT=%02X DIR=1 TITLE=%s\n";
+            if (strpbrk(ent->u.dir.title, " \t"))
+                fmt = "%s OPT=%02X DIR=1 TITLE=\"%s\"\n";
+            fprintf(fp, fmt, ent->acorn_fn, ent->u.dir.boot_opt, ent->u.dir.title);
         }
-        if (ent->attribs & ATTR_IS_DIR)
-            fprintf(fp, "%s %02X %s\n", ent->acorn_fn, ent->u.dir.boot_opt, ent->u.dir.title);
         else
-            fprintf(fp, "%s %08X %08X\n", ent->acorn_fn, ent->u.file.load_addr, ent->u.file.exec_addr);
+            fprintf(fp, "%c.%s %08X %08X %08X %02X\n", ent->dfs_dir, ent->acorn_fn, ent->u.file.load_addr, ent->u.file.exec_addr, ent->u.file.length, ent->attribs & ATTR_ACORN_MASK);
         fclose(fp);
     } else
         log_warn("vdfs: unable to create INF file '%s': %s\n", ent->host_path, strerror(errno));
@@ -2656,7 +2677,7 @@ static void cmd_title(uint16_t addr)
             quote = 1;
             ch = readmem(addr++);
         }
-        while (ptr < end && ch != '\r' && (ch != '"' || !quote) && (ch != ' ' || quote)) {
+        while (ptr < end && ch != '\r' && (ch != '"' || !quote) && ((ch != ' ' && ch != '\t') || quote)) {
             *ptr++ = ch & 0x7f;
             ch = readmem(addr++);
         }
