@@ -491,10 +491,15 @@ static uint32_t do_readmem(uint32_t addr)
         case 0xFED0:
         case 0xFED4:
         case 0xFED8:
-        case 0xFEDC:
                 if (!MASTER)
                         return adc_read((uint16_t)addr);
                 break;
+        case 0xFEDC:
+            if (MASTER)
+                return mmccard_read();
+            else
+                return adc_read((uint16_t)addr);
+            break;
 
         case 0xFEE0:
         case 0xFEE4:
@@ -884,10 +889,15 @@ static void do_writemem(uint32_t addr, uint32_t val)
         case 0xFED0:
         case 0xFED4:
         case 0xFED8:
-        case 0xFEDC:
                 if (!MASTER)
                         adc_write((uint16_t)addr, (uint8_t)val);
                 break;
+        case 0xFEDC:
+            if (MASTER)
+                mmccard_write(val);
+            else
+                adc_write((uint16_t)addr, (uint8_t)val);
+            break;
 
         case 0xFEE0:
         case 0xFEE4:
