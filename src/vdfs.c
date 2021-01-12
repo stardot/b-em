@@ -3588,7 +3588,10 @@ static const struct cmdent ctab_always[] = {
     { "List",    VDFS_ROM_LIST    },
     { "Print",   VDFS_ROM_PRINT   },
     { "Type",    VDFS_ROM_TYPE    },
-    { "Roms",    VDFS_ROM_ROMS    },
+    { "Roms",    VDFS_ROM_ROMS    }
+};
+
+static const struct cmdent ctab_mmb[] = {
     { "DAbout",  VDFS_ACT_NOP     },
     { "Din",     VDFS_ACT_MMBDIN  }
 };
@@ -3616,6 +3619,8 @@ static void serv_cmd(void)
         ent = lookup_cmd(ctab_always, ARRAY_SIZE(ctab_always), cmd);
         if (!ent && vdfs_enabled)
             ent = lookup_cmd(ctab_enabled, ARRAY_SIZE(ctab_enabled), cmd);
+        if (!ent && mmb_fn)
+            ent = lookup_cmd(ctab_mmb, ARRAY_SIZE(ctab_mmb), cmd);
         if (ent)
             if (vdfs_do(ent->act, addr))
                 a = 0;

@@ -14,6 +14,7 @@
 #include "mouse.h"
 #include "music2000.h"
 #include "music5000.h"
+#include "mmccard.h"
 #include "paula.h"
 #include "serial.h"
 #include "scsi.h"
@@ -425,6 +426,8 @@ static uint32_t do_readmem(uint32_t addr)
         case 0xFE18:
                 if (MASTER)
                         return adc_read((uint16_t)addr);
+                else
+                    return mmccard_read();
                 break;
 
         case 0xFE24:
@@ -790,6 +793,8 @@ static void do_writemem(uint32_t addr, uint32_t val)
         case 0xFE18:
                 if (MASTER)
                         adc_write((uint16_t)addr, (uint8_t)val);
+                else
+                    mmccard_write(val);
                 break;
 
         case 0xFE20:

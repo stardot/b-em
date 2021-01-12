@@ -33,6 +33,7 @@
 #include "midi.h"
 #include "music4000.h"
 #include "music5000.h"
+#include "mmccard.h"
 #include "paula.h"
 #include "pal.h"
 #include "savestate.h"
@@ -316,6 +317,8 @@ void main_init(int argc, char *argv[])
         disc_load(0, discfns[0]);
     disc_load(1, discfns[1]);
     tape_load(tape_fn);
+    if (mmccard_fn)
+        mmccard_load(mmccard_fn);
     if (defaultwriteprot)
         writeprot[0] = writeprot[1] = 1;
     if (discfns[0])

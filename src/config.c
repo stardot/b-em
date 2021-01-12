@@ -9,6 +9,7 @@
 #include "keyboard.h"
 #include "model.h"
 #include "mouse.h"
+#include "mmccard.h"
 #include "ide.h"
 #include "midi.h"
 #include "scsi.h"
@@ -134,6 +135,11 @@ void config_load(void)
             if (mmb_fn)
                 free(mmb_fn);
             mmb_fn = strdup(p);
+        }
+        if ((p = get_config_string("disc", "mmccard", NULL))) {
+            if (mmccard_fn)
+                free(mmccard_fn);
+            mmccard_fn = strdup(p);
         }
         if ((p = get_config_string("tape", "tape", NULL))) {
             if (tape_fn)
@@ -272,6 +278,7 @@ void config_save(void)
         set_config_path("disc", "disc0", discfns[0]);
         set_config_path("disc", "disc1", discfns[1]);
         set_config_string("disc", "mmb", mmb_fn);
+        set_config_string("disc", "mmccard", mmccard_fn);
         set_config_bool("disc", "defaultwriteprotect", defaultwriteprot);
 
         if (tape_loaded)

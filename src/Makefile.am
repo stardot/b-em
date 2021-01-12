@@ -84,6 +84,7 @@ b_em_SOURCES = \
 	mem.c \
 	model.c \
 	mouse.c \
+    mmccard.c \
 	midi-linux.c \
 	music2000.c \
 	music4000.c \
