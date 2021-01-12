@@ -25,6 +25,7 @@ static unsigned mmc_count = 0;
 static uint8_t mmc_cmd, mmc_args[7];
 static unsigned char mmc_buffer[0x200];
 static off_t mmc_block_len = 0x200;
+static bool mmc_sdhc_mode = false;
 
 // Card ID - I'm familiar with these numbers
 static const unsigned char CardID[] = {
@@ -62,9 +63,19 @@ void mmccard_write(uint8_t byte)
                             mmc_shiftreg = 0x01;
                             mmc_state = MMC_IDLE;
                             break;
+                        case 0x69:
+                            if (mmc_args[0] & 0x40)
+                                mmc_sdhc_mode = true;
+                            // FALL THROUGH.
                         case 0x41: // Initialise card.
+                        case 0x77:
                             mmc_shiftreg = 0x00;
                             mmc_state = MMC_IDLE;
+                            break;
+                        case 0x48: // MMC_IF_COND, used to detect SDHC.
+                            mmc_shiftreg = 0x01;
+                            mmc_count = 0;
+                            mmc_state = MMC_SEND_ARGS;
                             break;
                         case 0x4a: // Card ID.
                             mmc_shiftreg = 0;
@@ -83,6 +94,8 @@ void mmccard_write(uint8_t byte)
                             break;
                         case 0x51: // Read sector.
                             address = (mmc_args[0] << 24) | (mmc_args[1] << 16) | (mmc_args[2] << 8) | mmc_args[3];
+                            if (mmc_sdhc_mode)
+                                address *= 0x200;
                             log_debug("mmccard: read from %lx", address);
                             if (address < mmc_size) {
                                 if (!fseek(mmc_fp, address, SEEK_SET) && fread(mmc_buffer, mmc_block_len, 1, mmc_fp) == 1) {
@@ -101,6 +114,8 @@ void mmccard_write(uint8_t byte)
                             break;
                         case 0x58: // Write sector.
                             address = (mmc_args[0] << 24) | (mmc_args[1] << 16) | (mmc_args[2] << 8) | mmc_args[3];
+                            if (mmc_sdhc_mode)
+                                address *= 0x200;
                             log_debug("mmccard: write to %lx", address);
                             if (mmc_wprot) {
                                 mmc_shiftreg = 0xff;
@@ -115,6 +130,12 @@ void mmccard_write(uint8_t byte)
                                 mmc_shiftreg = 0x40;
                                 mmc_state = MMC_IDLE;
                             }
+                            break;
+                        case 0x7a:
+                            mmc_shiftreg = 0;
+                            mmc_args[0] = 0x40;
+                            mmc_count = 0;
+                            mmc_state = MMC_SEND_ARGS;
                             break;
                         default:
                             mmc_shiftreg = 0xff;
