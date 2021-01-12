@@ -179,6 +179,7 @@ void mmccard_write(uint8_t byte)
                 mmc_buffer[mmc_count++] = byte;
                 if (mmc_count >= mmc_block_len) {
                     if (fwrite(mmc_buffer, mmc_block_len, 1, mmc_fp) == 1) {
+                        fflush(mmc_fp); // Guard against a real card being removed.
                         mmc_shiftreg = 0x05;
                         mmc_count = 0;
                         mmc_state = MMC_WRITE_FINISH;
