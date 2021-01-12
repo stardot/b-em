@@ -572,7 +572,7 @@ static void write_romsel(int val)
             ram1k = ram_fe34 & INTEGRA_PRVS1;
         }
     }
-    RAMbank[0xA] = ram8k;
+    RAMbank[0xA] = ram8k ? 1 : 0;
     if (ram4k) {
         for (int c = 0x80; c < 0x90; c++) {
             memlook[0][c] = memlook[1][c] = ram;
