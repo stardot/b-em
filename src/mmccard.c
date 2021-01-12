@@ -205,7 +205,7 @@ void mmccard_load(char *fn)
     FILE *fp = fopen(fn, "rb+");
     if (!fp) {
         fp = fopen(fn, "rb");
-        if (fp) {
+        if (!fp) {
             log_error("unable to open MMC card image %s: %s", fn, strerror(errno));
             return;
         }
