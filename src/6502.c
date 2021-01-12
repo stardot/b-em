@@ -321,8 +321,8 @@ static void os_paste_cnpv(void)
 
 static inline uint32_t debug_addr(uint32_t addr)
 {
-    if (addr >= 0x8000 && addr < 0xC000)
-        addr |= ram_fe30 << 28;
+    if ((addr & 0xc000) == 0x8000)
+        addr |= (ram_fe30 << 28);
     return addr;
 }
 
@@ -350,13 +350,12 @@ static inline uint16_t read_zp_indirect(uint16_t zp)
 }
 
 static uint32_t dbg_do_readmem(uint32_t addr) {
-    uint32_t romno = addr & 0xF0000000;
-    addr = addr & 0xFFFF;
-    if (romno && addr >= 0x8000 && addr < 0xC000) {
-            return rom[(romno >> 14) + addr - 0x8000];
+    if ((addr & 0xc000) == 0x8000) {
+        uint32_t romno = addr >> 28;
+        if (romno != (ram_fe30 & 0x7f))
+            return rom[(romno << 14) | (addr & 0x3fff)];
     }
-    else
-        return do_readmem(addr);
+    return do_readmem(addr);
 }
 
 static uint32_t do_readmem(uint32_t addr)
@@ -532,14 +531,14 @@ uint8_t readmem(uint16_t addr)
 }
 
 static void dbg_do_writemem(uint32_t addr, uint32_t val) {
-    uint32_t romno = addr & 0xF0000000;
-    addr = addr & 0xFFFF;
-    if (romno && addr >= 0x8000 && addr < 0xC000) {
-        if (rom_slots[romno >> 28].swram)
-            rom[(romno >> 14) + addr - 0x8000] = (uint8_t)val;
+    if ((addr & 0xc000) == 0x8000) {
+        uint32_t romno = addr >> 28;
+        if (romno != (ram_fe30 & 0x7f)) {
+            rom[(romno << 14) | (addr & 0x3fff)] = val;
+            return;
+        }
     }
-    else
-        do_writemem(addr, val);
+    do_writemem(addr, val);
 }
 
 static inline void shadow_mem(int enabled)
