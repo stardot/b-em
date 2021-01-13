@@ -283,7 +283,9 @@ cpu_debug_t mc68000_cpu_debug = {
     .reg_set        = dbg_reg_set,
     .reg_print      = dbg_reg_print,
     .reg_parse      = dbg_reg_parse,
-    .get_instr_addr = dbg_get_instr_addr
+    .get_instr_addr = dbg_get_instr_addr,
+    .print_addr     = debug_print_addr32,
+    .parse_addr     = debug_parse_addr
 };
 
 void mc68000_cpu_preexec(unsigned pc)

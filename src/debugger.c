@@ -439,6 +439,10 @@ size_t debug_print_addr32(cpu_debug_t *cpu, uint32_t value, char *buf, size_t bu
         return ret;
 }
 
+uint32_t debug_parse_addr(cpu_debug_t *cpu, const char *buf, const char **end)
+{
+    return strtoul(buf, (char **)end, 16);
+}
 
 static void print_registers(cpu_debug_t *cpu) {
     const char **np, *name;
@@ -454,36 +458,13 @@ static void print_registers(cpu_debug_t *cpu) {
     debug_out("\n", 1);
 }
 
-static uint32_t parse_address_with_romno(cpu_debug_t *cpu, char *arg, const char **endret) {
+static uint32_t parse_address_or_symbol(cpu_debug_t *cpu, char *arg, const char **endret) {
 
     uint32_t a;
     //first see if there is a symbol
     if (symbol_find_by_name(cpu->symbols, arg, &a, endret))
         return a;
-
-    char *end1;
-    a = strtoul(arg, &end1, 16);
-    if (end1 == arg) {
-        *endret = arg;
-        return -1;
-    }
-    if (*end1++ == ':') {
-        char *end2;
-        uint32_t b = strtoul(end1, &end2, 16);
-        if (end2 > end1) {
-            a = (a << 28) | b;
-            *endret = end2;
-            return a;
-        }
-        else {
-            *endret = arg;
-            return -1;
-        }
-    }
-    else {
-        *endret = end1;
-        return a;
-    }
+    return cpu->parse_addr(cpu, arg, endret);
 }
 
 static void set_sym(cpu_debug_t *cpu, const char *arg) {
@@ -498,7 +479,7 @@ static void set_sym(cpu_debug_t *cpu, const char *arg) {
         const char *e;
         uint32_t addr;
         if (n == 2)
-            addr = parse_address_with_romno(cpu, rest, &e);
+            addr = parse_address_or_symbol(cpu, rest, &e);
 
 
         if (n == 2 && e != rest && strlen(name)) {
@@ -529,7 +510,7 @@ static void set_point(cpu_debug_t *cpu, int *table, char *arg, const char *desc)
     int c;
 
     const char *end1;
-    uint32_t a = parse_address_with_romno(cpu, arg, &end1);
+    uint32_t a = parse_address_or_symbol(cpu, arg, &end1);
 
     char addrbuf[16 + SYM_MAX];
     cpu->print_addr(cpu, a, addrbuf, sizeof(addrbuf), true);
@@ -562,7 +543,7 @@ static void clear_point(cpu_debug_t *cpu, int *table, char *arg, const char *des
     int c, e;
 
     const char *p;
-    e = parse_address_with_romno(cpu, arg, &p);
+    e = parse_address_or_symbol(cpu, arg, &p);
 
     if (p != arg) {
         int ix = -1;
@@ -778,7 +759,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
             case 'd':
                 if (*iptr) {
                     const char *e;
-                    debug_disaddr = parse_address_with_romno(cpu, iptr, &e);
+                    debug_disaddr = parse_address_or_symbol(cpu, iptr, &e);
                 }
                 for (c = 0; c < 12; c++) {
                     const char *sym;
