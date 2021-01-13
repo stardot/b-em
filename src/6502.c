@@ -1193,7 +1193,7 @@ void m6502_exec(void)
                 switch (opcode) {
                 case 0x00:      /* BRK */
                         if (dbg_core6502)
-                            debug_trap(&core6502_cpu_debug, oldpc, 0);
+                            debug_trap(&core6502_cpu_debug, debug_addr(oldpc), 0);
                         pc++;
                         push(pc >> 8);
                         push(pc & 0xFF);
