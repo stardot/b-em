@@ -793,11 +793,14 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 break;
 
             case 'm':
-                if (*iptr)
-                    sscanf(iptr, "%X", (unsigned int *)&debug_memaddr);
+                if (*iptr) {
+                    const char *e;
+                    debug_memaddr = parse_address_or_symbol(cpu, iptr, &e);
+                }
                 for (c = 0; c < 16; c++) {
                     char dump[256], *dptr;
-                    debug_outf("    %04X : ", debug_memaddr);
+                    cpu->print_addr(cpu, debug_memaddr, dump, sizeof(dump), false);
+                    debug_outf("%s : ", dump);
                     for (int d = 0; d < 16; d++)
                         debug_outf("%02X ", cpu->memread(debug_memaddr + d));
                     debug_out("  ", 2);
