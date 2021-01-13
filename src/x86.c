@@ -227,6 +227,18 @@ static uint32_t x86_dbg_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, 
    return addr + oplen;
 }
 
+static uint32_t dbg_parse_addr(cpu_debug_t *cpu, const char *arg, const char **end)
+{
+    uint32_t a = strtoul(arg, (char **)end, 16);
+    const char *ptr = *end;
+    if (ptr > arg && *ptr++ == ':') {
+        uint32_t b = strtoul(ptr, (char **)end, 16);
+        if (*end > ptr)
+            a = (a << 4) | b;
+    }
+    return a;
+}
+
 // Get a register - which is the index into the names above
 static uint32_t x86_dbg_reg_get(int which) {
     switch (which) {
@@ -372,7 +384,8 @@ cpu_debug_t tubex86_cpu_debug = {
    .reg_print      = x86_dbg_reg_print,
    .reg_parse      = x86_dbg_reg_parse,
    .get_instr_addr = x86_dbg_get_instr_addr,
-   .print_addr     = dbg_print_addr
+   .print_addr     = dbg_print_addr,
+   .parse_addr     = dbg_parse_addr
 };
 
 #define pc x86pc
