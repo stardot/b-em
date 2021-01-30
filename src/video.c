@@ -595,38 +595,38 @@ static inline void mode7_render(ALLEGRO_LOCKED_REGION *region, uint8_t dat)
 
         if (dat < 0x20) {
             switch (dat) {
-            case 1:
-            case 2:
-            case 3:
-            case 4:
-            case 5:
-            case 6:
-            case 7:
+            case 1: /* 129: alphanumeric red     */
+            case 2: /* 130: alphanumeric green   */
+            case 3: /* 131: alphanumeric yellow  */
+            case 4: /* 132: alphanumeric blue    */
+            case 5: /* 133: alphanumeric magenta */
+            case 6: /* 134: alphanumeric cyan    */
+            case 7: /* 135: alphanumeric white   */
                 mode7_gfx = 0;
                 mode7_col = dat;
                 mode7_p[0] = mode7_chars;
                 mode7_p[1] = mode7_charsi;
                 holdclear = 1;
                 break;
-            case 8:
+            case 8: /* 136: flash */
                 mode7_flash = 1;
                 break;
-            case 9:
+            case 9: /* 137: steadt */
                 mode7_flash = 0;
                 break;
-            case 12:
-            case 13:
+            case 12: /* 140: normal height */
+            case 13: /* 141: double height */
                 mode7_dbl = dat & 1;
                 if (mode7_dbl)
                     mode7_wasdbl = 1;
                 break;
-            case 17:
-            case 18:
-            case 19:
-            case 20:
-            case 21:
-            case 22:
-            case 23:
+            case 17: /* 145: graphics red     */
+            case 18: /* 146: graphics green   */
+            case 19: /* 147: graphics yellow  */
+            case 20: /* 148: graphics blue    */
+            case 21: /* 149: graphics magenta */
+            case 22: /* 150: graphics cyan    */
+            case 23: /* 151: graphics white   */
                 mode7_gfx = 1;
                 mode7_col = dat & 7;
                 if (mode7_sep) {
@@ -637,33 +637,33 @@ static inline void mode7_render(ALLEGRO_LOCKED_REGION *region, uint8_t dat)
                     mode7_p[1] = mode7_graphi;
                 }
                 break;
-            case 24:
+            case 24: /* 152: conceal */
                 mode7_col = mcolx = mode7_bg;
                 break;
-            case 25:
+            case 25: /* 153: contiguous graphics */
                 if (mode7_gfx) {
                     mode7_p[0] = mode7_graph;
                     mode7_p[1] = mode7_graphi;
                 }
                 mode7_sep = 0;
                 break;
-            case 26:
+            case 26: /* 154: separated graphics */
                 if (mode7_gfx) {
                     mode7_p[0] = mode7_sepgraph;
                     mode7_p[1] = mode7_sepgraphi;
                 }
                 mode7_sep = 1;
                 break;
-            case 28:
+            case 28: /* 156: black background */
                 mode7_bg = 0;
                 break;
-            case 29:
+            case 29: /* 157: new background */
                 mode7_bg = mode7_col;
                 break;
-            case 30:
+            case 30: /* 158: hold graphics */
                 mode7_holdchar = 1;
                 break;
-            case 31:
+            case 31: /* 159: release graphics */
                 holdoff = 1;
                 break;
             }
