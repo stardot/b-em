@@ -669,14 +669,14 @@ static inline void mode7_render(ALLEGRO_LOCKED_REGION *region, uint8_t dat)
             }
             if (mode7_holdchar) {
                 dat = mode7_heldchar;
-                if (dat >= 0x40 && dat < 0x60)
-                    dat = 32;
+                if (!(dat & 0x20))
+                    dat = 0x20;
                 mode7_px[0] = mode7_heldp[0];
                 mode7_px[1] = mode7_heldp[1];
             } else
                 dat = 0x20;
             if (mode7_dblx != mode7_dbl)
-                dat = 32;           /*Double height doesn't respect held characters */
+                dat = 0x20;           /*Double height doesn't respect held characters */
         } else if (mode7_p[0] != mode7_chars && dat & 0x20) {
             mode7_heldchar = dat;
             mode7_heldp[0] = mode7_px[0];
