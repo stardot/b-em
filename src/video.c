@@ -466,6 +466,9 @@ void mode7_makechars()
         teletext_separated_graphics[c] *= 15;
     for (c = 0; c < (96 * 120); c++)
         mode7_tempi2[c] = teletext_characters[c >> 1];
+
+    /* Resample the teletext graphics from six pixels width to 16 */
+
     for (c = 0; c < 960; c++) {
         x = 0;
         x2 = 0;
@@ -493,6 +496,9 @@ void mode7_makechars()
         offs1 += 6;
         offs2 += 16;
     }
+
+    /* Character rounding for the teletext text characters */
+
     for (c = 0; c < 96; c++) {
         for (y = 0; y < 10; y++) {
             for (d = 0; d < 6; d++) {
@@ -515,6 +521,9 @@ void mode7_makechars()
         }
         p += 60;
     }
+
+    /* Resample the teletext text characters from six pixels width to 16 */
+
     offs1 = offs2 = 0;
     for (c = 0; c < 960; c++) {
         x = 0;
