@@ -6,7 +6,7 @@
 #include <allegro5/allegro_primitives.h>
 #include "b-em.h"
 
-#include "bbctext.h"
+#include "ttxfont.h"
 #include "mem.h"
 #include "model.h"
 #include "serial.h"
@@ -436,7 +436,6 @@ void videoula_loadstate(FILE * f)
 }
 
 /*Mode 7 (SAA5050)*/
-static uint8_t mode7_chars[96 * 160], mode7_charsi[96 * 160], mode7_tempi[96 * 120], mode7_tempi2[96 * 120];
 static int mode7_lookup[8][8][16];
 
 static int mode7_col = 7, mode7_bg = 0;
@@ -445,70 +444,7 @@ static int mode7_dbl, mode7_nextdbl, mode7_wasdbl;
 static int mode7_gfx;
 static int mode7_flash, mode7_flashon = 0, mode7_flashtime = 0;
 static uint8_t mode7_buf[2];
-static uint8_t *mode7_p[2] = { mode7_chars, mode7_charsi };
-
 static uint8_t mode7_heldchar, mode7_holdchar;
-
-static void mode7_bin_to_grey(void)
-{
-    for (int c = 0; c < (96 * 60); c++)
-        teletext_characters[c] *= 15;
-    for (int c = 0; c < (96 * 120); c++)
-        mode7_tempi2[c] = teletext_characters[c >> 1];
-}
-
-static void mode7_round_chars(uint8_t *p, uint8_t *p2)
-{
-    for (int c = 0; c < 96; c++) {
-        for (int y = 0; y < 10; y++) {
-            for (int d = 0; d < 6; d++) {
-                int stat = 0;
-                if (y < 9 && p[(y * 6) + d] && p[(y * 6) + d + 6])
-                    stat |= 3;  /*Above + below - set both */
-                if (y < 9 && d > 0 && p[(y * 6) + d] && p[(y * 6) + d + 5] && !p[(y * 6) + d - 1])
-                    stat |= 1;  /*Above + left  - set left */
-                if (y < 9 && d > 0 && p[(y * 6) + d + 6] && p[(y * 6) + d - 1] && !p[(y * 6) + d + 5])
-                    stat |= 1;  /*Below + left  - set left */
-                if (y < 9 && d < 5 && p[(y * 6) + d] && p[(y * 6) + d + 7] && !p[(y * 6) + d + 1])
-                    stat |= 2;  /*Above + right - set right */
-                if (y < 9 && d < 5 && p[(y * 6) + d + 6] && p[(y * 6) + d + 1] && !p[(y * 6) + d + 7])
-                    stat |= 2;  /*Below + right - set right */
-
-                p2[0] = (stat & 1) ? 15 : 0;
-                p2[1] = (stat & 2) ? 15 : 0;
-                p2 += 2;
-            }
-        }
-        p += 60;
-    }
-}
-
-static void mode7_resample_text(void)
-{
-    int offs1 = 0, offs2 = 0;
-    for (int c = 0; c < 960; c++) {
-        float x = 0;
-        int x2 = 0;
-        for (int d = 0; d < 16; d++) {
-            mode7_chars[offs2 + d] = (int) (((float) mode7_tempi2[offs1 + x2] * (1.0 - x)) + ((float) mode7_tempi2[offs1 + x2 + 1] * x));
-            mode7_charsi[offs2 + d] = (int) (((float) mode7_tempi[offs1 + x2] * (1.0 - x)) + ((float) mode7_tempi[offs1 + x2 + 1] * x));
-            x += (11.0 / 15.0);
-            if (x >= 1.0) {
-                x2++;
-                x -= 1.0;
-            }
-        }
-        offs1 += 12;
-        offs2 += 16;
-    }
-}
-
-void mode7_makechars()
-{
-    mode7_bin_to_grey();
-    mode7_round_chars(teletext_characters, mode7_tempi);
-    mode7_resample_text();
-}
 
 static void mode7_gen_nula_lookup(void)
 {
@@ -652,43 +588,40 @@ static inline void mode7_render(ALLEGRO_LOCKED_REGION *region, uint8_t dat)
         else
             on = mode7_lookup[mcolx & 7][mode7_bg & 7];
 
-        if (mode7_gfx && dat & 0x20) {
-            /* On-the-fly sixel generation from Brandy BASIC */
-            unsigned bits = 0;
-            if ((line >= 0) && (line <= 6)) {
-                if (dat & 1) bits = mode7_sixel_left;
-                if (dat & 2) bits += mode7_sixel_right;
+        int xpos = scrx + 16;
+        if (mode7_flashx && !mode7_flashon) {
+            for (int c = 0; c < 16; c++)
+                put_pixel(region, xpos++, scry, off);
+        }
+        else {
+            unsigned bits;
+            if (mode7_gfx && dat & 0x20) {
+                /* On-the-fly sixel generation from Brandy BASIC */
+                bits = 0;
+                if ((line >= 0) && (line <= 6)) {
+                    if (dat & 1) bits = mode7_sixel_left;
+                    if (dat & 2) bits += mode7_sixel_right;
+                }
+                else if ((line >= 7) && (line <= 13)) {
+                    if (dat & 4) bits = mode7_sixel_left;
+                    if (dat & 8) bits += mode7_sixel_right;
+                }
+                else if ((line >= 14) && (line <= 19)) {
+                    if (dat & 16) bits = mode7_sixel_left;
+                    if (dat & 64) bits += mode7_sixel_right;
+                }
+                if (mode7_sep) {
+                    if (line == 0 || line == 6 || line == 7 || line == 13 || line==14 || line == 19) bits = 0;
+                    bits &= mode7_sixel_hmask;
+                }
             }
-            else if ((line >= 7) && (line <= 13)) {
-                if (dat & 4) bits = mode7_sixel_left;
-                if (dat & 8) bits += mode7_sixel_right;
-            }
-            else if ((line >= 14) && (line <= 19)) {
-                if (dat & 16) bits = mode7_sixel_left;
-                if (dat & 64) bits += mode7_sixel_right;
-            }
-            if (mode7_sep) {
-                if (line == 0 || line == 6 || line == 7 || line == 13 || line==14 || line == 19) bits = 0;
-                bits &= mode7_sixel_hmask;
-            }
-            int xpos = scrx + 16;
+            else
+                bits = mode7font[dat-0x20][line];
+
             for (int c = 0; c < 16; c++) {
                 unsigned col = (bits & 0x8000) ? 15 : 0;
                 put_pixel(region, xpos++, scry, on[col]);
                 bits <<= 1;
-            }
-        }
-        else {
-            t = ((dat - 0x20) * 160) + (line >> 1) * 16;
-
-            for (c = 0; c < 16; c++) {
-                if (mode7_flashx && !mode7_flashon)
-                    put_pixel(region, scrx + c + 16, scry, off);
-                else if (mode7_dblx)
-                    put_pixel(region, scrx + c + 16, scry, on[mode7_p[sc & 1][t] & 15]);
-                else
-                    put_pixel(region, scrx + c + 16, scry, on[mode7_p[interindex][t] & 15]);
-                t++;
             }
         }
 
