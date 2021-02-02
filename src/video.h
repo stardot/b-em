@@ -44,6 +44,7 @@ void nula_reset(void);
 
 extern uint16_t vidbank;
 
+void mode7_makechars(void);
 extern int interlline;
 
 #endif

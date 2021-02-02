@@ -6,7 +6,6 @@
 #include <allegro5/allegro_primitives.h>
 #include "b-em.h"
 
-#include "ttxfont.h"
 #include "mem.h"
 #include "model.h"
 #include "serial.h"
@@ -436,6 +435,8 @@ void videoula_loadstate(FILE * f)
 }
 
 /*Mode 7 (SAA5050)*/
+static uint8_t *mode7_chars, *mode7_graph, *mode7_sepgraph, *mode7_p, *mode7_heldp;
+static int mode7_width, mode7_bytes_per_char;
 static int mode7_lookup[8][8][16];
 
 static int mode7_col = 7, mode7_bg = 0;
@@ -444,7 +445,60 @@ static int mode7_dbl, mode7_nextdbl, mode7_wasdbl;
 static int mode7_gfx;
 static int mode7_flash, mode7_flashon = 0, mode7_flashtime = 0;
 static uint8_t mode7_buf[2];
+
 static uint8_t mode7_heldchar, mode7_holdchar;
+
+#define MODE7_CHAR_BANKS       3
+#define MODE7_NUM_CHARS       96
+
+void mode7_makechars()
+{
+    bool worked = false;
+    ALLEGRO_PATH *path = find_cfg_file("mode7chars", ".dat");
+    if (path) {
+        const char *cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+        FILE *fp = fopen(cpath, "rb");
+        if (fp) {
+            char hdr[10];
+            if (fread(hdr, sizeof(hdr), 1, fp) == 1) {
+                if (!memcmp(hdr, "BEMTTX01", 8)) {
+                    int rows = hdr[9];
+                    mode7_width = hdr[8];
+                    mode7_bytes_per_char = rows * mode7_width;
+                    log_info("video: Loading Mode 7 font %s, %dx%d", cpath, mode7_width, rows);
+                    int bytes_per_bank = mode7_bytes_per_char * MODE7_NUM_CHARS;
+                    int total_size = bytes_per_bank * MODE7_CHAR_BANKS;
+                    if ((mode7_chars = malloc(total_size))) {
+                        mode7_p = mode7_chars;
+                        mode7_graph = mode7_chars + bytes_per_bank;
+                        mode7_sepgraph = mode7_graph + bytes_per_bank;
+                        log_debug("video: mode7_makechars chars=%p, graph=%p, sepgraph=%p", mode7_chars, mode7_graph, mode7_sepgraph);
+                        if (fread(mode7_chars, total_size, 1, fp) == 1)
+                            worked = true;
+                        else {
+                            const char *msg = ferror(fp) ? strerror(errno) : "file is too short";
+                            log_fatal("video: error reading body of teletext font file '%s': %s", cpath, msg);
+                        }
+                    }
+                    else
+                        log_fatal("video: out of memory reading teletext font file '%s'", cpath);
+                }
+                else
+                    log_fatal("video: teletext font file '%s' is not in a recognised format", cpath);
+            }
+            else
+                log_fatal("video: error reading header of teletext font file '%s': %s", cpath, strerror(errno));
+            fclose(fp);
+        }
+        else
+            log_fatal("video: unable to open teletext font file '%s': %s", cpath, strerror(errno));
+        al_destroy_path(path);
+    }
+    else
+        log_fatal("video: unable to open find a teletext font file");
+    if (!worked)
+        exit(1);
+}
 
 static void mode7_gen_nula_lookup(void)
 {
@@ -473,16 +527,13 @@ static void mode7_gen_nula_lookup(void)
     mode7_need_new_lookup = 0;
 }
 
-static const unsigned mode7_sixel_left  = 0xFF00u;
-static const unsigned mode7_sixel_right = 0x00FFu;
-static const unsigned mode7_sixel_hmask = 0x7E7Eu;
-
 static inline void mode7_render(ALLEGRO_LOCKED_REGION *region, uint8_t dat)
 {
     int t, c;
     int off;
     int mcolx = mode7_col;
-    int holdoff = 0, holdclear = 0, sep_pend = 0;
+    int holdoff = 0, holdclear = 0;
+    uint8_t *mode7_px;
     int mode7_flashx = mode7_flash, mode7_dblx = mode7_dbl;
     int *on;
 
@@ -494,11 +545,12 @@ static inline void mode7_render(ALLEGRO_LOCKED_REGION *region, uint8_t dat)
         mode7_buf[0] = mode7_buf[1];
         mode7_buf[1] = dat;
         dat = t;
+        mode7_px = mode7_p;
 
         if (!mode7_dbl && mode7_nextdbl)
             on = mode7_lookup[mode7_bg & 7][mode7_bg & 7];
         if (dat == 255) {
-            for (c = 0; c < 16; c++)
+            for (c = 0; c < mode7_width; c++)
                 put_pixel(region, scrx + c + 16, scry, colblack);
             return;
         }
@@ -514,6 +566,7 @@ static inline void mode7_render(ALLEGRO_LOCKED_REGION *region, uint8_t dat)
             case 7: /* 135: alphanumeric white   */
                 mode7_gfx = 0;
                 mode7_col = dat;
+                mode7_p = mode7_chars;
                 holdclear = 1;
                 break;
             case 8: /* 136: flash */
@@ -537,15 +590,23 @@ static inline void mode7_render(ALLEGRO_LOCKED_REGION *region, uint8_t dat)
             case 23: /* 151: graphics white   */
                 mode7_gfx = 1;
                 mode7_col = dat & 7;
+                if (mode7_sep)
+                    mode7_p = mode7_sepgraph;
+                else
+                    mode7_p = mode7_graph;
                 break;
             case 24: /* 152: conceal */
                 mode7_col = mcolx = mode7_bg;
                 break;
             case 25: /* 153: contiguous graphics */
+                if (mode7_gfx)
+                    mode7_p = mode7_graph;
                 mode7_sep = 0;
                 break;
             case 26: /* 154: separated graphics */
-                sep_pend = 1;
+                if (mode7_gfx)
+                    mode7_p = mode7_sepgraph;
+                mode7_sep = 1;
                 break;
             case 28: /* 156: black background */
                 mode7_bg = 0;
@@ -564,66 +625,52 @@ static inline void mode7_render(ALLEGRO_LOCKED_REGION *region, uint8_t dat)
                 dat = mode7_heldchar;
                 if (!(dat & 0x20))
                     dat = 0x20;
+                mode7_px = mode7_heldp;
             } else
                 dat = 0x20;
             if (mode7_dblx != mode7_dbl)
                 dat = 0x20;           /*Double height doesn't respect held characters */
             if (!mode7_holdchar || !mode7_gfx)
                 mode7_heldchar = 0x20;
-        } else if (mode7_gfx && dat & 0x20)
+        } else if (mode7_gfx && dat & 0x20) {
             mode7_heldchar = dat;
-
-        int interindex = (vid_dtype_intern == VDT_INTERLACE) && interlline;
-        unsigned line;
-        if (mode7_dblx && !mode7_nextdbl)
-            line = sc;
-        else if (mode7_dblx)
-            line = sc + 10;
-        else
-            line = (sc << 1) + interindex;
+            mode7_heldp = mode7_px;
+        }
 
         off = mode7_lookup[0][mode7_bg & 7][0];
-        if (!mode7_dbl && mode7_nextdbl)
-            on = mode7_lookup[mode7_bg & 7][mode7_bg & 7];
-        else
-            on = mode7_lookup[mcolx & 7][mode7_bg & 7];
-
         int xpos = scrx + 16;
+
         if (mode7_flashx && !mode7_flashon) {
-            for (int c = 0; c < 16; c++)
+            for (int c = 0; c < mode7_width; c++)
                 put_pixel(region, xpos++, scry, off);
         }
         else {
-            unsigned bits;
-            if (mode7_gfx && dat & 0x20) {
-                /* On-the-fly sixel generation from Brandy BASIC */
-                bits = 0;
-                if ((line >= 0) && (line <= 6)) {
-                    if (dat & 1) bits = mode7_sixel_left;
-                    if (dat & 2) bits += mode7_sixel_right;
-                }
-                else if ((line >= 7) && (line <= 13)) {
-                    if (dat & 4) bits = mode7_sixel_left;
-                    if (dat & 8) bits += mode7_sixel_right;
-                }
-                else if ((line >= 14) && (line <= 19)) {
-                    if (dat & 16) bits = mode7_sixel_left;
-                    if (dat & 64) bits += mode7_sixel_right;
-                }
-                if (mode7_sep) {
-                    if (line == 0 || line == 6 || line == 7 || line == 13 || line==14 || line == 19) bits = 0;
-                    bits &= mode7_sixel_hmask;
-                }
+            const uint8_t *ptr = mode7_px + (dat - 0x20) * mode7_bytes_per_char;
+            if (mode7_dblx) {
+                if (!mode7_nextdbl)
+                    ptr += (sc >> 1) * mode7_width;
+                else
+                    ptr += ((sc >> 1) + 5) * mode7_width;
             }
             else
-                bits = mode7font[dat-0x20][line];
+                ptr += sc * mode7_width;
 
-            for (int c = 0; c < 16; c++) {
-                unsigned col = (bits & 0x8000) ? 15 : 0;
-                put_pixel(region, xpos++, scry, on[col]);
-                bits <<= 1;
+            if (!mode7_dbl && mode7_nextdbl)
+                on = mode7_lookup[mode7_bg & 7][mode7_bg & 7];
+            else
+                on = mode7_lookup[mcolx & 7][mode7_bg & 7];
+
+            int interindex = (vid_dtype_intern == VDT_INTERLACE) && interlline;
+            if ((!mode7_dblx && interindex) || (mode7_dblx && sc & 1)) {
+                for (int c = 0; c < mode7_width; c++)
+                    put_pixel(region, xpos++, scry, on[*ptr++ >> 4]);
+            }
+            else {
+                for (int c = 0; c < mode7_width; c++)
+                    put_pixel(region, xpos++, scry, on[*ptr++ & 0x0f]);
             }
         }
+        scrx -= (16 - mode7_width);
 
         if ((scrx + 16) < firstx)
             firstx = scrx + 16;
@@ -636,8 +683,6 @@ static inline void mode7_render(ALLEGRO_LOCKED_REGION *region, uint8_t dat)
         }
         if (holdclear)
             mode7_heldchar = 32;
-        if (sep_pend)
-            mode7_sep = 1;
     }
 }
 
@@ -984,9 +1029,11 @@ void video_poll(int clocks, int timer_enable)
             mode7_bg = 0;
             mode7_holdchar = 0;
             mode7_heldchar = 0x20;
+            mode7_p = mode7_chars;
             mode7_flash = 0;
             mode7_sep = 0;
             mode7_gfx = 0;
+            mode7_heldp = mode7_p;
 
             hc = 0;
 
