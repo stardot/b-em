@@ -469,8 +469,6 @@ static void mode7_resample_graphics(void)
         float x = 0;
         int x2 = 0;
         for (int d = 0; d < 16; d++) {
-            mode7_graph[offs2 + d] = (int) (((float) teletext_graphics[offs1 + x2] * (1.0 - x)) + ((float) teletext_graphics[offs1 + x2 + 1] * x));
-            mode7_sepgraph[offs2 + d] = (int) (((float) teletext_separated_graphics[offs1 + x2] * (1.0 - x)) + ((float) teletext_separated_graphics[offs1 + x2 + 1] * x));
             if (!d) {
                 mode7_graph[offs2 + d] = mode7_graphi[offs2 + d] = teletext_graphics[offs1];
                 mode7_sepgraph[offs2 + d] = mode7_sepgraphi[offs2 + d] = teletext_separated_graphics[offs1];
@@ -486,7 +484,6 @@ static void mode7_resample_graphics(void)
                 x2++;
                 x -= 1.0;
             }
-            mode7_charsi[offs2 + d] = 0;
         }
 
         offs1 += 6;
