@@ -450,29 +450,25 @@ static uint8_t *mode7_p[2] = { mode7_chars, mode7_charsi };
 static uint8_t mode7_heldchar, mode7_holdchar;
 static uint8_t *mode7_heldp[2];
 
-void mode7_makechars()
+static void mode7_bin_to_grey(void)
 {
-    int c, d, y;
-    int offs1 = 0, offs2 = 0;
-    float x;
-    int x2;
-    int stat;
-    uint8_t *p = teletext_characters, *p2 = mode7_tempi;
-    for (c = 0; c < (96 * 60); c++)
+    for (int c = 0; c < (96 * 60); c++)
         teletext_characters[c] *= 15;
-    for (c = 0; c < (96 * 60); c++)
+    for (int c = 0; c < (96 * 60); c++)
         teletext_graphics[c] *= 15;
-    for (c = 0; c < (96 * 60); c++)
+    for (int c = 0; c < (96 * 60); c++)
         teletext_separated_graphics[c] *= 15;
-    for (c = 0; c < (96 * 120); c++)
+    for (int c = 0; c < (96 * 120); c++)
         mode7_tempi2[c] = teletext_characters[c >> 1];
+}
 
-    /* Resample the teletext graphics from six pixels width to 16 */
-
-    for (c = 0; c < 960; c++) {
-        x = 0;
-        x2 = 0;
-        for (d = 0; d < 16; d++) {
+static void mode7_resample_graphics(void)
+{
+    int offs1 = 0, offs2 = 0;
+    for (int c = 0; c < 960; c++) {
+        float x = 0;
+        int x2 = 0;
+        for (int d = 0; d < 16; d++) {
             mode7_graph[offs2 + d] = (int) (((float) teletext_graphics[offs1 + x2] * (1.0 - x)) + ((float) teletext_graphics[offs1 + x2 + 1] * x));
             mode7_sepgraph[offs2 + d] = (int) (((float) teletext_separated_graphics[offs1 + x2] * (1.0 - x)) + ((float) teletext_separated_graphics[offs1 + x2 + 1] * x));
             if (!d) {
@@ -496,13 +492,14 @@ void mode7_makechars()
         offs1 += 6;
         offs2 += 16;
     }
+}
 
-    /* Character rounding for the teletext text characters */
-
-    for (c = 0; c < 96; c++) {
-        for (y = 0; y < 10; y++) {
-            for (d = 0; d < 6; d++) {
-                stat = 0;
+static void mode7_round_chars(uint8_t *p, uint8_t *p2)
+{
+    for (int c = 0; c < 96; c++) {
+        for (int y = 0; y < 10; y++) {
+            for (int d = 0; d < 6; d++) {
+                int stat = 0;
                 if (y < 9 && p[(y * 6) + d] && p[(y * 6) + d + 6])
                     stat |= 3;  /*Above + below - set both */
                 if (y < 9 && d > 0 && p[(y * 6) + d] && p[(y * 6) + d + 5] && !p[(y * 6) + d - 1])
@@ -521,14 +518,15 @@ void mode7_makechars()
         }
         p += 60;
     }
+}
 
-    /* Resample the teletext text characters from six pixels width to 16 */
-
-    offs1 = offs2 = 0;
-    for (c = 0; c < 960; c++) {
-        x = 0;
-        x2 = 0;
-        for (d = 0; d < 16; d++) {
+static void mode7_resample_text(void)
+{
+    int offs1 = 0, offs2 = 0;
+    for (int c = 0; c < 960; c++) {
+        float x = 0;
+        int x2 = 0;
+        for (int d = 0; d < 16; d++) {
             mode7_chars[offs2 + d] = (int) (((float) mode7_tempi2[offs1 + x2] * (1.0 - x)) + ((float) mode7_tempi2[offs1 + x2 + 1] * x));
             mode7_charsi[offs2 + d] = (int) (((float) mode7_tempi[offs1 + x2] * (1.0 - x)) + ((float) mode7_tempi[offs1 + x2 + 1] * x));
             x += (11.0 / 15.0);
@@ -544,6 +542,14 @@ void mode7_makechars()
         offs1 += 12;
         offs2 += 16;
     }
+}
+
+void mode7_makechars()
+{
+    mode7_bin_to_grey();
+    mode7_resample_graphics();
+    mode7_round_chars(teletext_characters, mode7_tempi);
+    mode7_resample_text();
 }
 
 static void mode7_gen_nula_lookup(void)
