@@ -695,7 +695,7 @@ static void swiftsym(cpu_debug_t *cpu, char *iptr)
                         name_ptr = name;
                         state = SWS_IN_NAME;
                     }
-                    else if (ch != ' ')
+                    else if (!strchr(" \t\r\n", ch))
                         state = SWS_GROUND;
                     break;
                 case SWS_IN_NAME:
@@ -721,7 +721,7 @@ static void swiftsym(cpu_debug_t *cpu, char *iptr)
                         addr = 0;
                         state = SWS_IN_VALUE;
                     }
-                    else if (ch != ' ')
+                    else if (!strchr(" \t\r\n", ch))
                         state = SWS_GROUND;
                     break;
                 case SWS_IN_VALUE:
@@ -743,7 +743,7 @@ static void swiftsym(cpu_debug_t *cpu, char *iptr)
                 case SWS_AWAIT_COMMA:
                     if (ch == ',')
                         state = SWS_GOT_CURLY;
-                    else if (ch != ' ')
+                    else if (!strchr(" \t\r\n", ch))
                         state = SWS_GROUND;
             }
         }
