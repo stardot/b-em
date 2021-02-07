@@ -266,12 +266,15 @@ static void disable_tube_debug(void)
     }
 }
 
-void debug_start(void)
+void debug_start(const char *exec_fn)
 {
     if (debug_core)
         enable_core_debug();
     if (debug_tube)
         enable_tube_debug();
+    if (exec_fn)
+        if (!(exec_fp = fopen(exec_fn, "r")))
+            log_warn("debugger: unable to open initial exec file '%s': %s\n", exec_fn, strerror(errno));
 }
 
 void debug_end(void)
