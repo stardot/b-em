@@ -68,6 +68,7 @@
 #undef printf
 
 bool quitting = false;
+bool keydefining = false;
 int autoboot=0;
 int joybutton[2];
 float joyaxes[4];
@@ -491,13 +492,16 @@ void main_run()
         al_wait_for_event(queue, &event);
         switch(event.type) {
             case ALLEGRO_EVENT_KEY_DOWN:
-                key_down_event(&event);
+                if (!keydefining)
+                    key_down_event(&event);
                 break;
             case ALLEGRO_EVENT_KEY_CHAR:
-                key_char_event(&event);
+                if (!keydefining)
+                    key_char_event(&event);
                 break;
             case ALLEGRO_EVENT_KEY_UP:
-                key_up_event(&event);
+                if (!keydefining)
+                    key_up_event(&event);
                 break;
             case ALLEGRO_EVENT_MOUSE_AXES:
                 mouse_axes(&event);

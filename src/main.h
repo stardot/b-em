@@ -16,6 +16,7 @@ extern int emuspeed;
 extern int framesrun;
 
 extern bool quitting;
+extern bool keydefining;
 
 void main_init(int argc, char *argv[]);
 void main_softreset(void);

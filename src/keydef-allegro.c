@@ -1,5 +1,6 @@
 #include "b-em.h"
 #include "keyboard.h"
+#include "main.h"
 #include "model.h"
 #include <allegro5/allegro_font.h>
 #include <allegro5/allegro_primitives.h>
@@ -424,6 +425,7 @@ static void *keydef_thread(ALLEGRO_THREAD *thread, void *tdata)
         al_destroy_display(display);
     } else
         log_error("keydef-allegro: unable to create display");
+    keydefining = false;
     return NULL;
 }
 
@@ -431,8 +433,10 @@ void gui_keydefine_open(void)
 {
     ALLEGRO_THREAD *thread;
 
-    if ((thread = al_create_thread(keydef_thread, NULL)))
+    if ((thread = al_create_thread(keydef_thread, NULL))) {
+        keydefining = true;
         al_start_thread(thread);
+    }
 }
 
 void gui_keydefine_close(void)
