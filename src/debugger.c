@@ -26,7 +26,13 @@ int indebug = 0;
 extern int fcount;
 static int vrefresh = 1;
 static FILE *trace_fp = NULL;
-static FILE *exec_fp = NULL;
+
+struct file_stack;
+
+struct filestack {
+    struct filestack *next;
+    FILE *fp;
+} *exec_stack;
 
 static void close_trace()
 {
@@ -266,6 +272,30 @@ static void disable_tube_debug(void)
     }
 }
 
+
+static void push_exec(const char *fn)
+{
+    struct filestack *fs = malloc(sizeof(struct filestack));
+    if (fs) {
+        if ((fs->fp = fopen(fn, "r"))) {
+            fs->next = exec_stack;
+            exec_stack = fs;
+        }
+        else
+            debug_outf("unable to open exec file '%s': %s\n", fn, strerror(errno));
+    }
+    else
+        debug_outf("out of memory for exec file\n");
+}
+
+static void pop_exec(void)
+{
+    struct filestack *cur = exec_stack;
+    fclose(cur->fp);
+    exec_stack = cur->next;
+    free(cur);
+}
+
 void debug_start(const char *exec_fn)
 {
     if (debug_core)
@@ -273,8 +303,7 @@ void debug_start(const char *exec_fn)
     if (debug_tube)
         enable_tube_debug();
     if (exec_fn)
-        if (!(exec_fp = fopen(exec_fn, "r")))
-            log_warn("debugger: unable to open initial exec file '%s': %s\n", exec_fn, strerror(errno));
+        push_exec(exec_fn);
 }
 
 void debug_end(void)
@@ -777,10 +806,9 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
         int c;
         bool badcmd = false;
 
-        if (exec_fp) {
-            if (!fgets(ins, sizeof ins, exec_fp)) {
-                fclose(exec_fp);
-                exec_fp = NULL;
+        if (exec_stack) {
+            if (!fgets(ins, sizeof ins, exec_stack->fp)) {
+                pop_exec();
                 continue;
             }
         }
@@ -885,8 +913,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                         char *eptr = strchr(iptr, '\n');
                         if (eptr)
                             *eptr = 0;
-                        if (!(exec_fp = fopen(iptr, "r")))
-                            debug_outf("unable to open '%s': %s\n", iptr, strerror(errno));
+                        push_exec(iptr);
                     }
                 }
                 else
