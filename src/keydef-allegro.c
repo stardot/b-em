@@ -1,5 +1,6 @@
 #include "b-em.h"
 #include "keyboard.h"
+#include "main.h"
 #include "model.h"
 #include <allegro5/allegro_font.h>
 #include <allegro5/allegro_primitives.h>
@@ -397,15 +398,16 @@ static void *keydef_thread(ALLEGRO_THREAD *thread, void *tdata)
                     case ALLEGRO_EVENT_KEY_CHAR:
                         if (state == ST_PC_KEY) {
                             int keycode = key_map_keypad(&event);
-                            int actcode = 0xff - kptr->keycode;
-                            if (actcode >= 0) {
+                            int actcode = kptr->keycode;
+                            if (actcode & 0x80) {
+                                actcode = 0xff - actcode;
                                 log_debug("keydef-allegro: mapping allegro code %d:%s to action#%d:%s, alt=%d", keycode, al_keycode_to_name(keycode), actcode, kptr->name, alt_down);
                                 keyactioncpy[actcode].keycode = keycode;
                                 keyactioncpy[actcode].altstate = alt_down;
                             }
                             else {
-                                log_debug("keydef-allegro: mapping allegro code %d:%s to BBC code %02x", keycode, al_keycode_to_name(keycode), kptr->keycode);
-                                keylookcpy[event.keyboard.keycode] = kptr->keycode;
+                                log_debug("keydef-allegro: mapping allegro code %d:%s to BBC code %02x", keycode, al_keycode_to_name(keycode), actcode);
+                                keylookcpy[event.keyboard.keycode] = actcode;
                             }
                             state = ST_BBC_KEY;
                             draw_keyboard(key_dlg, ok_x, can_x);
@@ -424,6 +426,7 @@ static void *keydef_thread(ALLEGRO_THREAD *thread, void *tdata)
         al_destroy_display(display);
     } else
         log_error("keydef-allegro: unable to create display");
+    keydefining = false;
     return NULL;
 }
 
@@ -431,8 +434,10 @@ void gui_keydefine_open(void)
 {
     ALLEGRO_THREAD *thread;
 
-    if ((thread = al_create_thread(keydef_thread, NULL)))
+    if ((thread = al_create_thread(keydef_thread, NULL))) {
+        keydefining = true;
         al_start_thread(thread);
+    }
 }
 
 void gui_keydefine_close(void)

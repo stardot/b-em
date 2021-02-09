@@ -26,7 +26,13 @@ int indebug = 0;
 extern int fcount;
 static int vrefresh = 1;
 static FILE *trace_fp = NULL;
-static FILE *exec_fp = NULL;
+
+struct file_stack;
+
+struct filestack {
+    struct filestack *next;
+    FILE *fp;
+} *exec_stack;
 
 static void close_trace()
 {
@@ -266,12 +272,38 @@ static void disable_tube_debug(void)
     }
 }
 
-void debug_start(void)
+
+static void push_exec(const char *fn)
+{
+    struct filestack *fs = malloc(sizeof(struct filestack));
+    if (fs) {
+        if ((fs->fp = fopen(fn, "r"))) {
+            fs->next = exec_stack;
+            exec_stack = fs;
+        }
+        else
+            debug_outf("unable to open exec file '%s': %s\n", fn, strerror(errno));
+    }
+    else
+        debug_outf("out of memory for exec file\n");
+}
+
+static void pop_exec(void)
+{
+    struct filestack *cur = exec_stack;
+    fclose(cur->fp);
+    exec_stack = cur->next;
+    free(cur);
+}
+
+void debug_start(const char *exec_fn)
 {
     if (debug_core)
         enable_core_debug();
     if (debug_tube)
         enable_tube_debug();
+    if (exec_fn)
+        push_exec(exec_fn);
 }
 
 void debug_end(void)
@@ -648,6 +680,109 @@ void trimnl(char *buf) {
 
 }
 
+typedef enum {
+    SWS_GROUND,
+    SWS_GOT_SQUARE,
+    SWS_GOT_CURLY,
+    SWS_IN_NAME,
+    SWS_TOO_LONG,
+    SWS_NAME_END,
+    SWS_IN_VALUE,
+    SWS_AWAIT_COMMA
+} swstate;
+
+static void swiftsym(cpu_debug_t *cpu, char *iptr)
+{
+    uint32_t romaddr = 0;
+    char *sep = strpbrk(iptr, " \t");
+    if (sep) {
+        *sep++ = 0;
+        romaddr = strtoul(sep, NULL, 16) << 28;
+    }
+    FILE *fp = fopen(iptr, "r");
+    if (fp) {
+        swstate state = SWS_GROUND;
+        char name[80], *name_ptr, *name_end = name+sizeof(name);
+        uint32_t addr;
+        int ch, syms = 0;
+        if (!cpu->symbols)
+            cpu->symbols = symbol_new();
+        while ((ch = getc(fp)) != EOF) {
+            switch(state) {
+                case SWS_GROUND:
+                    if (ch == '[')
+                        state = SWS_GOT_SQUARE;
+                    break;
+                case SWS_GOT_SQUARE:
+                    if (ch == '{')
+                        state = SWS_GOT_CURLY;
+                    else if (ch != '[')
+                        state = SWS_GROUND;
+                    break;
+                case SWS_GOT_CURLY:
+                    if (ch == '\'') {
+                        name_ptr = name;
+                        state = SWS_IN_NAME;
+                    }
+                    else if (!strchr(" \t\r\n", ch))
+                        state = SWS_GROUND;
+                    break;
+                case SWS_IN_NAME:
+                    if (ch == '\'') {
+                        *name_ptr = 0;
+                        state = SWS_NAME_END;
+                    }
+                    else if (name_ptr >= name_end) {
+                        debug_outf("swift import name too long");
+                        state = SWS_TOO_LONG;
+                    }
+                    else
+                        *name_ptr++ = ch;
+                    break;
+                case SWS_TOO_LONG:
+                    if (ch == '\'') {
+                        name_ptr = 0;
+                        state = SWS_NAME_END;
+                    }
+                    break;
+                case SWS_NAME_END:
+                    if (ch == ':') {
+                        addr = 0;
+                        state = SWS_IN_VALUE;
+                    }
+                    else if (!strchr(" \t\r\n", ch))
+                        state = SWS_GROUND;
+                    break;
+                case SWS_IN_VALUE:
+                    if (ch >= '0' && ch <= '9')
+                        addr = addr * 10 + ch - '0';
+                    else if (ch == 'L') {
+                        symbol_add(cpu->symbols, name, addr|romaddr);
+                        state = SWS_AWAIT_COMMA;
+                        syms++;
+                    }
+                    else if (ch == ',') {
+                        symbol_add(cpu->symbols, name, addr|romaddr);
+                        state = SWS_GOT_CURLY;
+                        syms++;
+                    }
+                    else
+                        state = SWS_GROUND;
+                    break;
+                case SWS_AWAIT_COMMA:
+                    if (ch == ',')
+                        state = SWS_GOT_CURLY;
+                    else if (!strchr(" \t\r\n", ch))
+                        state = SWS_GROUND;
+            }
+        }
+        fclose(fp);
+        debug_outf("%d symbols loaded from %s\n", syms, iptr);
+    }
+    else
+        debug_outf("unable to open '%s': %s\n", iptr, strerror(errno));
+}
+
 void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 {
     uint32_t next_addr;
@@ -671,10 +806,9 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
         int c;
         bool badcmd = false;
 
-        if (exec_fp) {
-            if (!fgets(ins, sizeof ins, exec_fp)) {
-                fclose(exec_fp);
-                exec_fp = NULL;
+        if (exec_stack) {
+            if (!fgets(ins, sizeof ins, exec_stack->fp)) {
+                pop_exec();
                 continue;
             }
         }
@@ -779,8 +913,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                         char *eptr = strchr(iptr, '\n');
                         if (eptr)
                             *eptr = 0;
-                        if (!(exec_fp = fopen(iptr, "r")))
-                            debug_outf("unable to open '%s': %s\n", iptr, strerror(errno));
+                        push_exec(iptr);
                     }
                 }
                 else
@@ -896,24 +1029,29 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 
             case 's':
                 if (cmdlen > 1) {
-                    if (!strncmp(cmd, "symbol", cmdlen)) {
+                    if (!strncmp(cmd, "swiftsym", cmdlen)) {
+                        if (iptr)
+                            swiftsym(cpu, iptr);
+                        else
+                            debug_outf("Missing filename\n");
+                    }
+                    else if (!strncmp(cmd, "symbol", cmdlen)) {
                         if (*iptr)
                             set_sym(cpu, iptr);
-                        break;
+                        else
+                            debug_outf("Missing parameters\n");
                     }
-                    else if (!strncmp(cmd, "symlist", cmdlen)) {
+                    else if (!strncmp(cmd, "symlist", cmdlen))
                         list_syms(cpu, iptr);
-                        break;
-                    }
                     else if (!strncmp(cmd, "save", cmdlen)) {
                         if (*iptr)
                             debugger_save(iptr);
-                        break;
+                        else
+                            debug_outf("Missing filename\n");
                     }
-                    else {
+                    else
                         badcmd = true;
-                        break;
-                    }
+                    break;
                 }
                 else {
                     if (*iptr)

@@ -68,6 +68,7 @@
 #undef printf
 
 bool quitting = false;
+bool keydefining = false;
 int autoboot=0;
 int joybutton[2];
 float joyaxes[4];
@@ -141,15 +142,15 @@ static const char helptext[] =
     "-i              - interlace display mode\n"
     "-spx            - Emulation speed x from 0 to 9 (default 4)\n"
     "-debug          - start debugger\n"
-    "-debugtube      - start debugging tube processor\n\n";
+    "-debugtube      - start debugging tube processor\n"
+    "-exec file      - debugger to execute file\n\n";
 
 void main_init(int argc, char *argv[])
 {
-    int c;
-    int tapenext = 0, discnext = 0;
+    int tapenext = 0, discnext = 0, execnext = 0;
     ALLEGRO_DISPLAY *display;
     ALLEGRO_PATH *path;
-    const char *ext;
+    const char *ext, *exec_fn = NULL;
 
     if (!al_init()) {
         fputs("Failed to initialise Allegro!\n", stderr);
@@ -170,8 +171,8 @@ void main_init(int argc, char *argv[])
 
     model_loadcfg();
 
-    for (c = 1; c < argc; c++) {
-        if (!strcasecmp(argv[c], "--help") || !strcasecmp(argv[c], "-?") || !strcasecmp(argv[c], "-h")) {
+    for (int c = 1; c < argc; c++) {
+        if (!strcasecmp(argv[c], "--help") || !strcmp(argv[c], "-?") || !strcasecmp(argv[c], "-h")) {
             fwrite(helptext, sizeof helptext-1, 1, stdout);
             exit(1);
         }
@@ -207,6 +208,8 @@ void main_init(int argc, char *argv[])
             debug_tube = 1;
         else if (argv[c][0] == '-' && (argv[c][1] == 'i' || argv[c][1] == 'I'))
             vid_dtype_user = VDT_INTERLACE;
+        else if (!strcasecmp(argv[c], "-exec"))
+            execnext = 1;
         else if (tapenext) {
             if (tape_fn)
                 al_destroy_path(tape_fn);
@@ -217,6 +220,10 @@ void main_init(int argc, char *argv[])
                 al_destroy_path(discfns[discnext-1]);
             discfns[discnext-1] = al_create_path(argv[c]);
             discnext = 0;
+        }
+        else if (execnext) {
+            exec_fn = argv[c];
+            execnext = 0;
         }
         else {
             path = al_create_path(argv[c]);
@@ -326,7 +333,7 @@ void main_init(int argc, char *argv[])
     if (discfns[1])
         gui_set_disc_wprot(1, writeprot[1]);
     main_setspeed(emuspeed);
-    debug_start();
+    debug_start(exec_fn);
 }
 
 void main_restart()
@@ -485,13 +492,16 @@ void main_run()
         al_wait_for_event(queue, &event);
         switch(event.type) {
             case ALLEGRO_EVENT_KEY_DOWN:
-                key_down_event(&event);
+                if (!keydefining)
+                    key_down_event(&event);
                 break;
             case ALLEGRO_EVENT_KEY_CHAR:
-                key_char_event(&event);
+                if (!keydefining)
+                    key_char_event(&event);
                 break;
             case ALLEGRO_EVENT_KEY_UP:
-                key_up_event(&event);
+                if (!keydefining)
+                    key_up_event(&event);
                 break;
             case ALLEGRO_EVENT_MOUSE_AXES:
                 mouse_axes(&event);

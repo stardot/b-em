@@ -57,6 +57,7 @@ OBJ = \
     main.o \
     mem.o \
     midi-windows.o \
+    mmccard.o \
     model.o \
     mouse.o \
     music2000.o \

@@ -1,7 +1,7 @@
 #ifndef __INC_DEBUGGER_H
 #define __INC_DEBUGGER_H
 
-extern void debug_start(void);
+extern void debug_start(const char *exec_fn);
 extern void debug_kill(void);
 extern void debug_end(void);
 extern void debug_toggle_core(void);
