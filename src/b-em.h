@@ -48,6 +48,7 @@
 extern ALLEGRO_PATH *find_dat_file(ALLEGRO_PATH *dir, const char *name, const char *ext);
 extern ALLEGRO_PATH *find_cfg_file(const char *name, const char *ext);
 extern ALLEGRO_PATH *find_cfg_dest(const char *name, const char *ext);
+extern bool is_relative_filename(const char *fn);
 
 extern int joybutton[2];
 extern float joyaxes[4];

@@ -146,12 +146,6 @@ void mem_loadrom(int slot, const char *name, const char *path, uint8_t use_name)
         log_warn("mem: unable to load ROM slot %02d with %s, uanble to open %s: %s", slot, name, path, strerror(errno));
 }
 
-static int is_relative_filename(const char *fn)
-{
-    int c0 = *fn;
-    return !(c0 == '/' || c0 == '\\' || (isalpha(c0) && fn[1] == ':'));
-}
-
 static void cfg_load_rom(int slot, const char *sect) {
     const char *key, *name, *file;
     ALLEGRO_PATH *path;
