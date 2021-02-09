@@ -54,24 +54,30 @@ Next are the width and height of the font in that order, each stored
 as a single byte.  The font would usually be expected to be 16x20.
 B-Em can cope with different widths, though it may look rather odd.
 
-Next is the name, stored a one-byte length followed by the characters
-of the name itself.
+Next is the name, stored as a one-byte length followed by the
+characters of the name itself.
 
-The pixel data follows.  Pixels are stored in three banks with no
-separator.  The first bank of 96 characters are for the textual
-characters that are displayed when graphics is not in effect.  The
-first character store is ASCII space so these are the characters with
-codes 0x20 to 0x7f (32 to 127).  The second bank contains the set of
+The pixel data follows.  Pixels are stored in three banks of 96
+characters with no separator.  The first character stored in each
+bank is ASCII space so these are the characters with codes 0x20 to
+0x7f (32 to 127) inclusive.
+
+The first bank are for the textual characters that are displayed when
+graphics is not in effect.  The second bank contains the set of
 characters used for contiguous graphics and the third bank the set used
 for separated graphics.  The 32 character block containing the capital
-letter is duplicated to implement "blast through" you could put any
-set of glyphs there and there would be used.
+letter is duplicated in each bank to implement "blast through", though
+you could put any set of glyphs there and there would be used,
+contrary to the teletext specification.
 
 Pixels are grey scale and can have a value between 0 and 15 and two
-pixels are multiplex into each byte, one in the upper nibble (for even
+pixels are multiplexed into each byte, one in the upper nibble (for even
 fields of the interlaced display) and one in the lower nibble (for the
 odd fields).  The order of bytes is starting at the left of line zero
-working right until the width (usually 16) is reached then on to the
-next line.  There are ten stored lines for a 16x20 font as the even
-lines have their values in the upper nibbles as mentioned earlier.
-After that the next byte is for the next character.
+or the character, working right until the width (usually 16) is reached
+then on to the next line.  There are ten stored lines for a 16x20 font
+as the even lines have their values in the upper nibbles as mentioned
+earlier.  After that the next byte is for the next character.
+
+Nothing after the pixel data is read so this could be used for
+attaching any notes.
