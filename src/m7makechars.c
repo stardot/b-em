@@ -4068,49 +4068,90 @@ static void decode_row(uint8_t *dest, unsigned bits)
     }
 }
 
-#define LEFT  0xFF00u;
-#define RIGHT 0x00FFu;
-#define HMASK 0x7E7Eu;
-
-static void generate_row(uint8_t *dest, uint8_t *sepdest, unsigned int ch, unsigned int y)
+static void generate_contig(uint8_t *dest, unsigned int ch, unsigned int y)
 {
-    unsigned int val = 0;
-    /* Row sets - 0 to 6, 7 to 13, and 14 to 19 */
-    if ((y >= 0) && (y <= 6)) {
-        if (ch & 1) val = LEFT;
-        if (ch & 2) val += RIGHT;
+    unsigned left = 0xff00u;
+    unsigned right = 0x00ffu;
+    unsigned bits = 0;
+    if ((y >= 0) && (y <= 5)) {
+        if (ch & 1) bits = left;
+        if (ch & 2) bits += right;
     }
-    else if ((y >= 7) && (y <= 13)) {
-        if (ch & 4) val = LEFT;
-        if (ch & 8) val += RIGHT;
+    else if ((y >= 6) && (y <= 13)) {
+        if (ch & 4) bits = left;
+        if (ch & 8) bits += right;
     }
     else if ((y >= 14) && (y <= 19)) {
-        if (ch & 16) val = LEFT;
-        if (ch & 64) val += RIGHT;
+        if (ch & 16) bits = left;
+        if (ch & 64) bits += right;
     }
-    decode_row(dest, val);
-    if (y == 0 || y == 6 || y == 7 || y == 13 || y==14 || y == 19) val = 0;
-    val &= HMASK;
-    decode_row(sepdest, val);
-
+    decode_row(dest, bits);
 }
 
-static void generate_gchars(int ch)
+static void generate_balanced(uint8_t *dest, unsigned int ch, unsigned int y)
+{
+    unsigned bits = 0;
+    unsigned left = 0x7e00u;
+    unsigned right = 0x007eu;
+    if ((y >= 1) && (y <= 4)) {
+        if (ch & 1) bits = left;
+        if (ch & 2) bits += right;
+    }
+    else if ((y >= 7) && (y <= 12)) {
+        if (ch & 4) bits = left;
+        if (ch & 8) bits += right;
+    }
+    else if ((y >= 15) && (y <= 18)) {
+        if (ch & 16) bits = left;
+        if (ch & 64) bits += right;
+    }
+    decode_row(dest, bits);
+}
+
+static void generate_right(uint8_t *dest, unsigned int ch, unsigned int y)
+{
+    unsigned bits = 0;
+    unsigned left = 0x3f00u;
+    unsigned right = 0x003fu;
+    if ((y >= 0) && (y <= 3)) {
+        if (ch & 1) bits = left;
+        if (ch & 2) bits += right;
+    }
+    else if ((y >= 6) && (y <= 11)) {
+        if (ch & 4) bits = left;
+        if (ch & 8) bits += right;
+    }
+    else if ((y >= 14) && (y <= 17)) {
+        if (ch & 16) bits = left;
+        if (ch & 64) bits += right;
+    }
+    decode_row(dest, bits);
+}
+
+static void generate_gchars(int right, int ch)
 {
     int offs = (ch - 0x20) * 160;
     for (int line = 0; line < 20; line += 2) {
-        generate_row(mode7_graph + offs, mode7_sepgraph + offs, ch, line);
-        generate_row(mode7_graphi + offs, mode7_sepgraphi + offs, ch, line+1);
+        generate_contig(mode7_graph + offs, ch, line);
+        generate_contig(mode7_graphi + offs, ch, line+1);
+        if (right) {
+            generate_right(mode7_sepgraph + offs, ch, line);
+            generate_right(mode7_sepgraphi + offs, ch, line+1);
+        }
+        else {
+            generate_balanced(mode7_sepgraph + offs, ch, line);
+            generate_balanced(mode7_sepgraphi + offs, ch, line+1);
+        }
         offs += 16;
     }
 }
 
-static void generate_graphics(void)
+static void generate_graphics(int right)
 {
     for (int ch = 0x20; ch < 0x40; ch++)
-        generate_gchars(ch);
+        generate_gchars(right, ch);
     for (int ch = 0x60; ch < 0x80; ch++)
-        generate_gchars(ch);
+        generate_gchars(right, ch);
 }
 
 static void resample_graphics(int width)
@@ -4272,15 +4313,17 @@ static void save_bank(FILE *fp, int width, uint8_t *glyph, uint8_t *field1, uint
 
 int main(int argc, char **argv)
 {
-    const char *fn = "mode7chars.dat", *ifn = NULL;
+    const char *fn = "mode7chars.fnt", *ifn = NULL;
+    const char *name = "";
     int status = 0;
     int brandy = 0;
     int gensix = 0;
     int sdl    = 0;
-    int width = 16;
+    int width  = 16;
+    int right  = 0;
     int opt;
 
-    while ((opt = getopt(argc, argv, "bge:f:sw:")) != EOF) {
+    while ((opt = getopt(argc, argv, "bge:f:n:rsw:")) != EOF) {
         switch(opt) {
             case 'b':
                 brandy = 1;
@@ -4293,6 +4336,12 @@ int main(int argc, char **argv)
                 break;
             case 'f':
                 fn = optarg;
+                break;
+            case 'n':
+                name = optarg;
+                break;
+            case 'r':
+                right = 1;
                 break;
             case 's':
                 sdl = 1;
@@ -4319,12 +4368,15 @@ int main(int argc, char **argv)
     if (mem) {
         FILE *fp = fopen(fn, "wb");
         if (fp) {
+            size_t namelen = strlen(name);
             memset(mem, 0xff, total_size);
-            char hdr[10];
+            char hdr[11];
             memcpy(hdr, "BEMTTX01", 8);
             hdr[8] = width;
             hdr[9] = 10;
+            hdr[10] = namelen;
             fwrite(hdr, sizeof(hdr), 1, fp);
+            fwrite(name, namelen, 1, fp);
 
             mode7_chars = mem;
             mode7_charsi = mem + bank_size;
@@ -4336,7 +4388,7 @@ int main(int argc, char **argv)
             mode7_tempi2 = mem + bank_size * 7;
 
             if (gensix)
-                generate_graphics();
+                generate_graphics(right);
             else {
                 for (int c = 0; c < (96 * 60); c++)
                     teletext_graphics[c] *= 15;

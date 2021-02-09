@@ -435,7 +435,9 @@ void videoula_loadstate(FILE * f)
 }
 
 /*Mode 7 (SAA5050)*/
-static uint8_t *mode7_chars, *mode7_graph, *mode7_sepgraph, *mode7_p, *mode7_heldp;
+const char *mode7_fontfile;
+static ALLEGRO_PATH *font_dir;
+static uint8_t *mode7_chars = NULL, *mode7_graph, *mode7_sepgraph, *mode7_p, *mode7_heldp;
 static int mode7_width, mode7_bytes_per_char;
 static int mode7_lookup[8][8][16];
 
@@ -451,53 +453,88 @@ static uint8_t mode7_heldchar, mode7_holdchar;
 #define MODE7_CHAR_BANKS       3
 #define MODE7_NUM_CHARS       96
 
-void mode7_makechars()
+static bool mode7_load_file(const char *cpath)
 {
     bool worked = false;
-    ALLEGRO_PATH *path = find_cfg_file("mode7chars", ".dat");
-    if (path) {
-        const char *cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
-        FILE *fp = fopen(cpath, "rb");
-        if (fp) {
-            char hdr[10];
-            if (fread(hdr, sizeof(hdr), 1, fp) == 1) {
-                if (!memcmp(hdr, "BEMTTX01", 8)) {
-                    int rows = hdr[9];
-                    mode7_width = hdr[8];
-                    mode7_bytes_per_char = rows * mode7_width;
+    FILE *fp = fopen(cpath, "rb");
+    if (fp) {
+        char hdr[11];
+        if (fread(hdr, sizeof(hdr), 1, fp) == 1) {
+            if (!memcmp(hdr, "BEMTTX01", 8)) {
+                char name[80];
+                int namelen = hdr[10];
+                int rows = hdr[9];
+                mode7_width = hdr[8];
+                mode7_bytes_per_char = rows * mode7_width;
+                if (namelen > 0 && namelen < sizeof(name)-1 && fread(name, namelen, 1, fp) == 1) {
+                    name[namelen] = 0;
+                    log_info("video: Loading Mode 7 font %s '%s', %dx%d", cpath, name, mode7_width, rows);
+                }
+                else {
+                    fseek(fp, sizeof(hdr)+namelen, SEEK_SET);
                     log_info("video: Loading Mode 7 font %s, %dx%d", cpath, mode7_width, rows);
-                    int bytes_per_bank = mode7_bytes_per_char * MODE7_NUM_CHARS;
-                    int total_size = bytes_per_bank * MODE7_CHAR_BANKS;
-                    if ((mode7_chars = malloc(total_size))) {
-                        mode7_p = mode7_chars;
-                        mode7_graph = mode7_chars + bytes_per_bank;
+                }
+                int bytes_per_bank = mode7_bytes_per_char * MODE7_NUM_CHARS;
+                int total_size = bytes_per_bank * MODE7_CHAR_BANKS;
+                uint8_t *new_chars = malloc(total_size);
+                if (new_chars) {
+                    if (fread(new_chars, total_size, 1, fp) == 1) {
+                        if (mode7_chars)
+                            free(mode7_chars);
+                        mode7_p = mode7_chars = new_chars;
+                        mode7_graph = new_chars + bytes_per_bank;
                         mode7_sepgraph = mode7_graph + bytes_per_bank;
                         log_debug("video: mode7_makechars chars=%p, graph=%p, sepgraph=%p", mode7_chars, mode7_graph, mode7_sepgraph);
-                        if (fread(mode7_chars, total_size, 1, fp) == 1)
-                            worked = true;
-                        else {
-                            const char *msg = ferror(fp) ? strerror(errno) : "file is too short";
-                            log_fatal("video: error reading body of teletext font file '%s': %s", cpath, msg);
-                        }
+                        worked = true;
                     }
-                    else
-                        log_fatal("video: out of memory reading teletext font file '%s'", cpath);
+                    else {
+                        const char *msg = ferror(fp) ? strerror(errno) : "file is too short";
+                        log_error("video: error reading body of teletext font file '%s': %s", cpath, msg);
+                        free(new_chars);
+                    }
                 }
                 else
-                    log_fatal("video: teletext font file '%s' is not in a recognised format", cpath);
+                    log_error("video: out of memory reading teletext font file '%s'", cpath);
             }
             else
-                log_fatal("video: error reading header of teletext font file '%s': %s", cpath, strerror(errno));
-            fclose(fp);
+                log_error("video: teletext font file '%s' is not in a recognised format", cpath);
         }
         else
-            log_fatal("video: unable to open teletext font file '%s': %s", cpath, strerror(errno));
-        al_destroy_path(path);
+            log_error("video: error reading header of teletext font file '%s': %s", cpath, strerror(errno));
+        fclose(fp);
     }
     else
-        log_fatal("video: unable to open find a teletext font file");
-    if (!worked)
+        log_error("video: unable to open teletext font file '%s': %s", cpath, strerror(errno));
+    return worked;
+}
+
+bool mode7_loadchars(const char *fn)
+{
+    bool worked = false;
+    if (is_relative_filename(fn)) {
+        ALLEGRO_PATH *path = find_dat_file(font_dir, fn, ".fnt");
+        if (path) {
+            const char *cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+            worked = mode7_load_file(cpath);
+            al_destroy_path(path);
+        }
+        else
+            log_error("video: unable to open find teletext font file %s", fn);
+    }
+    else
+        worked = mode7_load_file(fn);
+    if (worked)
+        mode7_fontfile = fn;
+    return worked;
+}
+
+void mode7_makechars(void)
+{
+    font_dir = al_create_path_for_directory("fonts");
+    if (!font_dir || !mode7_loadchars(mode7_fontfile)) {
+        log_fatal("video: unable to load mode 7 font");
         exit(1);
+    }
 }
 
 static void mode7_gen_nula_lookup(void)
@@ -529,28 +566,23 @@ static void mode7_gen_nula_lookup(void)
 
 static inline void mode7_render(ALLEGRO_LOCKED_REGION *region, uint8_t dat)
 {
-    int t, c;
-    int off;
-    int mcolx = mode7_col;
-    int holdoff = 0, holdclear = 0;
-    uint8_t *mode7_px;
-    int mode7_flashx = mode7_flash, mode7_dblx = mode7_dbl;
-    int *on;
-
     if (scrx < (1280-32)) {
+        int mcolx = mode7_col;
+        int holdoff = 0, holdclear = 0;
+        int mode7_flashx = mode7_flash, mode7_dblx = mode7_dbl;
+        int *on;
+
         if (mode7_need_new_lookup)
             mode7_gen_nula_lookup();
 
-        t = mode7_buf[0];
+        uint8_t t = mode7_buf[0];
         mode7_buf[0] = mode7_buf[1];
         mode7_buf[1] = dat;
         dat = t;
-        mode7_px = mode7_p;
+        uint8_t *mode7_px = mode7_p;
 
-        if (!mode7_dbl && mode7_nextdbl)
-            on = mode7_lookup[mode7_bg & 7][mode7_bg & 7];
         if (dat == 255) {
-            for (c = 0; c < mode7_width; c++)
+            for (int c = 0; c < mode7_width; c++)
                 put_pixel(region, scrx + c + 16, scry, colblack);
             return;
         }
@@ -572,7 +604,7 @@ static inline void mode7_render(ALLEGRO_LOCKED_REGION *region, uint8_t dat)
             case 8: /* 136: flash */
                 mode7_flash = 1;
                 break;
-            case 9: /* 137: steadt */
+            case 9: /* 137: steady */
                 mode7_flash = 0;
                 break;
             case 12: /* 140: normal height */
@@ -637,7 +669,7 @@ static inline void mode7_render(ALLEGRO_LOCKED_REGION *region, uint8_t dat)
             mode7_heldp = mode7_px;
         }
 
-        off = mode7_lookup[0][mode7_bg & 7][0];
+        int off = mode7_lookup[0][mode7_bg & 7][0];
         int xpos = scrx + 16;
 
         if (mode7_flashx && !mode7_flashon) {
