@@ -22,9 +22,11 @@ extern void log_info(const char *fmt, ...) printflike;
 
 #ifdef _DEBUG
 extern void log_debug(const char *format, ...) printflike;
+extern void log_dump(const char *prefix, uint8_t *data, size_t size);
 #else
 static inline void log_debug(const char *format, ...) printflike;
 static inline void log_debug(const char *format, ...) {}
+static inline void log_dump(const char *prefix, uint8_t *data, size_t size) {}
 #endif
 
 #endif
