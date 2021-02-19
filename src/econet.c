@@ -868,7 +868,7 @@ static void TransmitData(void)
             // TODO
             log_debug("Econet(Tx): TXLast set - Send %d byte packet to %02x %02x (%08X:%u)",
                       BeebTx.Pointer, (unsigned int)(BeebTx.eh.destnet), (unsigned int)BeebTx.eh.deststn, (unsigned int)RecvAddr.sin_addr.s_addr, (unsigned int)ntohs(RecvAddr.sin_port));
-            log_dump("Econet(Tx): Packet data: ", BeebTx.buff, BeebTx.Pointer);
+            log_dump("Econet(Tx): Econet packet: ", BeebTx.buff, BeebTx.Pointer);
     /*                  if (confAUNmode && fourwaystage != FWS_IDLE) {
                 if (RecvAddr.sin_port != EconetTx.inet_addr ||
                     RecvAddr.sin_port != htons(EconetTx.port) ) {
@@ -990,6 +990,7 @@ static void TransmitData(void)
             if (SendMe) {
                 if (confAUNmode) {
                     log_debug("Econet(Tx): Sending a AUN packet, SendLen=%d", SendLen);
+                    log_dump("Econet(Tx): AUN Packet: ", (uint8_t *)&EconetTx, SendLen);
                     if (sendto(SendSocket, (char *)&EconetTx, SendLen, 0, (SOCKADDR *) &RecvAddr, sizeof(RecvAddr)) == SOCKET_ERROR) {
                         log_error("Econet(Tx): Failed to send packet to %02x %02x (%08X :%u)",
                                   (unsigned int)(network[i].inet_addr), (unsigned int)network[i].station, (unsigned int)network[i].inet_addr, (unsigned int)network[i].port);
@@ -997,6 +998,7 @@ static void TransmitData(void)
                 }
                 else {
                     log_debug("Econet(Tx): Sending a non-AUN packet, BeebTx.Pointer=%d", BeebTx.Pointer);
+                    log_dump("Econet(Tx): BeebEm Packet: ", BeebTx.buff, BeebTx.Pointer);
                     if (sendto(SendSocket, (char *)BeebTx.buff, BeebTx.Pointer, 0, (SOCKADDR *) &RecvAddr, sizeof(RecvAddr)) == SOCKET_ERROR) {
                         log_error("Econet(Tx): Failed to send packet to %02x %02x (%08X :%u)",
                                   (unsigned int)(BeebTx.eh.destnet), (unsigned int)BeebTx.eh.deststn, (unsigned int)network[i].inet_addr, (unsigned int)network[i].port);
@@ -1069,10 +1071,10 @@ static void ReceiveData(void)
                         RetVal = recvfrom(ListenSocket, (char *)BeebRx.buff, sizeof(BeebRx.buff), 0, (SOCKADDR *) & RecvAddr, (socklen_t *)&sizRcvAdr);
                     }
                     if (RetVal > 0) {
-                        log_debug("Econet(Rx): Packet received. %u bytes from %08X :%u)", (int)RetVal, RecvAddr.sin_addr.s_addr, htons(RecvAddr.sin_port));
-
+                        log_debug("Econet(Rx): Packet received, %u bytes from %08X :%u)", (int)RetVal, RecvAddr.sin_addr.s_addr, htons(RecvAddr.sin_port));
                         if (confAUNmode) {
-                            log_dump("Econet(Rx): Packet data: ", EconetRx.raw, RetVal);
+                            log_dump("Econet(Rx): AUN packet: ", EconetRx.raw, RetVal);
+
                             // convert from AUN format
                             // find station number of sender
                             hostno = 0;
@@ -1215,7 +1217,7 @@ static void ReceiveData(void)
                             }
                         }
                         else {
-                            log_dump("Econet(Rx): Packet data: ", BeebRx.buff, RetVal);
+                            log_dump("Econet(Rx): BeebEm packet: ", BeebRx.buff, RetVal);
                             BeebRx.BytesInBuffer = RetVal;
                             BeebRx.Pointer = 0;
                         }
@@ -1271,11 +1273,12 @@ static void ReceiveData(void)
                         BeebRx.BytesInBuffer = j;
                         BeebRx.Pointer = 0;
                         fourwaystage = FWS_DATARCVD;
-                        log_debug("Econet(Rx): Set FWS_DATARCVD");
-                        log_dump("Econet(Tx): Packet data: ", BeebRx.buff, j);
+                        log_debug("Econet(Rx): Set FWS_DATARCVD, real packet follows");
                         break;
                 }
             }
+            if (BeebRx.BytesInBuffer > 0)
+                log_dump("Econet(Rx): Econet packet: ", BeebRx.buff, BeebRx.BytesInBuffer);
         }
     }
 }
