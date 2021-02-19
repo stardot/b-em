@@ -3967,9 +3967,8 @@ void m6502_exec(void)
                         pc = readmem(0xFFFA) | (readmem(0xFFFB) << 8);
                         p.i = 1;
                         polltime(7);
-                        nmi = 0;
-//                        printf("NMI\n");
                 }
+                oldnmi = nmi;
         }
 }
 
@@ -5809,7 +5808,6 @@ void m65c02_exec(void)
                         pc = readmem(0xFFFA) | (readmem(0xFFFB) << 8);
                         p.i = 1;
                         polltime(7);
-                        nmi = 0;
                         p.d = 0;
 //                        log_debug("NMI\n");
 //                        printf("NMI\n");
