@@ -359,6 +359,8 @@ static uint32_t dbg_do_readmem(uint32_t addr) {
     return do_readmem(addr);
 }
 
+#define IO_ADDR(a) (a >> 2)
+
 static uint32_t do_readmem(uint32_t addr)
 {
     addr &= 0xffff;
@@ -389,103 +391,104 @@ static uint32_t do_readmem(uint32_t addr)
         }
 
 
-        switch (addr & ~3) {
-            case 0xFC08:
-            case 0xFC0C:
+    switch (IO_ADDR(addr)) {
+        case IO_ADDR(0xFC08):
+        case IO_ADDR(0xFC0C):
                 if (sound_music5000)
                     return music2000_read(addr);
                 break;
-        case 0xFC20:
-        case 0xFC24:
-        case 0xFC28:
-        case 0xFC2C:
-        case 0xFC30:
-        case 0xFC34:
-        case 0xFC38:
-        case 0xFC3C:
+        case IO_ADDR(0xFC20):
+        case IO_ADDR(0xFC24):
+        case IO_ADDR(0xFC28):
+        case IO_ADDR(0xFC2C):
+        case IO_ADDR(0xFC30):
+        case IO_ADDR(0xFC34):
+        case IO_ADDR(0xFC38):
+        case IO_ADDR(0xFC3C):
                 if (sound_beebsid)
                         return sid_read((uint16_t)addr);
                 break;
 
-        case 0xFC40:
-        case 0xFC44:
-        case 0xFC48:
-        case 0xFC4C:
-        case 0xFC50:
-        case 0xFC54:
-        case 0xFC58:
+        case IO_ADDR(0xFC40):
+        case IO_ADDR(0xFC44):
+        case IO_ADDR(0xFC48):
+        case IO_ADDR(0xFC4C):
+        case IO_ADDR(0xFC50):
+        case IO_ADDR(0xFC54):
+        case IO_ADDR(0xFC58):
                 if (scsi_enabled)
                         return scsi_read((uint16_t)addr);
                 if (ide_enable)
                         return ide_read((uint16_t)addr);
                 break;
 
-        case 0xFC5C:
+        case IO_ADDR(0xFC5C):
                 return vdfs_read((uint16_t)addr);
                 break;
 
-        case 0xFE00:
-        case 0xFE04:
+        case IO_ADDR(0xFE00):
+        case IO_ADDR(0xFE04):
                 return crtc_read((uint16_t)addr);
 
-        case 0xFE08:
-        case 0xFE0C:
+        case IO_ADDR(0xFE08):
+        case IO_ADDR(0xFE0C):
                 return acia_read(&sysacia, (uint16_t)addr);
 
-        case 0xFE10:
-        case 0xFE14:
+        case IO_ADDR(0xFE10):
+        case IO_ADDR(0xFE14):
                 return serial_read((uint16_t)addr);
 
-        case 0xFE18:
+        case IO_ADDR(0xFE18):
+        case IO_ADDR(0xFE1C):
                 if (MASTER)
                         return adc_read((uint16_t)addr);
                 else
                     return mmccard_read();
-                break;
 
-        case 0xFE24:
-        case 0xFE28:
+
+        case IO_ADDR(0xFE24):
+        case IO_ADDR(0xFE28):
                 if (MASTER)
                         return wd1770_read((uint16_t)addr);
                 break;
 
-        case 0xFE34:
+        case IO_ADDR(0xFE34):
                 if (MASTER)
                         return acccon;
                 break;
 
-        case 0xFE3C:
+        case IO_ADDR(0xFE3C):
             if (integra)
                 return cmos_read_data_integra();
 
-        case 0xFE40:
-        case 0xFE44:
-        case 0xFE48:
-        case 0xFE4C:
-        case 0xFE50:
-        case 0xFE54:
-        case 0xFE58:
-        case 0xFE5C:
+        case IO_ADDR(0xFE40):
+        case IO_ADDR(0xFE44):
+        case IO_ADDR(0xFE48):
+        case IO_ADDR(0xFE4C):
+        case IO_ADDR(0xFE50):
+        case IO_ADDR(0xFE54):
+        case IO_ADDR(0xFE58):
+        case IO_ADDR(0xFE5C):
                 return sysvia_read((uint16_t)addr);
 
-        case 0xFE60:
-        case 0xFE64:
-        case 0xFE68:
-        case 0xFE6C:
-        case 0xFE70:
-        case 0xFE74:
-        case 0xFE78:
-        case 0xFE7C:
+        case IO_ADDR(0xFE60):
+        case IO_ADDR(0xFE64):
+        case IO_ADDR(0xFE68):
+        case IO_ADDR(0xFE6C):
+        case IO_ADDR(0xFE70):
+        case IO_ADDR(0xFE74):
+        case IO_ADDR(0xFE78):
+        case IO_ADDR(0xFE7C):
                 return uservia_read((uint16_t)addr);
 
-        case 0xFE80:
-        case 0xFE84:
-        case 0xFE88:
-        case 0xFE8C:
-        case 0xFE90:
-        case 0xFE94:
-        case 0xFE98:
-        case 0xFE9C:
+        case IO_ADDR(0xFE80):
+        case IO_ADDR(0xFE84):
+        case IO_ADDR(0xFE88):
+        case IO_ADDR(0xFE8C):
+        case IO_ADDR(0xFE90):
+        case IO_ADDR(0xFE94):
+        case IO_ADDR(0xFE98):
+        case IO_ADDR(0xFE9C):
             switch(fdc_type) {
                 case FDC_NONE:
                 case FDC_MASTER:
@@ -497,31 +500,31 @@ static uint32_t do_readmem(uint32_t addr)
             }
             break;
 
-        case 0xFEC0:
-        case 0xFEC4:
-        case 0xFEC8:
-        case 0xFECC:
-        case 0xFED0:
-        case 0xFED4:
-        case 0xFED8:
+        case IO_ADDR(0xFEC0):
+        case IO_ADDR(0xFEC4):
+        case IO_ADDR(0xFEC8):
+        case IO_ADDR(0xFECC):
+        case IO_ADDR(0xFED0):
+        case IO_ADDR(0xFED4):
+        case IO_ADDR(0xFED8):
                 if (!MASTER)
                         return adc_read((uint16_t)addr);
                 break;
-        case 0xFEDC:
+        case IO_ADDR(0xFEDC):
             if (MASTER)
                 return mmccard_read();
             else
                 return adc_read((uint16_t)addr);
             break;
 
-        case 0xFEE0:
-        case 0xFEE4:
-        case 0xFEE8:
-        case 0xFEEC:
-        case 0xFEF0:
-        case 0xFEF4:
-        case 0xFEF8:
-        case 0xFEFC:
+        case IO_ADDR(0xFEE0):
+        case IO_ADDR(0xFEE4):
+        case IO_ADDR(0xFEE8):
+        case IO_ADDR(0xFEEC):
+        case IO_ADDR(0xFEF0):
+        case IO_ADDR(0xFEF4):
+        case IO_ADDR(0xFEF8):
+        case IO_ADDR(0xFEFC):
                 return tube_host_read((uint16_t)addr);
         }
         if (addr >= 0xFC00 && addr < 0xFE00)
@@ -758,131 +761,131 @@ static void do_writemem(uint32_t addr, uint32_t val)
            }
         }
 
-        switch (addr & ~3) {
-            case 0xFC08:
-            case 0xFC0C:
-                if (sound_music5000)
-                    music2000_write(addr, (uint8_t)val);
-                break;
-        case 0xFC20:
-        case 0xFC24:
-        case 0xFC28:
-        case 0xFC2C:
-        case 0xFC30:
-        case 0xFC34:
-        case 0xFC38:
-        case 0xFC3C:
+    switch (IO_ADDR(addr)) {
+        case IO_ADDR(0xFC08):
+        case IO_ADDR(0xFC0C):
+            if (sound_music5000)
+                music2000_write(addr, (uint8_t)val);
+            break;
+        case IO_ADDR(0xFC20):
+        case IO_ADDR(0xFC24):
+        case IO_ADDR(0xFC28):
+        case IO_ADDR(0xFC2C):
+        case IO_ADDR(0xFC30):
+        case IO_ADDR(0xFC34):
+        case IO_ADDR(0xFC38):
+        case IO_ADDR(0xFC3C):
                 if (sound_beebsid)
                         sid_write((uint16_t)addr, (uint8_t)val);
                 break;
 
-        case 0xFC40:
-        case 0xFC44:
-        case 0xFC48:
-        case 0xFC4C:
-        case 0xFC50:
-        case 0xFC54:
-        case 0xFC58:
+        case IO_ADDR(0xFC40):
+        case IO_ADDR(0xFC44):
+        case IO_ADDR(0xFC48):
+        case IO_ADDR(0xFC4C):
+        case IO_ADDR(0xFC50):
+        case IO_ADDR(0xFC54):
+        case IO_ADDR(0xFC58):
                 if (scsi_enabled)
                         scsi_write((uint16_t)addr, (uint8_t)val);
                 else if (ide_enable)
                         ide_write((uint16_t)addr, (uint8_t)val);
                 break;
 
-        case 0xFC5C:
+        case IO_ADDR(0xFC5C):
                 vdfs_write((uint16_t)addr, (uint8_t)val);
                 break;
 
-        case 0xFE00:
-        case 0xFE04:
+        case IO_ADDR(0xFE00):
+        case IO_ADDR(0xFE04):
                 crtc_write((uint16_t)addr, (uint8_t)val);
                 break;
 
-        case 0xFE08:
-        case 0xFE0C:
+        case IO_ADDR(0xFE08):
+        case IO_ADDR(0xFE0C):
                 acia_write(&sysacia, (uint16_t)addr, (uint8_t)val);
                 break;
 
-        case 0xFE10:
-        case 0xFE14:
+        case IO_ADDR(0xFE10):
+        case IO_ADDR(0xFE14):
                 serial_write((uint16_t)addr, (uint8_t)val);
                 break;
 
-        case 0xFE18:
+        case IO_ADDR(0xFE18):
                 if (MASTER)
-                        adc_write((uint16_t)addr, (uint8_t)val);
+                    adc_write((uint16_t)addr, (uint8_t)val);
                 else
                     mmccard_write(val);
                 break;
 
-        case 0xFE20:
+        case IO_ADDR(0xFE20):
                 videoula_write((uint16_t)addr, (uint8_t)val);
                 break;
 
-        case 0xFE24:
+        case IO_ADDR(0xFE24):
                 if (MASTER)
                         wd1770_write((uint16_t)addr, (uint8_t)val);
                 else
                         videoula_write((uint16_t)addr, (uint8_t)val);
                 break;
 
-        case 0xFE28:
+        case IO_ADDR(0xFE28):
                 if (MASTER)
                         wd1770_write((uint16_t)addr, (uint8_t)val);
                 break;
 
-        case 0xFE30:
+        case IO_ADDR(0xFE30):
             write_romsel(val);
             break;
 
-        case 0xFE34:
+        case IO_ADDR(0xFE34):
             write_fe34(val);
             break;
 
-        case 0xFE38:
+        case IO_ADDR(0xFE38):
             if (integra)
                 cmos_write_addr_integra(val);
             else if (!MASTER && !BPLUS)
                 write_romsel(val);
             break;
 
-        case 0xFE3C:
+        case IO_ADDR(0xFE3C):
             if (integra)
                 cmos_write_data_integra(val);
             else if (!MASTER && !BPLUS)
                 write_romsel(val);
             break;
 
-        case 0xFE40:
-        case 0xFE44:
-        case 0xFE48:
-        case 0xFE4C:
-        case 0xFE50:
-        case 0xFE54:
-        case 0xFE58:
-        case 0xFE5C:
+        case IO_ADDR(0xFE40):
+        case IO_ADDR(0xFE44):
+        case IO_ADDR(0xFE48):
+        case IO_ADDR(0xFE4C):
+        case IO_ADDR(0xFE50):
+        case IO_ADDR(0xFE54):
+        case IO_ADDR(0xFE58):
+        case IO_ADDR(0xFE5C):
                 sysvia_write((uint16_t)addr, (uint8_t)val);
                 break;
 
-        case 0xFE60:
-        case 0xFE64:
-        case 0xFE68:
-        case 0xFE6C:
-        case 0xFE70:
-        case 0xFE74:
-        case 0xFE78:
-        case 0xFE7C:
+        case IO_ADDR(0xFE60):
+        case IO_ADDR(0xFE64):
+        case IO_ADDR(0xFE68):
+        case IO_ADDR(0xFE6C):
+        case IO_ADDR(0xFE70):
+        case IO_ADDR(0xFE74):
+        case IO_ADDR(0xFE78):
+        case IO_ADDR(0xFE7C):
                 uservia_write((uint16_t)addr, (uint8_t)val);
                 break;
 
-        case 0xFE80:
-        case 0xFE84:
-        case 0xFE88:
-        case 0xFE8C:
-        case 0xFE90:
-        case 0xFE94:
-        case 0xFE98:
-        case 0xFE9C:
+        case IO_ADDR(0xFE80):
+        case IO_ADDR(0xFE84):
+        case IO_ADDR(0xFE88):
+        case IO_ADDR(0xFE8C):
+        case IO_ADDR(0xFE90):
+        case IO_ADDR(0xFE94):
+        case IO_ADDR(0xFE98):
+        case IO_ADDR(0xFE9C):
             switch(fdc_type) {
                 case FDC_NONE:
                 case FDC_MASTER:
@@ -895,31 +898,31 @@ static void do_writemem(uint32_t addr, uint32_t val)
             }
             break;
 
-        case 0xFEC0:
-        case 0xFEC4:
-        case 0xFEC8:
-        case 0xFECC:
-        case 0xFED0:
-        case 0xFED4:
-        case 0xFED8:
+        case IO_ADDR(0xFEC0):
+        case IO_ADDR(0xFEC4):
+        case IO_ADDR(0xFEC8):
+        case IO_ADDR(0xFECC):
+        case IO_ADDR(0xFED0):
+        case IO_ADDR(0xFED4):
+        case IO_ADDR(0xFED8):
                 if (!MASTER)
                         adc_write((uint16_t)addr, (uint8_t)val);
                 break;
-        case 0xFEDC:
+        case IO_ADDR(0xFEDC):
             if (MASTER)
                 mmccard_write(val);
             else
                 adc_write((uint16_t)addr, (uint8_t)val);
             break;
 
-        case 0xFEE0:
-        case 0xFEE4:
-        case 0xFEE8:
-        case 0xFEEC:
-        case 0xFEF0:
-        case 0xFEF4:
-        case 0xFEF8:
-        case 0xFEFC:
+        case IO_ADDR(0xFEE0):
+        case IO_ADDR(0xFEE4):
+        case IO_ADDR(0xFEE8):
+        case IO_ADDR(0xFEEC):
+        case IO_ADDR(0xFEF0):
+        case IO_ADDR(0xFEF4):
+        case IO_ADDR(0xFEF8):
+        case IO_ADDR(0xFEFC):
                 tube_host_write((uint16_t)addr, (uint8_t)val);
                 break;
         }
