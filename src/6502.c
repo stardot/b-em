@@ -1,3 +1,4 @@
+#define _DEBUG
 /*B-em v2.2 by Tom Walker
   6502/65c02 host CPU emulation*/
 
@@ -29,6 +30,7 @@
 #include "vdfs.h"
 #include "video.h"
 #include "wd1770.h"
+#include "econet.h"
 
 static int dbg_core6502 = 0;
 
@@ -247,6 +249,8 @@ static inline void polltime(int c)
             disc_poll();
         }
     }
+    if (EconetEnabled)
+        EconetPoll(c);
     tubecycle += c;
 }
 
@@ -437,11 +441,20 @@ static uint32_t do_readmem(uint32_t addr)
                 return serial_read((uint16_t)addr);
 
         case 0xFE18:
+        case 0xFE1C:
                 if (MASTER)
-                        return adc_read((uint16_t)addr);
-                else
-                    return mmccard_read();
-                break;
+                    return adc_read((uint16_t)addr);
+                else {
+                    EconetNMIenabled = false;
+                    return Read_Econet_Station(); // mmccard_read();
+                }
+
+        case 0xFE20:
+            if (!MASTER) {
+                EconetNMIenabled = true;
+                log_debug("6502: econet NMI enabled");
+            }
+            break;
 
         case 0xFE24:
         case 0xFE28:
@@ -496,6 +509,9 @@ static uint32_t do_readmem(uint32_t addr)
                     return wd1770_read((uint16_t)addr);
             }
             break;
+
+        case 0xFEA0:
+            return ReadEconetRegister(addr);
 
         case 0xFEC0:
         case 0xFEC4:
@@ -893,6 +909,10 @@ static void do_writemem(uint32_t addr, uint32_t val)
                 default:
                     wd1770_write((uint16_t)addr, (uint8_t)val);
             }
+            break;
+
+        case 0xFEA0:
+            WriteEconetRegister(addr, val);
             break;
 
         case 0xFEC0:

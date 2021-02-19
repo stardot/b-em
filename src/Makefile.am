@@ -61,6 +61,7 @@ b_em_SOURCES = \
 	debugger.c \
 	debugger_symbols.cpp \
 	disc.c fdi.c \
+    econet.c \
 	fdi2raw.c \
 	gui-allegro.c\
 	hfe.c \

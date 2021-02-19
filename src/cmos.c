@@ -120,7 +120,7 @@ static uint8_t get_cmos(unsigned addr)
     return cmos[addr];
 }
 
-static void set_cmos(unsigned addr, uint8_t val)
+void cmos_set(unsigned addr, uint8_t val)
 {
     cmos[addr] = val;
     if ((addr <= 6 && !(addr & 1)) || (addr >= 7 && addr <= 9))
@@ -136,7 +136,7 @@ void cmos_update(uint8_t IC32, uint8_t sdbval)
     // log_debug("CMOS update %i %i %i\n",cmos_rw,cmos_strobe,cmos_old);
     if (cmos_strobe && cmos_ena) {
         if (!cmos_rw && !(IC32 & 4))        /*Write triggered on low -> high on D*/
-            set_cmos(cmos_addr, sdbval);
+            cmos_set(cmos_addr, sdbval);
         if (cmos_rw && (IC32 & 4))          /*Read data output while D high*/
             cmos_data = get_cmos(cmos_addr);
     }
@@ -167,7 +167,7 @@ void cmos_write_addr_integra(uint8_t val)
 void cmos_write_data_integra(uint8_t val)
 {
     log_debug("cmos: write_data_integra, val=%02X", val);
-    set_cmos(cmos_addr, val);
+    cmos_set(cmos_addr, val);
 }
 
 static int uip_count = 0;

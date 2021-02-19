@@ -17,6 +17,7 @@
 #include "ddnoise.h"
 #include "debugger.h"
 #include "disc.h"
+#include "econet.h"
 #include "fdi.h"
 #include "hfe.h"
 #include "gui-allegro.h"
@@ -332,6 +333,7 @@ void main_init(int argc, char *argv[])
         gui_set_disc_wprot(0, writeprot[0]);
     if (discfns[1])
         gui_set_disc_wprot(1, writeprot[1]);
+    EconetReset();
     main_setspeed(emuspeed);
     debug_start(exec_fn);
 }

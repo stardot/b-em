@@ -5,6 +5,7 @@
 #include "config.h"
 #include "cmos.h"
 #include "6809tube.h"
+#include "econet.h"
 #include "mc6809nc/mc6809_debug.h"
 #include "mem.h"
 #include "tube.h"
@@ -145,6 +146,7 @@ void model_loadcfg(void)
             ptr->os01    = get_config_bool(sect, "os01",    false);
             ptr->compact = get_config_bool(sect, "compact", false);
             ptr->integra = get_config_bool(sect, "integra", false);
+            ptr->econet  = get_config_bool(sect, "econet", false);
             ptr->os      = get_config_string(sect, "os", "os12");
             ptr->cmos    = get_config_string(sect, "cmos", "");
             ptr->romsetup = model_find_romsetup(get_config_string(sect, "romsetup", "swram"), ptr->name);
@@ -239,6 +241,7 @@ void model_init()
     integra     = models[curmodel].integra;
     OS01        = models[curmodel].os01;
     compactcmos = models[curmodel].compact;
+    EconetEnabled = models[curmodel].econet;
 
     mem_clearroms();
     models[curmodel].romsetup->func();
