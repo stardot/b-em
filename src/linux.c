@@ -225,4 +225,9 @@ ALLEGRO_PATH *find_cfg_dest(const char *name, const char *ext)
     return false;
 }
 
+bool is_relative_filename(const char *fn)
+{
+    return !(*fn == '/');
+}
+
 #endif
