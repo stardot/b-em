@@ -303,6 +303,26 @@ static ALLEGRO_MENU *create_tube_menu(void)
     return menu;
 }
 
+static const char *mode7_font_files[] = { "saa5050", "brandy", "basicsdl", "original", NULL };
+static const char *mode7_font_names[] = { "SAA5050", "Brandy BASIC", "BBC BASIC for SDL", "B-Em Original", NULL };
+static int mode7_font_index;
+
+static ALLEGRO_MENU *create_m7font_menu(void)
+{
+    int c = 0;
+    const char *ptr;
+    while ((ptr = mode7_font_files[c])) {
+        if (!strcmp(ptr, mode7_fontfile)) {
+            mode7_font_index = c;
+            break;
+        }
+        ++c;
+    }
+    ALLEGRO_MENU *sub = al_create_menu();
+    add_radio_set(sub, mode7_font_names, IDM_VIDEO_MODE7_FONT, mode7_font_index);
+    return sub;
+}
+
 static const char *border_names[] = { "None", "Medium", "Full", NULL };
 static const char *vmode_names[] = { "Scaled", "Interlace", "Scanlines", "Line doubling", NULL };
 static const char *led_location_names[] = { "None", "Overlapped", "Separate", NULL };
@@ -327,6 +347,7 @@ static ALLEGRO_MENU *create_video_menu(void)
     sub = al_create_menu();
     al_append_menu_item(menu, "LED visibility...", 0, 0, NULL, sub);
     add_radio_set(sub, led_visibility_names, IDM_VIDEO_LED_VISIBILITY, vid_ledvisibility);
+    al_append_menu_item(menu, "Mode 7 Font...", 0, 0, NULL, create_m7font_menu());
     return menu;
 }
 
@@ -1043,6 +1064,13 @@ static void change_ddnoise_dtype(ALLEGRO_EVENT *event)
     ddnoise_init();
 }
 
+static void change_mode7_font(ALLEGRO_EVENT *event)
+{
+    int newix = radio_event_simple(event, mode7_font_index);
+    if (mode7_loadchars(mode7_font_files[newix]))
+        mode7_font_index = newix;
+}
+
 static const char all_dext[] = "*.ssd;*.dsd;*.img;*.adf;*.ads;*.adm;*.adl;*.sdd;*.ddd;*.fdi;*.imd;*.hfe"
                                "*.SSD;*.DSD;*.IMG;*.ADF;*.ADS;*.ADM;*.ADL;*.SDD;*.DDD;*.FDI;*.IMD;*.HFE";
 
@@ -1207,6 +1235,9 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             break;
         case IDM_VIDEO_LED_VISIBILITY:
             video_set_led_visibility(radio_event_simple(event, vid_ledvisibility));
+            break;
+        case IDM_VIDEO_MODE7_FONT:
+            change_mode7_font(event);
             break;
         case IDM_SOUND_INTERNAL:
             sound_internal = !sound_internal;
