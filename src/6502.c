@@ -444,10 +444,12 @@ static uint32_t do_readmem(uint32_t addr)
         case 0xFE1C:
                 if (MASTER)
                     return adc_read((uint16_t)addr);
-                else {
+                else if (EconetEnabled) {
                     EconetNMIenabled = false;
-                    return Read_Econet_Station(); // mmccard_read();
+                    return Read_Econet_Station();
                 }
+                else
+                    return mmccard_read();
 
         case 0xFE20:
             if (!MASTER) {
@@ -511,7 +513,15 @@ static uint32_t do_readmem(uint32_t addr)
             break;
 
         case 0xFEA0:
-            return ReadEconetRegister(addr);
+        case 0xFEA4:
+        case 0xFEA8:
+        case 0xFEAC:
+        case 0xFEB0:
+        case 0xFEB4:
+        case 0xFEB8:
+        case 0xFEBC:
+            if (EconetEnabled)
+                return ReadEconetRegister(addr);
 
         case 0xFEC0:
         case 0xFEC4:
@@ -826,7 +836,9 @@ static void do_writemem(uint32_t addr, uint32_t val)
 
         case 0xFE18:
                 if (MASTER)
-                        adc_write((uint16_t)addr, (uint8_t)val);
+                    adc_write((uint16_t)addr, (uint8_t)val);
+                else if (EconetEnabled)
+                    EconetNMIenabled = false;
                 else
                     mmccard_write(val);
                 break;
@@ -912,7 +924,15 @@ static void do_writemem(uint32_t addr, uint32_t val)
             break;
 
         case 0xFEA0:
-            WriteEconetRegister(addr, val);
+        case 0xFEA4:
+        case 0xFEA8:
+        case 0xFEAC:
+        case 0xFEB0:
+        case 0xFEB4:
+        case 0xFEB8:
+        case 0xFEBC:
+            if (EconetEnabled)
+                WriteEconetRegister(addr, val);
             break;
 
         case 0xFEC0:
