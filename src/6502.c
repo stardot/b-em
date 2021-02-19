@@ -185,8 +185,15 @@ static uint32_t dbg_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size
 static uint16_t pc3, oldpc, oldoldpc;
 static uint8_t opcode;
 
+static inline uint32_t debug_addr(uint32_t addr)
+{
+    if ((addr & 0xc000) == 0x8000)
+        addr |= (ram_fe30 << 28);
+    return addr;
+}
+
 static uint32_t dbg_get_instr_addr(void) {
-    return oldpc;
+    return debug_addr(oldpc);
 }
 
 static const char *trap_names[] = { "BRK", NULL };
@@ -318,13 +325,6 @@ static void os_paste_cnpv(void)
         return;
     }
     opcode = readmem(pc);
-}
-
-static inline uint32_t debug_addr(uint32_t addr)
-{
-    if ((addr & 0xc000) == 0x8000)
-        addr |= (ram_fe30 << 28);
-    return addr;
 }
 
 static inline void fetch_opcode(void)
