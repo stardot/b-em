@@ -136,17 +136,20 @@ struct aunhdr {
 
 unsigned long ec_sequence = 0;
 
-unsigned int fourwaystage;
-#define FWS_IDLE 0
-#define FWS_SCOUTSENT 1
-#define FWS_SCACKRCVD 2
-#define FWS_DATASENT 3
-#define FWS_WAIT4IDLE 4
-#define FWS_SCOUTRCVD 11
-#define FWS_SCACKSENT 12
-#define FWS_DATARCVD 13
-#define FWS_IMMSENT 7
-#define FWS_IMMRCVD 8
+enum fourway {
+    FWS_IDLE,
+    FWS_SCOUTSENT,  // BBC micro send scout (on Econet, suppressed on AUN).
+    FWS_SCACKRCVD,  // Fake scout ack created for BBC micro to receive.
+    FWS_DATASENT,   // BBC micro data packet sent to AUN.
+    FWS_WAIT4IDLE,
+    FWS_SCOUTRCVD,  // Data has arrived on AUN, faking scout to BBC micro.
+    FWS_SCACKSENT,  // BBC micro has send scout ack, running a timer.
+    FWS_DATARCVD,   // Deliver the (delayed) AUN packet to the BBC micro.
+    FWS_IMMSENT,    // immediate scout packet sent on AUN
+    FWS_IMMRCVD
+};
+
+static enum fourway fourwaystage;
 
 struct shorteconethdr {
     uint8_t deststn;
@@ -894,7 +897,7 @@ static void TransmitData(void)
                         }       // else fall through...
                     case FWS_IDLE:
                         log_debug("Econet(Tx): AUN FWS_IDLE");
-                        // not currently doing anything, so this will be a scout,
+                        // not currently doing anything.
                         memcpy(BeebTxCopy, BeebTx.buff, sizeof(BeebTx.eh));
                         // maybe a long scout or a broadcast
                         EconetTx.ah.cb = (unsigned int)(BeebTx.eh.cb) & 127;    //| 128;
@@ -932,7 +935,7 @@ static void TransmitData(void)
                             log_debug("Econet(Tx): SCACKtimer set");
                             FlagFillActive = true;
                             EconetFlagFillTimeoutTrigger = EconetCycles + EconetFlagFillTimeout;
-                        }       // else BROADCAST !!!!
+                        }
                         break;
                     case FWS_SCOUTRCVD:
                         log_debug("Econet(Tx): AUN FWS_SCOUTRCVD");
@@ -1265,6 +1268,8 @@ static void ReceiveData(void)
                         BeebRx.Pointer = 0;
                         fourwaystage = FWS_DATARCVD;
                         log_debug("Econet(Rx): Set FWS_DATARCVD, real packet follows");
+                        break;
+                    default:
                         break;
                 }
             }
