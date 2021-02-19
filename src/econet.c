@@ -58,6 +58,7 @@ typedef int SOCKET;
 #include "econet.h"
 #include "via.h"
 #include "sysvia.h"
+#include <ctype.h>
 
 // Configuration Options.
 // These, among others, are overridden in econet.cfg (see ReadNetwork() )
@@ -65,7 +66,7 @@ bool confAUNmode = false;       // Use AUN style networking
 bool confLEARN = false;         // Add receipts from unknown hosts to network table
 bool confSTRICT = false;        // Assume network ip=stn number when sending to unknown hosts
 bool confSingleSocket = true;   // use same socket for Send and receive
-unsigned int FourWayStageTimeout = 500000;
+unsigned int FourWayStageTimeout = 1000000;
 bool MassageNetworks = false;   // massage network numbers on send/receive (add/sub 128)
 
 int inmask, outmask;
@@ -278,95 +279,86 @@ static void ReadNetwork(void)
         const char *cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
         FILE *EcoCfg = fopen(cpath, "rt");
         if (EcoCfg) {
-            char value[80];
             char EcoNameBuf[256];
-            char *EcoName = EcoNameBuf;
-            unsigned int i, j, p, q;
-            networkp = 0;
-            do {
-                if (fgets(EcoName, sizeof(EcoNameBuf)-1, EcoCfg) == NULL)
-                    break;
+            while (fgets(EcoNameBuf, sizeof(EcoNameBuf)-1, EcoCfg)) {
+                char *EcoName = EcoNameBuf;
                 log_debug("Econet: ConfigFile %s", EcoName);
-                if (EcoName[0] != '#') {
-                    i = 0;
-                    p = 0;
-                    q = 0;
-                    do {
-                        int len = strlen(EcoName);
-                        j = 0;
-                        do {
-                            value[j] = EcoName[i];
-                            i++;
-                            j++;
-                        } while (EcoName[i] != ' ' && i < len && j < 80);
-                        value[j] = 0;
-                        if (p == 0) {
-                            if (_stricmp("AUNMODE", value) == 0)
-                                q = 1;
-                            if (_stricmp("LEARN", value) == 0)
-                                q = 2;
-                            if (_stricmp("AUNSTRICT", value) == 0)
-                                q = 3;
-                            if (_stricmp("SINGLESOCKET", value) == 0)
-                                q = 4;
-                            if (_stricmp("FLAGFILLTIMEOUT", value) == 0)
-                                q = 5;
-                            if (_stricmp("SCACKTIMEOUT", value) == 0)
-                                q = 6;
-                            if (_stricmp("TIMEBETWEENBYTES", value) == 0)
-                                q = 7;
-                            if (_stricmp("FOURWAYTIMEOUT", value) == 0)
-                                q = 8;
-                            if (_stricmp("MASSAGENETS", value) == 0)
-                                q = 9;
-                            if (q == 0)
-                                network[networkp].network = atoi(value);
+                int ch = *EcoName;
+                while (ch == ' ' || ch == '\t')
+                    ch = *++EcoName;
+                if (ch != '#') {
+                    if (isdigit(ch)) {
+                        if (networkp >= NETWORKTABLELENGTH) {
+                            log_warn("Econet: network table full");
+                            break;
                         }
-                        if (p == 1) {
-                            if (q == 1)
-                                confAUNmode = (atoi(value) != 0);
-                            if (q == 2)
-                                confLEARN = (atoi(value) != 0);
-                            if (q == 3)
-                                confSTRICT = (atoi(value) != 0);
-                            if (q == 4)
-                                confSingleSocket = (atoi(value) != 0);
-                            if (q == 5)
-                                EconetFlagFillTimeout = (atoi(value));
-                            if (q == 6)
-                                EconetSCACKtimeout = (atoi(value));
-                            if (q == 7)
-                                TimeBetweenBytes = (atoi(value));
-                            if (q == 8)
-                                FourWayStageTimeout = (atoi(value));
-                            if (q == 9)
-                                MassageNetworks = (atoi(value) != 0);
-                            if (q == 0)
-                                network[networkp].station = atoi(value);
-                            else {
-                                log_debug("Econet: Config option %i flag %s", q, value);
-                                break;
+                        char *end;
+                        network[networkp].network = strtol(EcoName, &end, 10);
+                        if (end > EcoName) {
+                            EcoName = end;
+                            network[networkp].station = strtol(EcoName, &end, 10);
+                            if (end > EcoName) {
+                                EcoName = end;
+                                ch = *EcoName;
+                                while (ch && isspace(ch))
+                                    ch = *++EcoName;
+                                char *EcoPtr = EcoName;
+                                while (ch && (ch == '.' || isdigit(ch)))
+                                    ch = *++EcoPtr;
+                                if (EcoPtr > EcoName) {
+                                    *EcoPtr++ = 0;
+                                    network[networkp].inet_addr = inet_addr(EcoName);
+                                    network[networkp].port = strtol(EcoPtr, &end, 10);
+                                    if (end > EcoPtr) {
+                                        log_debug("Econet: ConfigFile Net %i Stn %i IP %08x Port %i", network[networkp].network, network[networkp].station, network[networkp].inet_addr, network[networkp].port);
+                                        networkp++;
+                                    }
+                                }
                             }
-
                         }
-                        if (p == 2)
-                            network[networkp].inet_addr = inet_addr(value);
-                        if (p == 3)
-                            network[networkp].port = atoi(value);
-                        do
-                            i++;
-                        while (EcoName[i] == ' ' && i < strlen(EcoName));
-                        p++;
-                    } while (i < strlen(EcoName));
+                    }
+                    else {
+                        char *EcoPtr = EcoName;
+                        do {
+                            if (isupper(ch))
+                                ch = tolower(ch);
+                            *EcoPtr = ch;
+                            ch = *++EcoPtr;
+                        } while (ch && !isspace(ch));
 
-                    if (q == 0) {
-                        log_debug("Econet: ConfigFile Net %i Stn %i IP %08x Port %i", network[networkp].network, network[networkp].station, network[networkp].inet_addr, network[networkp].port);
-                        if (p == 4)
-                            networkp++; // there were correct qty fields on line
-                        // otherwise pointer not incremented, next line overwrites it.
+                        if (ch) {
+                            bool bad = false;
+                            *EcoPtr++ = 0;
+                            int value = atoi(EcoPtr);
+                            if (strcmp("aunmode", EcoName) == 0)
+                                confAUNmode = (value != 0);
+                            else if (strcmp("learn", EcoName) == 0)
+                                confLEARN = (value != 0);
+                            else if (strcmp("aunstrict", EcoName) == 0)
+                                confSTRICT = (value != 0);
+                            else if (strcmp("singlesocket", EcoName) == 0)
+                                confSingleSocket = (value != 0);
+                            else if (strcmp("flagfilltimeout", EcoName) == 0)
+                                EconetFlagFillTimeout = (value);
+                            else if (strcmp("scacktimeout", EcoName) == 0)
+                                EconetSCACKtimeout = (value);
+                            else if (strcmp("timebetweenbytes", EcoName) == 0)
+                                TimeBetweenBytes = (value);
+                            else if (strcmp("fourwaytimeout", EcoName) == 0)
+                                FourWayStageTimeout = (value);
+                            else if (strcmp("massagenets", EcoName) == 0)
+                                MassageNetworks = (value != 0);
+                            else {
+                                bad = true;
+                                log_warn("Econet: unrecognised option name %s in config file %s", EcoName, cpath);
+                            }
+                            if (!bad)
+                                log_debug("Econet: Config option %s flag %i", EcoName, value);
+                        }
                     }
                 }
-            } while (networkp < NETWORKTABLELENGTH);
+            }
+            fclose(EcoCfg);
             network[networkp].station = 0;
 
             if (MassageNetworks) {
@@ -377,7 +369,6 @@ static void ReadNetwork(void)
                 inmask = 127;
                 outmask = 128;
             }
-            fclose(EcoCfg);
         }
         else {
             log_error("Econet: Failed to open configuration file %s", cpath);
@@ -413,8 +404,8 @@ static void ReadNetwork(void)
                         i = 0;
                         p = 0;
                         q = 0;
+                        int len = strlen(EcoName);
                         do {
-                            int len = strlen(EcoName);
                             j = 0;
                             do {
                                 value[j] = EcoName[i];
@@ -438,7 +429,7 @@ static void ReadNetwork(void)
                                 i++;
                             while (EcoName[i] == ' ' && i < strlen(EcoName));
                             p++;
-                        } while (i < strlen(EcoName));
+                        } while (i < len);
                         if (q == 1 && p == 3) {
                             log_debug("Econet: AUNmap Net %i IP %08x ", aunnet[aunnetp].network, aunnet[aunnetp].inet_addr);
                             // note which network we are a part of.. this wont work on first run as listenip not set!
