@@ -142,8 +142,8 @@ struct MC6854 {
 
 uint8_t Read_Econet_Station(void);
 void EconetReset(void);
-uint8_t ReadEconetRegister(uint8_t Register);
-void WriteEconetRegister(uint8_t Register, uint8_t Value);
+uint8_t ReadEconetRegister(uint8_t addr);
+void WriteEconetRegister(uint8_t addr, uint8_t Value);
 void debugADLCprint(void);
 
 void EconetPoll(int cycles);

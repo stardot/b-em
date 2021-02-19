@@ -691,11 +691,11 @@ uint8_t Read_Econet_Station(void)
 //---------------------------------------------------------------------------
 // read to FEA0-3
 
-uint8_t ReadEconetRegister(uint8_t Register)
+uint8_t ReadEconetRegister(uint8_t addr)
 {
     debugADLCprint();
 
-    switch (Register & 0x03) {
+    switch (addr & 0x03) {
         case 0:
             log_debug("ADLC: read register Status1");
             return ADLC.status1;
@@ -733,9 +733,9 @@ static void WriteTxReg(uint8_t Value, bool end)
     }
 }
 
-void WriteEconetRegister(uint8_t Register, uint8_t Value)
+void WriteEconetRegister(uint8_t addr, uint8_t Value)
 {
-    switch (Register & 0x03) {
+    switch (addr & 0x03) {
         case 0:
             log_debug("ADLC: write register Control1=%02X", Value);
             if ((ADLC.control1 & ~ADLC_CTL1_AC) != (Value & ~ADLC_CTL1_AC))
