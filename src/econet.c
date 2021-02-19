@@ -944,6 +944,8 @@ static void TransmitData(void)
                         log_debug("Econet(Tx): Set FWS_SCACKSENT");
                         EconetSCACKtrigger = EconetCycles + EconetSCACKtimeout;
                         log_debug("Econet(Tx): SCACKtimer set");
+                        FlagFillActive = true;
+                        EconetFlagFillTimeoutTrigger = EconetCycles + EconetFlagFillTimeout;
                         break;
                     case FWS_DATARCVD:
                         log_debug("Econet(Tx): AUN FWS_DATARCVD");
