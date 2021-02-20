@@ -878,7 +878,7 @@ static void TransmitData(void)
                 SendMe = false;
                 switch (fourwaystage) {
                     case FWS_SCACKRCVD:
-                        log_debug("Econet(Tx): AUN FWS_SCACKRCVD");
+                        log_debug("Econet(Tx): AUN mode, in state FWS_SCACKRCVD");
                         // it came in response to our ack of a scout
                         // what we have /should/ be the data block ..
                         //CLUDGE WARNING is this a scout sent again immediately?? TODO fix this?!?!
@@ -896,7 +896,7 @@ static void TransmitData(void)
                             break;
                         }       // else fall through...
                     case FWS_IDLE:
-                        log_debug("Econet(Tx): AUN FWS_IDLE");
+                        log_debug("Econet(Tx): AUN mode, in state FWS_IDLE");
                         // not currently doing anything.
                         memcpy(BeebTxCopy, BeebTx.buff, sizeof(BeebTx.eh));
                         // maybe a long scout or a broadcast
@@ -935,10 +935,11 @@ static void TransmitData(void)
                             log_debug("Econet(Tx): SCACKtimer set");
                             FlagFillActive = true;
                             EconetFlagFillTimeoutTrigger = EconetCycles + EconetFlagFillTimeout;
+                            log_debug("Econet(Tx): FlagFill set (between tx scout and ack)");
                         }
                         break;
                     case FWS_SCOUTRCVD:
-                        log_debug("Econet(Tx): AUN FWS_SCOUTRCVD");
+                        log_debug("Econet(Tx): AUN mode, in state FWS_SCOUTRCVD");
                         // it's an ack for a scout which we sent the beeb. just drop it, but move on.
                         fourwaystage = FWS_SCACKSENT;
                         log_debug("Econet(Tx): Set FWS_SCACKSENT");
@@ -946,9 +947,10 @@ static void TransmitData(void)
                         log_debug("Econet(Tx): SCACKtimer set");
                         FlagFillActive = true;
                         EconetFlagFillTimeoutTrigger = EconetCycles + EconetFlagFillTimeout;
+                        log_debug("Econet(Tx): FlagFill set (between rx scout ack and data)");
                         break;
                     case FWS_DATARCVD:
-                        log_debug("Econet(Tx): AUN FWS_DATARCVD");
+                        log_debug("Econet(Tx): AUN mode, in state FWS_DATARCVD");
                         // this must be ack for data just receved
                         // now we really need to send an ack to the far AUN host...
                         // send header of last block received straight back.
@@ -961,7 +963,7 @@ static void TransmitData(void)
                         log_debug("Econet(Tx): Set FWS_WAIT4IDLE (final ack sent)");
                         break;
                     case FWS_IMMRCVD:
-                        log_debug("Econet(Tx): AUN FWS_IMMRCVD");
+                        log_debug("Econet(Tx): AUN mode, in state FWS_IMMRCVD");
                         // it's a reply to an immediate command we just had
                         fourwaystage = FWS_WAIT4IDLE;
                         log_debug("Econet(Tx): Set FWS_WAIT4IDLE (imm rcvd)");
@@ -976,16 +978,15 @@ static void TransmitData(void)
                         SendLen = sizeof(EconetTx.ah) + EconetTx.Pointer;
                         break;
                     default:
-                        log_debug("Econet(Tx): AUN invalid fourway state");
+                        log_debug("Econet(Tx): AUN mode, invalid fourway state, set FWS_WAIT4IDLE");
                         // shouldn't be here.. ignore packet and abort fourway
                         fourwaystage = FWS_WAIT4IDLE;
-                        log_debug("Econet(Tx): Set FWS_WAIT4IDLE (unexpected mode, packet ignored)");
                 }
             }
 
             if (SendMe) {
                 if (confAUNmode) {
-                    log_debug("Econet(Tx): Sending a AUN packet, SendLen=%d", SendLen);
+                    log_debug("Econet(Tx): Sending an AUN packet, SendLen=%d", SendLen);
                     log_dump("Econet(Tx): AUN Packet: ", (uint8_t *)&EconetTx, SendLen);
                     if (sendto(SendSocket, (char *)&EconetTx, SendLen, 0, (SOCKADDR *) &RecvAddr, sizeof(RecvAddr)) == SOCKET_ERROR) {
                         log_error("Econet(Tx): Failed to send packet to %02x %02x (%08X :%u)",
@@ -1251,6 +1252,7 @@ static void ReceiveData(void)
                         BeebRx.Pointer = 0;
                         fourwaystage = FWS_SCACKRCVD;
                         log_debug("Econet(Rx): Set FWS_SCACKRCVD, faked packet follows");
+                        FlagFillActive = false;
                         break;
                     case FWS_SCACKSENT:
                         // beeb acked the scout we gave it, so give it the data AUN sent us earlier.
@@ -1270,6 +1272,7 @@ static void ReceiveData(void)
                         BeebRx.Pointer = 0;
                         fourwaystage = FWS_DATARCVD;
                         log_debug("Econet(Rx): Set FWS_DATARCVD, real packet follows");
+                        FlagFillActive = false;
                         break;
                     default:
                         break;
@@ -1293,7 +1296,7 @@ static void ReceiveData(void)
 // code actually working!
 
 void EconetPoll_real(void)
-{                               //return NMI status
+{
     // save flags
     ADLCtemp.status1 = ADLC.status1;
     ADLCtemp.status2 = ADLC.status2;
