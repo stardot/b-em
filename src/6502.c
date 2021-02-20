@@ -469,9 +469,17 @@ static uint32_t do_readmem(uint32_t addr)
                         return acccon;
                 break;
 
+        case 0xFE38:
+            if (MASTER)
+                EconetNMIenabled = false;
+            break;
+
         case 0xFE3C:
-            if (integra)
+            if (MASTER && EconetEnabled)
+                EconetNMIenabled = true;
+            else if (integra)
                 return cmos_read_data_integra();
+            break;
 
         case 0xFE40:
         case 0xFE44:
