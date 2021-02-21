@@ -83,7 +83,12 @@ static void cmos_stop()
 
 static void cmos_nextbyte()
 {
-        i2c_byte = cmos_ram[(cmos_addr++) & 0x7F];
+    uint8_t addr = (cmos_addr++) & 0x7F;
+    i2c_byte = cmos_ram[addr];
+    if (addr == 0x10 && autoboot) {
+        log_debug("compactcmos: doing autoboot");
+        i2c_byte |= 0x10;
+    }
 }
 
 static void cmos_write(uint8_t byte)
@@ -98,7 +103,7 @@ static void cmos_write(uint8_t byte)
                 {
                         cmos_state = CMOS_SENDDATA;
                         i2c_transmit = CMOS;
-                        i2c_byte = cmos_ram[(cmos_addr++) & 0x7F];
+                        cmos_nextbyte();
                 }
                 else
                 {
@@ -117,13 +122,13 @@ static void cmos_write(uint8_t byte)
                 break;
 
                 case CMOS_RECIEVEDATA:
-//        log_debug("Rec byte - %02X\n",cmos_ram[(cmos_addr)&0x7F]);
+                log_debug("compactcmos: set byte %02X=%02X", cmos_addr, byte);
                 cmos_ram[(cmos_addr++) & 0x7F] = byte;
                 break;
 
                 case CMOS_SENDDATA:
-                i2c_byte = cmos_ram[(cmos_addr++) & 0x7F];
-                break;
+                    cmos_nextbyte();
+                    break;
 //                closevideo();
 //                printf("Send data %02X\n",cmos_addr);
 //                exit(-1);
