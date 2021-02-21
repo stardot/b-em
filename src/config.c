@@ -19,6 +19,7 @@
 #include "tape.h"
 #include "tube.h"
 #include "vdfs.h"
+#include "video.h"
 #include "video_render.h"
 
 int curmodel;
@@ -184,6 +185,8 @@ void config_load(void)
     }
     video_set_disptype(c);
 
+    mode7_fontfile   = get_config_string("video", "mode7font", "saa5050");
+
     fasttape         = get_config_bool("tape", "fasttape",      0);
 
     scsi_enabled     = get_config_bool("disc", "scsienable", 0);
@@ -315,6 +318,7 @@ void config_save(void)
         if (vid_ledlocation >= 0)
             set_config_int("video", "ledlocation", vid_ledlocation);
         set_config_int("video", "ledvisibility", vid_ledvisibility);
+        set_config_string("video", "mode7font", mode7_fontfile);
 
         set_config_bool("tape", "fasttape", fasttape);
 

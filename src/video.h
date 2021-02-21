@@ -45,6 +45,8 @@ void nula_reset(void);
 extern uint16_t vidbank;
 
 void mode7_makechars(void);
+bool mode7_loadchars(const char *fn);
 extern int interlline;
+extern const char *mode7_fontfile;
 
 #endif

@@ -17,5 +17,5 @@ if grep -q -i '^ISRELEASED="yes"' ./configure.ac; then
 	# A release build.  Strip the git information off the tag name.
 	git describe --tags --abbrev=0 2>/dev/null || echo "$B_EM_VERSION"
 else
-	git describe --always --long
+	git describe --always --exclude m5000pi
 fi

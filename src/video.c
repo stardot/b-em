@@ -6,7 +6,6 @@
 #include <allegro5/allegro_primitives.h>
 #include "b-em.h"
 
-#include "bbctext.h"
 #include "mem.h"
 #include "model.h"
 #include "serial.h"
@@ -436,7 +435,10 @@ void videoula_loadstate(FILE * f)
 }
 
 /*Mode 7 (SAA5050)*/
-static uint8_t mode7_chars[96 * 160], mode7_charsi[96 * 160], mode7_graph[96 * 160], mode7_graphi[96 * 160], mode7_sepgraph[96 * 160], mode7_sepgraphi[96 * 160], mode7_tempi[96 * 120], mode7_tempi2[96 * 120];
+const char *mode7_fontfile;
+static ALLEGRO_PATH *font_dir;
+static uint8_t *mode7_chars = NULL, *mode7_graph, *mode7_sepgraph, *mode7_p, *mode7_heldp;
+static int mode7_width, mode7_bytes_per_char;
 static int mode7_lookup[8][8][16];
 
 static int mode7_col = 7, mode7_bg = 0;
@@ -445,95 +447,93 @@ static int mode7_dbl, mode7_nextdbl, mode7_wasdbl;
 static int mode7_gfx;
 static int mode7_flash, mode7_flashon = 0, mode7_flashtime = 0;
 static uint8_t mode7_buf[2];
-static uint8_t *mode7_p[2] = { mode7_chars, mode7_charsi };
 
 static uint8_t mode7_heldchar, mode7_holdchar;
-static uint8_t *mode7_heldp[2];
 
-void mode7_makechars()
+#define MODE7_CHAR_BANKS       3
+#define MODE7_NUM_CHARS       96
+
+static bool mode7_load_file(const char *cpath)
 {
-    int c, d, y;
-    int offs1 = 0, offs2 = 0;
-    float x;
-    int x2;
-    int stat;
-    uint8_t *p = teletext_characters, *p2 = mode7_tempi;
-    for (c = 0; c < (96 * 60); c++)
-        teletext_characters[c] *= 15;
-    for (c = 0; c < (96 * 60); c++)
-        teletext_graphics[c] *= 15;
-    for (c = 0; c < (96 * 60); c++)
-        teletext_separated_graphics[c] *= 15;
-    for (c = 0; c < (96 * 120); c++)
-        mode7_tempi2[c] = teletext_characters[c >> 1];
-    for (c = 0; c < 960; c++) {
-        x = 0;
-        x2 = 0;
-        for (d = 0; d < 16; d++) {
-            mode7_graph[offs2 + d] = (int) (((float) teletext_graphics[offs1 + x2] * (1.0 - x)) + ((float) teletext_graphics[offs1 + x2 + 1] * x));
-            mode7_sepgraph[offs2 + d] = (int) (((float) teletext_separated_graphics[offs1 + x2] * (1.0 - x)) + ((float) teletext_separated_graphics[offs1 + x2 + 1] * x));
-            if (!d) {
-                mode7_graph[offs2 + d] = mode7_graphi[offs2 + d] = teletext_graphics[offs1];
-                mode7_sepgraph[offs2 + d] = mode7_sepgraphi[offs2 + d] = teletext_separated_graphics[offs1];
-            } else if (d == 15) {
-                mode7_graph[offs2 + d] = mode7_graphi[offs2 + d] = teletext_graphics[offs1 + 5];
-                mode7_sepgraph[offs2 + d] = mode7_sepgraphi[offs2 + d] = teletext_separated_graphics[offs1 + 5];
-            } else {
-                mode7_graph[offs2 + d] = mode7_graphi[offs2 + d] = teletext_graphics[offs1 + x2];
-                mode7_sepgraph[offs2 + d] = mode7_sepgraphi[offs2 + d] = teletext_separated_graphics[offs1 + x2];
+    bool worked = false;
+    FILE *fp = fopen(cpath, "rb");
+    if (fp) {
+        char hdr[11];
+        if (fread(hdr, sizeof(hdr), 1, fp) == 1) {
+            if (!memcmp(hdr, "BEMTTX01", 8)) {
+                char name[80];
+                int namelen = hdr[10];
+                int rows = hdr[9];
+                mode7_width = hdr[8];
+                mode7_bytes_per_char = rows * mode7_width;
+                if (namelen > 0 && namelen < sizeof(name)-1 && fread(name, namelen, 1, fp) == 1) {
+                    name[namelen] = 0;
+                    log_info("video: Loading Mode 7 font %s '%s', %dx%d", cpath, name, mode7_width, rows);
+                }
+                else {
+                    fseek(fp, sizeof(hdr)+namelen, SEEK_SET);
+                    log_info("video: Loading Mode 7 font %s, %dx%d", cpath, mode7_width, rows);
+                }
+                int bytes_per_bank = mode7_bytes_per_char * MODE7_NUM_CHARS;
+                int total_size = bytes_per_bank * MODE7_CHAR_BANKS;
+                uint8_t *new_chars = malloc(total_size);
+                if (new_chars) {
+                    if (fread(new_chars, total_size, 1, fp) == 1) {
+                        if (mode7_chars)
+                            free(mode7_chars);
+                        mode7_p = mode7_chars = new_chars;
+                        mode7_graph = new_chars + bytes_per_bank;
+                        mode7_sepgraph = mode7_graph + bytes_per_bank;
+                        log_debug("video: mode7_makechars chars=%p, graph=%p, sepgraph=%p", mode7_chars, mode7_graph, mode7_sepgraph);
+                        worked = true;
+                    }
+                    else {
+                        const char *msg = ferror(fp) ? strerror(errno) : "file is too short";
+                        log_error("video: error reading body of teletext font file '%s': %s", cpath, msg);
+                        free(new_chars);
+                    }
+                }
+                else
+                    log_error("video: out of memory reading teletext font file '%s'", cpath);
             }
-            x += (5.0 / 15.0);
-            if (x >= 1.0) {
-                x2++;
-                x -= 1.0;
-            }
-            mode7_charsi[offs2 + d] = 0;
+            else
+                log_error("video: teletext font file '%s' is not in a recognised format", cpath);
         }
-
-        offs1 += 6;
-        offs2 += 16;
+        else
+            log_error("video: error reading header of teletext font file '%s': %s", cpath, strerror(errno));
+        fclose(fp);
     }
-    for (c = 0; c < 96; c++) {
-        for (y = 0; y < 10; y++) {
-            for (d = 0; d < 6; d++) {
-                stat = 0;
-                if (y < 9 && p[(y * 6) + d] && p[(y * 6) + d + 6])
-                    stat |= 3;  /*Above + below - set both */
-                if (y < 9 && d > 0 && p[(y * 6) + d] && p[(y * 6) + d + 5] && !p[(y * 6) + d - 1])
-                    stat |= 1;  /*Above + left  - set left */
-                if (y < 9 && d > 0 && p[(y * 6) + d + 6] && p[(y * 6) + d - 1] && !p[(y * 6) + d + 5])
-                    stat |= 1;  /*Below + left  - set left */
-                if (y < 9 && d < 5 && p[(y * 6) + d] && p[(y * 6) + d + 7] && !p[(y * 6) + d + 1])
-                    stat |= 2;  /*Above + right - set right */
-                if (y < 9 && d < 5 && p[(y * 6) + d + 6] && p[(y * 6) + d + 1] && !p[(y * 6) + d + 7])
-                    stat |= 2;  /*Below + right - set right */
+    else
+        log_error("video: unable to open teletext font file '%s': %s", cpath, strerror(errno));
+    return worked;
+}
 
-                p2[0] = (stat & 1) ? 15 : 0;
-                p2[1] = (stat & 2) ? 15 : 0;
-                p2 += 2;
-            }
+bool mode7_loadchars(const char *fn)
+{
+    bool worked = false;
+    if (is_relative_filename(fn)) {
+        ALLEGRO_PATH *path = find_dat_file(font_dir, fn, ".fnt");
+        if (path) {
+            const char *cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+            worked = mode7_load_file(cpath);
+            al_destroy_path(path);
         }
-        p += 60;
+        else
+            log_error("video: unable to open find teletext font file %s", fn);
     }
-    offs1 = offs2 = 0;
-    for (c = 0; c < 960; c++) {
-        x = 0;
-        x2 = 0;
-        for (d = 0; d < 16; d++) {
-            mode7_chars[offs2 + d] = (int) (((float) mode7_tempi2[offs1 + x2] * (1.0 - x)) + ((float) mode7_tempi2[offs1 + x2 + 1] * x));
-            mode7_charsi[offs2 + d] = (int) (((float) mode7_tempi[offs1 + x2] * (1.0 - x)) + ((float) mode7_tempi[offs1 + x2 + 1] * x));
-            x += (11.0 / 15.0);
-            if (x >= 1.0) {
-                x2++;
-                x -= 1.0;
-            }
-            if (c >= 320 && c < 640) {
-                mode7_graph[offs2 + d] = mode7_sepgraph[offs2 + d] = mode7_chars[offs2 + d];
-                mode7_graphi[offs2 + d] = mode7_sepgraphi[offs2 + d] = mode7_charsi[offs2 + d];
-            }
-        }
-        offs1 += 12;
-        offs2 += 16;
+    else
+        worked = mode7_load_file(fn);
+    if (worked)
+        mode7_fontfile = fn;
+    return worked;
+}
+
+void mode7_makechars(void)
+{
+    font_dir = al_create_path_for_directory("fonts");
+    if (!font_dir || !mode7_loadchars(mode7_fontfile)) {
+        log_fatal("video: unable to load mode 7 font");
+        exit(1);
     }
 }
 
@@ -566,146 +566,143 @@ static void mode7_gen_nula_lookup(void)
 
 static inline void mode7_render(ALLEGRO_LOCKED_REGION *region, uint8_t dat)
 {
-    int t, c;
-    int off;
-    int mcolx = mode7_col;
-    int holdoff = 0, holdclear = 0;
-    uint8_t *mode7_px[2];
-    int mode7_flashx = mode7_flash, mode7_dblx = mode7_dbl;
-    int *on;
-
     if (scrx < (1280-32)) {
+        int mcolx = mode7_col;
+        int holdoff = 0, holdclear = 0;
+        int mode7_flashx = mode7_flash, mode7_dblx = mode7_dbl;
+        int *on;
+
         if (mode7_need_new_lookup)
             mode7_gen_nula_lookup();
 
-        t = mode7_buf[0];
+        uint8_t t = mode7_buf[0];
         mode7_buf[0] = mode7_buf[1];
         mode7_buf[1] = dat;
         dat = t;
-        mode7_px[0] = mode7_p[0];
-        mode7_px[1] = mode7_p[1];
+        uint8_t *mode7_px = mode7_p;
 
-        if (!mode7_dbl && mode7_nextdbl)
-            on = mode7_lookup[mode7_bg & 7][mode7_bg & 7];
         if (dat == 255) {
-            for (c = 0; c < 16; c++)
+            for (int c = 0; c < mode7_width; c++)
                 put_pixel(region, scrx + c + 16, scry, colblack);
             return;
         }
 
         if (dat < 0x20) {
             switch (dat) {
-            case 1:
-            case 2:
-            case 3:
-            case 4:
-            case 5:
-            case 6:
-            case 7:
+            case 1: /* 129: alphanumeric red     */
+            case 2: /* 130: alphanumeric green   */
+            case 3: /* 131: alphanumeric yellow  */
+            case 4: /* 132: alphanumeric blue    */
+            case 5: /* 133: alphanumeric magenta */
+            case 6: /* 134: alphanumeric cyan    */
+            case 7: /* 135: alphanumeric white   */
                 mode7_gfx = 0;
                 mode7_col = dat;
-                mode7_p[0] = mode7_chars;
-                mode7_p[1] = mode7_charsi;
+                mode7_p = mode7_chars;
                 holdclear = 1;
                 break;
-            case 8:
+            case 8: /* 136: flash */
                 mode7_flash = 1;
                 break;
-            case 9:
+            case 9: /* 137: steady */
                 mode7_flash = 0;
                 break;
-            case 12:
-            case 13:
+            case 12: /* 140: normal height */
+            case 13: /* 141: double height */
                 mode7_dbl = dat & 1;
                 if (mode7_dbl)
                     mode7_wasdbl = 1;
                 break;
-            case 17:
-            case 18:
-            case 19:
-            case 20:
-            case 21:
-            case 22:
-            case 23:
+            case 17: /* 145: graphics red     */
+            case 18: /* 146: graphics green   */
+            case 19: /* 147: graphics yellow  */
+            case 20: /* 148: graphics blue    */
+            case 21: /* 149: graphics magenta */
+            case 22: /* 150: graphics cyan    */
+            case 23: /* 151: graphics white   */
                 mode7_gfx = 1;
                 mode7_col = dat & 7;
-                if (mode7_sep) {
-                    mode7_p[0] = mode7_sepgraph;
-                    mode7_p[1] = mode7_sepgraphi;
-                } else {
-                    mode7_p[0] = mode7_graph;
-                    mode7_p[1] = mode7_graphi;
-                }
+                if (mode7_sep)
+                    mode7_p = mode7_sepgraph;
+                else
+                    mode7_p = mode7_graph;
                 break;
-            case 24:
+            case 24: /* 152: conceal */
                 mode7_col = mcolx = mode7_bg;
                 break;
-            case 25:
-                if (mode7_gfx) {
-                    mode7_p[0] = mode7_graph;
-                    mode7_p[1] = mode7_graphi;
-                }
+            case 25: /* 153: contiguous graphics */
+                if (mode7_gfx)
+                    mode7_p = mode7_graph;
                 mode7_sep = 0;
                 break;
-            case 26:
-                if (mode7_gfx) {
-                    mode7_p[0] = mode7_sepgraph;
-                    mode7_p[1] = mode7_sepgraphi;
-                }
+            case 26: /* 154: separated graphics */
+                if (mode7_gfx)
+                    mode7_p = mode7_sepgraph;
                 mode7_sep = 1;
                 break;
-            case 28:
+            case 28: /* 156: black background */
                 mode7_bg = 0;
                 break;
-            case 29:
+            case 29: /* 157: new background */
                 mode7_bg = mode7_col;
                 break;
-            case 30:
+            case 30: /* 158: hold graphics */
                 mode7_holdchar = 1;
                 break;
-            case 31:
+            case 31: /* 159: release graphics */
                 holdoff = 1;
                 break;
             }
             if (mode7_holdchar) {
                 dat = mode7_heldchar;
-                if (dat >= 0x40 && dat < 0x60)
-                    dat = 32;
-                mode7_px[0] = mode7_heldp[0];
-                mode7_px[1] = mode7_heldp[1];
+                if (!(dat & 0x20))
+                    dat = 0x20;
+                mode7_px = mode7_heldp;
             } else
                 dat = 0x20;
             if (mode7_dblx != mode7_dbl)
-                dat = 32;           /*Double height doesn't respect held characters */
-        } else if (mode7_p[0] != mode7_chars) {
+                dat = 0x20;           /*Double height doesn't respect held characters */
+            if (!mode7_holdchar || !mode7_gfx)
+                mode7_heldchar = 0x20;
+        } else if (mode7_gfx && dat & 0x20) {
             mode7_heldchar = dat;
-            mode7_heldp[0] = mode7_px[0];
-            mode7_heldp[1] = mode7_px[1];
+            mode7_heldp = mode7_px;
         }
 
-        if (mode7_dblx && !mode7_nextdbl)
-            t = ((dat - 0x20) * 160) + ((sc >> 1) * 16);
-        else if (mode7_dblx)
-            t = ((dat - 0x20) * 160) + ((sc >> 1) * 16) + (5 * 16);
-        else
-            t = ((dat - 0x20) * 160) + (sc * 16);
+        int off = mode7_lookup[0][mode7_bg & 7][0];
+        int xpos = scrx + 16;
 
-        off = mode7_lookup[0][mode7_bg & 7][0];
-        if (!mode7_dbl && mode7_nextdbl)
-            on = mode7_lookup[mode7_bg & 7][mode7_bg & 7];
-        else
-            on = mode7_lookup[mcolx & 7][mode7_bg & 7];
-
-        int interindex = (vid_dtype_intern == VDT_INTERLACE) && interlline;
-        for (c = 0; c < 16; c++) {
-            if (mode7_flashx && !mode7_flashon)
-                put_pixel(region, scrx + c + 16, scry, off);
-            else if (mode7_dblx)
-                put_pixel(region, scrx + c + 16, scry, on[mode7_px[sc & 1][t] & 15]);
+        if (mode7_flashx && !mode7_flashon) {
+            for (int c = 0; c < mode7_width; c++)
+                put_pixel(region, xpos++, scry, off);
+        }
+        else {
+            const uint8_t *ptr = mode7_px + (dat - 0x20) * mode7_bytes_per_char;
+            if (mode7_dblx) {
+                if (!mode7_nextdbl)
+                    ptr += (sc >> 1) * mode7_width;
+                else
+                    ptr += ((sc >> 1) + 5) * mode7_width;
+            }
             else
-                put_pixel(region, scrx + c + 16, scry, on[mode7_px[interindex][t] & 15]);
-            t++;
+                ptr += sc * mode7_width;
+
+            if (!mode7_dbl && mode7_nextdbl)
+                on = mode7_lookup[mode7_bg & 7][mode7_bg & 7];
+            else
+                on = mode7_lookup[mcolx & 7][mode7_bg & 7];
+
+            int interindex = (vid_dtype_intern == VDT_INTERLACE) && interlline;
+            if ((!mode7_dblx && interindex) || (mode7_dblx && sc & 1)) {
+                for (int c = 0; c < mode7_width; c++)
+                    put_pixel(region, xpos++, scry, on[*ptr++ >> 4]);
+            }
+            else {
+                for (int c = 0; c < mode7_width; c++)
+                    put_pixel(region, xpos++, scry, on[*ptr++ & 0x0f]);
+            }
         }
+        scrx -= (16 - mode7_width);
 
         if ((scrx + 16) < firstx)
             firstx = scrx + 16;
@@ -1064,13 +1061,11 @@ void video_poll(int clocks, int timer_enable)
             mode7_bg = 0;
             mode7_holdchar = 0;
             mode7_heldchar = 0x20;
-            mode7_p[0] = mode7_chars;
-            mode7_p[1] = mode7_charsi;
+            mode7_p = mode7_chars;
             mode7_flash = 0;
             mode7_sep = 0;
             mode7_gfx = 0;
-            mode7_heldp[0] = mode7_p[0];
-            mode7_heldp[1] = mode7_p[1];
+            mode7_heldp = mode7_p;
 
             hc = 0;
 

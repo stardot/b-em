@@ -1,6 +1,6 @@
 # Makefile.am for B-em
 
-bin_PROGRAMS = b-em hdfmt jstest gtest sdf2imd
+bin_PROGRAMS = b-em m7makechars hdfmt jstest gtest sdf2imd
 noinst_SCRIPTS = ../b-em$(EXEEXT)
 CLEANFILES = $(noinst_SCRIPTS)
 
