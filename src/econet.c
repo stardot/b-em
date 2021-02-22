@@ -937,7 +937,7 @@ static void econet_tx_data(void)
 
             if (SendMe) {
                 if (confAUNmode) {
-                    log_debug("Econet(Tx): Sending an AUN packet, SendLen=%d", SendLen);
+                    log_debug("Econet(Tx): Sending an AUN packet, SendLen=%d. type=%u, port=%u, handle=%u", SendLen, EconetTx.ah.type, EconetTx.ah.port, EconetTx.ah.handle);
                     log_dump("Econet(Tx): AUN Packet: ", (uint8_t *)&EconetTx, SendLen);
                     if (sendto(SendSocket, (char *)&EconetTx, SendLen, 0, (SOCKADDR *) &RecvAddr, sizeof(RecvAddr)) == SOCKET_ERROR) {
                         log_error("Econet(Tx): Failed to send packet to %02x %02x (%08X :%u)",
@@ -1027,7 +1027,7 @@ static void econet_rx_data(void)
                         RetVal = recvfrom(ListenSocket, (char *)BeebRx.buff, sizeof(BeebRx.buff), 0, (SOCKADDR *) & RecvAddr, (socklen_t *)&sizRcvAdr);
                     }
                     if (RetVal > 0) {
-                        log_debug("Econet(Rx): Packet received, %u bytes from %08X :%u)", (int)RetVal, RecvAddr.sin_addr.s_addr, htons(RecvAddr.sin_port));
+                        log_debug("Econet(Rx): Packet received, %u bytes from %08X:%u", (int)RetVal, RecvAddr.sin_addr.s_addr, htons(RecvAddr.sin_port));
                         if (confAUNmode) {
                             log_dump("Econet(Rx): AUN packet: ", EconetRx.raw, RetVal);
 
@@ -1067,7 +1067,7 @@ static void econet_rx_data(void)
                                 BeebRx.BytesInBuffer = 0;       //ignore the packet
                             }
                             else {
-                                log_debug("Econet(Rx): Packet was from %02x %02x ", (unsigned int)(network[hostno].network), (unsigned int)network[hostno].station);
+                                log_debug("Econet(Rx): Packet was from %02x %02x, type=%u, port=%u, handle=%u", (unsigned int)(network[hostno].network), (unsigned int)network[hostno].station, EconetRx.ah.type, EconetRx.ah.port, EconetRx.ah.handle);
                                 // TODO - many of these copies can use memcpy()
                                 switch (fourwaystage) {
                                     case FWS_IDLE:
