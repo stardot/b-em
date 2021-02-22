@@ -724,6 +724,13 @@ uint8_t econet_read_station(void)
 //---------------------------------------------------------------------------
 // write to FEA0-3
 
+static void econet_tx_copy(int start)
+{
+    size_t size = BeebTx.Pointer - start;
+    memcpy(EconetTx.buff, BeebTx.buff + start, size);
+    EconetTx.Pointer = size;
+}
+
 static void econet_set_wait4idle(const char *dir, const char *reason)
 {
     fourwaystage = FWS_WAIT4IDLE;
@@ -835,7 +842,6 @@ static void econet_tx_data(void)
     */
             // Send a datagram to the receiver
             if (confAUNmode) {
-                unsigned int j = 0;
                 // OK. Lets do AUN ...
                 // The beeb has given us a packet .. what is it?
                 SendMe = false;
@@ -846,12 +852,7 @@ static void econet_tx_data(void)
                         // what we have /should/ be the data block ..
                         //CLUDGE WARNING is this a scout sent again immediately?? TODO fix this?!?!
                         if (BeebTx.Pointer != sizeof(BeebTx.eh) || memcmp(BeebTx.buff, BeebTxCopy, sizeof(BeebTx.eh)) != 0) {   // nope
-    //                              j=0;
-                            for (unsigned int k = 4; k < BeebTx.Pointer; k++) {
-                                EconetTx.buff[j] = BeebTx.buff[k];
-                                j++;
-                            }
-                            EconetTx.Pointer = j;
+                            econet_tx_copy(4);
                             fourwaystage = FWS_DATASENT;
                             log_debug("Econet(Tx): Set FWS_DATASENT");
                             SendMe = true;
@@ -870,11 +871,7 @@ static void econet_tx_data(void)
 
                         EconetTx.destnet = BeebTx.eh.destnet | outmask; //30JUN
                         EconetTx.deststn = BeebTx.eh.deststn;
-                        for (unsigned int k = 6; k < BeebTx.Pointer; k++) {
-                            EconetTx.buff[j] = BeebTx.buff[k];
-                            j++;
-                        }
-                        EconetTx.Pointer = j;
+                        econet_tx_copy(6);
                         if (EconetTx.deststn == 255 || EconetTx.deststn == 0) {
                             EconetTx.ah.type = AUN_TYPE_BROADCAST;
                             econet_set_wait4idle("Tx", "broadcast snt");
@@ -927,11 +924,7 @@ static void econet_tx_data(void)
                         log_debug("Econet(Tx): AUN mode, in state FWS_IMMRCVD");
                         // it's a reply to an immediate command we just had
                         econet_set_wait4idle("Tx", "imm rcvd");
-                        for (unsigned int k = 4; k < BeebTx.Pointer; k++) {
-                            EconetTx.buff[j] = BeebTx.buff[k];
-                            j++;
-                        }
-                        EconetTx.Pointer = j;
+                        econet_tx_copy(4);
                         EconetTx.ah = EconetRx.ah;
                         EconetTx.ah.type = AUN_TYPE_IMM_REPLY;
                         SendMe = true;
@@ -972,6 +965,13 @@ static void econet_tx_data(void)
             }
         }
     }
+}
+
+static void econet_rx_copy(int start, int bytes)
+{
+    size_t size = bytes - sizeof(EconetRx.ah);
+    memcpy(BeebRx.buff + start, EconetRx.buff, size);
+    BeebRx.BytesInBuffer = size + start;
 }
 
 static void econet_rx_data(void)
@@ -1088,21 +1088,11 @@ static void econet_rx_data(void)
                                             case AUN_TYPE_BROADCAST:
                                                 BeebRx.eh.deststn = 255;        // wasn't just for us..
                                                 BeebRx.eh.destnet = 0;  // TODO check if not net 0.. does it make a difference?
-                                                j = 6;
-                                                for (unsigned int i = 0; i < RetVal - sizeof(EconetRx.ah); i++) {
-                                                    BeebRx.buff[j] = EconetRx.buff[i];
-                                                    j++;
-                                                }
-                                                BeebRx.BytesInBuffer = j;
+                                                econet_rx_copy(6, RetVal);
                                                 econet_set_wait4idle("Rx", "broadcast received");
                                                 break;
                                             case AUN_TYPE_IMMEDIATE:
-                                                j = 6;
-                                                for (unsigned int i = 0; i < RetVal - sizeof(EconetRx.ah); i++) {
-                                                    BeebRx.buff[j] = EconetRx.buff[i];
-                                                    j++;
-                                                }
-                                                BeebRx.BytesInBuffer = j;
+                                                econet_rx_copy(6, RetVal);
                                                 fourwaystage = FWS_IMMRCVD;
                                                 log_debug("Econet(Rx): Set FWS_IMMRCVD");
                                                 break;
@@ -1128,15 +1118,7 @@ static void econet_rx_data(void)
                                         BeebRx.eh.srcnet = network[hostno].network;
                                         BeebRx.eh.deststn = EconetStationNumber;        // must be for us.
                                         BeebRx.eh.destnet = 0;
-//                                          BeebRx.eh.deststn = EconetRx.eh.deststn ; // 30jun was EconetStationNumber; // must be for us.
-//                                          BeebRx.eh.destnet = EconetRx.eh.destnet & inmask ; // 30jun was 0
-
-                                        j = 4;
-                                        for (unsigned int i = 0; i < RetVal - sizeof(EconetRx.ah); i++) {
-                                            BeebRx.buff[j] = EconetRx.buff[i];
-                                            j++;
-                                        }
-                                        BeebRx.BytesInBuffer = j;
+                                        econet_rx_copy(4, RetVal);
                                         BeebRx.Pointer = 0;
                                         econet_set_wait4idle("Rx", "ack received from remote AUN server");
                                         break;
