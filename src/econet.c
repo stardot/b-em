@@ -109,6 +109,22 @@ enum fourway {
 
 static enum fourway fourwaystage;
 
+#ifdef _DEBUG
+
+static const char fws_names[][10] = {
+    "IDLE",
+    "SCOUTSENT",
+    "SCACKRCVD",
+    "DATASENT",
+    "WAIT4IDLE",
+    "SCOUTRCVD",
+    "SCACKSENT",
+    "IMMSENT",
+    "IMMRCVD"
+};
+
+#endif
+
 /* Headers for traditional Econet */
 
 struct shorteconethdr {
@@ -493,13 +509,18 @@ static void econet_read_netfile(void)
 //---------------------------------------------------------------------------
 //---------------------------------------------------------------------------
 
+#ifdef _DEBUG
+
 void econet_adlc_debug(void)
 {
-    log_debug("ADLC: Ctl:%02X %02X %02X %02X St:%02X %02X TXptr:%01x rx:%01x FF:%d IRQc:%02x SR2c:%02x PC:%04x 4W:%i ",
+    log_debug("ADLC: Ctl:%02X %02X %02X %02X St:%02X %02X TXptr:%01x rx:%01x FF:%d IRQc:%02x SR2c:%02x PC:%04x 4W:%s",
             (int)ADLC.control1, (int)ADLC.control2, (int)ADLC.control3, (int)ADLC.control4,
             (int)ADLC.status1, (int)ADLC.status2, (int)ADLC.txfptr, (int)ADLC.rxfptr, FlagFillActive ? 1 : 0,
-            (int)irqcause, (int)sr1b2cause, (int)pc, (int)fourwaystage);
+            (int)irqcause, (int)sr1b2cause, (int)pc, fws_names[fourwaystage]);
 }
+#else
+static inline void econet_adlc_debug(void) {}
+#endif
 
 void econet_reset(void)
 {
@@ -1398,7 +1419,6 @@ static void econet_update_tail(void)
 
     //waiting for AUN to become idle?
     if (confAUNmode && fourwaystage == FWS_WAIT4IDLE && BeebRx.BytesInBuffer == 0 && ADLC.rxfptr == 0 && ADLC.txfptr == 0) {
-        log_debug("Econet: in WAIT4IDLE, timeout=%ld", EconetSCACKtrigger);
         if (EconetSCACKtrigger == 0) {
             log_debug("Econet: setting WAIT4IDLE timeout");
             EconetSCACKtrigger = EconetCycles + EconetSCACKtimeout;
@@ -1765,6 +1785,5 @@ void econet_write_register(uint8_t addr, uint8_t Value)
     if (changed) {
         econet_update_head();
         econet_update_tail();
-        econet_adlc_debug();
     }
 }
