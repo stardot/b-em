@@ -1,35 +1,37 @@
 #define _DEBUG
-/****************************************************************
-BeebEm - BBC Micro and Master 128 Emulator
-Copyright (C) 2004  Rob O'Donnell
-Copyright (C) 2005  Mike Wyatt
+/*
+ * This file is part of B-Em, a BBC Micro Emulator by Sarah Walker
+ * and provides support for Econet, Acorn's low-cost network.
+ *
+ * A version of this file was originally part of BeebEm and has
+ * been ported to B-Em by Steve Fosdick, 2021.  The original is:
+ *
+ * Copyright (C) 2004  Rob O'Donnell
+ * Copyright (C) 2005  Mike Wyatt
+ *
+ * AUN support was added (to BeebEm) by Rob in Jun/Jul 2009.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public
+ * License along with this program; if not, write to the Free
+ * Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+ * Boston, MA  02110-1301, USA.
+ */
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-as published by the Free Software Foundation; either version 2
-of the License, or (at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public
-License along with this program; if not, write to the Free
-Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
-Boston, MA  02110-1301, USA.
-****************************************************************/
-
-// Econet support for BeebEm
-// Rob O'Donnell. robert@irrelevant.com, December 28th 2004.
-// Mike Wyatt - further development, Dec 2005
-// AUN by Rob Jun/Jul 2009
-//
-//
-// Search TODO for some issues that need addressing.
-//
-//
-
+/*
+ * The following conditional compilation is to deal with differences
+ * between WINSOCK and the original Berkeley networking as used in
+ * Unix-like systems.
+ */
 #ifdef WIN32
 #include <windows.h>
 #define local_ipaddr(a) (a.S_un.S_addr)
@@ -48,7 +50,6 @@ typedef int SOCKET;
 #define WSACleanup()
 #define SOCKADDR struct sockaddr
 #define local_ipaddr(a) (a.s_addr)
-#define _stricmp strcasecmp
 #endif
 
 #include "b-em.h"
@@ -60,57 +61,11 @@ typedef int SOCKET;
 #include "sysvia.h"
 #include <ctype.h>
 
-// Configuration Options.
-// These, among others, are overridden in econet.cfg (see ReadNetwork() )
-bool confAUNmode = false;       // Use AUN style networking
-bool confLEARN = false;         // Add receipts from unknown hosts to network table
-bool confSTRICT = false;        // Assume network ip=stn number when sending to unknown hosts
-bool confSingleSocket = true;   // use same socket for Send and receive
-unsigned int FourWayStageTimeout = 1000000;
-bool MassageNetworks = false;   // massage network numbers on send/receive (add/sub 128)
-
-int inmask, outmask;
-
 bool EconetEnabled;             // Enable hardware
 bool EconetNMIenabled;          // 68B54 -> NMI enabled. (IC97)
 
-const uint8_t powers[4] = { 1, 2, 4, 8 };
+/* Acorn Universal Networking (AUN) packet header. */
 
-// Frequency between network actions.
-// max 250Khz network clock. 2MHz system clock. one click every 8 cycles.
-// say one byte takes about 8 clocks, receive a byte every 64 cpu cycyes. ?
-// (The reason for "about" 8 clocks is that as this a continuous syncronous tx,
-// there are no start/stop bits, however to avoid detecting a dead line as ffffff
-// zeros are added and removed transparently if you get more than five "1"s
-// during data transmission - more than 5 are flags or errors)
-// 6854 datasheet has max clock frequency of 1.5MHz for the B version.
-// 64 cycles seems to be a bit fast for 'netmon' prog to keep up - set to 128.
-static unsigned long EconetCycles = 0;
-
-// Station Configuration settings:
-// You specify station number on command line.
-// This allows multiple different instances of the emulator to be run and
-// to communicate with each other.  Note that you STILL need to have them
-// all listed in econet.cfg so each one knows where the other area.
-uint8_t EconetStationNumber = 0;        // default Station Number
-unsigned int EconetListenPort = 0;      // default Listen port
-unsigned long EconetListenIP = 0x0100007f;
-// IP settings:
-SOCKET ListenSocket = INVALID_SOCKET;   // Listen socket
-SOCKET SendSocket = INVALID_SOCKET;
-bool ReceiverSocketsOpen = false;       // Used to flag line up and clock running
-
-// Written in 2004:
-// we will be using Econet over Ethernet as per AUN,
-// however I've not got a real acorn ethernet machine to see how
-// it actually works!  The only details I can find is it is:
-// "standard econet encpsulated in UDP to port 32768" and that
-// Addressing defaults to "1.0.net.stn" where net >= 128 for ethernet.
-// but can be overridden, so we won't worry about that.
-
-// 2009: Now I come back to this, I know the format ... :-)
-// and sure enough, it's pretty simple.
-// It's translating the different protocols that was harder..
 struct aunhdr {
     uint8_t type;               /* AUN magic protocol byte */
 #define AUN_TYPE_BROADCAST  1   // 'type' from NetBSD aund.h
@@ -121,21 +76,27 @@ struct aunhdr {
 #define AUN_TYPE_IMM_REPLY  6
 
     uint8_t port;               // dest port
+#define EC_PORT_FS              0x99
+#define EC_PORT_PS_STATUS_ENQ   0x9f
+#define EC_PORT_PS_STATUS_REPLY 0x9e
+#define EC_PORT_PS_JOB          0xd1
+
     uint8_t cb;                 // flag
     uint8_t pad;                // retrans
     uint32_t handle;            // 4 byte sequence little-endian.
 };
 
-#define EC_PORT_FS 0x99
-#define EC_PORT_PS_STATUS_ENQ 0x9f
-#define EC_PORT_PS_STATUS_REPLY 0x9e
-#define EC_PORT_PS_JOB  0xd1
+static unsigned long ec_sequence = 0; // AUN sequence.
 
-unsigned long ec_sequence = 0;
+/*
+ * A finite state machine to handle the translation between AUN and
+ * tradional Econet.  This includes the ability to fake the scout
+ * packet and its response in each direction.
+ */
 
 enum fourway {
     FWS_IDLE,
-    FWS_SCOUTSENT,  // BBC micro send scout (on Econet, suppressed on AUN).
+    FWS_SCOUTSENT,  // BBC micro sent scout (on Econet, suppressed on AUN).
     FWS_SCACKRCVD,  // Fake scout ack created for BBC micro to receive.
     FWS_DATASENT,   // BBC micro data packet sent to AUN.
     FWS_WAIT4IDLE,
@@ -147,6 +108,8 @@ enum fourway {
 };
 
 static enum fourway fourwaystage;
+
+/* Headers for traditional Econet */
 
 struct shorteconethdr {
     uint8_t deststn;
@@ -162,29 +125,34 @@ struct longeconetpacket {
     uint8_t srcnet;
     uint8_t cb;
     uint8_t port;
-//  uint8_t buff[2];
 };
 
-// MC6854 has 3 byte FIFOs. There is no wait for an end of data
-// before transmission starts. Data is sent immediately it's put into
-// the first slot.
+/*
+ * What is the biggest packet required?  The MC6854 has 3 byte FIFOs.
+ * There is no wait for an end of data before transmission starts. Data
+ * is sent immediately it's put into the first slot.
+ *
+ * Does Econet send multiple packets for big transfers, or just one
+ * huge packet?  What's MTU on econet? Depends on clock speed but it's
+ * big (e.g. 100K).  As we are using UDP, we will use a larger buffer
+ * buffer and accept data into this, then send it periodically.  We
+ * will accept incoming data similarly, and dribble it back into the
+ * emulated 68B54.
+ *
+ * We should thus never suffer underrun errors....
+ * -- we do actually flag an underrun, if data exceeds the size of the buffer.
+ * -- sniffed AUN between live arcs seems to max out at 1288 bytes (1280+header)
+ * -- bigger packers ARE possible - UDP fragments & reassembles transparently.. doh..
+ *
+ * 64K max.. can't see any transfers being neeeded larger than this too often!
+ * (and that's certainly larger than acorn bridges can cope with.)
+ */
 
-// Does econet send multiple packets for big transfers, or just one huge
-// packet?
-// What's MTU on econet? Depends on clock speed but its big (e.g. 100K).
-// As we are using UDP, we will construct a 2048 byte buffer accept data
-// into this, and send it periodically.  We will accept incoming data
-// similarly, and dribble it back into the emulated 68B54.
-// We should thus never suffer underrun errors....
-// --we do actually flag an underrun, if data exceeds the size of the buffer.
-// -- sniffed AUN between live arcs seems to max out at 1288 bytes (1280+header)
-// --- bigger packers ARE possible - UDP fragments & reassembles transparently.. doh..
-
-// 64K max.. can't see any transfers being neeeded larger than this too often!
-// (and that's certainly larger than acorn bridges can cope with.)
 #define ETHERNETBUFFERSIZE 65536
 
-struct ethernetpacket {
+/* Defintion for the AUN packets sent over UDP. */
+
+struct aunpacket {
     union {
         uint8_t raw[8];
         struct aunhdr ah;
@@ -201,9 +169,10 @@ struct ethernetpacket {
     unsigned int destnet;
 };
 
-// buffers used to construct packets for sending out via UDP
-struct ethernetpacket EconetRx;
-struct ethernetpacket EconetTx;
+/* buffers used to construct packets for sending out via UDP */
+
+static struct aunpacket EconetRx;
+static struct aunpacket EconetTx;
 
 // buffers used to construct packets sent to/received from bbc micro
 
@@ -216,10 +185,12 @@ struct econetpacket {
     volatile unsigned int BytesInBuffer;
 };
 
-struct econetpacket BeebTx;
-struct econetpacket BeebRx;
+static struct econetpacket BeebTx;
+static struct econetpacket BeebRx;
 
 uint8_t BeebTxCopy[6];          // size of longeconetpacket structure
+
+/* Networking Table */
 
 // Holds data from econet.cfg file
 struct ECOLAN {                 // what we we need to find a beeb?
@@ -236,40 +207,107 @@ struct AUNTAB {
 
 #define NETWORKTABLELENGTH 512  // total number of hosts we can know about
 #define AUNTABLELENGTH 128      // number of disparate network in AUNmap
-struct ECOLAN network[NETWORKTABLELENGTH];      // list of my friends! :-)
-struct AUNTAB aunnet[AUNTABLELENGTH];   // AUNmap file for guess mode.
+static struct ECOLAN network[NETWORKTABLELENGTH];      // list of my friends! :-)
+static struct AUNTAB aunnet[AUNTABLELENGTH];   // AUNmap file for guess mode.
 
-unsigned int networkp = 0;      // how many friends do I have?
-unsigned int aunnetp = 0;       // now many networks do i know about
-unsigned int myaunnet = 0;      // aunnet table entry that I match. should be -1 as 0 is valid..
+static unsigned int networkp = 0;      // how many friends do I have?
+static unsigned int aunnetp = 0;       // now many networks do i know about
+static unsigned int myaunnet = 0;      // aunnet table entry that I match. should be -1 as 0 is valid..
 
-uint8_t irqcause;               // flagto indicate cause of irq sr1b7
-uint8_t sr1b2cause;             // flagto indicate cause of irq sr1b2
+static int inmask, outmask;
 
-// A receiving station goes into flag fill mode while it is processing
-// a message.  This stops other stations sending messages that may interfere
-// with the four-way handshake.  Attempting to notify evey station using
-// IP messages when flag fill goes active/inactive would be complicated and
-// would suffer from timing issues due to network latency, so a pseudo
-// flag fill algorithm is emulated.  We assume that the receiving station
-// will go into flag fill when we send a message or when we see a message
-// destined for another station.  We cancel flag fill when we receive a
-// message as the other station must have cancelled flag fill.  In order to
-// cancel flag fill after the last message of a four-way handshake we time it
-// out - which is not ideal as we do not want to delay new messages any
-// longer that we have to - but it will have to do for now!
-static bool FlagFillActive;            // Flag fill state
-static unsigned long EconetFlagFillTimeoutTrigger;       // Trigger point for flag fill
-static unsigned long EconetFlagFillTimeout = 500000;     // Cycles for flag fill timeout // added cfg file to override this
+/* Configuration Options.
+ * These, among others, are overridden in econet.cfg
+ * (see econet_read_netfile())
+ */
+static bool confAUNmode = false;       // Use AUN style networking
+static bool confLEARN = false;         // Add receipts from unknown hosts to network table
+static bool confSTRICT = false;        // Assume network ip=stn number when sending to unknown hosts
+static bool confSingleSocket = true;   // use same socket for Send and receive
+static unsigned int FourWayStageTimeout = 1000000;
+static bool MassageNetworks = false;   // massage network numbers on send/receive (add/sub 128)
+
+/* Station Configuration settings:
+ * You specify station number on command line.
+ * This allows multiple different instances of the emulator to be run
+ * and to communicate with each other.  Note that you STILL need to
+ * have them all listed in econet.cfg so each one knows where the
+ * others are.
+ */
+static uint8_t EconetStationNumber = 0;        // default Station Number
+static unsigned int EconetListenPort = 0;      // default Listen port
+static unsigned long EconetListenIP = 0x0100007f;
+// IP settings:
+static SOCKET ListenSocket = INVALID_SOCKET;   // Listen socket
+static SOCKET SendSocket = INVALID_SOCKET;
+static bool ReceiverSocketsOpen = false;       // Used to flag line up and clock running
+
+/* Flag Fill.
+ *
+ * A receiving station goes into flag fill mode while it is processing,
+ * a message.  This stops other stations sending messages that may
+ * interfere with the four-way handshake. That means from the emulated
+ * perspective of this BBC micro, the remote end would flag-fill
+ * between an outgoing scout and the acknowledgement and between an
+ * outgoing data packet and its acknowledgement.  The BBC micro itself
+ * would flag fill between receiving a flag acknowledgement and sending
+ * the data packet.
+ *
+ * Attempting to notify evey station using IP messages when flag fill
+ * goes active/inactive would be complicated and would suffer from
+ * timing issues due to network latency, so a pseudo flag fill
+ * algorithm is emulated.  We assume that the receiving station will go
+ * into flag fill when we send a message or when we see a message
+ * destined for another station.  We cancel flag fill when we receive a
+ * message as the other station must have cancelled flag fill.  In
+ * order to cancel flag fill after the last message of a four-way
+ * handshake we time it out - which is not ideal as we do not want to
+ * delay new messages any longer that we have to - but it will have
+ * to do for now!
+ */
+
+static bool FlagFillActive;                             // Flag fill state
+static unsigned long EconetFlagFillTimeoutTrigger;      // Trigger point for flag fill
+static unsigned long EconetFlagFillTimeout = 500000;    // Cycles for flag fill timeout // added cfg file to override this
+
+/* In the BeebEm version the time between network bytes was
+ * configurable but in B-Em we have hooked the function otherstuff_poll
+ * which fixes the interval at 128 CPU cycles.  The original BeebEm
+ * comment follows...
+ *
+ * Frequency between network actions.
+ * max 250Khz network clock. 2MHz system clock. one click every 8 cycles.
+ * say one byte takes about 8 clocks, receive a byte every 64 cpu cycyes?
+ * (The reason for "about" 8 clocks is that as this a continuous syncronous tx,
+ * there are no start/stop bits, however to avoid detecting a dead line as ffffff
+ * zeros are added and removed transparently if you get more than five "1"s
+ * during data transmission - more than 5 are flags or errors)
+ * 6854 datasheet has max clock frequency of 1.5MHz for the B version.
+ * 64 cycles seems to be a bit fast for 'netmon' prog to keep up - set to 128.
+ */
+
+/*
+ * BeebEm has a central, incrementing counter which can be used to
+ * implement timeouts.  B-Em does not so this module keeps its own
+ * counter.  This ticks in units of 128 CPU cycles.
+ */
+static unsigned long EconetCycles = 0;
+
+/* Other timeouts using the above cycke counter */
+
 static unsigned long EconetSCACKtrigger;         //trigger point for scout ack
 static unsigned long EconetSCACKtimeout = 4;   // cycles to delay before sending ack to scout (aun mode only)
 static unsigned long Econet4Wtrigger;
-// Device and temp copy!
+
+/* Device and temp copy */
+
 volatile struct MC6854 ADLC;
 static struct MC6854 ADLCtemp;
 
-//-----------------------------------------------------------------------------
-//---------------------------------------------------------------------------
+static const uint8_t powers[4] = { 1, 2, 4, 8 };
+
+uint8_t irqcause;               // flagto indicate cause of irq sr1b7
+uint8_t sr1b2cause;             // flagto indicate cause of irq sr1b2
 
 static void econet_read_netfile(void)
 {
@@ -412,7 +450,7 @@ static void econet_read_netfile(void)
                             } while (EcoName[i] != ' ' && i < len && j < 80);
                             value[j] = 0;
                             if (p == 0) {
-                                if (_stricmp("ADDMAP", value) == 0)
+                                if (strcasecmp("ADDMAP", value) == 0)
                                     q = 1;
                             }
                             if (p == 1) {

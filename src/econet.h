@@ -150,9 +150,4 @@ extern bool EconetEnabled;
 extern bool EconetNMIenabled;
 volatile extern struct MC6854 ADLC;
 
-extern uint8_t EconetStationNumber;
-extern unsigned int EconetListenPort;
-
-//extern WSADATA WsaDat;                          // Windows sockets info
-
 #endif
