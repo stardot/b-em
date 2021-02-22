@@ -71,7 +71,6 @@ bool MassageNetworks = false;   // massage network numbers on send/receive (add/
 
 int inmask, outmask;
 
-bool EconetStateChanged = false;
 bool EconetEnabled;             // Enable hardware
 bool EconetNMIenabled;          // 68B54 -> NMI enabled. (IC97)
 
@@ -86,9 +85,7 @@ const uint8_t powers[4] = { 1, 2, 4, 8 };
 // during data transmission - more than 5 are flags or errors)
 // 6854 datasheet has max clock frequency of 1.5MHz for the B version.
 // 64 cycles seems to be a bit fast for 'netmon' prog to keep up - set to 128.
-static unsigned int TimeBetweenBytes = 128;
-static unsigned long EconetTrigger = 0;
-static unsigned long EconetCycles = 128;
+static unsigned long EconetCycles = 0;
 
 // Station Configuration settings:
 // You specify station number on command line.
@@ -265,7 +262,7 @@ static bool FlagFillActive;            // Flag fill state
 static unsigned long EconetFlagFillTimeoutTrigger;       // Trigger point for flag fill
 static unsigned long EconetFlagFillTimeout = 500000;     // Cycles for flag fill timeout // added cfg file to override this
 static unsigned long EconetSCACKtrigger;         //trigger point for scout ack
-static unsigned long EconetSCACKtimeout = 500;   // cycles to delay before sending ack to scout (aun mode only)
+static unsigned long EconetSCACKtimeout = 4;   // cycles to delay before sending ack to scout (aun mode only)
 static unsigned long Econet4Wtrigger;
 // Device and temp copy!
 volatile struct MC6854 ADLC;
@@ -274,7 +271,7 @@ static struct MC6854 ADLCtemp;
 //-----------------------------------------------------------------------------
 //---------------------------------------------------------------------------
 
-static void ReadNetwork(void)
+static void econet_read_netfile(void)
 {
     // read econet.cfg file into network table
     ALLEGRO_PATH *path = find_cfg_file("econet", ".cfg");
@@ -345,8 +342,6 @@ static void ReadNetwork(void)
                                 EconetFlagFillTimeout = (value);
                             else if (strcmp("scacktimeout", EcoName) == 0)
                                 EconetSCACKtimeout = (value);
-                            else if (strcmp("timebetweenbytes", EcoName) == 0)
-                                TimeBetweenBytes = (value);
                             else if (strcmp("fourwaytimeout", EcoName) == 0)
                                 FourWayStageTimeout = (value);
                             else if (strcmp("massagenets", EcoName) == 0)
@@ -460,7 +455,15 @@ static void ReadNetwork(void)
 //---------------------------------------------------------------------------
 //---------------------------------------------------------------------------
 
-void EconetReset(void)
+void econet_adlc_debug(void)
+{
+    log_debug("ADLC: Ctl:%02X %02X %02X %02X St:%02X %02X TXptr:%01x rx:%01x FF:%d IRQc:%02x SR2c:%02x PC:%04x 4W:%i ",
+            (int)ADLC.control1, (int)ADLC.control2, (int)ADLC.control3, (int)ADLC.control4,
+            (int)ADLC.status1, (int)ADLC.status2, (int)ADLC.txfptr, (int)ADLC.rxfptr, FlagFillActive ? 1 : 0,
+            (int)irqcause, (int)sr1b2cause, (int)pc, (int)fourwaystage);
+}
+
+void econet_reset(void)
 {
     if (EconetEnabled)
         log_debug("Econet: reset, hardware enabled");
@@ -521,7 +524,7 @@ void EconetReset(void)
         return;
 
     // Read in econet.cfg.  Done here so can refresh it on Break.
-    ReadNetwork();
+    econet_read_netfile();
 
     //----------------------
     // Create a SOCKET for listening for incoming connection requests.
@@ -666,109 +669,31 @@ void EconetReset(void)
     }
 
     ReceiverSocketsOpen = true;
-    EconetStateChanged = true;
-    EconetTrigger = EconetCycles + TimeBetweenBytes;
-    log_debug("Econet: reset, EconetTrigger=%ld", EconetTrigger);
 }
 
 //---------------------------------------------------------------------------
 //---------------------------------------------------------------------------
 // read to FE18..
 
-uint8_t Read_Econet_Station(void)
+uint8_t econet_read_station(void)
 {
     log_debug("Econet: Read Station %02X", (int)EconetStationNumber);
     return (EconetStationNumber);
 }
 
-//---------------------------------------------------------------------------
-//---------------------------------------------------------------------------
-// read to FEA0-3
-
-uint8_t ReadEconetRegister(uint8_t addr)
-{
-    debugADLCprint();
-
-    switch (addr & 0x03) {
-        case 0:
-            log_debug("ADLC: read register Status1");
-            return ADLC.status1;
-        case 1:
-            log_debug("ADLC: read register Status2");
-            return ADLC.status2;
-        default:
-            log_debug("ADLC: read register Receive Data");
-            if (((ADLC.control1 & ADLC_CTL1_RX_RESET) == 0) && ADLC.rxfptr) {       // rxreset not set and someting in fifo
-                log_debug("Econet: Returned fifo: %02X", (int)ADLC.rxfifo[ADLC.rxfptr - 1]);
-
-                if (ADLC.rxfptr) {
-                    EconetStateChanged = true;
-                    return (ADLC.rxfifo[--ADLC.rxfptr]);    // read rx buffer
-                }
-            }
-            return 0;
-    }
-}
 
 //---------------------------------------------------------------------------
 //---------------------------------------------------------------------------
 // write to FEA0-3
 
-static void WriteTxReg(uint8_t Value, bool end)
+static void econet_set_wait4idle(const char *dir, const char *reason)
 {
-    if ((ADLC.control1 & ADLC_CTL1_TX_RESET) == 0) {
-        ADLC.txfifo[2] = ADLC.txfifo[1];
-        ADLC.txfifo[1] = ADLC.txfifo[0];
-        ADLC.txfifo[0] = Value;
-        ADLC.txfptr++;
-        ADLC.txftl = ADLC.txftl << 1;       /// shift txlast bits up.
-        if (end)
-            ADLC.control2 |= ADLC_CTL2_TX_LAST;    // set txlast control flag ourself
-    }
+    fourwaystage = FWS_WAIT4IDLE;
+    EconetSCACKtrigger = 0; //EconetCycles + EconetSCACKtimeout * 3<< 1);
+    log_debug("Econet(%s): Set FWS_WAIT4IDLE (%s)", dir, reason);
 }
 
-void WriteEconetRegister(uint8_t addr, uint8_t Value)
-{
-    switch (addr & 0x03) {
-        case 0:
-            log_debug("ADLC: write register Control1=%02X", Value);
-            if ((ADLC.control1 & ~ADLC_CTL1_AC) != (Value & ~ADLC_CTL1_AC))
-                EconetStateChanged = true;
-            ADLC.control1 = Value;
-            break;
-        case 1:
-            if (ADLC.control1 & ADLC_CTL1_AC) {
-                log_debug("ADLC: write register Control3=%02X", Value);
-                ADLC.control3 = Value;
-            }
-            else {
-                log_debug("ADLC: write register Control2=%02X", Value);
-                ADLC.control2 = Value;
-            }
-            EconetStateChanged = true;
-            break;
-        case 2:
-            log_debug("ADLC: write register Transmit Data Continue=%02X", Value);
-            WriteTxReg(Value, false);
-            EconetStateChanged = true;
-            break;
-        case 3:
-            if (ADLC.control1 & ADLC_CTL1_AC) {
-                log_debug("ADLC: write register Control4=%02X", Value);
-                ADLC.control4 = Value;
-            }
-            else {
-                log_debug("ADLC: write register Transmit Data Finish=%02X", Value);
-                WriteTxReg(Value, true);
-            }
-            EconetStateChanged = true;
-            break;
-    }
-    debugADLCprint();
-    EconetTrigger = EconetCycles + TimeBetweenBytes;
-}
-
-static void TransmitData(void)
+static void econet_tx_data(void)
 {
     if (ADLC.txfptr) {
         log_debug("Econet(Tx): Write to FIFO noticed");
@@ -914,8 +839,7 @@ static void TransmitData(void)
                         EconetTx.Pointer = j;
                         if (EconetTx.deststn == 255 || EconetTx.deststn == 0) {
                             EconetTx.ah.type = AUN_TYPE_BROADCAST;
-                            fourwaystage = FWS_WAIT4IDLE;       // no response to broadcasts...
-                            log_debug("Econet(Tx): Set FWS_WAIT4IDLE (broadcast snt)");
+                            econet_set_wait4idle("Tx", "broadcast snt");
                             SendMe = true;      // send packet ...
                             SendLen = sizeof(EconetTx.ah) + 8;
                         }
@@ -959,14 +883,12 @@ static void TransmitData(void)
                         EconetTx.ah = EconetRx.ah;
                         EconetTx.ah.type = AUN_TYPE_ACK;
                         SendMe = true;
-                        fourwaystage = FWS_WAIT4IDLE;
-                        log_debug("Econet(Tx): Set FWS_WAIT4IDLE (final ack sent)");
+                        econet_set_wait4idle("Tx", "final ack sent");
                         break;
                     case FWS_IMMRCVD:
                         log_debug("Econet(Tx): AUN mode, in state FWS_IMMRCVD");
                         // it's a reply to an immediate command we just had
-                        fourwaystage = FWS_WAIT4IDLE;
-                        log_debug("Econet(Tx): Set FWS_WAIT4IDLE (imm rcvd)");
+                        econet_set_wait4idle("Tx", "imm rcvd");
                         for (unsigned int k = 4; k < BeebTx.Pointer; k++) {
                             EconetTx.buff[j] = BeebTx.buff[k];
                             j++;
@@ -978,9 +900,7 @@ static void TransmitData(void)
                         SendLen = sizeof(EconetTx.ah) + EconetTx.Pointer;
                         break;
                     default:
-                        log_debug("Econet(Tx): AUN mode, invalid fourway state, set FWS_WAIT4IDLE");
-                        // shouldn't be here.. ignore packet and abort fourway
-                        fourwaystage = FWS_WAIT4IDLE;
+                        econet_set_wait4idle("Tx", "invalid 4-way state");
                 }
             }
 
@@ -1010,13 +930,13 @@ static void TransmitData(void)
 
                 BeebTx.Pointer = 0;     // wipe buffer
                 BeebTx.BytesInBuffer = 0;
-                debugADLCprint();
+                econet_adlc_debug();
             }
         }
     }
 }
 
-static void ReceiveData(void)
+static void econet_rx_data(void)
 {
     if (BeebRx.Pointer < BeebRx.BytesInBuffer) {
         // something waiting to be given to the processor
@@ -1038,6 +958,7 @@ static void ReceiveData(void)
             }
         }
     }
+
     if (ADLC.rxfptr == 0) {
         unsigned int hostno, j = 0;
 
@@ -1135,8 +1056,7 @@ static void ReceiveData(void)
                                                     j++;
                                                 }
                                                 BeebRx.BytesInBuffer = j;
-                                                fourwaystage = FWS_WAIT4IDLE;
-                                                log_debug("Econet(Rx): Set FWS_WAIT4IDLE (broadcast received)");
+                                                econet_set_wait4idle("Rx", "broadcast received");
                                                 break;
                                             case AUN_TYPE_IMMEDIATE:
                                                 j = 6;
@@ -1180,9 +1100,7 @@ static void ReceiveData(void)
                                         }
                                         BeebRx.BytesInBuffer = j;
                                         BeebRx.Pointer = 0;
-                                        fourwaystage = FWS_WAIT4IDLE;
-                                        log_debug("Econet(Rx): Set FWS_WAIT4IDLE (ack received from remote AUN server)");
-
+                                        econet_set_wait4idle("Rx", "ack received from remote AUN server");
                                         break;
                                     case FWS_DATASENT:
                                         log_debug("Econet(Rx): received in FWS_DATASENT");
@@ -1200,15 +1118,11 @@ static void ReceiveData(void)
 
                                             BeebRx.BytesInBuffer = 4;
                                             BeebRx.Pointer = 0;
-                                            log_debug("Econet(Rx): Set FWS_WAIT4IDLE (aun ack rxd)");
-                                            fourwaystage = FWS_WAIT4IDLE;
+                                            econet_set_wait4idle("Rx", "aun ack rxd");
                                             break;
                                         }       // else unexpected packet - ignore it.TODO: queue it?
                                     default:   // erm, what are we doing here?
-                                        log_debug("Econet(Rx): packet ignored");
-                                        //ignore packet
-                                        fourwaystage = FWS_WAIT4IDLE;
-                                        log_debug("Econet(Rx): Set FWS_WAIT4IDLE (ack received from remote AUN server)");
+                                        econet_set_wait4idle("Rx", "unexpected 4-way state, packet ignored");
                                         break;
                                 }
                             }
@@ -1295,7 +1209,7 @@ static void ReceiveData(void)
 // routines before they are checked) but for the moment I just want to get this
 // code actually working!
 
-void EconetPoll_real(void)
+static void econet_update_head(void)
 {
     // save flags
     ADLCtemp.status1 = ADLC.status1;
@@ -1427,38 +1341,35 @@ void EconetPoll_real(void)
     // CR4b6 - ABTex - extend abort - adjust way the abort flag is sent.  ignore,
     //  can affect timing of RTS output line (and thus CTS input) still ignored.
     // CR4b7 - NRZI/NRZ - invert data encoding on wire. ignore.
+}
 
-    //--------------------------------------------------------------------------------------------
-    //--------------------------------------------------------------------------------------------
+static void econet_rx_tx(void)
+{
+    // Only do this bit occasionally as data only comes in from
+    // line occasionally.
+    // Trickle data between fifo registers and ip packets.
 
-    if (EconetTrigger <= EconetCycles) {
-        // Only do this bit occasionally as data only comes in from
-        // line occasionally.
-        // Trickle data between fifo registers and ip packets.
+    // Transmit data
+    if (!(ADLC.control1 & ADLC_CTL1_TX_RESET))    // tx reset off
+        econet_tx_data();
+    // Receive data
+    if (!(ADLC.control1 & ADLC_CTL1_RX_RESET))    // rx reset off
+        econet_rx_data();
 
-        // Transmit data
-        if (!(ADLC.control1 & ADLC_CTL1_TX_RESET))    // tx reset off
-            TransmitData();
-        // Receive data
-        if (!(ADLC.control1 & ADLC_CTL1_RX_RESET))    // rx reset off
-            ReceiveData();
-
-        // Update idle status
-        if (!(ADLC.control1 & ADLC_CTL1_RX_RESET)     // not rxreset
-            && !ADLC.rxfptr     // nothing in fifo
-            && !(ADLC.status2 & ADLC_STA2_FRAME_VAL)      // no FV
-            && (BeebRx.BytesInBuffer == 0)) {   // nothing in ip buffer
-            ADLC.idle = true;
-        }
-        else {
-            ADLC.idle = false;
-        }
-
-        //----------------------------------------------------------------------------------
-        // how long before we come back in here?
-        EconetTrigger = EconetCycles + TimeBetweenBytes;
+    // Update idle status
+    if (!(ADLC.control1 & ADLC_CTL1_RX_RESET)     // not rxreset
+        && !ADLC.rxfptr     // nothing in fifo
+        && !(ADLC.status2 & ADLC_STA2_FRAME_VAL)      // no FV
+        && (BeebRx.BytesInBuffer == 0)) {   // nothing in ip buffer
+        ADLC.idle = true;
     }
+    else {
+        ADLC.idle = false;
+    }
+}
 
+static void econet_update_tail(void)
+{
     // Reset pseudo flag fill?
     if (EconetFlagFillTimeoutTrigger <= EconetCycles && FlagFillActive) {
         FlagFillActive = false;
@@ -1466,15 +1377,22 @@ void EconetPoll_real(void)
     }
 
     //waiting for AUN to become idle?
-    if (confAUNmode && fourwaystage == FWS_WAIT4IDLE && BeebRx.BytesInBuffer == 0 && ADLC.rxfptr == 0 && ADLC.txfptr == 0       // ??
-//      && EconetSCACKtrigger > TotalCycles
-        ) {
-        fourwaystage = FWS_IDLE;
-        Econet4Wtrigger = 0;
-        EconetSCACKtrigger = 0;
-        FlagFillActive = false;
+    if (confAUNmode && fourwaystage == FWS_WAIT4IDLE && BeebRx.BytesInBuffer == 0 && ADLC.rxfptr == 0 && ADLC.txfptr == 0) {
+        log_debug("Econet: in WAIT4IDLE, timeout=%ld", EconetSCACKtrigger);
+        if (EconetSCACKtrigger == 0) {
+            log_debug("Econet: setting WAIT4IDLE timeout");
+            EconetSCACKtrigger = EconetCycles + EconetSCACKtimeout;
+        }
+        else if (EconetSCACKtrigger <= EconetCycles) {
+            log_debug("Econet: wait over, returning to FWS_IDLE");
+            fourwaystage = FWS_IDLE;
+            Econet4Wtrigger = 0;
+            EconetSCACKtrigger = 0;
+            FlagFillActive = false;
+        }
     }
 
+#if 0
     // timeout four way handshake - for when we get lost..
     if (Econet4Wtrigger == 0) {
         if (fourwaystage != FWS_IDLE)
@@ -1485,14 +1403,16 @@ void EconetPoll_real(void)
         Econet4Wtrigger = 0;
         fourwaystage = FWS_IDLE;
         log_debug("Econet: 4waystage timeout; Set FWS_IDLE");
-        debugADLCprint();
+        econet_adlc_debug();
     }
-
+#endif
     //--------------------------------------------------------------------------------------------
     // Status bits need changing?
 
     // SR1b0 - RDA - received data available.
     if (!(ADLC.control1 & ADLC_CTL1_RX_RESET)) {                          // rx reset off
+        if (ADLC.rxfptr && (ADLC.rxffc & (powers[ADLC.rxfptr - 1])))
+            ADLC.status2 |= ADLC_STA2_FRAME_VAL;
         if ((ADLC.rxfptr && !(ADLC.control2 & ADLC_CTL2_2BYTE))           // 1 byte mode
             || ((ADLC.rxfptr > 1) && (ADLC.control2 & ADLC_CTL2_2BYTE)))  // 2 byte mode
         {
@@ -1597,9 +1517,9 @@ void EconetPoll_real(void)
             ADLC.status2 &= ~ADLC_STA2_ADDR_PRES;
         }
         // SR2b1 - FV -Frame Valid - set in rx - only reset by ClearRx or RxReset
-        if (ADLC.rxfptr && (ADLC.rxffc & (powers[ADLC.rxfptr - 1]))) {
+        /* if (ADLC.rxfptr && (ADLC.rxffc & (powers[ADLC.rxfptr - 1]))) {
             ADLC.status2 |= ADLC_STA2_FRAME_VAL;
-        }
+        } */
         // SR2b2 - Inactive Idle Received - sets irq!
         if (ADLC.idle && !FlagFillActive)
             ADLC.status2 |= ADLC_STA2_INAC_IDLE;
@@ -1705,7 +1625,7 @@ void EconetPoll_real(void)
                 log_debug("ADLC: IRQ cause reset, irqcause %02x", (int)temp2);
             }
         }
-        debugADLCprint();
+        econet_adlc_debug();
     }
 }
 
@@ -1713,13 +1633,13 @@ void EconetPoll_real(void)
 //--------------------------------------------------------------------------------------------
 // Optimisation - only call real poll routine when something has changed
 
-void EconetPoll(int cycles)
+void econet_poll(void)
 {
     /* This timeout scheme is copied from BeebEm where it has central
      * support within the emulator.  It is foreign to B-Em, though, so
      * is implemented only within this module.
      */
-    EconetCycles += cycles;
+    EconetCycles += 1;
     if (EconetCycles >= LONG_MAX) {
         /* This handles the counters wrapping around.  As they are
          * unsigned and we're checking against the MAX for the signed
@@ -1727,8 +1647,6 @@ void EconetPoll(int cycles)
          */
         log_debug("Econet: wrap timing counters");
         EconetCycles -= LONG_MAX;
-        if (EconetTrigger)
-            EconetTrigger -= LONG_MAX;
         if (EconetSCACKtrigger)
             EconetSCACKtrigger -= LONG_MAX;
         if (EconetFlagFillTimeoutTrigger)
@@ -1736,11 +1654,11 @@ void EconetPoll(int cycles)
         if (Econet4Wtrigger)
             Econet4Wtrigger -= LONG_MAX;
     }
-    if (EconetStateChanged || EconetTrigger <= EconetCycles) {
-        EconetStateChanged = false;
-        // Don't poll if failed to init sockets
-        if (ReceiverSocketsOpen)
-            EconetPoll_real();
+    // Don't poll if failed to init sockets
+    if (ReceiverSocketsOpen) {
+        econet_update_head();
+        econet_rx_tx();
+        econet_update_tail();
     }
     if (EconetNMIenabled && ADLC.status1 & ADLC_STA1_IRQ && !(nmi & 0x04)) {
         nmi |= 0x04;
@@ -1750,15 +1668,84 @@ void EconetPoll(int cycles)
         nmi &= ~0x04;
 }
 
-//--------------------------------------------------------------------------------------------
-//--------------------------------------------------------------------------------------------
-// display some information
-
-void debugADLCprint(void)
+uint8_t econet_read_register(uint8_t addr)
 {
-    log_debug("ADLC: Ctl:%02X %02X %02X %02X St:%02X %02X TXptr:%01x rx:%01x FF:%d IRQc:%02x SR2c:%02x PC:%04x 4W:%i ",
-            (int)ADLC.control1, (int)ADLC.control2, (int)ADLC.control3, (int)ADLC.control4,
-            (int)ADLC.status1, (int)ADLC.status2, (int)ADLC.txfptr, (int)ADLC.rxfptr, FlagFillActive ? 1 : 0,
-            (int)irqcause, (int)sr1b2cause, (int)pc, (int)fourwaystage);
+    econet_adlc_debug();
+
+    switch (addr & 0x03) {
+        case 0:
+            log_debug("ADLC: read register Status1");
+            return ADLC.status1;
+        case 1:
+            log_debug("ADLC: read register Status2");
+            return ADLC.status2;
+        default:
+            log_debug("ADLC: read register Receive Data");
+            if (((ADLC.control1 & ADLC_CTL1_RX_RESET) == 0) && ADLC.rxfptr) {       // rxreset not set and someting in fifo
+                log_debug("Econet: Returned fifo: %02X", (int)ADLC.rxfifo[ADLC.rxfptr - 1]);
+
+                if (ADLC.rxfptr) {
+                    uint8_t value = ADLC.rxfifo[--ADLC.rxfptr];
+                    econet_update_head();
+                    econet_update_tail();
+                    return value;
+                }
+            }
+            return 0;
+    }
 }
 
+static void econet_write_txreg(uint8_t value)
+{
+    if ((ADLC.control1 & ADLC_CTL1_TX_RESET) == 0) {
+        ADLC.txfifo[2] = ADLC.txfifo[1];
+        ADLC.txfifo[1] = ADLC.txfifo[0];
+        ADLC.txfifo[0] = value;
+        ADLC.txfptr++;
+        ADLC.txftl = ADLC.txftl << 1;       /// shift txlast bits up.
+                // set txlast control flag ourself
+    }
+}
+
+void econet_write_register(uint8_t addr, uint8_t Value)
+{
+    bool changed = true;
+    switch (addr & 0x03) {
+        case 0:
+            log_debug("ADLC: write register Control1=%02X", Value);
+            if ((ADLC.control1 & ~ADLC_CTL1_AC) == (Value & ~ADLC_CTL1_AC))
+                changed = false;
+            ADLC.control1 = Value;
+            break;
+        case 1:
+            if (ADLC.control1 & ADLC_CTL1_AC) {
+                log_debug("ADLC: write register Control3=%02X", Value);
+                ADLC.control3 = Value;
+            }
+            else {
+                log_debug("ADLC: write register Control2=%02X", Value);
+                ADLC.control2 = Value;
+            }
+            break;
+        case 2:
+            log_debug("ADLC: write register Transmit Data Continue=%02X", Value);
+            econet_write_txreg(Value);
+            break;
+        case 3:
+            if (ADLC.control1 & ADLC_CTL1_AC) {
+                log_debug("ADLC: write register Control4=%02X", Value);
+                ADLC.control4 = Value;
+            }
+            else {
+                log_debug("ADLC: write register Transmit Data Finish=%02X", Value);
+                econet_write_txreg(Value);
+                ADLC.control2 |= ADLC_CTL2_TX_LAST;
+            }
+            break;
+    }
+    if (changed) {
+        econet_update_head();
+        econet_update_tail();
+        econet_adlc_debug();
+    }
+}

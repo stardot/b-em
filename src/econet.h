@@ -140,17 +140,14 @@ struct MC6854 {
 #define ADLC_STA2_RX_OVER   0x40
 #define ADLC_STA2_RDA       0x80
 
-uint8_t Read_Econet_Station(void);
-void EconetReset(void);
-uint8_t ReadEconetRegister(uint8_t addr);
-void WriteEconetRegister(uint8_t addr, uint8_t Value);
-void debugADLCprint(void);
-
-void EconetPoll(int cycles);
+void econet_reset(void);
+uint8_t econet_read_station(void);
+uint8_t econet_read_register(uint8_t addr);
+void econet_write_register(uint8_t addr, uint8_t Value);
+void econet_poll(void);
 
 extern bool EconetEnabled;
 extern bool EconetNMIenabled;
-extern bool EconetStateChanged;
 volatile extern struct MC6854 ADLC;
 
 extern uint8_t EconetStationNumber;

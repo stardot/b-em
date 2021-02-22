@@ -249,8 +249,6 @@ static inline void polltime(int c)
             disc_poll();
         }
     }
-    if (EconetEnabled)
-        EconetPoll(c);
     tubecycle += c;
 }
 
@@ -446,7 +444,7 @@ static uint32_t do_readmem(uint32_t addr)
                     return adc_read((uint16_t)addr);
                 else if (EconetEnabled) {
                     EconetNMIenabled = false;
-                    return Read_Econet_Station();
+                    return econet_read_station();
                 }
                 else
                     return mmccard_read();
@@ -529,7 +527,7 @@ static uint32_t do_readmem(uint32_t addr)
         case 0xFEB8:
         case 0xFEBC:
             if (EconetEnabled)
-                return ReadEconetRegister(addr);
+                return econet_read_register(addr);
 
         case 0xFEC0:
         case 0xFEC4:
@@ -940,7 +938,7 @@ static void do_writemem(uint32_t addr, uint32_t val)
         case 0xFEB8:
         case 0xFEBC:
             if (EconetEnabled)
-                WriteEconetRegister(addr, val);
+                econet_write_register(addr, val);
             break;
 
         case 0xFEC0:
@@ -1057,6 +1055,8 @@ static void otherstuff_poll(void) {
         if (ide_count <= 0)
             ide_callback();
     }
+    if (EconetEnabled)
+        econet_poll();
     if (adc_time) {
         adc_time--;
         if (!adc_time)

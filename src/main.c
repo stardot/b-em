@@ -124,6 +124,7 @@ void main_reset()
     music5000_reset();
     paula_reset();
     sn_init();
+    econet_reset();
     if (curtube != -1) tubes[curtube].reset();
     else               tube_exec = NULL;
     tube_reset();
@@ -333,7 +334,6 @@ void main_init(int argc, char *argv[])
         gui_set_disc_wprot(0, writeprot[0]);
     if (discfns[1])
         gui_set_disc_wprot(1, writeprot[1]);
-    EconetReset();
     main_setspeed(emuspeed);
     debug_start(exec_fn);
 }
@@ -392,6 +392,7 @@ void main_key_break(void)
     sid_reset();
     music5000_reset();
     paula_reset();
+    econet_reset();
 
     if (curtube != -1)
         tubes[curtube].reset();
