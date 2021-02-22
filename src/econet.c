@@ -224,7 +224,7 @@ static bool confAUNmode = false;       // Use AUN style networking
 static bool confLEARN = false;         // Add receipts from unknown hosts to network table
 static bool confSTRICT = false;        // Assume network ip=stn number when sending to unknown hosts
 static bool confSingleSocket = true;   // use same socket for Send and receive
-static unsigned int FourWayStageTimeout = 1000000;
+static unsigned int FourWayStageTimeout = 15625;
 static bool MassageNetworks = false;   // massage network numbers on send/receive (add/sub 128)
 
 /* Station Configuration settings:
@@ -1412,7 +1412,6 @@ static void econet_update_tail(void)
         }
     }
 
-#if 0
     // timeout four way handshake - for when we get lost..
     if (Econet4Wtrigger == 0) {
         if (fourwaystage != FWS_IDLE)
@@ -1425,7 +1424,7 @@ static void econet_update_tail(void)
         log_debug("Econet: 4waystage timeout; Set FWS_IDLE");
         econet_adlc_debug();
     }
-#endif
+
     //--------------------------------------------------------------------------------------------
     // Status bits need changing?
 
