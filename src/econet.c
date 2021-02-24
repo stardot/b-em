@@ -1258,51 +1258,6 @@ static void econet_update_head(void)
 
     // okie dokie.  This is where the brunt of the ADLC emulation & network handling will happen.
 
-    // look for control bit changes and take appropriate action
-
-    // CR1b0 - Address Control - only used to select between register 2/3/4
-    //      no action needed here
-    // CR1b1 - RIE - Receiver Interrupt Enable - Flag to allow receiver section to create interrupt.
-    //      no action needed here
-    // CR1b2 - TIE - Transmitter Interrupt Enable - ditto
-    //      no action needed here
-    // CR1b3 - RDSR mode. When set, interrupts on received data are inhibited.
-    //      unsupported - no action needed here
-    // CR1b4 - TDSR mode. When set, interrupts on trasmit data are inhibited.
-    //      unsupported - no action needed here
-    // CR1b5 - Discontinue - when set, discontinue reception of incoming data.
-    //      automatically reset this when reach the end of current frame in progress
-    //      automatically reset when frame aborted bvy receiving an abort flag, or DCD fails.
-    if (ADLC.control1 & ADLC_CTL1_RX_DISC) {
-        log_debug("EconetPoll: RxABORT is set");
-        BeebRx.Pointer = 0;
-        BeebRx.BytesInBuffer = 0;
-        ADLC.rxfptr = 0;
-        ADLC.rxap = 0;
-        ADLC.rxffc = 0;
-        ADLC.control1 &= ~ADLC_CTL1_RX_DISC;   // reset flag
-        fourwaystage = FWS_IDLE;
-    }
-    // CR1b6 - RxRs - Receiver reset. set by cpu or when reset line goes low.
-    //      all receive operations blocked (bar dcd monitoring) when this is set.
-    //      see CR2b5
-    // CR1b7 - TxRS - Transmitter reset. set by cpu or when reset line goes low.
-    //      all transmit operations blocked (bar cts monitoring) when this is set.
-    //      no action needed here; watch this bit elsewhere to inhibit actions
-
-    // -----------------------
-    // CR2b0 - PSE - priotitised status enable - adjusts how status bits show up.
-    //         See sr2pse and code in status section
-    // CR2b1 - 2byte/1byte mode.  set to indicate 2 byte mode. see trda status bit.
-    // CR2b2 - Flag/Mark idle select. What is transmitted when tx idle. ignored here as not needed
-    // CR2b3 - FC/TDRA mode - does status bit SR1b6 indicate 1=frame complete,
-    //  0=tx data reg available. 1=frame tx complete.  see tdra status bit
-    // CR2b4 - TxLast - byte just put into fifo was the last byte of a packet.
-    if (ADLC.control2 & ADLC_CTL2_TX_LAST) { // TxLast set
-        ADLC.txftl |= 1;        // set b0 - flag for fifo[0]
-        ADLC.control2 &= ~ADLC_CTL2_TX_LAST; // clear flag.
-    }
-
     // CR2b5 - CLR RxST - Clear Receiver Status - reset status bits
     if ((ADLC.control2 & ADLC_CTL2_RX_CLEAR) || (ADLC.control1 & ADLC_CTL1_RX_RESET)) { // or rxreset
         ADLC.control2 &= ~ADLC_CTL2_RX_CLEAR; // clear this bit
@@ -1345,43 +1300,6 @@ static void econet_update_head(void)
             ADLC.txftl = 0;
         }
     }
-
-    // CR2b7 - RTS control - looks after RTS output line. ignored here.
-    //      but used in CTS logic
-    // RTS gates TXD onto the econet bus. if not zero, no tx reaches it,
-    // in the B+, RTS substitutes for the collision detection circuit.
-
-    // -----------------------
-    // CR3 seems always to be all zero while debugging emulation.
-    // CR3b0 - LCF - Logical Control Field Select. if zero, no control fields in frame, ignored.
-    // CR3b1 - CEX - Extend Control Field Select - when set, control field is 16 bits. ignored.
-    // CR3b2 - AEX - When set, address will be two bytes (unless first byte is zero). ignored here.
-    // CR3b3 - 01/11 idle - idle transmission mode - ignored here,.
-    // CR3b4 - FDSE - flag detect status enable.  when set, then FD (SR1b3) + interrupr indicated a flag
-    //              has been received. I don't think we use this mode, so ignoring it.
-    // CR3b5 - Loop - Loop mode. Not used.
-    // CR3b6 - GAP/TST - sets test loopback mode (when not in Loop operation mode.) ignored.
-    // CR3b7 - LOC/DTR - (when not in loop mode) controls DTR pin directly. pin not used in a BBC B
-
-    // -----------------------
-    // CR4b0 - FF/F - when clear, re-used the Flag at end of one packet as start of next packet. ignored.
-    // CR4b1,2 - TX word length. 11=8 bits. BBC uses 8 bits so ignore flags and assume 8 bits throughout
-    // CR4b3,4 - RX word length. 11=8 bits. BBC uses 8 bits so ignore flags and assume 8 bits throughout
-    // CR4b5 - TransmitABT - Abort Transmission.  Once abort starts, bit is cleared.
-    if (ADLC.control4 & ADLC_CTL4_TX_ABORT) {   // ABORT
-        log_debug("EconetPoll: TxABORT is set");
-        ADLC.txfptr = 0;        //  reset fifo
-        ADLC.txftl = 0;         //  reset fifo flags
-        BeebTx.Pointer = 0;
-        BeebTx.BytesInBuffer = 0;
-        ADLC.control4 &= ~ADLC_CTL4_TX_ABORT;   // reset flag.
-        fourwaystage = FWS_IDLE;
-        log_debug("Econet: Set FWS_IDLE (abort)");
-    }
-
-    // CR4b6 - ABTex - extend abort - adjust way the abort flag is sent.  ignore,
-    //  can affect timing of RTS output line (and thus CTS input) still ignored.
-    // CR4b7 - NRZI/NRZ - invert data encoding on wire. ignore.
 }
 
 static void econet_rx_tx(void)
@@ -1707,6 +1625,24 @@ void econet_poll(void)
         nmi &= ~0x04;
 }
 
+static uint8_t econet_read_rxreg(void)
+{
+    if ((ADLC.control1 & ADLC_CTL1_RX_RESET) == 0) {       // rxreset not set
+        if (ADLC.rxfptr) {
+            uint8_t value = ADLC.rxfifo[--ADLC.rxfptr];
+            econet_update_head();
+            econet_update_tail();
+            log_debug("ADLC: read register Receive Data, returned fifo: %02X", value);
+            return value;
+        }
+        else
+            log_debug("ADLC: read register Receive Data when FIFO is empty");
+    }
+    else
+        log_debug("ADLC: read register Receive Data when receiver in reset state");
+    return 0;
+}
+
 uint8_t econet_read_register(uint8_t addr)
 {
     econet_adlc_debug();
@@ -1719,22 +1655,11 @@ uint8_t econet_read_register(uint8_t addr)
             log_debug("ADLC: read register Status2");
             return ADLC.status2;
         default:
-            log_debug("ADLC: read register Receive Data");
-            if (((ADLC.control1 & ADLC_CTL1_RX_RESET) == 0) && ADLC.rxfptr) {       // rxreset not set and someting in fifo
-                log_debug("Econet: Returned fifo: %02X", (int)ADLC.rxfifo[ADLC.rxfptr - 1]);
-
-                if (ADLC.rxfptr) {
-                    uint8_t value = ADLC.rxfifo[--ADLC.rxfptr];
-                    econet_update_head();
-                    econet_update_tail();
-                    return value;
-                }
-            }
-            return 0;
+            return econet_read_rxreg();
     }
 }
 
-static void econet_write_txreg(uint8_t value)
+static void econet_write_txreg(uint8_t value, bool last)
 {
     if ((ADLC.control1 & ADLC_CTL1_TX_RESET) == 0) {
         ADLC.txfifo[2] = ADLC.txfifo[1];
@@ -1742,7 +1667,89 @@ static void econet_write_txreg(uint8_t value)
         ADLC.txfifo[0] = value;
         ADLC.txfptr++;
         ADLC.txftl = ADLC.txftl << 1;       /// shift txlast bits up.
-                // set txlast control flag ourself
+        if (last)
+            ADLC.txftl |= 1;        // set b0 - flag for fifo[0]
+    }
+}
+
+static bool econet_write_ctl1(uint8_t value)
+{
+    uint8_t changes = value ^ ADLC.control1;
+    if (changes) {
+        uint8_t raised  = changes & value;
+        log_debug("ADLC: write register Control1=%02X, changes=%02X, raised=%02X", value, changes, raised);
+        if (raised & ADLC_CTL1_RX_DISC) {
+            log_debug("EconetPoll: RxABORT is set");
+            BeebRx.Pointer = 0;
+            BeebRx.BytesInBuffer = 0;
+            ADLC.rxfptr = 0;
+            ADLC.rxap = 0;
+            ADLC.rxffc = 0;
+            value &= ~ADLC_CTL1_RX_DISC;   // reset flag
+            fourwaystage = FWS_IDLE;
+        }
+        ADLC.control1 = value;
+        return (changes & ~ADLC_CTL1_AC);
+    }
+    else {
+        log_debug("ADLC: write register Control1=%02X (unchanged)", value);
+        return false;
+    }
+}
+
+static bool econet_write_ctl2(uint8_t value)
+{
+    uint8_t changes = value ^ ADLC.control1;
+    if (changes) {
+        uint8_t raised  = changes & value;
+        log_debug("ADLC: write register Control2=%02X, changes=%02X, raised=%02X", value, changes, raised);
+        if (raised & ADLC_CTL2_TX_LAST) {
+            ADLC.txftl |= 1;             // set b0 - flag for fifo[0]
+            value &= ~ADLC_CTL2_TX_LAST; // clear flag.
+        }
+        ADLC.control2 = value;
+        return true;
+    }
+    else {
+        log_debug("ADLC: write register Control2=%02X (unchanged)", value);
+        return false;
+    }
+}
+
+static bool econet_write_ctl3(uint8_t value)
+{
+    uint8_t changes = value ^ ADLC.control1;
+    if (changes) {
+        uint8_t raised  = changes & value;
+        log_debug("ADLC: write register Control3=%02X, changes=%02X, raised=%02X", value, changes, raised);
+    }
+    else
+        log_debug("ADLC: write register Control3=%02X (unchanged)", value);
+    return false;
+}
+
+static bool econet_write_ctl4(uint8_t value)
+{
+    uint8_t changes = value ^ ADLC.control1;
+    if (changes) {
+        uint8_t raised  = changes & value;
+        log_debug("ADLC: write register Control4=%02X, changes=%02X, raised=%02X", value, changes, raised);
+        if (raised & ADLC_CTL4_TX_ABORT) {
+            log_debug("EconetPoll: TxABORT is set");
+            ADLC.txfptr = 0;        //  reset fifo
+            ADLC.txftl = 0;         //  reset fifo flags
+            BeebTx.Pointer = 0;
+            BeebTx.BytesInBuffer = 0;
+            value &= ~ADLC_CTL4_TX_ABORT;   // reset flag.
+            fourwaystage = FWS_IDLE;
+            log_debug("Econet: Set FWS_IDLE (abort)");
+        }
+        ADLC.control4 = value;
+        return true;
+    }
+    else {
+        log_debug("ADLC: write register Control4=%02X (unchanged)", value);
+        return false;
     }
 }
 
@@ -1751,34 +1758,24 @@ void econet_write_register(uint8_t addr, uint8_t Value)
     bool changed = true;
     switch (addr & 0x03) {
         case 0:
-            log_debug("ADLC: write register Control1=%02X", Value);
-            if ((ADLC.control1 & ~ADLC_CTL1_AC) == (Value & ~ADLC_CTL1_AC))
-                changed = false;
-            ADLC.control1 = Value;
+            changed = econet_write_ctl1(Value);
             break;
         case 1:
-            if (ADLC.control1 & ADLC_CTL1_AC) {
-                log_debug("ADLC: write register Control3=%02X", Value);
-                ADLC.control3 = Value;
-            }
-            else {
-                log_debug("ADLC: write register Control2=%02X", Value);
-                ADLC.control2 = Value;
-            }
+            if (ADLC.control1 & ADLC_CTL1_AC)
+                changed = econet_write_ctl3(Value);
+            else
+                changed = econet_write_ctl2(Value);
             break;
         case 2:
             log_debug("ADLC: write register Transmit Data Continue=%02X", Value);
-            econet_write_txreg(Value);
+            econet_write_txreg(Value, false);
             break;
         case 3:
-            if (ADLC.control1 & ADLC_CTL1_AC) {
-                log_debug("ADLC: write register Control4=%02X", Value);
-                ADLC.control4 = Value;
-            }
+            if (ADLC.control1 & ADLC_CTL1_AC)
+                changed = econet_write_ctl4(Value);
             else {
                 log_debug("ADLC: write register Transmit Data Finish=%02X", Value);
-                econet_write_txreg(Value);
-                ADLC.control2 |= ADLC_CTL2_TX_LAST;
+                econet_write_txreg(Value, true);
             }
             break;
     }
