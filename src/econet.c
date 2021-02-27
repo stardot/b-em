@@ -313,6 +313,8 @@ static unsigned long EconetCycles = 0;
 
 static unsigned long EconetSCACKtrigger;         //trigger point for scout ack
 static unsigned long EconetSCACKtimeout = 4;   // cycles to delay before sending ack to scout (aun mode only)
+static unsigned long EconetWait4IdleTrigger;
+static unsigned long EconetWait4IdleTimeout = 12;
 static unsigned long Econet4Wtrigger;
 
 /* Device and temp copy */
@@ -755,7 +757,7 @@ static void econet_tx_copy(int start)
 static void econet_set_wait4idle(const char *dir, const char *reason)
 {
     fourwaystage = FWS_WAIT4IDLE;
-    EconetSCACKtrigger = 0; //EconetCycles + EconetSCACKtimeout * 3<< 1);
+    EconetWait4IdleTrigger = 0; //EconetCycles + EconetSCACKtimeout * 3<< 1);
     log_debug("Econet(%s): Set FWS_WAIT4IDLE (%s)", dir, reason);
 }
 
@@ -1337,15 +1339,15 @@ static void econet_update_tail(void)
 
     //waiting for AUN to become idle?
     if (confAUNmode && fourwaystage == FWS_WAIT4IDLE && BeebRx.BytesInBuffer == 0 && ADLC.rxfptr == 0 && ADLC.txfptr == 0) {
-        if (EconetSCACKtrigger == 0) {
+        if (EconetWait4IdleTrigger == 0) {
             log_debug("Econet: setting WAIT4IDLE timeout");
-            EconetSCACKtrigger = EconetCycles + EconetSCACKtimeout;
+            EconetWait4IdleTrigger = EconetCycles + EconetWait4IdleTimeout;
         }
-        else if (EconetSCACKtrigger <= EconetCycles) {
+        else if (EconetWait4IdleTrigger <= EconetCycles) {
             log_debug("Econet: wait over, returning to FWS_IDLE");
             fourwaystage = FWS_IDLE;
             Econet4Wtrigger = 0;
-            EconetSCACKtrigger = 0;
+            EconetWait4IdleTrigger = 0;
             FlagFillActive = false;
         }
     }
@@ -1357,6 +1359,7 @@ static void econet_update_tail(void)
     }
     else if (Econet4Wtrigger <= EconetCycles) {
         EconetSCACKtrigger = 0;
+        EconetWait4IdleTrigger = 0;
         Econet4Wtrigger = 0;
         fourwaystage = FWS_IDLE;
         log_debug("Econet: 4waystage timeout; Set FWS_IDLE");
