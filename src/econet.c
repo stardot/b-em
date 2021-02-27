@@ -1118,21 +1118,41 @@ static void econet_rx_data(void)
                             if (!foundhost) {
                                 // packet from unknown host
                                 if (confLEARN) {
-                                    log_debug("Econet(Rx): Previusly unknown host; add entry!");
-                                    host = malloc(sizeof(struct ECOLAN));
+                                    uint8_t station = ntohl(host->inet_addr.s_addr) & 0xff;
+                                    uint8_t network = 0;
+                                    for (struct AUNTAB *aunent = aunnet; aunent; aunent = aunent->next) {
+                                        if (aunent->inet_addr.s_addr == RecvAddr.sin_addr.s_addr) {
+                                            network = aunent->network;
+                                            break;
+                                        }
+                                    }
+                                    log_debug("Econet(Rx): Previusly unknown IP, Econet %u:%u", network, station);
+                                    for (struct ECOLAN *entry = networks; entry; entry = entry->next) {
+                                        if (entry->network == network && entry->station == station) {
+                                            host = entry;
+                                            break;
+                                        }
+                                    }
                                     if (host) {
-                                        host->next = networks;
+                                        log_debug("Econet(Rx): updating existing entry %s:%u", inet_ntoa(host->inet_addr), host->port);
                                         host->port = ntohs(RecvAddr.sin_port);
                                         host->inet_addr = RecvAddr.sin_addr;
-                                        // TODO sort this out!! potential for clashes!! look for dupes
-                                        host->station = ntohl(host->inet_addr.s_addr) & 0xff;
-                                        // TODO and we need to use the map file ..
-                                        host->network = 0;
-                                        networks = host;
                                         foundhost = true;
                                     }
-                                    else
-                                        log_error("econet: out of memory for network table");
+                                    else {
+                                        host = malloc(sizeof(struct ECOLAN));
+                                        if (host) {
+                                            host->next = networks;
+                                            host->port = ntohs(RecvAddr.sin_port);
+                                            host->inet_addr = RecvAddr.sin_addr;
+                                            host->station = station;
+                                            host->network = network;
+                                            log_debug("Econet(Rx): adding new entry %u:%u -> %s:%u", network, station, inet_ntoa(host->inet_addr), host->port);
+                                            foundhost = true;
+                                        }
+                                        else
+                                            log_error("econet: out of memory for network table");
+                                    }
                                 }
                                 else {
                                     // ignore it..
