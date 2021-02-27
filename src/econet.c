@@ -213,13 +213,13 @@ struct ECOLAN {                 // what we we need to find a beeb?
     struct ECOLAN *next;
     uint8_t station;
     uint8_t network;
-    uint32_t inet_addr;
-    unsigned int port;
+    uint16_t port;
+    struct in_addr inet_addr;
 };
 
 struct AUNTAB {
     struct AUNTAB *next;
-    uint32_t inet_addr;
+    struct in_addr inet_addr;
     uint8_t network;
 };
 
@@ -356,7 +356,9 @@ static void econet_read_netfile(void)
         if (EcoCfg) {
             econet_free_networks();
             char EcoNameBuf[256];
+            unsigned lineno = 0;
             while (fgets(EcoNameBuf, sizeof(EcoNameBuf)-1, EcoCfg)) {
+                lineno++;
                 char *EcoName = EcoNameBuf;
                 log_debug("Econet: ConfigFile %s", EcoName);
                 int ch = *EcoName;
@@ -379,27 +381,39 @@ static void econet_read_netfile(void)
                                     ch = *++EcoPtr;
                                 if (EcoPtr > EcoName) {
                                     *EcoPtr++ = 0;
-                                    uint32_t iaddr = inet_addr(EcoName);
-                                    unsigned int port = strtol(EcoPtr, &end, 10);
-                                    if (end > EcoPtr) {
-                                        log_debug("Econet: ConfigFile Net %i Stn %i IP %08x Port %i", network, station, iaddr, port);
-                                        struct ECOLAN *entry = malloc(sizeof(struct ECOLAN));
-                                        if (entry) {
-                                            entry->next = networks;
-                                            entry->station = station;
-                                            entry->network = network;
-                                            entry->inet_addr = iaddr;
-                                            entry->port = port;
-                                            networks = entry;
+                                    struct in_addr iaddr;
+                                    if (inet_aton(EcoName, &iaddr)) {
+                                        unsigned int port = strtol(EcoPtr, &end, 10);
+                                        if (end > EcoPtr) {
+                                            log_debug("Econet: ConfigFile Net %i Stn %i IP %s Port %i", network, station, inet_ntoa(iaddr), port);
+                                            struct ECOLAN *entry = malloc(sizeof(struct ECOLAN));
+                                            if (entry) {
+                                                entry->next = networks;
+                                                entry->station = station;
+                                                entry->network = network;
+                                                entry->inet_addr = iaddr;
+                                                entry->port = port;
+                                                networks = entry;
+                                            }
+                                            else {
+                                                log_error("econet: out of memory for network table");
+                                                break;
+                                            }
                                         }
-                                        else {
-                                            log_error("econet: out of memory for network table");
-                                            break;
-                                        }
+                                        else
+                                            log_warn("Econet: %s, line %u: missing or invalid port number", cpath, lineno);
                                     }
+                                    else
+                                        log_warn("Econet: %s, line %u: invalid IP address '%s'", cpath, lineno, EcoName);
                                 }
+                                else
+                                    log_warn("Econet: %s, line %u: missing IP address", cpath, lineno);
                             }
+                            else
+                                log_warn("Econet: %s, line %u: invalid station number '%s'", cpath, lineno, EcoName);
                         }
+                        else
+                            log_warn("Econet: %s, line %u: invalid network number '%s'", cpath, lineno, EcoName);
                     }
                     else {
                         char *EcoPtr = EcoName;
@@ -465,7 +479,9 @@ static void econet_read_netfile(void)
             if (EcoCfg) {
                 econet_free_aunmap();
                 char EcoNameBuf[256];
+                unsigned lineno = 0;
                 while (fgets(EcoNameBuf, sizeof(EcoNameBuf), EcoCfg)) {
+                    lineno++;
                     char *EcoName = EcoNameBuf;
                     int ch = *EcoName;
                     while (ch && isspace(ch))
@@ -482,34 +498,44 @@ static void econet_read_netfile(void)
                                 EcoName = EcoSep;
                                 while (ch && (isdigit(ch) || ch == '.'))
                                     ch = *EcoSep++;
-                                if (ch) {
+                                if (ch && EcoSep > EcoName) {
                                     EcoSep[-1] = 0;
-                                    in_addr_t addr = inet_addr(EcoName);
-                                    while (ch && isspace(ch))
-                                        ch = *EcoSep++;
-                                    if (ch) {
-                                        unsigned net = strtol(EcoSep, NULL, 10);
-                                        log_debug("Econet: AUNmap Net %i IP %08x ", net, addr);
-                                        struct AUNTAB *entry = malloc(sizeof(struct AUNTAB));
-                                        if (entry) {
-                                            uint32_t haddr = ntohl(addr) & 0xffffff00;
-                                            entry->next = aunnet;
-                                            entry->inet_addr = htonl(haddr);
-                                            entry->network = net;
-                                            aunnet = entry;
-                                            // note which network we are a part of.. this wont work on first run as listenip not set!
-                                            if (haddr == (ntohl(EconetListenIP) & 0xffffff00)) {
-                                                myaunnet = entry;
-                                                log_debug("Econet: ..and that's the one we're in");
+                                    struct in_addr iaddr;
+                                    if (inet_aton(EcoName, &iaddr)) {
+                                        while (ch && isspace(ch))
+                                            ch = *EcoSep++;
+                                        if (ch) {
+                                            unsigned net = strtol(EcoSep, NULL, 10);
+                                            log_debug("Econet: AUNmap Net %i IP %s ", net, inet_ntoa(iaddr));
+                                            struct AUNTAB *entry = malloc(sizeof(struct AUNTAB));
+                                            if (entry) {
+                                                uint32_t haddr = ntohl(iaddr.s_addr) & 0xffffff00;
+                                                entry->next = aunnet;
+                                                entry->inet_addr.s_addr = htonl(haddr);
+                                                entry->network = net;
+                                                aunnet = entry;
+                                                // note which network we are a part of.. this wont work on first run as listenip not set!
+                                                if (haddr == (ntohl(EconetListenIP) & 0xffffff00)) {
+                                                    myaunnet = entry;
+                                                    log_debug("Econet: ..and that's the one we're in");
+                                                }
+                                            }
+                                            else {
+                                                log_error("econet: out of memory for AUN map");
+                                                break;
                                             }
                                         }
-                                        else {
-                                            log_error("econet: out of memory for AUN map");
-                                            break;
-                                        }
+                                        else
+                                            log_warn("Econet: %s, line %u: missing network", cpath, lineno);
                                     }
+                                    else
+                                        log_warn("Econet: %s, line %u: invalid IP address '%s'", cpath, lineno, EcoName);
                                 }
+                                else
+                                    log_warn("Econet: %s, line %u: missing IP address", cpath, lineno);
                             }
+                            else
+                                log_warn("Econet: %s, line %u: missing IP address", cpath, lineno);
                         }
                     }
                 }
@@ -625,7 +651,7 @@ void econet_reset(void)
         for (struct ECOLAN *entry = networks; entry; entry = entry->next) {
             if (entry->station == EconetStationNumber) {
                 EconetListenPort = entry->port;
-                EconetListenIP = entry->inet_addr;
+                EconetListenIP = entry->inet_addr.s_addr;
                 break;
             }
         }
@@ -659,12 +685,12 @@ void econet_reset(void)
                 // Check address for each network interface/card
                 for (int a = 0; hent->h_addr_list[a] != NULL && EconetStationNumber == 0; ++a) {
                     memcpy(&localaddr, hent->h_addr_list[a], sizeof(struct in_addr));
-                    if (entry->inet_addr == INADDR_LOOPBACK || entry->inet_addr == local_ipaddr(localaddr)) {
+                    if (entry->inet_addr.s_addr == INADDR_LOOPBACK || entry->inet_addr.s_addr == local_ipaddr(localaddr)) {
                         service.sin_port = htons(entry->port);
-                        service.sin_addr.s_addr = entry->inet_addr;
+                        service.sin_addr = entry->inet_addr;
                         if (bind(ListenSocket, (SOCKADDR *) & service, sizeof(service)) == 0) {
                             EconetListenPort = entry->port;
-                            EconetListenIP = entry->inet_addr;
+                            EconetListenIP = entry->inet_addr.s_addr;
                             EconetStationNumber = entry->station;
                         }
                     }
@@ -679,7 +705,7 @@ void econet_reset(void)
                     for (struct AUNTAB *entry = aunnet; entry && EconetStationNumber == 0; entry = entry->next) {
                         for (int a = 0; hent->h_addr_list[a] != NULL && EconetStationNumber == 0; ++a) {
                             memcpy(&localaddr, hent->h_addr_list[a], sizeof(struct in_addr));
-                            if (entry->inet_addr == local) {
+                            if (entry->inet_addr.s_addr == local) {
                                 service.sin_port = htons(32768);
                                 service.sin_addr.s_addr = local_ipaddr(localaddr);
                                 if (bind(ListenSocket, (SOCKADDR *) & service, sizeof(service)) == 0) {
@@ -687,7 +713,7 @@ void econet_reset(void)
                                     struct ECOLAN *ecoent = malloc(sizeof(struct ECOLAN));
                                     if (ecoent) {
                                         ecoent->next = networks;
-                                        ecoent->inet_addr = EconetListenIP = local_ipaddr(localaddr);
+                                        ecoent->inet_addr.s_addr = EconetListenIP = local_ipaddr(localaddr);
                                         ecoent->port = EconetListenPort = 32768;
                                         ecoent->station = EconetStationNumber = local_ipaddr(localaddr) >> 24;
                                         ecoent->network = entry->network;
@@ -842,7 +868,7 @@ static void econet_tx_data(void)
                         ecoent = malloc(sizeof(struct ECOLAN));
                         if (ecoent) {
                             ecoent->next = networks;
-                            ecoent->inet_addr = myaunnet->inet_addr | (BeebTx.eh.deststn << 24);
+                            ecoent->inet_addr.s_addr = htonl(ntohl(myaunnet->inet_addr.s_addr) | (BeebTx.eh.deststn & 0xff));
                             ecoent->port = 32768;        // default AUN port
                             ecoent->network = BeebTx.eh.destnet;
                             ecoent->station = BeebTx.eh.deststn;
@@ -858,7 +884,7 @@ static void econet_tx_data(void)
                                 ecoent = malloc(sizeof(struct ECOLAN));
                                 if (ecoent) {
                                     ecoent->next = networks;
-                                    ecoent->inet_addr = aunent->inet_addr | (BeebTx.eh.deststn << 24);
+                                    ecoent->inet_addr.s_addr = htonl(ntohl(myaunnet->inet_addr.s_addr) | (BeebTx.eh.deststn & 0xff));
                                     ecoent->port = 32768;        // default AUN port
                                     ecoent->network = BeebTx.eh.destnet;
                                     ecoent->station = BeebTx.eh.deststn;
@@ -874,12 +900,12 @@ static void econet_tx_data(void)
 
                 RecvAddr.sin_family = AF_INET;
                 RecvAddr.sin_port = htons(ecoent->port);
-                RecvAddr.sin_addr.s_addr = ecoent->inet_addr;
+                RecvAddr.sin_addr = ecoent->inet_addr;
             }
 
             // TODO
-            log_debug("Econet(Tx): TXLast set - Send %d byte packet to %02x %02x (%08X:%u)",
-                      BeebTx.Pointer, (unsigned int)(BeebTx.eh.destnet), (unsigned int)BeebTx.eh.deststn, (unsigned int)RecvAddr.sin_addr.s_addr, (unsigned int)ntohs(RecvAddr.sin_port));
+            log_debug("Econet(Tx): TXLast set - Send %d byte packet to %02x %02x (%s:%u)",
+                      BeebTx.Pointer, (unsigned int)(BeebTx.eh.destnet), (unsigned int)BeebTx.eh.deststn, inet_ntoa(RecvAddr.sin_addr), (unsigned int)ntohs(RecvAddr.sin_port));
             log_dump("Econet(Tx): Econet packet: ", BeebTx.buff, BeebTx.Pointer);
     /*                  if (confAUNmode && fourwaystage != FWS_IDLE) {
                 if (RecvAddr.sin_port != EconetTx.inet_addr ||
@@ -988,16 +1014,16 @@ static void econet_tx_data(void)
                     log_debug("Econet(Tx): Sending an AUN packet, SendLen=%d. type=%u, port=%u, handle=%u", SendLen, EconetTx.ah.type, EconetTx.ah.port, EconetTx.ah.handle);
                     log_dump("Econet(Tx): AUN Packet: ", (uint8_t *)&EconetTx, SendLen);
                     if (sendto(SendSocket, (char *)&EconetTx, SendLen, 0, (SOCKADDR *) &RecvAddr, sizeof(RecvAddr)) == SOCKET_ERROR) {
-                        log_error("Econet(Tx): Failed to send packet to %02x %02x (%08X :%u)",
-                                  (unsigned int)(ecoent->inet_addr), (unsigned int)ecoent->station, (unsigned int)ecoent->inet_addr, (unsigned int)ecoent->port);
+                        log_error("Econet(Tx): Failed to send packet to %02x %02x (%s:%u)",
+                                  (unsigned int)(ecoent->network), (unsigned int)ecoent->station, inet_ntoa(ecoent->inet_addr), (unsigned int)ecoent->port);
                     }
                 }
                 else {
                     log_debug("Econet(Tx): Sending a non-AUN packet, BeebTx.Pointer=%d", BeebTx.Pointer);
                     log_dump("Econet(Tx): BeebEm Packet: ", BeebTx.buff, BeebTx.Pointer);
                     if (sendto(SendSocket, (char *)BeebTx.buff, BeebTx.Pointer, 0, (SOCKADDR *) &RecvAddr, sizeof(RecvAddr)) == SOCKET_ERROR) {
-                        log_error("Econet(Tx): Failed to send packet to %02x %02x (%08X :%u)",
-                                  (unsigned int)(BeebTx.eh.destnet), (unsigned int)BeebTx.eh.deststn, (unsigned int)ecoent->inet_addr, (unsigned int)ecoent->port);
+                        log_error("Econet(Tx): Failed to send packet to %02x %02x (%s:%u)",
+                                  (unsigned int)(BeebTx.eh.destnet), (unsigned int)BeebTx.eh.deststn, inet_ntoa(ecoent->inet_addr), (unsigned int)ecoent->port);
                     }
                 }
 
@@ -1075,21 +1101,20 @@ static void econet_rx_data(void)
                         RetVal = recvfrom(ListenSocket, (char *)BeebRx.buff, sizeof(BeebRx.buff), 0, (SOCKADDR *) & RecvAddr, (socklen_t *)&sizRcvAdr);
                     }
                     if (RetVal > 0) {
-                        log_debug("Econet(Rx): Packet received, %u bytes from %08X:%u", (int)RetVal, RecvAddr.sin_addr.s_addr, htons(RecvAddr.sin_port));
+                        log_debug("Econet(Rx): Packet received, %u bytes from %s:%u", (int)RetVal, inet_ntoa(RecvAddr.sin_addr), htons(RecvAddr.sin_port));
                         if (confAUNmode) {
                             log_dump("Econet(Rx): AUN packet: ", EconetRx.raw, RetVal);
 
                             // convert from AUN format
                             // find station number of sender
-                            struct ECOLAN *host = networks;
+                            struct ECOLAN *host;
                             bool foundhost = false;
-                            do {
-                                if (RecvAddr.sin_port == htons(host->port) && RecvAddr.sin_addr.s_addr == host->inet_addr) {
+                            for (host = networks; host; host = host->next) {
+                                if (RecvAddr.sin_port == htons(host->port) && RecvAddr.sin_addr.s_addr == host->inet_addr.s_addr) {
                                     foundhost = true;
                                     break;
                                 }
-                                host = host->next;
-                            } while (host);
+                            }
                             if (!foundhost) {
                                 // packet from unknown host
                                 if (confLEARN) {
@@ -1098,9 +1123,9 @@ static void econet_rx_data(void)
                                     if (host) {
                                         host->next = networks;
                                         host->port = ntohs(RecvAddr.sin_port);
-                                        host->inet_addr = RecvAddr.sin_addr.s_addr;
+                                        host->inet_addr = RecvAddr.sin_addr;
                                         // TODO sort this out!! potential for clashes!! look for dupes
-                                        host->station = ntohl(host->inet_addr) & 0xff;
+                                        host->station = ntohl(host->inet_addr.s_addr) & 0xff;
                                         // TODO and we need to use the map file ..
                                         host->network = 0;
                                         networks = host;
