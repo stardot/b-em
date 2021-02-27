@@ -320,7 +320,7 @@ static unsigned long Econet4Wtrigger;
 /* Device and temp copy */
 
 volatile struct MC6854 ADLC;
-static struct MC6854 ADLCtemp;
+static uint8_t old_status1, old_status2;
 
 static const uint8_t powers[4] = { 1, 2, 4, 8 };
 
@@ -1241,69 +1241,6 @@ static void econet_rx_data(void)
     }
 }
 
-//--------------------------------------------------------------------------------------------
-//--------------------------------------------------------------------------------------------
-// Run when state changed or time to check comms.
-// The majority of this code is to handle the status registers.
-// These are just flags that depend on the tx & rx satus, and the control flags.
-// These change immediately anything happens, so need refreshing all the time,
-// as rx and tx operations can depend on them too.  It /might/ be possible to
-// only re-calculate them when needed (e.g. on a memory-read or in the receive
-// routines before they are checked) but for the moment I just want to get this
-// code actually working!
-
-static void econet_update_head(void)
-{
-    // save flags
-    ADLCtemp.status1 = ADLC.status1;
-    ADLCtemp.status2 = ADLC.status2;
-
-    // okie dokie.  This is where the brunt of the ADLC emulation & network handling will happen.
-
-    // CR2b5 - CLR RxST - Clear Receiver Status - reset status bits
-    if ((ADLC.control2 & ADLC_CTL2_RX_CLEAR) || (ADLC.control1 & ADLC_CTL1_RX_RESET)) { // or rxreset
-        ADLC.control2 &= ~ADLC_CTL2_RX_CLEAR; // clear this bit
-        ADLC.status1 &= ~(ADLC_STA1_S2RR|ADLC_STA1_FLAG_DET);  // clear sr2rq, FD
-        ADLC.status2 &= ~(ADLC_STA2_FRAME_VAL|ADLC_STA2_INAC_IDLE|ADLC_STA2_ABORT|ADLC_STA2_FCS_ERR|ADLC_STA2_NOT_DCD|ADLC_STA2_RX_OVER);  // clear FV, RxIdle, RxAbt, Err, OVRN, DCD
-
-        if ((ADLC.control2 & ADLC_CTL2_PSE) && ADLC.sr2pse) {       // PSE active?
-            ADLC.sr2pse++;      // Advance PSE to next priority
-            if (ADLC.sr2pse > 4)
-                ADLC.sr2pse = 0;
-        }
-        else {
-            ADLC.sr2pse = 0;
-        }
-
-        sr1b2cause = 0;         // clear cause of sr2b1 going up
-        if (ADLC.control1 & ADLC_CTL1_RX_RESET) {     // rx reset,clear buffers.
-            BeebRx.Pointer = 0;
-            BeebRx.BytesInBuffer = 0;
-            ADLC.rxfptr = 0;
-            ADLC.rxap = 0;
-            ADLC.rxffc = 0;
-            ADLC.sr2pse = 0;
-        }
-//      fourwaystage = FWS_IDLE;            // this really doesn't like being here.
-    }
-
-    // CR2b6 - CLT TxST - Clear Transmitter Status - reset status bits
-    if ((ADLC.control2 & ADLC_CTL2_TX_CLEAR) || (ADLC.control1 & ADLC_CTL1_TX_RESET)) {        // or txreset
-        ADLC.control2 &= ~ADLC_CTL2_TX_CLEAR;   // clear this bit
-        ADLC.status1 &= ~(ADLC_STA1_NOT_CTS|ADLC_STA1_TX_UNDER|ADLC_STA1_TDRAFC);  // clear TXU , cts, TDRA/FC
-        if (ADLC.cts) {
-            ADLC.status1 |= ADLC_STA1_NOT_CTS;      //cts follows signal, reset high again
-            ADLCtemp.status1 |= ADLC_STA1_NOT_CTS;  // don't trigger another interrupt instantly
-        }
-        if (ADLC.control1 & ADLC_CTL1_TX_RESET) {      // tx reset,clear buffers.
-            BeebTx.Pointer = 0;
-            BeebTx.BytesInBuffer = 0;
-            ADLC.txfptr = 0;
-            ADLC.txftl = 0;
-        }
-    }
-}
-
 static void econet_rx_tx(void)
 {
     // Only do this bit occasionally as data only comes in from
@@ -1327,16 +1264,16 @@ static void econet_rx_tx(void)
     else {
         ADLC.idle = false;
     }
-}
 
-static void econet_update_tail(void)
-{
     // Reset pseudo flag fill?
     if (EconetFlagFillTimeoutTrigger <= EconetCycles && FlagFillActive) {
         FlagFillActive = false;
         log_debug("Econet: FlagFill timeout reset");
     }
+}
 
+static void econet_update_tail(void)
+{
     //waiting for AUN to become idle?
     if (confAUNmode && fourwaystage == FWS_WAIT4IDLE && BeebRx.BytesInBuffer == 0 && ADLC.rxfptr == 0 && ADLC.txfptr == 0) {
         if (EconetWait4IdleTrigger == 0) {
@@ -1539,11 +1476,11 @@ static void econet_update_tail(void)
         log_debug("ADLC: PSE SR2Rx priority changed to %d", ADLC.sr2pse);
 
     // Do we need to flag an interrupt?
-    if (ADLC.status1 != ADLCtemp.status1 || ADLC.status2 != ADLCtemp.status2) { // something changed
+    if (ADLC.status1 != old_status1 || ADLC.status2 != old_status2) { // something changed
         uint8_t tempcause, temp2;
 
         // SR1b1 - S2RQ - Status2 request. New bit set in S2?
-        tempcause = ((ADLC.status2 ^ ADLCtemp.status2) & ADLC.status2) & ~ADLC_STA2_RDA;
+        tempcause = ((ADLC.status2 ^ old_status2) & ADLC.status2) & ~ADLC_STA2_RDA;
 
         if (!(ADLC.control1 & ADLC_CTL1_RIE)) {     // RIE not set,
             tempcause = 0;
@@ -1559,7 +1496,7 @@ static void econet_update_tail(void)
         }
 
         // New bit set in S1?
-        tempcause = ((ADLC.status1 ^ ADLCtemp.status1) & ADLC.status1) & ~ADLC_STA1_IRQ;
+        tempcause = ((ADLC.status1 ^ old_status1) & ADLC.status1) & ~ADLC_STA1_IRQ;
 
         if (!(ADLC.control1 & ADLC_CTL1_RIE)) {     // RIE not set,
             tempcause = tempcause & ~11;
@@ -1576,7 +1513,7 @@ static void econet_update_tail(void)
         }
 
         // Bit cleared in S1?
-        temp2 = ((ADLC.status1 ^ ADLCtemp.status1) & ADLCtemp.status1) & ~ADLC_STA1_IRQ;
+        temp2 = ((ADLC.status1 ^ old_status1) & old_status1) & ~ADLC_STA1_IRQ;
         if (temp2) {            // something went off
             irqcause = irqcause & ~temp2;       // clear flags that went off
             if (irqcause == 0) {        // all flag gone off now
@@ -1616,7 +1553,8 @@ void econet_poll(void)
     }
     // Don't poll if failed to init sockets
     if (ReceiverSocketsOpen) {
-        econet_update_head();
+        old_status1 = ADLC.status1;
+        old_status2 = ADLC.status2;
         econet_rx_tx();
         econet_update_tail();
     }
@@ -1633,7 +1571,8 @@ static uint8_t econet_read_rxreg(void)
     if ((ADLC.control1 & ADLC_CTL1_RX_RESET) == 0) {       // rxreset not set
         if (ADLC.rxfptr) {
             uint8_t value = ADLC.rxfifo[--ADLC.rxfptr];
-            econet_update_head();
+            old_status1 = ADLC.status1;
+            old_status2 = ADLC.status2;
             econet_update_tail();
             log_debug("ADLC: read register Receive Data, returned fifo: %02X", value);
             return value;
@@ -1664,6 +1603,8 @@ uint8_t econet_read_register(uint8_t addr)
 
 static void econet_write_txreg(uint8_t value, bool last)
 {
+    old_status1 = ADLC.status1;
+    old_status2 = ADLC.status2;
     if ((ADLC.control1 & ADLC_CTL1_TX_RESET) == 0) {
         ADLC.txfifo[2] = ADLC.txfifo[1];
         ADLC.txfifo[1] = ADLC.txfifo[0];
@@ -1675,12 +1616,57 @@ static void econet_write_txreg(uint8_t value, bool last)
     }
 }
 
+static void econet_rx_clear(void)
+{
+    ADLC.control2 &= ~ADLC_CTL2_RX_CLEAR; // clear this bit
+    ADLC.status1 &= ~(ADLC_STA1_S2RR|ADLC_STA1_FLAG_DET);  // clear sr2rq, FD
+    ADLC.status2 &= ~(ADLC_STA2_FRAME_VAL|ADLC_STA2_INAC_IDLE|ADLC_STA2_ABORT|ADLC_STA2_FCS_ERR|ADLC_STA2_NOT_DCD|ADLC_STA2_RX_OVER);  // clear FV, RxIdle, RxAbt, Err, OVRN, DCD
+
+    if ((ADLC.control2 & ADLC_CTL2_PSE) && ADLC.sr2pse) {       // PSE active?
+        ADLC.sr2pse++;      // Advance PSE to next priority
+        if (ADLC.sr2pse > 4)
+            ADLC.sr2pse = 0;
+    }
+    else {
+        ADLC.sr2pse = 0;
+    }
+
+    sr1b2cause = 0;         // clear cause of sr2b1 going up
+    if (ADLC.control1 & ADLC_CTL1_RX_RESET) {     // rx reset,clear buffers.
+        BeebRx.Pointer = 0;
+        BeebRx.BytesInBuffer = 0;
+        ADLC.rxfptr = 0;
+        ADLC.rxap = 0;
+        ADLC.rxffc = 0;
+        ADLC.sr2pse = 0;
+    }
+}
+
+static void econet_tx_clear(void)
+{
+    ADLC.control2 &= ~ADLC_CTL2_TX_CLEAR;   // clear this bit
+    ADLC.status1 &= ~(ADLC_STA1_NOT_CTS|ADLC_STA1_TX_UNDER|ADLC_STA1_TDRAFC);  // clear TXU , cts, TDRA/FC
+    if (ADLC.cts) {
+        ADLC.status1 |= ADLC_STA1_NOT_CTS;      //cts follows signal, reset high again
+        old_status1 |= ADLC_STA1_NOT_CTS;  // don't trigger another interrupt instantly
+    }
+    if (ADLC.control1 & ADLC_CTL1_TX_RESET) {      // tx reset,clear buffers.
+        BeebTx.Pointer = 0;
+        BeebTx.BytesInBuffer = 0;
+        ADLC.txfptr = 0;
+        ADLC.txftl = 0;
+    }
+}
+
 static bool econet_write_ctl1(uint8_t value)
 {
     uint8_t changes = value ^ ADLC.control1;
     if (changes) {
         uint8_t raised  = changes & value;
         log_debug("ADLC: write register Control1=%02X, changes=%02X, raised=%02X", value, changes, raised);
+        ADLC.control1 = value;
+        old_status1 = ADLC.status1;
+        old_status2 = ADLC.status2;
         if (raised & ADLC_CTL1_RX_DISC) {
             log_debug("EconetPoll: RxABORT is set");
             BeebRx.Pointer = 0;
@@ -1688,10 +1674,13 @@ static bool econet_write_ctl1(uint8_t value)
             ADLC.rxfptr = 0;
             ADLC.rxap = 0;
             ADLC.rxffc = 0;
-            value &= ~ADLC_CTL1_RX_DISC;   // reset flag
+            ADLC.control1 &= ~ADLC_CTL1_RX_DISC;   // reset flag
             fourwaystage = FWS_IDLE;
         }
-        ADLC.control1 = value;
+        if (raised & ADLC_CTL1_RX_RESET)
+            econet_rx_clear();
+        if (raised & ADLC_CTL1_TX_RESET)
+            econet_tx_clear();
         return (changes & ~ADLC_CTL1_AC);
     }
     else {
@@ -1706,11 +1695,17 @@ static bool econet_write_ctl2(uint8_t value)
     if (changes) {
         uint8_t raised  = changes & value;
         log_debug("ADLC: write register Control2=%02X, changes=%02X, raised=%02X", value, changes, raised);
+        ADLC.control2 = value;
+        old_status1 = ADLC.status1;
+        old_status2 = ADLC.status2;
         if (raised & ADLC_CTL2_TX_LAST) {
             ADLC.txftl |= 1;             // set b0 - flag for fifo[0]
-            value &= ~ADLC_CTL2_TX_LAST; // clear flag.
+            ADLC.control2 &= ~ADLC_CTL2_TX_LAST; // clear flag.
         }
-        ADLC.control2 = value;
+        if (raised & ADLC_CTL2_RX_CLEAR)
+            econet_rx_clear();
+        if (raised & ADLC_CTL2_TX_CLEAR)
+            econet_tx_clear();
         return true;
     }
     else {
@@ -1737,6 +1732,8 @@ static bool econet_write_ctl4(uint8_t value)
     if (changes) {
         uint8_t raised  = changes & value;
         log_debug("ADLC: write register Control4=%02X, changes=%02X, raised=%02X", value, changes, raised);
+        old_status1 = ADLC.status1;
+        old_status2 = ADLC.status2;
         if (raised & ADLC_CTL4_TX_ABORT) {
             log_debug("EconetPoll: TxABORT is set");
             ADLC.txfptr = 0;        //  reset fifo
@@ -1782,8 +1779,6 @@ void econet_write_register(uint8_t addr, uint8_t Value)
             }
             break;
     }
-    if (changed) {
-        econet_update_head();
+    if (changed)
         econet_update_tail();
-    }
 }
