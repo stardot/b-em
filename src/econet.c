@@ -119,6 +119,7 @@ static const char fws_names[][10] = {
     "WAIT4IDLE",
     "SCOUTRCVD",
     "SCACKSENT",
+    "DATARCVD",
     "IMMSENT",
     "IMMRCVD"
 };
