@@ -680,12 +680,12 @@ void econet_reset(void)
 
         // Get localhost IP address
         if (gethostname(localhost, 256) != SOCKET_ERROR && (hent = gethostbyname(localhost)) != NULL) {
+            in_addr_t loopback = htonl(INADDR_LOOPBACK);
             // See if configured addresses match local IPs
             for (struct ECOLAN *entry = networks; entry && EconetStationNumber == 0; entry = entry->next) {
                 // Check address for each network interface/card
                 for (int a = 0; hent->h_addr_list[a] != NULL && EconetStationNumber == 0; ++a) {
-                    memcpy(&localaddr, hent->h_addr_list[a], sizeof(struct in_addr));
-                    if (entry->inet_addr.s_addr == INADDR_LOOPBACK || entry->inet_addr.s_addr == local_ipaddr(localaddr)) {
+                    if (entry->inet_addr.s_addr == loopback || entry->inet_addr.s_addr == *(in_addr_t *)hent->h_addr_list[a]) {
                         service.sin_port = htons(entry->port);
                         service.sin_addr = entry->inet_addr;
                         if (bind(ListenSocket, (SOCKADDR *) & service, sizeof(service)) == 0) {
@@ -1008,7 +1008,6 @@ static void econet_tx_data(void)
                         econet_set_wait4idle("Tx", "invalid 4-way state");
                 }
             }
-
             if (SendMe) {
                 if (confAUNmode) {
                     log_debug("Econet(Tx): Sending an AUN packet, SendLen=%d. type=%u, port=%u, handle=%u", SendLen, EconetTx.ah.type, EconetTx.ah.port, EconetTx.ah.handle);
