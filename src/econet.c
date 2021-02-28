@@ -282,7 +282,7 @@ static bool ReceiverSocketsOpen = false;       // Used to flag line up and clock
 
 static bool FlagFillActive;                             // Flag fill state
 static unsigned long EconetFlagFillTimeoutTrigger;      // Trigger point for flag fill
-static unsigned long EconetFlagFillTimeout = 500000;    // Cycles for flag fill timeout // added cfg file to override this
+static unsigned long EconetFlagFillTimeout = 12;    // Cycles for flag fill timeout // added cfg file to override this
 
 /* In the BeebEm version the time between network bytes was
  * configurable but in B-Em we have hooked the function otherstuff_poll
