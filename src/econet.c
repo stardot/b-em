@@ -49,6 +49,8 @@ typedef int SOCKET;
 #define WSACleanup()
 #define SOCKADDR struct sockaddr
 #define local_ipaddr(a) (a.s_addr)
+#define WSAGetLastError() errno
+#define WSAEWOULDBLOCK EWOULDBLOCK
 #endif
 
 #include "b-em.h"
@@ -640,6 +642,27 @@ void econet_reset(void)
         WSACleanup();
         return;
     }
+#ifdef WIN32
+    unsigned long one = 1;
+    if (ioctlsocket(UdpSocket, FIONBIO, &one)) {
+        log_error("Econet: Failed to set non-blocking mode on socket: %s", econet_socket_errstr());
+        closesocket(sock);
+        WSACleanup();
+        return;
+    }
+#else
+    int flags = fcntl(UdpSocket, F_GETFL);
+    if (flags == -1) {
+        log_error("Econet: Failed to get socket flags (non-blocking): %s", econet_socket_errstr());
+        closesocket(UdpSocket);
+        return;
+    }
+    else if (fcntl(UdpSocket, F_SETFL, flags | O_NONBLOCK) == -1) {
+        log_error("Econet: Failed to set socket flags (non-blocking): %s", econet_socket_errstr());
+        closesocket(UdpSocket);
+        return;
+    }
+#endif
 
     //----------------------
     // The sockaddr_in structure specifies the address family,
@@ -1071,189 +1094,180 @@ static void econet_rx_data(void)
                 // Try and get another packet from network
                 // Check if packet is waiting without blocking
                 int RetVal;
-                fd_set RdFds;
-                struct timeval TmOut = { 0, 0 };
-                FD_ZERO(&RdFds);
-                FD_SET(UdpSocket, &RdFds);
-                RetVal = select((int)UdpSocket + 1, &RdFds, NULL, NULL, &TmOut);
+                struct sockaddr_in RecvAddr;
+                // Read the packet
+                int sizRcvAdr = sizeof(RecvAddr);
+                if (confAUNmode) {
+                    RetVal = recvfrom(UdpSocket, (char *)EconetRx.raw, sizeof(EconetRx), 0, (SOCKADDR *) & RecvAddr, (socklen_t *)&sizRcvAdr);
+                    EconetRx.BytesInBuffer = RetVal;
+                }
+                else {
+                    RetVal = recvfrom(UdpSocket, (char *)BeebRx.buff, sizeof(BeebRx.buff), 0, (SOCKADDR *) & RecvAddr, (socklen_t *)&sizRcvAdr);
+                }
                 if (RetVal > 0) {
-                    struct sockaddr_in RecvAddr;
-                    // Read the packet
-                    int sizRcvAdr = sizeof(RecvAddr);
+                    log_debug("Econet(Rx): Packet received, %u bytes from %s:%u", (int)RetVal, inet_ntoa(RecvAddr.sin_addr), htons(RecvAddr.sin_port));
                     if (confAUNmode) {
-                        RetVal = recvfrom(UdpSocket, (char *)EconetRx.raw, sizeof(EconetRx), 0, (SOCKADDR *) & RecvAddr, (socklen_t *)&sizRcvAdr);
-                        EconetRx.BytesInBuffer = RetVal;
-                    }
-                    else {
-                        RetVal = recvfrom(UdpSocket, (char *)BeebRx.buff, sizeof(BeebRx.buff), 0, (SOCKADDR *) & RecvAddr, (socklen_t *)&sizRcvAdr);
-                    }
-                    if (RetVal > 0) {
-                        log_debug("Econet(Rx): Packet received, %u bytes from %s:%u", (int)RetVal, inet_ntoa(RecvAddr.sin_addr), htons(RecvAddr.sin_port));
-                        if (confAUNmode) {
-                            log_dump("Econet(Rx): AUN packet: ", EconetRx.raw, RetVal);
+                        log_dump("Econet(Rx): AUN packet: ", EconetRx.raw, RetVal);
 
-                            // convert from AUN format
-                            // find station number of sender
-                            struct ECOLAN *host;
-                            bool foundhost = false;
-                            for (host = networks; host; host = host->next) {
-                                if (RecvAddr.sin_port == htons(host->port) && RecvAddr.sin_addr.s_addr == host->inet_addr.s_addr) {
-                                    foundhost = true;
-                                    break;
-                                }
+                        // convert from AUN format
+                        // find station number of sender
+                        struct ECOLAN *host;
+                        bool foundhost = false;
+                        for (host = networks; host; host = host->next) {
+                            if (RecvAddr.sin_port == htons(host->port) && RecvAddr.sin_addr.s_addr == host->inet_addr.s_addr) {
+                                foundhost = true;
+                                break;
                             }
-                            if (!foundhost) {
-                                // packet from unknown host
-                                if (confLEARN) {
-                                    uint8_t station = ntohl(host->inet_addr.s_addr) & 0xff;
-                                    uint8_t network = 0;
-                                    for (struct AUNTAB *aunent = aunnet; aunent; aunent = aunent->next) {
-                                        if (aunent->inet_addr.s_addr == RecvAddr.sin_addr.s_addr) {
-                                            network = aunent->network;
-                                            break;
-                                        }
+                        }
+                        if (!foundhost) {
+                            // packet from unknown host
+                            if (confLEARN) {
+                                uint8_t station = ntohl(host->inet_addr.s_addr) & 0xff;
+                                uint8_t network = 0;
+                                for (struct AUNTAB *aunent = aunnet; aunent; aunent = aunent->next) {
+                                    if (aunent->inet_addr.s_addr == RecvAddr.sin_addr.s_addr) {
+                                        network = aunent->network;
+                                        break;
                                     }
-                                    log_debug("Econet(Rx): Previusly unknown IP, Econet %u:%u", network, station);
-                                    for (struct ECOLAN *entry = networks; entry; entry = entry->next) {
-                                        if (entry->network == network && entry->station == station) {
-                                            host = entry;
-                                            break;
-                                        }
+                                }
+                                log_debug("Econet(Rx): Previusly unknown IP, Econet %u:%u", network, station);
+                                for (struct ECOLAN *entry = networks; entry; entry = entry->next) {
+                                    if (entry->network == network && entry->station == station) {
+                                        host = entry;
+                                        break;
                                     }
-                                    if (host) {
-                                        log_debug("Econet(Rx): updating existing entry %s:%u", inet_ntoa(host->inet_addr), host->port);
-                                        host->port = ntohs(RecvAddr.sin_port);
-                                        host->inet_addr = RecvAddr.sin_addr;
-                                        foundhost = true;
-                                    }
-                                    else {
-                                        host = malloc(sizeof(struct ECOLAN));
-                                        if (host) {
-                                            host->next = networks;
-                                            host->port = ntohs(RecvAddr.sin_port);
-                                            host->inet_addr = RecvAddr.sin_addr;
-                                            host->station = station;
-                                            host->network = network;
-                                            log_debug("Econet(Rx): adding new entry %u:%u -> %s:%u", network, station, inet_ntoa(host->inet_addr), host->port);
-                                            foundhost = true;
-                                        }
-                                        else
-                                            log_error("econet: out of memory for network table");
-                                    }
+                                }
+                                if (host) {
+                                    log_debug("Econet(Rx): updating existing entry %s:%u", inet_ntoa(host->inet_addr), host->port);
+                                    host->port = ntohs(RecvAddr.sin_port);
+                                    host->inet_addr = RecvAddr.sin_addr;
+                                    foundhost = true;
                                 }
                                 else {
-                                    // ignore it..
-                                    log_debug("Econet(Rx): Packet ignored");
+                                    host = malloc(sizeof(struct ECOLAN));
+                                    if (host) {
+                                        host->next = networks;
+                                        host->port = ntohs(RecvAddr.sin_port);
+                                        host->inet_addr = RecvAddr.sin_addr;
+                                        host->station = station;
+                                        host->network = network;
+                                        log_debug("Econet(Rx): adding new entry %u:%u -> %s:%u", network, station, inet_ntoa(host->inet_addr), host->port);
+                                        foundhost = true;
+                                    }
+                                    else
+                                        log_error("econet: out of memory for network table");
                                 }
                             }
-
-                            if (!foundhost) {   // didn't find it in the table ..
-                                BeebRx.BytesInBuffer = 0;       //ignore the packet
-                            }
                             else {
-                                log_debug("Econet(Rx): Packet was from %02x %02x, type=%u, port=%u, handle=%u", (unsigned int)(host->network), (unsigned int)host->station, EconetRx.ah.type, EconetRx.ah.port, EconetRx.ah.handle);
-                                // TODO - many of these copies can use memcpy()
-                                switch (fourwaystage) {
-                                    case FWS_IDLE:
-                                        log_debug("Econet(Rx): received in FWS_IDLE");
-                                        // we weren't doing anything when this packet came in.
-                                        BeebRx.eh.srcstn = host->station;
-                                        BeebRx.eh.srcnet = host->network;
+                                // ignore it..
+                                log_debug("Econet(Rx): Packet ignored");
+                            }
+                        }
 
-                                        BeebRx.eh.deststn = EconetStationNumber;        // must be for us.
-                                        BeebRx.eh.destnet = 0;
+                        if (!foundhost) {   // didn't find it in the table ..
+                            BeebRx.BytesInBuffer = 0;       //ignore the packet
+                        }
+                        else {
+                            log_debug("Econet(Rx): Packet was from %02x %02x, type=%u, port=%u, handle=%u", (unsigned int)(host->network), (unsigned int)host->station, EconetRx.ah.type, EconetRx.ah.port, EconetRx.ah.handle);
+                            // TODO - many of these copies can use memcpy()
+                            switch (fourwaystage) {
+                                case FWS_IDLE:
+                                    log_debug("Econet(Rx): received in FWS_IDLE");
+                                    // we weren't doing anything when this packet came in.
+                                    BeebRx.eh.srcstn = host->station;
+                                    BeebRx.eh.srcnet = host->network;
+
+                                    BeebRx.eh.deststn = EconetStationNumber;        // must be for us.
+                                    BeebRx.eh.destnet = 0;
 //                                          BeebRx.eh.deststn = EconetRx.eh.deststn ; // 30jun was EconetStationNumber; // must be for us.
 //                                          BeebRx.eh.destnet = EconetRx.eh.destnet & inmask ; // 30jun was 0
 
-                                        BeebRx.eh.cb = EconetRx.ah.cb | 128;
-                                        BeebRx.eh.port = EconetRx.ah.port;
-                                        switch (EconetRx.ah.type) {
+                                    BeebRx.eh.cb = EconetRx.ah.cb | 128;
+                                    BeebRx.eh.port = EconetRx.ah.port;
+                                    switch (EconetRx.ah.type) {
 
-                                            case AUN_TYPE_BROADCAST:
-                                                BeebRx.eh.deststn = 255;        // wasn't just for us..
-                                                BeebRx.eh.destnet = 0;  // TODO check if not net 0.. does it make a difference?
-                                                econet_rx_copy(6, RetVal);
-                                                econet_set_wait4idle("Rx", "broadcast received");
-                                                break;
-                                            case AUN_TYPE_IMMEDIATE:
-                                                econet_rx_copy(6, RetVal);
-                                                fourwaystage = FWS_IMMRCVD;
-                                                log_debug("Econet(Rx): Set FWS_IMMRCVD");
-                                                break;
-                                            case AUN_TYPE_UNICAST:
-                                                // we're assuming things here..
-                                                fourwaystage = FWS_SCOUTRCVD;
-                                                log_debug("Econet(Rx): Set FWS_SCOUTRCVD");
-                                                BeebRx.BytesInBuffer = sizeof(BeebRx.eh);
-                                                break;
-                                            default:
-                                                //ignore anything else
-                                                BeebRx.BytesInBuffer = 0;
-                                        }
-                                        BeebRx.Pointer = 0;
-                                        break;
-                                    case FWS_IMMSENT:  // it should be reply to an immediate instruction
-                                        log_debug("Econet(Rx): received in FWS_IMMSENT");
-                                        // TODO  check that it is!!!   Example scenario where it will not
-                                        // be - *STATIONs poll sends packet to itself... packet we get
-                                        // here is the one we just sent out..!!!
-                                        // I'm pretty sure that real econet can't send to itself..
+                                        case AUN_TYPE_BROADCAST:
+                                            BeebRx.eh.deststn = 255;        // wasn't just for us..
+                                            BeebRx.eh.destnet = 0;  // TODO check if not net 0.. does it make a difference?
+                                            econet_rx_copy(6, RetVal);
+                                            econet_set_wait4idle("Rx", "broadcast received");
+                                            break;
+                                        case AUN_TYPE_IMMEDIATE:
+                                            econet_rx_copy(6, RetVal);
+                                            fourwaystage = FWS_IMMRCVD;
+                                            log_debug("Econet(Rx): Set FWS_IMMRCVD");
+                                            break;
+                                        case AUN_TYPE_UNICAST:
+                                            // we're assuming things here..
+                                            fourwaystage = FWS_SCOUTRCVD;
+                                            log_debug("Econet(Rx): Set FWS_SCOUTRCVD");
+                                            BeebRx.BytesInBuffer = sizeof(BeebRx.eh);
+                                            break;
+                                        default:
+                                            //ignore anything else
+                                            BeebRx.BytesInBuffer = 0;
+                                    }
+                                    BeebRx.Pointer = 0;
+                                    break;
+                                case FWS_IMMSENT:  // it should be reply to an immediate instruction
+                                    log_debug("Econet(Rx): received in FWS_IMMSENT");
+                                    // TODO  check that it is!!!   Example scenario where it will not
+                                    // be - *STATIONs poll sends packet to itself... packet we get
+                                    // here is the one we just sent out..!!!
+                                    // I'm pretty sure that real econet can't send to itself..
+                                    BeebRx.eh.srcstn = host->station;
+                                    BeebRx.eh.srcnet = host->network;
+                                    BeebRx.eh.deststn = EconetStationNumber;        // must be for us.
+                                    BeebRx.eh.destnet = 0;
+                                    econet_rx_copy(4, RetVal);
+                                    BeebRx.Pointer = 0;
+                                    econet_set_wait4idle("Rx", "ack received from remote AUN server");
+                                    break;
+                                case FWS_DATASENT:
+                                    log_debug("Econet(Rx): received in FWS_DATASENT");
+                                    // we sent block of data, awaiting final ack..
+                                    if (EconetRx.ah.type == AUN_TYPE_ACK || EconetRx.ah.type == AUN_TYPE_NACK) {
+                                        // are we expecting a (N)ACK ?
+                                        // TODO check it is a (n)ack for packet we just sent!!, deal with naks!
+                                        // construct a final ack for the beeb
                                         BeebRx.eh.srcstn = host->station;
                                         BeebRx.eh.srcnet = host->network;
-                                        BeebRx.eh.deststn = EconetStationNumber;        // must be for us.
+                                        BeebRx.eh.deststn = EconetStationNumber;    // must be for us.
                                         BeebRx.eh.destnet = 0;
-                                        econet_rx_copy(4, RetVal);
-                                        BeebRx.Pointer = 0;
-                                        econet_set_wait4idle("Rx", "ack received from remote AUN server");
-                                        break;
-                                    case FWS_DATASENT:
-                                        log_debug("Econet(Rx): received in FWS_DATASENT");
-                                        // we sent block of data, awaiting final ack..
-                                        if (EconetRx.ah.type == AUN_TYPE_ACK || EconetRx.ah.type == AUN_TYPE_NACK) {
-                                            // are we expecting a (N)ACK ?
-                                            // TODO check it is a (n)ack for packet we just sent!!, deal with naks!
-                                            // construct a final ack for the beeb
-                                            BeebRx.eh.srcstn = host->station;
-                                            BeebRx.eh.srcnet = host->network;
-                                            BeebRx.eh.deststn = EconetStationNumber;    // must be for us.
-                                            BeebRx.eh.destnet = 0;
 //                                              BeebRx.eh.deststn = EconetRx.eh.deststn ; // 30jun was EconetStationNumber; // must be for us.
 //                                              BeebRx.eh.destnet = EconetRx.eh.destnet & inmask ; // 30jun was 0
 
-                                            BeebRx.BytesInBuffer = 4;
-                                            BeebRx.Pointer = 0;
-                                            econet_set_wait4idle("Rx", "aun ack rxd");
-                                            break;
-                                        }       // else unexpected packet - ignore it.TODO: queue it?
-                                    default:   // erm, what are we doing here?
-                                        econet_set_wait4idle("Rx", "unexpected 4-way state, packet ignored");
+                                        BeebRx.BytesInBuffer = 4;
+                                        BeebRx.Pointer = 0;
+                                        econet_set_wait4idle("Rx", "aun ack rxd");
                                         break;
-                                }
+                                    }       // else unexpected packet - ignore it.TODO: queue it?
+                                default:   // erm, what are we doing here?
+                                    econet_set_wait4idle("Rx", "unexpected 4-way state, packet ignored");
+                                    break;
                             }
                         }
-                        else {
-                            log_dump("Econet(Rx): BeebEm packet: ", BeebRx.buff, RetVal);
-                            BeebRx.BytesInBuffer = RetVal;
-                            BeebRx.Pointer = 0;
-                        }
-
-                        if ((BeebRx.eh.deststn == EconetStationNumber || BeebRx.eh.deststn == 255 || BeebRx.eh.deststn == 0) && BeebRx.BytesInBuffer > 0) {
-                            // Peer sent us packet - no longer in flag fill
-                            FlagFillActive = false;
-                            log_debug("Econet(Rx): FlagFill reset");
-                        }
-                        else {
-                            // Two other stations communicating - assume one of them will flag fill
-                            FlagFillActive = true;
-                            EconetFlagFillTimeoutTrigger = EconetCycles + EconetFlagFillTimeout;
-                            log_debug("Econet(Rx): FlagFill set - other station comms");
-                        }
                     }
-                    else if (RetVal == SOCKET_ERROR)
-                        log_error("Econet(Rx): Failed to receive packet: %s", econet_socket_errstr());
+                    else {
+                        log_dump("Econet(Rx): BeebEm packet: ", BeebRx.buff, RetVal);
+                        BeebRx.BytesInBuffer = RetVal;
+                        BeebRx.Pointer = 0;
+                    }
+
+                    if ((BeebRx.eh.deststn == EconetStationNumber || BeebRx.eh.deststn == 255 || BeebRx.eh.deststn == 0) && BeebRx.BytesInBuffer > 0) {
+                        // Peer sent us packet - no longer in flag fill
+                        FlagFillActive = false;
+                        log_debug("Econet(Rx): FlagFill reset");
+                    }
+                    else {
+                        // Two other stations communicating - assume one of them will flag fill
+                        FlagFillActive = true;
+                        EconetFlagFillTimeoutTrigger = EconetCycles + EconetFlagFillTimeout;
+                        log_debug("Econet(Rx): FlagFill set - other station comms");
+                    }
                 }
-                else if (RetVal == SOCKET_ERROR)
-                    log_error("Econet(Rx): Failed to check for new packet");
+                else if (RetVal == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK)
+                    log_error("Econet(Rx): Failed to receive packet: %s", econet_socket_errstr());
             }
 
             // this bit fakes the bits of the 4-way handshake that AUN doesn't do.
