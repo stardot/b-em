@@ -46,7 +46,6 @@ typedef int SOCKET;
 #define INVALID_SOCKET -1
 #define SOCKET_ERROR   -1
 #define closesocket close
-#define WSAGetLastError() (long)errno
 #define WSACleanup()
 #define SOCKADDR struct sockaddr
 #define local_ipaddr(a) (a.s_addr)
@@ -566,6 +565,17 @@ void econet_adlc_debug(void)
 static inline void econet_adlc_debug(void) {}
 #endif
 
+static const char *econet_socket_errstr(void)
+{
+#ifdef WIN32
+    static char err[20];
+    snprintf(err, sizeof(err), "error %d", WSAGetLastError());
+    return err;
+#else
+    return strerror(errno);
+#endif
+}
+
 void econet_reset(void)
 {
     if (EconetEnabled)
@@ -633,7 +643,7 @@ void econet_reset(void)
     // Create a SOCKET for listening for incoming connection requests.
     ListenSocket = socket(AF_INET, SOCK_DGRAM, 0);
     if (ListenSocket == INVALID_SOCKET) {
-        log_error("Econet: Failed to open listening socket (error %ld)", WSAGetLastError());
+        log_error("Econet: Failed to open listening socket: %s", econet_socket_errstr());
         WSACleanup();
         return;
     }
@@ -660,7 +670,7 @@ void econet_reset(void)
             service.sin_port = htons(EconetListenPort);
             service.sin_addr.s_addr = EconetListenIP;
             if (bind(ListenSocket, (SOCKADDR *) & service, sizeof(service)) == SOCKET_ERROR) {
-                log_error("Econet: Failed to bind to port %d (error %ld)", EconetListenPort, WSAGetLastError());
+                log_error("Econet: Failed to bind to port %d; %s", EconetListenPort, econet_socket_errstr());
                 closesocket(ListenSocket);
                 WSACleanup();
                 return;
@@ -756,7 +766,7 @@ void econet_reset(void)
     else {
         SendSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
         if (SendSocket == INVALID_SOCKET) {
-            log_error("Econet: Failed to open sending socket (error %ld)", WSAGetLastError());
+            log_error("Econet: Failed to open sending socket: %s", econet_socket_errstr());
             closesocket(ListenSocket);
             WSACleanup();
             return;
@@ -766,7 +776,7 @@ void econet_reset(void)
     // this call is what allows broadcast packets to be sent:
     int broadcast = 1;
     if (setsockopt(SendSocket, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof broadcast) == -1) {
-        log_error("Econet: Failed to set socket for broadcasts (error %ld)", WSAGetLastError());
+        log_error("Econet: Failed to set socket for broadcasts: %s", econet_socket_errstr());
         closesocket(ListenSocket);
         WSACleanup();
         return;
@@ -1263,7 +1273,7 @@ static void econet_rx_data(void)
                         }
                     }
                     else if (RetVal == SOCKET_ERROR && !confSingleSocket)
-                        log_error("Econet(Rx): Failed to receive packet (error %ld)", WSAGetLastError());
+                        log_error("Econet(Rx): Failed to receive packet: %s", econet_socket_errstr());
                 }
                 else if (RetVal == SOCKET_ERROR)
                     log_error("Econet(Rx): Failed to check for new packet");
