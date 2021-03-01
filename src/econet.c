@@ -236,7 +236,6 @@ static int inmask, outmask;
 static bool confAUNmode = false;       // Use AUN style networking
 static bool confLEARN = false;         // Add receipts from unknown hosts to network table
 static bool confSTRICT = false;        // Assume network ip=stn number when sending to unknown hosts
-static bool confSingleSocket = true;   // use same socket for Send and receive
 static unsigned int FourWayStageTimeout = 15625;
 static bool MassageNetworks = false;   // massage network numbers on send/receive (add/sub 128)
 
@@ -251,9 +250,8 @@ static uint8_t EconetStationNumber = 0;        // default Station Number
 static unsigned int EconetListenPort = 0;      // default Listen port
 static unsigned long EconetListenIP = 0x0100007f;
 // IP settings:
-static SOCKET ListenSocket = INVALID_SOCKET;   // Listen socket
-static SOCKET SendSocket = INVALID_SOCKET;
-static bool ReceiverSocketsOpen = false;       // Used to flag line up and clock running
+static SOCKET UdpSocket = INVALID_SOCKET;      // Single UDP socket.
+static bool SocketOpen = false;                // Used to flag line up and clock running
 
 /* Flag Fill.
  *
@@ -434,8 +432,6 @@ static void econet_read_netfile(void)
                                 confLEARN = (value != 0);
                             else if (strcmp("aunstrict", EcoName) == 0)
                                 confSTRICT = (value != 0);
-                            else if (strcmp("singlesocket", EcoName) == 0)
-                                confSingleSocket = (value != 0);
                             else if (strcmp("flagfilltimeout", EcoName) == 0)
                                 EconetFlagFillTimeout = (value);
                             else if (strcmp("scacktimeout", EcoName) == 0)
@@ -625,11 +621,9 @@ void econet_reset(void)
     EconetFlagFillTimeoutTrigger = 0;
 
     // kill anything that was in use
-    if (ReceiverSocketsOpen) {
-        if (!confSingleSocket)
-            closesocket(SendSocket);
-        closesocket(ListenSocket);
-        ReceiverSocketsOpen = false;
+    if (SocketOpen) {
+        closesocket(UdpSocket);
+        SocketOpen = false;
     }
 
     // Stop here if not enabled
@@ -641,8 +635,7 @@ void econet_reset(void)
 
     //----------------------
     // Create a SOCKET for listening for incoming connection requests.
-    ListenSocket = socket(AF_INET, SOCK_DGRAM, 0);
-    if (ListenSocket == INVALID_SOCKET) {
+    if ((UdpSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == INVALID_SOCKET) {
         log_error("Econet: Failed to open listening socket: %s", econet_socket_errstr());
         WSACleanup();
         return;
@@ -669,9 +662,9 @@ void econet_reset(void)
         if (EconetListenPort != 0) {
             service.sin_port = htons(EconetListenPort);
             service.sin_addr.s_addr = EconetListenIP;
-            if (bind(ListenSocket, (SOCKADDR *) & service, sizeof(service)) == SOCKET_ERROR) {
+            if (bind(UdpSocket, (SOCKADDR *) & service, sizeof(service)) == SOCKET_ERROR) {
                 log_error("Econet: Failed to bind to port %d; %s", EconetListenPort, econet_socket_errstr());
-                closesocket(ListenSocket);
+                closesocket(UdpSocket);
                 WSACleanup();
                 return;
             }
@@ -699,7 +692,7 @@ void econet_reset(void)
                     if (entry->inet_addr.s_addr == loopback || entry->inet_addr.s_addr == *(in_addr_t *)hent->h_addr_list[a]) {
                         service.sin_port = htons(entry->port);
                         service.sin_addr = entry->inet_addr;
-                        if (bind(ListenSocket, (SOCKADDR *) & service, sizeof(service)) == 0) {
+                        if (bind(UdpSocket, (SOCKADDR *) & service, sizeof(service)) == 0) {
                             EconetListenPort = entry->port;
                             EconetListenIP = entry->inet_addr.s_addr;
                             EconetStationNumber = entry->station;
@@ -719,7 +712,7 @@ void econet_reset(void)
                             if (entry->inet_addr.s_addr == local) {
                                 service.sin_port = htons(32768);
                                 service.sin_addr.s_addr = local_ipaddr(localaddr);
-                                if (bind(ListenSocket, (SOCKADDR *) & service, sizeof(service)) == 0) {
+                                if (bind(UdpSocket, (SOCKADDR *) & service, sizeof(service)) == 0) {
                                     myaunnet = entry;
                                     struct ECOLAN *ecoent = malloc(sizeof(struct ECOLAN));
                                     if (ecoent) {
@@ -758,31 +751,15 @@ void econet_reset(void)
     if (MASTER)
         cmos_set(0xe, EconetStationNumber);
 
-    //---------------------
-    // Socket used to send messages.
-    if (confSingleSocket) {
-        SendSocket = ListenSocket;
-    }
-    else {
-        SendSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-        if (SendSocket == INVALID_SOCKET) {
-            log_error("Econet: Failed to open sending socket: %s", econet_socket_errstr());
-            closesocket(ListenSocket);
-            WSACleanup();
-            return;
-        }
-    }
-
     // this call is what allows broadcast packets to be sent:
     int broadcast = 1;
-    if (setsockopt(SendSocket, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof broadcast) == -1) {
+    if (setsockopt(UdpSocket, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof broadcast) == -1) {
         log_error("Econet: Failed to set socket for broadcasts: %s", econet_socket_errstr());
-        closesocket(ListenSocket);
+        closesocket(UdpSocket);
         WSACleanup();
         return;
     }
-
-    ReceiverSocketsOpen = true;
+    SocketOpen = true;
 }
 
 //---------------------------------------------------------------------------
@@ -1023,7 +1000,7 @@ static void econet_tx_data(void)
                 if (confAUNmode) {
                     log_debug("Econet(Tx): Sending an AUN packet, SendLen=%d. type=%u, port=%u, handle=%u", SendLen, EconetTx.ah.type, EconetTx.ah.port, EconetTx.ah.handle);
                     log_dump("Econet(Tx): AUN Packet: ", (uint8_t *)&EconetTx, SendLen);
-                    if (sendto(SendSocket, (char *)&EconetTx, SendLen, 0, (SOCKADDR *) &RecvAddr, sizeof(RecvAddr)) == SOCKET_ERROR) {
+                    if (sendto(UdpSocket, (char *)&EconetTx, SendLen, 0, (SOCKADDR *) &RecvAddr, sizeof(RecvAddr)) == SOCKET_ERROR) {
                         log_error("Econet(Tx): Failed to send packet to %02x %02x (%s:%u)",
                                   (unsigned int)(ecoent->network), (unsigned int)ecoent->station, inet_ntoa(ecoent->inet_addr), (unsigned int)ecoent->port);
                     }
@@ -1031,7 +1008,7 @@ static void econet_tx_data(void)
                 else {
                     log_debug("Econet(Tx): Sending a non-AUN packet, BeebTx.Pointer=%d", BeebTx.Pointer);
                     log_dump("Econet(Tx): BeebEm Packet: ", BeebTx.buff, BeebTx.Pointer);
-                    if (sendto(SendSocket, (char *)BeebTx.buff, BeebTx.Pointer, 0, (SOCKADDR *) &RecvAddr, sizeof(RecvAddr)) == SOCKET_ERROR) {
+                    if (sendto(UdpSocket, (char *)BeebTx.buff, BeebTx.Pointer, 0, (SOCKADDR *) &RecvAddr, sizeof(RecvAddr)) == SOCKET_ERROR) {
                         log_error("Econet(Tx): Failed to send packet to %02x %02x (%s:%u)",
                                   (unsigned int)(BeebTx.eh.destnet), (unsigned int)BeebTx.eh.deststn, inet_ntoa(ecoent->inet_addr), (unsigned int)ecoent->port);
                     }
@@ -1097,18 +1074,18 @@ static void econet_rx_data(void)
                 fd_set RdFds;
                 struct timeval TmOut = { 0, 0 };
                 FD_ZERO(&RdFds);
-                FD_SET(ListenSocket, &RdFds);
-                RetVal = select((int)ListenSocket + 1, &RdFds, NULL, NULL, &TmOut);
+                FD_SET(UdpSocket, &RdFds);
+                RetVal = select((int)UdpSocket + 1, &RdFds, NULL, NULL, &TmOut);
                 if (RetVal > 0) {
                     struct sockaddr_in RecvAddr;
                     // Read the packet
                     int sizRcvAdr = sizeof(RecvAddr);
                     if (confAUNmode) {
-                        RetVal = recvfrom(ListenSocket, (char *)EconetRx.raw, sizeof(EconetRx), 0, (SOCKADDR *) & RecvAddr, (socklen_t *)&sizRcvAdr);
+                        RetVal = recvfrom(UdpSocket, (char *)EconetRx.raw, sizeof(EconetRx), 0, (SOCKADDR *) & RecvAddr, (socklen_t *)&sizRcvAdr);
                         EconetRx.BytesInBuffer = RetVal;
                     }
                     else {
-                        RetVal = recvfrom(ListenSocket, (char *)BeebRx.buff, sizeof(BeebRx.buff), 0, (SOCKADDR *) & RecvAddr, (socklen_t *)&sizRcvAdr);
+                        RetVal = recvfrom(UdpSocket, (char *)BeebRx.buff, sizeof(BeebRx.buff), 0, (SOCKADDR *) & RecvAddr, (socklen_t *)&sizRcvAdr);
                     }
                     if (RetVal > 0) {
                         log_debug("Econet(Rx): Packet received, %u bytes from %s:%u", (int)RetVal, inet_ntoa(RecvAddr.sin_addr), htons(RecvAddr.sin_port));
@@ -1272,7 +1249,7 @@ static void econet_rx_data(void)
                             log_debug("Econet(Rx): FlagFill set - other station comms");
                         }
                     }
-                    else if (RetVal == SOCKET_ERROR && !confSingleSocket)
+                    else if (RetVal == SOCKET_ERROR)
                         log_error("Econet(Rx): Failed to receive packet: %s", econet_socket_errstr());
                 }
                 else if (RetVal == SOCKET_ERROR)
@@ -1430,7 +1407,7 @@ static void econet_update_tail(void)
     // sockets true means dcd low means not dcd high means cts low
     // doing it this way finally works !!  great :-) :-)
 
-    if (ReceiverSocketsOpen && (ADLC.control2 & ADLC_CTL2_RTS)) { // clock + RTS
+    if (SocketOpen && (ADLC.control2 & ADLC_CTL2_RTS)) { // clock + RTS
         ADLC.cts = false;
         ADLC.status1 &= ~ADLC_STA1_NOT_CTS;
     }
@@ -1510,7 +1487,7 @@ static void econet_update_tail(void)
     // SR2b3 - RxAbort - Abort received - set in rx routines above
     // SR2b4 - Error during reception - set if error flaged in rx routine.
     // SR2b5 - DCD
-    if (!ReceiverSocketsOpen) { // is line down?
+    if (!SocketOpen) { // is line down?
         ADLC.status2 |= ADLC_STA2_NOT_DCD;     // flag error
     }
     else {
@@ -1636,7 +1613,7 @@ void econet_poll(void)
             Econet4Wtrigger -= LONG_MAX;
     }
     // Don't poll if failed to init sockets
-    if (ReceiverSocketsOpen) {
+    if (SocketOpen) {
         old_status1 = ADLC.status1;
         old_status2 = ADLC.status2;
         econet_rx_tx();
