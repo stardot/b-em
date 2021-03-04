@@ -17,7 +17,36 @@
 
 #include <allegro5/allegro_primitives.h>
 
-#define NUM_BREAKPOINTS 8
+typedef enum {
+    BREAK_EXEC,
+    BREAK_READ,
+    BREAK_WRITE,
+    BREAK_INPUT,
+    BREAK_OUTPUT,
+    WATCH_READ,
+    WATCH_WRITE,
+    WATCH_INPUT,
+    WATCH_OUTPUT
+} break_type;
+
+static const char break_names[][11] = {
+    "breakpoint",
+    "breakr",
+    "breakw",
+    "breaki",
+    "breako",
+    "watchr",
+    "watchw",
+    "watchi",
+    "watcho"
+};
+
+struct breakpoint {
+    breakpoint *next;
+    uint32_t   address;
+    break_type type;
+    int        num;
+};
 
 int debug_core = 0;
 int debug_tube = 0;
@@ -33,6 +62,9 @@ struct filestack {
     struct filestack *next;
     FILE *fp;
 } *exec_stack;
+
+static int breakpseq = 0;
+static int contcount = 0;
 
 static void close_trace()
 {
@@ -336,18 +368,6 @@ static uint32_t debug_memaddr=0;
 static uint32_t debug_disaddr=0;
 static uint8_t  debug_lastcommand=0;
 
-static int tbreak = -1;
-static int breakpoints[NUM_BREAKPOINTS] = {-1, -1, -1, -1, -1, -1, -1, -1};
-static int breakr[NUM_BREAKPOINTS]      = {-1, -1, -1, -1, -1, -1, -1, -1};
-static int breakw[NUM_BREAKPOINTS]      = {-1, -1, -1, -1, -1, -1, -1, -1};
-static int breaki[NUM_BREAKPOINTS]      = {-1, -1, -1, -1, -1, -1, -1, -1};
-static int breako[NUM_BREAKPOINTS]      = {-1, -1, -1, -1, -1, -1, -1, -1};
-static int watchr[NUM_BREAKPOINTS]      = {-1, -1, -1, -1, -1, -1, -1, -1};
-static int watchw[NUM_BREAKPOINTS]      = {-1, -1, -1, -1, -1, -1, -1, -1};
-static int watchi[NUM_BREAKPOINTS]      = {-1, -1, -1, -1, -1, -1, -1, -1};
-static int watcho[NUM_BREAKPOINTS]      = {-1, -1, -1, -1, -1, -1, -1, -1};
-static int contcount = 0;
-
 void debug_reset()
 {
     if (trace_fp) {
@@ -537,83 +557,86 @@ static void list_syms(cpu_debug_t *cpu, const char *arg) {
     symbol_list(cpu->symbols, cpu, &debug_outf);
 }
 
-static void set_point(cpu_debug_t *cpu, int *table, char *arg, const char *desc)
+static void set_point(cpu_debug_t *cpu, break_type type, char *arg, const char *desc)
 {
-    int c;
-
     const char *end1;
     uint32_t a = parse_address_or_symbol(cpu, arg, &end1);
-
-    char addrbuf[16 + SYM_MAX];
-    cpu->print_addr(cpu, a, addrbuf, sizeof(addrbuf), true);
-
     if (end1 > arg) {
-
-        // check to see if already set
-        for (c = 0; c < NUM_BREAKPOINTS; c++) {
-            if (table[c] == a)
-            {
-                debug_outf("    %s %i already set to %s\n", desc, c, addrbuf);
+        char addrbuf[16 + SYM_MAX];
+        cpu->print_addr(cpu, a, addrbuf, sizeof(addrbuf), true);
+        for (breakpoint *bp = cpu->breakpoints; bp; bp = bp->next) {
+            if (bp->address == a && bp->type == type) {
+                debug_outf("    %s %i already set to %s\n", desc, bp->num, addrbuf);
                 return;
             }
         }
-
-        for (c = 0; c < NUM_BREAKPOINTS; c++) {
-            if (table[c] == -1) {
-                table[c] = a;
-                debug_outf("    %s %i set to %s\n", desc, c, addrbuf);
-                return;
-            }
+        breakpoint *bp = malloc(sizeof(breakpoint));
+        if (bp) {
+            bp->next = cpu->breakpoints;
+            bp->address = a;
+            bp->type = type;
+            bp->num = breakpseq++;
+            cpu->breakpoints = bp;
+            debug_outf("    %s %i set to %s\n", desc, bp->num, addrbuf);
         }
-        debug_outf("    unable to set %s breakpoint, table full\n", desc);
-    } else
-        debug_out("    missing parameter or invalid address\n!", 24);
+        else
+            debug_outf("    unable to set %s breakpoint, out of memory\n", desc);
+    }
+    else
+        debug_outf("    '%s' is not a valid address\n", arg);
 }
 
-static void clear_point(cpu_debug_t *cpu, int *table, char *arg, const char *desc)
+static void clear_point(cpu_debug_t *cpu, break_type type, char *arg, const char *desc)
 {
-    int c, e;
-
-    const char *p;
-    e = parse_address_or_symbol(cpu, arg, &p);
-
-    if (p != arg) {
-        int ix = -1;
-        //DB: changed this to search by address first then by index
-        for (c = 0; c < NUM_BREAKPOINTS; c++) {
-            if (table[c] == e) {
-                ix = c;
+    const char *end1;
+    uint32_t a = parse_address_or_symbol(cpu, arg, &end1);
+    if (end1 > arg) {
+        //DB: changed this to search by address first then by index.
+        breakpoint *found = NULL;
+        breakpoint *prev = NULL;
+        for (breakpoint *bp = cpu->breakpoints; bp; bp = bp->next) {
+            if (bp->address == a && bp->type == type) {
+                found = bp;
+                break;
+            }
+            prev = bp;
+        }
+        if (!found) {
+            prev = NULL;
+            for (breakpoint *bp = cpu->breakpoints; bp; bp = bp->next) {
+                if (bp->num == a && bp->type == type) {
+                    found = bp;
+                    break;
+                }
+                prev = bp;
+            }
+            if (!found) {
+                debug_outf("    Can't find that breakpoint\n");
+                return;
             }
         }
-        if (ix == -1 && e < NUM_BREAKPOINTS && table[e] != -1)
-            ix = e;
-
-        if (ix >= 0) {
-
-            char addrbuf[16 + SYM_MAX];
-            cpu->print_addr(cpu, table[ix], addrbuf, sizeof(addrbuf), true);
-
-            debug_outf("    %s %i at %s cleared\n", desc, ix, addrbuf);
-            table[ix] = -1;
-        }
-        else {
-            debug_outf("    Can't find that breakpoint\n");
-        }
-
-
-    } else
-        debug_out("    missing parameter\n!", 24);
+        if (prev)
+            prev->next = found->next;
+        else
+            cpu->breakpoints = found->next;
+        char addrbuf[16 + SYM_MAX];
+        cpu->print_addr(cpu, found->address, addrbuf, sizeof(addrbuf), true);
+        debug_outf("    %s %i at %s cleared\n", desc, found->num, addrbuf);
+        free(found);
+    }
+    else
+        debug_outf("    '%s' is not a valid address or number\n", arg);
 }
 
-static void list_points(cpu_debug_t *cpu, int *table, const char *desc)
+static void list_points(cpu_debug_t *cpu, break_type type, const char *desc)
 {
     char addr_buf[17 + SYM_MAX];
-
-    for (int c = 0; c < NUM_BREAKPOINTS; c++)
-        if (table[c] != -1) {
-            cpu->print_addr(cpu, table[c], addr_buf, sizeof(addr_buf), true);
-            debug_outf("    %s %i : %-8s\n", desc, c, addr_buf);
+    for (breakpoint *bp = cpu->breakpoints; bp; bp = bp->next) {
+        if (bp->type == type) {
+            cpu->print_addr(cpu, bp->address, addr_buf, sizeof(addr_buf), true);
+            debug_outf("    %s %i : %-8s\n", desc, bp->num, addr_buf);
         }
+    }
 }
 
 static void debug_paste(const char *iptr)
@@ -640,36 +663,30 @@ static void debug_paste(const char *iptr)
     }
 }
 
-static void save_points(FILE *sfp, const char *cmd, int *points)
+static void debugger_save(cpu_debug_t *cpu, char *iptr)
 {
-    for (int c = 0; c < NUM_BREAKPOINTS; c++) {
-        int point = points[c];
-        if (point != -1)
-            fprintf(sfp, "%s %x\n", cmd, point);
-    }
-}
-
-static void debugger_save(char *iptr)
-{
-    char *eptr = strchr(iptr, '\n');
-    if (eptr)
-        *eptr = '\0';
-    FILE *sfp = fopen(iptr, "w");
-    if (sfp) {
-        save_points(sfp, "break", breakpoints);
-        save_points(sfp, "breakr", breakr);
-        save_points(sfp, "breakw", breakw);
-        save_points(sfp, "breaki", breaki);
-        save_points(sfp, "breako", breako);
-        save_points(sfp, "watchr", watchr);
-        save_points(sfp, "watchw", watchw);
-        save_points(sfp, "watchi", watchi);
-        save_points(sfp, "watcho", watcho);
-        debug_outf("Breakpoints saved to %s\n", iptr);
-        fclose(sfp);
+    breakpoint *bp = cpu->breakpoints;
+    if (bp) {
+        char *eptr = strchr(iptr, '\n');
+        if (eptr)
+            *eptr = '\0';
+        FILE *sfp = fopen(iptr, "w");
+        if (sfp) {
+            do {
+                char addr_buf[17 + SYM_MAX];
+                cpu->print_addr(cpu, bp->address, addr_buf, sizeof(addr_buf), true);
+                fprintf(sfp, "%s %s\n", break_names[bp->type], addr_buf);
+                bp = bp->next;
+            }
+            while (bp);
+            debug_outf("Breakpoints for CPU %s saved to %s\n", cpu->cpu_name, iptr);
+            fclose(sfp);
+        }
+        else
+            debug_outf("unable to open '%s' for writing: %s\n", strerror(errno));
     }
     else
-        debug_outf("unable to open '%s' for writing: %s\n", strerror(errno));
+        debug_outf("Nothing to save (no breakpoints)\n");
 }
 
 void trimnl(char *buf) {
@@ -848,32 +865,32 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
         switch (*cmd) {
             case 'b':
                 if (!strncmp(cmd, "break", cmdlen))
-                    set_point(cpu, breakpoints, iptr, "Breakpoint");
+                    set_point(cpu, BREAK_EXEC, iptr, "Breakpoint");
                 else if (!strncmp(cmd, "breaki", cmdlen))
-                    set_point(cpu, breaki, iptr, "Input breakpoint");
+                    set_point(cpu, BREAK_INPUT, iptr, "Input breakpoint");
                 else if (!strncmp(cmd, "breako", cmdlen))
-                    set_point(cpu, breako, iptr, "Output breakpoint");
+                    set_point(cpu, BREAK_OUTPUT, iptr, "Output breakpoint");
                 else if (!strncmp(cmd, "breakr", cmdlen))
-                    set_point(cpu, breakr, iptr, "Read breakpoint");
+                    set_point(cpu, BREAK_READ, iptr, "Read breakpoint");
                 else if (!strncmp(cmd, "breakw", cmdlen))
-                    set_point(cpu, breakw, iptr, "Write breakpoint");
+                    set_point(cpu, BREAK_WRITE, iptr, "Write breakpoint");
                 else if (!strncmp(ins, "blist", cmdlen)) {
-                    list_points(cpu, breakpoints, "Breakpoint");
-                    list_points(cpu, breakr, "Read breakpoint");
-                    list_points(cpu, breakw, "Write breakpoint");
-                    list_points(cpu, breaki, "Input breakpoint");
-                    list_points(cpu, breako, "Output breakpoint");
+                    list_points(cpu, BREAK_EXEC, "Breakpoint");
+                    list_points(cpu, BREAK_READ, "Read breakpoint");
+                    list_points(cpu, BREAK_WRITE, "Write breakpoint");
+                    list_points(cpu, BREAK_INPUT, "Input breakpoint");
+                    list_points(cpu, BREAK_OUTPUT, "Output breakpoint");
                 }
                 else if (!strncmp(ins, "bclear", cmdlen))
-                    clear_point(cpu, breakpoints, iptr, "Breakpoint");
+                    clear_point(cpu, BREAK_EXEC, iptr, "Breakpoint");
                 else if (!strncmp(cmd, "bcleari", cmdlen))
-                    clear_point(cpu, breaki, iptr, "Input breakpoint");
+                    clear_point(cpu, BREAK_INPUT, iptr, "Input breakpoint");
                 else if (!strncmp(cmd, "bclearo", cmdlen))
-                    clear_point(cpu, breako, iptr, "Output breakpoint");
+                    clear_point(cpu, BREAK_OUTPUT, iptr, "Output breakpoint");
                 else if (!strncmp(cmd, "bclearr", cmdlen))
-                    clear_point(cpu, breakr, iptr, "Read breakpoint");
+                    clear_point(cpu, BREAK_READ, iptr, "Read breakpoint");
                 else if (!strncmp(cmd, "bclearw", cmdlen))
-                    clear_point(cpu, breakw, iptr, "Write breakpoint");
+                    clear_point(cpu, BREAK_WRITE, iptr, "Write breakpoint");
                 else
                     badcmd = true;
                 break;
@@ -953,7 +970,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 break;
 
             case 'n':
-                tbreak = next_addr;
+                cpu->tbreak = next_addr;
                 debug_lastcommand = 'n';
                 indebug = 0;
                 main_resume();
@@ -1045,9 +1062,10 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                         list_syms(cpu, iptr);
                     else if (!strncmp(cmd, "save", cmdlen)) {
                         if (*iptr)
-                            debugger_save(iptr);
+                            debugger_save(cpu, iptr);
                         else
                             debug_outf("Missing filename\n");
+                        break;
                     }
                     else
                         badcmd = true;
@@ -1103,27 +1121,27 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 
             case 'w':
                 if (!strncmp(cmd, "watchr", cmdlen))
-                    set_point(cpu, watchr, iptr, "Read watchpoint");
+                    set_point(cpu, WATCH_READ, iptr, "Read watchpoint");
                 else if (!strncmp(cmd, "watchw", cmdlen))
-                    set_point(cpu, watchw, iptr, "Write watchpoint");
+                    set_point(cpu, WATCH_WRITE, iptr, "Write watchpoint");
                 else if (!strncmp(cmd, "watchi", cmdlen))
-                    set_point(cpu, watchi, iptr, "Input watchpoint");
+                    set_point(cpu, WATCH_INPUT, iptr, "Input watchpoint");
                 else if (!strncmp(cmd, "watcho", cmdlen))
-                    set_point(cpu, watcho, iptr, "Output watchpoint");
+                    set_point(cpu, WATCH_OUTPUT, iptr, "Output watchpoint");
                 else if (!strncmp(cmd, "wlist", cmdlen)) {
-                    list_points(cpu, watchr, "Read watchpoint");
-                    list_points(cpu, watchw, "Write watchpoint");
-                    list_points(cpu, watchi, "Input watchpoint");
-                    list_points(cpu, watcho, "Output watchpoint");
+                    list_points(cpu, WATCH_READ, "Read watchpoint");
+                    list_points(cpu, WATCH_WRITE, "Write watchpoint");
+                    list_points(cpu, WATCH_INPUT, "Input watchpoint");
+                    list_points(cpu, WATCH_OUTPUT, "Output watchpoint");
                 }
                 else if (!strncmp(cmd, "wclearr", cmdlen))
-                    clear_point(cpu, watchr, iptr, "Read watchpoint");
+                    clear_point(cpu, WATCH_READ, iptr, "Read watchpoint");
                 else if (!strncmp(cmd, "wclearw", cmdlen))
-                    clear_point(cpu, watchw, iptr, "Write watchpoint");
+                    clear_point(cpu, WATCH_WRITE, iptr, "Write watchpoint");
                 else if (!strncmp(cmd, "wcleari", cmdlen))
-                    clear_point(cpu, watchi, iptr, "Input watchpoint");
+                    clear_point(cpu, WATCH_INPUT, iptr, "Input watchpoint");
                 else if (!strncmp(cmd, "wclearo", cmdlen))
-                    clear_point(cpu, watcho, iptr, "Output watchpoint");
+                    clear_point(cpu, WATCH_OUTPUT, iptr, "Output watchpoint");
                 else if (!strncmp(cmd, "writem", cmdlen)) {
                     if (*iptr) {
                         unsigned addr, value;
@@ -1146,54 +1164,51 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
     }
 }
 
-static inline void check_points(cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t size, int *break_tab, int *watch_tab, const char *desc)
+static inline void check_points(cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t size, break_type btype, break_type wtype, const char *desc)
 {
-    for (int c = 0; c < NUM_BREAKPOINTS; c++) {
-        if (break_tab[c] == addr) {
-            char addr_str[20 + SYM_MAX], iaddr_str[20 + SYM_MAX];
-            uint32_t iaddr = cpu->get_instr_addr();
-            cpu->print_addr(cpu, addr, addr_str, sizeof(addr_str), true);
-            cpu->print_addr(cpu, iaddr, iaddr_str, sizeof(iaddr_str), true);
-            debug_outf("cpu %s: %s: break on %s %s, value=%X\n", cpu->cpu_name, iaddr_str, desc, addr_str, value);
-            debugger_do(cpu, iaddr);
-        }
-        if (watch_tab[c] == addr) {
-            char addr_str[10], iaddr_str[10];
-            uint32_t iaddr = cpu->get_instr_addr();
-            cpu->print_addr(cpu, addr, addr_str, sizeof(addr_str), true);
-            cpu->print_addr(cpu, iaddr, iaddr_str, sizeof(iaddr_str), true);
-            debug_outf("cpu %s: %s: %s %s, value=%0*X\n", cpu->cpu_name, iaddr_str, desc, addr_str, size*2, value);
+    for (breakpoint *bp = cpu->breakpoints; bp; bp = bp->next) {
+        if (bp->address == addr) {
+            if (bp->type == btype) {
+                char addr_str[20 + SYM_MAX], iaddr_str[20 + SYM_MAX];
+                uint32_t iaddr = cpu->get_instr_addr();
+                cpu->print_addr(cpu, addr, addr_str, sizeof(addr_str), true);
+                cpu->print_addr(cpu, iaddr, iaddr_str, sizeof(iaddr_str), true);
+                debug_outf("cpu %s: %s: break on %s %s, value=%X\n", cpu->cpu_name, iaddr_str, desc, addr_str, value);
+                debugger_do(cpu, iaddr);
+            }
+            else if (bp->type == wtype) {
+                char addr_str[10], iaddr_str[10];
+                uint32_t iaddr = cpu->get_instr_addr();
+                cpu->print_addr(cpu, addr, addr_str, sizeof(addr_str), true);
+                cpu->print_addr(cpu, iaddr, iaddr_str, sizeof(iaddr_str), true);
+                debug_outf("cpu %s: %s: %s %s, value=%0*X\n", cpu->cpu_name, iaddr_str, desc, addr_str, size*2, value);
+            }
         }
     }
 }
 
 void debug_memread (cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t size) {
-    check_points(cpu, addr, value, size, breakr, watchr, "read from");
+    check_points(cpu, addr, value, size, BREAK_READ, WATCH_READ, "read from");
 }
 
 void debug_memwrite(cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t size) {
-    check_points(cpu, addr, value, size, breakw, watchw, "write to");
+    check_points(cpu, addr, value, size, BREAK_WRITE, WATCH_WRITE, "write to");
 }
 
 void debug_ioread (cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t size) {
-    check_points(cpu, addr, value, size, breaki, watchi, "input from");
+    check_points(cpu, addr, value, size, BREAK_INPUT, WATCH_INPUT, "input from");
 }
 
 void debug_iowrite(cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t size) {
-    check_points(cpu, addr, value, size, breako, watcho, "output to");
+    check_points(cpu, addr, value, size, BREAK_OUTPUT, WATCH_OUTPUT, "output to");
 }
 
 void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
-    char buf[256];
-    size_t len;
-    int c, r, enter = 0;
-    const char **np, *name;
-
-    if ((addr & 0xF000) == 0x8000)
-        addr = addr;
+    bool enter = false;
 
     if (trace_fp) {
         const char *symlbl;
+        char buf[256];
         if (symbol_find_by_addr(cpu->symbols, addr, &symlbl)) {
             fputs(symlbl, trace_fp);
             fputs(":\n", trace_fp);
@@ -1209,8 +1224,11 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
         fputs(buf, trace_fp);
         *buf = ' ';
 
-        for (r = 0, np = cpu->reg_names; (name = *np++);) {
-            len = cpu->reg_print(r++, buf + 1, sizeof buf - 1);
+        const char **np = cpu->reg_names;
+        const char *name;
+        int r = 0;
+        while ((name = *np++)) {
+            size_t len = cpu->reg_print(r++, buf + 1, sizeof buf - 1);
             fwrite(buf, len + 1, 1, trace_fp);
         }
 
@@ -1223,13 +1241,13 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
         putc('\n', trace_fp);
     }
 
-    if (addr == tbreak) {
+    if (addr == cpu->tbreak) {
         log_debug("debugger; enter for CPU %s on tbreak at %04X", cpu->cpu_name, addr);
         enter = 1;
     }
     else {
-        for (c = 0; c < NUM_BREAKPOINTS; c++) {
-            if (breakpoints[c] == addr) {
+        for (breakpoint *bp = cpu->breakpoints; bp; bp = bp->next) {
+            if (bp->address == addr && bp->type == BREAK_EXEC) {
                 char addr_str[16+SYM_MAX];
                 cpu->print_addr(cpu, addr, addr_str, sizeof(addr_str), true);
                 debug_outf("cpu %s: Break at %s\n", cpu->cpu_name, addr_str);
@@ -1250,7 +1268,7 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
         }
     }
     if (enter) {
-        tbreak = -1;
+        cpu->tbreak = -1;
         debugger_do(cpu, addr);
     }
 }

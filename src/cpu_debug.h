@@ -11,6 +11,8 @@
 #define WIDTH_16BITS 1
 #define WIDTH_32BITS 2
 
+typedef struct breakpoint breakpoint;
+
 typedef struct cpu_debug_t {
   const char *cpu_name;                                               // Name/model of CPU.
   int      (*debug_enable)(int newvalue);                             // enable/disable debugging on this CPU, returns previous value.
@@ -32,6 +34,8 @@ typedef struct cpu_debug_t {
   size_t   (*print_addr)(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t bufsize, bool include_symbol);   // Print an address.
   uint32_t (*parse_addr)(cpu_debug_t *cpu, const char *arg, const char **end); // Parse an address.
   symbol_table *symbols;                                              // symbol table for storing symbolic addresses
+  breakpoint *breakpoints;                                            // Linked list of all breakpoints and watchpoints.
+  uint32_t   tbreak;                                                  // Address to break when skipping subroutines.
 } cpu_debug_t;
 
 extern void debug_memread (cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t size);
