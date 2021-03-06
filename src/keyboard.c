@@ -1181,8 +1181,11 @@ void key_scan(int row, int col) {
 }
 
 bool key_is_down(void) {
-    if (keyrow == 0 && keycol >= 2 && keycol <= 9)
+    if (keyrow == 0 && keycol >= 2 && keycol <= 9) {
+        if (keycol == 6 && autoboot > 0)
+            return true;
         return kbdips & (1 << (9 - keycol));
+    }
     else
         return bbcmatrix[keycol][keyrow];
 }
