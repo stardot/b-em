@@ -1,3 +1,4 @@
+//#define _DEBUG
 /*B-em v2.2 by Tom Walker
   Debugger*/
 
@@ -23,6 +24,7 @@ typedef enum {
     BREAK_WRITE,
     BREAK_INPUT,
     BREAK_OUTPUT,
+    WATCH_EXEC,
     WATCH_READ,
     WATCH_WRITE,
     WATCH_INPUT,
@@ -35,6 +37,7 @@ static const char break_names[][11] = {
     "breakw",
     "breaki",
     "breako",
+    "watch",
     "watchr",
     "watchw",
     "watchi",
@@ -863,6 +866,9 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
             cmdlen = 1;
         }
         switch (*cmd) {
+            case '#':
+                /* do nothing - for comments in exec file */
+                break;
             case 'b':
                 if (!strncmp(cmd, "break", cmdlen))
                     set_point(cpu, BREAK_EXEC, iptr, "Breakpoint");
