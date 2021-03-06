@@ -1059,7 +1059,7 @@ static void econet_rx_copy(int start, int bytes)
     BeebRx.BytesInBuffer = size + start;
 }
 
-static unsigned rxdelay = 0;
+static int rxdelay = -1;
 
 static void econet_rx_data(void)
 {
@@ -1067,15 +1067,19 @@ static void econet_rx_data(void)
         log_debug("Econet(Rx): holding off rx, RTS aserted");
         return;
     }
-    if (rxdelay) {
-        log_debug("Econet(Rx): holding off rx, rx delay=%u", rxdelay);
-        if (rxdelay-- == 0 && FlagFillActive) {
+    if (rxdelay >= 0) {
+        if (rxdelay == 0) {
+            log_debug("Econet(Rx): rx packet release, flag fill reset");
             FlagFillActive = false;
-            log_debug("Econet(Rx): FlagFill reset");
+            rxdelay = -1;
         }
-        else if (FlagFillActive)
-            EconetFlagFillTimeoutTrigger = EconetCycles + EconetFlagFillTimeout;
-        return;
+        else {
+            log_debug("Econet(Rx): holding off rx, rx delay=%u", rxdelay);
+            rxdelay--;
+            if (FlagFillActive)
+                EconetFlagFillTimeoutTrigger = EconetCycles + EconetFlagFillTimeout;
+            return;
+        }
     }
     if (BeebRx.Pointer < BeebRx.BytesInBuffer) {
         // something waiting to be given to the processor
@@ -1473,7 +1477,7 @@ static void econet_rx_tx(void)
         && !ADLC.rxfptr     // nothing in fifo
         && !(ADLC.status2 & ADLC_STA2_FRAME_VAL)      // no FV
         && (BeebRx.BytesInBuffer == 0
-        && rxdelay == 0)) {   // nothing in ip buffer
+        && rxdelay == -1)) {   // nothing in ip buffer
         ADLC.idle = true;
     }
     else {
