@@ -205,6 +205,7 @@ struct econetpacket {
 
 static struct econetpacket BeebTx;
 static struct econetpacket BeebRx;
+static unsigned lastrxlen = 0;
 
 uint8_t BeebTxCopy[6];          // size of longeconetpacket structure
 
@@ -1028,6 +1029,9 @@ static void econet_tx_data(void)
                         log_error("Econet(Tx): Failed to send packet to %02x %02x (%s:%u)",
                                   (unsigned int)(ecoent->network), (unsigned int)ecoent->station, inet_ntoa(ecoent->inet_addr), (unsigned int)ecoent->port);
                     }
+                    FlagFillActive = true;
+                    EconetFlagFillTimeoutTrigger = EconetCycles + EconetFlagFillTimeout;
+                    log_debug("Econet(Tx): FlagFill set (packet sent)");
                 }
                 else {
                     log_debug("Econet(Tx): Sending a non-AUN packet, BeebTx.Pointer=%d", BeebTx.Pointer);
@@ -1036,14 +1040,19 @@ static void econet_tx_data(void)
                         log_error("Econet(Tx): Failed to send packet to %02x %02x (%s:%u)",
                                   (unsigned int)(BeebTx.eh.destnet), (unsigned int)BeebTx.eh.deststn, inet_ntoa(ecoent->inet_addr), (unsigned int)ecoent->port);
                     }
+                    /* If we have just sent a packet then then a real peer
+                     * would probably go into flag-fill.  The exception is
+                     * when the just sent a data ack packet which is the
+                     * end of the four-way handshake.
+                     */
+                    if (BeebTx.Pointer != 4 || lastrxlen <= 6) {
+                        FlagFillActive = true;
+                        EconetFlagFillTimeoutTrigger = EconetCycles + EconetFlagFillTimeout;
+                        log_debug("Econet(Tx): FlagFill set (packet sent)");
+                    }
+                    else
+                        log_debug("Econet(Tx): skipping flag-fill");
                 }
-
-                // Sending packet will mean peer goes into flag fill while
-                // it deals with it
-                FlagFillActive = true;
-                EconetFlagFillTimeoutTrigger = EconetCycles + EconetFlagFillTimeout;
-                log_debug("Econet(Tx): FlagFill set (packet sent)");
-
                 BeebTx.Pointer = 0;     // wipe buffer
                 BeebTx.BytesInBuffer = 0;
                 econet_adlc_debug();
@@ -1057,6 +1066,7 @@ static void econet_rx_copy(int start, int bytes)
     size_t size = bytes - sizeof(EconetRx.ah);
     memcpy(BeebRx.buff + start, EconetRx.buff, size);
     BeebRx.BytesInBuffer = size + start;
+    lastrxlen = size;
 }
 
 static int rxdelay = -1;
@@ -1265,7 +1275,7 @@ static void econet_rx_data(void)
                         log_dump("Econet(Rx): BeebEm packet: ", BeebRx.buff, RetVal);
                         BeebRx.BytesInBuffer = RetVal;
                         BeebRx.Pointer = 0;
-
+                        lastrxlen = RetVal;
                     }
 
                     if ((BeebRx.eh.deststn == EconetStationNumber || BeebRx.eh.deststn == 255 || BeebRx.eh.deststn == 0) && BeebRx.BytesInBuffer > 0) {
