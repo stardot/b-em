@@ -1082,6 +1082,7 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
         case IDM_FILE_RESET:
             nula_reset();
             main_restart();
+            update_rom_menu();
             break;
         case IDM_FILE_LOAD_STATE:
             file_load_state(event);
