@@ -130,7 +130,9 @@ static uint8_t wt_sectid;
 static uint8_t wt_sectsz;
 
 #ifdef WIN32
-#ifndef __GNUC__
+#ifdef __GNUC__
+extern int ftruncate(int fd, off_t length);
+#else
 // https://stackoverflow.com/a/19932364/433626
 int ftruncate(int fd, off_t length) {
     HANDLE handle = (HANDLE) _get_osfhandle(_fileno(fd));
