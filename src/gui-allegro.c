@@ -44,6 +44,12 @@ typedef struct {
     int itemno;
 } menu_map_t;
 
+static enum pdest {
+    PDEST_NONE,
+    PDEST_FILE,
+    PDEST_PIPE
+} print_dest;
+
 static ALLEGRO_MENU *disc_menu;
 static ALLEGRO_MENU *rom_menu;
 
@@ -109,7 +115,8 @@ static ALLEGRO_MENU *create_file_menu(void)
     al_append_menu_item(menu, "Load state...", IDM_FILE_LOAD_STATE, 0, NULL, NULL);
     al_append_menu_item(menu, "Save State...", IDM_FILE_SAVE_STATE, 0, NULL, NULL);
     al_append_menu_item(menu, "Save Screenshot...", IDM_FILE_SCREEN_SHOT, 0, NULL, NULL);
-    add_checkbox_item(menu, "Print to file", IDM_FILE_PRINT, prt_fp);
+    add_checkbox_item(menu, "Print to file", IDM_FILE_PRINT, print_dest == PDEST_FILE);
+    add_checkbox_item(menu, "Print to command", IDM_FILE_PCMD, print_dest == PDEST_PIPE);
     add_checkbox_item(menu, "Record Music 5000 to file", IDM_FILE_M5000, music5000_fp);
     add_checkbox_item(menu, "Record Paula to file", IDM_FILE_PAULAREC, paula_fp);
     al_append_menu_item(menu, "Exit", IDM_FILE_EXIT, 0, NULL, NULL);
@@ -587,24 +594,76 @@ static void file_save_scrshot(ALLEGRO_EVENT *event)
     }
 }
 
+static void file_print_close_file(void)
+{
+    if (fclose(prt_fp))
+        log_error("error closing print file: %s",  strerror(errno));
+    prt_fp = NULL;
+    print_dest = PDEST_NONE;
+}
+
+static void file_print_close_pipe(void)
+{
+    int ecode = pclose(prt_fp);
+    if (ecode == -1)
+        log_error("error waiting for print command: %s", strerror(errno));
+    else if (ecode > 0)
+        log_error("print command failed, exit status=%d", ecode);
+    prt_fp = NULL;
+    print_dest = PDEST_NONE;
+}
+
 static void file_print(ALLEGRO_EVENT *event)
 {
     ALLEGRO_FILECHOOSER *chooser;
     ALLEGRO_DISPLAY *display;
 
-    if (prt_fp) {
-        fclose(prt_fp);
-        prt_fp = NULL;
+    switch(print_dest) {
+        case PDEST_PIPE:
+            file_print_close_pipe();
+            al_set_menu_item_flags((ALLEGRO_MENU *)(event->user.data3), IDM_FILE_PCMD, 0);
+            /* FALL THROUGH */
+        case PDEST_NONE:
+            if ((chooser = al_create_native_file_dialog(savestate_name, "Print to file", "*.prn", ALLEGRO_FILECHOOSER_SAVE))) {
+                display = (ALLEGRO_DISPLAY *)(event->user.data2);
+                while (al_show_native_file_dialog(display, chooser)) {
+                    if (al_get_native_file_dialog_count(chooser) <= 0)
+                        break;
+                    if ((prt_fp = fopen(al_get_native_file_dialog_path(chooser, 0), "wb")))
+                        break;
+                }
+                al_destroy_native_file_dialog(chooser);
+            }
+            if (prt_fp)
+                print_dest = PDEST_FILE;
+            else
+                al_set_menu_item_flags((ALLEGRO_MENU *)(event->user.data3), IDM_FILE_PRINT, 0);
+            break;
+        case PDEST_FILE:
+            file_print_close_file();
     }
-    else if ((chooser = al_create_native_file_dialog(savestate_name, "Print to file", "*.prn", ALLEGRO_FILECHOOSER_SAVE))) {
-        display = (ALLEGRO_DISPLAY *)(event->user.data2);
-        while (al_show_native_file_dialog(display, chooser)) {
-            if (al_get_native_file_dialog_count(chooser) <= 0)
-                break;
-            if ((prt_fp = fopen(al_get_native_file_dialog_path(chooser, 0), "wb")))
-                break;
-        }
-        al_destroy_native_file_dialog(chooser);
+}
+
+static void file_print_pipe(ALLEGRO_EVENT *event)
+{
+    const char *pcmd;
+
+    switch(print_dest) {
+        case PDEST_FILE:
+            file_print_close_file();
+            al_set_menu_item_flags((ALLEGRO_MENU *)(event->user.data3), IDM_FILE_PRINT, 0);
+            /* FALL THROUGH */
+        case PDEST_NONE:
+            pcmd = get_config_string(NULL, "printcmd", "lp");
+            if ((prt_fp = popen(pcmd, "w")))
+                print_dest = PDEST_PIPE;
+            else {
+                log_error("unable to start print command '%s': %s", pcmd, strerror(errno));
+                al_set_menu_item_flags((ALLEGRO_MENU *)(event->user.data3), IDM_FILE_PCMD, 0);
+            }
+            break;
+        case PDEST_PIPE:
+            file_print_close_pipe();
     }
 }
 
@@ -1095,6 +1154,9 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             break;
         case IDM_FILE_PRINT:
             file_print(event);
+            break;
+        case IDM_FILE_PCMD:
+            file_print_pipe(event);
             break;
         case IDM_FILE_M5000:
             m5000_rec(event);
