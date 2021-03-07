@@ -520,7 +520,7 @@ static const uint8_t allegro2bbclogical[ALLEGRO_KEY_MAX] =
 #define A2B_SHIFT 0x100
 #define A2B_CTRL  0x200
 
-static uint16_t ascii2bbc[] =
+static const uint16_t ascii2bbc[] =
 {
     0x47|A2B_CTRL,  // 0x00 NUL (CTRL-@)
     0x41|A2B_CTRL,  // 0x01 SOH (CTRL-A)
