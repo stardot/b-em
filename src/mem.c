@@ -348,6 +348,8 @@ void mem_save_romcfg(const char *sect) {
             value = slotp->use_name ? slotp->name : slotp->path;
             if (value)
                 al_set_config_value(bem_cfg, sect, slotkeys[slot], value);
+            else
+                al_remove_config_key(bem_cfg, sect, slotkeys[slot]);
         }
     }
 }
