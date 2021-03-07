@@ -891,7 +891,7 @@ static void hfe_seek(int drive, int track)
   hfe_info[drive]->track_data_bytes = track_len;
   hfe_info[drive]->poll_calls_per_bit = encoding ? 1 : 2;
   log_debug("hfe: seek: loaded %lu bytes of data for drive %d track %d at %p",
-            hfe_info[drive]->track_data_bytes,
+            (unsigned long)hfe_info[drive]->track_data_bytes,
             drive,
             track,
             hfe_info[drive]->track_data);
