@@ -404,9 +404,9 @@ static void sdf_lock(int drive, FILE *fp, int ltype)
 
 static void sdf_spinup(int drive)
 {
-    FILE *fp = sdf_fp[drive];
     log_debug("sdf: spinup drive %d", drive);
 #ifndef WIN32
+    FILE *fp = sdf_fp[drive];
     if (fp)
         sdf_lock(drive, fp, F_WRLCK);
 #endif

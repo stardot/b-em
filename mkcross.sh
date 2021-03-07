@@ -11,7 +11,7 @@ dlls='allegro-5.2.dll             allegro_acodec-5.2.dll
       libwebp-7.dll               libwinpthread-1.dll
       OpenAL32.dll                zlib1.dll'
 
-dirs='ddnoise discs docs icon roms tapes'
+dirs='ddnoise discs docs fonts icon roms tapes'
 cmos='cmos350.bin cmosa.bin cmos.bin cmosc.bin'
 
 buildit() {
