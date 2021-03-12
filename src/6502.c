@@ -652,8 +652,10 @@ static void write_acccon_bplus(int val)
         RAMbank[0xA] = ram8k ? 1 : 0;
         RAMbank[0xC] = RAMbank[0xD] = 1;
     }
-    else
+    else {
+        RAMbank[0xA] = 0;
         RAMbank[0xC] = RAMbank[0xD] = 0;
+    }
 }
 
 static void write_acccon_integra(int val)
