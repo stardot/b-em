@@ -648,8 +648,10 @@ static void write_acccon_bplus(int val)
 {
     acccon = val;
     vidbank = (val & 0x80) << 8;
-    if (val & 0x80)
+    if (val & 0x80) {
+        RAMbank[0xA] = ram8k ? 1 : 0;
         RAMbank[0xC] = RAMbank[0xD] = 1;
+    }
     else
         RAMbank[0xC] = RAMbank[0xD] = 0;
 }
