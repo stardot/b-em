@@ -13,6 +13,7 @@ AC_CANONICAL_HOST
 # Set up the compiler in two different ways and say yes we may want to install.
 AC_PROG_CC
 AC_PROG_CXX
+CXXFLAGS="$CXXFLAGS -std=gnu++11"
 AM_PROG_CC_C_O
 
 # Whether this is a released build or not.
