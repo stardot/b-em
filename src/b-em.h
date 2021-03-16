@@ -37,6 +37,11 @@
 #define putc_unlocked   putc
 #define fread_unlocked  fread
 #define fwrite_unlocked fwrite
+#else
+#ifdef __APPLE__
+#define fread_unlocked fread
+#define fwrite_unlocked fwrite
+#endif
 #endif
 
 #endif
