@@ -1071,7 +1071,6 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                             debugger_save(cpu, iptr);
                         else
                             debug_outf("Missing filename\n");
-                        break;
                     }
                     else
                         badcmd = true;

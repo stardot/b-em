@@ -55,7 +55,6 @@ OBJ = \
     led.o \
     logging.o \
     main.o \
-    mmccard.o \
     mem.o \
     midi-windows.o \
     mmccard.o \

@@ -117,7 +117,12 @@ static uint8_t get_cmos(unsigned addr)
 {
     if ((addr <= 6 && !(addr & 1)) || (addr >= 7 && addr <= 9))
         return read_cmos_rtc(addr);
-    return cmos[addr];
+    else {
+        uint8_t value = cmos[addr];
+        if (addr == 0x1e && autoboot)
+            value |= 0x10;
+        return value;
+    }
 }
 
 void cmos_set(unsigned addr, uint8_t val)

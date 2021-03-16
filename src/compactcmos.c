@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include "b-em.h"
 #include "model.h"
+#include "compactcmos.h"
 
 int i2c_clock = 1, i2c_data = 1;
 
@@ -33,15 +34,22 @@ static int cmos_rw;
 static uint8_t cmos_addr = 0;
 static uint8_t cmos_ram[256];
 
-void compactcmos_load(const MODEL *m) {
-    FILE *cmosf;
-    ALLEGRO_PATH *path;
-    const char *cpath;
+static const char *cmos_name(const MODEL *m)
+{
+    if (m->cmos && *(m->cmos))
+        return m->cmos;
+    return "cmosc";
+}
 
+void compactcmos_load(const MODEL *m)
+{
+    const char *cmos_file = cmos_name(m);
     memset(cmos_ram, 0, 128);
-    if ((path = find_cfg_file(m->cmos, ".bin"))) {
-        cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
-        if ((cmosf = fopen(cpath, "rb"))) {
+    ALLEGRO_PATH *path = find_cfg_file(cmos_file, ".bin");
+    if (path) {
+        const char *cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+        FILE *cmosf = fopen(cpath, "rb");
+        if (cmosf) {
             if (fread(cmos_ram, 128, 1, cmosf) != 1)
                 log_warn("compactcmos: cmos file %s read incompletely, some values will be zero", cpath);
             fclose(cmosf);
@@ -52,17 +60,17 @@ void compactcmos_load(const MODEL *m) {
         al_destroy_path(path);
     }
     else
-        log_error("compactcmos: unable to find CMOS file %s", m->cmos);
+        log_error("compactcmos: unable to find CMOS file %s", cmos_file);
 }
 
-void compactcmos_save(MODEL m) {
-    FILE *cmosf;
-    ALLEGRO_PATH *path;
-    const char *cpath;
-
-    if ((path = find_cfg_dest(m.cmos, ".bin"))) {
-        cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
-        if ((cmosf = fopen(cpath, "wb"))) {
+void compactcmos_save(const MODEL *m)
+{
+    const char *cmos_file = cmos_name(m);
+    ALLEGRO_PATH *path = find_cfg_dest(cmos_name(m), ".bin");
+    if (path) {
+        const char *cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+        FILE *cmosf = fopen(cpath, "wb");
+        if (cmosf) {
             log_debug("compactcmos: saving to %s", cpath);
             fwrite(cmos_ram, 128, 1, cmosf);
             fclose(cmosf);
@@ -72,7 +80,7 @@ void compactcmos_save(MODEL m) {
         al_destroy_path(path);
     }
     else
-        log_error("compactcmos: unable to save CMOS file %s: no suitable destination", m.cmos);
+        log_error("compactcmos: unable to save CMOS file %s: no suitable destination", cmos_file);
 }
 
 static void cmos_stop()
@@ -83,7 +91,12 @@ static void cmos_stop()
 
 static void cmos_nextbyte()
 {
-        i2c_byte = cmos_ram[(cmos_addr++) & 0x7F];
+    uint8_t addr = (cmos_addr++) & 0x7F;
+    i2c_byte = cmos_ram[addr];
+    if (addr == 0x10 && autoboot) {
+        log_debug("compactcmos: doing autoboot");
+        i2c_byte |= 0x10;
+    }
 }
 
 static void cmos_write(uint8_t byte)
@@ -98,7 +111,7 @@ static void cmos_write(uint8_t byte)
                 {
                         cmos_state = CMOS_SENDDATA;
                         i2c_transmit = CMOS;
-                        i2c_byte = cmos_ram[(cmos_addr++) & 0x7F];
+                        cmos_nextbyte();
                 }
                 else
                 {
@@ -117,13 +130,13 @@ static void cmos_write(uint8_t byte)
                 break;
 
                 case CMOS_RECIEVEDATA:
-//        log_debug("Rec byte - %02X\n",cmos_ram[(cmos_addr)&0x7F]);
+                log_debug("compactcmos: set byte %02X=%02X", cmos_addr, byte);
                 cmos_ram[(cmos_addr++) & 0x7F] = byte;
                 break;
 
                 case CMOS_SENDDATA:
-                i2c_byte = cmos_ram[(cmos_addr++) & 0x7F];
-                break;
+                    cmos_nextbyte();
+                    break;
 //                closevideo();
 //                printf("Send data %02X\n",cmos_addr);
 //                exit(-1);

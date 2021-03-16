@@ -497,7 +497,9 @@ static uint32_t do_readmem(uint32_t addr)
         case 0xFE74:
         case 0xFE78:
         case 0xFE7C:
+            if (!MODELA)
                 return uservia_read((uint16_t)addr);
+            break;
 
         case 0xFE80:
         case 0xFE84:
@@ -542,7 +544,7 @@ static uint32_t do_readmem(uint32_t addr)
         case 0xFEDC:
             if (MASTER)
                 return mmccard_read();
-            else
+            else if (!MODELA)
                 return adc_read((uint16_t)addr);
             break;
 
@@ -625,7 +627,7 @@ static void write_romsel(int val)
             ram1k = ram_fe34 & INTEGRA_PRVS1;
         }
     }
-    RAMbank[0xA] = ram8k ? 1 : 0;
+    RAMbank[0xA] = (ram8k && acccon & 0x80) ? 1 : 0;
     if (ram4k) {
         for (int c = 0x80; c < 0x90; c++) {
             memlook[0][c] = memlook[1][c] = ram;
@@ -906,8 +908,9 @@ static void do_writemem(uint32_t addr, uint32_t val)
         case 0xFE74:
         case 0xFE78:
         case 0xFE7C:
+            if (!MODELA)
                 uservia_write((uint16_t)addr, (uint8_t)val);
-                break;
+            break;
 
         case 0xFE80:
         case 0xFE84:
@@ -948,13 +951,13 @@ static void do_writemem(uint32_t addr, uint32_t val)
         case 0xFED0:
         case 0xFED4:
         case 0xFED8:
-                if (!MASTER)
-                        adc_write((uint16_t)addr, (uint8_t)val);
-                break;
+            if (!MASTER && !MODELA)
+                adc_write((uint16_t)addr, (uint8_t)val);
+            break;
         case 0xFEDC:
             if (MASTER)
                 mmccard_write(val);
-            else
+            else if (!MODELA)
                 adc_write((uint16_t)addr, (uint8_t)val);
             break;
 
