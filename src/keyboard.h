@@ -37,6 +37,7 @@ extern void key_down(uint8_t code);
 extern void key_up(uint8_t code);
 
 extern void key_init(void);
+extern void key_clear(void);
 extern void key_reset(void);
 extern void key_check(void);
 extern void key_paste_poll(void);

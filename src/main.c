@@ -73,7 +73,6 @@ int autoboot=0;
 int joybutton[2];
 float joyaxes[4];
 int emuspeed = 4;
-bool alt_down = false;
 
 static ALLEGRO_TIMER *timer;
 static ALLEGRO_EVENT_QUEUE *queue;
@@ -416,11 +415,6 @@ void main_key_pause(void)
     }
 }
 
-void lost_focus() {
-    //force alt down to false;
-    alt_down = false;
-}
-
 double prev_time = 0;
 int execs = 0;
 double spd = 0;
@@ -542,7 +536,7 @@ void main_run()
                 video_update_window_size(&event);
                 break;
             case ALLEGRO_EVENT_DISPLAY_SWITCH_OUT:
-                lost_focus();
+                key_lost_focus();
                 break;
         }
     }
