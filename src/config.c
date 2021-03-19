@@ -174,6 +174,9 @@ void config_load(void)
     ddnoise_type     = get_config_int("sound", "ddtype",        0);
 
     vid_fullborders  = get_config_int("video", "fullborders",   1);
+    vid_win_multiplier = get_config_int("video", "winmultipler", 1);
+    winsizex         = get_config_int("video", "winsizex", 800);
+    winsizey         = get_config_int("video", "winsizey", 600);
 
     vid_ledlocation  = get_config_int("video", "ledlocation",   0);
     vid_ledvisibility = get_config_int("video", "ledvisibility", 2);
@@ -311,6 +314,10 @@ void config_save(void)
         set_config_int("sound", "ddtype", ddnoise_type);
 
         set_config_int("video", "fullborders", vid_fullborders);
+        set_config_int("video", "winmultipler", vid_win_multiplier);
+        set_config_int("video", "winsizex", winsizex);
+        set_config_int("video", "winsizey", winsizey);
+
         c = vid_dtype_user;
         if (vid_pal)
             c += 4;
