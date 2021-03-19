@@ -332,6 +332,7 @@ static ALLEGRO_MENU *create_m7font_menu(void)
 
 static const char *border_names[] = { "None", "Medium", "Full", NULL };
 static const char *vmode_names[] = { "Scaled", "Interlace", "Scanlines", "Line doubling", NULL };
+static const char *win_mult_names[] = { "Freeform", "1x", "2x", "3x", NULL };
 static const char *led_location_names[] = { "None", "Overlapped", "Separate", NULL };
 static const char *led_visibility_names[] = { "When changed", "When changed or transient", "Always", NULL };
 
@@ -344,6 +345,9 @@ static ALLEGRO_MENU *create_video_menu(void)
     sub = al_create_menu();
     add_radio_set(sub, border_names, IDM_VIDEO_BORDERS, vid_fullborders);
     al_append_menu_item(menu, "Borders...", 0, 0, NULL, sub);
+    sub = al_create_menu();
+    add_radio_set(sub, win_mult_names, IDM_VIDEO_WIN_MULT, vid_win_multiplier);
+    al_append_menu_item(menu, "Default window scaling...", 0, 0, NULL, sub);
     al_append_menu_item(menu, "Reset Window Size", IDM_VIDEO_WINSIZE, 0, NULL, NULL);
     add_checkbox_item(menu, "Fullscreen", IDM_VIDEO_FULLSCR, fullscreen);
     add_checkbox_item(menu, "NuLA", IDM_VIDEO_NULA, !nula_disable);
@@ -1280,6 +1284,9 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             break;
         case IDM_VIDEO_BORDERS:
             video_set_borders(radio_event_simple(event, vid_fullborders));
+            break;
+        case IDM_VIDEO_WIN_MULT:
+            video_set_multipier(radio_event_simple(event, vid_win_multiplier));
             break;
         case IDM_VIDEO_WINSIZE:
             video_set_borders(vid_fullborders);
