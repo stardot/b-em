@@ -1455,7 +1455,7 @@ static void exec_swr_ram(uint8_t flags, uint32_t ram_start, uint16_t len, uint32
     log_debug("vdfs: exec_swr_ram: flags=%02x, ram_start=%04x, len=%04x, sw_start=%04x, romid=%02d\n", flags, ram_start, len, sw_start, romid);
     if ((nromid = swr_calc_addr(flags, &sw_start, romid)) >= 0) {
         rom_ptr = rom + romid * 0x4000 + sw_start;
-        if (ram_start > 0xffff0000 || curtube == -1) {
+        if (ram_start >= 0xffff0000 || curtube == -1) {
             if (flags & 0x80)
                 while (len--)
                     *rom_ptr++ = readmem(ram_start++);
@@ -1710,7 +1710,7 @@ static uint32_t write_bytes(FILE *fp, uint32_t addr, size_t bytes)
 {
     char buffer[8192];
 
-    if (addr > 0xffff0000 || curtube == -1) {
+    if (addr >= 0xffff0000 || curtube == -1) {
         while (bytes >= sizeof buffer) {
             char *ptr = buffer;
             size_t chunk = sizeof buffer;
@@ -2001,7 +2001,7 @@ static void osfile_load(uint32_t pb, const char *path)
                     addr = readmem32(pb+0x02);
                 else
                     addr = ent->u.file.load_addr;
-                if (addr > 0xffff0000 || curtube == -1)
+                if (addr >= 0xffff0000 || curtube == -1)
                     read_file_io(fp, addr);
                 else
                     read_file_tube(fp, addr);
@@ -2268,7 +2268,7 @@ static size_t read_bytes(FILE *fp, uint32_t addr, size_t bytes)
         if ((nbytes = fread(buffer, 1, sizeof buffer, fp)) <= 0)
             return bytes;
         bytes -= nbytes;
-        if (addr > 0xffff0000 || curtube == -1) {
+        if (addr >= 0xffff0000 || curtube == -1) {
             while (nbytes--)
                 writemem(addr++, *ptr++);
         }
@@ -2282,7 +2282,7 @@ static size_t read_bytes(FILE *fp, uint32_t addr, size_t bytes)
         if ((nbytes = fread(buffer, 1, bytes, fp)) <= 0)
             return bytes;
         bytes -= nbytes;
-        if (addr > 0xffff0000 || curtube == -1) {
+        if (addr >= 0xffff0000 || curtube == -1) {
             while (nbytes--)
                 writemem(addr++, *ptr++);
         }
@@ -2318,7 +2318,7 @@ static int osgbpb_read(uint32_t pb)
 static uint32_t write_len_str(uint32_t mem_ptr, const char *str)
 {
     size_t len = strlen(str);
-    if (mem_ptr > 0xffff0000 || curtube == -1) {
+    if (mem_ptr >= 0xffff0000 || curtube == -1) {
         writemem(mem_ptr++, len);
         for (const char *ptr = str, *end = str + len; ptr < end; )
             writemem(mem_ptr++, *ptr++);
@@ -2339,7 +2339,7 @@ static void osgbpb_get_title(uint32_t pb)
         if (!*title)
             title = cur_dir->acorn_fn;
         mem_ptr = write_len_str(mem_ptr, title);
-        if (mem_ptr > 0xffff0000 || curtube == -1) {
+        if (mem_ptr >= 0xffff0000 || curtube == -1) {
             writemem(mem_ptr++, cur_dir->u.dir.boot_opt);
             writemem(mem_ptr, 0);   // drive is always 0.
         }
@@ -2739,7 +2739,7 @@ static void run_file(const char *err)
                 if (fp) {
                     uint16_t addr = ent->u.file.load_addr;
                     show_activity();
-                    if (addr > 0xffff0000 || curtube == -1) {
+                    if (addr >= 0xffff0000 || curtube == -1) {
                         log_debug("vdfs: run_file: writing to I/O proc memory at %08X", addr);
                         read_file_io(fp, addr);
                         pc = ent->u.file.exec_addr;
