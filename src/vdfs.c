@@ -2828,8 +2828,10 @@ static void rename_file(uint16_t addr)
 
 const struct cmdent ctab_filing[] = {
     { "ACcess",  VDFS_ACT_NOP     },
+    { "APpend",  VDFS_ROM_APPEND  },
     { "BAck",    VDFS_ACT_BACK    },
     { "BACKUp",  VDFS_ACT_NOP     },
+    { "BUild",   VDFS_ROM_BUILD   },
     { "CDir",    VDFS_ACT_CDIR    },
     { "COMpact", VDFS_ACT_NOP     },
     { "COpy",    VDFS_ACT_NOP     },
@@ -3649,8 +3651,6 @@ static const struct cmdent ctab_always[] = {
     { "List",    VDFS_ROM_LIST    },
     { "Print",   VDFS_ROM_PRINT   },
     { "Type",    VDFS_ROM_TYPE    },
-    { "Build",   VDFS_ROM_BUILD   },
-    { "Append",  VDFS_ROM_APPEND  },
     { "Roms",    VDFS_ROM_ROMS    }
 };
 

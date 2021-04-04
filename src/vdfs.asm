@@ -82,7 +82,6 @@ dmpcnt      =   &AB
 
 filechan    =   &A8
 lineno      =   &A9
-fnptr       =   &A9
 
 ltflag      =   &AB
 ltpchr      =   &AC
@@ -881,26 +880,7 @@ prtextws    =   &A8
 
 .cmd_append
 {
-            stx     fnptr
-            sty     fnptr+1
-            lda     #&00            ; Find current filing system.
-            tay
-            jsr     OSARGS
-            cmp     #fsno_dfs
-            bcs     randomfs
-            ldx     #randomfs-msg
-.loop       lda     msg,x
-            sta     &0100,x
-            dex
-            bpl     loop
-            jmp     &0100
-.msg        brk
-            equb    &fe
-            equs    "Not on a sequential filing system"
-            equb    &00
-.randomfs   lda     #&c0            ; Open for update (to keep contents).
-            ldx     fnptr
-            ldy     fnptr+1
+            lda     #&c0            ; Open for update (to keep contents).
             jsr     OSFIND
             tay
             bne     found
@@ -921,6 +901,23 @@ prtextws    =   &A8
             sta     gbpbpb+&0C
             lda     #&01            ; First GBPB to set file pointer.
             sta     gbpbcmd
+            bne     build_gbpb
+}
+
+; *BUILD command.
+
+.cmd_build
+{
+            lda     #&80            ; Open for writing (discard previous).
+            jsr     OSFIND
+            tay
+            bne     found
+            jmp     not_found
+.found      sty     filechan
+            lda     #&02            ; First GBPB to use current pointer.
+            sta     gbpbcmd
+            lda     #&12            ; Temporarily set our own ROM bank as RAM.
+            sta     port_cmd
 }
 
 ; Common code for *APPEND/*BUILD using OSGBPB.
@@ -935,7 +932,7 @@ prtextws    =   &A8
             ldx     #<oswpb         ; at the end of this ROM.
             ldy     #>oswpb
             jsr     OSWORD
-            bcs     build_esc       ; Escape indicates EOF.
+            bcs     escape          ; Escape indicates EOF.
             iny
             sty     gbpbpb+5        ; Number of bytes to transfer.
             lda     #&00
@@ -958,52 +955,8 @@ prtextws    =   &A8
             lda     #&02            ; Next call will write at current pointer.
             sta     gbpbcmd
             jmp     line_lp
-}
 
-; *BUILD command.
-
-.cmd_build
-{
-            lda     #&80            ; Open for writing (discard previous).
-            jsr     OSFIND
-            tay
-            bne     found
-            jmp     not_found
-.found      sty     filechan
-            lda     #&12            ; Temporarily set our own ROM bank as RAM.
-            sta     port_cmd
-            lda     #&00            ; Find current filing system.
-            jsr     OSARGS
-            cmp     fsno_dfs
-            bcc     build_bput
-            lda     #&02            ; First GBPB to use current pointer.
-            sta     gbpbcmd
-            bne     build_gbpb      ; Use the OSGBPB loop.
-.build_bput lda     #&00
-            sta     lineno          ; Start at line zero.
-            sta     lineno+1
-.line_lp    jsr     line_num        ; Print the new line number.
-            lda     #&00            ; Read a line of input into RAM
-            ldx     #<oswpb         ; at the end of this ROM.
-            ldy     #>oswpb
-            jsr     OSWORD
-            bcs     build_esc       ; Escape indicates EOF.
-            ldx     #&00
-            ldy     filechan
-.putlp      lda     end,x
-            jsr     OSBPUT
-            cmp     #&0d
-            beq     line_lp
-            inx
-            bne     putlp
-            beq     line_lp
-}
-
-; Handle end of *APPEND/*BUILD
-
-.build_esc
-{
-            lda     #&13            ; Restore our RAM bank status.
+.escape     lda     #&13            ; Restore our RAM bank status.
             sta     port_cmd
             lda     #&7c            ; Clear Escape without flushing anything.
             jsr     OSBYTE
@@ -1013,12 +966,12 @@ prtextws    =   &A8
             jsr     OSNEWL
             lda     #&00            ; Declare command implemented by this ROM.
             rts
-}
 
 .oswpb      equw    buffer          ; Buffer address for input.
             equb    &ff             ; Maximum line length.
             equb    &00             ; Minimum ASCII value.
             equb    &ff             ; Maximum ASCII value.
+}
 
 ; *ROMS
 
