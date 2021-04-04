@@ -904,9 +904,9 @@ prtextws    =   &A8
             ldx     #&00
             ldy     buildchan
 .putlp      lda     end,x
+            jsr     OSBPUT
             cmp     #&0d
             beq     line_lp
-            jsr     OSBPUT
             inx
             bne     putlp
             beq     line_lp
