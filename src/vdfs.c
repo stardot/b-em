@@ -222,6 +222,7 @@ enum vdfs_action {
     VDFS_ROM_NOPEN,
     VDFS_ROM_OSW_TAIL,
     VDFS_ROM_CLOSEALL,
+    VDFS_ROM_BUILD,
     VDFS_ACT_NOP,
     VDFS_ACT_QUIT,
     VDFS_ACT_SRLOAD,
@@ -3360,6 +3361,7 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
     case VDFS_ROM_LIST:
     case VDFS_ROM_PRINT:
     case VDFS_ROM_TYPE:
+    case VDFS_ROM_BUILD:
         x = addr & 0xff;
         y = addr >> 8;
         rom_dispatch(act);
@@ -3609,11 +3611,34 @@ static void osword(void)
     }
 }
 
- static void check_ram(void) {
+static void check_ram(void)
+{
     p.c = 0;
     if (y >= 0 && y <= 15)
         if (rom_slots[y].swram)
             p.c = 1;
+}
+
+static bool prev_ram = false;
+
+static void set_ram(void)
+{
+    int rom_id = ram_fe30 & 0x0f;
+    if (rom_slots[rom_id].swram)
+        prev_ram = true;
+    else {
+        prev_ram = false;
+        rom_slots[rom_id].swram = true;
+        m6502_update_swram();
+    }
+}
+
+static void rest_ram(void)
+{
+    if (!prev_ram) {
+        rom_slots[ram_fe30 & 0x0f].swram = false;
+        m6502_update_swram();
+    }
 }
 
 static const struct cmdent ctab_always[] = {
@@ -3622,6 +3647,7 @@ static const struct cmdent ctab_always[] = {
     { "List",    VDFS_ROM_LIST    },
     { "Print",   VDFS_ROM_PRINT   },
     { "Type",    VDFS_ROM_TYPE    },
+    { "Build",   VDFS_ROM_BUILD   },
     { "Roms",    VDFS_ROM_ROMS    }
 };
 
@@ -3714,6 +3740,9 @@ static void service(void)
     case 0x04: // unrecognised command.
         serv_cmd();
         break;
+    case 0x06: // BRK instruction.
+        rest_ram();
+        break;
     case 0x08: // OSWORD
         osword();
         break;
@@ -3768,6 +3797,8 @@ static inline void dispatch(uint8_t value)
         case 0x0f: cat_dfs_rewind();  break;
         case 0x10: cat_get_dir(cur_dir, dfs_dir); break;
         case 0x11: cat_get_dir(lib_dir, dfs_lib); break;
+        case 0x12: set_ram();   break;
+        case 0x13: rest_ram();  break;
         default: log_warn("vdfs: function code %d not recognised\n", value);
     }
 }

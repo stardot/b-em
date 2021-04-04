@@ -83,6 +83,8 @@ dmpcnt      =   &AB
 ltflag      =   &A8
 ltpchr      =   &A9
 lineno      =   &AA
+gbpbflag    =   &AD
+buildchan   =   &AE
 
 prtextws    =   &A8
 
@@ -146,6 +148,7 @@ prtextws    =   &A8
             equw    none_open       ; "No open files" message.
             equw    osw_tail        ; finish a command with an OSWORD call.
             equw    close_all
+            equw    cmd_build       ; *BUILD
 .dispend
 
 ; Stubs to transfer control to the vdfs.c module.
@@ -764,24 +767,8 @@ prtextws    =   &A8
             jmp     OSWRCH
 }
 
-; The *LIST and *TYPE commands.
-
-.cmd_list   lda     #&00
-            sta     lineno
-            sta     lineno+1
-            beq     lstype
-
-.cmd_type   lda     #&80
-
-.lstype
+.line_num
 {
-            sta     ltflag
-            lda     #&40
-            jsr     OSFIND
-            tay
-            bne     found
-            jmp     not_found
-.pline      tax
             sed
             sec
             lda     #&00
@@ -805,6 +792,28 @@ prtextws    =   &A8
             clc
             jsr     bcdnyb
             outspc
+            rts
+}
+
+; The *LIST and *TYPE commands.
+
+.cmd_list   lda     #&00
+            sta     lineno
+            sta     lineno+1
+            beq     lstype
+
+.cmd_type   lda     #&80
+
+.lstype
+{
+            sta     ltflag
+            lda     #&40
+            jsr     OSFIND
+            tay
+            bne     found
+            jmp     not_found
+.pline      tax
+            jsr     line_num
             txa
 .chrlp      cmp     #&0D
             beq     newlin
@@ -861,6 +870,82 @@ prtextws    =   &A8
             jsr     OSBYTE
 .eof        lda     #&00
             jmp     OSFIND
+}
+
+; *BUILD command.
+
+.cmd_build
+{
+            lda     #&80            ; Open the file for writing.
+            jsr     OSFIND
+            tay
+            bne     found
+            jmp     not_found
+.found      sty     buildchan       ; Save the channel number.
+            lda     #&12
+            sta     port_cmd        ; Temporarily set our own ROM bank as RAM.
+            lda     #&00
+            sta     lineno          ; Start at line zero.
+            sta     lineno+1
+            tay                     ; Find current filing system.
+            jsr     OSARGS
+            cmp     #fsno_dfs
+            bcc     nogbpb
+            iny                     ; Flag that OSGBPB is implemented.
+.nogbpb     sty     gbpbflag
+.line_lp    jsr     line_num        ; Print the new line number.
+            lda     #&00            ; Read a line of input into RAM
+            ldx     #<oswpb         ; at the end of this ROM.
+            ldy     #>oswpb
+            jsr     OSWORD
+            bcs     escape          ; Escape indicates EOF.
+            lda     gbpbflag
+            bne     usegbpb         ; OK to use OSGBPB
+            ldx     #&00
+            ldy     buildchan
+.putlp      lda     end,x
+            cmp     #&0d
+            beq     line_lp
+            jsr     OSBPUT
+            inx
+            bne     putlp
+            beq     line_lp
+.usegbpb    iny
+            sty     gbpbpb+5        ; Number of bytes to transfer.
+            lda     #&00
+            sta     gbpbpb+6
+            sta     gbpbpb+7
+            sta     gbpbpb+8
+            lda     #<buffer        ; Address of 1st byte.
+            sta     gbpbpb+1
+            lda     #>buffer
+            sta     gbpbpb+2
+            lda     #&ff
+            sta     gbpbpb+3
+            sta     gbpbpb+4
+            lda     buildchan       ; Save channel num in OSPGPB pblock.
+            sta     gbpbpb
+            lda     #&02
+            ldx     #<gbpbpb        ; Write to file at current pointer.
+            ldy     #>gbpbpb
+            jsr     OSGBPB
+            jmp     line_lp
+
+.escape     lda     #&13            ; Restore our RAM bank status.
+            sta     port_cmd
+            lda     #&7c            ; Clear Escape without flushing anything.
+            jsr     OSBYTE
+            lda     #&00            ; Close the file.
+            ldy     buildchan
+            jsr     OSFIND
+            jsr     OSNEWL
+            lda     #&00            ; Declare command implemented by this ROM.
+            rts
+
+.oswpb      equw    buffer          ; Buffer address for input.
+            equb    &ff             ; Maximum line length.
+            equb    &00             ; Minimum ASCII value.
+            equb    &ff             ; Maximum ASCII value.
 }
 
 ; *ROMS
@@ -1420,4 +1505,10 @@ prtextws    =   &A8
             sta     port_cmd
             rts
 .end
+.gbpbpb     equb    &00
+            equd    &00000000
+            equd    &00000000
+            equd    &00000000
+.buffer     equb    &00
+
             save    "vdfs6", start, end

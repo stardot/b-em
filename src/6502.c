@@ -568,6 +568,11 @@ static inline void page_rom(int rom_no, int rom_sel, int start, int end)
     }
 }
 
+void m6502_update_swram(void)
+{
+    page_rom(ram_fe30 & 0x0f, romsel, 0x80, 0xc0);
+}
+
 #define INTEGRA_SHEN   0x80
 #define INTEGRA_PRVS1  0x40
 #define INTEGRA_PRVS4  0x20
