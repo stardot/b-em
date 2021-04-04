@@ -78,7 +78,7 @@ romid       =   &AA
 copywr      =   &AB
 
 dmpadd      =   &A8
-dmpcnt      =   &AB
+dmpcnt      =   &AC
 
 filechan    =   &A8
 lineno      =   &A9
@@ -650,7 +650,15 @@ prtextws    =   &A8
             tay
             beq     not_found
             pha
-            lda     #&87            ; find screen mode.
+            lda     dmpcnt          ; Need to seek?
+            ora     dmpcnt+1
+            ora     dmpcnt+2
+            ora     dmpcnt+3
+            beq     noseek
+            lda     #&01
+            ldx     #dmpcnt
+            jsr     OSARGS
+.noseek     lda     #&87            ; find screen mode.
             jsr     OSBYTE
             lda     #&08
             cpy     #&00
@@ -661,10 +669,6 @@ prtextws    =   &A8
 .narrow     sta     dmpcnt
             pla
             tay
-            lda     #&00
-            sta     dmpadd
-            sta     dmpadd+1
-            sta     dmpadd+2
             bit     &FF
             bmi     gotesc
 .linlp      lda     dmpadd+2

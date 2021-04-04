@@ -1,3 +1,4 @@
+#define _DEBUG
 /*
  * VDFS for B-EM
  * Steve Fosdick 2016-2020
@@ -224,6 +225,7 @@ enum vdfs_action {
     VDFS_ROM_CLOSEALL,
     VDFS_ROM_BUILD,
     VDFS_ROM_APPEND,
+    VDFS_ROM_CLOSE_CMD,
     VDFS_ACT_NOP,
     VDFS_ACT_QUIT,
     VDFS_ACT_SRLOAD,
@@ -3355,12 +3357,65 @@ static void cmd_mmb_din(uint16_t addr)
         mmb_pick(0, num1);
 }
 
+static void cmd_dump(uint16_t addr)
+{
+    x = addr & 0xff;
+    y = addr >> 8;
+
+    // Skip over the filename and any spaces after.
+
+    int ch;
+    do
+        ch = readmem(addr++);
+    while (ch != ' ' && ch != '\t' && ch != '\r');
+    while (ch == ' ' || ch == '\t')
+        ch = readmem(addr++);
+    uint32_t start = 0, offset = 0;
+    if (ch != '\r') {
+        log_debug("vdfs: cmd_dump, start present");
+        do {
+            ch = hex2nyb(ch);
+            if (ch == -1) {
+                adfs_error(err_badparms);
+                return;
+            }
+            start = start << 4 | ch;
+            log_debug("vdfs: cmd_dump, start loop, nyb=%x, start=%x\n", ch, start);
+            ch = readmem(addr++);
+        }
+        while (ch != ' ' && ch != '\t' && ch != '\r');
+        while (ch == ' ' || ch == '\t')
+            ch = readmem(addr++);
+        if (ch == '\r')
+            offset = start;
+        else {
+            log_debug("vdfs: cmd_dump, offset present");
+            do {
+                ch = hex2nyb(ch);
+                if (ch == -1) {
+                    adfs_error(err_badparms);
+                    return;
+                }
+                offset = offset << 4 | ch;
+                log_debug("vdfs: cmd_dump, start loop, nyb=%x, offset=%x\n", ch, offset);
+                ch = readmem(addr++);
+            }
+            while (ch != ' ' && ch != '\t' && ch != '\r');
+        }
+    }
+    writemem32(0xa8, offset);
+    writemem32(0xac, start);
+    rom_dispatch(VDFS_ROM_DUMP);
+}
+
 static bool vdfs_do(enum vdfs_action act, uint16_t addr)
 {
     log_debug("vdfs: vdfs_do, act=%d, addr=%04X", act, addr);
     switch(act)
     {
     case VDFS_ROM_DUMP:
+        cmd_dump(addr);
+        break;
     case VDFS_ROM_LIST:
     case VDFS_ROM_PRINT:
     case VDFS_ROM_TYPE:
