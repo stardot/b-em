@@ -769,7 +769,6 @@ prtextws    =   &A8
 .cmd_list   lda     #&00
             sta     lineno
             sta     lineno+1
-            sta     lineno+2
             beq     lstype
 
 .cmd_type   lda     #&80
