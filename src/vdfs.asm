@@ -71,7 +71,7 @@ OSRDRM      =   &FFB9
 BRKV        =   &0202
 EVNTV       =   &0220
 
-; Zero page workspace.
+; Zero page workspace - note overlaps.
 
 romtab      =   &A8
 romid       =   &AA
@@ -80,11 +80,15 @@ copywr      =   &AB
 dmpadd      =   &A8
 dmpcnt      =   &AB
 
-ltflag      =   &A8
-ltpchr      =   &A9
-lineno      =   &AA
-gbpbflag    =   &AD
-buildchan   =   &AE
+filechan    =   &A8
+lineno      =   &A9
+fnptr       =   &A9
+
+ltflag      =   &AB
+ltpchr      =   &AC
+
+gbpbcmd     =   &AB
+argsblk     =   &AC
 
 prtextws    =   &A8
 
@@ -149,6 +153,7 @@ prtextws    =   &A8
             equw    osw_tail        ; finish a command with an OSWORD call.
             equw    close_all
             equw    cmd_build       ; *BUILD
+            equw    cmd_append      ; *APPEND.
 .dispend
 
 ; Stubs to transfer control to the vdfs.c module.
@@ -872,45 +877,66 @@ prtextws    =   &A8
             jmp     OSFIND
 }
 
-; *BUILD command.
+; *APPEND command.
 
-.cmd_build
+.cmd_append
 {
-            lda     #&80            ; Open the file for writing.
+            stx     fnptr
+            sty     fnptr+1
+            lda     #&00            ; Find current filing system.
+            tay
+            jsr     OSARGS
+            cmp     #fsno_dfs
+            bcs     randomfs
+            ldx     #randomfs-msg
+.loop       lda     msg,x
+            sta     &0100,x
+            dex
+            bpl     loop
+            jmp     &0100
+.msg        brk
+            equb    &fe
+            equs    "Not on a sequential filing system"
+            equb    &00
+.randomfs   lda     #&c0            ; Open for update (to keep contents).
+            ldx     fnptr
+            ldy     fnptr+1
             jsr     OSFIND
             tay
             bne     found
             jmp     not_found
-.found      sty     buildchan       ; Save the channel number.
-            lda     #&12
-            sta     port_cmd        ; Temporarily set our own ROM bank as RAM.
-            lda     #&00
-            sta     lineno          ; Start at line zero.
-            sta     lineno+1
-            tay                     ; Find current filing system.
+.found      sty     filechan
+            lda     #&02            ; Read file length.
+            ldx     #argsblk
             jsr     OSARGS
-            cmp     #fsno_dfs
-            bcc     nogbpb
-            iny                     ; Flag that OSGBPB is implemented.
-.nogbpb     sty     gbpbflag
+            lda     #&12            ; Temporarily set our own ROM bank as RAM.
+            sta     port_cmd
+            lda     argsblk         ; Set the length in the parameter
+            sta     gbpbpb+&09      ; block for OSGBPB.
+            lda     argsblk+1
+            sta     gbpbpb+&0A
+            lda     argsblk+2
+            sta     gbpbpb+&0B
+            lda     argsblk+3
+            sta     gbpbpb+&0C
+            lda     #&01            ; First GBPB to set file pointer.
+            sta     gbpbcmd
+}
+
+; Common code for *APPEND/*BUILD using OSGBPB.
+
+.build_gbpb
+{
+            lda     #&00            ; Start at line zero.
+            sta     lineno
+            sta     lineno+1
 .line_lp    jsr     line_num        ; Print the new line number.
             lda     #&00            ; Read a line of input into RAM
             ldx     #<oswpb         ; at the end of this ROM.
             ldy     #>oswpb
             jsr     OSWORD
-            bcs     escape          ; Escape indicates EOF.
-            lda     gbpbflag
-            bne     usegbpb         ; OK to use OSGBPB
-            ldx     #&00
-            ldy     buildchan
-.putlp      lda     end,x
-            jsr     OSBPUT
-            cmp     #&0d
-            beq     line_lp
-            inx
-            bne     putlp
-            beq     line_lp
-.usegbpb    iny
+            bcs     build_esc       ; Escape indicates EOF.
+            iny
             sty     gbpbpb+5        ; Number of bytes to transfer.
             lda     #&00
             sta     gbpbpb+6
@@ -923,30 +949,76 @@ prtextws    =   &A8
             lda     #&ff
             sta     gbpbpb+3
             sta     gbpbpb+4
-            lda     buildchan       ; Save channel num in OSPGPB pblock.
+            lda     filechan        ; Save channel num in OSPGPB pblock.
             sta     gbpbpb
-            lda     #&02
-            ldx     #<gbpbpb        ; Write to file at current pointer.
+            lda     gbpbcmd
+            ldx     #<gbpbpb
             ldy     #>gbpbpb
             jsr     OSGBPB
+            lda     #&02            ; Next call will write at current pointer.
+            sta     gbpbcmd
             jmp     line_lp
+}
 
-.escape     lda     #&13            ; Restore our RAM bank status.
+; *BUILD command.
+
+.cmd_build
+{
+            lda     #&80            ; Open for writing (discard previous).
+            jsr     OSFIND
+            tay
+            bne     found
+            jmp     not_found
+.found      sty     filechan
+            lda     #&12            ; Temporarily set our own ROM bank as RAM.
+            sta     port_cmd
+            lda     #&00            ; Find current filing system.
+            jsr     OSARGS
+            cmp     fsno_dfs
+            bcc     build_bput
+            lda     #&02            ; First GBPB to use current pointer.
+            sta     gbpbcmd
+            bne     build_gbpb      ; Use the OSGBPB loop.
+.build_bput lda     #&00
+            sta     lineno          ; Start at line zero.
+            sta     lineno+1
+.line_lp    jsr     line_num        ; Print the new line number.
+            lda     #&00            ; Read a line of input into RAM
+            ldx     #<oswpb         ; at the end of this ROM.
+            ldy     #>oswpb
+            jsr     OSWORD
+            bcs     build_esc       ; Escape indicates EOF.
+            ldx     #&00
+            ldy     filechan
+.putlp      lda     end,x
+            jsr     OSBPUT
+            cmp     #&0d
+            beq     line_lp
+            inx
+            bne     putlp
+            beq     line_lp
+}
+
+; Handle end of *APPEND/*BUILD
+
+.build_esc
+{
+            lda     #&13            ; Restore our RAM bank status.
             sta     port_cmd
             lda     #&7c            ; Clear Escape without flushing anything.
             jsr     OSBYTE
             lda     #&00            ; Close the file.
-            ldy     buildchan
+            ldy     filechan
             jsr     OSFIND
             jsr     OSNEWL
             lda     #&00            ; Declare command implemented by this ROM.
             rts
+}
 
 .oswpb      equw    buffer          ; Buffer address for input.
             equb    &ff             ; Maximum line length.
             equb    &00             ; Minimum ASCII value.
             equb    &ff             ; Maximum ASCII value.
-}
 
 ; *ROMS
 

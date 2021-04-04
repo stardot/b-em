@@ -223,6 +223,7 @@ enum vdfs_action {
     VDFS_ROM_OSW_TAIL,
     VDFS_ROM_CLOSEALL,
     VDFS_ROM_BUILD,
+    VDFS_ROM_APPEND,
     VDFS_ACT_NOP,
     VDFS_ACT_QUIT,
     VDFS_ACT_SRLOAD,
@@ -3362,6 +3363,7 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
     case VDFS_ROM_PRINT:
     case VDFS_ROM_TYPE:
     case VDFS_ROM_BUILD:
+    case VDFS_ROM_APPEND:
         x = addr & 0xff;
         y = addr >> 8;
         rom_dispatch(act);
@@ -3648,6 +3650,7 @@ static const struct cmdent ctab_always[] = {
     { "Print",   VDFS_ROM_PRINT   },
     { "Type",    VDFS_ROM_TYPE    },
     { "Build",   VDFS_ROM_BUILD   },
+    { "Append",  VDFS_ROM_APPEND  },
     { "Roms",    VDFS_ROM_ROMS    }
 };
 
