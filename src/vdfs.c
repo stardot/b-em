@@ -2177,8 +2177,8 @@ static void osfind(void)
             channel -= MIN_CHANNEL;
             if (channel >= 0 && channel < NUM_CHANNELS)
                 close_file(channel);
-        else
-            adfs_error(err_channel);
+            else
+                adfs_error(err_channel);
         }
     }
     else if (check_valid_dir(cur_dir, "current")) {        // open file.
@@ -3548,7 +3548,7 @@ static void osfsc_cmd(void)
     if ((addr = parse_cmd((y << 8) | x, cmd))) {
         if ((ent = lookup_cmd(ctab_filing, ARRAY_SIZE(ctab_filing), cmd))) {
             if (vdfs_do(ent->act, addr))
-            return;
+                return;
         }
     }
     run_file(err_badcmd);
