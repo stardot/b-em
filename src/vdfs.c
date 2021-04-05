@@ -979,6 +979,12 @@ static int scan_dir(vdfs_entry *dir)
     }
 }
 
+/*
+ * Parse a name, probably of a file, from 'addr' on the guest into 'str'
+ * on the host with a maximum length of 'size'.  Return the address on
+ * the guest immediately after the name, or zero if too long.
+ */
+
 static uint16_t parse_name(char *str, size_t size, uint16_t addr)
 {
     char *ptr = str;
@@ -994,7 +1000,11 @@ static uint16_t parse_name(char *str, size_t size, uint16_t addr)
         quote = 1;
         ch = readmem(addr++);
     }
-    while (ptr < end && !(ch == '\r' || ch == ' ' || ch == '\t' || (ch == '"' && quote))) {
+    while (!(ch == '\r' || ch == ' ' || ch == '\t' || (ch == '"' && quote))) {
+        if (ptr >= end || ch < ' ' || ch == 0x7f) {
+            adfs_error(err_badname);
+            return 0;
+        }
         *ptr++ = ch & 0x7f;
         ch = readmem(addr++);
     }
@@ -1390,49 +1400,51 @@ static void exec_swr_fs(uint8_t flags, uint16_t fname, int8_t romid, uint32_t st
     if (check_valid_dir(cur_dir, "current")) {
         if ((romid = swr_calc_addr(flags, &start, romid)) >= 0) {
             vdfs_findres res;
-            parse_name(path, sizeof path, fname);
-            ent = find_entry(path, &res, cur_dir, dfs_dir);
-            if (flags & 0x80) {
-                // read file into sideways RAM.
-                len = 0x4000 - start;
-                if (len > 0) {
-                    if (ent && ent->attribs & ATTR_EXISTS) {
-                        if (ent->attribs & ATTR_IS_DIR)
-                            adfs_error(err_wont);
-                        else if ((fp = fopen(ent->host_path, "rb"))) {
-                            if (fread(rom + romid * 0x4000 + start, len, 1, fp) != 1 && ferror(fp))
-                                log_warn("vdfs: error reading file '%s': %s", ent->host_fn, strerror(errno));
-                            fclose(fp);
-                        } else {
-                            log_warn("vdfs: unable to load file '%s': %s", ent->host_fn, strerror(errno));
-                            adfs_hosterr(errno);
-                        }
-                    } else
-                        adfs_error(res.errmsg);
-                } else
-                    adfs_error(err_too_big);
-            } else {
-                // write sideways RAM to file.
-                len = pblen;
-                if (len <= 16384) {
-                    if (!ent && res.parent)
-                        ent = add_new_file(&res);
-                    if (ent) {
-                        if ((fp = fopen(ent->host_path, "wb"))) {
-                            fwrite(rom + romid * 0x4000 + start, len, 1, fp);
-                            fclose(fp);
-                            load_add = 0xff008000 | (romid << 16) | start;
-                            ent->attribs |= ATTR_EXISTS;
-                            scan_attr(ent);
-                            ent->u.file.load_addr = load_add;
-                            ent->u.file.exec_addr = load_add;
-                            write_back(ent);
+            if (parse_name(path, sizeof path, fname)) {
+                ent = find_entry(path, &res, cur_dir, dfs_dir);
+                if (flags & 0x80) {
+                    // read file into sideways RAM.
+                    len = 0x4000 - start;
+                    if (len > 0) {
+                        if (ent && ent->attribs & ATTR_EXISTS) {
+                            if (ent->attribs & ATTR_IS_DIR)
+                                adfs_error(err_wont);
+                            else if ((fp = fopen(ent->host_path, "rb"))) {
+                                if (fread(rom + romid * 0x4000 + start, len, 1, fp) != 1 && ferror(fp))
+                                    log_warn("vdfs: error reading file '%s': %s", ent->host_fn, strerror(errno));
+                                fclose(fp);
+                            } else {
+                                log_warn("vdfs: unable to load file '%s': %s", ent->host_fn, strerror(errno));
+                                adfs_hosterr(errno);
+                            }
                         } else
-                            log_warn("vdfs: unable to create file '%s': %s\n", ent->host_fn, strerror(errno));
+                            adfs_error(res.errmsg);
                     } else
-                        adfs_error(res.errmsg);
-                } else
-                    adfs_error(err_too_big);
+                        adfs_error(err_too_big);
+                }
+                else {
+                    // write sideways RAM to file.
+                    len = pblen;
+                    if (len <= 16384) {
+                        if (!ent && res.parent)
+                            ent = add_new_file(&res);
+                        if (ent) {
+                            if ((fp = fopen(ent->host_path, "wb"))) {
+                                fwrite(rom + romid * 0x4000 + start, len, 1, fp);
+                                fclose(fp);
+                                load_add = 0xff008000 | (romid << 16) | start;
+                                ent->attribs |= ATTR_EXISTS;
+                                scan_attr(ent);
+                                ent->u.file.load_addr = load_add;
+                                ent->u.file.exec_addr = load_add;
+                                write_back(ent);
+                            } else
+                                log_warn("vdfs: unable to create file '%s': %s\n", ent->host_fn, strerror(errno));
+                        } else
+                            adfs_error(res.errmsg);
+                    } else
+                        adfs_error(err_too_big);
+                }
             }
         }
     }
@@ -2028,38 +2040,39 @@ static void osfile(void)
     if (a <= 0x08 || a == 0xff) {
         log_debug("vdfs: osfile(A=%02X, X=%02X, Y=%02X)", a, x, y);
         if (check_valid_dir(cur_dir, "current")) {
-            parse_name(path, sizeof path, readmem16(pb));
-            switch (a) {
-                case 0x00:  // save file.
-                    osfile_write(pb, path, write_bytes);
-                    break;
-                case 0x01:  // set all attributes.
-                    osfile_set_meta(pb, path, META_LOAD|META_EXEC|META_ATTR);
-                    break;
-                case 0x02:  // set load address only.
-                    osfile_set_meta(pb, path, META_LOAD);
-                    break;
-                case 0x03:  // set exec address only.
-                    osfile_set_meta(pb, path, META_EXEC);
-                    break;
-                case 0x04:  // write attributes.
-                    osfile_set_meta(pb, path, META_ATTR);
-                    break;
-                case 0x05:  // get addresses and attributes.
-                    osfile_get_attr(pb, path);
-                    break;
-                case 0x06:
-                    osfile_delete(pb, path);
-                    break;
-                case 0x07:
-                    osfile_write(pb, path, cfile_callback);
-                    break;
-                case 0x08:
-                    osfile_cdir(path);
-                    break;
-                case 0xff:  // load file.
-                    osfile_load(pb, path);
-                    break;
+            if (parse_name(path, sizeof path, readmem16(pb))) {
+                switch (a) {
+                    case 0x00:  // save file.
+                        osfile_write(pb, path, write_bytes);
+                        break;
+                    case 0x01:  // set all attributes.
+                        osfile_set_meta(pb, path, META_LOAD|META_EXEC|META_ATTR);
+                        break;
+                    case 0x02:  // set load address only.
+                        osfile_set_meta(pb, path, META_LOAD);
+                        break;
+                    case 0x03:  // set exec address only.
+                        osfile_set_meta(pb, path, META_EXEC);
+                        break;
+                    case 0x04:  // write attributes.
+                        osfile_set_meta(pb, path, META_ATTR);
+                        break;
+                    case 0x05:  // get addresses and attributes.
+                        osfile_get_attr(pb, path);
+                        break;
+                    case 0x06:
+                        osfile_delete(pb, path);
+                        break;
+                    case 0x07:
+                        osfile_write(pb, path, cfile_callback);
+                        break;
+                    case 0x08:
+                        osfile_cdir(path);
+                        break;
+                    case 0xff:  // load file.
+                        osfile_load(pb, path);
+                        break;
+                }
             }
         }
     } else
@@ -2167,7 +2180,8 @@ static void osfind(void)
         else
             adfs_error(err_channel);
         }
-    } else if (check_valid_dir(cur_dir, "current")) {        // open file.
+    }
+    else if (check_valid_dir(cur_dir, "current")) {        // open file.
         mode = NULL;
         acorn_mode = a;
         a = 0;
@@ -2179,64 +2193,66 @@ static void osfind(void)
                 return;
             }
         } while (vdfs_chan[channel].ent);
-        parse_name(path, sizeof path, (y << 8) | x);
-        ent = find_entry(path, &res, cur_dir, dfs_dir);
-        if (ent && (ent->attribs & (ATTR_EXISTS|ATTR_IS_DIR)) == (ATTR_EXISTS|ATTR_IS_DIR)) {
-            vdfs_chan[channel].ent = ent;  // make "half-open"
-            a = MIN_CHANNEL + channel;
-            return;
-        }
-        if (acorn_mode == 0x40) {
-            if (ent && ent->attribs & ATTR_EXISTS) {
-                if (ent->attribs & ATTR_OPEN_WRITE)
-                    adfs_error(err_isopen);
-                else {
-                    mode = "rb";
-                    attribs = ATTR_OPEN_READ;
-                }
-            }
-        }
-        else if (acorn_mode == 0x80) {
-            if (!no_wildcards(path))
+        if (parse_name(path, sizeof path, (y << 8) | x)) {
+            ent = find_entry(path, &res, cur_dir, dfs_dir);
+            if (ent && (ent->attribs & (ATTR_EXISTS|ATTR_IS_DIR)) == (ATTR_EXISTS|ATTR_IS_DIR)) {
+                vdfs_chan[channel].ent = ent;  // make "half-open"
+                a = MIN_CHANNEL + channel;
                 return;
-            if (ent && (ent->attribs & ATTR_EXISTS) && (ent->attribs & (ATTR_OPEN_READ|ATTR_OPEN_WRITE)))
-                adfs_error(err_isopen);
-            else {
-                mode = "wb";
-                attribs = ATTR_OPEN_WRITE;
-                if (!ent && res.parent)
-                    ent = add_new_file(&res);
             }
-        } else if (acorn_mode == 0xc0) {
-            attribs = ATTR_OPEN_READ|ATTR_OPEN_WRITE;
-            if (ent) {
-                if (ent->attribs & ATTR_EXISTS) {
-                    if (ent->attribs & (ATTR_OPEN_READ|ATTR_OPEN_WRITE))
+            if (acorn_mode == 0x40) {
+                if (ent && ent->attribs & ATTR_EXISTS) {
+                    if (ent->attribs & ATTR_OPEN_WRITE)
                         adfs_error(err_isopen);
-                    else
-                        mode = "rb+";
+                    else {
+                        mode = "rb";
+                        attribs = ATTR_OPEN_READ;
+                    }
                 }
-                else
-                    mode = "wb+";
-            } else {
+            }
+            else if (acorn_mode == 0x80) {
                 if (!no_wildcards(path))
                     return;
-                if (res.parent)
-                    ent = add_new_file(&res);
-                mode = "wb+";
+                if (ent && (ent->attribs & ATTR_EXISTS) && (ent->attribs & (ATTR_OPEN_READ|ATTR_OPEN_WRITE)))
+                    adfs_error(err_isopen);
+                else {
+                    mode = "wb";
+                    attribs = ATTR_OPEN_WRITE;
+                    if (!ent && res.parent)
+                        ent = add_new_file(&res);
+                }
             }
-        }
-        if (mode && ent) {
-            log_debug("vdfs: osfind open host file %s in mode %s", ent->host_path, mode);
-            if ((fp = fopen(ent->host_path, mode))) {
-                show_activity();
-                ent->attribs |= attribs | ATTR_EXISTS; // file now exists.
-                scan_attr(ent);
-                vdfs_chan[channel].fp = fp;
-                vdfs_chan[channel].ent = ent;
-                a = MIN_CHANNEL + channel;
-            } else
-                log_warn("vdfs: osfind: unable to open file '%s' in mode '%s': %s\n", ent->host_fn, mode, strerror(errno));
+            else if (acorn_mode == 0xc0) {
+                attribs = ATTR_OPEN_READ|ATTR_OPEN_WRITE;
+                if (ent) {
+                    if (ent->attribs & ATTR_EXISTS) {
+                        if (ent->attribs & (ATTR_OPEN_READ|ATTR_OPEN_WRITE))
+                            adfs_error(err_isopen);
+                        else
+                            mode = "rb+";
+                    }
+                    else
+                        mode = "wb+";
+                } else {
+                    if (!no_wildcards(path))
+                        return;
+                    if (res.parent)
+                        ent = add_new_file(&res);
+                    mode = "wb+";
+                }
+            }
+            if (mode && ent) {
+                log_debug("vdfs: osfind open host file %s in mode %s", ent->host_path, mode);
+                if ((fp = fopen(ent->host_path, mode))) {
+                    show_activity();
+                    ent->attribs |= attribs | ATTR_EXISTS; // file now exists.
+                    scan_attr(ent);
+                    vdfs_chan[channel].fp = fp;
+                    vdfs_chan[channel].ent = ent;
+                    a = MIN_CHANNEL + channel;
+                } else
+                    log_warn("vdfs: osfind: unable to open file '%s' in mode '%s': %s\n", ent->host_fn, mode, strerror(errno));
+            }
         }
     }
     log_debug("vdfs: osfind returns a=%d", a);
@@ -2608,10 +2624,9 @@ static void cmd_cdir(uint16_t addr)
 {
     char path[MAX_ACORN_PATH];
 
-    if (check_valid_dir(cur_dir, "current")) {
-        addr = parse_name(path, sizeof path, addr);
-        osfile_cdir(path);
-    }
+    if (check_valid_dir(cur_dir, "current"))
+        if (parse_name(path, sizeof path, addr))
+            osfile_cdir(path);
 }
 
 static void cmd_delete(uint16_t addr)
@@ -2620,14 +2635,15 @@ static void cmd_delete(uint16_t addr)
         vdfs_entry *ent;
         vdfs_findres res;
         char path[MAX_ACORN_PATH];
-        addr = parse_name(path, sizeof path, addr);
-        if (!no_wildcards(path))
-            return;
-        if ((ent = find_entry(path, &res, cur_dir, dfs_dir))) {
-            delete_file(ent);
-            return;
+        if (parse_name(path, sizeof path, addr)) {
+            if (!no_wildcards(path))
+                return;
+            if ((ent = find_entry(path, &res, cur_dir, dfs_dir))) {
+                delete_file(ent);
+                return;
+            }
+            adfs_error(res.errmsg);
         }
-        adfs_error(res.errmsg);
     }
 }
 
@@ -2637,15 +2653,16 @@ static vdfs_entry *lookup_dir(uint16_t addr)
         vdfs_entry *ent;
         vdfs_findres res;
         char path[MAX_ACORN_PATH];
-        parse_name(path, sizeof path, addr);
-        ent = find_entry(path, &res, cur_dir, dfs_dir);
-        if (ent && ent->attribs & ATTR_EXISTS) {
-            if (ent->attribs & ATTR_IS_DIR)
-                return ent;
-            else
-                adfs_error(err_baddir);
-        } else
-            adfs_error(res.errmsg);
+        if (parse_name(path, sizeof path, addr)) {
+            ent = find_entry(path, &res, cur_dir, dfs_dir);
+            if (ent && ent->attribs & ATTR_EXISTS) {
+                if (ent->attribs & ATTR_IS_DIR)
+                    return ent;
+                else
+                    adfs_error(err_baddir);
+            } else
+                adfs_error(res.errmsg);
+        }
     }
     return NULL;
 }
@@ -2730,36 +2747,38 @@ static void run_file(const char *err)
         vdfs_entry *ent;
         vdfs_findres res;
         char path[MAX_ACORN_PATH];
-        cmd_tail = parse_name(path, sizeof path, (y << 8) | x);
-        ent = find_entry(path, &res, cur_dir, dfs_dir);
-        if (!(ent && ent->attribs & ATTR_EXISTS) && lib_dir)
-            ent = find_entry(path, &res, lib_dir, dfs_lib);
-        if (ent && ent->attribs & ATTR_EXISTS) {
-            if (ent->attribs & ATTR_IS_DIR)
-                adfs_error(err_wont);
-            else {
-                FILE *fp = fopen(ent->host_path, "rb");
-                if (fp) {
-                    uint16_t addr = ent->u.file.load_addr;
-                    show_activity();
-                    if (addr >= 0xffff0000 || curtube == -1) {
-                        log_debug("vdfs: run_file: writing to I/O proc memory at %08X", addr);
-                        read_file_io(fp, addr);
-                        pc = ent->u.file.exec_addr;
+        if ((cmd_tail = parse_name(path, sizeof path, (y << 8) | x))) {
+            ent = find_entry(path, &res, cur_dir, dfs_dir);
+            if (!(ent && ent->attribs & ATTR_EXISTS) && lib_dir)
+                ent = find_entry(path, &res, lib_dir, dfs_lib);
+            if (ent && ent->attribs & ATTR_EXISTS) {
+                if (ent->attribs & ATTR_IS_DIR)
+                    adfs_error(err_wont);
+                else {
+                    FILE *fp = fopen(ent->host_path, "rb");
+                    if (fp) {
+                        uint16_t addr = ent->u.file.load_addr;
+                        show_activity();
+                        if (addr >= 0xffff0000 || curtube == -1) {
+                            log_debug("vdfs: run_file: writing to I/O proc memory at %08X", addr);
+                            read_file_io(fp, addr);
+                            pc = ent->u.file.exec_addr;
+                        } else {
+                            log_debug("vdfs: run_file: writing to tube proc memory at %08X", addr);
+                            writemem32(0xc0, ent->u.file.exec_addr); // set up for tube execution.
+                            read_file_tube(fp, addr);
+                            rom_dispatch(VDFS_ROM_TUBE_EXEC);
+                        }
+                        fclose(fp);
                     } else {
-                        log_debug("vdfs: run_file: writing to tube proc memory at %08X", addr);
-                        writemem32(0xc0, ent->u.file.exec_addr); // set up for tube execution.
-                        read_file_tube(fp, addr);
-                        rom_dispatch(VDFS_ROM_TUBE_EXEC);
+                        log_warn("vdfs: unable to run file '%s': %s\n", ent->host_fn, strerror(errno));
+                        adfs_hosterr(errno);
                     }
-                    fclose(fp);
-                } else {
-                    log_warn("vdfs: unable to run file '%s': %s\n", ent->host_fn, strerror(errno));
-                    adfs_hosterr(errno);
                 }
             }
-        } else
-            adfs_error(err);
+            else
+                adfs_error(err);
+        }
     }
 }
 
@@ -2795,35 +2814,38 @@ static void rename_file(uint16_t addr)
 {
     char old_path[MAX_ACORN_PATH], new_path[MAX_ACORN_PATH];
 
-    parse_name(new_path, sizeof new_path, parse_name(old_path, sizeof old_path, addr));
-    if (*old_path && *new_path) {
-        vdfs_findres old_res;
-        vdfs_entry *old_ent = find_entry(old_path, &old_res, cur_dir, dfs_dir);
-        if (old_ent && old_ent->attribs & ATTR_EXISTS) {
-            vdfs_findres new_res;
-            vdfs_entry *new_ent = find_entry(new_path, &new_res, cur_dir, dfs_dir);
-            if (new_ent) {
-                if (new_ent->attribs & ATTR_EXISTS) {
-                    if (new_ent->attribs & ATTR_IS_DIR) {
-                        old_res.parent = new_ent;
-                        if ((new_ent = add_new_file(&old_res)))
+    if ((addr = parse_name(old_path, sizeof old_path, addr))) {
+        if (parse_name(new_path, sizeof new_path, addr)) {
+            if (*old_path && *new_path) {
+                vdfs_findres old_res;
+                vdfs_entry *old_ent = find_entry(old_path, &old_res, cur_dir, dfs_dir);
+                if (old_ent && old_ent->attribs & ATTR_EXISTS) {
+                    vdfs_findres new_res;
+                    vdfs_entry *new_ent = find_entry(new_path, &new_res, cur_dir, dfs_dir);
+                    if (new_ent) {
+                        if (new_ent->attribs & ATTR_EXISTS) {
+                            if (new_ent->attribs & ATTR_IS_DIR) {
+                                old_res.parent = new_ent;
+                                if ((new_ent = add_new_file(&old_res)))
+                                    rename_tail(old_ent, new_ent);
+                            } else {
+                                log_debug("vdfs: new file '%s' for rename already exists", new_res.acorn_fn);
+                                adfs_error(err_exists);
+                            }
+                        } else
                             rename_tail(old_ent, new_ent);
-                    } else {
-                        log_debug("vdfs: new file '%s' for rename already exists", new_res.acorn_fn);
-                        adfs_error(err_exists);
                     }
-                } else
-                    rename_tail(old_ent, new_ent);
+                    else if (new_res.parent && (new_ent = add_new_file(&new_res)))
+                        rename_tail(old_ent, new_ent);
+                } else {
+                    log_debug("vdfs: old file '%s' for rename not found", old_res.acorn_fn);
+                    adfs_error(old_res.errmsg);
+                }
+            } else {
+                log_debug("vdfs: rename attempted with an empty filename");
+                adfs_error(err_badren);
             }
-            else if (new_res.parent && (new_ent = add_new_file(&new_res)))
-                rename_tail(old_ent, new_ent);
-        } else {
-            log_debug("vdfs: old file '%s' for rename not found", old_res.acorn_fn);
-            adfs_error(old_res.errmsg);
         }
-    } else {
-        log_debug("vdfs: rename attempted with an empty filename");
-        adfs_error(err_badren);
     }
 }
 
@@ -2960,28 +2982,29 @@ static bool cat_prep_adfs(uint16_t addr, vdfs_entry *dir, int dfsdir, const char
 {
     if (check_valid_dir(dir, dir_desc)) {
         char path[MAX_ACORN_PATH];
-        parse_name(path, sizeof path, addr);
-        if (*path) {
-            vdfs_findres res;
-            vdfs_entry *ent = find_entry(path, &res, dir, dfsdir);
-            if (ent && ent->attribs & ATTR_EXISTS) {
-                if (ent->attribs & ATTR_IS_DIR) {
-                    dir = ent;
+        if (parse_name(path, sizeof path, addr)) {
+            if (*path) {
+                vdfs_findres res;
+                vdfs_entry *ent = find_entry(path, &res, dir, dfsdir);
+                if (ent && ent->attribs & ATTR_EXISTS) {
+                    if (ent->attribs & ATTR_IS_DIR) {
+                        dir = ent;
+                    } else {
+                        adfs_error(err_baddir);
+                        return false;
+                    }
                 } else {
-                    adfs_error(err_baddir);
+                    adfs_error(res.errmsg);
                     return false;
                 }
-            } else {
-                adfs_error(res.errmsg);
-                return false;
             }
-        }
-        if (!scan_dir(dir)) {
-            acorn_sort(dir, SORT_ADFS);
-            cat_dir = dir;
-            cat_ent = dir->u.dir.children;
-            cat_dfs = dfsdir;
-            return true;
+            if (!scan_dir(dir)) {
+                acorn_sort(dir, SORT_ADFS);
+                cat_dir = dir;
+                cat_ent = dir->u.dir.children;
+                cat_dfs = dfsdir;
+                return true;
+            }
         }
     }
     return false;
@@ -3130,13 +3153,14 @@ static void file_info(uint16_t addr)
         vdfs_entry *ent;
         vdfs_findres res;
         char path[MAX_ACORN_PATH];
-        parse_name(path, sizeof path, addr);
-        if ((ent = find_entry(path, &res, cur_dir, dfs_dir)) && ent->attribs & ATTR_EXISTS) {
-            gcopy_attr(ent);
-            rom_dispatch(VDFS_ROM_INFO);
-            return;
+        if (parse_name(path, sizeof path, addr)) {
+            if ((ent = find_entry(path, &res, cur_dir, dfs_dir)) && ent->attribs & ATTR_EXISTS) {
+                gcopy_attr(ent);
+                rom_dispatch(VDFS_ROM_INFO);
+                return;
+            }
+            adfs_error(res.errmsg);
         }
-        adfs_error(res.errmsg);
     }
 }
 
