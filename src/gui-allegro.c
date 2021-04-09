@@ -1100,6 +1100,7 @@ static void change_tube(ALLEGRO_EVENT *event)
         selecttube = newtube;
     }
     main_restart();
+    update_rom_menu();
 }
 
 static void change_tube_speed(ALLEGRO_EVENT *event)
