@@ -1976,28 +1976,40 @@ static void osfile_cdir(const char *path)
     }
 }
 
-static void read_file_io(FILE *fp, uint32_t addr)
+static void update_length(vdfs_entry *ent, uint32_t length)
 {
-    char buffer[32768];
-    size_t nbytes;
-
-    while ((nbytes = fread(buffer, 1, sizeof buffer, fp)) > 0) {
-        char *ptr = buffer;
-        while (nbytes--)
-            writemem(addr++, *ptr++);
+    if (length != ent->u.file.length) {
+        ent->u.file.length = length;
+        write_back(ent);
     }
 }
 
-static void read_file_tube(FILE *fp, uint32_t addr)
+static void read_file_io(vdfs_entry *ent, FILE *fp, uint32_t addr)
 {
     char buffer[32768];
     size_t nbytes;
+    uint32_t dest = addr;
 
     while ((nbytes = fread(buffer, 1, sizeof buffer, fp)) > 0) {
         char *ptr = buffer;
         while (nbytes--)
-            tube_writemem(addr++, *ptr++);
+            writemem(dest++, *ptr++);
     }
+    update_length(ent, dest - addr);
+}
+
+static void read_file_tube(vdfs_entry *ent, FILE *fp, uint32_t addr)
+{
+    char buffer[32768];
+    size_t nbytes;
+    uint32_t dest = addr;
+
+    while ((nbytes = fread(buffer, 1, sizeof buffer, fp)) > 0) {
+        char *ptr = buffer;
+        while (nbytes--)
+            tube_writemem(dest++, *ptr++);
+    }
+    update_length(ent, dest - addr);
 }
 
 static void osfile_load(uint32_t pb, const char *path)
@@ -2017,9 +2029,9 @@ static void osfile_load(uint32_t pb, const char *path)
                 else
                     addr = ent->u.file.load_addr;
                 if (addr >= 0xffff0000 || curtube == -1)
-                    read_file_io(fp, addr);
+                    read_file_io(ent, fp, addr);
                 else
-                    read_file_tube(fp, addr);
+                    read_file_tube(ent, fp, addr);
                 fclose(fp);
                 osfile_attribs(pb, ent);
                 a = 1;
@@ -2761,12 +2773,12 @@ static void run_file(const char *err)
                         show_activity();
                         if (addr >= 0xffff0000 || curtube == -1) {
                             log_debug("vdfs: run_file: writing to I/O proc memory at %08X", addr);
-                            read_file_io(fp, addr);
+                            read_file_io(ent, fp, addr);
                             pc = ent->u.file.exec_addr;
                         } else {
                             log_debug("vdfs: run_file: writing to tube proc memory at %08X", addr);
                             writemem32(0xc0, ent->u.file.exec_addr); // set up for tube execution.
-                            read_file_tube(fp, addr);
+                            read_file_tube(ent, fp, addr);
                             rom_dispatch(VDFS_ROM_TUBE_EXEC);
                         }
                         fclose(fp);
