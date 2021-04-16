@@ -1264,7 +1264,11 @@ static vdfs_entry *ss_load_dir(vdfs_entry *dir, FILE *f, const char *which)
     int ch;
 
     if ((ch = getc(f)) != EOF) {
-        if (ch == 'R') {
+        if (ch == 'N') {
+            dir = NULL;
+            log_debug("vdfs: loadstate %s directory set to undefined", which);
+        }
+        else if (ch == 'R') {
             dir = &root_dir;
             log_debug("vdfs: loadstate %s directory set to root", which);
         } else if (ch == 'C') {
@@ -1319,7 +1323,9 @@ static void ss_save_dir1(vdfs_entry *ent, FILE *f)
 {
     size_t len;
 
-    if (ent == &root_dir)
+    if (!ent)
+        putc('N', f);
+    else if (ent == &root_dir)
         putc('R', f);
     else {
         putc('S', f);
