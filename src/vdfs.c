@@ -1,3 +1,4 @@
+#define _DEBUG
 /*
  * VDFS for B-EM
  * Steve Fosdick 2016-2020
@@ -3813,6 +3814,13 @@ static uint8_t save_y;
 static void serv_boot(void)
 {
     if (vdfs_enabled && (!key_any_down() || key_code_down(ALLEGRO_KEY_S))) {
+        if (readmem(0x028d)) { /* last break type */
+            close_all();
+            cur_dir = prev_dir = cat_dir = &root_dir;
+            dfs_dir = dfs_lib = '$';
+            vdfs_findres res;
+            lib_dir = find_entry_adfs("Lib", &res, &root_dir, dfs_dir);
+        }
         vdfs_entry *dir = cur_dir;
         if (check_valid_dir(dir, "current")) {
             scan_dir(dir);
@@ -3943,7 +3951,6 @@ void vdfs_write(uint16_t addr, uint8_t value)
 
 void vdfs_init(const char *root)
 {
-    vdfs_findres res;
     scan_seq = 0;
     const char *env = getenv("BEM_VDFS_ROOT");
     if (env)
@@ -3951,9 +3958,6 @@ void vdfs_init(const char *root)
     if (!root)
         root = ".";
     vdfs_new_root(root, &root_dir);
-    root_dir.parent = cur_dir = prev_dir = cat_dir = &root_dir;
-    lib_dir = find_entry_adfs("Lib", &res, &root_dir, dfs_dir);
-    dfs_dir = dfs_lib = '$';
     scan_seq++;
     vdfs_adfs_mode();
 }
