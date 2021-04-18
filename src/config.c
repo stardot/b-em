@@ -7,6 +7,7 @@
 #include "ddnoise.h"
 #include "disc.h"
 #include "keyboard.h"
+#include "main.h"
 #include "model.h"
 #include "mouse.h"
 #include "mmccard.h"
@@ -153,6 +154,8 @@ void config_load(void)
 
     defaultwriteprot = get_config_bool("disc", "defaultwriteprotect", 1);
 
+    autopause        = get_config_bool(NULL, "autopause", false);
+
     curmodel         = get_config_int(NULL, "model",         3);
     selecttube       = get_config_int(NULL, "tube",         -1);
     tube_speed_num   = get_config_int(NULL, "tubespeed",     0);
@@ -291,6 +294,8 @@ void config_save(void)
             al_set_config_value(bem_cfg, "tape", "tape", al_path_cstr(tape_fn, ALLEGRO_NATIVE_PATH_SEP));
         else
             al_remove_config_key(bem_cfg, "tape", "tape");
+
+        set_config_bool(NULL, "autopause", autopause);
 
         set_config_int(NULL, "model", curmodel);
         set_config_int(NULL, "tube", selecttube);

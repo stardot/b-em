@@ -95,6 +95,7 @@ typedef enum {
     IDM_KEY_AS,
     IDM_KEY_LOGICAL,
     IDM_KEY_PAD,
+    IDM_AUTO_PAUSE,
     IDM_MOUSE_AMX,
     IDM_JOYMAP,
     IDM_SPEED,

@@ -69,6 +69,7 @@
 
 bool quitting = false;
 bool keydefining = false;
+bool autopause = false;
 int autoboot=0;
 int joybutton[2];
 float joyaxes[4];
@@ -337,7 +338,7 @@ void main_init(int argc, char *argv[])
 
 void main_restart()
 {
-    main_pause();
+    main_pause("restarting");
     cmos_save(&models[oldmodel]);
 
     model_init();
@@ -474,6 +475,8 @@ static void main_timer(ALLEGRO_EVENT *event)
     }
 }
 
+static double last_switch_in = 0.0;
+
 void main_run()
 {
     ALLEGRO_EVENT event;
@@ -525,7 +528,7 @@ void main_run()
                 main_timer(&event);
                 break;
             case ALLEGRO_EVENT_MENU_CLICK:
-                main_pause();
+                main_pause("menu active");
                 gui_allegro_event(&event);
                 main_resume();
                 break;
@@ -536,8 +539,17 @@ void main_run()
                 video_update_window_size(&event);
                 break;
             case ALLEGRO_EVENT_DISPLAY_SWITCH_OUT:
-                key_lost_focus();
+                /* bodge for when OUT events immediately follow an IN event */
+                if ((event.any.timestamp - last_switch_in) > 0.01) {
+                    key_lost_focus();
+                    if (autopause)
+                        main_pause("auto-paused");
+                }
                 break;
+            case ALLEGRO_EVENT_DISPLAY_SWITCH_IN:
+                last_switch_in = event.any.timestamp;
+                if (autopause)
+                    main_resume();
         }
     }
     log_debug("main: end loop");
@@ -600,8 +612,11 @@ void main_setspeed(int speed)
     emuspeed = speed;
 }
 
-void main_pause(void)
+void main_pause(const char *why)
 {
+    char buf[120];
+    snprintf(buf, sizeof(buf), "%s (%s)", VERSION_STR, why);
+    al_set_window_title(tmp_display, buf);
     al_stop_timer(timer);
 }
 

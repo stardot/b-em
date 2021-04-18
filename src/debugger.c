@@ -1,4 +1,3 @@
-//#define _DEBUG
 /*B-em v2.2 by Tom Walker
   Debugger*/
 
@@ -808,7 +807,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
     uint32_t next_addr;
     char ins[256];
 
-    main_pause();
+    main_pause("debugging");
     indebug = 1;
     const char *sym;
     if (symbol_find_by_addr(cpu->symbols, addr, &sym)) {
