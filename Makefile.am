@@ -5,6 +5,9 @@ dist_pkgdata_DATA = b-em.cfg
 desktopdir = $(datadir)/applications
 desktop_DATA = uk.org.stardot.b-em.desktop
 
+appicondir=$(datadir)/icons/hicolor/scalable/apps
+appicon_DATA=icon/b-em.svg
+
 install-data-hook:
 	mkdir -p $(DESTDIR)$(pkgdatadir)
 	cp -r ddnoise discs fonts roms tapes $(DESTDIR)$(pkgdatadir)
