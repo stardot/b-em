@@ -2,6 +2,9 @@ SUBDIRS = src
 dist_doc_DATA = README.md
 dist_pkgdata_DATA = b-em.cfg
 
+desktopdir = $(datadir)/applications
+desktop_DATA = uk.org.stardot.b-em.desktop
+
 install-data-hook:
 	mkdir -p $(DESTDIR)$(pkgdatadir)
 	cp -r ddnoise discs fonts roms tapes $(DESTDIR)$(pkgdatadir)

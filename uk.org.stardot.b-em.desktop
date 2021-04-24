@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Version=1.4
+Name=B-Em
+Comment=An opensource BBC Micro emulator
+Exec=b-em
+Icon=b-em
+Terminal=false
+Categories=System;Emulator;
+Keywords=BBC Micro;Emulation;
