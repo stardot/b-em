@@ -1085,6 +1085,7 @@ static void change_model(ALLEGRO_EVENT *event)
     oldmodel = curmodel;
     curmodel = menu_get_num(event);
     main_restart();
+    oldmodel = curmodel;
     update_rom_menu();
 }
 
