@@ -93,7 +93,7 @@ static void *mem_thread_proc(ALLEGRO_THREAD *thread, void *data)
             while (!quitting && !al_get_thread_should_stop(thread)) {
                 al_rest(0.02);
                 al_set_target_bitmap(bitmap);
-                if ((region = al_lock_bitmap(bitmap, ALLEGRO_LOCK_WRITEONLY, ALLEGRO_PIXEL_FORMAT_ANY))) {
+                if ((region = al_lock_bitmap(bitmap, ALLEGRO_PIXEL_FORMAT_ANY, ALLEGRO_LOCK_WRITEONLY))) {
                     addr = 0;
                     for (row = 0; row < 256; row++) {
                         for (col = 0; col < 256; col++) {

@@ -298,7 +298,7 @@ static inline void save_screenshot(void)
                     al_draw_scaled_bitmap(b, firstx, firsty << 1, xsize, ysize << 1, 0, 0, xsize, ysize << 1, 0);
                     break;
             }
-            region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_READWRITE);
+            region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_WRITEONLY);
         }
         al_save_bitmap(vid_scrshotname, scrshotb);
         al_destroy_bitmap(scrshotb);
