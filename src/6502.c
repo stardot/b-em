@@ -625,31 +625,30 @@ static void write_romsel(int val)
 
 static void write_acccon_master(int val)
 {
-    acccon = val;
-    int changes = val ^ ram_fe34;
-    vidbank = (val & 1) ? 0x8000 : 0;
-    if (val & 2)
-        RAMbank[0xC] = RAMbank[0xD] = 1;
-    else
-        RAMbank[0xC] = RAMbank[0xD] = 0;
-    if (changes & 4)
-        shadow_mem(val & 4);
-    if (changes & 8) {
-        if (val & 8) { /* 8K filing system RAM */
-            uint8_t *base = ram - 0x3000;
-            for (int c = 0xc0; c < 0xe0; c++) {
-                memlook[0][c] = memlook[1][c] = base;
-                memstat[0][c] = memstat[1][c] = 1;
-            }
-        }
-        else {
-            uint8_t *base = os - 0xC000;
-            for (int c = 0xc0; c < 0xe0; c++) {
-                memlook[0][c] = memlook[1][c] = base;
-                memstat[0][c] = memstat[1][c] = 2;
-            }
-        }
-    }
+	acccon = val;
+	vidbank = (val & 1) ? 0x8000 : 0;
+
+	int bank = 0;
+	if (val & 8) { /* 8K filing system RAM */
+		uint8_t *base = ram - 0x3000;
+		for (int c = 0xc0; c < 0xe0; c++) {
+			memlook[0][c] = memlook[1][c] = base;
+			memstat[0][c] = memstat[1][c] = 1;
+		}
+	}
+	else {
+		uint8_t *base = os - 0xC000;
+		for (int c = 0xc0; c < 0xe0; c++) {
+			memlook[0][c] = memlook[1][c] = base;
+			memstat[0][c] = memstat[1][c] = 2;
+		}
+		if (val & 2)
+			bank = 1;
+		if (val & 4)
+			bank = !bank;
+	}
+	shadow_mem(val & 4);
+	RAMbank[0xC] = RAMbank[0xD] = bank;
 }
 
 static void write_acccon_bplus(int val)
