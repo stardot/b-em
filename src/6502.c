@@ -647,7 +647,19 @@ static void write_acccon_master(int val)
 		if (val & 4)
 			bank = !bank;
 	}
-	shadow_mem(val & 4);
+    uint8_t *shadow = ram + 0x8000;
+    if (val & 4) {
+        for (int c = 0x30; c < 0x80; c++) {
+            memlook[0][c] = shadow;
+            memlook[1][c] = ram;
+        }
+    }
+    else {
+        for (int c = 0x30; c < 0x80; c++) {
+            memlook[0][c] = ram;
+            memlook[1][c] = shadow;
+        }
+    }        
 	RAMbank[0xC] = RAMbank[0xD] = bank;
 }
 
