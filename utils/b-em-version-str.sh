@@ -9,13 +9,25 @@
 #
 #
 # Intended to be called from configure.ac (via autogen.sh)
-B_EM_VERSION=2.2
 
-[ -d ".git" ] || { echo "$B_EM_VERSION" ; exit ; }
-
-if grep -q -i '^ISRELEASED="yes"' ./configure.ac; then
-	# A release build.  Strip the git information off the tag name.
-	git describe --tags --abbrev=0 2>/dev/null || echo "$B_EM_VERSION"
+if [ -d .git ]
+then
+    if grep -q -i '^ISRELEASED="yes"' configure.ac; then
+		# A release build.  Strip the git information off the tag name.
+		git describe --tags --abbrev=0 2>/dev/null || echo unknown
+	else
+		git describe --always --exclude m5000pi
+	fi
 else
-	git describe --always --exclude m5000pi
+    if [ -d ../.git ]
+    then
+		if grep -q -i '^ISRELEASED="yes"' ../configure.ac; then
+			# A release build.  Strip the git information off the tag name.
+			ver=`git describe --tags --abbrev=0 2>/dev/null || echo unknown`
+		else
+			ver=`git describe --always --exclude m5000pi`
+		fi
+		echo "#define REAL_VERSION_STR \"B-Em $ver\"" > version.h
+		echo "EQUS \"$ver\":EQUB 0" > version.asm
+	fi
 fi
