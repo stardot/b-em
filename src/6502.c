@@ -682,31 +682,37 @@ static void write_acccon_integra(int val)
     int changes = val ^ ram_fe34;
     if (changes & INTEGRA_SHEN)
         shadow_mem((val & INTEGRA_SHEN) && !(ram_fe30 & INTEGRA_MEMSEL));
-    if (changes & (INTEGRA_PRVS1|INTEGRA_PRVS4|INTEGRA_PRVS8)) {
-        if (val & INTEGRA_PRVS4) {
-            for (int c = 0x80; c < 0x90; c++) {
-                memlook[0][c] = memlook[1][c] = ram;
-                memstat[0][c] = memstat[1][c] = 1;
-            }
-        }
-        else if (val & INTEGRA_PRVS1) {
-            for (int c = 0x80; c < 0x84; c++) {
-                memlook[0][c] = memlook[1][c] = ram;
-                memstat[0][c] = memstat[1][c] = 1;
-            }
-            page_rom(ram_fe30 & 0x0f, romsel, 0x84, 0x90);
-        }
-        else
-            page_rom(ram_fe30 & 0x0f, romsel, 0x80, 0x90);
+    if ((changes & (INTEGRA_PRVS1|INTEGRA_PRVS4|INTEGRA_PRVS8))) {
+		ram1k = ram4k = ram8k = 0;
+		if (ram_fe30 & INTEGRA_PRVEN) {
+			if (val & INTEGRA_PRVS4) {
+				ram4k = 1; 
+				for (int c = 0x80; c < 0x90; c++) {
+					memlook[0][c] = memlook[1][c] = ram;
+					memstat[0][c] = memstat[1][c] = 1;
+				}
+			}
+			else if (val & INTEGRA_PRVS1) {
+				ram1k = 1;
+				for (int c = 0x80; c < 0x84; c++) {
+					memlook[0][c] = memlook[1][c] = ram;
+					memstat[0][c] = memstat[1][c] = 1;
+				}
+				page_rom(ram_fe30 & 0x0f, romsel, 0x84, 0x90);
+			}
+			else
+				page_rom(ram_fe30 & 0x0f, romsel, 0x80, 0x90);
 
-        if (val & INTEGRA_PRVS8) {
-            for (int c = 0x90; c < 0xb0; c++) {
-                memlook[0][c] = memlook[1][c] = ram;
-                memstat[0][c] = memstat[1][c] = 1;
-            }
-        }
-        else
-            page_rom(ram_fe30 & 0x0f, romsel, 0x90, 0xb0);
+			if (val & INTEGRA_PRVS8) {
+				ram8k = 1;
+				for (int c = 0x90; c < 0xb0; c++) {
+					memlook[0][c] = memlook[1][c] = ram;
+					memstat[0][c] = memstat[1][c] = 1;
+				}
+			}
+			else
+				page_rom(ram_fe30 & 0x0f, romsel, 0x90, 0xb0);
+		}
     }
 }
 
