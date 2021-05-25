@@ -7,9 +7,6 @@ CLEANFILES = $(noinst_SCRIPTS)
 ../b-em$(EXEEXT): b-em$(EXEEXT)
 	cp b-em$(EXEEXT) ..
 
-version.h version.asm: ../.git/HEAD
-	../utils/b-em-version-str.sh
-
 amrefresh:
 
 # The following flags are used by PiTubeDirect Co Pros:

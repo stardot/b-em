@@ -1,7 +1,6 @@
 /*B-em v2.2 by Tom Walker
   Main loop + start/finish code*/
 
-#include "version.h"
 #include "b-em.h"
 #include <allegro5/allegro_audio.h>
 #include <allegro5/allegro_acodec.h>
@@ -129,7 +128,7 @@ void main_reset()
 }
 
 static const char helptext[] =
-    REAL_VERSION_STR " command line options:\n\n"
+    VERSION_STR " command line options:\n\n"
     "-mx             - start as model x (see readme.txt for models)\n"
     "-tx             - start with tube x (see readme.txt for tubes)\n"
     "-disc disc.ssd  - load disc.ssd into drives :0/:2\n"
@@ -158,7 +157,7 @@ void main_init(int argc, char *argv[])
     }
 
     al_init_native_dialog_addon();
-    al_set_new_window_title(REAL_VERSION_STR);
+    al_set_new_window_title(VERSION_STR);
     al_init_primitives_addon();
     if (!al_install_keyboard()) {
         log_fatal("main: unable to install keyboard");
@@ -167,7 +166,7 @@ void main_init(int argc, char *argv[])
     key_init();
     config_load();
     log_open();
-    log_info("main: starting %s", REAL_VERSION_STR);
+    log_info("main: starting %s", VERSION_STR);
 
     model_loadcfg();
 
@@ -466,7 +465,7 @@ static void main_timer(ALLEGRO_EVENT *event)
 
 
             char buf[120];
-            snprintf(buf, 120, "%s %.3fMHz %.1f%%", REAL_VERSION_STR, speed / 1000000, spd);
+            snprintf(buf, 120, "%s %.3fMHz %.1f%%", VERSION_STR, speed / 1000000, spd);
             al_set_window_title(tmp_display, buf);
 
             execs = 0;
