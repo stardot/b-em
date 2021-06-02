@@ -895,6 +895,13 @@ uint32_t BitPrefix(void)
    uint32_t bit;
    SIGN_EXTEND(OpSize.Op[0], Offset);
 
+   // BitPrefix() is used for the bit operations (SBIT/CBIT/IBIT/TBIT)
+   // Access class is regaddr, so morph TOS to Memory so the SP is not modified
+   if (gentype[1] == TOS)
+   {
+      gentype[1] = Memory;
+   }
+
    if (gentype[1] == Register)
    {
       // operand 0 is a register
@@ -1851,11 +1858,6 @@ void n32016_exec()
          case TBIT:
          {
             temp2 = BitPrefix();
-            if (gentype[1] == TOS)
-            {
-               PiWARN("TBIT with base==TOS is not yet implemented");
-               continue; // with next instruction
-            }
             temp = ReadGen(1);
             F_FLAG = TEST(temp & temp2);
             continue;
@@ -2289,7 +2291,13 @@ void n32016_exec()
             temp3 = READ_PC_BYTE();
             temp = ReadGen(0); // src operand
 
-            // The field can be upto 32 bits, and is independent of the opcode i bits
+            // Access class is regaddr, so morph TOS to Memory so the SP is not modified
+            if (gentype[1] == TOS)
+            {
+               gentype[1] = Memory;
+            }
+
+            // The field can be up to 32 bits, and is independent of the opcode i bits
             OpSize.Op[1] = sz32;
             temp2 = ReadGen(1); // base operand
             for (c = 0; c <= (temp3 & 0x1F); c++)
@@ -2310,10 +2318,10 @@ void n32016_exec()
             uint32_t c;
             uint32_t temp4 = 1;
 
+            // Access class is regaddr, so morph TOS to Memory so the SP is not modified
             if (gentype[0] == TOS)
             {
-               PiWARN("EXTS with base==TOS is not yet implemented");
-               continue; // with next instruction
+               gentype[0] = Memory;
             }
 
             // Read the immediate offset (3 bits) / length - 1 (5 bits) from the instruction
@@ -2526,20 +2534,13 @@ void n32016_exec()
                continue; // with next instruction
             }
 
+            // Access class is regaddr, so morph TOS to Memory so the SP is not modified
             if (gentype[0] == TOS)
             {
-               // base is TOS
-               //
-               // This case is complicated because:
-               //
-               // 1. We need to avoid modifying the stack pointer.
-               //
-               // 2. We potentially need to take account of an offset.
-               //
-               PiWARN("EXT with base==TOS is not yet implemented; offset = %"PRId32, Offset);
-               continue; // with next instruction
+               gentype[0] = Memory;
             }
-            else if (gentype[0] == Register)
+
+            if (gentype[0] == Register)
             {
                // base is a register
                StartBit = ((uint32_t) Offset) & 31;
@@ -2589,23 +2590,13 @@ void n32016_exec()
                continue; // with next instruction
             }
 
+            // Access class is regaddr, so morph TOS to Memory so the SP is not modified
             if (gentype[1] == TOS)
             {
-               // base is TOS
-               //
-               // This case is complicated because:
-               //
-               // 1. We need to avoid modifying the stack pointer,
-               // which might not be an issue as we read then write.
-               //
-               // 2. We potentially need to take account of an offset. This
-               // is harder as our current TOS read/write doesn't allow
-               // for an offset. It's also not clear what this means.
-               //
-               PiWARN("INS with base==TOS is not yet implemented; offset = %"PRId32, Offset);
-               continue; // with next instruction
+               gentype[1] = Memory;
             }
-            else if (gentype[1] == Register)
+
+            if (gentype[1] == Register)
             {
                // base is a register
                StartBit = ((uint32_t) Offset) & 31;
