@@ -677,6 +677,7 @@ static void scan_inf_file(vdfs_entry *ent)
     }
     ent->u.file.load_addr = load_addr;
     ent->u.file.exec_addr = exec_addr;
+    log_debug("vdfs: load=%08X, exec=%08X", load_addr, exec_addr);
 }
 
 static unsigned scan_inf_dir_new(const char *lptr, const char *eptr, char *title)
@@ -1152,7 +1153,7 @@ static void close_file(int channel)
         if ((fp = vdfs_chan[channel].fp)) {
             fclose(fp);
             vdfs_chan[channel].fp = NULL;
-            scan_attr(ent);
+            scan_entry(ent);
         }
         ent->attribs &= ~(ATTR_OPEN_READ|ATTR_OPEN_WRITE);
         write_back(ent);
@@ -2264,7 +2265,7 @@ static void osfind(void)
                 if ((fp = fopen(ent->host_path, mode))) {
                     show_activity();
                     ent->attribs |= attribs | ATTR_EXISTS; // file now exists.
-                    scan_attr(ent);
+                    scan_entry(ent);
                     vdfs_chan[channel].fp = fp;
                     vdfs_chan[channel].ent = ent;
                     a = MIN_CHANNEL + channel;
