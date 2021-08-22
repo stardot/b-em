@@ -47,16 +47,8 @@ tube_speed_t tube_speeds[NUM_TUBE_SPEEDS] =
 
 int tube_irq=0;
 tubetype tube_type=TUBEX86;
-
-#define PH1_SIZE 24
-
-struct
-{
-        uint8_t ph1[PH1_SIZE],ph2,ph3[2],ph4;
-        uint8_t hp1,hp2,hp3[2],hp4;
-        uint8_t hstat[4],pstat[4],r1stat;
-        int ph1tail,ph1head,ph1count,ph3pos,hp3pos;
-} tubeula;
+bool tube_resetting;
+tube_ula tubeula;
 
 void tube_updateints()
 {
@@ -121,7 +113,7 @@ uint8_t tube_host_read(uint16_t addr)
                 if (tubeula.ph1count > 0) {
                     if (--tubeula.ph1count == 0)
                         tubeula.hstat[0] &= ~0x80;
-                    if (++tubeula.ph1head == PH1_SIZE)
+                    if (++tubeula.ph1head == TUBE_PH1_SIZE)
                         tubeula.ph1head = 0;
                     tubeula.pstat[0] |= 0x40;
                 }
@@ -175,8 +167,15 @@ void tube_host_write(uint16_t addr, uint8_t val)
         switch (addr & 7)
         {
             case 0: /*Register 1 stat*/
-                if (val & 0x80) tubeula.r1stat |=  (val&0x3F);
-                else            tubeula.r1stat &= ~(val&0x3F);
+                if (val & 0x80)
+                    tubeula.r1stat |= val & 0x3F;
+                else if (tubeula.r1stat & 0x20) {
+                    tube_reset();
+                    if (curtube != -1)
+                        tubes[curtube].reset();
+                }
+                else
+                    tubeula.r1stat &= ~(val&0x3F);
                 log_debug("tube: host write S1=%02X->%02X", val, tubeula.r1stat);
                 tubeula.hstat[0] = (tubeula.hstat[0] & 0xC0) | (val & 0x3F);
                 break;
@@ -292,12 +291,12 @@ void tube_parasite_write(uint32_t addr, uint8_t val)
         {
             case 1: /*Register 1*/
                 log_debug("tube: parasite write R%c=%02X", '1', val);
-                if (tubeula.ph1count < PH1_SIZE) {
+                if (tubeula.ph1count < TUBE_PH1_SIZE) {
                     tubeula.ph1[tubeula.ph1tail++] = val;
                     tubeula.hstat[0] |= 0x80;
-                    if (tubeula.ph1tail == PH1_SIZE)
+                    if (tubeula.ph1tail == TUBE_PH1_SIZE)
                         tubeula.ph1tail = 0;
-                    if (++tubeula.ph1count == PH1_SIZE)
+                    if (++tubeula.ph1count == TUBE_PH1_SIZE)
                         tubeula.pstat[0] &= ~0x40;
                 }
                 break;

@@ -5820,7 +5820,7 @@ void m65c02_exec(void)
 //                        printf("INT\n");
                 }
                 interrupt &= ~128;
-                if (tube_exec && tubecycle) {
+                if (tube_exec && tubecycle && !(tubeula.r1stat & 0x20)) {
 //                        log_debug("tubeexec %i %i %i\n",tubecycles,tubecycle,tube_shift);
                         tubecycles += (tubecycle * tube_multipler) >> 1;
                         if (tubecycles > 3)
