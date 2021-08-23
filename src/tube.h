@@ -28,6 +28,18 @@ typedef struct {
 extern tube_speed_t tube_speeds[NUM_TUBE_SPEEDS];
 extern int tube_speed_num, tube_multipler;
 
+#define TUBE_PH1_SIZE 24
+
+typedef struct
+{
+    uint8_t ph1[TUBE_PH1_SIZE],ph2,ph3[2],ph4;
+    uint8_t hp1,hp2,hp3[2],hp4;
+    uint8_t hstat[4],pstat[4],r1stat;
+    int ph1tail,ph1head,ph1count,ph3pos,hp3pos;
+} tube_ula;
+
+extern tube_ula tubeula;
+
 bool tube_32016_init(void *rom);
 
 extern uint8_t (*tube_readmem)(uint32_t addr);
