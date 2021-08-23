@@ -513,7 +513,7 @@ static void print_registers(cpu_debug_t *cpu) {
     debug_out("\n", 1);
 }
 
-static uint32_t parse_address_or_symbol(cpu_debug_t *cpu, char *arg, const char **endret) {
+static uint32_t parse_address_or_symbol(cpu_debug_t *cpu, const char *arg, const char **endret) {
 
     uint32_t a;
     //first see if there is a symbol
@@ -803,6 +803,33 @@ static void swiftsym(cpu_debug_t *cpu, char *iptr)
         debug_outf("unable to open '%s': %s\n", iptr, strerror(errno));
 }
 
+static void debugger_dumpmem(cpu_debug_t *cpu, const char *iptr, int rows)
+{
+    if (*iptr) {
+        const char *e;
+        debug_memaddr = parse_address_or_symbol(cpu, iptr, &e);
+    }
+    for (int row = 0; row < rows; row++) {
+        char dump[256], *dptr;
+        cpu->print_addr(cpu, debug_memaddr, dump, sizeof(dump), false);
+        debug_outf("%s : ", dump);
+        for (int d = 0; d < 16; d++)
+            debug_outf("%02X ", cpu->memread(debug_memaddr + d));
+        debug_out("  ", 2);
+        dptr = dump;
+        for (int d = 0; d < 16; d++) {
+            uint32_t temp = cpu->memread(debug_memaddr + d);
+            if (temp < ' ' || temp >= 0x7f)
+                *dptr++ = '.';
+            else
+                *dptr++ = temp;
+        }
+        *dptr++ = '\n';
+        debug_out(dump, dptr - dump);
+        debug_memaddr += 16;
+    }
+}
+
 void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 {
     uint32_t next_addr;
@@ -949,29 +976,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 break;
 
             case 'm':
-                if (*iptr) {
-                    const char *e;
-                    debug_memaddr = parse_address_or_symbol(cpu, iptr, &e);
-                }
-                for (c = 0; c < 16; c++) {
-                    char dump[256], *dptr;
-                    cpu->print_addr(cpu, debug_memaddr, dump, sizeof(dump), false);
-                    debug_outf("%s : ", dump);
-                    for (int d = 0; d < 16; d++)
-                        debug_outf("%02X ", cpu->memread(debug_memaddr + d));
-                    debug_out("  ", 2);
-                    dptr = dump;
-                    for (int d = 0; d < 16; d++) {
-                        uint32_t temp = cpu->memread(debug_memaddr + d);
-                        if (temp < ' ' || temp >= 0x7f)
-                            *dptr++ = '.';
-                        else
-                            *dptr++ = temp;
-                    }
-                    *dptr++ = '\n';
-                    debug_out(dump, dptr - dump);
-                    debug_memaddr += 16;
-                }
+                debugger_dumpmem(cpu, iptr, cmd[1] == 'b' ? 1 : 16);
                 debug_lastcommand = 'm';
                 break;
 
