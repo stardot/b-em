@@ -829,6 +829,132 @@ static void debugger_dumpmem(cpu_debug_t *cpu, const char *iptr, int rows)
     }
 }
 
+typedef struct {
+    uint32_t start;
+    unsigned count;
+} prof_pair;
+
+static int prof_cmp(const void *a, const void *b)
+{
+    const prof_pair *pa = a;
+    const prof_pair *pb = b;
+    int d = pb->count - pa->count;
+    if (d == 0)
+        d = pa->start - pb->start;
+    return d;
+}
+
+static prof_pair *debugger_profcount(cpu_debug_t *cpu, unsigned *nitem)
+{
+    unsigned *c_ptr = cpu->prof_counts;
+    unsigned *c_end = c_ptr + (cpu->prof_end - cpu->prof_start);
+    unsigned items = 0;
+    while (c_ptr < c_end)
+        if (*c_ptr++)
+            ++items;
+    log_debug("debugger: %u profile items counted", items);
+    prof_pair *pairs = malloc(items * sizeof(prof_pair));
+    if (pairs) {
+        prof_pair *p_ptr = pairs;
+        unsigned addr = cpu->prof_start;
+        c_ptr = cpu->prof_counts;
+        while (c_ptr < c_end) {
+            unsigned count = *c_ptr++;
+            if (count > 0) {
+                p_ptr->start = addr;
+                p_ptr->count = count;
+                ++p_ptr;
+            }
+            ++addr;
+        }
+        *nitem = items;
+        qsort(pairs, items, sizeof(prof_pair), prof_cmp);
+    }
+    else
+        debug_outf("out of memory processing profile entries");
+    return pairs;
+}
+
+static void debugger_profile(cpu_debug_t *cpu, const char *iptr)
+{
+    if (cpu->prof_counts) {
+        if (!strcasecmp(iptr, "stop")) {
+            free(cpu->prof_counts);
+            cpu->prof_counts = NULL;
+            cpu->prof_start = 0;
+            cpu->prof_end = 0;
+        }
+        else if (!strcasecmp(iptr, "reset")) {
+            unsigned *ptr = cpu->prof_counts;
+            unsigned *end = ptr + (cpu->prof_end - cpu->prof_start);
+            while (ptr < end)
+                *ptr++ = 0;
+        }
+        else if (!strcasecmp(iptr, "print")) {
+            unsigned nitem;
+            prof_pair *pairs = debugger_profcount(cpu, &nitem);
+            if (pairs) {
+                prof_pair *ptr = pairs;
+                prof_pair *end = pairs + nitem;
+                while (ptr < end) {
+                    char addr_buf[17 + SYM_MAX];
+                    cpu->print_addr(cpu, ptr->start, addr_buf, sizeof(addr_buf), true);
+                    debug_outf("%s %u\n", addr_buf, ptr->count);
+                    ++ptr;
+                }
+                free(pairs);
+            }
+        }
+        else if (!strncasecmp(iptr, "file", 4)) {
+            iptr += 4;
+            while (isspace(*iptr))
+                ++iptr;
+            FILE *fp = fopen(iptr, "w");
+            if (fp) {
+                unsigned nitem;
+                prof_pair *pairs = debugger_profcount(cpu, &nitem);
+                if (pairs) {
+                    prof_pair *ptr = pairs;
+                    prof_pair *end = pairs + nitem;
+                    while (ptr < end) {
+                        char addr_buf[17 + SYM_MAX];
+                        cpu->print_addr(cpu, ptr->start, addr_buf, sizeof(addr_buf), true);
+                        fprintf(fp, "%s %u\n", addr_buf, ptr->count);
+                        ++ptr;
+                    }
+                    free(pairs);
+                }
+                fclose(fp);
+                debug_outf("profile stats written to %s\n", iptr);
+            }
+            else
+                debug_outf("unable to open %s for writing: %s\n", iptr, strerror(errno));
+        }
+        else
+            debug_outf("unrecognised sub-command: stop, reset, print, file available\n");
+    }
+    else {
+        const char *end1;
+        uint32_t startaddr = parse_address_or_symbol(cpu, iptr, &end1);
+        if (end1 > iptr) {
+            const char *end2;
+            uint32_t endaddr = parse_address_or_symbol(cpu, end1, &end2);
+            if (end2 > end1) {
+                if ((cpu->prof_counts = malloc((endaddr - startaddr) * sizeof(unsigned)))) {
+                    char addr_buf_s[17 + SYM_MAX], addr_buf_e[17 + SYM_MAX];
+                    cpu->prof_start = startaddr;
+                    cpu->prof_end = endaddr;
+                    cpu->print_addr(cpu, startaddr, addr_buf_s, sizeof(addr_buf_s), true);
+                    cpu->print_addr(cpu, endaddr, addr_buf_e, sizeof(addr_buf_e), true);
+                    debug_outf("profiling for cpu %s from %s to %s\n", cpu->cpu_name, addr_buf_s, addr_buf_e);
+                    return;
+                }
+            }
+        }
+        debug_outf("missing address\nUsage: profile <start-addr> <end-addr>\n");
+    }
+}
+
 void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 {
     uint32_t next_addr;
@@ -989,6 +1115,8 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
             case 'p':
                 if (!strncmp(cmd, "paste", cmdlen))
                     debug_paste(iptr);
+                else if (!strncmp(cmd, "profile", cmdlen))
+                    debugger_profile(cpu, iptr);
                 else
                     badcmd = true;
                 break;
@@ -1249,6 +1377,9 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
 
         putc('\n', trace_fp);
     }
+
+    if (cpu->prof_counts && addr >= cpu->prof_start && addr < cpu->prof_end)
+        cpu->prof_counts[addr - cpu->prof_start]++;
 
     if (addr == cpu->tbreak) {
         log_debug("debugger; enter for CPU %s on tbreak at %04X", cpu->cpu_name, addr);

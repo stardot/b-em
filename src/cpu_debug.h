@@ -36,6 +36,9 @@ typedef struct cpu_debug_t {
   symbol_table *symbols;                                              // symbol table for storing symbolic addresses
   breakpoint *breakpoints;                                            // Linked list of all breakpoints and watchpoints.
   uint32_t   tbreak;                                                  // Address to break when skipping subroutines.
+  uint32_t   prof_start;                                              // Start address for profiling.
+  uint32_t   prof_end;                                                // End address for profiling.
+  unsigned   *prof_counts;                                            // Profile execution counts.
 } cpu_debug_t;
 
 extern void debug_memread (cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t size);
