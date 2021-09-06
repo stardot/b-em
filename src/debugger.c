@@ -964,6 +964,23 @@ static void debugger_profile(cpu_debug_t *cpu, const char *iptr)
     }
 }
 
+static void debugger_ruler(const char *iptr)
+{
+    unsigned start = 0;
+    unsigned count = 16;
+    if (*iptr) {
+        char *end;
+        start = strtoul(iptr, &end, 0);
+        if (end > iptr) {
+            iptr = end;
+            if (*iptr)
+                count = strtoul(iptr, &end, 0);
+        }
+    }
+    while (count--)
+        debug_outf("%02X ", start++);
+}
+
 void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 {
     uint32_t next_addr;
@@ -1134,7 +1151,10 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 if (cmdlen >= 3 && !strncmp(cmd, "reset", cmdlen)) {
                     main_reset();
                     debug_outf("Emulator reset\n");
-                } else if (*iptr) {
+                }
+                else if (cmdlen >= 2 && !strncmp(cmd, "ruler", cmdlen))
+                    debugger_ruler(iptr);
+                else if (*iptr) {
                     size_t arglen = strcspn(iptr, " \t\n");
                     iptr[arglen] = 0;
                     if (!strncasecmp(iptr, "sysvia", arglen)) {
