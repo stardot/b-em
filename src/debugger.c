@@ -940,13 +940,22 @@ static void debugger_profile(cpu_debug_t *cpu, const char *iptr)
             const char *end2;
             uint32_t endaddr = parse_address_or_symbol(cpu, end1, &end2);
             if (end2 > end1) {
-                if ((cpu->prof_counts = malloc((endaddr - startaddr) * sizeof(unsigned)))) {
+                unsigned *ptr = malloc((endaddr - startaddr) * sizeof(unsigned));
+                if (ptr) {
+                    unsigned *end = ptr + (endaddr - startaddr);
                     char addr_buf_s[17 + SYM_MAX], addr_buf_e[17 + SYM_MAX];
+                    cpu->prof_counts = ptr;
+                    while (ptr < end)
+                        *ptr++ = 0;
                     cpu->prof_start = startaddr;
                     cpu->prof_end = endaddr;
                     cpu->print_addr(cpu, startaddr, addr_buf_s, sizeof(addr_buf_s), true);
                     cpu->print_addr(cpu, endaddr, addr_buf_e, sizeof(addr_buf_e), true);
                     debug_outf("profiling for cpu %s from %s to %s\n", cpu->cpu_name, addr_buf_s, addr_buf_e);
+                    return;
+                }
+                else {
+                    debug_outf("out of memory enabling profiling");
                     return;
                 }
             }
