@@ -977,8 +977,12 @@ static void debugger_ruler(const char *iptr)
                 count = strtoul(iptr, &end, 0);
         }
     }
-    while (count--)
-        debug_outf("%02X ", start++);
+    if (count) {
+        debug_out("      ", 6);
+        while (count--)
+            debug_outf(" %02X", start++);
+        debug_out("\n", 1);
+    }
 }
 
 void debugger_do(cpu_debug_t *cpu, uint32_t addr)
