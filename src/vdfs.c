@@ -3393,7 +3393,7 @@ static bool mmb_check_pick(unsigned drive, unsigned disc)
     return true;
 }
 
-static bool cmd_mmb_din(uint16_t addr)
+static void cmd_mmb_din(uint16_t addr)
 {
     int num1, num2, ch;
 
@@ -3405,26 +3405,25 @@ static bool cmd_mmb_din(uint16_t addr)
         while (ch == ' ')
             ch = readmem(addr++);
         if (ch == '\r')
-            return mmb_check_pick(0, num1);
+            mmb_check_pick(0, num1);
         else if (ch >= '0' && ch <= '9') {
             num2 = ch - '0';
             while ((ch = readmem(addr++)) >= '0' && ch <= '9')
                 num2 = num2 * 10 + ch - '0';
             if (num1 >= 0 && num1 <= 3)
-                return mmb_check_pick(num1, num2);
+                mmb_check_pick(num1, num2);
             else
                 adfs_error(err_badparms);
         }
         else if ((num2 = mmb_parse_find(addr, ch)) >= 0) {
             if (num1 >= 0 && num1 <= 3)
-                return mmb_check_pick(num1, num2);
+                mmb_check_pick(num1, num2);
             else
                 adfs_error(err_badparms);
         }
     }
     else if ((num1 = mmb_parse_find(addr, ch)) >= 0)
-        return mmb_check_pick(0, num1);
-    return false;
+        mmb_check_pick(0, num1);
 }
 
 static void cmd_dump(uint16_t addr)

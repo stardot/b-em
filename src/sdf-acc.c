@@ -602,6 +602,7 @@ void mmb_eject(void)
         free(mmb_fn);
         mmb_fn = NULL;
     }
+    mmb_ndisc = 0;
 }
 
 static void reset_one(int drive)
