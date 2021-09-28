@@ -18,12 +18,18 @@
 #include "disc.h"
 #include "sdf.h"
 
-#define MMB_CAT_SIZE 0x2000
+#define MMB_DISC_SIZE  (200*1024)
+#define MMB_ZONE_DISCS 511
+#define MMB_NAME_SIZE  16
+#define MMB_ZONE_SIZE  (MMB_ZONE_DISCS*MMB_NAME_SIZE)
+#define MMB_SKIP_SIZE  (MMB_ZONE_DISCS*MMB_DISC_SIZE+MMB_NAME_SIZE)
 
 static FILE *sdf_fp[NUM_DRIVES], *mmb_fp;
 static const struct sdf_geometry *geometry[NUM_DRIVES];
 static uint8_t current_track[NUM_DRIVES];
 static off_t mmb_offset[NUM_DRIVES][2];
+static unsigned mmb_boot_discs[4];
+static unsigned mmb_cat_size;
 static char *mmb_cat;
 char *mmb_fn;
 
@@ -484,41 +490,83 @@ void sdf_new_disc(int drive, ALLEGRO_PATH *fn, const struct sdf_geometry *geo)
     }
 }
 
+static void mmb_read_error(const char *fn, FILE *fp)
+{
+    if (ferror(fp))
+        log_error("sdf: read error on MMB file %s: %s", fn, strerror(errno));
+    else
+        log_error("sdf: unexpected EOF on MMB file %s", fn);
+    fclose(fp);
+}
+
+static unsigned mmb_calc_offset(unsigned disc)
+{
+    return (disc / MMB_ZONE_DISCS) * (MMB_ZONE_SIZE + MMB_SKIP_SIZE) + (disc % MMB_ZONE_SIZE) * MMB_DISC_SIZE;
+}
+
 void mmb_load(char *fn)
 {
-    FILE *fp;
-
-    if (!mmb_cat) {
-        if (!(mmb_cat = malloc(MMB_CAT_SIZE))) {
-            log_error("sdf: out of memory allocating MMB catalogue");
-            return;
-        }
-    }
     writeprot[0] = 0;
-    if ((fp = fopen(fn, "rb+")) == NULL) {
+    FILE *fp = fopen(fn, "rb+");
+    if (fp == NULL) {
         if ((fp = fopen(fn, "rb")) == NULL) {
             log_error("Unable to open file '%s' for reading - %s", fn, strerror(errno));
             return;
         }
         writeprot[0] = 1;
     }
-    if (fread(mmb_cat, MMB_CAT_SIZE, 1, fp) != 1) {
-        log_error("mmb: %s is not a valid MMB file", fn);
-        fclose(fp);
+    unsigned char header[16];
+    if (fread(header, sizeof(header), 1, fp) != 1) {
+        mmb_read_error(fn, fp);
         return;
+    }
+    mmb_boot_discs[0] = header[0] | (header[4] << 8);
+    mmb_boot_discs[1] = header[1] | (header[5] << 8);
+    mmb_boot_discs[2] = header[2] | (header[6] << 8);
+    mmb_boot_discs[3] = header[3] | (header[7] << 8);
+    unsigned extra_zones = header[8];
+    if (extra_zones > 15)
+        extra_zones = 0;
+    unsigned reqd_cat_size = (extra_zones + 1) * MMB_ZONE_SIZE;
+    if (reqd_cat_size != mmb_cat_size) {
+        if (mmb_cat)
+            free(mmb_cat);
+        if (!(mmb_cat = malloc(reqd_cat_size))) {
+            log_error("sdf: out of memory allocating MMB catalogue");
+            return;
+        }
+        mmb_cat_size = reqd_cat_size;
+    }
+    if (fread(mmb_cat, MMB_ZONE_SIZE, 1, fp) != 1) {
+        mmb_read_error(fn, fp);
+        return;
+    }
+    char *mmb_ptr = mmb_cat + MMB_ZONE_SIZE;
+    char *mmb_end = mmb_cat + reqd_cat_size;
+    while (mmb_ptr < mmb_end) {
+        if (fseek(fp, MMB_SKIP_SIZE, SEEK_CUR)) {
+            log_error("sdf: seek error on MMB file %s: %s", fn, strerror(errno));
+            fclose(fp);
+            return;
+        }
+        if (fread(mmb_ptr, MMB_ZONE_SIZE, 1, fp) != 1) {
+            mmb_read_error(fn, fp);
+            return;
+        }
+        mmb_ptr += MMB_ZONE_SIZE;
     }
     if (mmb_fp) {
         fclose(mmb_fp);
         if (sdf_fp[1] == mmb_fp) {
             sdf_mount(1, fn, fp, &sdf_geometries.dfs_10s_seq_80t);
             writeprot[1] = writeprot[0];
-            mmb_offset[1][0] = MMB_CAT_SIZE;
-            mmb_offset[1][1] = MMB_CAT_SIZE + 10 * 256 * 80;
+            mmb_offset[1][0] = mmb_calc_offset(mmb_boot_discs[2]);
+            mmb_offset[1][1] = mmb_calc_offset(mmb_boot_discs[3]);
         }
     }
     sdf_mount(0, fn, fp, &sdf_geometries.dfs_10s_seq_80t);
-    mmb_offset[0][0] = MMB_CAT_SIZE;
-    mmb_offset[0][1] = MMB_CAT_SIZE + 10 * 256 * 80;
+    mmb_offset[0][0] = mmb_calc_offset(mmb_boot_discs[0]);
+    mmb_offset[0][1] = mmb_calc_offset(mmb_boot_discs[1]);
     mmb_fp = fp;
     mmb_fn = fn;
     if (fdc_spindown)
@@ -551,8 +599,8 @@ void mmb_eject(void)
 static void reset_one(int drive)
 {
     if (sdf_fp[drive] == mmb_fp) {
-        mmb_offset[drive][0] = MMB_CAT_SIZE;
-        mmb_offset[drive][1] = MMB_CAT_SIZE + 10 * 256 * 80;
+        mmb_offset[drive][0] = mmb_calc_offset(0);
+        mmb_offset[drive][1] = mmb_calc_offset(1);
     }
 }
 
@@ -589,7 +637,7 @@ void mmb_pick(int drive, int disc)
         disc_close(drive);
         sdf_mount(drive, mmb_fn, mmb_fp, &sdf_geometries.dfs_10s_seq_80t);
     }
-    mmb_offset[drive][side] = MMB_CAT_SIZE + 10 * 256 * 80 * disc;
+    mmb_offset[drive][side] = mmb_calc_offset(disc);
     if (fdc_spindown)
         fdc_spindown();
 }
@@ -613,13 +661,13 @@ static inline int cat_name_cmp(const char *nam_ptr, const char *cat_ptr, const c
 
 int mmb_find(const char *name)
 {
-    const char *cat_ptr = mmb_cat + 16;
-    const char *cat_end = mmb_cat + MMB_CAT_SIZE;
-    int i;
+    const char *cat_ptr = mmb_cat;
+    const char *cat_end = mmb_cat + mmb_cat_size;
 
     do {
         const char *cat_nxt = cat_ptr + 16;
-        if ((i = cat_name_cmp(name, cat_ptr, cat_nxt)) >= 0) {
+        int i = cat_name_cmp(name, cat_ptr, cat_nxt);
+        if (i >= 0) {
             log_debug("mmb: found MMB SSD '%s' at %d", name, i);
             return i;
         }
