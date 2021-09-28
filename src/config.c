@@ -7,6 +7,7 @@
 #include "ddnoise.h"
 #include "disc.h"
 #include "keyboard.h"
+#include "main.h"
 #include "model.h"
 #include "mouse.h"
 #include "mmccard.h"
@@ -153,6 +154,8 @@ void config_load(void)
 
     defaultwriteprot = get_config_bool("disc", "defaultwriteprotect", 1);
 
+    autopause        = get_config_bool(NULL, "autopause", false);
+
     curmodel         = get_config_int(NULL, "model",         3);
     selecttube       = get_config_int(NULL, "tube",         -1);
     tube_speed_num   = get_config_int(NULL, "tubespeed",     0);
@@ -174,6 +177,9 @@ void config_load(void)
     ddnoise_type     = get_config_int("sound", "ddtype",        0);
 
     vid_fullborders  = get_config_int("video", "fullborders",   1);
+    vid_win_multiplier = get_config_int("video", "winmultipler", 1);
+    winsizex         = get_config_int("video", "winsizex", 800);
+    winsizey         = get_config_int("video", "winsizey", 600);
 
     vid_ledlocation  = get_config_int("video", "ledlocation",   0);
     vid_ledvisibility = get_config_int("video", "ledvisibility", 2);
@@ -289,6 +295,8 @@ void config_save(void)
         else
             al_remove_config_key(bem_cfg, "tape", "tape");
 
+        set_config_bool(NULL, "autopause", autopause);
+
         set_config_int(NULL, "model", curmodel);
         set_config_int(NULL, "tube", selecttube);
         set_config_int(NULL, "tubespeed", tube_speed_num);
@@ -311,6 +319,10 @@ void config_save(void)
         set_config_int("sound", "ddtype", ddnoise_type);
 
         set_config_int("video", "fullborders", vid_fullborders);
+        set_config_int("video", "winmultipler", vid_win_multiplier);
+        set_config_int("video", "winsizex", winsizex);
+        set_config_int("video", "winsizey", winsizey);
+
         c = vid_dtype_user;
         if (vid_pal)
             c += 4;

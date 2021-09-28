@@ -332,6 +332,7 @@ static ALLEGRO_MENU *create_m7font_menu(void)
 
 static const char *border_names[] = { "None", "Medium", "Full", NULL };
 static const char *vmode_names[] = { "Scaled", "Interlace", "Scanlines", "Line doubling", NULL };
+static const char *win_mult_names[] = { "Freeform", "1x", "2x", "3x", NULL };
 static const char *led_location_names[] = { "None", "Overlapped", "Separate", NULL };
 static const char *led_visibility_names[] = { "When changed", "When changed or transient", "Always", NULL };
 
@@ -344,6 +345,9 @@ static ALLEGRO_MENU *create_video_menu(void)
     sub = al_create_menu();
     add_radio_set(sub, border_names, IDM_VIDEO_BORDERS, vid_fullborders);
     al_append_menu_item(menu, "Borders...", 0, 0, NULL, sub);
+    sub = al_create_menu();
+    add_radio_set(sub, win_mult_names, IDM_VIDEO_WIN_MULT, vid_win_multiplier);
+    al_append_menu_item(menu, "Default window scaling...", 0, 0, NULL, sub);
     al_append_menu_item(menu, "Reset Window Size", IDM_VIDEO_WINSIZE, 0, NULL, NULL);
     add_checkbox_item(menu, "Fullscreen", IDM_VIDEO_FULLSCR, fullscreen);
     add_checkbox_item(menu, "NuLA", IDM_VIDEO_NULA, !nula_disable);
@@ -494,6 +498,7 @@ static ALLEGRO_MENU *create_settings_menu(void)
     al_append_menu_item(menu, "MIDI", 0, 0, NULL, create_midi_menu());
 #endif
     al_append_menu_item(menu, "Keyboard", 0, 0, NULL, create_keyboard_menu());
+    add_checkbox_item(menu, "Auto-Pause", IDM_AUTO_PAUSE, autopause);
     add_checkbox_item(menu, "Mouse (AMX)", IDM_MOUSE_AMX, mouse_amx);
     if (joymap_count > 0)
         al_append_menu_item(menu, "Joystick Map", 0, 0, NULL, create_joymap_menu());
@@ -1081,6 +1086,7 @@ static void change_model(ALLEGRO_EVENT *event)
     oldmodel = curmodel;
     curmodel = menu_get_num(event);
     main_restart();
+    oldmodel = curmodel;
     update_rom_menu();
 }
 
@@ -1096,6 +1102,7 @@ static void change_tube(ALLEGRO_EVENT *event)
         selecttube = newtube;
     }
     main_restart();
+    update_rom_menu();
 }
 
 static void change_tube_speed(ALLEGRO_EVENT *event)
@@ -1281,6 +1288,9 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
         case IDM_VIDEO_BORDERS:
             video_set_borders(radio_event_simple(event, vid_fullborders));
             break;
+        case IDM_VIDEO_WIN_MULT:
+            video_set_multipier(radio_event_simple(event, vid_win_multiplier));
+            break;
         case IDM_VIDEO_WINSIZE:
             video_set_borders(vid_fullborders);
             break;
@@ -1405,6 +1415,9 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             break;
         case IDM_KEY_PAD:
             keypad = !keypad;
+            break;
+        case IDM_AUTO_PAUSE:
+            autopause = !autopause;
             break;
         case IDM_MOUSE_AMX:
             mouse_amx = !mouse_amx;

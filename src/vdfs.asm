@@ -71,18 +71,23 @@ OSRDRM      =   &FFB9
 BRKV        =   &0202
 EVNTV       =   &0220
 
-; Zero page workspace.
+; Zero page workspace - note overlaps.
 
 romtab      =   &A8
 romid       =   &AA
 copywr      =   &AB
 
 dmpadd      =   &A8
-dmpcnt      =   &AB
+dmpcnt      =   &AC
 
-ltflag      =   &A8
-ltpchr      =   &A9
-lineno      =   &AA
+filechan    =   &A8
+lineno      =   &A9
+
+ltflag      =   &AB
+ltpchr      =   &AC
+
+gbpbcmd     =   &AB
+argsblk     =   &AC
 
 prtextws    =   &A8
 
@@ -146,6 +151,8 @@ prtextws    =   &A8
             equw    none_open       ; "No open files" message.
             equw    osw_tail        ; finish a command with an OSWORD call.
             equw    close_all
+            equw    cmd_build       ; *BUILD
+            equw    cmd_append      ; *APPEND.
 .dispend
 
 ; Stubs to transfer control to the vdfs.c module.
@@ -643,7 +650,15 @@ prtextws    =   &A8
             tay
             beq     not_found
             pha
-            lda     #&87            ; find screen mode.
+            lda     dmpcnt          ; Need to seek?
+            ora     dmpcnt+1
+            ora     dmpcnt+2
+            ora     dmpcnt+3
+            beq     noseek
+            lda     #&01
+            ldx     #dmpcnt
+            jsr     OSARGS
+.noseek     lda     #&87            ; find screen mode.
             jsr     OSBYTE
             lda     #&08
             cpy     #&00
@@ -654,10 +669,6 @@ prtextws    =   &A8
 .narrow     sta     dmpcnt
             pla
             tay
-            lda     #&00
-            sta     dmpadd
-            sta     dmpadd+1
-            sta     dmpadd+2
             bit     &FF
             bmi     gotesc
 .linlp      lda     dmpadd+2
@@ -764,25 +775,8 @@ prtextws    =   &A8
             jmp     OSWRCH
 }
 
-; The *LIST and *TYPE commands.
-
-.cmd_list   lda     #&00
-            sta     lineno
-            sta     lineno+1
-            sta     lineno+2
-            beq     lstype
-
-.cmd_type   lda     #&80
-
-.lstype
+.line_num
 {
-            sta     ltflag
-            lda     #&40
-            jsr     OSFIND
-            tay
-            bne     found
-            jmp     not_found
-.pline      tax
             sed
             sec
             lda     #&00
@@ -806,6 +800,28 @@ prtextws    =   &A8
             clc
             jsr     bcdnyb
             outspc
+            rts
+}
+
+; The *LIST and *TYPE commands.
+
+.cmd_list   lda     #&00
+            sta     lineno
+            sta     lineno+1
+            beq     lstype
+
+.cmd_type   lda     #&80
+
+.lstype
+{
+            sta     ltflag
+            lda     #&40
+            jsr     OSFIND
+            tay
+            bne     found
+            jmp     not_found
+.pline      tax
+            jsr     line_num
             txa
 .chrlp      cmp     #&0D
             beq     newlin
@@ -862,6 +878,103 @@ prtextws    =   &A8
             jsr     OSBYTE
 .eof        lda     #&00
             jmp     OSFIND
+}
+
+; *APPEND command.
+
+.cmd_append
+{
+            lda     #&c0            ; Open for update (to keep contents).
+            jsr     OSFIND
+            tay
+            bne     found
+            jmp     not_found
+.found      sty     filechan
+            lda     #&02            ; Read file length.
+            ldx     #argsblk
+            jsr     OSARGS
+            lda     #&12            ; Temporarily set our own ROM bank as RAM.
+            sta     port_cmd
+            lda     argsblk         ; Set the length in the parameter
+            sta     gbpbpb+&09      ; block for OSGBPB.
+            lda     argsblk+1
+            sta     gbpbpb+&0A
+            lda     argsblk+2
+            sta     gbpbpb+&0B
+            lda     argsblk+3
+            sta     gbpbpb+&0C
+            lda     #&01            ; First GBPB to set file pointer.
+            sta     gbpbcmd
+            bne     build_gbpb
+}
+
+; *BUILD command.
+
+.cmd_build
+{
+            lda     #&80            ; Open for writing (discard previous).
+            jsr     OSFIND
+            tay
+            bne     found
+            jmp     not_found
+.found      sty     filechan
+            lda     #&02            ; First GBPB to use current pointer.
+            sta     gbpbcmd
+            lda     #&12            ; Temporarily set our own ROM bank as RAM.
+            sta     port_cmd
+}
+
+; Common code for *APPEND/*BUILD using OSGBPB.
+
+.build_gbpb
+{
+            lda     #&00            ; Start at line zero.
+            sta     lineno
+            sta     lineno+1
+.line_lp    jsr     line_num        ; Print the new line number.
+            lda     #&00            ; Read a line of input into RAM
+            ldx     #<oswpb         ; at the end of this ROM.
+            ldy     #>oswpb
+            jsr     OSWORD
+            bcs     escape          ; Escape indicates EOF.
+            iny
+            sty     gbpbpb+5        ; Number of bytes to transfer.
+            lda     #&00
+            sta     gbpbpb+6
+            sta     gbpbpb+7
+            sta     gbpbpb+8
+            lda     #<buffer        ; Address of 1st byte.
+            sta     gbpbpb+1
+            lda     #>buffer
+            sta     gbpbpb+2
+            lda     #&ff
+            sta     gbpbpb+3
+            sta     gbpbpb+4
+            lda     filechan        ; Save channel num in OSPGPB pblock.
+            sta     gbpbpb
+            lda     gbpbcmd
+            ldx     #<gbpbpb
+            ldy     #>gbpbpb
+            jsr     OSGBPB
+            lda     #&02            ; Next call will write at current pointer.
+            sta     gbpbcmd
+            jmp     line_lp
+
+.escape     lda     #&13            ; Restore our RAM bank status.
+            sta     port_cmd
+            lda     #&7c            ; Clear Escape without flushing anything.
+            jsr     OSBYTE
+            lda     #&00            ; Close the file.
+            ldy     filechan
+            jsr     OSFIND
+            jsr     OSNEWL
+            lda     #&00            ; Declare command implemented by this ROM.
+            rts
+
+.oswpb      equw    buffer          ; Buffer address for input.
+            equb    &ff             ; Maximum line length.
+            equb    &00             ; Minimum ASCII value.
+            equb    &ff             ; Maximum ASCII value.
 }
 
 ; *ROMS
@@ -1421,4 +1534,10 @@ prtextws    =   &A8
             sta     port_cmd
             rts
 .end
+.gbpbpb     equb    &00
+            equd    &00000000
+            equd    &00000000
+            equd    &00000000
+.buffer     equb    &00
+
             save    "vdfs6", start, end

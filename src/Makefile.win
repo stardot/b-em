@@ -1,9 +1,5 @@
 VPATH = . resid-fp NS32016 darm mc6809nc pdp11 musahi
 
-CPP  = i686-w64-mingw32-g++
-CC   = i686-w64-mingw32-gcc
-WINDRES = i686-w64-mingw32-windres
-
 # The following flags are used by PiTubeDirect Co Pros:
 #                BEM - fixes for compilation in B-Em envorinment
 #   INCLUDE_DEBUGGER - include the cpu_debug implementation

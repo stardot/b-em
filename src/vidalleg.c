@@ -22,7 +22,7 @@ static int fskipcount;
 int vid_savescrshot = 0;
 char vid_scrshotname[260];
 
-int winsizex, winsizey;
+int winsizex, winsizey, vid_win_multiplier;
 int save_winsizex, save_winsizey;
 int scr_x_start, scr_x_size, scr_y_start, scr_y_size;
 
@@ -92,32 +92,54 @@ void video_enterfullscreen()
 
 void video_set_window_size(bool fudge)
 {
+    int x_wanted, y_wanted;
     scr_x_start = 0;
     scr_y_start = 0;
 
     switch(vid_fullborders) {
         case 0:
-            scr_x_size = BORDER_NONE_X_END_GRA - BORDER_NONE_X_START_GRA;
-            scr_y_size = (BORDER_NONE_Y_END_GRA - BORDER_NONE_Y_START_GRA) * 2;
+            x_wanted = BORDER_NONE_X_END_GRA - BORDER_NONE_X_START_GRA;
+            y_wanted = (BORDER_NONE_Y_END_GRA - BORDER_NONE_Y_START_GRA) * 2;
             break;
-        case 1:
-            scr_x_size = BORDER_MED_X_END_GRA - BORDER_MED_X_START_GRA;
-            scr_y_size = (BORDER_MED_Y_END_GRA - BORDER_MED_Y_START_GRA) * 2;
+        default:
+            x_wanted = BORDER_MED_X_END_GRA - BORDER_MED_X_START_GRA;
+            y_wanted = (BORDER_MED_Y_END_GRA - BORDER_MED_Y_START_GRA) * 2;
             break;
         case 2:
-            scr_x_size = BORDER_FULL_X_END_GRA - BORDER_FULL_X_START_GRA;
-            scr_y_size = (BORDER_FULL_Y_END_GRA - BORDER_FULL_Y_START_GRA) * 2;
+            x_wanted = BORDER_FULL_X_END_GRA - BORDER_FULL_X_START_GRA;
+            y_wanted = (BORDER_FULL_Y_END_GRA - BORDER_FULL_Y_START_GRA) * 2;
     }
-    winsizex = scr_x_size;
-    winsizey = fudge ? scr_y_size + y_fudge : scr_y_size;
-    if (vid_ledlocation == LED_LOC_SEPARATE) // Separate - LEDs have extra window space at the bottom.
-        winsizey += LED_BOX_HEIGHT;
-    log_debug("vidalleg: video_set_window_size, scr_x_size=%d, scr_y_size=%d, fudgedy=%d", scr_x_size, scr_y_size, winsizey);
+    if (vid_win_multiplier > 0) {
+        winsizex = scr_x_size = x_wanted * vid_win_multiplier;
+        winsizey = scr_y_size = y_wanted * vid_win_multiplier;
+        if (fudge)
+            winsizey += y_fudge;
+        if (vid_ledlocation == LED_LOC_SEPARATE) // Separate - LEDs have extra window space at the bottom.
+            winsizey += LED_BOX_HEIGHT;
+    }
+    else {
+        if (fudge)
+            y_wanted += y_fudge;
+        if (vid_ledlocation == LED_LOC_SEPARATE) // Separate - LEDs have extra window space at the bottom.
+            y_wanted += LED_BOX_HEIGHT;
+        if ((scr_x_size = winsizex) < x_wanted)
+            scr_x_size = winsizex = x_wanted;
+        if ((scr_y_size = winsizey) < y_wanted)
+            scr_y_size = winsizey = y_wanted;
+    }
+    log_debug("vidalleg: video_set_window_size, scr_x_size=%d, scr_y_size=%d, winsizex=%d, winsizey=%d", scr_x_size, scr_y_size, winsizex, winsizey);
 }
 
 void video_set_borders(int borders)
 {
     vid_fullborders = borders;
+    video_set_window_size(false);
+    al_resize_display(al_get_current_display(), winsizex, winsizey);
+}
+
+void video_set_multipier(int multipler)
+{
+    vid_win_multiplier = multipler;
     video_set_window_size(false);
     al_resize_display(al_get_current_display(), winsizex, winsizey);
 }
@@ -276,7 +298,7 @@ static inline void save_screenshot(void)
                     al_draw_scaled_bitmap(b, firstx, firsty << 1, xsize, ysize << 1, 0, 0, xsize, ysize << 1, 0);
                     break;
             }
-            region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_READWRITE);
+            region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_WRITEONLY);
         }
         al_save_bitmap(vid_scrshotname, scrshotb);
         al_destroy_bitmap(scrshotb);

@@ -7,6 +7,7 @@
 #include "6502.h"
 #include "video_render.h"
 #include <ctype.h>
+#include <allegro5/keyboard.h>
 
 /*
  * The BBC micro keyboard is a fairly standard matrix.  On the Model B,
@@ -721,7 +722,6 @@ void key_reset()
         for (int r = 0; r < 16; r++)
             bbcmatrix[c][r] = 0;
     sysvia_set_ca2(0);
-
     kp_state = KP_IDLE;
     key_paste_str_size = 0;
     key_paste_ptr = 0;

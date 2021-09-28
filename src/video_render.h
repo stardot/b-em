@@ -34,7 +34,7 @@ extern ALLEGRO_COLOR border_col;
 
 extern int firstx, firsty, lastx, lasty;
 extern int scr_x_start, scr_x_size, scr_y_start, scr_y_size;
-extern int winsizex, winsizey;
+extern int winsizex, winsizey, vid_win_multiplier;
 
 extern int fullscreen;
 
@@ -61,6 +61,7 @@ void video_set_window_size(bool fudge);
 void video_update_window_size(ALLEGRO_EVENT *event);
 void video_set_disptype(enum vid_disptype dtype);
 void video_set_borders(int borders);
+void video_set_multipier(int multipler);
 void video_set_led_location(int location);
 void video_set_led_visibility(int visibility);
 

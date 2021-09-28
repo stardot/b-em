@@ -19,6 +19,7 @@ void m6502_reset(void);
 void m6502_exec(void);
 void m65c02_exec(void);
 void dumpregs(void);
+void m6502_update_swram(void);
 
 uint8_t readmem(uint16_t addr);
 void writemem(uint16_t addr, uint8_t val);

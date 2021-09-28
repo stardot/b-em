@@ -766,7 +766,7 @@ ALLEGRO_DISPLAY *video_init(void)
         exit(1);
     }
 
-    al_set_new_bitmap_flags(ALLEGRO_VIDEO_BITMAP);
+    al_set_new_bitmap_flags(ALLEGRO_VIDEO_BITMAP|ALLEGRO_NO_PRESERVE_TEXTURE);
     b16 = al_create_bitmap(832, 614);
     b32 = al_create_bitmap(1536, 800);
 
@@ -803,7 +803,7 @@ ALLEGRO_DISPLAY *video_init(void)
     b = al_create_bitmap(1280, 800);
     al_set_target_bitmap(b);
     al_clear_to_color(al_map_rgb(0, 0,0));
-    region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_READWRITE);
+    region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_WRITEONLY);
     return display;
 }
 
@@ -1135,7 +1135,7 @@ void video_poll(int clocks, int timer_enable)
                         al_unlock_bitmap(b);
                         al_set_target_bitmap(b);
                         al_clear_to_color(black);
-                        region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_READWRITE);
+                        region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_WRITEONLY);
                     }
                     frameodd ^= 1;
                     if (frameodd)
@@ -1150,7 +1150,7 @@ void video_poll(int clocks, int timer_enable)
                         al_unlock_bitmap(b);
                         al_set_target_bitmap(b);
                         al_clear_to_color(al_map_rgb(0, 0, 0));
-                        region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_READWRITE);
+                        region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_WRITEONLY);
                         video_doblit(crtc_mode, crtc[4]);
                     }
                     ccount++;
