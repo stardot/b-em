@@ -1,3 +1,4 @@
+#define _DEBUG
 /* Part of B-Em by Tom Walker */
 
 #include "b-em.h"

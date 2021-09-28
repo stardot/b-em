@@ -33,6 +33,7 @@ static off_t mmb_offset[NUM_DRIVES][2];
 static unsigned mmb_boot_discs[4];
 static unsigned mmb_cat_size;
 static char *mmb_cat;
+unsigned mmb_ndisc;
 char *mmb_fn;
 
 typedef enum {
@@ -575,6 +576,7 @@ void mmb_load(char *fn)
     mmb_offset[0][1] = mmb_calc_offset(mmb_boot_discs[1]);
     mmb_fp = fp;
     mmb_fn = fn;
+    mmb_ndisc = (extra_zones + 1) * MMB_ZONE_DISCS;
     if (fdc_spindown)
         fdc_spindown();
 }
@@ -618,25 +620,8 @@ void mmb_reset(void)
     }
 }
 
-void mmb_pick(int drive, int disc)
+void mmb_pick(unsigned drive, unsigned side, unsigned disc)
 {
-    int side;
-
-    switch(drive) {
-        case 0:
-        case 1:
-            side = 0;
-            break;
-        case 2:
-        case 3:
-            drive &= 1;
-            disc--;
-            side = 1;
-            break;
-        default:
-            log_debug("sdf: sdf_mmb_pick: invalid logical drive %d", drive);
-            return;
-    }
     log_debug("sdf: picking MMB disc, drive=%d, side=%d, disc=%d", drive, side, disc);
 
     if (sdf_fp[drive] != mmb_fp) {

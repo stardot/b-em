@@ -3366,7 +3366,34 @@ static int mmb_parse_find(uint16_t addr, int ch)
     return i;
 }
 
-static void cmd_mmb_din(uint16_t addr)
+static bool mmb_check_pick(unsigned drive, unsigned disc)
+{
+    if (disc >= mmb_ndisc) {
+        adfs_error(err_notfound);
+        return false;
+    }
+    unsigned side;
+    switch(drive) {
+        case 0:
+        case 1:
+            side = 0;
+            break;
+        case 2:
+        case 3:
+            drive &= 1;
+            disc--;
+            side = 1;
+            break;
+        default:
+            log_debug("vdfs: mmb_check_pick: invalid logical drive %d", drive);
+            adfs_error(err_badparms);
+            return false;
+    }
+    mmb_pick(drive, side, disc);
+    return true;
+}
+
+static bool cmd_mmb_din(uint16_t addr)
 {
     int num1, num2, ch;
 
@@ -3378,25 +3405,26 @@ static void cmd_mmb_din(uint16_t addr)
         while (ch == ' ')
             ch = readmem(addr++);
         if (ch == '\r')
-            mmb_pick(0, num1);
+            return mmb_check_pick(0, num1);
         else if (ch >= '0' && ch <= '9') {
             num2 = ch - '0';
             while ((ch = readmem(addr++)) >= '0' && ch <= '9')
                 num2 = num2 * 10 + ch - '0';
             if (num1 >= 0 && num1 <= 3)
-                mmb_pick(num1, num2);
+                return mmb_check_pick(num1, num2);
             else
                 adfs_error(err_badparms);
         }
         else if ((num2 = mmb_parse_find(addr, ch)) >= 0) {
             if (num1 >= 0 && num1 <= 3)
-                mmb_pick(num1, num2);
+                return mmb_check_pick(num1, num2);
             else
                 adfs_error(err_badparms);
         }
     }
     else if ((num1 = mmb_parse_find(addr, ch)) >= 0)
-        mmb_pick(0, num1);
+        return mmb_check_pick(0, num1);
+    return false;
 }
 
 static void cmd_dump(uint16_t addr)

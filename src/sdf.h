@@ -51,6 +51,7 @@ struct sdf_geometry_set {
 extern const struct sdf_geometry_set sdf_geometries;
 
 extern char *mmb_fn;
+extern unsigned mmb_ndisc;
 
 // In sdf-geo.c
 const struct sdf_geometry *sdf_find_geo(const char *fn, const char *ext, FILE *fp);
@@ -65,7 +66,7 @@ FILE *sdf_owseek(uint8_t drive, uint8_t sector, uint8_t track, uint8_t side, uin
 // Functions for MMB files.
 void mmb_load(char *fn);
 void mmb_eject(void);
-void mmb_pick(int drive, int disc);
+void mmb_pick(unsigned drive, unsigned side, unsigned disc);
 void mmb_reset(void);
 int mmb_find(const char *name);
 
