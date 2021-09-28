@@ -1,3 +1,4 @@
+#define _DEBUG
 /*
  * B-EM SDF - Simple Disk Formats - Access
  *
@@ -18,11 +19,12 @@
 #include "disc.h"
 #include "sdf.h"
 
-#define MMB_DISC_SIZE  (200*1024)
-#define MMB_ZONE_DISCS 511
-#define MMB_NAME_SIZE  16
-#define MMB_ZONE_SIZE  (MMB_ZONE_DISCS*MMB_NAME_SIZE)
-#define MMB_SKIP_SIZE  (MMB_ZONE_DISCS*MMB_DISC_SIZE+MMB_NAME_SIZE)
+#define MMB_DISC_SIZE      (200*1024)
+#define MMB_NAME_SIZE      16
+#define MMB_ZONE_DISCS     511
+#define MMB_ZONE_CAT_SIZE  (MMB_ZONE_DISCS*MMB_NAME_SIZE)
+#define MMB_ZONE_FULL_SIZE (MMB_ZONE_CAT_SIZE+MMB_NAME_SIZE+MMB_ZONE_DISCS*MMB_DISC_SIZE)
+#define MMB_ZONE_SKIP_SIZE (MMB_ZONE_DISCS*MMB_DISC_SIZE+MMB_NAME_SIZE)
 
 static FILE *sdf_fp[NUM_DRIVES], *mmb_fp;
 static const struct sdf_geometry *geometry[NUM_DRIVES];
@@ -501,7 +503,11 @@ static void mmb_read_error(const char *fn, FILE *fp)
 
 static unsigned mmb_calc_offset(unsigned disc)
 {
-    return (disc / MMB_ZONE_DISCS) * (MMB_ZONE_SIZE + MMB_SKIP_SIZE) + (disc % MMB_ZONE_SIZE) * MMB_DISC_SIZE;
+    unsigned zone_start = disc / MMB_ZONE_DISCS;
+    unsigned zone_index = disc % MMB_ZONE_DISCS;
+    unsigned offset = zone_start * MMB_ZONE_FULL_SIZE + MMB_ZONE_CAT_SIZE + MMB_NAME_SIZE + zone_index * MMB_DISC_SIZE;
+    log_debug("sdf: mmb_calc_offset(%u) -> zone_start=%u, zone_index=%u, offset=%u", disc, zone_start, zone_index, offset);
+    return offset;
 }
 
 void mmb_load(char *fn)
@@ -527,7 +533,7 @@ void mmb_load(char *fn)
     unsigned extra_zones = header[8];
     if (extra_zones > 15)
         extra_zones = 0;
-    unsigned reqd_cat_size = (extra_zones + 1) * MMB_ZONE_SIZE;
+    unsigned reqd_cat_size = (extra_zones + 1) * MMB_ZONE_CAT_SIZE;
     if (reqd_cat_size != mmb_cat_size) {
         if (mmb_cat)
             free(mmb_cat);
@@ -537,23 +543,23 @@ void mmb_load(char *fn)
         }
         mmb_cat_size = reqd_cat_size;
     }
-    if (fread(mmb_cat, MMB_ZONE_SIZE, 1, fp) != 1) {
+    if (fread(mmb_cat, MMB_ZONE_CAT_SIZE, 1, fp) != 1) {
         mmb_read_error(fn, fp);
         return;
     }
-    char *mmb_ptr = mmb_cat + MMB_ZONE_SIZE;
+    char *mmb_ptr = mmb_cat + MMB_ZONE_CAT_SIZE;
     char *mmb_end = mmb_cat + reqd_cat_size;
     while (mmb_ptr < mmb_end) {
-        if (fseek(fp, MMB_SKIP_SIZE, SEEK_CUR)) {
+        if (fseek(fp, MMB_ZONE_SKIP_SIZE, SEEK_CUR)) {
             log_error("sdf: seek error on MMB file %s: %s", fn, strerror(errno));
             fclose(fp);
             return;
         }
-        if (fread(mmb_ptr, MMB_ZONE_SIZE, 1, fp) != 1) {
+        if (fread(mmb_ptr, MMB_ZONE_CAT_SIZE, 1, fp) != 1) {
             mmb_read_error(fn, fp);
             return;
         }
-        mmb_ptr += MMB_ZONE_SIZE;
+        mmb_ptr += MMB_ZONE_CAT_SIZE;
     }
     if (mmb_fp) {
         fclose(mmb_fp);
