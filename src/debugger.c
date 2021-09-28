@@ -940,8 +940,13 @@ static void debugger_profile(cpu_debug_t *cpu, const char *iptr)
             const char *end2;
             uint32_t endaddr = parse_address_or_symbol(cpu, end1, &end2);
             if (end2 > end1) {
-                if ((cpu->prof_counts = malloc((endaddr - startaddr) * sizeof(unsigned)))) {
+                unsigned *ptr = malloc((endaddr - startaddr) * sizeof(unsigned));
+                if (ptr) {
+                    unsigned *end = ptr + (endaddr - startaddr);
                     char addr_buf_s[17 + SYM_MAX], addr_buf_e[17 + SYM_MAX];
+                    cpu->prof_counts = ptr;
+                    while (ptr < end)
+                        *ptr++ = 0;
                     cpu->prof_start = startaddr;
                     cpu->prof_end = endaddr;
                     cpu->print_addr(cpu, startaddr, addr_buf_s, sizeof(addr_buf_s), true);
@@ -949,9 +954,34 @@ static void debugger_profile(cpu_debug_t *cpu, const char *iptr)
                     debug_outf("profiling for cpu %s from %s to %s\n", cpu->cpu_name, addr_buf_s, addr_buf_e);
                     return;
                 }
+                else {
+                    debug_outf("out of memory enabling profiling");
+                    return;
+                }
             }
         }
         debug_outf("missing address\nUsage: profile <start-addr> <end-addr>\n");
+    }
+}
+
+static void debugger_ruler(const char *iptr)
+{
+    unsigned start = 0;
+    unsigned count = 16;
+    if (*iptr) {
+        char *end;
+        start = strtoul(iptr, &end, 0);
+        if (end > iptr) {
+            iptr = end;
+            if (*iptr)
+                count = strtoul(iptr, &end, 0);
+        }
+    }
+    if (count) {
+        debug_out("      ", 6);
+        while (count--)
+            debug_outf(" %02X", start++);
+        debug_out("\n", 1);
     }
 }
 
@@ -1125,7 +1155,10 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 if (cmdlen >= 3 && !strncmp(cmd, "reset", cmdlen)) {
                     main_reset();
                     debug_outf("Emulator reset\n");
-                } else if (*iptr) {
+                }
+                else if (cmdlen >= 2 && !strncmp(cmd, "ruler", cmdlen))
+                    debugger_ruler(iptr);
+                else if (*iptr) {
                     size_t arglen = strcspn(iptr, " \t\n");
                     iptr[arglen] = 0;
                     if (!strncasecmp(iptr, "sysvia", arglen)) {
