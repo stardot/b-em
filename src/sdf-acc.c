@@ -628,7 +628,7 @@ void mmb_pick(int drive, int disc)
             side = 0;
             break;
         case 2:
-        case 4:
+        case 3:
             drive &= 1;
             disc--;
             side = 1;
