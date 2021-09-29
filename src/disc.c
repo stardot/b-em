@@ -79,14 +79,28 @@ void disc_close(int drive)
 
 int disc_notfound=0;
 
+static void disc_init_drive(DRIVE *drive)
+{
+    drive->close       = NULL;
+    drive->seek        = NULL;
+    drive->readsector  = NULL;
+    drive->writesector = NULL;
+    drive->readaddress = NULL;
+    drive->format      = NULL;
+    drive->writetrack  = NULL;
+    drive->readtrack   = NULL;
+    drive->poll        = NULL;
+    drive->abort       = NULL;
+    drive->spinup      = NULL;
+    drive->spindown    = NULL;
+    drive->verify      = NULL;
+}
+
 void disc_init()
 {
-        drives[0].poll = drives[1].poll = 0;
-        drives[0].seek = drives[1].seek = 0;
-        drives[0].readsector = drives[1].readsector = 0;
-        drives[0].spinup = drives[1].spinup = 0;
-        drives[0].spindown = drives[1].spindown = 0;
-        curdrive = 0;
+    disc_init_drive(&drives[0]);
+    disc_init_drive(&drives[1]);
+    curdrive = 0;
 }
 
 void disc_poll()
