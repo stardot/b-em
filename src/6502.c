@@ -439,6 +439,7 @@ static uint32_t do_readmem(uint32_t addr)
                 return serial_read((uint16_t)addr);
 
         case 0xFE18:
+        case 0xFE1C:
                 if (MASTER)
                     return adc_read((uint16_t)addr);
                 else if (EconetEnabled) {
@@ -873,6 +874,7 @@ static void do_writemem(uint32_t addr, uint32_t val)
                 break;
 
         case 0xFE18:
+        case 0xFE1C:
                 if (MASTER)
                     adc_write((uint16_t)addr, (uint8_t)val);
                 else if (EconetEnabled)
