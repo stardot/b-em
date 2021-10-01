@@ -1185,53 +1185,46 @@ void vdfs_close(void)
     }
 }
 
-static int vdfs_new_root(const char *root, vdfs_entry *ent)
+void vdfs_set_root(const char *root)
 {
-    size_t len;
-    char   *path, *inf;
-    int    ch;
-
-    init_entry(ent);
-    ent->parent = ent;
-    len = strlen(root);
+    vdfs_entry new_root;
+    init_entry(&new_root);
+    new_root.parent = &new_root;
+    size_t len = strlen(root);
+    int ch;
     while (len > 0 && ((ch = root[--len]) == '/' || ch == '\\'))
         ;
     if (++len > 0) {
-        if ((path = malloc(len + 6))) {
+        char *path = malloc(len + 6);
+        if (path) {
             memcpy(path, root, len);
-            inf = path + len;
-            ent->host_path = path;
-            ent->host_inf = inf;
+            char *inf = path + len;
+            new_root.host_path = path;
+            new_root.host_inf = inf;
             *inf++ = '\0';
             *inf++ = 'i';
             *inf++ = 'n';
             *inf++ = 'f';
             *inf = '\0';
-            ent->acorn_fn[0] = '$';
-            ent->acorn_fn[1] = '\0';
-            scan_entry(ent);
-            if (ent->attribs & ATTR_IS_DIR)
-                return 1;
+            new_root.acorn_fn[0] = '$';
+            new_root.acorn_fn[1] = '\0';
+            scan_entry(&new_root);
+            if (new_root.attribs & ATTR_IS_DIR) {
+                vdfs_close();
+                root_dir = new_root;
+                root_dir.parent = cur_dir = prev_dir = cat_dir = &root_dir;
+                vdfs_findres res;
+                lib_dir = find_entry_adfs("Lib", &res, &root_dir, dfs_dir);
+                scan_seq++;
+                return;
+            }
             log_error("vdfs: unable to set %s as root as it is not a valid directory", path);
+            free(path);
         } else
-            log_error("vdfs: unable to set root as unable to allocate path");
-    } else
+            log_error("vdfs: unable to set %s as root as unable to allocate path", root);
+    }
+    else
         log_warn("vdfs: unable to set root as path is empty");
-    return 0;
-}
-
-void vdfs_set_root(const char *root)
-{
-    vdfs_entry new_root;
-    if (vdfs_new_root(root, &new_root)) {
-        vdfs_findres res;
-        vdfs_close();
-        root_dir = new_root;
-        root_dir.parent = cur_dir = prev_dir = cat_dir = &root_dir;
-        lib_dir = find_entry_adfs("Lib", &res, &root_dir, dfs_dir);
-        scan_seq++;
-    } else if (new_root.host_path)
-        free(new_root.host_path);
 }
 
 const char *vdfs_get_root(void)
@@ -3984,7 +3977,7 @@ void vdfs_init(const char *root)
         root = env; //environment variable wins
     if (!root)
         root = ".";
-    vdfs_new_root(root, &root_dir);
+    vdfs_set_root(root);
     scan_seq++;
     vdfs_adfs_mode();
 }
