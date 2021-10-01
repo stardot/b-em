@@ -531,8 +531,9 @@ void mmb_load(char *fn)
     mmb_boot_discs[1] = header[1] | (header[5] << 8);
     mmb_boot_discs[2] = header[2] | (header[6] << 8);
     mmb_boot_discs[3] = header[3] | (header[7] << 8);
-    unsigned extra_zones = header[8];
-    extra_zones = ((extra_zones & 0xf0) == 0xa0) ? extra_zones & 0x0f : 0;
+    unsigned extra_zones = header[8] ^ 0xA0U;
+    if (extra_zones >= 0x10)
+        extra_zones = 0;
     unsigned reqd_cat_size = (extra_zones + 1) * MMB_ZONE_CAT_SIZE;
     log_debug("sdf-acc: mmb extra zones=%u, mmb cat total size=%u", extra_zones, reqd_cat_size);
     if (reqd_cat_size != mmb_cat_size) {
