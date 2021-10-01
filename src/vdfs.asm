@@ -153,6 +153,7 @@ prtextws    =   &A8
             equw    close_all
             equw    cmd_build       ; *BUILD
             equw    cmd_append      ; *APPEND.
+            equw    prt_dbase
 .dispend
 
 ; Stubs to transfer control to the vdfs.c module.
@@ -1533,6 +1534,32 @@ prtextws    =   &A8
             lda     #&0b
             sta     port_cmd
             rts
+
+.prt_dbase
+{
+            ldx     #&00
+            lda     text,x
+.loop1      jsr     OSWRCH
+            inx
+            lda     text,x
+            bne     loop1
+            lda     cat_tmp
+            jsr     OSWRCH
+            lda     cat_tmp+1
+.loop2      jsr     OSWRCH
+            inx
+            lda     text,x
+            bne     loop2
+            lda     cat_tmp+2
+            jsr     OSWRCH
+            lda     cat_tmp+3
+            jsr     OSWRCH
+            jsr     OSNEWL
+            lda     #&00
+            rts
+.text       equs    "MMB Base: ",&00,&0d,&0a
+            equs    "MMB Size: ",&00
+}
 .end
 .gbpbpb     equb    &00
             equd    &00000000

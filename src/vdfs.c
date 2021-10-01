@@ -224,7 +224,7 @@ enum vdfs_action {
     VDFS_ROM_CLOSEALL,
     VDFS_ROM_BUILD,
     VDFS_ROM_APPEND,
-    VDFS_ROM_CLOSE_CMD,
+    VDFS_ROM_DBASE,
     VDFS_ACT_NOP,
     VDFS_ACT_QUIT,
     VDFS_ACT_SRLOAD,
@@ -255,6 +255,7 @@ enum vdfs_action {
     VDFS_ACT_OSW7F_AC2,
     VDFS_ACT_OSW7F_WATF,
     VDFS_ACT_OSW7F_WAT5,
+    VDFS_ACT_DBASE,
     VDFS_ACT_MMBDIN
 };
 
@@ -3361,6 +3362,7 @@ static int mmb_parse_find(uint16_t addr, int ch)
 
 static bool mmb_check_pick(unsigned drive, unsigned disc)
 {
+    disc += mmb_zone_base;
     if (disc >= mmb_ndisc) {
         adfs_error(err_notfound);
         return false;
@@ -3384,6 +3386,37 @@ static bool mmb_check_pick(unsigned drive, unsigned disc)
     }
     mmb_pick(drive, side, disc);
     return true;
+}
+
+static void zone2dec(uint16_t addr, unsigned value)
+{
+    value /= MMB_ZONE_DISCS;
+    if (value >= 10) {
+        writemem(addr, value / 10 + '0');
+        writemem(addr+1, value % 10 + '0');
+    }
+    else {
+        writemem(addr, ' ');
+        writemem(addr+1, value + '0');
+    }
+}
+
+static void cmd_mmb_dbase(uint16_t addr)
+{
+    int ch = readmem(addr++);
+    if (ch >= '0' && ch <= '9') {
+        unsigned zone_base = ch - '0';
+        while ((ch = readmem(addr++)) >= '0' && ch <= '9')
+            zone_base = zone_base * 10 + ch - '0';
+        mmb_set_base(zone_base);
+    }
+    else if (ch == '\r') {
+        zone2dec(0x100, mmb_zone_base);
+        zone2dec(0x102, mmb_ndisc);
+        rom_dispatch(VDFS_ROM_DBASE);
+    }
+    else
+        adfs_error(err_badparms);
 }
 
 static void cmd_mmb_din(uint16_t addr)
@@ -3564,6 +3597,9 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
         break;
     case VDFS_ACT_OSW7F:
         cmd_osw7f(addr);
+        break;
+    case VDFS_ACT_DBASE:
+        cmd_mmb_dbase(addr);
         break;
     case VDFS_ACT_MMBDIN:
         cmd_mmb_din(addr);
@@ -3773,6 +3809,7 @@ static const struct cmdent ctab_always[] = {
 
 static const struct cmdent ctab_mmb[] = {
     { "DAbout",  VDFS_ACT_NOP     },
+    { "DBase",   VDFS_ACT_DBASE   },
     { "Din",     VDFS_ACT_MMBDIN  }
 };
 

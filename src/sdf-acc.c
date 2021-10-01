@@ -33,7 +33,7 @@ static off_t mmb_offset[NUM_DRIVES][2];
 static unsigned mmb_boot_discs[4];
 static unsigned mmb_cat_size;
 static char *mmb_cat;
-unsigned mmb_ndisc;
+unsigned mmb_ndisc, mmb_zone_base;
 char *mmb_fn;
 
 typedef enum {
@@ -534,6 +534,9 @@ void mmb_load(char *fn)
     unsigned extra_zones = header[8] ^ 0xA0U;
     if (extra_zones >= 0x10)
         extra_zones = 0;
+    unsigned zone_base = header[9];
+    if (zone_base >= 0x10)
+        zone_base = 0;
     unsigned reqd_cat_size = (extra_zones + 1) * MMB_ZONE_CAT_SIZE;
     log_debug("sdf-acc: mmb extra zones=%u, mmb cat total size=%u", extra_zones, reqd_cat_size);
     if (reqd_cat_size != mmb_cat_size) {
@@ -578,6 +581,7 @@ void mmb_load(char *fn)
     mmb_fp = fp;
     mmb_fn = fn;
     mmb_ndisc = (extra_zones + 1) * MMB_ZONE_DISCS;
+    mmb_zone_base = zone_base * MMB_ZONE_DISCS;
     if (fdc_spindown)
         fdc_spindown();
 }
@@ -667,4 +671,14 @@ int mmb_find(const char *name)
         cat_ptr = cat_nxt;
     } while (cat_ptr < cat_end);
     return -1;
+}
+
+void mmb_set_base(unsigned base)
+{
+    mmb_zone_base = base * MMB_ZONE_DISCS;
+    if (mmb_fp) {
+        fseek(mmb_fp, 9, SEEK_SET);
+        putc(base, mmb_fp);
+        fflush(mmb_fp);
+    }
 }
