@@ -153,7 +153,8 @@ prtextws    =   &A8
             equw    close_all
             equw    cmd_build       ; *BUILD
             equw    cmd_append      ; *APPEND.
-            equw    prt_dbase
+            equw    prt_dbase       ; helper for *DBASE.
+            equw    mmb_dboot       ; Boot on behalf of *DBOOT.
 .dispend
 
 ; Stubs to transfer control to the vdfs.c module.
@@ -255,9 +256,7 @@ prtextws    =   &A8
 ; call &03 when the code in vdfs.c has determined that VDFS is the
 ; filing system selected.
 
-.fsboot
-{
-            pha                     ; save the OPT 4 setting.
+.fsboot     pha                     ; save the OPT 4 setting.
             tya                     ; save the boot flag.
             pha
             jsr     prtitle         ; announce the filing system
@@ -266,62 +265,56 @@ prtextws    =   &A8
             ldy     #fsno_vdfs
             jsr     fsstart         ; same setup as for call &12.
             pla
-            bne     noboot1         ; then maybe exec !BOOT.
+            bne     noboot          ; process !BOOT?
             pla                     ; get back OPT 4
-            beq     noboot2
-            cmp     #&03
-            bne     notexec
-            lda     #&40
-            ldx     #<name
-            ldy     #>name
-            jsr     find            ; Call the VDFS OSFIND.
-            cmp     #&00
-            bne     found
+            bne     doboot
             rts
-.found      tax                     ; Found a !BOOT file.
-            ldy     #&00            ; Set as the current EXEC file.
-            lda     #&C6
-            jsr     OSBYTE
+.noboot     pla
+            lda     #&00
+            rts
+
+; MMB boot option.  This is used for MMFS emulation to check th
+; boot option on the DFS disc and then fall through to process
+; this exactly the same as when VDFS is starting and looking at the
+; boot option.
+
+.mmb_dboot  lda     #&0d            ; Set up data address of OSGBPB.
+            ldx     #<cat_tmp
+            ldy     #>cat_tmp
+            stx     cat_tmp
+            sta     cat_tmp+1
+            sty     cat_tmp+2
+            stx     cat_tmp+3
+            stx     cat_tmp+4
+            lda     #&05            ; Ask the current filing system for
+            jsr     OSGBPB          ; the title/boot option.
+            ldx     cat_tmp+&0d     ; Get length of title.
+            lda     cat_tmp+&0e,x   ; Get boot option.
+            beq     noboot
+
+; Process boot option.  This is common to VDFS booting as a filing
+; system and the MMFS DBOOT command.
+
+.doboot     cmp     #&04
+            bcs     noboot2
+            tax
+            lda     bootcmd-1,x
+            sta     cat_tmp
+            ldx     #&07
+.bootlp     lda     bootnam,x
+            sta     cat_tmp+1,x
+            dex
+            bpl     bootlp
+            ldx     #<cat_tmp
+            ldy     #>cat_tmp
+            jsr     OSCLI
             lda     #&00
 .noboot2    rts
 .noboot1    pla
-.notrun     lda     #&00
+            lda     #&00
             rts
-.name       equs    "!BOOT",&0d
-.notexec    ldx     #<name
-            ldy     #>name
-            stx     &b0             ; set up OSFILE control block.
-            sty     &b1
-            pha                     ; save OPT 4.
-            lda     #&ff
-            sta     &b6             ; flag to use file's own load address.
-            ldx     #&B0
-            ldy     #&00
-            jsr     file            ; Call the VDFS OSFILE
-            pla
-            cmp     #&02
-            bne     notrun
-            lda     &b8             ; exec address bits 16-23
-            cmp     #&ff
-            bne     tube
-            lda     &b9             ; exec address bits 24-31
-            cmp     #&ff
-            bne     tube
-.notube     jmp     (&b6)           ; start execution.
-.tube       lda     #&ea            ; check for tube processor.
-            ldx     #&00
-            ldy     #&ff
-            jsr     OSBYTE
-            cpx     #&00
-            beq     notube
-.tube_exec  lda     #&D1            ; claim the tube.
-            jsr     &0406
-            bcc     tube_exec
-            lda     #&04            ; start executation at the 32 bit
-            ldx     #&b6            ; execution address from the OSFILE
-            ldy     #&00            ; control block.
-            jmp     &0406
-}
+.bootcmd    equs    "LRE"
+.bootnam    equs    ".!BOOT",&0d
 
 ; Filing system info.  This is in response to ROM service call
 ; &25 which is master-specific.  This is where we tell the OS

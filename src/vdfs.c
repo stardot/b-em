@@ -225,6 +225,7 @@ enum vdfs_action {
     VDFS_ROM_BUILD,
     VDFS_ROM_APPEND,
     VDFS_ROM_DBASE,
+    VDFS_ROM_DBOOT,
     VDFS_ACT_NOP,
     VDFS_ACT_QUIT,
     VDFS_ACT_SRLOAD,
@@ -256,6 +257,7 @@ enum vdfs_action {
     VDFS_ACT_OSW7F_WATF,
     VDFS_ACT_OSW7F_WAT5,
     VDFS_ACT_DBASE,
+    VDFS_ACT_DBOOT,
     VDFS_ACT_MMBDIN
 };
 
@@ -3360,7 +3362,7 @@ static int mmb_parse_find(uint16_t addr, int ch)
     return i;
 }
 
-static bool mmb_check_pick(unsigned drive, unsigned disc)
+static bool mmb_check_pick(unsigned drive, unsigned disc, bool boot)
 {
     disc += mmb_zone_base;
     if (disc >= mmb_ndisc) {
@@ -3385,6 +3387,8 @@ static bool mmb_check_pick(unsigned drive, unsigned disc)
             return false;
     }
     mmb_pick(drive, side, disc);
+    if (boot)
+        rom_dispatch(VDFS_ROM_DBOOT);
     return true;
 }
 
@@ -3419,7 +3423,7 @@ static void cmd_mmb_dbase(uint16_t addr)
         adfs_error(err_badparms);
 }
 
-static void cmd_mmb_din(uint16_t addr)
+static void cmd_mmb_din(uint16_t addr, bool boot)
 {
     int num1, num2, ch;
 
@@ -3431,25 +3435,25 @@ static void cmd_mmb_din(uint16_t addr)
         while (ch == ' ')
             ch = readmem(addr++);
         if (ch == '\r')
-            mmb_check_pick(0, num1);
+            mmb_check_pick(0, num1, boot);
         else if (ch >= '0' && ch <= '9') {
             num2 = ch - '0';
             while ((ch = readmem(addr++)) >= '0' && ch <= '9')
                 num2 = num2 * 10 + ch - '0';
             if (num1 >= 0 && num1 <= 3)
-                mmb_check_pick(num1, num2);
+                mmb_check_pick(num1, num2, boot);
             else
                 adfs_error(err_badparms);
         }
         else if ((num2 = mmb_parse_find(addr, ch)) >= 0) {
             if (num1 >= 0 && num1 <= 3)
-                mmb_check_pick(num1, num2);
+                mmb_check_pick(num1, num2, boot);
             else
                 adfs_error(err_badparms);
         }
     }
     else if ((num1 = mmb_parse_find(addr, ch)) >= 0)
-        mmb_check_pick(0, num1);
+        mmb_check_pick(0, num1, boot);
 }
 
 static void cmd_dump(uint16_t addr)
@@ -3601,8 +3605,11 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
     case VDFS_ACT_DBASE:
         cmd_mmb_dbase(addr);
         break;
+    case VDFS_ACT_DBOOT:
+        cmd_mmb_din(addr, true);
+        break;
     case VDFS_ACT_MMBDIN:
-        cmd_mmb_din(addr);
+        cmd_mmb_din(addr, false);
         break;
     default:
         rom_dispatch(act);
@@ -3809,8 +3816,9 @@ static const struct cmdent ctab_always[] = {
 
 static const struct cmdent ctab_mmb[] = {
     { "DAbout",  VDFS_ACT_NOP     },
-    { "DBase",   VDFS_ACT_DBASE   },
-    { "Din",     VDFS_ACT_MMBDIN  }
+    { "DBAse",   VDFS_ACT_DBASE   },
+    { "DBoot",   VDFS_ACT_DBOOT   },
+    { "DIn",     VDFS_ACT_MMBDIN  }
 };
 
 static const struct cmdent ctab_enabled[] = {
