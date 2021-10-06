@@ -155,6 +155,8 @@ prtextws    =   &A8
             equw    cmd_append      ; *APPEND.
             equw    prt_dbase       ; helper for *DBASE.
             equw    mmb_dboot       ; Boot on behalf of *DBOOT.
+            equw    mmb_dcat        ; Print one *DCAT entry.
+            equw    newlret         ; Print newline, set A=0, RTS
 .dispend
 
 ; Stubs to transfer control to the vdfs.c module.
@@ -375,10 +377,11 @@ prtextws    =   &A8
             bne     dfs_msg
 .dfs_yes    ldx     #msg_claim-banner+1
 .dfs_msg    jsr     prmsg
-            jsr     OSNEWL
+}
+
+.newlret    jsr     OSNEWL
             lda     #&00
             rts
-}
 
 ; Routines to list information about files.
 
@@ -1552,6 +1555,26 @@ prtextws    =   &A8
             rts
 .text       equs    "MMB Base: ",&00,&0d,&0a
             equs    "MMB Size: ",&00
+}
+
+.mmb_dcat
+{
+            bit     &ff
+            bmi     escape
+            ldx     #&14
+.loop       lda     cat_tmp,x
+            jsr     OSWRCH
+            dex
+            bpl     loop
+            lda     #&14
+            sta     port_cmd
+            rts
+.escape     lda     #&7e
+            jsr     OSBYTE
+            brk
+            equb    &11
+            equs    "Escape"
+            equb    &00
 }
 .end
 .gbpbpb     equb    &00

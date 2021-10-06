@@ -1,3 +1,4 @@
+#define _DEBUG
 /*
  * VDFS for B-EM
  * Steve Fosdick 2016-2020
@@ -226,6 +227,8 @@ enum vdfs_action {
     VDFS_ROM_APPEND,
     VDFS_ROM_DBASE,
     VDFS_ROM_DBOOT,
+    VDFS_ROM_MMB_DCAT,
+    VDFS_ROM_NEWLRET,
     VDFS_ACT_NOP,
     VDFS_ACT_QUIT,
     VDFS_ACT_SRLOAD,
@@ -258,7 +261,8 @@ enum vdfs_action {
     VDFS_ACT_OSW7F_WAT5,
     VDFS_ACT_DBASE,
     VDFS_ACT_DBOOT,
-    VDFS_ACT_MMBDIN
+    VDFS_ACT_MMBDIN,
+    VDFS_ACT_MMBDCAT
 };
 
 /*
@@ -823,6 +827,7 @@ static vdfs_entry *acorn_search(vdfs_entry *dir, const char *acorn_fn)
 
 static int vdfs_wildmat(const char *pattern, const char *candidate, size_t len)
 {
+    log_debug("vdfs: vdfs_wildmat, pattern=%s, candidate=%.*s, len=%lu", pattern, (int)len, candidate, len);
     int pat_ch, can_ch, d;
 
     while (len-- > 0) {
@@ -3362,7 +3367,9 @@ static unsigned mmb_boot_discs[4];
 static unsigned mmb_cat_size;
 static off_t mmb_zone_base;
 static char *mmb_cat;
-
+static const char *mmb_dcat_ptr;
+static unsigned mmb_dcat_cur, mmb_dcat_max;
+static char mmb_dcat_pattern[13];
 
 static void mmb_eject_one(int drive)
 {
@@ -3387,8 +3394,10 @@ void mmb_eject(void)
         free(mmb_fn);
         mmb_fn = NULL;
     }
-    if (mmb_cat)
+    if (mmb_cat) {
         free(mmb_cat);
+        mmb_cat = NULL;
+    }
     mmb_cat_size = 0;
     mmb_ndisc = 0;
 }
@@ -3653,6 +3662,77 @@ static void cmd_mmb_din(uint16_t addr, bool boot)
         mmb_check_pick(0, num1, boot);
 }
 
+static void mmb_dcat_next(void)
+{
+    while (mmb_dcat_cur <= mmb_dcat_max) {
+        unsigned flag = *(unsigned char *)(mmb_dcat_ptr+15);
+        log_debug("vdfs: mmb_dcat_next, mmb_dcat_ptr=%p, mmb_dcat_cur=%u, flag=%02X, entry=%.15s", mmb_dcat_ptr, mmb_dcat_cur, flag, mmb_dcat_ptr);
+        if (!(flag & 0xf0) && !vdfs_wildmat(mmb_dcat_pattern, mmb_dcat_ptr, sizeof(mmb_dcat_pattern))) {
+            char num[6];
+            snprintf(num, sizeof(num), "%5d", mmb_dcat_cur);
+            uint16_t addr = CAT_TMP;
+            int ch = ' ';
+            if ((flag & 0x0f) == 0)
+                ch = 'P';
+            writemem(addr++, ch);
+            writemem(addr++, ' ');
+            for (int i = 12; i; ) {
+                ch = mmb_dcat_ptr[--i];
+                if (!ch)
+                    ch = ' ';
+                writemem(addr++, ch);
+            }
+            writemem(addr++, ' ');
+            for (int i = 5; i; )
+                writemem(addr++, num[--i]);
+            rom_dispatch(VDFS_ROM_MMB_DCAT);
+            mmb_dcat_ptr += MMB_NAME_SIZE;
+            mmb_dcat_cur++;
+            return;
+        }
+        mmb_dcat_ptr += MMB_NAME_SIZE;
+        mmb_dcat_cur++;
+    }
+    a = 0;
+    rom_dispatch(VDFS_ROM_NEWLRET);
+}
+
+static void cmd_mmb_dcat(uint16_t addr)
+{
+    unsigned min = 0;
+    unsigned max = mmb_ndisc - 1;
+    mmb_dcat_pattern[0] = '*';
+    mmb_dcat_pattern[1] = 0;
+
+    int ch = readmem(addr++);
+    if (ch >= '0' && ch <= '9') {
+        min = ch - '0';
+        while ((ch = readmem(addr++)) >= '0' && ch <= '9')
+            min = min * 10 + ch - '0';
+        while (ch == ' ')
+            ch = readmem(addr++);
+    }
+    if (ch >= '0' && ch <= '9') {
+        max = ch - '0';
+        while ((ch = readmem(addr++)) >= '0' && ch <= '9')
+            max = max * 10 + ch - '0';
+        while (ch == ' ')
+            ch = readmem(addr++);
+    }
+    if (ch != '\r') {
+        int i = 0;
+        do {
+            mmb_dcat_pattern[i++] = ch;
+            ch = readmem(addr++);
+        } while (ch != '\r' && i < sizeof(mmb_dcat_pattern)-1);
+        mmb_dcat_pattern[i] = 0;
+    }
+    mmb_dcat_ptr = mmb_cat;
+    mmb_dcat_cur = min;
+    mmb_dcat_max = max;
+    mmb_dcat_next();
+}
+
 static void cmd_dump(uint16_t addr)
 {
     x = addr & 0xff;
@@ -3807,6 +3887,9 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
         break;
     case VDFS_ACT_MMBDIN:
         cmd_mmb_din(addr, false);
+        break;
+    case VDFS_ACT_MMBDCAT:
+        cmd_mmb_dcat(addr);
         break;
     default:
         rom_dispatch(act);
@@ -4015,6 +4098,7 @@ static const struct cmdent ctab_mmb[] = {
     { "DAbout",  VDFS_ACT_NOP     },
     { "DBAse",   VDFS_ACT_DBASE   },
     { "DBoot",   VDFS_ACT_DBOOT   },
+    { "DCat",    VDFS_ACT_MMBDCAT },
     { "DIn",     VDFS_ACT_MMBDIN  }
 };
 
@@ -4168,6 +4252,7 @@ static inline void dispatch(uint8_t value)
         case 0x11: cat_get_dir(lib_dir, dfs_lib); break;
         case 0x12: set_ram();   break;
         case 0x13: rest_ram();  break;
+        case 0x14: mmb_dcat_next(); break;
         default: log_warn("vdfs: function code %d not recognised\n", value);
     }
 }
