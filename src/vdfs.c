@@ -3730,14 +3730,25 @@ static void cmd_mmb_dcat(uint16_t addr)
 static void mmb_ddrive_next(void)
 {
     if (mmb_dcat_cur <= mmb_dcat_max) {
-        unsigned disc = mmb_cur_disc[mmb_dcat_cur];
-        const char *title = mmb_cat + disc * MMB_NAME_SIZE;
-        unsigned flag = *(unsigned char *)(title+15);
+        unsigned log_drive = mmb_dcat_cur++;
+        unsigned phy_drive = log_drive & 1;
+        unsigned side = log_drive >> 1;
         char text[32];
-        int bytes = snprintf(text, sizeof(text), ":%u %5u %-12.12s %c\r\n", mmb_dcat_cur++, disc, title, (flag & 0x0f) ? ' ' : 'P');
-        x = bytes;
-        for (uint16_t addr = CAT_TMP; bytes; )
+        int bytes;
+        if (mmb_offset[phy_drive][side] == 0)
+            bytes = snprintf(text, sizeof(text), ":%u not MMB\r\n", log_drive);
+        else {
+            unsigned disc = mmb_cur_disc[log_drive];
+            const char *title = mmb_cat + disc * MMB_NAME_SIZE;
+            unsigned flag = *(unsigned char *)(title+15);
+            bytes = snprintf(text, sizeof(text), ":%u %5u %-12.12s %c\r\n", log_drive, disc, title, (flag & 0x0f) ? ' ' : 'P');
+        }
+        log_debug("vdfs: mmb_ddrive_next, bytes=%d", bytes);
+        x = bytes - 1;
+        uint16_t addr = CAT_TMP;
+        do
             writemem(addr++, text[--bytes]);
+        while (bytes);
         rom_dispatch(VDFS_ROM_STACKPRT);
         y = 0x15;
     }
