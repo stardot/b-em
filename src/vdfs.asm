@@ -1569,9 +1569,19 @@ prtextws    =   &A8
             lda     #&14
             sta     port_cmd
             rts
-.escape     lda     #&7e
+}
+
+.escape
+{
+            lda     #&7e
             jsr     OSBYTE
-            brk
+            ldx     #&09
+.esclp      lda     escmsg,x
+            sta     &0100,x
+            dex
+            bpl     esclp
+            jmp     &0100
+.escmsg     brk
             equb    &11
             equs    "Escape"
             equb    &00
