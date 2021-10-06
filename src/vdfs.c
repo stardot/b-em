@@ -227,7 +227,7 @@ enum vdfs_action {
     VDFS_ROM_APPEND,
     VDFS_ROM_DBASE,
     VDFS_ROM_DBOOT,
-    VDFS_ROM_MMB_DCAT,
+    VDFS_ROM_STACKPRT,
     VDFS_ROM_NEWLRET,
     VDFS_ROM_DABOUT,
     VDFS_ACT_NOP,
@@ -3683,7 +3683,8 @@ static void mmb_dcat_next(void)
             writemem(addr++, ' ');
             for (int i = 5; i; )
                 writemem(addr++, num[--i]);
-            rom_dispatch(VDFS_ROM_MMB_DCAT);
+            x = y = 0x14;
+            rom_dispatch(VDFS_ROM_STACKPRT);
             mmb_dcat_ptr += MMB_NAME_SIZE;
             mmb_dcat_cur++;
             return;

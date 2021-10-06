@@ -157,7 +157,7 @@ prtextws    =   &A8
             equw    cmd_append      ; *APPEND.
             equw    prt_dbase       ; helper for *DBASE.
             equw    mmb_dboot       ; Boot on behalf of *DBOOT.
-            equw    mmb_dcat        ; Print one *DCAT entry.
+            equw    stack_print     ; Print whatever is at the bottom of the stack.
             equw    newlret         ; Print newline, set A=0, RTS
             equw    mmb_dabout      ; Print MMB "about" message.
 .dispend
@@ -1563,17 +1563,15 @@ prtextws    =   &A8
             equs    "MMB Size: ",&00
 }
 
-.mmb_dcat
+.stack_print
 {
             bit     &ff
             bmi     escape
-            ldx     #&14
 .loop       lda     cat_tmp,x
             jsr     OSWRCH
             dex
             bpl     loop
-            lda     #&14
-            sta     port_cmd
+            sty     port_cmd
             rts
 }
 
