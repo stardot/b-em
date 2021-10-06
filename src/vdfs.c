@@ -229,6 +229,7 @@ enum vdfs_action {
     VDFS_ROM_DBOOT,
     VDFS_ROM_MMB_DCAT,
     VDFS_ROM_NEWLRET,
+    VDFS_ROM_DABOUT,
     VDFS_ACT_NOP,
     VDFS_ACT_QUIT,
     VDFS_ACT_SRLOAD,
@@ -4095,7 +4096,7 @@ static const struct cmdent ctab_always[] = {
 };
 
 static const struct cmdent ctab_mmb[] = {
-    { "DAbout",  VDFS_ACT_NOP     },
+    { "DAbout",  VDFS_ROM_DABOUT  },
     { "DBAse",   VDFS_ACT_DBASE   },
     { "DBoot",   VDFS_ACT_DBOOT   },
     { "DCat",    VDFS_ACT_MMBDCAT },

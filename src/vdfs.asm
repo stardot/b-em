@@ -120,6 +120,7 @@ prtextws    =   &A8
 .msg_exec   equs    "3 (Exec)",0
 .msg_dir    equs    "Dir. ", 0
 .msg_lib    equs    "Lib. ", 0
+.msg_mmb    equs    " MMB Support",&00
 
 ; The dispatch table.  This needs to be in the same order as
 ; enum vdfs_action in the vdfs.c module.
@@ -157,6 +158,7 @@ prtextws    =   &A8
             equw    mmb_dboot       ; Boot on behalf of *DBOOT.
             equw    mmb_dcat        ; Print one *DCAT entry.
             equw    newlret         ; Print newline, set A=0, RTS
+            equw    mmb_dabout      ; Print MMB "about" message.
 .dispend
 
 ; Stubs to transfer control to the vdfs.c module.
@@ -1145,9 +1147,8 @@ prtextws    =   &A8
 
 ; Help text and suboutines to print parts of it.
 
-.help_title
+.pr_rom_vers
 {
-            jsr     OSNEWL
             ldx     #&ff
             bne     start
 .loop1      jsr     OSWRCH
@@ -1159,8 +1160,12 @@ prtextws    =   &A8
             inx
             lda     romtitle,x
             bne     loop2
-            jmp     OSNEWL
+            rts
 }
+
+.help_title jsr     OSNEWL
+            jsr     pr_rom_vers
+            jmp     OSNEWL
 
 .help_short
 {
@@ -1586,6 +1591,13 @@ prtextws    =   &A8
             equs    "Escape"
             equb    &00
 }
+
+.mmb_dabout
+            jsr     pr_rom_vers
+            ldx     #msg_mmb-banner
+            jsr     prmsg
+            jmp     newlret
+
 .end
 .gbpbpb     equb    &00
             equd    &00000000
