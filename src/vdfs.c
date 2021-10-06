@@ -3677,7 +3677,8 @@ static void mmb_dcat_next(void)
             writemem(addr++, ' ');
             for (int i = 5; i; )
                 writemem(addr++, num[--i]);
-            x = y = 0x14;
+            x = 0x13;
+            y = 0x14;
             rom_dispatch(VDFS_ROM_STACKPRT);
             mmb_dcat_ptr += MMB_NAME_SIZE;
             mmb_dcat_cur++;
