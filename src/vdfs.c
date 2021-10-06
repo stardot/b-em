@@ -263,7 +263,8 @@ enum vdfs_action {
     VDFS_ACT_DBASE,
     VDFS_ACT_DBOOT,
     VDFS_ACT_MMBDIN,
-    VDFS_ACT_MMBDCAT
+    VDFS_ACT_MMBDCAT,
+    VDFS_ACT_MMBDDRV
 };
 
 /*
@@ -3360,7 +3361,7 @@ static void select_vdfs(uint8_t fsno)
 
 char *mmb_fn;
 static unsigned mmb_ndisc;
-static unsigned mmb_boot_discs[4];
+static unsigned mmb_boot_discs[4], mmb_cur_disc[4];
 static unsigned mmb_cat_size;
 static off_t mmb_zone_base;
 static char *mmb_cat;
@@ -3413,6 +3414,7 @@ static void mmb_set_offset(unsigned log_drive, unsigned phy_drive, unsigned side
         offset -= MMB_DISC_SIZE;
     log_debug("vdfs: MMB log_drive %u, phy_drive %u, side %u, disc %u, zone_start=%u, zone_index=%u, offset=%u", log_drive, phy_drive, side, disc, zone_start, zone_index, offset);
     mmb_offset[phy_drive][side] = offset;
+    mmb_cur_disc[log_drive] = disc;
 }
 
 void mmb_reset(void)
@@ -3724,6 +3726,46 @@ static void cmd_mmb_dcat(uint16_t addr)
     mmb_dcat_next();
 }
 
+static void mmb_ddrive_next(void)
+{
+    if (mmb_dcat_cur <= mmb_dcat_max) {
+        unsigned disc = mmb_cur_disc[mmb_dcat_cur];
+        const char *title = mmb_cat + disc * MMB_NAME_SIZE;
+        unsigned flag = *(unsigned char *)(title+15);
+        char text[32];
+        int bytes = snprintf(text, sizeof(text), ":%u %5u %-12.12s %c\r\n", mmb_dcat_cur++, disc, title, (flag & 0x0f) ? ' ' : 'P');
+        x = bytes;
+        for (uint16_t addr = CAT_TMP; bytes; )
+            writemem(addr++, text[--bytes]);
+        rom_dispatch(VDFS_ROM_STACKPRT);
+        y = 0x15;
+    }
+    a= 0;
+}
+
+static void cmd_mmb_ddrive(uint16_t addr)
+{
+    int ch = readmem(addr++);
+    if (ch >= '0' && ch <= '9') {
+        unsigned log_drive = ch - '0';
+        while ((ch = readmem(addr++)) >= '0' && ch <= '9')
+            log_drive = log_drive * 10 + ch - '0';
+        if (log_drive > 3) {
+            log_debug("vdfs: cmd_mmb_ddrive: invalid logical drive %u", log_drive);
+            adfs_error(err_badparms);
+            return;
+        }
+        mmb_dcat_cur = log_drive;
+        mmb_dcat_max = log_drive;
+        mmb_ddrive_next();
+    }
+    else {
+        mmb_dcat_cur = 0;
+        mmb_dcat_max = 3;
+        mmb_ddrive_next();
+    }
+}
+
 static void cmd_dump(uint16_t addr)
 {
     x = addr & 0xff;
@@ -3881,6 +3923,9 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
         break;
     case VDFS_ACT_MMBDCAT:
         cmd_mmb_dcat(addr);
+        break;
+    case VDFS_ACT_MMBDDRV:
+        cmd_mmb_ddrive(addr);
         break;
     default:
         rom_dispatch(act);
@@ -4090,6 +4135,7 @@ static const struct cmdent ctab_mmb[] = {
     { "DBAse",   VDFS_ACT_DBASE   },
     { "DBoot",   VDFS_ACT_DBOOT   },
     { "DCat",    VDFS_ACT_MMBDCAT },
+    { "DDRive",  VDFS_ACT_MMBDDRV },
     { "DIn",     VDFS_ACT_MMBDIN  }
 };
 
@@ -4243,7 +4289,8 @@ static inline void dispatch(uint8_t value)
         case 0x11: cat_get_dir(lib_dir, dfs_lib); break;
         case 0x12: set_ram();   break;
         case 0x13: rest_ram();  break;
-        case 0x14: mmb_dcat_next(); break;
+        case 0x14: mmb_dcat_next();   break;
+        case 0x15: mmb_ddrive_next(); break;
         default: log_warn("vdfs: function code %d not recognised\n", value);
     }
 }
