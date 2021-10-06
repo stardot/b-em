@@ -3400,29 +3400,31 @@ void mmb_eject(void)
     mmb_ndisc = 0;
 }
 
-static void mmb_set_offset(unsigned drive, unsigned side, unsigned disc)
+static void mmb_set_offset(unsigned log_drive, unsigned phy_drive, unsigned side, unsigned disc)
 {
     if (disc >= mmb_ndisc) {
-        log_debug("vdfs: MMB drive %u, side %u, disc %u out of range", drive, side, disc);
+        log_debug("vdfs: MMB log_drive %u, phy_drive %u, side %u, disc %u out of range", log_drive, phy_drive, side, disc);
         disc = 0;
     }
     unsigned zone_start = disc / MMB_ZONE_DISCS;
     unsigned zone_index = disc % MMB_ZONE_DISCS;
     unsigned offset = zone_start * MMB_ZONE_FULL_SIZE + MMB_ZONE_CAT_SIZE + MMB_NAME_SIZE + zone_index * MMB_DISC_SIZE;
-    log_debug("vdfs: MMB drive %u, side %u, disc %u, zone_start=%u, zone_index=%u, offset=%u", drive, side, disc, zone_start, zone_index, offset);
-    mmb_offset[drive][side] = offset;
+    if (side > 0)
+        offset -= MMB_DISC_SIZE;
+    log_debug("vdfs: MMB log_drive %u, phy_drive %u, side %u, disc %u, zone_start=%u, zone_index=%u, offset=%u", log_drive, phy_drive, side, disc, zone_start, zone_index, offset);
+    mmb_offset[phy_drive][side] = offset;
 }
 
 void mmb_reset(void)
 {
     if (mmb_fp) {
         if (sdf_fp[0] == mmb_fp) {
-            mmb_set_offset(0, 0, mmb_boot_discs[0]);
-            mmb_set_offset(0, 1, mmb_boot_discs[1]);
+            mmb_set_offset(0, 0, 0, mmb_boot_discs[0]);
+            mmb_set_offset(2, 0, 1, mmb_boot_discs[1]);
         }
         if (sdf_fp[1] == mmb_fp) {
-            mmb_set_offset(1, 0, mmb_boot_discs[2]);
-            mmb_set_offset(1, 1, mmb_boot_discs[3]);
+            mmb_set_offset(1, 1, 0, mmb_boot_discs[2]);
+            mmb_set_offset(3, 1, 1, mmb_boot_discs[3]);
         }
     }
 }
@@ -3493,13 +3495,13 @@ void mmb_load(char *fn)
         if (sdf_fp[1] == mmb_fp) {
             sdf_mount(1, fn, fp, &sdf_geometries.dfs_10s_seq_80t);
             writeprot[1] = writeprot[0];
-            mmb_set_offset(1, 0, mmb_boot_discs[2]);
-            mmb_set_offset(1, 1, mmb_boot_discs[3]);
+            mmb_set_offset(1, 1, 0, mmb_boot_discs[2]);
+            mmb_set_offset(3, 1, 1, mmb_boot_discs[3]);
         }
     }
     sdf_mount(0, fn, fp, &sdf_geometries.dfs_10s_seq_80t);
-    mmb_set_offset(0, 0, mmb_boot_discs[0]);
-    mmb_set_offset(0, 1, mmb_boot_discs[1]);
+    mmb_set_offset(0, 0, 0, mmb_boot_discs[0]);
+    mmb_set_offset(2, 0, 1, mmb_boot_discs[1]);
     mmb_fp = fp;
     mmb_fn = fn;
     if (fdc_spindown)
@@ -3553,37 +3555,27 @@ static int mmb_parse_find(uint16_t addr, int ch)
     return -1;
 }
 
-static bool mmb_check_pick(unsigned drive, unsigned disc, bool boot)
+static bool mmb_check_pick(unsigned log_drive, unsigned disc, bool boot)
 {
     disc += mmb_zone_base;
     if (disc >= mmb_ndisc) {
+        log_debug("vdfs: mmb_check_pick: invalid disc drive %u", log_drive);
         adfs_error(err_notfound);
         return false;
     }
-    unsigned side;
-    switch(drive) {
-        case 0:
-        case 1:
-            side = 0;
-            break;
-        case 2:
-        case 3:
-            drive &= 1;
-            disc--;
-            side = 1;
-            break;
-        default:
-            log_debug("vdfs: mmb_check_pick: invalid logical drive %d", drive);
-            adfs_error(err_badparms);
-            return false;
+    if (log_drive > 3) {
+        log_debug("vdfs: mmb_check_pick: invalid logical drive %u", log_drive);
+        adfs_error(err_badparms);
+        return false;
     }
-    log_debug("vdfs: picking MMB disc, drive=%d, side=%d, disc=%d", drive, side, disc);
-
-    if (sdf_fp[drive] != mmb_fp) {
-        disc_close(drive);
-        sdf_mount(drive, mmb_fn, mmb_fp, &sdf_geometries.dfs_10s_seq_80t);
+    unsigned phy_drive = log_drive & 1;
+    unsigned side = log_drive >> 1;
+    log_debug("vdfs: picking MMB disc, log_drive=%u, phy_drive=%u, side=%d, disc=%u", log_drive, phy_drive, side, disc);
+    if (sdf_fp[phy_drive] != mmb_fp) {
+        disc_close(phy_drive);
+        sdf_mount(phy_drive, mmb_fn, mmb_fp, &sdf_geometries.dfs_10s_seq_80t);
     }
-    mmb_set_offset(drive, side, disc);
+    mmb_set_offset(log_drive, phy_drive, side, disc);
     if (fdc_spindown)
         fdc_spindown();
     if (boot)
