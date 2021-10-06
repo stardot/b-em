@@ -1,6 +1,8 @@
 #ifndef SDF_INC
 #define SDF_INC
 
+#include "disc.h"
+
 enum sdf_sides {
     SDF_SIDES_SINGLE,
     SDF_SIDES_SEQUENTIAL,
@@ -50,8 +52,9 @@ struct sdf_geometry_set {
 
 extern const struct sdf_geometry_set sdf_geometries;
 
+extern FILE *sdf_fp[NUM_DRIVES];
+extern off_t mmb_offset[NUM_DRIVES][2];
 extern char *mmb_fn;
-extern unsigned mmb_ndisc, mmb_zone_base;
 
 // In sdf-geo.c
 const struct sdf_geometry *sdf_find_geo(const char *fn, const char *ext, FILE *fp);
@@ -60,19 +63,9 @@ const char *sdf_desc_dens(const struct sdf_geometry *geo);
 
 // In sdf-acc.c
 void sdf_new_disc(int drive, ALLEGRO_PATH *fn, const struct sdf_geometry *geo);
+void sdf_mount(int drive, const char *fn, FILE *fp, const struct sdf_geometry *geo);
 void sdf_load(int drive, const char *fn, const char *ext);
 FILE *sdf_owseek(uint8_t drive, uint8_t sector, uint8_t track, uint8_t side, uint16_t ssize);
-
-// Functions for MMB files.
-
-#define MMB_ZONE_DISCS     511
-
-void mmb_load(char *fn);
-void mmb_eject(void);
-void mmb_pick(unsigned drive, unsigned side, unsigned disc);
-void mmb_reset(void);
-int mmb_find(const char *name);
-void mmb_set_base(unsigned base);
 
 //DB: bodge for VS
 #ifdef _MSC_VER

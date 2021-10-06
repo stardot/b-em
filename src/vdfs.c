@@ -3344,22 +3344,206 @@ static void select_vdfs(uint8_t fsno)
     }
 }
 
+/*
+ * Support for MMB files.
+ */
+
+#define MMB_DISC_SIZE      (200*1024)
+#define MMB_NAME_SIZE      16
+#define MMB_ZONE_DISCS     511
+#define MMB_ZONE_CAT_SIZE  (MMB_ZONE_DISCS*MMB_NAME_SIZE)
+#define MMB_ZONE_FULL_SIZE (MMB_ZONE_CAT_SIZE+MMB_NAME_SIZE+MMB_ZONE_DISCS*MMB_DISC_SIZE)
+#define MMB_ZONE_SKIP_SIZE (MMB_ZONE_DISCS*MMB_DISC_SIZE+MMB_NAME_SIZE)
+
+char *mmb_fn;
+static FILE *mmb_fp;
+static unsigned mmb_ndisc;
+static unsigned mmb_boot_discs[4];
+static unsigned mmb_cat_size;
+static off_t mmb_zone_base;
+static char *mmb_cat;
+
+
+static void mmb_eject_one(int drive)
+{
+    ALLEGRO_PATH *path;
+
+    if (sdf_fp[drive] == mmb_fp) {
+        disc_close(drive);
+        if ((path = discfns[drive]))
+            disc_load(drive, path);
+    }
+}
+
+void mmb_eject(void)
+{
+    if (mmb_fp) {
+        mmb_eject_one(0);
+        mmb_eject_one(1);
+        fclose(mmb_fp);
+        mmb_fp = NULL;
+    }
+    if (mmb_fn) {
+        free(mmb_fn);
+        mmb_fn = NULL;
+    }
+    if (mmb_cat)
+        free(mmb_cat);
+    mmb_cat_size = 0;
+    mmb_ndisc = 0;
+}
+
+static void mmb_set_offset(unsigned drive, unsigned side, unsigned disc)
+{
+    if (disc >= mmb_ndisc) {
+        log_debug("vdfs: MMB drive %u, side %u, disc %u out of range", drive, side, disc);
+        disc = 0;
+    }
+    unsigned zone_start = disc / MMB_ZONE_DISCS;
+    unsigned zone_index = disc % MMB_ZONE_DISCS;
+    unsigned offset = zone_start * MMB_ZONE_FULL_SIZE + MMB_ZONE_CAT_SIZE + MMB_NAME_SIZE + zone_index * MMB_DISC_SIZE;
+    log_debug("vdfs: MMB drive %u, side %u, disc %u, zone_start=%u, zone_index=%u, offset=%u", drive, side, disc, zone_start, zone_index, offset);
+    mmb_offset[drive][side] = offset;
+}
+
+void mmb_reset(void)
+{
+    if (mmb_fp) {
+        if (sdf_fp[0] == mmb_fp) {
+            mmb_set_offset(0, 0, mmb_boot_discs[0]);
+            mmb_set_offset(0, 1, mmb_boot_discs[1]);
+        }
+        if (sdf_fp[1] == mmb_fp) {
+            mmb_set_offset(1, 0, mmb_boot_discs[2]);
+            mmb_set_offset(1, 1, mmb_boot_discs[3]);
+        }
+    }
+}
+
+static void mmb_read_error(const char *fn, FILE *fp)
+{
+    if (ferror(fp))
+        log_error("vdfs: read error on MMB file %s: %s", fn, strerror(errno));
+    else
+        log_error("vdfs: unexpected EOF on MMB file %s", fn);
+    fclose(fp);
+}
+
+void mmb_load(char *fn)
+{
+    writeprot[0] = 0;
+    FILE *fp = fopen(fn, "rb+");
+    if (fp == NULL) {
+        if ((fp = fopen(fn, "rb")) == NULL) {
+            log_error("Unable to open file '%s' for reading - %s", fn, strerror(errno));
+            return;
+        }
+        writeprot[0] = 1;
+    }
+    unsigned char header[16];
+    if (fread(header, sizeof(header), 1, fp) != 1) {
+        mmb_read_error(fn, fp);
+        return;
+    }
+    mmb_boot_discs[0] = header[0] | (header[4] << 8);
+    mmb_boot_discs[1] = header[1] | (header[5] << 8);
+    mmb_boot_discs[2] = header[2] | (header[6] << 8);
+    mmb_boot_discs[3] = header[3] | (header[7] << 8);
+    unsigned extra_zones = header[8];
+    extra_zones = ((extra_zones & 0xf0) == 0xa0) ? extra_zones & 0x0f : 0;
+    unsigned reqd_cat_size = (extra_zones + 1) * MMB_ZONE_CAT_SIZE;
+    log_debug("vdfs: mmb extra zones=%u, mmb cat total size=%u", extra_zones, reqd_cat_size);
+    if (reqd_cat_size != mmb_cat_size) {
+        if (mmb_cat)
+            free(mmb_cat);
+        if (!(mmb_cat = malloc(reqd_cat_size))) {
+            log_error("vdfs: out of memory allocating MMB catalogue");
+            return;
+        }
+        mmb_cat_size = reqd_cat_size;
+    }
+    if (fread(mmb_cat, MMB_ZONE_CAT_SIZE, 1, fp) != 1) {
+        mmb_read_error(fn, fp);
+        return;
+    }
+    char *mmb_ptr = mmb_cat + MMB_ZONE_CAT_SIZE;
+    char *mmb_end = mmb_cat + reqd_cat_size;
+    while (mmb_ptr < mmb_end) {
+        if (fseek(fp, MMB_ZONE_SKIP_SIZE, SEEK_CUR)) {
+            log_error("vdfs: seek error on MMB file %s: %s", fn, strerror(errno));
+            fclose(fp);
+            return;
+        }
+        if (fread(mmb_ptr, MMB_ZONE_CAT_SIZE, 1, fp) != 1) {
+            mmb_read_error(fn, fp);
+            return;
+        }
+        mmb_ptr += MMB_ZONE_CAT_SIZE;
+    }
+    mmb_ndisc = (extra_zones + 1) * MMB_ZONE_DISCS;
+    if (mmb_fp) {
+        fclose(mmb_fp);
+        if (sdf_fp[1] == mmb_fp) {
+            sdf_mount(1, fn, fp, &sdf_geometries.dfs_10s_seq_80t);
+            writeprot[1] = writeprot[0];
+            mmb_set_offset(1, 0, mmb_boot_discs[2]);
+            mmb_set_offset(1, 1, mmb_boot_discs[3]);
+        }
+    }
+    sdf_mount(0, fn, fp, &sdf_geometries.dfs_10s_seq_80t);
+    mmb_set_offset(0, 0, mmb_boot_discs[0]);
+    mmb_set_offset(0, 1, mmb_boot_discs[1]);
+    mmb_fp = fp;
+    mmb_fn = fn;
+    if (fdc_spindown)
+        fdc_spindown();
+}
+
+
+static inline int cat_name_cmp(const char *nam_ptr, const char *cat_ptr, const char *cat_nxt)
+{
+    do {
+        char cat_ch = *cat_ptr++;
+        char nam_ch = *nam_ptr++;
+        if (!nam_ch) {
+            if (!cat_ch)
+                break;
+            else
+                return -1;
+        }
+        if ((cat_ch ^ nam_ch) & 0x5f)
+            return -1;
+    } while (cat_nxt != cat_ptr);
+    return (cat_nxt - mmb_cat) / 16 - 2;
+}
+
 static int mmb_parse_find(uint16_t addr, int ch)
 {
-    char name[17];
-    int i;
-
     if (ch == '"')
         ch = readmem(addr++);
-    i = 0;
+    int i = 0;
+    char name[17];
     while (ch != '"' && ch != '\r' && i < sizeof(name)) {
         name[i++] = ch;
         ch = readmem(addr++);
     }
     name[i] = 0;
-    if ((i = mmb_find(name)) < 0)
-        adfs_error(err_discerr);
-    return i;
+
+    const char *cat_ptr = mmb_cat;
+    const char *cat_end = mmb_cat + mmb_cat_size;
+
+    do {
+        const char *cat_nxt = cat_ptr + 16;
+        int i = cat_name_cmp(name, cat_ptr, cat_nxt);
+        if (i >= 0) {
+            log_debug("mmb: found MMB SSD '%s' at %d", name, i);
+            return i;
+        }
+        cat_ptr = cat_nxt;
+    } while (cat_ptr < cat_end);
+
+    adfs_error(err_discerr);
+    return -1;
 }
 
 static bool mmb_check_pick(unsigned drive, unsigned disc, bool boot)
@@ -3386,7 +3570,15 @@ static bool mmb_check_pick(unsigned drive, unsigned disc, bool boot)
             adfs_error(err_badparms);
             return false;
     }
-    mmb_pick(drive, side, disc);
+    log_debug("vdfs: picking MMB disc, drive=%d, side=%d, disc=%d", drive, side, disc);
+
+    if (sdf_fp[drive] != mmb_fp) {
+        disc_close(drive);
+        sdf_mount(drive, mmb_fn, mmb_fp, &sdf_geometries.dfs_10s_seq_80t);
+    }
+    mmb_set_offset(drive, side, disc);
+    if (fdc_spindown)
+        fdc_spindown();
     if (boot)
         rom_dispatch(VDFS_ROM_DBOOT);
     return true;
@@ -3412,7 +3604,12 @@ static void cmd_mmb_dbase(uint16_t addr)
         unsigned zone_base = ch - '0';
         while ((ch = readmem(addr++)) >= '0' && ch <= '9')
             zone_base = zone_base * 10 + ch - '0';
-        mmb_set_base(zone_base);
+        mmb_zone_base = zone_base * MMB_ZONE_DISCS;
+        if (mmb_fp) {
+            fseek(mmb_fp, 9, SEEK_SET);
+            putc(zone_base, mmb_fp);
+            fflush(mmb_fp);
+        }
     }
     else if (ch == '\r') {
         zone2dec(0x100, mmb_zone_base);

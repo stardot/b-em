@@ -16,4 +16,7 @@ extern void vdfs_savestate(FILE *f);
 
 extern const char *vdfs_cfg_root;
 
+extern void mmb_eject(void);
+extern void mmb_load(char *fn);
+
 #endif
