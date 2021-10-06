@@ -351,16 +351,16 @@ static uint32_t readmem32(uint16_t addr)
 
 static void writemem16(uint16_t addr, uint16_t value)
 {
-    writemem(addr, value & 0xff);
-    writemem(addr+1, (value >> 8) & 0xff);
+    writemem(addr, value);
+    writemem(addr+1, value >> 8);
 }
 
 static void writemem32(uint16_t addr, uint32_t value)
 {
-    writemem(addr, value & 0xff);
-    writemem(addr+1, (value >> 8) & 0xff);
-    writemem(addr+2, (value >> 16) & 0xff);
-    writemem(addr+3, (value >> 24) & 0xff);
+    writemem(addr, value);
+    writemem(addr+1, value >> 8);
+    writemem(addr+2, value >> 16);
+    writemem(addr+3, value >> 24);
 }
 
 static void rom_dispatch(enum vdfs_action act)
