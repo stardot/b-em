@@ -18,13 +18,6 @@
 #include "disc.h"
 #include "sdf.h"
 
-#define MMB_DISC_SIZE      (200*1024)
-#define MMB_NAME_SIZE      16
-#define MMB_ZONE_DISCS     511
-#define MMB_ZONE_CAT_SIZE  (MMB_ZONE_DISCS*MMB_NAME_SIZE)
-#define MMB_ZONE_FULL_SIZE (MMB_ZONE_CAT_SIZE+MMB_NAME_SIZE+MMB_ZONE_DISCS*MMB_DISC_SIZE)
-#define MMB_ZONE_SKIP_SIZE (MMB_ZONE_DISCS*MMB_DISC_SIZE+MMB_NAME_SIZE)
-
 FILE *sdf_fp[NUM_DRIVES], *mmb_fp;
 static const struct sdf_geometry *geometry[NUM_DRIVES];
 static uint8_t current_track[NUM_DRIVES];

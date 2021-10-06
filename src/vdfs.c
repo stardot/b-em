@@ -3362,7 +3362,6 @@ static void select_vdfs(uint8_t fsno)
 #define MMB_ZONE_SKIP_SIZE (MMB_ZONE_DISCS*MMB_DISC_SIZE+MMB_NAME_SIZE)
 
 char *mmb_fn;
-static FILE *mmb_fp;
 static unsigned mmb_ndisc;
 static unsigned mmb_boot_discs[4];
 static unsigned mmb_cat_size;
@@ -3386,6 +3385,7 @@ static void mmb_eject_one(int drive)
 void mmb_eject(void)
 {
     if (mmb_fp) {
+        log_debug("vdfs: mmb_fp=%p", mmb_fp);
         mmb_eject_one(0);
         mmb_eject_one(1);
         fclose(mmb_fp);

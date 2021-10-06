@@ -52,7 +52,7 @@ struct sdf_geometry_set {
 
 extern const struct sdf_geometry_set sdf_geometries;
 
-extern FILE *sdf_fp[NUM_DRIVES];
+extern FILE *sdf_fp[NUM_DRIVES], *mmb_fp;
 extern off_t mmb_offset[NUM_DRIVES][2];
 extern char *mmb_fn;
 
