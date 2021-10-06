@@ -826,35 +826,33 @@ static vdfs_entry *acorn_search(vdfs_entry *dir, const char *acorn_fn)
     return NULL;
 }
 
-static int vdfs_wildmat(const char *pattern, const char *candidate, size_t len)
+static bool vdfs_wildmat(const char *pattern, const char *candidate, size_t len)
 {
-    int pat_ch, can_ch, d;
-
     while (len-- > 0) {
-        pat_ch = *(const unsigned char *)pattern++;
+        int pat_ch = *(const unsigned char *)pattern++;
         if (pat_ch == '*') {
             if (!*pattern)
-                return 0;
+                return true;
             len++;
             do {
-                if (!vdfs_wildmat(pattern, candidate++, len--))
-                    return 0;
+                if (vdfs_wildmat(pattern, candidate++, len--))
+                    return true;
             } while (len && *candidate);
-            return 1;
+            return false;
         }
-        can_ch = *(const unsigned char *)candidate++;
+        int can_ch = *(const unsigned char *)candidate++;
         if (!pat_ch)
-            return can_ch ? -1 : 0;
+            return can_ch ? false : true;
         if (pat_ch != can_ch && pat_ch != '#') {
             if (pat_ch >= 'a' && pat_ch <= 'z')
                 pat_ch = pat_ch - 'a' + 'A';
             if (can_ch >= 'a' && can_ch <= 'z')
                 can_ch = can_ch - 'a' + 'A';
-            if ((d = pat_ch - can_ch))
-                return d;
+            if (pat_ch != can_ch)
+                return false;
         }
     }
-    return 0;
+    return true;
 }
 
 static vdfs_entry *wild_search(vdfs_entry *dir, const char *pattern)
@@ -862,7 +860,7 @@ static vdfs_entry *wild_search(vdfs_entry *dir, const char *pattern)
     vdfs_entry *ent;
 
     for (ent = dir->u.dir.children; ent; ent = ent->next)
-        if (!vdfs_wildmat(pattern, ent->acorn_fn, MAX_FILE_NAME))
+        if (vdfs_wildmat(pattern, ent->acorn_fn, MAX_FILE_NAME))
             return ent;
     return NULL;
 }
@@ -1096,7 +1094,7 @@ static vdfs_entry *find_entry_dfs(const char *filename, vdfs_findres *res, vdfs_
             log_debug("vdfs: find_entry_dfs, considering entry %s", ent->acorn_fn);
             if (dfsdir == '*' || dfsdir == '#' || dfsdir == ent->dfs_dir) {
                 log_debug("vdfs: find_entry_dfs, matched DFS dir");
-                if (!vdfs_wildmat(filename, ent->acorn_fn, MAX_FILE_NAME))
+                if (vdfs_wildmat(filename, ent->acorn_fn, MAX_FILE_NAME))
                     return ent;
             }
         }
@@ -3667,7 +3665,7 @@ static void mmb_dcat_next(void)
     while (mmb_dcat_cur <= mmb_dcat_max) {
         unsigned flag = *(unsigned char *)(mmb_dcat_ptr+15);
         log_debug("vdfs: mmb_dcat_next, mmb_dcat_ptr=%p, mmb_dcat_cur=%u, flag=%02X, entry=%.15s", mmb_dcat_ptr, mmb_dcat_cur, flag, mmb_dcat_ptr);
-        if (!(flag & 0xf0) && !vdfs_wildmat(mmb_dcat_pattern, mmb_dcat_ptr, sizeof(mmb_dcat_pattern))) {
+        if (!(flag & 0xf0) && vdfs_wildmat(mmb_dcat_pattern, mmb_dcat_ptr, sizeof(mmb_dcat_pattern))) {
             char num[6];
             snprintf(num, sizeof(num), "%5d", mmb_dcat_cur);
             uint16_t addr = CAT_TMP;
