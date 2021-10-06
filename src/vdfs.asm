@@ -49,6 +49,7 @@ port_a      =   &FC5F               ; store A ready for command.
 ; Base of some temporary space used during *CAT, *EX, *INFO, *LCAT
 
 cat_tmp     =   &0100
+stack       =   &0100
 
 ; OS entry points.
 
@@ -283,17 +284,17 @@ prtextws    =   &A8
 ; boot option.
 
 .mmb_dboot  lda     #&0d            ; Set up data address of OSGBPB.
-            ldx     #<cat_tmp
-            ldy     #>cat_tmp
-            stx     cat_tmp
-            sta     cat_tmp+1
-            sty     cat_tmp+2
-            stx     cat_tmp+3
-            stx     cat_tmp+4
+            ldx     #<stack
+            ldy     #>stack
+            stx     stack
+            sta     stack+1
+            sty     stack+2
+            stx     stack+3
+            stx     stack+4
             lda     #&05            ; Ask the current filing system for
             jsr     OSGBPB          ; the title/boot option.
-            ldx     cat_tmp+&0d     ; Get length of title.
-            lda     cat_tmp+&0e,x   ; Get boot option.
+            ldx     stack+&0d       ; Get length of title.
+            lda     stack+&0e,x     ; Get boot option.
             beq     noboot
 
 ; Process boot option.  This is common to VDFS booting as a filing
@@ -303,14 +304,14 @@ prtextws    =   &A8
             bcs     noboot2
             tax
             lda     bootcmd-1,x
-            sta     cat_tmp
+            sta     stack
             ldx     #&07
 .bootlp     lda     bootnam,x
-            sta     cat_tmp+1,x
+            sta     stack+1,x
             dex
             bpl     bootlp
-            ldx     #<cat_tmp
-            ldy     #>cat_tmp
+            ldx     #<stack
+            ldy     #>stack
             jsr     OSCLI
             lda     #&00
 .noboot2    rts
@@ -412,7 +413,7 @@ prtextws    =   &A8
 
             macro   pr_attr mask, char
             lda     #mask
-            bit     &010c
+            bit     cat_tmp+&0c
             beq     notset
             outcnt  char
 .notset
@@ -438,7 +439,7 @@ prtextws    =   &A8
             outcnt  ' '
             jsr     OSWRCH
             inx
-            bit     &010d           ; test most significant byte of
+            bit     cat_tmp+&0d     ; test most significant byte of
             bvc     notdir          ; attributes for the directory flag.
             outcnt  'D'
 .notdir     pr_attr &08, 'L'
@@ -497,20 +498,20 @@ prtextws    =   &A8
             jsr     pr_others
             jsr     pr_pad
             twospc
-            hexout  &0111
-            hexout  &0110
-            hexout  &010f
-            hexout  &010e
+            hexout  cat_tmp+&11
+            hexout  cat_tmp+&10
+            hexout  cat_tmp+&0f
+            hexout  cat_tmp+&0e
             twospc
-            hexout  &0115
-            hexout  &0114
-            hexout  &0113
-            hexout  &0112
+            hexout  cat_tmp+&15
+            hexout  cat_tmp+&14
+            hexout  cat_tmp+&13
+            hexout  cat_tmp+&12
             twospc
-            hexout  &0119
-            hexout  &0118
-            hexout  &0117
-            hexout  &0116
+            hexout  cat_tmp+&19
+            hexout  cat_tmp+&18
+            hexout  cat_tmp+&17
+            hexout  cat_tmp+&16
             jmp     OSNEWL
 
 .opt_tab    equb    msg_off-banner
@@ -518,12 +519,12 @@ prtextws    =   &A8
             equb    msg_run-banner
             equb    msg_exec-banner
 
-.dir_cat    lda     &0101           ; Is there a title?
+.dir_cat    lda     cat_tmp+&01     ; Is there a title?
             beq     notitle
             ldx     #&00
 .title_lp   jsr     OSWRCH          ; print the title.
             inx
-            lda     &0101,x
+            lda     cat_tmp+&01,x
             bne     title_lp
             lda     #' '            ; pad out to 20 characters.
 .title_pad  jsr     OSWRCH
@@ -629,10 +630,10 @@ prtextws    =   &A8
 {
             ldx     #end-msg
 .loop       lda     msg,x
-            sta     &0100,x
+            sta     stack,x
             dex
             bpl     loop
-            jmp     &0100
+            jmp     stack
 .msg        brk
             equb    &d6
             equs    "Not found"
@@ -680,7 +681,7 @@ prtextws    =   &A8
             ldx     dmpcnt
 .getlp      jsr     OSBGET
             bcs     skip
-            sta     &0100,X
+            sta     stack,X
             jsr     hexbyt
             outspc
             dex
@@ -691,11 +692,11 @@ prtextws    =   &A8
 .endlp      outtwo  '*'
             outspc
             lda     #&00
-            sta     &0100,X
+            sta     stack,X
             dex
             bne     endlp
 .ascii      ldx     dmpcnt
-.asclp      lda     &0100,X
+.asclp      lda     stack,X
             and     #&7F
             cmp     #&7F
             beq     nonprt
@@ -1456,17 +1457,17 @@ prtextws    =   &A8
             jsr     OSWRCH
             jsr     OSWRCH
             ldx     #&00            ; print characters of the name.
-.charloop   lda     &0103,x
+.charloop   lda     cat_tmp+&03,x
             jsr     OSWRCH
             inx
             cpx     #&0a
             bne     charloop
             outspc
             lda     #&20            ; test if open for writing.
-            bit     &010d
+            bit     cat_tmp+&0d
             beq     openin
             lda     #&10            ; test if open for reading.
-            bit     &010d
+            bit     cat_tmp+&0d
             BNE     openup
             lda     #'O'
             ldx     #'U'
@@ -1484,7 +1485,7 @@ prtextws    =   &A8
             tya
             jsr     OSWRCH
             twospc
-            bit     &010d
+            bit     cat_tmp+&0d
             bvs     isdir
             ldx     #&0e
             jsr     hexfour
@@ -1582,10 +1583,10 @@ prtextws    =   &A8
             jsr     OSBYTE
             ldx     #&09
 .esclp      lda     escmsg,x
-            sta     &0100,x
+            sta     stack,x
             dex
             bpl     esclp
-            jmp     &0100
+            jmp     stack
 .escmsg     brk
             equb    &11
             equs    "Escape"
