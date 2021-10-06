@@ -3497,13 +3497,13 @@ void mmb_load(char *fn)
         if (sdf_fp[1] == mmb_fp) {
             sdf_mount(1, fn, fp, &sdf_geometries.dfs_10s_seq_80t);
             writeprot[1] = writeprot[0];
-            mmb_set_offset(1, 1, 0, mmb_boot_discs[2]);
+            mmb_set_offset(1, 1, 0, mmb_boot_discs[1]);
             mmb_set_offset(3, 1, 1, mmb_boot_discs[3]);
         }
     }
     sdf_mount(0, fn, fp, &sdf_geometries.dfs_10s_seq_80t);
     mmb_set_offset(0, 0, 0, mmb_boot_discs[0]);
-    mmb_set_offset(2, 0, 1, mmb_boot_discs[1]);
+    mmb_set_offset(2, 0, 1, mmb_boot_discs[2]);
     mmb_fp = fp;
     mmb_fn = fn;
     if (fdc_spindown)
