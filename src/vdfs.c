@@ -230,6 +230,7 @@ enum vdfs_action {
     VDFS_ROM_STACKPRT,
     VDFS_ROM_NEWLRET,
     VDFS_ROM_DABOUT,
+    VDFS_ROM_DFREE,
     VDFS_ACT_NOP,
     VDFS_ACT_QUIT,
     VDFS_ACT_SRLOAD,
@@ -264,7 +265,8 @@ enum vdfs_action {
     VDFS_ACT_DBOOT,
     VDFS_ACT_DIN,
     VDFS_ACT_DCAT,
-    VDFS_ACT_DDRIVE
+    VDFS_ACT_DDRIVE,
+    VDFS_ACT_DFREE
 };
 
 /*
@@ -3727,6 +3729,16 @@ static void cmd_mmb_dcat(uint16_t addr)
     mmb_dcat_next();
 }
 
+static void copy_to_cat_tmp(const char *src, int bytes)
+{
+    log_debug("vdfs: copy_to_cat_tmp, bytes=%d", bytes);
+    x = bytes - 1;
+    uint16_t addr = CAT_TMP;
+    do
+        writemem(addr++, src[--bytes]);
+    while (bytes);
+}
+
 static void mmb_ddrive_next(void)
 {
     if (mmb_dcat_cur <= mmb_dcat_max) {
@@ -3743,12 +3755,7 @@ static void mmb_ddrive_next(void)
             unsigned flag = *(unsigned char *)(title+15);
             bytes = snprintf(text, sizeof(text), ":%u %5u %-12.12s %c\r\n", log_drive, disc, title, (flag & 0x0f) ? ' ' : 'P');
         }
-        log_debug("vdfs: mmb_ddrive_next, bytes=%d", bytes);
-        x = bytes - 1;
-        uint16_t addr = CAT_TMP;
-        do
-            writemem(addr++, text[--bytes]);
-        while (bytes);
+        copy_to_cat_tmp(text, bytes);
         rom_dispatch(VDFS_ROM_STACKPRT);
         y = 0x15;
     }
@@ -3776,6 +3783,25 @@ static void cmd_mmb_ddrive(uint16_t addr)
         mmb_dcat_max = 3;
         mmb_ddrive_next();
     }
+}
+
+static void cmd_mmb_dfree(void)
+{
+    const char *cat_ptr = mmb_cat + 0x0f;
+    const char *cat_end = mmb_cat + mmb_cat_size;
+    unsigned dfree = 0;
+    while (cat_ptr < cat_end) {
+        unsigned flag = *(const unsigned char *)cat_ptr;
+        if (flag == 0xff)
+            break;
+        else if (flag == 0xf0)
+            dfree++;
+        cat_ptr += MMB_NAME_SIZE;
+    }
+    char text[16];
+    int bytes = snprintf(text, sizeof(text), "%d of %d", dfree, mmb_ndisc);
+    copy_to_cat_tmp(text, bytes);
+    rom_dispatch(VDFS_ROM_DFREE);
 }
 
 static void cmd_dump(uint16_t addr)
@@ -3938,6 +3964,9 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
         break;
     case VDFS_ACT_DDRIVE:
         cmd_mmb_ddrive(addr);
+        break;
+    case VDFS_ACT_DFREE:
+        cmd_mmb_dfree();
         break;
     default:
         rom_dispatch(act);
@@ -4148,6 +4177,7 @@ static const struct cmdent ctab_mmb[] = {
     { "DBoot",   VDFS_ACT_DBOOT   },
     { "DCat",    VDFS_ACT_DCAT    },
     { "DDRive",  VDFS_ACT_DDRIVE  },
+    { "DFree",   VDFS_ACT_DFREE   },
     { "DIn",     VDFS_ACT_DIN     }
 };
 

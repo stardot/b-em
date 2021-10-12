@@ -122,6 +122,7 @@ prtextws    =   &A8
 .msg_dir    equs    "Dir. ", 0
 .msg_lib    equs    "Lib. ", 0
 .msg_mmb    equs    " MMB Support",&00
+.msg_dfree  equs    " discs free (unformatted)",&00
 
 ; The dispatch table.  This needs to be in the same order as
 ; enum vdfs_action in the vdfs.c module.
@@ -160,6 +161,7 @@ prtextws    =   &A8
             equw    stack_print     ; Print whatever is at the bottom of the stack.
             equw    newlret         ; Print newline, set A=0, RTS
             equw    mmb_dabout      ; Print MMB "about" message.
+            equw    mmb_dfree       ; Print the *DFREE output.
 .dispend
 
 ; Stubs to transfer control to the vdfs.c module.
@@ -1596,6 +1598,17 @@ prtextws    =   &A8
             ldx     #msg_mmb-banner
             jsr     prmsg
             jmp     newlret
+
+.mmb_dfree
+{
+.loop       lda     cat_tmp,x
+            jsr     OSWRCH
+            dex
+            bpl     loop
+            ldx     #msg_dfree-banner
+            jsr     prmsg
+            jmp     newlret
+}
 
 .end
 .gbpbpb     equb    &00
