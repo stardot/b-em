@@ -262,9 +262,9 @@ enum vdfs_action {
     VDFS_ACT_OSW7F_WAT5,
     VDFS_ACT_DBASE,
     VDFS_ACT_DBOOT,
-    VDFS_ACT_MMBDIN,
-    VDFS_ACT_MMBDCAT,
-    VDFS_ACT_MMBDDRV
+    VDFS_ACT_DIN,
+    VDFS_ACT_DCAT,
+    VDFS_ACT_DDRIVE
 };
 
 /*
@@ -3930,13 +3930,13 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
     case VDFS_ACT_DBOOT:
         cmd_mmb_din(addr, true);
         break;
-    case VDFS_ACT_MMBDIN:
+    case VDFS_ACT_DIN:
         cmd_mmb_din(addr, false);
         break;
-    case VDFS_ACT_MMBDCAT:
+    case VDFS_ACT_DCAT:
         cmd_mmb_dcat(addr);
         break;
-    case VDFS_ACT_MMBDDRV:
+    case VDFS_ACT_DDRIVE:
         cmd_mmb_ddrive(addr);
         break;
     default:
@@ -4146,9 +4146,9 @@ static const struct cmdent ctab_mmb[] = {
     { "DAbout",  VDFS_ROM_DABOUT  },
     { "DBAse",   VDFS_ACT_DBASE   },
     { "DBoot",   VDFS_ACT_DBOOT   },
-    { "DCat",    VDFS_ACT_MMBDCAT },
-    { "DDRive",  VDFS_ACT_MMBDDRV },
-    { "DIn",     VDFS_ACT_MMBDIN  }
+    { "DCat",    VDFS_ACT_DCAT    },
+    { "DDRive",  VDFS_ACT_DDRIVE  },
+    { "DIn",     VDFS_ACT_DIN     }
 };
 
 static const struct cmdent ctab_enabled[] = {
