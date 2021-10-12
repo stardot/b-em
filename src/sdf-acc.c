@@ -394,7 +394,7 @@ static void sdf_lock(int drive, FILE *fp, int ltype)
             return;
         }
     } while (errno == EINTR);
-    log_warn("sdf: lock failure on drive %d", drive);
+    log_warn("sdf: lock failure on drive %d: %s", drive, strerror(errno));
 }
 #endif
 
