@@ -264,6 +264,7 @@ enum vdfs_action {
     VDFS_ACT_DBASE,
     VDFS_ACT_DBOOT,
     VDFS_ACT_DIN,
+    VDFS_ACT_DONBOOT,
     VDFS_ACT_DCAT,
     VDFS_ACT_DDRIVE,
     VDFS_ACT_DFREE
@@ -3459,8 +3460,8 @@ void mmb_load(char *fn)
         return;
     }
     mmb_boot_discs[0] = header[0] | (header[4] << 8);
-    mmb_boot_discs[1] = header[1] | (header[5] << 8);
-    mmb_boot_discs[2] = header[2] | (header[6] << 8);
+    mmb_boot_discs[2] = header[1] | (header[5] << 8);
+    mmb_boot_discs[1] = header[2] | (header[6] << 8);
     mmb_boot_discs[3] = header[3] | (header[7] << 8);
     unsigned extra_zones = header[8];
     extra_zones = ((extra_zones & 0xf0) == 0xa0) ? extra_zones & 0x0f : 0;
@@ -3499,13 +3500,13 @@ void mmb_load(char *fn)
         if (sdf_fp[1] == mmb_fp) {
             sdf_mount(1, fn, fp, &sdf_geometries.dfs_10s_seq_80t);
             writeprot[1] = writeprot[0];
-            mmb_set_offset(1, 1, 0, mmb_boot_discs[1]);
+            mmb_set_offset(1, 1, 0, mmb_boot_discs[2]);
             mmb_set_offset(3, 1, 1, mmb_boot_discs[3]);
         }
     }
     sdf_mount(0, fn, fp, &sdf_geometries.dfs_10s_seq_80t);
     mmb_set_offset(0, 0, 0, mmb_boot_discs[0]);
-    mmb_set_offset(2, 0, 1, mmb_boot_discs[2]);
+    mmb_set_offset(2, 0, 1, mmb_boot_discs[1]);
     mmb_fp = fp;
     mmb_fn = fn;
     if (fdc_spindown)
@@ -3559,32 +3560,50 @@ static int mmb_parse_find(uint16_t addr, int ch)
     return -1;
 }
 
-static bool mmb_check_pick(unsigned log_drive, unsigned disc, bool boot)
+static void mmb_two_exec(unsigned log_drive, unsigned disc, enum vdfs_action act)
 {
     disc += mmb_zone_base;
     if (disc >= mmb_ndisc) {
         log_debug("vdfs: mmb_check_pick: invalid disc drive %u", log_drive);
         adfs_error(err_notfound);
-        return false;
+        return;
     }
     if (log_drive > 3) {
         log_debug("vdfs: mmb_check_pick: invalid logical drive %u", log_drive);
         adfs_error(err_badparms);
-        return false;
+        return;
     }
-    unsigned phy_drive = log_drive & 1;
-    unsigned side = log_drive >> 1;
-    log_debug("vdfs: picking MMB disc, log_drive=%u, phy_drive=%u, side=%d, disc=%u", log_drive, phy_drive, side, disc);
-    if (sdf_fp[phy_drive] != mmb_fp) {
-        disc_close(phy_drive);
-        sdf_mount(phy_drive, mmb_fn, mmb_fp, &sdf_geometries.dfs_10s_seq_80t);
+    if (act == VDFS_ACT_DONBOOT) {
+        mmb_boot_discs[log_drive] = disc;
+        if (!fseek(mmb_fp, 0, SEEK_SET)) {
+            char header[8];
+            header[0] = mmb_boot_discs[0];
+            header[1] = mmb_boot_discs[1];
+            header[2] = mmb_boot_discs[2];
+            header[3] = mmb_boot_discs[3];
+            header[4] = mmb_boot_discs[0] >> 8;
+            header[5] = mmb_boot_discs[1] >> 8;
+            header[6] = mmb_boot_discs[2] >> 8;
+            header[7] = mmb_boot_discs[3] >> 8;
+            if (fwrite(header, sizeof(header), 1, mmb_fp) == 1)
+                return;
+        }
+        adfs_hosterr(errno);
     }
-    mmb_set_offset(log_drive, phy_drive, side, disc);
-    if (fdc_spindown)
-        fdc_spindown();
-    if (boot)
-        rom_dispatch(VDFS_ROM_DBOOT);
-    return true;
+    else {
+        unsigned phy_drive = log_drive & 1;
+        unsigned side = log_drive >> 1;
+        log_debug("vdfs: picking MMB disc, log_drive=%u, phy_drive=%u, side=%d, disc=%u", log_drive, phy_drive, side, disc);
+        if (sdf_fp[phy_drive] != mmb_fp) {
+            disc_close(phy_drive);
+            sdf_mount(phy_drive, mmb_fn, mmb_fp, &sdf_geometries.dfs_10s_seq_80t);
+        }
+        mmb_set_offset(log_drive, phy_drive, side, disc);
+        if (fdc_spindown)
+            fdc_spindown();
+        if (act == VDFS_ACT_DBOOT)
+            rom_dispatch(VDFS_ROM_DBOOT);
+    }
 }
 
 static void zone2dec(uint16_t addr, unsigned value)
@@ -3623,7 +3642,7 @@ static void cmd_mmb_dbase(uint16_t addr)
         adfs_error(err_badparms);
 }
 
-static void cmd_mmb_din(uint16_t addr, bool boot)
+static void cmd_mmb_two_args(uint16_t addr, enum vdfs_action act)
 {
     int num1, num2, ch;
 
@@ -3635,25 +3654,25 @@ static void cmd_mmb_din(uint16_t addr, bool boot)
         while (ch == ' ')
             ch = readmem(addr++);
         if (ch == '\r')
-            mmb_check_pick(0, num1, boot);
+            mmb_two_exec(0, num1, act);
         else if (ch >= '0' && ch <= '9') {
             num2 = ch - '0';
             while ((ch = readmem(addr++)) >= '0' && ch <= '9')
                 num2 = num2 * 10 + ch - '0';
             if (num1 >= 0 && num1 <= 3)
-                mmb_check_pick(num1, num2, boot);
+                mmb_two_exec(num1, num2, act);
             else
                 adfs_error(err_badparms);
         }
         else if ((num2 = mmb_parse_find(addr, ch)) >= 0) {
             if (num1 >= 0 && num1 <= 3)
-                mmb_check_pick(num1, num2, boot);
+                mmb_two_exec(num1, num2, act);
             else
                 adfs_error(err_badparms);
         }
     }
     else if ((num1 = mmb_parse_find(addr, ch)) >= 0)
-        mmb_check_pick(0, num1, boot);
+        mmb_two_exec(0, num1, act);
 }
 
 static void mmb_dcat_next(void)
@@ -3802,6 +3821,10 @@ static void cmd_mmb_dfree(void)
     int bytes = snprintf(text, sizeof(text), "%d of %d", dfree, mmb_ndisc);
     copy_to_cat_tmp(text, bytes);
     rom_dispatch(VDFS_ROM_DFREE);
+}
+
+static void cmd_mmb_donboot(uint16_t addr)
+{
 }
 
 static void cmd_dump(uint16_t addr)
@@ -3954,10 +3977,9 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
         cmd_mmb_dbase(addr);
         break;
     case VDFS_ACT_DBOOT:
-        cmd_mmb_din(addr, true);
-        break;
     case VDFS_ACT_DIN:
-        cmd_mmb_din(addr, false);
+    case VDFS_ACT_DONBOOT:
+        cmd_mmb_two_args(addr, act);
         break;
     case VDFS_ACT_DCAT:
         cmd_mmb_dcat(addr);
@@ -3967,6 +3989,8 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
         break;
     case VDFS_ACT_DFREE:
         cmd_mmb_dfree();
+        break;
+        cmd_mmb_donboot(addr);
         break;
     default:
         rom_dispatch(act);
@@ -4178,7 +4202,8 @@ static const struct cmdent ctab_mmb[] = {
     { "DCat",    VDFS_ACT_DCAT    },
     { "DDRive",  VDFS_ACT_DDRIVE  },
     { "DFree",   VDFS_ACT_DFREE   },
-    { "DIn",     VDFS_ACT_DIN     }
+    { "DIn",     VDFS_ACT_DIN     },
+    { "DOnboot", VDFS_ACT_DONBOOT }
 };
 
 static const struct cmdent ctab_enabled[] = {
