@@ -1,3 +1,4 @@
+#define _DEBUG
 /*
  * VDFS for B-EM
  * Steve Fosdick 2016-2020
@@ -121,6 +122,8 @@ struct vdfs_entry {
     char       acorn_fn[MAX_FILE_NAME+1];
     char       dfs_dir;
     uint16_t   attribs;
+    time_t     btime;
+    time_t     mtime;
     union {
         struct {
             uint32_t   load_addr;
@@ -562,13 +565,25 @@ static void adfs_hosterr(int errnum)
 
 static void scan_attr(vdfs_entry *ent)
 {
+#ifdef linux
+#define size_field stx.stx_size
+    struct statx stx;
+
+    if (!statx(AT_FDCWD, ent->host_path, AT_NO_AUTOMOUNT, STATX_BASIC_STATS|STATX_BTIME, &stx)) {
+        mode_t mode = stx.stx_mode;
+        ent->btime = stx.stx_btime.tv_sec;
+        ent->mtime = stx.stx_mtime.tv_sec;
+#else
+#define size_field stb.st_size
     struct stat stb;
 
-    if (stat(ent->host_path, &stb) == -1)
-        log_warn("vdfs: unable to stat '%s': %s\n", ent->host_path, strerror(errno));
-    else {
+    if (!stat(ent->host_path, &stb)) {
+        mode_t mode = stb.st_mode;
+        ent->btime = 0;
+        ent->mtime = stb.st_mtime;
+#endif
         ent->attribs |= ATTR_EXISTS;
-        if (S_ISDIR(stb.st_mode)) {
+        if (S_ISDIR(mode)) {
             if (!(ent->attribs & ATTR_IS_DIR)) {
                 ent->attribs |= ATTR_IS_DIR;
                 ent->u.dir.children = NULL;
@@ -587,30 +602,32 @@ static void scan_attr(vdfs_entry *ent)
             }
             ent->u.file.load_addr = 0;
             ent->u.file.exec_addr = 0;
-            ent->u.file.length = stb.st_size;
+            ent->u.file.length = size_field;
         }
 #ifdef WIN32
-        if (stb.st_mode & S_IRUSR)
+        if (mode & S_IRUSR)
             ent->attribs |= ATTR_USER_READ|ATTR_OTHR_READ;
-        if (stb.st_mode & S_IWUSR)
+        if (mode & S_IWUSR)
             ent->attribs |= ATTR_USER_WRITE|ATTR_OTHR_WRITE;
-        if (stb.st_mode & S_IXUSR)
+        if (mode & S_IXUSR)
             ent->attribs |= ATTR_USER_EXEC|ATTR_OTHR_EXEC;
 #else
-        if (stb.st_mode & S_IRUSR)
+        if (mode & S_IRUSR)
             ent->attribs |= ATTR_USER_READ;
-        if (stb.st_mode & S_IWUSR)
+        if (mode & S_IWUSR)
             ent->attribs |= ATTR_USER_WRITE;
-        if (stb.st_mode & S_IXUSR)
+        if (mode & S_IXUSR)
             ent->attribs |= ATTR_USER_EXEC;
-        if (stb.st_mode & (S_IRGRP|S_IROTH))
+        if (mode & (S_IRGRP|S_IROTH))
             ent->attribs |= ATTR_OTHR_READ;
-        if (stb.st_mode & (S_IWGRP|S_IWOTH))
+        if (mode & (S_IWGRP|S_IWOTH))
             ent->attribs |= ATTR_OTHR_WRITE;
-        if (stb.st_mode & (S_IXGRP|S_IXOTH))
+        if (mode & (S_IXGRP|S_IXOTH))
             ent->attribs |= ATTR_OTHR_EXEC;
 #endif
     }
+    else
+        log_warn("vdfs: unable to stat '%s': %s\n", ent->host_path, strerror(errno));
     log_debug("vdfs: scan_attr: host=%s, attr=%04X\n", ent->host_fn, ent->attribs);
 }
 
