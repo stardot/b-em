@@ -302,7 +302,7 @@ void ide_callback()
             case 0x91: /*Set parameters*/
                 ide.spt = ide.secount;
                 ide.hpc = ide.head + 1;
-                ide.atastat = 0x40;
+                ide.atastat = 0x50;
                 return;
             case 0xA1:
             case 0xE3:
