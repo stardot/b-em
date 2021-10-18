@@ -512,7 +512,30 @@ prtextws    =   &A8
             hexout  &0118
             hexout  &0117
             hexout  &0116
+            twospc
+            hexout  &011a
+            outchr  '-'
+            ldx     &011b
+            lda     month1,x
+            jsr     OSWRCH
+            lda     month2,x
+            jsr     OSWRCH
+            lda     month3,x
+            jsr     OSWRCH
+            outchr  '-'
+            hexout  &011c
+            hexout  &011d
+            outspc
+            hexout  &011e
+            outchr  ':'
+            hexout  &011f
+            outchr  ':'
+            hexout  &0120
             jmp     OSNEWL
+
+.month1     equs    "JFMAMJJASOND"
+.month2     equs    "aeapauuuecoe"
+.month3     equs    "nbrrynlgptvc"
 
 .opt_tab    equb    msg_off-banner
             equb    msg_load-banner

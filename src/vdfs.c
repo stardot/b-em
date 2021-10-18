@@ -3126,11 +3126,30 @@ static uint16_t gcopy_fn(vdfs_entry *ent, uint16_t mem_ptr)
     return mem_ptr;
 }
 
+static void write_bcd_byte(uint32_t maddr, unsigned value)
+{
+    value = ((value / 10) << 4) | (value % 10);
+    writemem(maddr, value);
+}
+
+static void write_bcd_word(uint32_t maddr, unsigned value)
+{
+    write_bcd_byte(maddr, value / 100);
+    write_bcd_byte(maddr+1, value % 100);
+}
+
 static void gcopy_attr(vdfs_entry *ent)
 {
     uint16_t mem_ptr = gcopy_fn(ent, CAT_TMP);
     writemem16(mem_ptr, ent->attribs);
     write_file_attr(mem_ptr, ent);
+    const struct tm *tp = localtime(&ent->mtime);
+    write_bcd_byte(mem_ptr+0x0e, tp->tm_mday);
+    writemem(mem_ptr+0x0f, tp->tm_mon);
+    write_bcd_word(mem_ptr+0x10, tp->tm_year + 1900);
+    write_bcd_byte(mem_ptr+0x12, tp->tm_hour);
+    write_bcd_byte(mem_ptr+0x13, tp->tm_min);
+    write_bcd_byte(mem_ptr+0x14, tp->tm_sec);
 }
 
 static void cat_next_tail(void)
