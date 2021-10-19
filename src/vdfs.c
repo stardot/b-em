@@ -1732,10 +1732,26 @@ static void write_file_attr(uint32_t maddr, vdfs_entry *ent)
     writemem32(maddr+0x0a, length);
 }
 
+static void osfile_write_date(uint32_t maddr, const struct tm *tp)
+{
+    unsigned year = 1900 + tp->tm_year - 1981;
+    writemem(maddr, ((year & 0x70) << 1) | tp->tm_mday);
+    writemem(maddr+1, ((year & 0x0f) << 4) | (tp->tm_mon + 1));
+}
+
+static void osfile_write_time(uint32_t maddr, const struct tm *tp)
+{
+    writemem(maddr, tp->tm_hour);
+    writemem(maddr+1, tp->tm_min);
+    writemem(maddr+2, tp->tm_sec);
+}
+
 static void osfile_attribs(uint32_t pb, vdfs_entry *ent)
 {
     write_file_attr(pb, ent);
-    writemem32(pb+0x0e, ent->attribs);
+    writemem(pb+0x0e, ent->attribs);
+    osfile_write_date(pb+0x0f, localtime(&ent->mtime));
+    writemem(pb+0x11, 0);
 }
 
 static uint32_t write_bytes(FILE *fp, uint32_t addr, size_t bytes)
@@ -1890,6 +1906,26 @@ static void osfile_get_attr(uint32_t pb, const char *path)
     if ((ent = find_entry(path, &res, cur_dir, dfs_dir)) && ent->attribs & ATTR_EXISTS) {
         scan_entry(ent);
         osfile_attribs(pb, ent);
+        a = (ent->attribs & ATTR_IS_DIR) ? 2 : 1;
+    }
+    else
+        a = 0;
+}
+
+static void osfile_get_extattr(uint32_t pb, const char *path)
+{
+    vdfs_entry *ent;
+    vdfs_findres res;
+
+    if ((ent = find_entry(path, &res, cur_dir, dfs_dir)) && ent->attribs & ATTR_EXISTS) {
+        scan_entry(ent);
+        writemem32(pb+2, 0);
+        const struct tm *tp= localtime(&ent->mtime);
+        osfile_write_time(pb+6, tp);
+        tp = localtime(&ent->btime);
+        osfile_write_date(pb+9, tp);
+        osfile_write_time(pb+11, tp);
+        writemem32(pb+14, 0);
         a = (ent->attribs & ATTR_IS_DIR) ? 2 : 1;
     }
     else
@@ -2066,7 +2102,7 @@ static void osfile(void)
     uint32_t pb = (y << 8) | x;
     char path[MAX_ACORN_PATH];
 
-    if (a <= 0x08 || a == 0xff) {
+    if (a <= 0x08 || a == 0xff || a == 0xfd) {
         log_debug("vdfs: osfile(A=%02X, X=%02X, Y=%02X)", a, x, y);
         if (check_valid_dir(cur_dir, "current")) {
             if (parse_name(path, sizeof path, readmem16(pb))) {
@@ -2097,6 +2133,9 @@ static void osfile(void)
                         break;
                     case 0x08:
                         osfile_cdir(path);
+                        break;
+                    case 0xfd:
+                        osfile_get_extattr(pb, path);
                         break;
                     case 0xff:  // load file.
                         osfile_load(pb, path);
