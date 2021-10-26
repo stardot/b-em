@@ -158,7 +158,7 @@ void ide_write(uint16_t addr, uint8_t val)
                         ide_count = 200;
                         return;
                 }
-                log_debug("Bad IDE command %02X\n", val);
+                log_fatal("ide: Bad IDE command %02X", val);
                 exit(-1);
                 return;
         }
