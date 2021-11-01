@@ -3550,30 +3550,16 @@ void x86_exec()
                                 tubecycles-=29;
                                 break;
                                 case 0x38: /*IDIV AL,b*/
-                                tempws=(int)AX;
-                                if (temp)
-                                {
-                                        tempw2=tempws%(int)((signed char)temp);
-/*                                        if (!tempw)
-                                        {
-                                                writememwl((ss+SP)-2,flags|0xF000);
-                                                writememwl((ss+SP)-4,cs>>4);
-                                                writememwl((ss+SP)-6,pc);
-                                                SP-=6;
-                                                flags&=~I_FLAG;
-                                                pc=readmemwl(0);
-                                                cs=readmemwl(2)<<4;
-                                                printf("Div by zero %04X:%04X\n",cs>>4,pc);
-                                        }
-                                        else
-                                        {*/
-                                                AH=tempw2&0xFF;
-                                                tempws/=(int)((signed char)temp);
-                                                AL=tempws&0xFF;
-//                                        }
-                                }
-                                else
-                                {
+                                    if (temp)
+                                    {
+                                        tempws = (int)AL % (int)(signed char)temp;
+                                        if (AL & 0x80)
+                                            tempws = -tempws;
+                                        AL = ((int)(int8_t)AL / (int)(int8_t)temp) & 0xff;
+                                        AH = tempws & 0xff;
+                                    }
+                                    else
+                                    {
                                         printf("IDIVb BY 0 %04X:%04X\n",cs>>4,pc);
                                                 writememwl(ss,(SP-2)&0xFFFF,flags|0xF000);
                                                 writememwl(ss,(SP-4)&0xFFFF,CS);
