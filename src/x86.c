@@ -1146,6 +1146,17 @@ static void rep(int fv)
         if (changeds) ds=oldds;
 }
 
+static void x86_intcall(unsigned offset)
+{
+    writememwl(ss, (SP-2) & 0xFFFF, flags|0xF000);
+    writememwl(ss, (SP-4) & 0xFFFF, CS);
+    writememwl(ss, (SP-6) & 0xFFFF, pc);
+    SP-=6;
+    flags &= ~I_FLAG;
+    pc = readmemwl(0, offset);
+    loadcs(readmemwl(0, offset+2));
+}
+
 static int inhlt=0;
 static uint16_t lastpc,lastcs;
 static int skipnextprint=0;
@@ -3550,28 +3561,39 @@ void x86_exec()
                                 tubecycles-=29;
                                 break;
                                 case 0x38: /*IDIV AL,b*/
-                                    if (temp)
-                                    {
-                                        tempws = (int)AL % (int)(signed char)temp;
-                                        if (AL & 0x80)
-                                            tempws = -tempws;
-                                        AL = ((int)(int8_t)AL / (int)(int8_t)temp) & 0xff;
-                                        AH = tempws & 0xff;
+                                    if (!temp) {
+                                        log_debug("x86: DIVb division by zero at %04X:%04X", cs>>4, pc);
+                                        x86_intcall(0);
                                     }
-                                    else
-                                    {
-                                        printf("IDIVb BY 0 %04X:%04X\n",cs>>4,pc);
-                                                writememwl(ss,(SP-2)&0xFFFF,flags|0xF000);
-                                                writememwl(ss,(SP-4)&0xFFFF,CS);
-                                                writememwl(ss,(SP-6)&0xFFFF,pc);
-                                                SP-=6;
-                                                flags&=~I_FLAG;
-                                                pc=readmemwl(0,0);
-                                                loadcs(readmemwl(0,2));
-//                                                cs=loadcs(CS);
-//                                                cs=CS<<4;
-//                                        printf("Div by zero %04X:%04X %02X %02X\n",cs>>4,pc,0xf6,0x38);
-                                }
+                                    else {
+                                        // Dividend is 16 bits.
+                                        uint16_t s1 = AX;
+                                        int sign1 = (s1 & 0x8000) != 0;
+                                        // Divisor is 8 bits.
+                                        uint16_t s2 = temp;
+                                        int sign2 = (s2 & 0x80) != 0;
+                                        // Make divisor and dividend both positive
+                                        if (sign1)
+                                            s1 = ((uint16_t)~s1 + 1) & 0xffffu;
+                                        if (sign2)
+                                            s2 = ((uint16_t)~(s2 | 0xff00) + 1) & 0xffffu;
+                                        uint16_t d1 = s1 / s2;
+                                        uint16_t d2 = s1 % s2;
+                                        if (d1 & 0xFF00) {
+                                            log_debug("x86: IDIV8 overflow at %04X:%04X, dividend(AX)=%04X, divisor=%02X", cs>>4, pc, AX, temp);
+                                            x86_intcall(0);
+                                        }
+                                        else {
+                                            // Correct the sign of the quotient.
+                                            if (sign1 ^ sign2)
+                                                d1 = (~d1 + 1) & 0xff;
+                                            // Correct the sign of the remainder.
+                                            if (sign1)
+                                                d2 = (~d2 + 1) & 0xff;
+                                            AH = d2;
+                                            AL = d1;
+                                        }
+                                    }
                                 tubecycles-=44;
                                 break;
 
