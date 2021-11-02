@@ -1148,6 +1148,8 @@ static void rep(int fv)
 
 static void x86_intcall(unsigned offset)
 {
+    if (ssegs)
+        ss=oldss;
     writememwl(ss, (SP-2) & 0xFFFF, flags|0xF000);
     writememwl(ss, (SP-4) & 0xFFFF, CS);
     writememwl(ss, (SP-6) & 0xFFFF, pc);
@@ -1341,27 +1343,13 @@ void x86_exec()
                                 break;
 
                                 case 0xFF: /*Invalid - Windows 3.1 syscall trap?*/
-                                pc-=2;
-                                        if (ssegs) ss=oldss;
-                                        writememwl(ss,((SP-2)&0xFFFF),flags|0xF000);
-                                        writememwl(ss,((SP-4)&0xFFFF),CS);
-                                        writememwl(ss,((SP-6)&0xFFFF),pc);
-                                        SP-=6;
-                                        addr=6<<2;
-//                                        flags&=~I_FLAG;
-                                        pc=readmemwl(0,addr);
-                                        loadcs(readmemwl(0,addr+2));
-                                        /*if (!pc && !cs)
-                                        {
-                                                printf("Bad int %02X %04X:%04X\n",temp,oldcs,oldpc);
-                                                x86dumpregs();
-                                                exit(-1);
-                                        }*/
-                                tubecycles-=70;
-                                break;
+                                    log_debug("x86: invalid opcode 0F FF at %04X:%04X", cs>>4, pc);
+                                    pc-=2;
+                                    x86_intcall(6<<2);
+                                    tubecycles-=70;
+                                    break;
 
                                 default:
-                                break;
 //                                printf("Bad 0F opcode %02X\n",temp);
 //                                pc-=2;
 //                                x86dumpregs();
@@ -2801,17 +2789,9 @@ void x86_exec()
                         tubecycles-=22;
                         break;
                         case 0xCC: /*INT 3*/
-                                if (ssegs) ss=oldss;
-                                writememwl(ss,((SP-2)&0xFFFF),flags|0xF000);
-                                writememwl(ss,((SP-4)&0xFFFF),CS);
-                                writememwl(ss,((SP-6)&0xFFFF),pc);
-                                SP-=6;
-                                addr=3<<2;
-                                flags&=~I_FLAG;
-                                pc=readmemwl(0,addr);
-                                loadcs(readmemwl(0,addr+2));
-                        tubecycles-=45;
-                        break;
+                            x86_intcall(3<<2);
+                            tubecycles-=45;
+                            break;
                         case 0xCD: /*INT*/
                         lastpc=pc;
                         lastcs=CS;
@@ -2861,24 +2841,9 @@ void x86_exec()
                         }
                         else
                         {*/
-                                        if (ssegs) ss=oldss;
-                                        writememwl(ss,((SP-2)&0xFFFF),flags|0xF000);
-                                        writememwl(ss,((SP-4)&0xFFFF),CS);
-                                        writememwl(ss,((SP-6)&0xFFFF),pc);
-                                        SP-=6;
-                                        addr=temp<<2;
-//                                        flags&=~I_FLAG;
-                                        pc=readmemwl(0,addr);
-                                        loadcs(readmemwl(0,addr+2));
-/*                                        if (!pc && !cs)
-                                        {
-                                                printf("Bad int %02X %04X:%04X\n",temp,oldcs,oldpc);
-                                                x86dumpregs();
-                                                exit(-1);
-                                        }*/
-//                        }
-                        tubecycles-=47;
-                        break;
+                            x86_intcall(temp<<2);
+                            tubecycles-=47;
+                            break;
                         case 0xCF: /*IRET*/
 //                        if (inint) printf("IRET %04X %04X:%04X\n",flags,cs>>4,pc,SP);
 /*                        if (x86output)
@@ -3521,42 +3486,14 @@ void x86_exec()
                                 tempw=AX;
                                 if (temp)
                                 {
-                                        tempw2=tempw%temp;
-/*                                        if (!tempw)
-                                        {
-                                                writememwl((ss+SP)-2,flags|0xF000);
-                                                writememwl((ss+SP)-4,cs>>4);
-                                                writememwl((ss+SP)-6,pc);
-                                                SP-=6;
-                                                flags&=~I_FLAG;
-                                                pc=readmemwl(0);
-                                                cs=readmemwl(2)<<4;
-                                                printf("Div by zero %04X:%04X\n",cs>>4,pc);
-//                                                x86dumpregs();
-//                                                exit(-1);
-                                        }
-                                        else
-                                        {*/
-                                                AH=tempw2;
-                                                tempw/=temp;
-                                                AL=tempw&0xFF;
-//                                        }
+                                    tempw2=tempw%temp;
+                                    AH=tempw2;
+                                    tempw/=temp;
+                                    AL=tempw&0xFF;
                                 }
-                                else
-                                {
-                                        printf("DIVb BY 0 %04X:%04X\n",cs>>4,pc);
-                                                writememwl(ss,(SP-2)&0xFFFF,flags|0xF000);
-                                                writememwl(ss,(SP-4)&0xFFFF,CS);
-                                                writememwl(ss,(SP-6)&0xFFFF,pc);
-                                                SP-=6;
-                                                flags&=~I_FLAG;
-                                                pc=readmemwl(0,0);
-                                                loadcs(readmemwl(0,2));
-//                                                cs=loadcs(CS);
-//                                                cs=CS<<4;
-//                                        printf("Div by zero %04X:%04X %02X %02X\n",cs>>4,pc,0xf6,0x30);
-//                                        x86dumpregs();
-//                                        exit(-1);
+                                else {
+                                    log_debug("x86: DIVb division by zero at %04X:%04X\n",cs>>4, pc);
+                                    x86_intcall(0);
                                 }
                                 tubecycles-=29;
                                 break;
@@ -3665,20 +3602,8 @@ void x86_exec()
                                 }
                                 else
                                 {
-//                                        printf("DIVw BY 0 %04X:%04X\n",cs>>4,pc);
-//                                        x86dumpregs();
-//                                        exit(-1);
-//                                        printf("%04X:%04X\n",cs>>4,pc);
-                                                writememwl(ss,(SP-2)&0xFFFF,flags|0xF000);
-                                                writememwl(ss,(SP-4)&0xFFFF,CS);
-                                                writememwl(ss,(SP-6)&0xFFFF,pc);
-                                                SP-=6;
-                                                flags&=~I_FLAG;
-                                                pc=readmemwl(0,0);
-                                                loadcs(readmemwl(0,2));
-//                                                cs=loadcs(CS);
-//                                                cs=CS<<4;
-//                                        printf("Div by zero %04X:%04X %02X %02X 1\n",cs>>4,pc,0xf7,0x30);
+                                    log_debug("x86: DIVw division by zero at %04X:%04X", cs>>4, pc);
+                                    x86_intcall(0);
                                 }
                                 tubecycles-=38;
                                 break;
@@ -3695,18 +3620,8 @@ void x86_exec()
                                 }
                                 else
                                 {
-//                                        printf("IDIVw BY 0 %04X:%04X\n",cs>>4,pc);
-//                                        printf("%04X:%04X\n",cs>>4,pc);
-                                                writememwl(ss,(SP-2)&0xFFFF,flags|0xF000);
-                                                writememwl(ss,(SP-4)&0xFFFF,CS);
-                                                writememwl(ss,(SP-6)&0xFFFF,pc);
-                                                SP-=6;
-                                                flags&=~I_FLAG;
-                                                pc=readmemwl(0,0);
-                                                loadcs(readmemwl(0,2));
-//                                                cs=loadcs(CS);
-//                                                cs=CS<<4;
-//                                        printf("Div by zero %04X:%04X %02X %02X 1\n",cs>>4,pc,0xf7,0x38);
+                                    log_debug("x86: IDIVw division by zero at %04X:%04X", cs>>4, pc);
+                                    x86_intcall(0);
                                 }
                                 tubecycles-=53;
                                 break;
