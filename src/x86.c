@@ -230,14 +230,50 @@ static uint32_t x86_dbg_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, 
 
 static uint32_t dbg_parse_addr(cpu_debug_t *cpu, const char *arg, const char **end)
 {
-    uint32_t a = strtoul(arg, (char **)end, 16);
-    const char *ptr = *end;
-    if (ptr > arg && *ptr++ == ':') {
-        uint32_t b = strtoul(ptr, (char **)end, 16);
-        if (*end > ptr)
-            a = (a << 4) + b;
+    /* Check for a segment register name. */
+    static const char names[] = "CcDdSsEe";
+    const char *sname = strchr(names, *arg);
+    if (sname && (arg[1] == 'S' || arg[1] == 's')) {
+        /* Found a segment register name so this will always set the
+         * segment.  If no number follows the offset will be zero
+         */
+        uint32_t seg = 0, off = 0;
+        switch((sname - names) >> 1) {
+            case 0:
+                seg = CS;
+                break;
+            case 1:
+                seg = DS;
+                break;
+            case 2:
+                seg = SS;
+                break;
+            case 3:
+                seg = ES;
+                break;
+        }
+        arg += 2;
+        if (*arg == ':')
+            off = strtoul(++arg, (char **)end, 16);
+        return (seg << 4) + off;
     }
-    return a;
+    else {
+        /* No segment register name so convert a hex number.  We don't
+         * know yet if this is the segment or offset.
+         */
+        uint32_t a = strtoul(arg, (char **)end, 16);
+        const char *ptr = *end;
+        if (ptr > arg && *ptr++ == ':') {
+            /* As there is a second number then the first must be the
+             * segment and this number is the offset.  If this were
+             * missing we would default the segment to zero.
+             */
+            uint32_t b = strtoul(ptr, (char **)end, 16);
+            if (*end > ptr)
+                a = (a << 4) + b;
+        }
+        return a;
+    }
 }
 
 // Get a register - which is the index into the names above
