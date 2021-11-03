@@ -1,3 +1,4 @@
+#define _DEBUG
 /*B-em v2.2 by Tom Walker
   80186 emulation
   Originally from PCem
@@ -193,7 +194,7 @@ static size_t dbg_print_addr(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
 {
     //TODO: DB: symbol lookup
     if (bufsize >= 9) {
-        uint32_t msw = addr & 0x0fff0000;
+        uint32_t msw = (addr & 0x0fff0000) >> 4;
         uint32_t lsw = addr & 0x0000ffff;
         size_t len = debug_print_16bit(msw, buf, bufsize);
         buf[len-1] = ':';
@@ -234,7 +235,7 @@ static uint32_t dbg_parse_addr(cpu_debug_t *cpu, const char *arg, const char **e
     if (ptr > arg && *ptr++ == ':') {
         uint32_t b = strtoul(ptr, (char **)end, 16);
         if (*end > ptr)
-            a = (a << 4) | b;
+            a = (a << 4) + b;
     }
     return a;
 }
