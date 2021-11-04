@@ -1,4 +1,3 @@
-#define _DEBUG
 /*B-em v2.2 by Tom Walker
   80186 emulation
   Originally from PCem
@@ -3646,6 +3645,7 @@ void x86_exec()
                                 break;
                                 case 0x38: /*IDIV AX,w*/
                                 tempws=(int)((DX<<16)|AX);
+                                log_debug("IDIV16 dividend=%d, divisor=%u", tempws, tempw);
 //                                printf("IDIV %i %i ",tempws,tempw);
                                 if (tempw)
                                 {
@@ -3654,10 +3654,16 @@ void x86_exec()
                                                 DX=tempw2;
                                                 tempws/=(int)((signed short)tempw);
                                                 AX=tempws&0xFFFF;
+                                                if ((!(tempws & 0x8000) && (tempws & 0xffff0000)) || ((tempws & 0x8000) && (tempws & 0xffff0000) != 0xffff0000)) {
+                                                    log_debug("x86: IDIV16 overflow at %04X:%04X", cs>>4, pc);
+                                                    x86_intcall(0);
+                                                }
                                 }
                                 else
                                 {
                                     log_debug("x86: IDIVw division by zero at %04X:%04X", cs>>4, pc);
+                                    extern int debug_step;
+                                    debug_step = 1;
                                     x86_intcall(0);
                                 }
                                 tubecycles-=53;
