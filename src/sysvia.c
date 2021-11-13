@@ -10,6 +10,7 @@
 #include "via.h"
 #include "sysvia.h"
 #include "sn76489.h"
+#include "speech.h"
 #include "video.h"
 
 VIA sysvia;
@@ -80,6 +81,9 @@ static void sysvia_update_sdb()
         key_scan((sdbval >> 4) & 7, sdbval & 0xF);
         if (!(IC32 & 8) && !key_is_down())
             sdbval &= 0x7f;
+
+   if (!(IC32 & 0x02))
+        sdbval &= speech_read();
 }
 
 static void sysvia_write_IC32(uint8_t val)
@@ -96,7 +100,10 @@ static void sysvia_write_IC32(uint8_t val)
         if (!(IC32 & 1) && (oldIC32 & 1))
            sn_write(sdbval);
 
-        scrsize = ((IC32 & 0x10) ? 2 : 0) | ((IC32 & 0x20) ? 1 : 0);
+    if (!(IC32 & 4) && (oldIC32 & 4))
+        speech_write(sdbval);
+
+    scrsize = ((IC32 & 0x10) ? 2 : 0) | ((IC32 & 0x20) ? 1 : 0);
 
     log_debug("sysvia: IC32=%02X", IC32);
     led_update(LED_CAPS_LOCK, !(IC32 & 0x40), 0);
@@ -147,7 +154,7 @@ uint8_t sysvia_read_portB()
                 if (joybutton[0]) temp &= ~0x10;
                 if (joybutton[1]) temp &= ~0x20;
         }
-        return temp;
+        return temp & speech_status;
 }
 
 void sysvia_write(uint16_t addr, uint8_t val)

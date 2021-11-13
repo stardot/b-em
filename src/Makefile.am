@@ -98,6 +98,7 @@ b_em_SOURCES = \
 	sdf-geo.c \
 	serial.c \
 	sn76489.c \
+    speech.c \
 	sound.c \
 	sysacia.c \
 	sysvia.c \
