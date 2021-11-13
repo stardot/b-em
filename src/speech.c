@@ -1,3 +1,18 @@
+/*
+ * Synthetic Speech for B-Em.
+ *
+ * This modules emulates a TMS5220 speech processor and attached
+ * Serial ROM (PHROM) with the contents of the ROM supplied in the
+ * file phrom_a.rom
+ *
+ * It is an adpatation of the TMS5220 emulation from MAME.
+ *
+ * Copyright Frank Palazzolo, Neill Corlett and Aaron Giles.
+ * Adaptation by Steve Fosdick 2021.
+ *
+ * BSD 3-clause license.
+ */
+
 #define _DEBUG
 #define DEBUG_FRAME
 #include "speech.h"
