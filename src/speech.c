@@ -662,7 +662,8 @@ static void speech_process(int16_t *buffer, unsigned int size)
 
                     speech_TALKD = speech_TALK; // TALKD is latched from TALK
                     speech_update_fifo_status_and_ints(); // to trigger an interrupt if talk_status has changed
-                    if ((!speech_TALK) && speech_SPEN) speech_TALK = true; // TALK is only activated if it wasn't already active, if SPEN is active, and if we're in RESETL4 (which we are).
+                    if ((!speech_TALK) && speech_SPEN)
+                        speech_TALK = true; // TALK is only activated if it wasn't already active, if SPEN is active, and if we're in RESETL4 (which we are).
 
                     log_debug("speech: RESETL4, status updated: IP=%d, PC=%d, subcycle=%d, SPEN=%d, TALK=%d, TALKD=%d", speech_IP, speech_PC, speech_subcycle, speech_SPEN, speech_TALK, speech_TALKD);
                 }
@@ -904,6 +905,7 @@ static void speech_command(uint8_t cmd)
                 speech_phrom_addr = (speech_phrom_addr >> 4) | ((cmd & 0xf) << 16);
                 speech_phrom_bits = 0;
                 log_debug("speech: phrom_address=%04X", speech_phrom_addr);
+                speech_RDB_flag = false;
             }
             else
                 log_debug("speech: Load Address command received during TALK state, ignoring!\n");
@@ -912,9 +914,9 @@ static void speech_command(uint8_t cmd)
         case 0x5: /* speak */
             speech_phrom_addr &= 0x3fff;
             log_debug("speech: Speak (VSM) command received, begin at adress %04X", speech_phrom_addr);
-            speech_SPEN = 1;
+            speech_SPEN = true;
 #ifdef FAST_START_HACK
-            speech_TALK = 1;
+            speech_TALK = true;
 #endif
             speech_DDIS = false; // speak using VSM
             speech_zpar = true; // zero all the parameters
@@ -934,6 +936,7 @@ static void speech_command(uint8_t cmd)
                 speech_new_frame_k_idx[i] = 0xF;
             for (int i = 7; i < speech_coeff.num_k; i++)
                 speech_new_frame_k_idx[i] = 0x7;
+            speech_RDB_flag = false;
             break;
 
         case 0x6: /* speak external */
@@ -977,15 +980,18 @@ static void speech_command(uint8_t cmd)
 
 uint8_t speech_read(void)
 {
-    if (speech_RDB_flag)
+    if (speech_RDB_flag) {
+        log_debug("speech: read returning byte %02X from PHROM", speech_phrom_byte);
         return speech_phrom_byte;
+    }
     unsigned flags = 0;
     if (speech_SPEN || speech_TALKD)
         flags |= 0x80;
     if (speech_buffer_low)
         flags |= 0x40;
     if (speech_buffer_empty)
-        flags &= 0x20;
+        flags |= 0x20;
+    log_debug("speech: read returning flags %02X", flags);
     return flags;
 }
 
