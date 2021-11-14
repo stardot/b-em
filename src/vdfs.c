@@ -1833,7 +1833,6 @@ static void osfile_write(uint32_t pb, const char *path, uint32_t (*callback)(FIL
             adfs_error(err_nomem);
             return;
         }
-
         if ((fp = fopen(ent->host_path, "wb"))) {
             ent->attribs = (ent->attribs & ~ATTR_IS_DIR) | ATTR_EXISTS;
             start_addr = readmem32(pb+0x0a);
@@ -1847,8 +1846,12 @@ static void osfile_write(uint32_t pb, const char *path, uint32_t (*callback)(FIL
             writemem32(pb+0x0a, ent->u.file.length);
             writemem32(pb+0x0e, ent->attribs);
             a = 1;
-        } else
-            log_warn("vdfs: unable to create file '%s': %s\n", ent->host_fn, strerror(errno));
+        }
+        else {
+            int err = errno;
+            log_warn("vdfs: unable to create file '%s': %s\n", ent->host_fn, strerror(err));
+            adfs_hosterr(err);
+        }
     }
 }
 
