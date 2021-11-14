@@ -3552,20 +3552,18 @@ void x86_exec()
                                             s2 = ((uint16_t)~(s2 | 0xff00) + 1) & 0xffffu;
                                         uint16_t d1 = s1 / s2;
                                         uint16_t d2 = s1 % s2;
-                                        if (d1 & 0xFF00) {
+                                        if (d1 > (127 + (sign1 ^ sign2))) {
                                             log_debug("x86: IDIV8 overflow at %04X:%04X, dividend(AX)=%04X, divisor=%02X", cs>>4, pc, AX, temp);
                                             x86_intcall(0);
                                         }
-                                        else {
-                                            // Correct the sign of the quotient.
-                                            if (sign1 ^ sign2)
-                                                d1 = (~d1 + 1) & 0xff;
-                                            // Correct the sign of the remainder.
-                                            if (sign1)
-                                                d2 = (~d2 + 1) & 0xff;
-                                            AH = d2;
-                                            AL = d1;
-                                        }
+                                        // Correct the sign of the quotient.
+                                        if (sign1 ^ sign2)
+                                            d1 = (~d1 + 1) & 0xff;
+                                        // Correct the sign of the remainder.
+                                        if (sign1)
+                                            d2 = (~d2 + 1) & 0xff;
+                                        AH = d2;
+                                        AL = d1;
                                     }
                                 tubecycles-=44;
                                 break;
@@ -3644,30 +3642,44 @@ void x86_exec()
                                 tubecycles-=38;
                                 break;
                                 case 0x38: /*IDIV AX,w*/
-                                tempws=(int)((DX<<16)|AX);
-                                log_debug("IDIV16 dividend=%d, divisor=%u", tempws, tempw);
-//                                printf("IDIV %i %i ",tempws,tempw);
-                                if (tempw)
-                                {
-                                        tempw2=tempws%(int)((signed short)tempw);
-//                                        printf("%04X ",tempw2);
-                                                DX=tempw2;
-                                                tempws/=(int)((signed short)tempw);
-                                                AX=tempws&0xFFFF;
-                                                if ((!(tempws & 0x8000) && (tempws & 0xffff0000)) || ((tempws & 0x8000) && (tempws & 0xffff0000) != 0xffff0000)) {
-                                                    log_debug("x86: IDIV16 overflow at %04X:%04X", cs>>4, pc);
-                                                    x86_intcall(0);
-                                                }
-                                }
-                                else
-                                {
-                                    log_debug("x86: IDIVw division by zero at %04X:%04X", cs>>4, pc);
-                                    extern int debug_step;
-                                    debug_step = 1;
-                                    x86_intcall(0);
-                                }
-                                tubecycles-=53;
-                                break;
+                                    if (!tempw) {
+                                        log_debug("x86: DIVw division by zero at %04X:%04X", cs>>4, pc);
+                                        x86_intcall(0);
+                                    }
+                                    else {
+                                        // Dividend is 32 bits
+                                        uint32_t s1 = (DX<<16)|AX;
+                                        int sign1 = (s1 & 0x80000000u) != 0;
+                                        // Divisor is 16 bits
+                                        uint32_t s2 = tempw;
+                                        int sign2 = (s2 & 0x8000u) != 0;
+                                        // Sign-extend divisor to 32 bits
+                                        s2 = sign2 ? (s2 | 0xffff0000u) : s2;
+                                        // Make divisor and dividend both positive
+                                        if (sign1)
+                                            s1 = ~s1 + 1;
+                                        if (sign2)
+                                            s2 = ~s2 + 1;
+                                        // Calculate the quotient and remainder
+                                        uint32_t d1 = s1 / s2;
+                                        uint32_t d2 = s1 % s2;
+                                        // Check for overflow in the 16-bit quotient (-32678 to 32767)
+                                        if (d1 > (32767 + (sign1 ^ sign2))) {
+                                            log_debug("x86: IDIV16 overflow at %04X:%04X, dividend(DX:AX)=%04X%04X, divisor=%04X", cs>>4, pc, DX, AX, tempw);
+                                            x86_intcall(0);
+                                        }
+                                        // Correct the sign of the 16-bit quotient
+                                        if (sign1 ^ sign2)
+                                            d1 = (~d1 + 1) & 0xffff;
+                                        // Correct the sign of the 16-bit remainder
+                                        if (sign1)
+                                            d2 = (~d2 + 1) & 0xffff;
+                                        // Put results back in the registers.
+                                        AX = d1;
+                                        DX = d2;
+                                    }
+                                    tubecycles-=53;
+                                    break;
 
                                 default:
                                 printf("Bad F7 opcode %02X\n",rmdat&0x38);
