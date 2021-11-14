@@ -1,0 +1,85 @@
+   10 MODE0
+   20 DIM code% 100
+   30 DIMR% 2
+   40 P%=code%
+   50 [
+   60 .except
+   70 ADD SP,6
+   80 MOV AX,&FFFF
+   90 RETF
+  100 .setup
+  110 PUSH ES
+  120 PUSH AX
+  130 MOV AX,0
+  140 MOV ES,AX
+  150 MOV WORD PTR ES:[0],except
+  160 MOV WORD PTR ES:[2],CS
+  170 POP AX
+  180 POP ES
+  190 RET
+  200 .test8
+  210 CALL setup
+  220 IDIV BL
+  230 RETF
+  240 .test16
+  250 CALL setup
+  260 IDIV BX
+  270 MOV WORD PTR [R%],DX
+  280 RETF
+  290 ]
+  300 INPUT'"Machine under test";A$
+  310 CLS
+  320 PRINTTAB(2,1);"IDIV8 TEST: ";A$
+  330 PROCtest(2,3,14,3)
+  340 PROCtest(2,8,14,-3)
+  350 PROCtest(2,13,-14,3)
+  360 PROCtest(2,18,-14,-3)
+  370 PROCtest(30,3,1400,127)
+  380 PROCtest(30,8,1400,-127)
+  390 PROCtest(30,13,-1400,127)
+  400 PROCtest(30,18,-1400,-127)
+  410 PROCtest(56,3,16447,-128)
+  420 PROCtest(56,8,16256,127)
+  430 PROCtest(56,13,3,0)
+  440 PROCtest(56,18,3000,3)
+  450 PROCready("16-bit tests")
+  460 PRINTTAB(2,1);"IDIV16 TEST: ";A$
+  470 PROCtest16(2,3,1400,300)
+  480 PROCtest16(2,8,1400,-300)
+  490 PROCtest16(2,13,-1400,300)
+  500 PROCtest16(2,18,-1400,-300)
+  510 PROCtest16(30,3,467376,300)
+  520 PROCtest16(30,8,467376,-300)
+  530 PROCtest16(30,13,-467376,300)
+  540 PROCtest16(30,18,-467376,-300)
+  550 PROCtest16(56,3,-265453568,-8101)
+  560 PROCtest16(56,8,&C0000000,&FFFF8000)
+  570 PROCtest16(56,13,467376,0)
+  580 PROCtest16(56,18,467376,3)
+  590 PRINTTAB(0,23);
+  600 END
+  610 DEFPROCready(P$)
+  620 PRINTTAB(0,23);"Press any key for ";P$;"...";
+  630 G%=GET
+  640 CLS
+  650 ENDPROC
+  660 DEFPROCtest(X%,Y%,A%,B%)
+  670 Z%=USR(test8) AND &FFFF
+  680 PROCresult(Z%,Z% AND &FF,(Z% DIV 256) AND &FF)
+  690 ENDPROC
+  700 DEFPROCtest16(X%,Y%,A%,B%)
+  710 D%=(A% AND &FFFF0000) DIV 65536
+  720 Z%=USR(test16) AND &FFFF
+  730 PROCresult(Z%,Z%,!R%)
+  740 ENDPROC
+  750 DEFPROCresult(Z%,Q%,R%)
+  760 PRINTTAB(X%,Y%);"Dividend  = "~A%
+  770 PRINTTAB(X%,Y%+1);"Divisor   = "~B%
+  780 IFZ%=&FFFFTHENPROCexcept ENDPROC
+  790 PRINTTAB(X%,Y%+2);"Quotient  = "~Q%
+  800 PRINTTAB(X%,Y%+3);"Remainder = "~R%
+  810 ENDPROC
+  820 DEFPROCexcept
+  830 PRINTTAB(X%,Y%+2);"Quotient  = EXCEPTION"
+  840 PRINTTAB(X%,Y%+3);"Remainder = EXCEPTION"
+  850 ENDPROC
