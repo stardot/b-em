@@ -150,6 +150,7 @@ static vdfs_entry *cat_dir;
 static unsigned   scan_seq;
 static char dfs_dir;
 static char dfs_lib;
+static uint8_t vdfs_opt1;
 
 typedef struct vdfs_findres {
     struct vdfs_entry *parent;
@@ -228,7 +229,7 @@ enum vdfs_action {
     VDFS_ROM_CLOSEALL,
     VDFS_ROM_BUILD,
     VDFS_ROM_APPEND,
-    VDFS_ROM_CLOSE_CMD,
+    VDFS_ROM_OPT1,
     VDFS_ACT_NOP,
     VDFS_ACT_QUIT,
     VDFS_ACT_SRLOAD,
@@ -1805,6 +1806,59 @@ static uint32_t cfile_callback(FILE *fp, uint32_t start_addr, size_t bytes)
     return 0;
 }
 
+#define CAT_TMP 0x100
+static vdfs_entry *cat_ent;
+static int cat_dfs;
+
+static uint16_t gcopy_fn(vdfs_entry *ent, uint16_t mem_ptr)
+{
+    uint16_t mem_end = mem_ptr + MAX_FILE_NAME+2;
+    const char *ptr = ent->acorn_fn;
+    int ch;
+
+    if (ent->dfs_dir == cat_dfs) {
+        log_debug("vdfs: gcopy_fn, same DFS directory file");
+        writemem(mem_ptr++, ' ');
+        writemem(mem_ptr++, ' ');
+    }
+    else {
+        log_debug("vdfs: gcopy_fn, different DFS directory file");
+        writemem(mem_ptr++, ent->dfs_dir);
+        writemem(mem_ptr++, '.');
+    }
+    while (mem_ptr < mem_end && (ch = *ptr++))
+        writemem(mem_ptr++, ch);
+    while (mem_ptr < mem_end)
+        writemem(mem_ptr++, ' ');
+    return mem_ptr;
+}
+
+static void write_bcd_byte(uint32_t maddr, unsigned value)
+{
+    value = ((value / 10) << 4) | (value % 10);
+    writemem(maddr, value);
+}
+
+static void write_bcd_word(uint32_t maddr, unsigned value)
+{
+    write_bcd_byte(maddr, value / 100);
+    write_bcd_byte(maddr+1, value % 100);
+}
+
+static void gcopy_attr(vdfs_entry *ent)
+{
+    uint16_t mem_ptr = gcopy_fn(ent, CAT_TMP);
+    writemem16(mem_ptr, ent->attribs);
+    write_file_attr(mem_ptr, ent);
+    const struct tm *tp = localtime(&ent->mtime);
+    write_bcd_byte(mem_ptr+0x0e, tp->tm_mday);
+    writemem(mem_ptr+0x0f, tp->tm_mon);
+    write_bcd_word(mem_ptr+0x10, tp->tm_year + 1900);
+    write_bcd_byte(mem_ptr+0x12, tp->tm_hour);
+    write_bcd_byte(mem_ptr+0x13, tp->tm_min);
+    write_bcd_byte(mem_ptr+0x14, tp->tm_sec);
+}
+
 static void osfile_write(uint32_t pb, const char *path, uint32_t (*callback)(FILE *fp, uint32_t addr, size_t bytes))
 {
     vdfs_entry *ent;
@@ -1849,6 +1903,10 @@ static void osfile_write(uint32_t pb, const char *path, uint32_t (*callback)(FIL
             writemem32(pb+0x0a, ent->u.file.length);
             writemem32(pb+0x0e, ent->attribs);
             a = 1;
+            if (vdfs_opt1) {
+                gcopy_attr(ent);
+                rom_dispatch(VDFS_ROM_OPT1);
+            }
         }
         else {
             int err = errno;
@@ -2100,6 +2158,10 @@ static void osfile_load(uint32_t pb, const char *path)
                 fclose(fp);
                 osfile_attribs(pb, ent);
                 a = 1;
+                if (vdfs_opt1) {
+                    gcopy_attr(ent);
+                    rom_dispatch(VDFS_ROM_OPT1);
+                }
             } else {
                 log_warn("vdfs: unable to load file '%s': %s\n", ent->host_fn, strerror(errno));
                 adfs_hosterr(errno);
@@ -3055,8 +3117,6 @@ static void fsclaim(uint16_t addr)
 
 #define CAT_TMP 0x100
 
-static vdfs_entry *cat_ent;
-static int cat_dfs;
 
 static bool cat_prep_adfs(uint16_t addr, vdfs_entry *dir, int dfsdir, const char *dir_desc)
 {
@@ -3152,55 +3212,6 @@ static void cat_get_dir_dfs(vdfs_entry *ent, int dfsdir)
     writemem(CAT_TMP+2, '.');
     writemem(CAT_TMP+3, dfsdir);
     writemem(CAT_TMP+4, 0);
-}
-
-static uint16_t gcopy_fn(vdfs_entry *ent, uint16_t mem_ptr)
-{
-    uint16_t mem_end = mem_ptr + MAX_FILE_NAME+2;
-    const char *ptr = ent->acorn_fn;
-    int ch;
-
-    if (ent->dfs_dir == cat_dfs) {
-        log_debug("vdfs: gcopy_fn, same DFS directory file");
-        writemem(mem_ptr++, ' ');
-        writemem(mem_ptr++, ' ');
-    }
-    else {
-        log_debug("vdfs: gcopy_fn, different DFS directory file");
-        writemem(mem_ptr++, ent->dfs_dir);
-        writemem(mem_ptr++, '.');
-    }
-    while (mem_ptr < mem_end && (ch = *ptr++))
-        writemem(mem_ptr++, ch);
-    while (mem_ptr < mem_end)
-        writemem(mem_ptr++, ' ');
-    return mem_ptr;
-}
-
-static void write_bcd_byte(uint32_t maddr, unsigned value)
-{
-    value = ((value / 10) << 4) | (value % 10);
-    writemem(maddr, value);
-}
-
-static void write_bcd_word(uint32_t maddr, unsigned value)
-{
-    write_bcd_byte(maddr, value / 100);
-    write_bcd_byte(maddr+1, value % 100);
-}
-
-static void gcopy_attr(vdfs_entry *ent)
-{
-    uint16_t mem_ptr = gcopy_fn(ent, CAT_TMP);
-    writemem16(mem_ptr, ent->attribs);
-    write_file_attr(mem_ptr, ent);
-    const struct tm *tp = localtime(&ent->mtime);
-    write_bcd_byte(mem_ptr+0x0e, tp->tm_mday);
-    writemem(mem_ptr+0x0f, tp->tm_mon);
-    write_bcd_word(mem_ptr+0x10, tp->tm_year + 1900);
-    write_bcd_byte(mem_ptr+0x12, tp->tm_hour);
-    write_bcd_byte(mem_ptr+0x13, tp->tm_min);
-    write_bcd_byte(mem_ptr+0x14, tp->tm_sec);
 }
 
 static void cat_next_tail(void)
@@ -3688,6 +3699,8 @@ static void osfsc_opt(void)
             write_back(cur_dir);
         }
     }
+    else if (x == 1)
+        vdfs_opt1 = y;
     else
         log_debug("vdfs: osfsc unimplemented option %d,%d", x, y);
 }
