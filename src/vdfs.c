@@ -1332,7 +1332,7 @@ static void write_back(vdfs_entry *ent)
                 tp = localtime(&ent->btime);
                 fprintf(fp, " %04X %06X\n", unix_date_acorn(tp), unix_time_acorn(tp));
             }
-        else
+            else
                 putc('\n', fp);
         }
         fclose(fp);
