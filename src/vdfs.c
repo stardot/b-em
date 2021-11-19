@@ -300,6 +300,7 @@ struct cmdent {
 
 #define CLAIM_DFS   0x01
 #define CLAIM_ADFS  0x02
+#define WRITE_DATES 0x04
 #define DFS_MODE    0x40
 #define VDFS_ACTIVE 0x80
 
@@ -335,6 +336,14 @@ static uint16_t readmem16(uint16_t addr)
 {
     uint16_t value = readmem(addr);
     value |= (readmem(addr+1) << 8);
+    return value;
+}
+
+static uint32_t readmem24(uint16_t addr)
+{
+    uint32_t value = readmem(addr);
+    value |= (readmem(addr+1) << 8);
+    value |= (readmem(addr+2) << 16);
     return value;
 }
 
@@ -2019,6 +2028,19 @@ static void osfile_write(uint32_t pb, const char *path, uint32_t (*callback)(FIL
     }
 }
 
+#ifndef WIN32
+
+static void set_file_mtime(vdfs_entry *ent)
+{
+    struct timespec times[2];
+    times[0].tv_nsec = UTIME_OMIT;
+    times[1].tv_sec = ent->mtime;
+    times[1].tv_nsec = 0;
+    if (utimensat(AT_FDCWD, ent->host_path, times, 0) == -1)
+        log_warn("unable to set times on %s: %s", ent->host_path, strerror(errno));
+}
+#endif
+
 static void osfile_set_meta(uint32_t pb, const char *path, uint16_t which)
 {
     vdfs_entry *ent;
@@ -2035,7 +2057,19 @@ static void osfile_set_meta(uint32_t pb, const char *path, uint16_t which)
             if (which & META_ATTR) {
                 uint16_t attr = readmem(pb+0x0e);
                 log_debug("vdfs: setting attributes of %02X", attr);
-#ifndef WIN32
+                if (fs_flags & WRITE_DATES) {
+                    uint16_t mdate = readmem16(pb+0x0f);
+                    if (mdate) {
+                        struct tm *tp = localtime(&ent->mtime);
+                        acorn_date_unix(tp, mdate);
+                        ent->mtime = mktime(tp);
+#ifdef WIN32
+                    }
+                }
+#else
+                        set_file_mtime(ent);
+                    }
+                }
                 if (attr != (ent->attribs & ATTR_ACORN_MASK)) {
                     mode_t mode = 0;
                     if (attr & ATTR_USER_READ)
@@ -2103,6 +2137,27 @@ static void osfile_get_extattr(uint32_t pb, const char *path)
     }
     else
         a = 0;
+}
+
+static void osfile_set_exattr(uint32_t pb, const char *path)
+{
+    if (fs_flags & WRITE_DATES) {
+        vdfs_findres res;
+        vdfs_entry *ent = find_entry(path, &res, cur_dir, dfs_dir);
+        if (ent && ent->attribs & ATTR_EXISTS) {
+            struct tm *tp = localtime(&ent->mtime);
+            acorn_time_unix(tp, readmem24(pb+6));
+            ent->mtime = mktime(tp);
+            ent->btime = acorn_timedate_unix(readmem16(pb+9), readmem24(pb+11));
+            write_back(ent);
+#ifndef WIN32
+            set_file_mtime(ent);
+#endif
+            a = (ent->attribs & ATTR_IS_DIR) ? 2 : 1;
+        }
+        else
+            a = 0;
+    }
 }
 
 static void delete_inf(vdfs_entry *ent)
@@ -2310,6 +2365,9 @@ static void osfile(void)
                         break;
                     case 0x08:
                         osfile_cdir(path);
+                        break;
+                    case 0xfc:
+                        osfile_set_exattr(pb, path);
                         break;
                     case 0xfd:
                         osfile_get_extattr(pb, path);
