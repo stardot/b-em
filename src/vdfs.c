@@ -797,10 +797,10 @@ static void scan_inf_file(vdfs_entry *ent)
             ent->mtime = msecs;
     }
     if (cdate_valid) {
-        ent->attribs |= ATTR_BTIME_VALID;
         time_t csecs = acorn_timedate_unix(cdate, ctime);
-        if (csecs < ent->btime)
+        if (!(ent->attribs & ATTR_BTIME_VALID) || csecs < ent->btime)
             ent->btime = csecs;
+        ent->attribs |= ATTR_BTIME_VALID;
     }
 }
 
@@ -2149,6 +2149,7 @@ static void osfile_set_exattr(uint32_t pb, const char *path)
             acorn_time_unix(tp, readmem24(pb+6));
             ent->mtime = mktime(tp);
             ent->btime = acorn_timedate_unix(readmem16(pb+9), readmem24(pb+11));
+            ent->attribs |= ATTR_BTIME_VALID;
             write_back(ent);
 #ifndef WIN32
             set_file_mtime(ent);
