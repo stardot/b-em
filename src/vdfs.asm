@@ -597,23 +597,18 @@ prtextws    =   &A8
             jsr     OSNEWL
             lda     #&20            ; DFS mode?
             bit     port_flags
+            beq     adfs_cat
             bne     dfs_cat
 
-            lda     #&0c            ; Fetch the first entry.
-            sta     port_cmd
-            bcs     cat_done
-.cat_loop   ldx     #&00
+.cat_loop   ldx     #&00            ; print the entry.
             jsr     pr_basic
             jsr     pr_others
             jsr     pr_pad
-.adfs_cat   lda     #&0c            ; Fetch the next entry.
+.adfs_cat   lda     #&0c            ; fetch an entry.
             sta     port_cmd
             bcc     cat_loop
             jmp     OSNEWL
 
-            lda     #&0d            ; fetch one directory entry.
-            sta     port_cmd
-            bcs     dfs_none1
 .dfs_lp1    jsr     pr_dfs
             jsr     pr_pad
 .dfs_cat    lda     #&0d            ; fetch one directory entry.
