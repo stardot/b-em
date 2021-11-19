@@ -353,6 +353,13 @@ static void writemem16(uint16_t addr, uint16_t value)
     writemem(addr+1, (value >> 8) & 0xff);
 }
 
+static void writemem24(uint16_t addr, uint32_t value)
+{
+    writemem(addr, value & 0xff);
+    writemem(addr+1, (value >> 8) & 0xff);
+    writemem(addr+2, (value >> 16) & 0xff);
+}
+
 static void writemem32(uint16_t addr, uint32_t value)
 {
     writemem(addr, value & 0xff);
@@ -674,11 +681,40 @@ static const char *scan_inf_start(vdfs_entry *ent, char inf_line[MAX_INF_LINE])
     return NULL;
 }
 
+static void acorn_date_unix(struct tm *tp, unsigned adate)
+{
+    tp->tm_year = 1981 + (((adate & 0x00e0) >> 1) | ((adate & 0xf000) >> 12)) - 1900;
+    tp->tm_mon = ((adate & 0x0f00) >> 8) - 1;
+    tp->tm_mday = (adate & 0x001f);
+    log_debug("vdfs: acorn_date_unix: acorn_date=%04X, local=%02u/%02u/%02u", adate, tp->tm_mday, tp->tm_mon+1, tp->tm_year + 1900);
+}
+
+static void acorn_time_unix(struct tm *tp, unsigned atime)
+{
+    tp->tm_hour = atime & 0x0000ff;
+    tp->tm_min = (atime & 0x00ff00) >> 8;
+    tp->tm_sec = (atime & 0xff0000) >> 16;
+    log_debug("vdfs: acorn_time_unix: acorn_time=%06X, local=%02u:%02u:%02u", atime, tp->tm_hour, tp->tm_min, tp->tm_sec);
+}
+
+static time_t acorn_timedate_unix(unsigned adate, unsigned atime)
+{
+    struct tm tm;
+    memset(&tm, 0, sizeof(tm));
+    acorn_date_unix(&tm, adate);
+    acorn_time_unix(&tm, atime);
+    tm.tm_isdst = -1;
+    time_t secs = mktime(&tm);
+    return secs;
+}
+
 static void scan_inf_file(vdfs_entry *ent)
 {
     char inf_line[MAX_INF_LINE];
     int ch, nyb;
     uint32_t load_addr = 0, exec_addr = 0;
+    bool mdate_valid = false, cdate_valid = false;
+    unsigned mdate = 0, mtime = 0, cdate = 0, ctime = 0;
     const char *lptr = scan_inf_start(ent, inf_line);
     if (lptr) {
         // Parse load address.
@@ -696,10 +732,67 @@ static void scan_inf_file(vdfs_entry *ent)
             exec_addr = (exec_addr << 4) | nyb;
             ch = *lptr++;
         }
+
+        // Skip the length.
+        while (ch == ' ' || ch == '\t')
+            ch = *lptr++;
+        while ((nyb = hex2nyb(ch)) >= 0)
+            ch = *lptr++;
+
+        // Skip the attributes.
+        while (ch == ' ' || ch == '\t')
+            ch = *lptr++;
+        while (ch == 'L' || ch == 'l' || (nyb = hex2nyb(ch)) >= 0)
+            ch = *lptr++;
+
+        // Parse modification date.
+        while (ch == ' ' || ch == '\t')
+            ch = *lptr++;
+        while ((nyb = hex2nyb(ch)) >= 0) {
+            mdate_valid = true;
+            mdate = (mdate << 4) | nyb;
+            ch = *lptr++;
+        }
+
+        // Parse modification time.
+        while (ch == ' ' || ch == '\t')
+            ch = *lptr++;
+        while ((nyb = hex2nyb(ch)) >= 0) {
+            mtime = (mtime << 4) | nyb;
+            ch = *lptr++;
+        }
+
+        // Parse creation date.
+        while (ch == ' ' || ch == '\t')
+            ch = *lptr++;
+        while ((nyb = hex2nyb(ch)) >= 0) {
+            cdate_valid = true;
+            cdate = (cdate << 4) | nyb;
+            ch = *lptr++;
+        }
+
+        // Parse creation time.
+        while (ch == ' ' || ch == '\t')
+            ch = *lptr++;
+        while ((nyb = hex2nyb(ch)) >= 0) {
+            ctime = (ctime << 4) | nyb;
+            ch = *lptr++;
+        }
     }
     ent->u.file.load_addr = load_addr;
     ent->u.file.exec_addr = exec_addr;
     log_debug("vdfs: load=%08X, exec=%08X", load_addr, exec_addr);
+    if (mdate_valid) {
+        time_t msecs = acorn_timedate_unix(mdate, mtime);
+        if (msecs > ent->mtime)
+            ent->mtime = msecs;
+    }
+    if (cdate_valid) {
+        ent->attribs |= ATTR_BTIME_VALID;
+        time_t csecs = acorn_timedate_unix(cdate, ctime);
+        if (csecs < ent->btime)
+            ent->btime = csecs;
+    }
 }
 
 static unsigned scan_inf_dir_new(const char *lptr, const char *eptr, char *title)
@@ -1145,6 +1238,21 @@ static vdfs_entry *add_new_file(vdfs_findres *res)
 
 // Write changed attributes back to the .inf file.
 
+static unsigned unix_date_acorn(const struct tm *tp)
+{
+    unsigned year = tp->tm_year + 1900 - 1981;
+    unsigned adate = tp->tm_mday | ((tp->tm_mon + 1) << 8) | ((year & 0x70) << 1) | ((year & 0x0f) << 12);
+    log_debug("vdfs: unix_date_acorn: local=%02u/%02u/%04u, ayear=%u, acorn_date=%04X", tp->tm_mday, tp->tm_mon+1, tp->tm_year + 1900, year, adate);
+    return adate;
+}
+
+static unsigned unix_time_acorn(const struct tm *tp)
+{
+    unsigned atime = tp->tm_hour | (tp->tm_min << 8) | (tp->tm_sec << 16);
+    log_debug("vdfs: unix_time_acorn: local=%02u:%02u:%02u, acorn_time=%06X", tp->tm_hour, tp->tm_min, tp->tm_sec, atime);
+    return atime;
+}
+
 static void write_back(vdfs_entry *ent)
 {
     FILE *fp;
@@ -1158,8 +1266,16 @@ static void write_back(vdfs_entry *ent)
                 fmt = "%s OPT=%02X DIR=1 TITLE=\"%s\"\n";
             fprintf(fp, fmt, ent->acorn_fn, ent->u.dir.boot_opt, ent->u.dir.title);
         }
+        else {
+            const struct tm *tp = localtime(&ent->mtime);
+            fprintf(fp, "%c.%s %08X %08X %08X %02X %04X %06X", ent->dfs_dir, ent->acorn_fn, ent->u.file.load_addr, ent->u.file.exec_addr, ent->u.file.length, ent->attribs & ATTR_ACORN_MASK, unix_date_acorn(tp), unix_time_acorn(tp));
+            if (ent->attribs & ATTR_BTIME_VALID) {
+                tp = localtime(&ent->btime);
+                fprintf(fp, " %04X %06X\n", unix_date_acorn(tp), unix_time_acorn(tp));
+            }
         else
-            fprintf(fp, "%c.%s %08X %08X %08X %02X\n", ent->dfs_dir, ent->acorn_fn, ent->u.file.load_addr, ent->u.file.exec_addr, ent->u.file.length, ent->attribs & ATTR_ACORN_MASK);
+                putc('\n', fp);
+        }
         fclose(fp);
     } else
         log_warn("vdfs: unable to create INF file '%s': %s\n", ent->host_path, strerror(errno));
@@ -1737,25 +1853,11 @@ static void write_file_attr(uint32_t maddr, vdfs_entry *ent)
     writemem32(maddr+0x0a, length);
 }
 
-static void osfile_write_date(uint32_t maddr, const struct tm *tp)
-{
-    unsigned year = 1900 + tp->tm_year - 1981;
-    writemem(maddr, ((year & 0x70) << 1) | tp->tm_mday);
-    writemem(maddr+1, ((year & 0x0f) << 4) | (tp->tm_mon + 1));
-}
-
-static void osfile_write_time(uint32_t maddr, const struct tm *tp)
-{
-    writemem(maddr, tp->tm_hour);
-    writemem(maddr+1, tp->tm_min);
-    writemem(maddr+2, tp->tm_sec);
-}
-
 static void osfile_attribs(uint32_t pb, vdfs_entry *ent)
 {
     write_file_attr(pb, ent);
     writemem(pb+0x0e, ent->attribs);
-    osfile_write_date(pb+0x0f, localtime(&ent->mtime));
+    writemem16(pb+0x0f, unix_date_acorn(localtime(&ent->mtime)));
     writemem(pb+0x11, 0);
 }
 
@@ -1986,17 +2088,17 @@ static void osfile_get_extattr(uint32_t pb, const char *path)
         scan_entry(ent);
         writemem32(pb+2, 0);
         const struct tm *tp= localtime(&ent->mtime);
-        osfile_write_time(pb+6, tp);
+        writemem24(pb+6, unix_time_acorn(tp));
         if (ent->attribs & ATTR_BTIME_VALID) {
             tp = localtime(&ent->btime);
-            osfile_write_date(pb+9, tp);
-            osfile_write_time(pb+11, tp);
-            writemem32(pb+14, 0);
+            writemem16(pb+9, unix_date_acorn(tp));
+            writemem24(pb+11, unix_time_acorn(tp));
         }
         else {
-            for (int i = 9; i < 18; ++i)
-                writemem(pb+1, 0);
+            writemem16(pb+9, 0);
+            writemem24(pb+11, 0);
         }
+        writemem32(pb+14, 0);
         a = (ent->attribs & ATTR_IS_DIR) ? 2 : 1;
     }
     else
