@@ -98,6 +98,7 @@ const char *vdfs_cfg_root = NULL;
 #define ATTR_OPEN_READ   0x1000
 #define ATTR_OPEN_WRITE  0x2000
 #define ATTR_IS_DIR      0x4000
+#define ATTR_BTIME_VALID 0x0100
 
 // Which file metadata to process.
 
@@ -573,6 +574,8 @@ static void scan_attr(vdfs_entry *ent)
         mode_t mode = stx.stx_mode;
         ent->btime = stx.stx_btime.tv_sec;
         ent->mtime = stx.stx_mtime.tv_sec;
+        if (stx.stx_mask & STATX_BTIME)
+            ent->attribs |= ATTR_BTIME_VALID;
 #else
 #define size_field stb.st_size
     struct stat stb;
@@ -1925,10 +1928,16 @@ static void osfile_get_extattr(uint32_t pb, const char *path)
         writemem32(pb+2, 0);
         const struct tm *tp= localtime(&ent->mtime);
         osfile_write_time(pb+6, tp);
-        tp = localtime(&ent->btime);
-        osfile_write_date(pb+9, tp);
-        osfile_write_time(pb+11, tp);
-        writemem32(pb+14, 0);
+        if (ent->attribs & ATTR_BTIME_VALID) {
+            tp = localtime(&ent->btime);
+            osfile_write_date(pb+9, tp);
+            osfile_write_time(pb+11, tp);
+            writemem32(pb+14, 0);
+        }
+        else {
+            for (int i = 9; i < 18; ++i)
+                writemem(pb+1, 0);
+        }
         a = (ent->attribs & ATTR_IS_DIR) ? 2 : 1;
     }
     else
