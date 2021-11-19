@@ -196,8 +196,6 @@ prtextws    =   &A8
 
 .fsstart
 {
-            tya
-            pha
             lda     #&06            ; Inform current FS new FS taking over
             jsr     callfscv
             ldx     #&00
@@ -219,15 +217,14 @@ prtextws    =   &A8
             iny
             cpx     #&0e
             bne     vecloop
-            pla
-            pha
-            sta     port_fsid
+            lda     #&01            ; Make VDFS active.
+            ora     port_flags
+            sta     port_flags
             lda     #&8f
             ldx     #&0f
             jsr     OSBYTE          ; Notify that vectors have changed
-            pla
-            tay
             lda     #&00
+            ldy     port_fsid
             rts
 .callfscv   jmp     (&021E)
 .vectab     equw    file
@@ -263,7 +260,6 @@ prtextws    =   &A8
             jsr     prtitle         ; announce the filing system
             jsr     OSNEWL
             jsr     OSNEWL
-            ldy     #fsno_vdfs
             jsr     fsstart         ; same setup as for call &12.
             pla
             bne     noboot1         ; then maybe exec !BOOT.

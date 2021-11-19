@@ -301,10 +301,11 @@ struct cmdent {
 #define CLAIM_ADFS  0x80
 #define CLAIM_DFS   0x40
 #define DFS_MODE    0x20
+#define VDFS_ACTIVE 0x01
 
 static uint8_t  reg_a;
 static uint8_t  fs_flags = 0;
-static uint8_t  fs_num   = 0;
+static uint8_t  fs_num   = FSNO_VDFS;
 static uint16_t cmd_tail;
 
 /*
@@ -1624,7 +1625,7 @@ static bool srp_tail(uint16_t addr, uint8_t flag, uint16_t fnaddr, uint16_t star
     addr = srp_romid(addr, &romid);
     if (romid >= 0)
         flag &= ~0x40;
-    if (fs_num) {
+    if (fs_flags & VDFS_ACTIVE) {
         exec_swr_fs(flag, fnaddr, romid, start, len);
         p.c = 0;
         return true;
@@ -3433,8 +3434,8 @@ static void select_vdfs(uint8_t fsno)
         vdfs_dfs_mode();
     else
         vdfs_adfs_mode();
-    if (!fs_num) {
-        y = fsno;
+    if (!(fs_flags & VDFS_ACTIVE)) {
+        fs_num = fsno;
         rom_dispatch(VDFS_ROM_FSSTART);
     }
 }
@@ -3693,16 +3694,22 @@ static void osfsc_cmd(void)
 
 static void osfsc_opt(void)
 {
-    if (x == 4) {
-        if (check_valid_dir(cur_dir, "current")) {
-            cur_dir->u.dir.boot_opt = y;
-            write_back(cur_dir);
-        }
+    switch(x) {
+        case 1:
+            vdfs_opt1 = y;
+            break;
+        case 2:
+            fs_num = y;
+            break;
+        case 4:
+            if (check_valid_dir(cur_dir, "current")) {
+                cur_dir->u.dir.boot_opt = y;
+                write_back(cur_dir);
+            }
+            break;
+        default:
+            log_debug("vdfs: osfsc unimplemented option %d,%d", x, y);
     }
-    else if (x == 1)
-        vdfs_opt1 = y;
-    else
-        log_debug("vdfs: osfsc unimplemented option %d,%d", x, y);
 }
 
 static void osfsc(void)
@@ -3734,7 +3741,7 @@ static void osfsc(void)
             }
             break;
         case 0x06: // new filesystem taking over.
-            fs_num = 0;
+            fs_flags &= ~VDFS_ACTIVE;
             break;
         case 0x07:
             x = MIN_CHANNEL;
@@ -3949,7 +3956,7 @@ static void serv_boot(void)
         }
     }
     else
-        fs_num = 0; // some other filing system.
+        fs_flags &= ~VDFS_ACTIVE; // some other filing system.
 }
 
 static void service(void)
