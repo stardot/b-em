@@ -717,6 +717,21 @@ static time_t acorn_timedate_unix(unsigned adate, unsigned atime)
     return secs;
 }
 
+static void set_ent_date_time(vdfs_entry *ent, bool mdate_valid, unsigned mdate, unsigned mtime, bool cdate_valid, unsigned cdate, unsigned ctime)
+{
+    if (mdate_valid) {
+        time_t msecs = acorn_timedate_unix(mdate, mtime);
+        if (msecs > ent->mtime)
+            ent->mtime = msecs;
+    }
+    if (cdate_valid) {
+        time_t csecs = acorn_timedate_unix(cdate, ctime);
+        if (!(ent->attribs & ATTR_BTIME_VALID) || csecs < ent->btime)
+            ent->btime = csecs;
+        ent->attribs |= ATTR_BTIME_VALID;
+    }
+}
+
 static void scan_inf_file(vdfs_entry *ent)
 {
     char inf_line[MAX_INF_LINE];
@@ -791,64 +806,90 @@ static void scan_inf_file(vdfs_entry *ent)
     ent->u.file.load_addr = load_addr;
     ent->u.file.exec_addr = exec_addr;
     log_debug("vdfs: load=%08X, exec=%08X", load_addr, exec_addr);
-    if (mdate_valid) {
-        time_t msecs = acorn_timedate_unix(mdate, mtime);
-        if (msecs > ent->mtime)
-            ent->mtime = msecs;
-    }
-    if (cdate_valid) {
-        time_t csecs = acorn_timedate_unix(cdate, ctime);
-        if (!(ent->attribs & ATTR_BTIME_VALID) || csecs < ent->btime)
-            ent->btime = csecs;
-        ent->attribs |= ATTR_BTIME_VALID;
-    }
+    set_ent_date_time(ent, mdate_valid, mdate, mtime, cdate_valid, cdate, ctime);
 }
 
-static unsigned scan_inf_dir_new(const char *lptr, const char *eptr, char *title)
+static void scan_inf_dir_new(vdfs_entry *dir, const char *lptr, const char *eptr)
 {
     unsigned opt = 0;
+    bool mdate_valid = false, cdate_valid = false;
+    unsigned mdate = 0, mtime = 0, cdate = 0, ctime = 0;
     do {
+        // Skip spaces after the '='
+        const char *aptr = eptr;
+        int ch;
+        while ((ch = *++aptr) == ' ' || ch == '\t')
+            ;
+        // Try three character keys.
         const char *sptr = eptr - 3;
         if (sptr >= lptr && !strncasecmp(sptr, "OPT=", 4)) {
-            int ch, nyb;
+            int nyb;
             // Parse options.
-            while ((ch = *++eptr) == ' ' || ch == '\t')
-                ;
             while ((nyb = hex2nyb(ch)) >= 0) {
                 opt = (opt << 4) | nyb;
-                ch = *++eptr;
+                ch = *++aptr;
             }
         }
         else {
+            // Try five character keys.
             sptr = eptr - 5;
-            if (sptr >= lptr && !strncasecmp(sptr, "TITLE=", 6)) {
-                // Parse title.
-                char *ptr = title;
-                char *end = title + MAX_TITLE;
-                int ch, quote= 0;
+            if (sptr >= lptr) {
+                if (!strncasecmp(sptr, "TITLE=", 6)) {
+                    // Parse title.
+                    char *ptr = dir->u.dir.title;
+                    char *end = dir->u.dir.title + MAX_TITLE;
+                    int quote= 0;
 
-                do
-                    ch = *++eptr;
-                while (ch == ' ' || ch == '\t');
-
-                if (ch == '"') {
-                    quote = 1;
-                    ch = *++eptr;
+                    if (ch == '"') {
+                        quote = 1;
+                        ch = *++aptr;
+                    }
+                    while (ptr < end && ch && ch != '\n' && (ch != '"' || !quote) && ((ch != ' ' && ch != '\t') || quote)) {
+                        *ptr++ = ch & 0x7f;
+                        ch = *++aptr;
+                    }
+                    *ptr = '\0';
                 }
-                while (ptr < end && ch && ch != '\n' && (ch != '"' || !quote) && ((ch != ' ' && ch != '\t') || quote)) {
-                    *ptr++ = ch & 0x7f;
-                    ch = *++eptr;
+                else if (!strncasecmp(sptr, "MDATE=", 6)) {
+                    int nyb;
+                    while ((nyb = hex2nyb(ch)) >= 0) {
+                        mdate_valid = true;
+                        mdate = (mdate << 4) | nyb;
+                        ch = *++aptr;
+                    }
                 }
-                *ptr = '\0';
+                else if (!strncasecmp(sptr, "MTIME=", 6)) {
+                    int nyb;
+                    while ((nyb = hex2nyb(ch)) >= 0) {
+                        mtime = (mtime << 4) | nyb;
+                        ch = *++aptr;
+                    }
+                }
+                else if (!strncasecmp(sptr, "CDATE=", 6)) {
+                    int nyb;
+                    while ((nyb = hex2nyb(ch)) >= 0) {
+                        cdate_valid = true;
+                        cdate = (cdate << 4) | nyb;
+                        ch = *++aptr;
+                    }
+                }
+                else if (!strncasecmp(sptr, "CTIME=", 6)) {
+                    int nyb;
+                    while ((nyb = hex2nyb(ch)) >= 0) {
+                        ctime = (ctime << 4) | nyb;
+                        ch = *++aptr;
+                    }
+                }
             }
             else
-                ++eptr;
+                ++aptr;
         }
-        lptr = eptr;
+        lptr = aptr;
         eptr = strchr(lptr, '=');
     }
     while (eptr);
-    return opt;
+    dir->u.dir.boot_opt = opt;
+    set_ent_date_time(dir, mdate_valid, mdate, mtime, cdate_valid, cdate, ctime);
 }
 
 static unsigned scan_inf_dir_old(const char *lptr, char *title)
@@ -883,7 +924,7 @@ static void scan_inf_dir(vdfs_entry *dir)
     if (lptr) {
         const char *eptr = strchr(lptr, '=');
         if (eptr)
-            dir->u.dir.boot_opt = scan_inf_dir_new(lptr, eptr, dir->u.dir.title);
+            scan_inf_dir_new(dir, lptr, eptr);
         else
             dir->u.dir.boot_opt = scan_inf_dir_old(lptr, dir->u.dir.title);
     }
@@ -1269,14 +1310,23 @@ static void write_back(vdfs_entry *ent)
     show_activity();
     *ent->host_inf = '.'; // select .inf file.
     if ((fp = fopen(ent->host_path, "wt"))) {
+        const struct tm *tp = localtime(&ent->mtime);
         if (ent->attribs & ATTR_IS_DIR) {
-            const char *fmt = "%s OPT=%02X DIR=1 TITLE=%s\n";
-            if (strpbrk(ent->u.dir.title, " \t"))
-                fmt = "%s OPT=%02X DIR=1 TITLE=\"%s\"\n";
-            fprintf(fp, fmt, ent->acorn_fn, ent->u.dir.boot_opt, ent->u.dir.title);
+            fprintf(fp, "%s OPT=%02X DIR=1 MDATE=%04X MTIME=%06X", ent->acorn_fn, ent->u.dir.boot_opt, unix_date_acorn(tp), unix_time_acorn(tp));
+            if (ent->attribs & ATTR_BTIME_VALID) {
+                tp = localtime(&ent->btime);
+                fprintf(fp, " CDATE=%04X CTIME=%06X", unix_date_acorn(tp), unix_time_acorn(tp));
+            }
+            if (ent->u.dir.title[0]) {
+                const char *fmt = " TITLE=%s\n";
+                if (strpbrk(ent->u.dir.title, " \t"))
+                    fmt = " TITLE=\"%s\"\n";
+                fprintf(fp, fmt, ent->u.dir.title);
+            }
+            else
+                putc('\n', fp);
         }
         else {
-            const struct tm *tp = localtime(&ent->mtime);
             fprintf(fp, "%c.%s %08X %08X %08X %02X %04X %06X", ent->dfs_dir, ent->acorn_fn, ent->u.file.load_addr, ent->u.file.exec_addr, ent->u.file.length, ent->attribs & ATTR_ACORN_MASK, unix_date_acorn(tp), unix_time_acorn(tp));
             if (ent->attribs & ATTR_BTIME_VALID) {
                 tp = localtime(&ent->btime);
