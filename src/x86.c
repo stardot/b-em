@@ -1378,18 +1378,12 @@ void x86_exec()
                                 tubecycles-=4;
                                 break;
 
-                                case 0xFF: /*Invalid - Windows 3.1 syscall trap?*/
-                                    log_debug("x86: invalid opcode 0F FF at %04X:%04X", cs>>4, pc);
+                                default: /*Invalid */
+                                    log_debug("x86: invalid opcode 0F %02X at %04X:%04X", temp, cs>>4, pc);
                                     pc-=2;
                                     x86_intcall(6<<2);
                                     tubecycles-=70;
                                     break;
-
-                                default:
-//                                printf("Bad 0F opcode %02X\n",temp);
-//                                pc-=2;
-//                                x86dumpregs();
-//                                exit(-1);
                         }
                         break;
 
