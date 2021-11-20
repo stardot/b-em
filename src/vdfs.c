@@ -582,8 +582,72 @@ static void adfs_hosterr(int errnum)
 
 // Populate a VDFS entry from host information.
 
+static void init_dir(vdfs_entry *ent)
+{
+    ent->u.dir.children = NULL;
+    ent->u.dir.scan_mtime = 0;
+    ent->u.dir.scan_seq = 0;
+    ent->u.dir.sorted = SORT_NONE;
+    ent->u.dir.boot_opt = 0;
+    ent->u.dir.title[0] = 0;
+}
+
+#ifdef WIN32
+#include <fileapi.h>
+
+static time_t time_win2unix(LPFILETIME td)
+{
+    uint64_t lo = td->dwLowDateTime;
+    uint64_t hi = td->dwHighDateTime;
+    uint64_t ticks = lo | (hi << 32);
+    /* Convert units, 100ns to second */
+    uint64_t secs = ticks / 10000000;
+    /* Convert epoch, 01-Jan-1601 to 01-Jan-1970 */
+    return secs - (uint64_t)((1970-1601)*365+92-3)*24*60*60;
+}
+
 static void scan_attr(vdfs_entry *ent)
 {
+    uint16_t attribs = ent->attribs;
+    WIN32_FILE_ATTRIBUTE_DATA wattr;
+    if (GetFileAttributesEx(ent->host_path, GetFileExInfoStandard, &wattr)) {
+        ent->btime = time_win2unix(&wattr.ftCreationTime);
+        ent->mtime = time_win2unix(&wattr.ftLastWriteTime);
+        attribs &= ~ATTR_ACORN_MASK;
+        attribs |= ATTR_EXISTS|ATTR_BTIME_VALID|ATTR_USER_READ|ATTR_OTHR_READ;
+        if (wattr.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+            if (!(attribs & ATTR_IS_DIR)) {
+                attribs |= ATTR_IS_DIR;
+                init_dir(ent);
+            }
+        }
+        else {
+            if (attribs & ATTR_IS_DIR) {
+                log_debug("vdfs: dir %s has become a file", ent->acorn_fn);
+                attribs &= ~ATTR_IS_DIR;
+                free_entry(ent->u.dir.children);
+            }
+            ent->u.file.load_addr = 0;
+            ent->u.file.exec_addr = 0;
+            if (wattr.nFileSizeHigh) {
+                log_warn("vdfs: file %s is too big (>4Gb)", ent->host_path);
+                ent->u.file.length = 0xffffffff;
+            }
+            else
+                ent->u.file.length = wattr.nFileSizeLow;
+        }
+        if (wattr.dwFileAttributes & FILE_ATTRIBUTE_READONLY)
+            attribs |= ATTR_USER_LOCKD;
+        else
+            attribs |= ATTR_USER_WRITE|ATTR_OTHR_WRITE;
+        ent->attribs = attribs;
+    }
+    else
+        log_warn("vdfs: GetFileAttributesEx failed for %s: %s", ent->host_path, strerror(errno));
+#else
+static void scan_attr(vdfs_entry *ent)
+{
+    uint16_t attribs = ent->attribs;
 #ifdef linux
 #define size_field stx.stx_size
     struct statx stx;
@@ -593,7 +657,7 @@ static void scan_attr(vdfs_entry *ent)
         ent->btime = stx.stx_btime.tv_sec;
         ent->mtime = stx.stx_mtime.tv_sec;
         if (stx.stx_mask & STATX_BTIME)
-            ent->attribs |= ATTR_BTIME_VALID;
+            attribs |= ATTR_BTIME_VALID;
 #else
 #define size_field stb.st_size
     struct stat stb;
@@ -603,53 +667,42 @@ static void scan_attr(vdfs_entry *ent)
         ent->btime = 0;
         ent->mtime = stb.st_mtime;
 #endif
-        ent->attribs |= ATTR_EXISTS;
+        attribs |= ATTR_EXISTS;
+        attribs &= ~ATTR_ACORN_MASK;
         if (S_ISDIR(mode)) {
-            if (!(ent->attribs & ATTR_IS_DIR)) {
-                ent->attribs |= ATTR_IS_DIR;
-                ent->u.dir.children = NULL;
-                ent->u.dir.scan_mtime = 0;
-                ent->u.dir.scan_seq = 0;
-                ent->u.dir.sorted = SORT_NONE;
-                ent->u.dir.boot_opt = 0;
-                ent->u.dir.title[0] = 0;
+            if (!(attribs & ATTR_IS_DIR)) {
+                attribs |= ATTR_IS_DIR;
+                init_dir(ent);
             }
         }
         else {
-            if (ent->attribs & ATTR_IS_DIR) {
+            if (attribs & ATTR_IS_DIR) {
                 log_debug("vdfs: dir %s has become a file", ent->acorn_fn);
-                ent->attribs &= ~ATTR_IS_DIR;
+                attribs &= ~ATTR_IS_DIR;
                 free_entry(ent->u.dir.children);
             }
             ent->u.file.load_addr = 0;
             ent->u.file.exec_addr = 0;
             ent->u.file.length = size_field;
         }
-#ifdef WIN32
         if (mode & S_IRUSR)
-            ent->attribs |= ATTR_USER_READ|ATTR_OTHR_READ;
+            attribs |= ATTR_USER_READ;
         if (mode & S_IWUSR)
-            ent->attribs |= ATTR_USER_WRITE|ATTR_OTHR_WRITE;
+            attribs |= ATTR_USER_WRITE;
         if (mode & S_IXUSR)
-            ent->attribs |= ATTR_USER_EXEC|ATTR_OTHR_EXEC;
-#else
-        if (mode & S_IRUSR)
-            ent->attribs |= ATTR_USER_READ;
-        if (mode & S_IWUSR)
-            ent->attribs |= ATTR_USER_WRITE;
-        if (mode & S_IXUSR)
-            ent->attribs |= ATTR_USER_EXEC;
+            attribs |= ATTR_USER_EXEC;
         if (mode & (S_IRGRP|S_IROTH))
-            ent->attribs |= ATTR_OTHR_READ;
+            attribs |= ATTR_OTHR_READ;
         if (mode & (S_IWGRP|S_IWOTH))
-            ent->attribs |= ATTR_OTHR_WRITE;
+            attribs |= ATTR_OTHR_WRITE;
         if (mode & (S_IXGRP|S_IXOTH))
-            ent->attribs |= ATTR_OTHR_EXEC;
-#endif
+            attribs |= ATTR_OTHR_EXEC;
     }
     else
         log_warn("vdfs: unable to stat '%s': %s\n", ent->host_path, strerror(errno));
-    log_debug("vdfs: scan_attr: host=%s, attr=%04X\n", ent->host_fn, ent->attribs);
+#endif
+    log_debug("vdfs: scan_attr: host=%s, attr=%04X\n", ent->host_fn, attribs);
+    ent->attribs = attribs;
 }
 
 static const char *scan_inf_start(vdfs_entry *ent, char inf_line[MAX_INF_LINE])
@@ -2078,9 +2131,56 @@ static void osfile_write(uint32_t pb, const char *path, uint32_t (*callback)(FIL
     }
 }
 
-#ifndef WIN32
+#ifdef WIN32
 
-static void set_file_mtime(vdfs_entry *ent)
+static void time_unix2win(time_t secs, LPFILETIME td)
+{
+    /* Convert epoch, 01-Jan-1970 to 01-Jan-1601 */
+    uint64_t wsec = secs + (uint64_t)((1970-1601)*365+92-3)*24*60*60;
+    /* Convert units, seconds to 100ns */
+    uint64_t ticks = wsec * 10000000;
+    /* Split into Windows file time */
+    td->dwLowDateTime = ticks & 0xffffffff;
+    td->dwHighDateTime = ticks >> 32;
+}
+
+static void set_file_times(vdfs_entry *ent)
+{
+    HANDLE h = CreateFile(ent->host_path, FILE_WRITE_ATTRIBUTES, 0, NULL, OPEN_EXISTING, 0, NULL);
+    if (h) {
+        FILETIME mtime, btime;
+        time_unix2win(ent->mtime, &mtime);
+        if (ent->attribs & ATTR_BTIME_VALID)
+            time_unix2win(ent->btime, &btime);
+        else {
+            btime.dwLowDateTime = 0;
+            btime.dwHighDateTime = 0;
+        }
+        if (!SetFileTime(h, &btime, NULL, &mtime))
+            log_warn("unable to set mtime on %s: SetFileTime failed: %s", ent->host_path, strerror(errno));
+    }
+    else
+        log_warn("unable to set mtime on %s: CreateFile failed: %s", ent->host_path, strerror(errno));
+}
+
+static void set_file_atribs(vdfs_entry *ent, uint16_t attr)
+{
+    DWORD wattr = GetFileAttributes(ent->host_fn);
+    if (wattr != INVALID_FILE_ATTRIBUTES) {
+        if (attr & ATTR_USER_LOCKD || !(attr & ATTR_USER_WRITE))
+            wattr |= FILE_ATTRIBUTE_READONLY;
+        else
+            wattr &= ~FILE_ATTRIBUTE_READONLY;
+        if (!SetFileAttributes(ent->host_fn, wattr))
+            log_warn("vdfs: unable to set attributes, SetFileAttributes failed on %s: %s", ent->host_fn, strerror(errno));
+    }
+    else
+        log_warn("vdfs: unable to set attributes, GetFileAttributes failed on %s: %s", ent->host_fn, strerror(errno));
+}
+
+#else
+
+static void set_file_times(vdfs_entry *ent)
 {
     struct timespec times[2];
     times[0].tv_nsec = UTIME_OMIT;
@@ -2089,6 +2189,27 @@ static void set_file_mtime(vdfs_entry *ent)
     if (utimensat(AT_FDCWD, ent->host_path, times, 0) == -1)
         log_warn("unable to set times on %s: %s", ent->host_path, strerror(errno));
 }
+
+static void set_file_atribs(vdfs_entry *ent, uint16_t attr)
+{
+    mode_t mode = 0;
+    if (attr & ATTR_USER_READ)
+        mode |= S_IRUSR;
+    if (attr & ATTR_USER_WRITE)
+        mode |= S_IWUSR;
+    if (attr & ATTR_USER_EXEC)
+        mode |= S_IXUSR;
+    if (attr & ATTR_OTHR_READ)
+        mode |= S_IRGRP|S_IROTH;
+    if (attr & ATTR_OTHR_WRITE)
+        mode |= S_IWGRP|S_IWOTH;
+    if (attr & ATTR_OTHR_EXEC)
+        mode |= S_IXGRP|S_IXOTH;
+    log_debug("vdfs: chmod(%s, %o)", ent->host_path, mode);
+    if (chmod(ent->host_path, mode) == -1)
+        log_warn("unable to chmod %s: %s", ent->host_path, strerror(errno));
+}
+
 #endif
 
 static void osfile_set_meta(uint32_t pb, const char *path, uint16_t which)
@@ -2113,33 +2234,13 @@ static void osfile_set_meta(uint32_t pb, const char *path, uint16_t which)
                         struct tm *tp = localtime(&ent->mtime);
                         acorn_date_unix(tp, mdate);
                         ent->mtime = mktime(tp);
-#ifdef WIN32
-                    }
-                }
-#else
-                        set_file_mtime(ent);
+                        set_file_times(ent);
                     }
                 }
                 if (attr != (ent->attribs & ATTR_ACORN_MASK)) {
-                    mode_t mode = 0;
-                    if (attr & ATTR_USER_READ)
-                        mode |= S_IRUSR;
-                    if (attr & ATTR_USER_WRITE)
-                        mode |= S_IWUSR;
-                    if (attr & ATTR_USER_EXEC)
-                        mode |= S_IXUSR;
-                    if (attr & ATTR_OTHR_READ)
-                        mode |= S_IRGRP|S_IROTH;
-                    if (attr & ATTR_OTHR_WRITE)
-                        mode |= S_IWGRP|S_IWOTH;
-                    if (attr & ATTR_OTHR_EXEC)
-                        mode |= S_IXGRP|S_IXOTH;
-                    log_debug("vdfs: chmod(%s, %o)", ent->host_path, mode);
-                    if (chmod(ent->host_path, mode) == -1)
-                        log_warn("unable to chmod %s: %s", ent->host_path, strerror(errno));
+                    set_file_atribs(ent, attr);
+                    ent->attribs = (ent->attribs & ~ATTR_ACORN_MASK) | attr;
                 }
-#endif
-                ent->attribs = (ent->attribs & ~ATTR_ACORN_MASK) | attr;
             }
             write_back(ent);
             a = 1;
@@ -2201,9 +2302,7 @@ static void osfile_set_exattr(uint32_t pb, const char *path)
             ent->btime = acorn_timedate_unix(readmem16(pb+9), readmem24(pb+11));
             ent->attribs |= ATTR_BTIME_VALID;
             write_back(ent);
-#ifndef WIN32
-            set_file_mtime(ent);
-#endif
+            set_file_times(ent);
             a = (ent->attribs & ATTR_IS_DIR) ? 2 : 1;
         }
         else
