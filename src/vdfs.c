@@ -155,6 +155,7 @@ static uint8_t vdfs_opt1;
 typedef struct vdfs_findres {
     struct vdfs_entry *parent;
     const char *errmsg;
+    char dfs_dir;
     char acorn_fn[MAX_FILE_NAME+1];
 } vdfs_findres;
 
@@ -1079,10 +1080,20 @@ static vdfs_entry *wild_search(vdfs_entry *dir, const char *pattern)
 
 // Create VDFS entry for a new file.
 
+static int next_seq_ch(int seq_ch)
+{
+    if (seq_ch == '9')
+        return 'A';
+    if (seq_ch == 'Z')
+        return 'a';
+    if (seq_ch == 'z')
+        return -1;
+    return seq_ch + 1;
+}
+
 static vdfs_entry *new_entry(vdfs_entry *dir, const char *host_fn)
 {
     vdfs_entry *ent;
-    int name_len, seq_ch = '0';
     char *host_path;
 
     if ((ent = malloc(sizeof(vdfs_entry)))) {
@@ -1091,28 +1102,20 @@ static vdfs_entry *new_entry(vdfs_entry *dir, const char *host_fn)
         if ((host_path = make_host_path(ent, host_fn))) {
             scan_entry(ent);
             if (acorn_search(dir, ent->acorn_fn)) {
-                // name was already in tree - generate a unique one.
-                name_len = strlen(ent->acorn_fn);
-                if (name_len < (MAX_FILE_NAME-2)) {
-                    ent->acorn_fn[name_len] = '~';
-                    ent->acorn_fn[name_len+1] = seq_ch;
-                } else {
-                    ent->acorn_fn[MAX_FILE_NAME-2] = '~';
-                    ent->acorn_fn[MAX_FILE_NAME-1] = seq_ch;
-                }
+                // name was already in use - generate a unique one.
+                int seq_ch = '0';
+                size_t ix = strlen(ent->acorn_fn);
+                if (ix > (MAX_FILE_NAME-2))
+                    ix = MAX_FILE_NAME-2;
+                ent->acorn_fn[ix] = '~';
+                ent->acorn_fn[ix+1] = seq_ch;
                 while (acorn_search(dir, ent->acorn_fn)) {
-                    if (seq_ch == '9')
-                        seq_ch = 'A';
-                    else if (seq_ch == 'Z')
-                        seq_ch = 'a';
-                    else if (seq_ch == 'z')
-                        break;
-                    else
-                        seq_ch++;
-                    if (name_len < (MAX_FILE_NAME-2))
-                        ent->acorn_fn[name_len+1] = seq_ch;
-                    else
-                        ent->acorn_fn[MAX_FILE_NAME-1] = seq_ch;
+                    if ((seq_ch = next_seq_ch(seq_ch)) < 0) {
+                        log_warn("vdfs: unable to create unique acorn name for %s", host_fn);
+                        free(ent);
+                        return NULL;
+                    }
+                    ent->acorn_fn[ix+1] = seq_ch;
                 }
                 log_debug("vdfs: new_entry: unique name %s used", ent->acorn_fn);
             }
@@ -1252,6 +1255,7 @@ static vdfs_entry *find_entry_adfs(const char *filename, vdfs_findres *res, vdfs
 
     res->parent = NULL;
     res->errmsg = err_notfound;
+    res->dfs_dir = dfsdir;
 
     for (fn_src = filename;;) {
         fn_ptr = res->acorn_fn;
@@ -1301,9 +1305,10 @@ static vdfs_entry *find_entry_dfs(const char *filename, vdfs_findres *res, vdfs_
         if (ic && filename[1] == '.') {
             dfsdir = ic;
             filename += 2;
+            log_debug("vdfs: find_entry_dfs, parsed DFS dir %c, filename=%s", dfsdir, filename);
         }
         for (vdfs_entry *ent = dir->u.dir.children; ent; ent = ent->next) {
-            log_debug("vdfs: find_entry_dfs, considering entry %s", ent->acorn_fn);
+            log_debug("vdfs: find_entry_dfs, considering entry %c.%s", ent->dfs_dir, ent->acorn_fn);
             if (dfsdir == '*' || dfsdir == '#' || dfsdir == ent->dfs_dir) {
                 log_debug("vdfs: find_entry_dfs, matched DFS dir");
                 if (!vdfs_wildmat(filename, ent->acorn_fn, MAX_FILE_NAME))
@@ -1311,6 +1316,9 @@ static vdfs_entry *find_entry_dfs(const char *filename, vdfs_findres *res, vdfs_
             }
         }
     }
+    res->parent = dir;
+    res->dfs_dir = dfsdir;
+    strncpy(res->acorn_fn, filename, MAX_FILE_NAME);
     res->errmsg = err_notfound;
     return NULL;
 }
@@ -1319,13 +1327,31 @@ static vdfs_entry *add_new_file(vdfs_findres *res)
 {
     vdfs_entry *dir = res->parent;
     vdfs_entry *new_ent;
-    char host_fn[MAX_FILE_NAME];
+    char host_fn[MAX_FILE_NAME+3];
 
     if ((new_ent = malloc(sizeof(vdfs_entry)))) {
         init_entry(new_ent);
         memcpy(new_ent->acorn_fn, res->acorn_fn, MAX_FILE_NAME+1);
-        new_ent->dfs_dir = dfs_dir;
+        new_ent->dfs_dir = res->dfs_dir;
         bbc2hst(res->acorn_fn, host_fn);
+        if (host_search(dir, host_fn)) {
+            /* host name already exists, generate a unique name */
+            size_t name_len = strlen(host_fn);
+            int seq_ch = '0';
+            host_fn[name_len] = '~';
+            host_fn[name_len+1] = seq_ch;
+            host_fn[name_len+2] = 0;
+            while (host_search(dir, host_fn)) {
+                if ((seq_ch = next_seq_ch(seq_ch)) < 0) {
+                    log_warn("vdfs: unable to create unique host name for %c.%s", res->dfs_dir, res->acorn_fn);
+                    res->errmsg = err_badname;
+                    free(new_ent);
+                    return NULL;
+                }
+                host_fn[name_len+1] = seq_ch;
+            }
+            log_debug("vdfs: add_new_file: unique name %s used", host_fn);
+        }
         new_ent->parent = dir;
         if (make_host_path(new_ent, host_fn)) {
             new_ent->next = dir->u.dir.children;
