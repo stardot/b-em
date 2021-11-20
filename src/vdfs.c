@@ -512,7 +512,7 @@ static const char err_badname[]  = "\xcc" "Bad name";
 static const char err_notfound[] = "\xd6" "Not found";
 static const char err_channel[]  = "\xde" "Channel";
 static const char err_badcmd[]   = "\xfe" "Bad command";
-static const char err_badaddr[]  = "\x94" "Bad parms";
+static const char err_badaddr[]  = "\x94" "Bad address";
 static const char err_nomem[]    = "\x92" "Out of memory";
 static const char err_no_swr[]   = "\x93" "No SWRAM at that address";
 static const char err_too_big[]  = "\x94" "Too big";
@@ -699,9 +699,9 @@ static void scan_attr(vdfs_entry *ent)
             attribs |= ATTR_OTHR_EXEC;
     }
     else
-        log_warn("vdfs: unable to stat '%s': %s\n", ent->host_path, strerror(errno));
+        log_warn("vdfs: unable to stat '%s': %s", ent->host_path, strerror(errno));
 #endif
-    log_debug("vdfs: scan_attr: host=%s, attr=%04X\n", ent->host_fn, attribs);
+    log_debug("vdfs: scan_attr: host=%s, attr=%04X", ent->host_fn, attribs);
     ent->attribs = attribs;
 }
 
@@ -1114,12 +1114,12 @@ static vdfs_entry *new_entry(vdfs_entry *dir, const char *host_fn)
                     else
                         ent->acorn_fn[MAX_FILE_NAME-1] = seq_ch;
                 }
-                log_debug("vdfs: new_entry: unique name %s used\n", ent->acorn_fn);
+                log_debug("vdfs: new_entry: unique name %s used", ent->acorn_fn);
             }
             ent->next = dir->u.dir.children;
             dir->u.dir.children = ent;
             dir->u.dir.sorted = SORT_NONE;
-            log_debug("vdfs: new_entry: returing new entry %p\n", ent);
+            log_debug("vdfs: new_entry: returning new entry %p", ent);
             return ent;
         }
         free(ent);
@@ -1193,7 +1193,7 @@ static int scan_dir(vdfs_entry *dir)
         dir->u.dir.scan_mtime = stb.st_mtime;
         return 0;
     } else {
-        log_warn("vdfs: unable to opendir '%s': %s\n", dir->host_path, strerror(errno));
+        log_warn("vdfs: unable to opendir '%s': %s", dir->host_path, strerror(errno));
         return 1;
     }
 }
@@ -1210,7 +1210,7 @@ static uint16_t parse_name(char *str, size_t size, uint16_t addr)
     char *end = str + size - 1;
     int ch, quote= 0;
 
-    log_debug("vdfs: parse_name: addr=%04x\n", addr);
+    log_debug("vdfs: parse_name: addr=%04x", addr);
     do
         ch = readmem(addr++);
     while (ch == ' ' || ch == '\t');
@@ -1390,7 +1390,7 @@ static void write_back(vdfs_entry *ent)
         }
         fclose(fp);
     } else
-        log_warn("vdfs: unable to create INF file '%s': %s\n", ent->host_path, strerror(errno));
+        log_warn("vdfs: unable to create INF file '%s': %s", ent->host_path, strerror(errno));
     *ent->host_inf = '\0'; // select real file.
 }
 
@@ -1618,7 +1618,7 @@ static int16_t swr_calc_addr(uint8_t flags, uint32_t *st_ptr, int16_t romid)
             adfs_error(err_no_swr);
             return -1;
         }
-        log_debug("vdfs: swr_calc_addr: pseudo addr bank=%02d, start=%04x\n", romid, start);
+        log_debug("vdfs: swr_calc_addr: pseudo addr bank=%02d, start=%04x", romid, start);
     } else {
         // Absolutre addressing.
 
@@ -1631,7 +1631,7 @@ static int16_t swr_calc_addr(uint8_t flags, uint32_t *st_ptr, int16_t romid)
             adfs_error(err_no_swr);
             return -1;
         }
-        log_debug("vdfs: swr_calc_addr: abs addr bank=%02d, start=%04x\n", romid, start);
+        log_debug("vdfs: swr_calc_addr: abs addr bank=%02d, start=%04x", romid, start);
         start -= 0x8000;
     }
     *st_ptr = start;
@@ -1646,7 +1646,7 @@ static void exec_swr_fs(uint8_t flags, uint16_t fname, int8_t romid, uint32_t st
     FILE *fp;
     char path[MAX_ACORN_PATH];
 
-    log_debug("vdfs: exec_swr_fs: flags=%02x, fn=%04x, romid=%02d, start=%04x, len=%04x\n", flags, fname, romid, start, pblen);
+    log_debug("vdfs: exec_swr_fs: flags=%02x, fn=%04x, romid=%02d, start=%04x, len=%04x", flags, fname, romid, start, pblen);
     if (check_valid_dir(cur_dir, "current")) {
         if ((romid = swr_calc_addr(flags, &start, romid)) >= 0) {
             vdfs_findres res;
@@ -1689,7 +1689,7 @@ static void exec_swr_fs(uint8_t flags, uint16_t fname, int8_t romid, uint32_t st
                                 ent->u.file.exec_addr = load_add;
                                 write_back(ent);
                             } else
-                                log_warn("vdfs: unable to create file '%s': %s\n", ent->host_fn, strerror(errno));
+                                log_warn("vdfs: unable to create file '%s': %s", ent->host_fn, strerror(errno));
                         } else
                             adfs_error(res.errmsg);
                     } else
@@ -2125,7 +2125,7 @@ static void osfile_write(uint32_t pb, const char *path, uint32_t (*callback)(FIL
         }
         else {
             int err = errno;
-            log_warn("vdfs: unable to create file '%s': %s\n", ent->host_fn, strerror(err));
+            log_warn("vdfs: unable to create file '%s': %s", ent->host_fn, strerror(err));
             adfs_hosterr(err);
         }
     }
@@ -2187,7 +2187,7 @@ static void set_file_times(vdfs_entry *ent)
     times[1].tv_sec = ent->mtime;
     times[1].tv_nsec = 0;
     if (utimensat(AT_FDCWD, ent->host_path, times, 0) == -1)
-        log_warn("unable to set times on %s: %s", ent->host_path, strerror(errno));
+        log_warn("vdfs: unable to set times on %s: %s", ent->host_path, strerror(errno));
 }
 
 static void set_file_atribs(vdfs_entry *ent, uint16_t attr)
@@ -2207,7 +2207,7 @@ static void set_file_atribs(vdfs_entry *ent, uint16_t attr)
         mode |= S_IXGRP|S_IXOTH;
     log_debug("vdfs: chmod(%s, %o)", ent->host_path, mode);
     if (chmod(ent->host_path, mode) == -1)
-        log_warn("unable to chmod %s: %s", ent->host_path, strerror(errno));
+        log_warn("vdfs: unable to chmod %s: %s", ent->host_path, strerror(errno));
 }
 
 #endif
@@ -2471,7 +2471,7 @@ static void osfile_load(uint32_t pb, const char *path)
                     rom_dispatch(VDFS_ROM_OPT1);
                 }
             } else {
-                log_warn("vdfs: unable to load file '%s': %s\n", ent->host_fn, strerror(errno));
+                log_warn("vdfs: unable to load file '%s': %s", ent->host_fn, strerror(errno));
                 adfs_hosterr(errno);
             }
         }
@@ -2547,7 +2547,7 @@ static FILE *getfp_read(int channel)
             return fp;
         log_debug("vdfs: attempt to use closed channel %d", channel);
     } else
-        log_debug("vdfs: channel %d out of range\n", channel);
+        log_debug("vdfs: channel %d out of range", channel);
     adfs_error(err_channel);
     return NULL;
 }
@@ -2704,7 +2704,7 @@ static void osfind(void)
                     vdfs_chan[channel].ent = ent;
                     a = MIN_CHANNEL + channel;
                 } else
-                    log_warn("vdfs: osfind: unable to open file '%s' in mode '%s': %s\n", ent->host_fn, mode, strerror(errno));
+                    log_warn("vdfs: osfind: unable to open file '%s' in mode '%s': %s", ent->host_fn, mode, strerror(errno));
             }
         }
     }
@@ -2943,7 +2943,7 @@ static int osgbpb_list(uint32_t pb)
             status = 0;
             mem_ptr = readmem32(pb+1);
             n = readmem32(pb+5);
-            log_debug("vdfs: seq_ptr=%d, writing max %d entries starting %04X, first=%s\n", seq_ptr, n, mem_ptr, cat_ptr->acorn_fn);
+            log_debug("vdfs: seq_ptr=%d, writing max %d entries starting %04X, first=%s", seq_ptr, n, mem_ptr, cat_ptr->acorn_fn);
             for (;;) {
                 mem_ptr = write_len_str(mem_ptr, cat_ptr->acorn_fn);
                 seq_ptr++;
@@ -2958,7 +2958,7 @@ static int osgbpb_list(uint32_t pb)
                 }
                 log_debug("vdfs: next=%s", cat_ptr->acorn_fn);
             }
-            log_debug("vdfs: finish at %04X\n", mem_ptr);
+            log_debug("vdfs: finish at %04X", mem_ptr);
             writemem32(pb+5, n);
             writemem32(pb+9, seq_ptr);
             return status;
@@ -2972,7 +2972,7 @@ static void osgbpb(void)
     int status = 0;
     uint32_t pb = (y << 8) | x;
 
-    log_debug("vdfs: osgbpb(A=%02X, YX=%04X)\n", a, pb);
+    log_debug("vdfs: osgbpb(A=%02X, YX=%04X)", a, pb);
 
     switch (a)
     {
@@ -3175,7 +3175,7 @@ static void cmd_title(uint16_t addr)
         char *end = cur_dir->u.dir.title + sizeof(cur_dir->u.dir.title) - 1;
         int ch, quote= 0;
 
-        log_debug("vdfs: cmd_title: addr=%04x\n", addr);
+        log_debug("vdfs: cmd_title: addr=%04x", addr);
         do
             ch = readmem(addr++);
         while (ch == ' ' || ch == '\t');
@@ -3189,7 +3189,7 @@ static void cmd_title(uint16_t addr)
             ch = readmem(addr++);
         }
         *ptr = '\0';
-        log_debug("vdfs: cmd_title: name=%s\n", cur_dir->u.dir.title);
+        log_debug("vdfs: cmd_title: name=%s", cur_dir->u.dir.title);
         write_back(cur_dir);
     }
 }
@@ -3224,7 +3224,7 @@ static void run_file(const char *err)
                         }
                         fclose(fp);
                     } else {
-                        log_warn("vdfs: unable to run file '%s': %s\n", ent->host_fn, strerror(errno));
+                        log_warn("vdfs: unable to run file '%s': %s", ent->host_fn, strerror(errno));
                         adfs_hosterr(errno);
                     }
                 }
@@ -3851,7 +3851,7 @@ static void cmd_dump(uint16_t addr)
                 return;
             }
             start = start << 4 | ch;
-            log_debug("vdfs: cmd_dump, start loop, nyb=%x, start=%x\n", ch, start);
+            log_debug("vdfs: cmd_dump, start loop, nyb=%x, start=%x", ch, start);
             ch = readmem(addr++);
         }
         while (ch != ' ' && ch != '\t' && ch != '\r');
@@ -3868,7 +3868,7 @@ static void cmd_dump(uint16_t addr)
                     return;
                 }
                 offset = offset << 4 | ch;
-                log_debug("vdfs: cmd_dump, start loop, nyb=%x, offset=%x\n", ch, offset);
+                log_debug("vdfs: cmd_dump, start loop, nyb=%x, offset=%x", ch, offset);
                 ch = readmem(addr++);
             }
             while (ch != ' ' && ch != '\t' && ch != '\r');
@@ -4349,7 +4349,7 @@ static inline void dispatch(uint8_t value)
         case 0x11: cat_get_dir(lib_dir, dfs_lib); break;
         case 0x12: set_ram();   break;
         case 0x13: rest_ram();  break;
-        default: log_warn("vdfs: function code %d not recognised\n", value);
+        default: log_warn("vdfs: function code %d not recognised", value);
     }
 }
 
