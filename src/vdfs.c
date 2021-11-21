@@ -790,7 +790,7 @@ static void scan_inf_file(vdfs_entry *ent)
 {
     char inf_line[MAX_INF_LINE];
     int ch, nyb;
-    uint32_t load_addr = 0, exec_addr = 0;
+    uint32_t load_addr = 0, exec_addr = 0, attribs = 0;
     bool mdate_valid = false, cdate_valid = false;
     unsigned mdate = 0, mtime = 0, cdate = 0, ctime = 0;
     const char *lptr = scan_inf_start(ent, inf_line);
@@ -817,11 +817,17 @@ static void scan_inf_file(vdfs_entry *ent)
         while ((nyb = hex2nyb(ch)) >= 0)
             ch = *lptr++;
 
-        // Skip the attributes.
+        // Parse the attributes.
         while (ch == ' ' || ch == '\t')
             ch = *lptr++;
-        while (ch == 'L' || ch == 'l' || (nyb = hex2nyb(ch)) >= 0)
-            ch = *lptr++;
+        if (ch == 'L' || ch == 'l')
+            attribs = ATTR_USER_READ|ATTR_USER_LOCKD|ATTR_OTHR_READ|ATTR_OTHR_LOCKD;
+        else {
+            while ((nyb = hex2nyb(ch)) >= 0) {
+                attribs = (attribs << 4) | nyb;
+                ch = *lptr++;
+            }
+        }
 
         // Parse modification date.
         while (ch == ' ' || ch == '\t')
@@ -860,6 +866,11 @@ static void scan_inf_file(vdfs_entry *ent)
     ent->u.file.load_addr = load_addr;
     ent->u.file.exec_addr = exec_addr;
     log_debug("vdfs: load=%08X, exec=%08X", load_addr, exec_addr);
+    if (attribs) {
+        /* merge .inf and host filing system attributes */
+        ent->attribs &= attribs|~ATTR_ACORN_MASK;
+        ent->attribs |= attribs & (ATTR_USER_LOCKD|ATTR_OTHR_LOCKD);
+    }
     set_ent_date_time(ent, mdate_valid, mdate, mtime, cdate_valid, cdate, ctime);
 }
 
