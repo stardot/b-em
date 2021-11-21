@@ -3416,20 +3416,21 @@ const struct cmdent ctab_filing[] = {
 
 static uint16_t parse_cmd(uint16_t addr, char *dest)
 {
-    int   ch, i = 0;
-
-    do {
-        if (i == MAX_CMD_LEN)
-            return 0;
-        ch = readmem(addr++);
-        dest[i++] = ch;
-    } while (ch != ' ' && ch != '\r' && ch != '.' && ch != '"');
-
-    log_debug("vdfs: parse_cmd: cmd=%.*s, finish with %02X at %04X", i, dest, ch, addr);
-    if (ch != '\r')
-        while ((ch = readmem(addr++)) == ' ')
-            ;
-    return --addr;
+    for (int i = 0; i < MAX_CMD_LEN; ++i) {
+        int ch = readmem(addr++);
+        dest[i] = ch;
+        if (ch < 'A' || (ch > 'Z' && ch < 'a') || ch > 'z') {
+            if (ch == '.')
+                ch = readmem(addr++);
+            else
+                dest[i] = '\r';
+            while (ch == ' ' || ch == '\t')
+                ch = readmem(addr++);
+            log_debug("vdfs: parse_cmd: cmd=%.*s, finish with %02X at %04X", i, dest, ch, addr);
+            break;
+        }
+    }
+    return addr-1;
 }
 
 static const struct cmdent *lookup_cmd(const struct cmdent *tab, size_t nentry, char *cmd)
@@ -3445,7 +3446,7 @@ static const struct cmdent *lookup_cmd(const struct cmdent *tab, size_t nentry, 
             tab_ch = *tab_cmd++;
             cmd_ch = *cmd_ptr++;
         } while (tab_ch && !((tab_ch ^ cmd_ch) & 0x5f)); // case insensitive comparison.
-        if ((!tab_ch && (cmd_ch == ' ' || cmd_ch == '\r' || cmd_ch == '"')) || (cmd_ch == '.' && (tab_ch < 'A' || tab_ch > 'Z')))
+        if ((!tab_ch && cmd_ch == '\r') || (cmd_ch == '.' && tab_ch > 'Z'))
             return tab_ptr;
         tab_ptr++;
     }
