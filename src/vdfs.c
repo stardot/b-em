@@ -268,7 +268,8 @@ enum vdfs_action {
     VDFS_ACT_OSW7F_WATF,
     VDFS_ACT_OSW7F_WAT5,
     VDFS_ACT_MMBDIN,
-    VDFS_ACT_DRIVE
+    VDFS_ACT_DRIVE,
+    VDFS_ACT_ACCESS
 };
 
 /*
@@ -1321,17 +1322,30 @@ static vdfs_entry *find_entry_adfs(const char *filename, vdfs_findres *res, vdfs
     return NULL;
 }
 
+static vdfs_entry *find_next_adfs(vdfs_entry *ent, vdfs_findres *res)
+{
+    size_t len = strlen(res->acorn_fn);
+    do {
+        ent = ent->next;
+        if (!ent)
+            return NULL;
+    } while (!(ent->attribs & ATTR_EXISTS) || vdfs_wildmat(res->acorn_fn, ent->acorn_fn, len));
+    return ent;
+}
+
 static vdfs_entry *find_entry_dfs(const char *filename, vdfs_findres *res, vdfs_dirlib *dir)
 {
     int srchdir = dir->dfs_dir;
     log_debug("vdfs: find_entry_dfs, filename=%s, dfsdir=%c", filename, srchdir);
+    int ic = filename[0];
+    if (ic && filename[1] == '.') {
+        srchdir = ic;
+        filename += 2;
+        log_debug("vdfs: find_entry_dfs, parsed DFS dir %c, filename=%s", srchdir, filename);
+    }
+    res->dfs_dir = srchdir;
+    strncpy(res->acorn_fn, filename, MAX_FILE_NAME);
     if (!scan_dir(dir->dir)) {
-        int ic = filename[0];
-        if (ic && filename[1] == '.') {
-            srchdir = ic;
-            filename += 2;
-            log_debug("vdfs: find_entry_dfs, parsed DFS dir %c, filename=%s", srchdir, filename);
-        }
         for (vdfs_entry *ent = dir->dir->u.dir.children; ent; ent = ent->next) {
             log_debug("vdfs: find_entry_dfs, considering entry %c.%s", ent->dfs_dir, ent->acorn_fn);
             if (srchdir == '*' || srchdir == '#' || srchdir == ent->dfs_dir) {
@@ -1342,10 +1356,22 @@ static vdfs_entry *find_entry_dfs(const char *filename, vdfs_findres *res, vdfs_
         }
     }
     res->parent = dir->dir;
-    res->dfs_dir = srchdir;
-    strncpy(res->acorn_fn, filename, MAX_FILE_NAME);
     res->errmsg = err_notfound;
     return NULL;
+}
+
+static vdfs_entry *find_next_dfs(vdfs_entry *ent, vdfs_findres *res)
+{
+    int srchdir = res->dfs_dir;
+    log_debug("vdfs: find_next_dfs, pattern=%s, start=%c.%s, srchdir=%c", res->acorn_fn, ent->dfs_dir, ent->acorn_fn, srchdir);
+    size_t len = strlen(res->acorn_fn);
+    do {
+        ent = ent->next;
+        if (!ent)
+            return NULL;
+        log_debug("vdfs: find_next_dfs, checking %c.%s", ent->dfs_dir, ent->acorn_fn);
+    } while (!(ent->attribs & ATTR_EXISTS) || !(srchdir == '*' || srchdir == '#' || srchdir == ent->dfs_dir) || vdfs_wildmat(res->acorn_fn, ent->acorn_fn, len));
+    return ent;
 }
 
 static vdfs_entry *add_new_file(vdfs_findres *res)
@@ -3121,6 +3147,76 @@ static void osargs(void)
  * dispatched the commands need to come first.
  */
 
+static void cmd_access(uint16_t addr)
+{
+    if (check_valid_dir(&cur_dir)) {
+        char path[MAX_ACORN_PATH];
+        if ((addr = parse_name(path, sizeof path, addr))) {
+            uint_least32_t attribs = 0;
+            uint_least32_t attr_mask = ATTR_USER_READ|ATTR_USER_WRITE|ATTR_USER_LOCKD|ATTR_USER_EXEC;
+            int ch = readmem(addr++);
+            while (ch == ' ' || ch == '\t')
+                ch = readmem(addr++);
+            while (ch != ' ' && ch != '\t' && ch != '\r' && ch != '/') {
+                if (ch == 'R' || ch == 'r')
+                    attribs |= ATTR_USER_READ;
+                else if (ch == 'W' || ch == 'w')
+                    attribs |= ATTR_USER_WRITE;
+                else if (ch == 'L' || ch == 'l')
+                    attribs |= ATTR_USER_LOCKD;
+                else if (ch == 'E' || ch == 'e')
+                    attribs |= ATTR_USER_EXEC;
+                else {
+                    adfs_error(err_badparms);
+                    return;
+                }
+                ch = readmem(addr++);
+            }
+            if (ch == '/') {
+                attr_mask |= ATTR_OPEN_READ|ATTR_OTHR_WRITE|ATTR_OTHR_LOCKD|ATTR_OTHR_EXEC;
+                ch = readmem(addr++);
+                while (ch != ' ' && ch != '\t' && ch != '\r') {
+                    if (ch == 'R' || ch == 'r')
+                        attribs |= ATTR_OTHR_READ;
+                    else if (ch == 'W' || ch == 'w')
+                        attribs |= ATTR_OPEN_WRITE;
+                    else if (ch == 'L' || ch == 'l')
+                        attribs |= ATTR_OTHR_LOCKD;
+                    else if (ch == 'E' || ch == 'e')
+                        attribs |= ATTR_OTHR_EXEC;
+                    else {
+                        adfs_error(err_badparms);
+                        return;
+                    }
+                    ch = readmem(addr++);
+                }
+            }
+            vdfs_findres res;
+            vdfs_entry *ent = find_entry(path, &res, &cur_dir);
+            if (ent && ent->attribs & ATTR_EXISTS) {
+                attr_mask = ~attr_mask;
+                if (fs_flags & DFS_MODE) {
+                    attribs |= ATTR_USER_READ;
+                    if (attribs & ATTR_OTHR_LOCKD)
+                        attribs &= ~ATTR_USER_WRITE;
+                    do {
+                        ent->attribs = (ent->attribs & attr_mask) | attribs;
+                        write_back(ent);
+                        ent = find_next_dfs(ent, &res);
+                    } while (ent);
+                }
+                else {
+                    do {
+                        ent->attribs = (ent->attribs & attr_mask) | attribs;
+                        write_back(ent);
+                        ent = find_next_adfs(ent, &res);
+                    } while (ent);
+                }
+            }
+        }
+    }
+}
+
 static void cmd_back(void)
 {
     vdfs_entry *ent = cur_dir.dir;
@@ -3383,7 +3479,7 @@ static void rename_file(uint16_t addr)
 }
 
 const struct cmdent ctab_filing[] = {
-    { "ACcess",  VDFS_ACT_NOP     },
+    { "ACcess",  VDFS_ACT_ACCESS  },
     { "APpend",  VDFS_ROM_APPEND  },
     { "BAck",    VDFS_ACT_BACK    },
     { "BACKUp",  VDFS_ACT_NOP     },
@@ -4064,6 +4160,9 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
         break;
     case VDFS_ACT_DRIVE:
         cmd_drive(addr);
+        break;
+    case VDFS_ACT_ACCESS:
+        cmd_access(addr);
         break;
     default:
         rom_dispatch(act);
