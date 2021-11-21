@@ -3818,6 +3818,23 @@ static void select_vdfs(uint8_t fsno)
     }
 }
 
+static void cmd_vdfs(uint16_t addr)
+{
+    int ch = readmem(addr);
+    if (ch == 'A' || ch == 'a')
+        vdfs_adfs_mode();
+    else if (ch == 'D' || ch == 'd')
+        vdfs_dfs_mode();
+    else {
+        adfs_error(err_badparms);
+        return;
+    }
+    if (!(fs_flags & VDFS_ACTIVE)) {
+        fs_num = FSNO_VDFS;
+        rom_dispatch(VDFS_ROM_FSSTART);
+    }
+}
+
 static int mmb_parse_find(uint16_t addr, int ch)
 {
     char name[17];
@@ -4024,7 +4041,7 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
         cmd_title(addr);
         break;
     case VDFS_ACT_VDFS:
-        select_vdfs(FSNO_VDFS);
+        cmd_vdfs(addr);
         break;
     case VDFS_ACT_ADFS:
         if (!(fs_flags & CLAIM_ADFS))
