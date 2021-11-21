@@ -77,7 +77,7 @@ const char *vdfs_cfg_root = NULL;
 #define MAX_FILE_NAME    10
 #define MAX_ACORN_PATH   256
 #define MAX_TITLE        19
-#define MAX_INF_LINE     80
+#define MAX_INF_LINE     160
 
 // These are Acorn standard attributes
 
