@@ -165,6 +165,8 @@ typedef struct vdfs_findres {
     char acorn_fn[MAX_FILE_NAME+1];
 } vdfs_findres;
 
+static vdfs_findres info_res;
+
 /*
  * Open files.  An open file is an association between a host OS file
  * pointer, i.e. the host file is kept open too, and a catalogue
@@ -325,6 +327,7 @@ static uint16_t cmd_tail;
  */
 
 static vdfs_entry *(*find_entry)(const char *filename, vdfs_findres *res, vdfs_dirlib *dir);
+static vdfs_entry *(*find_next)(vdfs_entry *ent, vdfs_findres *res);
 static void (*osgbpb_get_dir)(uint32_t pb, vdfs_dirlib *dir);
 static bool (*cat_prep)(uint16_t addr, vdfs_dirlib *dir);
 static void (*cat_get_dir)(vdfs_dirlib *dir);
@@ -3733,18 +3736,30 @@ static void cat_dfs_rewind(void)
 static void file_info(uint16_t addr)
 {
     if (check_valid_dir(&cur_dir)) {
-        vdfs_entry *ent;
-        vdfs_findres res;
         char path[MAX_ACORN_PATH];
         if (parse_name(path, sizeof path, addr)) {
-            if ((ent = find_entry(path, &res, &cur_dir)) && ent->attribs & ATTR_EXISTS) {
+            vdfs_entry *ent = find_entry(path, &info_res, &cur_dir);
+            if (ent && ent->attribs & ATTR_EXISTS) {
                 gcopy_attr(ent);
+                cat_ent = ent;
                 rom_dispatch(VDFS_ROM_INFO);
                 return;
             }
-            adfs_error(res.errmsg);
+            adfs_error(info_res.errmsg);
         }
     }
+}
+
+static void info_next(void)
+{
+    vdfs_entry *ent = find_next(cat_ent, &info_res);
+    if (ent) {
+        gcopy_attr(ent);
+        cat_ent = ent;
+        p.c = 0;
+    }
+    else
+        p.c = 1;
 }
 
 static int chan_seq = 0;
@@ -3883,6 +3898,7 @@ static void vdfs_dfs_mode(void)
 {
     fs_flags |= DFS_MODE;
     find_entry = find_entry_dfs;
+    find_next = find_next_dfs;
     osgbpb_get_dir = osgbpb_get_dir_dfs;
     cat_prep = cat_prep_dfs;
     cat_get_dir = cat_get_dir_dfs;
@@ -3894,6 +3910,7 @@ static void vdfs_adfs_mode(void)
 {
     fs_flags &= ~DFS_MODE;
     find_entry = find_entry_adfs;
+    find_next = find_next_adfs;
     osgbpb_get_dir = osgbpb_get_dir_adfs;
     cat_prep = cat_prep_adfs;
     cat_get_dir = cat_get_dir_adfs;
@@ -4541,6 +4558,7 @@ static inline void dispatch(uint8_t value)
         case 0x11: cat_get_dir(&lib_dir); break;
         case 0x12: set_ram();   break;
         case 0x13: rest_ram();  break;
+        case 0x14: info_next(); break;
         default: log_warn("vdfs: function code %d not recognised", value);
     }
 }

@@ -131,7 +131,7 @@ prtextws    =   &A8
             equw    fs_claim        ; say which filing systems claimed.
             equw    dir_cat         ; *CAT  via OSFSC
             equw    dir_ex          ; *EX   via OSFSC
-            equw    pr_all          ; *INFO via ISFSC
+            equw    dir_info        ; *INFO via OSFSC
             equw    cmd_dump        ; *DUMP
             equw    cmd_list        ; *LIST
             equw    cmd_print       ; *PRiNT
@@ -639,6 +639,12 @@ prtextws    =   &A8
 .ex_dfs     lda     #&0d
             sta     port_cmd
             bcc     ex_dfs_lp
+            rts
+
+.dir_info   jsr     pr_all
+            lda     #&14
+            sta     port_cmd
+            bcc     dir_info
             rts
 
 .not_found
