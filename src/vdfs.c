@@ -3414,40 +3414,39 @@ const struct cmdent ctab_filing[] = {
     { "WIpe",    VDFS_ACT_NOP     }
 };
 
-static uint16_t parse_cmd(uint16_t addr, char *dest)
+static void parse_cmd(uint16_t addr, char *dest)
 {
     for (int i = 0; i < MAX_CMD_LEN; ++i) {
         int ch = readmem(addr++);
         dest[i] = ch;
-        if (ch < 'A' || (ch > 'Z' && ch < 'a') || ch > 'z') {
-            if (ch == '.')
-                ch = readmem(addr++);
-            else
-                dest[i] = '\r';
-            while (ch == ' ' || ch == '\t')
-                ch = readmem(addr++);
+        if (ch == '\r' || ch == '.' || ch == ' ' || ch == '\t') {
             log_debug("vdfs: parse_cmd: cmd=%.*s, finish with %02X at %04X", i, dest, ch, addr);
             break;
         }
     }
-    return addr-1;
 }
 
-static const struct cmdent *lookup_cmd(const struct cmdent *tab, size_t nentry, char *cmd)
+static const struct cmdent *lookup_cmd(const struct cmdent *tab, size_t nentry, char *cmd, char **end)
 {
     const struct cmdent *tab_ptr = tab;
     const struct cmdent *tab_end = tab+nentry;
-    int tab_ch, cmd_ch;
 
     while (tab_ptr < tab_end) {
+        int tab_ch, cmd_ch;
         const char *tab_cmd = tab_ptr->cmd;
         char *cmd_ptr = cmd;
         do {
             tab_ch = *tab_cmd++;
             cmd_ch = *cmd_ptr++;
         } while (tab_ch && !((tab_ch ^ cmd_ch) & 0x5f)); // case insensitive comparison.
-        if ((!tab_ch && cmd_ch == '\r') || (cmd_ch == '.' && tab_ch > 'Z'))
+        if (!tab_ch && (cmd_ch < 'A' || (cmd_ch > 'Z' && cmd_ch < 'a') || cmd_ch > 'z')) {
+            *end = cmd_ptr-1;
             return tab_ptr;
+        }
+        if (cmd_ch == '.' && tab_ch > 'Z') {
+            *end = cmd_ptr;
+            return tab_ptr;
+        }
         tab_ptr++;
     }
     return NULL;
@@ -3764,22 +3763,24 @@ const struct cmdent ctab_osw7f[] = {
 
 static void cmd_osw7f(uint16_t addr)
 {
-    const struct cmdent *ent;
-    char  cmd[MAX_CMD_LEN];
-
     if (readmem(addr) == '\r') {
         x = osw7fmc_act - VDFS_ACT_OSW7F_NONE;
         rom_dispatch(VDFS_ROM_OSW7F);
     }
-    else if ((addr = parse_cmd(addr, cmd)) && ((ent = lookup_cmd(ctab_osw7f, ARRAY_SIZE(ctab_osw7f), cmd)))) {
-        osw7fmc_act = ent->act;
-        if (ent->act == VDFS_ACT_OSW7F_NONE)
-            osw7fmc_tab = NULL;
+    else {
+        char cmd[MAX_CMD_LEN], *end;
+        parse_cmd(addr, cmd);
+        const struct cmdent *ent = lookup_cmd(ctab_osw7f, ARRAY_SIZE(ctab_osw7f), cmd, &end);
+        if (ent) {
+            osw7fmc_act = ent->act;
+            if (ent->act == VDFS_ACT_OSW7F_NONE)
+                osw7fmc_tab = NULL;
+            else
+                osw7fmc_tab = osw7fmc_tabs[ent->act - VDFS_ACT_OSW7F_NONE - 1];
+        }
         else
-            osw7fmc_tab = osw7fmc_tabs[ent->act - VDFS_ACT_OSW7F_NONE - 1];
+            adfs_error(err_badcmd);
     }
-    else
-        adfs_error(err_badcmd);
 }
 
 static void vdfs_dfs_mode(void)
@@ -4057,17 +4058,23 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
  * OSFSC and supporting functions.
  */
 
+static uint16_t skip_spaces(uint16_t addr)
+{
+    int ch = readmem(addr);
+    while (ch == ' ' || ch == '\t')
+        ch = readmem(++addr);
+    return addr;
+}
+
 static void osfsc_cmd(void)
 {
-    uint16_t addr;
-    const struct cmdent *ent;
-    char  cmd[MAX_CMD_LEN];
-
-    if ((addr = parse_cmd((y << 8) | x, cmd))) {
-        if ((ent = lookup_cmd(ctab_filing, ARRAY_SIZE(ctab_filing), cmd))) {
-            if (vdfs_do(ent->act, addr))
-                return;
-        }
+    uint16_t addr = (y << 8) | x;
+    char cmd[MAX_CMD_LEN], *end;
+    parse_cmd(addr, cmd);
+    const struct cmdent *ent = lookup_cmd(ctab_filing, ARRAY_SIZE(ctab_filing), cmd, &end);
+    if (ent) {
+        vdfs_do(ent->act, skip_spaces(addr + (end - cmd)));
+        return;
     }
     run_file(err_badcmd);
 }
@@ -4285,20 +4292,17 @@ static const struct cmdent ctab_enabled[] = {
 
 static void serv_cmd(void)
 {
-    uint16_t addr;
-    const struct cmdent *ent;
-    char  cmd[MAX_CMD_LEN];
+    uint16_t addr = readmem16(0xf2) + y;
+    char cmd[MAX_CMD_LEN], *end;
 
-    if ((addr = parse_cmd(readmem16(0xf2) + y, cmd))) {
-        ent = lookup_cmd(ctab_always, ARRAY_SIZE(ctab_always), cmd);
-        if (!ent && vdfs_enabled)
-            ent = lookup_cmd(ctab_enabled, ARRAY_SIZE(ctab_enabled), cmd);
-        if (!ent && mmb_fn)
-            ent = lookup_cmd(ctab_mmb, ARRAY_SIZE(ctab_mmb), cmd);
-        if (ent)
-            if (vdfs_do(ent->act, addr))
-                a = 0;
-    }
+    parse_cmd(addr, cmd);
+    const struct cmdent *ent = lookup_cmd(ctab_always, ARRAY_SIZE(ctab_always), cmd, &end);
+    if (!ent && vdfs_enabled)
+        ent = lookup_cmd(ctab_enabled, ARRAY_SIZE(ctab_enabled), cmd, &end);
+    if (!ent && mmb_fn)
+        ent = lookup_cmd(ctab_mmb, ARRAY_SIZE(ctab_mmb), cmd, &end);
+    if (ent && vdfs_do(ent->act, skip_spaces(addr + (end - cmd))))
+        a = 0;
 }
 
 const struct cmdent ctab_help[] = {
@@ -4309,18 +4313,19 @@ const struct cmdent ctab_help[] = {
 
 static void serv_help(void)
 {
-    const struct cmdent *ent;
-    char  cmd[MAX_CMD_LEN];
     uint16_t addr = readmem16(0xf2) + y;
-
     int ch = readmem(addr);
     if (ch == '\r')
         rom_dispatch(VDFS_ROM_HELP_SHORT);
     else if (ch == '.')
         rom_dispatch(VDFS_ROM_HELP_ALL);
-    else if ((addr = parse_cmd(addr, cmd)))
-        if ((ent = lookup_cmd(ctab_help, ARRAY_SIZE(ctab_help), cmd)))
+    else {
+        char cmd[MAX_CMD_LEN], *end;
+        parse_cmd(addr, cmd);
+        const struct cmdent *ent = lookup_cmd(ctab_help, ARRAY_SIZE(ctab_help), cmd, &end);
+        if (ent)
             rom_dispatch(ent->act);
+    }
 }
 
 static uint8_t save_y;
