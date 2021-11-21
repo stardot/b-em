@@ -2993,8 +2993,9 @@ static int osgbpb_list(uint32_t pb)
         n = seq_ptr;
         for (cat_ptr = cur_dir.dir->u.dir.children; cat_ptr; cat_ptr = cat_ptr->next)
             if (cat_ptr->attribs & ATTR_EXISTS)
-                if (n-- == 0)
-                    break;
+                if (!(fs_flags & DFS_MODE) || cat_ptr->dfs_dir == cur_dir.dfs_dir)
+                    if (n-- == 0)
+                        break;
         if (cat_ptr) {
             status = 0;
             mem_ptr = readmem32(pb+1);
@@ -3007,7 +3008,7 @@ static int osgbpb_list(uint32_t pb)
                     break;
                 do
                     cat_ptr = cat_ptr->next;
-                while (cat_ptr && !(cat_ptr->attribs & ATTR_EXISTS));
+                while (cat_ptr && !(cat_ptr->attribs & ATTR_EXISTS) && (fs_flags & DFS_MODE) && cat_ptr->dfs_dir != cur_dir.dfs_dir);
                 if (!cat_ptr) {
                     status = 1;
                     break;
