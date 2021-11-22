@@ -271,7 +271,8 @@ enum vdfs_action {
     VDFS_ACT_OSW7F_WAT5,
     VDFS_ACT_MMBDIN,
     VDFS_ACT_DRIVE,
-    VDFS_ACT_ACCESS
+    VDFS_ACT_ACCESS,
+    VDFS_ACT_COPY
 };
 
 /*
@@ -508,6 +509,7 @@ static char *make_host_path(vdfs_entry *ent, const char *host_fn)
 
 static const char err_wont[]     = "\x93" "Won't";
 static const char err_badparms[] = "\x94" "Bad parms";
+static const char err_badcopy[]  = "\x94" "Bad copy - two names needed";
 static const char err_delcsd[]   = "\x97" "Can't delete CSD";
 static const char err_dellib[]   = "\x98" "Can't delete library";
 static const char err_badren[]   = "\xb0" "Bad rename";
@@ -3236,6 +3238,186 @@ static void cmd_cdir(uint16_t addr)
             osfile_cdir(path);
 }
 
+#ifdef WIN32
+#include <winbase.h>
+
+static bool copy_file(vdfs_entry *old_ent, vdfs_entry *new_ent)
+{
+    BOOL res = CopyFile(old_ent->host_path, new_ent->host_path);
+    if (!res)
+        adfs_hosterr(errno);
+    return res;
+}
+
+#else
+#ifdef __unix__
+
+static bool copy_loop(const char *old_fn, int old_fd, const char *new_fn, int new_fd)
+{
+    char buf[4096];
+    ssize_t bytes = read(old_fd, buf, sizeof(buf));
+    while (bytes > 0) {
+        if (write(new_fd, buf, bytes) != bytes) {
+            int err = errno;
+            adfs_hosterr(err);
+            log_warn("vdfs: error writing %s: %s", new_fn, strerror(err));
+            return false;
+        }
+    }
+    if (bytes < 0) {
+        int err = errno;
+        adfs_hosterr(err);
+        log_warn("vdfs: error reading %s: %s", old_fn, strerror(err));
+        return false;
+    }
+    return true;
+}
+
+static bool copy_file(vdfs_entry *old_ent, vdfs_entry *new_ent)
+{
+    bool res = false;
+    int old_fd = open(old_ent->host_path, O_RDONLY);
+    if (old_fd >= 0) {
+        int new_fd = open(new_ent->host_path, O_WRONLY|O_CREAT, 0666);
+        if (new_fd >= 0) {
+#ifdef linux
+            struct stat stb;
+            if (!fstat(old_fd, &stb)) {
+                ssize_t bytes = copy_file_range(old_fd, NULL, new_fd, NULL, stb.st_size, 0);
+                if (bytes == stb.st_size)
+                    res = true;
+                else if (bytes == 0 && errno == EXDEV)
+                    res = copy_loop(old_ent->host_path, old_fd, new_ent->host_path, new_fd);
+                else {
+                    int err = errno;
+                    adfs_hosterr(err);
+                    log_warn("vdfs: copy_file_range failed %s to %s: %s", old_ent->host_path, new_ent->host_path, strerror(err));
+                }
+            }
+            else {
+                int err = errno;
+                adfs_hosterr(err);
+                log_warn("vdfs: unable to fstat '%s': %s", old_ent->host_path, strerror(err));
+            }
+#else
+            res = copy_loop(old_ent->host_path, old_fd, new_ent->host_path, new_fd);
+#endif
+            close(new_fd);
+        }
+        else {
+            int err = errno;
+            adfs_hosterr(err);
+            log_warn("vdfs: unable to open %s for writing: %s", new_ent->host_path, strerror(err));
+        }
+        close(old_fd);
+    }
+    else {
+        int err = errno;
+        adfs_hosterr(err);
+        log_warn("vdfs: unable to open %s for reading: %s", old_ent->host_path, strerror(err));
+    }
+    return res;
+}
+
+#else
+
+static bool copy_file(vdfs_entry *old_ent, vdfs_entry *new_ent)
+{
+    bool res = false;
+    int old_fp = fopen(old_ent->host_path, "rb");
+    if (old_fp) {
+        int new_fp = fopen(new_ent->host_path, "wb");
+        if (new_fp) {
+            res = true;
+            int ch = getc(old_fp);
+            while (ch != EOF && putc(ch, new_fp) != EOF)
+                ch = getc(old_fp);
+            if (ferror(old_fp)) {
+                int err = errno;
+                adfs_hosterr(err);
+                log_warn("vdfs: read error on %s: %s", old_ent->host_path, strerror(err));
+                res = false;
+            }
+            if (ferror(new_fp)) {
+                int err = errno;
+                adfs_hosterr(err);
+                log_warn("vdfs: write error on %s: %s", new_ent->host_path, strerror(err));
+                res = false;
+            }
+            if (fclose(new_fp)) {
+                int err = errno;
+                adfs_hosterr(err);
+                log_warn("vdfs: write error on %s: %s", new_ent->host_path, strerror(err));
+                res = false;
+            }
+        }
+        else {
+            int err = errno;
+            adfs_hosterr(err);
+            log_warn("vdfs: unable to open %s for writing: %s", new_ent->host_path, strerror(err));
+        }
+        fclose(old_fp);
+    }
+    else {
+        int err = errno;
+        adfs_hosterr(err);
+        log_warn("vdfs: unable to open %s for reading: %s", old_ent->host_path, strerror(err));
+    }
+    return res;
+}
+
+#endif
+#endif
+
+static void cmd_copy(uint16_t addr)
+{
+    if (check_valid_dir(&cur_dir)) {
+        char old_path[MAX_ACORN_PATH], new_path[MAX_ACORN_PATH];
+        if ((addr = parse_name(old_path, sizeof old_path, addr))) {
+            if (parse_name(new_path, sizeof new_path, addr)) {
+                if (*old_path && *new_path) {
+                    vdfs_findres old_res;
+                    vdfs_entry *old_ent = find_entry(old_path, &old_res, &cur_dir);
+                    if (old_ent && (old_ent->attribs & ATTR_EXISTS)) {
+                        vdfs_findres new_res;
+                        vdfs_entry *new_ent = find_entry(new_path, &new_res, &cur_dir);
+                        if (new_ent) {
+                            if ((new_ent->attribs & (ATTR_EXISTS|ATTR_IS_DIR)) == (ATTR_EXISTS|ATTR_IS_DIR)) {
+                                /* as destination is a dir, loop over wild-cards */
+                                new_res.parent = new_ent;
+                                do {
+                                    memcpy(new_res.acorn_fn, old_ent->acorn_fn, MAX_FILE_NAME);
+                                    if (!(new_ent = add_new_file(&new_res)))
+                                        break;
+                                    if (!copy_file(old_ent, new_ent))
+                                        break;
+                                } while ((old_ent = find_next(old_ent, &old_res)));
+                            }
+                            else {
+                                /* destination is a file */
+                                if (find_next(old_ent, &old_res))
+                                    adfs_error(err_wildcard);
+                                else
+                                    copy_file(old_ent, new_ent);
+                            }
+                        }
+                        else if (find_next(old_ent, &old_res))
+                            adfs_error(err_wildcard);
+                        else if ((new_ent = add_new_file(&new_res)) && copy_file(old_ent, new_ent))
+                            new_ent->attribs |= ATTR_EXISTS;
+                    }
+                    else
+                        adfs_error(old_res.errmsg);
+                }
+                else {
+                    log_debug("vdfs: copy attempted with an empty filename");
+                    adfs_error(err_badcopy);
+                }
+            }
+        }
+    }
+}
+
 static void cmd_delete(uint16_t addr)
 {
     if (check_valid_dir(&cur_dir)) {
@@ -3403,7 +3585,7 @@ static void run_file(const char *err)
                         }
                         fclose(fp);
                     } else {
-                        log_warn("vdfs: unable to run file '%s': %s", ent->host_fn, strerror(errno));
+                        log_warn("vdfs: unable to run file '%s': %s", ent->host_path, strerror(errno));
                         adfs_hosterr(errno);
                     }
                 }
@@ -3489,7 +3671,7 @@ const struct cmdent ctab_filing[] = {
     { "BUild",   VDFS_ROM_BUILD   },
     { "CDir",    VDFS_ACT_CDIR    },
     { "COMpact", VDFS_ACT_NOP     },
-    { "COpy",    VDFS_ACT_NOP     },
+    { "COpy",    VDFS_ACT_COPY    },
     { "DELete",  VDFS_ACT_DELETE  },
     { "DEStroy", VDFS_ACT_NOP     },
     { "DIR",     VDFS_ACT_DIR     },
@@ -4180,6 +4362,9 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
         break;
     case VDFS_ACT_ACCESS:
         cmd_access(addr);
+        break;
+    case VDFS_ACT_COPY:
+        cmd_copy(addr);
         break;
     default:
         rom_dispatch(act);
