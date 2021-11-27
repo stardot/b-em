@@ -143,7 +143,6 @@ struct vdfs_entry {
 };
 
 static vdfs_entry root_dir;     // root as seen by BBC, not host.
-static vdfs_entry *prev_dir;
 static vdfs_entry *cat_dir;
 static unsigned   scan_seq;
 static uint8_t    vdfs_opt1;
@@ -157,6 +156,7 @@ typedef struct {
 
 static vdfs_dirlib cur_dir;
 static vdfs_dirlib lib_dir;
+static vdfs_dirlib prev_dir;
 
 typedef struct vdfs_findres {
     struct vdfs_entry *parent;
@@ -1544,7 +1544,7 @@ void vdfs_set_root(const char *root)
             if (new_root.attribs & ATTR_IS_DIR) {
                 vdfs_close();
                 root_dir = new_root;
-                root_dir.parent = cur_dir.dir = prev_dir = cat_dir = &root_dir;
+                root_dir.parent = cur_dir.dir = prev_dir.dir = cat_dir = &root_dir;
                 vdfs_findres res;
                 lib_dir.dir = find_entry_adfs("Lib", &res, &cur_dir);
                 scan_seq++;
@@ -1621,7 +1621,7 @@ void vdfs_loadstate(FILE *f)
         cur_dir.dir = &root_dir;
         vdfs_entry *new_cdir = ss_load_dir(cur_dir.dir, f, "current");
         lib_dir.dir = ss_load_dir(lib_dir.dir, f, "library");
-        prev_dir = ss_load_dir(prev_dir, f, "previous");
+        prev_dir.dir = ss_load_dir(prev_dir.dir, f, "previous");
         cat_dir = ss_load_dir(cat_dir, f, "catalogue");
         cur_dir.dir = new_cdir;
     }
@@ -1679,7 +1679,7 @@ void vdfs_savestate(FILE *f)
     putc(vdfs_enabled ? 'V' : 'v', f);
     ss_save_dir1(cur_dir.dir, f);
     ss_save_dir2(lib_dir.dir, f);
-    ss_save_dir2(prev_dir, f);
+    ss_save_dir2(prev_dir.dir, f);
     ss_save_dir2(cat_dir, f);
 }
 
@@ -2414,8 +2414,8 @@ static void delete_file(vdfs_entry *ent)
         else if (ent == lib_dir.dir)
             adfs_error(err_dellib);
         else if (rmdir(ent->host_path) == 0) {
-            if (ent == prev_dir)
-                prev_dir = cur_dir.dir;
+            if (ent == prev_dir.dir)
+                prev_dir = cur_dir;
             ent->attribs &= ~(ATTR_IS_DIR|ATTR_EXISTS);
             delete_inf(ent);
             a = 2;
@@ -2907,7 +2907,10 @@ static void osgbpb_get_title(uint32_t pb)
 static void osgbpb_get_dir_adfs(uint32_t pb, vdfs_dirlib *dir)
 {
     uint32_t mem_ptr = readmem32(pb+1);
-    mem_ptr = write_len_str(mem_ptr, "", 0);
+    char tmp[2];
+    tmp[0] = '0' + dir->drive;
+    tmp[1] = 0;
+    mem_ptr = write_len_str(mem_ptr, tmp, 1);
     vdfs_entry *ent = dir->dir;
     if (ent)
         write_len_str(mem_ptr, ent->acorn_fn, strlen(ent->acorn_fn));
@@ -3224,9 +3227,9 @@ static void cmd_access(uint16_t addr)
 
 static void cmd_back(void)
 {
-    vdfs_entry *ent = cur_dir.dir;
-    cur_dir.dir = prev_dir;
-    prev_dir = ent;
+    vdfs_dirlib tmp = cur_dir;
+    cur_dir = prev_dir;
+    prev_dir = tmp;
 }
 
 static void cmd_cdir(uint16_t addr)
@@ -3243,7 +3246,7 @@ static void cmd_cdir(uint16_t addr)
 
 static bool copy_file(vdfs_entry *old_ent, vdfs_entry *new_ent)
 {
-    BOOL res = CopyFile(old_ent->host_path, new_ent->host_path);
+    BOOL res = CopyFile(old_ent->host_path, new_ent->host_path, FALSE);
     if (!res)
         adfs_hosterr(errno);
     return res;
@@ -3371,6 +3374,7 @@ static bool copy_file(vdfs_entry *old_ent, vdfs_entry *new_ent)
 
 static void cmd_copy(uint16_t addr)
 {
+    log_debug("vdfs: cmd_copy, addr=%04X", addr);
     if (check_valid_dir(&cur_dir)) {
         char old_path[MAX_ACORN_PATH], new_path[MAX_ACORN_PATH];
         if ((addr = parse_name(old_path, sizeof old_path, addr))) {
@@ -3456,20 +3460,49 @@ static vdfs_entry *lookup_dir(uint16_t addr)
     return NULL;
 }
 
+static vdfs_entry *parse_adfs_dir(uint16_t addr, int *drive)
+{
+    int ch = readmem(addr);
+    if (ch == ':') {
+        ch = readmem(++addr);
+        if (ch < '0' || ch > '7') {
+            log_debug("vdfs: parse_adfs_dir, bad drive number");
+            adfs_error(err_badparms);
+            return NULL;
+        }
+        *drive = ch - '0';
+        ch = readmem(++addr);
+        if (ch != '.') {
+            if (ch == '\r')
+                return &root_dir;
+            log_debug("vdfs: parse_adfs_dir, missing dot");
+            adfs_error(err_badparms);
+            return NULL;
+        }
+        ++addr;
+    }
+    return lookup_dir(addr);
+}
+
 static void cmd_dir_adfs(uint16_t addr)
 {
-    vdfs_entry *ent = lookup_dir(addr);
+    int drive = cur_dir.drive;
+    vdfs_entry *ent = parse_adfs_dir(addr, &drive);
     if (ent) {
-        prev_dir = cur_dir.dir;
+        prev_dir = cur_dir;
+        cur_dir.drive = drive;
         cur_dir.dir = ent;
     }
 }
 
 static void cmd_lib_adfs(uint16_t addr)
 {
+    int drive = lib_dir.drive;
     vdfs_entry *ent = lookup_dir(addr);
-    if (ent)
+    if (ent) {
+        lib_dir.drive = drive;
         lib_dir.dir = ent;
+    }
 }
 
 static void parse_dfs_dir(uint16_t addr, vdfs_dirlib *dir)
@@ -3522,7 +3555,7 @@ static void cmd_lib_dfs(uint16_t addr)
 static void cmd_drive(uint16_t addr)
 {
     int ch = readmem(addr++);
-    if (ch >= '0' && ch <= '3')
+    if (ch >= '0' && (ch <= '3' || (ch <= '7' && !(fs_flags & DFS_MODE))))
         cur_dir.drive = ch - '0';
     else
         adfs_error(err_badparms);
@@ -4653,7 +4686,7 @@ static void serv_boot(void)
     if (vdfs_enabled && (!key_any_down() || key_code_down(ALLEGRO_KEY_S))) {
         if (readmem(0x028d)) { /* last break type */
             close_all();
-            cur_dir.dir = prev_dir = cat_dir = &root_dir;
+            cur_dir.dir = prev_dir.dir = cat_dir = &root_dir;
             cur_dir.drive = lib_dir.drive = 0;
             cur_dir.dfs_dir = lib_dir.dfs_dir = '$';
             vdfs_findres res;
@@ -4787,17 +4820,24 @@ void vdfs_write(uint16_t addr, uint8_t value)
 
 // Initialise the VDFS module.
 
+static void init_dirlib(vdfs_dirlib *dir, const char *desc)
+{
+    dir->desc = desc;
+    dir->dfs_dir = '$';
+    dir->drive = 0;
+}
+
 void vdfs_init(const char *root)
 {
     scan_seq = 0;
-    cur_dir.desc = "current";
-    lib_dir.desc = "library";
+    init_dirlib(&cur_dir, "current");
+    init_dirlib(&lib_dir, "library");
+    init_dirlib(&prev_dir, "previous");
     const char *env = getenv("BEM_VDFS_ROOT");
     if (env)
         root = env; //environment variable wins
     if (!root)
         root = ".";
     vdfs_set_root(root);
-    scan_seq++;
     vdfs_adfs_mode();
 }
