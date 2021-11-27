@@ -76,7 +76,7 @@ const char *vdfs_cfg_root = NULL;
 #define MAX_FILE_NAME    10
 #define MAX_ACORN_PATH   256
 #define MAX_TITLE        19
-#define MAX_INF_LINE     80
+#define MAX_INF_LINE     160
 
 // These are Acorn standard attributes
 
@@ -97,6 +97,7 @@ const char *vdfs_cfg_root = NULL;
 #define ATTR_OPEN_READ   0x1000
 #define ATTR_OPEN_WRITE  0x2000
 #define ATTR_IS_DIR      0x4000
+#define ATTR_BTIME_VALID 0x0100
 
 // Which file metadata to process.
 
@@ -121,6 +122,8 @@ struct vdfs_entry {
     char       acorn_fn[MAX_FILE_NAME+1];
     char       dfs_dir;
     uint16_t   attribs;
+    time_t     btime;
+    time_t     mtime;
     union {
         struct {
             uint32_t   load_addr;
@@ -139,19 +142,29 @@ struct vdfs_entry {
 };
 
 static vdfs_entry root_dir;     // root as seen by BBC, not host.
-static vdfs_entry *cur_dir;
-static vdfs_entry *lib_dir;
-static vdfs_entry *prev_dir;
 static vdfs_entry *cat_dir;
 static unsigned   scan_seq;
-static char dfs_dir;
-static char dfs_lib;
+static uint8_t    vdfs_opt1;
+
+typedef struct {
+    vdfs_entry *dir;
+    const char *desc;
+    char       dfs_dir;
+    uint8_t    drive;
+} vdfs_dirlib;
+
+static vdfs_dirlib cur_dir;
+static vdfs_dirlib lib_dir;
+static vdfs_dirlib prev_dir;
 
 typedef struct vdfs_findres {
     struct vdfs_entry *parent;
     const char *errmsg;
+    char dfs_dir;
     char acorn_fn[MAX_FILE_NAME+1];
 } vdfs_findres;
+
+static vdfs_findres info_res;
 
 /*
  * Open files.  An open file is an association between a host OS file
@@ -224,7 +237,7 @@ enum vdfs_action {
     VDFS_ROM_CLOSEALL,
     VDFS_ROM_BUILD,
     VDFS_ROM_APPEND,
-    VDFS_ROM_CLOSE_CMD,
+    VDFS_ROM_OPT1,
     VDFS_ACT_NOP,
     VDFS_ACT_QUIT,
     VDFS_ACT_SRLOAD,
@@ -255,7 +268,10 @@ enum vdfs_action {
     VDFS_ACT_OSW7F_AC2,
     VDFS_ACT_OSW7F_WATF,
     VDFS_ACT_OSW7F_WAT5,
-    VDFS_ACT_MMBDIN
+    VDFS_ACT_MMBDIN,
+    VDFS_ACT_DRIVE,
+    VDFS_ACT_ACCESS,
+    VDFS_ACT_COPY
 };
 
 /*
@@ -293,13 +309,15 @@ struct cmdent {
  * define this behaviour and are set/reset with the *FSCLAIM command.
  */
 
-#define CLAIM_ADFS  0x80
-#define CLAIM_DFS   0x40
+#define CLAIM_DFS   0x01
+#define CLAIM_ADFS  0x02
+#define WRITE_DATES 0x04
 #define DFS_MODE    0x20
+#define VDFS_ACTIVE 0x80
 
 static uint8_t  reg_a;
 static uint8_t  fs_flags = 0;
-static uint8_t  fs_num   = 0;
+static uint8_t  fs_num   = FSNO_VDFS;
 static uint16_t cmd_tail;
 
 /*
@@ -308,10 +326,11 @@ static uint16_t cmd_tail;
  * ADFS or DFS to the guest.
  */
 
-static vdfs_entry *(*find_entry)(const char *filename, vdfs_findres *res, vdfs_entry *dir, int dfsdir);
-static void (*osgbpb_get_dir)(uint32_t pb, vdfs_entry *dir, int dfsdir);
-static bool (*cat_prep)(uint16_t addr, vdfs_entry *dir, int dfsdir, const char *dir_desc);
-static void (*cat_get_dir)(vdfs_entry *dir, int dfsdir);
+static vdfs_entry *(*find_entry)(const char *filename, vdfs_findres *res, vdfs_dirlib *dir);
+static vdfs_entry *(*find_next)(vdfs_entry *ent, vdfs_findres *res);
+static void (*osgbpb_get_dir)(uint32_t pb, vdfs_dirlib *dir);
+static bool (*cat_prep)(uint16_t addr, vdfs_dirlib *dir);
+static void (*cat_get_dir)(vdfs_dirlib *dir);
 static void (*cmd_dir)(uint16_t addr);
 static void (*cmd_lib)(uint16_t addr);
 
@@ -332,6 +351,14 @@ static uint16_t readmem16(uint16_t addr)
     return value;
 }
 
+static uint32_t readmem24(uint16_t addr)
+{
+    uint32_t value = readmem(addr);
+    value |= (readmem(addr+1) << 8);
+    value |= (readmem(addr+2) << 16);
+    return value;
+}
+
 static uint32_t readmem32(uint16_t addr)
 {
     uint32_t value = readmem(addr);
@@ -345,6 +372,13 @@ static void writemem16(uint16_t addr, uint16_t value)
 {
     writemem(addr, value & 0xff);
     writemem(addr+1, (value >> 8) & 0xff);
+}
+
+static void writemem24(uint16_t addr, uint32_t value)
+{
+    writemem(addr, value & 0xff);
+    writemem(addr+1, (value >> 8) & 0xff);
+    writemem(addr+2, (value >> 16) & 0xff);
 }
 
 static void writemem32(uint16_t addr, uint32_t value)
@@ -474,6 +508,7 @@ static char *make_host_path(vdfs_entry *ent, const char *host_fn)
 
 static const char err_wont[]     = "\x93" "Won't";
 static const char err_badparms[] = "\x94" "Bad parms";
+static const char err_badcopy[]  = "\x94" "Bad copy - two names needed";
 static const char err_delcsd[]   = "\x97" "Can't delete CSD";
 static const char err_dellib[]   = "\x98" "Can't delete library";
 static const char err_badren[]   = "\xb0" "Bad rename";
@@ -490,15 +525,19 @@ static const char err_badname[]  = "\xcc" "Bad name";
 static const char err_notfound[] = "\xd6" "Not found";
 static const char err_channel[]  = "\xde" "Channel";
 static const char err_badcmd[]   = "\xfe" "Bad command";
-static const char err_badaddr[]  = "\x94" "Bad parms";
+static const char err_badaddr[]  = "\x94" "Bad address";
 static const char err_nomem[]    = "\x92" "Out of memory";
 static const char err_no_swr[]   = "\x93" "No SWRAM at that address";
 static const char err_too_big[]  = "\x94" "Too big";
 static const char err_wildcard[] = "\xfd" "Wild cards";
 
+// DFS error messages (used)
+
+static const char err_baddir[]   = "\xce" "Bad directory";
+
 // Error messages unique to VDFS
 
-static const char err_baddir[]  = "\xc7" "Not a directory";
+static const char err_notdir[]   = "\xc7" "Not a directory";
 
 /* Other ADFS messages not used.
 
@@ -560,58 +599,127 @@ static void adfs_hosterr(int errnum)
 
 // Populate a VDFS entry from host information.
 
+static void init_dir(vdfs_entry *ent)
+{
+    ent->u.dir.children = NULL;
+    ent->u.dir.scan_mtime = 0;
+    ent->u.dir.scan_seq = 0;
+    ent->u.dir.sorted = SORT_NONE;
+    ent->u.dir.boot_opt = 0;
+    ent->u.dir.title[0] = 0;
+}
+
+#ifdef WIN32
+#include <fileapi.h>
+
+static time_t time_win2unix(LPFILETIME td)
+{
+    uint64_t lo = td->dwLowDateTime;
+    uint64_t hi = td->dwHighDateTime;
+    uint64_t ticks = lo | (hi << 32);
+    /* Convert units, 100ns to second */
+    uint64_t secs = ticks / 10000000;
+    /* Convert epoch, 01-Jan-1601 to 01-Jan-1970 */
+    return secs - (uint64_t)((1970-1601)*365+92-3)*24*60*60;
+}
+
 static void scan_attr(vdfs_entry *ent)
 {
-    struct stat stb;
-
-    if (stat(ent->host_path, &stb) == -1)
-        log_warn("vdfs: unable to stat '%s': %s\n", ent->host_path, strerror(errno));
-    else {
-        ent->attribs |= ATTR_EXISTS;
-        if (S_ISDIR(stb.st_mode)) {
-            if (!(ent->attribs & ATTR_IS_DIR)) {
-                ent->attribs |= ATTR_IS_DIR;
-                ent->u.dir.children = NULL;
-                ent->u.dir.scan_mtime = 0;
-                ent->u.dir.scan_seq = 0;
-                ent->u.dir.sorted = SORT_NONE;
-                ent->u.dir.boot_opt = 0;
-                ent->u.dir.title[0] = 0;
+    uint16_t attribs = ent->attribs;
+    WIN32_FILE_ATTRIBUTE_DATA wattr;
+    if (GetFileAttributesEx(ent->host_path, GetFileExInfoStandard, &wattr)) {
+        ent->btime = time_win2unix(&wattr.ftCreationTime);
+        ent->mtime = time_win2unix(&wattr.ftLastWriteTime);
+        attribs &= ~ATTR_ACORN_MASK;
+        attribs |= ATTR_EXISTS|ATTR_BTIME_VALID|ATTR_USER_READ|ATTR_OTHR_READ;
+        if (wattr.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+            if (!(attribs & ATTR_IS_DIR)) {
+                attribs |= ATTR_IS_DIR;
+                init_dir(ent);
             }
         }
         else {
-            if (ent->attribs & ATTR_IS_DIR) {
+            if (attribs & ATTR_IS_DIR) {
                 log_debug("vdfs: dir %s has become a file", ent->acorn_fn);
-                ent->attribs &= ~ATTR_IS_DIR;
+                attribs &= ~ATTR_IS_DIR;
                 free_entry(ent->u.dir.children);
             }
             ent->u.file.load_addr = 0;
             ent->u.file.exec_addr = 0;
-            ent->u.file.length = stb.st_size;
+            if (wattr.nFileSizeHigh) {
+                log_warn("vdfs: file %s is too big (>4Gb)", ent->host_path);
+                ent->u.file.length = 0xffffffff;
+            }
+            else
+                ent->u.file.length = wattr.nFileSizeLow;
         }
-#ifdef WIN32
-        if (stb.st_mode & S_IRUSR)
-            ent->attribs |= ATTR_USER_READ|ATTR_OTHR_READ;
-        if (stb.st_mode & S_IWUSR)
-            ent->attribs |= ATTR_USER_WRITE|ATTR_OTHR_WRITE;
-        if (stb.st_mode & S_IXUSR)
-            ent->attribs |= ATTR_USER_EXEC|ATTR_OTHR_EXEC;
-#else
-        if (stb.st_mode & S_IRUSR)
-            ent->attribs |= ATTR_USER_READ;
-        if (stb.st_mode & S_IWUSR)
-            ent->attribs |= ATTR_USER_WRITE;
-        if (stb.st_mode & S_IXUSR)
-            ent->attribs |= ATTR_USER_EXEC;
-        if (stb.st_mode & (S_IRGRP|S_IROTH))
-            ent->attribs |= ATTR_OTHR_READ;
-        if (stb.st_mode & (S_IWGRP|S_IWOTH))
-            ent->attribs |= ATTR_OTHR_WRITE;
-        if (stb.st_mode & (S_IXGRP|S_IXOTH))
-            ent->attribs |= ATTR_OTHR_EXEC;
-#endif
+        if (wattr.dwFileAttributes & FILE_ATTRIBUTE_READONLY)
+            attribs |= ATTR_USER_LOCKD;
+        else
+            attribs |= ATTR_USER_WRITE|ATTR_OTHR_WRITE;
+        ent->attribs = attribs;
     }
-    log_debug("vdfs: scan_attr: host=%s, attr=%04X\n", ent->host_fn, ent->attribs);
+    else
+        log_warn("vdfs: GetFileAttributesEx failed for %s: %s", ent->host_path, strerror(errno));
+#else
+static void scan_attr(vdfs_entry *ent)
+{
+    uint16_t attribs = ent->attribs;
+#ifdef linux
+#define size_field stx.stx_size
+    struct statx stx;
+
+    if (!statx(AT_FDCWD, ent->host_path, AT_NO_AUTOMOUNT, STATX_BASIC_STATS|STATX_BTIME, &stx)) {
+        mode_t mode = stx.stx_mode;
+        ent->btime = stx.stx_btime.tv_sec;
+        ent->mtime = stx.stx_mtime.tv_sec;
+        if (stx.stx_mask & STATX_BTIME)
+            attribs |= ATTR_BTIME_VALID;
+#else
+#define size_field stb.st_size
+    struct stat stb;
+
+    if (!stat(ent->host_path, &stb)) {
+        mode_t mode = stb.st_mode;
+        ent->btime = 0;
+        ent->mtime = stb.st_mtime;
+#endif
+        attribs |= ATTR_EXISTS;
+        attribs &= ~ATTR_ACORN_MASK;
+        if (S_ISDIR(mode)) {
+            if (!(attribs & ATTR_IS_DIR)) {
+                attribs |= ATTR_IS_DIR;
+                init_dir(ent);
+            }
+        }
+        else {
+            if (attribs & ATTR_IS_DIR) {
+                log_debug("vdfs: dir %s has become a file", ent->acorn_fn);
+                attribs &= ~ATTR_IS_DIR;
+                free_entry(ent->u.dir.children);
+            }
+            ent->u.file.load_addr = 0;
+            ent->u.file.exec_addr = 0;
+            ent->u.file.length = size_field;
+        }
+        if (mode & S_IRUSR)
+            attribs |= ATTR_USER_READ;
+        if (mode & S_IWUSR)
+            attribs |= ATTR_USER_WRITE;
+        if (mode & S_IXUSR)
+            attribs |= ATTR_USER_EXEC;
+        if (mode & (S_IRGRP|S_IROTH))
+            attribs |= ATTR_OTHR_READ;
+        if (mode & (S_IWGRP|S_IWOTH))
+            attribs |= ATTR_OTHR_WRITE;
+        if (mode & (S_IXGRP|S_IXOTH))
+            attribs |= ATTR_OTHR_EXEC;
+    }
+    else
+        log_warn("vdfs: unable to stat '%s': %s", ent->host_path, strerror(errno));
+#endif
+    log_debug("vdfs: scan_attr: host=%s, attr=%04X", ent->host_fn, attribs);
+    ent->attribs = attribs;
 }
 
 static const char *scan_inf_start(vdfs_entry *ent, char inf_line[MAX_INF_LINE])
@@ -652,11 +760,55 @@ static const char *scan_inf_start(vdfs_entry *ent, char inf_line[MAX_INF_LINE])
     return NULL;
 }
 
+static void acorn_date_unix(struct tm *tp, unsigned adate)
+{
+    tp->tm_year = 1981 + (((adate & 0x00e0) >> 1) | ((adate & 0xf000) >> 12)) - 1900;
+    tp->tm_mon = ((adate & 0x0f00) >> 8) - 1;
+    tp->tm_mday = (adate & 0x001f);
+    log_debug("vdfs: acorn_date_unix: acorn_date=%04X, local=%02u/%02u/%02u", adate, tp->tm_mday, tp->tm_mon+1, tp->tm_year + 1900);
+}
+
+static void acorn_time_unix(struct tm *tp, unsigned atime)
+{
+    tp->tm_hour = atime & 0x0000ff;
+    tp->tm_min = (atime & 0x00ff00) >> 8;
+    tp->tm_sec = (atime & 0xff0000) >> 16;
+    log_debug("vdfs: acorn_time_unix: acorn_time=%06X, local=%02u:%02u:%02u", atime, tp->tm_hour, tp->tm_min, tp->tm_sec);
+}
+
+static time_t acorn_timedate_unix(unsigned adate, unsigned atime)
+{
+    struct tm tm;
+    memset(&tm, 0, sizeof(tm));
+    acorn_date_unix(&tm, adate);
+    acorn_time_unix(&tm, atime);
+    tm.tm_isdst = -1;
+    time_t secs = mktime(&tm);
+    return secs;
+}
+
+static void set_ent_date_time(vdfs_entry *ent, bool mdate_valid, unsigned mdate, unsigned mtime, bool cdate_valid, unsigned cdate, unsigned ctime)
+{
+    if (mdate_valid) {
+        time_t msecs = acorn_timedate_unix(mdate, mtime);
+        if (msecs > ent->mtime)
+            ent->mtime = msecs;
+    }
+    if (cdate_valid) {
+        time_t csecs = acorn_timedate_unix(cdate, ctime);
+        if (!(ent->attribs & ATTR_BTIME_VALID) || csecs < ent->btime)
+            ent->btime = csecs;
+        ent->attribs |= ATTR_BTIME_VALID;
+    }
+}
+
 static void scan_inf_file(vdfs_entry *ent)
 {
     char inf_line[MAX_INF_LINE];
     int ch, nyb;
-    uint32_t load_addr = 0, exec_addr = 0;
+    uint32_t load_addr = 0, exec_addr = 0, attribs = 0;
+    bool mdate_valid = false, cdate_valid = false;
+    unsigned mdate = 0, mtime = 0, cdate = 0, ctime = 0;
     const char *lptr = scan_inf_start(ent, inf_line);
     if (lptr) {
         // Parse load address.
@@ -674,57 +826,151 @@ static void scan_inf_file(vdfs_entry *ent)
             exec_addr = (exec_addr << 4) | nyb;
             ch = *lptr++;
         }
+
+        // Skip the length.
+        while (ch == ' ' || ch == '\t')
+            ch = *lptr++;
+        while ((nyb = hex2nyb(ch)) >= 0)
+            ch = *lptr++;
+
+        // Parse the attributes.
+        while (ch == ' ' || ch == '\t')
+            ch = *lptr++;
+        if (ch == 'L' || ch == 'l')
+            attribs = ATTR_USER_READ|ATTR_USER_LOCKD|ATTR_OTHR_READ|ATTR_OTHR_LOCKD;
+        else {
+            while ((nyb = hex2nyb(ch)) >= 0) {
+                attribs = (attribs << 4) | nyb;
+                ch = *lptr++;
+            }
+        }
+
+        // Parse modification date.
+        while (ch == ' ' || ch == '\t')
+            ch = *lptr++;
+        while ((nyb = hex2nyb(ch)) >= 0) {
+            mdate_valid = true;
+            mdate = (mdate << 4) | nyb;
+            ch = *lptr++;
+        }
+
+        // Parse modification time.
+        while (ch == ' ' || ch == '\t')
+            ch = *lptr++;
+        while ((nyb = hex2nyb(ch)) >= 0) {
+            mtime = (mtime << 4) | nyb;
+            ch = *lptr++;
+        }
+
+        // Parse creation date.
+        while (ch == ' ' || ch == '\t')
+            ch = *lptr++;
+        while ((nyb = hex2nyb(ch)) >= 0) {
+            cdate_valid = true;
+            cdate = (cdate << 4) | nyb;
+            ch = *lptr++;
+        }
+
+        // Parse creation time.
+        while (ch == ' ' || ch == '\t')
+            ch = *lptr++;
+        while ((nyb = hex2nyb(ch)) >= 0) {
+            ctime = (ctime << 4) | nyb;
+            ch = *lptr++;
+        }
     }
     ent->u.file.load_addr = load_addr;
     ent->u.file.exec_addr = exec_addr;
     log_debug("vdfs: load=%08X, exec=%08X", load_addr, exec_addr);
+    if (attribs) {
+        /* merge .inf and host filing system attributes */
+        ent->attribs &= attribs|~ATTR_ACORN_MASK;
+        ent->attribs |= attribs & (ATTR_USER_LOCKD|ATTR_OTHR_LOCKD);
+    }
+    set_ent_date_time(ent, mdate_valid, mdate, mtime, cdate_valid, cdate, ctime);
 }
 
-static unsigned scan_inf_dir_new(const char *lptr, const char *eptr, char *title)
+static void scan_inf_dir_new(vdfs_entry *dir, const char *lptr, const char *eptr)
 {
     unsigned opt = 0;
+    bool mdate_valid = false, cdate_valid = false;
+    unsigned mdate = 0, mtime = 0, cdate = 0, ctime = 0;
     do {
+        // Skip spaces after the '='
+        const char *aptr = eptr;
+        int ch;
+        while ((ch = *++aptr) == ' ' || ch == '\t')
+            ;
+        // Try three character keys.
         const char *sptr = eptr - 3;
         if (sptr >= lptr && !strncasecmp(sptr, "OPT=", 4)) {
-            int ch, nyb;
+            int nyb;
             // Parse options.
-            while ((ch = *++eptr) == ' ' || ch == '\t')
-                ;
             while ((nyb = hex2nyb(ch)) >= 0) {
                 opt = (opt << 4) | nyb;
-                ch = *++eptr;
+                ch = *++aptr;
             }
         }
         else {
+            // Try five character keys.
             sptr = eptr - 5;
-            if (sptr >= lptr && !strncasecmp(sptr, "TITLE=", 6)) {
-                // Parse title.
-                char *ptr = title;
-                char *end = title + MAX_TITLE;
-                int ch, quote= 0;
+            if (sptr >= lptr) {
+                if (!strncasecmp(sptr, "TITLE=", 6)) {
+                    // Parse title.
+                    char *ptr = dir->u.dir.title;
+                    char *end = dir->u.dir.title + MAX_TITLE;
+                    int quote= 0;
 
-                do
-                    ch = *++eptr;
-                while (ch == ' ' || ch == '\t');
-
-                if (ch == '"') {
-                    quote = 1;
-                    ch = *++eptr;
+                    if (ch == '"') {
+                        quote = 1;
+                        ch = *++aptr;
+                    }
+                    while (ptr < end && ch && ch != '\n' && (ch != '"' || !quote) && ((ch != ' ' && ch != '\t') || quote)) {
+                        *ptr++ = ch & 0x7f;
+                        ch = *++aptr;
+                    }
+                    *ptr = '\0';
                 }
-                while (ptr < end && ch && ch != '\n' && (ch != '"' || !quote) && ((ch != ' ' && ch != '\t') || quote)) {
-                    *ptr++ = ch & 0x7f;
-                    ch = *++eptr;
+                else if (!strncasecmp(sptr, "MDATE=", 6)) {
+                    int nyb;
+                    while ((nyb = hex2nyb(ch)) >= 0) {
+                        mdate_valid = true;
+                        mdate = (mdate << 4) | nyb;
+                        ch = *++aptr;
+                    }
                 }
-                *ptr = '\0';
+                else if (!strncasecmp(sptr, "MTIME=", 6)) {
+                    int nyb;
+                    while ((nyb = hex2nyb(ch)) >= 0) {
+                        mtime = (mtime << 4) | nyb;
+                        ch = *++aptr;
+                    }
+                }
+                else if (!strncasecmp(sptr, "CDATE=", 6)) {
+                    int nyb;
+                    while ((nyb = hex2nyb(ch)) >= 0) {
+                        cdate_valid = true;
+                        cdate = (cdate << 4) | nyb;
+                        ch = *++aptr;
+                    }
+                }
+                else if (!strncasecmp(sptr, "CTIME=", 6)) {
+                    int nyb;
+                    while ((nyb = hex2nyb(ch)) >= 0) {
+                        ctime = (ctime << 4) | nyb;
+                        ch = *++aptr;
+                    }
+                }
             }
             else
-                ++eptr;
+                ++aptr;
         }
-        lptr = eptr;
+        lptr = aptr;
         eptr = strchr(lptr, '=');
     }
     while (eptr);
-    return opt;
+    dir->u.dir.boot_opt = opt;
+    set_ent_date_time(dir, mdate_valid, mdate, mtime, cdate_valid, cdate, ctime);
 }
 
 static unsigned scan_inf_dir_old(const char *lptr, char *title)
@@ -759,7 +1005,7 @@ static void scan_inf_dir(vdfs_entry *dir)
     if (lptr) {
         const char *eptr = strchr(lptr, '=');
         if (eptr)
-            dir->u.dir.boot_opt = scan_inf_dir_new(lptr, eptr, dir->u.dir.title);
+            scan_inf_dir_new(dir, lptr, eptr);
         else
             dir->u.dir.boot_opt = scan_inf_dir_old(lptr, dir->u.dir.title);
     }
@@ -861,10 +1107,20 @@ static vdfs_entry *wild_search(vdfs_entry *dir, const char *pattern)
 
 // Create VDFS entry for a new file.
 
+static int next_seq_ch(int seq_ch)
+{
+    if (seq_ch == '9')
+        return 'A';
+    if (seq_ch == 'Z')
+        return 'a';
+    if (seq_ch == 'z')
+        return -1;
+    return seq_ch + 1;
+}
+
 static vdfs_entry *new_entry(vdfs_entry *dir, const char *host_fn)
 {
     vdfs_entry *ent;
-    int name_len, seq_ch = '0';
     char *host_path;
 
     if ((ent = malloc(sizeof(vdfs_entry)))) {
@@ -873,35 +1129,27 @@ static vdfs_entry *new_entry(vdfs_entry *dir, const char *host_fn)
         if ((host_path = make_host_path(ent, host_fn))) {
             scan_entry(ent);
             if (acorn_search(dir, ent->acorn_fn)) {
-                // name was already in tree - generate a unique one.
-                name_len = strlen(ent->acorn_fn);
-                if (name_len < (MAX_FILE_NAME-2)) {
-                    ent->acorn_fn[name_len] = '~';
-                    ent->acorn_fn[name_len+1] = seq_ch;
-                } else {
-                    ent->acorn_fn[MAX_FILE_NAME-2] = '~';
-                    ent->acorn_fn[MAX_FILE_NAME-1] = seq_ch;
-                }
+                // name was already in use - generate a unique one.
+                int seq_ch = '0';
+                size_t ix = strlen(ent->acorn_fn);
+                if (ix > (MAX_FILE_NAME-2))
+                    ix = MAX_FILE_NAME-2;
+                ent->acorn_fn[ix] = '~';
+                ent->acorn_fn[ix+1] = seq_ch;
                 while (acorn_search(dir, ent->acorn_fn)) {
-                    if (seq_ch == '9')
-                        seq_ch = 'A';
-                    else if (seq_ch == 'Z')
-                        seq_ch = 'a';
-                    else if (seq_ch == 'z')
-                        break;
-                    else
-                        seq_ch++;
-                    if (name_len < (MAX_FILE_NAME-2))
-                        ent->acorn_fn[name_len+1] = seq_ch;
-                    else
-                        ent->acorn_fn[MAX_FILE_NAME-1] = seq_ch;
+                    if ((seq_ch = next_seq_ch(seq_ch)) < 0) {
+                        log_warn("vdfs: unable to create unique acorn name for %s", host_fn);
+                        free(ent);
+                        return NULL;
+                    }
+                    ent->acorn_fn[ix+1] = seq_ch;
                 }
-                log_debug("vdfs: new_entry: unique name %s used\n", ent->acorn_fn);
+                log_debug("vdfs: new_entry: unique name %s used", ent->acorn_fn);
             }
             ent->next = dir->u.dir.children;
             dir->u.dir.children = ent;
             dir->u.dir.sorted = SORT_NONE;
-            log_debug("vdfs: new_entry: returing new entry %p\n", ent);
+            log_debug("vdfs: new_entry: returning new entry %p", ent);
             return ent;
         }
         free(ent);
@@ -975,7 +1223,7 @@ static int scan_dir(vdfs_entry *dir)
         dir->u.dir.scan_mtime = stb.st_mtime;
         return 0;
     } else {
-        log_warn("vdfs: unable to opendir '%s': %s\n", dir->host_path, strerror(errno));
+        log_warn("vdfs: unable to opendir '%s': %s", dir->host_path, strerror(errno));
         return 1;
     }
 }
@@ -992,7 +1240,7 @@ static uint16_t parse_name(char *str, size_t size, uint16_t addr)
     char *end = str + size - 1;
     int ch, quote= 0;
 
-    log_debug("vdfs: parse_name: addr=%04x\n", addr);
+    log_debug("vdfs: parse_name: addr=%04x", addr);
     do
         ch = readmem(addr++);
     while (ch == ' ' || ch == '\t');
@@ -1014,19 +1262,21 @@ static uint16_t parse_name(char *str, size_t size, uint16_t addr)
     return addr;
 }
 
-static bool check_valid_dir(vdfs_entry *ent, const char *which)
+static bool check_valid_dir(vdfs_dirlib *dir)
 {
+    vdfs_entry *ent = dir->dir;
     if (ent && ent->attribs & ATTR_IS_DIR)
         return true;
-    log_warn("vdfs: %s directory is not valid", which);
+    log_warn("vdfs: %s directory is not valid", dir->desc);
     adfs_error(err_baddir);
     return false;
 }
 
 // Given an Acorn filename, find the VDFS entry.
 
-static vdfs_entry *find_entry_adfs(const char *filename, vdfs_findres *res, vdfs_entry *ent, int dfsdir)
+static vdfs_entry *find_entry_adfs(const char *filename, vdfs_findres *res, vdfs_dirlib *dir)
 {
+    vdfs_entry *ent = dir->dir;
     int ch, fn0, fn1;
     const char *fn_src;
     char *fn_ptr, *fn_end;
@@ -1034,6 +1284,7 @@ static vdfs_entry *find_entry_adfs(const char *filename, vdfs_findres *res, vdfs
 
     res->parent = NULL;
     res->errmsg = err_notfound;
+    res->dfs_dir = dir->dfs_dir;
 
     for (fn_src = filename;;) {
         fn_ptr = res->acorn_fn;
@@ -1050,8 +1301,8 @@ static vdfs_entry *find_entry_adfs(const char *filename, vdfs_findres *res, vdfs
         fn1 = res->acorn_fn[1];
         if (((fn0 == '$' || fn0 == '&') && fn1 == '\0') || (fn0 == ':' && fn1 >= '0' && fn1 <= '9'))
             ent = &root_dir;
-        else if (fn0 == '%' && fn1 == '\0' && check_valid_dir(lib_dir, "library"))
-            ent = lib_dir;
+        else if (fn0 == '%' && fn1 == '\0' && check_valid_dir(&lib_dir))
+            ent = lib_dir.dir;
         else if (fn0 == '^' && fn1 == '\0')
             ent = ent->parent;
         else if (!scan_dir(ent) && (ptr = wild_search(ent, res->acorn_fn)))
@@ -1068,46 +1319,94 @@ static vdfs_entry *find_entry_adfs(const char *filename, vdfs_findres *res, vdfs
         }
         if (!(ent->attribs & ATTR_IS_DIR)) {
             log_debug("vdfs: find_entry: acorn path %s has file %s where directory expected", filename, ent->host_path);
-            res->errmsg = err_baddir;
+            res->errmsg = err_notdir;
             return NULL;
         }
     }
     return NULL;
 }
 
-static vdfs_entry *find_entry_dfs(const char *filename, vdfs_findres *res, vdfs_entry *dir, int dfsdir)
+static vdfs_entry *find_next_adfs(vdfs_entry *ent, vdfs_findres *res)
 {
-    log_debug("vdfs: find_entry_dfs, filename=%s, dfsdir=%c", filename, dfsdir);
-    if (!scan_dir(dir)) {
-        int ic = filename[0];
-        if (ic && filename[1] == '.') {
-            dfsdir = ic;
-            filename += 2;
-        }
-        for (vdfs_entry *ent = dir->u.dir.children; ent; ent = ent->next) {
-            log_debug("vdfs: find_entry_dfs, considering entry %s", ent->acorn_fn);
-            if (dfsdir == '*' || dfsdir == '#' || dfsdir == ent->dfs_dir) {
+    size_t len = strlen(res->acorn_fn);
+    do {
+        ent = ent->next;
+        if (!ent)
+            return NULL;
+    } while (!(ent->attribs & ATTR_EXISTS) || vdfs_wildmat(res->acorn_fn, ent->acorn_fn, len));
+    return ent;
+}
+
+static vdfs_entry *find_entry_dfs(const char *filename, vdfs_findres *res, vdfs_dirlib *dir)
+{
+    int srchdir = dir->dfs_dir;
+    log_debug("vdfs: find_entry_dfs, filename=%s, dfsdir=%c", filename, srchdir);
+    int ic = filename[0];
+    if (ic && filename[1] == '.') {
+        srchdir = ic;
+        filename += 2;
+        log_debug("vdfs: find_entry_dfs, parsed DFS dir %c, filename=%s", srchdir, filename);
+    }
+    res->dfs_dir = srchdir;
+    strncpy(res->acorn_fn, filename, MAX_FILE_NAME);
+    if (!scan_dir(dir->dir)) {
+        for (vdfs_entry *ent = dir->dir->u.dir.children; ent; ent = ent->next) {
+            log_debug("vdfs: find_entry_dfs, considering entry %c.%s", ent->dfs_dir, ent->acorn_fn);
+            if (srchdir == '*' || srchdir == '#' || srchdir == ent->dfs_dir) {
                 log_debug("vdfs: find_entry_dfs, matched DFS dir");
                 if (!vdfs_wildmat(filename, ent->acorn_fn, MAX_FILE_NAME))
                     return ent;
             }
         }
     }
+    res->parent = dir->dir;
     res->errmsg = err_notfound;
     return NULL;
+}
+
+static vdfs_entry *find_next_dfs(vdfs_entry *ent, vdfs_findres *res)
+{
+    int srchdir = res->dfs_dir;
+    log_debug("vdfs: find_next_dfs, pattern=%s, start=%c.%s, srchdir=%c", res->acorn_fn, ent->dfs_dir, ent->acorn_fn, srchdir);
+    size_t len = strlen(res->acorn_fn);
+    do {
+        ent = ent->next;
+        if (!ent)
+            return NULL;
+        log_debug("vdfs: find_next_dfs, checking %c.%s", ent->dfs_dir, ent->acorn_fn);
+    } while (!(ent->attribs & ATTR_EXISTS) || !(srchdir == '*' || srchdir == '#' || srchdir == ent->dfs_dir) || vdfs_wildmat(res->acorn_fn, ent->acorn_fn, len));
+    return ent;
 }
 
 static vdfs_entry *add_new_file(vdfs_findres *res)
 {
     vdfs_entry *dir = res->parent;
     vdfs_entry *new_ent;
-    char host_fn[MAX_FILE_NAME];
+    char host_fn[MAX_FILE_NAME+3];
 
     if ((new_ent = malloc(sizeof(vdfs_entry)))) {
         init_entry(new_ent);
         memcpy(new_ent->acorn_fn, res->acorn_fn, MAX_FILE_NAME+1);
-        new_ent->dfs_dir = dfs_dir;
+        new_ent->dfs_dir = res->dfs_dir;
         bbc2hst(res->acorn_fn, host_fn);
+        if (host_search(dir, host_fn)) {
+            /* host name already exists, generate a unique name */
+            size_t name_len = strlen(host_fn);
+            int seq_ch = '0';
+            host_fn[name_len] = '~';
+            host_fn[name_len+1] = seq_ch;
+            host_fn[name_len+2] = 0;
+            while (host_search(dir, host_fn)) {
+                if ((seq_ch = next_seq_ch(seq_ch)) < 0) {
+                    log_warn("vdfs: unable to create unique host name for %c.%s", res->dfs_dir, res->acorn_fn);
+                    res->errmsg = err_badname;
+                    free(new_ent);
+                    return NULL;
+                }
+                host_fn[name_len+1] = seq_ch;
+            }
+            log_debug("vdfs: add_new_file: unique name %s used", host_fn);
+        }
         new_ent->parent = dir;
         if (make_host_path(new_ent, host_fn)) {
             new_ent->next = dir->u.dir.children;
@@ -1123,6 +1422,21 @@ static vdfs_entry *add_new_file(vdfs_findres *res)
 
 // Write changed attributes back to the .inf file.
 
+static unsigned unix_date_acorn(const struct tm *tp)
+{
+    unsigned year = tp->tm_year + 1900 - 1981;
+    unsigned adate = tp->tm_mday | ((tp->tm_mon + 1) << 8) | ((year & 0x70) << 1) | ((year & 0x0f) << 12);
+    log_debug("vdfs: unix_date_acorn: local=%02u/%02u/%04u, ayear=%u, acorn_date=%04X", tp->tm_mday, tp->tm_mon+1, tp->tm_year + 1900, year, adate);
+    return adate;
+}
+
+static unsigned unix_time_acorn(const struct tm *tp)
+{
+    unsigned atime = tp->tm_hour | (tp->tm_min << 8) | (tp->tm_sec << 16);
+    log_debug("vdfs: unix_time_acorn: local=%02u:%02u:%02u, acorn_time=%06X", tp->tm_hour, tp->tm_min, tp->tm_sec, atime);
+    return atime;
+}
+
 static void write_back(vdfs_entry *ent)
 {
     FILE *fp;
@@ -1130,17 +1444,34 @@ static void write_back(vdfs_entry *ent)
     show_activity();
     *ent->host_inf = '.'; // select .inf file.
     if ((fp = fopen(ent->host_path, "wt"))) {
+        const struct tm *tp = localtime(&ent->mtime);
         if (ent->attribs & ATTR_IS_DIR) {
-            const char *fmt = "%s OPT=%02X DIR=1 TITLE=%s\n";
-            if (strpbrk(ent->u.dir.title, " \t"))
-                fmt = "%s OPT=%02X DIR=1 TITLE=\"%s\"\n";
-            fprintf(fp, fmt, ent->acorn_fn, ent->u.dir.boot_opt, ent->u.dir.title);
+            fprintf(fp, "%s OPT=%02X DIR=1 MDATE=%04X MTIME=%06X", ent->acorn_fn, ent->u.dir.boot_opt, unix_date_acorn(tp), unix_time_acorn(tp));
+            if (ent->attribs & ATTR_BTIME_VALID) {
+                tp = localtime(&ent->btime);
+                fprintf(fp, " CDATE=%04X CTIME=%06X", unix_date_acorn(tp), unix_time_acorn(tp));
+            }
+            if (ent->u.dir.title[0]) {
+                const char *fmt = " TITLE=%s\n";
+                if (strpbrk(ent->u.dir.title, " \t"))
+                    fmt = " TITLE=\"%s\"\n";
+                fprintf(fp, fmt, ent->u.dir.title);
+            }
+            else
+                putc('\n', fp);
         }
-        else
-            fprintf(fp, "%c.%s %08X %08X %08X %02X\n", ent->dfs_dir, ent->acorn_fn, ent->u.file.load_addr, ent->u.file.exec_addr, ent->u.file.length, ent->attribs & ATTR_ACORN_MASK);
+        else {
+            fprintf(fp, "%c.%s %08X %08X %08X %02X %04X %06X", ent->dfs_dir, ent->acorn_fn, ent->u.file.load_addr, ent->u.file.exec_addr, ent->u.file.length, ent->attribs & ATTR_ACORN_MASK, unix_date_acorn(tp), unix_time_acorn(tp));
+            if (ent->attribs & ATTR_BTIME_VALID) {
+                tp = localtime(&ent->btime);
+                fprintf(fp, " %04X %06X\n", unix_date_acorn(tp), unix_time_acorn(tp));
+            }
+            else
+                putc('\n', fp);
+        }
         fclose(fp);
     } else
-        log_warn("vdfs: unable to create INF file '%s': %s\n", ent->host_path, strerror(errno));
+        log_warn("vdfs: unable to create INF file '%s': %s", ent->host_path, strerror(errno));
     *ent->host_inf = '\0'; // select real file.
 }
 
@@ -1212,9 +1543,9 @@ void vdfs_set_root(const char *root)
             if (new_root.attribs & ATTR_IS_DIR) {
                 vdfs_close();
                 root_dir = new_root;
-                root_dir.parent = cur_dir = prev_dir = cat_dir = &root_dir;
+                root_dir.parent = cur_dir.dir = prev_dir.dir = cat_dir = &root_dir;
                 vdfs_findres res;
-                lib_dir = find_entry_adfs("Lib", &res, &root_dir, dfs_dir);
+                lib_dir.dir = find_entry_adfs("Lib", &res, &cur_dir);
                 scan_seq++;
                 return;
             }
@@ -1245,7 +1576,7 @@ static vdfs_entry *ss_spec_path(FILE *f, const char *which)
 
     path = savestate_load_str(f);
     log_debug("vdfs: loadstate setting %s directory to $.%s", which, path);
-    if ((ent = find_entry(path, &res, &root_dir, '$')))
+    if ((ent = find_entry_adfs(path, &res, &cur_dir)))
         if (!(ent->attribs & ATTR_IS_DIR))
             ent = NULL;
     free(path);
@@ -1254,10 +1585,8 @@ static vdfs_entry *ss_spec_path(FILE *f, const char *which)
 
 static vdfs_entry *ss_load_dir(vdfs_entry *dir, FILE *f, const char *which)
 {
-    vdfs_entry *ent;
-    int ch;
-
-    if ((ch = getc(f)) != EOF) {
+    int ch = ch = getc(f);
+    if (ch != EOF) {
         if (ch == 'N') {
             dir = NULL;
             log_debug("vdfs: loadstate %s directory set to undefined", which);
@@ -1265,11 +1594,16 @@ static vdfs_entry *ss_load_dir(vdfs_entry *dir, FILE *f, const char *which)
         else if (ch == 'R') {
             dir = &root_dir;
             log_debug("vdfs: loadstate %s directory set to root", which);
-        } else if (ch == 'C') {
-            dir = cur_dir;
+        }
+        else if (ch == 'C') {
+            dir = cur_dir.dir;
             log_debug("vdfs: loadstate %s directory set to current", which);
-        } else if (ch == 'S' && ((ent = ss_spec_path(f, which))))
-            dir = ent;
+        }
+        else if (ch == 'S') {
+            vdfs_entry *ent = ss_spec_path(f, which);
+            if (ent)
+                dir = ent;
+        }
     }
     return dir;
 }
@@ -1283,10 +1617,12 @@ void vdfs_loadstate(FILE *f)
             vdfs_enabled = true;
         else if (ch == 'v')
             vdfs_enabled = false;
-        cur_dir = ss_load_dir(cur_dir, f, "current");
-        lib_dir = ss_load_dir(lib_dir, f, "library");
-        prev_dir = ss_load_dir(prev_dir, f, "previous");
+        cur_dir.dir = &root_dir;
+        vdfs_entry *new_cdir = ss_load_dir(cur_dir.dir, f, "current");
+        lib_dir.dir = ss_load_dir(lib_dir.dir, f, "library");
+        prev_dir.dir = ss_load_dir(prev_dir.dir, f, "previous");
         cat_dir = ss_load_dir(cat_dir, f, "catalogue");
+        cur_dir.dir = new_cdir;
     }
 }
 
@@ -1331,7 +1667,7 @@ static void ss_save_dir1(vdfs_entry *ent, FILE *f)
 
 static void ss_save_dir2(vdfs_entry *ent, FILE *f)
 {
-    if (ent == cur_dir)
+    if (ent == cur_dir.dir)
         putc('C', f);
     else
         ss_save_dir1(ent, f);
@@ -1340,9 +1676,9 @@ static void ss_save_dir2(vdfs_entry *ent, FILE *f)
 void vdfs_savestate(FILE *f)
 {
     putc(vdfs_enabled ? 'V' : 'v', f);
-    ss_save_dir1(cur_dir, f);
-    ss_save_dir2(lib_dir, f);
-    ss_save_dir2(prev_dir, f);
+    ss_save_dir1(cur_dir.dir, f);
+    ss_save_dir2(lib_dir.dir, f);
+    ss_save_dir2(prev_dir.dir, f);
     ss_save_dir2(cat_dir, f);
 }
 
@@ -1368,7 +1704,7 @@ static int16_t swr_calc_addr(uint8_t flags, uint32_t *st_ptr, int16_t romid)
             adfs_error(err_no_swr);
             return -1;
         }
-        log_debug("vdfs: swr_calc_addr: pseudo addr bank=%02d, start=%04x\n", romid, start);
+        log_debug("vdfs: swr_calc_addr: pseudo addr bank=%02d, start=%04x", romid, start);
     } else {
         // Absolutre addressing.
 
@@ -1381,7 +1717,7 @@ static int16_t swr_calc_addr(uint8_t flags, uint32_t *st_ptr, int16_t romid)
             adfs_error(err_no_swr);
             return -1;
         }
-        log_debug("vdfs: swr_calc_addr: abs addr bank=%02d, start=%04x\n", romid, start);
+        log_debug("vdfs: swr_calc_addr: abs addr bank=%02d, start=%04x", romid, start);
         start -= 0x8000;
     }
     *st_ptr = start;
@@ -1396,12 +1732,12 @@ static void exec_swr_fs(uint8_t flags, uint16_t fname, int8_t romid, uint32_t st
     FILE *fp;
     char path[MAX_ACORN_PATH];
 
-    log_debug("vdfs: exec_swr_fs: flags=%02x, fn=%04x, romid=%02d, start=%04x, len=%04x\n", flags, fname, romid, start, pblen);
-    if (check_valid_dir(cur_dir, "current")) {
+    log_debug("vdfs: exec_swr_fs: flags=%02x, fn=%04x, romid=%02d, start=%04x, len=%04x", flags, fname, romid, start, pblen);
+    if (check_valid_dir(&cur_dir)) {
         if ((romid = swr_calc_addr(flags, &start, romid)) >= 0) {
             vdfs_findres res;
             if (parse_name(path, sizeof path, fname)) {
-                ent = find_entry(path, &res, cur_dir, dfs_dir);
+                ent = find_entry(path, &res, &cur_dir);
                 if (flags & 0x80) {
                     // read file into sideways RAM.
                     len = 0x4000 - start;
@@ -1439,7 +1775,7 @@ static void exec_swr_fs(uint8_t flags, uint16_t fname, int8_t romid, uint32_t st
                                 ent->u.file.exec_addr = load_add;
                                 write_back(ent);
                             } else
-                                log_warn("vdfs: unable to create file '%s': %s\n", ent->host_fn, strerror(errno));
+                                log_warn("vdfs: unable to create file '%s': %s", ent->host_fn, strerror(errno));
                         } else
                             adfs_error(res.errmsg);
                     } else
@@ -1603,7 +1939,7 @@ static bool srp_tail(uint16_t addr, uint8_t flag, uint16_t fnaddr, uint16_t star
     addr = srp_romid(addr, &romid);
     if (romid >= 0)
         flag &= ~0x40;
-    if (fs_num) {
+    if (fs_flags & VDFS_ACTIVE) {
         exec_swr_fs(flag, fnaddr, romid, start, len);
         p.c = 0;
         return true;
@@ -1718,7 +2054,9 @@ static void write_file_attr(uint32_t maddr, vdfs_entry *ent)
 static void osfile_attribs(uint32_t pb, vdfs_entry *ent)
 {
     write_file_attr(pb, ent);
-    writemem32(pb+0x0e, ent->attribs);
+    writemem(pb+0x0e, ent->attribs);
+    writemem16(pb+0x0f, unix_date_acorn(localtime(&ent->mtime)));
+    writemem(pb+0x11, 0);
 }
 
 static uint32_t write_bytes(FILE *fp, uint32_t addr, size_t bytes)
@@ -1769,6 +2107,59 @@ static uint32_t cfile_callback(FILE *fp, uint32_t start_addr, size_t bytes)
     return 0;
 }
 
+#define CAT_TMP 0x100
+static vdfs_entry *cat_ent;
+static int cat_dfs;
+
+static uint16_t gcopy_fn(vdfs_entry *ent, uint16_t mem_ptr)
+{
+    uint16_t mem_end = mem_ptr + MAX_FILE_NAME+2;
+    const char *ptr = ent->acorn_fn;
+    int ch;
+
+    if (ent->dfs_dir == cat_dfs) {
+        log_debug("vdfs: gcopy_fn, same DFS directory file");
+        writemem(mem_ptr++, ' ');
+        writemem(mem_ptr++, ' ');
+    }
+    else {
+        log_debug("vdfs: gcopy_fn, different DFS directory file");
+        writemem(mem_ptr++, ent->dfs_dir);
+        writemem(mem_ptr++, '.');
+    }
+    while (mem_ptr < mem_end && (ch = *ptr++))
+        writemem(mem_ptr++, ch);
+    while (mem_ptr < mem_end)
+        writemem(mem_ptr++, ' ');
+    return mem_ptr;
+}
+
+static void write_bcd_byte(uint32_t maddr, unsigned value)
+{
+    value = ((value / 10) << 4) | (value % 10);
+    writemem(maddr, value);
+}
+
+static void write_bcd_word(uint32_t maddr, unsigned value)
+{
+    write_bcd_byte(maddr, value / 100);
+    write_bcd_byte(maddr+1, value % 100);
+}
+
+static void gcopy_attr(vdfs_entry *ent)
+{
+    uint16_t mem_ptr = gcopy_fn(ent, CAT_TMP);
+    writemem16(mem_ptr, ent->attribs);
+    write_file_attr(mem_ptr, ent);
+    const struct tm *tp = localtime(&ent->mtime);
+    write_bcd_byte(mem_ptr+0x0e, tp->tm_mday);
+    writemem(mem_ptr+0x0f, tp->tm_mon);
+    write_bcd_word(mem_ptr+0x10, tp->tm_year + 1900);
+    write_bcd_byte(mem_ptr+0x12, tp->tm_hour);
+    write_bcd_byte(mem_ptr+0x13, tp->tm_min);
+    write_bcd_byte(mem_ptr+0x14, tp->tm_sec);
+}
+
 static void osfile_write(uint32_t pb, const char *path, uint32_t (*callback)(FILE *fp, uint32_t addr, size_t bytes))
 {
     vdfs_entry *ent;
@@ -1777,7 +2168,7 @@ static void osfile_write(uint32_t pb, const char *path, uint32_t (*callback)(FIL
 
     if (no_wildcards(path)) {
         vdfs_findres res;
-        if ((ent = find_entry(path, &res, cur_dir, dfs_dir))) {
+        if ((ent = find_entry(path, &res, &cur_dir))) {
             if (ent->attribs & (ATTR_OPEN_READ|ATTR_OPEN_WRITE)) {
                 log_debug("vdfs: attempt to save file %s which is already open via OSFIND", res.acorn_fn);
                 adfs_error(err_isopen);
@@ -1800,7 +2191,6 @@ static void osfile_write(uint32_t pb, const char *path, uint32_t (*callback)(FIL
             adfs_error(err_nomem);
             return;
         }
-
         if ((fp = fopen(ent->host_path, "wb"))) {
             ent->attribs = (ent->attribs & ~ATTR_IS_DIR) | ATTR_EXISTS;
             start_addr = readmem32(pb+0x0a);
@@ -1814,17 +2204,106 @@ static void osfile_write(uint32_t pb, const char *path, uint32_t (*callback)(FIL
             writemem32(pb+0x0a, ent->u.file.length);
             writemem32(pb+0x0e, ent->attribs);
             a = 1;
-        } else
-            log_warn("vdfs: unable to create file '%s': %s\n", ent->host_fn, strerror(errno));
+            if (vdfs_opt1) {
+                gcopy_attr(ent);
+                rom_dispatch(VDFS_ROM_OPT1);
+            }
+        }
+        else {
+            int err = errno;
+            log_warn("vdfs: unable to create file '%s': %s", ent->host_fn, strerror(err));
+            adfs_hosterr(err);
+        }
     }
 }
+
+#ifdef WIN32
+
+static void time_unix2win(time_t secs, LPFILETIME td)
+{
+    /* Convert epoch, 01-Jan-1970 to 01-Jan-1601 */
+    uint64_t wsec = secs + (uint64_t)((1970-1601)*365+92-3)*24*60*60;
+    /* Convert units, seconds to 100ns */
+    uint64_t ticks = wsec * 10000000;
+    /* Split into Windows file time */
+    td->dwLowDateTime = ticks & 0xffffffff;
+    td->dwHighDateTime = ticks >> 32;
+}
+
+static void set_file_times(vdfs_entry *ent)
+{
+    HANDLE h = CreateFile(ent->host_path, FILE_WRITE_ATTRIBUTES, 0, NULL, OPEN_EXISTING, 0, NULL);
+    if (h) {
+        FILETIME mtime, btime;
+        time_unix2win(ent->mtime, &mtime);
+        if (ent->attribs & ATTR_BTIME_VALID)
+            time_unix2win(ent->btime, &btime);
+        else {
+            btime.dwLowDateTime = 0;
+            btime.dwHighDateTime = 0;
+        }
+        if (!SetFileTime(h, &btime, NULL, &mtime))
+            log_warn("unable to set mtime on %s: SetFileTime failed: %s", ent->host_path, strerror(errno));
+    }
+    else
+        log_warn("unable to set mtime on %s: CreateFile failed: %s", ent->host_path, strerror(errno));
+}
+
+static void set_file_atribs(vdfs_entry *ent, uint16_t attr)
+{
+    DWORD wattr = GetFileAttributes(ent->host_fn);
+    if (wattr != INVALID_FILE_ATTRIBUTES) {
+        if (attr & ATTR_USER_LOCKD || !(attr & ATTR_USER_WRITE))
+            wattr |= FILE_ATTRIBUTE_READONLY;
+        else
+            wattr &= ~FILE_ATTRIBUTE_READONLY;
+        if (!SetFileAttributes(ent->host_fn, wattr))
+            log_warn("vdfs: unable to set attributes, SetFileAttributes failed on %s: %s", ent->host_fn, strerror(errno));
+    }
+    else
+        log_warn("vdfs: unable to set attributes, GetFileAttributes failed on %s: %s", ent->host_fn, strerror(errno));
+}
+
+#else
+
+static void set_file_times(vdfs_entry *ent)
+{
+    struct timespec times[2];
+    times[0].tv_nsec = UTIME_OMIT;
+    times[1].tv_sec = ent->mtime;
+    times[1].tv_nsec = 0;
+    if (utimensat(AT_FDCWD, ent->host_path, times, 0) == -1)
+        log_warn("vdfs: unable to set times on %s: %s", ent->host_path, strerror(errno));
+}
+
+static void set_file_atribs(vdfs_entry *ent, uint16_t attr)
+{
+    mode_t mode = 0;
+    if (attr & ATTR_USER_READ)
+        mode |= S_IRUSR;
+    if (attr & ATTR_USER_WRITE)
+        mode |= S_IWUSR;
+    if (attr & ATTR_USER_EXEC)
+        mode |= S_IXUSR;
+    if (attr & ATTR_OTHR_READ)
+        mode |= S_IRGRP|S_IROTH;
+    if (attr & ATTR_OTHR_WRITE)
+        mode |= S_IWGRP|S_IWOTH;
+    if (attr & ATTR_OTHR_EXEC)
+        mode |= S_IXGRP|S_IXOTH;
+    log_debug("vdfs: chmod(%s, %o)", ent->host_path, mode);
+    if (chmod(ent->host_path, mode) == -1)
+        log_warn("vdfs: unable to chmod %s: %s", ent->host_path, strerror(errno));
+}
+
+#endif
 
 static void osfile_set_meta(uint32_t pb, const char *path, uint16_t which)
 {
     vdfs_entry *ent;
     vdfs_findres res;
 
-    if ((ent = find_entry(path, &res, cur_dir, dfs_dir)) && ent->attribs & ATTR_EXISTS) {
+    if ((ent = find_entry(path, &res, &cur_dir)) && ent->attribs & ATTR_EXISTS) {
         if (ent->attribs & ATTR_IS_DIR)
             a = 2;
         else {
@@ -1835,27 +2314,19 @@ static void osfile_set_meta(uint32_t pb, const char *path, uint16_t which)
             if (which & META_ATTR) {
                 uint16_t attr = readmem(pb+0x0e);
                 log_debug("vdfs: setting attributes of %02X", attr);
-#ifndef WIN32
-                if (attr != (ent->attribs & ATTR_ACORN_MASK)) {
-                    mode_t mode = 0;
-                    if (attr & ATTR_USER_READ)
-                        mode |= S_IRUSR;
-                    if (attr & ATTR_USER_WRITE)
-                        mode |= S_IWUSR;
-                    if (attr & ATTR_USER_EXEC)
-                        mode |= S_IXUSR;
-                    if (attr & ATTR_OTHR_READ)
-                        mode |= S_IRGRP|S_IROTH;
-                    if (attr & ATTR_OTHR_WRITE)
-                        mode |= S_IWGRP|S_IWOTH;
-                    if (attr & ATTR_OTHR_EXEC)
-                        mode |= S_IXGRP|S_IXOTH;
-                    log_debug("vdfs: chmod(%s, %o)", ent->host_path, mode);
-                    if (chmod(ent->host_path, mode) == -1)
-                        log_warn("unable to chmod %s: %s", ent->host_path, strerror(errno));
+                if (fs_flags & WRITE_DATES) {
+                    uint16_t mdate = readmem16(pb+0x0f);
+                    if (mdate) {
+                        struct tm *tp = localtime(&ent->mtime);
+                        acorn_date_unix(tp, mdate);
+                        ent->mtime = mktime(tp);
+                        set_file_times(ent);
+                    }
                 }
-#endif
-                ent->attribs = (ent->attribs & ~ATTR_ACORN_MASK) | attr;
+                if (attr != (ent->attribs & ATTR_ACORN_MASK)) {
+                    set_file_atribs(ent, attr);
+                    ent->attribs = (ent->attribs & ~ATTR_ACORN_MASK) | attr;
+                }
             }
             write_back(ent);
             a = 1;
@@ -1870,13 +2341,59 @@ static void osfile_get_attr(uint32_t pb, const char *path)
     vdfs_entry *ent;
     vdfs_findres res;
 
-    if ((ent = find_entry(path, &res, cur_dir, dfs_dir)) && ent->attribs & ATTR_EXISTS) {
+    if ((ent = find_entry(path, &res, &cur_dir)) && ent->attribs & ATTR_EXISTS) {
         scan_entry(ent);
         osfile_attribs(pb, ent);
         a = (ent->attribs & ATTR_IS_DIR) ? 2 : 1;
     }
     else
         a = 0;
+}
+
+static void osfile_get_extattr(uint32_t pb, const char *path)
+{
+    vdfs_entry *ent;
+    vdfs_findres res;
+
+    if ((ent = find_entry(path, &res, &cur_dir)) && ent->attribs & ATTR_EXISTS) {
+        scan_entry(ent);
+        writemem32(pb+2, 0);
+        const struct tm *tp= localtime(&ent->mtime);
+        writemem24(pb+6, unix_time_acorn(tp));
+        if (ent->attribs & ATTR_BTIME_VALID) {
+            tp = localtime(&ent->btime);
+            writemem16(pb+9, unix_date_acorn(tp));
+            writemem24(pb+11, unix_time_acorn(tp));
+        }
+        else {
+            writemem16(pb+9, 0);
+            writemem24(pb+11, 0);
+        }
+        writemem32(pb+14, 0);
+        a = (ent->attribs & ATTR_IS_DIR) ? 2 : 1;
+    }
+    else
+        a = 0;
+}
+
+static void osfile_set_exattr(uint32_t pb, const char *path)
+{
+    if (fs_flags & WRITE_DATES) {
+        vdfs_findres res;
+        vdfs_entry *ent = find_entry(path, &res, &cur_dir);
+        if (ent && ent->attribs & ATTR_EXISTS) {
+            struct tm *tp = localtime(&ent->mtime);
+            acorn_time_unix(tp, readmem24(pb+6));
+            ent->mtime = mktime(tp);
+            ent->btime = acorn_timedate_unix(readmem16(pb+9), readmem24(pb+11));
+            ent->attribs |= ATTR_BTIME_VALID;
+            write_back(ent);
+            set_file_times(ent);
+            a = (ent->attribs & ATTR_IS_DIR) ? 2 : 1;
+        }
+        else
+            a = 0;
+    }
 }
 
 static void delete_inf(vdfs_entry *ent)
@@ -1891,12 +2408,12 @@ static void delete_file(vdfs_entry *ent)
 {
     show_activity();
     if (ent->attribs & ATTR_IS_DIR) {
-        if (ent == cur_dir)
+        if (ent == cur_dir.dir)
             adfs_error(err_delcsd);
-        else if (ent == lib_dir)
+        else if (ent == lib_dir.dir)
             adfs_error(err_dellib);
         else if (rmdir(ent->host_path) == 0) {
-            if (ent == prev_dir)
+            if (ent == prev_dir.dir)
                 prev_dir = cur_dir;
             ent->attribs &= ~(ATTR_IS_DIR|ATTR_EXISTS);
             delete_inf(ent);
@@ -1919,7 +2436,7 @@ static void osfile_delete(uint32_t pb, const char *path)
         vdfs_entry *ent;
         vdfs_findres res;
 
-        if ((ent = find_entry(path, &res, cur_dir, dfs_dir)) && ent->attribs & ATTR_EXISTS) {
+        if ((ent = find_entry(path, &res, &cur_dir)) && ent->attribs & ATTR_EXISTS) {
             osfile_attribs(pb, ent);
             delete_file(ent);
         }
@@ -1952,7 +2469,7 @@ static void osfile_cdir(const char *path)
     if (no_wildcards(path)) {
         vdfs_entry *ent;
         vdfs_findres res;
-        if ((ent = find_entry(path, &res, cur_dir, dfs_dir))) {
+        if ((ent = find_entry(path, &res, &cur_dir))) {
             if (ent->attribs & ATTR_EXISTS) {
                 if (!(ent->attribs & ATTR_IS_DIR)) {
                     log_debug("vdfs: attempt to create dir %s on top of an existing file", res.acorn_fn);
@@ -2015,7 +2532,7 @@ static void read_file_tube(vdfs_entry *ent, FILE *fp, uint32_t addr)
 static void osfile_load(uint32_t pb, const char *path)
 {
     vdfs_findres res;
-    vdfs_entry *ent = find_entry(path, &res, cur_dir, dfs_dir);
+    vdfs_entry *ent = find_entry(path, &res, &cur_dir);
     if (ent && ent->attribs & ATTR_EXISTS) {
         if (ent->attribs & ATTR_IS_DIR)
             adfs_error(err_wont);
@@ -2035,8 +2552,12 @@ static void osfile_load(uint32_t pb, const char *path)
                 fclose(fp);
                 osfile_attribs(pb, ent);
                 a = 1;
+                if (vdfs_opt1) {
+                    gcopy_attr(ent);
+                    rom_dispatch(VDFS_ROM_OPT1);
+                }
             } else {
-                log_warn("vdfs: unable to load file '%s': %s\n", ent->host_fn, strerror(errno));
+                log_warn("vdfs: unable to load file '%s': %s", ent->host_fn, strerror(errno));
                 adfs_hosterr(errno);
             }
         }
@@ -2049,9 +2570,9 @@ static void osfile(void)
     uint32_t pb = (y << 8) | x;
     char path[MAX_ACORN_PATH];
 
-    if (a <= 0x08 || a == 0xff) {
+    if (a <= 0x08 || a == 0xff || a == 0xfd) {
         log_debug("vdfs: osfile(A=%02X, X=%02X, Y=%02X)", a, x, y);
-        if (check_valid_dir(cur_dir, "current")) {
+        if (check_valid_dir(&cur_dir)) {
             if (parse_name(path, sizeof path, readmem16(pb))) {
                 switch (a) {
                     case 0x00:  // save file.
@@ -2081,6 +2602,12 @@ static void osfile(void)
                     case 0x08:
                         osfile_cdir(path);
                         break;
+                    case 0xfc:
+                        osfile_set_exattr(pb, path);
+                        break;
+                    case 0xfd:
+                        osfile_get_extattr(pb, path);
+                        break;
                     case 0xff:  // load file.
                         osfile_load(pb, path);
                         break;
@@ -2106,7 +2633,7 @@ static FILE *getfp_read(int channel)
             return fp;
         log_debug("vdfs: attempt to use closed channel %d", channel);
     } else
-        log_debug("vdfs: channel %d out of range\n", channel);
+        log_debug("vdfs: channel %d out of range", channel);
     adfs_error(err_channel);
     return NULL;
 }
@@ -2193,7 +2720,7 @@ static void osfind(void)
                 adfs_error(err_channel);
         }
     }
-    else if (check_valid_dir(cur_dir, "current")) {        // open file.
+    else if (check_valid_dir(&cur_dir)) {        // open file.
         mode = NULL;
         acorn_mode = a;
         a = 0;
@@ -2206,7 +2733,7 @@ static void osfind(void)
             }
         } while (vdfs_chan[channel].ent);
         if (parse_name(path, sizeof path, (y << 8) | x)) {
-            ent = find_entry(path, &res, cur_dir, dfs_dir);
+            ent = find_entry(path, &res, &cur_dir);
             if (ent && (ent->attribs & (ATTR_EXISTS|ATTR_IS_DIR)) == (ATTR_EXISTS|ATTR_IS_DIR)) {
                 vdfs_chan[channel].ent = ent;  // make "half-open"
                 a = MIN_CHANNEL + channel;
@@ -2263,7 +2790,7 @@ static void osfind(void)
                     vdfs_chan[channel].ent = ent;
                     a = MIN_CHANNEL + channel;
                 } else
-                    log_warn("vdfs: osfind: unable to open file '%s' in mode '%s': %s\n", ent->host_fn, mode, strerror(errno));
+                    log_warn("vdfs: osfind: unable to open file '%s' in mode '%s': %s", ent->host_fn, mode, strerror(errno));
             }
         }
     }
@@ -2346,9 +2873,8 @@ static int osgbpb_read(uint32_t pb)
     return undone;
 }
 
-static uint32_t write_len_str(uint32_t mem_ptr, const char *str)
+static uint32_t write_len_str(uint32_t mem_ptr, const char *str, size_t len)
 {
-    size_t len = strlen(str);
     if (mem_ptr >= 0xffff0000 || curtube == -1) {
         writemem(mem_ptr++, len);
         for (const char *ptr = str, *end = str + len; ptr < end; )
@@ -2364,38 +2890,42 @@ static uint32_t write_len_str(uint32_t mem_ptr, const char *str)
 
 static void osgbpb_get_title(uint32_t pb)
 {
-    if (check_valid_dir(cur_dir, "current")) {
+    if (check_valid_dir(&cur_dir)) {
         uint32_t mem_ptr = readmem32(pb+1);
-        const char *title = cur_dir->u.dir.title;
+        const char *title = cur_dir.dir->u.dir.title;
         if (!*title)
-            title = cur_dir->acorn_fn;
-        mem_ptr = write_len_str(mem_ptr, title);
-        if (mem_ptr >= 0xffff0000 || curtube == -1) {
-            writemem(mem_ptr++, cur_dir->u.dir.boot_opt);
-            writemem(mem_ptr, 0);   // drive is always 0.
-        }
-        else {
-            tube_writemem(mem_ptr++, cur_dir->u.dir.boot_opt);
-            tube_writemem(mem_ptr, 0);   // drive is always 0.
-        }
+            title = cur_dir.dir->acorn_fn;
+        mem_ptr = write_len_str(mem_ptr, title, strlen(title));
+        if (mem_ptr >= 0xffff0000 || curtube == -1)
+            writemem(mem_ptr++, cur_dir.dir->u.dir.boot_opt);
+        else
+            tube_writemem(mem_ptr++, cur_dir.dir->u.dir.boot_opt);
     }
 }
 
-static void osgbpb_get_dir_adfs(uint32_t pb, vdfs_entry *dir, int dfsdir)
-{
-    uint32_t mem_ptr = readmem32(pb+1);
-    mem_ptr = write_len_str(mem_ptr, "");
-    write_len_str(mem_ptr, dir ? dir->acorn_fn : "Unset");
-}
-
-static void osgbpb_get_dir_dfs(uint32_t pb, vdfs_entry *dir, int dfsdir)
+static void osgbpb_get_dir_adfs(uint32_t pb, vdfs_dirlib *dir)
 {
     uint32_t mem_ptr = readmem32(pb+1);
     char tmp[2];
-    tmp[0] = dfsdir;
+    tmp[0] = '0' + dir->drive;
     tmp[1] = 0;
-    mem_ptr = write_len_str(mem_ptr, "0");
-    write_len_str(mem_ptr, tmp);
+    mem_ptr = write_len_str(mem_ptr, tmp, 1);
+    vdfs_entry *ent = dir->dir;
+    if (ent)
+        write_len_str(mem_ptr, ent->acorn_fn, strlen(ent->acorn_fn));
+    else
+        write_len_str(mem_ptr, "Unset", 5);
+}
+
+static void osgbpb_get_dir_dfs(uint32_t pb, vdfs_dirlib *dir)
+{
+    uint32_t mem_ptr = readmem32(pb+1);
+    char tmp[2];
+    tmp[0] = '0' + dir->drive;
+    tmp[1] = 0;
+    mem_ptr = write_len_str(mem_ptr, tmp, 1);
+    tmp[0] = dir->dfs_dir;
+    write_len_str(mem_ptr, tmp, 1);
 }
 
 static void acorn_sort(vdfs_entry *dir, sort_type sort_reqd)
@@ -2489,35 +3019,36 @@ static int osgbpb_list(uint32_t pb)
     vdfs_entry *cat_ptr;
     int status;
 
-    if (check_valid_dir(cur_dir, "current")) {
+    if (check_valid_dir(&cur_dir)) {
         seq_ptr = readmem32(pb+9);
         if (seq_ptr == 0)
-            acorn_sort(cur_dir, (fs_flags & DFS_MODE) ? SORT_DFS : SORT_ADFS);
+            acorn_sort(cur_dir.dir, (fs_flags & DFS_MODE) ? SORT_DFS : SORT_ADFS);
         n = seq_ptr;
-        for (cat_ptr = cur_dir->u.dir.children; cat_ptr; cat_ptr = cat_ptr->next)
+        for (cat_ptr = cur_dir.dir->u.dir.children; cat_ptr; cat_ptr = cat_ptr->next)
             if (cat_ptr->attribs & ATTR_EXISTS)
-                if (n-- == 0)
-                    break;
+                if (!(fs_flags & DFS_MODE) || cat_ptr->dfs_dir == cur_dir.dfs_dir)
+                    if (n-- == 0)
+                        break;
         if (cat_ptr) {
             status = 0;
             mem_ptr = readmem32(pb+1);
             n = readmem32(pb+5);
-            log_debug("vdfs: seq_ptr=%d, writing max %d entries starting %04X, first=%s\n", seq_ptr, n, mem_ptr, cat_ptr->acorn_fn);
+            log_debug("vdfs: seq_ptr=%d, writing max %d entries starting %04X, first=%s", seq_ptr, n, mem_ptr, cat_ptr->acorn_fn);
             for (;;) {
-                mem_ptr = write_len_str(mem_ptr, cat_ptr->acorn_fn);
+                mem_ptr = write_len_str(mem_ptr, cat_ptr->acorn_fn, strlen(cat_ptr->acorn_fn));
                 seq_ptr++;
                 if (--n == 0)
                     break;
                 do
                     cat_ptr = cat_ptr->next;
-                while (cat_ptr && !(cat_ptr->attribs & ATTR_EXISTS));
+                while (cat_ptr && !(cat_ptr->attribs & ATTR_EXISTS) && (fs_flags & DFS_MODE) && cat_ptr->dfs_dir != cur_dir.dfs_dir);
                 if (!cat_ptr) {
                     status = 1;
                     break;
                 }
                 log_debug("vdfs: next=%s", cat_ptr->acorn_fn);
             }
-            log_debug("vdfs: finish at %04X\n", mem_ptr);
+            log_debug("vdfs: finish at %04X", mem_ptr);
             writemem32(pb+5, n);
             writemem32(pb+9, seq_ptr);
             return status;
@@ -2531,7 +3062,7 @@ static void osgbpb(void)
     int status = 0;
     uint32_t pb = (y << 8) | x;
 
-    log_debug("vdfs: osgbpb(A=%02X, YX=%04X)\n", a, pb);
+    log_debug("vdfs: osgbpb(A=%02X, YX=%04X)", a, pb);
 
     switch (a)
     {
@@ -2550,11 +3081,11 @@ static void osgbpb(void)
             break;
 
         case 0x06: // get current dir
-            osgbpb_get_dir(pb, cur_dir, dfs_dir);
+            osgbpb_get_dir(pb, &cur_dir);
             break;
 
         case 0x07: // get library dir.
-            osgbpb_get_dir(pb, lib_dir, dfs_lib);
+            osgbpb_get_dir(pb, &lib_dir);
             break;
 
         case 0x08: // list files in current directory.
@@ -2623,34 +3154,283 @@ static void osargs(void)
  * dispatched the commands need to come first.
  */
 
+static void cmd_access(uint16_t addr)
+{
+    if (check_valid_dir(&cur_dir)) {
+        char path[MAX_ACORN_PATH];
+        if ((addr = parse_name(path, sizeof path, addr))) {
+            uint_least32_t attribs = 0;
+            uint_least32_t attr_mask = ATTR_USER_READ|ATTR_USER_WRITE|ATTR_USER_LOCKD|ATTR_USER_EXEC;
+            int ch = readmem(addr++);
+            while (ch == ' ' || ch == '\t')
+                ch = readmem(addr++);
+            while (ch != ' ' && ch != '\t' && ch != '\r' && ch != '/') {
+                if (ch == 'R' || ch == 'r')
+                    attribs |= ATTR_USER_READ;
+                else if (ch == 'W' || ch == 'w')
+                    attribs |= ATTR_USER_WRITE;
+                else if (ch == 'L' || ch == 'l')
+                    attribs |= ATTR_USER_LOCKD;
+                else if (ch == 'E' || ch == 'e')
+                    attribs |= ATTR_USER_EXEC;
+                else {
+                    adfs_error(err_badparms);
+                    return;
+                }
+                ch = readmem(addr++);
+            }
+            if (ch == '/') {
+                attr_mask |= ATTR_OPEN_READ|ATTR_OTHR_WRITE|ATTR_OTHR_LOCKD|ATTR_OTHR_EXEC;
+                ch = readmem(addr++);
+                while (ch != ' ' && ch != '\t' && ch != '\r') {
+                    if (ch == 'R' || ch == 'r')
+                        attribs |= ATTR_OTHR_READ;
+                    else if (ch == 'W' || ch == 'w')
+                        attribs |= ATTR_OPEN_WRITE;
+                    else if (ch == 'L' || ch == 'l')
+                        attribs |= ATTR_OTHR_LOCKD;
+                    else if (ch == 'E' || ch == 'e')
+                        attribs |= ATTR_OTHR_EXEC;
+                    else {
+                        adfs_error(err_badparms);
+                        return;
+                    }
+                    ch = readmem(addr++);
+                }
+            }
+            vdfs_findres res;
+            vdfs_entry *ent = find_entry(path, &res, &cur_dir);
+            if (ent && ent->attribs & ATTR_EXISTS) {
+                attr_mask = ~attr_mask;
+                if (fs_flags & DFS_MODE) {
+                    attribs |= ATTR_USER_READ;
+                    if (attribs & ATTR_OTHR_LOCKD)
+                        attribs &= ~ATTR_USER_WRITE;
+                    do {
+                        ent->attribs = (ent->attribs & attr_mask) | attribs;
+                        write_back(ent);
+                        ent = find_next_dfs(ent, &res);
+                    } while (ent);
+                }
+                else {
+                    do {
+                        ent->attribs = (ent->attribs & attr_mask) | attribs;
+                        write_back(ent);
+                        ent = find_next_adfs(ent, &res);
+                    } while (ent);
+                }
+            }
+        }
+    }
+}
+
 static void cmd_back(void)
 {
-    vdfs_entry *ent;
-
-    ent = cur_dir;
+    vdfs_dirlib tmp = cur_dir;
     cur_dir = prev_dir;
-    prev_dir = ent;
+    prev_dir = tmp;
 }
 
 static void cmd_cdir(uint16_t addr)
 {
     char path[MAX_ACORN_PATH];
 
-    if (check_valid_dir(cur_dir, "current"))
+    if (check_valid_dir(&cur_dir))
         if (parse_name(path, sizeof path, addr))
             osfile_cdir(path);
 }
 
+#ifdef WIN32
+#include <winbase.h>
+
+static bool copy_file(vdfs_entry *old_ent, vdfs_entry *new_ent)
+{
+    BOOL res = CopyFile(old_ent->host_path, new_ent->host_path, FALSE);
+    if (!res)
+        adfs_hosterr(errno);
+    return res;
+}
+
+#else
+#ifdef __unix__
+
+static bool copy_loop(const char *old_fn, int old_fd, const char *new_fn, int new_fd)
+{
+    char buf[4096];
+    ssize_t bytes = read(old_fd, buf, sizeof(buf));
+    while (bytes > 0) {
+        if (write(new_fd, buf, bytes) != bytes) {
+            int err = errno;
+            adfs_hosterr(err);
+            log_warn("vdfs: error writing %s: %s", new_fn, strerror(err));
+            return false;
+        }
+    }
+    if (bytes < 0) {
+        int err = errno;
+        adfs_hosterr(err);
+        log_warn("vdfs: error reading %s: %s", old_fn, strerror(err));
+        return false;
+    }
+    return true;
+}
+
+static bool copy_file(vdfs_entry *old_ent, vdfs_entry *new_ent)
+{
+    bool res = false;
+    int old_fd = open(old_ent->host_path, O_RDONLY);
+    if (old_fd >= 0) {
+        int new_fd = open(new_ent->host_path, O_WRONLY|O_CREAT, 0666);
+        if (new_fd >= 0) {
+#ifdef linux
+            struct stat stb;
+            if (!fstat(old_fd, &stb)) {
+                ssize_t bytes = copy_file_range(old_fd, NULL, new_fd, NULL, stb.st_size, 0);
+                if (bytes == stb.st_size)
+                    res = true;
+                else if (bytes == 0 && errno == EXDEV)
+                    res = copy_loop(old_ent->host_path, old_fd, new_ent->host_path, new_fd);
+                else {
+                    int err = errno;
+                    adfs_hosterr(err);
+                    log_warn("vdfs: copy_file_range failed %s to %s: %s", old_ent->host_path, new_ent->host_path, strerror(err));
+                }
+            }
+            else {
+                int err = errno;
+                adfs_hosterr(err);
+                log_warn("vdfs: unable to fstat '%s': %s", old_ent->host_path, strerror(err));
+            }
+#else
+            res = copy_loop(old_ent->host_path, old_fd, new_ent->host_path, new_fd);
+#endif
+            close(new_fd);
+        }
+        else {
+            int err = errno;
+            adfs_hosterr(err);
+            log_warn("vdfs: unable to open %s for writing: %s", new_ent->host_path, strerror(err));
+        }
+        close(old_fd);
+    }
+    else {
+        int err = errno;
+        adfs_hosterr(err);
+        log_warn("vdfs: unable to open %s for reading: %s", old_ent->host_path, strerror(err));
+    }
+    return res;
+}
+
+#else
+
+static bool copy_file(vdfs_entry *old_ent, vdfs_entry *new_ent)
+{
+    bool res = false;
+    int old_fp = fopen(old_ent->host_path, "rb");
+    if (old_fp) {
+        int new_fp = fopen(new_ent->host_path, "wb");
+        if (new_fp) {
+            res = true;
+            int ch = getc(old_fp);
+            while (ch != EOF && putc(ch, new_fp) != EOF)
+                ch = getc(old_fp);
+            if (ferror(old_fp)) {
+                int err = errno;
+                adfs_hosterr(err);
+                log_warn("vdfs: read error on %s: %s", old_ent->host_path, strerror(err));
+                res = false;
+            }
+            if (ferror(new_fp)) {
+                int err = errno;
+                adfs_hosterr(err);
+                log_warn("vdfs: write error on %s: %s", new_ent->host_path, strerror(err));
+                res = false;
+            }
+            if (fclose(new_fp)) {
+                int err = errno;
+                adfs_hosterr(err);
+                log_warn("vdfs: write error on %s: %s", new_ent->host_path, strerror(err));
+                res = false;
+            }
+        }
+        else {
+            int err = errno;
+            adfs_hosterr(err);
+            log_warn("vdfs: unable to open %s for writing: %s", new_ent->host_path, strerror(err));
+        }
+        fclose(old_fp);
+    }
+    else {
+        int err = errno;
+        adfs_hosterr(err);
+        log_warn("vdfs: unable to open %s for reading: %s", old_ent->host_path, strerror(err));
+    }
+    return res;
+}
+
+#endif
+#endif
+
+static void cmd_copy(uint16_t addr)
+{
+    log_debug("vdfs: cmd_copy, addr=%04X", addr);
+    if (check_valid_dir(&cur_dir)) {
+        char old_path[MAX_ACORN_PATH], new_path[MAX_ACORN_PATH];
+        if ((addr = parse_name(old_path, sizeof old_path, addr))) {
+            if (parse_name(new_path, sizeof new_path, addr)) {
+                if (*old_path && *new_path) {
+                    vdfs_findres old_res;
+                    vdfs_entry *old_ent = find_entry(old_path, &old_res, &cur_dir);
+                    if (old_ent && (old_ent->attribs & ATTR_EXISTS)) {
+                        vdfs_findres new_res;
+                        vdfs_entry *new_ent = find_entry(new_path, &new_res, &cur_dir);
+                        if (new_ent) {
+                            if ((new_ent->attribs & (ATTR_EXISTS|ATTR_IS_DIR)) == (ATTR_EXISTS|ATTR_IS_DIR)) {
+                                /* as destination is a dir, loop over wild-cards */
+                                new_res.parent = new_ent;
+                                do {
+                                    memcpy(new_res.acorn_fn, old_ent->acorn_fn, MAX_FILE_NAME);
+                                    if (!(new_ent = add_new_file(&new_res)))
+                                        break;
+                                    if (!copy_file(old_ent, new_ent))
+                                        break;
+                                } while ((old_ent = find_next(old_ent, &old_res)));
+                            }
+                            else {
+                                /* destination is a file */
+                                if (find_next(old_ent, &old_res))
+                                    adfs_error(err_wildcard);
+                                else
+                                    copy_file(old_ent, new_ent);
+                            }
+                        }
+                        else if (find_next(old_ent, &old_res))
+                            adfs_error(err_wildcard);
+                        else if ((new_ent = add_new_file(&new_res)) && copy_file(old_ent, new_ent))
+                            new_ent->attribs |= ATTR_EXISTS;
+                    }
+                    else
+                        adfs_error(old_res.errmsg);
+                }
+                else {
+                    log_debug("vdfs: copy attempted with an empty filename");
+                    adfs_error(err_badcopy);
+                }
+            }
+        }
+    }
+}
+
 static void cmd_delete(uint16_t addr)
 {
-    if (check_valid_dir(cur_dir, "current")) {
+    if (check_valid_dir(&cur_dir)) {
         vdfs_entry *ent;
         vdfs_findres res;
         char path[MAX_ACORN_PATH];
         if (parse_name(path, sizeof path, addr)) {
             if (!no_wildcards(path))
                 return;
-            if ((ent = find_entry(path, &res, cur_dir, dfs_dir))) {
+            if ((ent = find_entry(path, &res, &cur_dir))) {
                 delete_file(ent);
                 return;
             }
@@ -2661,17 +3441,17 @@ static void cmd_delete(uint16_t addr)
 
 static vdfs_entry *lookup_dir(uint16_t addr)
 {
-    if (check_valid_dir(cur_dir, "current")) {
+    if (check_valid_dir(&cur_dir)) {
         vdfs_entry *ent;
         vdfs_findres res;
         char path[MAX_ACORN_PATH];
         if (parse_name(path, sizeof path, addr)) {
-            ent = find_entry(path, &res, cur_dir, dfs_dir);
+            ent = find_entry(path, &res, &cur_dir);
             if (ent && ent->attribs & ATTR_EXISTS) {
                 if (ent->attribs & ATTR_IS_DIR)
                     return ent;
                 else
-                    adfs_error(err_baddir);
+                    adfs_error(err_notdir);
             } else
                 adfs_error(res.errmsg);
         }
@@ -2679,62 +3459,116 @@ static vdfs_entry *lookup_dir(uint16_t addr)
     return NULL;
 }
 
+static vdfs_entry *parse_adfs_dir(uint16_t addr, int *drive)
+{
+    int ch = readmem(addr);
+    if (ch == ':') {
+        ch = readmem(++addr);
+        if (ch < '0' || ch > '7') {
+            log_debug("vdfs: parse_adfs_dir, bad drive number");
+            adfs_error(err_badparms);
+            return NULL;
+        }
+        *drive = ch - '0';
+        ch = readmem(++addr);
+        if (ch != '.') {
+            if (ch == '\r')
+                return &root_dir;
+            log_debug("vdfs: parse_adfs_dir, missing dot");
+            adfs_error(err_badparms);
+            return NULL;
+        }
+        ++addr;
+    }
+    return lookup_dir(addr);
+}
+
 static void cmd_dir_adfs(uint16_t addr)
 {
-    vdfs_entry *ent;
-
-    if ((ent = lookup_dir(addr))) {
+    int drive = cur_dir.drive;
+    vdfs_entry *ent = parse_adfs_dir(addr, &drive);
+    if (ent) {
         prev_dir = cur_dir;
-        cur_dir = ent;
+        cur_dir.drive = drive;
+        cur_dir.dir = ent;
     }
 }
 
 static void cmd_lib_adfs(uint16_t addr)
 {
-    vdfs_entry *ent;
-
-    if ((ent = lookup_dir(addr)))
-        lib_dir = ent;
+    int drive = lib_dir.drive;
+    vdfs_entry *ent = lookup_dir(addr);
+    if (ent) {
+        lib_dir.drive = drive;
+        lib_dir.dir = ent;
+    }
 }
 
-static int parse_dfs_dir(uint16_t addr)
+static void parse_dfs_dir(uint16_t addr, vdfs_dirlib *dir)
 {
-    int ch, dir;
-    do
+    int drive = dir->drive;
+    int ch = readmem(addr++);
+    if (ch == ':') {
         ch = readmem(addr++);
-    while (ch == ' ' || ch == '\t');
-    dir = ch;
-    do
+        if (ch < '0' || ch > '3') {
+            adfs_error(err_badparms);
+            return;
+        }
+        drive = ch - '0';
         ch = readmem(addr++);
-    while (ch == ' ' || ch == '\t');
-    if (ch == '\r')
-        return dir;
+        if (ch == '.')
+            ch = readmem(addr++);
+        else {
+            while (ch == ' ' || ch == '\t')
+                ch = readmem(addr++);
+            if (ch == '\r')
+                dir->drive = drive;
+            else
+                adfs_error(err_baddir);
+            return;
+        }
+    }
+    if (ch != ' ' && ch != '\t' && ch != '\r') {
+        int dfsdir = ch;
+        while ((ch = readmem(addr++)) == ' ' || ch == '\t')
+            ;
+        if (ch == '\r') {
+            dir->drive = drive;
+            dir->dfs_dir = dfsdir;
+            return;
+        }
+    }
     adfs_error(err_baddir);
-    return 0;
 }
 
 static void cmd_dir_dfs(uint16_t addr)
 {
-    int dir = parse_dfs_dir(addr);
-    if (dir > 0)
-        dfs_dir = dir;
+    parse_dfs_dir(addr, &cur_dir);
 }
 
 static void cmd_lib_dfs(uint16_t addr)
 {
-    int dir = parse_dfs_dir(addr);
-    if (dir > 0)
-        dfs_lib = dir;
+    parse_dfs_dir(addr, &lib_dir);
+}
+
+static void cmd_drive(uint16_t addr)
+{
+    int ch = readmem(addr++);
+    if (ch >= '0' && (ch <= '3' || (ch <= '7' && !(fs_flags & DFS_MODE))))
+        cur_dir.drive = ch - '0';
+    else
+        adfs_error(err_badparms);
 }
 
 static void cmd_title(uint16_t addr)
 {
-    if (check_valid_dir(cur_dir, "current")) {
-        char *ptr = cur_dir->u.dir.title;
-        char *end = cur_dir->u.dir.title + sizeof(cur_dir->u.dir.title) - 1;
+    if (check_valid_dir(&cur_dir)) {
+        vdfs_entry *ent = cur_dir.dir;
+        char *ptr = ent->u.dir.title;
+        char *end = ent->u.dir.title + sizeof(ent->u.dir.title) - 1;
         int ch, quote= 0;
 
-        log_debug("vdfs: cmd_title: addr=%04x\n", addr);
+        log_debug("vdfs: cmd_title: addr=%04x", addr);
         do
             ch = readmem(addr++);
         while (ch == ' ' || ch == '\t');
@@ -2748,21 +3582,21 @@ static void cmd_title(uint16_t addr)
             ch = readmem(addr++);
         }
         *ptr = '\0';
-        log_debug("vdfs: cmd_title: name=%s\n", cur_dir->u.dir.title);
-        write_back(cur_dir);
+        log_debug("vdfs: cmd_title: name=%s", ent->u.dir.title);
+        write_back(ent);
     }
 }
 
 static void run_file(const char *err)
 {
-    if (check_valid_dir(cur_dir, "current")) {
+    if (check_valid_dir(&cur_dir)) {
         vdfs_entry *ent;
         vdfs_findres res;
         char path[MAX_ACORN_PATH];
         if ((cmd_tail = parse_name(path, sizeof path, (y << 8) | x))) {
-            ent = find_entry(path, &res, cur_dir, dfs_dir);
-            if (!(ent && ent->attribs & ATTR_EXISTS) && lib_dir)
-                ent = find_entry(path, &res, lib_dir, dfs_lib);
+            ent = find_entry(path, &res, &cur_dir);
+            if (!(ent && ent->attribs & ATTR_EXISTS) && lib_dir.dir)
+                ent = find_entry(path, &res, &lib_dir);
             if (ent && ent->attribs & ATTR_EXISTS) {
                 if (ent->attribs & ATTR_IS_DIR)
                     adfs_error(err_wont);
@@ -2783,7 +3617,7 @@ static void run_file(const char *err)
                         }
                         fclose(fp);
                     } else {
-                        log_warn("vdfs: unable to run file '%s': %s\n", ent->host_fn, strerror(errno));
+                        log_warn("vdfs: unable to run file '%s': %s", ent->host_path, strerror(errno));
                         adfs_hosterr(errno);
                     }
                 }
@@ -2830,10 +3664,10 @@ static void rename_file(uint16_t addr)
         if (parse_name(new_path, sizeof new_path, addr)) {
             if (*old_path && *new_path) {
                 vdfs_findres old_res;
-                vdfs_entry *old_ent = find_entry(old_path, &old_res, cur_dir, dfs_dir);
+                vdfs_entry *old_ent = find_entry(old_path, &old_res, &cur_dir);
                 if (old_ent && old_ent->attribs & ATTR_EXISTS) {
                     vdfs_findres new_res;
-                    vdfs_entry *new_ent = find_entry(new_path, &new_res, cur_dir, dfs_dir);
+                    vdfs_entry *new_ent = find_entry(new_path, &new_res, &cur_dir);
                     if (new_ent) {
                         if (new_ent->attribs & ATTR_EXISTS) {
                             if (new_ent->attribs & ATTR_IS_DIR) {
@@ -2862,18 +3696,18 @@ static void rename_file(uint16_t addr)
 }
 
 const struct cmdent ctab_filing[] = {
-    { "ACcess",  VDFS_ACT_NOP     },
+    { "ACcess",  VDFS_ACT_ACCESS  },
     { "APpend",  VDFS_ROM_APPEND  },
     { "BAck",    VDFS_ACT_BACK    },
     { "BACKUp",  VDFS_ACT_NOP     },
     { "BUild",   VDFS_ROM_BUILD   },
     { "CDir",    VDFS_ACT_CDIR    },
     { "COMpact", VDFS_ACT_NOP     },
-    { "COpy",    VDFS_ACT_NOP     },
+    { "COpy",    VDFS_ACT_COPY    },
     { "DELete",  VDFS_ACT_DELETE  },
     { "DEStroy", VDFS_ACT_NOP     },
     { "DIR",     VDFS_ACT_DIR     },
-    { "DRive",   VDFS_ACT_NOP     },
+    { "DRive",   VDFS_ACT_DRIVE   },
     { "ENable",  VDFS_ACT_NOP     },
     { "EX",      VDFS_ACT_EX      },
     { "FIles",   VDFS_ACT_FILES   },
@@ -2893,39 +3727,39 @@ const struct cmdent ctab_filing[] = {
     { "WIpe",    VDFS_ACT_NOP     }
 };
 
-static uint16_t parse_cmd(uint16_t addr, char *dest)
+static void parse_cmd(uint16_t addr, char *dest)
 {
-    int   ch, i = 0;
-
-    do {
-        if (i == MAX_CMD_LEN)
-            return 0;
-        ch = readmem(addr++);
-        dest[i++] = ch;
-    } while (ch != ' ' && ch != '\r' && ch != '.' && ch != '"');
-
-    log_debug("vdfs: parse_cmd: cmd=%.*s, finish with %02X at %04X", i, dest, ch, addr);
-    if (ch != '\r')
-        while ((ch = readmem(addr++)) == ' ')
-            ;
-    return --addr;
+    for (int i = 0; i < MAX_CMD_LEN; ++i) {
+        int ch = readmem(addr++);
+        dest[i] = ch;
+        if (ch == '\r' || ch == '.' || ch == ' ' || ch == '\t') {
+            log_debug("vdfs: parse_cmd: cmd=%.*s, finish with %02X at %04X", i, dest, ch, addr);
+            break;
+        }
+    }
 }
 
-static const struct cmdent *lookup_cmd(const struct cmdent *tab, size_t nentry, char *cmd)
+static const struct cmdent *lookup_cmd(const struct cmdent *tab, size_t nentry, char *cmd, char **end)
 {
     const struct cmdent *tab_ptr = tab;
     const struct cmdent *tab_end = tab+nentry;
-    int tab_ch, cmd_ch;
 
     while (tab_ptr < tab_end) {
+        int tab_ch, cmd_ch;
         const char *tab_cmd = tab_ptr->cmd;
         char *cmd_ptr = cmd;
         do {
             tab_ch = *tab_cmd++;
             cmd_ch = *cmd_ptr++;
         } while (tab_ch && !((tab_ch ^ cmd_ch) & 0x5f)); // case insensitive comparison.
-        if ((!tab_ch && (cmd_ch == ' ' || cmd_ch == '\r' || cmd_ch == '"')) || (cmd_ch == '.' && (tab_ch < 'A' || tab_ch > 'Z')))
+        if (!tab_ch && (cmd_ch < 'A' || (cmd_ch > 'Z' && cmd_ch < 'a') || cmd_ch > 'z')) {
+            *end = cmd_ptr-1;
             return tab_ptr;
+        }
+        if (cmd_ch == '.' && tab_ch > 'Z') {
+            *end = cmd_ptr;
+            return tab_ptr;
+        }
         tab_ptr++;
     }
     return NULL;
@@ -2987,22 +3821,21 @@ static void fsclaim(uint16_t addr)
 
 #define CAT_TMP 0x100
 
-static vdfs_entry *cat_ent;
-static int cat_dfs;
 
-static bool cat_prep_adfs(uint16_t addr, vdfs_entry *dir, int dfsdir, const char *dir_desc)
+static bool cat_prep_adfs(uint16_t addr, vdfs_dirlib *dir)
 {
-    if (check_valid_dir(dir, dir_desc)) {
+    if (check_valid_dir(dir)) {
+        cat_dir = dir->dir;
         char path[MAX_ACORN_PATH];
         if (parse_name(path, sizeof path, addr)) {
             if (*path) {
                 vdfs_findres res;
-                vdfs_entry *ent = find_entry(path, &res, dir, dfsdir);
+                vdfs_entry *ent = find_entry(path, &res, dir);
                 if (ent && ent->attribs & ATTR_EXISTS) {
                     if (ent->attribs & ATTR_IS_DIR) {
-                        dir = ent;
+                        cat_dir = ent;
                     } else {
-                        adfs_error(err_baddir);
+                        adfs_error(err_notdir);
                         return false;
                     }
                 } else {
@@ -3010,11 +3843,10 @@ static bool cat_prep_adfs(uint16_t addr, vdfs_entry *dir, int dfsdir, const char
                     return false;
                 }
             }
-            if (!scan_dir(dir)) {
-                acorn_sort(dir, SORT_ADFS);
-                cat_dir = dir;
-                cat_ent = dir->u.dir.children;
-                cat_dfs = dfsdir;
+            if (!scan_dir(cat_dir)) {
+                acorn_sort(cat_dir, SORT_ADFS);
+                cat_ent = cat_dir->u.dir.children;
+                cat_dfs = dir->dfs_dir;
                 return true;
             }
         }
@@ -3022,29 +3854,14 @@ static bool cat_prep_adfs(uint16_t addr, vdfs_entry *dir, int dfsdir, const char
     return false;
 }
 
-static bool cat_prep_dfs(uint16_t addr, vdfs_entry *dir, int dfsdir, const char *dir_desc)
+static bool cat_prep_dfs(uint16_t addr, vdfs_dirlib *dir)
 {
-    int ch;
-    do
-        ch = readmem(addr++);
-    while (ch == ' ' || ch == '\t');
-    if (ch != '\r') {
-        dfsdir = ch;
-        do
-            ch = readmem(addr++);
-        while (ch == ' ' || ch == '\t');
-        if (ch != '\r') {
-            adfs_error(err_baddir);
-            return false;
-        }
-    }
-    if (!dir)
-        dir = cur_dir;
-    if (!scan_dir(dir)) {
-        acorn_sort(dir, SORT_DFS);
-        cat_dir = dir;
-        cat_ent = dir->u.dir.children;
-        cat_dfs = dfsdir;
+    vdfs_entry *ent = dir->dir;
+    if (!scan_dir(ent)) {
+        cat_dfs = dir->dfs_dir;
+        acorn_sort(ent, SORT_DFS);
+        cat_dir = ent;
+        cat_ent = ent->u.dir.children;
         return true;
     }
     return false;
@@ -3067,8 +3884,9 @@ static void cat_title(void)
     writemem(mem_ptr++, 0);
 }
 
-static void cat_get_dir_adfs(vdfs_entry *ent, int dfsdir)
+static void cat_get_dir_adfs(vdfs_dirlib *dir)
 {
+    vdfs_entry *ent = dir->dir;
     uint32_t mem_ptr = CAT_TMP;
     const char *ptr = ent ? ent->acorn_fn : "Unset";
     int ch;
@@ -3077,43 +3895,13 @@ static void cat_get_dir_adfs(vdfs_entry *ent, int dfsdir)
     writemem(mem_ptr, 0);
 }
 
-static void cat_get_dir_dfs(vdfs_entry *ent, int dfsdir)
+static void cat_get_dir_dfs(vdfs_dirlib *dir)
 {
     writemem(CAT_TMP, ':');
-    writemem(CAT_TMP+1, '0');
+    writemem(CAT_TMP+1, '0' + dir->drive);
     writemem(CAT_TMP+2, '.');
-    writemem(CAT_TMP+3, dfsdir);
+    writemem(CAT_TMP+3, dir->dfs_dir);
     writemem(CAT_TMP+4, 0);
-}
-
-static uint16_t gcopy_fn(vdfs_entry *ent, uint16_t mem_ptr)
-{
-    uint16_t mem_end = mem_ptr + MAX_FILE_NAME+2;
-    const char *ptr = ent->acorn_fn;
-    int ch;
-
-    if (ent->dfs_dir == cat_dfs) {
-        log_debug("vdfs: gcopy_fn, same DFS directory file");
-        writemem(mem_ptr++, ' ');
-        writemem(mem_ptr++, ' ');
-    }
-    else {
-        log_debug("vdfs: gcopy_fn, different DFS directory file");
-        writemem(mem_ptr++, ent->dfs_dir);
-        writemem(mem_ptr++, '.');
-    }
-    while (mem_ptr < mem_end && (ch = *ptr++))
-        writemem(mem_ptr++, ch);
-    while (mem_ptr < mem_end)
-        writemem(mem_ptr++, ' ');
-    return mem_ptr;
-}
-
-static void gcopy_attr(vdfs_entry *ent)
-{
-    uint16_t mem_ptr = gcopy_fn(ent, CAT_TMP);
-    writemem16(mem_ptr, ent->attribs);
-    write_file_attr(mem_ptr, ent);
 }
 
 static void cat_next_tail(void)
@@ -3161,19 +3949,31 @@ static void cat_dfs_rewind(void)
 
 static void file_info(uint16_t addr)
 {
-    if (check_valid_dir(cur_dir, "current")) {
-        vdfs_entry *ent;
-        vdfs_findres res;
+    if (check_valid_dir(&cur_dir)) {
         char path[MAX_ACORN_PATH];
         if (parse_name(path, sizeof path, addr)) {
-            if ((ent = find_entry(path, &res, cur_dir, dfs_dir)) && ent->attribs & ATTR_EXISTS) {
+            vdfs_entry *ent = find_entry(path, &info_res, &cur_dir);
+            if (ent && ent->attribs & ATTR_EXISTS) {
                 gcopy_attr(ent);
+                cat_ent = ent;
                 rom_dispatch(VDFS_ROM_INFO);
                 return;
             }
-            adfs_error(res.errmsg);
+            adfs_error(info_res.errmsg);
         }
     }
+}
+
+static void info_next(void)
+{
+    vdfs_entry *ent = find_next(cat_ent, &info_res);
+    if (ent) {
+        gcopy_attr(ent);
+        cat_ent = ent;
+        p.c = 0;
+    }
+    else
+        p.c = 1;
 }
 
 static int chan_seq = 0;
@@ -3288,28 +4088,31 @@ const struct cmdent ctab_osw7f[] = {
 
 static void cmd_osw7f(uint16_t addr)
 {
-    const struct cmdent *ent;
-    char  cmd[MAX_CMD_LEN];
-
     if (readmem(addr) == '\r') {
         x = osw7fmc_act - VDFS_ACT_OSW7F_NONE;
         rom_dispatch(VDFS_ROM_OSW7F);
     }
-    else if ((addr = parse_cmd(addr, cmd)) && ((ent = lookup_cmd(ctab_osw7f, ARRAY_SIZE(ctab_osw7f), cmd)))) {
-        osw7fmc_act = ent->act;
-        if (ent->act == VDFS_ACT_OSW7F_NONE)
-            osw7fmc_tab = NULL;
+    else {
+        char cmd[MAX_CMD_LEN], *end;
+        parse_cmd(addr, cmd);
+        const struct cmdent *ent = lookup_cmd(ctab_osw7f, ARRAY_SIZE(ctab_osw7f), cmd, &end);
+        if (ent) {
+            osw7fmc_act = ent->act;
+            if (ent->act == VDFS_ACT_OSW7F_NONE)
+                osw7fmc_tab = NULL;
+            else
+                osw7fmc_tab = osw7fmc_tabs[ent->act - VDFS_ACT_OSW7F_NONE - 1];
+        }
         else
-            osw7fmc_tab = osw7fmc_tabs[ent->act - VDFS_ACT_OSW7F_NONE - 1];
+            adfs_error(err_badcmd);
     }
-    else
-        adfs_error(err_badcmd);
 }
 
 static void vdfs_dfs_mode(void)
 {
     fs_flags |= DFS_MODE;
     find_entry = find_entry_dfs;
+    find_next = find_next_dfs;
     osgbpb_get_dir = osgbpb_get_dir_dfs;
     cat_prep = cat_prep_dfs;
     cat_get_dir = cat_get_dir_dfs;
@@ -3321,6 +4124,7 @@ static void vdfs_adfs_mode(void)
 {
     fs_flags &= ~DFS_MODE;
     find_entry = find_entry_adfs;
+    find_next = find_next_adfs;
     osgbpb_get_dir = osgbpb_get_dir_adfs;
     cat_prep = cat_prep_adfs;
     cat_get_dir = cat_get_dir_adfs;
@@ -3335,8 +4139,25 @@ static void select_vdfs(uint8_t fsno)
         vdfs_dfs_mode();
     else
         vdfs_adfs_mode();
-    if (!fs_num) {
-        y = fsno;
+    if (!(fs_flags & VDFS_ACTIVE)) {
+        fs_num = fsno;
+        rom_dispatch(VDFS_ROM_FSSTART);
+    }
+}
+
+static void cmd_vdfs(uint16_t addr)
+{
+    int ch = readmem(addr);
+    if (ch == 'A' || ch == 'a')
+        vdfs_adfs_mode();
+    else if (ch == 'D' || ch == 'd')
+        vdfs_dfs_mode();
+    else {
+        adfs_error(err_badparms);
+        return;
+    }
+    if (!(fs_flags & VDFS_ACTIVE)) {
+        fs_num = FSNO_VDFS;
         rom_dispatch(VDFS_ROM_FSSTART);
     }
 }
@@ -3442,7 +4263,7 @@ static void cmd_dump(uint16_t addr)
                 return;
             }
             start = start << 4 | ch;
-            log_debug("vdfs: cmd_dump, start loop, nyb=%x, start=%x\n", ch, start);
+            log_debug("vdfs: cmd_dump, start loop, nyb=%x, start=%x", ch, start);
             ch = readmem(addr++);
         }
         while (ch != ' ' && ch != '\t' && ch != '\r');
@@ -3459,7 +4280,7 @@ static void cmd_dump(uint16_t addr)
                     return;
                 }
                 offset = offset << 4 | ch;
-                log_debug("vdfs: cmd_dump, start loop, nyb=%x, offset=%x\n", ch, offset);
+                log_debug("vdfs: cmd_dump, start loop, nyb=%x, offset=%x", ch, offset);
                 ch = readmem(addr++);
             }
             while (ch != ' ' && ch != '\t' && ch != '\r');
@@ -3513,7 +4334,7 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
         cmd_dir(addr);
         break;
     case VDFS_ACT_EX:
-        cat_prep(addr, cur_dir, dfs_dir, "current");
+        cat_prep(addr, &cur_dir);
         rom_dispatch(VDFS_ROM_EX);
         break;
     case VDFS_ACT_FILES:
@@ -3526,12 +4347,12 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
             file_info(addr);
         break;
     case VDFS_ACT_LCAT:
-        cat_prep(addr, (fs_flags & DFS_MODE) ? cur_dir : lib_dir, dfs_lib, "library");
+        cat_prep(addr, &lib_dir);
         cat_title();
         rom_dispatch(VDFS_ROM_CAT);
         break;
     case VDFS_ACT_LEX:
-        cat_prep(addr, lib_dir, dfs_lib, "library");
+        cat_prep(addr, &lib_dir);
         rom_dispatch(VDFS_ROM_EX);
         break;
     case VDFS_ACT_LIB:
@@ -3547,7 +4368,7 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
         cmd_title(addr);
         break;
     case VDFS_ACT_VDFS:
-        select_vdfs(FSNO_VDFS);
+        cmd_vdfs(addr);
         break;
     case VDFS_ACT_ADFS:
         if (!(fs_flags & CLAIM_ADFS))
@@ -3568,6 +4389,15 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
     case VDFS_ACT_MMBDIN:
         cmd_mmb_din(addr);
         break;
+    case VDFS_ACT_DRIVE:
+        cmd_drive(addr);
+        break;
+    case VDFS_ACT_ACCESS:
+        cmd_access(addr);
+        break;
+    case VDFS_ACT_COPY:
+        cmd_copy(addr);
+        break;
     default:
         rom_dispatch(act);
     }
@@ -3578,31 +4408,52 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
  * OSFSC and supporting functions.
  */
 
+static uint16_t skip_spaces(uint16_t addr)
+{
+    int ch = readmem(addr);
+    while (ch == ' ' || ch == '\t')
+        ch = readmem(++addr);
+    return addr;
+}
+
 static void osfsc_cmd(void)
 {
-    uint16_t addr;
-    const struct cmdent *ent;
-    char  cmd[MAX_CMD_LEN];
-
-    if ((addr = parse_cmd((y << 8) | x, cmd))) {
-        if ((ent = lookup_cmd(ctab_filing, ARRAY_SIZE(ctab_filing), cmd))) {
-            if (vdfs_do(ent->act, addr))
-                return;
-        }
+    uint16_t addr = (y << 8) | x;
+    char cmd[MAX_CMD_LEN], *end;
+    parse_cmd(addr, cmd);
+    const struct cmdent *ent = lookup_cmd(ctab_filing, ARRAY_SIZE(ctab_filing), cmd, &end);
+    if (ent) {
+        vdfs_do(ent->act, skip_spaces(addr + (end - cmd)));
+        return;
     }
     run_file(err_badcmd);
 }
 
 static void osfsc_opt(void)
 {
-    if (x == 4) {
-        if (check_valid_dir(cur_dir, "current")) {
-            cur_dir->u.dir.boot_opt = y;
-            write_back(cur_dir);
-        }
+    switch(x) {
+        case 1:
+            vdfs_opt1 = y;
+            break;
+        case 2:
+            fs_num = y;
+            break;
+        case 4:
+            if (check_valid_dir(&cur_dir)) {
+                vdfs_entry *ent = cur_dir.dir;
+                ent->u.dir.boot_opt = y;
+                write_back(ent);
+            }
+            break;
+        case 6:
+            fs_flags |= (y & 0x0f);
+            break;
+        case 7:
+            fs_flags &= ~(y & 0x0f);
+            break;
+        default:
+            log_debug("vdfs: osfsc unimplemented option %d,%d", x, y);
     }
-    else
-        log_debug("vdfs: osfsc unimplemented option %d,%d", x, y);
 }
 
 static void osfsc(void)
@@ -3628,20 +4479,20 @@ static void osfsc(void)
             osfsc_cmd();
             break;
         case 0x05:
-            if (cat_prep(x + (y << 8), cur_dir, dfs_dir, "current")) {
+            if (cat_prep(x + (y << 8), &cur_dir)) {
                 cat_title();
                 rom_dispatch(VDFS_ROM_CAT);
             }
             break;
         case 0x06: // new filesystem taking over.
-            fs_num = 0;
+            fs_flags &= ~VDFS_ACTIVE;
             break;
         case 0x07:
             x = MIN_CHANNEL;
             y = MIN_CHANNEL + NUM_CHANNELS;
             break;
         case 0x09:
-            if (cat_prep(x + (y << 8), cur_dir, dfs_dir, "current"))
+            if (cat_prep(x + (y << 8), &cur_dir))
                 rom_dispatch(VDFS_ROM_EX);
             break;
         case 0x0a:
@@ -3791,20 +4642,17 @@ static const struct cmdent ctab_enabled[] = {
 
 static void serv_cmd(void)
 {
-    uint16_t addr;
-    const struct cmdent *ent;
-    char  cmd[MAX_CMD_LEN];
+    uint16_t addr = readmem16(0xf2) + y;
+    char cmd[MAX_CMD_LEN], *end;
 
-    if ((addr = parse_cmd(readmem16(0xf2) + y, cmd))) {
-        ent = lookup_cmd(ctab_always, ARRAY_SIZE(ctab_always), cmd);
-        if (!ent && vdfs_enabled)
-            ent = lookup_cmd(ctab_enabled, ARRAY_SIZE(ctab_enabled), cmd);
-        if (!ent && mmb_fn)
-            ent = lookup_cmd(ctab_mmb, ARRAY_SIZE(ctab_mmb), cmd);
-        if (ent)
-            if (vdfs_do(ent->act, addr))
-                a = 0;
-    }
+    parse_cmd(addr, cmd);
+    const struct cmdent *ent = lookup_cmd(ctab_always, ARRAY_SIZE(ctab_always), cmd, &end);
+    if (!ent && vdfs_enabled)
+        ent = lookup_cmd(ctab_enabled, ARRAY_SIZE(ctab_enabled), cmd, &end);
+    if (!ent && mmb_fn)
+        ent = lookup_cmd(ctab_mmb, ARRAY_SIZE(ctab_mmb), cmd, &end);
+    if (ent && vdfs_do(ent->act, skip_spaces(addr + (end - cmd))))
+        a = 0;
 }
 
 const struct cmdent ctab_help[] = {
@@ -3815,18 +4663,19 @@ const struct cmdent ctab_help[] = {
 
 static void serv_help(void)
 {
-    const struct cmdent *ent;
-    char  cmd[MAX_CMD_LEN];
     uint16_t addr = readmem16(0xf2) + y;
-
     int ch = readmem(addr);
     if (ch == '\r')
         rom_dispatch(VDFS_ROM_HELP_SHORT);
     else if (ch == '.')
         rom_dispatch(VDFS_ROM_HELP_ALL);
-    else if ((addr = parse_cmd(addr, cmd)))
-        if ((ent = lookup_cmd(ctab_help, ARRAY_SIZE(ctab_help), cmd)))
+    else {
+        char cmd[MAX_CMD_LEN], *end;
+        parse_cmd(addr, cmd);
+        const struct cmdent *ent = lookup_cmd(ctab_help, ARRAY_SIZE(ctab_help), cmd, &end);
+        if (ent)
             rom_dispatch(ent->act);
+    }
 }
 
 static uint8_t save_y;
@@ -3836,20 +4685,20 @@ static void serv_boot(void)
     if (vdfs_enabled && (!key_any_down() || key_code_down(ALLEGRO_KEY_S))) {
         if (readmem(0x028d)) { /* last break type */
             close_all();
-            cur_dir = prev_dir = cat_dir = &root_dir;
-            dfs_dir = dfs_lib = '$';
+            cur_dir.dir = prev_dir.dir = cat_dir = &root_dir;
+            cur_dir.drive = lib_dir.drive = 0;
+            cur_dir.dfs_dir = lib_dir.dfs_dir = '$';
             vdfs_findres res;
-            lib_dir = find_entry_adfs("Lib", &res, &root_dir, dfs_dir);
+            lib_dir.dir = find_entry_adfs("Lib", &res, &cur_dir);
         }
-        vdfs_entry *dir = cur_dir;
-        if (check_valid_dir(dir, "current")) {
-            scan_dir(dir);
-            a = dir->u.dir.boot_opt;
+        if (check_valid_dir(&cur_dir)) {
+            scan_dir(cur_dir.dir);
+            a = cur_dir.dir->u.dir.boot_opt;
             rom_dispatch(VDFS_ROM_FSBOOT);
         }
     }
     else
-        fs_num = 0; // some other filing system.
+        fs_flags &= ~VDFS_ACTIVE; // some other filing system.
 }
 
 static void service(void)
@@ -3922,11 +4771,12 @@ static inline void dispatch(uint8_t value)
         case 0x0d: cat_next_dfsdir(); break;
         case 0x0e: cat_next_dfsnot(); break;
         case 0x0f: cat_dfs_rewind();  break;
-        case 0x10: cat_get_dir(cur_dir, dfs_dir); break;
-        case 0x11: cat_get_dir(lib_dir, dfs_lib); break;
+        case 0x10: cat_get_dir(&cur_dir); break;
+        case 0x11: cat_get_dir(&lib_dir); break;
         case 0x12: set_ram();   break;
         case 0x13: rest_ram();  break;
-        default: log_warn("vdfs: function code %d not recognised\n", value);
+        case 0x14: info_next(); break;
+        default: log_warn("vdfs: function code %d not recognised", value);
     }
 }
 
@@ -3969,15 +4819,24 @@ void vdfs_write(uint16_t addr, uint8_t value)
 
 // Initialise the VDFS module.
 
+static void init_dirlib(vdfs_dirlib *dir, const char *desc)
+{
+    dir->desc = desc;
+    dir->dfs_dir = '$';
+    dir->drive = 0;
+}
+
 void vdfs_init(const char *root)
 {
     scan_seq = 0;
+    init_dirlib(&cur_dir, "current");
+    init_dirlib(&lib_dir, "library");
+    init_dirlib(&prev_dir, "previous");
     const char *env = getenv("BEM_VDFS_ROOT");
     if (env)
         root = env; //environment variable wins
     if (!root)
         root = ".";
     vdfs_set_root(root);
-    scan_seq++;
     vdfs_adfs_mode();
 }

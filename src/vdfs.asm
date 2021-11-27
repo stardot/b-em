@@ -131,7 +131,7 @@ prtextws    =   &A8
             equw    fs_claim        ; say which filing systems claimed.
             equw    dir_cat         ; *CAT  via OSFSC
             equw    dir_ex          ; *EX   via OSFSC
-            equw    pr_all          ; *INFO via ISFSC
+            equw    dir_info        ; *INFO via OSFSC
             equw    cmd_dump        ; *DUMP
             equw    cmd_list        ; *LIST
             equw    cmd_print       ; *PRiNT
@@ -153,6 +153,7 @@ prtextws    =   &A8
             equw    close_all
             equw    cmd_build       ; *BUILD
             equw    cmd_append      ; *APPEND.
+            equw    opt1_print
 .dispend
 
 ; Stubs to transfer control to the vdfs.c module.
@@ -195,8 +196,6 @@ prtextws    =   &A8
 
 .fsstart
 {
-            tya
-            pha
             lda     #&06            ; Inform current FS new FS taking over
             jsr     callfscv
             ldx     #&00
@@ -218,15 +217,14 @@ prtextws    =   &A8
             iny
             cpx     #&0e
             bne     vecloop
-            pla
-            pha
-            sta     port_fsid
+            lda     #&01            ; Make VDFS active.
+            ora     port_flags
+            sta     port_flags
             lda     #&8f
             ldx     #&0f
             jsr     OSBYTE          ; Notify that vectors have changed
-            pla
-            tay
             lda     #&00
+            ldy     port_fsid
             rts
 .callfscv   jmp     (&021E)
 .vectab     equw    file
@@ -262,7 +260,6 @@ prtextws    =   &A8
             jsr     prtitle         ; announce the filing system
             jsr     OSNEWL
             jsr     OSNEWL
-            ldy     #fsno_vdfs
             jsr     fsstart         ; same setup as for call &12.
             pla
             bne     noboot1         ; then maybe exec !BOOT.
@@ -512,7 +509,30 @@ prtextws    =   &A8
             hexout  &0118
             hexout  &0117
             hexout  &0116
+            twospc
+            hexout  &011a
+            outchr  '-'
+            ldx     &011b
+            lda     month1,x
+            jsr     OSWRCH
+            lda     month2,x
+            jsr     OSWRCH
+            lda     month3,x
+            jsr     OSWRCH
+            outchr  '-'
+            hexout  &011c
+            hexout  &011d
+            outspc
+            hexout  &011e
+            outchr  ':'
+            hexout  &011f
+            outchr  ':'
+            hexout  &0120
             jmp     OSNEWL
+
+.month1     equs    "JFMAMJJASOND"
+.month2     equs    "aeapauuuecoe"
+.month3     equs    "nbrrynlgptvc"
 
 .opt_tab    equb    msg_off-banner
             equb    msg_load-banner
@@ -574,23 +594,18 @@ prtextws    =   &A8
             jsr     OSNEWL
             lda     #&20            ; DFS mode?
             bit     port_flags
+            beq     adfs_cat
             bne     dfs_cat
 
-            lda     #&0c            ; Fetch the first entry.
-            sta     port_cmd
-            bcs     cat_done
-.cat_loop   ldx     #&00
+.cat_loop   ldx     #&00            ; print the entry.
             jsr     pr_basic
             jsr     pr_others
             jsr     pr_pad
-.adfs_cat   lda     #&0c            ; Fetch the next entry.
+.adfs_cat   lda     #&0c            ; fetch an entry.
             sta     port_cmd
             bcc     cat_loop
             jmp     OSNEWL
 
-            lda     #&0d            ; fetch one directory entry.
-            sta     port_cmd
-            bcs     dfs_none1
 .dfs_lp1    jsr     pr_dfs
             jsr     pr_pad
 .dfs_cat    lda     #&0d            ; fetch one directory entry.
@@ -626,6 +641,12 @@ prtextws    =   &A8
             bcc     ex_dfs_lp
             rts
 
+.dir_info   jsr     pr_all
+            lda     #&14
+            sta     port_cmd
+            bcc     dir_info
+            rts
+
 .not_found
 {
             ldx     #end-msg
@@ -640,6 +661,10 @@ prtextws    =   &A8
             equb    &00
 .end
 }
+
+.opt1_print jsr     pr_all
+            lda     #&01
+            rts
 
 ; The *DUMP command.
 
