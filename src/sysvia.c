@@ -100,8 +100,17 @@ static void sysvia_write_IC32(uint8_t val)
         if (!(IC32 & 1) && (oldIC32 & 1))
            sn_write(sdbval);
 
-    if (!(IC32 & 4) && (oldIC32 & 4))
+    if (!(IC32 & 2) && (oldIC32 & 2))
+        speech_set_rs(true);
+    else if ((IC32 & 2) && !(oldIC32 & 2))
+        speech_set_rs(false);
+
+    if (!(IC32 & 4) && (oldIC32 & 4)) {
+        speech_set_ws(true);
         speech_write(sdbval);
+    }
+    else if ((IC32 & 4) && !(oldIC32 & 4))
+        speech_set_ws(false);
 
     scrsize = ((IC32 & 0x10) ? 2 : 0) | ((IC32 & 0x20) ? 1 : 0);
 

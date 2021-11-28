@@ -151,7 +151,10 @@ static int32_t speech_current_pitch;
 static int32_t speech_current_k[MAX_K];
 #endif
 
+static bool speech_read_select;
+static bool speech_write_select;
 static bool speech_io_ready;
+static int speech_ready_delay;
 static bool speech_uv_zpar;             /* If 1, zero k5 thru k10 coefficients */
 static bool speech_zpar;                /* If 1, zero ALL parameters. */
 
@@ -245,6 +248,8 @@ static void speech_update_fifo_status_and_ints(void)
         log_debug("speech: Talk status WAS 1, is now 0, unsetting  and firing an interrupt!\n");
         speech_set_interrupt_state(1);
         speech_DDIS = false;
+        speech_io_ready = true;
+        speech_update_ready_state();
     }
     speech_previous_talk_status = talk_status;
 }
@@ -256,6 +261,7 @@ static int speech_read_phrom(int count)
     while (count--) {
         if (speech_phrom_bits == 0) {
             speech_phrom_byte = speech_phrom[speech_phrom_addr++];
+            log_debug("speech: read ROM %04X: %02X", speech_phrom_addr-1, speech_phrom_byte);
             speech_phrom_bits = 8;
         }
         val = (val << 1) | (speech_phrom_byte & 1);
@@ -1016,4 +1022,42 @@ void speech_write(uint8_t val)
         speech_fifo_add(val);
     else
         speech_command(val);
+}
+
+void speech_set_rs(bool state)
+{
+    speech_read_select = state;
+    if (state) {
+        log_debug("speech: read select set");
+        speech_io_ready = false;
+        speech_status |= 0x80;
+        speech_ready_delay = 2;
+    }
+}
+
+void speech_set_ws(bool state)
+{
+    speech_write_select = state;
+    if (state) {
+        log_debug("speech: write select set");
+        speech_io_ready = false;
+        speech_status |= 0x80;
+        speech_ready_delay = 2;
+    }
+}
+
+void speech_poll(void)
+{
+    if (speech_ready_delay && --speech_ready_delay == 0) {
+        log_debug("speech: poll");
+        if (speech_write_select && !speech_read_select && (speech_fifo_count >= FIFO_SIZE) && speech_DDIS) {
+            log_debug("speech: FIFO full, re-requesting poll");
+            speech_ready_delay = 8;
+        }
+        else {
+            log_debug("speech: asserting I/O ready");
+            speech_io_ready = true;
+            speech_status &= ~0x80;
+        }
+    }
 }

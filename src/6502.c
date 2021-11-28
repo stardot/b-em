@@ -20,6 +20,7 @@
 #include "scsi.h"
 #include "sid_b-em.h"
 #include "sound.h"
+#include "speech.h"
 #include "sysacia.h"
 #include "tape.h"
 #include "tube.h"
@@ -1020,12 +1021,19 @@ static inline uint16_t getsw(void)
         return temp;
 }
 
-static void otherstuff_poll(void) {
+/*
+ * The otherstuff_pool function is called every 128 clock cycles, so
+ * for a 2Mhz clock, every 15.625us
+ */
+
+static void otherstuff_poll(void)
+{
     otherstuffcount += 128;
     acia_poll(&sysacia);
     if (sound_music5000)
         music2000_poll();
     sound_poll();
+    speech_poll();
     if (!tapelcount) {
         tape_poll();
         tapelcount = tapellatch;
