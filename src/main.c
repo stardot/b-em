@@ -279,7 +279,7 @@ void main_init(int argc, char *argv[])
     sid_init();
     sid_settype(sidmethod, cursid);
     music5000_init(queue);
-    speech_init(queue);
+    speech_init();
     paula_init();
     ddnoise_init();
     tapenoise_init(queue);
@@ -538,7 +538,6 @@ void main_run()
                 break;
             case ALLEGRO_EVENT_AUDIO_STREAM_FRAGMENT:
                 music5000_streamfrag();
-                speech_streamfrag();
                 break;
             case ALLEGRO_EVENT_DISPLAY_RESIZE:
                 video_update_window_size(&event);

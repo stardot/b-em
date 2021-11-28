@@ -5,7 +5,7 @@
 
 extern uint8_t speech_status;
 
-extern void speech_init(ALLEGRO_EVENT_QUEUE *queue);
+extern void speech_init(void);
 extern void speech_reset(void);
 extern void speech_close(void);
 extern void speech_poll(void);

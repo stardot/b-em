@@ -13,17 +13,16 @@
  * BSD 3-clause license.
  */
 
-#define _DEBUG
 #define DEBUG_FRAME
 #include "speech.h"
 #include <allegro5/allegro_audio.h>
 
 uint8_t speech_status;
 
-//#define TMS5220_PERFECT_INTERPOLATION_HACK
+#define TMS5220_PERFECT_INTERPOLATION_HACK
 
 #define FREQ_SPEECH   8000
-#define BUFLEN_SPEECH  256
+#define BUFLEN_SPEECH   32
 
 #define MAX_K                   10
 #define MAX_SCALE_BITS          6
@@ -105,6 +104,7 @@ static const struct coeffs speech_coeff =
 static ALLEGRO_VOICE *voice;
 static ALLEGRO_MIXER *mixer;
 static ALLEGRO_AUDIO_STREAM *stream;
+static unsigned speech_proc_count;
 static uint8_t speech_phrom[16384];
 static uint32_t speech_phrom_addr;
 static uint8_t speech_phrom_bits;
@@ -727,26 +727,6 @@ static void speech_process(int16_t *buffer, unsigned int size)
     }
 }
 
-
-void speech_streamfrag(void)
-{
-    int16_t *buf;
-
-    /* This function is called when a audio stream fragment available
-     * event is received in the main event handling loop but the event
-     * does not specify for which stream a new fragment has become
-     * available so we need to check if it is this one!
-     */
-
-    if (stream) {
-        if ((buf = al_get_audio_stream_fragment(stream))) {
-            speech_process(buf, BUFLEN_SPEECH);
-            al_set_audio_stream_fragment(stream, buf);
-            al_set_audio_stream_playing(stream, true);
-        }
-    }
-}
-
 void speech_reset(void)
 {
     speech_status = 0xff;
@@ -795,7 +775,7 @@ void speech_close(void)
 {
 }
 
-void speech_init(ALLEGRO_EVENT_QUEUE *queue)
+void speech_init(void)
 {
     ALLEGRO_PATH *dir = al_create_path_for_directory("roms/speech");
     if (dir) {
@@ -811,10 +791,9 @@ void speech_init(ALLEGRO_EVENT_QUEUE *queue)
                         if ((mixer = al_create_mixer(FREQ_SPEECH, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_1))) {
                             log_debug("speech: mixer=%p", mixer);
                             if (al_attach_mixer_to_voice(mixer, voice)) {
-                                if ((stream = al_create_audio_stream(4, BUFLEN_SPEECH, FREQ_SPEECH, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_1))) {
+                                if ((stream = al_create_audio_stream(32, BUFLEN_SPEECH, FREQ_SPEECH, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_1))) {
                                     log_debug("speech: stream=%p", stream);
                                     if (al_attach_audio_stream_to_mixer(stream, mixer)) {
-                                        al_register_event_source(queue, al_get_audio_stream_event_source(stream));
                                         speech_io_ready = true;
                                         speech_reset();
                                     } else
@@ -1048,6 +1027,17 @@ void speech_set_ws(bool state)
 
 void speech_poll(void)
 {
+    if (++speech_proc_count >= 60) {
+        if (stream) {
+            int16_t *buf = al_get_audio_stream_fragment(stream);
+            if (buf) {
+                speech_process(buf, BUFLEN_SPEECH);
+                al_set_audio_stream_fragment(stream, buf);
+                al_set_audio_stream_playing(stream, true);
+                speech_proc_count = 0;
+            }
+        }
+    }
     if (speech_ready_delay && --speech_ready_delay == 0) {
         log_debug("speech: poll");
         if (speech_write_select && !speech_read_select && (speech_fifo_count >= FIFO_SIZE) && speech_DDIS) {
