@@ -68,6 +68,7 @@ OBJ = \
     serial.o \
     sn76489.o \
     sound.o \
+    speech.o \
     sysacia.o \
     sysvia.o \
     tape.o \
