@@ -1,3 +1,4 @@
+#define _DEBUG
 /*
  * Synthetic Speech for B-Em.
  *
@@ -15,6 +16,7 @@
 
 #define DEBUG_FRAME
 #include "speech.h"
+#include "config.h"
 #include <allegro5/allegro_audio.h>
 
 uint8_t speech_status;
@@ -23,6 +25,8 @@ uint8_t speech_status;
 
 #define FREQ_SPEECH   8000
 #define BUFLEN_SPEECH   32
+
+#define SPEECH_ROM_SIZE 16384
 
 #define MAX_K                   10
 #define MAX_SCALE_BITS          6
@@ -105,7 +109,8 @@ static ALLEGRO_VOICE *voice;
 static ALLEGRO_MIXER *mixer;
 static ALLEGRO_AUDIO_STREAM *stream;
 static unsigned speech_proc_count;
-static uint8_t speech_phrom[16384];
+static uint8_t *speech_phroms;
+static uint8_t *speech_phrom;
 static uint32_t speech_phrom_addr;
 static uint8_t speech_phrom_bits;
 static uint8_t speech_phrom_byte;
@@ -775,48 +780,67 @@ void speech_close(void)
 {
 }
 
-void speech_init(void)
+static void speech_load_rom(ALLEGRO_PATH *dir, unsigned posn, const char *dflt, uint8_t *addr)
 {
-    ALLEGRO_PATH *dir = al_create_path_for_directory("roms/speech");
-    if (dir) {
-        ALLEGRO_PATH *file = find_dat_file(dir, "phrom_a", ".rom");
+    log_debug("speech: looking for ROM %02d", posn);
+    char key[12];
+    snprintf(key, sizeof(key), "rom%02d", posn);
+    const char *name = get_config_string("speech", key, dflt);
+    if (name) {
+        ALLEGRO_PATH *file = find_dat_file(dir, name, ".rom");
         if (file) {
             const char *cpath = al_path_cstr(file, ALLEGRO_NATIVE_PATH_SEP);
             FILE *fp = fopen(cpath, "rb");
             if (fp) {
-                if (fread(speech_phrom, sizeof(speech_phrom), 1, fp)) {
-                    fclose(fp);
-                    if ((voice = al_create_voice(FREQ_SPEECH, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_1))) {
-                        log_debug("speech: voice=%p", voice);
-                        if ((mixer = al_create_mixer(FREQ_SPEECH, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_1))) {
-                            log_debug("speech: mixer=%p", mixer);
-                            if (al_attach_mixer_to_voice(mixer, voice)) {
-                                if ((stream = al_create_audio_stream(32, BUFLEN_SPEECH, FREQ_SPEECH, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_1))) {
-                                    log_debug("speech: stream=%p", stream);
-                                    if (al_attach_audio_stream_to_mixer(stream, mixer)) {
-                                        speech_io_ready = true;
-                                        speech_reset();
-                                    } else
-                                        log_error("speech: unable to attach stream to mixer");
-                                } else
-                                    log_error("speech: unable to create stream=");
-                            } else
-                                log_error("speech: unable to attach mixer to voice");
-                        } else
-                            log_error("speech: unable to create mixer");
-                    } else
-                        log_error("speech: unable to create voice");
-                }
-                else {
+                if (fread(addr, 1, 16384, fp) <= 0)
                     log_error("speech: error reading PHROM data from %s: %s", cpath, strerror(errno));
-                    fclose(fp);
-                }
+                fclose(fp);
             }
             else
-                log_error("speech: unable to open PHROM file %s: %s", cpath, strerror(errno));
+                log_error("speech: unable to open PHROM %s for reading: %s", cpath, strerror(errno));
         }
         else
-            log_error("speech: PHROM file phrom_a not found");
+            log_error("speech: PHROM %s not found", name);
+    }
+}
+
+void speech_init(void)
+{
+    ALLEGRO_PATH *dir = al_create_path_for_directory("roms/speech");
+    if (dir) {
+        const ssize_t size = 16 * SPEECH_ROM_SIZE;
+        uint8_t *addr = malloc(size);
+        if (addr) {
+            memset(addr, 0xff, size);
+            speech_phroms = addr;
+            for (int i = 0; i < 15; i++) {
+                speech_load_rom(dir, i, NULL, addr);
+                addr += 16384;
+            }
+            speech_load_rom(dir, 15, "phrom_a", addr);
+            if ((voice = al_create_voice(FREQ_SPEECH, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_1))) {
+                log_debug("speech: voice=%p", voice);
+                if ((mixer = al_create_mixer(FREQ_SPEECH, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_1))) {
+                    log_debug("speech: mixer=%p", mixer);
+                    if (al_attach_mixer_to_voice(mixer, voice)) {
+                        if ((stream = al_create_audio_stream(32, BUFLEN_SPEECH, FREQ_SPEECH, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_1))) {
+                            log_debug("speech: stream=%p", stream);
+                            if (al_attach_audio_stream_to_mixer(stream, mixer)) {
+                                speech_io_ready = true;
+                                speech_reset();
+                            } else
+                                log_error("speech: unable to attach stream to mixer");
+                        } else
+                            log_error("speech: unable to create stream");
+                    } else
+                        log_error("speech: unable to attach mixer to voice");
+                } else
+                    log_error("speech: unable to create mixer");
+            } else
+                log_error("speech: unable to create voice");
+        }
+        else
+            log_error("speech: out of memory load PHROMs");
     }
     else
         log_error("speech: unable to create directory object");
@@ -904,6 +928,7 @@ static void speech_command(uint8_t cmd)
                  */
                 speech_phrom_addr = (speech_phrom_addr >> 4) | ((cmd & 0xf) << 16);
                 speech_phrom_bits = 0;
+                speech_phrom = speech_phroms + (speech_phrom_addr & 0x3c000);
                 log_debug("speech: phrom_address=%04X", speech_phrom_addr);
                 speech_RDB_flag = false;
             }
