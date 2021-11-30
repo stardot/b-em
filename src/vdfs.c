@@ -1,3 +1,4 @@
+#define _DEBUG
 /*
  * VDFS for B-EM
  * Steve Fosdick 2016-2020
@@ -2734,9 +2735,15 @@ static void osfind(void)
         } while (vdfs_chan[channel].ent);
         if (parse_name(path, sizeof path, (y << 8) | x)) {
             ent = find_entry(path, &res, &cur_dir);
-            if (ent && (ent->attribs & (ATTR_EXISTS|ATTR_IS_DIR)) == (ATTR_EXISTS|ATTR_IS_DIR)) {
-                vdfs_chan[channel].ent = ent;  // make "half-open"
-                a = MIN_CHANNEL + channel;
+            if (ent) {
+                if ((ent->attribs & (ATTR_EXISTS|ATTR_IS_DIR)) == (ATTR_EXISTS|ATTR_IS_DIR)) {
+                    vdfs_chan[channel].ent = ent;  // make "half-open"
+                    a = MIN_CHANNEL + channel;
+                    return;
+                }
+            }
+            else if (!res.parent) {
+                adfs_error(res.errmsg);
                 return;
             }
             if (acorn_mode == 0x40) {
