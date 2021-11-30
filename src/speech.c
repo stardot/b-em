@@ -115,6 +115,7 @@ static uint32_t speech_phrom_addr;
 static uint8_t speech_phrom_bits;
 static uint8_t speech_phrom_byte;
 static bool speech_RDB_flag;
+static bool speech_read_addr;
 
 #define FIFO_SIZE 16
 static uint8_t speech_fifo[FIFO_SIZE];
@@ -818,6 +819,7 @@ void speech_init(void)
                 addr += 16384;
             }
             speech_load_rom(dir, 15, "phrom_a", addr);
+            speech_read_addr = get_config_bool("speech", "read_address", false);
             if ((voice = al_create_voice(FREQ_SPEECH, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_1))) {
                 log_debug("speech: voice=%p", voice);
                 if ((mixer = al_create_mixer(FREQ_SPEECH, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_1))) {
@@ -890,8 +892,6 @@ static void speech_fifo_add(uint8_t data)
 
 static void speech_command(uint8_t cmd)
 {
-    log_debug("speech: process_command called with parameter %02X", cmd);
-
     /* parse the command */
     switch ((cmd & 0x70) >> 4) {
         case 0x1: /* read byte */
@@ -906,8 +906,26 @@ static void speech_command(uint8_t cmd)
                 log_debug("speech: Read Byte command received during TALK state, ignoring!");
             break;
 
-        case 0x0: case 0x2: /* set rate (tms5220c and cd2501ecd only), otherwise NOP */
-            log_debug("speech: set rate is a NOP command on the TMS5220");
+        case 0x0: /* set rate (tms5220c and cd2501ecd only), otherwise NOP */
+            if (speech_read_addr) {
+                /* not on orginal hardware - read back low byte of PHROM address */
+                speech_phrom_byte = speech_phrom_addr;
+                log_debug("speech: read address low, byte=%02X", speech_phrom_byte);
+                speech_RDB_flag = true;
+            }
+            else
+                log_debug("speech: set rate is a NOP command on the TMS5220");
+            break;
+
+        case 0x2: /* set rate (tms5220c and cd2501ecd only), otherwise NOP */
+            if (speech_read_addr) {
+                /* not on orginal hardware - read back low byte of PHROM address */
+                speech_phrom_byte = speech_phrom_addr >> 8;
+                log_debug("speech: read address high, byte=%02X", speech_phrom_byte);
+                speech_RDB_flag = true;
+            }
+            else
+                log_debug("speech: set rate is a NOP command on the TMS5220");
             break;
 
         case 0x3: /* read and branch */
