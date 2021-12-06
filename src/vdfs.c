@@ -4152,7 +4152,7 @@ static void cmd_vdfs(uint16_t addr)
         vdfs_adfs_mode();
     else if (ch == 'D' || ch == 'd')
         vdfs_dfs_mode();
-    else {
+    else if (ch != '\r') {
         adfs_error(err_badparms);
         return;
     }
