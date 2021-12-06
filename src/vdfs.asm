@@ -37,6 +37,9 @@ fsno_adfs   =   &08                 ; ADFS filing system no.
 
 claim_adfs  =   &80
 claim_dfs   =   &40
+write_dates =   &10
+dfs_mode    =   &02
+vdfs_active =   &01
 
 ; The interface between this ROM and the vdfs.c module, four ports
 ; in the FRED 1Mhz bus area.
@@ -217,7 +220,7 @@ prtextws    =   &A8
             iny
             cpx     #&0e
             bne     vecloop
-            lda     #&01            ; Make VDFS active.
+            lda     #vdfs_active    ; Make VDFS active.
             ora     port_flags
             sta     port_flags
             lda     #&8f
@@ -592,7 +595,7 @@ prtextws    =   &A8
             bne     cat_liblp
 .nolib      jsr     OSNEWL
             jsr     OSNEWL
-            lda     #&20            ; DFS mode?
+            lda     #dfs_mode       ; DFS mode?
             bit     port_flags
             beq     adfs_cat
             bne     dfs_cat
@@ -624,7 +627,7 @@ prtextws    =   &A8
             jmp     OSNEWL
 .cat_done   rts
 
-.dir_ex     lda     #&20            ; DFS mode?
+.dir_ex     lda     #dfs_mode       ; DFS mode?
             bit     port_flags
             bne     ex_dfs
             beq     ex_adfs

@@ -309,11 +309,11 @@ struct cmdent {
  * define this behaviour and are set/reset with the *FSCLAIM command.
  */
 
-#define CLAIM_DFS   0x01
-#define CLAIM_ADFS  0x02
-#define WRITE_DATES 0x04
-#define DFS_MODE    0x20
-#define VDFS_ACTIVE 0x80
+#define CLAIM_ADFS  0x80
+#define CLAIM_DFS   0x40
+#define WRITE_DATES 0x10
+#define DFS_MODE    0x02
+#define VDFS_ACTIVE 0x01
 
 static uint8_t  reg_a;
 static uint8_t  fs_flags = 0;
@@ -4446,10 +4446,10 @@ static void osfsc_opt(void)
             }
             break;
         case 6:
-            fs_flags |= (y & 0x0f);
+            fs_flags |= (y & 0x0f) << 4;
             break;
         case 7:
-            fs_flags &= ~(y & 0x0f);
+            fs_flags &= ~((y & 0x0f) << 4);
             break;
         default:
             log_debug("vdfs: osfsc unimplemented option %d,%d", x, y);
