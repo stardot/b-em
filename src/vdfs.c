@@ -665,7 +665,7 @@ static void scan_attr(vdfs_entry *ent)
 static void scan_attr(vdfs_entry *ent)
 {
     uint16_t attribs = ent->attribs;
-#if defined(linux) && __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 28
+#if defined(linux) && ((__GLIBC__ == 2 && __GLIBC_MINOR__ >= 28) || __GLIBC__ > 2)
 #define size_field stx.stx_size
     struct statx stx;
 
