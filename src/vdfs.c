@@ -1,3 +1,4 @@
+#define _DEBUG
 /*
  * VDFS for B-EM
  * Steve Fosdick 2016-2020
@@ -4162,15 +4163,18 @@ static void cmd_vdfs(uint16_t addr)
     }
 }
 
-static int mmb_parse_find(uint16_t addr, int ch)
+static int mmb_parse_find(uint16_t addr)
 {
     char name[17];
-    int i;
+    int ch = readmem(addr++);
+    int i = 0;
+    bool quote = false;
 
-    if (ch == '"')
+    if (ch == '"') {
+        quote = true;
         ch = readmem(addr++);
-    i = 0;
-    while (ch != '"' && ch != '\r' && i < sizeof(name)) {
+    }
+    while (ch != '\r' && i < sizeof(name) && ((quote && ch != '"') || (!quote && ch != ' '))) {
         name[i++] = ch;
         ch = readmem(addr++);
     }
@@ -4209,34 +4213,41 @@ static bool mmb_check_pick(unsigned drive, unsigned disc)
 
 static void cmd_mmb_din(uint16_t addr)
 {
-    int num1, num2, ch;
-
-    ch = readmem(addr++);
-    if (ch >= '0' && ch <= '9') {
-        num1 = ch - '0';
-        while ((ch = readmem(addr++)) >= '0' && ch <= '9')
-            num1 = num1 * 10 + ch - '0';
+    int num1 = 0, num2 = 0;
+    uint16_t addr2 = addr;
+    int ch = readmem(addr2);
+    while (ch >= '0' && ch <= '9') {
+        num1 = num1 * 10 + ch - '0';
+        ch = readmem(++addr2);
+    }
+    if (ch == ' ' || ch == '\r') {
         while (ch == ' ')
-            ch = readmem(addr++);
+            ch = readmem(++addr2);
         if (ch == '\r')
             mmb_check_pick(0, num1);
-        else if (ch >= '0' && ch <= '9') {
-            num2 = ch - '0';
-            while ((ch = readmem(addr++)) >= '0' && ch <= '9')
+        else {
+            addr = addr2;
+            while (ch >= '0' && ch <= '9') {
                 num2 = num2 * 10 + ch - '0';
-            if (num1 >= 0 && num1 <= 3)
-                mmb_check_pick(num1, num2);
-            else
-                adfs_error(err_badparms);
-        }
-        else if ((num2 = mmb_parse_find(addr, ch)) >= 0) {
-            if (num1 >= 0 && num1 <= 3)
-                mmb_check_pick(num1, num2);
-            else
-                adfs_error(err_badparms);
+                ch = readmem(++addr2);
+            }
+            if (ch == ' ' || ch == '\r') {
+                while (ch == ' ')
+                    ch = readmem(++addr2);
+                if (ch == '\r' && num1 >= 0 && num1 <= 3)
+                    mmb_check_pick(num1, num2);
+                else
+                    adfs_error(err_badparms);
+            }
+            else if ((num2 = mmb_parse_find(addr)) >= 0) {
+                if (num1 >= 0 && num1 <= 3)
+                    mmb_check_pick(num1, num2);
+                else
+                    adfs_error(err_badparms);
+            }
         }
     }
-    else if ((num1 = mmb_parse_find(addr, ch)) >= 0)
+    else if ((num1 = mmb_parse_find(addr)) >= 0)
         mmb_check_pick(0, num1);
 }
 
