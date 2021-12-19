@@ -1349,7 +1349,12 @@ static vdfs_entry *find_entry_dfs(const char *filename, vdfs_findres *res, vdfs_
         log_debug("vdfs: find_entry_dfs, parsed DFS dir %c, filename=%s", srchdir, filename);
     }
     res->dfs_dir = srchdir;
-    strncpy(res->acorn_fn, filename, MAX_FILE_NAME);
+    size_t len = strlen(filename);
+    if (len > MAX_FILE_NAME) {
+        adfs_error(err_badname);
+        res->parent = NULL;
+    }
+    memcpy(res->acorn_fn, filename, len+1);
     if (!scan_dir(dir->dir)) {
         for (vdfs_entry *ent = dir->dir->u.dir.children; ent; ent = ent->next) {
             log_debug("vdfs: find_entry_dfs, considering entry %c.%s", ent->dfs_dir, ent->acorn_fn);
@@ -2735,9 +2740,15 @@ static void osfind(void)
         } while (vdfs_chan[channel].ent);
         if (parse_name(path, sizeof path, (y << 8) | x)) {
             ent = find_entry(path, &res, &cur_dir);
-            if (ent && (ent->attribs & (ATTR_EXISTS|ATTR_IS_DIR)) == (ATTR_EXISTS|ATTR_IS_DIR)) {
-                vdfs_chan[channel].ent = ent;  // make "half-open"
-                a = MIN_CHANNEL + channel;
+            if (ent) {
+                if ((ent->attribs & (ATTR_EXISTS|ATTR_IS_DIR)) == (ATTR_EXISTS|ATTR_IS_DIR)) {
+                    vdfs_chan[channel].ent = ent;  // make "half-open"
+                    a = MIN_CHANNEL + channel;
+                    return;
+                }
+            }
+            else if (!res.parent) {
+                adfs_error(res.errmsg);
                 return;
             }
             if (acorn_mode == 0x40) {
