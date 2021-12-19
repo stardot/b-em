@@ -1446,7 +1446,8 @@ prtextws    =   &A8
 
 .tube_explode
 {
-            cpy     #&00
+            tya
+            pha
             beq     notube          ; if no tube.
             lda     #&14            ; explode character set.
             ldx     #&06
@@ -1457,8 +1458,47 @@ prtextws    =   &A8
             beq     done            ; end of message?
             jsr     OSWRCH
             jmp     imsglp
-.notube     lda     #&fe
-.done       rts
+.notube     lda     #&ff            ; Get start-up options (kbdips).
+            ldx     #&00
+            tay
+            jsr     OSBYTE
+            txa
+            and     #&40
+            bne     done
+            lda     #&87
+            jsr     OSBYTE
+            tya
+            and     #&07
+            cmp     #&07
+            bne     done
+            lda     #&86
+            jsr     OSBYTE
+            tya
+            pha
+            txa
+            pha
+            ldx     #&00
+            lda     logo
+.logolp     jsr     OSWRCH
+            inx
+            lda     logo,x
+            bne     logolp
+            pla
+            jsr     OSWRCH
+            pla
+            jsr     OSWRCH
+.done       pla
+            tay
+            lda     #&fe
+            rts
+.logo       equb    &1f,&1e,&01,&91,&e2,&a6,&e2,&a2,&e6,&a6,&e2,&a2,&e6
+            equb    &1f,&1e,&02,&91,&a8,&b0,&a9,&a1,&b0,&b0,&a9,&a1,&b8
+            equb    &1f,&1e,&03,&93,&e2,&e6,&e4,&e0,&e2,&e0,&e0,&a6,&e2
+            equb    &1f,&1e,&04,&92,&a8,&b9,&b9,&b9,&b9,&20,&20,&20,&a8
+            equb    &1f,&1e,&05,&96,&20,&a2,&e6,&e6,&e6,&e4,&20,&20,&e2
+            equb    &1f,&1e,&06,&94,&20,&20,&20,&a9,&b9,&a9,&b9,&b0,&a8
+            equb    &1f,&1e,&07,&95,&20,&a4,&a4,&a6,&a4,&a6,&a4,&a2,&e6
+            equb    &1f,&00
 }
 
 .break_type
