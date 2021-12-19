@@ -4747,6 +4747,7 @@ static void service(void)
         close_all();
         break;
     case 0xfe: // Tube explode character set.
+        x = models[curmodel].boot_logo;
         rom_dispatch(VDFS_ROM_TUBE_EXPL);
         break;
     case 0xff: // Tube initialisation.
