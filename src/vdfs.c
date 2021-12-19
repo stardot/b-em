@@ -1,3 +1,4 @@
+#define _DEBUG
 /*
  * VDFS for B-EM
  * Steve Fosdick 2016-2020
@@ -309,11 +310,11 @@ struct cmdent {
  * define this behaviour and are set/reset with the *FSCLAIM command.
  */
 
-#define CLAIM_DFS   0x01
-#define CLAIM_ADFS  0x02
-#define WRITE_DATES 0x04
-#define DFS_MODE    0x20
-#define VDFS_ACTIVE 0x80
+#define CLAIM_ADFS  0x80
+#define CLAIM_DFS   0x40
+#define WRITE_DATES 0x10
+#define DFS_MODE    0x02
+#define VDFS_ACTIVE 0x01
 
 static uint8_t  reg_a;
 static uint8_t  fs_flags = 0;
@@ -665,7 +666,7 @@ static void scan_attr(vdfs_entry *ent)
 static void scan_attr(vdfs_entry *ent)
 {
     uint16_t attribs = ent->attribs;
-#ifdef linux
+#if defined(linux) && ((__GLIBC__ == 2 && __GLIBC_MINOR__ >= 28) || __GLIBC__ > 2)
 #define size_field stx.stx_size
     struct statx stx;
 
@@ -1348,7 +1349,12 @@ static vdfs_entry *find_entry_dfs(const char *filename, vdfs_findres *res, vdfs_
         log_debug("vdfs: find_entry_dfs, parsed DFS dir %c, filename=%s", srchdir, filename);
     }
     res->dfs_dir = srchdir;
-    strncpy(res->acorn_fn, filename, MAX_FILE_NAME);
+    size_t len = strlen(filename);
+    if (len > MAX_FILE_NAME) {
+        adfs_error(err_badname);
+        res->parent = NULL;
+    }
+    memcpy(res->acorn_fn, filename, len+1);
     if (!scan_dir(dir->dir)) {
         for (vdfs_entry *ent = dir->dir->u.dir.children; ent; ent = ent->next) {
             log_debug("vdfs: find_entry_dfs, considering entry %c.%s", ent->dfs_dir, ent->acorn_fn);
@@ -2734,9 +2740,15 @@ static void osfind(void)
         } while (vdfs_chan[channel].ent);
         if (parse_name(path, sizeof path, (y << 8) | x)) {
             ent = find_entry(path, &res, &cur_dir);
-            if (ent && (ent->attribs & (ATTR_EXISTS|ATTR_IS_DIR)) == (ATTR_EXISTS|ATTR_IS_DIR)) {
-                vdfs_chan[channel].ent = ent;  // make "half-open"
-                a = MIN_CHANNEL + channel;
+            if (ent) {
+                if ((ent->attribs & (ATTR_EXISTS|ATTR_IS_DIR)) == (ATTR_EXISTS|ATTR_IS_DIR)) {
+                    vdfs_chan[channel].ent = ent;  // make "half-open"
+                    a = MIN_CHANNEL + channel;
+                    return;
+                }
+            }
+            else if (!res.parent) {
+                adfs_error(res.errmsg);
                 return;
             }
             if (acorn_mode == 0x40) {
@@ -4152,7 +4164,7 @@ static void cmd_vdfs(uint16_t addr)
         vdfs_adfs_mode();
     else if (ch == 'D' || ch == 'd')
         vdfs_dfs_mode();
-    else {
+    else if (ch != '\r') {
         adfs_error(err_badparms);
         return;
     }
@@ -4162,15 +4174,18 @@ static void cmd_vdfs(uint16_t addr)
     }
 }
 
-static int mmb_parse_find(uint16_t addr, int ch)
+static int mmb_parse_find(uint16_t addr)
 {
     char name[17];
-    int i;
+    int ch = readmem(addr++);
+    int i = 0;
+    bool quote = false;
 
-    if (ch == '"')
+    if (ch == '"') {
+        quote = true;
         ch = readmem(addr++);
-    i = 0;
-    while (ch != '"' && ch != '\r' && i < sizeof(name)) {
+    }
+    while (ch != '\r' && i < sizeof(name) && ((quote && ch != '"') || (!quote && ch != ' '))) {
         name[i++] = ch;
         ch = readmem(addr++);
     }
@@ -4209,34 +4224,41 @@ static bool mmb_check_pick(unsigned drive, unsigned disc)
 
 static void cmd_mmb_din(uint16_t addr)
 {
-    int num1, num2, ch;
-
-    ch = readmem(addr++);
-    if (ch >= '0' && ch <= '9') {
-        num1 = ch - '0';
-        while ((ch = readmem(addr++)) >= '0' && ch <= '9')
-            num1 = num1 * 10 + ch - '0';
+    int num1 = 0, num2 = 0;
+    uint16_t addr2 = addr;
+    int ch = readmem(addr2);
+    while (ch >= '0' && ch <= '9') {
+        num1 = num1 * 10 + ch - '0';
+        ch = readmem(++addr2);
+    }
+    if (ch == ' ' || ch == '\r') {
         while (ch == ' ')
-            ch = readmem(addr++);
+            ch = readmem(++addr2);
         if (ch == '\r')
             mmb_check_pick(0, num1);
-        else if (ch >= '0' && ch <= '9') {
-            num2 = ch - '0';
-            while ((ch = readmem(addr++)) >= '0' && ch <= '9')
+        else {
+            addr = addr2;
+            while (ch >= '0' && ch <= '9') {
                 num2 = num2 * 10 + ch - '0';
-            if (num1 >= 0 && num1 <= 3)
-                mmb_check_pick(num1, num2);
-            else
-                adfs_error(err_badparms);
-        }
-        else if ((num2 = mmb_parse_find(addr, ch)) >= 0) {
-            if (num1 >= 0 && num1 <= 3)
-                mmb_check_pick(num1, num2);
-            else
-                adfs_error(err_badparms);
+                ch = readmem(++addr2);
+            }
+            if (ch == ' ' || ch == '\r') {
+                while (ch == ' ')
+                    ch = readmem(++addr2);
+                if (ch == '\r' && num1 >= 0 && num1 <= 3)
+                    mmb_check_pick(num1, num2);
+                else
+                    adfs_error(err_badparms);
+            }
+            else if ((num2 = mmb_parse_find(addr)) >= 0) {
+                if (num1 >= 0 && num1 <= 3)
+                    mmb_check_pick(num1, num2);
+                else
+                    adfs_error(err_badparms);
+            }
         }
     }
-    else if ((num1 = mmb_parse_find(addr, ch)) >= 0)
+    else if ((num1 = mmb_parse_find(addr)) >= 0)
         mmb_check_pick(0, num1);
 }
 
@@ -4446,10 +4468,10 @@ static void osfsc_opt(void)
             }
             break;
         case 6:
-            fs_flags |= (y & 0x0f);
+            fs_flags |= (y & 0x0f) << 4;
             break;
         case 7:
-            fs_flags &= ~(y & 0x0f);
+            fs_flags &= ~((y & 0x0f) << 4);
             break;
         default:
             log_debug("vdfs: osfsc unimplemented option %d,%d", x, y);

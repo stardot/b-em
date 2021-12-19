@@ -562,6 +562,9 @@ void mmb_load(char *fn)
         }
         mmb_ptr += MMB_ZONE_CAT_SIZE;
     }
+    unsigned i = 0;
+    for (mmb_ptr = mmb_cat; mmb_ptr < mmb_end; mmb_ptr += 16)
+        log_debug("sdf-acc: mmb#%04u=%-12.12s", i++, mmb_ptr);
     if (mmb_fp) {
         fclose(mmb_fp);
         if (sdf_fp[1] == mmb_fp) {
@@ -648,7 +651,7 @@ static inline int cat_name_cmp(const char *nam_ptr, const char *cat_ptr, const c
         if ((cat_ch ^ nam_ch) & 0x5f)
             return -1;
     } while (cat_nxt != cat_ptr);
-    return (cat_nxt - mmb_cat) / 16 - 2;
+    return (cat_nxt - mmb_cat) / 16 - 1;
 }
 
 int mmb_find(const char *name)
