@@ -1018,6 +1018,61 @@ static void debugger_rset(cpu_debug_t *cpu, const char *iptr)
         debug_out(err_norname, sizeof(err_norname)-1);
 }
 
+static int hexdig(int ch)
+{
+    if (ch >= '0' && ch <= '9')
+        return ch - '0';
+    if (ch >= 'A' && ch <= 'F')
+        return ch - 'A' + 10;
+    if (ch >= 'a' && ch <= 'f')
+        return ch - 'a' + 10;
+    return -1;
+}
+
+static const char err_noaddr[] = "missing address\n";
+
+static void debugger_writemem(cpu_debug_t *cpu, const char *iptr)
+{
+    const char *end;
+    uint32_t addr = cpu->parse_addr(cpu, iptr, &end);
+    if (end > iptr) {
+        iptr = end;
+        int ch = *iptr;
+        while (ch) {
+            while (ch == ' ' || ch == '\t')
+                ch = *++iptr;
+            if (ch == '"' || ch == '\'') {
+                int quote = ch;
+                ch = *++iptr;
+                while (ch && ch != quote) {
+                    cpu->memwrite(addr++, ch);
+                    ch = *++iptr;
+                }
+            }
+            else {
+                int value = hexdig(ch);
+                if (value >= 0) {
+                    ch = *++iptr;
+                    int val2 = hexdig(ch);
+                    if (val2 >= 0) {
+                        value = (value << 4) | val2;
+                        ch = *++iptr;
+                    }
+                    cpu->memwrite(addr++, value);
+                }
+                else {
+                    debug_outf("bad hex '%s'\n", iptr);
+                    break;
+                }
+            }
+        }
+        if (cpu == &core6502_cpu_debug && vrefresh)
+            video_poll(CLOCKS_PER_FRAME, 0);
+    }
+    else
+        debug_out(err_noaddr, sizeof(err_noaddr)-1);
+}
+
 void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 {
     uint32_t next_addr;
@@ -1347,16 +1402,8 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                     clear_point(cpu, WATCH_INPUT, iptr, "Input watchpoint");
                 else if (!strncmp(cmd, "wclearo", cmdlen))
                     clear_point(cpu, WATCH_OUTPUT, iptr, "Output watchpoint");
-                else if (!strncmp(cmd, "writem", cmdlen)) {
-                    if (*iptr) {
-                        unsigned addr, value;
-                        sscanf(iptr, "%X %X", &addr, &value);
-                        log_debug("debugger: writem %04X %04X\n", addr, value);
-                        cpu->memwrite(addr, value);
-                        if (cpu == &core6502_cpu_debug && vrefresh)
-                            video_poll(CLOCKS_PER_FRAME, 0);
-                    }
-                }
+                else if (!strncmp(cmd, "writem", cmdlen))
+                    debugger_writemem(cpu, iptr);
                 else
                     badcmd = true;
                 break;
