@@ -133,6 +133,67 @@ void log_debug(const char *fmt, ...)
     va_end(ap);
 }
 
+static char dmp_malloc[] = "log_dump: out of space, data dump omitted";
+static const char xdigs[] = "0123456789ABCDEF";
+
+void log_dump(const char *prefix, uint8_t *data, size_t size)
+{
+    unsigned opt = log_options & ll_debug.mask;
+    if (opt) {
+        unsigned dest = opt >> ll_debug.shift;
+        size_t pfxlen = strlen(prefix);
+        size_t totlen = pfxlen + 64;
+        char buf[100], *buffer = buf, *hexbase, *ascbase;
+        if (totlen > sizeof(buf)) {
+            buffer = malloc(totlen);
+            if (!buffer) {
+                log_common(dest, ll_debug.name, dmp_malloc, sizeof dmp_malloc);
+                return;
+            }
+        }
+        memcpy(buffer, prefix, pfxlen);
+        hexbase = buffer + pfxlen;
+        ascbase = hexbase + 48;
+        while (size >= 16) {
+            char *hexptr = hexbase;
+            char *ascptr = ascbase;
+            for (int i = 0; i < 16; i++) {
+                uint8_t byte = *data++;
+                *hexptr++ = xdigs[byte >> 4];
+                *hexptr++ = xdigs[byte & 0x0f];
+                *hexptr++ = ' ';
+                if (byte < 0x20 || byte > 0x7e)
+                    byte = '.';
+                *ascptr++ = byte;
+            }
+            log_common(dest, ll_debug.name, buffer, totlen);
+            size -= 16;
+        }
+        if (size > 0) {
+            char *hexptr = hexbase;
+            char *ascptr = ascbase;
+            size_t pad = 16 - size;
+            do {
+                uint8_t byte = *data++;
+                *hexptr++ = xdigs[byte >> 4];
+                *hexptr++ = xdigs[byte & 0x0f];
+                *hexptr++ = ' ';
+                if (byte < 0x20 || byte > 0x7e)
+                    byte = '.';
+                *ascptr++ = byte;
+            } while (--size);
+            do {
+                *hexptr++ = '*';
+                *hexptr++ = '*';
+                *hexptr++ = ' ';
+            } while (--pad);
+            log_common(dest, ll_debug.name, buffer, ascptr - buffer);
+        }
+        if (buffer != buf)
+            free(buffer);
+    }
+}
+
 #endif
 
 void log_info(const char *fmt, ...)
