@@ -30,7 +30,7 @@ void csw_load(const char *fn)
 {
     FILE *csw_f;
     int end,c;
-    uint32_t destlen = 8 * 1024 * 1024;
+    unsigned long destlen = 8 * 1024 * 1024;
     uint8_t *tempin;
 
     /*Allocate buffer*/

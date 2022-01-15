@@ -158,7 +158,7 @@ void ide_write(uint16_t addr, uint8_t val)
                         ide_count = 200;
                         return;
                 }
-                log_debug("Bad IDE command %02X\n", val);
+                log_fatal("ide: Bad IDE command %02X", val);
                 exit(-1);
                 return;
         }
@@ -302,7 +302,7 @@ void ide_callback()
             case 0x91: /*Set parameters*/
                 ide.spt = ide.secount;
                 ide.hpc = ide.head + 1;
-                ide.atastat = 0x40;
+                ide.atastat = 0x50;
                 return;
             case 0xA1:
             case 0xE3:
