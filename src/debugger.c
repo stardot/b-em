@@ -406,7 +406,7 @@ static const char helptext[] =
     "    r vidproc  - print VIDPROC registers\n"
     "    r sound    - print Sound registers\n"
     "    reset      - reset emulated machine\n"
-    "    rset       - set a CPU register\n"
+    "    rset r v   - set a CPU register\n"
     "    s [n]      - step n instructions (or 1 if no parameter)\n"
     "    symbol name=[rom:]addr\n"
     "               - add debugger symbol\n"
