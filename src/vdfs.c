@@ -3614,7 +3614,7 @@ static void run_file(const char *err)
                 else {
                     FILE *fp = fopen(ent->host_path, "rb");
                     if (fp) {
-                        uint16_t addr = ent->u.file.load_addr;
+                        uint32_t addr = ent->u.file.load_addr;
                         show_activity();
                         if (addr >= 0xffff0000 || curtube == -1) {
                             log_debug("vdfs: run_file: writing to I/O proc memory at %08X", addr);
