@@ -739,22 +739,25 @@ static const char *scan_inf_start(vdfs_entry *ent, char inf_line[MAX_INF_LINE])
             // Parse filename.
             while ((ic = *lptr++) == ' ' || ic == '\t')
                 ;
-            if ((ch = *lptr++) == '.') {
-                ent->dfs_dir = ic;
-                ch = *lptr++;
-            }
-            else {
-                ent->dfs_dir = '$';
-                *ptr++ = ic;
-            }
-            while (ch && ch != ' ' && ch != '\t') {
+            if (ic != '\n') {
+                if ((ch = *lptr++) == '.') {
+                    ent->dfs_dir = ic;
+                    ch = *lptr++;
+                }
+                else {
+                    ent->dfs_dir = '$';
+                    *ptr++ = ic;
+                }
+                while (ch && ch != ' ' && ch != '\t' && ch != '\n') {
+                    if (ptr < end && ch >= '!' && ch <= '~')
+                        *ptr++ = ch;
+                    ch = *lptr++;
+                }
                 if (ptr < end)
-                    *ptr++ = ch;
-                ch = *lptr++;
+                    *ptr = '\0';
+                if (ch != '\n')
+                    return lptr;
             }
-            if (ptr < end)
-                *ptr = '\0';
-            return lptr;
         }
     }
     return NULL;
