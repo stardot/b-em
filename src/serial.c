@@ -12,7 +12,8 @@
 int motor, acia_is_tape;
 
 static uint8_t serial_reg;
-static uint8_t serial_transmit_rate, serial_recive_rate;
+static uint8_t serial_transmit_rate;
+uint8_t serial_recive_rate;
 
 void serial_reset()
 {

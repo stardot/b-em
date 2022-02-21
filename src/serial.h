@@ -10,4 +10,5 @@ void serial_loadstate(FILE *f);
 
 extern int motor;
 extern int acia_is_tape;
+extern uint8_t serial_recive_rate;
 #endif

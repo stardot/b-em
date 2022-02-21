@@ -103,10 +103,21 @@ static void sysacia_tx_hook(ACIA *acia, uint8_t data)
     }
 }
 
+static const unsigned baud_poll[8] = {
+    9,      // 19,200 baud.
+    131,    //  1,200 baud.
+    33,     //  4,800 baud.
+    1042,   //    150 baud.
+    17,     //  9,600 baud.
+    521,    //    300 baud.
+    66,     //  2,400 baud.
+    2084    //     75 baud.
+};
+
 static void sysacia_poll(ACIA *acia)
 {
     if (!acia_is_tape && sysacia_pty >= 0 && !(acia->status_reg & 0x01) && !(acia->control_reg & 0x40) && !sysacia_xoff) {
-        if (++poll_count >= 20) {
+        if (++poll_count >= baud_poll[serial_recive_rate]) {
             uint8_t val;
             if (read(sysacia_pty, &val, 1) == 1) {
                 log_debug("sysacia: read character %02X (%c) to pty master", val, (val >= ' ' && val <= '~') ? val : '.');
