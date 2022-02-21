@@ -87,6 +87,8 @@ void acia_dcdlow(ACIA *acia) {
 }
 
 void acia_poll(ACIA *acia) {
+    if (acia->poll_hook)
+        acia->poll_hook(acia);
     if (!(acia->status_reg & TXD_REG_EMP)) {
         acia->status_reg |= TXD_REG_EMP;
         acia_updateint(acia);

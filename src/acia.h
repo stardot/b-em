@@ -12,6 +12,7 @@ struct acia {
     void (*rx_hook)(ACIA *acia, uint8_t byte);
     void (*tx_hook)(ACIA *acia, uint8_t byte);
     void (*tx_end)(ACIA *acia);
+    void (*poll_hook)(ACIA *acia);
     void *udata;
 };
 
