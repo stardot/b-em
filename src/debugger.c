@@ -406,6 +406,7 @@ static const char helptext[] =
     "    r vidproc  - print VIDPROC registers\n"
     "    r sound    - print Sound registers\n"
     "    reset      - reset emulated machine\n"
+    "    rset r v   - set a CPU register\n"
     "    s [n]      - step n instructions (or 1 if no parameter)\n"
     "    symbol name=[rom:]addr\n"
     "               - add debugger symbol\n"
@@ -985,6 +986,93 @@ static void debugger_ruler(const char *iptr)
     }
 }
 
+static const char err_norname[] = "missing register name\n";
+static const char err_novalue[] = "missing value\n";
+
+static void debugger_rset(cpu_debug_t *cpu, const char *iptr)
+{
+    if (*iptr) {
+        const char *eptr = iptr;
+        int ch = *eptr;
+        while (ch && ch != ' ' && ch != '\t')
+            ch = *++eptr;
+        size_t namelen = eptr - iptr;
+        while (ch == ' ' || ch == '\t')
+            ch = *++eptr;
+        if (!ch) {
+            debug_out(err_novalue, sizeof(err_novalue)-1);
+            return;
+        }
+        int regno = 0;
+        const char *rname = cpu->reg_names[regno];
+        while (rname) {
+            if (!strncasecmp(rname, iptr, namelen)) {
+                cpu->reg_parse(regno, eptr);
+                return;
+            }
+            rname = cpu->reg_names[++regno];
+        }
+        debug_outf("unkown register '%.*s'\n", namelen, iptr);
+    }
+    else
+        debug_out(err_norname, sizeof(err_norname)-1);
+}
+
+static int hexdig(int ch)
+{
+    if (ch >= '0' && ch <= '9')
+        return ch - '0';
+    if (ch >= 'A' && ch <= 'F')
+        return ch - 'A' + 10;
+    if (ch >= 'a' && ch <= 'f')
+        return ch - 'a' + 10;
+    return -1;
+}
+
+static const char err_noaddr[] = "missing address\n";
+
+static void debugger_writemem(cpu_debug_t *cpu, const char *iptr)
+{
+    const char *end;
+    uint32_t addr = cpu->parse_addr(cpu, iptr, &end);
+    if (end > iptr) {
+        iptr = end;
+        int ch = *iptr;
+        while (ch) {
+            while (ch == ' ' || ch == '\t')
+                ch = *++iptr;
+            if (ch == '"' || ch == '\'') {
+                int quote = ch;
+                ch = *++iptr;
+                while (ch && ch != quote) {
+                    cpu->memwrite(addr++, ch);
+                    ch = *++iptr;
+                }
+            }
+            else {
+                int value = hexdig(ch);
+                if (value >= 0) {
+                    ch = *++iptr;
+                    int val2 = hexdig(ch);
+                    if (val2 >= 0) {
+                        value = (value << 4) | val2;
+                        ch = *++iptr;
+                    }
+                    cpu->memwrite(addr++, value);
+                }
+                else {
+                    debug_outf("bad hex '%s'\n", iptr);
+                    break;
+                }
+            }
+        }
+        if (cpu == &core6502_cpu_debug && vrefresh)
+            video_poll(CLOCKS_PER_FRAME, 0);
+    }
+    else
+        debug_out(err_noaddr, sizeof(err_noaddr)-1);
+}
+
 void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 {
     uint32_t next_addr;
@@ -1156,6 +1244,8 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                     main_reset();
                     debug_outf("Emulator reset\n");
                 }
+                else if (cmdlen >= 2 && !strncmp(cmd, "rset", cmdlen))
+                    debugger_rset(cpu, iptr);
                 else if (cmdlen >= 2 && !strncmp(cmd, "ruler", cmdlen))
                     debugger_ruler(iptr);
                 else if (*iptr) {
@@ -1312,16 +1402,8 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                     clear_point(cpu, WATCH_INPUT, iptr, "Input watchpoint");
                 else if (!strncmp(cmd, "wclearo", cmdlen))
                     clear_point(cpu, WATCH_OUTPUT, iptr, "Output watchpoint");
-                else if (!strncmp(cmd, "writem", cmdlen)) {
-                    if (*iptr) {
-                        unsigned addr, value;
-                        sscanf(iptr, "%X %X", &addr, &value);
-                        log_debug("debugger: writem %04X %04X\n", addr, value);
-                        cpu->memwrite(addr, value);
-                        if (cpu == &core6502_cpu_debug && vrefresh)
-                            video_poll(CLOCKS_PER_FRAME, 0);
-                    }
-                }
+                else if (!strncmp(cmd, "writem", cmdlen))
+                    debugger_writemem(cpu, iptr);
                 else
                     badcmd = true;
                 break;
