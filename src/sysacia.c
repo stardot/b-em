@@ -116,12 +116,14 @@ static const unsigned baud_poll[8] = {
 
 static void sysacia_poll(ACIA *acia)
 {
-    if (!acia_is_tape && sysacia_pty >= 0 && !(acia->status_reg & 0x01) && !(acia->control_reg & 0x40) && !sysacia_xoff) {
+    if (!acia_is_tape && sysacia_pty >= 0 && !sysacia_xoff) {
         if (++poll_count >= baud_poll[serial_recive_rate]) {
-            uint8_t val;
-            if (read(sysacia_pty, &val, 1) == 1) {
-                log_debug("sysacia: read character %02X (%c) to pty master", val, (val >= ' ' && val <= '~') ? val : '.');
-                acia_receive(acia, val);
+            if (!(acia->status_reg & 0x01) && !(acia->control_reg & 0x40)) {
+                uint8_t val;
+                if (read(sysacia_pty, &val, 1) == 1) {
+                    log_debug("sysacia: read character %02X (%c) to pty master", val, (val >= ' ' && val <= '~') ? val : '.');
+                    acia_receive(acia, val);
+                }
             }
             poll_count = 0;
         }
