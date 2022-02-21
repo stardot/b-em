@@ -81,29 +81,31 @@ static void sysvia_open_pty(void)
 
 static void sysacia_tx_hook(ACIA *acia, uint8_t data)
 {
-    if (sysacia_pty < 0)
-        sysvia_open_pty();
-    if (sysacia_pty >= 0) {
-        if (data == 0x13) {
-            log_debug("sysacia: xoff");
-            sysacia_xoff = true;
+    if (!acia_is_tape) {
+        if (sysacia_pty < 0)
+            sysvia_open_pty();
+        if (sysacia_pty >= 0) {
+            if (data == 0x13) {
+                log_debug("sysacia: xoff");
+                sysacia_xoff = true;
+            }
+            else if (data == 0x11) {
+                log_debug("sysacia: xon");
+                sysacia_xoff = false;
+            }
+            else {
+                log_debug("sysacia: writing character %02X (%c) to pty master", data, (data >= ' ' && data <= '~') ? data : '.');
+                write(sysacia_pty, &data, 1);
+            }
         }
-        else if (data == 0x11) {
-            log_debug("sysacia: xon");
-            sysacia_xoff = false;
-        }
-        else {
-            log_debug("sysacia: writing character %02X (%c) to pty master", data, (data >= ' ' && data <= '~') ? data : '.');
-            write(sysacia_pty, &data, 1);
-        }
+        else
+            putchar(data);
     }
-    else
-        putchar(data);
 }
 
 static void sysacia_poll(ACIA *acia)
 {
-    if (sysacia_pty >= 0 && !(acia->status_reg & 0x01) && !(acia->control_reg & 0x40) && !sysacia_xoff) {
+    if (!acia_is_tape && sysacia_pty >= 0 && !(acia->status_reg & 0x01) && !(acia->control_reg & 0x40) && !sysacia_xoff) {
         if (++poll_count >= 20) {
             uint8_t val;
             if (read(sysacia_pty, &val, 1) == 1) {
