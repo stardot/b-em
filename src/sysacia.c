@@ -93,7 +93,7 @@ static void sysacia_tx_hook(ACIA *acia, uint8_t data)
 
 static void sysacia_poll(ACIA *acia)
 {
-    if (sysacia_pty >= 0 && !(acia->status_reg & 0x01)) {
+    if (sysacia_pty >= 0 && !(acia->status_reg & 0x01) && !(acia->control_reg & 0x40)) {
         if (++poll_count >= 20) {
             uint8_t val;
             if (read(sysacia_pty, &val, 1) == 1) {
