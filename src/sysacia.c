@@ -60,6 +60,7 @@ static void sysvia_open_pty(void)
                         log_error("sysvia: unable to fork: %m");
                     else {
                         /* Parent process */
+                        fcntl(master, F_SETFL, O_NONBLOCK|fcntl(master, F_GETFL));
                         sysacia_pty = master;
                         return;
                     }
@@ -83,15 +84,8 @@ static void sysacia_tx_hook(ACIA *acia, uint8_t data)
     if (sysacia_pty < 0)
         sysvia_open_pty();
     if (sysacia_pty >= 0) {
-        struct pollfd pfd;
-        pfd.fd = sysacia_pty;
-        pfd.events = POLLOUT;
-        if (poll(&pfd, 1, 0) > 0) {
         log_debug("sysacia: writing character %02X (%c) to pty master", data, (data >= ' ' && data <= '~') ? data : '.');
         write(sysacia_pty, &data, 1);
-    }
-    else
-            log_debug("sysacia: discarding character %02X (%c) as device not ready", data, (data >= ' ' && data <= '~') ? data : '.');
     }
     else
         putchar(data);
@@ -101,17 +95,12 @@ static void sysacia_poll(ACIA *acia)
 {
     if (sysacia_pty >= 0 && !(acia->status_reg & 0x01)) {
         if (++poll_count >= 20) {
-            struct pollfd pfd;
-            pfd.fd = sysacia_pty;
-            pfd.events = POLLIN;
-            if (poll(&pfd, 1, 0) > 0) {
-                uint8_t val;
-                if (read(sysacia_pty, &val, 1) == 1) {
-                    log_debug("sysacia: read character %02X (%c) to pty master", val, (val >= ' ' && val <= '~') ? val : '.');
-                    acia_receive(acia, val);
-                }
-                poll_count = 0;
+            uint8_t val;
+            if (read(sysacia_pty, &val, 1) == 1) {
+                log_debug("sysacia: read character %02X (%c) to pty master", val, (val >= ' ' && val <= '~') ? val : '.');
+                acia_receive(acia, val);
             }
+            poll_count = 0;
         }
     }
 }
