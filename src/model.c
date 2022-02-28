@@ -149,6 +149,7 @@ void model_loadcfg(void)
             ptr->cmos    = get_config_string(sect, "cmos", "");
             ptr->romsetup = model_find_romsetup(get_config_string(sect, "romsetup", "swram"), ptr->name);
             ptr->tube = model_find_tube(get_config_string(sect, "tube", "none"), ptr->name);
+            ptr->boot_logo = get_config_int(sect, "boot_logo", 255);
         }
     }
     model_count = max;

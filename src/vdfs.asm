@@ -1446,7 +1446,8 @@ prtextws    =   &A8
 
 .tube_explode
 {
-            cpy     #&00
+            tya
+            pha
             beq     notube          ; if no tube.
             lda     #&14            ; explode character set.
             ldx     #&06
@@ -1457,8 +1458,100 @@ prtextws    =   &A8
             beq     done            ; end of message?
             jsr     OSWRCH
             jmp     imsglp
-.notube     lda     #&fe
-.done       rts
+.notube     cpx     #&05            ; Boot logo number.
+            bcs     done
+            txa
+            pha
+            lda     #&87
+            jsr     OSBYTE
+            pla
+            tax
+            tya
+            and     #&07
+            cmp     #&07
+            bne     done
+            lda     &a8
+            pha
+            lda     &a9
+            pha
+            lda     logolo,x
+            sta     &a8
+            lda     logohi,x
+            sta     &a9
+            lda     #&86
+            jsr     OSBYTE
+            tya
+            pha
+            txa
+            pha
+            ldy     #&00
+            lda     (&a8),y
+.logolp     jsr     OSWRCH
+            iny
+            lda     (&a8),y
+            bne     logolp
+            pla
+            jsr     OSWRCH
+            pla
+            jsr     OSWRCH
+            pla
+            sta     &a9
+            pla
+            sta     &a8
+.done       pla
+            tay
+            lda     #&fe
+            rts
+.owl_dv8    equb    &1f,&1e,&01,&91,&e2,&a6,&e2,&a2,&e6,&a6,&e2,&a2,&e6
+            equb    &1f,&1e,&02,&91,&a8,&b0,&a9,&a1,&b0,&b0,&a9,&a1,&b8
+            equb    &1f,&1e,&03,&93,&e2,&e6,&e4,&e0,&e2,&e0,&e0,&a6,&e2
+            equb    &1f,&1e,&04,&92,&a8,&b9,&b9,&b9,&b9,&20,&20,&20,&a8
+            equb    &1f,&1e,&05,&96,&20,&a2,&e6,&e6,&e6,&e4,&20,&20,&e2
+            equb    &1f,&1e,&06,&94,&20,&20,&20,&a9,&b9,&a9,&b9,&b0,&a8
+            equb    &1f,&1e,&07,&95,&20,&a4,&a4,&a6,&a4,&a6,&a4,&a2,&e6
+            equb    &1f,&00
+.owl_ash    equb    &1f,&1e,&01,&91,&e2,&a6,&e2,&a2,&f6,&a6,&e2,&a2,&e6
+            equb    &1f,&1e,&02,&91,&a8,&b0,&a9,&a1,&b0,&b0,&a9,&a1,&b8
+            equb    &1f,&1e,&03,&91,&e2,&f6,&e4,&e0,&e2,&e0,&e0,&a6,&e2
+            equb    &1f,&1e,&04,&93,&a8,&b9,&b9,&b9,&b9,&20,&20,&20,&a8
+            equb    &1f,&1e,&05,&93,&20,&a2,&f6,&f6,&f6,&e4,&20,&20,&e2
+            equb    &1f,&1e,&06,&92,&20,&20,&20,&a9,&b9,&a9,&b9,&b0,&a8
+            equb    &1f,&1e,&07,&92,&20,&a4,&a4,&a6,&a4,&a6,&a4,&a2,&e6
+            equb    &1f,&00
+.owl_mono   equb    &1f,&1e,&01,&97,&e2,&a6,&e2,&a2,&f6,&a6,&e2,&a2,&e6
+            equb    &1f,&1e,&02,&97,&a8,&b0,&a9,&a1,&b0,&b0,&a9,&a1,&b8
+            equb    &1f,&1e,&03,&97,&e2,&f6,&e4,&e0,&e2,&e0,&e0,&a6,&a2
+            equb    &1f,&1e,&04,&97,&a8,&b9,&b9,&b9,&b9,&20,&20,&20,&a8
+            equb    &1f,&1e,&05,&97,&20,&a2,&f6,&f6,&f6,&e4,&20,&20,&e2
+            equb    &1f,&1e,&06,&97,&20,&20,&20,&a9,&b9,&a9,&b9,&b0,&a8
+            equb    &1f,&1e,&07,&97,&20,&a4,&a4,&a6,&a4,&a6,&a4,&a2,&e6
+            equb    &1f,&00
+.acorn      equb    &1f,&1e,&01,&92,&9a,&a0,&a0,&f8,&ff,&ff,&f4,&a0,&a0
+            equb    &1f,&1e,&02,&92,&9a,&a0,&e8,&ff,&ff,&ff,&ff,&b4,&a0
+            equb    &1f,&1e,&03,&92,&9a,&a0,&fe,&ff,&ff,&ff,&ff,&fd,&a0
+            equb    &1f,&1e,&04,&92,&9a,&e8,&ff,&ff,&ff,&ff,&ff,&ff,&b4
+            equb    &1f,&1e,&05,&92,&9a,&e2,&f3,&f3,&f3,&f3,&f3,&f3,&b1
+            equb    &1f,&1e,&06,&92,&9a,&a2,&ff,&ff,&ff,&ff,&ff,&ff,&a1
+            equb    &1f,&1e,&07,&92,&9a,&a0,&a2,&ab,&af,&bf,&a7,&a1,&a0
+            equb    &1f,&1e,&08,&92,&9a,&a0,&a3,&a3,&ac,&ad,&e4,&f0,&a0
+            equb    &1f,&00
+.master     equb    &1f,&20,&01,&97,&6a,&64,&20,&20,&20,&5f,&6e
+            equb    &1f,&20,&02,&97,&6a,&20,&29,&30,&38,&21,&6a
+            equb    &1f,&20,&03,&97,&6A,&20,&30,&6a,&20,&30,&6a
+            equb    &1f,&20,&04,&97,&6a,&20,&35,&6a,&20,&35,&6a
+            equb    &1f,&20,&05,&97,&6a,&20,&35,&6a,&20,&35,&6a
+            equb    &1f,&20,&06,&97,&6a,&20,&35,&6a,&20,&35,&6a
+            equb    &1f,&00
+.logolo     equb    <owl_dv8
+            equb    <owl_ash
+            equb    <owl_mono
+            equb    <acorn
+            equb    <master
+.logohi     equb    >owl_dv8
+            equb    >owl_ash
+            equb    >owl_mono
+            equb    >acorn
+            equb    >master
 }
 
 .break_type
