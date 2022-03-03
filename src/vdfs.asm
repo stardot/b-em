@@ -1088,21 +1088,7 @@ prtextws    =   &A8
             outchr  'm'
             outspc
             lda     romid
-            cmp     #&0A
-            bcs     geten
-            outchr  '0'
-            lda     romid
-            jmp     both
-.geten      outchr  '1'
-            lda     romid
-            sec
-            sbc     #&0a
-.both       and     #&0f
-            clc
-            adc     #'0'
-            jsr     OSWRCH
-            outspc
-            outchr  ':'
+            jsr     hexnyb
             outspc
             outchr  '('
             txa
