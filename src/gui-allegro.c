@@ -8,6 +8,7 @@
 #include "debugger.h"
 #include "ddnoise.h"
 #include "disc.h"
+#include "fullscreen.h"
 #include "joystick.h"
 #include "keyboard.h"
 #include "keydef-allegro.h"
@@ -541,6 +542,12 @@ void gui_allegro_init(ALLEGRO_EVENT_QUEUE *queue, ALLEGRO_DISPLAY *display)
     al_append_menu_item(menu, "Debug", 0, 0, NULL, create_debug_menu());
     al_set_display_menu(display, menu);
     al_register_event_source(queue, al_get_default_menu_event_source());
+}
+
+void gui_allegro_destroy(ALLEGRO_EVENT_QUEUE *queue, ALLEGRO_DISPLAY *display)
+{
+    al_unregister_event_source(queue, al_get_default_menu_event_source());
+    al_set_display_menu(display, NULL);
 }
 
 static int radio_event_simple(ALLEGRO_EVENT *event, int current)
@@ -1295,7 +1302,7 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             video_set_borders(vid_fullborders);
             break;
         case IDM_VIDEO_FULLSCR:
-            video_toggle_fullscreen();
+            toggle_fullscreen();
             break;
         case IDM_VIDEO_PAL:
             vid_pal = !vid_pal;

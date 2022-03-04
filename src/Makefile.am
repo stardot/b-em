@@ -62,6 +62,7 @@ b_em_SOURCES = \
 	debugger_symbols.cpp \
 	disc.c fdi.c \
 	fdi2raw.c \
+	fullscreen.c \
 	gui-allegro.c\
 	hfe.c \
 	i8271.c \
