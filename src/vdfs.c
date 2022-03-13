@@ -2670,6 +2670,7 @@ static void osbget(void)
             return;
         }
     }
+    a = 0xfe;
     p.c = 1;
 }
 
