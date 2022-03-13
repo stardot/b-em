@@ -1345,6 +1345,16 @@ static vdfs_entry *find_entry_dfs(const char *filename, vdfs_findres *res, vdfs_
     int srchdir = dir->dfs_dir;
     log_debug("vdfs: find_entry_dfs, filename=%s, dfsdir=%c", filename, srchdir);
     int ic = filename[0];
+    if (ic == ':') {
+        int drive = filename[1];
+        if (drive < '0' || drive > '3' || filename[2] != '.') {
+            adfs_error(err_badname);
+            res->parent = NULL;
+            return NULL;
+        }
+        filename += 3;
+        ic = filename[0];
+    }
     if (ic && filename[1] == '.') {
         srchdir = ic;
         filename += 2;
