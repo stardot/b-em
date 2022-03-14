@@ -1434,49 +1434,40 @@ prtextws    =   &A8
 {
             tya
             pha
-            beq     notube          ; if no tube.
-            lda     #&14            ; explode character set.
-            ldx     #&06
-            jsr     OSBYTE
-.imsglp     bit     &FEE0           ; wait for character to be send from tube
-            bpl     imsglp
-            lda     &FEE1           ; fetch the character.
-            beq     done            ; end of message?
-            jsr     OSWRCH
-            jmp     imsglp
-.notube     cpx     #&05            ; Boot logo number.
-            bcs     done
+            bne     istube
+            cpx     #&05            ; X is set to boot logo number by VDFS C code.
+            bcs     done            ; skip if out of range.
             txa
             pha
-            lda     #&87
+            lda     #&87            ; get the current screen mode.
             jsr     OSBYTE
             pla
             tax
             tya
-            and     #&07
+            and     #&07            ; in case of shadow modes.
             cmp     #&07
-            bne     done
+            bne     done            ; logos only in mode 7.
             lda     &a8
             pha
             lda     &a9
             pha
-            lda     logolo,x
+            lda     logolo,x        ; set address of relevant logo.
             sta     &a8
             lda     logohi,x
             sta     &a9
-            lda     #&86
+            lda     #&86            ; get current cursor position.
             jsr     OSBYTE
-            tya
+            tya                     ; save cursor position on stack.
             pha
             txa
             pha
-            ldy     #&00
+            ldy     #&00            ; print the characters of the logo.
             lda     (&a8),y
 .logolp     jsr     OSWRCH
             iny
             lda     (&a8),y
             bne     logolp
-            pla
+            pla                     ; restore the character position.
             jsr     OSWRCH
             pla
             jsr     OSWRCH
@@ -1486,8 +1477,25 @@ prtextws    =   &A8
             sta     &a8
 .done       pla
             tay
-            lda     #&fe
+            lda     #&fe            ; don't claim the call.
             rts
+.imsglp     jsr     OSWRCH
+.istube     bit     &FEE0           ; wait for character to be send from tube
+            bpl     istube
+            lda     &FEE1           ; fetch the character.
+            bne     imsglp          ; loop until end of message.
+            lda     #&14            ; explode character set.
+            ldx     #&06
+            jsr     OSBYTE
+            lda     #&d7            ; suppress OS start-up message.
+            ldx     #&00
+            ldy     #&7f
+            jsr     OSBYTE
+            pla
+            tay
+            lda     #&00
+            rts
+
 .owl_dv8    equb    &1f,&1e,&01,&91,&e2,&a6,&e2,&a2,&e6,&a6,&e2,&a2,&e6
             equb    &1f,&1e,&02,&91,&a8,&b0,&a9,&a1,&b0,&b0,&a9,&a1,&b8
             equb    &1f,&1e,&03,&93,&e2,&e6,&e4,&e0,&e2,&e0,&e0,&a6,&e2
