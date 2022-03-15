@@ -194,17 +194,6 @@ void video_leavefullscreen(void)
     scr_y_size = winsizey - video_led_height();
 }
 
-void video_toggle_fullscreen(void)
-{
-    if (fullscreen) {
-        fullscreen = 0;
-        video_leavefullscreen();
-    } else {
-        fullscreen = 1;
-        video_enterfullscreen();
-    }
-}
-
 static void upscale_only(ALLEGRO_BITMAP *src, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh)
 {
     al_set_target_backbuffer(al_get_current_display());

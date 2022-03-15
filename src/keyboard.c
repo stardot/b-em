@@ -5,7 +5,7 @@
 #include "keyboard.h"
 #include "model.h"
 #include "6502.h"
-#include "video_render.h"
+#include "fullscreen.h"
 #include <ctype.h>
 #include <allegro5/keyboard.h>
 
@@ -674,9 +674,9 @@ const struct key_act_const keyact_const[KEY_ACTION_MAX] = {
     { "break",        ALLEGRO_KEY_F12,   false, main_key_break,          do_nothing      },
     { "full-Speed",   ALLEGRO_KEY_PGUP,  false, main_start_fullspeed,    stop_full_speed },
     { "pause",        ALLEGRO_KEY_PGDN,  false, main_key_pause,          do_nothing      },
-    { "full-screen1", ALLEGRO_KEY_F11,   false, video_toggle_fullscreen, do_nothing      },
+    { "full-screen1", ALLEGRO_KEY_F11,   false, toggle_fullscreen, do_nothing      },
     { "debug-break",  ALLEGRO_KEY_F10,   false, debug_break,             do_nothing      },
-    { "full-screen2", ALLEGRO_KEY_ENTER, true,  video_toggle_fullscreen, do_nothing      }
+    { "full-screen2", ALLEGRO_KEY_ENTER, true,  toggle_fullscreen, do_nothing      }
 };
 
 uint8_t keylookup[ALLEGRO_KEY_MAX];
