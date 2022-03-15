@@ -6,8 +6,8 @@ extern ALLEGRO_EVENT_QUEUE *queue;
 extern ALLEGRO_DISPLAY *tmp_display;
 void enter_fullscreen()
 {
-    gui_allegro_destroy(queue, tmp_display);
     video_enterfullscreen();
+    gui_allegro_destroy(queue, tmp_display);
 }
 
 void leave_fullscreen()
