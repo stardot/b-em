@@ -97,7 +97,8 @@ const char *vdfs_cfg_root = NULL;
 #define ATTR_OPEN_READ   0x1000
 #define ATTR_OPEN_WRITE  0x2000
 #define ATTR_IS_DIR      0x4000
-#define ATTR_BTIME_VALID 0x0100
+#define ATTR_BTIME_VALID 0x0800
+#define ATTR_NL_TRANS    0x0100
 
 // Which file metadata to process.
 
@@ -888,7 +889,7 @@ static void scan_inf_file(vdfs_entry *ent)
     if (attribs) {
         /* merge .inf and host filing system attributes */
         ent->attribs &= attribs|~ATTR_ACORN_MASK;
-        ent->attribs |= attribs & (ATTR_USER_LOCKD|ATTR_OTHR_LOCKD);
+        ent->attribs |= attribs & (ATTR_USER_LOCKD|ATTR_OTHR_LOCKD|ATTR_NL_TRANS);
     }
     set_ent_date_time(ent, mdate_valid, mdate, mtime, cdate_valid, cdate, ctime);
 }
@@ -1469,7 +1470,7 @@ static void write_back(vdfs_entry *ent)
                 putc('\n', fp);
         }
         else {
-            fprintf(fp, "%c.%s %08X %08X %08X %02X %04X %06X", ent->dfs_dir, ent->acorn_fn, ent->u.file.load_addr, ent->u.file.exec_addr, ent->u.file.length, ent->attribs & ATTR_ACORN_MASK, unix_date_acorn(tp), unix_time_acorn(tp));
+            fprintf(fp, "%c.%s %08X %08X %08X %02X %04X %06X", ent->dfs_dir, ent->acorn_fn, ent->u.file.load_addr, ent->u.file.exec_addr, ent->u.file.length, ent->attribs & (ATTR_ACORN_MASK|ATTR_NL_TRANS), unix_date_acorn(tp), unix_time_acorn(tp));
             if (ent->attribs & ATTR_BTIME_VALID) {
                 tp = localtime(&ent->btime);
                 fprintf(fp, " %04X %06X\n", unix_date_acorn(tp), unix_time_acorn(tp));
@@ -2067,48 +2068,64 @@ static void osfile_attribs(uint32_t pb, vdfs_entry *ent)
     writemem(pb+0x11, 0);
 }
 
-static uint32_t write_bytes(FILE *fp, uint32_t addr, size_t bytes)
+static uint32_t write_bytes(FILE *fp, uint32_t addr, size_t bytes, unsigned nlflag)
 {
-    char buffer[8192];
-
     if (addr >= 0xffff0000 || curtube == -1) {
+        char buffer[8192];
         while (bytes >= sizeof buffer) {
             char *ptr = buffer;
             size_t chunk = sizeof buffer;
-            while (chunk--)
-                *ptr++ = readmem(addr++);
+            while (chunk--) {
+                int ch = readmem(addr++);
+                if (ch == '\r' && nlflag)
+                    ch = '\n';
+                *ptr++ = ch;
+            }
             fwrite(buffer, sizeof buffer, 1, fp);
             bytes -= sizeof buffer;
         }
         if (bytes > 0) {
             char *ptr = buffer;
             size_t chunk = bytes;
-            while (chunk--)
-                *ptr++ = readmem(addr++);
+            while (chunk--) {
+                int ch = readmem(addr++);
+                if (ch == '\r' && nlflag)
+                    ch = '\n';
+                *ptr++ = ch;
+            }
             fwrite(buffer, bytes, 1, fp);
         }
     }
     else {
+        char buffer[8192];
         while (bytes >= sizeof buffer) {
             char *ptr = buffer;
             size_t chunk = sizeof buffer;
-            while (chunk--)
-                *ptr++ = tube_readmem(addr++);
+            while (chunk--) {
+                int ch = tube_readmem(addr++);
+                if (ch == '\r' && nlflag)
+                    ch = '\n';
+                *ptr++ = ch;
+            }
             fwrite(buffer, sizeof buffer, 1, fp);
             bytes -= sizeof buffer;
         }
         if (bytes > 0) {
             char *ptr = buffer;
             size_t chunk = bytes;
-            while (chunk--)
-                *ptr++ = tube_readmem(addr++);
+            while (chunk--) {
+                int ch = tube_readmem(addr++);
+                if (ch == '\r' && nlflag)
+                    ch = '\n';
+                *ptr++ = ch;
+            }
             fwrite(buffer, bytes, 1, fp);
         }
     }
     return addr;
 }
 
-static uint32_t cfile_callback(FILE *fp, uint32_t start_addr, size_t bytes)
+static uint32_t cfile_callback(FILE *fp, uint32_t start_addr, size_t bytes, unsigned nlflag)
 {
     fseek(fp, bytes-1, SEEK_SET);
     putc(0, fp);
@@ -2168,7 +2185,7 @@ static void gcopy_attr(vdfs_entry *ent)
     write_bcd_byte(mem_ptr+0x14, tp->tm_sec);
 }
 
-static void osfile_write(uint32_t pb, const char *path, uint32_t (*callback)(FILE *fp, uint32_t addr, size_t bytes))
+static void osfile_write(uint32_t pb, const char *path, uint32_t (*callback)(FILE *fp, uint32_t addr, size_t bytes, unsigned nlflag))
 {
     vdfs_entry *ent;
     FILE *fp;
@@ -2203,7 +2220,7 @@ static void osfile_write(uint32_t pb, const char *path, uint32_t (*callback)(FIL
             ent->attribs = (ent->attribs & ~ATTR_IS_DIR) | ATTR_EXISTS;
             start_addr = readmem32(pb+0x0a);
             end_addr = readmem32(pb+0x0e);
-            callback(fp, start_addr, end_addr - start_addr);
+            callback(fp, start_addr, end_addr - start_addr, ent->attribs & ATTR_NL_TRANS);
             fclose(fp);
             scan_attr(ent);
             ent->u.file.load_addr = readmem32(pb+0x02);
@@ -2501,8 +2518,9 @@ static void osfile_cdir(const char *path)
     }
 }
 
-static void update_length(vdfs_entry *ent, uint32_t length)
+static void update_length(vdfs_entry *ent, uint32_t addr, uint32_t dest)
 {
+    uint32_t length = dest - addr;
     if (length != ent->u.file.length) {
         ent->u.file.length = length;
         write_back(ent);
@@ -2514,13 +2532,18 @@ static void read_file_io(vdfs_entry *ent, FILE *fp, uint32_t addr)
     char buffer[32768];
     size_t nbytes;
     uint32_t dest = addr;
+    unsigned nlflag = ent->attribs & ATTR_NL_TRANS;
 
     while ((nbytes = fread(buffer, 1, sizeof buffer, fp)) > 0) {
         char *ptr = buffer;
-        while (nbytes--)
-            writemem(dest++, *ptr++);
+        while (nbytes--) {
+            int ch = *ptr++;
+            if (ch == '\n' && nlflag)
+                ch = '\r';
+            writemem(dest++, ch);
+        }
     }
-    update_length(ent, dest - addr);
+    update_length(ent, addr, dest);
 }
 
 static void read_file_tube(vdfs_entry *ent, FILE *fp, uint32_t addr)
@@ -2528,13 +2551,18 @@ static void read_file_tube(vdfs_entry *ent, FILE *fp, uint32_t addr)
     char buffer[32768];
     size_t nbytes;
     uint32_t dest = addr;
+    unsigned nlflag = ent->attribs & ATTR_NL_TRANS;
 
     while ((nbytes = fread(buffer, 1, sizeof buffer, fp)) > 0) {
         char *ptr = buffer;
-        while (nbytes--)
-            tube_writemem(dest++, *ptr++);
+        while (nbytes--) {
+            int ch = *ptr++;
+            if (ch == '\n' && nlflag)
+                ch = '\r';
+            tube_writemem(dest++, ch);
+        }
     }
-    update_length(ent, dest - addr);
+    update_length(ent, addr, dest);
 }
 
 static void osfile_load(uint32_t pb, const char *path)
@@ -2631,14 +2659,14 @@ static void osfile(void)
  * OSBGET, OSBPUT, OSGBPB and OSFIND calls.
  */
 
-static FILE *getfp_read(int channel)
+static vdfs_open_file *get_open_read(int channel)
 {
     int chan = channel - MIN_CHANNEL;
-    FILE *fp;
 
     if (chan >= 0 && chan < NUM_CHANNELS) {
-        if ((fp = vdfs_chan[chan].fp))
-            return fp;
+        vdfs_open_file *cp = &vdfs_chan[chan];
+        if (cp->fp)
+            return cp;
         log_debug("vdfs: attempt to use closed channel %d", channel);
     } else
         log_debug("vdfs: channel %d out of range", channel);
@@ -2648,13 +2676,14 @@ static FILE *getfp_read(int channel)
 
 static void osbget(void)
 {
-    int ch;
-    FILE *fp;
-
     log_debug("vdfs: osbget(A=%02X, X=%02X, Y=%02X)", a, x, y);
     show_activity();
-    if ((fp = getfp_read(y))) {
-        if ((ch = getc(fp)) != EOF) {
+    vdfs_open_file *cp = get_open_read(y);
+    if (cp) {
+        int ch = getc(cp->fp);
+        if (ch != EOF) {
+            if (ch == '\n' && cp->ent->attribs & ATTR_NL_TRANS)
+                ch = '\r';
             a = ch;
             p.c = 0;
             return;
@@ -2663,45 +2692,48 @@ static void osbget(void)
     p.c = 1;
 }
 
-static FILE *getfp_write(int channel)
+static vdfs_open_file *get_open_write(int channel)
 {
     int chan = channel - MIN_CHANNEL;
-    vdfs_open_file *p;
-    vdfs_entry *ent;
-    FILE *fp = NULL;
 
     if (chan >= 0 && chan < NUM_CHANNELS) {
-        p = &vdfs_chan[chan];
-        if ((ent = p->ent)) {
+        vdfs_open_file *cp = &vdfs_chan[chan];
+        vdfs_entry *ent = cp->ent;
+        if (ent) {
             if (ent->attribs & ATTR_OPEN_WRITE) {
-                if (!(fp = p->fp)) {
-                    log_debug("vdfs: attempt to use write to channel %d not open for write", channel);
-                    adfs_error(err_channel);
-                }
-            } else {
+                if (cp->fp)
+                    return cp;
+                log_debug("vdfs: attempt to use write to channel %d not open for write", channel);
+                adfs_error(err_channel);
+            }
+            else {
                 log_debug("vdfs: attempt to write to a read-only channel %d", channel);
                 adfs_error(err_nupdate);
             }
-        } else {
+        }
+        else {
             log_debug("vdfs: attempt to use closed channel %d", channel);
             adfs_error(err_channel);
         }
-    } else {
+    }
+    else {
         log_debug("vdfs: channel %d out of range\n", channel);
         adfs_error(err_channel);
     }
-    return fp;
+    return NULL;
 }
 
 static void osbput(void)
 {
-    FILE *fp;
-
     log_debug("vdfs: osbput(A=%02X, X=%02X, Y=%02X)", a, x, y);
-
     show_activity();
-    if ((fp = getfp_write(y)))
-        putc(a, fp);
+    vdfs_open_file *cp = get_open_write(y);
+    if (cp) {
+        int ch = a;
+        if (ch == '\r' && cp->ent->attribs & ATTR_NL_TRANS)
+            ch = '\n';
+        putc(ch, cp->fp);
+    }
 }
 
 static void osfind(void)
@@ -2813,24 +2845,19 @@ static void osfind(void)
 
 static void osgbpb_write(uint32_t pb)
 {
-    FILE *fp;
-    uint32_t mem_ptr;
-    size_t bytes;
-
-    if ((fp = getfp_write(readmem(pb)))) {
+    vdfs_open_file *cp = get_open_write(readmem(pb));
+    if (cp) {
         show_activity();
+        FILE *fp = cp->fp;
         if (a == 0x01)
             fseek(fp, readmem32(pb+9), SEEK_SET);
-        mem_ptr = readmem32(pb+1);
-        bytes = readmem32(pb+5);
-        mem_ptr = write_bytes(fp, mem_ptr, bytes);
-        writemem32(pb+1, mem_ptr);
+        writemem32(pb+1, write_bytes(fp, readmem32(pb+1), readmem32(pb+5), cp->ent->attribs & ATTR_NL_TRANS));
         writemem32(pb+5, 0);
         writemem32(pb+9, ftell(fp));
     }
 }
 
-static size_t read_bytes(FILE *fp, uint32_t addr, size_t bytes)
+static size_t read_bytes(FILE *fp, uint32_t addr, size_t bytes, unsigned nlflag)
 {
     char buffer[8192];
     size_t nbytes;
@@ -2841,12 +2868,20 @@ static size_t read_bytes(FILE *fp, uint32_t addr, size_t bytes)
             return bytes;
         bytes -= nbytes;
         if (addr >= 0xffff0000 || curtube == -1) {
-            while (nbytes--)
-                writemem(addr++, *ptr++);
+            while (nbytes--) {
+                int ch = *ptr++;
+                if (ch == '\n' && nlflag)
+                    ch = '\r';
+                writemem(addr++, ch);
+            }
         }
         else {
-            while (nbytes--)
+            while (nbytes--) {
+                int ch = *ptr++;
+                if (ch == '\n' && nlflag)
+                    ch = '\r';
                 tube_writemem(addr++, *ptr++);
+            }
         }
     }
     while (bytes > 0) {
@@ -2855,12 +2890,20 @@ static size_t read_bytes(FILE *fp, uint32_t addr, size_t bytes)
             return bytes;
         bytes -= nbytes;
         if (addr >= 0xffff0000 || curtube == -1) {
-            while (nbytes--)
+            while (nbytes--) {
+                int ch = *ptr++;
+                if (ch == '\n' && nlflag)
+                    ch = '\r';
                 writemem(addr++, *ptr++);
+            }
         }
         else {
-            while (nbytes--)
+            while (nbytes--) {
+                int ch = *ptr++;
+                if (ch == '\n' && nlflag)
+                    ch = '\r';
                 tube_writemem(addr++, *ptr++);
+            }
         }
     }
     return 0;
@@ -2868,18 +2911,16 @@ static size_t read_bytes(FILE *fp, uint32_t addr, size_t bytes)
 
 static int osgbpb_read(uint32_t pb)
 {
-    FILE *fp;
-    uint32_t mem_ptr;
-    size_t bytes;
     size_t undone = 0;
-
-    if ((fp = getfp_read(readmem(pb)))) {
+    vdfs_open_file *cp = get_open_read(readmem(pb));
+    if (cp) {
         show_activity();
+        FILE *fp = cp->fp;
         if (a == 0x03)
             fseek(fp, readmem32(pb+9), SEEK_SET);
-        mem_ptr = readmem32(pb+1);
-        bytes = readmem32(pb+5);
-        undone = read_bytes(fp, mem_ptr, bytes);
+        uint32_t mem_ptr = readmem32(pb+1);
+        size_t bytes = readmem32(pb+5);
+        undone = read_bytes(fp, mem_ptr, bytes, cp->ent->attribs & ATTR_NL_TRANS);
         writemem32(pb+1, mem_ptr + bytes - undone);
         writemem32(pb+5, undone);
         writemem32(pb+9, ftell(fp));
@@ -3118,9 +3159,6 @@ static void osgbpb(void)
 
 static void osargs(void)
 {
-    FILE *fp;
-    long temp;
-
     log_debug("vdfs: osargs(A=%02X, X=%02X, Y=%02X)", a, x, y);
 
     if (y == 0) {
@@ -3138,9 +3176,13 @@ static void osargs(void)
             default:
                 log_debug("vdfs: osargs not implemented for y=0, a=%d", a);
         }
-    } else if ((fp = getfp_read(y))) {
-        switch (a)
-        {
+    }
+    else {
+        vdfs_open_file *cp = get_open_read(y);
+        if (cp) {
+            FILE *fp = cp->fp;
+            long temp;
+            switch (a) {
             case 0:     // read sequential pointer
                 writemem32(x, ftell(fp));
                 break;
@@ -3158,6 +3200,7 @@ static void osargs(void)
                 break;
             default:
                 log_debug("vdfs: osargs: unrecognised function code a=%d for channel y=%d", a, y);
+            }
         }
     }
 }
@@ -4482,8 +4525,7 @@ static void osfsc_opt(void)
 
 static void osfsc(void)
 {
-    FILE *fp;
-
+    vdfs_open_file *cp;
     log_debug("vdfs: osfsc(A=%02X, X=%02X, Y=%02X)", a, x, y);
 
     p.c = 0;
@@ -4492,8 +4534,8 @@ static void osfsc(void)
             osfsc_opt();
             break;
         case 0x01: // check EOF
-            if ((fp = getfp_read(x)))
-                x = feof(fp) ? 0xff : 0x00;
+            if ((cp = get_open_read(x)))
+                x = feof(cp->fp) ? 0xff : 0x00;
             break;
         case 0x02: // */ command
         case 0x04: // *RUN command
@@ -4560,9 +4602,9 @@ static void osword_discio(void)
         uint32_t addr = readmem32(pb+1);
         size_t bytes = (sects & 0x0f) << 8;
         if (cmd == 0x53)
-            read_bytes(fp, addr, bytes);
+            read_bytes(fp, addr, bytes, 0);
         else if (cmd == 0x4b) {
-            write_bytes(fp, addr, bytes);
+            write_bytes(fp, addr, bytes, 0);
             p.z = 1;
         }
         writemem(pb+10, 0);
