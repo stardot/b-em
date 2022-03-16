@@ -1346,6 +1346,16 @@ static vdfs_entry *find_entry_dfs(const char *filename, vdfs_findres *res, vdfs_
     int srchdir = dir->dfs_dir;
     log_debug("vdfs: find_entry_dfs, filename=%s, dfsdir=%c", filename, srchdir);
     int ic = filename[0];
+    if (ic == ':') {
+        int drive = filename[1];
+        if (drive < '0' || drive > '3' || filename[2] != '.') {
+            adfs_error(err_badname);
+            res->parent = NULL;
+            return NULL;
+        }
+        filename += 3;
+        ic = filename[0];
+    }
     if (ic && filename[1] == '.') {
         srchdir = ic;
         filename += 2;
@@ -2689,6 +2699,7 @@ static void osbget(void)
             return;
         }
     }
+    a = 0xfe;
     p.c = 1;
 }
 
@@ -3237,7 +3248,7 @@ static void cmd_access(uint16_t addr)
                 ch = readmem(addr++);
             }
             if (ch == '/') {
-                attr_mask |= ATTR_OPEN_READ|ATTR_OTHR_WRITE|ATTR_OTHR_LOCKD|ATTR_OTHR_EXEC;
+                attr_mask |= ATTR_OTHR_READ|ATTR_OTHR_WRITE|ATTR_OTHR_LOCKD|ATTR_OTHR_EXEC;
                 ch = readmem(addr++);
                 while (ch != ' ' && ch != '\t' && ch != '\r') {
                     if (ch == 'R' || ch == 'r')

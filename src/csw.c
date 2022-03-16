@@ -26,16 +26,18 @@ static void csw_read_failed(FILE *csw_f, const char *fn)
         log_error("csw: premature EOF on '%s'", fn);
 }
 
+#define CSW_MAXLEN (8 * 1024 * 1024)
+
 void csw_load(const char *fn)
 {
     FILE *csw_f;
     int end,c;
-    unsigned long destlen = 8 * 1024 * 1024;
+    unsigned long destlen = CSW_MAXLEN;
     uint8_t *tempin;
 
     /*Allocate buffer*/
     if (!csw_dat) {
-        if (!(csw_dat = malloc(8 * 1024 * 1024))) {
+        if (!(csw_dat = malloc(CSW_MAXLEN))) {
             log_error("csw: out of memory reading '%s'", fn);
             return;
         }
@@ -43,7 +45,7 @@ void csw_load(const char *fn)
 
     /*Open file and get size*/
     if (!(csw_f = fopen(fn,"rb"))) {
-        log_warn("csw: uanble to open CSW file '%s': %s", fn, strerror(errno));
+        log_warn("csw: unable to open CSW file '%s': %s", fn, strerror(errno));
         return;
     }
     fseek(csw_f, -1, SEEK_END);
@@ -59,8 +61,17 @@ void csw_load(const char *fn)
         if ((tempin = malloc(end))) {
             if (fread(tempin, end, 1, csw_f) == 1) {
                 fclose(csw_f);
-                /*Decompress*/
-                uncompress(csw_dat, (unsigned long *)&destlen, tempin, end);
+                if (2 == csw_head[0x21]) {
+                    /*Decompress*/
+                    uncompress(csw_dat, (unsigned long *)&destlen, tempin, end);
+                } else {
+                    if (end >= CSW_MAXLEN) {
+                        log_error("csw: out of memory reading '%s'", fn);
+                        return;
+                    }
+                    memcpy(csw_dat, tempin, end);
+                    destlen = end;
+                }
                 free(tempin);
                 /*Reset data pointer*/
                 csw_point = 0;
@@ -68,6 +79,7 @@ void csw_load(const char *fn)
                 tapellatch  = (1000000 / (1200 / 10)) / 64;
                 tapelcount  = 0;
                 tape_loaded = 1;
+                csw_ena     = 1;
                 return;
             }
             else {

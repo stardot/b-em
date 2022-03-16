@@ -56,7 +56,6 @@ extern char vid_scrshotname[260];
 void video_doblit(bool non_ttx, uint8_t vtotal);
 void video_enterfullscreen(void);
 void video_leavefullscreen(void);
-void video_toggle_fullscreen(void);
 void video_set_window_size(bool fudge);
 void video_update_window_size(ALLEGRO_EVENT *event);
 void video_set_disptype(enum vid_disptype dtype);
