@@ -3228,7 +3228,7 @@ static void cmd_access(uint16_t addr)
         char path[MAX_ACORN_PATH];
         if ((addr = parse_name(path, sizeof path, addr))) {
             uint_least32_t attribs = 0;
-            uint_least32_t attr_mask = ATTR_USER_READ|ATTR_USER_WRITE|ATTR_USER_LOCKD|ATTR_USER_EXEC;
+            uint_least32_t attr_mask = ATTR_USER_READ|ATTR_USER_WRITE|ATTR_USER_LOCKD|ATTR_USER_EXEC|ATTR_NL_TRANS;
             int ch = readmem(addr++);
             while (ch == ' ' || ch == '\t')
                 ch = readmem(addr++);
@@ -3241,6 +3241,8 @@ static void cmd_access(uint16_t addr)
                     attribs |= ATTR_USER_LOCKD;
                 else if (ch == 'E' || ch == 'e')
                     attribs |= ATTR_USER_EXEC;
+                else if (ch == 'T' || ch == 't')
+                    attribs |= ATTR_NL_TRANS;
                 else {
                     adfs_error(err_badparms);
                     return;
