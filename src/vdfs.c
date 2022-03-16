@@ -3205,7 +3205,7 @@ static void cmd_access(uint16_t addr)
                 ch = readmem(addr++);
             }
             if (ch == '/') {
-                attr_mask |= ATTR_OPEN_READ|ATTR_OTHR_WRITE|ATTR_OTHR_LOCKD|ATTR_OTHR_EXEC;
+                attr_mask |= ATTR_OTHR_READ|ATTR_OTHR_WRITE|ATTR_OTHR_LOCKD|ATTR_OTHR_EXEC;
                 ch = readmem(addr++);
                 while (ch != ' ' && ch != '\t' && ch != '\r') {
                     if (ch == 'R' || ch == 'r')
