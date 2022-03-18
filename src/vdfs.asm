@@ -491,7 +491,6 @@ prtextws    =   &A8
             adc     #&06
 .ddig       jmp     OSWRCH
 
-
             macro   hexout addr
             lda     addr
             jsr     hexbyt
@@ -502,20 +501,14 @@ prtextws    =   &A8
             jsr     pr_others
             jsr     pr_pad
             twospc
-            hexout  &0111
-            hexout  &0110
-            hexout  &010f
-            hexout  &010e
+            ldx     #&0e
+            jsr     hexfour
             twospc
-            hexout  &0115
-            hexout  &0114
-            hexout  &0113
-            hexout  &0112
+            ldx     #&12
+            jsr     hexfour
             twospc
-            hexout  &0119
-            hexout  &0118
-            hexout  &0117
-            hexout  &0116
+            ldx     #&16
+            jsr     hexfour
             twospc
             hexout  &011a
             outchr  '-'
