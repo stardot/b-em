@@ -1077,7 +1077,7 @@ static int vdfs_wildmat(const char *pattern, const char *candidate, size_t len)
                 return 0;
             len++;
             do {
-                if (vdfs_wildmat(pattern, candidate++, len--))
+                if (!vdfs_wildmat(pattern, candidate++, len--))
                     return 0;
             } while (len && *candidate);
             return 1;
