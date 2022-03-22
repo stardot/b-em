@@ -47,11 +47,11 @@ static unsigned E, F, V, MD;
 static unsigned iPC;
 
 static unsigned ea = 0;
-static long cpu_clk = 0;
-static long cpu_period = 0;
 static unsigned int irqs_pending = 0;
 static unsigned int firqs_pending = 0;
 static unsigned int cc_changed = 0;
+
+#define cpu_clk tubecycles
 
 static unsigned *index_regs[4] = { &X, &Y, &U, &S };
 
@@ -1567,11 +1567,10 @@ static void bsr (void)
 }
 
 /* Execute 6809 code for tubecycles cycles. */
+
 void mc6809nc_execute(void)
 {
   unsigned opcode;
-
-  cpu_period = cpu_clk = tubecycles;
 
   if (sync_flag) {
      return;
@@ -2940,11 +2939,7 @@ void mc6809nc_execute(void)
         if (cc_changed)
           cc_modified ();
 
-   tubeUseCycles(1);
   } while (tubeContinueRunning());
-
-  cpu_period -= cpu_clk;
-  cpu_clk = cpu_period;
 }
 
 void mc6809nc_reset (void)
