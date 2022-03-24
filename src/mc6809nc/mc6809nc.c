@@ -302,7 +302,7 @@ static void indexed (void)                      /* note take 1 extra cycle */
           break;
         default:
           ea = 0;
-          log_warn("invalid index post $%02X", post);
+          log_warn("mc6809nc: invalid index post $%02X at %04x", post, iPC);
           break;
         }
     }
@@ -1931,7 +1931,7 @@ void mc6809nc_execute(void)
                 st16 (S);
                 break;
               default:
-                log_warn("mc6809nc: invalid opcode (1) at %04x", iPC);
+                log_warn("mc6809nc: invalid PAGE 1 opcode $%02X at %04x", opcode, iPC);
                 break;
               }
           }
@@ -2006,7 +2006,7 @@ void mc6809nc_execute(void)
                 cpu_clk--;
                 break;
               default:
-                log_warn ("mc6809nc: invalid opcode (2) at %04x", iPC);
+                log_warn("mc6809nc: invalid PAGE 2 opcode $%02X at %04x", opcode, iPC);
                 break;
               }
           }
@@ -2931,7 +2931,7 @@ void mc6809nc_execute(void)
 
         default:
           cpu_clk -= 2;
-          log_warn ("mc6809nc: invalid opcode '%02X'", opcode);
+          log_warn("mc6809nc: invalid PAGE 0 opcode $%02X at %04X", opcode, iPC);
           PC = iPC;
           break;
         }
