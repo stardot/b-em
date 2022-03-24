@@ -62,46 +62,46 @@ static void firq (void);
 
 void mc6809nc_request_irq (unsigned int source)
 {
-        /* If the interrupt is not masked, generate
-         * IRQ immediately.  Else, mark it pending and
-         * we'll check it later when the flags change.
-         */
-//      irqs_pending |= (1 << source);
-   sync_flag = 0;
-        if (!(EFI & I_FLAG))
-                irq ();
+  /* If the interrupt is not masked, generate
+  * IRQ immediately.  Else, mark it pending and
+  * we'll check it later when the flags change.
+  */
+  //irqs_pending |= (1 << source);
+  sync_flag = 0;
+  if (!(EFI & I_FLAG))
+    irq ();
 }
 
 void mc6809nc_release_irq (unsigned int source)
 {
-        irqs_pending &= ~(1 << source);
+  irqs_pending &= ~(1 << source);
 }
 
 void mc6809nc_request_firq (unsigned int source)
 {
-        /* If the interrupt is not masked, generate
-         * IRQ immediately.  Else, mark it pending and
-         * we'll check it later when the flags change.
-         */
-        //firqs_pending |= (1 << source);
-   sync_flag = 0;
-        if (!(EFI & F_FLAG))
-                firq ();
+  /* If the interrupt is not masked, generate
+  * IRQ immediately.  Else, mark it pending and
+  * we'll check it later when the flags change.
+  */
+  //firqs_pending |= (1 << source);
+  sync_flag = 0;
+  if (!(EFI & F_FLAG))
+    firq ();
 }
 
 void mc6809nc_release_firq (unsigned int source)
 {
-        firqs_pending &= ~(1 << source);
+  firqs_pending &= ~(1 << source);
 }
 
 static inline void check_pc (void)
 {
-        /* TODO */
+  /* TODO */
 }
 
 static inline void check_stack (void)
 {
-        /* TODO */
+  /* TODO */
 }
 
 static inline void change_pc (unsigned newPC)
@@ -533,11 +533,11 @@ void set_cc (unsigned arg)
 void cc_modified (void)
 {
   /* Check for pending interrupts */
-        if (firqs_pending && !(EFI & F_FLAG))
-                firq ();
-        else if (irqs_pending && !(EFI & I_FLAG))
-                irq ();
-        cc_changed = 0;
+  if (firqs_pending && !(EFI & F_FLAG))
+    firq ();
+  else if (irqs_pending && !(EFI & I_FLAG))
+    irq ();
+  cc_changed = 0;
 }
 
 unsigned get_reg (unsigned nro)
@@ -1660,7 +1660,7 @@ void mc6809nc_execute(void)
           direct ();
           cpu_clk -= 3;
           PC = ea;
-     check_pc ();
+          check_pc ();
           break;                /* JMP direct */
         case 0x0f:
           direct ();
@@ -1947,8 +1947,8 @@ void mc6809nc_execute(void)
                 swi3 ();
                 break;
 #ifdef H6309
-                        case 0x80: /* SUBE */
-                        case 0x81: /* CMPE */
+              case 0x80: /* SUBE */
+              case 0x81: /* CMPE */
 #endif
               case 0x83:
                 cpu_clk -= 5;
@@ -1963,11 +1963,11 @@ void mc6809nc_execute(void)
                 cmp16 (S, imm_word ());
                 break;
 #ifdef H6309
-                        case 0x8D: /* DIVD */
-                        case 0x8E: /* DIVQ */
-                        case 0x8F: /* MULD */
-                        case 0x90: /* SUBE */
-                        case 0x91: /* CMPE */
+              case 0x8D: /* DIVD */
+              case 0x8E: /* DIVQ */
+              case 0x8F: /* MULD */
+              case 0x90: /* SUBE */
+              case 0x91: /* CMPE */
 #endif
               case 0x93:
                 direct ();
@@ -2944,37 +2944,37 @@ void mc6809nc_execute(void)
 
 void mc6809nc_reset (void)
 {
-    log_debug("mc6809nc: reset");
-   X = Y = S = U = A = B = DP = 0;
-   H = N = OV = C = 0;
-   Z = 1;
-   EFI = F_FLAG | I_FLAG;
+  log_debug("mc6809nc: reset");
+  X = Y = S = U = A = B = DP = 0;
+  H = N = OV = C = 0;
+  Z = 1;
+  EFI = F_FLAG | I_FLAG;
 #ifdef H6309
-   MD = E = F = V = 0;
+  MD = E = F = V = 0;
 #endif
-   sync_flag = 0;
-   change_pc (read16 (0xfefe));
+  sync_flag = 0;
+  change_pc (read16 (0xfefe));
 }
 
 void print_regs (void)
 {
-   char flags[9] = "        ";
-   if (get_cc() & C_FLAG) flags[0] = 'C';
-   if (get_cc() & V_FLAG) flags[1] = 'V';
-   if (get_cc() & Z_FLAG) flags[2] = 'Z';
-   if (get_cc() & N_FLAG) flags[3] = 'N';
-   if (get_cc() & I_FLAG) flags[4] = 'I';
-   if (get_cc() & H_FLAG) flags[5] = 'H';
-   if (get_cc() & F_FLAG) flags[6] = 'F';
-   if (get_cc() & E_FLAG) flags[7] = 'E';
+  char flags[9] = "        ";
+  if (get_cc() & C_FLAG) flags[0] = 'C';
+  if (get_cc() & V_FLAG) flags[1] = 'V';
+  if (get_cc() & Z_FLAG) flags[2] = 'Z';
+  if (get_cc() & N_FLAG) flags[3] = 'N';
+  if (get_cc() & I_FLAG) flags[4] = 'I';
+  if (get_cc() & H_FLAG) flags[5] = 'H';
+  if (get_cc() & F_FLAG) flags[6] = 'F';
+  if (get_cc() & E_FLAG) flags[7] = 'E';
 
-   printf (" X: 0x%04X  [X]: 0x%04X    Y: 0x%04X  [Y]: 0x%04X    ",
-            get_x(), read16(get_x()), get_y(), read16(get_y()) );
-   printf ("PC: 0x%04X [PC]: 0x%04X\n",
-            get_pc(), read16(get_pc()) );
-   printf (" U: 0x%04X  [U]: 0x%04X    S: 0x%04X  [S]: 0x%04X    ",
-            get_u(), read16(get_u()), get_s(), read16(get_s()) );
-   printf ("DP: 0x%02X\n", get_dp() );
-   printf (" A: 0x%02X      B: 0x%02X    [D]: 0x%04X   CC: %s\n",
-            get_a(), get_b(), read16(get_d()), flags );
+  printf (" X: 0x%04X  [X]: 0x%04X    Y: 0x%04X  [Y]: 0x%04X    ",
+          get_x(), read16(get_x()), get_y(), read16(get_y()) );
+  printf ("PC: 0x%04X [PC]: 0x%04X\n",
+          get_pc(), read16(get_pc()) );
+  printf (" U: 0x%04X  [U]: 0x%04X    S: 0x%04X  [S]: 0x%04X    ",
+          get_u(), read16(get_u()), get_s(), read16(get_s()) );
+  printf ("DP: 0x%02X\n", get_dp() );
+  printf (" A: 0x%02X      B: 0x%02X    [D]: 0x%04X   CC: %s\n",
+          get_a(), get_b(), read16(get_d()), flags );
 }
