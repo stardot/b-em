@@ -66,7 +66,7 @@ TUBE tubes[NUM_TUBES]=
     {"65816",          w65816_init_recoco,     w65816_reset,    &tube65816_cpu_debug, 0x8000, "ReCo6502ROM_816", 16 },
     {"32016",          tube_32016_init, n32016_reset,    &n32016_cpu_debug,    0x0000, "",                 8 },
     {"6502 External",  tube_6502_init,  tube_6502_reset, &tube6502_cpu_debug,  0x0800, "6502Tube",         3 },
-    {"6809",           tube_6809_init,  mc6809nc_reset,  &mc6809nc_cpu_debug,  0x0800, "6809Tube",        16 },
+    {"6809",           tube_6809_init,  mc6809nc_reset,  &mc6809nc_cpu_debug,  0x0800, "6809Tube",         3 },
     {"Z80 ROM 2.00",   z80_init,        z80_reset,       &tubez80_cpu_debug,   0x1000, "Z80_200",          6 },
     {"PDP11",          tube_pdp11_init, copro_pdp11_rst, &pdp11_cpu_debug,     0x0800, "PDP11Tube",        2 },
     {"6502 Turbo",     tube_6502_iturb, tube_6502_reset, &tube6502_cpu_debug,  0x0800, "6502Turbo",        4 },
