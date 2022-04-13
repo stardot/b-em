@@ -105,6 +105,7 @@ typedef enum {
 } menu_id_t;
 
 extern void gui_allegro_init(ALLEGRO_EVENT_QUEUE *queue, ALLEGRO_DISPLAY *display);
+extern void gui_allegro_destroy(ALLEGRO_EVENT_QUEUE *queue, ALLEGRO_DISPLAY *display);
 extern void gui_allegro_event(ALLEGRO_EVENT *event);
 extern void gui_allegro_set_eject_text(int drive, ALLEGRO_PATH *path);
 extern void gui_set_disc_wprot(int drive, bool enabled);

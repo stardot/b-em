@@ -193,7 +193,7 @@ static size_t dbg_print_addr(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
 {
     //TODO: DB: symbol lookup
     if (bufsize >= 9) {
-        uint32_t msw = addr & 0x0fff0000;
+        uint32_t msw = (addr & 0x0fff0000) >> 4;
         uint32_t lsw = addr & 0x0000ffff;
         size_t len = debug_print_16bit(msw, buf, bufsize);
         buf[len-1] = ':';
@@ -229,14 +229,50 @@ static uint32_t x86_dbg_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, 
 
 static uint32_t dbg_parse_addr(cpu_debug_t *cpu, const char *arg, const char **end)
 {
-    uint32_t a = strtoul(arg, (char **)end, 16);
-    const char *ptr = *end;
-    if (ptr > arg && *ptr++ == ':') {
-        uint32_t b = strtoul(ptr, (char **)end, 16);
-        if (*end > ptr)
-            a = (a << 4) | b;
+    /* Check for a segment register name. */
+    static const char names[] = "CcDdSsEe";
+    const char *sname = strchr(names, *arg);
+    if (sname && (arg[1] == 'S' || arg[1] == 's')) {
+        /* Found a segment register name so this will always set the
+         * segment.  If no number follows the offset will be zero
+         */
+        uint32_t seg = 0, off = 0;
+        switch((sname - names) >> 1) {
+            case 0:
+                seg = CS;
+                break;
+            case 1:
+                seg = DS;
+                break;
+            case 2:
+                seg = SS;
+                break;
+            case 3:
+                seg = ES;
+                break;
+        }
+        arg += 2;
+        if (*arg == ':')
+            off = strtoul(++arg, (char **)end, 16);
+        return (seg << 4) + off;
     }
-    return a;
+    else {
+        /* No segment register name so convert a hex number.  We don't
+         * know yet if this is the segment or offset.
+         */
+        uint32_t a = strtoul(arg, (char **)end, 16);
+        const char *ptr = *end;
+        if (ptr > arg && *ptr++ == ':') {
+            /* As there is a second number then the first must be the
+             * segment and this number is the offset.  If this were
+             * missing we would default the segment to zero.
+             */
+            uint32_t b = strtoul(ptr, (char **)end, 16);
+            if (*end > ptr)
+                a = (a << 4) + b;
+        }
+        return a;
+    }
 }
 
 // Get a register - which is the index into the names above
@@ -1146,6 +1182,19 @@ static void rep(int fv)
         if (changeds) ds=oldds;
 }
 
+static void x86_intcall(unsigned offset)
+{
+    if (ssegs)
+        ss=oldss;
+    writememwl(ss, (SP-2) & 0xFFFF, flags|0xF000);
+    writememwl(ss, (SP-4) & 0xFFFF, CS);
+    writememwl(ss, (SP-6) & 0xFFFF, pc);
+    SP-=6;
+    flags &= ~I_FLAG;
+    pc = readmemwl(0, offset);
+    loadcs(readmemwl(0, offset+2));
+}
+
 static int inhlt=0;
 static uint16_t lastpc,lastcs;
 static int skipnextprint=0;
@@ -1329,32 +1378,12 @@ void x86_exec()
                                 tubecycles-=4;
                                 break;
 
-                                case 0xFF: /*Invalid - Windows 3.1 syscall trap?*/
-                                pc-=2;
-                                        if (ssegs) ss=oldss;
-                                        writememwl(ss,((SP-2)&0xFFFF),flags|0xF000);
-                                        writememwl(ss,((SP-4)&0xFFFF),CS);
-                                        writememwl(ss,((SP-6)&0xFFFF),pc);
-                                        SP-=6;
-                                        addr=6<<2;
-//                                        flags&=~I_FLAG;
-                                        pc=readmemwl(0,addr);
-                                        loadcs(readmemwl(0,addr+2));
-                                        /*if (!pc && !cs)
-                                        {
-                                                printf("Bad int %02X %04X:%04X\n",temp,oldcs,oldpc);
-                                                x86dumpregs();
-                                                exit(-1);
-                                        }*/
-                                tubecycles-=70;
-                                break;
-
-                                default:
-                                break;
-//                                printf("Bad 0F opcode %02X\n",temp);
-//                                pc-=2;
-//                                x86dumpregs();
-//                                exit(-1);
+                                default: /*Invalid */
+                                    log_debug("x86: invalid opcode 0F %02X at %04X:%04X", temp, cs>>4, pc);
+                                    pc-=2;
+                                    x86_intcall(6<<2);
+                                    tubecycles-=70;
+                                    break;
                         }
                         break;
 
@@ -2790,17 +2819,9 @@ void x86_exec()
                         tubecycles-=22;
                         break;
                         case 0xCC: /*INT 3*/
-                                if (ssegs) ss=oldss;
-                                writememwl(ss,((SP-2)&0xFFFF),flags|0xF000);
-                                writememwl(ss,((SP-4)&0xFFFF),CS);
-                                writememwl(ss,((SP-6)&0xFFFF),pc);
-                                SP-=6;
-                                addr=3<<2;
-                                flags&=~I_FLAG;
-                                pc=readmemwl(0,addr);
-                                loadcs(readmemwl(0,addr+2));
-                        tubecycles-=45;
-                        break;
+                            x86_intcall(3<<2);
+                            tubecycles-=45;
+                            break;
                         case 0xCD: /*INT*/
                         lastpc=pc;
                         lastcs=CS;
@@ -2850,24 +2871,9 @@ void x86_exec()
                         }
                         else
                         {*/
-                                        if (ssegs) ss=oldss;
-                                        writememwl(ss,((SP-2)&0xFFFF),flags|0xF000);
-                                        writememwl(ss,((SP-4)&0xFFFF),CS);
-                                        writememwl(ss,((SP-6)&0xFFFF),pc);
-                                        SP-=6;
-                                        addr=temp<<2;
-//                                        flags&=~I_FLAG;
-                                        pc=readmemwl(0,addr);
-                                        loadcs(readmemwl(0,addr+2));
-/*                                        if (!pc && !cs)
-                                        {
-                                                printf("Bad int %02X %04X:%04X\n",temp,oldcs,oldpc);
-                                                x86dumpregs();
-                                                exit(-1);
-                                        }*/
-//                        }
-                        tubecycles-=47;
-                        break;
+                            x86_intcall(temp<<2);
+                            tubecycles-=47;
+                            break;
                         case 0xCF: /*IRET*/
 //                        if (inint) printf("IRET %04X %04X:%04X\n",flags,cs>>4,pc,SP);
 /*                        if (x86output)
@@ -3510,82 +3516,49 @@ void x86_exec()
                                 tempw=AX;
                                 if (temp)
                                 {
-                                        tempw2=tempw%temp;
-/*                                        if (!tempw)
-                                        {
-                                                writememwl((ss+SP)-2,flags|0xF000);
-                                                writememwl((ss+SP)-4,cs>>4);
-                                                writememwl((ss+SP)-6,pc);
-                                                SP-=6;
-                                                flags&=~I_FLAG;
-                                                pc=readmemwl(0);
-                                                cs=readmemwl(2)<<4;
-                                                printf("Div by zero %04X:%04X\n",cs>>4,pc);
-//                                                x86dumpregs();
-//                                                exit(-1);
-                                        }
-                                        else
-                                        {*/
-                                                AH=tempw2;
-                                                tempw/=temp;
-                                                AL=tempw&0xFF;
-//                                        }
+                                    tempw2=tempw%temp;
+                                    AH=tempw2;
+                                    tempw/=temp;
+                                    AL=tempw&0xFF;
                                 }
-                                else
-                                {
-                                        printf("DIVb BY 0 %04X:%04X\n",cs>>4,pc);
-                                                writememwl(ss,(SP-2)&0xFFFF,flags|0xF000);
-                                                writememwl(ss,(SP-4)&0xFFFF,CS);
-                                                writememwl(ss,(SP-6)&0xFFFF,pc);
-                                                SP-=6;
-                                                flags&=~I_FLAG;
-                                                pc=readmemwl(0,0);
-                                                loadcs(readmemwl(0,2));
-//                                                cs=loadcs(CS);
-//                                                cs=CS<<4;
-//                                        printf("Div by zero %04X:%04X %02X %02X\n",cs>>4,pc,0xf6,0x30);
-//                                        x86dumpregs();
-//                                        exit(-1);
+                                else {
+                                    log_debug("x86: DIVb division by zero at %04X:%04X\n",cs>>4, pc);
+                                    x86_intcall(0);
                                 }
                                 tubecycles-=29;
                                 break;
                                 case 0x38: /*IDIV AL,b*/
-                                tempws=(int)AX;
-                                if (temp)
-                                {
-                                        tempw2=tempws%(int)((signed char)temp);
-/*                                        if (!tempw)
-                                        {
-                                                writememwl((ss+SP)-2,flags|0xF000);
-                                                writememwl((ss+SP)-4,cs>>4);
-                                                writememwl((ss+SP)-6,pc);
-                                                SP-=6;
-                                                flags&=~I_FLAG;
-                                                pc=readmemwl(0);
-                                                cs=readmemwl(2)<<4;
-                                                printf("Div by zero %04X:%04X\n",cs>>4,pc);
+                                    if (!temp) {
+                                        log_debug("x86: DIVb division by zero at %04X:%04X", cs>>4, pc);
+                                        x86_intcall(0);
+                                    }
+                                    else {
+                                        // Dividend is 16 bits.
+                                        uint16_t s1 = AX;
+                                        int sign1 = (s1 & 0x8000) != 0;
+                                        // Divisor is 8 bits.
+                                        uint16_t s2 = temp;
+                                        int sign2 = (s2 & 0x80) != 0;
+                                        // Make divisor and dividend both positive
+                                        if (sign1)
+                                            s1 = ((uint16_t)~s1 + 1) & 0xffffu;
+                                        if (sign2)
+                                            s2 = ((uint16_t)~(s2 | 0xff00) + 1) & 0xffffu;
+                                        uint16_t d1 = s1 / s2;
+                                        uint16_t d2 = s1 % s2;
+                                        if (d1 > (127 + (sign1 ^ sign2))) {
+                                            log_debug("x86: IDIV8 overflow at %04X:%04X, dividend(AX)=%04X, divisor=%02X", cs>>4, pc, AX, temp);
+                                            x86_intcall(0);
                                         }
-                                        else
-                                        {*/
-                                                AH=tempw2&0xFF;
-                                                tempws/=(int)((signed char)temp);
-                                                AL=tempws&0xFF;
-//                                        }
-                                }
-                                else
-                                {
-                                        printf("IDIVb BY 0 %04X:%04X\n",cs>>4,pc);
-                                                writememwl(ss,(SP-2)&0xFFFF,flags|0xF000);
-                                                writememwl(ss,(SP-4)&0xFFFF,CS);
-                                                writememwl(ss,(SP-6)&0xFFFF,pc);
-                                                SP-=6;
-                                                flags&=~I_FLAG;
-                                                pc=readmemwl(0,0);
-                                                loadcs(readmemwl(0,2));
-//                                                cs=loadcs(CS);
-//                                                cs=CS<<4;
-//                                        printf("Div by zero %04X:%04X %02X %02X\n",cs>>4,pc,0xf6,0x38);
-                                }
+                                        // Correct the sign of the quotient.
+                                        if (sign1 ^ sign2)
+                                            d1 = (~d1 + 1) & 0xff;
+                                        // Correct the sign of the remainder.
+                                        if (sign1)
+                                            d2 = (~d2 + 1) & 0xff;
+                                        AH = d2;
+                                        AL = d1;
+                                    }
                                 tubecycles-=44;
                                 break;
 
@@ -3657,51 +3630,50 @@ void x86_exec()
                                 }
                                 else
                                 {
-//                                        printf("DIVw BY 0 %04X:%04X\n",cs>>4,pc);
-//                                        x86dumpregs();
-//                                        exit(-1);
-//                                        printf("%04X:%04X\n",cs>>4,pc);
-                                                writememwl(ss,(SP-2)&0xFFFF,flags|0xF000);
-                                                writememwl(ss,(SP-4)&0xFFFF,CS);
-                                                writememwl(ss,(SP-6)&0xFFFF,pc);
-                                                SP-=6;
-                                                flags&=~I_FLAG;
-                                                pc=readmemwl(0,0);
-                                                loadcs(readmemwl(0,2));
-//                                                cs=loadcs(CS);
-//                                                cs=CS<<4;
-//                                        printf("Div by zero %04X:%04X %02X %02X 1\n",cs>>4,pc,0xf7,0x30);
+                                    log_debug("x86: DIVw division by zero at %04X:%04X", cs>>4, pc);
+                                    x86_intcall(0);
                                 }
                                 tubecycles-=38;
                                 break;
                                 case 0x38: /*IDIV AX,w*/
-                                tempws=(int)((DX<<16)|AX);
-//                                printf("IDIV %i %i ",tempws,tempw);
-                                if (tempw)
-                                {
-                                        tempw2=tempws%(int)((signed short)tempw);
-//                                        printf("%04X ",tempw2);
-                                                DX=tempw2;
-                                                tempws/=(int)((signed short)tempw);
-                                                AX=tempws&0xFFFF;
-                                }
-                                else
-                                {
-//                                        printf("IDIVw BY 0 %04X:%04X\n",cs>>4,pc);
-//                                        printf("%04X:%04X\n",cs>>4,pc);
-                                                writememwl(ss,(SP-2)&0xFFFF,flags|0xF000);
-                                                writememwl(ss,(SP-4)&0xFFFF,CS);
-                                                writememwl(ss,(SP-6)&0xFFFF,pc);
-                                                SP-=6;
-                                                flags&=~I_FLAG;
-                                                pc=readmemwl(0,0);
-                                                loadcs(readmemwl(0,2));
-//                                                cs=loadcs(CS);
-//                                                cs=CS<<4;
-//                                        printf("Div by zero %04X:%04X %02X %02X 1\n",cs>>4,pc,0xf7,0x38);
-                                }
-                                tubecycles-=53;
-                                break;
+                                    if (!tempw) {
+                                        log_debug("x86: DIVw division by zero at %04X:%04X", cs>>4, pc);
+                                        x86_intcall(0);
+                                    }
+                                    else {
+                                        // Dividend is 32 bits
+                                        uint32_t s1 = (DX<<16)|AX;
+                                        int sign1 = (s1 & 0x80000000u) != 0;
+                                        // Divisor is 16 bits
+                                        uint32_t s2 = tempw;
+                                        int sign2 = (s2 & 0x8000u) != 0;
+                                        // Sign-extend divisor to 32 bits
+                                        s2 = sign2 ? (s2 | 0xffff0000u) : s2;
+                                        // Make divisor and dividend both positive
+                                        if (sign1)
+                                            s1 = ~s1 + 1;
+                                        if (sign2)
+                                            s2 = ~s2 + 1;
+                                        // Calculate the quotient and remainder
+                                        uint32_t d1 = s1 / s2;
+                                        uint32_t d2 = s1 % s2;
+                                        // Check for overflow in the 16-bit quotient (-32678 to 32767)
+                                        if (d1 > (32767 + (sign1 ^ sign2))) {
+                                            log_debug("x86: IDIV16 overflow at %04X:%04X, dividend(DX:AX)=%04X%04X, divisor=%04X", cs>>4, pc, DX, AX, tempw);
+                                            x86_intcall(0);
+                                        }
+                                        // Correct the sign of the 16-bit quotient
+                                        if (sign1 ^ sign2)
+                                            d1 = (~d1 + 1) & 0xffff;
+                                        // Correct the sign of the 16-bit remainder
+                                        if (sign1)
+                                            d2 = (~d2 + 1) & 0xffff;
+                                        // Put results back in the registers.
+                                        AX = d1;
+                                        DX = d2;
+                                    }
+                                    tubecycles-=53;
+                                    break;
 
                                 default:
                                 printf("Bad F7 opcode %02X\n",rmdat&0x38);

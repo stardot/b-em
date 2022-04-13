@@ -37,6 +37,9 @@ fsno_adfs   =   &08                 ; ADFS filing system no.
 
 claim_adfs  =   &80
 claim_dfs   =   &40
+write_dates =   &10
+dfs_mode    =   &02
+vdfs_active =   &01
 
 ; The interface between this ROM and the vdfs.c module, four ports
 ; in the FRED 1Mhz bus area.
@@ -131,7 +134,7 @@ prtextws    =   &A8
             equw    fs_claim        ; say which filing systems claimed.
             equw    dir_cat         ; *CAT  via OSFSC
             equw    dir_ex          ; *EX   via OSFSC
-            equw    pr_all          ; *INFO via ISFSC
+            equw    dir_info        ; *INFO via OSFSC
             equw    cmd_dump        ; *DUMP
             equw    cmd_list        ; *LIST
             equw    cmd_print       ; *PRiNT
@@ -153,6 +156,7 @@ prtextws    =   &A8
             equw    close_all
             equw    cmd_build       ; *BUILD
             equw    cmd_append      ; *APPEND.
+            equw    opt1_print
 .dispend
 
 ; Stubs to transfer control to the vdfs.c module.
@@ -195,8 +199,6 @@ prtextws    =   &A8
 
 .fsstart
 {
-            tya
-            pha
             lda     #&06            ; Inform current FS new FS taking over
             jsr     callfscv
             ldx     #&00
@@ -218,15 +220,14 @@ prtextws    =   &A8
             iny
             cpx     #&0e
             bne     vecloop
-            pla
-            pha
-            sta     port_fsid
+            lda     #vdfs_active    ; Make VDFS active.
+            ora     port_flags
+            sta     port_flags
             lda     #&8f
             ldx     #&0f
             jsr     OSBYTE          ; Notify that vectors have changed
-            pla
-            tay
             lda     #&00
+            ldy     port_fsid
             rts
 .callfscv   jmp     (&021E)
 .vectab     equw    file
@@ -262,7 +263,6 @@ prtextws    =   &A8
             jsr     prtitle         ; announce the filing system
             jsr     OSNEWL
             jsr     OSNEWL
-            ldy     #fsno_vdfs
             jsr     fsstart         ; same setup as for call &12.
             pla
             bne     noboot1         ; then maybe exec !BOOT.
@@ -512,7 +512,30 @@ prtextws    =   &A8
             hexout  &0118
             hexout  &0117
             hexout  &0116
+            twospc
+            hexout  &011a
+            outchr  '-'
+            ldx     &011b
+            lda     month1,x
+            jsr     OSWRCH
+            lda     month2,x
+            jsr     OSWRCH
+            lda     month3,x
+            jsr     OSWRCH
+            outchr  '-'
+            hexout  &011c
+            hexout  &011d
+            outspc
+            hexout  &011e
+            outchr  ':'
+            hexout  &011f
+            outchr  ':'
+            hexout  &0120
             jmp     OSNEWL
+
+.month1     equs    "JFMAMJJASOND"
+.month2     equs    "aeapauuuecoe"
+.month3     equs    "nbrrynlgptvc"
 
 .opt_tab    equb    msg_off-banner
             equb    msg_load-banner
@@ -572,25 +595,20 @@ prtextws    =   &A8
             bne     cat_liblp
 .nolib      jsr     OSNEWL
             jsr     OSNEWL
-            lda     #&20            ; DFS mode?
+            lda     #dfs_mode       ; DFS mode?
             bit     port_flags
+            beq     adfs_cat
             bne     dfs_cat
 
-            lda     #&0c            ; Fetch the first entry.
-            sta     port_cmd
-            bcs     cat_done
-.cat_loop   ldx     #&00
+.cat_loop   ldx     #&00            ; print the entry.
             jsr     pr_basic
             jsr     pr_others
             jsr     pr_pad
-.adfs_cat   lda     #&0c            ; Fetch the next entry.
+.adfs_cat   lda     #&0c            ; fetch an entry.
             sta     port_cmd
             bcc     cat_loop
             jmp     OSNEWL
 
-            lda     #&0d            ; fetch one directory entry.
-            sta     port_cmd
-            bcs     dfs_none1
 .dfs_lp1    jsr     pr_dfs
             jsr     pr_pad
 .dfs_cat    lda     #&0d            ; fetch one directory entry.
@@ -609,7 +627,7 @@ prtextws    =   &A8
             jmp     OSNEWL
 .cat_done   rts
 
-.dir_ex     lda     #&20            ; DFS mode?
+.dir_ex     lda     #dfs_mode       ; DFS mode?
             bit     port_flags
             bne     ex_dfs
             beq     ex_adfs
@@ -626,6 +644,12 @@ prtextws    =   &A8
             bcc     ex_dfs_lp
             rts
 
+.dir_info   jsr     pr_all
+            lda     #&14
+            sta     port_cmd
+            bcc     dir_info
+            rts
+
 .not_found
 {
             ldx     #end-msg
@@ -640,6 +664,10 @@ prtextws    =   &A8
             equb    &00
 .end
 }
+
+.opt1_print jsr     pr_all
+            lda     #&01
+            rts
 
 ; The *DUMP command.
 
@@ -1060,21 +1088,7 @@ prtextws    =   &A8
             outchr  'm'
             outspc
             lda     romid
-            cmp     #&0A
-            bcs     geten
-            outchr  '0'
-            lda     romid
-            jmp     both
-.geten      outchr  '1'
-            lda     romid
-            sec
-            sbc     #&0a
-.both       and     #&0f
-            clc
-            adc     #'0'
-            jsr     OSWRCH
-            outspc
-            outchr  ':'
+            jsr     hexnyb
             outspc
             outchr  '('
             txa
@@ -1418,19 +1432,120 @@ prtextws    =   &A8
 
 .tube_explode
 {
-            cpy     #&00
-            beq     notube          ; if no tube.
+            tya
+            pha
+            bne     istube
+            cpx     #&05            ; X is set to boot logo number by VDFS C code.
+            bcs     done            ; skip if out of range.
+            txa
+            pha
+            lda     #&87            ; get the current screen mode.
+            jsr     OSBYTE
+            pla
+            tax
+            tya
+            and     #&07            ; in case of shadow modes.
+            cmp     #&07
+            bne     done            ; logos only in mode 7.
+            lda     &a8
+            pha
+            lda     &a9
+            pha
+            lda     logolo,x        ; set address of relevant logo.
+            sta     &a8
+            lda     logohi,x
+            sta     &a9
+            lda     #&86            ; get current cursor position.
+            jsr     OSBYTE
+            tya                     ; save cursor position on stack.
+            pha
+            txa
+            pha
+            ldy     #&00            ; print the characters of the logo.
+            lda     (&a8),y
+.logolp     jsr     OSWRCH
+            iny
+            lda     (&a8),y
+            bne     logolp
+            pla                     ; restore the character position.
+            jsr     OSWRCH
+            pla
+            jsr     OSWRCH
+            pla
+            sta     &a9
+            pla
+            sta     &a8
+.done       pla
+            tay
+            lda     #&fe            ; don't claim the call.
+            rts
+.imsglp     jsr     OSWRCH
+.istube     bit     &FEE0           ; wait for character to be send from tube
+            bpl     istube
+            lda     &FEE1           ; fetch the character.
+            bne     imsglp          ; loop until end of message.
             lda     #&14            ; explode character set.
             ldx     #&06
             jsr     OSBYTE
-.imsglp     bit     &FEE0           ; wait for character to be send from tube
-            bpl     imsglp
-            lda     &FEE1           ; fetch the character.
-            beq     done            ; end of message?
-            jsr     OSWRCH
-            jmp     imsglp
-.notube     lda     #&fe
-.done       rts
+            lda     #&d7            ; suppress OS start-up message.
+            ldx     #&00
+            ldy     #&7f
+            jsr     OSBYTE
+            pla
+            tay
+            lda     #&00
+            rts
+
+.owl_dv8    equb    &1f,&1e,&01,&91,&e2,&a6,&e2,&a2,&e6,&a6,&e2,&a2,&e6
+            equb    &1f,&1e,&02,&91,&a8,&b0,&a9,&a1,&b0,&b0,&a9,&a1,&b8
+            equb    &1f,&1e,&03,&93,&e2,&e6,&e4,&e0,&e2,&e0,&e0,&a6,&e2
+            equb    &1f,&1e,&04,&92,&a8,&b9,&b9,&b9,&b9,&20,&20,&20,&a8
+            equb    &1f,&1e,&05,&96,&20,&a2,&e6,&e6,&e6,&e4,&20,&20,&e2
+            equb    &1f,&1e,&06,&94,&20,&20,&20,&a9,&b9,&a9,&b9,&b0,&a8
+            equb    &1f,&1e,&07,&95,&20,&a4,&a4,&a6,&a4,&a6,&a4,&a2,&e6
+            equb    &1f,&00
+.owl_ash    equb    &1f,&1e,&01,&91,&e2,&a6,&e2,&a2,&f6,&a6,&e2,&a2,&e6
+            equb    &1f,&1e,&02,&91,&a8,&b0,&a9,&a1,&b0,&b0,&a9,&a1,&b8
+            equb    &1f,&1e,&03,&91,&e2,&f6,&e4,&e0,&e2,&e0,&e0,&a6,&e2
+            equb    &1f,&1e,&04,&93,&a8,&b9,&b9,&b9,&b9,&20,&20,&20,&a8
+            equb    &1f,&1e,&05,&93,&20,&a2,&f6,&f6,&f6,&e4,&20,&20,&e2
+            equb    &1f,&1e,&06,&92,&20,&20,&20,&a9,&b9,&a9,&b9,&b0,&a8
+            equb    &1f,&1e,&07,&92,&20,&a4,&a4,&a6,&a4,&a6,&a4,&a2,&e6
+            equb    &1f,&00
+.owl_mono   equb    &1f,&1e,&01,&97,&e2,&a6,&e2,&a2,&f6,&a6,&e2,&a2,&e6
+            equb    &1f,&1e,&02,&97,&a8,&b0,&a9,&a1,&b0,&b0,&a9,&a1,&b8
+            equb    &1f,&1e,&03,&97,&e2,&f6,&e4,&e0,&e2,&e0,&e0,&a6,&a2
+            equb    &1f,&1e,&04,&97,&a8,&b9,&b9,&b9,&b9,&20,&20,&20,&a8
+            equb    &1f,&1e,&05,&97,&20,&a2,&f6,&f6,&f6,&e4,&20,&20,&e2
+            equb    &1f,&1e,&06,&97,&20,&20,&20,&a9,&b9,&a9,&b9,&b0,&a8
+            equb    &1f,&1e,&07,&97,&20,&a4,&a4,&a6,&a4,&a6,&a4,&a2,&e6
+            equb    &1f,&00
+.acorn      equb    &1f,&1e,&01,&92,&9a,&a0,&a0,&f8,&ff,&ff,&f4,&a0,&a0
+            equb    &1f,&1e,&02,&92,&9a,&a0,&e8,&ff,&ff,&ff,&ff,&b4,&a0
+            equb    &1f,&1e,&03,&92,&9a,&a0,&fe,&ff,&ff,&ff,&ff,&fd,&a0
+            equb    &1f,&1e,&04,&92,&9a,&e8,&ff,&ff,&ff,&ff,&ff,&ff,&b4
+            equb    &1f,&1e,&05,&92,&9a,&e2,&f3,&f3,&f3,&f3,&f3,&f3,&b1
+            equb    &1f,&1e,&06,&92,&9a,&a2,&ff,&ff,&ff,&ff,&ff,&ff,&a1
+            equb    &1f,&1e,&07,&92,&9a,&a0,&a2,&ab,&af,&bf,&a7,&a1,&a0
+            equb    &1f,&1e,&08,&92,&9a,&a0,&a3,&a3,&ac,&ad,&e4,&f0,&a0
+            equb    &1f,&00
+.master     equb    &1f,&20,&01,&97,&6a,&64,&20,&20,&20,&5f,&6e
+            equb    &1f,&20,&02,&97,&6a,&20,&29,&30,&38,&21,&6a
+            equb    &1f,&20,&03,&97,&6A,&20,&30,&6a,&20,&30,&6a
+            equb    &1f,&20,&04,&97,&6a,&20,&35,&6a,&20,&35,&6a
+            equb    &1f,&20,&05,&97,&6a,&20,&35,&6a,&20,&35,&6a
+            equb    &1f,&20,&06,&97,&6a,&20,&35,&6a,&20,&35,&6a
+            equb    &1f,&00
+.logolo     equb    <owl_dv8
+            equb    <owl_ash
+            equb    <owl_mono
+            equb    <acorn
+            equb    <master
+.logohi     equb    >owl_dv8
+            equb    >owl_ash
+            equb    >owl_mono
+            equb    >acorn
+            equb    >master
 }
 
 .break_type

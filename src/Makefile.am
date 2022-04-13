@@ -63,6 +63,7 @@ b_em_SOURCES = \
 	disc.c fdi.c \
     econet.c \
 	fdi2raw.c \
+	fullscreen.c \
 	gui-allegro.c\
 	hfe.c \
 	i8271.c \

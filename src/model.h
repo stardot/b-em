@@ -38,6 +38,7 @@ typedef struct
     uint8_t compact:1;
     uint8_t integra:1;
     uint8_t econet:1;
+    uint8_t boot_logo;
     int tube;
 } MODEL;
 

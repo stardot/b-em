@@ -77,10 +77,10 @@ float joyaxes[4];
 int emuspeed = 4;
 
 static ALLEGRO_TIMER *timer;
-static ALLEGRO_EVENT_QUEUE *queue;
+ALLEGRO_EVENT_QUEUE *queue;
 static ALLEGRO_EVENT_SOURCE evsrc;
 
-static ALLEGRO_DISPLAY *tmp_display;
+ALLEGRO_DISPLAY *tmp_display;
 
 typedef enum {
     FSPEED_NONE,

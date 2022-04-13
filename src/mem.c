@@ -20,8 +20,8 @@
  *     0x8000 -> 0xafff - short sideways bank.
  *
  * Master:
- *     0x8000 -> 0x8fff - high VDU workspace (mapped at 0x8000).
- *     0x9000 -> 0xffff - filing system RAM  (mapped at 0xc000).
+ *     0x8000 -> 0x8fff - 4K high VDU workspace (mapped at 0x8000).
+ *     0x9000 -> 0xafff - 8K filing system RAM  (mapped at 0xc000).
  *
  * Integra:
  *     0x8000 -> 0x83ff - 1K bank at 0x8000.
