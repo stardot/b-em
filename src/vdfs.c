@@ -2903,7 +2903,7 @@ static size_t read_bytes(FILE *fp, uint32_t addr, size_t bytes, unsigned nlflag)
                 int ch = *ptr++;
                 if (ch == '\n' && nlflag)
                     ch = '\r';
-                tube_writemem(addr++, *ptr++);
+                tube_writemem(addr++, ch);
             }
         }
     }
@@ -2917,7 +2917,7 @@ static size_t read_bytes(FILE *fp, uint32_t addr, size_t bytes, unsigned nlflag)
                 int ch = *ptr++;
                 if (ch == '\n' && nlflag)
                     ch = '\r';
-                writemem(addr++, *ptr++);
+                writemem(addr++, ch);
             }
         }
         else {
@@ -2925,7 +2925,7 @@ static size_t read_bytes(FILE *fp, uint32_t addr, size_t bytes, unsigned nlflag)
                 int ch = *ptr++;
                 if (ch == '\n' && nlflag)
                     ch = '\r';
-                tube_writemem(addr++, *ptr++);
+                tube_writemem(addr++, ch);
             }
         }
     }
