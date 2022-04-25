@@ -3266,7 +3266,7 @@ static uint_least16_t cmd_access_parse(uint16_t addr, int ch)
             if (ch == 'R' || ch == 'r')
                 attribs |= ATTR_OTHR_READ;
             else if (ch == 'W' || ch == 'w')
-                attribs |= ATTR_OPEN_WRITE;
+                attribs |= ATTR_OTHR_WRITE;
             else if (ch == 'L' || ch == 'l')
                 attribs |= ATTR_OTHR_LOCKD;
             else if (ch == 'E' || ch == 'e')
