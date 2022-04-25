@@ -3324,17 +3324,17 @@ static void cmd_access(uint16_t addr)
                     if (attribs & ATTR_OTHR_LOCKD)
                         attribs &= ~ATTR_USER_WRITE;
                     do {
-                        ent->attribs = attribs = (ent->attribs & attr_mask) | attribs;
+                        ent->attribs = (ent->attribs & attr_mask) | attribs;
                         write_back(ent);
-                        set_file_atribs(ent, attribs);
+                        set_file_atribs(ent, ent->attribs);
                         ent = find_next_dfs(ent, &res);
                     } while (ent);
                 }
                 else {
                     do {
-                        ent->attribs = attribs = (ent->attribs & attr_mask) | attribs;
+                        ent->attribs = (ent->attribs & attr_mask) | attribs;
                         write_back(ent);
-                        set_file_atribs(ent, attribs);
+                        set_file_atribs(ent, ent->attribs);
                         ent = find_next_adfs(ent, &res);
                     } while (ent);
                 }
