@@ -3234,50 +3234,85 @@ static void osargs(void)
  * dispatched the commands need to come first.
  */
 
+// Attributes specific to *ACCESS internals which overlap file open.
+
+#define ATTR_BAD_CHAR    ATTR_OPEN_READ
+#define ATTR_GOT_OTHER   ATTR_OPEN_WRITE
+
+static uint_least16_t cmd_access_parse(uint16_t addr, int ch)
+{
+    uint_least16_t attribs = 0;
+    while (ch != ' ' && ch != '\t' && ch != '\r' && ch != '/') {
+        if (ch == 'R' || ch == 'r')
+            attribs |= ATTR_USER_READ;
+        else if (ch == 'W' || ch == 'w')
+            attribs |= ATTR_USER_WRITE;
+        else if (ch == 'L' || ch == 'l')
+            attribs |= ATTR_USER_LOCKD;
+        else if (ch == 'E' || ch == 'e')
+            attribs |= ATTR_USER_EXEC;
+        else if (ch == 'T' || ch == 't')
+            attribs |= ATTR_NL_TRANS;
+        else {
+            adfs_error(err_badparms);
+            return ATTR_BAD_CHAR;
+        }
+        ch = readmem(addr++);
+    }
+    if (ch == '/') {
+        attribs |= ATTR_GOT_OTHER;
+        ch = readmem(addr++);
+        while (ch != ' ' && ch != '\t' && ch != '\r') {
+            if (ch == 'R' || ch == 'r')
+                attribs |= ATTR_OTHR_READ;
+            else if (ch == 'W' || ch == 'w')
+                attribs |= ATTR_OPEN_WRITE;
+            else if (ch == 'L' || ch == 'l')
+                attribs |= ATTR_OTHR_LOCKD;
+            else if (ch == 'E' || ch == 'e')
+                attribs |= ATTR_OTHR_EXEC;
+            else {
+                adfs_error(err_badparms);
+                return ATTR_BAD_CHAR;
+            }
+            ch = readmem(addr++);
+        }
+    }
+    return attribs;
+}
+
 static void cmd_access(uint16_t addr)
 {
     if (check_valid_dir(&cur_dir)) {
         char path[MAX_ACORN_PATH];
         if ((addr = parse_name(path, sizeof path, addr))) {
-            uint_least32_t attribs = 0;
-            uint_least32_t attr_mask = ATTR_USER_READ|ATTR_USER_WRITE|ATTR_USER_LOCKD|ATTR_USER_EXEC|ATTR_NL_TRANS;
+            uint_least16_t attribs = 0;
+            uint_least16_t attr_mask = 0;
             int ch = readmem(addr++);
             while (ch == ' ' || ch == '\t')
                 ch = readmem(addr++);
-            while (ch != ' ' && ch != '\t' && ch != '\r' && ch != '/') {
-                if (ch == 'R' || ch == 'r')
-                    attribs |= ATTR_USER_READ;
-                else if (ch == 'W' || ch == 'w')
-                    attribs |= ATTR_USER_WRITE;
-                else if (ch == 'L' || ch == 'l')
-                    attribs |= ATTR_USER_LOCKD;
-                else if (ch == 'E' || ch == 'e')
-                    attribs |= ATTR_USER_EXEC;
-                else if (ch == 'T' || ch == 't')
-                    attribs |= ATTR_NL_TRANS;
-                else {
-                    adfs_error(err_badparms);
+            if (ch == '+') {
+                ch = readmem(addr++);
+                attribs = cmd_access_parse(addr, ch);
+                if (attribs & ATTR_BAD_CHAR)
                     return;
-                }
-                ch = readmem(addr++);
+                attribs &= ~ATTR_GOT_OTHER;
             }
-            if (ch == '/') {
-                attr_mask |= ATTR_OTHR_READ|ATTR_OTHR_WRITE|ATTR_OTHR_LOCKD|ATTR_OTHR_EXEC;
+            else if (ch == '-') {
                 ch = readmem(addr++);
-                while (ch != ' ' && ch != '\t' && ch != '\r') {
-                    if (ch == 'R' || ch == 'r')
-                        attribs |= ATTR_OTHR_READ;
-                    else if (ch == 'W' || ch == 'w')
-                        attribs |= ATTR_OPEN_WRITE;
-                    else if (ch == 'L' || ch == 'l')
-                        attribs |= ATTR_OTHR_LOCKD;
-                    else if (ch == 'E' || ch == 'e')
-                        attribs |= ATTR_OTHR_EXEC;
-                    else {
-                        adfs_error(err_badparms);
-                        return;
-                    }
-                    ch = readmem(addr++);
+                attr_mask = cmd_access_parse(addr, ch);
+                if (attr_mask & ATTR_BAD_CHAR)
+                    return;
+                attr_mask &= ~ATTR_GOT_OTHER;
+            }
+            else {
+                attr_mask = ATTR_USER_READ|ATTR_USER_WRITE|ATTR_USER_LOCKD|ATTR_USER_EXEC;
+                attribs = cmd_access_parse(addr, ch);
+                if (attribs & ATTR_BAD_CHAR)
+                    return;
+                if (attribs & ATTR_GOT_OTHER) {
+                    attr_mask &= ~ATTR_GOT_OTHER;
+                    attr_mask |= ATTR_OTHR_READ|ATTR_OTHR_WRITE|ATTR_OTHR_LOCKD|ATTR_OTHR_EXEC;
                 }
             }
             vdfs_findres res;
@@ -4844,6 +4879,18 @@ static void startup(void)
     y = save_y;
 }
 
+static double last_time = 0.0;
+
+static void log_time(void)
+{
+    double this_time = al_get_time();
+    if (last_time > 0)
+        log_info("timestamp, %g seconds since last timestamp", this_time - last_time);
+    else
+        log_info("timestamp, %g seconds since start", this_time);
+    last_time = this_time;
+}
+
 static inline void dispatch(uint8_t value)
 {
     switch(value) {
@@ -4868,6 +4915,7 @@ static inline void dispatch(uint8_t value)
         case 0x12: set_ram();   break;
         case 0x13: rest_ram();  break;
         case 0x14: info_next(); break;
+        case 0x15: log_time();  break;
         default: log_warn("vdfs: function code %d not recognised", value);
     }
 }
