@@ -379,7 +379,7 @@ void debug_reset()
 }
 
 static const char helptext[] =
-    "\n    Debugger commands :\n\n"
+    "\nDebugger commands :\n\n"
     "    bclear n   - clear breakpoint n or breakpoint at n\n"
     "    bclearr n  - clear read breakpoint n or read breakpoint at n\n"
     "    bclearw n  - clear write breakpoint n or write breakpoint at n\n"
@@ -398,6 +398,7 @@ static const char helptext[] =
     "    n          - step, but treat a called subroutine as one step\n"
     "    m [n]      - memory dump from address n\n"
     "    paste s    - paste string s as keyboard input\n"
+    "    profile... - various profile sub-commands\n"
     "    q          - force emulator exit\n"
     "    r          - print 6502 registers\n"
     "    r sysvia   - print System VIA registers\n"
@@ -407,6 +408,8 @@ static const char helptext[] =
     "    r sound    - print Sound registers\n"
     "    reset      - reset emulated machine\n"
     "    rset r v   - set a CPU register\n"
+    "    ruler [s [c]] - draw a ruler to help with hexdumps.\n"
+    "                 starts at 's' for 'c' bytes\n"
     "    s [n]      - step n instructions (or 1 if no parameter)\n"
     "    symbol name=[rom:]addr\n"
     "               - add debugger symbol\n"
@@ -422,7 +425,13 @@ static const char helptext[] =
     "    wcleari n  - clear input watchpoint n or input watchpoint at n\n"
     "    wclearo n  - clear output watchpoint n or output watchpoint at n\n"
     "    wlist      - list watchpoints\n"
-    "    writem a v - write to memory, a = address, v = value\n";
+    "    writem a v - write to memory, a = address, v = value\n"
+    "Profiling commands:\n"
+    "    profile <start> <end> - start profiling between address <start> and <end>\n"
+    "    profile print         - show profiling stats\n"
+    "    profile file <file>   - write profiling stats to <file>\n"
+    "    profile reset         - reset profiling counters\n"
+    "    profile stop          - stop profiling and free memory\n";
 
 static char xdigs[] = "0123456789ABCDEF";
 
