@@ -1,3 +1,4 @@
+#define _DEBUG
 /*B-em v2.2 by Tom Walker
   Debugger*/
 
@@ -812,6 +813,51 @@ static void swiftsym(cpu_debug_t *cpu, char *iptr)
         debug_outf("unable to open '%s': %s\n", iptr, strerror(errno));
 }
 
+static void simplesym(cpu_debug_t *cpu, char *iptr)
+{
+    uint32_t romaddr = 0;
+    char *sep = strpbrk(iptr, " \t");
+    if (sep) {
+        *sep++ = 0;
+        romaddr = strtoul(sep, NULL, 16) << 28;
+    }
+    FILE *fp = fopen(iptr, "r");
+    if (fp) {
+        if (!cpu->symbols)
+            cpu->symbols = symbol_new();
+        char line[132];
+        while (fgets(line, sizeof(line), fp)) {
+            char *start = line;
+            int ch = *start;
+            while (ch == ' ' || ch == '\t')
+                ch = *++start;
+            char *ptr = strchr(start, '=');
+            if (ptr > start) {
+                uint32_t addr;
+                char *end;
+                char *sym_end = ptr - 1;
+                int ch = *++ptr;
+                while (ch == ' ' || ch == '\t')
+                    ch = *++ptr;
+                if (ch == '$' || ch == '&')
+                    addr = strtoul(++ptr, &end, 16);
+                else
+                    addr = cpu->parse_addr(cpu, ptr, (const char **)&end);
+                if (end > ptr) {
+                    do
+                        ch = *--sym_end;
+                    while (sym_end > line && (ch == ' ' || ch == '\t'));
+                    sym_end[1] = 0;
+                    symbol_add(cpu->symbols, start, addr|romaddr);
+                }
+                else
+                    debug_outf("cannot parse address '%s'\n", ptr);
+            }
+        }
+        fclose(fp);
+    }
+}
+
 static void debugger_dumpmem(cpu_debug_t *cpu, const char *iptr, int rows)
 {
     if (*iptr) {
@@ -1330,6 +1376,12 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                     }
                     else if (!strncmp(cmd, "symlist", cmdlen))
                         list_syms(cpu, iptr);
+                    else if (!strncmp(cmd, "simplesym", cmdlen)) {
+                        if (iptr)
+                            simplesym(cpu, iptr);
+                        else
+                            debug_outf("Missing filename\n");
+                    }
                     else if (!strncmp(cmd, "save", cmdlen)) {
                         if (*iptr)
                             debugger_save(cpu, iptr);
