@@ -415,6 +415,8 @@ static const char helptext[] =
     "    symbol name=[rom:]addr\n"
     "               - add debugger symbol\n"
     "    symlist    - list all symbols\n"
+    "    swiftsym f - load symbols in swift format from file f\n"
+    "    simplesym f - load symbols in name=value format from file f\n"
     "    trace fn   - trace disassembly/registers to file, close file if no fn\n"
     "    vrefresh t - extra video refresh on entering debugger.  t=on or off\n"
     "    watchr n   - watch reads from address n\n"
