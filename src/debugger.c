@@ -1,3 +1,4 @@
+#define _DEBUG
 /*B-em v2.2 by Tom Walker
   Debugger*/
 
@@ -379,7 +380,7 @@ void debug_reset()
 }
 
 static const char helptext[] =
-    "\n    Debugger commands :\n\n"
+    "\nDebugger commands :\n\n"
     "    bclear n   - clear breakpoint n or breakpoint at n\n"
     "    bclearr n  - clear read breakpoint n or read breakpoint at n\n"
     "    bclearw n  - clear write breakpoint n or write breakpoint at n\n"
@@ -398,6 +399,7 @@ static const char helptext[] =
     "    n          - step, but treat a called subroutine as one step\n"
     "    m [n]      - memory dump from address n\n"
     "    paste s    - paste string s as keyboard input\n"
+    "    profile... - various profile sub-commands\n"
     "    q          - force emulator exit\n"
     "    r          - print 6502 registers\n"
     "    r sysvia   - print System VIA registers\n"
@@ -407,10 +409,14 @@ static const char helptext[] =
     "    r sound    - print Sound registers\n"
     "    reset      - reset emulated machine\n"
     "    rset r v   - set a CPU register\n"
+    "    ruler [s [c]] - draw a ruler to help with hexdumps.\n"
+    "                 starts at 's' for 'c' bytes\n"
     "    s [n]      - step n instructions (or 1 if no parameter)\n"
     "    symbol name=[rom:]addr\n"
     "               - add debugger symbol\n"
     "    symlist    - list all symbols\n"
+    "    swiftsym f - load symbols in swift format from file f\n"
+    "    simplesym f - load symbols in name=value format from file f\n"
     "    trace fn   - trace disassembly/registers to file, close file if no fn\n"
     "    vrefresh t - extra video refresh on entering debugger.  t=on or off\n"
     "    watchr n   - watch reads from address n\n"
@@ -422,7 +428,13 @@ static const char helptext[] =
     "    wcleari n  - clear input watchpoint n or input watchpoint at n\n"
     "    wclearo n  - clear output watchpoint n or output watchpoint at n\n"
     "    wlist      - list watchpoints\n"
-    "    writem a v - write to memory, a = address, v = value\n";
+    "    writem a v - write to memory, a = address, v = value\n"
+    "Profiling commands:\n"
+    "    profile <start> <end> - start profiling between address <start> and <end>\n"
+    "    profile print         - show profiling stats\n"
+    "    profile file <file>   - write profiling stats to <file>\n"
+    "    profile reset         - reset profiling counters\n"
+    "    profile stop          - stop profiling and free memory\n";
 
 static char xdigs[] = "0123456789ABCDEF";
 
@@ -801,6 +813,51 @@ static void swiftsym(cpu_debug_t *cpu, char *iptr)
     }
     else
         debug_outf("unable to open '%s': %s\n", iptr, strerror(errno));
+}
+
+static void simplesym(cpu_debug_t *cpu, char *iptr)
+{
+    uint32_t romaddr = 0;
+    char *sep = strpbrk(iptr, " \t");
+    if (sep) {
+        *sep++ = 0;
+        romaddr = strtoul(sep, NULL, 16) << 28;
+    }
+    FILE *fp = fopen(iptr, "r");
+    if (fp) {
+        if (!cpu->symbols)
+            cpu->symbols = symbol_new();
+        char line[132];
+        while (fgets(line, sizeof(line), fp)) {
+            char *start = line;
+            int ch = *start;
+            while (ch == ' ' || ch == '\t')
+                ch = *++start;
+            char *ptr = strchr(start, '=');
+            if (ptr > start) {
+                uint32_t addr;
+                char *end;
+                char *sym_end = ptr - 1;
+                int ch = *++ptr;
+                while (ch == ' ' || ch == '\t')
+                    ch = *++ptr;
+                if (ch == '$' || ch == '&')
+                    addr = strtoul(++ptr, &end, 16);
+                else
+                    addr = cpu->parse_addr(cpu, ptr, (const char **)&end);
+                if (end > ptr) {
+                    do
+                        ch = *--sym_end;
+                    while (sym_end > line && (ch == ' ' || ch == '\t'));
+                    sym_end[1] = 0;
+                    symbol_add(cpu->symbols, start, addr|romaddr);
+                }
+                else
+                    debug_outf("cannot parse address '%s'\n", ptr);
+            }
+        }
+        fclose(fp);
+    }
 }
 
 static void debugger_dumpmem(cpu_debug_t *cpu, const char *iptr, int rows)
@@ -1321,6 +1378,12 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                     }
                     else if (!strncmp(cmd, "symlist", cmdlen))
                         list_syms(cpu, iptr);
+                    else if (!strncmp(cmd, "simplesym", cmdlen)) {
+                        if (iptr)
+                            simplesym(cpu, iptr);
+                        else
+                            debug_outf("Missing filename\n");
+                    }
                     else if (!strncmp(cmd, "save", cmdlen)) {
                         if (*iptr)
                             debugger_save(cpu, iptr);
