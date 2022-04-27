@@ -4576,9 +4576,9 @@ static void osword_discio(void)
         ssize = 512;
     else
         ssize = 256;
-    log_debug("vdfs: osword 7F: cmd=%02X, track=%d, sect=%d, sects=%d, ssize=%d", cmd, track, sect, sects, ssize);
+    log_debug("vdfs: osword 7F: drive=%u, cmd=%02X, track=%u, sect=%u, sects=%u, ssize=%u", drive, cmd, track, sect, sects, ssize);
 
-    FILE *fp = sdf_owseek(drive & 1, sect, track, drive >> 1, ssize);
+    FILE *fp = sdf_owseek(drive & 1, sect, track, (drive >> 1) & 1, ssize);
     if (fp) {
         uint32_t addr = readmem32(pb+1);
         size_t bytes = (sects & 0x0f) << 8;
