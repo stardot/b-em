@@ -364,12 +364,12 @@ static struct imd_track *imd_find_track(int drive, int track, int side, int dens
  * than counting as sectors can be skewed or interleaved.
  */
 
-static struct imd_sect *imd_find_sector(int drive, int track, int side, int sector, struct imd_track *trk)
+static struct imd_sect *imd_find_sector(int drive, int track, int sector, struct imd_track *trk)
 {
     log_debug("imd: drive %d: searching for sector", drive);
     for (struct imd_sect *sect = trk->sect_head; sect; sect = sect->next) {
-        log_debug("imd: drive %d: cyl %u<>%u, head %u<>%u, sectid %u<>%u", drive, sect->cylinder, track, sect->head, side, sect->sectid, sector);
-        if (sect->cylinder == track && sect->head == side && sect->sectid == sector)
+        log_debug("imd: drive %d: cyl %u<>%u, sectid %u<>%u", drive, sect->cylinder, track, sect->sectid, sector);
+        if (sect->cylinder == track && sect->sectid == sector)
             return sect;
     }
     return NULL;
@@ -387,7 +387,7 @@ static void imd_readsector(int drive, int sector, int track, int side, int densi
     if (state == ST_IDLE) {
         struct imd_track *trk = imd_find_track(drive, track, side, density);
         if (trk) {
-            struct imd_sect *sect = imd_find_sector(drive, track, side, sector, trk);
+            struct imd_sect *sect = imd_find_sector(drive, track, sector, trk);
             if (sect) {
                 count = 128 << sect->sectsize;
                 cur_sect = sect;
@@ -421,7 +421,7 @@ static void imd_writesector(int drive, int sector, int track, int side, int dens
     if (state == ST_IDLE) {
         struct imd_track *trk = imd_find_track(drive, track, side, density);
         if (trk) {
-            struct imd_sect *sect = imd_find_sector(drive, track, side, sector, trk);
+            struct imd_sect *sect = imd_find_sector(drive, track, sector, trk);
             if (sect) {
                 if (writeprot[drive]) {
                     count = 1;
