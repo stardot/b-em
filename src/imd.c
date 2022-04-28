@@ -308,9 +308,9 @@ static int imd_verify(int drive, int track, int density)
         struct imd_file *imd = &imd_discs[drive];
         struct imd_track *trk = imd->track_cur;
         if (!trk) {
-            log_debug("imd: drive %d: searching for track", drive);
+            log_debug("imd: drive %d: searching for track %d", drive, track);
             for (trk = imd->track_head; trk; trk = trk->next) {
-                if (trk->cylinder == imd->trackno) {
+                if (trk->cylinder == track) {
                     log_debug("imd: drive %d: found track", drive);
                     imd->track_cur = trk;
                     imd->headno = trk->head;
