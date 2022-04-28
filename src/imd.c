@@ -143,6 +143,24 @@ int ftruncate(int fd, off_t length) {
 #endif
 
 /*
+ * This function is for debugging and writes a readable version of the
+ * ID fields for the linked lists in memory to the log file.
+ */
+
+static void imd_dump(struct imd_file *imd)
+{
+#ifdef _DEBUG
+    log_debug("imd: disc track0=%ld", imd->track0);
+    for (struct imd_track *trk = imd->track_head; trk; trk = trk->next) {
+        log_debug("imd: track mode=%02X, cylinder=%u, head=%02X, nsect=%u, sectsize=%02X", trk->mode, trk->cylinder, trk->head, trk->nsect, trk->sectsize);
+        for (struct imd_sect *sect = trk->sect_head; sect; sect = sect->next)
+            log_debug("imd: sector mode=%02X, cylinder=%u, head=%u, sectid=%u, sectsize=%02X", sect->mode, sect->cylinder, sect->head, sect->sectid, sect->sectsize);
+    }
+    log_debug("imd: maximum cylinder=%u", imd->maxcyl);
+#endif
+}
+
+/*
  * This function writes the IMD file in memory back to the disc file.
  * it does not re-write the comment at the start of the file but
  * rewrites everything else and truncates any remaining junk from
@@ -814,8 +832,6 @@ static void imd_poll_format_sectid(void)
     state = ST_FORMAT_SECTSZ;
 }
 
-static void imd_dump(struct imd_file *imd);
-
 /*
  * This function is part of the state machine to implement the format
  * command as used by the i8271.  It reveives and records the logical
@@ -1471,24 +1487,6 @@ failed:
         head = next;
     }
     return false;
-}
-
-/*
- * This function is for debugging and writes a readable version of the
- * ID fields for the linked lists in memory to the log file.
- */
-
-static void imd_dump(struct imd_file *imd)
-{
-#ifdef _DEBUG
-    log_debug("imd: disc track0=%ld", imd->track0);
-    for (struct imd_track *trk = imd->track_head; trk; trk = trk->next) {
-        log_debug("imd: track mode=%02X, cylinder=%u, head=%02X, nsect=%u, sectsize=%02X", trk->mode, trk->cylinder, trk->head, trk->nsect, trk->sectsize);
-        for (struct imd_sect *sect = trk->sect_head; sect; sect = sect->next)
-            log_debug("imd: sector mode=%02X, cylinder=%u, head=%u, sectid=%u, sectsize=%02X", sect->mode, sect->cylinder, sect->head, sect->sectid, sect->sectsize);
-    }
-    log_debug("imd: maximum cylinder=%u", imd->maxcyl);
-#endif
 }
 
 /*
