@@ -525,6 +525,7 @@ static bool imd_begin_format(int drive, int track, int side, int density)
         cur_sect = NULL;
         imd_time = -20;
         count = 120;
+        imd->dirty = true;
         return true;
     }
     count = 500;
