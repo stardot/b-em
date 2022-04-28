@@ -50,7 +50,15 @@ typedef enum {
     ST_FORMAT_CYLID,
     ST_FORMAT_HEADID,
     ST_FORMAT_SECTID,
-    ST_FORMAT_SECTSZ
+    ST_FORMAT_SECTSZ,
+    ST_WRTRACK_INITIAL,
+    ST_WRTRACK_CYLID,
+    ST_WRTRACK_HEADID,
+    ST_WRTRACK_SECTID,
+    ST_WRTRACK_SECTSZ,
+    ST_WRTRACK_HDRCRC,
+    ST_WRTRACK_DATA,
+    ST_WRTRACK_DATACRC
 } state_t;
 
 state_t state = ST_IDLE;
@@ -245,6 +253,40 @@ static void sdf_format(int drive, int track, int side, unsigned par2)
     }
 }
 
+static void sdf_writetrack(int drive, int track, int side, int density)
+{
+    if (state == ST_IDLE) {
+        sdf_drive = drive;
+        sdf_track = track;
+        sdf_side = side;
+        sdf_time = -20;
+        state = ST_WRTRACK_INITIAL;
+    }
+}
+
+static bool sdf_poll_write(void)
+{
+    if (writeprot[sdf_drive]) {
+        log_debug("sdf: poll, write protected during write sector");
+        fdc_writeprotect();
+        state = ST_IDLE;
+    }
+    else {
+        int c = fdc_getdata(--count == 0);
+        log_debug("sdf: write byte=%02X, count=%u", c, count);
+        if (c == -1) {
+            log_warn("sdf: data underrun on write");
+            count++;
+        }
+        else {
+            putc(c, sdf_fp[sdf_drive]);
+            if (count == 0)
+                return true;
+        }
+    }
+    return false;
+}
+
 static void sdf_poll()
 {
     int c;
@@ -276,22 +318,9 @@ static void sdf_poll()
             break;
 
         case ST_WRITESECTOR:
-            if (writeprot[sdf_drive]) {
-                log_debug("sdf: poll, write protected during write sector");
-                fdc_writeprotect();
+            if (sdf_poll_write()) {
+                fdc_finishread(false);
                 state = ST_IDLE;
-                break;
-            }
-            c = fdc_getdata(--count == 0);
-            if (c == -1) {
-                log_warn("sdf: data underrun on write");
-                count++;
-            } else {
-                putc(c, sdf_fp[sdf_drive]);
-                if (count == 0) {
-                    fdc_finishread(false);
-                    state = ST_IDLE;
-                }
             }
             break;
 
@@ -360,9 +389,9 @@ static void sdf_poll()
 
         case ST_FORMAT_SECTSZ:
             fdc_getdata(--count == 0);  // discard sector size.
-            log_debug("imd: poll format secsz, count=%d, sector=%d", count, sdf_sector);
+            log_debug("sdf: poll format secsz, count=%d, sector=%d", count, sdf_sector);
             if (sdf_sector < geometry[sdf_drive]->sectors_per_track) {
-                log_debug("imd: poll format secsz, filling at offset %lu", ftell(sdf_fp[sdf_drive]));
+                log_debug("sdf: poll format secsz, filling at offset %lu", ftell(sdf_fp[sdf_drive]));
                 for (unsigned i = 0; i < geometry[sdf_drive]->sector_size; i++)
                     putc(0xe5, sdf_fp[sdf_drive]);
                 sdf_sector++;
@@ -373,6 +402,91 @@ static void sdf_poll()
             }
             else
                 state = ST_FORMAT_CYLID;
+            break;
+
+        case ST_WRTRACK_INITIAL:
+            if (writeprot[sdf_drive]) {
+                log_debug("sdf: poll, write protected during write track");
+                fdc_writeprotect();
+                state = ST_IDLE;
+                break;
+            }
+            c = fdc_getdata(0);
+            log_debug("sdf: wrttrack_initial, c=%02X", c);
+            if (c == 0xfe)
+                state = ST_WRTRACK_CYLID;
+            else if (--count == 0) {
+                fdc_finishread(false);
+                state = ST_IDLE;
+            }
+            break;
+
+        case ST_WRTRACK_CYLID:
+            c = fdc_getdata(0);
+            log_debug("sdf: wrttrack_cylid, c=%02X", c);
+            if (c != -1)
+                state = ST_WRTRACK_HEADID;
+            break;
+
+        case ST_WRTRACK_HEADID:
+            c = fdc_getdata(0);
+            log_debug("sdf: wrttrack_headid, c=%02X", c);
+            if (c != -1)
+                state = ST_WRTRACK_SECTID;
+            break;
+
+        case ST_WRTRACK_SECTID:
+            c = fdc_getdata(0);
+            log_debug("sdf: wrttrack_sectid, c=%02X", c);
+            if (c != -1) {
+                sdf_sector = c;
+                state = ST_WRTRACK_SECTSZ;
+            }
+            break;
+
+        case ST_WRTRACK_SECTSZ:
+            c = fdc_getdata(0);
+            log_debug("sdf: wrttrack_sectsz, c=%02X", c);
+            if (c != -1) {
+                unsigned ssize = 128 << c;
+                if (ssize == geometry[sdf_drive]->sector_size)
+                    state = ST_WRTRACK_HDRCRC;
+                else {
+                    log_warn("sdf: write track with invalid sector size %u", ssize);
+                    fdc_writeprotect();
+                    state = ST_IDLE;
+                }
+            }
+            break;
+
+        case ST_WRTRACK_HDRCRC:
+            c = fdc_getdata(0);
+            log_debug("sdf: wrttrack_hdrcrc, c=%02X", c);
+            if (c == 0xfb) {
+                const struct sdf_geometry *geo = geometry[sdf_drive];
+                if (io_seek(geo, sdf_drive, sdf_sector, sdf_track, sdf_side)) {
+                    count = geometry[sdf_drive]->sector_size;
+                    state = ST_WRTRACK_DATA;
+                }
+                else {
+                    fdc_writeprotect();
+                    state = ST_IDLE;
+                }
+            }
+            break;
+
+        case ST_WRTRACK_DATA:
+            if (sdf_poll_write())
+                state = ST_WRTRACK_DATACRC;
+            break;
+
+        case ST_WRTRACK_DATACRC:
+            c = fdc_getdata(0);
+            log_debug("sdf: wrttrack_datacrc, c=%02X", c);
+            if (c == 0xf7) {
+                state = ST_WRTRACK_INITIAL;
+                count = 120;
+            }
             break;
     }
 }
@@ -448,6 +562,7 @@ static void sdf_mount(int drive, const char *fn, FILE *fp, const struct sdf_geom
     drives[drive].readaddress = sdf_readaddress;
     drives[drive].poll        = sdf_poll;
     drives[drive].format      = sdf_format;
+    drives[drive].writetrack  = sdf_writetrack;
     drives[drive].abort       = sdf_abort;
     drives[drive].spinup      = sdf_spinup;
     drives[drive].spindown    = sdf_spindown;
