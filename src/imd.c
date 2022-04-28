@@ -169,9 +169,11 @@ static void imd_dump(struct imd_file *imd)
 
 static void imd_save(struct imd_file *imd)
 {
+    log_debug("imd: saving");
+    imd_dump(imd);
     fseek(imd->fp, imd->track0, SEEK_SET);
     for (struct imd_track *trk = imd->track_head; trk; trk = trk->next) {
-        uint8_t buf[5+IMD_MAX_SECTS];
+        uint8_t buf[5+IMD_MAX_SECTS*4];
         buf[0] = trk->mode;
         buf[1] = trk->cylinder;
         buf[2] = trk->head;
@@ -187,25 +189,21 @@ static void imd_save(struct imd_file *imd)
             if (sect->head != trk->head)
                 headmap = true;
         }
-        fwrite(buf, ptr-buf, 1, imd->fp);
         if (cylmap) {
-            ptr = buf;
+            buf[2] |= 0x80;
             for (struct imd_sect *sect = trk->sect_head; sect; sect = sect->next)
                 *ptr++ = sect->cylinder;
-            fwrite(buf, ptr-buf, 1, imd->fp);
         }
         if (headmap) {
-            ptr = buf;
+            buf[2] |= 0x40;
             for (struct imd_sect *sect = trk->sect_head; sect; sect = sect->next)
                 *ptr++ = sect->head;
-            fwrite(buf, ptr-buf, 1, imd->fp);
         }
         if (trk->sectsize == 0xff) {
-            ptr = buf;
             for (struct imd_sect *sect = trk->sect_head; sect; sect = sect->next)
                 *ptr++ = sect->sectsize;
-            fwrite(buf, ptr-buf, 1, imd->fp);
         }
+        fwrite(buf, ptr-buf, 1, imd->fp);
         for (struct imd_sect *sect = trk->sect_head; sect; sect = sect->next) {
             putc(sect->mode, imd->fp);
             if (sect->mode & 1)
