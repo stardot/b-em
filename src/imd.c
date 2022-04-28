@@ -509,6 +509,8 @@ static bool imd_begin_format(int drive, int track, int side, int density)
                 else
                     imd->track_head = trk;
                 imd->track_tail = trk;
+                if (track > imd->maxcyl)
+                    imd->maxcyl = track;
             }
             else {
                 count = 500;
