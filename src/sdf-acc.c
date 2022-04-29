@@ -256,11 +256,26 @@ static void sdf_format(int drive, int track, int side, unsigned par2)
 static void sdf_writetrack(int drive, int track, int side, int density)
 {
     if (state == ST_IDLE) {
-        sdf_drive = drive;
-        sdf_track = track;
-        sdf_side = side;
-        sdf_time = -20;
-        state = ST_WRTRACK_INITIAL;
+        if (drive < NUM_DRIVES) {
+            enum sdf_density geo_dens = geometry[drive]->density;
+            if ((density && geo_dens == SDF_DENS_DOUBLE) || (!density && geo_dens == SDF_DENS_SINGLE)) {
+                sdf_drive = drive;
+                sdf_track = track;
+                sdf_side = side;
+                sdf_time = -20;
+                state = ST_WRTRACK_INITIAL;
+            }
+            else {
+                log_warn("sdf: write track attempted on disc with the wrong density");
+                state = ST_IDLE;
+                fdc_writeprotect();
+            }
+        }
+        else {
+            log_warn("sdf: drive number %d out of range", drive);
+            state = ST_IDLE;
+            fdc_notfound();
+        }
     }
 }
 
