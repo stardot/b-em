@@ -308,7 +308,7 @@ static int32_t dfs_size(FILE *fp, long offset)
 
 static const struct sdf_geometry *find_geo_dfs_ss(const char *fn, FILE *fp, long fsize)
 {
-    const struct sdf_geometry *geo;
+    const struct sdf_geometry *geo = NULL;
     int32_t sects = dfs_size(fp, 0);
     if (sects > 0) {
         if (sects <= (40 * 10))
