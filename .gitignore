@@ -35,6 +35,9 @@ src/gtest.exe
 src/fsmap
 src/hdfmt
 src/fdresize
+src/m7makechars
+src/vdfs6
+src/wildtest
 packages/*
 src/Debug/*
 src/Release/*
@@ -54,3 +57,5 @@ b-em-mg.exe
 enc_temp_folder/
 src/b-em.aps
 *.bak
+build-w32/
+build-w64/
