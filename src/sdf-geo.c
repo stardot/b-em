@@ -283,11 +283,11 @@ static int32_t dfs_size(FILE *fp, long offset)
                     dirsize -= 8;
                     new_start = ((base[6] & 0x03) << 8) | base[7];
                     if (new_start == 0) {
-                        log_debug("sdf: impossible start position");
+                        log_debug("sdf: impossible DFS start position");
                         return -1;
                     }
                     if (new_start > cur_start) {
-                        log_debug("sdf: catalogue not sorted");
+                        log_debug("sdf: DFS catalogue not sorted");
                         return -1;
                     }
                     cur_start = new_start;
@@ -299,7 +299,7 @@ static int32_t dfs_size(FILE *fp, long offset)
                 log_debug("sdf: DFS dirsize not valid");
         }
         else
-            log_debug("sdf: unable to read");
+            log_debug("sdf: unable to read: %s", ferror(fp) ? strerror(errno) : "premature EOF");
     }
     else
         log_debug("sdf: unable to seek: %s", strerror(errno));
@@ -316,7 +316,7 @@ static const struct sdf_geometry *find_geo_dfs_ss(const char *fn, FILE *fp, long
         else if (sects <= (80 * 10))
             geo = &sdf_geometries.dfs_10s_sin_80t;
         else {
-            log_warn("sdf: sector count too high (%u) for %s", sects, fn);
+            log_warn("sdf: DFS sector count too high (%u) for %s", sects, fn);
             return NULL;
         }
         uint32_t side_bytes = geo->tracks * geo->sectors_per_track * geo->sector_size;
@@ -341,7 +341,7 @@ static const struct sdf_geometry *find_geo_dfs_is(const char *fn, FILE *fp, long
         else if (sects <= (80 * 10))
             return &sdf_geometries.dfs_10s_int_80t;
         else {
-            log_warn("sdf: sector count too high (%u) for %s", sects, fn);
+            log_warn("sdf: DFS sector count too high (%u) for %s", sects, fn);
             return NULL;
         }
     }
