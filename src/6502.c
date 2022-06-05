@@ -3398,6 +3398,7 @@ void m6502_exec(void)
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         polltime(5);
+                        addr += y;
                         temp = readmem(addr) - 1;
                         polltime(1);
                         writemem(addr, temp + 1);
