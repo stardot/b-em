@@ -1256,30 +1256,30 @@ static uint16_t parse_name(char *str, size_t size, uint16_t addr)
 {
     char *ptr = str;
     char *end = str + size - 1;
-    int ch, quote= 0;
+    int quote= 0;
 
     log_debug("vdfs: parse_name: addr=%04x", addr);
-    do
-        ch = readmem(addr++);
-    while (ch == ' ' || ch == '\t');
+    int ch = readmem(addr);
+    while (ch == ' ' || ch == '\t')
+        ch = readmem(++addr);
 
     if (ch == '"') {
         quote = 1;
-        ch = readmem(addr++);
+        ch = readmem(++addr);
     }
-    while (!(ch == '\r' || ch == ' ' || ch == '\t' || (ch == '"' && quote))) {
-        if (ptr >= end || ch < ' ' || ch == 0x7f) {
-            adfs_error(err_badname);
-            return 0;
+    while (ptr < end) {
+        if (ch == '\r' || ch == ' ' || ch == '\t' || (ch == '"' && quote)) {
+            *ptr = '\0';
+            log_debug("vdfs: parse_name: name=%s", str);
+            return addr;
         }
+        if (ch < ' ' || ch == 0x7f)
+            break;
         *ptr++ = ch & 0x7f;
-        ch = readmem(addr++);
+        ch = readmem(++addr);
     }
-    if (ch == '\r')
-        --addr;
-    *ptr = '\0';
-    log_debug("vdfs: parse_name: name=%s", str);
-    return addr;
+    adfs_error(err_badname);
+    return 0;
 }
 
 static bool check_valid_dir(vdfs_dirlib *dir)
@@ -3193,6 +3193,8 @@ static void osargs(void)
                 a = fs_num; // say this filing selected.
                 break;
             case 1:
+                for (int ch = readmem(cmd_tail); ch == ' ' || ch == '\t'; ch = readmem(++cmd_tail))
+                    ;
                 writemem32(x, cmd_tail);
                 break;
             case 0xff:
