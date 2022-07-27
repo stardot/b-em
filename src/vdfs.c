@@ -1275,6 +1275,8 @@ static uint16_t parse_name(char *str, size_t size, uint16_t addr)
         *ptr++ = ch & 0x7f;
         ch = readmem(addr++);
     }
+    if (ch == '\r')
+        --addr;
     *ptr = '\0';
     log_debug("vdfs: parse_name: name=%s", str);
     return addr;
