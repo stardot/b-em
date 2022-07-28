@@ -4373,19 +4373,34 @@ static void cmd_mmb_din(uint16_t addr)
         mmb_check_pick(0, num1);
 }
 
+static void needs_filename(enum vdfs_action act, uint16_t addr)
+{
+    int ch = readmem(addr);
+    if (ch == '\r') {
+        adfs_error(err_badparms);
+        return;
+    }
+    x = addr & 0xff;
+    y = addr >> 8;
+    rom_dispatch(act);
+}
+
 static void cmd_dump(uint16_t addr)
 {
+    int ch = readmem(addr);
+    if (ch == '\r') {
+        adfs_error(err_badparms);
+        return;
+    }
     x = addr & 0xff;
     y = addr >> 8;
 
     // Skip over the filename and any spaces after.
 
-    int ch;
-    do
-        ch = readmem(addr++);
-    while (ch != ' ' && ch != '\t' && ch != '\r');
+    while (ch != ' ' && ch != '\t' && ch != '\r')
+        ch = readmem(++addr);
     while (ch == ' ' || ch == '\t')
-        ch = readmem(addr++);
+        ch = readmem(++addr);
     uint32_t start = 0, offset = 0;
     if (ch != '\r') {
         log_debug("vdfs: cmd_dump, start present");
@@ -4397,11 +4412,11 @@ static void cmd_dump(uint16_t addr)
             }
             start = start << 4 | ch;
             log_debug("vdfs: cmd_dump, start loop, nyb=%x, start=%x", ch, start);
-            ch = readmem(addr++);
+            ch = readmem(++addr);
         }
         while (ch != ' ' && ch != '\t' && ch != '\r');
         while (ch == ' ' || ch == '\t')
-            ch = readmem(addr++);
+            ch = readmem(++addr);
         if (ch == '\r')
             offset = start;
         else {
@@ -4414,7 +4429,7 @@ static void cmd_dump(uint16_t addr)
                 }
                 offset = offset << 4 | ch;
                 log_debug("vdfs: cmd_dump, start loop, nyb=%x, offset=%x", ch, offset);
-                ch = readmem(addr++);
+                ch = readmem(++addr);
             }
             while (ch != ' ' && ch != '\t' && ch != '\r');
         }
@@ -4437,9 +4452,8 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
     case VDFS_ROM_TYPE:
     case VDFS_ROM_BUILD:
     case VDFS_ROM_APPEND:
-        x = addr & 0xff;
-        y = addr >> 8;
-        rom_dispatch(act);
+        needs_filename(act, addr);
+        break;
     case VDFS_ACT_NOP:
         break;
     case VDFS_ACT_QUIT:
