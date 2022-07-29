@@ -29,7 +29,7 @@ static void jsenum(int num_js)
     }
 }
 
-static void jsevents(void)
+static void jsevents(int stick, int axis)
 {
     ALLEGRO_EVENT_QUEUE *queue;
     ALLEGRO_EVENT event;
@@ -40,7 +40,8 @@ static void jsevents(void)
         al_wait_for_event(queue, &event);
         switch(event.type) {
             case ALLEGRO_EVENT_JOYSTICK_AXIS:
-                printf("joystick %s, stick #%d, axis%d, value=%.6f\n", al_get_joystick_name(event.joystick.id), event.joystick.stick, event.joystick.axis, event.joystick.pos);
+                if ((stick == -1 || stick == event.joystick.stick) && (axis == -1 || axis == event.joystick.axis))
+                    printf("joystick %s, stick #%d, axis%d, value=%.6f\n", al_get_joystick_name(event.joystick.id), event.joystick.stick, event.joystick.axis, event.joystick.pos);
                 break;
             case ALLEGRO_EVENT_JOYSTICK_BUTTON_DOWN:
                 printf("joystick %s, button #%d down\n", al_get_joystick_name(event.joystick.id), event.joystick.button);
@@ -61,8 +62,14 @@ int main(int argc, char **argv)
             if ((num_js = al_get_num_joysticks())) {
                 status = 0;
                 jsenum(num_js);
-                if (argc == 2 && strcmp(argv[1], "-e") == 0)
-                    jsevents();
+                if (argc >= 2 && strcmp(argv[1], "-e") == 0) {
+                    if (argc == 2)
+                        jsevents(-1, -1);
+                    else if (argc == 3)
+                        jsevents(atoi(argv[2]), -1);
+                    else
+                        jsevents(atoi(argv[2]), atoi(argv[3]));
+                }
             }
             else {
                 fputs("jsenum: no joysticks found\n", stderr);
