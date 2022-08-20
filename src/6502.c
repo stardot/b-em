@@ -2349,9 +2349,11 @@ void m6502_exec(void)
                         temp = readmem(addr);
                         polltime(1);
                         writemem(addr, temp);
+                        tempi = temp & 1;
                         temp >>= 1;
                         if (p.c)
-                                temp |= 0x80;
+                            temp |= 0x80;
+                        p.c = tempi;
                         polltime(1);
                         writemem(addr, temp);
                         adc_nmos(temp);
@@ -2397,9 +2399,11 @@ void m6502_exec(void)
                         temp = readmem(addr);
                         polltime(1);
                         writemem(addr, temp);
+                        tempi = temp & 1;
                         temp >>= 1;
                         if (p.c)
-                                temp |= 0x80;
+                            temp |= 0x80;
+                        p.c = tempi;
                         polltime(1);
                         writemem(addr, temp);
                         adc_nmos(temp);
@@ -2482,9 +2486,11 @@ void m6502_exec(void)
                         temp = readmem(addr);
                         polltime(1);
                         writemem(addr, temp);
+                        tempi = temp & 1;
                         temp >>= 1;
                         if (p.c)
-                                temp |= 0x80;
+                            temp |= 0x80;
+                        p.c = tempi;
                         polltime(1);
                         writemem(addr, temp);
                         adc_nmos(temp);
@@ -2526,9 +2532,11 @@ void m6502_exec(void)
                         temp = readmem(addr);
                         polltime(1);
                         writemem(addr, temp);
+                        tempi = temp & 1;
                         temp >>= 1;
                         if (p.c)
-                                temp |= 0x80;
+                            temp |= 0x80;
+                        p.c = tempi;
                         polltime(1);
                         writemem(addr, temp);
                         adc_nmos(temp);
@@ -2576,9 +2584,11 @@ void m6502_exec(void)
                         temp = readmem(addr);
                         polltime(1);
                         writemem(addr, temp);
+                        tempi = temp & 1;
                         temp >>= 1;
                         if (p.c)
-                                temp |= 0x80;
+                            temp |= 0x80;
+                        p.c = tempi;
                         polltime(1);
                         writemem(addr, temp);
                         adc_nmos(temp);
@@ -2614,9 +2624,11 @@ void m6502_exec(void)
                         temp = readmem(addr + y);
                         polltime(1);
                         writemem(addr + y, temp);
+                        tempi = temp & 1;
                         temp >>= 1;
                         if (p.c)
-                                temp |= 0x80;
+                            temp |= 0x80;
+                        p.c = tempi;
                         polltime(1);
                         writemem(addr + y, temp);
                         adc_nmos(temp);
@@ -2668,9 +2680,11 @@ void m6502_exec(void)
                         temp = readmem(addr + x);
                         polltime(1);
                         writemem(addr + x, temp);
+                        tempi = temp & 1;
                         temp >>= 1;
                         if (p.c)
-                                temp |= 0x80;
+                            temp |= 0x80;
+                        p.c = tempi;
                         polltime(1);
                         writemem(addr + x, temp);
                         adc_nmos(temp);
