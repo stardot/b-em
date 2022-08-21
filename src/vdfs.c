@@ -1,3 +1,4 @@
+#define _DEBUG
 /*
  * VDFS for B-EM
  * Steve Fosdick 2016-2020
@@ -54,6 +55,7 @@
 
 bool vdfs_enabled = 0;
 const char *vdfs_cfg_root = NULL;
+const char *vdfs_boot_dir = NULL;
 
 /*
  * The definition of the VDFS entry that follows is the key data
@@ -4836,6 +4838,17 @@ static void serv_boot(void)
             cur_dir.dfs_dir = lib_dir.dfs_dir = '$';
             vdfs_findres res;
             lib_dir.dir = find_entry_adfs("Lib", &res, &cur_dir);
+            if (vdfs_boot_dir) {
+                vdfs_entry *ent = find_entry(vdfs_boot_dir, &res, &cur_dir);
+                if (ent && ent->attribs & ATTR_EXISTS) {
+                    if (ent->attribs & ATTR_IS_DIR)
+                        cur_dir.dir = ent;
+                    else
+                        log_warn("vdfs: boot directory '%s' %s", vdfs_boot_dir, "is a file");
+                }
+                else
+                    log_warn("vdfs: boot directory '%s' %s", vdfs_boot_dir, "not found");
+            }
         }
         if (check_valid_dir(&cur_dir)) {
             scan_dir(cur_dir.dir);
@@ -4986,17 +4999,22 @@ static void init_dirlib(vdfs_dirlib *dir, const char *desc)
     dir->drive = 0;
 }
 
-void vdfs_init(const char *root)
+void vdfs_init(const char *root, const char *dir)
 {
     scan_seq = 0;
     init_dirlib(&cur_dir, "current");
     init_dirlib(&lib_dir, "library");
     init_dirlib(&prev_dir, "previous");
-    const char *env = getenv("BEM_VDFS_ROOT");
-    if (env)
-        root = env; //environment variable wins
-    if (!root)
-        root = ".";
+    if (!root) {
+        const char *env = getenv("BEM_VDFS_ROOT");
+        if (env)
+            root = env; //environment variable wins
+        if (!root)
+            root = vdfs_cfg_root;
+        if (!root)
+            root = ".";
+    }
     vdfs_set_root(root);
     vdfs_adfs_mode();
+    vdfs_boot_dir = dir;
 }

@@ -143,14 +143,17 @@ static const char helptext[] =
     "-spx            - Emulation speed x from 0 to 9 (default 4)\n"
     "-debug          - start debugger\n"
     "-debugtube      - start debugging tube processor\n"
-    "-exec file      - debugger to execute file\n\n";
+    "-exec file      - debugger to execute file\n"
+    "-vroot host-dir - set the VDFS root\n"
+    "-vdir guest-dir - set the initial (boot) dir in VDFS\n\n";
 
 void main_init(int argc, char *argv[])
 {
-    int tapenext = 0, discnext = 0, execnext = 0;
+    int tapenext = 0, discnext = 0, execnext = 0, vdfsnext = 0;
     ALLEGRO_DISPLAY *display;
     ALLEGRO_PATH *path;
     const char *ext, *exec_fn = NULL;
+    const char *vroot = NULL, *vdir = NULL;
 
     if (!al_init()) {
         fputs("Failed to initialise Allegro!\n", stderr);
@@ -210,6 +213,10 @@ void main_init(int argc, char *argv[])
             vid_dtype_user = VDT_INTERLACE;
         else if (!strcasecmp(argv[c], "-exec"))
             execnext = 1;
+        else if (!strcasecmp(argv[c], "-vroot"))
+            vdfsnext = 1;
+        else if (!strcasecmp(argv[c], "-vdir"))
+            vdfsnext = 2;
         else if (tapenext) {
             if (tape_fn)
                 al_destroy_path(tape_fn);
@@ -224,6 +231,13 @@ void main_init(int argc, char *argv[])
         else if (execnext) {
             exec_fn = argv[c];
             execnext = 0;
+        }
+        else if (vdfsnext) {
+            if (vdfsnext == 2)
+                vdir = argv[c];
+            else
+                vroot = argv[c];
+            vdfsnext = 0;
         }
         else {
             path = al_create_path(argv[c]);
@@ -289,7 +303,7 @@ void main_init(int argc, char *argv[])
 
     scsi_init();
     ide_init();
-    vdfs_init(vdfs_cfg_root);
+    vdfs_init(vroot, vdir);
 
     model_init();
 

@@ -1,7 +1,7 @@
 #ifndef __INCLUDE_VDFS_H__
 #define __INCLUDE_VDFS_H__
 
-extern void vdfs_init(const char*root);
+extern void vdfs_init(const char *root, const char *dir);
 extern void vdfs_reset(void);
 extern void vdfs_close(void);
 extern uint8_t vdfs_read(uint16_t addr);
