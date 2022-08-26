@@ -142,6 +142,22 @@ static int nula_left_cut;
 static int nula_left_edge;
 static int mode7_need_new_lookup;
 
+static int nula_spect_toggle = 0;
+static int nula_spect_paper = 0;
+static int nula_spect_ink = 0;
+
+static const uint8_t nula_spect_colours[] =
+{
+    0, // 000 Black.
+    4, // 001 Blue.
+    1, // 010 Red.
+    5, // 011 Magenta
+    2, // 100 Green.
+    6, // 101 Cyan.
+    3, // 110 Yellow
+    7  // 111 White.
+};
+
 static inline uint32_t makecol(int red, int green, int blue)
 {
     return 0xff000000 | (red << 16) | (green << 8) | blue;
@@ -330,7 +346,7 @@ void videoula_write(uint16_t addr, uint8_t val)
                 break;
 
             case 6:
-                nula_attribute_mode = param & 1;
+                nula_attribute_mode = param & 2;
                 break;
 
             case 7:
@@ -945,11 +961,43 @@ void video_poll(int clocks, int timer_enable)
                                         // Very loose approximation of the text attribute mode
                                         nula_putpixel(region, scrx + 7, scry, ula_pal[attribute]);
                                     } else {
-                                        int attribute = ((dat & 3) << 2);
-                                        float pc = 0.0f;
-                                        for (c = 0; c < 8; c++, pc += 0.75f) {
-                                            int output = ula_pal[attribute | (dat >> (7 - (int) pc) & 1)];
-                                            nula_putpixel(region, scrx + c, scry, output);
+                                        if (nula_attribute_mode == 2) {
+                                            /* Spectrum mode */
+                                            if (nula_spect_toggle) {
+                                                for (int c = 0; c < 16; c += 2) {
+                                                    int colour = dat & 0x80 ? nula_spect_ink : nula_spect_paper;
+                                                    nula_putpixel(region, scrx + c, scry, colour);
+                                                    nula_putpixel(region, scrx + c + 1, scry, colour);
+                                                    dat <<= 1;
+                                                }
+                                                nula_spect_toggle = 0;
+                                            }
+                                            else {
+                                                int ink = nula_spect_colours[dat & 7];
+                                                int paper = nula_spect_colours[(dat >> 3) & 7];
+                                                if (dat & 0x40) {
+                                                    // Bright
+                                                    ink |= 0x08;
+                                                    paper |= 0x08;
+                                                }
+                                                if (dat & 0x80 && ula_ctrl & 1) {
+                                                    // Flashing - use swapped colours.
+                                                    int tmp = ink;
+                                                    ink = paper;
+                                                    paper = tmp;
+                                                }
+                                                nula_spect_ink = nula_collook[ink];
+                                                nula_spect_paper = nula_collook[paper];
+                                                nula_spect_toggle = 1;
+                                            }
+                                        }
+                                        else {
+                                            int attribute = ((dat & 3) << 2);
+                                            float pc = 0.0f;
+                                            for (c = 0; c < 8; c++, pc += 0.75f) {
+                                                int output = ula_pal[attribute | (dat >> (7 - (int) pc) & 1)];
+                                                nula_putpixel(region, scrx + c, scry, output);
+                                            }
                                         }
                                     }
                                 } else {
