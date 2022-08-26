@@ -148,7 +148,7 @@ static int nula_spect_ink = 0;
 
 static const uint8_t nula_spect_colours[] =
 {
-    0, // 000 Black.
+    8, // 000 Black.
     4, // 001 Blue.
     1, // 010 Red.
     5, // 011 Magenta
@@ -860,7 +860,7 @@ void video_reset()
     nula_left_edge = 0;
     nula_left_blank = 0;
     nula_horizontal_offset = 0;
-
+    nula_spect_toggle = 0;
 }
 
 #if 0
@@ -960,19 +960,28 @@ void video_poll(int clocks, int timer_enable)
                                         }
                                         // Very loose approximation of the text attribute mode
                                         nula_putpixel(region, scrx + 7, scry, ula_pal[attribute]);
-                                    } else {
-                                        if (nula_attribute_mode == 2) {
-                                            /* Spectrum mode */
-                                            if (nula_spect_toggle) {
-                                                for (int c = 0; c < 16; c += 2) {
-                                                    int colour = dat & 0x80 ? nula_spect_ink : nula_spect_paper;
-                                                    nula_putpixel(region, scrx + c, scry, colour);
-                                                    nula_putpixel(region, scrx + c + 1, scry, colour);
-                                                    dat <<= 1;
-                                                }
-                                                nula_spect_toggle = 0;
+                                    }
+                                    else if (nula_attribute_mode == 2) {
+                                        /* Spectrum mode */
+                                        if (nula_spect_toggle) {
+                                            for (int c = 0; c < 16; c += 2) {
+                                                int colour = dat & 0x80 ? nula_spect_ink : nula_spect_paper;
+                                                nula_putpixel(region, scrx + c, scry, colour);
+                                                nula_putpixel(region, scrx + c + 1, scry, colour);
+                                                dat <<= 1;
+                                            }
+                                            nula_spect_toggle = 0;
+                                        }
+                                        else {
+                                            if (dat == 0x80) {
+                                                /* Border colour */
+                                                nula_spect_ink = nula_spect_paper = nula_collook[0];
                                             }
                                             else {
+                                                /* Convert the ink and paper colours from the attribute
+                                                 * byte into indexes into the NuLA 12-bit pallete as the
+                                                 * bits are in the wrong order.
+                                                 */
                                                 int ink = nula_spect_colours[dat & 7];
                                                 int paper = nula_spect_colours[(dat >> 3) & 7];
                                                 if (dat & 0x40) {
@@ -986,18 +995,23 @@ void video_poll(int clocks, int timer_enable)
                                                     ink = paper;
                                                     paper = tmp;
                                                 }
+                                                /* Do the lookup into the 12-bit pallete to get final RGB
+                                                 * values now - they will be the same for each of the
+                                                 * pixels that follow.
+                                                 */
                                                 nula_spect_ink = nula_collook[ink];
                                                 nula_spect_paper = nula_collook[paper];
-                                                nula_spect_toggle = 1;
                                             }
+                                            nula_spect_toggle = 1;
                                         }
-                                        else {
-                                            int attribute = ((dat & 3) << 2);
-                                            float pc = 0.0f;
-                                            for (c = 0; c < 8; c++, pc += 0.75f) {
-                                                int output = ula_pal[attribute | (dat >> (7 - (int) pc) & 1)];
-                                                nula_putpixel(region, scrx + c, scry, output);
-                                            }
+                                    }
+                                    else {
+                                        /* Normal NuLA attribute mode */
+                                        int attribute = ((dat & 3) << 2);
+                                        float pc = 0.0f;
+                                        for (c = 0; c < 8; c++, pc += 0.75f) {
+                                            int output = ula_pal[attribute | (dat >> (7 - (int) pc) & 1)];
+                                            nula_putpixel(region, scrx + c, scry, output);
                                         }
                                     }
                                 } else {
@@ -1132,6 +1146,7 @@ void video_poll(int clocks, int timer_enable)
                 for (c = 0; c < nula_horizontal_offset * crtc_mode; c++, scrx++) {
                     put_pixel(region, scrx + crtc_mode * 8, scry, colblack);
                 }
+                nula_spect_toggle = 0;
             }
 
             if (sc == (crtc[11] & 31) || ((crtc[8] & 3) == 3 && sc == ((crtc[11] & 31) >> 1))) {
