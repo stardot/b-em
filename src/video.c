@@ -34,7 +34,11 @@ static int vadj;
 uint16_t ma, ttxbank;
 static uint16_t maback;
 static int vdispen, dispen;
-static int crtc_mode;
+static enum {
+    CRTC_TELETEXT,
+    CRTC_HIFREQ,
+    CRTC_LOFREQ
+} crtc_mode;
 
 void crtc_reset()
 {
@@ -44,7 +48,7 @@ void crtc_reset()
 
 static void set_intern_dtype(enum vid_disptype dtype)
 {
-    if (crtc_mode == 0 && (crtc[8] & 1))
+    if (crtc_mode == CRTC_TELETEXT && (crtc[8] & 1))
         dtype = VDT_INTERLACE;
     else if (dtype == VDT_INTERLACE && !(crtc[8] & 1))
         dtype = VDT_SCALE;
@@ -278,11 +282,11 @@ void videoula_write(uint16_t addr, uint8_t val)
             ula_ctrl = val;
             ula_mode = (ula_ctrl >> 2) & 3;
             if (val & 2)
-                crtc_mode = 0;  // Teletext
+                crtc_mode = CRTC_TELETEXT;  // Teletext
             else if (val & 0x10)
-                crtc_mode = 1;  // High frequency
+                crtc_mode = CRTC_HIFREQ;    // High frequency
             else
-                crtc_mode = 2;  // Low frequency
+                crtc_mode = CRTC_LOFREQ;    // Low frequency
             set_intern_dtype(vid_dtype_user);
         }
         break;
@@ -919,10 +923,10 @@ void video_poll(int clocks, int timer_enable)
                     put_pixels(region, scrx, scry, (ula_ctrl & 0x10) ? 8 : 16, colblack);
                 } else
                     switch (crtc_mode) {
-                    case 0:
+                    case CRTC_TELETEXT:
                         mode7_render(region, dat & 0x7F);
                         break;
-                    case 1:
+                    case CRTC_HIFREQ:
                         {
                             if (scrx < firstx)
                                 firstx = scrx;
@@ -964,7 +968,7 @@ void video_poll(int clocks, int timer_enable)
                             }
                         }
                         break;
-                    case 2:
+                    case CRTC_LOFREQ:
                         {
                             if (scrx < firstx)
                                 firstx = scrx;

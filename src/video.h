@@ -4,6 +4,7 @@
 #define CLOCKS_PER_FRAME 80000
 
 /*CRTC (6845)*/
+
 void    crtc_reset(void);
 void    crtc_write(uint16_t addr, uint8_t val);
 uint8_t crtc_read(uint16_t addr);
