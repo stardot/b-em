@@ -961,7 +961,7 @@ void video_poll(int clocks, int timer_enable)
                                         // Very loose approximation of the text attribute mode
                                         nula_putpixel(region, scrx + 7, scry, ula_pal[attribute]);
                                     }
-                                    else if (nula_attribute_mode == 2) {
+                                    else if (nula_attribute_mode >= 2) {
                                         /* Spectrum mode */
                                         if (nula_spect_toggle) {
                                             for (int c = 0; c < 16; c += 2) {
@@ -973,21 +973,38 @@ void video_poll(int clocks, int timer_enable)
                                             nula_spect_toggle = 0;
                                         }
                                         else {
-                                            if (dat == 0x80) {
-                                                /* Border colour */
+                                            if (dat == 0x80 && nula_attribute_mode == 2) {
+                                                /* Spectrum Border colour */
                                                 nula_spect_ink = nula_spect_paper = nula_collook[0];
                                             }
                                             else {
-                                                /* Convert the ink and paper colours from the attribute
-                                                 * byte into indexes into the NuLA 12-bit pallete as the
-                                                 * bits are in the wrong order.
+                                                /* Convert the ink and paper colours from the
+                                                 * attribute byte into indexes into the NuLA 12-bit
+                                                 * pallete as the bits are in the wrong order.
                                                  */
                                                 int ink = nula_spect_colours[dat & 7];
                                                 int paper = nula_spect_colours[(dat >> 3) & 7];
-                                                if (dat & 0x40) {
-                                                    // Bright
-                                                    ink |= 0x08;
-                                                    paper |= 0x08;
+                                                if (nula_attribute_mode == 2) {
+                                                    /* Spectrum attributes. */
+                                                    if (dat & 0x40) {
+                                                        // Brightness bit shared between ink and paper.
+                                                        ink |= 0x08;
+                                                        paper |= 0x08;
+                                                    }
+                                                }
+                                                else {
+                                                    /* Thomson attributes.  Black is not mapped to palette
+                                                     * entry 8 like the spectrum.
+                                                     */
+                                                    ink &= 7;
+                                                    paper &= 7;
+                                                    /* Most significant bit, equivalent to brightness bit in
+                                                     * spectrum mode, is separate for fg and bg.
+                                                     */
+                                                    if (dat & 0x40)
+                                                        ink |= 0x08;
+                                                    if (dat & 0x80)
+                                                        paper |= 0x80;
                                                 }
                                                 if (dat & 0x80 && ula_ctrl & 1) {
                                                     // Flashing - use swapped colours.
