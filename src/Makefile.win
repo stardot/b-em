@@ -40,6 +40,7 @@ OBJ = \
     disc.o \
     fdi2raw.o \
     fdi.o \
+    fullscreen.o\
     gui-allegro.o \
     hfe.o \
     i8271.o \
