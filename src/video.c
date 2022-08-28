@@ -346,7 +346,7 @@ void videoula_write(uint16_t addr, uint8_t val)
                 break;
 
             case 6:
-                nula_attribute_mode = param & 2;
+                nula_attribute_mode = param & 3;
                 break;
 
             case 7:
@@ -1004,7 +1004,7 @@ void video_poll(int clocks, int timer_enable)
                                                     if (dat & 0x40)
                                                         ink |= 0x08;
                                                     if (dat & 0x80)
-                                                        paper |= 0x80;
+                                                        paper |= 0x08;
                                                 }
                                                 if (dat & 0x80 && ula_ctrl & 1) {
                                                     // Flashing - use swapped colours.
