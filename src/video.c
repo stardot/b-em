@@ -59,7 +59,7 @@ static void crtc_setreg(int reg, uint8_t val)
 {
     val &= crtc_mask[reg];
     crtc[reg] = val;
-    if (crtc_i == 6 && vc == val)
+    if (reg == 6 && vc == val)
         vdispen = 0;
     else if (reg == 8)
         set_intern_dtype(vid_dtype_user);
