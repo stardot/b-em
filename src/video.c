@@ -964,7 +964,7 @@ void video_poll(int clocks, int timer_enable)
                                     else if (nula_attribute_mode >= 2) {
                                         /* Spectrum mode */
                                         if (nula_spect_toggle) {
-                                            for (int c = 0; c < 16; c += 2) {
+                                            for (int c = -8; c < 8; c += 2) {
                                                 int colour = dat & 0x80 ? nula_spect_ink : nula_spect_paper;
                                                 nula_putpixel(region, scrx + c, scry, colour);
                                                 nula_putpixel(region, scrx + c + 1, scry, colour);
