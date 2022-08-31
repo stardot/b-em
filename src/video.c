@@ -1176,7 +1176,7 @@ void video_poll(int clocks, int timer_enable)
                 ma = maback;
                 vadj--;
                 if (!vadj) {
-                    vdispen = 1;
+                    vdispen = crtc[6];
                     ma = maback = (crtc[13] | (crtc[12] << 8)) & 0x3FFF;
                     sc = 0;
                 }
@@ -1200,7 +1200,7 @@ void video_poll(int clocks, int timer_enable)
                     vc = 0;
                     vadj = crtc[5];
                     if (!vadj) {
-                        vdispen = 1;
+                        vdispen = crtc[6];
                         ma = maback = (crtc[13] | (crtc[12] << 8)) & 0x3FFF;
                     }
                     frcount++;
