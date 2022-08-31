@@ -675,6 +675,7 @@ void econet_reset(void)
     // Already have a station num? Either from command line or a free one
     // we found on previous reset.
     if (EconetStationNumber != 0) {
+        log_debug("Econet: looking up existing station number %d", EconetStationNumber);
         // Look up our port number in network config
         for (struct ECOLAN *entry = networks; entry; entry = entry->next) {
             if (entry->station == EconetStationNumber) {
@@ -687,7 +688,7 @@ void econet_reset(void)
             service.sin_port = htons(EconetListenPort);
             service.sin_addr.s_addr = EconetListenIP;
             if (bind(UdpSocket, (SOCKADDR *) & service, sizeof(service)) == SOCKET_ERROR) {
-                log_error("Econet: Failed to bind to port %d; %s", EconetListenPort, econet_socket_errstr());
+                log_error("Econet: Failed to bind local address %s:%u: %s", inet_ntoa(service.sin_addr), EconetListenPort, econet_socket_errstr());
                 closesocket(UdpSocket);
                 WSACleanup();
                 return;
@@ -702,6 +703,7 @@ void econet_reset(void)
     }
     else {
         // Station number not specified, find first one not already in use.
+        log_debug("Econet: auto-allocating station number");
         char localhost[256];
         struct hostent *hent;
 
@@ -723,7 +725,6 @@ void econet_reset(void)
                     }
                 }
             }
-
             if (EconetListenPort == 0) {
                 // still can't find one ... strict mode?
                 if (confSTRICT && confAUNmode) {
