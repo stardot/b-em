@@ -109,7 +109,7 @@ prtextws    =   &A8
 .romtitle   equs    "B-Em VDFS", &00
             include "version.asm"
 .copyright  equb    &00
-            equs    "(C) 2018 Steve Fosdick, GPL3", &00
+            equs    "(C) 2018-2021 Steve Fosdick, GPL3", &00
             equd    0
 .banner     equs    "Virtual DFS", &00
 .msg_nclaim equs    "ADFS is not being claimed", &00
@@ -445,7 +445,11 @@ prtextws    =   &A8
 .notdir     pr_attr &08, 'L'
             pr_attr &02, 'W'
             pr_attr &01, 'R'
-            rts
+            lda     #&01
+            bit     &010d
+            beq     notnlt
+            outcnt  'T'
+.notnlt     rts
 }
 
 .pr_others  outcnt  '/'
@@ -487,7 +491,6 @@ prtextws    =   &A8
             adc     #&06
 .ddig       jmp     OSWRCH
 
-
             macro   hexout addr
             lda     addr
             jsr     hexbyt
@@ -498,20 +501,14 @@ prtextws    =   &A8
             jsr     pr_others
             jsr     pr_pad
             twospc
-            hexout  &0111
-            hexout  &0110
-            hexout  &010f
-            hexout  &010e
+            ldx     #&0e
+            jsr     hexfour
             twospc
-            hexout  &0115
-            hexout  &0114
-            hexout  &0113
-            hexout  &0112
+            ldx     #&12
+            jsr     hexfour
             twospc
-            hexout  &0119
-            hexout  &0118
-            hexout  &0117
-            hexout  &0116
+            ldx     #&16
+            jsr     hexfour
             twospc
             hexout  &011a
             outchr  '-'

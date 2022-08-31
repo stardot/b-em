@@ -1272,6 +1272,38 @@ static inline void sbc_cmos(uint8_t temp)
     }
 }
 
+static inline void nmos_arr(void)
+{
+    uint_fast8_t s = readmem(pc++);
+    uint_fast8_t t = a & s;                 /* Perform the AND. */
+    if (p.d) {
+        uint_fast8_t ah = t >> 4;               /* Separate the high */
+        uint_fast8_t al = t & 15;               /* and low nybbles. */
+        a = t >> 1;
+        if (p.c)
+            a |= 0x80;
+        p.n = p.c;                          /* Set the N and */
+        p.z = !a;                           /* Z flags traditionally */
+        p.v = (t ^ a) & 64;                 /* and V flag in a weird way. */
+
+        if (al + (al & 1) > 5)              /* BCD "fixup" for low nybble. */
+            a = (a & 0xF0) | ((a + 6) & 0xF);
+        if ((p.c = ah + (ah & 1) > 5))      /* Set the Carry flag. */
+            a = (a + 0x60) & 0xFF;          /* BCD "fixup" for high nybble. */
+    }
+    else {        /*V & C flag behaviours in 64doc.txt are backwards */
+        a = t >> 1;
+        if (p.c)
+            a |= 0x80;
+        p.n = p.c;                          /* Set the N and */
+        p.z = !a;                           /* Z flags traditionally */
+        p.v = (t ^ a) & 64;                 /* and V flag in a weird way. */
+        p.c = a & 64;
+    }
+    polltime(2);
+    takeint = (interrupt && !p.i);
+}
+
 static void branchcycles(int temp)
 {
         if (temp > 2) {
@@ -1500,7 +1532,7 @@ void m6502_exec(void)
                         addr = readmem(pc);
                         pc++;
                         readmem((addr + x) & 0xFF);
-                        polltime(3);
+                        polltime(4);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -1509,7 +1541,7 @@ void m6502_exec(void)
                         pc++;
                         a |= readmem((addr + x) & 0xFF);
                         setzn(a);
-                        polltime(3);
+                        polltime(4);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -1521,7 +1553,7 @@ void m6502_exec(void)
                         temp <<= 1;
                         setzn(temp);
                         writemem(addr, temp);
-                        polltime(5);
+                        polltime(6);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -1536,6 +1568,7 @@ void m6502_exec(void)
                         p.c = temp & 0x80;
                         temp <<= 1;
                         writemem(addr, temp);
+                        polltime(1);
                         a |= temp;
                         setzn(a);
                         takeint = (interrupt && !p.i);
@@ -1860,7 +1893,7 @@ void m6502_exec(void)
                         addr = readmem(pc);
                         pc++;
                         readmem((addr + x) & 0xFF);
-                        polltime(3);
+                        polltime(4);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -1869,7 +1902,7 @@ void m6502_exec(void)
                         pc++;
                         a &= readmem((addr + x) & 0xFF);
                         setzn(a);
-                        polltime(3);
+                        polltime(4);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -1886,7 +1919,7 @@ void m6502_exec(void)
                                 temp |= 1;
                         setzn(temp);
                         writemem(addr, temp);
-                        polltime(5);
+                        polltime(6);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -1902,7 +1935,7 @@ void m6502_exec(void)
                         writemem(addr, temp);
                         a &= temp;
                         setzn(a);
-                        polltime(5);
+                        polltime(6);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -2212,7 +2245,7 @@ void m6502_exec(void)
                         addr = readmem(pc);
                         pc++;
                         readmem((addr + x) & 0xFF);
-                        polltime(3);
+                        polltime(4);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -2221,7 +2254,7 @@ void m6502_exec(void)
                         pc++;
                         a ^= readmem((addr + x) & 0xFF);
                         setzn(a);
-                        polltime(3);
+                        polltime(4);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -2233,7 +2266,7 @@ void m6502_exec(void)
                         temp >>= 1;
                         setzn(temp);
                         writemem(addr, temp);
-                        polltime(5);
+                        polltime(6);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -2248,6 +2281,7 @@ void m6502_exec(void)
                         temp >>= 1;
                         polltime(1);
                         writemem(addr, temp);
+                        polltime(1);
                         a ^= temp;
                         setzn(a);
                         takeint = (interrupt && !p.i);
@@ -2373,9 +2407,11 @@ void m6502_exec(void)
                         temp = readmem(addr);
                         polltime(1);
                         writemem(addr, temp);
+                        tempi = temp & 1;
                         temp >>= 1;
                         if (p.c)
-                                temp |= 0x80;
+                            temp |= 0x80;
+                        p.c = tempi;
                         polltime(1);
                         writemem(addr, temp);
                         adc_nmos(temp);
@@ -2421,9 +2457,11 @@ void m6502_exec(void)
                         temp = readmem(addr);
                         polltime(1);
                         writemem(addr, temp);
+                        tempi = temp & 1;
                         temp >>= 1;
                         if (p.c)
-                                temp |= 0x80;
+                            temp |= 0x80;
+                        p.c = tempi;
                         polltime(1);
                         writemem(addr, temp);
                         adc_nmos(temp);
@@ -2457,33 +2495,8 @@ void m6502_exec(void)
                         break;
 
                 case 0x6B:      /*Undocumented - ARR */
-                        a &= readmem(pc);
-                        pc++;
-                        tempi = p.c;
-                        if (p.d) {      /*This instruction is just as broken on a real 6502 as it is here */
-                                p.v = ((a >> 6) ^ (a >> 7));    /*V set if bit 6 changes in ROR */
-                                a >>= 1;
-                                if (tempi)
-                                        a |= 0x80;
-                                setzn((uint8_t)tempi);
-                                p.c = 0;
-                                if ((a & 0xF) + (a & 1) > 5)
-                                        a = (a & 0xF0) + ((a & 0xF) + 6);       /*Do broken fixup */
-                                if ((a & 0xF0) + (a & 0x10) > 0x50) {
-                                        a += 0x60;
-                                        p.c = 1;
-                                }
-                        } else {        /*V & C flag behaviours in 64doc.txt are backwards */
-                                p.v = ((a >> 6) ^ (a >> 7));    /*V set if bit 6 changes in ROR */
-                                a >>= 1;
-                                if (tempi)
-                                        a |= 0x80;
-                                setzn(a);
-                                p.c = a & 0x40;
-                        }
-                        polltime(2);
-                        takeint = (interrupt && !p.i);
-                        break;
+                    nmos_arr();
+                    break;
 
                 case 0x6C:      /*JMP () */
                         addr = getw();
@@ -2531,9 +2544,11 @@ void m6502_exec(void)
                         temp = readmem(addr);
                         polltime(1);
                         writemem(addr, temp);
+                        tempi = temp & 1;
                         temp >>= 1;
                         if (p.c)
-                                temp |= 0x80;
+                            temp |= 0x80;
+                        p.c = tempi;
                         polltime(1);
                         writemem(addr, temp);
                         adc_nmos(temp);
@@ -2575,9 +2590,11 @@ void m6502_exec(void)
                         temp = readmem(addr);
                         polltime(1);
                         writemem(addr, temp);
+                        tempi = temp & 1;
                         temp >>= 1;
                         if (p.c)
-                                temp |= 0x80;
+                            temp |= 0x80;
+                        p.c = tempi;
                         polltime(1);
                         writemem(addr, temp);
                         adc_nmos(temp);
@@ -2614,7 +2631,7 @@ void m6502_exec(void)
                                 temp |= 0x80;
                         setzn(temp);
                         writemem(addr, temp);
-                        polltime(5);
+                        polltime(6);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -2625,11 +2642,14 @@ void m6502_exec(void)
                         temp = readmem(addr);
                         polltime(1);
                         writemem(addr, temp);
+                        tempi = temp & 1;
                         temp >>= 1;
                         if (p.c)
-                                temp |= 0x80;
+                            temp |= 0x80;
+                        p.c = tempi;
                         polltime(1);
                         writemem(addr, temp);
+                        polltime(1);
                         adc_nmos(temp);
                         takeint = (interrupt && !p.i);
                         break;
@@ -2663,9 +2683,11 @@ void m6502_exec(void)
                         temp = readmem(addr + y);
                         polltime(1);
                         writemem(addr + y, temp);
+                        tempi = temp & 1;
                         temp >>= 1;
                         if (p.c)
-                                temp |= 0x80;
+                            temp |= 0x80;
+                        p.c = tempi;
                         polltime(1);
                         writemem(addr + y, temp);
                         adc_nmos(temp);
@@ -2717,9 +2739,11 @@ void m6502_exec(void)
                         temp = readmem(addr + x);
                         polltime(1);
                         writemem(addr + x, temp);
+                        tempi = temp & 1;
                         temp >>= 1;
                         if (p.c)
-                                temp |= 0x80;
+                            temp |= 0x80;
+                        p.c = tempi;
                         polltime(1);
                         writemem(addr + x, temp);
                         adc_nmos(temp);
@@ -3155,7 +3179,7 @@ void m6502_exec(void)
                         pc++;
                         y = readmem((addr + x) & 0xFF);
                         setzn(y);
-                        polltime(3);
+                        polltime(4);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -3164,7 +3188,7 @@ void m6502_exec(void)
                         pc++;
                         a = readmem((addr + x) & 0xFF);
                         setzn(a);
-                        polltime(3);
+                        polltime(4);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -3173,7 +3197,7 @@ void m6502_exec(void)
                         pc++;
                         x = readmem((addr + y) & 0xFF);
                         setzn(x);
-                        polltime(3);
+                        polltime(4);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -3454,6 +3478,7 @@ void m6502_exec(void)
                         if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
                                 polltime(1);
                         polltime(5);
+                        addr += y;
                         temp = readmem(addr) - 1;
                         polltime(1);
                         writemem(addr, temp + 1);
@@ -3468,7 +3493,7 @@ void m6502_exec(void)
                         addr = readmem(pc);
                         pc++;
                         readmem((addr + x) & 0xFF);
-                        polltime(3);
+                        polltime(4);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -3478,7 +3503,7 @@ void m6502_exec(void)
                         temp = readmem((addr + x) & 0xFF);
                         setzn(a - temp);
                         p.c = (a >= temp);
-                        polltime(3);
+                        polltime(4);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -3488,7 +3513,7 @@ void m6502_exec(void)
                         temp = readmem((addr + x) & 0xFF) - 1;
                         setzn(temp);
                         writemem((addr + x) & 0xFF, temp);
-                        polltime(5);
+                        polltime(6);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -3499,7 +3524,7 @@ void m6502_exec(void)
                         writemem(addr, temp);
                         setzn(a - temp);
                         p.c = (a >= temp);
-                        polltime(5);
+                        polltime(6);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -3799,7 +3824,7 @@ void m6502_exec(void)
                         pc++;
                         temp = readmem((addr + x) & 0xFF);
                         sbc_nmos(temp);
-                        polltime(3);
+                        polltime(4);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -3809,7 +3834,7 @@ void m6502_exec(void)
                         temp = readmem((addr + x) & 0xFF) + 1;
                         writemem((addr + x) & 0xFF, temp);
                         setzn(temp);
-                        polltime(5);
+                        polltime(6);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -3823,6 +3848,7 @@ void m6502_exec(void)
                         temp++;
                         polltime(1);
                         writemem(addr, temp);
+                        polltime(1);
                         sbc_nmos(temp);
                         takeint = (interrupt && !p.i);
                         break;
