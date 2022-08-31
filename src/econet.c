@@ -704,7 +704,6 @@ void econet_reset(void)
         // Station number not specified, find first one not already in use.
         char localhost[256];
         struct hostent *hent;
-        struct in_addr localaddr;
 
         // Get localhost IP address
         if (gethostname(localhost, 256) != SOCKET_ERROR && (hent = gethostbyname(localhost)) != NULL) {
@@ -729,10 +728,11 @@ void econet_reset(void)
                 // still can't find one ... strict mode?
                 if (confSTRICT && confAUNmode) {
                     log_debug("Econet: No free hosts in table; trying automatic mode..");
-                    in_addr_t local = htonl(ntohl(local_ipaddr(localaddr)) & 0xffffff00);
                     for (struct AUNTAB *entry = aunnet; entry && EconetStationNumber == 0; entry = entry->next) {
                         for (int a = 0; hent->h_addr_list[a] != NULL && EconetStationNumber == 0; ++a) {
+                            struct in_addr localaddr;
                             memcpy(&localaddr, hent->h_addr_list[a], sizeof(struct in_addr));
+                            in_addr_t local = htonl(ntohl(local_ipaddr(localaddr)) & 0xffffff00);
                             if (entry->inet_addr.s_addr == local) {
                                 service.sin_port = htons(32768);
                                 service.sin_addr.s_addr = local_ipaddr(localaddr);
