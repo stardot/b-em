@@ -489,10 +489,10 @@ static void econet_read_netfile(void)
                     while (ch && !isspace(ch))
                         ch = *++EcoSep;
                     if (ch) {
-                        *EcoSep++ = 0;
+                        *EcoSep = 0;
                         if (!strcasecmp(EcoName, "AddMap")) {
                             while (ch && isspace(ch))
-                                ch = *EcoSep++;
+                                ch = *++EcoSep;
                             if (ch) {
                                 EcoName = EcoSep;
                                 while (ch && (isdigit(ch) || ch == '.'))
