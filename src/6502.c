@@ -41,6 +41,7 @@ static int dbg_debug_enable(int newvalue) {
 uint8_t a, x, y, s;
 uint16_t pc;
 PREG p;
+uint_least32_t cycles_6502 = 0;
 
 static inline uint8_t pack_flags(uint8_t flags) {
     if (p.c)
@@ -231,6 +232,7 @@ int romsel;
 
 static inline void polltime(int c)
 {
+    cycles_6502 += c;
     cycles -= c;
     via_poll(&sysvia, c);
     via_poll(&uservia, c);

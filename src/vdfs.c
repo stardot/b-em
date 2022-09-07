@@ -4913,15 +4913,20 @@ static void startup(void)
 }
 
 static double last_time = 0.0;
+static uint_least32_t last_cycles = 0;
 
 static void log_time(void)
 {
     double this_time = al_get_time();
-    if (last_time > 0)
-        log_info("timestamp, %g seconds since last timestamp", this_time - last_time);
+    if (last_time > 0) {
+        uint_least32_t delta_cycles = cycles_6502 - last_cycles;
+        writemem32(0x80, delta_cycles);
+        log_info("timestamp, %g seconds, %u 6502 cycles since last timestamp", this_time - last_time, delta_cycles);
+    }
     else
-        log_info("timestamp, %g seconds since start", this_time);
+        log_info("timestamp, %g seconds, %u 6502 cycles since start", this_time, cycles_6502);
     last_time = this_time;
+    last_cycles = cycles_6502;
 }
 
 static inline void dispatch(uint8_t value)
