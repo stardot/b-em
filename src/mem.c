@@ -353,3 +353,71 @@ void mem_save_romcfg(const char *sect) {
         }
     }
 }
+
+enum mem_jim_sz mem_jim_size = FRED_NONE;
+static uint32_t mem_jim_max = 0;
+static uint8_t *mem_jim_data = NULL;
+static uint32_t mem_jim_page;
+
+static const uint32_t mem_jim_sizes[6] = {
+    0,
+    0x1000000,
+    0x4000000,
+    0x10000000,
+    0x1e000000,
+    0x3e000000
+};
+
+void mem_jim_setsize(enum mem_jim_sz size)
+{
+    if (size != mem_jim_size) {
+        uint32_t nmax = mem_jim_sizes[size];
+        log_debug("mem: new fred size %d=%d bytes", size, nmax);
+        if (nmax == 0) {
+            free(mem_jim_data);
+            mem_jim_size = size;
+            mem_jim_max = nmax;
+            mem_jim_data = NULL;
+        }
+        else {
+            uint8_t *nfred = realloc(mem_jim_data, nmax);
+            if (nfred) {
+                mem_jim_size = size;
+                mem_jim_max = nmax;
+                mem_jim_data = nfred;
+            }
+            else
+                log_error("mem: out of memory allocating FRED expansion RAM");
+        }
+    }
+}
+
+uint8_t mem_jim_getsize(void)
+{
+    uint8_t m16 = mem_jim_max >> 24;
+    log_debug("mem: get fred size, max=%08X, returns %d", mem_jim_max, m16);
+    return m16;
+}
+
+uint8_t mem_jim_read(uint16_t addr)
+{
+    uint32_t full_addr = mem_jim_page | (addr & 0xff);
+    if (full_addr < mem_jim_max)
+        return mem_jim_data[full_addr];
+    return addr >> 8;
+}
+
+void mem_jim_write(uint16_t addr, uint8_t value)
+{
+    if (addr >= 0xfd00) {
+        uint32_t full_addr = mem_jim_page | (addr & 0xff);
+        if (full_addr < mem_jim_max)
+            mem_jim_data[full_addr] = value;
+    }
+    else if (addr == 0xfcff)
+        mem_jim_page = (mem_jim_page & 0xffff0000) | (value << 8);
+    else if (addr == 0xfcfe)
+        mem_jim_page = (mem_jim_page & 0xff00ff00) | (value << 16);
+    else if (addr == 0xfcfd)
+        mem_jim_page = (mem_jim_page & 0x00ffff00) | (value << 24);
+}

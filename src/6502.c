@@ -381,14 +381,16 @@ static uint32_t do_readmem(uint32_t addr)
                 }
         }
 
-        if (sound_paula) {
-            if (addr >= 0xFCFD && addr <= 0xFDFF) {
+        if (addr >= 0xFCFD && addr <= 0xFDFF) {
+            // JIM, including paging registers in FRED.
+            if (sound_paula) {
                 uint8_t r;
                 if (paula_read(addr, &r))
                     return r;
             }
+            if (mem_jim_size)
+                return mem_jim_read(addr);
         }
-
 
         switch (addr & ~3) {
             case 0xFC08:
@@ -424,6 +426,11 @@ static uint32_t do_readmem(uint32_t addr)
         case 0xFC5C:
                 return vdfs_read((uint16_t)addr);
                 break;
+
+        case 0xfcc8:
+            if (addr == 0xfccb)
+                return mem_jim_getsize();
+            break;
 
         case 0xFE00:
         case 0xFE04:
@@ -776,17 +783,14 @@ static void do_writemem(uint32_t addr, uint32_t val)
                 }
         }
 
-        if (sound_music5000) {
-           if (addr >= 0xFCFF && addr <= 0xFDFF) {
-              music5000_write((uint16_t)addr, (uint8_t)val);
-              //return -- removed DB need to write to all users of paging register
-           }
-        }
-        if (sound_paula)
-        {
-            if (addr >= 0xFCFD && addr <= 0xFDFF) {
+        if (addr >= 0xFCFD && addr <= 0xFDFF) {
+            // JIM, including paging registers in FRED.
+            if (addr >= 0xFCFF && sound_music5000)
+                music5000_write((uint16_t)addr, (uint8_t)val);
+            if (sound_paula)
                 paula_write(addr, val);
-           }
+            if (mem_jim_size)
+                mem_jim_write(addr, val);
         }
 
         switch (addr & ~3) {

@@ -5,6 +5,7 @@
 
 extern uint8_t a,x,y,s;
 extern uint16_t pc;
+extern uint_least32_t cycles_6502;
 
 extern PREG p;
 
