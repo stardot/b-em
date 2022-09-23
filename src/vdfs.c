@@ -4605,9 +4605,23 @@ static void osfsc_opt(void)
     }
 }
 
+static void osfsc_eof(void)
+{
+    vdfs_open_file *cp = get_open_read(x);
+    if (cp) {
+        FILE *fp = cp->fp;
+        long ptr = ftell(fp);
+        fseek(fp, 0L, SEEK_END);
+        long ext = ftell(fp);
+        x = ptr >= ext ? 0xff : 0;
+        log_debug("vdfs: eof check, ptr=%08lX, ext=%08lX, x=%02X", ptr, ext, x);
+        if (ptr != ext)
+            fseek(fp, ptr, SEEK_SET);
+    }
+}
+
 static void osfsc(void)
 {
-    vdfs_open_file *cp;
     log_debug("vdfs: osfsc(A=%02X, X=%02X, Y=%02X)", a, x, y);
 
     p.c = 0;
@@ -4616,8 +4630,7 @@ static void osfsc(void)
             osfsc_opt();
             break;
         case 0x01: // check EOF
-            if ((cp = get_open_read(x)))
-                x = feof(cp->fp) ? 0xff : 0x00;
+            osfsc_eof();
             break;
         case 0x02: // */ command
         case 0x04: // *RUN command
