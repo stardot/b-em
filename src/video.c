@@ -59,7 +59,7 @@ static void crtc_setreg(int reg, uint8_t val)
 {
     val &= crtc_mask[reg];
     crtc[reg] = val;
-    if (crtc_i == 6 && vc == val)
+    if (reg == 6 && vc == val)
         vdispen = 0;
     else if (reg == 8)
         set_intern_dtype(vid_dtype_user);
@@ -1176,7 +1176,7 @@ void video_poll(int clocks, int timer_enable)
                 ma = maback;
                 vadj--;
                 if (!vadj) {
-                    vdispen = 1;
+                    vdispen = crtc[6];
                     ma = maback = (crtc[13] | (crtc[12] << 8)) & 0x3FFF;
                     sc = 0;
                 }
@@ -1200,7 +1200,7 @@ void video_poll(int clocks, int timer_enable)
                     vc = 0;
                     vadj = crtc[5];
                     if (!vadj) {
-                        vdispen = 1;
+                        vdispen = crtc[6];
                         ma = maback = (crtc[13] | (crtc[12] << 8)) & 0x3FFF;
                     }
                     frcount++;
