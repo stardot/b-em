@@ -592,19 +592,28 @@ static void set_point(cpu_debug_t *cpu, break_type type, char *arg, const char *
     if (end1 > arg) {
         const char *end2;
         uint32_t b = parse_address_or_symbol(cpu, ++end1, &end2);
-        char addrbuf[16 + SYM_MAX];
-        cpu->print_addr(cpu, a, addrbuf, sizeof(addrbuf), true);
+        if (end2 > end1) {
+            if (a > b) {
+                uint32_t t = a;
+                a = b;
+                b = t;
+            }
+        }
+        else
+            b = a;
         for (breakpoint *bp = cpu->breakpoints; bp; bp = bp->next) {
-            if (bp->start == a && bp->type == type) {
-                debug_outf("    %s %i already set to %s\n", desc, bp->num, addrbuf);
+            if (a >= bp->start && b <= bp->end && bp->type == type) {
+                debug_outf("    already covered by %s %i, not set\n", desc, bp->num);
                 return;
             }
+            else if ((a >= bp->start && a <= bp->end) || (b >= bp->start && b <= bp->end))
+                debug_outf("    note: overlaps %s %i\n", desc, bp->num);
         }
         breakpoint *bp = malloc(sizeof(breakpoint));
         if (bp) {
             bp->next = cpu->breakpoints;
             bp->start = a;
-            bp->end = end2 > end1 ? b : a;
+            bp->end = b;
             bp->type = type;
             bp->num = breakpseq++;
             cpu->breakpoints = bp;
