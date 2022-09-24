@@ -572,17 +572,16 @@ static void list_syms(cpu_debug_t *cpu, const char *arg) {
     symbol_list(cpu->symbols, cpu, &debug_outf);
 }
 
-static void print_point(cpu_debug_t *cpu, const breakpoint *bp, const char *tail)
+static void print_point(cpu_debug_t *cpu, const breakpoint *bp, const char *desc, const char *tail)
 {
-    const char *desc = break_names[bp->type];
     char start_buf[17 + SYM_MAX];
     cpu->print_addr(cpu, bp->start, start_buf, sizeof(start_buf), true);
     if (bp->start == bp->end)
-        debug_outf("    %s %i on %s: %s%s\n", desc, bp->num, cpu->cpu_name, start_buf, tail);
+        debug_outf("    %s %i at %s%s\n", desc, bp->num, start_buf, tail);
     else {
         char end_buf[17 + SYM_MAX];
         cpu->print_addr(cpu, bp->end, end_buf, sizeof(end_buf), true);
-        debug_outf("    %s %i on %s: %s to %s%s\n", desc, bp->num, cpu->cpu_name, start_buf, end_buf, tail);
+        debug_outf("    %s %i %s to %s%s\n", desc, bp->num, start_buf, end_buf, tail);
     }
 }
 
@@ -609,7 +608,7 @@ static void set_point(cpu_debug_t *cpu, break_type type, char *arg, const char *
             bp->type = type;
             bp->num = breakpseq++;
             cpu->breakpoints = bp;
-            print_point(cpu, bp, " set");
+            print_point(cpu, bp, desc, " set");
         }
         else
             debug_outf("    unable to set %s breakpoint, out of memory\n", desc);
@@ -651,7 +650,7 @@ static void clear_point(cpu_debug_t *cpu, break_type type, char *arg, const char
             prev->next = found->next;
         else
             cpu->breakpoints = found->next;
-        print_point(cpu, found, " cleared");
+        print_point(cpu, found, desc, " cleared");
         free(found);
     }
     else
@@ -662,7 +661,7 @@ static void list_points(cpu_debug_t *cpu, break_type type, const char *desc)
 {
     for (breakpoint *bp = cpu->breakpoints; bp; bp = bp->next)
         if (bp->type == type)
-            print_point(cpu, bp, "");
+            print_point(cpu, bp, desc, "");
 }
 
 static void debug_paste(const char *iptr)
