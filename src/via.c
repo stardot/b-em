@@ -203,7 +203,7 @@ void via_write(VIA *v, uint16_t addr, uint8_t val)
                 }
                 v->t2l &= 0x1FE;
                 v->t2l |= (val << 9);
-                v->t2c  = v->t2l + 1;
+                v->t2c = v->acr & 0x20 ? v->t2l : v->t2l + 1;
                 v->ifr &= ~INT_TIMER2;
                 via_updateIFR(v);
                 v->t2hit=0;

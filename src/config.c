@@ -8,6 +8,7 @@
 #include "disc.h"
 #include "keyboard.h"
 #include "main.h"
+#include "mem.h"
 #include "model.h"
 #include "mouse.h"
 #include "mmccard.h"
@@ -203,6 +204,9 @@ void config_load(void)
     keyas            = get_config_bool(NULL, "key_as",        0);
     keylogical       = get_config_bool(NULL, "key_logical",   0);
     keypad           = get_config_bool(NULL, "keypad", false);
+
+    mem_jim_setsize(get_config_int(NULL, "jim_mem_size", 0));
+
     mouse_amx        = get_config_bool(NULL, "mouse_amx",     0);
     kbdips           = get_config_int(NULL, "kbdips", 0);
 
@@ -344,6 +348,7 @@ void config_save(void)
         set_config_bool(NULL, "key_as", keyas);
         set_config_bool(NULL, "key_logical", keylogical);
         set_config_bool(NULL, "keypad", keypad);
+        set_config_int(NULL, "jim_mem_size", mem_jim_size);
 
         set_config_bool(NULL, "mouse_amx", mouse_amx);
 
