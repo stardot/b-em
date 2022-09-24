@@ -45,4 +45,19 @@ extern uint8_t ram_fe30, ram_fe34;
 extern uint8_t *ram, *rom, *os;
 extern rom_slot_t rom_slots[ROM_NSLOT];
 
+enum mem_jim_sz {
+    FRED_NONE,
+    FRED_16M,
+    FRED_64M,
+    FRED_256M,
+    FRED_480M,
+    FRED_996M
+};
+
+extern enum mem_jim_sz mem_jim_size;
+extern void mem_jim_setsize(enum mem_jim_sz size);
+extern uint8_t mem_jim_getsize(void);
+extern uint8_t mem_jim_read(uint16_t addr);
+extern void mem_jim_write(uint16_t addr, uint8_t value);
+
 #endif

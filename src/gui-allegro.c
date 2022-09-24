@@ -480,6 +480,24 @@ static ALLEGRO_MENU *create_keyboard_menu(void)
     return menu;
 }
 
+static const char *fred_sizes[] =
+{
+    "None (disabled)",
+    "16M",
+    "64M",
+    "256M",
+    "480M",
+    "996M",
+    NULL
+};
+
+static ALLEGRO_MENU *create_jim_menu(void)
+{
+    ALLEGRO_MENU *menu = al_create_menu();
+    add_radio_set(menu, fred_sizes, IDM_jim_SIZE, mem_jim_size);
+    return menu;
+}
+
 static ALLEGRO_MENU *create_joymap_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
@@ -499,6 +517,7 @@ static ALLEGRO_MENU *create_settings_menu(void)
     al_append_menu_item(menu, "MIDI", 0, 0, NULL, create_midi_menu());
 #endif
     al_append_menu_item(menu, "Keyboard", 0, 0, NULL, create_keyboard_menu());
+    al_append_menu_item(menu, "Jim Memory", 0, 0, NULL, create_jim_menu());
     add_checkbox_item(menu, "Auto-Pause", IDM_AUTO_PAUSE, autopause);
     add_checkbox_item(menu, "Mouse (AMX)", IDM_MOUSE_AMX, mouse_amx);
     if (joymap_count > 0)
@@ -1422,6 +1441,9 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             break;
         case IDM_KEY_PAD:
             keypad = !keypad;
+            break;
+        case IDM_jim_SIZE:
+            mem_jim_setsize(radio_event_simple(event, mem_jim_size));
             break;
         case IDM_AUTO_PAUSE:
             autopause = !autopause;
