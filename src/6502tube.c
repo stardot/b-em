@@ -213,6 +213,8 @@ static uint32_t dbg_get_instr_addr(void) {
     return oldtpc;
 }
 
+static const char *trap_names[] = { "BRK", "TRAP", NULL };
+
 cpu_debug_t tube6502_cpu_debug = {
     .cpu_name       = "tube6502",
     .debug_enable   = dbg_debug_enable,
@@ -225,6 +227,7 @@ cpu_debug_t tube6502_cpu_debug = {
     .reg_print      = dbg_reg_print,
     .reg_parse      = dbg_reg_parse,
     .get_instr_addr = dbg_get_instr_addr,
+    .trap_names     = trap_names,
     .print_addr     = debug_print_addr16,
     .parse_addr     = debug_parse_addr
 };
@@ -566,8 +569,9 @@ void tube_6502_exec()
                 switch (opcode) {
                 case 0x00:
                         /*BRK*/
-//                                log_debug("Tube BRK at %04X! %04X %04X\n",pc,oldtpc,oldtpc2);
-                            pc++;
+                        if (dbg_tube6502)
+                            debug_trap(&tube6502_cpu_debug, oldtpc, 0);
+                        pc++;
                         push(pc >> 8);
                         push(pc & 0xFF);
                         push(pack_flags(0x30));
@@ -586,7 +590,12 @@ void tube_6502_exec()
                         polltime(6);
                         break;
 
-                case 0x02:  /* NOP, 2 bytes, 2 cycles. */
+                case 0x02:
+                        if (dbg_tube6502) {
+                            debug_trap(&tube6502_cpu_debug, oldtpc, 1);
+                            break;
+                        }
+                        // FALL THROUGH
                 case 0x22:
                 case 0x42:
                 case 0x62:
