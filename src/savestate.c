@@ -111,32 +111,35 @@ static void sysacia_loadstate(FILE *f) {
     acia_loadstate(&sysacia, f);
 }
 
-static void save_tail(FILE *fp, long start, long end, long size)
+static void save_tail(FILE *fp, int key, long start, long end, long size)
 {
     fseek(fp, start, SEEK_SET);
-    putc(size & 0xff, fp);
-    putc((size >> 8) & 0xff, fp);
-    putc((size >> 16) & 0xff, fp);
-    fseek(fp, end, SEEK_SET);
+    if (size > 0) {
+        unsigned char hdr[4];
+        hdr[0] = key;
+        hdr[1] = size;
+        hdr[2] = size >> 8;
+        hdr[3] = size >> 16;
+        fwrite(hdr, sizeof(hdr), 1, fp);
+        fseek(fp, end, SEEK_SET);
+    }
 }
 
 static void save_sect(FILE *fp, int key, void (*save_func)(FILE *f))
 {
-    putc(key, fp);
     long start = ftell(fp);
-    fseek(fp, 3, SEEK_CUR);
+    fseek(fp, 4, SEEK_CUR);
     save_func(fp);
     long end = ftell(fp);
-    long size = end - start - 3;
+    long size = end - start - 4;
     log_debug("savestate: section %c saved, %ld bytes", key, size);
-    save_tail(fp, start, end, size);
+    save_tail(fp, key, start, end, size);
 }
 
 static void save_zlib(FILE *fp, int key, void (*save_func)(ZFILE *zpf))
 {
-    putc(key, fp);
     long start = ftell(fp);
-    fseek(fp, 3, SEEK_CUR);
+    fseek(fp, 4, SEEK_CUR);
 
     ZFILE zfile;
     zfile.zs.zalloc = Z_NULL;
@@ -156,12 +159,12 @@ static void save_zlib(FILE *fp, int key, void (*save_func)(ZFILE *zpf))
         if (zfile.zs.avail_out < BUFSIZ)
             fwrite(zfile.buf, BUFSIZ - zfile.zs.avail_out, 1, fp);
         log_debug("savestate: section %c saved deflated, %ld bytes into %ld", key, zfile.zs.total_in, zfile.zs.total_out);
-        save_tail(fp, start, start + zfile.zs.total_out + 3, zfile.zs.total_out);
+        save_tail(fp, key, start, start + zfile.zs.total_out + 4, zfile.zs.total_out);
     }
     else {
         log_error("savestate: compression error in section %c: %d(%s)", key, res, zfile.zs.msg);
         long end = ftell(fp);
-        save_tail(fp, start, end, end - start - 3);
+        save_tail(fp, key, start, end, end - start - 4);
     }
     deflateEnd(&zfile.zs);
 }
