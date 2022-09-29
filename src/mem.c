@@ -354,7 +354,7 @@ void mem_save_romcfg(const char *sect) {
     }
 }
 
-enum mem_jim_sz mem_jim_size = FRED_NONE;
+enum mem_jim_sz mem_jim_size = JIM_NONE;
 static uint32_t mem_jim_max = 0;
 static uint8_t *mem_jim_data = NULL;
 static uint32_t mem_jim_page;
@@ -372,7 +372,7 @@ void mem_jim_setsize(enum mem_jim_sz size)
 {
     if (size != mem_jim_size) {
         uint32_t nmax = mem_jim_sizes[size];
-        log_debug("mem: new fred size %d=%d bytes", size, nmax);
+        log_debug("mem: new jim size %d=%d bytes", size, nmax);
         if (nmax == 0) {
             free(mem_jim_data);
             mem_jim_size = size;
@@ -380,14 +380,14 @@ void mem_jim_setsize(enum mem_jim_sz size)
             mem_jim_data = NULL;
         }
         else {
-            uint8_t *nfred = realloc(mem_jim_data, nmax);
-            if (nfred) {
+            uint8_t *njim = realloc(mem_jim_data, nmax);
+            if (njim) {
                 mem_jim_size = size;
                 mem_jim_max = nmax;
-                mem_jim_data = nfred;
+                mem_jim_data = njim;
             }
             else
-                log_error("mem: out of memory allocating FRED expansion RAM");
+                log_error("mem: out of memory allocating JIM expansion RAM");
         }
     }
 }
@@ -395,7 +395,7 @@ void mem_jim_setsize(enum mem_jim_sz size)
 uint8_t mem_jim_getsize(void)
 {
     uint8_t m16 = mem_jim_max >> 24;
-    log_debug("mem: get fred size, max=%08X, returns %d", mem_jim_max, m16);
+    log_debug("mem: get jim size, max=%08X, returns %d", mem_jim_max, m16);
     return m16;
 }
 
