@@ -1,3 +1,4 @@
+#define _DEBUG
 /*B-em v2.2 by Tom Walker
   Savestate handling*/
 #include "b-em.h"
@@ -73,27 +74,23 @@ void savestate_load(const char *name)
     else {
         FILE *fp = fopen(name, "rb");
         if (fp) {
-            char magic[8];
+            unsigned char magic[8];
             if (fread(magic, 8, 1, fp) == 1 && memcmp(magic, "BEMSNAP", 7) == 0) {
-                char *name_copy = strdup(name);
-                if (name_copy) {
-                    if (savestate_name)
-                        free(savestate_name);
-                    savestate_name = name_copy;
-                    savestate_fp = fp;
-                    switch(magic[7]) {
-                        case '1':
-                            savestate_wantload = 1;
-                            return;
-                        case '2':
-                            savestate_wantload = 2;
-                            return;
-                        default:
-                            log_error("savestate: unable to load snapshot file version %c", magic[7]);
+                int vers = magic[7];
+                if (vers >= '1' && vers <= '3') {
+                    char *name_copy = strdup(name);
+                    if (name_copy) {
+                        if (savestate_name)
+                            free(savestate_name);
+                        savestate_name = name_copy;
+                        savestate_fp = fp;
+                        savestate_wantload = vers;
                     }
+                    else
+                        log_error("savestate: out of memory copying filename");
                 }
                 else
-                    log_error("savestate: out of memory copying filename");
+                    log_error("savestate: unable to load snapshot file version %c", magic[7]);
             }
             else
                 log_error("savestate: file %s is not a B-Em snapshot file", name);
@@ -115,31 +112,40 @@ static void save_tail(FILE *fp, int key, long start, long end, long size)
 {
     fseek(fp, start, SEEK_SET);
     if (size > 0) {
-        unsigned char hdr[4];
+        unsigned char hdr[5];
         hdr[0] = key;
         hdr[1] = size;
         hdr[2] = size >> 8;
-        hdr[3] = size >> 16;
-        fwrite(hdr, sizeof(hdr), 1, fp);
+        long hsize = 3;
+        if (key & 0x80) {
+            key &= 0x7f;
+            hsize = 5;
+            hdr[3] = size >> 16;
+            hdr[4] = size >> 24;
+        }
+        fwrite(hdr, hsize, 1, fp);
         fseek(fp, end, SEEK_SET);
+        log_debug("savestate: section %c from %08lX to %08lX, size %lu", key, start, end, size);
     }
 }
 
 static void save_sect(FILE *fp, int key, void (*save_func)(FILE *f))
 {
+    const unsigned hsize = 3;
     long start = ftell(fp);
-    fseek(fp, 4, SEEK_CUR);
+    fseek(fp, hsize, SEEK_CUR);
     save_func(fp);
     long end = ftell(fp);
-    long size = end - start - 4;
+    long size = end - start - hsize;
     log_debug("savestate: section %c saved, %ld bytes", key, size);
     save_tail(fp, key, start, end, size);
 }
 
 static void save_zlib(FILE *fp, int key, void (*save_func)(ZFILE *zpf))
 {
+    const unsigned hsize = 5;
     long start = ftell(fp);
-    fseek(fp, 4, SEEK_CUR);
+    fseek(fp, hsize, SEEK_CUR);
 
     ZFILE zfile;
     zfile.zs.zalloc = Z_NULL;
@@ -159,12 +165,12 @@ static void save_zlib(FILE *fp, int key, void (*save_func)(ZFILE *zpf))
         if (zfile.zs.avail_out < BUFSIZ)
             fwrite(zfile.buf, BUFSIZ - zfile.zs.avail_out, 1, fp);
         log_debug("savestate: section %c saved deflated, %ld bytes into %ld", key, zfile.zs.total_in, zfile.zs.total_out);
-        save_tail(fp, key, start, start + zfile.zs.total_out + 4, zfile.zs.total_out);
+        save_tail(fp, key|0x80, start, start + zfile.zs.total_out + hsize, zfile.zs.total_out);
     }
     else {
         log_error("savestate: compression error in section %c: %d(%s)", key, res, zfile.zs.msg);
         long end = ftell(fp);
-        save_tail(fp, key, start, end, end - start - 4);
+        save_tail(fp, key|0x80, start, end, end - start - hsize);
     }
     deflateEnd(&zfile.zs);
 }
@@ -190,7 +196,7 @@ void savestate_zwrite(ZFILE *zfp, void *src, size_t size)
 void savestate_dosave(void)
 {
     FILE *fp = savestate_fp;
-    fwrite("BEMSNAP2", 8, 1, fp);
+    fwrite("BEMSNAP3", 8,1, fp);
     save_sect(fp, 'm', model_savestate);
     save_sect(fp, '6', m6502_savestate);
     save_zlib(fp, 'M', mem_savezlib);
@@ -234,8 +240,6 @@ static void load_state_one(FILE *fp)
     serial_loadstate(fp);
     vdfs_loadstate(fp);
     music5000_loadstate(fp);
-
-    log_debug("savestate: loaded V1 snapshot file");
 }
 
 static void load_zlib(long size, void (*load_func)(ZFILE *zpf))
@@ -281,95 +285,122 @@ void savestate_zread(ZFILE *zfp, void *dest, size_t size)
     } while (res == Z_OK && zfp->zs.avail_out > 0);
 }
 
+static void load_section(FILE *fp, int key, long size)
+{
+    log_debug("savestate: found section %c of %ld bytes", key, size);
+    long start = ftell(fp);
+    switch(key) {
+        case 'm':
+            model_loadstate(fp);
+            break;
+        case '6':
+            m6502_loadstate(fp);
+            break;
+        case 'M':
+            load_zlib(size, mem_loadzlib);
+            break;
+        case 'S':
+            sysvia_loadstate(fp);
+            break;
+        case 'U':
+            uservia_loadstate(fp);
+            break;
+        case 'V':
+            videoula_loadstate(fp);
+            break;
+        case 'C':
+            crtc_loadstate(fp);
+            break;
+        case 'v':
+            video_loadstate(fp);
+            break;
+        case 's':
+            sn_loadstate(fp);
+            break;
+        case 'A':
+            adc_loadstate(fp);
+            break;
+        case 'a':
+            sysacia_loadstate(fp);
+            break;
+        case 'r':
+            serial_loadstate(fp);
+            break;
+        case 'F':
+            vdfs_loadstate(fp);
+            break;
+        case '5':
+            music5000_loadstate(fp);
+            break;
+        case 'T':
+            if (curtube != -1)
+                tube_ula_loadstate(fp);
+            break;
+        case 'P':
+            if (tube_proc_loadstate)
+                load_zlib(size, tube_proc_loadstate);
+            break;
+        case 'p':
+            paula_loadstate(fp);
+    }
+    long end = ftell(fp);
+    if (end == start) {
+        log_warn("savestate: section %c skipped", key);
+        fseek(fp, size, SEEK_CUR);
+    }
+    else if (size != (end - start)) {
+        log_warn("savestate: section %c, size mismatch, file=%ld, read=%ld", key, size, end - start);
+        fseek(fp, start + size, SEEK_SET);
+    }
+}
+
 static void load_state_two(FILE *fp)
 {
     unsigned char hdr[4];
 
     while (fread(hdr, sizeof hdr, 1, fp) == 1) {
         long size = hdr[1] | (hdr[2] << 8) | (hdr[3] << 16);
-        long start = ftell(fp);
-        log_debug("savestate: found section %c of %ld bytes", hdr[0], size);
-
-        switch(hdr[0]) {
-            case 'm':
-                model_loadstate(fp);
-                break;
-            case '6':
-                m6502_loadstate(fp);
-                break;
-            case 'M':
-                load_zlib(size, mem_loadzlib);
-                break;
-            case 'S':
-                sysvia_loadstate(fp);
-                break;
-            case 'U':
-                uservia_loadstate(fp);
-                break;
-            case 'V':
-                videoula_loadstate(fp);
-                break;
-            case 'C':
-                crtc_loadstate(fp);
-                break;
-            case 'v':
-                video_loadstate(fp);
-                break;
-            case 's':
-                sn_loadstate(fp);
-                break;
-            case 'A':
-                adc_loadstate(fp);
-                break;
-            case 'a':
-                sysacia_loadstate(fp);
-                break;
-            case 'r':
-                serial_loadstate(fp);
-                break;
-            case 'F':
-                vdfs_loadstate(fp);
-                break;
-            case '5':
-                music5000_loadstate(fp);
-                break;
-            case 'T':
-                if (curtube != -1)
-                    tube_ula_loadstate(fp);
-                break;
-            case 'P':
-                if (tube_proc_loadstate)
-                    load_zlib(size, tube_proc_loadstate);
-                break;
-            case 'p':
-                paula_loadstate(fp);
-        }
-        long end = ftell(fp);
-        if (end == start) {
-            log_warn("savestate: section %c skipped", hdr[0]);
-            fseek(fp, size, SEEK_CUR);
-        }
-        else if (size != (end - start)) {
-            log_warn("savestate: section %c, size mismatch, file=%ld, read=%ld", hdr[0], size, end - start);
-            fseek(fp, start + size, SEEK_SET);
-        }
+        load_section(fp, hdr[0], size);
     }
-    log_debug("savestate: loaded V2 snapshot file");
+}
+
+static void load_state_three(FILE *fp)
+{
+    unsigned char hdr[3];
+
+    while (fread(hdr, sizeof hdr, 1, fp) == 1) {
+        int key = hdr[0];
+        long size = hdr[1] | (hdr[2] << 8);
+        if (key & 0x80) {
+            if (fread(hdr, 2, 1, fp) != 1) {
+                log_error("savestate: unexpected EOF on file %s", savestate_name);
+                return;
+            }
+            size |= (hdr[0] << 16) | (hdr[1] << 24);
+            key &= 0x7f;
+        }
+        load_section(fp, key, size);
+    }
 }
 
 void savestate_doload(void)
 {
     FILE *fp = savestate_fp;
     switch(savestate_wantload) {
-        case 1:
+        case '1':
             load_state_one(fp);
             break;
-        case 2:
+        case '2':
             load_state_two(fp);
+            break;
+        case '3':
+            load_state_three(fp);
             break;
     }
     if (ferror(fp))
-        log_error("savestate: state not fully restored from '%s': %s", savestate_name, strerror(errno));
+        log_error("savestate: state not fully restored from V%c file '%s': %s", savestate_wantload, savestate_name, strerror(errno));
+    else
+        log_debug("savestate: loaded V%c snapshot file", savestate_wantload);
     fclose(fp);
     savestate_wantload = 0;
     savestate_fp = NULL;
