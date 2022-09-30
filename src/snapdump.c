@@ -358,6 +358,16 @@ static void dump_crtc(const unsigned char *data)
 
 }
 
+static void dump_video(const unsigned char *data)
+{
+    uint_least16_t scrx = data[0] | (data[1] << 8);
+    uint_least16_t scry = data[2] | (data[3] << 8);
+    uint_least32_t vidclk = data[5] | (data[6] << 8) | (data[7] << 16) | (data[8] << 24);
+    printf("Other video state:\n"
+           "  scrx=%04X (%d), scry=%04X (%d), oddclock=%d, vidclocks=%d\n",
+           scrx, scrx, scry, scry, data[4], vidclk);
+}
+
 static void small_section(const char *fn, FILE *fp, size_t size, void (*func)(const unsigned char *data))
 {
     unsigned char data[256];
@@ -379,8 +389,7 @@ static void dump_one(char *hexout, const char *fn, FILE *fp)
     small_section(fn, fp, 33, dump_uservia);
     small_section(fn, fp, 97, dump_vula);
     small_section(fn, fp, 25, dump_crtc);
-    puts("Other video state");
-    dump_hex(hexout, fn, fp, 9);
+    small_section(fn, fp, 9, dump_video);
     puts("Sound ship state");
     dump_hex(hexout, fn, fp, 55);
     puts("ADC state");
@@ -429,7 +438,8 @@ static void dump_section(char *hexout, const char *fn, FILE *fp, int key, long s
             done = true;
             break;
         case 'v':
-            desc = "Other video state";
+            small_section(fn, fp, size, dump_video);
+            done = true;
             break;
         case 's':
             desc = "Sound ship state";
