@@ -178,6 +178,74 @@ static void dump_compressed(char *hexout, const char *fn, FILE *fp, long size)
     }
 }
 
+unsigned load_var(FILE *fp)
+{
+    unsigned var, lshift;
+    int      ch;
+
+    var = lshift = 0;
+    while ((ch = getc(fp)) != EOF) {
+        if (ch & 0x80) {
+            var |= ((ch & 0x7f) << lshift);
+            break;
+        }
+        var |= ch << lshift;
+        lshift += 7;
+    }
+    return var;
+}
+
+void print_vstr(const char *fn, FILE *fp, const char *prompt)
+{
+    size_t len = load_var(fp);
+    if (len) {
+        printf("  %-11s ", prompt);
+        char buf[256];
+        while (len > sizeof(buf)) {
+            if (fread(buf, sizeof(buf), 1, fp) != 1) {
+                fprintf(stderr, "snapdump: unexpected EOF on %s\n", fn);
+                return;
+            }
+            fwrite(buf, sizeof(buf), 1, stdout);
+            len -= sizeof(buf);
+        }
+        if (fread(buf, len, 1, fp) != 1) {
+            fprintf(stderr, "snapdump: unexpected EOF on %s\n", fn);
+            return;
+        }
+        buf[len++] = '\n';
+        fwrite(buf, len, 1, stdout);
+    }
+    else
+        printf("  %-11s <null>\n", prompt);
+}
+
+static void print_bool(int value, const char *label)
+{
+    printf("  %-11s %s\n", label, value ? "Yes" : "No");
+}
+
+static void dump_model(const char *fn, FILE *fp)
+{
+    printf("Model information\n  Model num:  %d\n", load_var(fp));
+    print_vstr(fn, fp, "Model name:");
+    print_vstr(fn, fp, "OS");
+    print_vstr(fn, fp, "CMOS");
+    print_vstr(fn, fp, "ROM setup");
+    print_vstr(fn, fp, "FDC type");
+    unsigned char bytes[7];
+    fread(bytes, sizeof(bytes), 1, fp);
+    print_bool(bytes[0] & 0x01, "65C02:");
+    print_bool(bytes[0] & 0x80, "Integra:");
+    print_bool(bytes[1], "B+:");
+    print_bool(bytes[2], "Master:");
+    print_bool(bytes[3], "Model A:");
+    print_bool(bytes[4], "OS 0.1:");
+    print_bool(bytes[5], "Compact:");
+    if (bytes[6] == 1 || bytes[6] == 2)
+        print_vstr(fn, fp, "Tube:");
+}
+
 static void dump_one(char *hexout, const char *fn, FILE *fp)
 {
     printf("Version 1 dump, model = %d\n", getc(fp));
@@ -215,8 +283,8 @@ static void dump_section(char *hexout, const char *fn, FILE *fp, int key, long s
     bool compressed = false;
     switch(key) {
         case 'm':
-            desc = "Model information";
-            break;
+            dump_model(fn, fp);
+            return;
         case '6':
             desc = "6502 state";
             break;
