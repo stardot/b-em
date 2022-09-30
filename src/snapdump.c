@@ -260,6 +260,37 @@ static void dump_6502(const unsigned char *data)
            data[7], data[8], cycles);
 }
 
+static void dump_via(const unsigned char *data)
+{
+    uint_least32_t t1l = data[13] | (data[14] << 8) | (data[15] << 15) | (data[16] << 24);
+    uint_least32_t t2l = data[17] | (data[18] << 8) | (data[19] << 15) | (data[20] << 24);
+    uint_least32_t t1c = data[21] | (data[22] << 8) | (data[23] << 15) | (data[24] << 24);
+    uint_least32_t t2c = data[25] | (data[26] << 8) | (data[27] << 15) | (data[28] << 24);
+    printf("  ORA=%02X IRA=%02X INA=%02X DDRA=%02X\n"
+           "  ORB=%02X IRB=%02X INB=%02X DDRB=%02X\n"
+           "  SR=%02X ACR=%02X PCR=%02X IFR=%02X IER=%02X\n"
+           "  T1L=%04X (%d) T1C=%04X (%d)\n"
+           "  T2L=%04X (%d) T2C=%04X (%d)\n"
+           "  t1hit=%d t2hit=%d ca1=%d ca2=%d\n",
+           data[0], data[2], data[4], data[6], data[1], data[3], data[5],
+           data[7], data[8], data[9], data[10], data[11], data[12],
+           t1l, t1l, t1c, t1c, t2l, t2l, t2c, t2c,
+           data[29], data[30], data[31], data[32]);
+}
+
+static void dump_sysvia(const unsigned char *data)
+{
+    fputs("System VIA state:\n", stdout);
+    dump_via(data);
+    printf("  IC32=%02X\n", data[33]);
+}
+
+static void dump_uservia(const unsigned char *data)
+{
+    fputs("User VIA state:\n", stdout);
+    dump_via(data);
+}
+
 static void small_section(const char *fn, FILE *fp, size_t size, void (*func)(const unsigned char *data))
 {
     unsigned char data[256];
@@ -277,10 +308,8 @@ static void dump_one(char *hexout, const char *fn, FILE *fp)
     small_section(fn, fp, 13, dump_6502);
     puts("I/O processor memory");
     dump_hex(hexout, fn, fp, 327682);
-    puts("System VIA state");
-    dump_hex(hexout, fn, fp, 34);
-    puts("User VIA state");
-    dump_hex(hexout, fn, fp, 33);
+    small_section(fn, fp, 34, dump_sysvia);
+    small_section(fn, fp, 33, dump_uservia);
     puts("Video ULA state");
     dump_hex(hexout, fn, fp, 97);
     puts("CRTC state");
@@ -319,10 +348,12 @@ static void dump_section(char *hexout, const char *fn, FILE *fp, int key, long s
             compressed = true;
             break;
         case 'S':
-            desc = "System VIA state";
+            small_section(fn, fp, size, dump_sysvia);
+            done = true;
             break;
         case 'U':
-            desc = "User VIA state";
+            small_section(fn, fp, size, dump_uservia);
+            done = true;
             break;
         case 'V':
             desc = "Video ULA state";
