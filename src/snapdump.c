@@ -368,6 +368,26 @@ static void dump_video(const unsigned char *data)
            scrx, scrx, scry, scry, data[4], vidclk);
 }
 
+static void dump_sn76489(const unsigned char *data)
+{
+    fputs("Sound chip state:\n  Melodic channels:\n", stdout);
+    uint32_t *latch = (uint32_t *)data;
+    uint32_t *count = (uint32_t *)(data + 16);
+    uint32_t *cstat = (uint32_t *)(data + 32);
+    const unsigned char *vptr = data + 48;
+    for (int c = 0; c < 4; ++c) {
+        uint32_t lv = latch[c];
+        uint32_t cv = count[c];
+        uint32_t sv = cstat[c];
+        uint_least8_t vol = vptr[c];
+        printf("    Ch %d: latch %04X (%5d) count %04X (%5d) stat %04X (%5d) vol %02X (%3d)\n", c, lv, lv, cv, cv, sv, sv, vol, vol);
+    }
+    vptr += 4;
+    uint_least8_t noise = vptr[0];
+    uint_least16_t nshift = vptr[1] | (vptr[2] << 8);
+    printf("  Noise channel:\n    Noise %02X (%3d)  shift %04X (%5d)\n", noise, noise, nshift, nshift);
+}
+
 static void small_section(const char *fn, FILE *fp, size_t size, void (*func)(const unsigned char *data))
 {
     unsigned char data[256];
@@ -390,8 +410,7 @@ static void dump_one(char *hexout, const char *fn, FILE *fp)
     small_section(fn, fp, 97, dump_vula);
     small_section(fn, fp, 25, dump_crtc);
     small_section(fn, fp, 9, dump_video);
-    puts("Sound ship state");
-    dump_hex(hexout, fn, fp, 55);
+    small_section(fn, fp, 55, dump_sn76489);
     puts("ADC state");
     dump_hex(hexout, fn, fp, 5);
     puts("ACIA state");
@@ -442,7 +461,8 @@ static void dump_section(char *hexout, const char *fn, FILE *fp, int key, long s
             done = true;
             break;
         case 's':
-            desc = "Sound ship state";
+            small_section(fn, fp, 55, dump_sn76489);
+            done = true;
             break;
         case 'A':
             desc = "ADC state";
