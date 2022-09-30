@@ -291,6 +291,43 @@ static void dump_uservia(const unsigned char *data)
     dump_via(data);
 }
 
+static const char *nula_names[] = {
+    "palette mode",
+    "horizontal offset",
+    "left blank",
+    "disable",
+    "attribute mode",
+    "attribute text"
+};
+
+static void dump_vula(const unsigned char *data)
+{
+    printf("Video ULA state:\n  ULA CTRL=%02X\n  Original Palette:\n", data[0]);
+    for (int c = 0; c < 4; ++c) {
+        unsigned v1 = data[c+1];
+        unsigned v2 = data[c+5];
+        unsigned v3 = data[c+9];
+        unsigned v4 = data[c+13];
+        printf("    %2d: %02X (%3d)  %2d: %02X (%3d)  %2d: %02X (%3d)  %2d: %02X (%3d)\n", c, v1, v1, c+4, v2, v2, c+8, v3, v3, c+12, v4, v4);
+    }
+    fputs("  NuLA palette (RGBA):\n", stdout);
+    const unsigned char *ptr = data+14;
+    for (int c= 0; c < 16; ++c) {
+        uint_least32_t v = ptr[0] | (ptr[1] << 8) | (ptr[2] << 16) | (ptr[3] << 24);
+        printf("    %2d: %08X %4d,%4d,%4d,%4d\n", c, v, ptr[0], ptr[1], ptr[2], ptr[3]);
+        ptr += 4;
+    }
+    printf("  NuLA palette write flag: %02X\n  NuLA palette first byte: %02X\n  NuLA flash:", ptr[0], ptr[1]);
+    ptr += 2;
+    for (int c = 0; c < 8; ++c)
+        printf(" %02X", *ptr++);
+    putchar('\n');
+    for (int c = 0; c < 6; ++c) {
+        unsigned v = *ptr++;
+        printf("  NuLA %s: %02X (%u)\n", nula_names[c], v, v);
+    }
+}
+
 static void small_section(const char *fn, FILE *fp, size_t size, void (*func)(const unsigned char *data))
 {
     unsigned char data[256];
@@ -310,8 +347,7 @@ static void dump_one(char *hexout, const char *fn, FILE *fp)
     dump_hex(hexout, fn, fp, 327682);
     small_section(fn, fp, 34, dump_sysvia);
     small_section(fn, fp, 33, dump_uservia);
-    puts("Video ULA state");
-    dump_hex(hexout, fn, fp, 97);
+    small_section(fn, fp, 97, dump_vula);
     puts("CRTC state");
     dump_hex(hexout, fn, fp, 25);
     puts("Other video state");
@@ -356,7 +392,8 @@ static void dump_section(char *hexout, const char *fn, FILE *fp, int key, long s
             done = true;
             break;
         case 'V':
-            desc = "Video ULA state";
+            small_section(fn, fp, size, dump_vula);
+            done = true;
             break;
         case 'C':
             desc = "CRTC state";
