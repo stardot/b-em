@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
@@ -246,11 +247,34 @@ static void dump_model(const char *fn, FILE *fp)
         print_vstr(fn, fp, "Tube:");
 }
 
+static void dump_6502(const unsigned char *data)
+{
+    uint_least16_t pc = data[5] | (data[6] << 8);
+    uint_least32_t cycles = data[9] | (data[10] << 8) | (data[11] << 16) | (data[12] << 24);
+    unsigned flags = data[3];
+    printf("6502 state:\n  PC=%04X A=%02X X=%02X Y=%02X S=%02X Flags=%c%c%c%c%c%c%c NMI=%d IRQ=%d cycles=%d\n",
+           pc, data[0], data[1], data[2], data[4], flags & 0x80 ? 'N' : '-',
+           flags & 0x40 ? 'V' : '-', flags & 0x10 ? 'B' : '-',
+           flags & 0x08 ? 'D' : '-', flags & 0x04 ? 'I' : '-',
+           flags & 0x02 ? 'Z' : '-', flags & 0x01 ? 'C' : '-',
+           data[7], data[8], cycles);
+}
+
+static void small_section(const char *fn, FILE *fp, size_t size, void (*func)(const unsigned char *data))
+{
+    unsigned char data[256];
+    if (size > sizeof(data))
+        fprintf(stderr, "snapdump: in %s, section of %ld bytes too big\n", fn, size);
+    else if (fread(data, size, 1, fp) == 1)
+        func(data);
+    else
+        fprintf(stderr, "snapdump: unexpected EOF on %s\n", fn);
+}
+
 static void dump_one(char *hexout, const char *fn, FILE *fp)
 {
     printf("Version 1 dump, model = %d\n", getc(fp));
-    puts("6502 state");
-    dump_hex(hexout, fn, fp, 13);
+    small_section(fn, fp, 13, dump_6502);
     puts("I/O processor memory");
     dump_hex(hexout, fn, fp, 327682);
     puts("System VIA state");
@@ -280,13 +304,15 @@ static void dump_section(char *hexout, const char *fn, FILE *fp, int key, long s
 {
     long start = ftell(fp);
     const char *desc = "unknown section";
-    bool compressed = false;
+    bool compressed = false, done = false;
     switch(key) {
         case 'm':
             dump_model(fn, fp);
-            return;
+            done = true;
+            break;
         case '6':
-            desc = "6502 state";
+            small_section(fn, fp, size, dump_6502);
+            done = true;
             break;
         case 'M':
             desc = "I/O processor memory";
@@ -339,11 +365,13 @@ static void dump_section(char *hexout, const char *fn, FILE *fp, int key, long s
             desc = "JIM memory";
             compressed = true;
     }
-    puts(desc);
-    if (compressed)
-        dump_compressed(hexout, fn, fp, size);
-    else
-        dump_hex(hexout, fn, fp, size);
+    if (!done) {
+        puts(desc);
+        if (compressed)
+            dump_compressed(hexout, fn, fp, size);
+        else
+            dump_hex(hexout, fn, fp, size);
+    }
     fseek(fp, start+size, SEEK_SET);
 }
 
