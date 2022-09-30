@@ -1,6 +1,6 @@
 # Makefile.am for B-em
 
-bin_PROGRAMS = b-em m7makechars hdfmt jstest gtest sdf2imd
+bin_PROGRAMS = b-em m7makechars hdfmt jstest gtest sdf2imd snapdump
 noinst_SCRIPTS = ../b-em$(EXEEXT)
 CLEANFILES = $(noinst_SCRIPTS)
 
@@ -153,3 +153,7 @@ gtest_LDADD = -lallegro_main
 sdf2imd_SOURCES = sdf2imd.c sdf-geo.c
 
 sdf2imd_LDADD = -lallegro_main
+
+snapdump_SOURCES = snapdump.c
+
+snapdump_LDADD = -lz
