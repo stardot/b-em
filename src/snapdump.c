@@ -328,6 +328,36 @@ static void dump_vula(const unsigned char *data)
     }
 }
 
+static void dump_crtc(const unsigned char *data)
+{
+    fputs("CRTC state:\n  ", stdout);
+    for (int c = 0; c <= 5; ++c) {
+        unsigned v = *data++;
+        printf("R%d=%02X (%3d) ", c, v, v);
+    }
+    fputs("\n  ", stdout);
+    for (int c = 6; c <= 11; ++c) {
+        unsigned v = *data++;
+        printf("R%d=%02X (%3d) ", c, v, v);
+    }
+    unsigned r12 = data[0] | (data[1] << 8);
+    data += 2;
+    unsigned r14 = data[0] | (data[1] << 8);
+    data += 2;
+    unsigned r16 = data[0] | (data[1] << 8);
+    data += 2;
+    uint_least8_t vc = data[0];
+    uint_least8_t sc = data[1];
+    uint_least8_t hc = data[2];
+    uint_least16_t ma = data[3] | (data[4] << 8);
+    uint_least16_t mab = data[5] | (data[6] << 8);
+    printf("\n  R12/13=%04X (%d)  R14/15=%04X (%d)  R16/17=%04X (%d)\n"
+           "  VC=%02X (%d)  SC=%02X (%d)  HC=%02X (%d)\n"
+           "  MA=%04X (%d)  MABACK=%04X (%d)\n",
+           r12, r12, r14, r14, r16, r16, vc, vc, sc, sc, hc, hc, ma, ma, mab, mab);
+
+}
+
 static void small_section(const char *fn, FILE *fp, size_t size, void (*func)(const unsigned char *data))
 {
     unsigned char data[256];
@@ -348,8 +378,7 @@ static void dump_one(char *hexout, const char *fn, FILE *fp)
     small_section(fn, fp, 34, dump_sysvia);
     small_section(fn, fp, 33, dump_uservia);
     small_section(fn, fp, 97, dump_vula);
-    puts("CRTC state");
-    dump_hex(hexout, fn, fp, 25);
+    small_section(fn, fp, 25, dump_crtc);
     puts("Other video state");
     dump_hex(hexout, fn, fp, 9);
     puts("Sound ship state");
@@ -396,7 +425,8 @@ static void dump_section(char *hexout, const char *fn, FILE *fp, int key, long s
             done = true;
             break;
         case 'C':
-            desc = "CRTC state";
+            small_section(fn, fp, size, dump_crtc);
+            done = true;
             break;
         case 'v':
             desc = "Other video state";
