@@ -101,6 +101,53 @@ static void dump_hex(char *out, const char *fn, FILE *fp, size_t size)
     }
 }
 
+typedef struct {
+    z_stream zs;
+    FILE *fp;
+    size_t togo;
+    int flush;
+    unsigned char buf[BUFSIZ];
+} ZFILE;
+
+static void zinit(ZFILE *zfp, FILE *fp, long size)
+{
+    zfp->zs.zalloc = Z_NULL;
+    zfp->zs.zfree = Z_NULL;
+    zfp->zs.opaque = Z_NULL;
+    inflateInit(&zfp->zs);
+    zfp->zs.next_in = Z_NULL;
+    zfp->zs.avail_in = 0;
+    zfp->togo = size;
+    zfp->fp = fp;
+}
+
+static void zread(ZFILE *zfp, void *dest, size_t size)
+{
+    int res;
+
+    zfp->zs.next_out = dest;
+    zfp->zs.avail_out = size;
+    do {
+        if (zfp->zs.avail_in == 0) {
+            size_t chunk;
+            if (zfp->togo > BUFSIZ) {
+                zfp->flush = Z_NO_FLUSH;
+                chunk = BUFSIZ;
+            }
+            else {
+                zfp->flush = Z_FINISH;
+                chunk = zfp->togo;
+            }
+            if (fread(zfp->buf, chunk, 1, zfp->fp) != 1)
+                break;
+            zfp->zs.next_in = zfp->buf;
+            zfp->zs.avail_in = chunk;
+            zfp->togo -= chunk;
+        }
+        res = inflate(&zfp->zs, zfp->flush);
+    } while (res == Z_OK && zfp->zs.avail_out > 0);
+}
+
 static void dump_compressed(char *hexout, const char *fn, FILE *fp, long size)
 {
     if (size > 0) {
@@ -258,6 +305,55 @@ static void dump_6502(const unsigned char *data)
            flags & 0x08 ? 'D' : '-', flags & 0x04 ? 'I' : '-',
            flags & 0x02 ? 'Z' : '-', flags & 0x01 ? 'C' : '-',
            data[7], data[8], cycles);
+}
+
+static void dump_region(ZFILE *zfp, unsigned char *mem, uint_least16_t size, uint_least32_t offset, char *hexout)
+{
+    zread(zfp, mem, size);
+    while (size >= BLOCK_SIZE) {
+        char *outp = hex_group(mem, GROUP_SIZE, hexout + 11);
+        hex_group(mem + GROUP_SIZE, GROUP_SIZE, outp+1);
+        rest_out(offset, mem, BLOCK_SIZE, hexout, OUT_SIZE);
+        mem += BLOCK_SIZE;
+        offset += BLOCK_SIZE;
+        size -= BLOCK_SIZE;
+    }
+    if (size > 0) {
+        size_t out_size = 14 + 3*BLOCK_SIZE + size;
+        hexout[out_size-1] = '\n';
+        if (size >= GROUP_SIZE) {
+            char *outp = hex_group(mem, GROUP_SIZE, hexout + 11);
+            outp = hex_group(mem + GROUP_SIZE, size - GROUP_SIZE, outp+1);
+            star_pad(BLOCK_SIZE - size, outp);
+        }
+        else {
+            char *outp = hex_group(mem, size, hexout + 11);
+            outp = star_pad(GROUP_SIZE - size, outp);
+            star_pad(GROUP_SIZE, outp+1);
+        }
+        rest_out(offset, mem, size, hexout, out_size);
+    }
+}
+
+static void dump_iomem(char *hexout, const char *fn, FILE *fp, long size)
+{
+    ZFILE zf;
+    unsigned char mem[0x8000];
+    zinit(&zf, fp, size);
+    zread(&zf, mem, 2);
+    printf("I/O Processor memory:\n"
+           "  FE30 (ROMSEL)=%02X, FE34 (ACCCON)=%02X\n  Main RAM:\n", mem[0], mem[1]);
+    dump_region(&zf, mem, 0x8000, 0xffff0000, hexout);
+    fputs("  VDU workspace\n", stdout);
+    dump_region(&zf, mem, 0x1000, 0xff808000, hexout);
+    fputs("  Hazel Workspace\n", stdout);
+    dump_region(&zf, mem, 0x2000, 0xff80c000, hexout);
+    fputs("  Shdadow RAM\n", stdout);
+    dump_region(&zf, mem, 0x5000, 0xfffd3000, hexout);
+    for (int r = 0; r <= 15; ++r) {
+        printf("  ROM %d\n", r);
+        dump_region(&zf, mem, 0x4000, 0xfff08000|(r<<16), hexout);
+    }
 }
 
 static void dump_via(const unsigned char *data)
@@ -451,7 +547,7 @@ static void dump_one(char *hexout, const char *fn, FILE *fp)
     printf("Version 1 dump, model = %d\n", getc(fp));
     small_section(fn, fp, 13, dump_6502);
     puts("I/O processor memory");
-    dump_hex(hexout, fn, fp, 327682);
+    dump_iomem(hexout, fn, fp, 327682);
     small_section(fn, fp, 34, dump_sysvia);
     small_section(fn, fp, 33, dump_uservia);
     small_section(fn, fp, 97, dump_vula);
@@ -477,8 +573,7 @@ static void dump_section(char *hexout, const char *fn, FILE *fp, int key, long s
             small_section(fn, fp, size, dump_6502);
             break;
         case 'M':
-            fputs("I/O processor memory\n", stdout);
-            dump_compressed(hexout, fn, fp, size);
+            dump_iomem(hexout, fn, fp, size);
             break;
         case 'S':
             small_section(fn, fp, size, dump_sysvia);
