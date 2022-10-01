@@ -25,7 +25,6 @@
 struct _sszfile {
     z_stream zs;
     size_t togo;
-    int flush;
     unsigned char buf[BUFSIZ];
 };
 
@@ -260,28 +259,29 @@ static void load_zlib(long size, void (*load_func)(ZFILE *zpf))
 
 void savestate_zread(ZFILE *zfp, void *dest, size_t size)
 {
-    int res;
+    int res, flush;
 
     zfp->zs.next_out = dest;
     zfp->zs.avail_out = size;
     do {
+        flush = Z_NO_FLUSH;
         if (zfp->zs.avail_in == 0) {
-            size_t chunk;
-            if (zfp->togo > BUFSIZ) {
-                zfp->flush = Z_NO_FLUSH;
-                chunk = BUFSIZ;
-            }
+            if (zfp->togo == 0)
+                flush = Z_FINISH;
             else {
-                zfp->flush = Z_FINISH;
-                chunk = zfp->togo;
+                size_t chunk;
+                if (zfp->togo > BUFSIZ)
+                    chunk = BUFSIZ;
+                else
+                    chunk = zfp->togo;
+                if (fread(zfp->buf, chunk, 1, savestate_fp) != 1)
+                    break;
+                zfp->zs.next_in = zfp->buf;
+                zfp->zs.avail_in = chunk;
+                zfp->togo -= chunk;
             }
-            if (fread(zfp->buf, chunk, 1, savestate_fp) != 1)
-                break;
-            zfp->zs.next_in = zfp->buf;
-            zfp->zs.avail_in = chunk;
-            zfp->togo -= chunk;
         }
-        res = inflate(&zfp->zs, zfp->flush);
+        res = inflate(&zfp->zs, flush);
     } while (res == Z_OK && zfp->zs.avail_out > 0);
 }
 
