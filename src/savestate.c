@@ -137,7 +137,6 @@ static void save_sect(FILE *fp, int key, void (*save_func)(FILE *f))
     save_func(fp);
     long end = ftell(fp);
     long size = end - start - hsize;
-    log_debug("savestate: section %c saved, %ld bytes", key, size);
     save_tail(fp, key, start, end, size);
 }
 
@@ -212,6 +211,7 @@ void savestate_dosave(void)
     save_sect(fp, 'F', vdfs_savestate);
     save_sect(fp, '5', music5000_savestate);
     save_sect(fp, 'p', paula_savestate);
+    save_zlib(fp, 'J', mem_jim_savez);
     if (curtube != -1) {
         save_sect(fp, 'T', tube_ula_savestate);
         save_zlib(fp, 'P', tube_proc_savestate);
@@ -342,6 +342,9 @@ static void load_section(FILE *fp, int key, long size)
             break;
         case 'p':
             paula_loadstate(fp);
+            break;
+        case 'J':
+            load_zlib(size, mem_jim_loadz);
     }
     long end = ftell(fp);
     if (end == start) {

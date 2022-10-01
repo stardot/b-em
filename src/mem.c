@@ -421,3 +421,43 @@ void mem_jim_write(uint16_t addr, uint8_t value)
     else if (addr == 0xfcfd)
         mem_jim_page = (mem_jim_page & 0x00ffff00) | (value << 24);
 }
+
+void mem_jim_savez(ZFILE *zfp)
+{
+    unsigned char buf[7];
+    buf[0] = mem_jim_max & 0xff;
+    buf[1] = (mem_jim_max >> 8) & 0xff;
+    buf[2] = (mem_jim_max >> 16) & 0xff;
+    buf[3] = (mem_jim_max >> 24) & 0xff;
+    buf[4] = (mem_jim_page >> 8) & 0xff;
+    buf[5] = (mem_jim_page >> 16) & 0xff;
+    buf[6] = (mem_jim_page >> 24) & 0xff;
+    savestate_zwrite(zfp, buf, sizeof(buf));
+    if (mem_jim_max > 0)
+        savestate_zwrite(zfp, mem_jim_data, mem_jim_max);
+}
+
+extern void mem_jim_loadz(ZFILE *zfp)
+{
+    unsigned char buf[7];
+    savestate_zread(zfp, buf, sizeof(buf));
+    size_t nsize = buf[0] | (buf[1] << 8) | (buf[2] << 16) | (buf[3] << 24);
+    if (mem_jim_data)
+        free(mem_jim_data);
+    mem_jim_data = NULL;
+    mem_jim_max = 0;
+    mem_jim_size = JIM_NONE;
+    if (nsize > 0) {
+        uint8_t *njim = malloc(nsize);
+        if (njim) {
+            mem_jim_data = njim;
+            mem_jim_max = nsize;
+            while (mem_jim_size < JIM_INVALID && nsize != mem_jim_sizes[mem_jim_size])
+                ++mem_jim_size;
+            mem_jim_page = (buf[4] << 8) | (buf[5] << 16) | (buf[6] << 24);
+            savestate_zread(zfp, njim, nsize);
+        }
+        else
+            log_warn("mem: out of memory restoring JIM from savefile");
+    }
+}
