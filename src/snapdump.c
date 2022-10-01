@@ -395,6 +395,11 @@ static void dump_adc(const unsigned char *data)
     printf("ADC state:\n  status=%02X value=%04X (%5d) latch=%02X time=%02X (%3d)\n", data[0], value, value, data[3], atime, atime);
 }
 
+static void dump_acia(const unsigned char *data)
+{
+    printf("ACIA state:\n  control register=%02X, status_register=%02X\n", data[0], data[1]);
+}
+
 static void small_section(const char *fn, FILE *fp, size_t size, void (*func)(const unsigned char *data))
 {
     unsigned char data[256];
@@ -419,8 +424,7 @@ static void dump_one(char *hexout, const char *fn, FILE *fp)
     small_section(fn, fp, 9, dump_video);
     small_section(fn, fp, 55, dump_sn76489);
     small_section(fn, fp, 5, dump_adc);
-    puts("ACIA state");
-    dump_hex(hexout, fn, fp, 2);
+    small_section(fn, fp, 2, dump_acia);
     puts("Serial state");
     dump_hex(hexout, fn, fp, 1);
 /*
@@ -475,7 +479,8 @@ static void dump_section(char *hexout, const char *fn, FILE *fp, int key, long s
             done = true;
             break;
         case 'a':
-            desc = "ACIA state";
+            small_section(fn, fp, 2, dump_acia);
+            done = true;
             break;
         case 'r':
             desc = "Serial state";
