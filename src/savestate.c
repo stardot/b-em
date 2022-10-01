@@ -274,8 +274,10 @@ void savestate_zread(ZFILE *zfp, void *dest, size_t size)
                     chunk = BUFSIZ;
                 else
                     chunk = zfp->togo;
-                if (fread(zfp->buf, chunk, 1, savestate_fp) != 1)
+                if (fread(zfp->buf, chunk, 1, savestate_fp) != 1) {
+                    log_error("savestate: premature EOF on %s", savestate_name);
                     break;
+                }
                 zfp->zs.next_in = zfp->buf;
                 zfp->zs.avail_in = chunk;
                 zfp->togo -= chunk;
@@ -283,6 +285,9 @@ void savestate_zread(ZFILE *zfp, void *dest, size_t size)
         }
         res = inflate(&zfp->zs, flush);
     } while (res == Z_OK && zfp->zs.avail_out > 0);
+
+    if (res != Z_OK && res != Z_STREAM_END)
+        log_error("savestate: compression error reading %s: %d(%s)", savestate_name, res, zfp->zs.msg);
 }
 
 static void load_section(FILE *fp, int key, long size)
