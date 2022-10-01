@@ -405,6 +405,36 @@ static void dump_serial_ula(const unsigned char *data)
     printf("Serial ULA state:\n  register=%02X\n", data[0]);
 }
 
+static void print_dir(const char *fn, FILE *fp, const char *desc)
+{
+    int flag = getc(fp);
+    if (flag == 'N')
+        printf("  %s <undefined>\n", desc);
+    else if (flag == 'R')
+        printf("  %s <root>\n", desc);
+    else if (flag == 'S')
+        print_vstr(fn, fp, desc);
+    else
+        printf("  %s <invalid>\n", desc);
+}
+
+static void dump_vdfs(const char *fn, FILE *fp)
+{
+    fputs("VDFS state:\n  Enabled: ", stdout);
+    int ch = getc(fp);
+    if (ch == 'V') {
+        fputs("yes\n  Directories:\n", stdout);
+        print_dir(fn, fp, "  Current:");
+        print_dir(fn, fp, "  Library:");
+        print_dir(fn, fp, "  Previous:");
+        print_dir(fn, fp, "  Catalog: ");
+    }
+    else if (ch == 'v')
+        fputs("No\n", stdout);
+    else
+        fputs("invalid\n", stdout);
+}
+
 static void small_section(const char *fn, FILE *fp, size_t size, void (*func)(const unsigned char *data))
 {
     unsigned char data[256];
@@ -491,7 +521,8 @@ static void dump_section(char *hexout, const char *fn, FILE *fp, int key, long s
             done = true;
             break;
         case 'F':
-            desc = "VDFS filing system state";
+            dump_vdfs(fn, fp);
+            done = true;
             break;
         case '5':
             desc = "Music 5000";
