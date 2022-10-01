@@ -400,6 +400,11 @@ static void dump_acia(const unsigned char *data)
     printf("ACIA state:\n  control register=%02X, status_register=%02X\n", data[0], data[1]);
 }
 
+static void dump_serial_ula(const unsigned char *data)
+{
+    printf("Serial ULA state:\n  register=%02X\n", data[0]);
+}
+
 static void small_section(const char *fn, FILE *fp, size_t size, void (*func)(const unsigned char *data))
 {
     unsigned char data[256];
@@ -425,8 +430,7 @@ static void dump_one(char *hexout, const char *fn, FILE *fp)
     small_section(fn, fp, 55, dump_sn76489);
     small_section(fn, fp, 5, dump_adc);
     small_section(fn, fp, 2, dump_acia);
-    puts("Serial state");
-    dump_hex(hexout, fn, fp, 1);
+    small_section(fn, fp, 1, dump_serial_ula);
 /*
     vdfs_loadstate(fp);
     music5000_loadstate(fp);}*/
@@ -483,7 +487,8 @@ static void dump_section(char *hexout, const char *fn, FILE *fp, int key, long s
             done = true;
             break;
         case 'r':
-            desc = "Serial state";
+            small_section(fn, fp, 1, dump_serial_ula);
+            done = true;
             break;
         case 'F':
             desc = "VDFS filing system state";
