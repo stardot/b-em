@@ -121,7 +121,7 @@ static void zinit(ZFILE *zfp, FILE *fp, long size)
     zfp->fp = fp;
 }
 
-static void zread(ZFILE *zfp, void *dest, size_t size)
+static int zread(ZFILE *zfp, void *dest, size_t size)
 {
     int res;
 
@@ -129,101 +129,31 @@ static void zread(ZFILE *zfp, void *dest, size_t size)
     zfp->zs.avail_out = size;
     do {
         if (zfp->zs.avail_in == 0) {
-            size_t chunk;
-            if (zfp->togo > BUFSIZ) {
-                zfp->flush = Z_NO_FLUSH;
-                chunk = BUFSIZ;
-            }
-            else {
+            if (zfp->togo == 0)
                 zfp->flush = Z_FINISH;
-                chunk = zfp->togo;
+            else {
+                zfp->flush = Z_NO_FLUSH;
+                size_t chunk;
+                if (zfp->togo > BUFSIZ)
+                    chunk = BUFSIZ;
+                else
+                    chunk = zfp->togo;
+                fprintf(stderr, "snapdump: reading %ld bytes from file\n", chunk);
+                if (fread(zfp->buf, chunk, 1, zfp->fp) != 1)
+                    break;
+                zfp->zs.next_in = zfp->buf;
+                zfp->zs.avail_in = chunk;
+                zfp->togo -= chunk;
             }
-            if (fread(zfp->buf, chunk, 1, zfp->fp) != 1)
-                break;
-            zfp->zs.next_in = zfp->buf;
-            zfp->zs.avail_in = chunk;
-            zfp->togo -= chunk;
         }
+        fprintf(stderr, "snapdump: inflating, avail_in=%d, avail_out=%d\n", zfp->zs.avail_in, zfp->zs.avail_out);
         res = inflate(&zfp->zs, zfp->flush);
     } while (res == Z_OK && zfp->zs.avail_out > 0);
-}
 
-static void dump_compressed(char *hexout, const char *fn, FILE *fp, long size)
-{
-    if (size > 0) {
-        z_stream zs;
-        zs.zalloc = Z_NULL;
-        zs.zfree = Z_NULL;
-        zs.opaque = Z_NULL;
-        inflateInit(&zs);
-        zs.next_in = Z_NULL;
-        zs.avail_in = 0;
-        int res, flush;
-        unsigned long offset = 0;
-        unsigned char cbuf[BUFSIZ];
-        unsigned char ubuf[BUFSIZ];
-        zs.next_out = ubuf;
-        zs.avail_out = BUFSIZ;
-
-        do {
-            size_t cchunk;
-            if (size > BUFSIZ) {
-                flush = Z_NO_FLUSH;
-                cchunk = BUFSIZ;
-            }
-            else {
-                flush = Z_FINISH;
-                cchunk = size;
-            }
-            if (fread(cbuf, cchunk, 1, fp) != 1) {
-                fprintf(stderr, "snapdump: unexpected EOF on %s\n", fn);
-                return;
-            }
-            zs.next_in = cbuf;
-            zs.avail_in = cchunk;
-            size -= cchunk;
-            while ((res = inflate(&zs, flush)) == Z_OK || res == Z_STREAM_END) {
-                size_t uchunk = BUFSIZ - zs.avail_out;
-                const unsigned char *raw = ubuf;
-                while (uchunk >= BLOCK_SIZE) {
-                    char *outp = hex_group(raw, GROUP_SIZE, hexout + 11);
-                    hex_group(raw + GROUP_SIZE, GROUP_SIZE, outp+1);
-                    rest_out(offset, raw, BLOCK_SIZE, hexout, OUT_SIZE);
-                    raw += BLOCK_SIZE;
-                    offset += BLOCK_SIZE;
-                    uchunk -= BLOCK_SIZE;
-                }
-                if (uchunk > 0)
-                    memmove(ubuf, raw, uchunk);
-                zs.next_out = ubuf + uchunk;
-                zs.avail_out = BUFSIZ - uchunk;
-                if (zs.avail_in == 0)
-                    break;
-            }
-        } while (res == Z_OK && size);
-
-        fprintf(stderr, "snapdump: finished main loop, res=%d\n", res);
-
-        if (res == Z_STREAM_END) {
-            size_t uchunk = BUFSIZ - zs.avail_out;
-            fprintf(stderr, "snapdump: %ld bytes of uncompressed data at end\n", uchunk);
-            if (uchunk > 0) {
-                size_t out_size = 14 + 3*BLOCK_SIZE + uchunk;
-                hexout[out_size-1] = '\n';
-                if (uchunk >= GROUP_SIZE) {
-                    char *outp = hex_group(ubuf, GROUP_SIZE, hexout + 11);
-                    outp = hex_group(ubuf + GROUP_SIZE, uchunk - GROUP_SIZE, outp+1);
-                    star_pad(BLOCK_SIZE - uchunk, outp);
-                }
-                else {
-                    char *outp = hex_group(ubuf, uchunk, hexout + 11);
-                    outp = star_pad(GROUP_SIZE - uchunk, outp);
-                    star_pad(GROUP_SIZE, outp+1);
-                }
-                rest_out(offset, ubuf, uchunk, hexout, out_size);
-            }
-        }
-    }
+    if (res != Z_OK && res != Z_STREAM_END)
+        fprintf(stderr, "snapdump: compression error: %d=%s\n", res, zfp->zs.msg);
+    fprintf(stderr, "snapdump: return from zread, res=%d\n", res);
+    return res;
 }
 
 unsigned load_var(FILE *fp)
@@ -307,32 +237,36 @@ static void dump_6502(const unsigned char *data)
            data[7], data[8], cycles);
 }
 
-static void dump_region(ZFILE *zfp, unsigned char *mem, uint_least16_t size, uint_least32_t offset, char *hexout)
+static int dump_region(ZFILE *zfp, unsigned char *mem, uint_least16_t size, uint_least32_t offset, char *hexout)
 {
-    zread(zfp, mem, size);
-    while (size >= BLOCK_SIZE) {
-        char *outp = hex_group(mem, GROUP_SIZE, hexout + 11);
-        hex_group(mem + GROUP_SIZE, GROUP_SIZE, outp+1);
-        rest_out(offset, mem, BLOCK_SIZE, hexout, OUT_SIZE);
-        mem += BLOCK_SIZE;
-        offset += BLOCK_SIZE;
-        size -= BLOCK_SIZE;
-    }
-    if (size > 0) {
-        size_t out_size = 14 + 3*BLOCK_SIZE + size;
-        hexout[out_size-1] = '\n';
-        if (size >= GROUP_SIZE) {
+    int res = zread(zfp, mem, size);
+    if (res == Z_OK || res == Z_STREAM_END) {
+        long bytes = size - zfp->zs.avail_out;
+        while (bytes >= BLOCK_SIZE) {
             char *outp = hex_group(mem, GROUP_SIZE, hexout + 11);
-            outp = hex_group(mem + GROUP_SIZE, size - GROUP_SIZE, outp+1);
-            star_pad(BLOCK_SIZE - size, outp);
+            hex_group(mem + GROUP_SIZE, GROUP_SIZE, outp+1);
+            rest_out(offset, mem, BLOCK_SIZE, hexout, OUT_SIZE);
+            mem += BLOCK_SIZE;
+            offset += BLOCK_SIZE;
+            bytes -= BLOCK_SIZE;
         }
-        else {
-            char *outp = hex_group(mem, size, hexout + 11);
-            outp = star_pad(GROUP_SIZE - size, outp);
-            star_pad(GROUP_SIZE, outp+1);
+        if (bytes > 0) {
+            size_t out_size = 14 + 3*BLOCK_SIZE + bytes;
+            hexout[out_size-1] = '\n';
+            if (bytes >= GROUP_SIZE) {
+                char *outp = hex_group(mem, GROUP_SIZE, hexout + 11);
+                outp = hex_group(mem + GROUP_SIZE, bytes - GROUP_SIZE, outp+1);
+                star_pad(BLOCK_SIZE - bytes, outp);
+            }
+            else {
+                char *outp = hex_group(mem, bytes, hexout + 11);
+                outp = star_pad(GROUP_SIZE - bytes, outp);
+                star_pad(GROUP_SIZE, outp+1);
+            }
+            rest_out(offset, mem, bytes, hexout, out_size);
         }
-        rest_out(offset, mem, size, hexout, out_size);
     }
+    return res;
 }
 
 static void dump_iomem(char *hexout, const char *fn, FILE *fp, long size)
@@ -354,6 +288,20 @@ static void dump_iomem(char *hexout, const char *fn, FILE *fp, long size)
         printf("  ROM %d\n", r);
         dump_region(&zf, mem, 0x4000, 0xfff08000|(r<<16), hexout);
     }
+    inflateEnd(&zf.zs);
+}
+
+static void dump_compressed(char *hexout, const char *fn, FILE *fp, long size)
+{
+    fprintf(stderr, "snapdump: dump_compressed, size=%ld\n", size);
+    ZFILE zf;
+    unsigned char mem[0x8000];
+    zinit(&zf, fp, size);
+    uint_least32_t offset = 0;
+    int res;
+    while ((res = dump_region(&zf, mem, sizeof(mem), offset, hexout)) == Z_OK)
+        offset += sizeof(mem) - zf.zs.avail_out;
+    inflateEnd(&zf.zs);
 }
 
 static void dump_via(const unsigned char *data)
@@ -621,7 +569,7 @@ static void dump_section(char *hexout, const char *fn, FILE *fp, int key, long s
             fputs("Paula Sound\n", stdout);
             dump_hex(hexout, fn, fp, size);
             break;
-        case 'j':
+        case 'J':
             fputs("JIM memory\n", stdout);
             dump_compressed(hexout, fn, fp, size);
     }
