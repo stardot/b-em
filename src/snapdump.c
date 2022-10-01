@@ -469,84 +469,66 @@ static void dump_one(char *hexout, const char *fn, FILE *fp)
 static void dump_section(char *hexout, const char *fn, FILE *fp, int key, long size)
 {
     long start = ftell(fp);
-    const char *desc = "unknown section";
-    bool compressed = false, done = false;
     switch(key) {
         case 'm':
             dump_model(fn, fp);
-            done = true;
             break;
         case '6':
             small_section(fn, fp, size, dump_6502);
-            done = true;
             break;
         case 'M':
-            desc = "I/O processor memory";
-            compressed = true;
+            fputs("I/O processor memory\n", stdout);
+            dump_compressed(hexout, fn, fp, size);
             break;
         case 'S':
             small_section(fn, fp, size, dump_sysvia);
-            done = true;
             break;
         case 'U':
             small_section(fn, fp, size, dump_uservia);
-            done = true;
             break;
         case 'V':
             small_section(fn, fp, size, dump_vula);
-            done = true;
             break;
         case 'C':
             small_section(fn, fp, size, dump_crtc);
-            done = true;
             break;
         case 'v':
             small_section(fn, fp, size, dump_video);
-            done = true;
             break;
         case 's':
             small_section(fn, fp, 55, dump_sn76489);
-            done = true;
             break;
         case 'A':
             small_section(fn, fp, 5, dump_adc);
-            done = true;
             break;
         case 'a':
             small_section(fn, fp, 2, dump_acia);
-            done = true;
             break;
         case 'r':
             small_section(fn, fp, 1, dump_serial_ula);
-            done = true;
             break;
         case 'F':
             dump_vdfs(fn, fp);
-            done = true;
             break;
         case '5':
-            desc = "Music 5000";
+            fputs("Music 5000\n", stdout);
+            dump_hex(hexout, fn, fp, size);
             break;
         case 'T':
-            desc = "Tube ULA";
+            fputs("Tube ULA\n", stdout);
+            dump_hex(hexout, fn, fp, size);
             break;
         case 'P':
-            desc = "Tube Processor";
-            compressed = true;
+            fputs("Tube Processor\n", stdout);
+            dump_compressed(hexout, fn, fp, size);
             break;
         case 'p':
-            desc = "Paula Sound";
+            fputs("Paula Sound\n", stdout);
+            dump_hex(hexout, fn, fp, size);
             break;
         case 'j':
-            desc = "JIM memory";
-            compressed = true;
-    }
-    if (!done) {
-        puts(desc);
-        if (compressed)
+            fputs("JIM memory\n", stdout);
             dump_compressed(hexout, fn, fp, size);
-        else
-            dump_hex(hexout, fn, fp, size);
     }
     fseek(fp, start+size, SEEK_SET);
 }
