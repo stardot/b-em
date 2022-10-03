@@ -197,7 +197,7 @@ static uint32_t dbg_get_instr_addr(void) {
     return debug_addr(oldpc);
 }
 
-static const char *trap_names[] = { "BRK", NULL };
+static const char *trap_names[] = { "BRK", "TRAP", NULL };
 
 cpu_debug_t core6502_cpu_debug = {
     .cpu_name       = "core6502",
@@ -1296,6 +1296,11 @@ void m6502_exec(void)
                         takeint = (interrupt && !p.i);
                         a |= readmem(addr);
                         setzn(a);
+                        break;
+
+                case 0x02:
+                        if (dbg_core6502)
+                            debug_trap(&core6502_cpu_debug, debug_addr(oldpc), 1);
                         break;
 
                 case 0x03:      /*Undocumented - SLO (,x) */
@@ -4070,6 +4075,11 @@ void m65c02_exec(void)
                         takeint = (interrupt && !p.i);
                         a |= readmem(addr);
                         setzn(a);
+                        break;
+
+                case 0x02:
+                        if (dbg_core6502)
+                            debug_trap(&core6502_cpu_debug, debug_addr(oldpc), 1);
                         break;
 
                 case 0x04:      /*TSB zp */
