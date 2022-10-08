@@ -31,7 +31,7 @@ void adc_write(uint16_t addr, uint8_t val)
         if (!(addr & 3))
         {
                 adc_latch  = val;
-                adc_time   = 60;
+                adc_time   = val & 8 ? 178 : 80;
                 adc_status = (val & 0xF) | 0x80; /*Busy, converting*/
                 sysvia_set_cb1(1);
 //                printf("ADC conversion - %02X\n",val);
