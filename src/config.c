@@ -208,6 +208,7 @@ void config_load(void)
     mem_jim_setsize(get_config_int(NULL, "jim_mem_size", 0));
 
     mouse_amx        = get_config_bool(NULL, "mouse_amx",     0);
+    mouse_stick      = get_config_bool(NULL, "mouse_stick",   0);
     kbdips           = get_config_int(NULL, "kbdips", 0);
 
     buflen_m5        = get_config_int("sound", "buflen_music5000", BUFLEN_M5);
@@ -351,6 +352,7 @@ void config_save(void)
         set_config_int(NULL, "jim_mem_size", mem_jim_size);
 
         set_config_bool(NULL, "mouse_amx", mouse_amx);
+        set_config_bool(NULL, "mouse_stick", mouse_stick);
 
         for (int c = 0; c < KEY_ACTION_MAX; c++) {
             if (keyactions[c].keycode == keyact_const[c].keycode && keyactions[c].altstate == keyact_const[c].altstate)

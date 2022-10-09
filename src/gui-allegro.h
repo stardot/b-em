@@ -98,6 +98,7 @@ typedef enum {
     IDM_jim_SIZE,
     IDM_AUTO_PAUSE,
     IDM_MOUSE_AMX,
+    IDM_MOUSE_STICK,
     IDM_JOYMAP,
     IDM_SPEED,
     IDM_DEBUGGER,

@@ -520,6 +520,7 @@ static ALLEGRO_MENU *create_settings_menu(void)
     al_append_menu_item(menu, "Jim Memory", 0, 0, NULL, create_jim_menu());
     add_checkbox_item(menu, "Auto-Pause", IDM_AUTO_PAUSE, autopause);
     add_checkbox_item(menu, "Mouse (AMX)", IDM_MOUSE_AMX, mouse_amx);
+    add_checkbox_item(menu, "Joystick Mouse", IDM_MOUSE_STICK, mouse_stick);
     if (joymap_count > 0)
         al_append_menu_item(menu, "Joystick Map", 0, 0, NULL, create_joymap_menu());
     return menu;
@@ -1450,6 +1451,9 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             break;
         case IDM_MOUSE_AMX:
             mouse_amx = !mouse_amx;
+            break;
+        case IDM_MOUSE_STICK:
+            mouse_stick = !mouse_stick;
             break;
         case IDM_JOYMAP:
             joystick_change_joymap(radio_event_simple(event, joymap_num));
