@@ -144,12 +144,13 @@ static const char helptext[] =
     "-debug          - start debugger\n"
     "-debugtube      - start debugging tube processor\n"
     "-exec file      - debugger to execute file\n"
+    "-paste string   - paste string in as if typed\n"
     "-vroot host-dir - set the VDFS root\n"
     "-vdir guest-dir - set the initial (boot) dir in VDFS\n\n";
 
 void main_init(int argc, char *argv[])
 {
-    int tapenext = 0, discnext = 0, execnext = 0, vdfsnext = 0;
+    int tapenext = 0, discnext = 0, execnext = 0, vdfsnext = 0, pastenext = 0;
     ALLEGRO_DISPLAY *display;
     ALLEGRO_PATH *path;
     const char *ext, *exec_fn = NULL;
@@ -217,6 +218,8 @@ void main_init(int argc, char *argv[])
             vdfsnext = 1;
         else if (!strcasecmp(argv[c], "-vdir"))
             vdfsnext = 2;
+        else if (!strcasecmp(argv[c], "-paste"))
+            pastenext = 1;
         else if (tapenext) {
             if (tape_fn)
                 al_destroy_path(tape_fn);
@@ -239,6 +242,8 @@ void main_init(int argc, char *argv[])
                 vroot = argv[c];
             vdfsnext = 0;
         }
+        else if (pastenext)
+            os_paste_start(strdup(argv[c]));
         else {
             path = al_create_path(argv[c]);
             ext = al_get_path_extension(path);
