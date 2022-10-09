@@ -1307,7 +1307,7 @@ void m6502_exec(void)
                         temp = readmem(pc) + x;
                         pc++;
                         addr = read_zp_indirect(temp);
-                        polltime(5);
+                        polltime(6);
                         temp = readmem(addr);
                         polltime(1);
                         writemem(addr, temp);
@@ -1466,9 +1466,7 @@ void m6502_exec(void)
                         temp = readmem(pc);
                         pc++;
                         addr = read_zp_indirect(temp);
-                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
-                                polltime(1);
-                        polltime(5);
+                        polltime(6);
                         temp = readmem(addr + y);
                         polltime(1);
                         writemem(addr + y, temp);
@@ -1550,9 +1548,7 @@ void m6502_exec(void)
 
                 case 0x1B:      /*Undocumented - SLO abs,y */
                         addr = getw() + y;
-                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
-                                polltime(1);
-                        polltime(4);
+                        polltime(5);
                         temp = readmem(addr);
                         polltime(1);
                         writemem(addr, temp);
@@ -1601,9 +1597,7 @@ void m6502_exec(void)
 
                 case 0x1F:      /*Undocumented - SLO abs,x */
                         addr = getw() + x;
-                        if ((addr & 0xFF00) ^ ((addr + x) & 0xFF00))
-                                polltime(1);
-                        polltime(4);
+                        polltime(5);
                         temp = readmem(addr);
                         polltime(1);
                         writemem(addr, temp);
@@ -1641,7 +1635,7 @@ void m6502_exec(void)
                         temp = readmem(pc) + x;
                         pc++;
                         addr = read_zp_indirect(temp);
-                        polltime(5);
+                        polltime(6);
                         temp = readmem(addr);
                         polltime(1);
                         writemem(addr, temp);
@@ -1824,9 +1818,7 @@ void m6502_exec(void)
                         temp = readmem(pc);
                         pc++;
                         addr = read_zp_indirect(temp);
-                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
-                                polltime(1);
-                        polltime(5);
+                        polltime(6);
                         temp = readmem(addr + y);
                         polltime(1);
                         writemem(addr + y, temp);
@@ -1914,20 +1906,18 @@ void m6502_exec(void)
                         break;
 
                 case 0x3B:      /*Undocumented - RLA abs,y */
-                        addr = getw();
-                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
-                                polltime(1);
-                        polltime(4);
-                        temp = readmem(addr + y);
+                        addr = getw() + y;
+                        polltime(5);
+                        temp = readmem(addr);
                         polltime(1);
-                        writemem(addr + y, temp);
+                        writemem(addr, temp);
                         tempi = p.c;
                         p.c = temp & 0x80;
                         temp <<= 1;
                         if (tempi)
                                 temp |= 1;
                         polltime(1);
-                        writemem(addr + y, temp);
+                        writemem(addr, temp);
                         a &= temp;
                         setzn(a);
                         takeint = (interrupt && !p.i);
@@ -1971,20 +1961,18 @@ void m6502_exec(void)
                         break;
 
                 case 0x3F:      /*Undocumented - RLA abs,x */
-                        addr = getw();
-                        if ((addr & 0xFF00) ^ ((addr + x) & 0xFF00))
-                                polltime(1);
-                        polltime(4);
-                        temp = readmem(addr + x);
+                        addr = getw() + x;
+                        polltime(5);
+                        temp = readmem(addr);
                         polltime(1);
-                        writemem(addr + x, temp);
+                        writemem(addr, temp);
                         tempi = p.c;
                         p.c = temp & 0x80;
                         temp <<= 1;
                         if (tempi)
                                 temp |= 1;
                         polltime(1);
-                        writemem(addr + x, temp);
+                        writemem(addr, temp);
                         a &= temp;
                         setzn(a);
                         takeint = (interrupt && !p.i);
@@ -2014,7 +2002,7 @@ void m6502_exec(void)
                         temp = readmem(pc) + x;
                         pc++;
                         addr = read_zp_indirect(temp);
-                        polltime(5);
+                        polltime(6);
                         temp = readmem(addr);
                         polltime(1);
                         writemem(addr, temp);
@@ -2178,17 +2166,15 @@ void m6502_exec(void)
                 case 0x53:      /*Undocumented - SRE (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = read_zp_indirect(temp);
-                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
-                                polltime(1);
-                        polltime(5);
-                        temp = readmem(addr + y);
+                        addr = read_zp_indirect(temp) + y;
+                        polltime(6);
+                        temp = readmem(addr);
                         polltime(1);
-                        writemem(addr + y, temp);
+                        writemem(addr, temp);
                         p.c = temp & 1;
                         temp >>= 1;
                         polltime(1);
-                        writemem(addr + y, temp);
+                        writemem(addr, temp);
                         a ^= temp;
                         setzn(a);
                         takeint = (interrupt && !p.i);
@@ -2262,17 +2248,15 @@ void m6502_exec(void)
                         break;
 
                 case 0x5B:      /*Undocumented - SRE abs,y */
-                        addr = getw();
-                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
-                                polltime(1);
-                        polltime(4);
+                        addr = getw() + y;
+                        polltime(5);
                         temp = readmem(addr + y);
                         polltime(1);
-                        writemem(addr + y, temp);
+                        writemem(addr, temp);
                         p.c = temp & 1;
                         temp >>= 1;
                         polltime(1);
-                        writemem(addr + y, temp);
+                        writemem(addr, temp);
                         a ^= temp;
                         setzn(a);
                         takeint = (interrupt && !p.i);
@@ -2317,17 +2301,15 @@ void m6502_exec(void)
                         break;
 
                 case 0x5F:      /*Undocumented - SRE abs,x */
-                        addr = getw();
-                        if ((addr & 0xFF00) ^ ((addr + x) & 0xFF00))
-                                polltime(1);
-                        polltime(4);
+                        addr = getw() + x;
+                        polltime(5);
                         temp = readmem(addr + x);
                         polltime(1);
-                        writemem(addr + x, temp);
+                        writemem(addr, temp);
                         p.c = temp & 1;
                         temp >>= 1;
                         polltime(1);
-                        writemem(addr + x, temp);
+                        writemem(addr, temp);
                         a ^= temp;
                         setzn(a);
                         takeint = (interrupt && !p.i);
@@ -2356,7 +2338,7 @@ void m6502_exec(void)
                         temp = readmem(pc) + x;
                         pc++;
                         addr = read_zp_indirect(temp);
-                        polltime(5);
+                        polltime(6);
                         temp = readmem(addr);
                         polltime(1);
                         writemem(addr, temp);
@@ -2537,9 +2519,7 @@ void m6502_exec(void)
                         temp = readmem(pc);
                         pc++;
                         addr = read_zp_indirect(temp);
-                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
-                                polltime(1);
-                        polltime(5);
+                        polltime(6);
                         temp = readmem(addr);
                         polltime(1);
                         writemem(addr, temp);
@@ -2629,20 +2609,18 @@ void m6502_exec(void)
                         break;
 
                 case 0x7B:      /*Undocumented - RRA abs,y */
-                        addr = getw();
-                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
-                                polltime(1);
-                        polltime(4);
-                        temp = readmem(addr + y);
+                        addr = getw() + y;
+                        polltime(5);
+                        temp = readmem(addr);
                         polltime(1);
-                        writemem(addr + y, temp);
+                        writemem(addr, temp);
                         tempi = temp & 1;
                         temp >>= 1;
                         if (p.c)
                             temp |= 0x80;
                         p.c = tempi;
                         polltime(1);
-                        writemem(addr + y, temp);
+                        writemem(addr, temp);
                         adc_nmos(temp);
                         takeint = (interrupt && !p.i);
                         break;
@@ -2686,9 +2664,7 @@ void m6502_exec(void)
 
                 case 0x7F:      /*Undocumented - RRA abs,x */
                         addr = getw();
-                        if ((addr & 0xFF00) ^ ((addr + x) & 0xFF00))
-                                polltime(1);
-                        polltime(4);
+                        polltime(5);
                         temp = readmem(addr + x);
                         polltime(1);
                         writemem(addr + x, temp);
@@ -3159,7 +3135,7 @@ void m6502_exec(void)
                         pc++;
                         a = x = readmem((addr + y) & 0xFF);
                         setzn(a);
-                        polltime(3);
+                        polltime(4);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -3269,7 +3245,7 @@ void m6502_exec(void)
                         temp = readmem(pc) + x;
                         pc++;
                         addr = read_zp_indirect(temp);
-                        polltime(5);
+                        polltime(6);
                         temp = readmem(addr);
                         polltime(1);
                         writemem(addr, temp);
@@ -3427,16 +3403,13 @@ void m6502_exec(void)
                 case 0xD3:      /*Undocumented - DCP (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = read_zp_indirect(temp);
-                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
-                                polltime(1);
-                        polltime(5);
-                        addr += y;
-                        temp = readmem(addr) - 1;
-                        polltime(1);
-                        writemem(addr, temp + 1);
+                        addr = read_zp_indirect(temp) + y;
+                        polltime(6);
+                        temp = readmem(addr);
                         polltime(1);
                         writemem(addr, temp);
+                        polltime(1);
+                        writemem(addr, --temp);
                         setzn(a - temp);
                         p.c = (a >= temp);
                         takeint = (interrupt && !p.i);
@@ -3505,14 +3478,14 @@ void m6502_exec(void)
 
                 case 0xDB:      /*Undocumented - DCP abs,y */
                         addr = getw();
-                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
-                                polltime(1);
-                        polltime(4);
-                        temp = readmem(addr + y) - 1;
+                        readmem((addr & 0xFF00) | ((addr + x) & 0xFF));
+                        addr += y;
+                        polltime(5);
+                        temp = readmem(addr);
                         polltime(1);
-                        writemem(addr + y, temp + 1);
+                        writemem(addr, temp);
                         polltime(1);
-                        writemem(addr + y, temp);
+                        writemem(addr, --temp);
                         setzn(a - temp);
                         p.c = (a >= temp);
                         takeint = (interrupt && !p.i);
@@ -3542,24 +3515,26 @@ void m6502_exec(void)
                         addr = getw();
                         readmem((addr & 0xFF00) | ((addr + x) & 0xFF));
                         addr += x;
-                        temp = readmem(addr) - 1;
-                        writemem(addr, temp + 1);
+                        polltime(5);
+                        temp = readmem(addr);
+                        polltime(1);
                         writemem(addr, temp);
+                        polltime(1);
+                        writemem(addr, --temp);
                         setzn(temp);
-                        polltime(7);
                         takeint = (interrupt && !p.i);
                         break;
 
                 case 0xDF:      /*Undocumented - DCP abs,x */
                         addr = getw();
-                        if ((addr & 0xFF00) ^ ((addr + x) & 0xFF00))
-                                polltime(1);
-                        polltime(4);
-                        temp = readmem(addr + x) - 1;
+                        readmem((addr & 0xFF00) | ((addr + x) & 0xFF));
+                        addr += x;
+                        polltime(5);
+                        temp = readmem(addr);
                         polltime(1);
-                        writemem(addr + x, temp + 1);
+                        writemem(addr, temp);
                         polltime(1);
-                        writemem(addr + x, temp);
+                        writemem(addr, --temp);
                         setzn(a - temp);
                         p.c = (a >= temp);
                         takeint = (interrupt && !p.i);
@@ -3595,7 +3570,7 @@ void m6502_exec(void)
                         temp = readmem(pc) + x;
                         pc++;
                         addr = read_zp_indirect(temp);
-                        polltime(5);
+                        polltime(6);
                         temp = readmem(addr);
                         polltime(1);
                         writemem(addr, temp);
@@ -3751,16 +3726,14 @@ void m6502_exec(void)
                 case 0xF3:      /*Undocumented - ISB (),y */
                         temp = readmem(pc);
                         pc++;
-                        addr = read_zp_indirect(temp);
-                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
-                                polltime(1);
-                        polltime(5);
-                        temp = readmem(addr + y);
+                        addr = read_zp_indirect(temp) + y;
+                        polltime(6);
+                        temp = readmem(addr);
                         polltime(1);
-                        writemem(addr + y, temp);
+                        writemem(addr, temp);
                         temp++;
                         polltime(1);
-                        writemem(addr + y, temp);
+                        writemem(addr, temp);
                         sbc_nmos(temp);
                         takeint = (interrupt && !p.i);
                         break;
