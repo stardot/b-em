@@ -213,6 +213,8 @@ static uint32_t dbg_get_instr_addr(void) {
     return oldtpc;
 }
 
+static const char *trap_names[] = { "BRK", "TRAP", NULL };
+
 cpu_debug_t tube6502_cpu_debug = {
     .cpu_name       = "tube6502",
     .debug_enable   = dbg_debug_enable,
@@ -225,6 +227,7 @@ cpu_debug_t tube6502_cpu_debug = {
     .reg_print      = dbg_reg_print,
     .reg_parse      = dbg_reg_parse,
     .get_instr_addr = dbg_get_instr_addr,
+    .trap_names     = trap_names,
     .print_addr     = debug_print_addr16,
     .parse_addr     = debug_parse_addr
 };
@@ -415,12 +418,12 @@ static inline void setzn(uint8_t v)
 
 static inline void push(uint8_t v)
 {
-    tuberam[0x100+(s--)] = v;
+    writemem(0x100+(s--), v);
 }
 
 static inline uint8_t pull(void)
 {
-    return tuberam[0x100+(++s)];
+    return readmem(0x100+(++s));
 }
 
 static inline void adc_cmos(uint8_t temp)
@@ -566,8 +569,9 @@ void tube_6502_exec()
                 switch (opcode) {
                 case 0x00:
                         /*BRK*/
-//                                log_debug("Tube BRK at %04X! %04X %04X\n",pc,oldtpc,oldtpc2);
-                            pc++;
+                        if (dbg_tube6502)
+                            debug_trap(&tube6502_cpu_debug, oldtpc, 0);
+                        pc++;
                         push(pc >> 8);
                         push(pc & 0xFF);
                         push(pack_flags(0x30));
@@ -586,16 +590,12 @@ void tube_6502_exec()
                         polltime(6);
                         break;
 
-                case 0x02:  /* NOP, 2 bytes, 2 cycles. */
-                case 0x22:
-                case 0x42:
-                case 0x62:
-                case 0x82:
-                case 0xc2:
-                case 0xe2:
-                    (void)readmem(pc++);
-                    polltime(2);
-                    break;
+                case 0x02:
+                        if (dbg_tube6502)
+                            debug_trap(&tube6502_cpu_debug, oldtpc, 1);
+                        else
+                            polltime(1);
+                        break;
 
                 case 0x04:      /*TSB zp */
                         addr = readmem(pc);
@@ -610,19 +610,18 @@ void tube_6502_exec()
                 case 0x05:      /*ORA zp */
                         addr = readmem(pc);
                         pc++;
-                        a |= tuberam[addr];
+                        a |= readmem(addr);
                         setzn(a);
                         polltime(3);
                         break;
 
                 case 0x06:      /*ASL zp */
-                        addr = readmem(pc);
-                        pc++;
-                        temp = tuberam[addr];
+                        addr = readmem(pc++);
+                        temp = readmem(addr);
                         tubep.c = temp & 0x80;
                         temp <<= 1;
                         setzn(temp);
-                        tuberam[addr] = temp;
+                        writemem(addr, temp);
                         polltime(5);
                         break;
 
@@ -720,22 +719,21 @@ void tube_6502_exec()
                         break;
 
                 case 0x15:      /*ORA zp,x */
-                        addr = readmem(pc);
-                        pc++;
-                        a |= tuberam[(addr + x) & 0xFF];
+                        addr = (readmem(pc++) + x) & 0xff;
+                        a |= readmem(addr);
                         setzn(a);
-                        polltime(3);
+                        polltime(4);
                         break;
 
                 case 0x16:      /*ASL zp,x */
-                        addr = (readmem(pc) + x) & 0xFF;
-                        pc++;
-                        temp = tuberam[addr];
+                        addr = (readmem(pc++) + x) & 0xFF;
+                        temp = readmem(addr);
+                        writemem(addr, temp);
                         tubep.c = temp & 0x80;
                         temp <<= 1;
                         setzn(temp);
-                        tuberam[addr] = temp;
-                        polltime(5);
+                        writemem(addr, temp);
+                        polltime(6);
                         break;
 
                 case 0x17:
@@ -815,10 +813,19 @@ void tube_6502_exec()
                         polltime(6);
                         break;
 
+                case 0x22:
+                case 0x42:
+                case 0x62:
+                case 0x82:
+                case 0xc2:
+                case 0xe2:
+                    (void)readmem(pc++);
+                    polltime(2);
+                    break;
+
                 case 0x24:      /*BIT zp */
-                        addr = readmem(pc);
-                        pc++;
-                        temp = tuberam[addr];
+                        addr = readmem(pc++);
+                        temp = readmem(addr);
                         tubep.z = !(a & temp);
                         tubep.v = temp & 0x40;
                         tubep.n = temp & 0x80;
@@ -834,16 +841,15 @@ void tube_6502_exec()
                         break;
 
                 case 0x26:      /*ROL zp */
-                        addr = readmem(pc);
-                        pc++;
-                        temp = tuberam[addr];
+                        addr = readmem(pc++);
+                        temp = readmem(addr);
                         tempi = tubep.c;
                         tubep.c = temp & 0x80;
                         temp <<= 1;
                         if (tempi)
                                 temp |= 1;
                         setzn(temp);
-                        tuberam[addr] = temp;
+                        writemem(addr, temp);
                         polltime(5);
                         break;
 
@@ -947,27 +953,24 @@ void tube_6502_exec()
                         break;
 
                 case 0x35:      /*AND zp,x */
-                        addr = readmem(pc);
-                        pc++;
-                        a &= tuberam[(addr + x) & 0xFF];
+                        addr = (readmem(pc++) + x) & 0xff;
+                        a &= readmem(addr);
                         setzn(a);
-                        polltime(3);
+                        polltime(4);
                         break;
 
                 case 0x36:      /*ROL zp,x */
-                        addr = readmem(pc);
-                        pc++;
-                        addr += x;
-                        addr &= 0xFF;
-                        temp = tuberam[addr];
+                        addr = (readmem(pc++) + x) & 0xff;
+                        temp = readmem(addr);
+                        writemem(addr, temp);
                         tempi = tubep.c;
                         tubep.c = temp & 0x80;
                         temp <<= 1;
                         if (tempi)
                                 temp |= 1;
                         setzn(temp);
-                        tuberam[addr] = temp;
-                        polltime(5);
+                        writemem(addr, temp);
+                        polltime(6);
                         break;
 
                 case 0x37:
@@ -996,6 +999,8 @@ void tube_6502_exec()
 
                 case 0x3C:      /*BIT abs,x */
                         addr = getw();
+                        if ((addr & 0xFF00) ^ ((addr + x) & 0xFF00))
+                            polltime(1);
                         addr += x;
                         temp = readmem(addr);
 //                                printf("BIT abs,x %02X %04X\n",temp,addr);
@@ -1055,21 +1060,19 @@ void tube_6502_exec()
                     break;
 
                 case 0x45:      /*EOR zp */
-                        addr = readmem(pc);
-                        pc++;
-                        a ^= tuberam[addr];
+                        addr = readmem(pc++);
+                        a ^= readmem(addr);
                         setzn(a);
                         polltime(3);
                         break;
 
                 case 0x46:      /*LSR zp */
-                        addr = readmem(pc);
-                        pc++;
-                        temp = tuberam[addr];
+                        addr = readmem(pc++);
+                        temp = readmem(addr);
                         tubep.c = temp & 1;
                         temp >>= 1;
                         setzn(temp);
-                        tuberam[addr] = temp;
+                        writemem(addr, temp);
                         polltime(5);
                         break;
 
@@ -1159,22 +1162,21 @@ void tube_6502_exec()
                     break;
 
                 case 0x55:      /*EOR zp,x */
-                        addr = readmem(pc);
-                        pc++;
-                        a ^= tuberam[(addr + x) & 0xFF];
+                        addr = (readmem(pc++) + x) & 0xff;
+                        a ^= readmem(addr);
                         setzn(a);
-                        polltime(3);
+                        polltime(4);
                         break;
 
                 case 0x56:      /*LSR zp,x */
-                        addr = (readmem(pc) + x) & 0xFF;
-                        pc++;
-                        temp = tuberam[addr];
+                        addr = (readmem(pc++) + x) & 0xFF;
+                        temp = readmem(addr);
+                        writemem(addr, temp);
                         tubep.c = temp & 1;
                         temp >>= 1;
                         setzn(temp);
-                        tuberam[addr] = temp;
-                        polltime(5);
+                        writemem(addr, temp);
+                        polltime(6);
                         break;
 
                 case 0x57:
@@ -1248,31 +1250,29 @@ void tube_6502_exec()
                         break;
 
                 case 0x64:      /*STZ zp */
-                        addr = readmem(pc);
-                        pc++;
-                        tuberam[addr] = 0;
+                        addr = readmem(pc++);
+                        writemem(addr, 0);
                         polltime(3);
                         break;
 
                 case 0x65:      /*ADC zp */
-                        addr = readmem(pc);
-                        pc++;
-                        temp = tuberam[addr];
+                        addr = readmem(pc++);
+                        temp = readmem(addr);
                         adc_cmos(temp);
                         polltime(3);
                         break;
 
                 case 0x66:      /*ROR zp */
-                        addr = readmem(pc);
-                        pc++;
-                        temp = tuberam[addr];
+                        addr = readmem(pc++);
+                        temp = readmem(addr);
+                        writemem(addr, temp);
                         tempi = tubep.c;
                         tubep.c = temp & 1;
                         temp >>= 1;
                         if (tempi)
                                 temp |= 0x80;
                         setzn(temp);
-                        tuberam[addr] = temp;
+                        writemem(addr, temp);
                         polltime(5);
                         break;
 
@@ -1360,34 +1360,30 @@ void tube_6502_exec()
                         break;
 
                 case 0x74:      /*STZ zp,x */
-                        addr = readmem(pc);
-                        pc++;
-                        tuberam[(addr + x) & 0xFF] = 0;
-                        polltime(3);
+                        addr = (readmem(pc++) + x) & 0xff;
+                        writemem(addr, 0);
+                        polltime(4);
                         break;
 
                 case 0x75:      /*ADC zp,x */
-                        addr = readmem(pc);
-                        pc++;
-                        temp = tuberam[(addr + x) & 0xFF];
+                        addr = (readmem(pc++) + x) & 0xff;
+                        temp = readmem(addr);
                         adc_cmos(temp);
                         polltime(4);
                         break;
 
                 case 0x76:      /*ROR zp,x */
-                        addr = readmem(pc);
-                        pc++;
-                        addr += x;
-                        addr &= 0xFF;
-                        temp = tuberam[addr];
+                        addr = (readmem(pc++) + x) & 0xff;
+                        temp = readmem(addr);
+                        writemem(addr, temp);
                         tempi = tubep.c;
                         tubep.c = temp & 1;
                         temp >>= 1;
                         if (tempi)
                                 temp |= 0x80;
                         setzn(temp);
-                        tuberam[addr] = temp;
-                        polltime(5);
+                        writemem(addr, temp);
+                        polltime(6);
                         break;
 
                 case 0x77:
@@ -1469,23 +1465,20 @@ void tube_6502_exec()
                         break;
 
                 case 0x84:      /*STY zp */
-                        addr = readmem(pc);
-                        pc++;
-                        tuberam[addr] = y;
+                        addr = readmem(pc++);
+                        writemem(addr, y);
                         polltime(3);
                         break;
 
                 case 0x85:      /*STA zp */
-                        addr = readmem(pc);
-                        pc++;
-                        tuberam[addr] = a;
+                        addr = readmem(pc++);
+                        writemem(addr, a);
                         polltime(3);
                         break;
 
                 case 0x86:      /*STX zp */
-                        addr = readmem(pc);
-                        pc++;
-                        tuberam[addr] = x;
+                        addr = readmem(pc++);
+                        writemem(addr, x);
                         polltime(3);
                         break;
 
@@ -1558,23 +1551,20 @@ void tube_6502_exec()
                         break;
 
                 case 0x94:      /*STY zp,x */
-                        addr = readmem(pc);
-                        pc++;
-                        tuberam[(addr + x) & 0xFF] = y;
+                        addr = (readmem(pc++) + x ) & 0xff;
+                        writemem(addr, y);
                         polltime(4);
                         break;
 
                 case 0x95:      /*STA zp,x */
-                        addr = readmem(pc);
-                        pc++;
-                        tuberam[(addr + x) & 0xFF] = a;
+                        addr = (readmem(pc++) + x) & 0xff;
+                        writemem(addr, a);
                         polltime(4);
                         break;
 
                 case 0x96:      /*STX zp,y */
-                        addr = readmem(pc);
-                        pc++;
-                        tuberam[(addr + y) & 0xFF] = x;
+                        addr = (readmem(pc++) + y) & 0xff;
+                        writemem(addr, x);
                         polltime(4);
                         break;
 
@@ -1650,25 +1640,22 @@ void tube_6502_exec()
                         break;
 
                 case 0xA4:      /*LDY zp */
-                        addr = readmem(pc);
-                        pc++;
-                        y = tuberam[addr];
+                        addr = readmem(pc++);
+                        y = readmem(addr);
                         setzn(y);
                         polltime(3);
                         break;
 
                 case 0xA5:      /*LDA zp */
-                        addr = readmem(pc);
-                        pc++;
-                        a = tuberam[addr];
+                        addr = readmem(pc++);
+                        a = readmem(addr);
                         setzn(a);
                         polltime(3);
                         break;
 
                 case 0xA6:      /*LDX zp */
-                        addr = readmem(pc);
-                        pc++;
-                        x = tuberam[addr];
+                        addr = readmem(pc++);
+                        x = readmem(addr);
                         setzn(x);
                         polltime(3);
                         break;
@@ -1746,27 +1733,24 @@ void tube_6502_exec()
                         break;
 
                 case 0xB4:      /*LDY zp,x */
-                        addr = readmem(pc);
-                        pc++;
-                        y = tuberam[(addr + x) & 0xFF];
+                        addr = (readmem(pc++) + x) & 0xff;
+                        y = readmem(addr);
                         setzn(y);
-                        polltime(3);
+                        polltime(4);
                         break;
 
                 case 0xB5:      /*LDA zp,x */
-                        addr = readmem(pc);
-                        pc++;
-                        a = tuberam[(addr + x) & 0xFF];
+                        addr = (readmem(pc++) + x) & 0xff;
+                        a = readmem(addr);
                         setzn(a);
-                        polltime(3);
+                        polltime(4);
                         break;
 
                 case 0xB6:      /*LDX zp,y */
-                        addr = readmem(pc);
-                        pc++;
-                        x = tuberam[(addr + y) & 0xFF];
+                        addr = (readmem(pc++) + y) & 0xff;
+                        x = readmem(addr);
                         setzn(x);
-                        polltime(3);
+                        polltime(4);
                         break;
 
                 case 0xB7:
@@ -1844,28 +1828,27 @@ void tube_6502_exec()
                         break;
 
                 case 0xC4:      /*CPY zp */
-                        addr = readmem(pc);
-                        pc++;
-                        temp = tuberam[addr];
+                        addr = readmem(pc++);
+                        temp = readmem(addr);
                         setzn(y - temp);
                         tubep.c = (y >= temp);
                         polltime(3);
                         break;
 
                 case 0xC5:      /*CMP zp */
-                        addr = readmem(pc);
-                        pc++;
-                        temp = tuberam[addr];
+                        addr = readmem(pc++);
+                        temp = readmem(addr);
                         setzn(a - temp);
                         tubep.c = (a >= temp);
                         polltime(3);
                         break;
 
                 case 0xC6:      /*DEC zp */
-                        addr = readmem(pc);
-                        pc++;
-                        tuberam[addr]--;
-                        setzn(tuberam[addr]);
+                        addr = readmem(pc++);
+                        temp = readmem(addr);
+                        writemem(addr, temp);
+                        writemem(addr, --temp);
+                        setzn(temp);
                         polltime(5);
                         break;
 
@@ -1952,20 +1935,20 @@ void tube_6502_exec()
                         break;
 
                 case 0xD5:      /*CMP zp,x */
-                        addr = readmem(pc);
-                        pc++;
-                        temp = tuberam[(addr + x) & 0xFF];
+                        addr = (readmem(pc++) + x) & 0xff;
+                        temp = readmem(addr);
                         setzn(a - temp);
                         tubep.c = (a >= temp);
-                        polltime(3);
+                        polltime(4);
                         break;
 
                 case 0xD6:      /*DEC zp,x */
-                        addr = readmem(pc);
-                        pc++;
-                        tuberam[(addr + x) & 0xFF]--;
-                        setzn(tuberam[(addr + x) & 0xFF]);
-                        polltime(5);
+                        addr = (readmem(pc++) + x) & 0xff;
+                        temp = readmem(addr);
+                        writemem(addr, temp);
+                        writemem(addr, --temp);
+                        setzn(temp);
+                        polltime(6);
                         break;
 
                 case 0xD7:
@@ -2040,27 +2023,26 @@ void tube_6502_exec()
                         break;
 
                 case 0xE4:      /*CPX zp */
-                        addr = readmem(pc);
-                        pc++;
-                        temp = tuberam[addr];
+                        addr = readmem(pc++);
+                        temp = readmem(addr);
                         setzn(x - temp);
                         tubep.c = (x >= temp);
                         polltime(3);
                         break;
 
                 case 0xE5:      /*SBC zp */
-                        addr = readmem(pc);
-                        pc++;
-                        temp = tuberam[addr];
+                        addr = readmem(pc++);
+                        temp = readmem(addr);
                         sbc_cmos(temp);
                         polltime(3);
                         break;
 
                 case 0xE6:      /*INC zp */
-                        addr = readmem(pc);
-                        pc++;
-                        tuberam[addr]++;
-                        setzn(tuberam[addr]);
+                        addr = readmem(pc++);
+                        temp = readmem(addr);
+                        writemem(addr, temp);
+                        writemem(addr, ++temp);
+                        setzn(temp);
                         polltime(5);
                         break;
 
@@ -2139,19 +2121,19 @@ void tube_6502_exec()
                         break;
 
                 case 0xF5:      /*SBC zp,x */
-                        addr = readmem(pc);
-                        pc++;
-                        temp = tuberam[(addr + x) & 0xFF];
+                        addr = (readmem(pc++) + x) & 0xff;
+                        temp = readmem(addr);
                         sbc_cmos(temp);
                         polltime(4);
                         break;
 
                 case 0xF6:      /*INC zp,x */
-                        addr = readmem(pc);
-                        pc++;
-                        tuberam[(addr + x) & 0xFF]++;
-                        setzn(tuberam[(addr + x) & 0xFF]);
-                        polltime(5);
+                        addr = (readmem(pc++) + x) & 0xff;
+                        temp = readmem(addr);
+                        writemem(addr, temp);
+                        writemem(addr, ++temp);
+                        setzn(temp);
+                        polltime(6);
                         break;
 
                 case 0xF7:

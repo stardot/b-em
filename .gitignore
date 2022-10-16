@@ -48,6 +48,7 @@ b-em.pdb
 src/hdfmt.exe
 scsi/*
 src/sdf2imd
+src/bsnapdump
 *.exe
 *.sublime-project
 *.sublime-workspace

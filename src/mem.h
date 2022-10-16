@@ -46,12 +46,13 @@ extern uint8_t *ram, *rom, *os;
 extern rom_slot_t rom_slots[ROM_NSLOT];
 
 enum mem_jim_sz {
-    FRED_NONE,
-    FRED_16M,
-    FRED_64M,
-    FRED_256M,
-    FRED_480M,
-    FRED_996M
+    JIM_NONE,
+    JIM_16M,
+    JIM_64M,
+    JIM_256M,
+    JIM_480M,
+    JIM_996M,
+    JIM_INVALID
 };
 
 extern enum mem_jim_sz mem_jim_size;
@@ -59,5 +60,7 @@ extern void mem_jim_setsize(enum mem_jim_sz size);
 extern uint8_t mem_jim_getsize(void);
 extern uint8_t mem_jim_read(uint16_t addr);
 extern void mem_jim_write(uint16_t addr, uint8_t value);
+extern void mem_jim_savez(ZFILE *zfp);
+extern void mem_jim_loadz(ZFILE *zfp);
 
 #endif

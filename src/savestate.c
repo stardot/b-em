@@ -1,3 +1,4 @@
+#define _DEBUG
 /*B-em v2.2 by Tom Walker
   Savestate handling*/
 #include "b-em.h"
@@ -24,7 +25,6 @@
 struct _sszfile {
     z_stream zs;
     size_t togo;
-    int flush;
     unsigned char buf[BUFSIZ];
 };
 
@@ -34,19 +34,18 @@ FILE *savestate_fp;
 
 void savestate_save(const char *name)
 {
-    size_t name_len;
-    char *name_copy, *ext;
-
     log_debug("savestate: save, name=%s", name);
     if (savestate_fp)
         log_error("savestate: an operation is already in progress");
     else if (curtube != -1 && !tube_proc_savestate)
         log_error("savestate: current tube processor does not support saving state");
     else {
-        name_len = strlen(name);
-        if ((name_copy = malloc(name_len + 5))) {
+        size_t name_len = strlen(name);
+        char *name_copy = malloc(name_len + 5);
+        if (name_copy) {
             memcpy(name_copy, name, name_len+1);
-            if ((ext = strrchr(name_copy, '.'))) {
+            char *ext = strrchr(name_copy, '.');
+            if (ext) {
                 if (strcasecmp(ext, ".snp"))
                     strcpy(ext, ".snp");
             }
@@ -68,38 +67,36 @@ void savestate_save(const char *name)
 
 void savestate_load(const char *name)
 {
-    char *name_copy;
-    char magic[8];
-
     log_debug("savestate: load, name=%s", name);
     if (savestate_fp)
         log_error("savestate: an operation is already in progress");
-    else if ((savestate_fp = fopen(name, "rb"))) {
-        if (fread(magic, 8, 1, savestate_fp) == 1 && memcmp(magic, "BEMSNAP", 7) == 0) {
-            if ((name_copy = strdup(name))) {
-                if (savestate_name)
-                    free(savestate_name);
-                savestate_name = name_copy;
-                switch(magic[7]) {
-                    case '1':
-                        savestate_wantload = 1;
-                        return;
-                    case '2':
-                        savestate_wantload = 2;
-                        return;
-                    default:
-                        log_error("savestate: unable to load snapshot file version %c", magic[7]);
+    else {
+        FILE *fp = fopen(name, "rb");
+        if (fp) {
+            unsigned char magic[8];
+            if (fread(magic, 8, 1, fp) == 1 && memcmp(magic, "BEMSNAP", 7) == 0) {
+                int vers = magic[7];
+                if (vers >= '1' && vers <= '3') {
+                    char *name_copy = strdup(name);
+                    if (name_copy) {
+                        if (savestate_name)
+                            free(savestate_name);
+                        savestate_name = name_copy;
+                        savestate_fp = fp;
+                        savestate_wantload = vers;
+                    }
+                    else
+                        log_error("savestate: out of memory copying filename");
                 }
+                else
+                    log_error("savestate: unable to load snapshot file version %c", magic[7]);
             }
             else
-                log_error("savestate: out of memory copying filename");
+                log_error("savestate: file %s is not a B-Em snapshot file", name);
         }
         else
-            log_error("savestate: file %s is not a B-Em snapshot file", name);
-        fclose(savestate_fp);
+            log_error("savestate: unable to open %s for reading: %s", name, strerror(errno));
     }
-    else
-        log_error("savestate: unable to open %s for reading: %s", name, strerror(errno));
 }
 
 static void sysacia_savestate(FILE *f) {
@@ -110,39 +107,45 @@ static void sysacia_loadstate(FILE *f) {
     acia_loadstate(&sysacia, f);
 }
 
-static void save_tail(long start, long end, long size)
+static void save_tail(FILE *fp, int key, long start, long end, long size)
 {
-    fseek(savestate_fp, start, SEEK_SET);
-    putc(size & 0xff, savestate_fp);
-    putc((size >> 8) & 0xff, savestate_fp);
-    putc((size >> 16) & 0xff, savestate_fp);
-    fseek(savestate_fp, end, SEEK_SET);
+    fseek(fp, start, SEEK_SET);
+    if (size > 0) {
+        unsigned char hdr[5];
+        hdr[0] = key;
+        hdr[1] = size;
+        hdr[2] = size >> 8;
+        long hsize = 3;
+        if (key & 0x80) {
+            key &= 0x7f;
+            hsize = 5;
+            hdr[3] = size >> 16;
+            hdr[4] = size >> 24;
+        }
+        fwrite(hdr, hsize, 1, fp);
+        fseek(fp, end, SEEK_SET);
+        log_debug("savestate: section %c from %08lX to %08lX, size %lu", key, start, end, size);
+    }
 }
 
-static void save_sect(int key, void (*save_func)(FILE *f))
+static void save_sect(FILE *fp, int key, void (*save_func)(FILE *f))
 {
-    long start, end, size;
-
-    putc(key, savestate_fp);
-    start = ftell(savestate_fp);
-    fseek(savestate_fp, 3, SEEK_CUR);
-    save_func(savestate_fp);
-    end = ftell(savestate_fp);
-    size = end - start - 3;
-    log_debug("savestate: section %c saved, %ld bytes", key, size);
-    save_tail(start, end, size);
+    const unsigned hsize = 3;
+    long start = ftell(fp);
+    fseek(fp, hsize, SEEK_CUR);
+    save_func(fp);
+    long end = ftell(fp);
+    long size = end - start - hsize;
+    save_tail(fp, key, start, end, size);
 }
 
-static void save_zlib(int key, void (*save_func)(ZFILE *zpf))
+static void save_zlib(FILE *fp, int key, void (*save_func)(ZFILE *zpf))
 {
-    long start, end;
+    const unsigned hsize = 5;
+    long start = ftell(fp);
+    fseek(fp, hsize, SEEK_CUR);
+
     ZFILE zfile;
-    int res;
-
-    putc(key, savestate_fp);
-    start = ftell(savestate_fp);
-    fseek(savestate_fp, 3, SEEK_CUR);
-
     zfile.zs.zalloc = Z_NULL;
     zfile.zs.zfree = Z_NULL;
     zfile.zs.opaque = Z_NULL;
@@ -150,21 +153,22 @@ static void save_zlib(int key, void (*save_func)(ZFILE *zpf))
     zfile.zs.next_out = zfile.buf;
     zfile.zs.avail_out = BUFSIZ;
     save_func(&zfile);
+    int res;
     while ((res = deflate(&zfile.zs, Z_FINISH)) == Z_OK) {
-        fwrite(zfile.buf, BUFSIZ, 1, savestate_fp);
+        fwrite(zfile.buf, BUFSIZ, 1, fp);
         zfile.zs.next_out = zfile.buf;
         zfile.zs.avail_out = BUFSIZ;
     }
     if (res == Z_STREAM_END) {
         if (zfile.zs.avail_out < BUFSIZ)
-            fwrite(zfile.buf, BUFSIZ - zfile.zs.avail_out, 1, savestate_fp);
+            fwrite(zfile.buf, BUFSIZ - zfile.zs.avail_out, 1, fp);
         log_debug("savestate: section %c saved deflated, %ld bytes into %ld", key, zfile.zs.total_in, zfile.zs.total_out);
-        save_tail(start, start + zfile.zs.total_out + 3, zfile.zs.total_out);
+        save_tail(fp, key|0x80, start, start + zfile.zs.total_out + hsize, zfile.zs.total_out);
     }
     else {
         log_error("savestate: compression error in section %c: %d(%s)", key, res, zfile.zs.msg);
-        end = ftell(savestate_fp);
-        save_tail(start, end, end - start - 3);
+        long end = ftell(fp);
+        save_tail(fp, key|0x80, start, end, end - start - hsize);
     }
     deflateEnd(&zfile.zs);
 }
@@ -189,52 +193,52 @@ void savestate_zwrite(ZFILE *zfp, void *src, size_t size)
 
 void savestate_dosave(void)
 {
-    fwrite("BEMSNAP2", 8, 1, savestate_fp);
-    save_sect('m', model_savestate);
-    save_sect('6', m6502_savestate);
-    save_zlib('M', mem_savezlib);
-    save_sect('S', sysvia_savestate);
-    save_sect('U', uservia_savestate);
-    save_sect('V', videoula_savestate);
-    save_sect('C', crtc_savestate);
-    save_sect('v', video_savestate);
-    save_sect('s', sn_savestate);
-    save_sect('A', adc_savestate);
-    save_sect('a', sysacia_savestate);
-    save_sect('r', serial_savestate);
-    save_sect('F', vdfs_savestate);
-    save_sect('5', music5000_savestate);
-    save_sect('p', paula_savestate);
+    FILE *fp = savestate_fp;
+    fwrite("BEMSNAP3", 8,1, fp);
+    save_sect(fp, 'm', model_savestate);
+    save_sect(fp, '6', m6502_savestate);
+    save_zlib(fp, 'M', mem_savezlib);
+    save_sect(fp, 'S', sysvia_savestate);
+    save_sect(fp, 'U', uservia_savestate);
+    save_sect(fp, 'V', videoula_savestate);
+    save_sect(fp, 'C', crtc_savestate);
+    save_sect(fp, 'v', video_savestate);
+    save_sect(fp, 's', sn_savestate);
+    save_sect(fp, 'A', adc_savestate);
+    save_sect(fp, 'a', sysacia_savestate);
+    save_sect(fp, 'r', serial_savestate);
+    save_sect(fp, 'F', vdfs_savestate);
+    save_sect(fp, '5', music5000_savestate);
+    save_sect(fp, 'p', paula_savestate);
+    save_zlib(fp, 'J', mem_jim_savez);
     if (curtube != -1) {
-        save_sect('T', tube_ula_savestate);
-        save_zlib('P', tube_proc_savestate);
+        save_sect(fp, 'T', tube_ula_savestate);
+        save_zlib(fp, 'P', tube_proc_savestate);
     }
-    fclose(savestate_fp);
+    fclose(fp);
     savestate_wantsave = 0;
     savestate_fp = NULL;
 }
 
-static void load_state_one(void)
+static void load_state_one(FILE *fp)
 {
-    curmodel = getc(savestate_fp);
+    curmodel = getc(fp);
     selecttube = curtube = -1;
     main_restart();
 
-    m6502_loadstate(savestate_fp);
-    mem_loadstate(savestate_fp);
-    sysvia_loadstate(savestate_fp);
-    uservia_loadstate(savestate_fp);
-    videoula_loadstate(savestate_fp);
-    crtc_loadstate(savestate_fp);
-    video_loadstate(savestate_fp);
-    sn_loadstate(savestate_fp);
-    adc_loadstate(savestate_fp);
-    acia_loadstate(&sysacia, savestate_fp);
-    serial_loadstate(savestate_fp);
-    vdfs_loadstate(savestate_fp);
-    music5000_loadstate(savestate_fp);
-
-    log_debug("savestate: loaded V1 snapshot file");
+    m6502_loadstate(fp);
+    mem_loadstate(fp);
+    sysvia_loadstate(fp);
+    uservia_loadstate(fp);
+    videoula_loadstate(fp);
+    crtc_loadstate(fp);
+    video_loadstate(fp);
+    sn_loadstate(fp);
+    adc_loadstate(fp);
+    acia_loadstate(&sysacia, fp);
+    serial_loadstate(fp);
+    vdfs_loadstate(fp);
+    music5000_loadstate(fp);
 }
 
 static void load_zlib(long size, void (*load_func)(ZFILE *zpf))
@@ -255,121 +259,157 @@ static void load_zlib(long size, void (*load_func)(ZFILE *zpf))
 
 void savestate_zread(ZFILE *zfp, void *dest, size_t size)
 {
-    int res;
-    size_t chunk;
+    int res, flush;
 
     zfp->zs.next_out = dest;
     zfp->zs.avail_out = size;
     do {
+        flush = Z_NO_FLUSH;
         if (zfp->zs.avail_in == 0) {
-            if (zfp->togo > BUFSIZ) {
-                zfp->flush = Z_NO_FLUSH;
-                chunk = BUFSIZ;
-            }
+            if (zfp->togo == 0)
+                flush = Z_FINISH;
             else {
-                zfp->flush = Z_FINISH;
-                chunk = zfp->togo;
+                size_t chunk;
+                if (zfp->togo > BUFSIZ)
+                    chunk = BUFSIZ;
+                else
+                    chunk = zfp->togo;
+                if (fread(zfp->buf, chunk, 1, savestate_fp) != 1) {
+                    log_error("savestate: premature EOF on %s", savestate_name);
+                    break;
+                }
+                zfp->zs.next_in = zfp->buf;
+                zfp->zs.avail_in = chunk;
+                zfp->togo -= chunk;
             }
-            if (fread(zfp->buf, chunk, 1, savestate_fp) != 1)
-                break;
-            zfp->zs.next_in = zfp->buf;
-            zfp->zs.avail_in = chunk;
-            zfp->togo -= chunk;
         }
-        res = inflate(&zfp->zs, zfp->flush);
+        res = inflate(&zfp->zs, flush);
     } while (res == Z_OK && zfp->zs.avail_out > 0);
+
+    if (res != Z_OK && res != Z_STREAM_END)
+        log_error("savestate: compression error reading %s: %d(%s)", savestate_name, res, zfp->zs.msg);
 }
 
-static void load_state_two(void)
+static void load_section(FILE *fp, int key, long size)
+{
+    log_debug("savestate: found section %c of %ld bytes", key, size);
+    long start = ftell(fp);
+    switch(key) {
+        case 'm':
+            model_loadstate(fp);
+            break;
+        case '6':
+            m6502_loadstate(fp);
+            break;
+        case 'M':
+            load_zlib(size, mem_loadzlib);
+            break;
+        case 'S':
+            sysvia_loadstate(fp);
+            break;
+        case 'U':
+            uservia_loadstate(fp);
+            break;
+        case 'V':
+            videoula_loadstate(fp);
+            break;
+        case 'C':
+            crtc_loadstate(fp);
+            break;
+        case 'v':
+            video_loadstate(fp);
+            break;
+        case 's':
+            sn_loadstate(fp);
+            break;
+        case 'A':
+            adc_loadstate(fp);
+            break;
+        case 'a':
+            sysacia_loadstate(fp);
+            break;
+        case 'r':
+            serial_loadstate(fp);
+            break;
+        case 'F':
+            vdfs_loadstate(fp);
+            break;
+        case '5':
+            music5000_loadstate(fp);
+            break;
+        case 'T':
+            if (curtube != -1)
+                tube_ula_loadstate(fp);
+            break;
+        case 'P':
+            if (tube_proc_loadstate)
+                load_zlib(size, tube_proc_loadstate);
+            break;
+        case 'p':
+            paula_loadstate(fp);
+            break;
+        case 'J':
+            load_zlib(size, mem_jim_loadz);
+    }
+    long end = ftell(fp);
+    if (end == start) {
+        log_warn("savestate: section %c skipped", key);
+        fseek(fp, size, SEEK_CUR);
+    }
+    else if (size != (end - start)) {
+        log_warn("savestate: section %c, size mismatch, file=%ld, read=%ld", key, size, end - start);
+        fseek(fp, start + size, SEEK_SET);
+    }
+}
+
+static void load_state_two(FILE *fp)
 {
     unsigned char hdr[4];
-    long start, end, size;
 
-    while (fread(hdr, sizeof hdr, 1, savestate_fp) == 1) {
-        size = hdr[1] | (hdr[2] << 8) | (hdr[3] << 16);
-        start = ftell(savestate_fp);
-        log_debug("savestate: found section %c of %ld bytes", hdr[0], size);
-
-        switch(hdr[0]) {
-            case 'm':
-                model_loadstate(savestate_fp);
-                break;
-            case '6':
-                m6502_loadstate(savestate_fp);
-                break;
-            case 'M':
-                load_zlib(size, mem_loadzlib);
-                break;
-            case 'S':
-                sysvia_loadstate(savestate_fp);
-                break;
-            case 'U':
-                uservia_loadstate(savestate_fp);
-                break;
-            case 'V':
-                videoula_loadstate(savestate_fp);
-                break;
-            case 'C':
-                crtc_loadstate(savestate_fp);
-                break;
-            case 'v':
-                video_loadstate(savestate_fp);
-                break;
-            case 's':
-                sn_loadstate(savestate_fp);
-                break;
-            case 'A':
-                adc_loadstate(savestate_fp);
-                break;
-            case 'a':
-                sysacia_loadstate(savestate_fp);
-                break;
-            case 'r':
-                serial_loadstate(savestate_fp);
-                break;
-            case 'F':
-                vdfs_loadstate(savestate_fp);
-                break;
-            case '5':
-                music5000_loadstate(savestate_fp);
-                break;
-            case 'T':
-                if (curtube != -1)
-                    tube_ula_loadstate(savestate_fp);
-                break;
-            case 'P':
-                if (tube_proc_loadstate)
-                    load_zlib(size, tube_proc_loadstate);
-                break;
-            case 'p':
-                paula_loadstate(savestate_fp);
-        }
-        end = ftell(savestate_fp);
-        if (end == start) {
-            log_warn("savestate: section %c skipped", hdr[0]);
-            fseek(savestate_fp, size, SEEK_CUR);
-        }
-        else if (size != (end - start)) {
-            log_warn("savestate: section %c, size mismatch, file=%ld, read=%ld", hdr[0], size, end - start);
-            fseek(savestate_fp, start + size, SEEK_SET);
-        }
+    while (fread(hdr, sizeof hdr, 1, fp) == 1) {
+        long size = hdr[1] | (hdr[2] << 8) | (hdr[3] << 16);
+        load_section(fp, hdr[0], size);
     }
-    log_debug("savestate: loaded V2 snapshot file");
+}
+
+static void load_state_three(FILE *fp)
+{
+    unsigned char hdr[3];
+
+    while (fread(hdr, sizeof hdr, 1, fp) == 1) {
+        int key = hdr[0];
+        long size = hdr[1] | (hdr[2] << 8);
+        if (key & 0x80) {
+            if (fread(hdr, 2, 1, fp) != 1) {
+                log_error("savestate: unexpected EOF on file %s", savestate_name);
+                return;
+            }
+            size |= (hdr[0] << 16) | (hdr[1] << 24);
+            key &= 0x7f;
+        }
+        load_section(fp, key, size);
+    }
 }
 
 void savestate_doload(void)
 {
+    FILE *fp = savestate_fp;
     switch(savestate_wantload) {
-        case 1:
-            load_state_one();
+        case '1':
+            load_state_one(fp);
             break;
-        case 2:
-            load_state_two();
+        case '2':
+            load_state_two(fp);
+            break;
+        case '3':
+            load_state_three(fp);
             break;
     }
-    if (ferror(savestate_fp))
-        log_error("savestate: state not fully restored from '%s': %s", savestate_name, strerror(errno));
-    fclose(savestate_fp);
+    if (ferror(fp))
+        log_error("savestate: state not fully restored from V%c file '%s': %s", savestate_wantload, savestate_name, strerror(errno));
+    else
+        log_debug("savestate: loaded V%c snapshot file", savestate_wantload);
+    fclose(fp);
     savestate_wantload = 0;
     savestate_fp = NULL;
 }

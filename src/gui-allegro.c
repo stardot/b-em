@@ -480,7 +480,7 @@ static ALLEGRO_MENU *create_keyboard_menu(void)
     return menu;
 }
 
-static const char *fred_sizes[] =
+static const char *jim_sizes[] =
 {
     "None (disabled)",
     "16M",
@@ -494,7 +494,7 @@ static const char *fred_sizes[] =
 static ALLEGRO_MENU *create_jim_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
-    add_radio_set(menu, fred_sizes, IDM_jim_SIZE, mem_jim_size);
+    add_radio_set(menu, jim_sizes, IDM_JIM_SIZE, mem_jim_size);
     return menu;
 }
 
@@ -1443,7 +1443,7 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
         case IDM_KEY_PAD:
             keypad = !keypad;
             break;
-        case IDM_jim_SIZE:
+        case IDM_JIM_SIZE:
             mem_jim_setsize(radio_event_simple(event, mem_jim_size));
             break;
         case IDM_AUTO_PAUSE:
