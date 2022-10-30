@@ -52,6 +52,12 @@ inline uint32_t addr_distance(uint32_t a, uint32_t b)
 
 bool symbol_table::find_by_addr_near(uint32_t addr, uint32_t min, uint32_t max, uint32_t &addr_found, const char * &ret) const {
 
+    // prefer the exact address where possible
+    if (find_by_addr(addr, ret)) {
+        addr_found = addr;
+        return true;
+    }
+
     auto it = byaddrmap.upper_bound(addr);
 
     if (it == byaddrmap.end())
