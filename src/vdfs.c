@@ -4725,7 +4725,7 @@ static void osword_discio(void)
 
 static void osword(void)
 {
-    if (fs_num) {
+    if (fs_flags & VDFS_ACTIVE) {
         switch(readmem(0xef))
         {
             case 0x42:
