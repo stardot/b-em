@@ -1,4 +1,3 @@
-#define _DEBUG
 /*B-em v2.2 by Tom Walker
   Master 128 CMOS emulation*/
 
@@ -33,7 +32,8 @@ struct cmos_integra {
 static uint8_t cmos[64];
 
 static int cmos_old, cmos_addr, cmos_ena, cmos_rw;
-static time_t rtc_epoc_ref, rtc_epoc_adj, rtc_last;
+static bool rtc_new_epoc;
+static time_t rtc_epoc_adj, rtc_last;
 static struct tm rtc_tm;
 
 static uint8_t cmos_data;
@@ -42,10 +42,15 @@ static inline uint8_t bcd2bin(uint8_t value) {
     return ((value >> 4) * 10) + (value & 0xf);
 }
 
+static inline uint8_t bin2bcd(uint8_t value)
+{
+    return ((value / 10) << 4) | (value % 10);
+}
+
 static inline uint8_t bin_or_bcd(unsigned value) {
     if (cmos[11] & 4)
         return value; // binary
-    return ((value / 10) << 4) | (value % 10);
+    return bin2bcd(value);
 }
 
 static inline unsigned guess_century(unsigned year) {
@@ -54,13 +59,13 @@ static inline unsigned guess_century(unsigned year) {
     return year;
 }
 
-static uint8_t read_cmos_rtc(unsigned addr)
+static void cmos_update_rtc(void)
 {
     time_t now;
     struct tm *tp;
 
     time(&now);
-    if (rtc_epoc_ref) {
+    if (rtc_new_epoc) {
         // The RTC has been set since it was last read so convert
         // the time components set back to seconds since an epoc.
 
@@ -86,7 +91,7 @@ static uint8_t read_cmos_rtc(unsigned addr)
         }
         rtc_tm.tm_isdst = -1;
         rtc_epoc_adj = mktime(&rtc_tm) - now;
-        rtc_epoc_ref = 0;
+        rtc_new_epoc = false;
         rtc_last = 0;
     }
     now += rtc_epoc_adj;
@@ -94,6 +99,12 @@ static uint8_t read_cmos_rtc(unsigned addr)
         rtc_tm = *tp;
         rtc_last = now;
     }
+}
+
+static uint8_t read_cmos_rtc(unsigned addr)
+{
+    cmos_update_rtc();
+
     switch (addr)
     {
         case 0:
@@ -127,11 +138,57 @@ static uint8_t get_cmos(unsigned addr)
     }
 }
 
+#ifdef _DEBUG
+
+static const char rtc_names[][14] = {
+    "seconds",
+    "alarm seconds",
+    "minutes",
+    "alarm minutes",
+    "hours",
+    "alarm minutes",
+    "day of week",
+    "day on month",
+    "month",
+    "year",
+    "register A",
+    "register B",
+    "register C",
+    "register D"
+};
+
+#endif
+
 static void set_cmos(unsigned addr, uint8_t val)
 {
+    if ((addr <= 6 && !(addr & 1)) || (addr >= 7 && addr <= 9)) {
+#ifdef _DEBUG
+        log_debug("cmos: set RTC register #%d, %s = %d", addr, rtc_names[addr], val);
+#endif
+        cmos_update_rtc();
+        if (cmos[11] & 4 ) { // Register B DM bit.
+            // binary
+            cmos[0] = rtc_tm.tm_sec;
+            cmos[2] = rtc_tm.tm_min;
+            cmos[4] = rtc_tm.tm_hour;
+            cmos[6] = rtc_tm.tm_wday + 1;
+            cmos[7] = rtc_tm.tm_mday;
+            cmos[8] = rtc_tm.tm_mon + 1;
+            cmos[9] = rtc_tm.tm_year % 100;
+        }
+        else {
+            // BCD
+            cmos[0] = bin2bcd(rtc_tm.tm_sec);
+            cmos[2] = bin2bcd(rtc_tm.tm_min);
+            cmos[4] = bin2bcd(rtc_tm.tm_hour);
+            cmos[6] = bin2bcd(rtc_tm.tm_wday + 1);
+            cmos[7] = bin2bcd(rtc_tm.tm_mday);
+            cmos[8] = bin2bcd(rtc_tm.tm_mon + 1);
+            cmos[9] = bin2bcd(rtc_tm.tm_year % 100);
+        }
+        rtc_new_epoc = true;
+    }
     cmos[addr] = val;
-    if ((addr <= 6 && !(addr & 1)) || (addr >= 7 && addr <= 9))
-        time(&rtc_epoc_ref);
 }
 
 void cmos_update(uint8_t IC32, uint8_t sdbval)
@@ -250,7 +307,8 @@ void cmos_load(const MODEL *m)
         compactcmos_load(m);
     else {
         memset(cmos, 0, sizeof cmos);
-        rtc_epoc_ref = rtc_epoc_adj = 0;
+        rtc_new_epoc = false;
+        rtc_epoc_adj = 0;
         if ((path = find_cfg_file(m->cmos, ".bin"))) {
             cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
             if ((f = fopen(cpath, "rb"))) {
