@@ -1,3 +1,4 @@
+#define _DEBUG
 /*B-em v2.2 by Tom Walker
   Master 128 CMOS emulation*/
 
@@ -83,6 +84,7 @@ static uint8_t read_cmos_rtc(unsigned addr)
             rtc_tm.tm_mon = bcd2bin(cmos[8] - 1);
             rtc_tm.tm_year = guess_century(bcd2bin(cmos[9]));
         }
+        rtc_tm.tm_isdst = -1;
         rtc_epoc_adj = mktime(&rtc_tm) - now;
         rtc_epoc_ref = 0;
         rtc_last = 0;
