@@ -148,7 +148,7 @@ static const char rtc_names[][14] = {
     "hours",
     "alarm minutes",
     "day of week",
-    "day on month",
+    "day of month",
     "month",
     "year",
     "register A",
@@ -162,12 +162,12 @@ static const char rtc_names[][14] = {
 static void set_cmos(unsigned addr, uint8_t val)
 {
     if ((addr <= 6 && !(addr & 1)) || (addr >= 7 && addr <= 9)) {
-#ifdef _DEBUG
-        log_debug("cmos: set RTC register #%d, %s = %d", addr, rtc_names[addr], val);
-#endif
         rtc_epoc_ref = cmos_update_rtc();
         if (cmos[11] & 4 ) { // Register B DM bit.
             // binary
+#ifdef _DEBUG
+            log_debug("cmos: set RTC register #%d, %s = binary %d", addr, rtc_names[addr], val);
+#endif
             cmos[0] = rtc_tm.tm_sec;
             cmos[2] = rtc_tm.tm_min;
             cmos[4] = rtc_tm.tm_hour;
@@ -178,6 +178,9 @@ static void set_cmos(unsigned addr, uint8_t val)
         }
         else {
             // BCD
+#ifdef _DEBUG
+            log_debug("cmos: set RTC register #%d, %s = BCD %02X", addr, rtc_names[addr], val);
+#endif
             cmos[0] = bin2bcd(rtc_tm.tm_sec);
             cmos[2] = bin2bcd(rtc_tm.tm_min);
             cmos[4] = bin2bcd(rtc_tm.tm_hour);
