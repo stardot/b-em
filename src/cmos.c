@@ -32,8 +32,7 @@ struct cmos_integra {
 static uint8_t cmos[64];
 
 static int cmos_old, cmos_addr, cmos_ena, cmos_rw;
-static bool rtc_new_epoc;
-static time_t rtc_epoc_adj, rtc_last;
+static time_t rtc_epoc_ref, rtc_epoc_adj, rtc_last;
 static struct tm rtc_tm;
 
 static uint8_t cmos_data;
@@ -59,13 +58,13 @@ static inline unsigned guess_century(unsigned year) {
     return year;
 }
 
-static void cmos_update_rtc(void)
+static time_t cmos_update_rtc(void)
 {
     time_t now;
     struct tm *tp;
 
     time(&now);
-    if (rtc_new_epoc) {
+    if (rtc_epoc_ref) {
         // The RTC has been set since it was last read so convert
         // the time components set back to seconds since an epoc.
 
@@ -90,15 +89,16 @@ static void cmos_update_rtc(void)
             rtc_tm.tm_year = guess_century(bcd2bin(cmos[9]));
         }
         rtc_tm.tm_isdst = -1;
-        rtc_epoc_adj = mktime(&rtc_tm) - now;
-        rtc_new_epoc = false;
+        rtc_epoc_adj = mktime(&rtc_tm) - rtc_epoc_ref;
+        rtc_epoc_ref = 0;
         rtc_last = 0;
     }
-    now += rtc_epoc_adj;
-    if (now > rtc_last && (tp = localtime(&now))) {
+    time_t secs = now + rtc_epoc_adj;
+    if (secs > rtc_last && (tp = localtime(&secs))) {
         rtc_tm = *tp;
-        rtc_last = now;
+        rtc_last = secs;
     }
+    return now;
 }
 
 static uint8_t read_cmos_rtc(unsigned addr)
@@ -165,7 +165,7 @@ static void set_cmos(unsigned addr, uint8_t val)
 #ifdef _DEBUG
         log_debug("cmos: set RTC register #%d, %s = %d", addr, rtc_names[addr], val);
 #endif
-        cmos_update_rtc();
+        rtc_epoc_ref = cmos_update_rtc();
         if (cmos[11] & 4 ) { // Register B DM bit.
             // binary
             cmos[0] = rtc_tm.tm_sec;
@@ -186,7 +186,6 @@ static void set_cmos(unsigned addr, uint8_t val)
             cmos[8] = bin2bcd(rtc_tm.tm_mon + 1);
             cmos[9] = bin2bcd(rtc_tm.tm_year % 100);
         }
-        rtc_new_epoc = true;
     }
     cmos[addr] = val;
 }
@@ -307,8 +306,7 @@ void cmos_load(const MODEL *m)
         compactcmos_load(m);
     else {
         memset(cmos, 0, sizeof cmos);
-        rtc_new_epoc = false;
-        rtc_epoc_adj = 0;
+        rtc_epoc_ref = rtc_epoc_adj = 0;
         if ((path = find_cfg_file(m->cmos, ".bin"))) {
             cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
             if ((f = fopen(cpath, "rb"))) {
