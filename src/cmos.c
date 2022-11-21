@@ -83,9 +83,9 @@ static time_t cmos_update_rtc(void)
             rtc_tm.tm_sec = bcd2bin(cmos[0]);
             rtc_tm.tm_min = bcd2bin(cmos[2]);
             rtc_tm.tm_hour = bcd2bin(cmos[4]);
-            rtc_tm.tm_wday = bcd2bin(cmos[6] - 1);
+            rtc_tm.tm_wday = bcd2bin(cmos[6]) - 1;
             rtc_tm.tm_mday = bcd2bin(cmos[7]);
-            rtc_tm.tm_mon = bcd2bin(cmos[8] - 1);
+            rtc_tm.tm_mon = bcd2bin(cmos[8]) - 1;
             rtc_tm.tm_year = guess_century(bcd2bin(cmos[9]));
         }
         rtc_tm.tm_isdst = -1;
