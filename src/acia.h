@@ -25,5 +25,7 @@ void acia_loadstate(ACIA *acia, FILE *f);
 
 void acia_dcdhigh(ACIA *acia);
 void acia_dcdlow(ACIA *acia);
+void acia_ctson(ACIA *acia);
+void acia_ctsoff(ACIA *acia);
 
 #endif

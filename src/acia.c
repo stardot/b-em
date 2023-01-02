@@ -82,6 +82,22 @@ void acia_dcdlow(ACIA *acia) {
     acia_updateint(acia);
 }
 
+void acia_ctson(ACIA *acia)
+{
+    if (!(acia->status_reg & CTS)) {
+        acia->status_reg |= CTS|TXD_REG_EMP;
+        acia_updateint(acia);
+    }
+}
+
+void acia_ctsoff(ACIA *acia)
+{
+    if (acia->status_reg & CTS) {
+        acia->status_reg &= ~(CTS|TXD_REG_EMP);
+        acia_updateint(acia);
+    }
+}
+
 void acia_poll(ACIA *acia)
 {
     if ((acia->status_reg & (TXD_REG_EMP|CTS)) == CTS) {

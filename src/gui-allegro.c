@@ -25,6 +25,7 @@
 #include "sdf.h"
 #include "sound.h"
 #include "sn76489.h"
+#include "sysacia.h"
 #include "tape.h"
 #include "tapecat-allegro.h"
 #include "tube.h"
@@ -118,6 +119,7 @@ static ALLEGRO_MENU *create_file_menu(void)
     al_append_menu_item(menu, "Save Screenshot...", IDM_FILE_SCREEN_SHOT, 0, NULL, NULL);
     add_checkbox_item(menu, "Print to file", IDM_FILE_PRINT, print_dest == PDEST_FILE);
     add_checkbox_item(menu, "Print to command", IDM_FILE_PCMD, print_dest == PDEST_PIPE);
+    add_checkbox_item(menu, "Serial to file", IDM_FILE_SERIAL, sysacia_fp);
     add_checkbox_item(menu, "Record Music 5000 to file", IDM_FILE_M5000, music5000_fp);
     add_checkbox_item(menu, "Record Paula to file", IDM_FILE_PAULAREC, paula_fp);
     al_append_menu_item(menu, "Exit", IDM_FILE_EXIT, 0, NULL, NULL);
@@ -698,6 +700,25 @@ static void file_print_pipe(ALLEGRO_EVENT *event)
     }
 }
 
+static void serial_rec(ALLEGRO_EVENT *event)
+{
+    ALLEGRO_FILECHOOSER *chooser;
+    ALLEGRO_DISPLAY *display;
+
+    if (sysacia_fp)
+        sysacia_rec_stop();
+    else if ((chooser = al_create_native_file_dialog(savestate_name, "Record serial to file", "*.txt", ALLEGRO_FILECHOOSER_SAVE))) {
+        display = (ALLEGRO_DISPLAY *)(event->user.data2);
+        while (al_show_native_file_dialog(display, chooser)) {
+            if (al_get_native_file_dialog_count(chooser) <= 0)
+                break;
+            if (sysacia_rec_start(al_get_native_file_dialog_path(chooser, 0)))
+                break;
+        }
+        al_destroy_native_file_dialog(chooser);
+    }
+}
+
 static void m5000_rec(ALLEGRO_EVENT *event)
 {
     ALLEGRO_FILECHOOSER *chooser;
@@ -1190,6 +1211,9 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             break;
         case IDM_FILE_PCMD:
             file_print_pipe(event);
+            break;
+        case IDM_FILE_SERIAL:
+            serial_rec(event);
             break;
         case IDM_FILE_M5000:
             m5000_rec(event);
