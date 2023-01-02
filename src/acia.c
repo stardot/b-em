@@ -32,11 +32,6 @@ static void acia_updateint(ACIA *acia) {
        interrupt&=~4;
 }
 
-void acia_reset(ACIA *acia) {
-    acia->status_reg = (acia->status_reg & (CTS|DCD)) | TXD_REG_EMP;
-    acia_updateint(acia);
-}
-
 uint8_t acia_read(ACIA *acia, uint16_t addr) {
     uint8_t temp;
 
@@ -67,7 +62,7 @@ void acia_write(ACIA *acia, uint16_t addr, uint8_t val) {
                 acia->tx_end(acia);
         acia->control_reg = val;
         if (val == 3)
-            acia_reset(acia);
+            acia->status_reg = (acia->status_reg & (CTS|DCD)) | TXD_REG_EMP;
         if (acia->set_params)
             acia->set_params(acia, val);
         acia_updateint(acia);

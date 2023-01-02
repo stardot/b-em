@@ -15,7 +15,6 @@ struct acia {
     void *udata;
 };
 
-void acia_reset(ACIA *acia);
 uint8_t acia_read(ACIA *acia, uint16_t addr);
 void acia_write(ACIA *acia, uint16_t addr, uint8_t val);
 void acia_poll(ACIA *acia);

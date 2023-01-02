@@ -113,7 +113,6 @@ void main_reset()
     sysvia_reset();
     uservia_reset();
     serial_reset();
-    acia_reset(&sysacia);
     wd1770_reset();
     i8271_reset();
     scsi_reset();
