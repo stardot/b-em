@@ -194,6 +194,35 @@ void log_dump(const char *prefix, uint8_t *data, size_t size)
     }
 }
 
+void log_bitfield(const char *fmt, unsigned value, const char **names)
+{
+    unsigned opt = log_options & ll_debug.mask;
+    if (opt) {
+        char buf[128];
+        char *ptr = buf;
+        char *end = buf + sizeof(buf);
+        const char *name;
+        bool comma = false;
+        for (int i = 0; (name = names[i]); ++i) {
+            if (value & 1) {
+                size_t nlen = strlen(name);
+                char *nptr = ptr + 1 + nlen;
+                if (ptr >= end) {
+                    log_debug("log: bitfield truncated");
+                    break;
+                }
+                if (comma)
+                    *ptr++ = ',';
+                memcpy(ptr, name, nlen);
+                ptr = nptr;
+            }
+            value >>= 1;
+        }
+        *ptr = 0;
+        log_debug(fmt, buf);
+    }
+}
+
 #endif
 
 void log_info(const char *fmt, ...)
