@@ -45,7 +45,7 @@ Offset  Description                 Access
 #include "6502.h"
 #include "led.h"
 
-#define SCSI_INT_NUM 16
+#define SCSI_INT_NUM 4
 
 bool scsi_enabled = false;
 

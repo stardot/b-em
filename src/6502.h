@@ -12,23 +12,14 @@ extern PREG p;
 extern int output;
 extern int interrupt;
 /* Bit fields for interrupt
- * Bit  0 (00001): System VIA
- * Bit  1 (00002): User VIA
- * Bit  2 (00004): ACIA
- * Bit  3 (00008): TUBE
- * Bit  4 (00010):
- * Bit  5 (00020):
- * Bit  6 (00040):
- * Bit  7 (00080): Sys VIA T2 special case
- * Bit  8 (00100):
- * Bit  9 (00200):
- * Bit 10 (00400):
- * Bit 11 (00800):
- * Bit 12 (01000):
- * Bit 13 (02000):
- * Bit 14 (04000):
- * Bit 15 (08000):
- * Bit 16 (10000): SCSI
+ * Bit  0 (01): System VIA
+ * Bit  1 (02): User VIA
+ * Bit  2 (04): ACIA
+ * Bit  3 (08): TUBE
+ * Bit  4 (10): SCSI
+ * Bit  5 (20):
+ * Bit  6 (40):
+ * Bit  7 (80): Sys VIA T2 special case
  */
 extern int nmi;
 
