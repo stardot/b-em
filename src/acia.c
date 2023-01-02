@@ -55,6 +55,7 @@ void acia_write(ACIA *acia, uint16_t addr, uint8_t val) {
         if (acia->tx_hook)
             acia->tx_hook(acia, val);
         acia->status_reg &= ~TXD_REG_EMP;
+        acia_updateint(acia);
     }
     else if (val != acia->control_reg) {
         if ((val & 0x60) != 0x20) // interupt being turned off
@@ -62,7 +63,7 @@ void acia_write(ACIA *acia, uint16_t addr, uint8_t val) {
                 acia->tx_end(acia);
         acia->control_reg = val;
         if (val == 3)
-            acia->status_reg = (acia->status_reg & (CTS|DCD)) | TXD_REG_EMP;
+            acia->status_reg &= ~(CTS|DCD);
         if (acia->set_params)
             acia->set_params(acia, val);
         acia_updateint(acia);
@@ -81,8 +82,9 @@ void acia_dcdlow(ACIA *acia) {
     acia_updateint(acia);
 }
 
-void acia_poll(ACIA *acia) {
-    if (!(acia->status_reg & TXD_REG_EMP)) {
+void acia_poll(ACIA *acia)
+{
+    if ((acia->status_reg & (TXD_REG_EMP|CTS)) == CTS) {
         acia->status_reg |= TXD_REG_EMP;
         acia_updateint(acia);
     }
