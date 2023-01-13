@@ -18,12 +18,16 @@ static void sysvia_set_params(ACIA *acia, uint8_t val) {
     }
 }
 
-static void sysacia_tx_hook(ACIA *acia, uint8_t data) {
-    putc(data, sysacia_fp);
+static void sysacia_tx_hook(ACIA *acia, uint8_t data)
+{
+    if (sysacia_fp)
+        putc(data, sysacia_fp);
 }
 
-static void sysacia_tx_end(ACIA *acia) {
-    fflush(sysacia_fp);
+static void sysacia_tx_end(ACIA *acia)
+{
+    if (sysacia_fp)
+        fflush(sysacia_fp);
 }
 
 ACIA sysacia = {
@@ -37,6 +41,7 @@ void sysacia_rec_stop(void)
 {
     if (sysacia_fp) {
         fclose(sysacia_fp);
+        sysacia_fp = NULL;
         acia_ctsoff(&sysacia);
     }
 }
