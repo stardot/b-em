@@ -133,6 +133,7 @@ void uef_poll()
                         gzgetc(uef_f);
                         uef_chunklen -= 3;
                         uef_chunkpos = 1;
+                        acia_dcdlow(&sysacia);
                 }
                 else
                 {
