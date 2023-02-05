@@ -1,3 +1,4 @@
+#define _DEBUG
 #include "b-em.h"
 #include "main.h"
 #include "via.h"
@@ -344,7 +345,7 @@ static const uint8_t allegro2bbclogical[ALLEGRO_KEY_MAX] =
     0xbb,   // 57   ALLEGRO_KEY_F11
     0xaa,   // 58   ALLEGRO_KEY_F12
     0x70,   // 59   ALLEGRO_KEY_ESCAPE
-    0xbb,   // 60   ALLEGRO_KEY_TILDE
+    0xaa,   // 60   ALLEGRO_KEY_TILDE
     0xaa,   // 61   ALLEGRO_KEY_MINUS
     0xaa,   // 62   ALLEGRO_KEY_EQUALS
     0x59,   // 63   ALLEGRO_KEY_BACKSPACE
