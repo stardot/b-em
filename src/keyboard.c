@@ -1045,6 +1045,8 @@ void key_char_event(const ALLEGRO_EVENT *event)
         keycode = map_keypad_intern(keycode, unichar);
         if (keycode == ALLEGRO_KEY_A && keyas && !keylogical)
             keycode = ALLEGRO_KEY_CAPSLOCK;
+        else if (keycode == ALLEGRO_KEY_S && keyas && !keylogical)
+            keycode = ALLEGRO_KEY_LCTRL;
         for (int act = 0; act < KEY_ACTION_MAX; act++) {
             log_debug("keyboard: checking key action %d:%s codes %d<>%d, alt %d<>%d", act, keyact_const[act].name, keycode, keyactions[act].keycode, hostalt, keyactions[act].altstate);
             if (keycode == keyactions[act].keycode && keyactions[act].altstate == hostalt) {
@@ -1088,6 +1090,10 @@ void key_up_event(const ALLEGRO_EVENT *event)
                 hostctrl = false;
                 shiftctrl = true;
             }
+            else if (keycode == ALLEGRO_KEY_A && keyas && !keylogical)
+                keycode = ALLEGRO_KEY_CAPSLOCK;
+            else if (keycode == ALLEGRO_KEY_S && keyas && !keylogical)
+                keycode = ALLEGRO_KEY_LCTRL;
             if (shiftctrl && keylogical)
                 set_logical_shift_ctrl_if_idle();
             keycode = map_keypad_intern(keycode, unichar);
