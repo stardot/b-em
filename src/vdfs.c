@@ -4646,6 +4646,11 @@ static void osfsc(void)
             break;
         case 0x06: // new filesystem taking over.
             fs_flags &= ~VDFS_ACTIVE;
+            if (!MASTER) {
+                // OSBYTE to close SPOO/EXEC files.
+                a = 0x77;
+                pc = 0xfff4;
+            }
             break;
         case 0x07:
             x = MIN_CHANNEL;
