@@ -4845,13 +4845,15 @@ static void serv_boot(void)
     if (vdfs_enabled && (!key_any_down() || key_code_down(ALLEGRO_KEY_S))) {
         if (readmem(0x028d)) { /* last break type */
             close_all();
-            cur_dir.dir = prev_dir.dir = cat_dir = &root_dir;
+            cur_dir.dir = prev_dir.dir = lib_dir.dir = cat_dir = &root_dir;
             cur_dir.drive = lib_dir.drive = 0;
             cur_dir.dfs_dir = lib_dir.dfs_dir = '$';
             vdfs_findres res;
-            lib_dir.dir = find_entry_adfs("Lib", &res, &cur_dir);
+            vdfs_entry *ent = find_entry_adfs("Lib*", &res, &cur_dir);
+            if (ent)
+                lib_dir.dir = ent;
             if (vdfs_boot_dir) {
-                vdfs_entry *ent = find_entry(vdfs_boot_dir, &res, &cur_dir);
+                ent = find_entry(vdfs_boot_dir, &res, &cur_dir);
                 if (ent && ent->attribs & ATTR_EXISTS) {
                     if (ent->attribs & ATTR_IS_DIR)
                         cur_dir.dir = ent;
