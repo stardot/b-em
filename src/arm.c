@@ -566,47 +566,45 @@ static const char* flagname = "N Z C V I F M1 M0 ";
 // Print register value in CPU standard form.
 static size_t arm_dbg_reg_print(int which, char *buf, size_t bufsize) {
     if (which == i_PSR) {
-        int i;
-        int bit;
-        char c;
-        const char *flagnameptr = flagname;
-        int psr = arm_dbg_reg_get(i_PSR);
-
         if (bufsize < 40) {
             strncpy(buf, "buffer too small!!!", bufsize);
+            return strlen(buf);
         }
-
-        bit = 0x80;
-        for (i = 0; i < 8; i++) {
+        const char *flagnameptr = flagname;
+        char *bufptr = buf;
+        int psr = arm_dbg_reg_get(i_PSR);
+        int bit = 0x80;
+        for (int i = 0; i < 8; i++) {
+            char c;
             if (psr & bit) {
                 c = '1';
             } else {
                 c = '0';
             }
             do {
-                *buf++ = *flagnameptr++;
+                *bufptr++ = *flagnameptr++;
             } while (*flagnameptr != ' ');
             flagnameptr++;
-            *buf++ = ':';
-            *buf++ = c;
-            *buf++ = ' ';
+            *bufptr++ = ':';
+            *bufptr++ = c;
+            *bufptr++ = ' ';
             bit >>= 1;
         }
         switch (psr & 3) {
         case 0:
-            sprintf(buf, "(USR)");
+            sprintf(bufptr, "(USR)");
             break;
         case 1:
-            sprintf(buf, "(FIQ)");
+            sprintf(bufptr, "(FIQ)");
             break;
         case 2:
-            sprintf(buf, "(IRQ)");
+            sprintf(bufptr, "(IRQ)");
             break;
         case 3:
-            sprintf(buf, "(SVC)");
+            sprintf(bufptr, "(SVC)");
             break;
         }
-        return strlen(buf);
+        return bufptr - buf + strlen(bufptr);
     } else {
         return snprintf(buf, bufsize, "%08"PRIx32, arm_dbg_reg_get(which));
     }
