@@ -919,7 +919,7 @@ void arm_exec()
                 opcode2=opcode3;
                 opcode3=readarml(PC);
                 if (arm_debug_enabled)
-                    debug_preexec(&tubearm_cpu_debug, PC);
+                    debug_preexec(&tubearm_cpu_debug, PC-8);
                 if (flaglookup[opcode>>28][armregs[15]>>28])
                         {
                                 switch ((opcode>>20)&0xFF)
