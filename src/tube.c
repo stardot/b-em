@@ -17,6 +17,7 @@
 #include "z80.h"
 #include "pdp11/pdp11.h"
 #include "musahi/m68k.h"
+#include "sprow.h"
 
 int tube_multipler = 1;
 int tube_speed_num = 0;
@@ -71,6 +72,8 @@ void tube_updateints()
             else if (tube_type == TUBE68000)
                 m68k_set_virq(2, 1);
 #endif
+            else if (tube_type == TUBESPROW)
+                sprow_interrupt(1);
         }
     }
     else if (tube_irq & 1) {
@@ -87,6 +90,8 @@ void tube_updateints()
             log_debug("tube: parasite NMI asserted");
             if (tube_type == TUBEPDP11)
                 pdp11_interrupt(0x80, 7);
+            else if (tube_type == TUBESPROW)
+                sprow_interrupt(2);
         }
     }
     else if (tube_irq & 2)
