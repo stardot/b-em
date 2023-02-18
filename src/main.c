@@ -64,6 +64,7 @@
 #include "arm.h"
 #include "x86_tube.h"
 #include "z80.h"
+#include "sprow.h"
 
 #undef printf
 
@@ -97,7 +98,7 @@ const emu_speed_t emu_speeds[NUM_EMU_SPEEDS] = {
     {  "25%", 1.0 / (50.0 * 0.25), 1 },
     {  "50%", 1.0 / (50.0 * 0.50), 1 },
     {  "75%", 1.0 / (50.0 * 0.75), 1 },
-    { "100%", 1.0 / 50.0,          1 },
+    { "100%", 1.0 / 50.0,          2 },
     { "150%", 1.0 / (50.0 * 1.50), 2 },
     { "200%", 1.0 / (50.0 * 2.00), 2 },
     { "300%", 1.0 / (50.0 * 3.00), 3 },
@@ -594,6 +595,7 @@ void main_close()
     w65816_close();
     n32016_close();
     mc6809nc_close();
+    sprow_close();
     disc_close(0);
     disc_close(1);
     scsi_close();

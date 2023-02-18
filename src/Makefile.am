@@ -14,7 +14,7 @@ amrefresh:
 #   INCLUDE_DEBUGGER - include the cpu_debug implementation
 # USE_MEMORY_POINTER - do not assume Co Pro memory starts at address 0
 
-b_em_CFLAGS = $(allegro_CFLAGS) -DBEM -DINCLUDE_DEBUGGER -DUSE_MEMORY_POINTER
+b_em_CFLAGS = $(allegro_CFLAGS) -DBEM -DINCLUDE_DEBUGGER -DUSE_MEMORY_POINTER -DMODET -DMODE32 -DBEEBEM
 
 # workaround for Win32 Allegro, which has `allegro-config' missing
 if OS_WIN
@@ -134,7 +134,16 @@ b_em_SOURCES = \
 	resid-fp/wave8580_PST.cc \
 	resid-fp/wave8580_PS_.cc \
 	resid-fp/wave8580_P_T.cc \
-	resid-fp/wave8580__ST.cc
+	resid-fp/wave8580__ST.cc \
+	ARMulator/armemu.c \
+	ARMulator/arminit.c \
+	ARMulator/armmem.c \
+	ARMulator/armsupp.c \
+	ARMulator/bag.c \
+	ARMulator/thumbemu.c \
+	ARMulator/armdis.cpp \
+	map.c \
+	sprow.c
 
 if NO_TSEARCH
 b_em_SOURCES += tsearch.c

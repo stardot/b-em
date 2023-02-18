@@ -18,6 +18,7 @@
 #include "copro-pdp11.h"
 #include "pdp11/pdp11_debug.h"
 #include "mc68000tube.h"
+#include "sprow.h"
 
 #define CFG_SECT_LEN 20
 
@@ -73,7 +74,8 @@ TUBE tubes[NUM_TUBES]=
 #ifdef M68K
     {"68000",          tube_68000_init, tube_68000_rst,  &mc68000_cpu_debug,   0x8000, "CiscOS",           4 },
 #endif
-    {"65816Dossy",     w65816_init_dossy,     w65816_reset,    &tube65816_cpu_debug, 0x8000, "Dossy_816",       16 }
+    {"65816Dossy",     w65816_init_dossy,     w65816_reset,    &tube65816_cpu_debug, 0x8000, "Dossy_816",       16 },
+    {"Sprow ARM",      sprow_init,        sprow_reset,  &tubesprow_cpu_debug,   0x80000, "Sprow_ARM",      4 },
 };
 
 static fdc_type_t model_find_fdc(const char *name, const char *model)

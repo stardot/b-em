@@ -510,6 +510,7 @@ Thanks
 * Robert Schmidt for The BBC Lives!
 * DJ Delorie for DJGPP
 * Shawn Hargreaves for Allegro
+* Robert Sprowson for the ARM7 TDMI firmware. (http://www.sprow.co.uk/bbc/armcopro.htm)
 
 Acorn for making the BBC in the first place:
 
