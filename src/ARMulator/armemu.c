@@ -813,10 +813,10 @@ ARMul_Emulate26 (ARMul_State * state)
                 else
                 {
                     ARMword cp14r1;
-                    int do_int = 0;
 
                     state->CP14R0_CCD = (ARMword)-1;
 check_PMUintr:
+                    int do_int = 0;
                     cp14r0 |= ARMul_CP14_R0_FLAG2;
                     (void) state->CPWrite[14] (state, 0, cp14r0);
 
@@ -1670,8 +1670,6 @@ mainswitch:
                 {
                     if (AEBITS (4, 7) == 0x7)
                     {
-                        extern int SWI_vector_installed;
-
                         /* Hardware is allowed to optionally override this
                         instruction and treat it as a breakpoint.  Since
                         this is a simulator not hardware, we take the position

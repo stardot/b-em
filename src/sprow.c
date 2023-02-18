@@ -270,7 +270,7 @@ static uint32_t sprow_dbg_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf
   int len = snprintf(buf, bufsize, "%08"PRIx32" %08"PRIx32" ", addr, instr);
   buf += len;
   bufsize -= len;
-  strncpy(buf, dest, strlen(dest));
+  strncpy(buf, dest, bufsize);
 
   while (strlen(buf) < 40)
     strcat(buf, " ");
