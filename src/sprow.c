@@ -272,8 +272,8 @@ static uint32_t sprow_dbg_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf
   bufsize -= len;
   strncpy(buf, dest, bufsize);
 
-  while (strlen(buf) < 40)
-    strcat(buf, " ");
+  if ((len = strlen(buf)) < 40)
+    strncpy(buf, "                                        ", 40-len);
 
    return addr + 4;
 };
