@@ -1670,8 +1670,6 @@ mainswitch:
                 {
                     if (AEBITS (4, 7) == 0x7)
                     {
-                        extern int SWI_vector_installed;
-
                         /* Hardware is allowed to optionally override this
                         instruction and treat it as a breakpoint.  Since
                         this is a simulator not hardware, we take the position
@@ -1683,6 +1681,8 @@ mainswitch:
                         Thumb mode it does).  So intercept the instruction here
                         and generate a breakpoint SWI instead.  */
 #ifndef BEEBEM
+						extern int SWI_vector_installed;
+
                         if (! SWI_vector_installed)
                             ARMul_OSHandleSWI (state, SWI_Breakpoint);
                         else
