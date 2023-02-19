@@ -813,10 +813,10 @@ ARMul_Emulate26 (ARMul_State * state)
                 else
                 {
                     ARMword cp14r1;
-                    int do_int = 0;
 
                     state->CP14R0_CCD = (ARMword)-1;
 check_PMUintr:
+                    int do_int = 0;
                     cp14r0 |= ARMul_CP14_R0_FLAG2;
                     (void) state->CPWrite[14] (state, 0, cp14r0);
 
