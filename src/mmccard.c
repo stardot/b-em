@@ -84,7 +84,7 @@ void mmccard_write(uint8_t byte)
                             break;
                         case 0x50: // Set block length.
                             address = (mmc_args[0] << 24) | (mmc_args[1] << 16) | (mmc_args[2] << 8) | mmc_args[3];
-                            log_debug("mmccard: set block length to %lx", address);
+                            log_debug("mmccard: set block length to %llx", address);
                             if (address > 0 && address <= sizeof(mmc_buffer)) {
                                 mmc_shiftreg = 0x00;
                                 mmc_block_len = address;
@@ -96,7 +96,7 @@ void mmccard_write(uint8_t byte)
                             address = (mmc_args[0] << 24) | (mmc_args[1] << 16) | (mmc_args[2] << 8) | mmc_args[3];
                             if (mmc_sdhc_mode)
                                 address *= 0x200;
-                            log_debug("mmccard: read from %lx", address);
+                            log_debug("mmccard: read from %llx", address);
                             if (address < mmc_size) {
                                 if (!fseek(mmc_fp, address, SEEK_SET) && fread(mmc_buffer, mmc_block_len, 1, mmc_fp) == 1) {
                                     mmc_shiftreg = 0x00;
@@ -116,7 +116,7 @@ void mmccard_write(uint8_t byte)
                             address = (mmc_args[0] << 24) | (mmc_args[1] << 16) | (mmc_args[2] << 8) | mmc_args[3];
                             if (mmc_sdhc_mode)
                                 address *= 0x200;
-                            log_debug("mmccard: write to %lx", address);
+                            log_debug("mmccard: write to %llx", address);
                             if (mmc_wprot) {
                                 mmc_shiftreg = 0xff;
                                 mmc_state = MMC_IDLE;
@@ -215,7 +215,7 @@ void mmccard_load(char *fn)
     fseek(fp, 0, SEEK_END);
     mmc_size = ftell(fp);
     mmc_fp = fp;
-    log_debug("mmcard: %s loaded, size=%ld", fn, mmc_size);
+    log_debug("mmcard: %s loaded, size=%lld", fn, mmc_size);
 }
 
 void mmccard_eject(void)
