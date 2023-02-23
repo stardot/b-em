@@ -3450,9 +3450,9 @@ static bool copy_file(vdfs_entry *old_ent, vdfs_entry *new_ent)
 static bool copy_file(vdfs_entry *old_ent, vdfs_entry *new_ent)
 {
     bool res = false;
-    int old_fp = fopen(old_ent->host_path, "rb");
+    FILE *old_fp = fopen(old_ent->host_path, "rb");
     if (old_fp) {
-        int new_fp = fopen(new_ent->host_path, "wb");
+        FILE *new_fp = fopen(new_ent->host_path, "wb");
         if (new_fp) {
             res = true;
             int ch = getc(old_fp);
