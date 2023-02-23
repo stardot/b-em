@@ -1206,13 +1206,13 @@ void x86_exec()
         signed char offset;
         int tempws;
         uint32_t ea, templ;
-        int c,cycdiff;
+        int c; //cycdiff;
         int tempi;
 //        tubecycles+=(cycs<<2);
 //        printf("X86exec %i %i\n",tubecycles,cycs);
         while (tubecycles>0)
         {
-                cycdiff=tubecycles;
+//                cycdiff=tubecycles;
 //                old83=old82;
 //                old82=old8;
 //                old8=pc+(CS<<16);
@@ -3865,7 +3865,7 @@ void x86_exec()
                         ss=oldss;
                         ssegs=0;
                 }
-                cycdiff-=tubecycles;
+//                cycdiff-=tubecycles;
 
 x86ins++;
 //if (x86ins==65300000) x86output=1;
