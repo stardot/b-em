@@ -101,7 +101,8 @@ int main(int argc, char **argv)
 {
         const char *fn;
         int status, len, size, sectors, cyl;
-        char *dat_fn, *dsc_fn, geom[22];
+        char *dat_fn, *dsc_fn;
+        unsigned char geom[22];
         FILE *dat_fp, *dsc_fp;
 
         if (argc == 3)
