@@ -415,7 +415,7 @@ static fp_reg READ_EA_FPE(int ea)
             r.i = (uint64)(d1) << 32 | (uint64)(d2);
             break;
         }
-        default:    fatalerror("MC68040: READ_EA_FPE: unhandled mode %d, reg %d, at %08X\n", mode, reg, REG_PC);
+        default: r.i = 0; fatalerror("MC68040: READ_EA_FPE: unhandled mode %d, reg %d, at %08X\n", mode, reg, REG_PC);
     }
 
     return r;
