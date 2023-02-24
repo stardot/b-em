@@ -1,8 +1,8 @@
 typedef enum
 {
-  NO_ERROR,
-  DELETED_OLD_PAIR,
-  NO_SUCH_PAIR,
+  MAP_NO_ERROR,
+  MAP_DELETED_OLD_PAIR,
+  MAP_NO_SUCH_PAIR,
 }
 MAP_Error;
 

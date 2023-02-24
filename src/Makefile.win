@@ -1,11 +1,11 @@
-VPATH = . resid-fp NS32016 darm mc6809nc pdp11 musahi
+VPATH = . resid-fp NS32016 darm mc6809nc pdp11 musahi ARMulator
 
 # The following flags are used by PiTubeDirect Co Pros:
 #                BEM - fixes for compilation in B-Em envorinment
 #   INCLUDE_DEBUGGER - include the cpu_debug implementation
 # USE_MEMORY_POINTER - do not assume Co Pro memory starts at address 0
 
-COMMON_FLAGS = -O3 -Wall -DBEM -DVERSION=\"$(VERSION)\" -DINCLUDE_DEBUGGER -DUSE_MEMORY_POINTER -I /usr/i686-w64-mingw32/include $(ALLEGRO_INC)
+COMMON_FLAGS = -O3 -Wall -DBEM -DVERSION=\"$(VERSION)\" -DINCLUDE_DEBUGGER -DUSE_MEMORY_POINTER -DMODET -DMODE32 -DBEEBEM -I ../src -I /usr/i686-w64-mingw32/include $(ALLEGRO_INC)
 CFLAGS       = -std=gnu99 $(COMMON_FLAGS)
 CXXFLAGS     = $(COMMON_FLAGS)
 LDFLAGS	     = $(ALLEGRO_LIB)
@@ -51,6 +51,7 @@ OBJ = \
     keydef-allegro.o \
     led.o \
     logging.o \
+    map.o \
     main.o \
     mem.o \
     midi-windows.o \
@@ -69,6 +70,7 @@ OBJ = \
     serial.o \
     sn76489.o \
     sound.o \
+    sprow.o \
     sysacia.o \
     sysvia.o \
     tape.o \
@@ -131,12 +133,20 @@ M68000OBJ = \
     m68kcpu.o \
     m68kdasm.o
 
+ARMEMUOBJ = armdis.o \
+    armemu.o \
+    arminit.o \
+    armmem.o \
+    armsupp.o \
+    bag.o \
+    thumbemu.o
+
 LIBS = -lz -lallegro_audio -lallegro_acodec -lallegro_primitives -lallegro_dialog -lallegro_image -lallegro_font -lallegro -mwindows -lgdi32 -lwinmm -lstdc++
 
 all : b-em.exe hdfmt.exe jstest.exe gtest.exe
 
-b-em.exe: $(OBJ) $(SIDOBJ) $(NS32KOBJ) $(MC6809OBJ) $(PDP11OBJ)  $(M68000OBJ)
-	$(CC) $(LDFLAGS) $(OBJ) $(SIDOBJ) $(NS32KOBJ) $(MC6809OBJ) $(PDP11OBJ) $(M68000OBJ) -o "b-em.exe" $(LIBS)
+b-em.exe: $(OBJ) $(SIDOBJ) $(NS32KOBJ) $(MC6809OBJ) $(PDP11OBJ)  $(M68000OBJ) $(ARMEMUOBJ)
+	$(CC) $(LDFLAGS) $(OBJ) $(SIDOBJ) $(NS32KOBJ) $(MC6809OBJ) $(PDP11OBJ) $(M68000OBJ) $(ARMEMUOBJ) -o "b-em.exe" $(LIBS)
 
 clean :
 	del *.o *.exe *.res

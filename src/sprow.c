@@ -221,7 +221,7 @@ bool sprow_init(void *rom)
 static ARMword PeekRegister(ARMul_State *state, ARMword registerNumber)
 {
   int value = 0;
-  if (MAP_getsecond(registerNumber, &value) == NO_ERROR)
+  if (MAP_getsecond(registerNumber, &value) == MAP_NO_ERROR)
     return value;
   else
     return 0;

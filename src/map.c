@@ -63,7 +63,7 @@ MAP_putpair (int first, int second)
 {
   int junk;
 
-  if (MAP_getfirst (&junk, second) != NO_SUCH_PAIR)
+  if (MAP_getfirst (&junk, second) != MAP_NO_SUCH_PAIR)
     MAP_killpair_bysecond (second);
   MAP_addtolist (&MAP_lookupbyfirst[hash (first)], first, second);
   MAP_addtolist (&MAP_lookupbysecond[hash (second)], first, second);
@@ -79,9 +79,9 @@ MAP_getfirst (int *first, int second)
     if (look->second == second)
       {
 	*first = look->first;
-	return NO_ERROR;
+	return MAP_NO_ERROR;
       }
-  return NO_SUCH_PAIR;
+  return MAP_NO_SUCH_PAIR;
 }
 
 MAP_Error
@@ -95,11 +95,11 @@ MAP_getsecond (int first, int *second)
       if (look->first == first)
 	{
 	  *second = look->second;
-	  return NO_ERROR;
+	  return MAP_NO_ERROR;
 	}
       look = look->next;
     }
-  return NO_SUCH_PAIR;
+  return MAP_NO_SUCH_PAIR;
 }
 
 MAP_Error
@@ -107,11 +107,11 @@ MAP_killpair_byfirst (int first)
 {
   int second;
 
-  if (MAP_getsecond (first, &second) == NO_SUCH_PAIR)
-    return NO_SUCH_PAIR;
+  if (MAP_getsecond (first, &second) == MAP_NO_SUCH_PAIR)
+    return MAP_NO_SUCH_PAIR;
   MAP_removefromlist (&MAP_lookupbyfirst[hash (first)], first);
   MAP_removefromlist (&MAP_lookupbysecond[hash (second)], first);
-  return NO_ERROR;
+  return MAP_NO_ERROR;
 }
 
 MAP_Error
@@ -119,11 +119,11 @@ MAP_killpair_bysecond (int second)
 {
   int first;
 
-  if (MAP_getfirst (&first, second) == NO_SUCH_PAIR)
-    return NO_SUCH_PAIR;
+  if (MAP_getfirst (&first, second) == MAP_NO_SUCH_PAIR)
+    return MAP_NO_SUCH_PAIR;
   MAP_removefromlist (&MAP_lookupbyfirst[hash (first)], first);
   MAP_removefromlist (&MAP_lookupbysecond[hash (second)], first);
-  return NO_ERROR;
+  return MAP_NO_ERROR;
 }
 
 void

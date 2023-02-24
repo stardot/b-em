@@ -2,7 +2,7 @@
 
 set -e
 export VERSION=`utils/b-em-version-str.sh`
-export VPATH='../src ../src/resid-fp ../src/NS32016 ../src/darm ../src/mc6809nc ../src/pdp11 ../src/musahi'
+export VPATH='../src ../src/resid-fp ../src/NS32016 ../src/darm ../src/mc6809nc ../src/pdp11 ../src/musahi ../src/ARMulator'
 
 dlls='allegro-5.2.dll             allegro_acodec-5.2.dll
       allegro_audio-5.2.dll       allegro_dialog-5.2.dll

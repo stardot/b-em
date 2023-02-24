@@ -3,6 +3,7 @@
 
 #include "savestate.h"
 #include <stdbool.h>
+#include <stdint.h>
 
 typedef enum {
     TUBE6502,
