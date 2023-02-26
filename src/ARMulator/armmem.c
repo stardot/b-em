@@ -2,12 +2,14 @@
     Copyright (C) 2010 Kieran Mockford.
 */
 
+#include <stdint.h>
+
 #include "armopts.h"
 #include "armos.h"
 #include "armdefs.h"
 #include "ansidecl.h"
 
-#include "tube.h"
+#include "../tube.h"
 
 #ifdef VALIDATE			/* for running the validate suite */
 #define TUBE 48 * 1024 * 1024	/* write a char on the screen */

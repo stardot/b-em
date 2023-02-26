@@ -68,7 +68,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>VERSION="vsX";USE_MEMORY_POINTER;BEM;WIN32;INCLUDE_DEBUGGER;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>VERSION="vsX";USE_MEMORY_POINTER;BEM;MODET;MODE32;BEEBEM;WIN32;INCLUDE_DEBUGGER;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <UndefinePreprocessorDefinitions>UNICODE;_UNICODE;%(UndefinePreprocessorDefinitions)</UndefinePreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\packages\Allegro.5.2.6\build\native\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
@@ -87,7 +87,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>VERSION="vsX";USE_MEMORY_POINTER;BEM;WIN32;INCLUDE_DEBUGGER;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>VERSION="vsX";USE_MEMORY_POINTER;BEM;WIN32;MODET;MODE32;BEEBEM;INCLUDE_DEBUGGER;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <UndefinePreprocessorDefinitions>UNICODE;_UNICODE;%(UndefinePreprocessorDefinitions)</UndefinePreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <AdditionalIncludeDirectories>..\packages\Allegro.5.2.6\build\native\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -112,6 +112,22 @@
     <ClInclude Include="acia.h" />
     <ClInclude Include="adc.h" />
     <ClInclude Include="arm.h" />
+    <ClInclude Include="ARMulator\acconfig.h" />
+    <ClInclude Include="ARMulator\ansidecl.h" />
+    <ClInclude Include="ARMulator\armdefs.h" />
+    <ClInclude Include="ARMulator\armdis.h" />
+    <ClInclude Include="ARMulator\armemu.h" />
+    <ClInclude Include="ARMulator\armfpe.h" />
+    <ClInclude Include="ARMulator\armopts.h" />
+    <ClInclude Include="ARMulator\armos.h" />
+    <ClInclude Include="ARMulator\bag.h" />
+    <ClInclude Include="ARMulator\config.h" />
+    <ClInclude Include="ARMulator\dbg_conf.h" />
+    <ClInclude Include="ARMulator\dbg_cp.h" />
+    <ClInclude Include="ARMulator\dbg_hif.h" />
+    <ClInclude Include="ARMulator\dbg_rdi.h" />
+    <ClInclude Include="ARMulator\gdbhost.h" />
+    <ClInclude Include="ARMulator\iwmmxt.h" />
     <ClInclude Include="b-em.h" />
     <ClInclude Include="bbctext.h" />
     <ClInclude Include="cmos.h" />
@@ -136,6 +152,7 @@
     <ClInclude Include="disc.h" />
     <ClInclude Include="fdi.h" />
     <ClInclude Include="fdi2raw.h" />
+    <ClInclude Include="fullscreen.h" />
     <ClInclude Include="gui-allegro.h" />
     <ClInclude Include="hfe.h" />
     <ClInclude Include="i8271.h" />
@@ -147,11 +164,13 @@
     <ClInclude Include="led.h" />
     <ClInclude Include="logging.h" />
     <ClInclude Include="main.h" />
+    <ClInclude Include="map.h" />
     <ClInclude Include="mc6809nc\mc6809.h" />
     <ClInclude Include="mc6809nc\mc6809_debug.h" />
     <ClInclude Include="mc6809nc\mc6809_dis.h" />
     <ClInclude Include="mem.h" />
     <ClInclude Include="midi.h" />
+    <ClInclude Include="mmccard.h" />
     <ClInclude Include="model.h" />
     <ClInclude Include="mouse.h" />
     <ClInclude Include="music2000.h" />
@@ -186,6 +205,8 @@
     <ClInclude Include="sid_b-em.h" />
     <ClInclude Include="sn76489.h" />
     <ClInclude Include="sound.h" />
+    <ClInclude Include="sprow.h" />
+    <ClInclude Include="ssinline.h" />
     <ClInclude Include="sysacia.h" />
     <ClInclude Include="sysvia.h" />
     <ClInclude Include="tape.h" />
@@ -216,6 +237,13 @@
     <ClCompile Include="acia.c" />
     <ClCompile Include="adc.c" />
     <ClCompile Include="arm.c" />
+    <ClCompile Include="ARMulator\armdis.cpp" />
+    <ClCompile Include="ARMulator\armemu.c" />
+    <ClCompile Include="ARMulator\arminit.c" />
+    <ClCompile Include="ARMulator\armmem.c" />
+    <ClCompile Include="ARMulator\armsupp.c" />
+    <ClCompile Include="ARMulator\bag.c" />
+    <ClCompile Include="ARMulator\thumbemu.c" />
     <ClCompile Include="cmos.c" />
     <ClCompile Include="compactcmos.c" />
     <ClCompile Include="compact_joystick.c" />
@@ -238,6 +266,7 @@
     <ClCompile Include="disc.c" />
     <ClCompile Include="fdi.c" />
     <ClCompile Include="fdi2raw.c" />
+    <ClCompile Include="fullscreen.c" />
     <ClCompile Include="gui-allegro.c" />
     <ClCompile Include="hfe.c" />
     <ClCompile Include="i8271.c" />
@@ -249,11 +278,13 @@
     <ClCompile Include="led.c" />
     <ClCompile Include="logging.c" />
     <ClCompile Include="main.c" />
+    <ClCompile Include="map.c" />
     <ClCompile Include="mc6809nc\mc6809nc.c" />
     <ClCompile Include="mc6809nc\mc6809_debug.c" />
     <ClCompile Include="mc6809nc\mc6809_dis.c" />
     <ClCompile Include="mem.c" />
     <ClCompile Include="midi-windows.c" />
+    <ClCompile Include="mmccard.c" />
     <ClCompile Include="model.c" />
     <ClCompile Include="mouse.c" />
     <ClCompile Include="music2000.c" />
@@ -295,6 +326,7 @@
     <ClCompile Include="serial.c" />
     <ClCompile Include="sn76489.c" />
     <ClCompile Include="sound.c" />
+    <ClCompile Include="sprow.c" />
     <ClCompile Include="sysacia.c" />
     <ClCompile Include="sysvia.c" />
     <ClCompile Include="tape.c" />
