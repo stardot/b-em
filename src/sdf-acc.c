@@ -1,3 +1,4 @@
+#define _DEBUG
 /*
  * B-EM SDF - Simple Disk Formats - Access
  *
@@ -50,7 +51,15 @@ typedef enum {
     ST_FORMAT_CYLID,
     ST_FORMAT_HEADID,
     ST_FORMAT_SECTID,
-    ST_FORMAT_SECTSZ
+    ST_FORMAT_SECTSZ,
+    ST_WRTRACK_INITIAL,
+    ST_WRTRACK_CYLID,
+    ST_WRTRACK_HEADID,
+    ST_WRTRACK_SECTID,
+    ST_WRTRACK_SECTSZ,
+    ST_WRTRACK_HDRCRC,
+    ST_WRTRACK_DATA,
+    ST_WRTRACK_DATACRC
 } state_t;
 
 state_t state = ST_IDLE;
@@ -245,6 +254,144 @@ static void sdf_format(int drive, int track, int side, unsigned par2)
     }
 }
 
+static void sdf_writetrack(int drive, int track, int side, int density)
+{
+    const struct sdf_geometry *geo;
+
+    if (state == ST_IDLE && (geo = check_seek(drive, 0, track, side, density))) {
+        sdf_drive = drive;
+        sdf_side = side;
+        sdf_track = track;
+        sdf_sector = 0;
+        count = 120;
+        state = ST_WRTRACK_INITIAL;
+    }
+    else {
+        fdc_writeprotect();
+        state = ST_IDLE;
+    }
+}
+
+/*
+ * This function is part of the state machine to implement the write
+ * track command and implements the initial state which is waiting
+ * for the ID address mark.  If this does not arrive within a
+ * reasonable number of bytes we conclude the last sector has been
+ * received.
+ */
+
+static void sdf_poll_wrtrack_initial(void)
+{
+    int b = fdc_getdata(0);
+    log_debug("sdf: sdf_poll_wrtrack_initial, byte=%02X, count=%u", b, count);
+    if (b == 0xfe)
+        state = ST_WRTRACK_CYLID;
+    else if (--count == 0) {
+        fdc_finishread(false);
+        state = ST_IDLE;
+    }
+}
+
+/*
+ * This function is part of the state machine to implement the write
+ * track command and implements a state which skips the cylinder
+ * and head IDs.
+ */
+
+static void sdf_poll_wrtrack_next(state_t nstate)
+{
+    int b = fdc_getdata(0);
+    log_debug("sdf: sdf_poll_wrtrack_next byte=%02X", b);
+    if (b != -1)
+        state = nstate;
+}
+
+/*
+ * This function is part of the state machine to implement the write
+ * track command and implements a state which captures the sector ID
+ * from the ID header.
+ */
+
+static void sdf_poll_wrtrack_sectid(void)
+{
+    int b = fdc_getdata(0);
+    log_debug("sdf: sdf_poll_wrtrack_sectid byte=%02X", b);
+    if (b != -1) {
+        if (b > geometry[sdf_drive]->sectors_per_track)
+            log_warn("sdf: formatting sector %d beyond that supported by disc image", b);
+        sdf_sector = b;
+        state = ST_WRTRACK_SECTSZ;
+    }
+}
+
+/*
+ * This function is part of the state machine to implement the write
+ * track command and implements a state which captures the logical
+ * sector size code from the ID header.
+ */
+
+static void sdf_poll_wrtrack_sectsz(void)
+{
+    int b = fdc_getdata(0);
+    log_debug("sdf: sdf_poll_wrtrack_sectsz byte=%02X", b);
+    if (b != -1) {
+        unsigned bytes = 128 << b;
+        if (bytes != geometry[sdf_drive]->sector_size)
+            log_warn("sdf: formatting, sector size mismatch: id %d, image file %d", b, geometry[sdf_drive]->sector_size);
+        count = bytes;
+        state = ST_WRTRACK_HDRCRC;
+    }
+}
+
+/*
+ * This function is part of the state machine to implement the write
+ * track command and implements a state which waits for the request
+ * to generate the header CRC.
+ */
+
+static void sdf_poll_wrtrack_hdrcrc(void)
+{
+    int b = fdc_getdata(0);
+    log_debug("sdf: sdf_poll_wrtrack_hdrcrc byte=%02X", b);
+    if (b == 0xfb) {
+        io_seek(geometry[sdf_drive], sdf_drive, sdf_sector, current_track[sdf_drive], sdf_side);
+        state = ST_WRTRACK_DATA;
+    }
+}
+
+/*
+ * This function is part of the state machine to implement the write
+ * track command and implements a state which receives the
+ * first byte of the sector data.
+ */
+
+static void sdf_poll_wrtrack_data(void)
+{
+    int b = fdc_getdata(0);
+    log_debug("sdf: sdf_poll_wrtrack_data0 byte=%02X, count=%d", b, count);
+    if (b != -1) {
+        putc(b, sdf_fp[sdf_drive]);
+        if (!--count)
+            state = ST_WRTRACK_DATACRC;
+    }
+}
+
+/*
+ * This function is part of the state machine to implement the write
+ * track command and implements a state which waits for the byte
+ * requesting the data CRC be generated.
+ */
+
+static void sdf_poll_wrtrack_datacrc(void)
+{
+    int b = fdc_getdata(0);
+    log_debug("sdf: sdf_poll_wrtrack_datacrc byte=%02X", b);
+    if (b == 0xf7) {
+        state = ST_WRTRACK_INITIAL;
+        count = 120;
+    }
+}
+
 static void sdf_poll()
 {
     int c;
@@ -360,9 +507,9 @@ static void sdf_poll()
 
         case ST_FORMAT_SECTSZ:
             fdc_getdata(--count == 0);  // discard sector size.
-            log_debug("imd: poll format secsz, count=%d, sector=%d", count, sdf_sector);
+            log_debug("sdf: poll format secsz, count=%d, sector=%d", count, sdf_sector);
             if (sdf_sector < geometry[sdf_drive]->sectors_per_track) {
-                log_debug("imd: poll format secsz, filling at offset %lu", ftell(sdf_fp[sdf_drive]));
+                log_debug("sdf: poll format secsz, filling at offset %lu", ftell(sdf_fp[sdf_drive]));
                 for (unsigned i = 0; i < geometry[sdf_drive]->sector_size; i++)
                     putc(0xe5, sdf_fp[sdf_drive]);
                 sdf_sector++;
@@ -373,6 +520,30 @@ static void sdf_poll()
             }
             else
                 state = ST_FORMAT_CYLID;
+            break;
+        case ST_WRTRACK_INITIAL:
+            sdf_poll_wrtrack_initial();
+            break;
+        case ST_WRTRACK_CYLID:
+            sdf_poll_wrtrack_next(ST_WRTRACK_HEADID);
+            break;
+        case ST_WRTRACK_HEADID:
+            sdf_poll_wrtrack_next(ST_WRTRACK_SECTID);
+            break;
+        case ST_WRTRACK_SECTID:
+            sdf_poll_wrtrack_sectid();
+            break;
+        case ST_WRTRACK_SECTSZ:
+            sdf_poll_wrtrack_sectsz();
+            break;
+        case ST_WRTRACK_HDRCRC:
+            sdf_poll_wrtrack_hdrcrc();
+            break;
+        case ST_WRTRACK_DATA:
+            sdf_poll_wrtrack_data();
+            break;
+        case ST_WRTRACK_DATACRC:
+            sdf_poll_wrtrack_datacrc();
             break;
     }
 }
@@ -448,6 +619,7 @@ static void sdf_mount(int drive, const char *fn, FILE *fp, const struct sdf_geom
     drives[drive].readaddress = sdf_readaddress;
     drives[drive].poll        = sdf_poll;
     drives[drive].format      = sdf_format;
+    drives[drive].writetrack  = sdf_writetrack;
     drives[drive].abort       = sdf_abort;
     drives[drive].spinup      = sdf_spinup;
     drives[drive].spindown    = sdf_spindown;
