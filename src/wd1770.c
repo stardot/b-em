@@ -14,8 +14,7 @@
 
 struct
 {
-    uint8_t command, oldcmd, sector, track, status, data;
-    uint8_t ctrl;
+    uint8_t command, oldcmd, sector, track, status, data, resetting;
     int curside;
     int curtrack;
     int density;
@@ -40,7 +39,6 @@ static void short_spindown(void)
     motorspin = 15000;
     fdc_time = 0;
 }
-
 
 void wd1770_spinup()
 {
@@ -158,58 +156,60 @@ static void write_1770(uint16_t addr, uint8_t val)
     }
 }
 
+static void wd1770_maybe_reset(uint8_t val)
+{
+    if (val)
+        wd1770.resetting = 0;
+    else if (!wd1770.resetting) {
+        wd1770_reset();
+        wd1770.resetting = 1;
+    }
+}
+
 static void write_ctrl_acorn(uint8_t val)
 {
     log_debug("wd1770: write acorn-style ctrl %02X", val);
-    if (val & 0x20)
-        wd1770_reset();
-    wd1770.ctrl = val;
+    wd1770_maybe_reset(val & 0x20);
     curdrive = (val & 0x02) ? 1 : 0;
-    wd1770.curside =  (wd1770.ctrl & 0x04) ? 1 : 0;
-    wd1770.density = !(wd1770.ctrl & 0x08);
+    wd1770.curside =  (val & 0x04) ? 1 : 0;
+    wd1770.density = !(val & 0x08);
 }
 
 static void write_ctrl_master(uint8_t val)
 {
     log_debug("wd1770: write master-style ctrl %02X", val);
-    if (val & 0x04)
-        wd1770_reset();
-    wd1770.ctrl = val;
+    wd1770_maybe_reset(val & 0x04);
     curdrive = (val & 2) ? 1 : 0;
     if (motoron) {
         led_update((curdrive == 0) ? LED_DRIVE_0 : LED_DRIVE_1, true, 0);
         led_update((curdrive == 0) ? LED_DRIVE_1 : LED_DRIVE_0, false, 0);
     }
-    wd1770.curside =  (wd1770.ctrl & 0x10) ? 1 : 0;
-    wd1770.density = !(wd1770.ctrl & 0x20);
+    wd1770.curside =  (val & 0x10) ? 1 : 0;
+    wd1770.density = !(val & 0x20);
 }
 
 static void write_ctrl_opus(uint8_t val)
 {
     log_debug("wd1770: write opus-style ctrl %02X", val);
-    wd1770.ctrl = val;
     curdrive = (val & 0x01);
-    wd1770.curside =  (wd1770.ctrl & 0x02) ? 1 : 0;
-    wd1770.density = (wd1770.ctrl & 0x40);
+    wd1770.curside =  (val & 0x02) ? 1 : 0;
+    wd1770.density = (val & 0x40);
 }
 
 static void write_ctrl_stl(uint8_t val)
 {
     log_debug("wd1770: write solidisk-style ctrl %02X", val);
-    wd1770.ctrl = val;
     curdrive = (val & 0x01);
-    wd1770.curside =  (wd1770.ctrl & 0x02) ? 1 : 0;
-    wd1770.density = !(wd1770.ctrl & 0x04);
+    wd1770.curside =  (val & 0x02) ? 1 : 0;
+    wd1770.density = !(val & 0x04);
 }
 
 static void write_ctrl_watford(uint8_t val)
 {
     log_debug("wd1770: write watford-style ctrl %02X", val);
-    if (val & 0x80)
-        wd1770_reset();
-    wd1770.ctrl = val;
+    wd1770_maybe_reset(val & 0x80);
     curdrive = (val & 0x04) ? 1 : 0;
-    wd1770.curside =  (wd1770.ctrl & 0x02) ? 1 : 0;
+    wd1770.curside =  (val & 0x02) ? 1 : 0;
     wd1770.density = !(val & 0x01);
 }
 
@@ -453,14 +453,14 @@ static void wd1770_cmd_start(unsigned cmd)
             break;
 
         case 0xE: /* read track */
-            log_debug("wd1770: read track side=%d track=%d dens=%d, ctrl=%d\n", wd1770.curside, wd1770.track, wd1770.density, wd1770.ctrl);
+            log_debug("wd1770: read track side=%d track=%d dens=%d\n", wd1770.curside, wd1770.track, wd1770.density);
             wd1770.status = 0x83;
             nmi |= 2;
             disc_readtrack(curdrive, wd1770.track, wd1770.curside, wd1770.density);
             break;
 
         case 0xF: /*Write track*/
-            log_debug("wd1770: write track side=%d track=%d dens=%d, ctrl=%d\n", wd1770.curside, wd1770.track, wd1770.density, wd1770.ctrl);
+            log_debug("wd1770: write track side=%d track=%d dens=%d\n", wd1770.curside, wd1770.track, wd1770.density);
             wd1770.status = 0x83;
             nmi |= 2;
             disc_writetrack(curdrive, wd1770.track, wd1770.curside, wd1770.density);
@@ -559,6 +559,7 @@ void wd1770_reset()
     log_debug("wd1770: reset 1770");
     nmi = 0;
     wd1770.status = 0;
+    wd1770.sector = 1;
     motorspin = 0;
     fdc_time = 0;
     if (fdc_type >= FDC_ACORN) {
