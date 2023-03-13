@@ -18,7 +18,7 @@ typedef enum
 
 typedef struct
 {
-    char name[8];
+    char name[10];
     void (*func)(void);
 } rom_setup_t;
 
