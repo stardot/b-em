@@ -166,49 +166,108 @@ static void wd1770_maybe_reset(uint8_t val)
     }
 }
 
+/*
+ * Process the drive selection bits common to the Acorn WD1770
+ * interface in the Master and the Acorn WD1770 interface as used on
+ * the B+ and as a daughter board for the BBC B.
+ */
+
+static void wd1770_wctl_adrive(uint8_t val)
+{
+    curdrive = (val & 0x02) ? 1 : 0;
+    if (motoron) {
+        led_update(LED_DRIVE_0, val & 0x01, 0);
+        led_update(LED_DRIVE_1, val & 0x02, 0);
+    }
+}
+
+/*
+ * Process a write to the control latch for the Acorn WD1770 interface
+ * as fitted to the B+ and as a daughter board for the BBC B.
+ */
+
 static void wd1770_wctl_acorn(uint8_t val)
 {
     log_debug("wd1770: write acorn-style ctrl %02X", val);
     wd1770_maybe_reset(val & 0x20);
-    curdrive = (val & 0x02) ? 1 : 0;
+    wd1770_wctl_adrive(val);
     wd1770.curside =  (val & 0x04) ? 1 : 0;
     wd1770.density = !(val & 0x08);
 }
+
+/*
+ * Process a write to the control latch for the Acorn WD1770 interface
+ * as fitted to the BBC Master.
+ */
 
 static void wd1770_wctl_master(uint8_t val)
 {
     log_debug("wd1770: write master-style ctrl %02X", val);
     wd1770_maybe_reset(val & 0x04);
-    curdrive = (val & 2) ? 1 : 0;
-    if (motoron) {
-        led_update((curdrive == 0) ? LED_DRIVE_0 : LED_DRIVE_1, true, 0);
-        led_update((curdrive == 0) ? LED_DRIVE_1 : LED_DRIVE_0, false, 0);
-    }
+    wd1770_wctl_adrive(val);
     wd1770.curside =  (val & 0x10) ? 1 : 0;
     wd1770.density = !(val & 0x20);
 }
 
+/*
+ * Process the drive selection bit common to the non-Acorn WD1770
+ * interfaces.
+ */
+
+static void wd1770_wctl_sdrive(uint8_t val)
+{
+    if (val) {
+        curdrive = 1;
+        if (motoron) {
+            led_update(LED_DRIVE_0, false, 0);
+            led_update(LED_DRIVE_1, true, 0);
+        }
+    }
+    else {
+        curdrive = 0;
+        if (motoron) {
+            led_update(LED_DRIVE_0, true, 0);
+            led_update(LED_DRIVE_1, false, 0);
+        }
+    }
+}
+
+/*
+ * Process a write to the control latch for the Opus WD1770
+ * interface
+ */
+
 static void wd1770_wctl_opus(uint8_t val)
 {
     log_debug("wd1770: write opus-style ctrl %02X", val);
-    curdrive = (val & 0x01);
+    wd1770_wctl_sdrive(val & 0x01);
     wd1770.curside =  (val & 0x02) ? 1 : 0;
     wd1770.density = (val & 0x40);
 }
 
+/*
+ * Process a write to the control latch for the Solidisk WD1770
+ * interface.
+ */
+
 static void wd1770_wctl_stl(uint8_t val)
 {
     log_debug("wd1770: write solidisk-style ctrl %02X", val);
-    curdrive = (val & 0x01);
+    wd1770_wctl_sdrive(val & 0x01);
     wd1770.curside =  (val & 0x02) ? 1 : 0;
     wd1770.density = !(val & 0x04);
 }
 
+/*
+ * Process a write to the control latch for the Watford Electronics
+ * WD1770 interface.
+ */
+
 static void wd1770_wctl_watford(uint8_t val)
 {
     log_debug("wd1770: write watford-style ctrl %02X", val);
-    wd1770_maybe_reset(val & 0x80);
-    curdrive = (val & 0x04) ? 1 : 0;
+    wd1770_maybe_reset(val & 0x08);
+    wd1770_wctl_sdrive(val & 0x04);
     wd1770.curside =  (val & 0x02) ? 1 : 0;
     wd1770.density = !(val & 0x01);
 }
