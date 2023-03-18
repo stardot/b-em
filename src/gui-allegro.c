@@ -41,6 +41,12 @@
 
 #define ROM_LABEL_LEN 50
 
+/* pclose() and popen() on Windows are _pclose() and _popen() */
+#ifdef _WIN32
+#  define pclose _pclose
+#  define popen _popen
+#endif
+
 typedef struct {
     const char *label;
     int itemno;
