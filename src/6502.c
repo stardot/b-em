@@ -256,6 +256,7 @@ static int RAMbank[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
 static uint8_t *memlook[2][256];
 static int memstat[2][256];
+static uint8_t *weramrom_base;
 static int vis20k = 0;
 uint8_t ram1k, ram4k, ram8k;
 
@@ -578,6 +579,26 @@ static inline void page_rom(int rom_no, int rom_sel, int start, int end)
     }
 }
 
+static inline void page_weramrom(uint16_t addr, int rom_no, int rom_sel)
+{
+    unsigned we_bank = addr & ~0xfe30;
+    uint8_t *base = rom + rom_sel - 0x8000;
+    int mem_type = 2;
+    if (rom_slots[we_bank].swram) {
+        if (we_bank == rom_no)
+            mem_type = 1;
+        else {
+            weramrom_base = rom + (we_bank << 14) - 0x8000;
+            mem_type = 3;
+        }
+    }
+    log_debug("6502: page_weramrom: addr=%04X, rom_no=%d, rom_sel=%04x, we_bank=%u, mem_type=%d", addr, rom_no, rom_sel, we_bank, mem_type);
+    for (int c = 0x80; c < 0xc0; c++) {
+        memlook[0][c] = memlook[1][c] = base;
+        memstat[0][c] = memstat[1][c] = mem_type;
+    }
+}
+
 void m6502_update_swram(void)
 {
     page_rom(ram_fe30 & 0x0f, romsel, 0x80, 0xc0);
@@ -591,12 +612,15 @@ void m6502_update_swram(void)
 #define INTEGRA_MEMSEL 0x80
 #define INTEGRA_PRVEN  0x40
 
-static void write_romsel(int val)
+static void write_romsel(uint16_t addr, int val)
 {
     ram1k = ram4k = ram8k = 0;
     int rom_no = val & 0x0f;
     romsel = rom_no << 14;
-    page_rom(rom_no, romsel, 0x80, 0xc0);
+    if (weramrom)
+        page_weramrom(addr, rom_no, romsel);
+    else
+        page_rom(rom_no, romsel, 0x80, 0xc0);
     if (MASTER)
         ram4k = val & 0x80;
     else if (BPLUS)
@@ -725,7 +749,7 @@ static void write_acccon_integra(int val)
     }
 }
 
-static void write_fe34(int val)
+static void write_fe34(uint16_t addr, int val)
 {
     if (MASTER) {
         write_acccon_master(val);
@@ -740,39 +764,16 @@ static void write_fe34(int val)
         ram_fe34 = val;
     }
     else
-        write_romsel(val);
+        write_romsel(addr, val);
 }
 
 static void do_writemem(uint32_t addr, uint32_t val)
 {
-    int c;
-    static int watford_ram_bank = 14;
+        int c;
 
     addr &= 0xffff;
 
         writec[addr] = 31;
-
-        // Watford ROM/RAM board
-        if (!strcmp(models[curmodel].romsetup->name, "weramrom"))
-        {
-          if (addr >= 0xFF30 && addr <= 0xFF3F)
-          {
-            watford_ram_bank = addr - 0xFF30;
-            return;
-          }
-
-          if (addr >= 0x8000 && addr <= 0xBFFF)
-          {
-            int memtype = rom_slots[watford_ram_bank].swram ? 1 :2;
-            romsel = watford_ram_bank << 14;
-            if (memtype == 1)
-            {
-              uint8_t *base = rom + romsel - 0x8000;
-              *(base + addr) =  (uint8_t)val;
-            }
-            return;
-          }
-        }
 
         c = memstat[vis20k][addr >> 8];
         if (c == 1) {
@@ -792,9 +793,19 @@ static void do_writemem(uint32_t addr, uint32_t val)
                         break;
                 }
                 return;
-        } else if (c == 2) {
+        }
+        else if (c >= 2) {
+            if (c == 3) {
+                /* Watform RAM/ROM board writing to a different bank
+                 * than the one selected by ROMSEL.
+                 */
+                log_debug("6502: do_writemem, watford write, addr=%04X, val=%02X", addr, val);
+                if (addr >= 0x8000 && addr < 0xc000)
+                    weramrom_base[addr] = val;
+            }
+            else
                 log_debug("6502: attempt to write to ROM %x:%04x=%02x, pc=%04X\n", vis20k, addr, val, pc);
-                return;
+            return;
         }
         if (addr < 0xFC00 || addr >= 0xFF00)
                 return;
@@ -891,25 +902,25 @@ static void do_writemem(uint32_t addr, uint32_t val)
                 break;
 
         case 0xFE30:
-            write_romsel(val);
+            write_romsel(addr, val);
             break;
 
         case 0xFE34:
-            write_fe34(val);
+            write_fe34(addr, val);
             break;
 
         case 0xFE38:
             if (integra)
                 cmos_write_addr_integra(val);
             else if (!MASTER && !BPLUS)
-                write_romsel(val);
+                write_romsel(addr, val);
             break;
 
         case 0xFE3C:
             if (integra)
                 cmos_write_data_integra(val);
             else if (!MASTER && !BPLUS)
-                write_romsel(val);
+                write_romsel(addr, val);
             break;
 
         case 0xFE40:
