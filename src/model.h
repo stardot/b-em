@@ -60,7 +60,7 @@ extern TUBE tubes[NUM_TUBES];
 
 extern int curmodel, curtube, oldmodel, selecttube;
 extern fdc_type_t fdc_type;
-extern bool BPLUS, x65c02, MASTER, MODELA, OS01, compactcmos, integra, weramrom;
+extern bool BPLUS, x65c02, MASTER, MODELA, OS01, compactcmos, integra;
 
 void model_loadcfg(void);
 void model_check(void);

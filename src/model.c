@@ -23,7 +23,7 @@
 #define CFG_SECT_LEN 20
 
 fdc_type_t fdc_type;
-bool BPLUS, x65c02, MASTER, MODELA, OS01, compactcmos, integra, weramrom;
+bool BPLUS, x65c02, MASTER, MODELA, OS01, compactcmos, integra;
 int curtube;
 int oldmodel, model_count;
 MODEL *models;
@@ -243,7 +243,6 @@ void model_init()
     integra     = models[curmodel].integra;
     OS01        = models[curmodel].os01;
     compactcmos = models[curmodel].compact;
-    weramrom    = false; /* set in the WE rom setup when needed */
 
     mem_clearroms();
     models[curmodel].romsetup->func();

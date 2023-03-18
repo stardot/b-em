@@ -289,7 +289,6 @@ void mem_romsetup_weramrom(void) {
     rom_slots[2].swram = 1;
     rom_slots[1].swram = 1;
     rom_slots[0].swram = 1;
-    weramrom = true;
 }
 
 int mem_findswram(int n) {
