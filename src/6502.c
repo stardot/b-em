@@ -745,34 +745,11 @@ static void write_fe34(int val)
 
 static void do_writemem(uint32_t addr, uint32_t val)
 {
-    int c;
-    static int watford_ram_bank = 14;
+        int c;
 
     addr &= 0xffff;
 
         writec[addr] = 31;
-
-        // Watford ROM/RAM board
-        if (!strcmp(models[curmodel].romsetup->name, "weramrom"))
-        {
-          if (addr >= 0xFF30 && addr <= 0xFF3F)
-          {
-            watford_ram_bank = addr - 0xFF30;
-            return;
-          }
-
-          if (addr >= 0x8000 && addr <= 0xBFFF)
-          {
-            int memtype = rom_slots[watford_ram_bank].swram ? 1 :2;
-            romsel = watford_ram_bank << 14;
-            if (memtype == 1)
-            {
-              uint8_t *base = rom + romsel - 0x8000;
-              *(base + addr) =  (uint8_t)val;
-            }
-            return;
-          }
-        }
 
         c = memstat[vis20k][addr >> 8];
         if (c == 1) {

@@ -22,7 +22,6 @@ extern void mem_romsetup_swram(void);
 extern void mem_romsetup_bp128(void);
 extern void mem_romsetup_master(void);
 extern void mem_romsetup_compact(void);
-extern void mem_romsetup_weramrom(void);
 extern void mem_fillswram(void);
 extern int mem_findswram(int n);
 extern void mem_clearroms(void);
