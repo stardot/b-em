@@ -1,4 +1,3 @@
-#define _DEBUG
 #include "b-em.h"
 #include "main.h"
 #include "via.h"

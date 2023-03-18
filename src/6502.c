@@ -754,7 +754,7 @@ static void do_writemem(uint32_t addr, uint32_t val)
         c = memstat[vis20k][addr >> 8];
         if (c == 1) {
             memlook[vis20k][addr >> 8][addr] = (uint8_t)val;
-                switch(addr) {
+            switch(addr) {
                     case 0x022c:
                         buf_remv = (buf_remv & 0xff00) | val;
                         break;
@@ -770,7 +770,7 @@ static void do_writemem(uint32_t addr, uint32_t val)
                 }
                 return;
         } else if (c == 2) {
-                log_debug("6502: attempt to write to ROM %x:%04x=%02x\n", vis20k, addr, val);
+                log_debug("6502: attempt to write to ROM %x:%04x=%02x, pc=%04X\n", vis20k, addr, val, pc);
                 return;
         }
         if (addr < 0xFC00 || addr >= 0xFF00)

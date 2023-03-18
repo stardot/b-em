@@ -69,7 +69,6 @@ static void crtc_setreg(int reg, uint8_t val)
 
 void crtc_write(uint16_t addr, uint8_t val)
 {
-//        log_debug("Write CRTC %04X %02X %04X\n",addr,val,pc);
     if (!(addr & 1))
         crtc_i = val & 31;
     else
