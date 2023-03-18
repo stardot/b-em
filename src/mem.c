@@ -272,6 +272,25 @@ void mem_romsetup_master(void) {
     exit(1);
 }
 
+void mem_romsetup_weramrom(void) {
+    const char *sect = models[curmodel].cfgsect;
+    int slot;
+
+    load_os_rom(sect);
+    for (slot = 15; slot >= 0; slot--)
+        cfg_load_rom(slot, sect);
+
+    rom_slots[14].swram = 1;
+    rom_slots[7].swram = 1;
+    rom_slots[6].swram = 1;
+    rom_slots[5].swram = 1;
+    rom_slots[4].swram = 1;
+    rom_slots[3].swram = 1;
+    rom_slots[2].swram = 1;
+    rom_slots[1].swram = 1;
+    rom_slots[0].swram = 1;
+}
+
 int mem_findswram(int n) {
     int c;
 
