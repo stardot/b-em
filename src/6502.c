@@ -591,12 +591,24 @@ void m6502_update_swram(void)
 #define INTEGRA_MEMSEL 0x80
 #define INTEGRA_PRVEN  0x40
 
-static void write_romsel(int val)
+static void write_romsel(uint16_t addr, int val)
 {
     ram1k = ram4k = ram8k = 0;
     int rom_no = val & 0x0f;
     romsel = rom_no << 14;
-    page_rom(rom_no, romsel, 0x80, 0xc0);
+    if (weramrom) {
+        int webank = addr & ~0xfe30;
+        for (int rom_no = 0; rom_no < 16; ++rom_no) {
+            int memtype = (rom_no == webank && rom_slots[rom_no].swram) ? 1 : 2;
+            uint8_t *base = rom + romsel - 0x8000;
+            for (int c = 0x80; c < 0xc0; ++c) {
+                memlook[0][c] = memlook[1][c] = base;
+                memstat[0][c] = memstat[1][c] = memtype;
+            }
+        }
+    }
+    else
+        page_rom(rom_no, romsel, 0x80, 0xc0);
     if (MASTER)
         ram4k = val & 0x80;
     else if (BPLUS)
@@ -725,7 +737,7 @@ static void write_acccon_integra(int val)
     }
 }
 
-static void write_fe34(int val)
+static void write_fe34(uint16_t addr, int val)
 {
     if (MASTER) {
         write_acccon_master(val);
@@ -740,39 +752,16 @@ static void write_fe34(int val)
         ram_fe34 = val;
     }
     else
-        write_romsel(val);
+        write_romsel(addr, val);
 }
 
 static void do_writemem(uint32_t addr, uint32_t val)
 {
     int c;
-    static int watford_ram_bank = 14;
 
     addr &= 0xffff;
 
         writec[addr] = 31;
-
-        // Watford ROM/RAM board
-        if (!strcmp(models[curmodel].romsetup->name, "weramrom"))
-        {
-          if (addr >= 0xFF30 && addr <= 0xFF3F)
-          {
-            watford_ram_bank = addr - 0xFF30;
-            return;
-          }
-
-          if (addr >= 0x8000 && addr <= 0xBFFF)
-          {
-            int memtype = rom_slots[watford_ram_bank].swram ? 1 :2;
-            romsel = watford_ram_bank << 14;
-            if (memtype == 1)
-            {
-              uint8_t *base = rom + romsel - 0x8000;
-              *(base + addr) =  (uint8_t)val;
-            }
-            return;
-          }
-        }
 
         c = memstat[vis20k][addr >> 8];
         if (c == 1) {
@@ -891,25 +880,25 @@ static void do_writemem(uint32_t addr, uint32_t val)
                 break;
 
         case 0xFE30:
-            write_romsel(val);
+            write_romsel(addr, val);
             break;
 
         case 0xFE34:
-            write_fe34(val);
+            write_fe34(addr, val);
             break;
 
         case 0xFE38:
             if (integra)
                 cmos_write_addr_integra(val);
             else if (!MASTER && !BPLUS)
-                write_romsel(val);
+                write_romsel(addr, val);
             break;
 
         case 0xFE3C:
             if (integra)
                 cmos_write_data_integra(val);
             else if (!MASTER && !BPLUS)
-                write_romsel(val);
+                write_romsel(addr, val);
             break;
 
         case 0xFE40:
