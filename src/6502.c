@@ -571,7 +571,14 @@ static inline void shadow_mem(int enabled)
 
 static inline void page_rom(int rom_no, int rom_sel, int start, int end)
 {
-    int memtype = rom_slots[rom_no].swram ? 1 : 2;
+    int memtype = 2;
+    if (weramrom) {
+        if (weramrom_base)
+            memtype = 3;
+    }
+    else if (rom_slots[rom_no].swram)
+        memtype = 1;
+    log_debug("6502: page_rom, slot=%x, memtype=%d", rom_no, memtype);
     uint8_t *base = rom + rom_sel - 0x8000;
     for (int c = start; c < end; c++) {
         memlook[0][c] = memlook[1][c] = base;
@@ -579,24 +586,22 @@ static inline void page_rom(int rom_no, int rom_sel, int start, int end)
     }
 }
 
-static inline void page_weramrom(uint16_t addr, int rom_no, int rom_sel)
+static inline void page_weramrom(uint16_t addr)
 {
-    unsigned we_bank = addr & ~0xfe30;
-    uint8_t *base = rom + rom_sel - 0x8000;
-    int mem_type = 2;
+    unsigned we_bank = addr & ~0xff30;
+    log_debug("6502: page_weramrom, addr=%04X, we_bank=%x", addr, we_bank);
+    int mem_type;
     if (rom_slots[we_bank].swram) {
-        if (we_bank == rom_no)
-            mem_type = 1;
-        else {
-            weramrom_base = rom + (we_bank << 14) - 0x8000;
-            mem_type = 3;
-        }
+        weramrom_base = rom + (we_bank << 14) - 0x8000;
+        mem_type = 3;
     }
-    log_debug("6502: page_weramrom: addr=%04X, rom_no=%d, rom_sel=%04x, we_bank=%u, mem_type=%d", addr, rom_no, rom_sel, we_bank, mem_type);
-    for (int c = 0x80; c < 0xc0; c++) {
-        memlook[0][c] = memlook[1][c] = base;
+    else {
+        weramrom_base = NULL;
+        mem_type = 2;
+    }
+    log_debug("6502: page_weramrom, RAM, base=%p, mem_type=%d", weramrom_base, mem_type);
+    for (int c = 0x80; c < 0xc0; c++)
         memstat[0][c] = memstat[1][c] = mem_type;
-    }
 }
 
 void m6502_update_swram(void)
@@ -612,15 +617,12 @@ void m6502_update_swram(void)
 #define INTEGRA_MEMSEL 0x80
 #define INTEGRA_PRVEN  0x40
 
-static void write_romsel(uint16_t addr, int val)
+static void write_romsel(int val)
 {
     ram1k = ram4k = ram8k = 0;
     int rom_no = val & 0x0f;
     romsel = rom_no << 14;
-    if (weramrom)
-        page_weramrom(addr, rom_no, romsel);
-    else
-        page_rom(rom_no, romsel, 0x80, 0xc0);
+    page_rom(rom_no, romsel, 0x80, 0xc0);
     if (MASTER)
         ram4k = val & 0x80;
     else if (BPLUS)
@@ -749,7 +751,7 @@ static void write_acccon_integra(int val)
     }
 }
 
-static void write_fe34(uint16_t addr, int val)
+static void write_fe34(int val)
 {
     if (MASTER) {
         write_acccon_master(val);
@@ -764,7 +766,7 @@ static void write_fe34(uint16_t addr, int val)
         ram_fe34 = val;
     }
     else
-        write_romsel(addr, val);
+        write_romsel(val);
 }
 
 static void do_writemem(uint32_t addr, uint32_t val)
@@ -803,8 +805,12 @@ static void do_writemem(uint32_t addr, uint32_t val)
                 if (addr >= 0x8000 && addr < 0xc000)
                     weramrom_base[addr] = val;
             }
-            else
-                log_debug("6502: attempt to write to ROM %x:%04x=%02x, pc=%04X\n", vis20k, addr, val, pc);
+            else {
+                if (addr >= 0xff30 && addr < 0xff40 && weramrom)
+                    page_weramrom(addr);
+                else
+                    log_debug("6502: attempt to write to ROM %x:%04x=%02x, pc=%04X\n", vis20k, addr, val, pc);
+            }
             return;
         }
         if (addr < 0xFC00 || addr >= 0xFF00)
@@ -902,25 +908,25 @@ static void do_writemem(uint32_t addr, uint32_t val)
                 break;
 
         case 0xFE30:
-            write_romsel(addr, val);
+            write_romsel(val);
             break;
 
         case 0xFE34:
-            write_fe34(addr, val);
+            write_fe34(val);
             break;
 
         case 0xFE38:
             if (integra)
                 cmos_write_addr_integra(val);
             else if (!MASTER && !BPLUS)
-                write_romsel(addr, val);
+                write_romsel(val);
             break;
 
         case 0xFE3C:
             if (integra)
                 cmos_write_data_integra(val);
             else if (!MASTER && !BPLUS)
-                write_romsel(addr, val);
+                write_romsel(val);
             break;
 
         case 0xFE40:
