@@ -171,6 +171,53 @@ static void cfg_load_rom(int slot, const char *sect) {
     }
 }
 
+static bool mem_load_batback(int slot)
+{
+    bool worked = false;
+    char name[16];
+    snprintf(name, sizeof(name), "model%02dram%02d", curmodel, slot);
+    ALLEGRO_PATH *path = find_cfg_file(name, ".bin");
+    if (path) {
+        const char *cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+        FILE *fp = fopen(cpath, "rb");
+        if (fp) {
+            if (fread(rom + (slot * ROM_SIZE), ROM_SIZE, 1, fp) == 1) {
+                log_debug("mem: battery backed slot %d loaded from %s", slot, cpath);
+                worked = true;
+            }
+            else
+                log_error("mem: unable to restore battery backed slot %d from file %s: %s", slot, cpath, strerror(errno));
+            fclose(fp);
+        }
+        al_destroy_path(path);
+    }
+    return worked;
+}
+
+static void mem_save_batback(int slot)
+{
+    char name[16];
+    snprintf(name, sizeof(name), "model%02dram%02d", curmodel, slot);
+    ALLEGRO_PATH *path = find_cfg_dest(name, ".bin");
+    if (path) {
+        const char *cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+        FILE *fp = fopen(cpath, "wb");
+        if (fp) {
+            uint8_t *base = rom + (slot * ROM_SIZE);
+            if (fwrite(base, ROM_SIZE, 1, fp) == 1)
+                log_debug("mem: battery backed slot %d saved to %s", slot, cpath);
+            else
+                log_error("mem: unable to save battery-backed RAM bank %d: failed writing to %s: %s", slot, cpath, strerror(errno));
+            fclose(fp);
+        }
+        else
+            log_error("unable to save battery-backed RAM bank %d: unable to open %s for writing: %s", slot, cpath, strerror(errno));
+        al_destroy_path(path);
+    }
+    else
+        log_error("unable to save battery-backed RAM bank %d: no suitable destination", slot);
+}
+
 void mem_romsetup_os01() {
     const char *sect = models[curmodel].cfgsect;
     char *name, *path;
@@ -274,12 +321,15 @@ void mem_romsetup_master(void) {
 
 void mem_romsetup_weramrom(void) {
     const char *sect = models[curmodel].cfgsect;
-    int slot;
 
     load_os_rom(sect);
-    for (slot = 15; slot >= 0; slot--)
+    cfg_load_rom(15, sect);
+    if (!mem_load_batback(14))
+        cfg_load_rom(14, sect);
+    for (int slot = 13; slot >= 0; --slot)
         cfg_load_rom(slot, sect);
 
+    rom_slots[14].backed = 1;
     rom_slots[14].swram = 1;
     rom_slots[7].swram = 1;
     rom_slots[6].swram = 1;
@@ -325,6 +375,7 @@ void mem_clearroms(void) {
     for (slot = 0; slot < ROM_NSLOT; slot++) {
         rom_clearmeta(slot);
         rom_slots[slot].swram = 0;
+        rom_slots[slot].backed = 0;
     }
 }
 
@@ -370,6 +421,8 @@ void mem_save_romcfg(const char *sect) {
                 al_set_config_value(bem_cfg, sect, slotkeys[slot], value);
             else
                 al_remove_config_key(bem_cfg, sect, slotkeys[slot]);
+            if (slotp->backed)
+                mem_save_batback(slot);
         }
     }
 }
