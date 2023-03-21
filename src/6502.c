@@ -589,16 +589,19 @@ static inline void page_range(uint8_t *base, int page, int end, enum mstat memty
 
 static inline void page_rom(int rom_no, int rom_sel, int start, int end)
 {
-    enum mstat memtype = MSTAT_ROM;
+    uint8_t *base = rom + rom_sel - 0x8000;
     if (weramrom) {
+        enum mstat memtype = MSTAT_ROM;
         if (weramrom_base)
             memtype = MSTAT_WSPLIT;
+        page_range(base, start, end, memtype);
     }
     else if (rom_slots[rom_no].swram)
-        memtype = MSTAT_RAM;
-    log_debug("6502: page_rom, slot=%x, memtype=%d", rom_no, memtype);
-    uint8_t *base = rom + rom_sel - 0x8000;
-    page_range(base, start, end, memtype);
+        page_range(base, start, end, MSTAT_RAM);
+    else {
+        page_range(base, start, rom_slots[rom_no].split, MSTAT_ROM);
+        page_range(base, rom_slots[rom_no].split, end, MSTAT_RAM);
+    }
 }
 
 static inline void page_weramrom(uint16_t addr)
