@@ -255,7 +255,7 @@ static int FEslowdown[8] = { 1, 0, 1, 1, 0, 0, 1, 0 };
 static int RAMbank[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
 enum mstat {
-    MSTAT_IO,
+    MSTAT_IO,       // This must be zero.
     MSTAT_RAM,
     MSTAT_ROM,
     MSTAT_WSPLIT
@@ -576,6 +576,17 @@ static inline void shadow_mem(int enabled)
         memlook[0][c] = base;
 }
 
+static inline void page_range(uint8_t *base, int page, int end, int memtype)
+{
+    while (page < end) {
+        memlook[0][page] = base;
+        memlook[1][page] = base;
+        memstat[0][page] = memtype;
+        memstat[1][page] = memtype;
+        ++page;
+    }
+}
+
 static inline void page_rom(int rom_no, int rom_sel, int start, int end)
 {
     int memtype = MSTAT_ROM;
@@ -587,10 +598,7 @@ static inline void page_rom(int rom_no, int rom_sel, int start, int end)
         memtype = MSTAT_RAM;
     log_debug("6502: page_rom, slot=%x, memtype=%d", rom_no, memtype);
     uint8_t *base = rom + rom_sel - 0x8000;
-    for (int c = start; c < end; c++) {
-        memlook[0][c] = memlook[1][c] = base;
-        memstat[0][c] = memstat[1][c] = memtype;
-    }
+    page_range(base, start, end, memtype);
 }
 
 static inline void page_weramrom(uint16_t addr)
@@ -607,8 +615,10 @@ static inline void page_weramrom(uint16_t addr)
         mem_type = MSTAT_ROM;
     }
     log_debug("6502: page_weramrom, RAM, base=%p, mem_type=%d", weramrom_base, mem_type);
-    for (int c = 0x80; c < 0xc0; c++)
-        memstat[0][c] = memstat[1][c] = mem_type;
+    for (int c = 0x80; c < 0xc0; c++) {
+        memstat[0][c] = mem_type;
+        memstat[1][c] = mem_type;
+    }
 }
 
 void m6502_update_swram(void)
@@ -644,24 +654,12 @@ static void write_romsel(int val)
         }
     }
     RAMbank[0xA] = (ram8k && acccon & 0x80) ? 1 : 0;
-    if (ram4k) {
-        for (int c = 0x80; c < 0x90; c++) {
-            memlook[0][c] = memlook[1][c] = ram;
-            memstat[0][c] = memstat[1][c] = MSTAT_RAM;
-        }
-    }
-    else if (ram1k) {
-        for (int c = 0x80; c < 0x84; c++) {
-            memlook[0][c] = memlook[1][c] = ram;
-            memstat[0][c] = memstat[1][c] = MSTAT_RAM;
-        }
-    }
-    if (ram8k) {
-        for (int c = 0x90; c < 0xb0; c++) {
-            memlook[0][c] = memlook[1][c] = ram;
-            memstat[0][c] = memstat[1][c] = MSTAT_RAM;
-        }
-    }
+    if (ram4k)
+        page_range(ram, 0x80, 0x90, MSTAT_RAM);
+    else if (ram1k)
+        page_range(ram, 0x80, 0x84, MSTAT_RAM);
+    if (ram8k)
+        page_range(ram, 0x90, 0xb0, MSTAT_RAM);
     ram_fe30 = val;
 }
 
@@ -671,19 +669,10 @@ static void write_acccon_master(int val)
     vidbank = (val & 1) ? 0x8000 : 0;
 
     int bank = 0;
-    if (val & 8) { /* 8K filing system RAM */
-        uint8_t *base = ram - 0x3000;
-        for (int c = 0xc0; c < 0xe0; c++) {
-            memlook[0][c] = memlook[1][c] = base;
-            memstat[0][c] = memstat[1][c] = MSTAT_RAM;
-        }
-    }
+    if (val & 8)    /* 8K filing system RAM */
+        page_range(ram - 0x3000, 0xc0, 0xe0, MSTAT_RAM);
     else {
-        uint8_t *base = os - 0xC000;
-        for (int c = 0xc0; c < 0xe0; c++) {
-            memlook[0][c] = memlook[1][c] = base;
-            memstat[0][c] = memstat[1][c] = MSTAT_ROM;
-        }
+        page_range(os - 0xC000, 0xc0, 0xe0, MSTAT_ROM);
         if (val & 2)
             bank = 1;
         if (val & 4)
@@ -729,17 +718,11 @@ static void write_acccon_integra(int val)
         if (ram_fe30 & INTEGRA_PRVEN) {
             if (val & INTEGRA_PRVS4) {
                 ram4k = 1;
-                for (int c = 0x80; c < 0x90; c++) {
-                    memlook[0][c] = memlook[1][c] = ram;
-                    memstat[0][c] = memstat[1][c] = MSTAT_RAM;
-                }
+                page_range(ram, 0x80, 0x90, MSTAT_RAM);
             }
             else if (val & INTEGRA_PRVS1) {
                 ram1k = 1;
-                for (int c = 0x80; c < 0x84; c++) {
-                    memlook[0][c] = memlook[1][c] = ram;
-                    memstat[0][c] = memstat[1][c] = MSTAT_RAM;
-                }
+                page_range(ram, 0x80, 0x84, MSTAT_RAM);
                 page_rom(ram_fe30 & 0x0f, romsel, 0x84, 0x90);
             }
             else
@@ -747,10 +730,7 @@ static void write_acccon_integra(int val)
 
             if (val & INTEGRA_PRVS8) {
                 ram8k = 1;
-                for (int c = 0x90; c < 0xb0; c++) {
-                    memlook[0][c] = memlook[1][c] = ram;
-                    memstat[0][c] = memstat[1][c] = MSTAT_RAM;
-                }
+                page_range(ram, 0x90, 0xb0, MSTAT_RAM);
             }
             else
                 page_rom(ram_fe30 & 0x0f, romsel, 0x90, 0xb0);
@@ -1023,12 +1003,9 @@ void m6502_reset(void)
         int c;
         for (c = 0; c < 16; c++)
                 RAMbank[c] = 0;
-        for (c = 0; c < 128; c++)
-                memstat[0][c] = memstat[1][c] = MSTAT_RAM;
+        page_range(ram, 0x00, 0x80, MSTAT_RAM);
         for (c = 128; c < 256; c++)
                 memstat[0][c] = memstat[1][c] = MSTAT_ROM;
-        for (c = 0; c < 128; c++)
-                memlook[0][c] = memlook[1][c] = ram;
         if (MODELA) {
                 for (c = 0; c < 64; c++)
                         memlook[0][c] = memlook[1][c] = ram + 16384;
