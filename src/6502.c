@@ -576,7 +576,7 @@ static inline void shadow_mem(int enabled)
         memlook[0][c] = base;
 }
 
-static inline void page_range(uint8_t *base, int page, int end, int memtype)
+static inline void page_range(uint8_t *base, int page, int end, enum mstat memtype)
 {
     while (page < end) {
         memlook[0][page] = base;
@@ -589,7 +589,7 @@ static inline void page_range(uint8_t *base, int page, int end, int memtype)
 
 static inline void page_rom(int rom_no, int rom_sel, int start, int end)
 {
-    int memtype = MSTAT_ROM;
+    enum mstat memtype = MSTAT_ROM;
     if (weramrom) {
         if (weramrom_base)
             memtype = MSTAT_WSPLIT;
@@ -605,7 +605,7 @@ static inline void page_weramrom(uint16_t addr)
 {
     unsigned we_bank = addr & ~0xff30;
     log_debug("6502: page_weramrom, addr=%04X, we_bank=%x", addr, we_bank);
-    int mem_type;
+    enum mstat mem_type;
     if (rom_slots[we_bank].swram) {
         weramrom_base = rom + (we_bank << 14) - 0x8000;
         mem_type = MSTAT_WSPLIT;
