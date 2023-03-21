@@ -23,7 +23,7 @@
 #define CFG_SECT_LEN 20
 
 fdc_type_t fdc_type;
-bool BPLUS, x65c02, MASTER, MODELA, OS01, compactcmos, integra;
+bool BPLUS, x65c02, MASTER, MODELA, OS01, compactcmos, integra, weramrom;
 int curtube;
 int oldmodel, model_count;
 MODEL *models;
@@ -40,14 +40,15 @@ static const char fdc_names[FDC_MAX][8] =
     "watford"
 };
 
-#define NUM_ROM_SETUP 5
+#define NUM_ROM_SETUP 6
 static rom_setup_t rom_setups[NUM_ROM_SETUP] =
 {
-    { "swram",   mem_romsetup_swram   },
-    { "os01",    mem_romsetup_os01    },
-    { "std",     mem_romsetup_std     },
-    { "bp128",   mem_romsetup_bp128   },
-    { "master",  mem_romsetup_master  }
+    { "swram",    mem_romsetup_swram    },
+    { "os01",     mem_romsetup_os01     },
+    { "std",      mem_romsetup_std      },
+    { "bp128",    mem_romsetup_bp128    },
+    { "master",   mem_romsetup_master   },
+    { "weramrom", mem_romsetup_weramrom }
 };
 
 /*
@@ -242,6 +243,7 @@ void model_init()
     integra     = models[curmodel].integra;
     OS01        = models[curmodel].os01;
     compactcmos = models[curmodel].compact;
+    weramrom    = false; /* set in the WE rom setup when needed */
 
     mem_clearroms();
     models[curmodel].romsetup->func();

@@ -9,6 +9,7 @@
 
 typedef struct {
     uint8_t swram;    // this slot behaves as sideways RAM.
+    uint8_t backed;   // sideways RAM has battery backup.
     uint8_t locked;   // slot is essential to machine config.
     uint8_t use_name; // use a short name writing to config file.
     uint8_t alloc;    // name/path are from malloc(3)
@@ -22,6 +23,7 @@ extern void mem_romsetup_swram(void);
 extern void mem_romsetup_bp128(void);
 extern void mem_romsetup_master(void);
 extern void mem_romsetup_compact(void);
+extern void mem_romsetup_weramrom(void);
 extern void mem_fillswram(void);
 extern int mem_findswram(int n);
 extern void mem_clearroms(void);

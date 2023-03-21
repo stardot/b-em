@@ -256,6 +256,7 @@ static int RAMbank[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
 static uint8_t *memlook[2][256];
 static int memstat[2][256];
+static uint8_t *weramrom_base;
 static int vis20k = 0;
 uint8_t ram1k, ram4k, ram8k;
 
@@ -570,12 +571,37 @@ static inline void shadow_mem(int enabled)
 
 static inline void page_rom(int rom_no, int rom_sel, int start, int end)
 {
-    int memtype = rom_slots[rom_no].swram ? 1 : 2;
+    int memtype = 2;
+    if (weramrom) {
+        if (weramrom_base)
+            memtype = 3;
+    }
+    else if (rom_slots[rom_no].swram)
+        memtype = 1;
+    log_debug("6502: page_rom, slot=%x, memtype=%d", rom_no, memtype);
     uint8_t *base = rom + rom_sel - 0x8000;
     for (int c = start; c < end; c++) {
         memlook[0][c] = memlook[1][c] = base;
         memstat[0][c] = memstat[1][c] = memtype;
     }
+}
+
+static inline void page_weramrom(uint16_t addr)
+{
+    unsigned we_bank = addr & ~0xff30;
+    log_debug("6502: page_weramrom, addr=%04X, we_bank=%x", addr, we_bank);
+    int mem_type;
+    if (rom_slots[we_bank].swram) {
+        weramrom_base = rom + (we_bank << 14) - 0x8000;
+        mem_type = 3;
+    }
+    else {
+        weramrom_base = NULL;
+        mem_type = 2;
+    }
+    log_debug("6502: page_weramrom, RAM, base=%p, mem_type=%d", weramrom_base, mem_type);
+    for (int c = 0x80; c < 0xc0; c++)
+        memstat[0][c] = memstat[1][c] = mem_type;
 }
 
 void m6502_update_swram(void)
@@ -754,7 +780,7 @@ static void do_writemem(uint32_t addr, uint32_t val)
         c = memstat[vis20k][addr >> 8];
         if (c == 1) {
             memlook[vis20k][addr >> 8][addr] = (uint8_t)val;
-                switch(addr) {
+            switch(addr) {
                     case 0x022c:
                         buf_remv = (buf_remv & 0xff00) | val;
                         break;
@@ -769,9 +795,23 @@ static void do_writemem(uint32_t addr, uint32_t val)
                         break;
                 }
                 return;
-        } else if (c == 2) {
-                log_debug("6502: attempt to write to ROM %x:%04x=%02x\n", vis20k, addr, val);
-                return;
+        }
+        else if (c >= 2) {
+            if (c == 3) {
+                /* Watform RAM/ROM board writing to a different bank
+                 * than the one selected by ROMSEL.
+                 */
+                log_debug("6502: do_writemem, watford write, addr=%04X, val=%02X", addr, val);
+                if (addr >= 0x8000 && addr < 0xc000)
+                    weramrom_base[addr] = val;
+            }
+            else {
+                if (addr >= 0xff30 && addr < 0xff40 && weramrom)
+                    page_weramrom(addr);
+                else
+                    log_debug("6502: attempt to write to ROM %x:%04x=%02x, pc=%04X\n", vis20k, addr, val, pc);
+            }
+            return;
         }
         if (addr < 0xFC00 || addr >= 0xFF00)
                 return;
