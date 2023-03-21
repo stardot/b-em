@@ -1,3 +1,4 @@
+#define _DEBUG
 /*
  * VDFS for B-EM
  * Steve Fosdick 2016-2020
@@ -4925,8 +4926,13 @@ static void service(void)
 
 static void startup(void)
 {
+    unsigned romver = readmem(0x8008);
+    if (romver < 7)
+        log_warn("vdfs: old ROM, expected version 7, got version %u", romver);
+    log_debug("vdfs: startup, break_type=%d, romno=%x, rom/ram split=%02x00", a, x, y);
     if (a > 0)
         mmb_reset();
+    rom_slots[x & 0x0f].split = y;
     a = 0x02;
     y = save_y;
 }
