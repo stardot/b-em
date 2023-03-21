@@ -254,8 +254,15 @@ static inline void polltime(int c)
 static int FEslowdown[8] = { 1, 0, 1, 1, 0, 0, 1, 0 };
 static int RAMbank[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
+enum mstat {
+    MSTAT_IO,
+    MSTAT_RAM,
+    MSTAT_ROM,
+    MSTAT_WSPLIT
+};
+
 static uint8_t *memlook[2][256];
-static int memstat[2][256];
+static enum mstat memstat[2][256];
 static uint8_t *weramrom_base;
 static int vis20k = 0;
 uint8_t ram1k, ram4k, ram8k;
@@ -571,13 +578,13 @@ static inline void shadow_mem(int enabled)
 
 static inline void page_rom(int rom_no, int rom_sel, int start, int end)
 {
-    int memtype = 2;
+    int memtype = MSTAT_ROM;
     if (weramrom) {
         if (weramrom_base)
-            memtype = 3;
+            memtype = MSTAT_WSPLIT;
     }
     else if (rom_slots[rom_no].swram)
-        memtype = 1;
+        memtype = MSTAT_RAM;
     log_debug("6502: page_rom, slot=%x, memtype=%d", rom_no, memtype);
     uint8_t *base = rom + rom_sel - 0x8000;
     for (int c = start; c < end; c++) {
@@ -593,11 +600,11 @@ static inline void page_weramrom(uint16_t addr)
     int mem_type;
     if (rom_slots[we_bank].swram) {
         weramrom_base = rom + (we_bank << 14) - 0x8000;
-        mem_type = 3;
+        mem_type = MSTAT_WSPLIT;
     }
     else {
         weramrom_base = NULL;
-        mem_type = 2;
+        mem_type = MSTAT_ROM;
     }
     log_debug("6502: page_weramrom, RAM, base=%p, mem_type=%d", weramrom_base, mem_type);
     for (int c = 0x80; c < 0xc0; c++)
@@ -640,19 +647,19 @@ static void write_romsel(int val)
     if (ram4k) {
         for (int c = 0x80; c < 0x90; c++) {
             memlook[0][c] = memlook[1][c] = ram;
-            memstat[0][c] = memstat[1][c] = 1;
+            memstat[0][c] = memstat[1][c] = MSTAT_RAM;
         }
     }
     else if (ram1k) {
         for (int c = 0x80; c < 0x84; c++) {
             memlook[0][c] = memlook[1][c] = ram;
-            memstat[0][c] = memstat[1][c] = 1;
+            memstat[0][c] = memstat[1][c] = MSTAT_RAM;
         }
     }
     if (ram8k) {
         for (int c = 0x90; c < 0xb0; c++) {
             memlook[0][c] = memlook[1][c] = ram;
-            memstat[0][c] = memstat[1][c] = 1;
+            memstat[0][c] = memstat[1][c] = MSTAT_RAM;
         }
     }
     ram_fe30 = val;
@@ -668,14 +675,14 @@ static void write_acccon_master(int val)
         uint8_t *base = ram - 0x3000;
         for (int c = 0xc0; c < 0xe0; c++) {
             memlook[0][c] = memlook[1][c] = base;
-            memstat[0][c] = memstat[1][c] = 1;
+            memstat[0][c] = memstat[1][c] = MSTAT_RAM;
         }
     }
     else {
         uint8_t *base = os - 0xC000;
         for (int c = 0xc0; c < 0xe0; c++) {
             memlook[0][c] = memlook[1][c] = base;
-            memstat[0][c] = memstat[1][c] = 2;
+            memstat[0][c] = memstat[1][c] = MSTAT_ROM;
         }
         if (val & 2)
             bank = 1;
@@ -724,14 +731,14 @@ static void write_acccon_integra(int val)
                 ram4k = 1;
                 for (int c = 0x80; c < 0x90; c++) {
                     memlook[0][c] = memlook[1][c] = ram;
-                    memstat[0][c] = memstat[1][c] = 1;
+                    memstat[0][c] = memstat[1][c] = MSTAT_RAM;
                 }
             }
             else if (val & INTEGRA_PRVS1) {
                 ram1k = 1;
                 for (int c = 0x80; c < 0x84; c++) {
                     memlook[0][c] = memlook[1][c] = ram;
-                    memstat[0][c] = memstat[1][c] = 1;
+                    memstat[0][c] = memstat[1][c] = MSTAT_RAM;
                 }
                 page_rom(ram_fe30 & 0x0f, romsel, 0x84, 0x90);
             }
@@ -742,7 +749,7 @@ static void write_acccon_integra(int val)
                 ram8k = 1;
                 for (int c = 0x90; c < 0xb0; c++) {
                     memlook[0][c] = memlook[1][c] = ram;
-                    memstat[0][c] = memstat[1][c] = 1;
+                    memstat[0][c] = memstat[1][c] = MSTAT_RAM;
                 }
             }
             else
@@ -1017,9 +1024,9 @@ void m6502_reset(void)
         for (c = 0; c < 16; c++)
                 RAMbank[c] = 0;
         for (c = 0; c < 128; c++)
-                memstat[0][c] = memstat[1][c] = 1;
+                memstat[0][c] = memstat[1][c] = MSTAT_RAM;
         for (c = 128; c < 256; c++)
-                memstat[0][c] = memstat[1][c] = 2;
+                memstat[0][c] = memstat[1][c] = MSTAT_ROM;
         for (c = 0; c < 128; c++)
                 memlook[0][c] = memlook[1][c] = ram;
         if (MODELA) {
@@ -1032,8 +1039,8 @@ void m6502_reset(void)
                 memlook[0][c] = memlook[1][c] = rom - 0x8000;
         for (c = 192; c < 256; c++)
                 memlook[0][c] = memlook[1][c] = os - 0xC000;
-        memstat[0][0xFC] = memstat[0][0xFD] = memstat[0][0xFE] = 0;
-        memstat[1][0xFC] = memstat[1][0xFD] = memstat[1][0xFE] = 0;
+        memstat[0][0xFC] = memstat[0][0xFD] = memstat[0][0xFE] = MSTAT_IO;
+        memstat[1][0xFC] = memstat[1][0xFD] = memstat[1][0xFE] = MSTAT_IO;
         ram_fe30 = 0;
         ram_fe34 = 0;
         cycles = 0;
