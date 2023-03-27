@@ -1478,26 +1478,32 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
     }
 }
 
-static inline void check_points(cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t size, break_type btype, break_type wtype, const char *desc)
+static void check_points(cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t size, break_type btype, break_type wtype, const char *desc)
 {
+    bool found = false;
+    const char *enter = "";
+    
     for (breakpoint *bp = cpu->breakpoints; bp; bp = bp->next) {
         if (bp->address == addr) {
             if (bp->type == btype) {
-                char addr_str[20 + SYM_MAX], iaddr_str[20 + SYM_MAX];
-                uint32_t iaddr = cpu->get_instr_addr();
-                cpu->print_addr(cpu, addr, addr_str, sizeof(addr_str), true);
-                cpu->print_addr(cpu, iaddr, iaddr_str, sizeof(iaddr_str), true);
-                debug_outf("cpu %s: %s: break on %s %s, value=%X\n", cpu->cpu_name, iaddr_str, desc, addr_str, value);
-                debugger_do(cpu, iaddr);
+                found = true;
+                enter = "break on";
+                break;
             }
             else if (bp->type == wtype) {
-                char addr_str[10], iaddr_str[10];
-                uint32_t iaddr = cpu->get_instr_addr();
-                cpu->print_addr(cpu, addr, addr_str, sizeof(addr_str), true);
-                cpu->print_addr(cpu, iaddr, iaddr_str, sizeof(iaddr_str), true);
-                debug_outf("cpu %s: %s: %s %s, value=%0*X\n", cpu->cpu_name, iaddr_str, desc, addr_str, size*2, value);
+                found = true;
+                break;
             }
         }
+    }
+    if (found) {
+        char addr_str[20 + SYM_MAX], iaddr_str[20 + SYM_MAX];
+        uint32_t iaddr = cpu->get_instr_addr();
+        cpu->print_addr(cpu, addr, addr_str, sizeof(addr_str), true);
+        cpu->print_addr(cpu, iaddr, iaddr_str, sizeof(iaddr_str), true);
+        debug_outf("cpu %s: %s:%s %s %s, value=%X\n", cpu->cpu_name, iaddr_str, enter, desc, addr_str, value);
+        if (*enter)
+            debugger_do(cpu, iaddr);
     }
 }
 
