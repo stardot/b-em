@@ -5,6 +5,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 #include "cpu_debug.h"
 #include "debugger.h"
@@ -58,6 +59,7 @@ int indebug = 0;
 extern int fcount;
 static int vrefresh = 1;
 static FILE *trace_fp = NULL;
+static char *trace_fn = NULL;
 
 struct file_stack;
 
@@ -69,11 +71,20 @@ struct filestack {
 static int breakpseq = 0;
 static int contcount = 0;
 
-static void close_trace()
+static const char time_fmt[] = "%d/%m/%Y %H:%M:%S";
+
+static void close_trace(const char *why)
 {
     if (trace_fp) {
-        fputs("Trace finished due to emulator quit\n", trace_fp);
+        char when[20];
+        time_t now;
+        time(&now);
+        strftime(when, sizeof(when), time_fmt, localtime(&now));
+        fprintf(trace_fp, "trace file %s closed at %s by %s\n", trace_fn, when, why);
         fclose(trace_fp);
+        trace_fp = NULL;
+        free(trace_fn);
+        trace_fn = NULL;
     }
 }
 
@@ -260,7 +271,7 @@ static inline void debug_cons_close(void) {}
 
 void debug_kill()
 {
-    close_trace();
+    close_trace("emulator quit");
     debug_memview_close();
     debug_cons_close();
 }
@@ -374,7 +385,11 @@ static uint8_t  debug_lastcommand=0;
 void debug_reset()
 {
     if (trace_fp) {
-        fputs("Processor reset!\n", trace_fp);
+        char when[20];
+        time_t now;
+        time(&now);
+        strftime(when, sizeof(when), time_fmt, localtime(&now));
+        fprintf(trace_fp, "Processor reset at %s\n", when);
         fflush(trace_fp);
     }
 }
@@ -1155,6 +1170,33 @@ static void debugger_writemem(cpu_debug_t *cpu, const char *iptr)
         debug_out(err_noaddr, sizeof(err_noaddr)-1);
 }
 
+static void debug_tracecmd(cpu_debug_t *cpu, const char *iptr)
+{
+    close_trace("command");
+    if (*iptr) {
+        if ((trace_fn = strdup(iptr))) {
+            FILE *fp = fopen(iptr, "a");
+            if (fp) {
+                char when[20];
+                time_t now;
+                time(&now);
+                strftime(when, sizeof(when), "%d/%m/%Y %H:%M:%S", localtime(&now));
+                fprintf(fp, "trace file %s opened at %s\n", iptr, when);
+                debug_outf("Tracing to %s\n", iptr);
+                trace_fp = fp;
+            }
+            else {
+                debug_outf("Unable to open trace file '%s' for append: %s\n", iptr, strerror(errno));
+                free(trace_fn);
+                trace_fn = NULL;
+            }
+        }
+        else
+            debug_outf("Unable to open trace file '%s': %s\n", iptr, strerror(errno));
+    } else
+        debug_outf("Trace file closed");
+}
+
 void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 {
     uint32_t next_addr;
@@ -1430,22 +1472,8 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                     return;
                 }
             case 't':
-                if (!strncmp(cmd, "trace", cmdlen)) {
-                    if (trace_fp) {
-                        fclose(trace_fp);
-                        trace_fp = NULL;
-                    }
-                    if (*iptr) {
-                        char *eptr = strchr(iptr, '\n');
-                        if (eptr)
-                            *eptr = '\0';
-                        if ((trace_fp = fopen(iptr, "a")))
-                            debug_outf("Tracing to %s\n", iptr);
-                        else
-                            debug_outf("Unable to open trace file '%s' for append: %s\n", iptr, strerror(errno));
-                    } else
-                        debug_outf("Trace file closed");
-                }
+                if (!strncmp(cmd, "trace", cmdlen))
+                    debug_tracecmd(cpu, iptr);
                 else
                     badcmd = true;
                 break;
@@ -1508,7 +1536,7 @@ static void check_points(cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_
 {
     bool found = false;
     const char *enter = "";
-    
+
     for (breakpoint *bp = cpu->breakpoints; bp; bp = bp->next) {
         if (addr >= bp->start && addr <= bp->end) {
             if (bp->type == btype) {
