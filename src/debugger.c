@@ -45,7 +45,8 @@ static const char break_names[][11] = {
 
 struct breakpoint {
     breakpoint *next;
-    uint32_t   address;
+    uint32_t   start;
+    uint32_t   end;
     break_type type;
     int        num;
 };
@@ -571,27 +572,52 @@ static void list_syms(cpu_debug_t *cpu, const char *arg) {
     symbol_list(cpu->symbols, cpu, &debug_outf);
 }
 
+static void print_point(cpu_debug_t *cpu, const breakpoint *bp, const char *desc, const char *tail)
+{
+    char start_buf[17 + SYM_MAX];
+    cpu->print_addr(cpu, bp->start, start_buf, sizeof(start_buf), true);
+    if (bp->start == bp->end)
+        debug_outf("    %s %i at %s%s\n", desc, bp->num, start_buf, tail);
+    else {
+        char end_buf[17 + SYM_MAX];
+        cpu->print_addr(cpu, bp->end, end_buf, sizeof(end_buf), true);
+        debug_outf("    %s %i %s to %s%s\n", desc, bp->num, start_buf, end_buf, tail);
+    }
+}
+
 static void set_point(cpu_debug_t *cpu, break_type type, char *arg, const char *desc)
 {
     const char *end1;
     uint32_t a = parse_address_or_symbol(cpu, arg, &end1);
     if (end1 > arg) {
-        char addrbuf[16 + SYM_MAX];
-        cpu->print_addr(cpu, a, addrbuf, sizeof(addrbuf), true);
+        const char *end2;
+        uint32_t b = parse_address_or_symbol(cpu, ++end1, &end2);
+        if (end2 > end1) {
+            if (a > b) {
+                uint32_t t = a;
+                a = b;
+                b = t;
+            }
+        }
+        else
+            b = a;
         for (breakpoint *bp = cpu->breakpoints; bp; bp = bp->next) {
-            if (bp->address == a && bp->type == type) {
-                debug_outf("    %s %i already set to %s\n", desc, bp->num, addrbuf);
+            if (a >= bp->start && b <= bp->end && bp->type == type) {
+                debug_outf("    already covered by %s %i, not set\n", desc, bp->num);
                 return;
             }
+            else if ((a >= bp->start && a <= bp->end) || (b >= bp->start && b <= bp->end))
+                debug_outf("    note: overlaps %s %i\n", desc, bp->num);
         }
         breakpoint *bp = malloc(sizeof(breakpoint));
         if (bp) {
             bp->next = cpu->breakpoints;
-            bp->address = a;
+            bp->start = a;
+            bp->end = b;
             bp->type = type;
             bp->num = breakpseq++;
             cpu->breakpoints = bp;
-            debug_outf("    %s %i set to %s\n", desc, bp->num, addrbuf);
+            print_point(cpu, bp, desc, " set");
         }
         else
             debug_outf("    unable to set %s breakpoint, out of memory\n", desc);
@@ -609,7 +635,7 @@ static void clear_point(cpu_debug_t *cpu, break_type type, char *arg, const char
         breakpoint *found = NULL;
         breakpoint *prev = NULL;
         for (breakpoint *bp = cpu->breakpoints; bp; bp = bp->next) {
-            if (bp->address == a && bp->type == type) {
+            if (bp->start == a && bp->type == type) {
                 found = bp;
                 break;
             }
@@ -633,9 +659,7 @@ static void clear_point(cpu_debug_t *cpu, break_type type, char *arg, const char
             prev->next = found->next;
         else
             cpu->breakpoints = found->next;
-        char addrbuf[16 + SYM_MAX];
-        cpu->print_addr(cpu, found->address, addrbuf, sizeof(addrbuf), true);
-        debug_outf("    %s %i at %s cleared\n", desc, found->num, addrbuf);
+        print_point(cpu, found, desc, " cleared");
         free(found);
     }
     else
@@ -644,13 +668,9 @@ static void clear_point(cpu_debug_t *cpu, break_type type, char *arg, const char
 
 static void list_points(cpu_debug_t *cpu, break_type type, const char *desc)
 {
-    char addr_buf[17 + SYM_MAX];
-    for (breakpoint *bp = cpu->breakpoints; bp; bp = bp->next) {
-        if (bp->type == type) {
-            cpu->print_addr(cpu, bp->address, addr_buf, sizeof(addr_buf), true);
-            debug_outf("    %s %i : %-8s\n", desc, bp->num, addr_buf);
-        }
-    }
+    for (breakpoint *bp = cpu->breakpoints; bp; bp = bp->next)
+        if (bp->type == type)
+            print_point(cpu, bp, desc, "");
 }
 
 static void debug_paste(const char *iptr)
@@ -687,9 +707,15 @@ static void debugger_save(cpu_debug_t *cpu, char *iptr)
         FILE *sfp = fopen(iptr, "w");
         if (sfp) {
             do {
-                char addr_buf[17 + SYM_MAX];
-                cpu->print_addr(cpu, bp->address, addr_buf, sizeof(addr_buf), true);
-                fprintf(sfp, "%s %s\n", break_names[bp->type], addr_buf);
+                char start_buf[17 + SYM_MAX];
+                cpu->print_addr(cpu, bp->start, start_buf, sizeof(start_buf), true);
+                if (bp->start == bp->end)
+                    fprintf(sfp, "%s %s\n", break_names[bp->type], start_buf);
+                else {
+                    char end_buf[17 + SYM_MAX];
+                    cpu->print_addr(cpu, bp->end, end_buf, sizeof(end_buf), true);
+                    fprintf(sfp, "%s %s %s\n", break_names[bp->type], start_buf, end_buf);
+                }
                 bp = bp->next;
             }
             while (bp);
@@ -1484,7 +1510,7 @@ static void check_points(cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_
     const char *enter = "";
     
     for (breakpoint *bp = cpu->breakpoints; bp; bp = bp->next) {
-        if (bp->address == addr) {
+        if (addr >= bp->start && addr <= bp->end) {
             if (bp->type == btype) {
                 found = true;
                 enter = "break on";
@@ -1570,7 +1596,7 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr) {
     }
     else {
         for (breakpoint *bp = cpu->breakpoints; bp; bp = bp->next) {
-            if (bp->address == addr && bp->type == BREAK_EXEC) {
+            if (addr >= bp->start && addr <= bp->end && bp->type == BREAK_EXEC) {
                 char addr_str[16+SYM_MAX];
                 cpu->print_addr(cpu, addr, addr_str, sizeof(addr_str), true);
                 debug_outf("cpu %s: Break at %s\n", cpu->cpu_name, addr_str);
