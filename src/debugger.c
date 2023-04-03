@@ -726,11 +726,10 @@ static void debugger_save(cpu_debug_t *cpu, char *iptr)
 {
     breakpoint *bp = cpu->breakpoints;
     if (bp) {
-        char *eptr = strchr(iptr, '\n');
-        if (eptr)
-            *eptr = '\0';
         FILE *sfp = fopen(iptr, "w");
         if (sfp) {
+            if (trace_fp)
+                fprintf(sfp, "trace %s\n", trace_fn);
             do {
                 char start_buf[17 + SYM_MAX];
                 cpu->print_addr(cpu, bp->start, start_buf, sizeof(start_buf), true);
