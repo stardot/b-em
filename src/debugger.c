@@ -32,8 +32,8 @@ typedef enum {
     TRACE_EXEC
 } break_type;
 
-static const char break_names[][11] = {
-    "breakpoint",
+static const char break_names[][8] = {
+    "break",
     "breakr",
     "breakw",
     "breaki",
@@ -1519,7 +1519,9 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                     return;
                 }
             case 't':
-                if (!strncmp(cmd, "trace", cmdlen))
+                if (!strncmp(cmd, "tlist", cmdlen))
+                    list_points(cpu, TRACE_EXEC, "Execution trace");
+                else if (!strncmp(cmd, "trace", cmdlen))
                     debug_tracecmd(cpu, iptr);
                 else if (!strncmp(cmd, "trange", cmdlen))
                     debug_trange(cpu, iptr);
