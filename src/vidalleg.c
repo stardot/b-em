@@ -23,7 +23,6 @@ int vid_savescrshot = 0;
 char vid_scrshotname[260];
 
 int winsizex, winsizey, vid_win_multiplier;
-int save_winsizex, save_winsizey;
 int scr_x_start, scr_x_size, scr_y_start, scr_y_size;
 
 bool vid_print_mode = false;
@@ -43,48 +42,8 @@ static const int y_fudge = 28;
 
 void video_enterfullscreen()
 {
-    ALLEGRO_DISPLAY *display;
-    ALLEGRO_COLOR black;
-    int value;
-    double aspect;
-
-    display = al_get_current_display();
-    save_winsizex = al_get_display_width(display);
-    save_winsizey = al_get_display_height(display);
-    if (al_set_display_flag(display, ALLEGRO_FULLSCREEN_WINDOW, true)) {
-
-        //no we really do mean it
-        al_set_display_flag(display, ALLEGRO_FULLSCREEN_WINDOW, false);
-        al_set_display_flag(display, ALLEGRO_FULLSCREEN_WINDOW, true);
-
-        black = al_map_rgb(0, 0, 0);
-        winsizex = al_get_display_width(display);
-        winsizey = al_get_display_height(display);
-        aspect = (double)winsizex / (double)winsizey;
-        if (aspect > (4.0 / 3.0)) {
-            value = 4 * winsizey / 3;
-            scr_x_start = (winsizex - value) / 2;
-            scr_y_start = 0;
-            scr_x_size = value;
-            scr_y_size = winsizey;
-            al_set_target_backbuffer(display);
-            // fill the gap between the left screen edge and the BBC image.
-            al_draw_filled_rectangle(0, 0, scr_x_start, scr_y_size, black);
-            // fill the gap between the BBC image and the right screen edge.
-            al_draw_filled_rectangle(scr_x_start + value, 0, winsizex, winsizey, black);
-        }
-        else {
-            value = 3 * winsizex / 4;
-            scr_x_start = 0;
-            scr_y_start = (winsizey - value) / 2;
-            scr_x_size = winsizex;
-            scr_y_size = value;
-            // fill the gap between the top of the screen and the BBC image.
-            al_draw_filled_rectangle(0, 0, scr_x_size, scr_y_start, black);
-            // fill the gap between the BBC image and the bottom of the screen.
-            al_draw_filled_rectangle(0, scr_y_start + value, winsizex, winsizey, black);
-        }
-    } else {
+    ALLEGRO_DISPLAY *display = al_get_current_display();
+    if (!al_set_display_flag(display, ALLEGRO_FULLSCREEN_WINDOW, true)) {
         log_error("vidalleg: could not set graphics mode to full-screen");
         fullscreen = 0;
     }
@@ -166,32 +125,45 @@ static int video_led_height(void)
 
 void video_update_window_size(ALLEGRO_EVENT *event)
 {
-    if (!fullscreen) {
+    winsizex = event->display.width;
+    winsizey = event->display.height;
+    if (fullscreen) {
+        double aspect = (double)winsizex / (double)winsizey;
+        const char *type;
+        if (aspect > (4.0 / 3.0)) {
+            // Screen is wide - pillarbox mode.
+            int value = 4 * winsizey / 3;
+            scr_x_start = (winsizex - value) / 2;
+            scr_y_start = 0;
+            scr_x_size = value;
+            scr_y_size = winsizey;
+            type = "pillarbox";
+        }
+        else {
+            int value = 3 * winsizex / 4;
+            scr_x_start = 0;
+            scr_y_start = (winsizey - value) / 2;
+            scr_x_size = winsizex;
+            scr_y_size = value;
+            type = "letterbox";
+        }
+        log_debug("vidalleg: video_update_window_size, fullscreen, %s, aspect=%g, scr_x_start=%d, scr_y_start=%d, scr_x_size=%d, scr_y_size=%d", type, aspect, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
+    }
+    else {
         scr_x_start = 0;
         scr_x_size = winsizex = event->display.width;
         scr_y_start = 0;
         winsizey = event->display.height;
         scr_y_size = winsizey - video_led_height();
-        log_debug("vidalleg: video_update_window_size, scr_x_size=%d, scr_y_size=%d", scr_x_size, scr_y_size);
-    }
+        log_debug("vidalleg: video_update_window_size, window, scr_x_size=%d, scr_y_size=%d", scr_x_size, scr_y_size);
+    }    
     al_acknowledge_resize(event->display.source);
 }
 
 void video_leavefullscreen(void)
 {
-    ALLEGRO_DISPLAY *display;
-
-    display = al_get_current_display();
-
-    //try and restore size to pre fullscreen size
-    al_resize_display(display, save_winsizex, save_winsizey);
-
+    ALLEGRO_DISPLAY *display = al_get_current_display();
     al_set_display_flag(display, ALLEGRO_FULLSCREEN_WINDOW, false);
-    scr_x_start = 0;
-    scr_x_size = winsizex = al_get_display_width(display);
-    scr_y_start = 0;
-    winsizey = al_get_display_height(display);
-    scr_y_size = winsizey - video_led_height();
 }
 
 static void upscale_only(ALLEGRO_BITMAP *src, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh)
