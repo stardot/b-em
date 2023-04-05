@@ -354,6 +354,7 @@ int mem_findswram(int n) {
 
 static void rom_clearmeta(int slot) {
     rom_free(slot);
+    rom_slots[slot].split = 0xc0;
     rom_slots[slot].locked = 0;
     rom_slots[slot].use_name = 0;
     rom_slots[slot].alloc = 0;
