@@ -1,7 +1,7 @@
 ; vdfs.asm
 ;
 ; VDFS for B-Em
-; Copyright 2018 Steve Fosdick.
+; Copyright 2018-2023 Steve Fosdick.
 ;
 ; This module implements the ROM part of a Virtual Disk Filing
 ; System, one in which a part of filing system of the host is
@@ -105,11 +105,11 @@ prtextws    =   &A8
             jmp     service
             equb    &82                 ; ROM type.
             equb    copyright-start
-.romversion equb    &06
+.romversion equb    &07
 .romtitle   equs    "B-Em VDFS", &00
             include "version.asm"
 .copyright  equb    &00
-            equs    "(C) 2018-2021 Steve Fosdick, GPL3", &00
+            equs    "(C) 2018-2023 Steve Fosdick, GPL3", &00
             equd    0
 .banner     equs    "Virtual DFS", &00
 .msg_nclaim equs    "ADFS is not being claimed", &00
@@ -918,8 +918,6 @@ prtextws    =   &A8
             lda     #&02            ; Read file length.
             ldx     #argsblk
             jsr     OSARGS
-            lda     #&12            ; Temporarily set our own ROM bank as RAM.
-            sta     port_cmd
             lda     argsblk         ; Set the length in the parameter
             sta     gbpbpb+&09      ; block for OSGBPB.
             lda     argsblk+1
@@ -945,8 +943,6 @@ prtextws    =   &A8
 .found      sty     filechan
             lda     #&02            ; First GBPB to use current pointer.
             sta     gbpbcmd
-            lda     #&12            ; Temporarily set our own ROM bank as RAM.
-            sta     port_cmd
 }
 
 ; Common code for *APPEND/*BUILD using OSGBPB.
@@ -985,9 +981,7 @@ prtextws    =   &A8
             sta     gbpbcmd
             jmp     line_lp
 
-.escape     lda     #&13            ; Restore our RAM bank status.
-            sta     port_cmd
-            lda     #&7c            ; Clear Escape without flushing anything.
+.escape     lda     #&7c            ; Clear Escape without flushing anything.
             jsr     OSBYTE
             lda     #&00            ; Close the file.
             ldy     filechan
@@ -1553,6 +1547,8 @@ prtextws    =   &A8
             jsr     OSBYTE
             stx     port_a
             lda     #&09
+            ldx     &f4             ; get our own ROM number.
+            ldy     #>gbpbpb        ; get page number of ROM/RAM split.            
             sta     port_cmd
             rts
 }
@@ -1646,10 +1642,11 @@ prtextws    =   &A8
             sta     port_cmd
             rts
 .end
+            align   &100
 .gbpbpb     equb    &00
             equd    &00000000
             equd    &00000000
             equd    &00000000
 .buffer     equb    &00
 
-            save    "vdfs6", start, end
+            save    "vdfs7", start, end
