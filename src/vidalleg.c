@@ -25,6 +25,10 @@ char vid_scrshotname[260];
 int winsizex, winsizey, vid_win_multiplier;
 int scr_x_start, scr_x_size, scr_y_start, scr_y_size;
 
+#ifdef WIN32
+static int save_winsizex, save_winsizey;
+#endif
+
 bool vid_print_mode = false;
 
 void video_close()
@@ -40,13 +44,55 @@ static const int y_fudge = 0;
 static const int y_fudge = 28;
 #endif
 
+static void video_fullscreen_wsize(int width, int height)
+{
+    if (width < winsizex)
+        width = winsizex;
+    if (height < winsizey)
+        height = winsizey;
+    double aspect = (double)width / (double)height;
+    const char *type;
+    if (aspect > (4.0 / 3.0)) {
+        // Screen is wide - pillarbox mode.
+        int value = 4 * height / 3;
+        scr_x_start = (width - value) / 2;
+        scr_y_start = 0;
+        scr_x_size = value;
+        scr_y_size = height;
+        type = "pillarbox";
+    }
+    else {
+        int value = 3 * width / 4;
+        scr_x_start = 0;
+        scr_y_start = (height - value) / 2;
+        scr_x_size = width;
+        scr_y_size = value;
+        type = "letterbox";
+    }
+    log_debug("vidalleg: video_fullscreen_wsize %s, aspect=%g, scr_x_start=%d, scr_y_start=%d, scr_x_size=%d, scr_y_size=%d", type, aspect, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
+    winsizex = width;
+    winsizey = height;
+}
+
 void video_enterfullscreen()
 {
+    log_debug("vidalleg: entering fullscreen");
     ALLEGRO_DISPLAY *display = al_get_current_display();
+#ifdef WIN32
+    save_winsizex = al_get_display_width(display);
+    save_winsizey = al_get_display_height(display);
+#endif
     if (!al_set_display_flag(display, ALLEGRO_FULLSCREEN_WINDOW, true)) {
         log_error("vidalleg: could not set graphics mode to full-screen");
         fullscreen = 0;
     }
+#ifdef WIN32
+    else {
+        al_set_display_flag(display, ALLEGRO_FULLSCREEN_WINDOW, false);
+        al_set_display_flag(display, ALLEGRO_FULLSCREEN_WINDOW, true);
+        video_fullscreen_wsize(al_get_display_width(display), al_get_display_height(display));
+    }
+#endif
 }
 
 void video_set_window_size(bool fudge)
@@ -123,47 +169,36 @@ static int video_led_height(void)
     return (vid_ledlocation == LED_LOC_SEPARATE) ? LED_BOX_HEIGHT : 0;
 }
 
+static void video_nonfs_wsize(int width, int height)
+{
+    winsizex = width;
+    winsizey = height;
+    scr_x_start = 0;
+    scr_x_size = width;
+    scr_y_start = 0;
+    scr_y_size = height - video_led_height();
+}
+
 void video_update_window_size(ALLEGRO_EVENT *event)
 {
-    winsizex = event->display.width;
-    winsizey = event->display.height;
-    if (fullscreen) {
-        double aspect = (double)winsizex / (double)winsizey;
-        const char *type;
-        if (aspect > (4.0 / 3.0)) {
-            // Screen is wide - pillarbox mode.
-            int value = 4 * winsizey / 3;
-            scr_x_start = (winsizex - value) / 2;
-            scr_y_start = 0;
-            scr_x_size = value;
-            scr_y_size = winsizey;
-            type = "pillarbox";
-        }
-        else {
-            int value = 3 * winsizex / 4;
-            scr_x_start = 0;
-            scr_y_start = (winsizey - value) / 2;
-            scr_x_size = winsizex;
-            scr_y_size = value;
-            type = "letterbox";
-        }
-        log_debug("vidalleg: video_update_window_size, fullscreen, %s, aspect=%g, scr_x_start=%d, scr_y_start=%d, scr_x_size=%d, scr_y_size=%d", type, aspect, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
-    }
-    else {
-        scr_x_start = 0;
-        scr_x_size = winsizex = event->display.width;
-        scr_y_start = 0;
-        winsizey = event->display.height;
-        scr_y_size = winsizey - video_led_height();
-        log_debug("vidalleg: video_update_window_size, window, scr_x_size=%d, scr_y_size=%d", scr_x_size, scr_y_size);
-    }    
+    if (!fullscreen)
+        video_nonfs_wsize(event->display.width, event->display.height);
+#ifndef WIN32
+    else
+        video_fullscreen_wsize(event->display.width, event->display.height);
+#endif
     al_acknowledge_resize(event->display.source);
 }
 
 void video_leavefullscreen(void)
 {
+    log_debug("vidalleg: leaving fullscreen");
     ALLEGRO_DISPLAY *display = al_get_current_display();
     al_set_display_flag(display, ALLEGRO_FULLSCREEN_WINDOW, false);
+#ifdef WIN32
+    al_resize_display(display, save_winsizex, save_winsizey);
+    video_nonfs_wsize(save_winsizex, save_winsizey);
+#endif
 }
 
 static void upscale_only(ALLEGRO_BITMAP *src, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh)
