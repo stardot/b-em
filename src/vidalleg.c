@@ -1,3 +1,4 @@
+#define _DEBUG
 /*B-em v2.2 by Tom Walker
   Allegro video code*/
 #include <allegro5/allegro_primitives.h>
