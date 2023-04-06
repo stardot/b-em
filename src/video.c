@@ -1,3 +1,4 @@
+#define _DEBUG
 /*B-em v2.2 by Tom Walker
   Video emulation
   Incorporates 6845 CRTC, Video ULA and SAA5050*/
@@ -268,6 +269,16 @@ void nula_reset(void)
         nula_flash[c] = 1;
 }
 
+static void video_set_border_colour(unsigned colno)
+{
+    int rgba = nula_collook[colno];
+    unsigned red = (rgba & 0xff0000) >> 16;
+    unsigned grn = (rgba & 0x00ff00) >> 8;
+    unsigned blu = (rgba & 0x0000ff);
+    border_col = al_map_rgb(red, grn, blu);
+    log_debug("video: border colour set to NuLA colour%d, r=%u, g=%u, b=%u", colno, red, grn, blu);
+}
+
 void videoula_write(uint16_t addr, uint8_t val)
 {
     int c;
@@ -364,6 +375,10 @@ void videoula_write(uint16_t addr, uint8_t val)
                 nula_flash[5] = param & 4;
                 nula_flash[6] = param & 2;
                 nula_flash[7] = param & 1;
+                break;
+
+            case 10:
+                video_set_border_colour(param);
                 break;
 
             default:
