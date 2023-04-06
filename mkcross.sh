@@ -9,7 +9,8 @@ dlls='allegro-5.2.dll             allegro_acodec-5.2.dll
       allegro_font-5.2.dll        allegro_image-5.2.dll
       allegro_primitives-5.2.dll  libstdc++-6.dll
       libwebp-7.dll               libwinpthread-1.dll
-      OpenAL32.dll                zlib1.dll'
+      OpenAL32.dll                zlib1.dll
+      libsharpyuv-0.dll'
 
 dirs='ddnoise discs docs fonts icon roms tapes'
 cmos='cmos350.bin cmosa.bin cmos.bin cmosc.bin'
