@@ -1,4 +1,3 @@
-#define _DEBUG
 /*B-em v2.2 by Tom Walker
   Video emulation
   Incorporates 6845 CRTC, Video ULA and SAA5050*/
@@ -158,6 +157,9 @@ static const uint8_t nula_spect_colours[] =
     7  // 111 White.
 };
 
+ALLEGRO_COLOR border_col;
+static ALLEGRO_COLOR clear_col;
+
 static inline uint32_t makecol(int red, int green, int blue)
 {
     return 0xff000000 | (red << 16) | (green << 8) | blue;
@@ -267,16 +269,19 @@ void nula_reset(void)
     // Reset flash
     for (int c = 0; c < 8; c++)
         nula_flash[c] = 1;
+
+    // Reset debugging colours.
+    border_col = clear_col = al_map_rgb(0, 0, 0);
+    colblack = 0xff000000;
 }
 
-static void video_set_border_colour(unsigned colno)
+static void video_set_colour(ALLEGRO_COLOR *colp, const char *desc, unsigned rgba)
 {
-    int rgba = nula_collook[colno];
     unsigned red = (rgba & 0xff0000) >> 16;
     unsigned grn = (rgba & 0x00ff00) >> 8;
     unsigned blu = (rgba & 0x0000ff);
-    border_col = al_map_rgb(red, grn, blu);
-    log_debug("video: border colour set to NuLA colour%d, r=%u, g=%u, b=%u", colno, red, grn, blu);
+    *colp = al_map_rgb(red, grn, blu);
+    log_debug("video: %s colour set to #%08X (%u,%u,%u)", desc, rgba, red, grn, blu);
 }
 
 void videoula_write(uint16_t addr, uint8_t val)
@@ -377,8 +382,14 @@ void videoula_write(uint16_t addr, uint8_t val)
                 nula_flash[7] = param & 1;
                 break;
 
-            case 10:
-                video_set_border_colour(param);
+            case 14:
+                video_set_colour(&border_col, "outer border", nula_collook[param]);
+                break;
+
+            case 15:
+                colblack = nula_collook[param];
+                video_set_colour(&clear_col, "video blank", colblack);
+                
                 break;
 
             default:
@@ -777,8 +788,6 @@ ALLEGRO_BITMAP *b, *b16, *b32;
 
 ALLEGRO_LOCKED_REGION *region;
 
-ALLEGRO_COLOR border_col;
-
 ALLEGRO_DISPLAY *video_init(void)
 {
     int c;
@@ -806,7 +815,7 @@ ALLEGRO_DISPLAY *video_init(void)
 
     colblack = 0xff000000;
     colwhite = 0xffffffff;
-    border_col = al_map_rgb(0, 0, 0);
+    border_col = clear_col = al_map_rgb(0, 0, 0);
 
     nula_default_palette();
 
@@ -836,7 +845,7 @@ ALLEGRO_DISPLAY *video_init(void)
     }
     b = al_create_bitmap(1280, 800);
     al_set_target_bitmap(b);
-    al_clear_to_color(al_map_rgb(0, 0,0));
+    al_clear_to_color(clear_col);
     region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_WRITEONLY);
     return display;
 }
@@ -1227,12 +1236,11 @@ void video_poll(int clocks, int timer_enable)
                     // Reached vertical sync position.
                     int intsync = crtc[8] & 1;
                     if (!intsync && oldr8) {
-                        ALLEGRO_COLOR black = al_map_rgb(0, 0, 0);
                         al_set_target_bitmap(b32);
-                        al_clear_to_color(black);
+                        al_clear_to_color(clear_col);
                         al_unlock_bitmap(b);
                         al_set_target_bitmap(b);
-                        al_clear_to_color(black);
+                        al_clear_to_color(clear_col);
                         region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_WRITEONLY);
                     }
                     frameodd ^= 1;
@@ -1247,7 +1255,7 @@ void video_poll(int clocks, int timer_enable)
                         vid_cleared = 1;
                         al_unlock_bitmap(b);
                         al_set_target_bitmap(b);
-                        al_clear_to_color(al_map_rgb(0, 0, 0));
+                        al_clear_to_color(clear_col);
                         region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_WRITEONLY);
                         video_doblit(crtc_mode, crtc[4]);
                     }
