@@ -1,3 +1,4 @@
+#define _DEBUG
 /*B-em v2.2 by Tom Walker
   Allegro video code*/
 #include <allegro5/allegro_primitives.h>
@@ -81,6 +82,7 @@ void video_enterfullscreen()
 #ifdef WIN32
     save_winsizex = al_get_display_width(display);
     save_winsizey = al_get_display_height(display);
+    log_debug("vidalleg: saving old display size, width=%d, height=%d", save_winsizex, save_winsizey);
 #endif
     if (!al_set_display_flag(display, ALLEGRO_FULLSCREEN_WINDOW, true)) {
         log_error("vidalleg: could not set graphics mode to full-screen");
@@ -88,8 +90,11 @@ void video_enterfullscreen()
     }
 #ifdef WIN32
     else {
+        log_debug("vidalleg: Windows bodge: clearing fullscreen flag");
         al_set_display_flag(display, ALLEGRO_FULLSCREEN_WINDOW, false);
+        log_debug("vidalleg: Windows bodge: fullscreen flag again");
         al_set_display_flag(display, ALLEGRO_FULLSCREEN_WINDOW, true);
+        log_debug("vidalleg: generating non-event re-size (for Windows)");
         video_fullscreen_wsize(al_get_display_width(display), al_get_display_height(display));
     }
 #endif
@@ -181,6 +186,7 @@ static void video_nonfs_wsize(int width, int height)
 
 void video_update_window_size(ALLEGRO_EVENT *event)
 {
+    log_debug("vidalleg: resize event with fullscreen=%d, x=%d, y=%d, width=%d, height=%d", fullscreen, event->display.x, event->display.y, event->display.width, event->display.height);
     if (!fullscreen)
         video_nonfs_wsize(event->display.width, event->display.height);
 #ifndef WIN32
@@ -196,6 +202,7 @@ void video_leavefullscreen(void)
     ALLEGRO_DISPLAY *display = al_get_current_display();
     al_set_display_flag(display, ALLEGRO_FULLSCREEN_WINDOW, false);
 #ifdef WIN32
+    log_debug("vidalleg: generating non-event re-size (for Windows)");
     al_resize_display(display, save_winsizex, save_winsizey);
     video_nonfs_wsize(save_winsizex, save_winsizey);
 #endif
