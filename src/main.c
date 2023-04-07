@@ -148,6 +148,16 @@ static const char helptext[] =
     "-vroot host-dir - set the VDFS root\n"
     "-vdir guest-dir - set the initial (boot) dir in VDFS\n\n";
 
+static void main_startmsg(void)
+{
+    uint32_t alleg_ver = al_get_allegro_version();
+    unsigned major = (alleg_ver & 0xff000000) >> 24;
+    unsigned minor = (alleg_ver & 0x00ff0000) >> 16;
+    unsigned revision = (alleg_ver & 0x0000ff00) >>8;
+    unsigned release = alleg_ver & 0x000000ff;
+    log_info("main: starting %s, Allegro %u.%u.%u[%u]", VERSION_STR, major, minor, revision, release);
+}
+
 void main_init(int argc, char *argv[])
 {
     int tapenext = 0, discnext = 0, execnext = 0, vdfsnext = 0, pastenext = 0;
@@ -171,8 +181,7 @@ void main_init(int argc, char *argv[])
     key_init();
     config_load();
     log_open();
-    log_info("main: starting %s", VERSION_STR);
-
+    main_startmsg();
     model_loadcfg();
 
     for (int c = 1; c < argc; c++) {
