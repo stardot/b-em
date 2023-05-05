@@ -362,7 +362,7 @@ static inline uint16_t read_zp_indirect(uint16_t zp)
 static uint32_t dbg_do_readmem(uint32_t addr) {
     if ((addr & 0xc000) == 0x8000) {
         uint32_t romno = addr >> 28;
-        if (romno != (ram_fe30 & 0x7f))
+        if (romno != (ram_fe30 & 0x3f))
             return rom[(romno << 14) | (addr & 0x3fff)];
     }
     return do_readmem(addr);
