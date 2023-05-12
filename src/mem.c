@@ -278,6 +278,15 @@ void mem_romsetup_bp128(void) {
     rom_slots[0].swram = 1;
 }
 
+void mem_romsetup_compact(void)
+{
+    mem_romsetup_std();
+    rom_slots[7].swram = 1;
+    rom_slots[6].swram = 1;
+    rom_slots[5].swram = 1;
+    rom_slots[4].swram = 1;
+}
+
 void mem_romsetup_master(void) {
     const char *sect = models[curmodel].cfgsect;
     const char *osname, *cpath;

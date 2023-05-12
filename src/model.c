@@ -40,7 +40,7 @@ static const char fdc_names[FDC_MAX][8] =
     "watford"
 };
 
-#define NUM_ROM_SETUP 6
+#define NUM_ROM_SETUP 7
 static rom_setup_t rom_setups[NUM_ROM_SETUP] =
 {
     { "swram",    mem_romsetup_swram    },
@@ -48,6 +48,7 @@ static rom_setup_t rom_setups[NUM_ROM_SETUP] =
     { "std",      mem_romsetup_std      },
     { "bp128",    mem_romsetup_bp128    },
     { "master",   mem_romsetup_master   },
+    { "compact",  mem_romsetup_compact  },
     { "weramrom", mem_romsetup_weramrom }
 };
 
