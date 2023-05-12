@@ -40,6 +40,11 @@ static void wd1770_short_spindown(void)
     fdc_time = 0;
 }
 
+void wd1770_setspindown()
+{
+    motorspin = 45000;
+}
+
 void wd1770_spinup()
 {
     wd1770.status |= 0x80;
@@ -52,6 +57,7 @@ void wd1770_spinup()
             if (drives[i].spinup)
                 drives[i].spinup(i);
     }
+    wd1770_setspindown();
 }
 
 static void wd1770_spindown()
@@ -66,11 +72,6 @@ static void wd1770_spindown()
             if (drives[i].spindown)
                 drives[i].spindown(i);
     }
-}
-
-void wd1770_setspindown()
-{
-    motorspin = 45000;
 }
 
 #define track0 (wd1770.curtrack ? 0 : 4)
