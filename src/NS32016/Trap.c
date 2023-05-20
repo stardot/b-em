@@ -50,7 +50,7 @@ void Dump(void)
    ProfileDump();
 }
 
-void n32016_dumpregs(char* pMessage)
+void n32016_dumpregs(const char* pMessage)
 {
    TrapTRACE("%s", pMessage);
    Dump();
