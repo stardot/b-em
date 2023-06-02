@@ -1016,8 +1016,10 @@ static void disc_vdfs_root(ALLEGRO_EVENT *event)
     if ((chooser = al_create_native_file_dialog(vdfs_get_root(), "Choose a folder to be the VDFS root", "*", ALLEGRO_FILECHOOSER_FOLDER))) {
         display = (ALLEGRO_DISPLAY *)(event->user.data2);
         if (al_show_native_file_dialog(display, chooser)) {
-            if (al_get_native_file_dialog_count(chooser) > 0)
+            if (al_get_native_file_dialog_count(chooser) > 0) {
                 vdfs_set_root(al_get_native_file_dialog_path(chooser, 0));
+                config_save();
+            }
         }
     }
 }
