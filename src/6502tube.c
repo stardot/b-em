@@ -795,12 +795,11 @@ void tube_6502_exec()
                         bbr(0x02);
                         break;
 
-                case 0x20:
-                        /*JSR*/ addr = getw();
-                        pc--;
+                case 0x20:      /*JSR*/
+                        addr = readmem(pc++);
                         push(pc >> 8);
                         push(pc);
-                        pc = addr;
+                        pc = addr | (readmem(pc) << 8);
                         polltime(6);
                         break;
 

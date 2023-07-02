@@ -1637,12 +1637,11 @@ void m6502_exec(void)
                         takeint = (interrupt && !p.i);
                         break;
 
-                case 0x20:
-                        /*JSR*/ addr = getw();
-                        pc--;
+                case 0x20:      /*JSR*/
+                        addr = readmem(pc++);
                         push(pc >> 8);
                         push((uint8_t)pc);
-                        pc = addr;
+                        pc = addr | (readmem(pc) << 8);
                         polltime(5);
                         takeint = (interrupt && !p.i);
                         polltime(1);
@@ -4292,12 +4291,11 @@ void m65c02_exec(void)
                         polltime(6 + tempw);
                         break;
 
-                case 0x20:
-                        /*JSR*/ addr = getw();
-                        pc--;
+                case 0x20:      /*JSR*/
+                        addr = readmem(pc++);
                         push(pc >> 8);
                         push((uint8_t)pc);
-                        pc = addr;
+                        pc = addr | (readmem(pc) << 8);
                         polltime(5);
                         takeint = (interrupt && !p.i);
                         polltime(1);
