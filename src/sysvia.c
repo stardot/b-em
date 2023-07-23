@@ -84,8 +84,6 @@ static void sysvia_update_sdb()
 
 static void sysvia_write_IC32(uint8_t val)
 {
-        uint8_t oldIC32 = IC32;
-
         if (val & 8)
            IC32 |=  (1 << (val & 7));
         else
