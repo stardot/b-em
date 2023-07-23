@@ -6,7 +6,7 @@
 #include "sn76489.h"
 #include "sound.h"
 #include "via.h"
-#include "uservia.h"
+#include "sysvia.h"
 
 uint8_t sn_freqhi[4], sn_freqlo[4];
 uint8_t sn_vol[4];
@@ -69,6 +69,10 @@ void sn_fillbuf(int16_t *buffer, int len)
 {
         int c, d;
         static int sidcount = 0;
+        uint8_t sdb_data;
+
+        if (sysvia_get_sn_data(&sdb_data))
+                sn_write(sdb_data);
 
         for (d = 0; d < len; d++)
         {
@@ -78,7 +82,7 @@ void sn_fillbuf(int16_t *buffer, int len)
                         if (sn_latch[c] > 256) buffer[d] += (int16_t) (snwaves[curwave][sn_stat[c]] * volslog[sn_vol[c]]);
                         else                   buffer[d] += (int16_t) (volslog[sn_vol[c]] * 127);
 
-                        sn_count[c] -= 8192;
+                        sn_count[c] -= 2048;
                         while ((int)sn_count[c] < 0  && sn_latch[c])
                         {
                                 sn_count[c] += sn_latch[c];
@@ -94,7 +98,7 @@ void sn_fillbuf(int16_t *buffer, int len)
                 }
                 else    buffer[d] += (((sn_shift & 1) ^ 1) * 127 * volslog[sn_vol[0]] * 2);
 
-                sn_count[0] -= 512;
+                sn_count[0] -= 128;
                 while ((int)sn_count[0] < 0 && sn_latch[0])
                 {
                         sn_count[0] += (sn_latch[0] * 2);
@@ -119,7 +123,7 @@ void sn_fillbuf(int16_t *buffer, int len)
 //                buffer[d] += (lpt_dac * 32);
 
                 sidcount++;
-                if (sidcount == 624)
+                if (sidcount == 2496)
                 {
                         sidcount = 0;
                         if (!sn_rect_dir)

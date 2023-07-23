@@ -93,9 +93,6 @@ static void sysvia_write_IC32(uint8_t val)
 
         sysvia_update_sdb();
 
-        if (!(IC32 & 1) && (oldIC32 & 1))
-           sn_write(sdbval);
-
         scrsize = ((IC32 & 0x10) ? 2 : 0) | ((IC32 & 0x20) ? 1 : 0);
 
     log_debug("sysvia: IC32=%02X", IC32);
@@ -193,4 +190,11 @@ void sysvia_loadstate(FILE *f)
 
         IC32=getc(f);
         scrsize=((IC32&16)?2:0)|((IC32&32)?1:0);
+}
+
+int sysvia_get_sn_data(uint8_t *data)
+{
+        *data = sdbval;
+
+        return !(IC32 & 1);
 }

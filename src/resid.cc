@@ -51,7 +51,7 @@ void sid_init()
                 psid->sid->write(c,0);
                 
         if (!psid->sid->set_sampling_parameters((float)cycles_per_sec, method,
-                                                (float) FREQ_SO, 0.9*((float) FREQ_SO)/2.0))
+                                                (float) FREQ_SID, 0.9*((float) FREQ_SID)/2.0))
                                             {
   //                                                      printf("reSID failed!\n");
                                                 }
@@ -72,7 +72,7 @@ void sid_reset()
 void sid_settype(int resamp, int model)
 {
         sampling_method method=(resamp)?SAMPLE_RESAMPLE_INTERPOLATE:SAMPLE_INTERPOLATE;
-        if (!psid->sid->set_sampling_parameters((float)1000000, method,(float) FREQ_SO, 0.9*((float) FREQ_SO)/2.0))
+        if (!psid->sid->set_sampling_parameters((float)1000000, method,(float) FREQ_SID, 0.9*((float) FREQ_SID)/2.0))
         {
 //                rpclog("Change failed\n");
         }
