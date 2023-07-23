@@ -235,6 +235,7 @@ static inline void polltime(int c)
     via_poll(&sysvia, c);
     via_poll(&uservia, c);
     video_poll(c, 1);
+    sound_poll(c);
     otherstuffcount -= c;
     if (motoron) {
         if (fdc_time) {
@@ -1057,7 +1058,6 @@ static void otherstuff_poll(void) {
     acia_poll(&sysacia);
     if (sound_music5000)
         music2000_poll();
-    sound_poll();
     if (!tapelcount) {
         tape_poll();
         tapelcount = tapellatch;

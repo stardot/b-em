@@ -19,4 +19,6 @@ void sysvia_set_ca2(int level);
 void sysvia_set_cb1(int level);
 void sysvia_set_cb2(int level);
 
+int sysvia_get_sn_data(uint8_t *data);
+
 #endif

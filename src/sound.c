@@ -21,24 +21,24 @@ static ALLEGRO_MIXER *mixer;
 static ALLEGRO_AUDIO_STREAM *stream;
 
 static int sound_pos = 0;
+static int sound_sn_pos = 0;
+
 static short sound_buffer[BUFLEN_SO];
 
-#define NCoef 4
+static int sound_sn76489_cycles = 0, sound_poll_cycles = 0;
+
+#define NCoef 2
 static float iir(float NewSample) {
     static const float ACoef[NCoef+1] = {
-        0.30631912757971225000,
-        0.00000000000000000000,
-        -0.61263825515942449000,
-        0.00000000000000000000,
-        0.30631912757971225000
+        0.9844825527642453,
+        -1.9689651055284907,
+        0.9844825527642453
     };
 
     static const float BCoef[NCoef+1] = {
-        1.00000000000000000000,
-        -1.86772356053227330000,
-        1.08459167506874430000,
-        -0.37711292573951394000,
-        0.17253125052500490000
+        1,
+        -1.9687243044104659,
+        0.9692059066465155
     };
 
     static float y[NCoef+1]; //output samples
@@ -60,25 +60,29 @@ static float iir(float NewSample) {
     return y[0];
 }
 
-void sound_poll(void)
+static void sound_poll_all(void)
 {
     float *buf;
     int c;
 
     if ((sound_internal || sound_beebsid) && stream) {
+        int16_t temp_buffer[2] = {0};
+
         if (sound_beebsid)
-            sid_fillbuf(sound_buffer + sound_pos, 2);
-        if (sound_internal)
-            sn_fillbuf(sound_buffer + sound_pos, 2);
+            sid_fillbuf(temp_buffer, 2);
         if (sound_paula)
-            paula_fillbuf(sound_buffer + sound_pos, 2);
+            paula_fillbuf(temp_buffer, 2);
         if (sound_dac) {
-            sound_buffer[sound_pos]     += (((int)lpt_dac - 0x80) * 32);
-            sound_buffer[sound_pos + 1] += (((int)lpt_dac - 0x80) * 32);
+            temp_buffer[0] += (((int)lpt_dac - 0x80) * 32);
+            temp_buffer[1] += (((int)lpt_dac - 0x80) * 32);
         }
 
-        // skip forward 2 mono samples
-        sound_pos += 2;
+        for (c = 0; c < 8/2; c++) {
+            sound_buffer[sound_pos + c] += temp_buffer[0];
+            sound_buffer[sound_pos + c + 4] += temp_buffer[1];
+        }
+        // skip forward 8 mono samples
+        sound_pos += 8;
         if (sound_pos == BUFLEN_SO) {
             if ((buf = al_get_audio_stream_fragment(stream))) {
                 if (sound_filter) {
@@ -93,7 +97,29 @@ void sound_poll(void)
             } else
                 log_debug("sound: overrun");
             sound_pos = 0;
+            sound_sn_pos = 0;
             memset(sound_buffer, 0, sizeof(sound_buffer));
+        }
+    }
+}
+
+void sound_poll(int cycles)
+{
+    sound_sn76489_cycles -= cycles;
+    if (sound_sn76489_cycles < 0)
+    {
+        sound_sn76489_cycles += 16;
+
+        if (sound_internal)
+            sn_fillbuf(&sound_buffer[sound_sn_pos], 1);
+
+        sound_sn_pos++;
+
+        sound_poll_cycles -= 16;
+        if (sound_poll_cycles < 0)
+        {
+            sound_poll_cycles += 128;
+            sound_poll_all();
         }
     }
 }
