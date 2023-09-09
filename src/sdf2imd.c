@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include "sdf.h"
 
+#define SKEW 3
+
 #if __GNUC__
 #define printflike __attribute__((format (printf, 1, 2)))
 #else
@@ -56,14 +58,47 @@ static void imd_hdr(const char *sdf_fn, const struct sdf_geometry *geo, FILE *if
             sdf_desc_dens(geo), geo->sectors_per_track, geo->sector_size);
 }
 
+static void copy_sector(FILE *sfp, const struct sdf_geometry *geo, FILE *ifp, uint8_t *buf, unsigned sect, unsigned track_pos)
+{
+    unsigned sect_pos = track_pos + sect * geo->sector_size;
+    unsigned write_len = 1;
+    if (!fseek(sfp, sect_pos, SEEK_SET)) {
+        if (fread(buf+1, geo->sector_size, 1, sfp) == 1) {
+            bool compress = true;
+            unsigned v = buf[1];
+            for (const uint8_t *ptr = buf+2; ptr < buf+geo->sector_size+1; ptr++) {
+                if (*ptr != v) {
+                    compress = false;
+                    break;
+                }
+            }
+            if (compress) {
+                log_debug("writing compressed sector %u", sect);
+                buf[0] = 0x02;
+                write_len = 2;
+            }
+            else {
+                log_debug("writing full sector %u", sect);
+                buf[0] = 0x01;
+                write_len = geo->sector_size+1;
+            }
+        }
+        else if (ferror(ifp))
+            log_error("error reading SDF file: %s", strerror(errno));
+    }
+    else
+        log_error("seek error on SDF file: %s", strerror(errno));
+    fwrite(buf, write_len, 1, ifp);
+}
+
 static const uint8_t modes[4] = { 0x02, 0x02, 0x05, 0x03 };
 
-static bool copy_track(FILE *sfp, const struct sdf_geometry *geo, FILE *ifp, unsigned cyclinder, unsigned head, bool eof)
+static void copy_track(FILE *sfp, const struct sdf_geometry *geo, FILE *ifp, unsigned cylinder, unsigned head, unsigned track_pos)
 {
-    log_debug("copy track cyl=%u, head=%u, eof=%u", cyclinder, head, eof);
+    log_debug("copy track cyl=%u, head=%u", cylinder, head);
     uint8_t buf[1025];
     buf[0] = modes[geo->density];
-    buf[1] = cyclinder;
+    buf[1] = cylinder;
     buf[2] = head;
     buf[3] = geo->sectors_per_track;
     unsigned size = geo->sector_size;
@@ -75,57 +110,45 @@ static bool copy_track(FILE *sfp, const struct sdf_geometry *geo, FILE *ifp, uns
     buf[4] = szcode;
     uint8_t *ptr = buf+5;
     unsigned base = (geo->sector_size > 256) ? 1 : 0;
-    for (unsigned sect = 0; sect < geo->sectors_per_track; sect++)
-        *ptr++ = base++;
+    unsigned ssect = (cylinder * SKEW) % geo->sectors_per_track;
+    for (unsigned sect = ssect; sect < geo->sectors_per_track; ++sect)
+        *ptr++ = base + sect;
+    for (unsigned sect = 0; sect < ssect; ++sect)
+        *ptr++ = base + sect;
     fwrite(buf, ptr-buf, 1, ifp);
-    for (unsigned sect = 0; sect < geo->sectors_per_track; sect++) {
-        if (!eof && fread(buf+1, geo->sector_size, 1, sfp) == 1) {
-            bool compress = true;
-            unsigned v = buf[1];
-            for (ptr = buf+2; ptr < buf+geo->sector_size+1; ptr++) {
-                if (*ptr != v) {
-                    compress = false;
-                    break;
-                }
-            }
-            if (compress) {
-                log_debug("writing compressed sector %u", sect);
-                buf[0] = 0x02;
-                fwrite(buf, 2, 1, ifp);
-            }
-            else {
-                log_debug("writing full sector %u", sect);
-                buf[0] = 0x01;
-                fwrite(buf, geo->sector_size+1, 1, ifp);
-            }
-        }
-        else {
-            eof = true;
-            putc(0, ifp);
-        }
-    }
-    return eof;
+    for (unsigned sect = ssect; sect < geo->sectors_per_track; ++sect)
+        copy_sector(sfp, geo, ifp, buf, sect, track_pos);
+    for (unsigned sect = 0; sect < ssect; ++sect)
+        copy_sector(sfp, geo, ifp, buf, sect, track_pos);
 }
 
 static void sdf2imd(FILE *sfp, const struct sdf_geometry *geo, FILE *ifp)
 {
-    bool eof = false;
-    fseek(sfp, 0, SEEK_SET);
+    unsigned track_pos = 0;
+    unsigned track_size = geo->sectors_per_track * geo->sector_size;
     switch(geo->sides) {
         case SDF_SIDES_SINGLE:
-            for (unsigned track = 0; track < geo->tracks; track++)
-                eof = copy_track(sfp, geo, ifp, track, 0, eof);
+            for (unsigned track = 0; track < geo->tracks; track++) {
+                copy_track(sfp, geo, ifp, track, 0, track_pos);
+                track_pos += track_size;
+            }
             break;
         case SDF_SIDES_SEQUENTIAL:
-            for (unsigned track = 0; track < geo->tracks; track++)
-                eof = copy_track(sfp, geo, ifp, track, 0, eof);
-            for (unsigned track = 0; track < geo->tracks; track++)
-                eof = copy_track(sfp, geo, ifp, track, 1, eof);
+            for (unsigned track = 0; track < geo->tracks; track++) {
+                copy_track(sfp, geo, ifp, track, 0, track_pos);
+                track_pos += track_size;
+            }
+            for (unsigned track = 0; track < geo->tracks; track++) {
+                copy_track(sfp, geo, ifp, track, 1, track_pos);
+                track_pos += track_size;
+            }
             break;
         case SDF_SIDES_INTERLEAVED:
             for (unsigned track = 0; track < geo->tracks; track++) {
-                eof = copy_track(sfp, geo, ifp, track, 0, eof);
-                eof = copy_track(sfp, geo, ifp, track, 1, eof);
+                copy_track(sfp, geo, ifp, track, 0, track_pos);
+                track_pos += track_size;
+                copy_track(sfp, geo, ifp, track, 1, track_pos);
+                track_pos += track_size;
             }
     }
 }
