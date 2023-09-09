@@ -561,7 +561,7 @@ void main_run()
                 /* bodge for when OUT events immediately follow an IN event */
                 if ((event.any.timestamp - last_switch_in) > 0.01) {
                     key_lost_focus();
-                    if (autopause)
+                    if (autopause && !debug_core && !debug_tube)
                         main_pause("auto-paused");
                 }
                 break;
