@@ -1332,21 +1332,27 @@ static void imd_sect_err(const char *fn, FILE *fp, int trackno, int sectno)
 
 static bool imd_load_sectors(const char *fn, FILE *fp, struct imd_track *trk, int trackno, struct imd_maps *mp)
 {
-    struct imd_sect *head = NULL;
-    struct imd_sect *tail = NULL;
     for (int sectno = 0; sectno < trk->nsect; sectno++) {
         unsigned ssize = (trk->sectsize == 0xff) ? mp->ssize_map[sectno] : trk->sectsize;
         size_t bytes = 128 << ssize;
         int mode = getc(fp);
         if (mode == EOF) {
             imd_sect_err(fn, fp, trackno, sectno);
-            goto failed;
+            return false;
         }
         struct imd_sect *sect = malloc((mode & 1) ? sizeof(struct imd_sect) + bytes : sizeof(struct imd_sect));
         if (!sect) {
             log_error("Disc image '%s' track %d, sector %d: %s", fn, trackno, sectno, "out of memory");
-            goto failed;
+            return false;
         }
+        sect->next = NULL;
+        sect->prev = trk->sect_tail;
+        if (trk->sect_tail)
+            trk->sect_tail->next = sect;
+        else
+            trk->sect_head = sect;
+        trk->sect_tail = sect;
+
         sect->mode = mode;
         sect->cylinder = (trk->head & 0x80) ? mp->cyl_map[sectno]  : trk->cylinder;
         sect->head     = (trk->head & 0x40) ? mp->head_map[sectno] : trk->head & ~0xc0;
@@ -1357,35 +1363,19 @@ static bool imd_load_sectors(const char *fn, FILE *fp, struct imd_track *trk, in
         else if (mode & 1) {
             if (fread(sect->data, bytes, 1, fp) != 1) {
                 imd_sect_err(fn, fp, trackno, sectno);
-                goto failed;
+                return false;
             }
         }
         else {
             int byte = getc(fp);
             if (byte == EOF) {
                 imd_sect_err(fn, fp, trackno, sectno);
-                goto failed;
+                return false;
             }
             sect->data[0] = byte;
         }
-        sect->prev = tail;
-        if (tail)
-            tail->next = sect;
-        else
-            head = sect;
-        sect->next = NULL;
-        tail = sect;
     }
-    trk->sect_head = head;
-    trk->sect_tail = tail;
     return true;
-failed:
-    while (head) {
-        struct imd_sect *next = head->next;
-        free(head);
-        head = next;
-    }
-    return false;
 }
 
 /*
@@ -1409,8 +1399,6 @@ static bool imd_load_map(const char *fn, FILE *fp, size_t nsect, uint8_t map[IMD
 
 static bool imd_load_tracks(const char *fn, FILE *fp, struct imd_file *imd)
 {
-    struct imd_track *head = NULL;
-    struct imd_track *tail = NULL;
     unsigned trackno = 0;
     uint8_t hdr[5];
     imd->maxcyl  = 0;
@@ -1419,8 +1407,18 @@ static bool imd_load_tracks(const char *fn, FILE *fp, struct imd_file *imd)
         struct imd_track *trk = malloc(sizeof(struct imd_track));
         if (!trk) {
             log_error("Disc image '%s' track %d: out of memory", fn, trackno);
-            goto failed;
+            return false;
         }
+        trk->next = NULL;
+        trk->prev = imd->track_tail;
+        if (imd->track_tail)
+            imd->track_tail->next = trk;
+        else
+            imd->track_head = trk;
+        imd->track_tail = trk;
+        trk->sect_head = NULL;
+        trk->sect_tail = NULL;
+
         trk->mode     = hdr[0];
         trk->cylinder = hdr[1];
         trk->head     = hdr[2] & ~0xc0;
@@ -1428,40 +1426,24 @@ static bool imd_load_tracks(const char *fn, FILE *fp, struct imd_file *imd)
         trk->sectsize = hdr[4];
         if (trk->nsect > IMD_MAX_SECTS) {
             log_error("Disc image '%s' track %d has too many sectors", fn, trackno);
-            goto failed;
+            return false;
         }
         if (trk->cylinder > imd->maxcyl)
             imd->maxcyl = trk->cylinder;
         struct imd_maps maps;
         if (!imd_load_map(fn, fp, trk->nsect, maps.snum_map, trackno, "sector ID"))
-            goto failed;
+            return false;
         if ((hdr[2] & 0x80) && !imd_load_map(fn, fp, trk->nsect, maps.cyl_map, trackno, "cyclinder"))
-            goto failed;
+            return false;
         if ((hdr[2] & 0x40) && !imd_load_map(fn, fp, trk->nsect, maps.head_map, trackno, "head"))
-            goto failed;
+            return false;
         if ((trk->sectsize == 0xff) && !imd_load_map(fn, fp, trk->nsect, maps.ssize_map, trackno, "sector size"))
-            goto failed;
+            return false;
         if (!imd_load_sectors(fn, fp, trk, trackno, &maps))
-            goto failed;
-        trk->prev = tail;
-        if (tail)
-            tail->next = trk;
-        else
-            head = trk;
-        trk->next = NULL;
-        tail = trk;
+            return false;
         trackno++;
     }
-    imd->track_head = head;
-    imd->track_tail = tail;
     return true;
-failed:
-    while (head) {
-        struct imd_track *next = head->next;
-        free(head);
-        head = next;
-    }
-    return false;
 }
 
 /*
