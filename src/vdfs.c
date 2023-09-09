@@ -1,10 +1,10 @@
 /*
  * VDFS for B-EM
- * Steve Fosdick 2016-2020
+ * Steve Fosdick 2016-2023
  *
  * This module implements the host part of a Virtual Disk Filing
  * System, one in which a part of filing system of the host is
- * exposed to the guest through normal OS cals on the guest.
+ * exposed to the guest through normal OS calls on the guest.
  *
  * This particular implementation comes in two parts:
  *
