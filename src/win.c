@@ -74,4 +74,13 @@ bool is_relative_filename(const char *fn)
     return !(c0 == '/' || c0 == '\\' || (isalpha(c0) && fn[1] == ':'));
 }
 
+#ifndef __GNUC__
+// https://stackoverflow.com/a/19932364/433626
+int ftruncate(int fd, off_t length) {
+    HANDLE handle = (HANDLE) _get_osfhandle(_fileno(fd));
+    SetFilePointer(handle, length, 0, FILE_BEGIN);
+    SetEndOfFile(handle);
+}
+#endif
+
 #endif

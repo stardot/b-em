@@ -1,3 +1,4 @@
+#define _DEBUG
 /*
  * VDFS for B-EM
  * Steve Fosdick 2016-2023
@@ -3152,6 +3153,60 @@ static void osgbpb(void)
  * OSARGS
  */
 
+#ifdef WIN32
+extern int ftruncate(int fd, off_t length);
+#endif
+
+static void osargs_set_ptr(vdfs_open_file *cp)
+{
+    FILE *fp = cp->fp;
+    fseek(fp, 0, SEEK_END);
+    long cur_len = ftell(fp);
+    long new_seq = readmem32(x);
+    if (new_seq > cur_len) {
+        if (cp->ent->attribs & ATTR_OPEN_WRITE) {
+            fseek(fp, new_seq-1, SEEK_SET);
+            putc(0, fp);
+        }
+        else
+            adfs_error(err_nupdate);
+    }
+    else
+        fseek(fp, new_seq, SEEK_SET);
+}
+
+static void osargs_get_ext(vdfs_open_file *cp)
+{
+    FILE *fp = cp->fp;
+    long seq_ptr = ftell(fp);
+    fseek(fp, 0, SEEK_END);
+    writemem32(x, ftell(fp));
+    fseek(fp, seq_ptr, SEEK_SET);
+}
+
+static void osargs_set_ext(vdfs_open_file *cp)
+{
+    if (cp->ent->attribs & ATTR_OPEN_WRITE) {
+        FILE *fp = cp->fp;
+        long seq_ptr = ftell(fp);
+        fseek(fp, 0, SEEK_END);
+        long cur_len = ftell(fp);
+        long new_len = readmem32(x);
+        if (new_len > cur_len) {
+            fseek(fp, new_len-1, SEEK_SET);
+            putc(0, fp);
+        }
+        else if (new_len < cur_len) {
+            ftruncate(fileno(fp), new_len);
+            if (new_len < seq_ptr)
+                seq_ptr = new_len;
+        }
+        fseek(fp, seq_ptr, SEEK_SET);
+    }
+    else
+        adfs_error(err_nupdate);
+}
+
 static void osargs(void)
 {
     log_debug("vdfs: osargs(A=%02X, X=%02X, Y=%02X)", a, x, y);
@@ -3177,23 +3232,21 @@ static void osargs(void)
     else {
         vdfs_open_file *cp = get_open_read(y);
         if (cp) {
-            FILE *fp = cp->fp;
-            long temp;
             switch (a) {
             case 0:     // read sequential pointer
-                writemem32(x, ftell(fp));
+                writemem32(x, ftell(cp->fp));
                 break;
             case 1:     // write sequential pointer
-                fseek(fp, readmem32(x), SEEK_SET);
+                osargs_set_ptr(cp);
                 break;
             case 2:     // read file size (extent)
-                temp = ftell(fp);
-                fseek(fp, 0, SEEK_END);
-                writemem32(x, ftell(fp));
-                fseek(fp, temp, SEEK_SET);
+                osargs_get_ext(cp);
+                break;
+            case 3:     // set file size (extent).
+                osargs_set_ext(cp);
                 break;
             case 0xff:  // write any cache to media.
-                fflush(fp);
+                fflush(cp->fp);
                 break;
             default:
                 log_debug("vdfs: osargs: unrecognised function code a=%d for channel y=%d", a, y);
