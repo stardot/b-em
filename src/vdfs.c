@@ -2805,21 +2805,11 @@ static void osfind(void)
             }
             else if (acorn_mode == 0xc0) {
                 attribs = ATTR_OPEN_READ|ATTR_OPEN_WRITE;
-                if (ent) {
-                    if (ent->attribs & ATTR_EXISTS) {
-                        if (ent->attribs & (ATTR_OPEN_READ|ATTR_OPEN_WRITE))
-                            adfs_error(err_isopen);
-                        else
-                            mode = "rb+";
-                    }
+                if (ent && ent->attribs & ATTR_EXISTS) {
+                    if (ent->attribs & (ATTR_OPEN_READ|ATTR_OPEN_WRITE))
+                        adfs_error(err_isopen);
                     else
-                        mode = "wb+";
-                } else {
-                    if (!no_wildcards(path))
-                        return;
-                    if (res.parent)
-                        ent = add_new_file(&res);
-                    mode = "wb+";
+                        mode = "rb+";
                 }
             }
             if (mode && ent) {
