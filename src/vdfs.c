@@ -1,4 +1,3 @@
-#define _DEBUG
 /*
  * VDFS for B-EM
  * Steve Fosdick 2016-2023
