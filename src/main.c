@@ -408,6 +408,7 @@ void main_key_break(void)
     wd1770_reset();
     sid_reset();
     music5000_reset();
+    cmos_reset();
     paula_reset();
 
     if (curtube != -1)
