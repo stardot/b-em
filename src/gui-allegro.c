@@ -406,6 +406,7 @@ static ALLEGRO_MENU *create_sid_menu(void)
 static const char *wave_names[] = { "Square", "Saw", "Sine", "Triangle", "SID", NULL };
 static const char *dd_type_names[] = { "5.25\"", "3.5\"", NULL };
 static const char *dd_noise_vols[] = { "33%", "66%", "100%", NULL };
+static const char *filt_freq[] = { "Original (3214Hz)", "16kHz", NULL };
 
 static ALLEGRO_MENU *create_sound_menu(void)
 {
@@ -414,6 +415,9 @@ static ALLEGRO_MENU *create_sound_menu(void)
     add_checkbox_item(menu, "Internal sound chip",   IDM_SOUND_INTERNAL,  sound_internal);
     add_checkbox_item(menu, "BeebSID",               IDM_SOUND_BEEBSID,   sound_beebsid);
     add_checkbox_item(menu, "Music 5000",            IDM_SOUND_MUSIC5000, sound_music5000);
+    sub = al_create_menu();
+    add_radio_set(sub, filt_freq, IDM_SOUND_MFILT, music5000_fno);
+    al_append_menu_item(menu, "Music 5000 Filter", 0, 0, NULL, sub);
     add_checkbox_item(menu, "Paula",                 IDM_SOUND_PAULA,     sound_paula);
     add_checkbox_item(menu, "Printer port DAC",      IDM_SOUND_DAC,       sound_dac);
     add_checkbox_item(menu, "Disc drive noise",      IDM_SOUND_DDNOISE,   sound_ddnoise);
@@ -1378,6 +1382,9 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             break;
         case IDM_SOUND_MUSIC5000:
             sound_music5000 = !sound_music5000;
+            break;
+        case IDM_SOUND_MFILT:
+            music5000_fno = radio_event_simple(event, music5000_fno);
             break;
         case IDM_SOUND_PAULA:
             sound_paula = !sound_paula;

@@ -351,7 +351,49 @@ static void fput_samples(FILE *fp, int sl, int sr)
     }
 }
 
-static void music5000_get_sample(int16_t *left, int16_t *right)
+typedef struct _m5000_fcoeff {
+    double biquada[3];
+    double biquadb[3];
+    double gain;
+} m5000_fcoeff;
+
+#define NBQ 2
+
+static const m5000_fcoeff m500_filters[2] = {
+    { // original.
+        {0.6545294918791053,-1.503352371060256,-0.640959826975052},
+        {1,2,1},
+        147.38757472209932
+    },
+    { // 16Khz.
+        {0.40854522701892754,0.7646729121849647,0.29507476655875625},
+        {1,2,1},
+        2.8424433902604673
+    }
+};
+
+static double xyv_l[]={0,0,0,0,0,0,0,0,0};
+static double xyv_r[]={0,0,0,0,0,0,0,0,0};
+int music5000_fno;
+
+static double applyfilter(const m5000_fcoeff *fcp, double *xyv, double v)
+{
+	int i,b,xp=0,yp=3,bqp=0;
+	double out=v/fcp->gain;
+	for (i=8; i>0; i--) {xyv[i]=xyv[i-1];}
+	for (b=0; b<NBQ; b++)
+	{
+		int len=(b==NBQ-1)?1:2;
+		xyv[xp]=out;
+		for(i=0; i<len; i++) { out+=xyv[xp+len-i]*fcp->biquadb[bqp+i]-xyv[yp+len-i]*fcp->biquada[bqp+i]; }
+		bqp+=len;
+		xyv[yp]=out;
+		xp=yp; yp+=len+1;
+	}
+	return out;
+}
+
+static void music5000_get_sample(int16_t *left, int16_t *right, const m5000_fcoeff *fcp)
 {
     int clip;
     static int divisor = 1;
@@ -367,8 +409,9 @@ static void music5000_get_sample(int16_t *left, int16_t *right)
     static int window = FREQ_M5 * 30;
 #endif
 
-    int sl = m5000.sleft  + m3000.sleft;
-    int sr = m5000.sright + m3000.sright;
+    int sl = applyfilter(fcp, xyv_l, (double)(m5000.sleft  + m3000.sleft) / 262144.0) * 262144;
+    int sr = applyfilter(fcp, xyv_r, (double)(m5000.sright + m3000.sright) / 262144.0) * 262144;
+    
     fput_samples(music5000_fp, sl, sr);
 
 #ifdef LOG_LEVELS
@@ -441,13 +484,13 @@ static void music5000_get_sample(int16_t *left, int16_t *right)
 }
 
 // Music 5000 runs at a sample rate of 6MHz / 128 = 46875
-static void music5000_fillbuf(int16_t *buffer, int len) {
+static void music5000_fillbuf(int16_t *buffer, int len, const m5000_fcoeff *fcp) {
     int sample;
     int16_t *bufptr = buffer;
     for (sample = 0; sample < len; sample++) {
         update_channels(&m5000);
         update_channels(&m3000);
-        music5000_get_sample(bufptr, bufptr + 1);
+        music5000_get_sample(bufptr, bufptr + 1, fcp);
         bufptr += 2;
     }
 }
@@ -463,7 +506,7 @@ void music5000_streamfrag(void)
 
     if (sound_music5000) {
         if ((buf = al_get_audio_stream_fragment(stream))) {
-            music5000_fillbuf(buf, BUFLEN_M5);
+            music5000_fillbuf(buf, BUFLEN_M5, &m500_filters[music5000_fno]);
             al_set_audio_stream_fragment(stream, buf);
             al_set_audio_stream_playing(stream, true);
         }
