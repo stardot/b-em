@@ -12,6 +12,7 @@
 #include "model.h"
 #include "mouse.h"
 #include "mmccard.h"
+#include "music5000.h"
 #include "ide.h"
 #include "midi.h"
 #include "scsi.h"
@@ -169,6 +170,7 @@ void config_load(void)
     sound_tape       = get_config_bool("sound", "sndtape",       false);
     sound_filter     = get_config_bool("sound", "soundfilter",   true);
     sound_paula      = get_config_bool("sound", "soundpaula",    false);
+    music5000_fno    = get_config_int("sound", "music5000_filter", 0);
 
     curwave          = get_config_int("sound", "soundwave",     0);
     sidmethod        = get_config_int("sound", "sidmethod",     0);
@@ -313,6 +315,7 @@ void config_save(void)
         set_config_bool("sound", "sndtape",     sound_tape);
         set_config_bool("sound", "soundfilter", sound_filter);
         set_config_bool("sound", "soundpaula",  sound_paula);
+        set_config_int("sound", "music5000_filter", music5000_fno);
 
         set_config_int("sound", "soundwave", curwave);
         set_config_int("sound", "sidmethod", sidmethod);

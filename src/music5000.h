@@ -13,5 +13,6 @@ FILE *music5000_rec_start(const char *fn);
 void music5000_rec_stop(void);
 
 extern FILE *music5000_fp;
+extern int music5000_fno;
 
 #endif
