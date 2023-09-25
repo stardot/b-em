@@ -591,6 +591,19 @@ static int radio_event_simple(ALLEGRO_EVENT *event, int current)
     return num;
 }
 
+static int radio_event_with_deselect(ALLEGRO_EVENT *event, int current)
+{
+    int id = menu_get_id(event);
+    int num = menu_get_num(event);
+    ALLEGRO_MENU *menu = (ALLEGRO_MENU *)(event->user.data3);
+
+    if (num == current)
+        num = -1;
+    else
+        al_set_menu_item_flags(menu, menu_id_num(id, current), ALLEGRO_MENU_ITEM_CHECKBOX);
+    return num;
+}
+
 static void file_load_state(ALLEGRO_EVENT *event)
 {
     ALLEGRO_DISPLAY *display = (ALLEGRO_DISPLAY *)(event->user.data2);
@@ -1384,7 +1397,7 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             sound_music5000 = !sound_music5000;
             break;
         case IDM_SOUND_MFILT:
-            music5000_fno = radio_event_simple(event, music5000_fno);
+            music5000_fno = radio_event_with_deselect(event, music5000_fno);
             break;
         case IDM_SOUND_PAULA:
             sound_paula = !sound_paula;
