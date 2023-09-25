@@ -409,8 +409,12 @@ static void music5000_get_sample(int16_t *left, int16_t *right, const m5000_fcoe
     static int window = FREQ_M5 * 30;
 #endif
 
-    int sl = applyfilter(fcp, xyv_l, (double)(m5000.sleft  + m3000.sleft) / 262144.0) * 262144;
-    int sr = applyfilter(fcp, xyv_r, (double)(m5000.sright + m3000.sright) / 262144.0) * 262144;
+    int sl = m5000.sleft  + m3000.sleft;
+    int sr = m5000.sright + m3000.sright;
+    if (fcp) {
+        sl = applyfilter(fcp, xyv_l, (double)sl);
+        sr = applyfilter(fcp, xyv_r, (double)sr);
+    }
     
     fput_samples(music5000_fp, sl, sr);
 
@@ -506,7 +510,7 @@ void music5000_streamfrag(void)
 
     if (sound_music5000) {
         if ((buf = al_get_audio_stream_fragment(stream))) {
-            music5000_fillbuf(buf, BUFLEN_M5, &m500_filters[music5000_fno]);
+            music5000_fillbuf(buf, BUFLEN_M5, music5000_fno < 0 ? NULL : &m500_filters[music5000_fno]);
             al_set_audio_stream_fragment(stream, buf);
             al_set_audio_stream_playing(stream, true);
         }
