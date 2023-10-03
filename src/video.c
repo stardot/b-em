@@ -835,7 +835,7 @@ void video_set_disptype(enum vid_disptype dtype)
 static const uint8_t cursorlook[7] = { 0, 0, 0, 0x80, 0x40, 0x20, 0x20 };
 static const int cdrawlook[4] = { 3, 2, 1, 0 };
 
-static const int cmask[4] = { 0, 0, 16, 32 };
+static const int cmask[4] = { 0, 0, 8, 16 };
 
 static int lasthc0 = 0, lasthc;
 static int ccount = 0;
@@ -884,7 +884,7 @@ void video_poll(int clocks, int timer_enable)
         scrx += 8;
         vidclocks++;
         oddclock = !oddclock;
-        if (!(ula_ctrl & 0x10) && !oddclock)
+        if (!(ula_ctrl & 0x10) && !oddclock) // Low fequency.
             continue;
 
         if (hc == crtc[1]) { // reached horizontal displayed count.
