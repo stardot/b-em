@@ -142,7 +142,7 @@ void music5000_init(ALLEGRO_EVENT_QUEUE *queue)
     if ((voice = al_create_voice(FREQ_M5, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_2))) {
         if ((mixer = al_create_mixer(FREQ_M5, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_2))) {
             if (al_attach_mixer_to_voice(mixer, voice)) {
-                if ((stream = al_create_audio_stream(4, BUFLEN_M5, FREQ_M5, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_2))) {
+                if ((stream = al_create_audio_stream(8, BUFLEN_M5, FREQ_M5, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_2))) {
                     if (al_attach_audio_stream_to_mixer(stream, mixer)) {
                         al_register_event_source(queue, al_get_audio_stream_event_source(stream));
                         for (n = 0; n < 128; n++) {
