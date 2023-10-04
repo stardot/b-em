@@ -250,6 +250,8 @@ static inline void polltime(int c)
         }
     }
     tubecycle += c;
+    if (music5000_time >= 0)
+        music5000_time += c;
 }
 
 static int FEslowdown[8] = { 1, 0, 1, 1, 0, 0, 1, 0 };
@@ -1056,8 +1058,10 @@ static inline uint16_t getsw(void)
 static void otherstuff_poll(void) {
     otherstuffcount += 128;
     acia_poll(&sysacia);
-    if (sound_music5000)
+    if (sound_music5000) {
         music2000_poll();
+        music5000_poll();
+    }
     if (!tapelcount) {
         tape_poll();
         tapelcount = tapellatch;

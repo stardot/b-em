@@ -1,3 +1,4 @@
+#define _DEBUG
 // Music 5000 emulation for B-Em
 // Copyright (C) 2016 Darren Izzard
 //
@@ -51,6 +52,8 @@
 #define INVERT(c)    (!!(CTL(c)&0x10))
 #define PAN(c)       (CTL(c)&0xf)
 
+#define CPU_CLOCKS 84
+
 #define ushort uint16_t
 #define byte uint8_t
 
@@ -66,6 +69,7 @@ static const uint8_t PanArray[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 6, 6, 6, 5, 4, 3, 
 
 size_t buflen_m5 = BUFLEN_M5;
 FILE *music5000_fp;
+int music5000_time = -1;
 
 static ALLEGRO_VOICE *voice;
 static ALLEGRO_MIXER *mixer;
@@ -73,6 +77,9 @@ static ALLEGRO_AUDIO_STREAM *stream;
 static bool rec_started;
 
 static ushort antilogtable[128];
+
+static uint16_t *music5000_buf;
+static int music5000_bufpos = 0;
 
 static void synth_reset(struct synth *s)
 {
@@ -137,20 +144,21 @@ void music5000_savestate(FILE *f) {
 
 void music5000_init(ALLEGRO_EVENT_QUEUE *queue)
 {
-    int n;
-
     if ((voice = al_create_voice(FREQ_M5, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_2))) {
         if ((mixer = al_create_mixer(FREQ_M5, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_2))) {
             if (al_attach_mixer_to_voice(mixer, voice)) {
                 if ((stream = al_create_audio_stream(8, BUFLEN_M5, FREQ_M5, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_2))) {
                     if (al_attach_audio_stream_to_mixer(stream, mixer)) {
-                        al_register_event_source(queue, al_get_audio_stream_event_source(stream));
-                        for (n = 0; n < 128; n++) {
-                            //12-bit antilog as per AM6070 datasheet
-                            int S = n & 15, C = n >> 4;
-                            antilogtable[n] = (ushort)(2 * (pow(2.0, C)*(S + 16.5) - 16.5));
+                        if ((music5000_buf = al_get_audio_stream_fragment(stream))) {
+                            for (int n = 0; n < 128; n++) {
+                                //12-bit antilog as per AM6070 datasheet
+                                int S = n & 15, C = n >> 4;
+                                antilogtable[n] = (ushort)(2 * (pow(2.0, C)*(S + 16.5) - 16.5));
+                            }
+                            music5000_reset();
                         }
-                        music5000_reset();
+                        else
+                            log_error("sound: unable to get buffer fragment for Music 5000");
                     } else
                         log_error("sound: unable to attach stream to mixer for Music 5000");
                 } else
@@ -221,38 +229,6 @@ void music5000_close(void)
 }
 
 static uint8_t page = 0;
-
-static void ram_write(struct synth *s, uint16_t addr, uint8_t val)
-{
-    if ((addr & 0xff00) == 0xfd00) {
-        addr = (page << 8) | (addr & 0xFF);
-        if ((addr & 0x0f00) == 0x0e00) {
-            //control RAM
-            s->ram[I_WFTOP + (addr & 0xff)] = val;
-        } else {
-            //waveform RAM
-            int wavepage = (addr & 0x0e00) >> 9;
-            ushort adr = I_WAVEFORM(wavepage * 2) + (addr & 0xff);
-            //if (adr >= I_WFTOP) {
-            //  __debugbreak();
-            //}
-            s->ram[adr] = val;
-        }
-    }
-}
-
-void music5000_write(uint16_t addr, uint8_t val)
-{
-    if (addr == 0xfcff)
-        page = val;
-    else {
-        uint8_t msn = page & 0xf0;
-        if (msn == 0x30)
-            ram_write(&m5000, addr, val);
-        else if (msn == 0x50)
-            ram_write(&m3000, addr, val);
-    }
-}
 
 static void update_channels(struct synth *s)
 {
@@ -393,10 +369,13 @@ static double applyfilter(const m5000_fcoeff *fcp, double *xyv, double v)
 	return out;
 }
 
-static void music5000_get_sample(int16_t *left, int16_t *right, const m5000_fcoeff *fcp)
+static void music5000_get_sample(const m5000_fcoeff *fcp)
 {
     int clip;
     static int divisor = 1;
+
+    update_channels(&m5000);
+    update_channels(&m3000);
 
 #ifdef LOG_LEVELS
     static int count = 0;
@@ -483,36 +462,65 @@ static void music5000_get_sample(int16_t *left, int16_t *right, const m5000_fcoe
         log_warn("Music 5000 clipped, reducing gain by 3dB (divisor now %d)", divisor);
     }
 
-    *left = (int16_t) sl;
-    *right = (int16_t) sr;
+    music5000_buf[music5000_bufpos++] = sl;
+    music5000_buf[music5000_bufpos++] = sr;
 }
 
-// Music 5000 runs at a sample rate of 6MHz / 128 = 46875
-static void music5000_fillbuf(int16_t *buffer, int len, const m5000_fcoeff *fcp) {
-    int sample;
-    int16_t *bufptr = buffer;
-    for (sample = 0; sample < len; sample++) {
-        update_channels(&m5000);
-        update_channels(&m3000);
-        music5000_get_sample(bufptr, bufptr + 1, fcp);
-        bufptr += 2;
+void music5000_poll(void)
+{
+    if (sound_music5000) {
+        if (music5000_time < 0)
+            music5000_time = 0;
+        else if (music5000_time >= CPU_CLOCKS) {
+            if (!music5000_buf)
+                music5000_buf = al_get_audio_stream_fragment(stream);
+            if (music5000_buf) {
+                const m5000_fcoeff *fcp = music5000_fno < 0 ? NULL : &m500_filters[music5000_fno];
+                do {
+                    music5000_time -= CPU_CLOCKS;
+                    music5000_get_sample(fcp);
+                    music5000_get_sample(fcp);
+                    if (music5000_bufpos >= (BUFLEN_M5*2)) {
+                        al_set_audio_stream_fragment(stream, music5000_buf);
+                        al_set_audio_stream_playing(stream, true);
+                        music5000_buf = al_get_audio_stream_fragment(stream);
+                        music5000_bufpos = 0;
+                    }
+                } while (music5000_buf && music5000_time >= CPU_CLOCKS);
+            }
+        }
     }
 }
 
-void music5000_streamfrag(void)
+static void ram_write(struct synth *s, uint16_t addr, uint8_t val)
 {
-    int16_t *buf;
-
-    // This function is called when a audio stream fragment available
-    // event is received in the main event handling loop but the event
-    // does not specify for which stream a new fragment has become
-    // available so we need to check if it is this one!
-
-    if (sound_music5000) {
-        if ((buf = al_get_audio_stream_fragment(stream))) {
-            music5000_fillbuf(buf, BUFLEN_M5, music5000_fno < 0 ? NULL : &m500_filters[music5000_fno]);
-            al_set_audio_stream_fragment(stream, buf);
-            al_set_audio_stream_playing(stream, true);
+    music5000_poll();
+    if ((addr & 0xff00) == 0xfd00) {
+        addr = (page << 8) | (addr & 0xFF);
+        if ((addr & 0x0f00) == 0x0e00) {
+            //control RAM
+            s->ram[I_WFTOP + (addr & 0xff)] = val;
+        } else {
+            //waveform RAM
+            int wavepage = (addr & 0x0e00) >> 9;
+            ushort adr = I_WAVEFORM(wavepage * 2) + (addr & 0xff);
+            //if (adr >= I_WFTOP) {
+            //  __debugbreak();
+            //}
+            s->ram[adr] = val;
         }
+    }
+}
+
+void music5000_write(uint16_t addr, uint8_t val)
+{
+    if (addr == 0xfcff)
+        page = val;
+    else {
+        uint8_t msn = page & 0xf0;
+        if (msn == 0x30)
+            ram_write(&m5000, addr, val);
+        else if (msn == 0x50)
+            ram_write(&m3000, addr, val);
     }
 }
