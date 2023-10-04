@@ -212,8 +212,6 @@ void config_load(void)
     mouse_amx        = get_config_bool(NULL, "mouse_amx",     0);
     kbdips           = get_config_int(NULL, "kbdips", 0);
 
-    buflen_m5        = get_config_int("sound", "buflen_music5000", BUFLEN_M5);
-
     for (int act = 0; act < KEY_ACTION_MAX; act++) {
         const char *str = al_get_config_value(bem_cfg, "key_actions", keyact_const[act].name);
         if (str) {
@@ -320,7 +318,6 @@ void config_save(void)
         set_config_int("sound", "soundwave", curwave);
         set_config_int("sound", "sidmethod", sidmethod);
         set_config_int("sound", "cursid", cursid);
-        set_config_int("sound", "buflen_music5000", buflen_m5);
 
         set_config_int("sound", "ddvol", ddnoise_vol);
         set_config_int("sound", "ddtype", ddnoise_type);
