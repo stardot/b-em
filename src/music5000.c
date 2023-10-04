@@ -57,6 +57,7 @@
 struct synth {
     int sleft,sright;
     uint32_t phaseRAM[16];
+    uint8_t amplitude[16];
     byte ram[0x800];
 };
 
@@ -258,27 +259,20 @@ static void update_channels(struct synth *s)
 {
     int sleft = 0;
     int sright = 0;
-    uint8_t modulate = 0; // in real hardware modulate wraps from channel 16 to 0 but is never used
+    static uint8_t modulate = 0;
 
     for (int i = 0; i < 16; i++) {
         uint8_t * c = s->ram + I_WFTOP + modulate + i;
-
-        // In the real hardware the disable bit works by forcing the
-        // phase accumulator to zero.
-        if (DISABLE(c)) {
-            s->phaseRAM[i] = 0;
-            // A slight differnce as modulation is still calculated in real hardware
-            // but not here
-            modulate = 0;
-        }
-        else {
+    {
             int c4d, sign, sample;
-            unsigned int sum = s->phaseRAM[i] + FREQ(c);
+            unsigned int sum = (DISABLE(c)?0:s->phaseRAM[i]) + FREQ(c);
             s->phaseRAM[i] = sum & 0xffffff;
             // c4d is used for "Synchronization" e.g. the "Wha" instrument
             c4d = sum & (1<<24);
-
             sample = s->ram[I_WAVEFORM(WAVESEL(c))|(s->phaseRAM[i] >> 17)];
+            // only if there is a carry ( waveform crossing do we update the amplitude)
+            if (c4d)
+                s->amplitude[i] = AMP(c);
 
             // The amplitude operates in the log domain
             // - sam holds the wave table output which is 1 bit sign and 7 bit magnitude
@@ -303,7 +297,7 @@ static void update_channels(struct synth *s)
             // - this behavior matches the FPGA implementation, and we think the original hardware
 
             sign = sample & 0x80;
-            sample += AMP(c);
+            sample += s->amplitude[i];
             modulate = (( MODULATE(c) && (!!(sign) || !!(c4d)))? 128:0);
             if ((sign ^ sample) & 0x80) {
                 // sign bits being different is the normal case
@@ -318,9 +312,9 @@ static void update_channels(struct synth *s)
             if (INVERT(c)) {
                 sign ^= 0x80;
             }
-            //sam is now an 8-bit log value
+            //sam is now an 7-bit log value
             sample =  antilogtable[sample];
-            if (!(sign)) {
+            if ((sign)) {
                 // sign being zero is negative
                 sample =-sample;
             }
