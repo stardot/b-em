@@ -229,13 +229,14 @@ int cycles;
 static int otherstuffcount = 0;
 int romsel;
 
-static inline void polltime(int c)
+static void polltime(int c)
 {
     cycles -= c;
     via_poll(&sysvia, c);
     via_poll(&uservia, c);
     video_poll(c, 1);
     sound_poll(c);
+    music5000_poll(c);
     otherstuffcount -= c;
     if (motoron) {
         if (fdc_time) {
