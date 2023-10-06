@@ -34,15 +34,12 @@ ALLEGRO_CONFIG *bem_cfg;
 
 int get_config_int(const char *sect, const char *key, int ival)
 {
-    const char *str;
-
-    if (bem_cfg) {
-        if ((str = al_get_config_value(bem_cfg, sect, key)))
-            ival = atoi(str);
-        else if (sect && (str = al_get_config_value(bem_cfg, NULL, key))) {
-            ival = atoi(str);
-            al_remove_config_key(bem_cfg, "", key);
-        }
+    const char *str = al_get_config_value(bem_cfg, sect, key);
+    if (str)
+        ival = atoi(str);
+    else if (sect && (str = al_get_config_value(bem_cfg, NULL, key))) {
+        ival = atoi(str);
+        al_remove_config_key(bem_cfg, "", key);
     }
     return ival;
 }
@@ -54,54 +51,46 @@ static bool parse_bool(const char *value)
 
 bool get_config_bool(const char *sect, const char *key, bool bval)
 {
-    const char *str;
-
-    if (bem_cfg) {
-        if ((str = al_get_config_value(bem_cfg, sect, key)))
-            bval = parse_bool(str);
-        else if (sect && (str = al_get_config_value(bem_cfg, NULL, key))) {
-            bval = parse_bool(str);
-            al_remove_config_key(bem_cfg, "", key);
-        }
+    const char *str = al_get_config_value(bem_cfg, sect, key);
+    if (str)
+        bval = parse_bool(str);
+    else if (sect && (str = al_get_config_value(bem_cfg, NULL, key))) {
+        bval = parse_bool(str);
+        al_remove_config_key(bem_cfg, "", key);
     }
     return bval;
 }
 
 const char *get_config_string(const char *sect, const char *key, const char *sval)
 {
-    const char *str;
-
-    if (bem_cfg) {
-        if ((str = al_get_config_value(bem_cfg, sect, key)))
-            sval = str;
-        else if (sect && (str = al_get_config_value(bem_cfg, NULL, key))) {
-            al_set_config_value(bem_cfg, sect, key, str);
-            al_remove_config_key(bem_cfg, "", key);
-            sval = al_get_config_value(bem_cfg, sect, key);
-        }
+    const char *str = al_get_config_value(bem_cfg, sect, key);
+    if (str)
+        sval = str;
+    else if (sect && (str = al_get_config_value(bem_cfg, NULL, key))) {
+        al_set_config_value(bem_cfg, sect, key, str);
+        al_remove_config_key(bem_cfg, "", key);
+        sval = al_get_config_value(bem_cfg, sect, key);
     }
     return sval;
 }
 
 ALLEGRO_COLOR get_config_colour(const char *sect, const char *key, ALLEGRO_COLOR cdefault)
 {
-    if (bem_cfg) {
-        const char *str = al_get_config_value(bem_cfg, sect, key);
-        if (str) {
-            if (*str == '#') {
-                unsigned long col = strtoul(str+1, NULL, 16);
-                unsigned r = (col >> 16) & 0xff;
-                unsigned g = (col >> 8) & 0xff;
-                unsigned b = col & 0xff;
-                log_debug("config: get_config_colour, sect=%s, key=%s, hex, r=%u, g=%u, b=%u", sect, key, r, g, b);
+    const char *str = al_get_config_value(bem_cfg, sect, key);
+    if (str) {
+        if (*str == '#') {
+            unsigned long col = strtoul(str+1, NULL, 16);
+            unsigned r = (col >> 16) & 0xff;
+            unsigned g = (col >> 8) & 0xff;
+            unsigned b = col & 0xff;
+            log_debug("config: get_config_colour, sect=%s, key=%s, hex, r=%u, g=%u, b=%u", sect, key, r, g, b);
+            return al_map_rgb(r, g, b);
+        }
+        else {
+            unsigned r, g, b;
+            if (sscanf(str, "%u,%u,%u", &r, &g, &b) == 3) {
+                log_debug("config: get_config_colour, sect=%s, key=%s, decimal, r=%u, g=%u, b=%u", sect, key, r, g, b);
                 return al_map_rgb(r, g, b);
-            }
-            else {
-                unsigned r, g, b;
-                if (sscanf(str, "%u,%u,%u", &r, &g, &b) == 3) {
-                    log_debug("config: get_config_colour, sect=%s, key=%s, decimal, r=%u, g=%u, b=%u", sect, key, r, g, b);
-                    return al_map_rgb(r, g, b);
-                }
             }
         }
     }
@@ -118,42 +107,44 @@ void config_load(void)
         cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
         if (bem_cfg)
             al_destroy_config(bem_cfg);
-        if (!(bem_cfg = al_load_config_file(cpath)))
-            log_warn("config: unable to load config file '%s', using defaults", cpath);
+        if (!(bem_cfg = al_load_config_file(cpath))) {
+            log_fatal("config: unable to load config file '%s'", cpath);
+            exit(1);
+        }
         al_destroy_path(path);
-    } else
-        log_warn("config: no config file found, using defaults");
-
-    if (bem_cfg) {
-        if ((p = get_config_string("disc", "disc0", NULL))) {
-            if (discfns[0])
-                al_destroy_path(discfns[0]);
-            discfns[0] = al_create_path(p);
-        }
-        if ((p = get_config_string("disc", "disc1", NULL))) {
-            if (discfns[1])
-                al_destroy_path(discfns[1]);
-            discfns[1] = al_create_path(p);
-        }
-        if ((p = get_config_string("disc", "mmb", NULL))) {
-            if (mmb_fn)
-                free(mmb_fn);
-            mmb_fn = strdup(p);
-        }
-        if ((p = get_config_string("disc", "mmccard", NULL))) {
-            if (mmccard_fn)
-                free(mmccard_fn);
-            mmccard_fn = strdup(p);
-        }
-        if ((p = get_config_string("tape", "tape", NULL))) {
-            if (tape_fn)
-                al_destroy_path(tape_fn);
-            tape_fn = al_create_path(p);
-        }
-        al_remove_config_key(bem_cfg, "", "video_resize");
-        al_remove_config_key(bem_cfg, "", "tube6502speed");
+    }
+    else {
+        log_fatal("config: no config file found");
+        exit(1);
     }
 
+    if ((p = get_config_string("disc", "disc0", NULL))) {
+        if (discfns[0])
+            al_destroy_path(discfns[0]);
+        discfns[0] = al_create_path(p);
+    }
+    if ((p = get_config_string("disc", "disc1", NULL))) {
+        if (discfns[1])
+            al_destroy_path(discfns[1]);
+        discfns[1] = al_create_path(p);
+    }
+    if ((p = get_config_string("disc", "mmb", NULL))) {
+        if (mmb_fn)
+            free(mmb_fn);
+        mmb_fn = strdup(p);
+    }
+    if ((p = get_config_string("disc", "mmccard", NULL))) {
+        if (mmccard_fn)
+            free(mmccard_fn);
+        mmccard_fn = strdup(p);
+    }
+    if ((p = get_config_string("tape", "tape", NULL))) {
+        if (tape_fn)
+            al_destroy_path(tape_fn);
+        tape_fn = al_create_path(p);
+    }
+    al_remove_config_key(bem_cfg, "", "video_resize");
+    al_remove_config_key(bem_cfg, "", "tube6502speed");
     defaultwriteprot = get_config_bool("disc", "defaultwriteprotect", 1);
 
     autopause        = get_config_bool(NULL, "autopause", false);
