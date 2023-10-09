@@ -145,7 +145,7 @@ void music5000_init(ALLEGRO_EVENT_QUEUE *queue)
     if ((voice = al_create_voice(FREQ_M5, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_2))) {
         if ((mixer = al_create_mixer(FREQ_M5, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_2))) {
             if (al_attach_mixer_to_voice(mixer, voice)) {
-                if ((stream = al_create_audio_stream(8, BUFLEN_M5, FREQ_M5, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_2))) {
+                if ((stream = al_create_audio_stream(8, buflen_m5, FREQ_M5, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_2))) {
                     if (al_attach_audio_stream_to_mixer(stream, mixer)) {
                         if ((music5000_buf = al_get_audio_stream_fragment(stream))) {
                             for (int n = 0; n < 128; n++) {
@@ -503,7 +503,7 @@ void music5000_poll(int cycles)
                 music5000_get_sample(fcp);
                 music5000_get_sample(fcp);
                 music5000_get_sample(fcp);
-                if (music5000_bufpos >= (BUFLEN_M5*2)) {
+                if (music5000_bufpos >= (buflen_m5*2)) {
                     al_set_audio_stream_fragment(stream, music5000_buf);
                     al_set_audio_stream_playing(stream, true);
                     music5000_buf = al_get_audio_stream_fragment(stream);
