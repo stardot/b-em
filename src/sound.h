@@ -12,7 +12,7 @@
 
 #define BUFLEN_SO 8000   //  64ms @ 125KHz    (must be multiple of 8)
 #define BUFLEN_DD 4410   // 100ms @ 44.1KHz
-#define BUFLEN_M5 375    //   8ms @ 46.875KHz (must be multiple of 3)
+#define BUFLEN_M5  750   //  16ms @ 46.875KHz (must be multiple of 3)
 
 extern size_t buflen_m5;
 

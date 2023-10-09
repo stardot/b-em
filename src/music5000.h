@@ -12,6 +12,7 @@ void music5000_reset(void);
 FILE *music5000_rec_start(const char *fn);
 void music5000_rec_stop(void);
 void music5000_poll(int cycles);
+bool music5000_ok(void);
 
 extern FILE *music5000_fp;
 extern int music5000_fno;

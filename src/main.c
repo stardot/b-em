@@ -452,7 +452,7 @@ static void main_timer(ALLEGRO_EVENT *event)
     double now = al_get_time();
     double delay = now - event->any.timestamp;
 
-    if (delay < time_limit) {
+    if (delay < time_limit && music5000_ok()) {
         if (autoboot)
             autoboot--;
         framesrun++;

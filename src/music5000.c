@@ -494,8 +494,10 @@ void music5000_poll(int cycles)
     if (sound_music5000) {
         music5000_time -= cycles;
         if (music5000_time < 0) {
-            if (!music5000_buf)
+            if (!music5000_buf) {
                 music5000_buf = al_get_audio_stream_fragment(stream);
+                log_debug("music5000: late buffer allocation %s", music5000_buf ? "worked" : "failed");
+            }
             if (music5000_buf) {
                 const m5000_fcoeff *fcp = music5000_fno < 0 ? NULL : &m500_filters[music5000_fno];
                 music5000_get_sample(fcp);
@@ -511,4 +513,16 @@ void music5000_poll(int cycles)
             music5000_time += 128;
         }
     }
+}
+
+bool music5000_ok(void)
+{
+    if (sound_music5000) {
+        unsigned frags = al_get_available_audio_stream_fragments(stream);
+        if (frags < 2)
+            return false;
+        if (frags >= 8)
+            log_debug("music5000: underrun");
+    }
+    return true;
 }
