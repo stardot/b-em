@@ -13,6 +13,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include "b-em.h"
+#include "6502.h"
 #include "mem.h"
 #include "via.h"
 #include "sysvia.h"
@@ -113,13 +114,54 @@ static uint8_t read_cmos_rtc(unsigned addr)
     }
 }
 
+static uint8_t cmos_fix_tube_lang(uint8_t value, unsigned code_type)
+{
+    unsigned lang = value >> 4;
+    unsigned cmos_rtype = readmem(0x2a1+lang);
+    if ((cmos_rtype & 0x0f) != code_type) {
+        /* The CMOS-defined language is the wrong CPU type for the
+         * tube processor so see if there is a ROM that has the
+         * correct CPU type.
+         */
+        for (int r = 15; r >= 0; --r) {
+            unsigned this_rtype = readmem(0x2a1+r);
+            if ((this_rtype & 0x0f) == code_type) {
+                log_info("cmos: overriding configured language with tube present to %u as suitable for tube CPU", r);
+                return (value & 0x0f) | (r << 4);
+            }
+        }
+        /* There is no suitable language ROM for the tube processor
+         * so we have to select an unsuitable one because the tube
+         * host code is too stupid to handle the case of there being
+         * nothing to send.  Make sure what we do pick is not
+         * something that relocates high.
+         */
+        if (cmos_rtype & 0x20) {
+            for (int r = 15; r >= 0; --r) {
+                unsigned this_rtype = readmem(0x2a1+r);
+                if ((this_rtype & 0x60) == 0x40) {
+                    log_info("cmos: overriding configured language with tube present to %u as non-relocating", r);
+                    return (value & 0x0f) | (r << 4);
+                }
+            }
+        }
+    }
+    return value;
+}
+
 static uint8_t get_cmos(unsigned addr)
 {
     if ((addr <= 6 && !(addr & 1)) || (addr >= 7 && addr <= 9))
         return read_cmos_rtc(addr);
     else {
         uint8_t value = cmos[addr];
-        if (addr == 0x1e && autoboot)
+        if (addr == 0x13) {
+            if (curtube == 2)
+                value = cmos_fix_tube_lang(value, 8);
+            else if (curtube == 9)
+                value = cmos_fix_tube_lang(value, 7);
+        }
+        else if (addr == 0x1e && autoboot)
             value |= 0x10;
         return value;
     }
