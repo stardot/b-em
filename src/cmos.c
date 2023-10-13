@@ -156,7 +156,7 @@ static uint8_t get_cmos(unsigned addr)
     else {
         uint8_t value = cmos[addr];
         if (addr == 0x13) {
-            if (curtube == 2)
+            if (curtube == 2 || curtube == 8)
                 value = cmos_fix_tube_lang(value, 8);
             else if (curtube == 9)
                 value = cmos_fix_tube_lang(value, 7);
