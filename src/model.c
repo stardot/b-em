@@ -64,7 +64,7 @@ TUBE tubes[NUM_TUBES]=
 {
     {"6502 Internal",  tube_6502_init,  tube_6502_reset, &tube6502_cpu_debug,  0x0800, "6502Intern",       4 },
     {"ARM",            arm_init,        arm_reset,       &tubearm_cpu_debug,   0x4000, "ARMeval_100",      4 },
-    {"Z80",            z80_init,        z80_reset,       &tubez80_cpu_debug,   0x1000, "Z80_122",          6 },
+    {"Z80",            z80_init,        z80_reset,       &tubez80_cpu_debug,   0x1000, "Z80_121",          6 },
     {"80186",          x86_init,        x86_reset,       &tubex86_cpu_debug,   0x4000, "BIOS",             8 },
     {"65816",          w65816_init_recoco,     w65816_reset,    &tube65816_cpu_debug, 0x8000, "ReCo6502ROM_816", 16 },
     {"32016",          tube_32016_init, n32016_reset,    &n32016_cpu_debug,    0x0000, "",                 8 },
@@ -76,8 +76,8 @@ TUBE tubes[NUM_TUBES]=
 #ifdef M68K
     {"68000",          tube_68000_init, tube_68000_rst,  &mc68000_cpu_debug,   0x8000, "CiscOS",           4 },
 #endif
-    {"65816Dossy",     w65816_init_dossy,     w65816_reset,    &tube65816_cpu_debug, 0x8000, "Dossy_816",       16 },
-    {"Sprow ARM",      sprow_init,        sprow_reset,  &tubesprow_cpu_debug,   0x80000, "Sprow_ARM",      4 },
+    {"65816Dossy",     w65816_init_dossy,     w65816_reset,    &tube65816_cpu_debug, 0x8000, "Dossy_816", 16 },
+    {"Sprow ARM",      sprow_init,        sprow_reset,  &tubesprow_cpu_debug,   0x80000, "Sprow_ARM",      4 }
 };
 
 static fdc_type_t model_find_fdc(const char *name, const char *model)
