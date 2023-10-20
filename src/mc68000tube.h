@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 
-#define MC68000_RAM_SIZE 0x3F0000
+#define MC68000_RAM_SIZE 0x800000
 #define MC68000_ROM_SIZE 0x8000
 
 extern bool tube_68000_init(void *rom);
