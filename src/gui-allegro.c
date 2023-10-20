@@ -421,7 +421,8 @@ static ALLEGRO_MENU *create_sound_menu(void)
     add_checkbox_item(menu, "Paula",                 IDM_SOUND_PAULA,     sound_paula);
     add_checkbox_item(menu, "Printer port DAC",      IDM_SOUND_DAC,       sound_dac);
     add_checkbox_item(menu, "Disc drive noise",      IDM_SOUND_DDNOISE,   sound_ddnoise);
-    add_checkbox_item(menu, "Tape noise",            IDM_SOUND_TAPE,      sound_tape);
+    add_checkbox_item(menu, "Tape signal",           IDM_SOUND_TAPE,      sound_tape);
+    add_checkbox_item(menu, "Tape relay clicks",     IDM_SOUND_TAPE_RELAY, sound_tape_relay); /* tape overhaul v2 */
     add_checkbox_item(menu, "Internal sound filter", IDM_SOUND_FILTER,    sound_filter);
     sub = al_create_menu();
     add_radio_set(sub, wave_names, IDM_WAVE, curwave);
@@ -1049,7 +1050,7 @@ static void tape_load_ui(ALLEGRO_EVENT *event)
 
     if (!tape_fn || !(fpath = al_path_cstr(tape_fn, ALLEGRO_NATIVE_PATH_SEP)))
         fpath = ".";
-    if ((chooser = al_create_native_file_dialog(fpath, "Choose a tape to load", "*.uef;*.csw", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST))) {
+    if ((chooser = al_create_native_file_dialog(fpath, "Choose a tape to load", "*.uef;*.csw;*.tibet;*.tibetz", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST))) {
         display = (ALLEGRO_DISPLAY *)(event->user.data2);
         if (al_show_native_file_dialog(display, chooser)) {
             if (al_get_native_file_dialog_count(chooser) > 0) {
@@ -1063,11 +1064,6 @@ static void tape_load_ui(ALLEGRO_EVENT *event)
     }
 }
 
-static void tape_rewind(void)
-{
-    tape_close();
-    tape_load(tape_fn);
-}
 
 static void tape_eject(void)
 {
@@ -1325,7 +1321,7 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             tape_load_ui(event);
             break;
         case IDM_TAPE_REWIND:
-            tape_rewind();
+            tape_rewind(); /* now lives on tape.c */
             break;
         case IDM_TAPE_EJECT:
             tape_eject();
@@ -1410,6 +1406,10 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             break;
         case IDM_SOUND_TAPE:
             sound_tape = !sound_tape;
+            break;
+        /* tape overhaul v2: */
+        case IDM_SOUND_TAPE_RELAY:
+            sound_tape_relay = !sound_tape_relay;
             break;
         case IDM_SOUND_FILTER:
             sound_filter = !sound_filter;

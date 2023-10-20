@@ -227,6 +227,9 @@ static int timetolive = 0;
 
 int cycles;
 static int otherstuffcount = 0;
+/* Diminished tape overhaul; move tape polling
+   out of otherstuff_poll() and deal with it separately */
+static int tape_poll_count = 0;
 int romsel;
 
 static inline void polltime(int c)
@@ -237,6 +240,7 @@ static inline void polltime(int c)
     video_poll(c, 1);
     sound_poll(c);
     otherstuffcount -= c;
+    tape_poll_count -= c; /* tape overhaul v2 */
     if (motoron) {
         if (fdc_time) {
             fdc_time -= c;
@@ -1053,16 +1057,26 @@ static inline uint16_t getsw(void)
         return temp;
 }
 
-static void otherstuff_poll(void) {
-    otherstuffcount += 128;
-    acia_poll(&sysacia);
-    if (sound_music5000)
-        music2000_poll();
+/* Diminished: tape overhaul v2; now called independently
+   from otherstuff_poll() */
+static void tape_poll_6502(void) {
+    if (fasttape) {
+        tape_poll_count += 12; /* fasttape hack -- this is as fast as MOS will reliably go */
+    } else {
+        tape_poll_count += 32; /* was 128; now poll at 4800 Hz, for correct DCD pulse length */
+    }
     if (!tapelcount) {
         tape_poll();
         tapelcount = tapellatch;
     }
     tapelcount--;
+}
+
+static void otherstuff_poll(void) {
+    otherstuffcount += 128;
+    acia_poll(&sysacia);
+    if (sound_music5000)
+        music2000_poll();
     if (motorspin) {
         motorspin--;
         if (!motorspin)
@@ -4017,6 +4031,11 @@ void m6502_exec(void)
 //                        log_debug("INT\n");
                 }
                 interrupt &= ~128;
+                
+                /* Diminished: tape overhaul v2 */
+                if (tape_poll_count <= 0) {
+                    tape_poll_6502();
+                }
 
                 if (otherstuffcount <= 0)
                     otherstuff_poll();
@@ -5860,6 +5879,11 @@ void m65c02_exec(void)
                         if (tubecycles > 3)
                                 tube_exec();
                         tubecycle = 0;
+                }
+                
+                /* Diminished: tape overhaul v2 */
+                if (tape_poll_count <= 0) {
+                    tape_poll_6502();
                 }
 
                 if (otherstuffcount <= 0)

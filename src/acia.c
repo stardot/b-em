@@ -1,5 +1,7 @@
 /*B-em v2.2 by Tom Walker
   6850 ACIA emulation*/
+  
+/* (also, Diminished was here) */
 
 #include <stdio.h>
 #include "b-em.h"
@@ -26,25 +28,59 @@ static inline int tx_int(ACIA *acia) {
 }
 
 static void acia_updateint(ACIA *acia) {
-    if (rx_int(acia) || tx_int(acia))
+    if (rx_int(acia) || tx_int(acia)) {
        interrupt|=4;
-    else
+    } else {
        interrupt&=~4;
+    }
 }
 
 uint8_t acia_read(ACIA *acia, uint16_t addr) {
     uint8_t temp;
 
     if (addr & 1) {
+        /* read data register */
         temp = acia->rx_data_reg;
         acia->status_reg &= ~(INTERUPT | RXD_REG_FUL);
+        
+        /* tape overhaul v2:
+           "[DCD status reg bit] remains high
+           after the DCD input is returned low until cleared by first
+           reading the Status Register and then the Data Register"
+        */
+        
+        acia->status_reg &= ~DCD;
+        
         acia_updateint(acia);
         return temp;
-    }
-    else {
+    } else {
+        /* read status register */
         temp = acia->status_reg & ~INTERUPT;
         if (rx_int(acia) || tx_int(acia))
-            temp |= INTERUPT;
+            temp |= INTERUPT; /* "shadow" behaviour */
+           
+        /* "If the DCD input remains high
+           after read status and read data or master reset has occurred
+           the interrupt is cleared, the DCD status bit remains high and
+           will follow the DCD input."
+           
+           Per the beebjit source code, this also seems to be an
+           overlay/shadowing-type function, in that the register's internal
+           value remains unchanged but reading that register shadows the
+           DCD bit with the value of the DCD line?
+           I tried it with the DCD line setting the value of
+           the register directly, but this leads to disaster.
+           
+           The following is what beebjit does. I confess I don't
+           really understand it, but I'm sure Chris knows what he's
+           doing. */
+           
+        if ( ! (acia->status_reg & DCD) ) {
+            if (acia->dcd_line_current_state) {
+                temp |= DCD;
+            }
+        }
+        
         return temp;
     }
 }
@@ -58,7 +94,7 @@ void acia_write(ACIA *acia, uint16_t addr, uint8_t val) {
         acia_updateint(acia);
     }
     else if (val != acia->control_reg) {
-        if ((val & 0x60) != 0x20) // interupt being turned off
+        if ((val & 0x60) != 0x20) // interrupt being turned off
             if (acia->tx_end)
                 acia->tx_end(acia);
         acia->control_reg = val;
@@ -71,14 +107,12 @@ void acia_write(ACIA *acia, uint16_t addr, uint8_t val) {
 }
 
 void acia_dcdhigh(ACIA *acia) {
+    acia->dcd_line_current_state = 1;
+    /* "Data Carrier Detect being high also causes RDRF to indicate empty" */
+    acia->status_reg &= ~RXD_REG_FUL;
     if (acia->status_reg & DCD)
         return;
     acia->status_reg |= DCD | INTERUPT;
-    acia_updateint(acia);
-}
-
-void acia_dcdlow(ACIA *acia) {
-    acia->status_reg &= ~DCD;
     acia_updateint(acia);
 }
 
@@ -106,7 +140,7 @@ void acia_poll(ACIA *acia)
     }
 }
 
-void acia_receive(ACIA *acia, uint8_t val) { /*Called when the acia recives some data*/
+void acia_receive(ACIA *acia, uint8_t val) { /*Called when the acia receives some data*/
     acia->rx_data_reg = val;
     acia->status_reg |= RXD_REG_FUL | INTERUPT;
     if (acia->rx_hook)

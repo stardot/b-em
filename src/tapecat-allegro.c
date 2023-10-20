@@ -3,6 +3,7 @@
 #include "tapecat-allegro.h"
 #include "csw.h"
 #include "uef.h"
+#include "tape.h"
 
 static ALLEGRO_TEXTLOG *textlog;
 ALLEGRO_EVENT_SOURCE uevsrc;
@@ -23,11 +24,11 @@ static void *tapecat_thread(ALLEGRO_THREAD *thread, void *tdata)
         al_init_user_event_source(&uevsrc);
         al_register_event_source(queue, &uevsrc);
         al_register_event_source(queue, al_get_native_text_log_event_source(ltxtlog));
-        do
+        do {
             al_wait_for_event(queue, &event);
-        while (event.type != ALLEGRO_EVENT_NATIVE_DIALOG_CLOSE);
+        } while (event.type != ALLEGRO_EVENT_NATIVE_DIALOG_CLOSE);
         textlog = NULL;                    // set the global that cataddname will see to NULL
-        al_close_native_text_log(ltxtlog); // before destorying the textlog with our local copy.
+        al_close_native_text_log(ltxtlog); // before destroying the textlog with our local copy.
         al_destroy_event_queue(queue);
     }
     return NULL;
@@ -35,10 +36,7 @@ static void *tapecat_thread(ALLEGRO_THREAD *thread, void *tdata)
 
 static void start_cat(void)
 {
-    if (csw_ena)
-        csw_findfilenames();
-    else
-        uef_findfilenames();
+    findfilenames_new();
 }
 
 void gui_tapecat_start(void)
@@ -46,9 +44,9 @@ void gui_tapecat_start(void)
     ALLEGRO_TEXTLOG *ltxtlog;
     ALLEGRO_THREAD *thread;
 
-    if (textlog)
+    if (textlog) {
         start_cat();
-    else if ((ltxtlog = al_open_native_text_log("B-Em Tape Catalogue", ALLEGRO_TEXTLOG_MONOSPACE))) {
+    } else if ((ltxtlog = al_open_native_text_log("B-Em Tape Catalogue", ALLEGRO_TEXTLOG_MONOSPACE))) {
         if ((thread = al_create_thread(tapecat_thread, ltxtlog))) {
             al_start_thread(thread);
             textlog = ltxtlog; // open to writes from cataddname.

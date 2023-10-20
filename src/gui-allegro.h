@@ -71,6 +71,7 @@ typedef enum {
     IDM_SOUND_DAC,
     IDM_SOUND_DDNOISE,
     IDM_SOUND_TAPE,
+    IDM_SOUND_TAPE_RELAY, /* tape overhaul v2 */
     IDM_SOUND_FILTER,
     IDM_WAVE,
     IDM_SID_TYPE,

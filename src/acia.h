@@ -8,6 +8,7 @@ struct acia {
     uint8_t status_reg;
     uint8_t rx_data_reg;
     uint8_t tx_data_reg;
+    uint8_t dcd_line_current_state; /* tape overhaul v2 */
     void (*set_params)(ACIA *acia, uint8_t val);
     void (*rx_hook)(ACIA *acia, uint8_t byte);
     void (*tx_hook)(ACIA *acia, uint8_t byte);
@@ -24,7 +25,7 @@ void acia_savestate(ACIA *acia, FILE *f);
 void acia_loadstate(ACIA *acia, FILE *f);
 
 void acia_dcdhigh(ACIA *acia);
-void acia_dcdlow(ACIA *acia);
+/*void acia_dcdlow(ACIA *acia);*/
 void acia_ctson(ACIA *acia);
 void acia_ctsoff(ACIA *acia);
 

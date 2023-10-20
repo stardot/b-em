@@ -443,7 +443,7 @@ int gui_loadt()
         int ret;
         int xsize = windx - 32, ysize = windy - 16;
         memcpy(tempname, al_path_cstr(tape_fn, ALLEGRO_NATIVE_PATH_SEP), 260);
-        ret=file_select_ex("Please choose a tape image", tempname, "UEF;CSW", 260, xsize, ysize);
+        ret=file_select_ex("Please choose a tape image", tempname, "UEF;CSW;TIBET;TIBETZ", 260, xsize, ysize);
         if (ret)
         {
             tape_close();

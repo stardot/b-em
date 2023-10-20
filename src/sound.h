@@ -19,6 +19,7 @@ extern size_t buflen_m5;
 extern bool sound_internal, sound_beebsid, sound_dac;
 extern bool sound_ddnoise, sound_tape;
 extern bool sound_music5000, sound_filter, sound_paula;
+extern bool sound_tape_relay; /* tape overhaul v2 */
 
 void sound_init(void);
 void sound_poll(int cycles);
