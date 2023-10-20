@@ -76,6 +76,7 @@ OBJ = \
     tape.o \
     tapecat-allegro.o \
     tapenoise.o \
+    tibet.o \
     tsearch.o \
     tube.o \
     uef.o \
