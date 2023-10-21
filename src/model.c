@@ -1,3 +1,4 @@
+#define _DEBUG
 #include "b-em.h"
 
 #include "main.h"
@@ -52,32 +53,61 @@ static rom_setup_t rom_setups[NUM_ROM_SETUP] =
     { "weramrom", mem_romsetup_weramrom }
 };
 
+extern cpu_debug_t n32016_cpu_debug;
+
+#define NUM_TUBE_CPUS 12
+
+static const TUBE_CPU tube_cpus[NUM_TUBE_CPUS] =
+{
+    {"6502",           tube_6502_init,     tube_6502_reset, &tube6502_cpu_debug  },
+    {"ARM",            arm_init,           arm_reset,       &tubearm_cpu_debug   },
+    {"Z80",            z80_init,           z80_reset,       &tubez80_cpu_debug   },
+    {"80186",          x86_init,           x86_reset,       &tubex86_cpu_debug   },
+    {"65816",          w65816_init_recoco, w65816_reset,    &tube65816_cpu_debug },
+    {"32016",          tube_32016_init,    n32016_reset,    &n32016_cpu_debug    },
+    {"6809",           tube_6809_init,     mc6809nc_reset,  &mc6809nc_cpu_debug  },
+    {"PDP11",          tube_pdp11_init,    copro_pdp11_rst, &pdp11_cpu_debug     },
+    {"6502 Turbo",     tube_6502_iturb,    tube_6502_reset, &tube6502_cpu_debug  },
+    {"68000",          tube_68000_init,    tube_68000_rst,  &mc68000_cpu_debug   },
+    {"65816Dossy",     w65816_init_dossy,  w65816_reset,    &tube65816_cpu_debug },
+    {"Sprow ARM",      sprow_init,         sprow_reset,     &tubesprow_cpu_debug }
+};
+
+TUBE_MODEL *tubes;
+int num_tubes;
+
 /*
  * The number of tube cycles to run for each core 6502 processor cycle
  * is calculated by mutliplying the multiplier in this table with the
  * one in the general tube speed table and dividing by two.
  */
 
-extern cpu_debug_t n32016_cpu_debug;
-
-TUBE tubes[NUM_TUBES]=
+typedef struct
 {
-    {"6502 Internal",  tube_6502_init,  tube_6502_reset, &tube6502_cpu_debug,  0x0800, "6502Intern",       4 },
-    {"ARM",            arm_init,        arm_reset,       &tubearm_cpu_debug,   0x4000, "ARMeval_100",      4 },
-    {"Z80",            z80_init,        z80_reset,       &tubez80_cpu_debug,   0x1000, "Z80_121",          6 },
-    {"80186",          x86_init,        x86_reset,       &tubex86_cpu_debug,   0x4000, "BIOS",             8 },
-    {"65816",          w65816_init_recoco,     w65816_reset,    &tube65816_cpu_debug, 0x8000, "ReCo6502ROM_816", 16 },
-    {"32016",          tube_32016_init, n32016_reset,    &n32016_cpu_debug,    0x0000, "",                 8 },
-    {"6502 External",  tube_6502_init,  tube_6502_reset, &tube6502_cpu_debug,  0x0800, "6502Tube",         3 },
-    {"6809",           tube_6809_init,  mc6809nc_reset,  &mc6809nc_cpu_debug,  0x0800, "6809Tube",         3 },
-    {"Z80 ROM 2.00",   z80_init,        z80_reset,       &tubez80_cpu_debug,   0x1000, "Z80_200",          6 },
-    {"PDP11",          tube_pdp11_init, copro_pdp11_rst, &pdp11_cpu_debug,     0x0800, "PDP11Tube",        2 },
-    {"6502 Turbo",     tube_6502_iturb, tube_6502_reset, &tube6502_cpu_debug,  0x0800, "6502Turbo",        4 },
-#ifdef M68K
-    {"68000",          tube_68000_init, tube_68000_rst,  &mc68000_cpu_debug,   0x8000, "CiscOS",           4 },
-#endif
-    {"65816Dossy",     w65816_init_dossy,     w65816_reset,    &tube65816_cpu_debug, 0x8000, "Dossy_816", 16 },
-    {"Sprow ARM",      sprow_init,        sprow_reset,  &tubesprow_cpu_debug,   0x80000, "Sprow_ARM",      4 }
+    char name[32];
+    char cpu[32];
+    uint_least32_t rom_size;
+    char bootrom[16];
+    int  speed_multiplier;
+} TUBE_DEFAULT;
+
+#define NUM_DFLT_TUBE 13
+
+static const TUBE_DEFAULT tube_defaults[] =
+{
+    {"6502 Internal",  "6502",       0x0800, "6502Intern",       4 },
+    {"ARM",            "ARM",        0x4000, "ARMeval_100",      4 },
+    {"Z80 ROM 1.21",   "Z80",        0x1000, "Z80_121",          6 },
+    {"80186",          "80186",      0x4000, "BIOS",             8 },
+    {"65816",          "65816",      0x8000, "ReCo6502ROM_816", 16 },
+    {"32016",          "32016",      0x0000, "",                 8 },
+    {"6502 External",  "6502",       0x0800, "6502Tube",         3 },
+    {"6809",           "6809",       0x0800, "6809Tube",         3 },
+    {"Z80 ROM 2.00",   "Z80",        0x1000, "Z80_200",          6 },
+    {"PDP11",          "PDP11",      0x0800, "PDP11Tube",        2 },
+    {"6502 Turbo",     "6502 Turbo", 0x0800, "6502Turbo",        4 },
+    {"65816Dossy",     "65816Dossy", 0x8000, "Dossy_816",       16 },
+    {"Sprow ARM",      "Sprow ARM",  0x80000, "Sprow_ARM",       4 }
 };
 
 static fdc_type_t model_find_fdc(const char *name, const char *model)
@@ -100,10 +130,19 @@ static rom_setup_t *model_find_romsetup(const char *name, const char *model)
     return rom_setups;
 }
 
+static const TUBE_CPU *model_find_tcpu(const char *name, const char *cpu)
+{
+    for (int i = 0; i < NUM_TUBE_CPUS; ++i)
+        if (strcmp(tube_cpus[i].name, cpu) == 0)
+            return &tube_cpus[i];
+    log_warn("model: invalid tube CPU name '%s' in tube '%s'", name, cpu);
+    return NULL;
+}
+
 static int model_find_tube(const char *name, const char *model)
 {
     if (strcmp(name, "none")) {
-        for (int i = 0; i < NUM_TUBES; i++)
+        for (int i = 0; i < num_tubes; i++)
             if (strcmp(tubes[i].name, name) == 0)
                 return i;
         log_warn("model: invalid tube name '%s' in model '%s', no tube will be used", name, model);
@@ -114,31 +153,78 @@ static int model_find_tube(const char *name, const char *model)
 void model_loadcfg(void)
 {
     ALLEGRO_CONFIG_SECTION *siter;
-    const char *sect;
-    int num, max = -1;
-    MODEL *ptr;
+    int max_model = -1;
+    int max_tube = -1;
 
-    for (sect = al_get_first_config_section(bem_cfg, &siter); sect; sect = al_get_next_config_section(&siter)) {
+    for (const char *sect = al_get_first_config_section(bem_cfg, &siter); sect; sect = al_get_next_config_section(&siter)) {
         if (strncmp(sect, "model_", 6) == 0) {
-            num = atoi(sect+6);
+            int num = atoi(sect+6);
             log_debug("model: pass1, found model#%02d", num);
-            if (num > max)
-                max = num;
+            if (num > max_model)
+                max_model = num;
+        }
+        else if (strncmp(sect, "tube_", 5) == 0) {
+            int num = atoi(sect+5);
+            log_debug("model: pass1, found tube#%02d", num);
+            if (num > max_tube)
+                max_tube = num;
         }
     }
-    if (max < 0) {
+    log_debug("model: pass1, max_model=%d, max_tube=%d", max_model, max_tube);
+    if (max_model < 0) {
         log_fatal("model: no models defined in config file");
         exit(1);
     }
-    if (!(models = malloc(++max * sizeof(MODEL)))) {
+    if (max_tube < 0) {
+        tubes = malloc(NUM_DFLT_TUBE * sizeof(TUBE_MODEL));
+        if (!tubes) {
+            log_fatal("model: out of memory allocating tubes");
+            exit(1);
+        }
+        num_tubes = NUM_DFLT_TUBE;
+        for (int i = 0; i < NUM_DFLT_TUBE; ++i) {
+            char sect[CFG_SECT_LEN];
+            tubes[i].name = tube_defaults[i].name;
+            tubes[i].cpu = model_find_tcpu(tube_defaults[i].name, tube_defaults[i].cpu);
+            tubes[i].rom_size = tube_defaults[i].rom_size;
+            tubes[i].bootrom = tube_defaults[i].bootrom;
+            tubes[i].speed_multiplier = tube_defaults[i].speed_multiplier;
+            snprintf(sect, sizeof(sect), "tube_%02d", i);
+            set_config_string(sect, "name", tube_defaults[i].name);
+            set_config_string(sect, "cpu", tube_defaults[i].cpu);
+            if (tube_defaults[i].rom_size)
+                set_config_hex(sect, "romsize", tube_defaults[i].rom_size);
+            if (tube_defaults[i].bootrom[0])
+                set_config_string(sect, "bootrom", tube_defaults[i].bootrom);
+            set_config_int(sect, "speed", tube_defaults[i].speed_multiplier);
+        }
+    }
+    else {
+        tubes = malloc(++max_tube * sizeof(TUBE_MODEL));
+        if (!tubes) {
+            log_fatal("model: out of memory allocating tubes");
+            exit(1);
+        }
+        num_tubes = max_tube;
+        for (int i = 0; i < max_tube; ++i) {
+            char sect[16];
+            snprintf(sect, sizeof(sect), "tube_%d", i);
+            tubes[i].name = get_config_string(sect, "name", NULL);
+            tubes[i].cpu = model_find_tcpu(tubes[i].name, get_config_string(sect, "cpu", "none"));
+            tubes[i].rom_size = get_config_int(sect, "romsize", 0);
+            tubes[i].bootrom = get_config_string(sect, "bootrom", NULL);
+            tubes[i].speed_multiplier = get_config_int(sect, "speed", 1);
+        }
+    }
+    if (!(models = malloc(++max_model * sizeof(MODEL)))) {
         log_fatal("model: out of memory allocating models");
         exit(1);
     }
-    for (sect = al_get_first_config_section(bem_cfg, &siter); sect; sect = al_get_next_config_section(&siter)) {
+    for (const char *sect = al_get_first_config_section(bem_cfg, &siter); sect; sect = al_get_next_config_section(&siter)) {
         if (strncmp(sect, "model_", 6) == 0) {
-            num = atoi(sect+6);
+            int num = atoi(sect+6);
             log_debug("model: pass2, found model#%02d", num);
-            ptr = models + num;
+            MODEL *ptr = models + num;
             ptr->cfgsect = sect;
             ptr->name = get_config_string(sect, "name", sect);
             ptr->fdc_type = model_find_fdc(get_config_string(sect, "fdc", "none"), ptr->name);
@@ -156,7 +242,7 @@ void model_loadcfg(void)
             ptr->boot_logo = get_config_int(sect, "boot_logo", 255);
         }
     }
-    model_count = max;
+    model_count = max_model;
 }
 
 void model_check(void) {
@@ -170,7 +256,7 @@ void model_check(void) {
         curtube = models[curmodel].tube;
     else
         curtube = selecttube;
-    if (curtube < -1 || curtube >= NUM_TUBES) {
+    if (curtube < -1 || curtube >= num_tubes) {
         log_warn("No tube #%d, running with no tube instead", curtube);
         curtube = -1;
     }
@@ -186,7 +272,7 @@ static void tube_init(void)
 
     if (curtube!=-1) {
         if (!tubes[curtube].bootrom[0]) { // no boot ROM needed
-            tubes[curtube].init(NULL);
+            tubes[curtube].cpu->init(NULL);
             tube_updatespeed();
             tube_reset();
         }
@@ -197,6 +283,11 @@ static void tube_init(void)
                 cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
                 if ((romf = fopen(cpath, "rb"))) {
                     int rom_size = tubes[curtube].rom_size;
+                    if (rom_size == 0) {
+                        fseek(romf, 0, SEEK_END);
+                        rom_size = ftell(romf);
+                        fseek(romf, 0, SEEK_SET);
+                    }
                     log_debug("model: rom_size=%X", rom_size);
                     if (tuberom)
                         free(tuberom);
@@ -204,7 +295,7 @@ static void tube_init(void)
                         log_debug("model: tuberom=%p, romf=%p", tuberom, romf);
                         if (fread(tuberom, rom_size, 1, romf) == 1) {
                             fclose(romf);
-                            if (tubes[curtube].init(tuberom)) {
+                            if (tubes[curtube].cpu->init(tuberom)) {
                                 tube_updatespeed();
                                 tube_reset();
                                 return;

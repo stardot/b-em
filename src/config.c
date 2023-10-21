@@ -260,6 +260,14 @@ void set_config_int(const char *sect, const char *key, int value)
     al_set_config_value(bem_cfg, sect, key, buf);
 }
 
+void set_config_hex(const char *sect, const char *key, unsigned value)
+{
+    char buf[11];
+
+    snprintf(buf, sizeof buf, "0x%x", value);
+    al_set_config_value(bem_cfg, sect, key, buf);
+}
+
 void set_config_bool(const char *sect, const char *key, bool value)
 {
     al_set_config_value(bem_cfg, sect, key, value ? "true" : "false");

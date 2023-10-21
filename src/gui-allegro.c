@@ -305,15 +305,17 @@ static ALLEGRO_MENU *create_tube_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
     ALLEGRO_MENU *sub = al_create_menu();
-    menu_map_t map[NUM_TUBES];
-    int i;
-
-    for (i = 0; i < NUM_TUBES; i++) {
+    menu_map_t *map = malloc(num_tubes * sizeof(menu_map_t));
+    if (!map) {
+        log_error("gui: unable to allocate tube menu");
+        return NULL;
+    }
+    for (int i = 0; i < num_tubes; ++i) {
         map[i].label = tubes[i].name;
         map[i].itemno = i;
     }
-    add_sorted_set(menu, map, NUM_TUBES, IDM_TUBE, curtube);
-    for (i = 0; i < NUM_TUBE_SPEEDS; i++)
+    add_sorted_set(menu, map, num_tubes, IDM_TUBE, curtube);
+    for (int i = 0; i < NUM_TUBE_SPEEDS; i++)
         add_radio_item(sub, tube_speeds[i].name, IDM_TUBE_SPEED, i, tube_speed_num);
     al_append_menu_item(menu, "Tube speed", 0, 0, NULL, sub);
     return menu;

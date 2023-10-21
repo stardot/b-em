@@ -177,7 +177,7 @@ void tube_host_write(uint16_t addr, uint8_t val)
                 else if (tubeula.r1stat & 0x20) {
                     tube_reset();
                     if (curtube != -1)
-                        tubes[curtube].reset();
+                        tubes[curtube].cpu->reset();
                 }
                 else
                     tubeula.r1stat &= ~(val&0x3F);
