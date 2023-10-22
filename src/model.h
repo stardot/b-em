@@ -54,8 +54,9 @@ typedef struct
 
 typedef struct
 {
-    const char *name;
     const TUBE_CPU *cpu;
+    const char *cfgsect;
+    const char *name;
     uint_least32_t rom_size;
     const char *bootrom;
     int  speed_multiplier;

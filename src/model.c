@@ -176,20 +176,23 @@ void model_loadcfg(void)
         exit(1);
     }
     if (max_tube < 0) {
-        tubes = malloc(NUM_DFLT_TUBE * sizeof(TUBE_MODEL));
-        if (!tubes) {
+        size_t tubes_size = NUM_DFLT_TUBE * sizeof(TUBE_MODEL);
+        size_t sects_size = NUM_DFLT_TUBE * CFG_SECT_LEN;
+        void *data = malloc(tubes_size + sects_size);
+        if (!data) {
             log_fatal("model: out of memory allocating tubes");
             exit(1);
         }
-        num_tubes = NUM_DFLT_TUBE;
+        tubes = data;
+        char *sect = (char *)data + tubes_size;
         for (int i = 0; i < NUM_DFLT_TUBE; ++i) {
-            char sect[CFG_SECT_LEN];
-            tubes[i].name = tube_defaults[i].name;
             tubes[i].cpu = model_find_tcpu(tube_defaults[i].name, tube_defaults[i].cpu);
+            snprintf(sect, CFG_SECT_LEN, "tube_%02d", i);
+            tubes[i].cfgsect = sect;
+            tubes[i].name = tube_defaults[i].name;
             tubes[i].rom_size = tube_defaults[i].rom_size;
             tubes[i].bootrom = tube_defaults[i].bootrom;
             tubes[i].speed_multiplier = tube_defaults[i].speed_multiplier;
-            snprintf(sect, sizeof(sect), "tube_%02d", i);
             set_config_string(sect, "name", tube_defaults[i].name);
             set_config_string(sect, "cpu", tube_defaults[i].cpu);
             if (tube_defaults[i].rom_size)
@@ -197,26 +200,32 @@ void model_loadcfg(void)
             if (tube_defaults[i].bootrom[0])
                 set_config_string(sect, "bootrom", tube_defaults[i].bootrom);
             set_config_int(sect, "speed", tube_defaults[i].speed_multiplier);
+            sect += CFG_SECT_LEN;
         }
+        num_tubes = NUM_DFLT_TUBE;
     }
     else {
-        tubes = malloc(++max_tube * sizeof(TUBE_MODEL));
+        tubes = calloc(++max_tube, sizeof(TUBE_MODEL));
         if (!tubes) {
             log_fatal("model: out of memory allocating tubes");
             exit(1);
         }
         num_tubes = max_tube;
-        for (int i = 0; i < max_tube; ++i) {
-            char sect[16];
-            snprintf(sect, sizeof(sect), "tube_%d", i);
-            tubes[i].name = get_config_string(sect, "name", NULL);
-            tubes[i].cpu = model_find_tcpu(tubes[i].name, get_config_string(sect, "cpu", "none"));
-            tubes[i].rom_size = get_config_int(sect, "romsize", 0);
-            tubes[i].bootrom = get_config_string(sect, "bootrom", NULL);
-            tubes[i].speed_multiplier = get_config_int(sect, "speed", 1);
+        for (const char *sect = al_get_first_config_section(bem_cfg, &siter); sect; sect = al_get_next_config_section(&siter)) {
+            if (strncmp(sect, "tube_", 5) == 0) {
+                int num = atoi(sect+5);
+                TUBE_MODEL *ptr = tubes + num;
+                log_debug("model: pass2, found tube#%02d", num);
+                ptr->cpu = model_find_tcpu(ptr->name, get_config_string(sect, "cpu", "none"));
+                ptr->cfgsect = sect;
+                ptr->name = get_config_string(sect, "name", NULL);
+                ptr->rom_size = get_config_int(sect, "romsize", 0);
+                ptr->bootrom = get_config_string(sect, "bootrom", NULL);
+                ptr->speed_multiplier = get_config_int(sect, "speed", 1);
+            }
         }
     }
-    if (!(models = malloc(++max_model * sizeof(MODEL)))) {
+    if (!(models = calloc(++max_model, sizeof(MODEL)))) {
         log_fatal("model: out of memory allocating models");
         exit(1);
     }
@@ -271,48 +280,50 @@ static void tube_init(void)
     FILE *romf;
 
     if (curtube!=-1) {
-        if (!tubes[curtube].bootrom[0]) { // no boot ROM needed
-            tubes[curtube].cpu->init(NULL);
+        TUBE_MODEL *tube = &tubes[curtube];
+        if (!tube->bootrom[0]) { // no boot ROM needed
+            tube->cpu->init(NULL);
             tube_updatespeed();
             tube_reset();
         }
         else {
             if (!tube_dir)
                 tube_dir = al_create_path_for_directory("roms/tube");
-            if ((path = find_dat_file(tube_dir, tubes[curtube].bootrom, ".rom"))) {
+            if ((path = find_dat_file(tube_dir, tube->bootrom, ".rom"))) {
                 cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
                 if ((romf = fopen(cpath, "rb"))) {
-                    int rom_size = tubes[curtube].rom_size;
+                    int rom_size = tube->rom_size;
+                    log_debug("model: rom_size=%X", rom_size);
                     if (rom_size == 0) {
                         fseek(romf, 0, SEEK_END);
                         rom_size = ftell(romf);
+                        log_debug("model: rom_size from file=%X", rom_size);
                         fseek(romf, 0, SEEK_SET);
                     }
-                    log_debug("model: rom_size=%X", rom_size);
                     if (tuberom)
                         free(tuberom);
                     if ((tuberom = malloc(rom_size))) {
                         log_debug("model: tuberom=%p, romf=%p", tuberom, romf);
                         if (fread(tuberom, rom_size, 1, romf) == 1) {
                             fclose(romf);
-                            if (tubes[curtube].cpu->init(tuberom)) {
+                            if (tube->cpu->init(tuberom)) {
                                 tube_updatespeed();
                                 tube_reset();
                                 return;
                             }
                         }
                         else {
-                            log_error("model: error reading boot rom %s for tube %s: %s", cpath, tubes[curtube].name, strerror(errno));
+                            log_error("model: error reading boot rom %s for tube %s: %s", cpath, tube->name, strerror(errno));
                             fclose(romf);
                         }
                     }
                     else
-                        log_error("model: no space for ROM for tube %s", tubes[curtube].name);
+                        log_error("model: no space for ROM for tube %s", tube->name);
                 } else
-                    log_error("model: unable to open boot rom %s for tube %s: %s", cpath, tubes[curtube].name, strerror(errno));
+                    log_error("model: unable to open boot rom %s for tube %s: %s", cpath, tube->name, strerror(errno));
                 al_destroy_path(path);
             } else
-                log_error("model: boot rom %s for tube %s not found", tubes[curtube].bootrom, tubes[curtube].name);
+                log_error("model: boot rom %s for tube %s not found", tube->bootrom, tube->name);
             curtube = -1;
         }
     }
