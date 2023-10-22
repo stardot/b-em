@@ -274,10 +274,6 @@ static void *tuberom = NULL;
 
 static void tube_init(void)
 {
-    ALLEGRO_PATH *path;
-    const char *cpath;
-    FILE *romf;
-
     if (curtube!=-1) {
         TUBE_MODEL *tube = &tubes[curtube];
         if (!tube->bootrom[0]) { // no boot ROM needed
@@ -286,11 +282,27 @@ static void tube_init(void)
             tube_reset();
         }
         else {
-            if (!tube_dir)
-                tube_dir = al_create_path_for_directory("roms/tube");
-            if ((path = find_dat_file(tube_dir, tube->bootrom, ".rom"))) {
-                cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
-                if ((romf = fopen(cpath, "rb"))) {
+            ALLEGRO_PATH *path = NULL;
+            const char *cpath;
+            if (is_relative_filename(tube->bootrom)) {
+                if (!tube_dir)
+                    tube_dir = al_create_path_for_directory("roms/tube");
+                if ((path = find_dat_file(tube_dir, tube->bootrom, ".rom"))) {
+                    cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+                    log_debug("model: will load searched tube ROM %s", cpath);
+                }
+                else {
+                    log_error("model: boot rom %s for tube %s not found", tube->bootrom, tube->name);
+                    cpath = NULL;
+                }
+            }
+            else {
+                cpath = tube->bootrom;
+                log_debug("model: will load absolute path tube ROM %s", cpath);
+            }
+            if (cpath) {
+                FILE *romf = fopen(cpath, "rb");
+                if (romf) {
                     int rom_size = tube->rom_size;
                     log_debug("model: rom_size=%X", rom_size);
                     if (rom_size == 0) {
@@ -305,10 +317,13 @@ static void tube_init(void)
                         log_debug("model: tuberom=%p, romf=%p", tuberom, romf);
                         if (fread(tuberom, rom_size, 1, romf) == 1) {
                             fclose(romf);
+                            if (path)
+                                al_destroy_path(path);
                             if (tube->cpu->init(tuberom)) {
                                 tube_updatespeed();
                                 tube_reset();
-                                al_destroy_path(path);
+                                if (path)
+                                    al_destroy_path(path);
                                 return;
                             }
                         }
@@ -317,13 +332,16 @@ static void tube_init(void)
                             fclose(romf);
                         }
                     }
-                    else
+                    else {
                         log_error("model: no space for ROM for tube %s", tube->name);
-                } else
+                        fclose(romf);
+                    }
+                }
+                else
                     log_error("model: unable to open boot rom %s for tube %s: %s", cpath, tube->name, strerror(errno));
+            }
+            if (path)
                 al_destroy_path(path);
-            } else
-                log_error("model: boot rom %s for tube %s not found", tube->bootrom, tube->name);
             curtube = -1;
         }
     }
