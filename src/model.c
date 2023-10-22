@@ -308,6 +308,7 @@ static void tube_init(void)
                             if (tube->cpu->init(tuberom)) {
                                 tube_updatespeed();
                                 tube_reset();
+                                al_destroy_path(path);
                                 return;
                             }
                         }
