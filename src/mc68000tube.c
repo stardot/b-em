@@ -1,10 +1,13 @@
-
+#define _DEBUG
 #include "b-em.h"
 #include "cpu_debug.h"
 #include "tube.h"
+#include "config.h"
+#include "model.h"
 #include "mc68000tube.h"
 #include "musahi/m68k.h"
 
+static uint_least32_t mc68000_ram_size;
 static uint8_t *mc68000_ram, *mc68000_rom;
 static bool mc68000_debug_enabled = false;
 static bool rom_low;
@@ -35,7 +38,7 @@ static uint8_t readmem(uint32_t addr)
     }
     else
     {
-        uint8_t data = mc68000_ram[addr % MC68000_RAM_SIZE];
+        uint8_t data = mc68000_ram[addr % mc68000_ram_size];
         log_debug("mc68000: read %08X as RAM -> %02X", addr, data);
         return data;
     }
@@ -96,7 +99,7 @@ static void writemem(uint32_t addr, uint8_t data)
   else
   {
     log_debug("mc68000: write %08X as RAM <- %02X", addr, data);
-    mc68000_ram[addr % MC68000_RAM_SIZE] = data;
+    mc68000_ram[addr % mc68000_ram_size] = data;
   }
 }
 
@@ -145,7 +148,7 @@ static void mc68000_savestate(ZFILE *zfp)
         m68k_get_context(buf);
         savestate_zwrite(zfp, buf, bytes);
         free(buf);
-        savestate_zwrite(zfp, mc68000_ram, MC68000_RAM_SIZE);
+        savestate_zwrite(zfp, mc68000_ram, mc68000_ram_size);
         savestate_zwrite(zfp, mc68000_rom, MC68000_ROM_SIZE);
     }
     else
@@ -160,7 +163,7 @@ static void mc68000_loadstate(ZFILE *zfp)
         savestate_zread(zfp, buf, bytes);
         m68k_set_context(buf);
         free(buf);
-        savestate_zread(zfp, mc68000_ram, MC68000_RAM_SIZE);
+        savestate_zread(zfp, mc68000_ram, mc68000_ram_size);
         savestate_zread(zfp, mc68000_rom, MC68000_ROM_SIZE);
     }
     else
@@ -171,7 +174,9 @@ bool tube_68000_init(void *rom)
 {
     log_debug("mc68000: init");
     if (!mc68000_ram) {
-        mc68000_ram = malloc(MC68000_RAM_SIZE);
+        const char *sect = tubes[curtube].cfgsect;
+        mc68000_ram_size = get_config_int(sect, "ramsize", MC68000_RAM_SIZE);
+        mc68000_ram = malloc(mc68000_ram_size);
         if (!mc68000_ram) {
             log_error("mc68000: unable to allocate RAM: %s", strerror(errno));
             return false;
