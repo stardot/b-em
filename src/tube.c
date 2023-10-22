@@ -68,10 +68,8 @@ void tube_updateints()
                 if (((m_pdp11->PS >> 5) & 7) < 6)
                     pdp11_interrupt(0x84, 6);
             }
-#ifdef M68K
             else if (tube_type == TUBE68000)
                 m68k_set_virq(2, 1);
-#endif
             else if (tube_type == TUBESPROW)
                 sprow_interrupt(1);
         }
