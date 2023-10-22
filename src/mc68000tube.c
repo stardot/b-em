@@ -1,4 +1,3 @@
-#define _DEBUG
 #include "b-em.h"
 #include "cpu_debug.h"
 #include "tube.h"
