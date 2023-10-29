@@ -317,8 +317,6 @@ static void tube_init(void)
                         log_debug("model: tuberom=%p, romf=%p", tuberom, romf);
                         if (fread(tuberom, rom_size, 1, romf) == 1) {
                             fclose(romf);
-                            if (path)
-                                al_destroy_path(path);
                             if (tube->cpu->init(tuberom)) {
                                 tube_updatespeed();
                                 tube_reset();
