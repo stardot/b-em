@@ -75,11 +75,9 @@ void tube_updateints()
         }
     }
     else if (tube_irq & 1) {
-#ifdef M68K
         log_debug("tube: parasite IRQ de-asserted");
         if (tube_type == TUBE68000)
             m68k_set_virq(2, 0);
-#endif
     }
 
     if (tubeula.r1stat & 8 && (tubeula.ph3pos == 0 || tubeula.hp3pos > (tubeula.r1stat & 16) ? 1 : 0)) {
