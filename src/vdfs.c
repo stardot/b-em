@@ -121,7 +121,8 @@ struct vdfs_entry {
     char       *host_path;
     char       *host_fn;
     char       *host_inf;
-    char       acorn_fn[MAX_FILE_NAME+1];
+    uint8_t    acorn_len;
+    char       acorn_fn[MAX_FILE_NAME];
     char       dfs_dir;
     uint16_t   attribs;
     time_t     btime;
@@ -138,7 +139,8 @@ struct vdfs_entry {
             unsigned   scan_seq;
             sort_type  sorted;
             char       boot_opt;
-            char       title[MAX_TITLE+1];
+            uint8_t    title_len;
+            char       title[MAX_TITLE];
         } dir;
     } u;
 };
@@ -162,8 +164,9 @@ static vdfs_dirlib prev_dir;
 typedef struct vdfs_findres {
     struct vdfs_entry *parent;
     const char *errmsg;
+    uint8_t acorn_len;
+    char acorn_fn[MAX_FILE_NAME];
     char dfs_dir;
-    char acorn_fn[MAX_FILE_NAME+1];
 } vdfs_findres;
 
 static vdfs_findres info_res;
@@ -449,10 +452,12 @@ static int hex2nyb(int ch)
 static const char hst_chars[] = "#$%&.?@^";
 static const char bbc_chars[] = "?<;+/#=>";
 
-static inline void hst2bbc(const char *host_fn, char *acorn_fn)
+static inline void hst2bbc(vdfs_entry *ent)
 {
-    int ch;    
+    const char *host_fn = ent->host_fn;
+    char *acorn_fn = ent->acorn_fn;
     char *end = acorn_fn + MAX_FILE_NAME;
+    int ch;
 
     while ((ch = *host_fn++) && acorn_fn < end) {
         const char *ptr = strchr(hst_chars, ch);
@@ -460,19 +465,23 @@ static inline void hst2bbc(const char *host_fn, char *acorn_fn)
             ch = bbc_chars[ptr-hst_chars];
         *acorn_fn++ = ch;
     }
-    *acorn_fn = '\0';
+    ent->acorn_len = acorn_fn - ent->acorn_fn;
 }
 
-static inline void bbc2hst(const char *acorn_fn, char *host_fn)
+static inline void bbc2hst(vdfs_findres *res, char *host_fn)
 {
-    int ch;
-    char *end = host_fn + MAX_FILE_NAME;
+    const char *acorn_fn = res->acorn_fn;
+    const char *acorn_end = acorn_fn + res->acorn_len;
+    char *host_end = host_fn + MAX_FILE_NAME;
 
-    while ((ch = *acorn_fn++) && host_fn < end) {
-        const char *ptr = strchr(bbc_chars, ch);
-        if (ptr)
-            ch = hst_chars[ptr-bbc_chars];
-        *host_fn++ = ch;
+    while (acorn_fn < acorn_end && host_fn < host_end) {
+        int ch = *acorn_fn++;
+        if (ch) {
+            const char *ptr = strchr(bbc_chars, ch);
+            if (ptr)
+                ch = hst_chars[ptr-bbc_chars];
+            *host_fn++ = ch;
+        }
     }
     *host_fn = '\0';
 }
@@ -607,7 +616,7 @@ static void init_dir(vdfs_entry *ent)
     ent->u.dir.scan_seq = 0;
     ent->u.dir.sorted = SORT_NONE;
     ent->u.dir.boot_opt = 0;
-    ent->u.dir.title[0] = 0;
+    ent->u.dir.title_len = 0;
 }
 
 #ifdef WIN32
@@ -641,7 +650,7 @@ static void scan_attr(vdfs_entry *ent)
         }
         else {
             if (attribs & ATTR_IS_DIR) {
-                log_debug("vdfs: dir %s has become a file", ent->acorn_fn);
+                log_debug("vdfs: dir %.*s has become a file", ent->acorn_len, ent->acorn_fn);
                 attribs &= ~ATTR_IS_DIR;
                 free_entry(ent->u.dir.children);
             }
@@ -695,7 +704,7 @@ static void scan_attr(vdfs_entry *ent)
         }
         else {
             if (attribs & ATTR_IS_DIR) {
-                log_debug("vdfs: dir %s has become a file", ent->acorn_fn);
+                log_debug("vdfs: dir %.*s has become a file", ent->acorn_len, ent->acorn_fn);
                 attribs &= ~ATTR_IS_DIR;
                 free_entry(ent->u.dir.children);
             }
@@ -754,8 +763,7 @@ static const char *scan_inf_start(vdfs_entry *ent, char inf_line[MAX_INF_LINE])
                         *ptr++ = ch;
                     ch = *lptr++;
                 }
-                if (ptr < end)
-                    *ptr = '\0';
+                ent->acorn_len = ptr - ent->acorn_fn;
                 if (ch != '\n')
                     return lptr;
             }
@@ -933,7 +941,7 @@ static void scan_inf_dir_new(vdfs_entry *dir, const char *lptr, const char *eptr
                         *ptr++ = ch & 0x7f;
                         ch = *++aptr;
                     }
-                    *ptr = '\0';
+                    dir->u.dir.title_len = ptr - dir->u.dir.title;
                 }
                 else if (!strncasecmp(sptr, "MDATE=", 6)) {
                     int nyb;
@@ -977,7 +985,7 @@ static void scan_inf_dir_new(vdfs_entry *dir, const char *lptr, const char *eptr
     set_ent_date_time(dir, mdate_valid, mdate, mtime, cdate_valid, cdate, ctime);
 }
 
-static unsigned scan_inf_dir_old(const char *lptr, char *title)
+static unsigned scan_inf_dir_old(const char *lptr, vdfs_entry *dir)
 {
     unsigned opt = 0;
     // Old .inf format for directories.
@@ -991,27 +999,27 @@ static unsigned scan_inf_dir_old(const char *lptr, char *title)
     }
     while (ch == ' ' || ch == '\t')
         ch = *lptr++;
-    char *ptr = title;
-    char *end = title + MAX_TITLE;
+    char *ptr = dir->u.dir.title;
+    char *end = ptr + MAX_TITLE;
     while (ptr < end && ch && ch != '\n') {
         *ptr++ = ch & 0x7f;
         ch = *lptr++;
     }
-    *ptr = '\0';
+    dir->u.dir.title_len = ptr - dir->u.dir.title;
     return opt;
 }
 
 static void scan_inf_dir(vdfs_entry *dir)
 {
     char inf_line[MAX_INF_LINE];
-    dir->u.dir.title[0] = 0;
+    dir->u.dir.title_len = 0;
     const char *lptr = scan_inf_start(dir, inf_line);
     if (lptr) {
         const char *eptr = strchr(lptr, '=');
         if (eptr)
             scan_inf_dir_new(dir, lptr, eptr);
         else
-            dir->u.dir.boot_opt = scan_inf_dir_old(lptr, dir->u.dir.title);
+            dir->u.dir.boot_opt = scan_inf_dir_old(lptr, dir);
     }
 }
 
@@ -1022,8 +1030,8 @@ static void scan_entry(vdfs_entry *ent)
         scan_inf_dir(ent);
     else
         scan_inf_file(ent);
-    if (ent->acorn_fn[0] == '\0')
-        hst2bbc(ent->host_fn, ent->acorn_fn);
+    if (ent->acorn_len == 0)
+        hst2bbc(ent);
 }
 
 static void init_entry(vdfs_entry *ent)
@@ -1031,19 +1039,21 @@ static void init_entry(vdfs_entry *ent)
     ent->next = NULL;
     ent->host_path = NULL;
     ent->host_fn = ".";
-    ent->acorn_fn[0] = '\0';
-    ent->acorn_fn[MAX_FILE_NAME] = '\0';
+    ent->acorn_len = 0;
     ent->dfs_dir = '$';
     ent->attribs = 0;
 }
 
-static int vdfs_cmp(const char *namea, const char *nameb, size_t len)
+static int vdfs_cmp(vdfs_entry *ent_a, vdfs_entry *ent_b)
 {
-    while (len-- > 0) {
-        int ca = *(const unsigned char *)namea++;
-        int cb = *(const unsigned char *)nameb++;
-        if (!ca)
-            return cb ? -1 : 0;
+    const unsigned char *namea = (unsigned char *)ent_a->acorn_fn;
+    const unsigned char *nameb = (unsigned char *)ent_b->acorn_fn;
+    const unsigned char *enda = namea + ent_a->acorn_len;
+    const unsigned char *endb = nameb + ent_b->acorn_len;
+
+    while (namea < enda && nameb < endb) {
+        unsigned ca = *namea++;
+        unsigned cb = *nameb++;
         if (ca != cb) {
             if (ca >= 'a' && ca <= 'z')
                 ca = ca - 'a' + 'A';
@@ -1054,38 +1064,45 @@ static int vdfs_cmp(const char *namea, const char *nameb, size_t len)
                 return d;
         }
     }
-    return 0;
+    if (namea < enda)
+        return 1;
+    else if (nameb < endb)
+        return -1;
+    else
+        return 0;
 }
 
-static vdfs_entry *acorn_search(vdfs_entry *dir, const char *acorn_fn)
+static vdfs_entry *acorn_search(vdfs_entry *dir, vdfs_entry *obj)
 {
     for (vdfs_entry *ent = dir->u.dir.children; ent; ent = ent->next)
-        if (!vdfs_cmp(ent->acorn_fn, acorn_fn, MAX_FILE_NAME))
+        if (!vdfs_cmp(ent, obj))
             return ent;
     return NULL;
 }
 
-static bool vdfs_wildmat(const char *pattern, const char *candidate)
+static bool vdfs_wildmat(const char *pattern, unsigned pat_len, const char *candidate, unsigned can_len)
 {
-    log_debug("vdfs: vdfs_wildmat, pattern=%s, candidate=%s", pattern, candidate);
-    for (;;) {
+    log_debug("vdfs: vdfs_wildmat, pattern=%.*s, candidate=%.*s", pat_len, pattern, can_len, candidate);
+    while (pat_len) {
         int pat_ch = *pattern++;
+        --pat_len;
         if (pat_ch == '*') {
-            if (!*pattern) {
+            if (!pat_len) {
                 log_debug("vdfs: vdfs_wildmat return#1, true, * matches nothing");
                 return true;
             }
             do {
-                if (vdfs_wildmat(pattern, candidate++)) {
+                if (vdfs_wildmat(pattern, pat_len, candidate++, can_len--)) {
                     log_debug("vdfs: vdfs_wildmat return#2, true, * recursive");
                     return true;
                 }
-            } while (*candidate);
+            } while (can_len);
             log_debug("vdfs: vdfs_wildmat return#3, false, * mismatch");
             return false;
         }
-        int can_ch = *candidate++;
-        if (can_ch) {
+        if (can_len) {
+            int can_ch = *candidate++;
+            --can_len;
             if (pat_ch != can_ch && pat_ch != '#') {
                 if (pat_ch >= 'a' && pat_ch <= 'z')
                     pat_ch = pat_ch - 'a' + 'A';
@@ -1097,23 +1114,25 @@ static bool vdfs_wildmat(const char *pattern, const char *candidate)
                 }
             }
         }
-        else if (pat_ch) {
+        else {
             log_debug("vdfs: vdfs_wildmat return#5, false, candidate too short");
             return false;
         }
-        else {
-            log_debug("vdfs: vdfs_wildmat return#6, true, NUL on both");
-            return true;
-        }
     }
-    log_debug("vdfs: vdfs_wildmat return#7, true, reached max length");
-    return true;
+    if (can_len) {
+        log_debug("vdfs: vdfs_wildmat return#6, false, pattern too short");
+        return false;
+    }
+    else {
+        log_debug("vdfs: vdfs_wildmat return#7, true, reached end");
+        return true;
+    }
 }
 
-static vdfs_entry *wild_search(vdfs_entry *dir, const char *pattern)
+static vdfs_entry *wild_search(vdfs_entry *dir, vdfs_findres *res)
 {
     for (vdfs_entry *ent = dir->u.dir.children; ent; ent = ent->next)
-        if (vdfs_wildmat(pattern, ent->acorn_fn))
+        if (vdfs_wildmat(res->acorn_fn, res->acorn_len, ent->acorn_fn, ent->acorn_len))
             return ent;
     return NULL;
 }
@@ -1140,15 +1159,19 @@ static vdfs_entry *new_entry(vdfs_entry *dir, const char *host_fn)
         char *host_path = make_host_path(ent, host_fn);
         if (host_path) {
             scan_entry(ent);
-            if (acorn_search(dir, ent->acorn_fn)) {
+            if (acorn_search(dir, ent)) {
                 // name was already in use - generate a unique one.
                 int seq_ch = '0';
-                size_t ix = strlen(ent->acorn_fn);
-                if (ix > (MAX_FILE_NAME-2))
+                size_t ix = ent->acorn_len;
+                if (ix > (MAX_FILE_NAME-2)) {
                     ix = MAX_FILE_NAME-2;
+                    ent->acorn_len = MAX_FILE_NAME;
+                }
+                else
+                    ent->acorn_len = ix + 2;
                 ent->acorn_fn[ix] = '~';
                 ent->acorn_fn[ix+1] = seq_ch;
-                while (acorn_search(dir, ent->acorn_fn)) {
+                while (acorn_search(dir, ent)) {
                     if ((seq_ch = next_seq_ch(seq_ch)) < 0) {
                         log_warn("vdfs: unable to create unique acorn name for %s", host_fn);
                         free(ent);
@@ -1156,7 +1179,7 @@ static vdfs_entry *new_entry(vdfs_entry *dir, const char *host_fn)
                     }
                     ent->acorn_fn[ix+1] = seq_ch;
                 }
-                log_debug("vdfs: new_entry: unique name %s used", ent->acorn_fn);
+                log_debug("vdfs: new_entry: unique name %.*s used", ent->acorn_len, ent->acorn_fn);
             }
             ent->next = dir->u.dir.children;
             dir->u.dir.children = ent;
@@ -1295,7 +1318,6 @@ static vdfs_entry *find_entry_adfs(const char *filename, vdfs_findres *res, vdfs
     res->dfs_dir = dir->dfs_dir;
 
     for (const char *fn_src = filename;;) {
-        vdfs_entry *ptr;
         char *fn_ptr = res->acorn_fn;
         char *fn_end = fn_ptr + MAX_FILE_NAME;
         int ch;
@@ -1306,22 +1328,26 @@ static vdfs_entry *find_entry_adfs(const char *filename, vdfs_findres *res, vdfs
             }
             *fn_ptr++ = ch;
         }
-        *fn_ptr = '\0';
+        int len = fn_ptr - res->acorn_fn;
+        res->acorn_len = len;
         int fn0 = res->acorn_fn[0];
         int fn1 = res->acorn_fn[1];
-        if (((fn0 == '$' || fn0 == '&') && fn1 == '\0') || (fn0 == ':' && fn1 >= '0' && fn1 <= '9'))
+        if ((len == 1 && (fn0 == '$' || fn0 == '&')) || (len == 2 && fn0 == ':' && fn1 >= '0' && fn1 <= '9'))
             ent = &root_dir;
-        else if (fn0 == '%' && fn1 == '\0' && check_valid_dir(&lib_dir))
+        else if (len == 1 && fn0 == '%' && check_valid_dir(&lib_dir))
             ent = lib_dir.dir;
-        else if (fn0 == '^' && fn1 == '\0')
+        else if (len == 1 && fn0 == '^')
             ent = ent->parent;
-        else if (!scan_dir(ent) && (ptr = wild_search(ent, res->acorn_fn)))
-            ent = ptr;
         else {
-            if (ch != '.')
-                res->parent = ent;
-            log_debug("vdfs: find_entry: acorn path %s not found", filename);
-            return NULL; // not found
+            vdfs_entry *ptr;
+            if (!scan_dir(ent) && (ptr = wild_search(ent, res)))
+                ent = ptr;
+            else {
+                if (ch != '.')
+                    res->parent = ent;
+                log_debug("vdfs: find_entry: acorn path %s not found", filename);
+                return NULL; // not found
+            }
         }
         if (ch != '.') {
             log_debug("vdfs: find_entry: acorn path %s found as %s", filename, ent->host_path);
@@ -1342,7 +1368,7 @@ static vdfs_entry *find_next_adfs(vdfs_entry *ent, vdfs_findres *res)
         ent = ent->next;
         if (!ent)
             return NULL;
-    } while (!(ent->attribs & ATTR_EXISTS) || !vdfs_wildmat(res->acorn_fn, ent->acorn_fn));
+    } while (!(ent->attribs & ATTR_EXISTS) || !vdfs_wildmat(res->acorn_fn, res->acorn_len, ent->acorn_fn, ent->acorn_len));
     return ent;
 }
 
@@ -1372,13 +1398,14 @@ static vdfs_entry *find_entry_dfs(const char *filename, vdfs_findres *res, vdfs_
         adfs_error(err_badname);
         res->parent = NULL;
     }
-    memcpy(res->acorn_fn, filename, len+1);
+    memcpy(res->acorn_fn, filename, len);
+    res->acorn_len = len;
     if (!scan_dir(dir->dir)) {
         for (vdfs_entry *ent = dir->dir->u.dir.children; ent; ent = ent->next) {
-            log_debug("vdfs: find_entry_dfs, considering entry %c.%s", ent->dfs_dir, ent->acorn_fn);
+            log_debug("vdfs: find_entry_dfs, considering entry %c.%.*s", ent->dfs_dir, ent->acorn_len, ent->acorn_fn);
             if (srchdir == '*' || srchdir == '#' || srchdir == ent->dfs_dir) {
                 log_debug("vdfs: find_entry_dfs, matched DFS dir");
-                if (vdfs_wildmat(filename, ent->acorn_fn))
+                if (vdfs_wildmat(res->acorn_fn, len, ent->acorn_fn, ent->acorn_len))
                     return ent;
             }
         }
@@ -1397,7 +1424,7 @@ static vdfs_entry *find_next_dfs(vdfs_entry *ent, vdfs_findres *res)
         if (!ent)
             return NULL;
         log_debug("vdfs: find_next_dfs, checking %c.%s", ent->dfs_dir, ent->acorn_fn);
-    } while (!(ent->attribs & ATTR_EXISTS) || !(srchdir == '*' || srchdir == '#' || srchdir == ent->dfs_dir) || !vdfs_wildmat(res->acorn_fn, ent->acorn_fn));
+    } while (!(ent->attribs & ATTR_EXISTS) || !(srchdir == '*' || srchdir == '#' || srchdir == ent->dfs_dir) || !vdfs_wildmat(res->acorn_fn, res->acorn_len, ent->acorn_fn, ent->acorn_len));
     return ent;
 }
 
@@ -1409,9 +1436,11 @@ static vdfs_entry *add_new_file(vdfs_findres *res)
     vdfs_entry *new_ent = malloc(sizeof(vdfs_entry));
     if (new_ent) {
         init_entry(new_ent);
-        memcpy(new_ent->acorn_fn, res->acorn_fn, MAX_FILE_NAME+1);
+        new_ent->acorn_len = res->acorn_len;
+        memcpy(new_ent->acorn_fn, res->acorn_fn, res->acorn_len);
+        log_debug("vdfs: new_entry, acorn_len=%u, acorn_fn=%.*s", res->acorn_len, res->acorn_len, res->acorn_fn);
         new_ent->dfs_dir = res->dfs_dir;
-        bbc2hst(res->acorn_fn, host_fn);
+        bbc2hst(res, host_fn);
         if (host_search(dir, host_fn)) {
             /* host name already exists, generate a unique name */
             size_t name_len = strlen(host_fn);
@@ -1421,7 +1450,7 @@ static vdfs_entry *add_new_file(vdfs_findres *res)
             host_fn[name_len+2] = 0;
             while (host_search(dir, host_fn)) {
                 if ((seq_ch = next_seq_ch(seq_ch)) < 0) {
-                    log_warn("vdfs: unable to create unique host name for %c.%s", res->dfs_dir, res->acorn_fn);
+                    log_warn("vdfs: unable to create unique host name for %c.%.*s", res->dfs_dir, res->acorn_len, res->acorn_fn);
                     res->errmsg = err_badname;
                     free(new_ent);
                     return NULL;
@@ -1469,22 +1498,28 @@ static void write_back(vdfs_entry *ent)
     if ((fp = fopen(ent->host_path, "wt"))) {
         const struct tm *tp = localtime(&ent->mtime);
         if (ent->attribs & ATTR_IS_DIR) {
-            fprintf(fp, "%s OPT=%02X DIR=1 MDATE=%04X MTIME=%06X", ent->acorn_fn, ent->u.dir.boot_opt, unix_date_acorn(tp), unix_time_acorn(tp));
+            fwrite(ent->acorn_fn, ent->acorn_len, 1, fp);
+            fprintf(fp, " OPT=%02X DIR=1 MDATE=%04X MTIME=%06X", ent->u.dir.boot_opt, unix_date_acorn(tp), unix_time_acorn(tp));
             if (ent->attribs & ATTR_BTIME_VALID) {
                 tp = localtime(&ent->btime);
                 fprintf(fp, " CDATE=%04X CTIME=%06X", unix_date_acorn(tp), unix_time_acorn(tp));
             }
-            if (ent->u.dir.title[0]) {
-                const char *fmt = " TITLE=%s\n";
-                if (strpbrk(ent->u.dir.title, " \t"))
-                    fmt = " TITLE=\"%s\"\n";
-                fprintf(fp, fmt, ent->u.dir.title);
+            if (ent->u.dir.title_len) {
+                fputs(" TITLE=", fp);
+                if (strpbrk(ent->u.dir.title, " \t")) {
+                    putc('"', fp);
+                    fwrite(ent->u.dir.title, ent->u.dir.title_len, 1, fp);
+                    putc('"', fp);
+                }
+                else
+                    fwrite(ent->u.dir.title, ent->u.dir.title_len, 1, fp);
             }
-            else
-                putc('\n', fp);
+            putc('\n', fp);
         }
         else {
-            fprintf(fp, "%c.%s %08X %08X %08X %02X %04X %06X", ent->dfs_dir, ent->acorn_fn, ent->u.file.load_addr, ent->u.file.exec_addr, ent->u.file.length, ent->attribs & (ATTR_ACORN_MASK|ATTR_NL_TRANS), unix_date_acorn(tp), unix_time_acorn(tp));
+            fprintf(fp, "%c.", ent->dfs_dir);
+            fwrite(ent->acorn_fn, ent->acorn_len, 1, fp);
+            fprintf(fp, " %08X %08X %08X %02X %04X %06X", ent->u.file.load_addr, ent->u.file.exec_addr, ent->u.file.length, ent->attribs & (ATTR_ACORN_MASK|ATTR_NL_TRANS), unix_date_acorn(tp), unix_time_acorn(tp));
             if (ent->attribs & ATTR_BTIME_VALID) {
                 tp = localtime(&ent->btime);
                 fprintf(fp, " %04X %06X\n", unix_date_acorn(tp), unix_time_acorn(tp));
@@ -1558,7 +1593,7 @@ void vdfs_set_root(const char *root)
             *inf++ = 'f';
             *inf = '\0';
             new_root.acorn_fn[0] = '$';
-            new_root.acorn_fn[1] = '\0';
+            new_root.acorn_len = 1;
             scan_entry(&new_root);
             if (new_root.attribs & ATTR_IS_DIR) {
                 vdfs_close();
@@ -1645,7 +1680,7 @@ void vdfs_loadstate(FILE *f)
 static size_t ss_calc_len(vdfs_entry *ent)
 {
     vdfs_entry *parent = ent->parent;
-    size_t len = strlen(ent->acorn_fn);
+    size_t len = ent->acorn_len;
 
     if (parent->parent != parent)
         len += ss_calc_len(ent->parent) + 1;
@@ -1657,11 +1692,11 @@ static void ss_save_ent(vdfs_entry *ent, FILE *f)
     vdfs_entry *parent = ent->parent;
 
     if (parent->parent == parent)
-        fputs(ent->acorn_fn, f);
+        fwrite(ent->acorn_fn, ent->acorn_len, 1, f);
     else {
         ss_save_ent(ent->parent, f);
         putc('.', f);
-        fputs(ent->acorn_fn, f);
+        fwrite(ent->acorn_fn, ent->acorn_len, 1, f);
     }
 }
 
@@ -2142,7 +2177,7 @@ static uint16_t gcopy_fn(vdfs_entry *ent, uint16_t mem_ptr)
 {
     uint16_t mem_end = mem_ptr + MAX_FILE_NAME+2;
     const char *ptr = ent->acorn_fn;
-    int ch;
+    unsigned len = ent->acorn_len;
 
     if (ent->dfs_dir == cat_dfs) {
         log_debug("vdfs: gcopy_fn, same DFS directory file");
@@ -2154,8 +2189,10 @@ static uint16_t gcopy_fn(vdfs_entry *ent, uint16_t mem_ptr)
         writemem(mem_ptr++, ent->dfs_dir);
         writemem(mem_ptr++, '.');
     }
-    while (mem_ptr < mem_end && (ch = *ptr++))
-        writemem(mem_ptr++, ch);
+    while (len && mem_ptr < mem_end) {
+        writemem(mem_ptr++, *ptr++);
+        --len;
+    }
     while (mem_ptr < mem_end)
         writemem(mem_ptr++, ' ');
     return mem_ptr;
@@ -2195,13 +2232,13 @@ static void osfile_write(uint32_t pb, const char *path, uint32_t (*callback)(FIL
         vdfs_entry *ent = find_entry(path, &res, &cur_dir);
         if (ent) {
             if (ent->attribs & (ATTR_OPEN_READ|ATTR_OPEN_WRITE)) {
-                log_debug("vdfs: attempt to save file %s which is already open via OSFIND", res.acorn_fn);
+                log_debug("vdfs: attempt to save file %.*s which is already open via OSFIND", res.acorn_len, res.acorn_fn);
                 adfs_error(err_isopen);
                 return;
             }
             if (ent->attribs & ATTR_EXISTS) {
                 if (ent->attribs & ATTR_IS_DIR) {
-                    log_debug("vdfs: attempt to create file %s over an existing dir", res.acorn_fn);
+                    log_debug("vdfs: attempt to create file %.*s over an existing dir", res.acorn_len, res.acorn_fn);
                     adfs_error(err_direxist);
                     return;
                 }
@@ -2493,7 +2530,7 @@ static void osfile_cdir(const char *path)
         if ((ent = find_entry(path, &res, &cur_dir))) {
             if (ent->attribs & ATTR_EXISTS) {
                 if (!(ent->attribs & ATTR_IS_DIR)) {
-                    log_debug("vdfs: attempt to create dir %s on top of an existing file", res.acorn_fn);
+                    log_debug("vdfs: attempt to create dir %.*s on top of an existing file", res.acorn_len, res.acorn_fn);
                     adfs_error(err_filexist);  // file in the way.
                 }
             } else
@@ -2503,11 +2540,11 @@ static void osfile_cdir(const char *path)
             if (parent && parent->attribs & ATTR_EXISTS) {
                 if ((ent = add_new_file(&res))) {
                     ent->u.dir.boot_opt = 0;
-                    ent->u.dir.title[0] = 0;
+                    ent->u.dir.title_len = 0;
                     create_dir(ent);
                 }
             } else {
-                log_debug("vdfs: attempt to create dir %s in non-existent directory", res.acorn_fn);
+                log_debug("vdfs: attempt to create dir %.*s in non-existent directory", res.acorn_len, res.acorn_fn);
                 adfs_error(res.errmsg);
             }
         }
@@ -2935,9 +2972,12 @@ static void osgbpb_get_title(uint32_t pb)
     if (check_valid_dir(&cur_dir)) {
         uint32_t mem_ptr = readmem32(pb+1);
         const char *title = cur_dir.dir->u.dir.title;
-        if (!*title)
+        unsigned title_len = cur_dir.dir->u.dir.title_len;
+        if (!title_len) {
             title = cur_dir.dir->acorn_fn;
-        mem_ptr = write_len_str(mem_ptr, title, strlen(title));
+            title_len = cur_dir.dir->acorn_len;
+        }
+        mem_ptr = write_len_str(mem_ptr, title, title_len);
         if (mem_ptr >= 0xffff0000 || curtube == -1)
             writemem(mem_ptr++, cur_dir.dir->u.dir.boot_opt);
         else
@@ -2954,7 +2994,7 @@ static void osgbpb_get_dir_adfs(uint32_t pb, vdfs_dirlib *dir)
     mem_ptr = write_len_str(mem_ptr, tmp, 1);
     vdfs_entry *ent = dir->dir;
     if (ent)
-        write_len_str(mem_ptr, ent->acorn_fn, strlen(ent->acorn_fn));
+        write_len_str(mem_ptr, ent->acorn_fn, ent->acorn_len);
     else
         write_len_str(mem_ptr, "Unset", 5);
 }
@@ -3015,7 +3055,7 @@ static void acorn_sort(vdfs_entry *dir, sort_type sort_reqd)
                         else {
                             int res = (sort_reqd == SORT_DFS) ? p->dfs_dir - q->dfs_dir : 0;
                             if (!res)
-                                res = vdfs_cmp(p->acorn_fn, q->acorn_fn, MAX_FILE_NAME);
+                                res = vdfs_cmp(p, q);
                             if (res <= 0) {
                                 /* First element of p is lower (or same);
                                 * e must come from p. */
@@ -3075,9 +3115,9 @@ static int osgbpb_list(uint32_t pb)
             status = 0;
             mem_ptr = readmem32(pb+1);
             n = readmem32(pb+5);
-            log_debug("vdfs: seq_ptr=%d, writing max %d entries starting %04X, first=%s", seq_ptr, n, mem_ptr, cat_ptr->acorn_fn);
+            log_debug("vdfs: seq_ptr=%d, writing max %d entries starting %04X, first=%.*s", seq_ptr, n, mem_ptr, cat_ptr->acorn_len, cat_ptr->acorn_fn);
             for (;;) {
-                mem_ptr = write_len_str(mem_ptr, cat_ptr->acorn_fn, strlen(cat_ptr->acorn_fn));
+                mem_ptr = write_len_str(mem_ptr, cat_ptr->acorn_fn, cat_ptr->acorn_len);
                 seq_ptr++;
                 if (--n == 0)
                     break;
@@ -3088,7 +3128,7 @@ static int osgbpb_list(uint32_t pb)
                     status = 1;
                     break;
                 }
-                log_debug("vdfs: next=%s", cat_ptr->acorn_fn);
+                log_debug("vdfs: next=%.*s", cat_ptr->acorn_len, cat_ptr->acorn_fn);
             }
             log_debug("vdfs: finish at %04X", mem_ptr);
             writemem32(pb+5, n);
@@ -3526,7 +3566,7 @@ static void cmd_copy(uint16_t addr)
                                 /* as destination is a dir, loop over wild-cards */
                                 new_res.parent = new_ent;
                                 do {
-                                    memcpy(new_res.acorn_fn, old_ent->acorn_fn, MAX_FILE_NAME);
+                                    memcpy(new_res.acorn_fn, old_ent->acorn_fn, old_ent->acorn_len);
                                     if (!(new_ent = add_new_file(&new_res)))
                                         break;
                                     if (!copy_file(old_ent, new_ent))
@@ -3703,9 +3743,8 @@ static uint16_t cmd_pwd_recurse(uint16_t addr, vdfs_entry *ent)
     if (parent && parent != ent)
         addr = cmd_pwd_recurse(addr, parent);
     const char *ptr = ent->acorn_fn;
-    int ch;
-    while ((ch = *ptr++))
-        writemem(addr++, ch);
+    for (int len = ent->acorn_len; len; --len)
+        writemem(addr++, *ptr++);
     writemem(addr++, '.');
     return addr;
 }
@@ -3746,8 +3785,8 @@ static void cmd_title(uint16_t addr)
             *ptr++ = ch & 0x7f;
             ch = readmem(addr++);
         }
-        *ptr = '\0';
-        log_debug("vdfs: cmd_title: name=%s", ent->u.dir.title);
+        ent->u.dir.title_len = ptr - ent->u.dir.title;
+        log_debug("vdfs: cmd_title: name=%.*s", ent->u.dir.title_len, ent->u.dir.title);
         write_back(ent);
     }
 }
@@ -3840,7 +3879,7 @@ static void rename_file(uint16_t addr)
                                 if ((new_ent = add_new_file(&old_res)))
                                     rename_tail(old_ent, new_ent);
                             } else {
-                                log_debug("vdfs: new file '%s' for rename already exists", new_res.acorn_fn);
+                                log_debug("vdfs: new file '%.*s' for rename already exists", new_res.acorn_len, new_res.acorn_fn);
                                 adfs_error(err_exists);
                             }
                         } else
@@ -3849,7 +3888,7 @@ static void rename_file(uint16_t addr)
                     else if (new_res.parent && (new_ent = add_new_file(&new_res)))
                         rename_tail(old_ent, new_ent);
                 } else {
-                    log_debug("vdfs: old file '%s' for rename not found", old_res.acorn_fn);
+                    log_debug("vdfs: old file '%.*s' for rename not found", old_res.acorn_len, old_res.acorn_fn);
                     adfs_error(old_res.errmsg);
                 }
             } else {
@@ -4036,13 +4075,17 @@ static void cat_title(void)
 {
     uint32_t mem_ptr = CAT_TMP;
     if (cat_dir) {
-        int ch;
         const char *ptr = cat_dir->u.dir.title;
-        if (!*ptr)
+        unsigned len = cat_dir->u.dir.title_len;
+        if (!len) {
             ptr = cat_dir->acorn_fn;
+            len = cat_dir->acorn_len;
+        }
         writemem(mem_ptr++, cat_dir->u.dir.boot_opt);
-        while ((ch = *ptr++))
-            writemem(mem_ptr++, ch);
+        while (len) {
+            writemem(mem_ptr++, *ptr++);
+            --len;
+        }
     }
     else
         writemem(mem_ptr++, 0);
@@ -4053,10 +4096,20 @@ static void cat_get_dir_adfs(vdfs_dirlib *dir)
 {
     vdfs_entry *ent = dir->dir;
     uint32_t mem_ptr = CAT_TMP;
-    const char *ptr = ent ? ent->acorn_fn : "Unset";
-    int ch;
-    while ((ch = *ptr++))
-        writemem(mem_ptr++, ch);
+    const char *ptr;
+    unsigned len;
+    if (ent) {
+        ptr = ent->acorn_fn;
+        len = ent->acorn_len;
+    }
+    else {
+        ptr = "Unset";
+        len = 5;
+    }
+    while (len) {
+        writemem(mem_ptr++, *ptr++);
+        --len;
+    }
     writemem(mem_ptr, 0);
 }
 
@@ -4091,7 +4144,7 @@ static void cat_next_dfsdir(void)
 {
     while (cat_ent && (!(cat_ent->attribs & ATTR_EXISTS) || cat_ent->dfs_dir != cat_dfs))
     {
-        log_debug("vdfs: cat_next_dfsdir skipping %c.%s", cat_ent->dfs_dir, cat_ent->acorn_fn);
+        log_debug("vdfs: cat_next_dfsdir skipping %c.%.*s", cat_ent->dfs_dir, cat_ent->acorn_len, cat_ent->acorn_fn);
         cat_ent = cat_ent->next;
     }
     cat_next_tail();
@@ -4100,7 +4153,7 @@ static void cat_next_dfsdir(void)
 static void cat_next_dfsnot(void)
 {
     while (cat_ent && (!(cat_ent->attribs & ATTR_EXISTS) || cat_ent->dfs_dir == cat_dfs)) {
-        log_debug("vdfs: cat_next_dfsnot skipping %c.%s", cat_ent->dfs_dir, cat_ent->acorn_fn);
+        log_debug("vdfs: cat_next_dfsnot skipping %c.%.*s", cat_ent->dfs_dir, cat_ent->acorn_len, cat_ent->acorn_fn);
         cat_ent = cat_ent->next;
     }
     cat_next_tail();
