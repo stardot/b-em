@@ -240,6 +240,7 @@ enum vdfs_action {
     VDFS_ROM_BUILD,
     VDFS_ROM_APPEND,
     VDFS_ROM_OPT1,
+    VDFS_ROM_PRINT_SPLIT,
     VDFS_ACT_NOP,
     VDFS_ACT_QUIT,
     VDFS_ACT_SRLOAD,
@@ -273,7 +274,8 @@ enum vdfs_action {
     VDFS_ACT_MMBDIN,
     VDFS_ACT_DRIVE,
     VDFS_ACT_ACCESS,
-    VDFS_ACT_COPY
+    VDFS_ACT_COPY,
+    VDFS_ACT_PWD
 };
 
 /*
@@ -3695,6 +3697,34 @@ static void cmd_drive(uint16_t addr)
         adfs_error(err_badparms);
 }
 
+static uint16_t cmd_pwd_recurse(uint16_t addr, vdfs_entry *ent)
+{
+    vdfs_entry *parent = ent->parent;
+    if (parent && parent != ent)
+        addr = cmd_pwd_recurse(addr, parent);
+    const char *ptr = ent->acorn_fn;
+    int ch;
+    while ((ch = *ptr++))
+        writemem(addr++, ch);
+    writemem(addr++, '.');
+    return addr;
+}
+
+static void cmd_pwd(void)
+{
+    if (check_valid_dir(&cur_dir)) {
+        int romno = readmem(0xf4);
+        uint16_t addr = (rom_slots[romno & 0x0f].split) << 8;
+        log_debug("vdfs: cmd_pwd, addr=%04X\n", addr);
+        writemem16(0xa8, addr);
+        addr = cmd_pwd_recurse(addr, cur_dir.dir);
+        writemem(addr-1, 0x0d);
+        writemem(addr, 0x0a);
+        writemem(addr+1, 0);
+        rom_dispatch(VDFS_ROM_PRINT_SPLIT);
+    }
+}
+
 static void cmd_title(uint16_t addr)
 {
     if (check_valid_dir(&cur_dir)) {
@@ -3854,6 +3884,7 @@ const struct cmdent ctab_filing[] = {
     { "LIB",     VDFS_ACT_LIB     },
     { "MAP",     VDFS_ACT_NOP     },
     { "MOunt",   VDFS_ACT_NOP     },
+    { "PWD",     VDFS_ACT_PWD     },
     { "OSW7f",   VDFS_ACT_OSW7F   },
     { "REname",  VDFS_ACT_RENAME  },
     { "REScan",  VDFS_ACT_RESCAN  },
@@ -4515,6 +4546,9 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
         break;
     case VDFS_ACT_LIB:
         cmd_lib(addr);
+        break;
+    case VDFS_ACT_PWD:
+        cmd_pwd();
         break;
     case VDFS_ACT_RENAME:
         rename_file(addr);

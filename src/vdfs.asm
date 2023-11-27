@@ -157,6 +157,7 @@ prtextws    =   &A8
             equw    cmd_build       ; *BUILD
             equw    cmd_append      ; *APPEND.
             equw    opt1_print
+            equw    print_split
 .dispend
 
 ; Stubs to transfer control to the vdfs.c module.
@@ -665,6 +666,19 @@ prtextws    =   &A8
 .opt1_print jsr     pr_all
             lda     #&01
             rts
+
+.print_split
+{
+            ldy     #0
+.loop       lda     (&a8),y
+            beq     done
+            jsr     OSWRCH
+            iny
+            bne     loop
+            inc     &a9
+            bne     loop
+.done       rts
+}
 
 ; The *DUMP command.
 
