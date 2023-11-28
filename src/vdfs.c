@@ -1044,6 +1044,17 @@ static void init_entry(vdfs_entry *ent)
     ent->attribs = 0;
 }
 
+static int vdfs_cmpch(int ca, int cb)
+{
+    if (ca == cb)
+        return 0;
+    if (ca >= 'a' && ca <= 'z')
+        ca = ca - 'a' + 'A';
+    if (cb >= 'a' && cb <= 'z')
+        cb = cb - 'a' + 'A';
+    return ca - cb;
+}
+
 static int vdfs_cmp(vdfs_entry *ent_a, vdfs_entry *ent_b)
 {
     const unsigned char *namea = (unsigned char *)ent_a->acorn_fn;
@@ -1052,17 +1063,9 @@ static int vdfs_cmp(vdfs_entry *ent_a, vdfs_entry *ent_b)
     const unsigned char *endb = nameb + ent_b->acorn_len;
 
     while (namea < enda && nameb < endb) {
-        unsigned ca = *namea++;
-        unsigned cb = *nameb++;
-        if (ca != cb) {
-            if (ca >= 'a' && ca <= 'z')
-                ca = ca - 'a' + 'A';
-            if (cb >= 'a' && cb <= 'z')
-                cb = cb - 'a' + 'A';
-            int d = ca - cb;
-            if (d)
-                return d;
-        }
+        int d = vdfs_cmpch(*namea++, *nameb++);
+        if (d)
+            return d;
     }
     if (namea < enda)
         return 1;
@@ -1403,7 +1406,7 @@ static vdfs_entry *find_entry_dfs(const char *filename, vdfs_findres *res, vdfs_
     if (!scan_dir(dir->dir)) {
         for (vdfs_entry *ent = dir->dir->u.dir.children; ent; ent = ent->next) {
             log_debug("vdfs: find_entry_dfs, considering entry %c.%.*s", ent->dfs_dir, ent->acorn_len, ent->acorn_fn);
-            if (srchdir == '*' || srchdir == '#' || srchdir == ent->dfs_dir) {
+            if (srchdir == '*' || srchdir == '#' || !vdfs_cmpch(srchdir, ent->dfs_dir)) {
                 log_debug("vdfs: find_entry_dfs, matched DFS dir");
                 if (vdfs_wildmat(res->acorn_fn, len, ent->acorn_fn, ent->acorn_len))
                     return ent;
