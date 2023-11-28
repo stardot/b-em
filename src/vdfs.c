@@ -1037,22 +1037,23 @@ static void init_entry(vdfs_entry *ent)
     ent->attribs = 0;
 }
 
+static int vdfs_cmpch(int ca, int cb)
+{
+    if (ca == cb)
+        return 0;
+    if (ca >= 'a' && ca <= 'z')
+        ca = ca - 'a' + 'A';
+    if (cb >= 'a' && cb <= 'z')
+        cb = cb - 'a' + 'A';
+    return ca - cb;
+}
+
 static int vdfs_cmp(const char *namea, const char *nameb, size_t len)
 {
     while (len-- > 0) {
-        int ca = *(const unsigned char *)namea++;
-        int cb = *(const unsigned char *)nameb++;
-        if (!ca)
-            return cb ? -1 : 0;
-        if (ca != cb) {
-            if (ca >= 'a' && ca <= 'z')
-                ca = ca - 'a' + 'A';
-            if (cb >= 'a' && cb <= 'z')
-                cb = cb - 'a' + 'A';
-            int d = ca - cb;
-            if (d)
-                return d;
-        }
+        int d = vdfs_cmpch(*namea++, *nameb++);
+        if (d)
+            return d;
     }
     return 0;
 }
@@ -1376,7 +1377,7 @@ static vdfs_entry *find_entry_dfs(const char *filename, vdfs_findres *res, vdfs_
     if (!scan_dir(dir->dir)) {
         for (vdfs_entry *ent = dir->dir->u.dir.children; ent; ent = ent->next) {
             log_debug("vdfs: find_entry_dfs, considering entry %c.%s", ent->dfs_dir, ent->acorn_fn);
-            if (srchdir == '*' || srchdir == '#' || srchdir == ent->dfs_dir) {
+            if (srchdir == '*' || srchdir == '#' || !vdfs_cmpch(srchdir, ent->dfs_dir)) {
                 log_debug("vdfs: find_entry_dfs, matched DFS dir");
                 if (vdfs_wildmat(filename, ent->acorn_fn))
                     return ent;
