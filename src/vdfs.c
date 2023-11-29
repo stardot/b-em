@@ -1344,7 +1344,7 @@ static uint16_t parse_name(vdfs_path *path, uint16_t addr)
         ch = readmem(++addr);
     }
     while (ptr < end) {
-        if (ch == '\r' || ch == ' ' || ch == '\t' || (ch == '"' && quote)) {
+        if (ch == '\r' || ((ch == ' ' || ch == '\t') && !quote) || (ch == '"' && quote)) {
             path->len = ptr - path->path;
             log_debug("vdfs: parse_name: name=%.*s", path->len, path->path);
             return addr;
