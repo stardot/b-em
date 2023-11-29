@@ -737,41 +737,90 @@ static void scan_attr(vdfs_entry *ent)
     ent->attribs = attribs;
 }
 
+static const char c_esc_bin[] = "\a\b\e\f\n\r\t\v\\\"";
+static const char c_esc_asc[] = "abefnrtv\\\"";
+
 static const char *scan_inf_start(vdfs_entry *ent, char inf_line[MAX_INF_LINE])
 {
-    FILE *fp;
     *ent->host_inf = '.';
-    fp = fopen(ent->host_path, "rt");
+    FILE *fp = fopen(ent->host_path, "rt");
     *ent->host_inf = '\0';
     if (fp) {
         const char *lptr = fgets(inf_line, MAX_INF_LINE, fp);
         fclose(fp);
         if (lptr) {
-            int ic, ch;
-            char *ptr = ent->acorn_fn;
-            char *end = ptr + MAX_FILE_NAME;
-
-            // Parse filename.
-            while ((ic = *lptr++) == ' ' || ic == '\t')
+            int ch;
+            while ((ch = *lptr++) == ' ' || ch == '\t')
                 ;
-            if (ic != '\n') {
-                if ((ch = *lptr++) == '.') {
-                    ent->dfs_dir = ic;
+            if (ch == '"') {
+                char tmp[MAX_FILE_NAME+2];
+                char *name = tmp;
+                char *ptr = tmp;
+                char *end = ptr + MAX_FILE_NAME + 2;
+                while ((ch = *lptr++) && ch != '"' && ch != '\n') {
+                    log_debug("vdfs: scan_inf_start, encoded, ch=%02X", ch);
+                    if (ch == '\\') {
+                        int nc = *lptr++;
+                        log_debug("vdfs: scan_inf_start, escape, nc=%02X", nc);
+                        if (nc >= '0' && nc <= '9') {
+                            ch = nc & 7;
+                            nc = *lptr;
+                            log_debug("vdfs: scan_inf_start, numeric1, ch=%02X, nc=%02X", ch, nc);
+                            if (nc >= '0' && nc <= '9') {
+                                ch = (ch << 3) | (nc & 7);
+                                nc = *++lptr;
+                                log_debug("vdfs: scan_inf_start, numeric2, ch=%02X, nc=%02X", ch, nc);
+                                if (nc >= '0' && nc <= '9') {
+                                    ch = (ch << 3) | (nc & 7);
+                                    log_debug("vdfs: scan_inf_start, numeric3, ch=%02X, nc=%02X", ch, nc);
+                                    ++lptr;
+                                }
+                            }
+                        }
+                        else {
+                            const char *pos = strchr(c_esc_asc, nc);
+                            if (pos)
+                                ch = c_esc_bin[pos-c_esc_asc];
+                            else
+                                ch = nc;
+                        }
+                    }
+                    if (ptr < end)
+                        *ptr++ = ch;
+                }
+                int len = ptr - name;
+                log_dump("vdfs: scan_inf_start, encoded name: ", (uint8_t *)name, len);
+                if (name[1] == '.') {
+                    ent->dfs_dir = name[0];
+                    name += 2;
+                    len -= 2;
+                }
+                else
+                    ent->dfs_dir = '$';
+                ent->acorn_len = len;
+                memcpy(ent->acorn_fn, name, len);
+            }
+            else {
+                log_debug("vdfs: scan_inf_start: ch=%02X, 0=%02X, 1=%02X", ch, lptr[0], lptr[1]);
+                char *ptr = ent->acorn_fn;
+                char *end = ptr + MAX_FILE_NAME;
+                if (*lptr == '.') {
+                    ent->dfs_dir = ch;
+                    ++lptr;
                     ch = *lptr++;
                 }
-                else {
+                else
                     ent->dfs_dir = '$';
-                    *ptr++ = ic;
-                }
                 while (ch && ch != ' ' && ch != '\t' && ch != '\n') {
-                    if (ptr < end && ch >= '!' && ch <= '~')
+                    if (ptr < end)
                         *ptr++ = ch;
                     ch = *lptr++;
                 }
                 ent->acorn_len = ptr - ent->acorn_fn;
-                if (ch != '\n')
-                    return lptr;
+                log_debug("vdfs: scan_inf_start, simple_name %c.%.*s", ent->dfs_dir, ent->acorn_len, ent->acorn_fn);
             }
+            if (ch != '\n')
+                return lptr;
         }
     }
     return NULL;
@@ -1297,9 +1346,7 @@ static uint16_t parse_name(vdfs_path *path, uint16_t addr)
             log_debug("vdfs: parse_name: name=%.*s", path->len, path->path);
             return addr;
         }
-        if (ch < ' ' || ch == 0x7f)
-            break;
-        *ptr++ = ch & 0x7f;
+        *ptr++ = ch;
         ch = readmem(++addr);
     }
     adfs_error(err_badname);
@@ -1510,16 +1557,62 @@ static unsigned unix_time_acorn(const struct tm *tp)
     return atime;
 }
 
+static void write_back_name(vdfs_entry *ent, FILE *fp)
+{
+    unsigned char tmp[MAX_FILE_NAME+2];
+    int len = ent->acorn_len;
+    bool quote = false;
+    tmp[0] = ent->dfs_dir;
+    tmp[1] = '.';
+    memcpy(tmp+2, ent->acorn_fn, len);
+    len += 2;
+    log_dump("vdfs: write_back_name, tmp=", (uint8_t *)tmp, len);
+    for (unsigned char *ptr = tmp; len; --len) {
+        int ch = *ptr++;
+        if (ch <= ' ' || ch >= 0x7f || ch == '"')
+            quote = true;
+    }
+    len = ent->acorn_len+2;
+    if (quote) {
+        char encoded[MAX_FILE_NAME*4+2];
+        char *enc = encoded;
+        *enc++ = '"';
+        for (unsigned char *ptr = tmp; len; --len) {
+            int ch = *ptr++;
+            if (ch >= ' ' && ch <= 0x7e && ch != '\\' && ch != '\"')
+                *enc++ = ch;
+            else {
+                *enc++ = '\\';
+                const char *pos;
+                if (ch && (pos = strchr(c_esc_bin, ch)))
+                    *enc++ = c_esc_asc[pos-c_esc_bin];
+                else {
+                    *enc++ = '0' + ((ch >> 6) & 0x07);
+                    *enc++ = '0' + ((ch >> 3) & 0x07);
+                    *enc++ = '0' + (ch & 0x07);
+                }
+            }
+        }
+        *enc++ = '"';
+        len = enc-encoded;
+        log_debug("vdfs: write_back_name, enc_len=%d, encoded=%.*s", len, len, encoded);
+        fwrite(encoded, len, 1, fp);
+    }
+    else {
+        log_debug("vdfs: write_back_name, ascii=%.*s", len, tmp);
+        fwrite(tmp, len, 1, fp);
+    }
+}
+
 static void write_back(vdfs_entry *ent)
 {
-    FILE *fp;
-
     show_activity();
     *ent->host_inf = '.'; // select .inf file.
-    if ((fp = fopen(ent->host_path, "wt"))) {
+    FILE *fp = fopen(ent->host_path, "wt");
+    if (fp) {
         const struct tm *tp = localtime(&ent->mtime);
+        write_back_name(ent, fp);
         if (ent->attribs & ATTR_IS_DIR) {
-            fwrite(ent->acorn_fn, ent->acorn_len, 1, fp);
             fprintf(fp, " OPT=%02X DIR=1 MDATE=%04X MTIME=%06X", ent->u.dir.boot_opt, unix_date_acorn(tp), unix_time_acorn(tp));
             if (ent->attribs & ATTR_BTIME_VALID) {
                 tp = localtime(&ent->btime);
@@ -1538,8 +1631,6 @@ static void write_back(vdfs_entry *ent)
             putc('\n', fp);
         }
         else {
-            fprintf(fp, "%c.", ent->dfs_dir);
-            fwrite(ent->acorn_fn, ent->acorn_len, 1, fp);
             fprintf(fp, " %08X %08X %08X %02X %04X %06X", ent->u.file.load_addr, ent->u.file.exec_addr, ent->u.file.length, ent->attribs & (ATTR_ACORN_MASK|ATTR_NL_TRANS), unix_date_acorn(tp), unix_time_acorn(tp));
             if (ent->attribs & ATTR_BTIME_VALID) {
                 tp = localtime(&ent->btime);
