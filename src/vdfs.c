@@ -323,6 +323,7 @@ struct cmdent {
 
 #define CLAIM_ADFS  0x80
 #define CLAIM_DFS   0x40
+#define GSTRANS_FN  0x20
 #define WRITE_DATES 0x10
 #define DFS_MODE    0x02
 #define VDFS_ACTIVE 0x01
@@ -1348,6 +1349,28 @@ static uint16_t parse_name(vdfs_path *path, uint16_t addr)
             path->len = ptr - path->path;
             log_debug("vdfs: parse_name: name=%.*s", path->len, path->path);
             return addr;
+        }
+        if (ch == '|' && (fs_flags & GSTRANS_FN)) {
+            ch = readmem(++addr);
+            if (ch == '\r')
+                break;
+            if (ch =='?')
+                ch = 0x7f;
+            else if (ch == '!') {
+                ch = readmem(++addr);
+                if (ch == '|') {
+                    ch = readmem(++addr);
+                    if (ch == '\r')
+                        break;
+                    if (ch =='?')
+                        ch = 0x7f;
+                    else if (ch != '"')
+                        ch &= 0x1f;
+                }
+                ch |= 0x80;
+            }
+            else if (ch != '"')
+                ch &= 0x1f;
         }
         *ptr++ = ch;
         ch = readmem(++addr);
@@ -4452,7 +4475,7 @@ static void cmd_osw7f(uint16_t addr)
 
 static void vdfs_dfs_mode(void)
 {
-    fs_flags |= DFS_MODE;
+    fs_flags |= (DFS_MODE|GSTRANS_FN);
     find_entry = find_entry_dfs;
     find_next = find_next_dfs;
     osgbpb_get_dir = osgbpb_get_dir_dfs;
@@ -4464,7 +4487,7 @@ static void vdfs_dfs_mode(void)
 
 static void vdfs_adfs_mode(void)
 {
-    fs_flags &= ~DFS_MODE;
+    fs_flags &= ~(DFS_MODE|GSTRANS_FN);
     find_entry = find_entry_adfs;
     find_next = find_next_adfs;
     osgbpb_get_dir = osgbpb_get_dir_adfs;
