@@ -465,15 +465,17 @@ static inline void hst2bbc(vdfs_entry *ent)
     int ch;
 
     while ((ch = *host_fn++) && acorn_fn < end) {
-        const char *ptr = strchr(hst_chars, ch);
-        if (ptr)
-            ch = bbc_chars[ptr-hst_chars];
-        *acorn_fn++ = ch;
+        if (ch >= ' ' && ch <= '~') {
+            const char *ptr = strchr(hst_chars, ch);
+            if (ptr)
+                ch = bbc_chars[ptr-hst_chars];
+            *acorn_fn++ = ch;
+        }
     }
     ent->acorn_len = acorn_fn - ent->acorn_fn;
 }
 
-static inline void bbc2hst(vdfs_findres *res, char *host_fn)
+static inline char *bbc2hst(vdfs_findres *res, char *host_fn)
 {
     const char *acorn_fn = res->acorn_fn;
     const char *acorn_end = acorn_fn + res->acorn_len;
@@ -481,7 +483,7 @@ static inline void bbc2hst(vdfs_findres *res, char *host_fn)
 
     while (acorn_fn < acorn_end && host_fn < host_end) {
         int ch = *acorn_fn++;
-        if (ch) {
+        if (ch >= ' ' && ch <= '~') {
             const char *ptr = strchr(bbc_chars, ch);
             if (ptr)
                 ch = hst_chars[ptr-bbc_chars];
@@ -489,6 +491,7 @@ static inline void bbc2hst(vdfs_findres *res, char *host_fn)
         }
     }
     *host_fn = '\0';
+    return host_fn;
 }
 
 static char *make_host_path(vdfs_entry *ent, const char *host_fn)
@@ -1508,14 +1511,13 @@ static vdfs_entry *add_new_file(vdfs_findres *res)
         memcpy(new_ent->acorn_fn, res->acorn_fn, res->acorn_len);
         log_debug("vdfs: new_entry, acorn_len=%u, acorn_fn=%.*s", res->acorn_len, res->acorn_len, res->acorn_fn);
         new_ent->dfs_dir = res->dfs_dir;
-        bbc2hst(res, host_fn);
-        if (host_search(dir, host_fn)) {
-            /* host name already exists, generate a unique name */
-            size_t name_len = strlen(host_fn);
+        char *host_end = bbc2hst(res, host_fn);
+        if (host_end == host_fn || host_search(dir, host_fn)) {
+            /* host name is empty or already exists, generate a unique name */
             int seq_ch = '0';
-            host_fn[name_len] = '~';
-            host_fn[name_len+1] = seq_ch;
-            host_fn[name_len+2] = 0;
+            host_end[0] = '~';
+            host_end[1] = seq_ch;
+            host_end[2] = 0;
             while (host_search(dir, host_fn)) {
                 if ((seq_ch = next_seq_ch(seq_ch)) < 0) {
                     log_warn("vdfs: unable to create unique host name for %c.%.*s", res->dfs_dir, res->acorn_len, res->acorn_fn);
@@ -1523,7 +1525,7 @@ static vdfs_entry *add_new_file(vdfs_findres *res)
                     free(new_ent);
                     return NULL;
                 }
-                host_fn[name_len+1] = seq_ch;
+                host_end[1] = seq_ch;
             }
             log_debug("vdfs: add_new_file: unique name %s used", host_fn);
         }
