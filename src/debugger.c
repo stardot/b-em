@@ -22,11 +22,13 @@ typedef enum {
     BREAK_EXEC,
     BREAK_READ,
     BREAK_WRITE,
+    BREAK_CHANGE,
     BREAK_INPUT,
     BREAK_OUTPUT,
     WATCH_EXEC,
     WATCH_READ,
     WATCH_WRITE,
+    WATCH_CHANGE,
     WATCH_INPUT,
     WATCH_OUTPUT,
     TRACE_EXEC
@@ -36,11 +38,13 @@ static const char break_names[][8] = {
     "break",
     "breakr",
     "breakw",
+    "breakc",
     "breaki",
     "breako",
     "watch",
     "watchr",
     "watchw",
+    "watchc",
     "watchi",
     "watcho",
     "trange"
@@ -1313,6 +1317,8 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
             case 'b':
                 if (!strncmp(cmd, "break", cmdlen))
                     parse_setpnt(cpu, BREAK_EXEC, iptr, "Breakpoint");
+                else if (!strncmp(cmd, "breakc", cmdlen))
+                    parse_setpnt(cpu, BREAK_CHANGE, iptr, "Change breakpoint");
                 else if (!strncmp(cmd, "breaki", cmdlen))
                     parse_setpnt(cpu, BREAK_INPUT, iptr, "Input breakpoint");
                 else if (!strncmp(cmd, "breako", cmdlen))
@@ -1325,11 +1331,14 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                     list_points(cpu, BREAK_EXEC, "Breakpoint");
                     list_points(cpu, BREAK_READ, "Read breakpoint");
                     list_points(cpu, BREAK_WRITE, "Write breakpoint");
+                    list_points(cpu, BREAK_CHANGE, "Change breakpoint");
                     list_points(cpu, BREAK_INPUT, "Input breakpoint");
                     list_points(cpu, BREAK_OUTPUT, "Output breakpoint");
                 }
                 else if (!strncmp(ins, "bclear", cmdlen))
                     parse_clrpnt(cpu, BREAK_EXEC, iptr, "Breakpoint");
+                else if (!strncmp(cmd, "bclearc", cmdlen))
+                    parse_clrpnt(cpu, BREAK_CHANGE, iptr, "Change breakpoint");
                 else if (!strncmp(cmd, "bcleari", cmdlen))
                     parse_clrpnt(cpu, BREAK_INPUT, iptr, "Input breakpoint");
                 else if (!strncmp(cmd, "bclearo", cmdlen))
@@ -1551,6 +1560,8 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                     parse_setpnt(cpu, WATCH_READ, iptr, "Read watchpoint");
                 else if (!strncmp(cmd, "watchw", cmdlen))
                     parse_setpnt(cpu, WATCH_WRITE, iptr, "Write watchpoint");
+                else if (!strncmp(cmd, "watchc", cmdlen))
+                    parse_setpnt(cpu, WATCH_CHANGE, iptr, "Change watchpoint");
                 else if (!strncmp(cmd, "watchi", cmdlen))
                     parse_setpnt(cpu, WATCH_INPUT, iptr, "Input watchpoint");
                 else if (!strncmp(cmd, "watcho", cmdlen))
@@ -1558,6 +1569,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 else if (!strncmp(cmd, "wlist", cmdlen)) {
                     list_points(cpu, WATCH_READ, "Read watchpoint");
                     list_points(cpu, WATCH_WRITE, "Write watchpoint");
+                    list_points(cpu, WATCH_CHANGE, "Change watchpoint");
                     list_points(cpu, WATCH_INPUT, "Input watchpoint");
                     list_points(cpu, WATCH_OUTPUT, "Output watchpoint");
                 }
@@ -1565,6 +1577,8 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                     parse_clrpnt(cpu, WATCH_READ, iptr, "Read watchpoint");
                 else if (!strncmp(cmd, "wclearw", cmdlen))
                     parse_clrpnt(cpu, WATCH_WRITE, iptr, "Write watchpoint");
+                else if (!strncmp(cmd, "wclearc", cmdlen))
+                    parse_clrpnt(cpu, WATCH_CHANGE, iptr, "Change watchpoint");
                 else if (!strncmp(cmd, "wcleari", cmdlen))
                     parse_clrpnt(cpu, WATCH_INPUT, iptr, "Input watchpoint");
                 else if (!strncmp(cmd, "wclearo", cmdlen))
@@ -1581,6 +1595,17 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
             debug_out("Bad command\n", 12);
 
     }
+}
+
+static void hit_point(cpu_debug_t *cpu, uint32_t addr, uint32_t value, const char *enter, const char *desc)
+{
+        char addr_str[20 + SYM_MAX], iaddr_str[20 + SYM_MAX];
+        uint32_t iaddr = cpu->get_instr_addr();
+        cpu->print_addr(cpu, addr, addr_str, sizeof(addr_str), true);
+        cpu->print_addr(cpu, iaddr, iaddr_str, sizeof(iaddr_str), true);
+        debug_outf("cpu %s: %s:%s %s %s, value=%X\n", cpu->cpu_name, iaddr_str, enter, desc, addr_str, value);
+        if (*enter)
+            debugger_do(cpu, iaddr);
 }
 
 static void check_points(cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t size, break_type btype, break_type wtype, const char *desc)
@@ -1601,23 +1626,50 @@ static void check_points(cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_
             }
         }
     }
-    if (found) {
-        char addr_str[20 + SYM_MAX], iaddr_str[20 + SYM_MAX];
-        uint32_t iaddr = cpu->get_instr_addr();
-        cpu->print_addr(cpu, addr, addr_str, sizeof(addr_str), true);
-        cpu->print_addr(cpu, iaddr, iaddr_str, sizeof(iaddr_str), true);
-        debug_outf("cpu %s: %s:%s %s %s, value=%X\n", cpu->cpu_name, iaddr_str, enter, desc, addr_str, value);
-        if (*enter)
-            debugger_do(cpu, iaddr);
-    }
+    if (found)
+        hit_point(cpu, addr, value, enter, desc);
 }
 
 void debug_memread (cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t size) {
     check_points(cpu, addr, value, size, BREAK_READ, WATCH_READ, "read from");
 }
 
-void debug_memwrite(cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t size) {
-    check_points(cpu, addr, value, size, BREAK_WRITE, WATCH_WRITE, "write to");
+void debug_memwrite(cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t size)
+{
+    bool found = false;
+    const char *desc = "write to";
+    const char *enter = "";
+
+    for (breakpoint *bp = cpu->breakpoints; bp; bp = bp->next) {
+        if (addr >= bp->start && addr <= bp->end) {
+            if (bp->type == BREAK_WRITE) {
+                found = true;
+                enter = "break on";
+                break;
+            }
+            else if (bp->type == BREAK_CHANGE) {
+                if (cpu->memread(addr) != value) {
+                    found = true;
+                    enter = "break on";
+                    desc = "change of";
+                    break;
+                }
+            }
+            else if (bp->type == WATCH_WRITE) {
+                found = true;
+                break;
+            }
+            else if (bp->type == WATCH_CHANGE) {
+                if (cpu->memread(addr) != value) {
+                    found = true;
+                    desc = "change of";
+                    break;
+                }
+            }
+        }
+    }
+    if (found)
+        hit_point(cpu, addr, value, enter, desc);
 }
 
 void debug_ioread (cpu_debug_t *cpu, uint32_t addr, uint32_t value, uint8_t size) {
