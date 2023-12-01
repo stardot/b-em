@@ -89,6 +89,7 @@ typedef enum {
     FSPEED_RUNNING
 } fspeed_type_t;
 
+static const int slice = 16000; // 8ms to match Music 5000.
 static double time_limit;
 static int fcount = 0;
 static fspeed_type_t fullspeed = FSPEED_NONE;
@@ -148,6 +149,13 @@ static const char helptext[] =
     "-paste string   - paste string in as if typed\n"
     "-vroot host-dir - set the VDFS root\n"
     "-vdir guest-dir - set the initial (boot) dir in VDFS\n\n";
+
+static double calc_speed(double divider)
+{
+    double secs = ((double)slice / 2000000.0) / divider;
+    time_limit = secs * 2.0;
+    return secs;
+}
 
 void main_init(int argc, char *argv[])
 {
@@ -322,8 +330,7 @@ void main_init(int argc, char *argv[])
 
     gui_allegro_init(queue, display);
 
-    time_limit = 2.0 / 50.0;
-    if (!(timer = al_create_timer(1.0 / 50.0))) {
+    if (!(timer = al_create_timer(calc_speed(1.0)))) {
         log_fatal("main: unable to create timer");
         exit(1);
     }
@@ -446,15 +453,15 @@ static void main_timer(ALLEGRO_EVENT *event)
     double now = al_get_time();
     double delay = now - event->any.timestamp;
 
-    if (delay < time_limit) {
+    if (delay < time_limit && music5000_ok()) {
         if (autoboot)
             autoboot--;
         framesrun++;
 
         if (x65c02)
-            m65c02_exec();
+            m65c02_exec(slice);
         else
-            m6502_exec();
+            m6502_exec(slice);
         execs++;
 
         if (ddnoise_ticks > 0 && --ddnoise_ticks == 0)
@@ -478,7 +485,7 @@ static void main_timer(ALLEGRO_EVENT *event)
 
         if (now - prev_time > 0.1) {
 
-            double speed = execs * 40000 / (now - prev_time);
+            double speed = execs * slice / (now - prev_time);
 
             if (spd < 0.01)
                 spd = 100.0 * speed / 2000000;
@@ -556,9 +563,6 @@ void main_run()
                 gui_allegro_event(&event);
                 main_resume();
                 break;
-            case ALLEGRO_EVENT_AUDIO_STREAM_FRAGMENT:
-                music5000_streamfrag();
-                break;
             case ALLEGRO_EVENT_DISPLAY_RESIZE:
                 video_update_window_size(&event);
                 break;
@@ -627,8 +631,7 @@ void main_setspeed(int speed)
                 log_warn("main: speed #%d out of range, defaulting to 100%%", speed);
                 speed = 4;
             }
-            al_set_timer_speed(timer, emu_speeds[speed].timer_interval);
-            time_limit = emu_speeds[speed].timer_interval * 2.0;
+            al_set_timer_speed(timer, calc_speed(emu_speeds[speed].timer_interval));
             vid_fskipmax = emu_speeds[speed].fskipmax;
             log_debug("main: new speed#%d, timer interval=%g, vid_fskipmax=%d", speed, emu_speeds[speed].timer_interval, vid_fskipmax);
             al_start_timer(timer);
