@@ -89,7 +89,7 @@ typedef enum {
     FSPEED_RUNNING
 } fspeed_type_t;
 
-static const int slice = 16000; // 8ms to match Music 5000.
+static const int slice = 40000; // 8ms to match Music 5000.
 static double time_limit;
 static int fcount = 0;
 static fspeed_type_t fullspeed = FSPEED_NONE;
