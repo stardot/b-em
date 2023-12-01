@@ -123,7 +123,7 @@ void main_reset()
     music5000_reset();
     paula_reset();
     sn_init();
-    if (curtube != -1) tubes[curtube].reset();
+    if (curtube != -1) tubes[curtube].cpu->reset();
     else               tube_exec = NULL;
     tube_reset();
 }
@@ -412,7 +412,7 @@ void main_key_break(void)
     paula_reset();
 
     if (curtube != -1)
-        tubes[curtube].reset();
+        tubes[curtube].cpu->reset();
     tube_reset();
 }
 

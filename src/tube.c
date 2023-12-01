@@ -68,20 +68,16 @@ void tube_updateints()
                 if (((m_pdp11->PS >> 5) & 7) < 6)
                     pdp11_interrupt(0x84, 6);
             }
-#ifdef M68K
             else if (tube_type == TUBE68000)
                 m68k_set_virq(2, 1);
-#endif
             else if (tube_type == TUBESPROW)
                 sprow_interrupt(1);
         }
     }
     else if (tube_irq & 1) {
-#ifdef M68K
         log_debug("tube: parasite IRQ de-asserted");
         if (tube_type == TUBE68000)
             m68k_set_virq(2, 0);
-#endif
     }
 
     if (tubeula.r1stat & 8 && (tubeula.ph3pos == 0 || tubeula.hp3pos > (tubeula.r1stat & 16) ? 1 : 0)) {
@@ -177,7 +173,7 @@ void tube_host_write(uint16_t addr, uint8_t val)
                 else if (tubeula.r1stat & 0x20) {
                     tube_reset();
                     if (curtube != -1)
-                        tubes[curtube].reset();
+                        tubes[curtube].cpu->reset();
                 }
                 else
                     tubeula.r1stat &= ~(val&0x3F);

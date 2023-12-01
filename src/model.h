@@ -50,18 +50,20 @@ typedef struct
     bool (*init)(void *rom);
     void (*reset)(void);
     cpu_debug_t *debug;
-    int  rom_size;
-    char bootrom[16];
+} TUBE_CPU;
+
+typedef struct
+{
+    const TUBE_CPU *cpu;
+    const char *cfgsect;
+    const char *name;
+    uint_least32_t rom_size;
+    const char *bootrom;
     int  speed_multiplier;
-} TUBE;
+} TUBE_MODEL;
 
-#ifdef M68K
-# define NUM_TUBES 14
-#else
-# define NUM_TUBES 13
-#endif
-
-extern TUBE tubes[NUM_TUBES];
+extern TUBE_MODEL *tubes;
+extern int num_tubes;
 
 extern int curmodel, curtube, oldmodel, selecttube;
 extern fdc_type_t fdc_type;
