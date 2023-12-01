@@ -560,6 +560,7 @@ static ALLEGRO_MENU *create_settings_menu(void)
     add_checkbox_item(menu, "Mouse (AMX)", IDM_MOUSE_AMX, mouse_amx);
     if (joystick_count > 0)
         al_append_menu_item(menu, "Joysticks", 0, 0, NULL, create_joysticks_menu());
+    add_checkbox_item(menu, "Joystick Mouse", IDM_MOUSE_STICK, mouse_stick);
     return menu;
 }
 
@@ -1539,6 +1540,8 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             break;
         case IDM_JOYSTICK2:
             change_joystick(1, radio_event_with_deselect(event, joystick_index[1]));
+        case IDM_MOUSE_STICK:
+            mouse_stick = !mouse_stick;
             break;
         case IDM_JOYMAP:
             joymap_index[0] = radio_event_simple(event, joymap_index[0]);

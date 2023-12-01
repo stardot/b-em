@@ -229,13 +229,14 @@ int cycles;
 static int otherstuffcount = 0;
 int romsel;
 
-static inline void polltime(int c)
+static void polltime(int c)
 {
     cycles -= c;
     via_poll(&sysvia, c);
     via_poll(&uservia, c);
     video_poll(c, 1);
     sound_poll(c);
+    music5000_poll(c);
     otherstuffcount -= c;
     if (motoron) {
         if (fdc_time) {
@@ -1291,13 +1292,13 @@ static void branchcycles(int temp)
         }
 }
 
-void m6502_exec(void)
+void m6502_exec(int slice)
 {
         uint16_t addr;
         uint8_t temp;
         int tempi;
         int8_t offset;
-        cycles += 40000;
+        cycles += slice;
 
         while (cycles > 0) {
                 fetch_opcode();
@@ -4039,14 +4040,14 @@ void m6502_exec(void)
         }
 }
 
-void m65c02_exec(void)
+void m65c02_exec(int slice)
 {
         uint16_t addr;
         uint8_t temp;
         uint16_t tempw;
         int tempi;
         int8_t offset;
-        cycles += 40000;
+        cycles += slice;
 //        log_debug("PC = %04X\n",pc);
 //        log_debug("Exec cycles %i\n",cycles);
         while (cycles > 0) {

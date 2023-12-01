@@ -179,6 +179,7 @@ void config_load(void)
     sound_filter     = get_config_bool("sound", "soundfilter",   true);
     sound_paula      = get_config_bool("sound", "soundpaula",    false);
     music5000_fno    = get_config_int("sound", "music5000_filter", 0);
+    buflen_m5        = get_config_int("sound", "buflen_music5000", BUFLEN_M5);
 
     curwave          = get_config_int("sound", "soundwave",     0);
     sidmethod        = get_config_int("sound", "sidmethod",     0);
@@ -218,9 +219,8 @@ void config_load(void)
     mem_jim_setsize(get_config_int(NULL, "jim_mem_size", 0));
 
     mouse_amx        = get_config_bool(NULL, "mouse_amx",     0);
+    mouse_stick      = get_config_bool(NULL, "mouse_stick",   0);
     kbdips           = get_config_int(NULL, "kbdips", 0);
-
-    buflen_m5        = get_config_int("sound", "buflen_music5000", BUFLEN_M5);
 
     for (int act = 0; act < KEY_ACTION_MAX; act++) {
         const char *str = al_get_config_value(bem_cfg, "key_actions", keyact_const[act].name);
@@ -332,11 +332,11 @@ void config_save(void)
         set_config_bool("sound", "soundfilter", sound_filter);
         set_config_bool("sound", "soundpaula",  sound_paula);
         set_config_int("sound", "music5000_filter", music5000_fno);
+        set_config_int("sound", "buflen_music5000", buflen_m5);
 
         set_config_int("sound", "soundwave", curwave);
         set_config_int("sound", "sidmethod", sidmethod);
         set_config_int("sound", "cursid", cursid);
-        set_config_int("sound", "buflen_music5000", buflen_m5);
 
         set_config_int("sound", "ddvol", ddnoise_vol);
         set_config_int("sound", "ddtype", ddnoise_type);
@@ -370,6 +370,7 @@ void config_save(void)
         set_config_int(NULL, "jim_mem_size", mem_jim_size);
 
         set_config_bool(NULL, "mouse_amx", mouse_amx);
+        set_config_bool(NULL, "mouse_stick", mouse_stick);
 
         for (int c = 0; c < KEY_ACTION_MAX; c++) {
             if (keyactions[c].keycode == keyact_const[c].keycode && keyactions[c].altstate == keyact_const[c].altstate)
