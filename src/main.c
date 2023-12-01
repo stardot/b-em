@@ -72,9 +72,10 @@ bool quitting = false;
 bool keydefining = false;
 bool autopause = false;
 int autoboot=0;
-int joybutton[2];
+int joybutton[4];
 float joyaxes[4];
 int emuspeed = 4;
+bool tricky_sega_adapter = false;
 
 static ALLEGRO_TIMER *timer;
 ALLEGRO_EVENT_QUEUE *queue;
@@ -123,7 +124,7 @@ void main_reset()
     music5000_reset();
     paula_reset();
     sn_init();
-    if (curtube != -1) tubes[curtube].reset();
+    if (curtube != -1) tubes[curtube].cpu->reset();
     else               tube_exec = NULL;
     tube_reset();
 }
@@ -412,7 +413,7 @@ void main_key_break(void)
     paula_reset();
 
     if (curtube != -1)
-        tubes[curtube].reset();
+        tubes[curtube].cpu->reset();
     tube_reset();
 }
 
@@ -539,6 +540,9 @@ void main_run()
                 break;
             case ALLEGRO_EVENT_JOYSTICK_BUTTON_UP:
                 joystick_button_up(&event);
+                break;
+            case ALLEGRO_EVENT_JOYSTICK_CONFIGURATION:
+                joystick_rescan_sticks();
                 break;
             case ALLEGRO_EVENT_DISPLAY_CLOSE:
                 log_debug("main: event display close - quitting");

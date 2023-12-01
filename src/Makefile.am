@@ -14,7 +14,7 @@ amrefresh:
 #   INCLUDE_DEBUGGER - include the cpu_debug implementation
 # USE_MEMORY_POINTER - do not assume Co Pro memory starts at address 0
 
-b_em_CFLAGS = $(allegro_CFLAGS) -DBEM -DINCLUDE_DEBUGGER -DUSE_MEMORY_POINTER -DMODET -DMODE32 -DBEEBEM
+b_em_CFLAGS = $(allegro_CFLAGS) -DBEM -DINCLUDE_DEBUGGER -DUSE_MEMORY_POINTER -DMODET -DMODE32 -DBEEBEM -DM68K
 
 # workaround for Win32 Allegro, which has `allegro-config' missing
 if OS_WIN

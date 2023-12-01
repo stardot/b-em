@@ -300,7 +300,7 @@ static void enable_tube_debug(void)
         debug_step = 1;
         debug_tube = 1;
         log_info("debugger: debugging of tube CPU enabled");
-        tubes[curtube].debug->debug_enable(1);
+        tubes[curtube].cpu->debug->debug_enable(1);
     }
 }
 
@@ -317,7 +317,7 @@ static void disable_tube_debug(void)
 {
     if (curtube != -1)
     {
-        tubes[curtube].debug->debug_enable(0);
+        tubes[curtube].cpu->debug->debug_enable(0);
         log_info("debugger: debugging of tube CPU disabled");
         debug_tube = 0;
         debug_cons_close();

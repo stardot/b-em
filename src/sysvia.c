@@ -136,6 +136,20 @@ uint8_t sysvia_read_portB()
                 if (i2c_clock) temp |= 0x20;
                 if (i2c_data)  temp |= 0x10;
         }
+        else if (tricky_sega_adapter)
+        {
+                temp |= 0xF0;
+                if ((sysvia.pcr & 0xE0) == 0xC0) // CB2 Low Output
+                {
+                    if (joybutton[2]) temp &= ~0x10;
+                    if (joybutton[3]) temp &= ~0x20;
+                }
+                else // assuming high, could do a better job!
+                {
+                    if (joybutton[0]) temp &= ~0x10;
+                    if (joybutton[1]) temp &= ~0x20;
+                }
+        }
         else
         {
                 temp |= 0xF0;

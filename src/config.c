@@ -35,28 +35,45 @@ ALLEGRO_CONFIG *bem_cfg;
 int get_config_int(const char *sect, const char *key, int ival)
 {
     const char *str = al_get_config_value(bem_cfg, sect, key);
-    if (str)
-        ival = atoi(str);
-    else if (sect && (str = al_get_config_value(bem_cfg, NULL, key))) {
-        ival = atoi(str);
-        al_remove_config_key(bem_cfg, "", key);
+    if (!str && sect) {
+        if ((str = al_get_config_value(bem_cfg, NULL, key)))
+            al_remove_config_key(bem_cfg, "", key);
+    }
+    if (str) {
+        char *end;
+        long nval = strtol(str, &end, 0);
+        if (end > str && !end[0])
+            ival = nval;
+        else if (sect)
+            log_warn("config: section '%s', key '%s': invalid integer %s", sect, key, str);
+        else
+            log_warn("config: global section, key '%s': invalid integer %s", key, str);
     }
     return ival;
-}
-
-static bool parse_bool(const char *value)
-{
-    return strcasecmp(value, "true") == 0 || strcasecmp(value, "yes") == 0 || atoi(value) > 0;
 }
 
 bool get_config_bool(const char *sect, const char *key, bool bval)
 {
     const char *str = al_get_config_value(bem_cfg, sect, key);
-    if (str)
-        bval = parse_bool(str);
-    else if (sect && (str = al_get_config_value(bem_cfg, NULL, key))) {
-        bval = parse_bool(str);
-        al_remove_config_key(bem_cfg, "", key);
+    if (!str && sect) {
+        if ((str = al_get_config_value(bem_cfg, NULL, key)))
+            al_remove_config_key(bem_cfg, "", key);
+    }
+    if (str) {
+        if (strcasecmp(str, "true") == 0 || strcasecmp(str, "yes") == 0)
+            bval = true;
+        else if (strcasecmp(str, "false") == 0 || strcasecmp(str, "no") == 0)
+            bval = false;
+        else {
+            char *end;
+            long nval = strtol(str, &end, 0);
+            if (end > str && !end[0])
+                bval = (nval > 0);
+            else if (sect)
+                log_warn("config: section '%s', key '%s': invalid boolean %s", sect, key, str);
+            else
+                log_warn("config: global section, key '%s': invalid boolean %s", key, str);
+        }
     }
     return bval;
 }
@@ -240,6 +257,14 @@ void set_config_int(const char *sect, const char *key, int value)
     char buf[11];
 
     snprintf(buf, sizeof buf, "%d", value);
+    al_set_config_value(bem_cfg, sect, key, buf);
+}
+
+void set_config_hex(const char *sect, const char *key, unsigned value)
+{
+    char buf[11];
+
+    snprintf(buf, sizeof buf, "0x%x", value);
     al_set_config_value(bem_cfg, sect, key, buf);
 }
 

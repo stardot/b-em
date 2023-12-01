@@ -305,15 +305,17 @@ static ALLEGRO_MENU *create_tube_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
     ALLEGRO_MENU *sub = al_create_menu();
-    menu_map_t map[NUM_TUBES];
-    int i;
-
-    for (i = 0; i < NUM_TUBES; i++) {
+    menu_map_t *map = malloc(num_tubes * sizeof(menu_map_t));
+    if (!map) {
+        log_error("gui: unable to allocate tube menu");
+        return NULL;
+    }
+    for (int i = 0; i < num_tubes; ++i) {
         map[i].label = tubes[i].name;
         map[i].itemno = i;
     }
-    add_sorted_set(menu, map, NUM_TUBES, IDM_TUBE, curtube);
-    for (i = 0; i < NUM_TUBE_SPEEDS; i++)
+    add_sorted_set(menu, map, num_tubes, IDM_TUBE, curtube);
+    for (int i = 0; i < NUM_TUBE_SPEEDS; i++)
         add_radio_item(sub, tube_speeds[i].name, IDM_TUBE_SPEED, i, tube_speed_num);
     al_append_menu_item(menu, "Tube speed", 0, 0, NULL, sub);
     return menu;
@@ -492,6 +494,40 @@ static ALLEGRO_MENU *create_keyboard_menu(void)
     return menu;
 }
 
+static ALLEGRO_MENU *create_joystick_menu(int joystick)
+{
+    ALLEGRO_MENU *menu = al_create_menu();
+    int i;
+
+    for (i = 0; i < joystick_count; i++) if (joystick_names[i])
+        add_checkbox_item(menu, joystick_names[i], menu_id_num(IDM_JOYSTICK + joystick, i), i == joystick_index[joystick]);
+    return menu;
+}
+
+static ALLEGRO_MENU *create_joymap_menu(int joystick)
+{
+    ALLEGRO_MENU *menu = al_create_menu();
+    int i;
+
+    for (i = 0; i < joymap_count; i++)
+        add_checkbox_item(menu, joymaps[i].name, menu_id_num(IDM_JOYMAP + joystick, i), i == joymap_index[joystick]);
+    return menu;
+}
+
+static ALLEGRO_MENU *create_joysticks_menu(void)
+{
+    ALLEGRO_MENU *menu = al_create_menu();
+    add_checkbox_item(menu, "Tricky SEGA Adapter", IDM_TRIACK_SEGA_ADAPTER, autopause);
+    al_append_menu_item(menu, "Joystick", 0, 0, NULL, create_joystick_menu(0));
+    al_append_menu_item(menu, "Joystick Map", 0, 0, NULL, create_joymap_menu(0));
+    if (joystick_count > 1) {
+        al_append_menu_item(menu, "Joystick 2", 0, 0, NULL, create_joystick_menu(1));
+        al_append_menu_item(menu, "Joystick 2 Map", 0, 0, NULL, create_joymap_menu(1));
+    }
+    return menu;
+}
+
+
 static const char *jim_sizes[] =
 {
     "None (disabled)",
@@ -510,16 +546,6 @@ static ALLEGRO_MENU *create_jim_menu(void)
     return menu;
 }
 
-static ALLEGRO_MENU *create_joymap_menu(void)
-{
-    ALLEGRO_MENU *menu = al_create_menu();
-    int i;
-
-    for (i = 0; i < joymap_count; i++)
-        add_checkbox_item(menu, joymaps[i].name, menu_id_num(IDM_JOYMAP, i), i == joymap_num);
-    return menu;
-}
-
 static ALLEGRO_MENU *create_settings_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
@@ -532,8 +558,8 @@ static ALLEGRO_MENU *create_settings_menu(void)
     al_append_menu_item(menu, "Jim Memory", 0, 0, NULL, create_jim_menu());
     add_checkbox_item(menu, "Auto-Pause", IDM_AUTO_PAUSE, autopause);
     add_checkbox_item(menu, "Mouse (AMX)", IDM_MOUSE_AMX, mouse_amx);
-    if (joymap_count > 0)
-        al_append_menu_item(menu, "Joystick Map", 0, 0, NULL, create_joymap_menu());
+    if (joystick_count > 0)
+        al_append_menu_item(menu, "Joysticks", 0, 0, NULL, create_joysticks_menu());
     return menu;
 }
 
@@ -1503,7 +1529,23 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
         case IDM_MOUSE_AMX:
             mouse_amx = !mouse_amx;
             break;
+        case IDM_TRIACK_SEGA_ADAPTER:
+            tricky_sega_adapter = !tricky_sega_adapter;
+            remap_joystick(0);
+            remap_joystick(1);
+            break;
+        case IDM_JOYSTICK:
+            change_joystick(0, radio_event_with_deselect(event, joystick_index[0]));
+            break;
+        case IDM_JOYSTICK2:
+            change_joystick(1, radio_event_with_deselect(event, joystick_index[1]));
+            break;
         case IDM_JOYMAP:
-            joystick_change_joymap(radio_event_simple(event, joymap_num));
+            joymap_index[0] = radio_event_simple(event, joymap_index[0]);
+            remap_joystick(0);
+        case IDM_JOYMAP2:
+            joymap_index[1] = radio_event_simple(event, joymap_index[1]);
+            remap_joystick(1);
+            break;
     }
 }
