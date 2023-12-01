@@ -27,8 +27,8 @@ extern int romsel;
 extern uint8_t ram1k, ram4k, ram8k;
 
 void m6502_reset(void);
-void m6502_exec(void);
-void m65c02_exec(void);
+void m6502_exec(int slice);
+void m65c02_exec(int slice);
 void dumpregs(void);
 void m6502_update_swram(void);
 

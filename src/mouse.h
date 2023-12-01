@@ -10,5 +10,6 @@ void mouse_poll(void);
 extern int mcount;
 extern uint8_t mouse_portb;
 extern bool mouse_amx;
+extern bool mouse_stick;
 
 #endif

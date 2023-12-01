@@ -29,7 +29,6 @@ typedef struct {
 } js_btn_map_t;
 
 typedef struct {
-    const char *js_name;
     ALLEGRO_JOYSTICK *js_id;
     int num_stick;
     js_stick_t *js_sticks;
@@ -39,11 +38,15 @@ typedef struct {
 
 static joystick_map_t *joystick_map;
 static joystick_map_t *joystick_end;
-static int num_joystick;
-
 joymap_t *joymaps;
+
 int joymap_count;
-int joymap_num;
+int joymap_index[2] = {0, 0};
+
+int joystick_count;
+int joystick_index[2] = {-1, -1};
+const char ** joystick_names;
+
 
 static void *js_malloc(size_t size)
 {
@@ -55,111 +58,198 @@ static void *js_malloc(size_t size)
     exit(1);
 }
 
-static void alloc_joystick(joystick_map_t *jsptr, ALLEGRO_JOYSTICK *js)
+static const char hori_fighting_stick_allegro_name[64] = {-26, -91, -109, -26, -107, -92, -26, -91, -105, -26, -111, -82, -25, -119, -91, -28, -100, -96, -26, -75, -95, -30, -127, -91, -26, -123, -112, -30, -127, -92, -25, -119, -112, -30, -127, -81, -27, -115, -107, -30, -127, -126, -26, -107, -74, -25, -115, -78, -26, -67, -87, -30, -127, -82, -30, -72, -79, 48, -31, -74, -87, -25, -104, 0};
+static const char hori_fighting_stick_display_name[20] = "Hori fighting stick";
+
+static void clear_joystick_map(int joystick)
 {
-    int num_stick, stick_num, num_axes, num_butn;
-    js_stick_t *stick;
+    joystick_map_t *jsptr = &joystick_map[joystick_index[joystick]];
+    js_stick_t *stick = jsptr->js_sticks;
     js_axis_map_t *axis;
-
-    jsptr->num_stick = num_stick = al_get_joystick_num_sticks(js);
-    jsptr->js_sticks = stick = js_malloc(jsptr->num_stick * sizeof(js_axis_map_t));
-    for (stick_num = 0; stick_num < jsptr->num_stick; stick_num++) {
-        stick->num_axes = num_axes = al_get_joystick_num_axes(js, stick_num);
-        stick->axes_map = axis = js_malloc(num_axes * sizeof(js_axis_map_t));
-        stick++;
-    }
-    jsptr->num_butn = num_butn = al_get_joystick_num_buttons(js);
-    jsptr->js_btns = js_malloc(jsptr->num_butn * sizeof(js_btn_map_t));
-}
-
-static int default_chan(int stick, int axis)
-{
-    switch(stick) {
-        case 0:
-            switch(axis) {
-                case 0: return 1;
-                case 1: return 2;
-            }
-            break;
-        case 1:
-            switch(axis) {
-                case 0: return 3;
-                case 1: return 4;
-            }
-            break;
-    }
-    return 0;
-}
-
-static void reset_joystick(joystick_map_t *jsptr, int js_num)
-{
+    js_btn_map_t *butn = jsptr->js_btns;
     int stick_num, axis_num, butn_num;
-    js_stick_t *stick;
-    js_axis_map_t *axis;
-    js_btn_map_t *butn;
+    if (-1 == joystick_index[joystick]) return;
 
-    stick = jsptr->js_sticks;
     for (stick_num = 0; stick_num < jsptr->num_stick; stick_num++) {
         axis = stick->axes_map;
         for (axis_num = 0; axis_num < stick->num_axes; axis_num++) {
-            if (num_joystick == 1)
-                axis->js_adc_chan = default_chan(js_num, axis_num);
-            else
-                axis->js_adc_chan = default_chan(stick_num, axis_num);
-            axis->js_scale = 1.0;
+            axis->js_scale = 1;
+            axis->js_adc_chan = 0;
             axis->js_nkey = 0;
             axis->js_pkey = 0;
             axis++;
         }
         stick++;
     }
-    butn = jsptr->js_btns;
+
     for (butn_num = 0; butn_num < jsptr->num_butn; butn_num++) {
-        if (num_joystick == 1)
-            butn->js_button = butn_num & 1;
-        else if (js_num == 0)
-            butn->js_button = 1;
-        else if (js_num == 1)
-            butn->js_button = 2;
-        else
-            butn->js_button = 0;
-        butn->js_key = 0;
+        butn->js_button = 0;
+        butn->js_key    = 0;
         butn++;
     }
 }
 
+static const char rebuke[] = "joystick: invalid %s %s at section %s, key %s";
+
+static void apply_axes_map(int joystick)
+{
+    int stick_num, axis_num;
+    joystick_map_t *jsptr = &joystick_map[joystick_index[joystick]];
+    joymap_t *joymap = &joymaps[joymap_index[joystick]];
+    js_stick_t *stick = jsptr->js_sticks;
+    js_axis_map_t *axis;
+    const char *value;
+    float scale;
+    char key[50];
+    int adc_chan, key_num;
+
+    for (stick_num = 0; stick_num < jsptr->num_stick; stick_num++) {
+        axis = stick->axes_map;
+        for (axis_num = 0; axis_num < stick->num_axes; axis_num++) {
+            snprintf(key, sizeof key, "stick%daxis%dadc", stick_num, axis_num);
+            if ((value = al_get_config_value(bem_cfg, joymap->sect, key))) {
+                if ((adc_chan = atoi(value)) >= 0 && adc_chan <= 4) {
+                    axis->js_adc_chan = adc_chan;
+                    if (adc_chan)
+                        log_debug("joystick: mapped stick %d axis %d to BBC ADC channel %d", stick_num, axis_num, adc_chan);
+                    else
+                        log_debug("joystick: mapped stick %d axis %d to 'not action'", stick_num, axis_num);
+                }
+                else
+                    log_warn(rebuke, "BBC ADC channel", value, joymap->sect, key);
+            }
+            snprintf(key, sizeof key, "stick%daxis%dscale", stick_num, axis_num);
+            if ((value = al_get_config_value(bem_cfg, joymap->sect, key))) {
+                if ((scale = atof(value)) != 0.0) {
+                    axis->js_scale = scale;
+                    log_debug("joystick: scaling for stick %d axis %d set to %g", stick_num, axis_num, scale);
+                }
+                else
+                    log_warn(rebuke, "scale", value, joymap->sect, key);
+            }
+            snprintf(key, sizeof key, "stick%daxis%dnkey", stick_num, axis_num);
+            if ((value = al_get_config_value(bem_cfg, joymap->sect, key))) {
+                if ((key_num = keydef_lookup_name(value))) {
+                    axis->js_nkey = key_num;
+                    log_debug("joysticK: mapped stick %d axis %d negative direction to key %d", stick_num, axis_num, key_num);
+                }
+                else
+                    log_warn(rebuke, "negative direction key", value, joymap->sect, key);
+            }
+            snprintf(key, sizeof key, "stick%daxis%dpkey", stick_num, axis_num);
+            if ((value = al_get_config_value(bem_cfg, joymap->sect, key))) {
+                if ((key_num = keydef_lookup_name(value))) {
+                    axis->js_pkey = key_num;
+                    log_debug("joysticK: mapped stick %d axis %d positive negative direction to key %d", stick_num, axis_num, key_num);
+                }
+                else
+                    log_warn(rebuke, "positive direction key", value, joymap->sect, key);
+            }
+            axis++;
+        }
+        stick++;
+    }
+}
+
+static void apply_button_map(int joystick)
+{
+    joystick_map_t *jsptr = &joystick_map[joystick_index[joystick]];
+    joymap_t *joymap = &joymaps[joymap_index[joystick]];
+    int butn_num, key_num, btn_mask = 1 + 2 * tricky_sega_adapter;
+    js_btn_map_t *butn = jsptr->js_btns;
+    const char *value;
+    char key[50];
+    
+    for (butn_num = 0; butn_num < jsptr->num_butn; butn_num++) {
+        snprintf(key, sizeof key, "button%dbtn", butn_num);
+        if ((value = al_get_config_value(bem_cfg, joymap->sect, key)))
+            butn->js_button = (atoi(value) & btn_mask) + 1;
+        snprintf(key, sizeof key, "button%dkey", butn_num);
+        if ((value = al_get_config_value(bem_cfg, joymap->sect, key))) {
+            if ((key_num = keydef_lookup_name(value)))
+                butn->js_key = key_num;
+            else
+                log_warn(rebuke, "key", value, joymap->sect, key);
+        }
+        butn++;
+    }
+}
+
+void remap_joystick(int joystick)
+{
+    if (-1 == joystick_index[joystick]) return;
+    clear_joystick_map(joystick);
+    apply_axes_map(joystick);
+    apply_button_map(joystick);
+}
+
+static void alloc_joystick(joystick_map_t *jsptr, ALLEGRO_JOYSTICK *js)
+{
+    int stick_num;
+    js_stick_t *stick;
+    jsptr->num_stick = al_get_joystick_num_sticks(js);
+    jsptr->js_sticks = stick = js_malloc(jsptr->num_stick * sizeof(js_axis_map_t));
+    for (stick_num = 0; stick_num < jsptr->num_stick; stick_num++) {
+        stick->num_axes = al_get_joystick_num_axes(js, stick_num);
+        stick->axes_map = js_malloc(stick->num_axes * sizeof(js_axis_map_t));
+        stick++;
+    }
+    jsptr->num_butn = al_get_joystick_num_buttons(js);
+    jsptr->js_btns = js_malloc(jsptr->num_butn * sizeof(js_btn_map_t));
+}
+
+static void free_joysticks()
+{
+    while (joystick_map != joystick_end--)
+    {
+        int j;
+        free(joystick_end->js_btns);
+        for (j = 0; j < joystick_end->num_stick; ++j)
+            free(joystick_end->js_sticks[j].axes_map);
+        free(joystick_end->js_sticks);
+    }
+    free(joystick_map);
+    joystick_map = joystick_end = NULL;
+}
+
 static void init_joysticks(void)
 {
-    int js_num;
+    int js_num, js_used = 0;
     joystick_map_t *jsptr;
     ALLEGRO_JOYSTICK *js;
 
-    jsptr = joystick_map = js_malloc(num_joystick * sizeof(joystick_map_t));
-    for (js_num = 0; js_num < num_joystick; js_num++) {
-        if ((js = al_get_joystick(js_num))) {
+    jsptr = joystick_map = js_malloc(joystick_count * sizeof(joystick_map_t));
+    joystick_names = js_malloc(joystick_count * sizeof(joystick_names[0]));
+    for (js_num = 0; js_num < joystick_count; js_num++) {
+        if ((js = al_get_joystick(js_num)) && al_get_joystick_active(js)) {
             jsptr->js_id = js;
-            jsptr->js_name = al_get_joystick_name(js);
-            log_debug("joystick: found joystick '%s'", jsptr->js_name);
+            joystick_names[js_num] = al_get_joystick_name(js);
+            if (!strncmp(joystick_names[js_num], hori_fighting_stick_allegro_name, 63)) // name seems t be meaningless!
+                joystick_names[js_num] = hori_fighting_stick_display_name;
+            log_debug("joystick: found joystick '%s'", joystick_names[js_num]);
             alloc_joystick(jsptr, js);
-            reset_joystick(jsptr, js_num);
+            if (js_used < 2) joystick_index[js_used++] = js_num;
         }
         else {
-            jsptr->js_name   = NULL;
-            jsptr->js_id     = NULL;
-            jsptr->js_sticks = NULL;
-            jsptr->js_btns   = NULL;
+            joystick_names[js_num] = NULL;
+            jsptr->js_id           = NULL;
+            jsptr->js_sticks       = NULL;
+            jsptr->js_btns         = NULL;
+            jsptr->num_butn = jsptr->num_stick = 0;
         }
         jsptr++;
     }
     joystick_end = jsptr;
+    change_joystick(0, joystick_index[0]);
+    change_joystick(1, joystick_index[1]);
 }
 
-static int cmp_joymap(const void *va, const void *vb)
-{
-    const joymap_t *ja = va;
-    const joymap_t *jb = vb;
-    return strcmp(ja->name, jb->name);
-}
+//static int cmp_joymap(const void *va, const void *vb)
+//{
+//    const joymap_t *ja = va;
+//    const joymap_t *jb = vb;
+//    return strcmp(ja->name, jb->name);
+//}
 
 static void read_joymaps(void)
 {
@@ -187,139 +277,55 @@ static void read_joymaps(void)
                     log_debug("joystick: found joymap %s", name);
                 }
             }
-            qsort(joymaps, num_jm, sizeof(joymap_t), cmp_joymap);
+//            qsort(joymaps, num_jm, sizeof(joymap_t), cmp_joymap);
         }
     }
 }
 
-static const char rebuke[] = "joystick: invalid %s %s at section %s, key %s";
-
-static void apply_axes(const char *sect, joystick_map_t *jsptr)
+void change_joystick(int joystick, int index)
 {
-    int stick_num, axis_num;
-    js_stick_t *stick;
-    js_axis_map_t *axis;
-    const char *value;
-    int adc_chan, key_num;
-    float scale;
-    char key[50];
-
-    stick = jsptr->js_sticks;
-    for (stick_num = 0; stick_num < jsptr->num_stick; stick_num++) {
-        axis = stick->axes_map;
-        for (axis_num = 0; axis_num < stick->num_axes; axis_num++) {
-            snprintf(key, sizeof key, "stick%daxis%dadc", stick_num, axis_num);
-            if ((value = al_get_config_value(bem_cfg, sect, key))) {
-                if ((adc_chan = atoi(value)) >= 0 && adc_chan <= 4) {
-                    axis->js_adc_chan = adc_chan;
-                    if (adc_chan)
-                        log_debug("joystick: mapped stick %d axis %d to BBC ADC channel %d", stick_num, axis_num, adc_chan);
-                    else
-                        log_debug("joystick: mapped stick %d axis %d to 'not action'", stick_num, axis_num);
-                }
-                else
-                    log_warn(rebuke, "BBC ADC channel", value, sect, key);
-            }
-            snprintf(key, sizeof key, "stick%daxis%dscale", stick_num, axis_num);
-            if ((value = al_get_config_value(bem_cfg, sect, key))) {
-                if ((scale = atof(value)) != 0.0) {
-                    axis->js_scale = scale;
-                    log_debug("joystick: scaling for stick %d axis %d set to %g", stick_num, axis_num, scale);
-                }
-                else
-                    log_warn(rebuke, "scale", value, sect, key);
-            }
-            snprintf(key, sizeof key, "stick%daxis%dnkey", stick_num, axis_num);
-            if ((value = al_get_config_value(bem_cfg, sect, key))) {
-                if ((key_num = keydef_lookup_name(value))) {
-                    axis->js_nkey = key_num;
-                    log_debug("joysticK: mapped stick %d axis %d negative direction to key %d", stick_num, axis_num, key_num);
-                }
-                else
-                    log_warn(rebuke, "negative direction key", value, sect, key);
-            }
-            snprintf(key, sizeof key, "stick%daxis%dpkey", stick_num, axis_num);
-            if ((value = al_get_config_value(bem_cfg, sect, key))) {
-                if ((key_num = keydef_lookup_name(value))) {
-                    axis->js_pkey = key_num;
-                    log_debug("joysticK: mapped stick %d axis %d positive negative direction to key %d", stick_num, axis_num, key_num);
-                }
-                else
-                    log_warn(rebuke, "positive direction key", value, sect, key);
-            }
-            axis++;
-        }
-        stick++;
+    int i;
+    char name[] = {'P', 'l', 'a', 'y', 'e', 'r', ' ', '1' + joystick, '\0'};
+    if (-1 != joystick_index[joystick] && -1 == index) // removing joystick
+        clear_joystick_map(joystick);
+    joystick_index[joystick] = index;
+    if (-1 == joystick_index[joystick]) {
+        if (-1 != joystick_index[joystick ^ 1])
+            change_joystick(joystick ^ 1, joystick_index[joystick ^ 1]);
+        return;
     }
-}
 
-static void apply_buttons(const char *sect, joystick_map_t *jsptr)
-{
-    int butn_num;
-    js_btn_map_t *butn;
-    const char *value;
-    int bbcbno, key_num;
-    char key[50];
-
-    butn = jsptr->js_btns;
-    for (butn_num = 0; butn_num < jsptr->num_butn; butn_num++) {
-        snprintf(key, sizeof key, "button%dbtn", butn_num);
-        if ((value = al_get_config_value(bem_cfg, sect, key))) {
-            if ((bbcbno = atoi(value)) >= 1 && bbcbno <= 2)
-                butn->js_button = bbcbno;
-            else
-                log_warn(rebuke, "button", value, sect, key);
+    joymap_index[joystick] = (joystick_index[joystick ^ 1] >= 0) ? 1 + joystick : 0;
+    if (joymap_index[joystick] > joymap_count) // expect first three joymaps to be single player, player 1 aplayer 2 ("default" in provided .cfg)
+        joymap_index[joystick] = joymap_count - 1;
+    for (i = 0; i < joymap_count; ++i)
+        if (strstr(joymaps[i].name, joystick_names[index])) { // partial match
+            joymap_index[joystick] = i;
+            break;
         }
-        snprintf(key, sizeof key, "button%dkey", butn_num);
-        if ((value = al_get_config_value(bem_cfg, sect, key))) {
-            if ((key_num = keydef_lookup_name(value)))
-                butn->js_key = key_num;
-            else
-                log_warn(rebuke, "key", value, sect, key);
+    for (i = 0; i < joymap_count; ++i)
+        if (!strcmp(joystick_names[index], joymaps[i].name)) { // exact match
+            joymap_index[joystick] = i;
+            break;
         }
-        butn++;
-    }
-}
-
-void joystick_change_joymap(int mapno)
-{
-    joystick_map_t *js;
-    const char *sect, *name;
-    int js_num;
-
-    if (mapno < joymap_count) {
-        log_debug("joystick: changing to joymap #%d, %s", mapno, joymaps[mapno].name);
-        sect = joymaps[mapno].sect;
-        js = joystick_map;
-        if ((name = al_get_config_value(bem_cfg, sect, "joystick"))) {
-            while (!js->js_name || strcasecmp(name, js->js_name)) {
-                if (++js == joystick_end) {
-                    js = joystick_map;
-                    if (js->js_name)
-                        log_warn("joystick: joystick '%s' not found, applying map to first joystick '%s'", name, js->js_name);
-                    break;
-                }
+    if (joystick_index[joystick ^ 1] >= 0) { // two players
+        for (i = 0; i < joymap_count; ++i) {
+            if (!strncmp(joystick_names[index], joymaps[i].name, strlen(joystick_names[index])) && strcmp(name, joymaps[i].name + strlen(joystick_names[index]) + 2)) { // exact match
+                joymap_index[joystick] = i;
+                break;
             }
-        }
-        if (js->js_name) {
-            js_num = js - joystick_map;
-            reset_joystick(js, js_num);
-            apply_axes(sect, js);
-            apply_buttons(sect, js);
-            joymap_num = mapno;
         }
     }
-    else
-        log_warn("joystick: attempt to change to invalid joymap no #%d", mapno);
+    remap_joystick(joystick);
+    remap_joystick(joystick ^ 1);
 }
 
 void joystick_init(ALLEGRO_EVENT_QUEUE *queue)
 {
     if (al_install_joystick()) {
-        if ((num_joystick = al_get_num_joysticks()) > 0) {
-            init_joysticks();
+        if ((joystick_count = al_get_num_joysticks()) > 0) {
             read_joymaps();
-            joystick_change_joymap(get_config_int("joystick", "joymap", 0));
+            init_joysticks();
             al_register_event_source(queue, al_get_joystick_event_source());
         }
         else
@@ -327,6 +333,25 @@ void joystick_init(ALLEGRO_EVENT_QUEUE *queue)
     }
     else
         log_warn("joystick: unable to install joystick driver");
+}
+
+void joystick_rescan_sticks()
+{
+    ALLEGRO_JOYSTICK * ids[2] = {-1 == joystick_index[0] ? NULL : joystick_map[joystick_index[0]].js_id, -1 == joystick_index[1] ? NULL : joystick_map[joystick_index[1]].js_id};
+    int j;
+    if (!al_reconfigure_joysticks()) return;
+    free_joysticks();
+    init_joysticks();
+    joystick_index[0] = joystick_index[1] = -1;
+    for (j = 0; j < joystick_count; ++j)
+    {
+        if (joystick_map[j].js_id == ids[0])
+            joystick_index[0] = j;
+        if (joystick_map[j].js_id == ids[1])
+            joystick_index[1] = j;
+    }
+    remap_joystick(0);
+    remap_joystick(1);
 }
 
 void joystick_axis(ALLEGRO_EVENT *event)
