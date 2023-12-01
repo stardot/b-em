@@ -1,3 +1,4 @@
+#define _DEBUG
 #include "b-em.h"
 
 #include "mouse.h"
@@ -5,8 +6,9 @@
 #include "model.h"
 #include "via.h"
 #include "uservia.h"
+#include "video_render.h"
 
-bool mouse_amx;
+bool mouse_amx, mouse_stick;
 int mcount = 8;
 
 uint8_t mouse_portb = 0xff;
@@ -14,8 +16,20 @@ uint8_t mouse_portb = 0xff;
 static int mx = 0,  my = 0;
 static int mouse_xff = 0, mouse_yff = 0;
 
+static float stick_calc(double posn, double limit)
+{
+    double value = posn / limit;
+    value = (value - 0.5) * 2.2;
+    if (value > 1.0)
+        value = 1.0;
+    else if (value < -1.0)
+        value = -1.0;
+    return value;
+}
+
 void mouse_axes(ALLEGRO_EVENT *event)
 {
+    log_debug("mouse: axes event, x=%d, y=%d, dx=%d, mx=%d, dy=%d, my=%d", event->mouse.x, event->mouse.y, event->mouse.dx, mx, event->mouse.dy, my);
     if (curtube == 3) {
         mx += event->mouse.dx;
         my += event->mouse.dy;
@@ -24,7 +38,10 @@ void mouse_axes(ALLEGRO_EVENT *event)
         mx += event->mouse.dx * 2;
         my += event->mouse.dy * 2;
     }
-    log_debug("mouse: axes event, dx=%d, mx=%d, dy=%d, my=%d", event->mouse.dx, mx, event->mouse.dy, my);
+    if (mouse_stick) {
+        joyaxes[0] = stick_calc(event->mouse.x, winsizex);
+        joyaxes[1] = stick_calc(event->mouse.y, winsizey);
+    }
 }
 
 void mouse_btn_down(ALLEGRO_EVENT *event)
@@ -51,6 +68,11 @@ void mouse_btn_down(ALLEGRO_EVENT *event)
                 mouse_portb &= ~0x40;
             break;
     }
+    if (mouse_stick) {
+        int btn = (button & 1) ^ 1;
+        log_debug("mouse: stick button %d down", btn);
+        joybutton[btn] = 1;
+    }
 }
 
 void mouse_btn_up(ALLEGRO_EVENT *event) {
@@ -76,6 +98,8 @@ void mouse_btn_up(ALLEGRO_EVENT *event) {
                 mouse_portb |=  0x40;
             break;
     }
+    if (mouse_stick)
+        joybutton[(button & 1) ^ 1] = 0;
 }
 
 static void mouse_poll_x86(int xmask, int ymask)
