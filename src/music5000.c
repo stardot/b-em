@@ -29,6 +29,7 @@
 #include <string.h>
 
 #include "b-em.h"
+#include "main.h"
 #include <allegro5/allegro_audio.h>
 #include "sound.h"
 #include "savestate.h"
@@ -68,9 +69,9 @@ static const uint8_t PanArray[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 6, 6, 6, 5, 4, 3, 
 size_t buflen_m5 = BUFLEN_M5;
 FILE *music5000_fp;
 
-static ALLEGRO_VOICE *voice;
-static ALLEGRO_MIXER *mixer;
-static ALLEGRO_AUDIO_STREAM *stream;
+static ALLEGRO_VOICE *music5000_voice;
+static ALLEGRO_MIXER *music5000_mixer;
+static ALLEGRO_AUDIO_STREAM *music5000_stream;
 static bool rec_started;
 
 static ushort antilogtable[128];
@@ -78,6 +79,7 @@ static ushort antilogtable[128];
 static uint16_t *music5000_buf;
 static int music5000_bufpos = 0;
 static int music5000_time = 0;
+static unsigned music5000_freq;
 
 static void synth_reset(struct synth *s)
 {
@@ -102,26 +104,6 @@ static void synth_loadstate(struct synth *s, FILE *f)
     fread_unlocked(s->ram, sizeof s->ram, 1, f);
 }
 
-void music5000_loadstate(FILE *f) {
-    int ch, pc;
-
-    if ((ch = getc_unlocked(f)) != EOF) {
-        if (ch == 'M') {
-            sound_music5000 = true;
-            pc = savestate_load_var(f);
-            if (pc == 9) {
-                synth_loadstate(&m5000, f);
-                synth_loadstate(&m3000, f);
-            }
-            else
-                log_warn("music5000: old, unsupported Music 5000 state");
-        } else if (ch == 'm')
-            sound_music5000 = false;
-        else
-            log_warn("music5000: invalid Music 5000 state from savestate file");
-    }
-}
-
 static void synth_savestate(struct synth *s, FILE *f)
 {
     fwrite_unlocked(&s->sleft, sizeof s->sleft, 1, f);
@@ -140,33 +122,65 @@ void music5000_savestate(FILE *f) {
         putc_unlocked('m', f);
 }
 
-void music5000_init(ALLEGRO_EVENT_QUEUE *queue)
+void music5000_init(int speed)
 {
-    if ((voice = al_create_voice(FREQ_M5, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_2))) {
-        if ((mixer = al_create_mixer(FREQ_M5, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_2))) {
-            if (al_attach_mixer_to_voice(mixer, voice)) {
-                if ((stream = al_create_audio_stream(8, buflen_m5, FREQ_M5, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_2))) {
-                    if (al_attach_audio_stream_to_mixer(stream, mixer)) {
-                        if ((music5000_buf = al_get_audio_stream_fragment(stream))) {
-                            for (int n = 0; n < 128; n++) {
-                                //12-bit antilog as per AM6070 datasheet
-                                int S = n & 15, C = n >> 4;
-                                antilogtable[n] = (ushort)(2 * (pow(2.0, C)*(S + 16.5) - 16.5));
+    if (sound_music5000) {
+        unsigned new_freq = FREQ_M5;
+        if (speed < NUM_EMU_SPEEDS)
+            new_freq *= emu_speeds[speed].multiplier;
+        if (new_freq != music5000_freq) {
+            ALLEGRO_VOICE *new_voice = al_create_voice(new_freq, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_2);
+            if (new_voice) {
+                ALLEGRO_MIXER *new_mixer = al_create_mixer(new_freq, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_2);
+                if (new_mixer) {
+                    if (al_attach_mixer_to_voice(new_mixer, new_voice)) {
+                        ALLEGRO_AUDIO_STREAM *new_stream = al_create_audio_stream(8, buflen_m5, new_freq, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_2);
+                        if (new_stream) {
+                            if (al_attach_audio_stream_to_mixer(new_stream, new_mixer)) {
+                                void *new_frag = al_get_audio_stream_fragment(new_stream);
+                                if (new_frag) {
+                                    if (music5000_freq == 0) { // Not previously running.
+                                        for (int n = 0; n < 128; n++) {
+                                            //12-bit antilog as per AM6070 datasheet
+                                            int S = n & 15, C = n >> 4;
+                                            antilogtable[n] = (ushort)(2 * (pow(2.0, C)*(S + 16.5) - 16.5));
+                                        }
+                                        music5000_reset();
+                                    }
+                                    if (music5000_stream)
+                                        al_destroy_audio_stream(music5000_stream);
+                                    music5000_stream = new_stream;
+                                    if (music5000_mixer)
+                                        al_destroy_mixer(music5000_mixer);
+                                    music5000_mixer = new_mixer;
+                                    if (music5000_voice)
+                                        al_destroy_voice(music5000_voice);
+                                    music5000_voice = new_voice;
+                                    music5000_freq = new_freq;
+                                    return;
+                                }
+                                else
+                                    log_error("sound: unable to get buffer fragment for Music 5000");
                             }
-                            music5000_reset();
+                            else
+                                log_error("sound: unable to attach stream to mixer for Music 5000");
+                            al_destroy_audio_stream(new_stream);
                         }
                         else
-                            log_error("sound: unable to get buffer fragment for Music 5000");
-                    } else
-                        log_error("sound: unable to attach stream to mixer for Music 5000");
-                } else
-                    log_error("sound: unable to create stream for Music 5000");
-            } else
-                log_error("sound: unable to attach mixer to voice for Music 5000");
-        } else
-            log_error("sound: unable to create mixer for Music 5000");
-    } else
-        log_error("sound: unable to create voice for Music 5000");
+                            log_error("sound: unable to create stream for Music 5000 at %uHz", new_freq);
+                    }
+                    else
+                        log_error("sound: unable to attach mixer to voice for Music 5000");
+                    al_destroy_mixer(new_mixer);
+                }
+                else
+                    log_error("sound: unable to create mixer for Music 5000 at %uHz", new_freq);
+                al_destroy_voice(new_voice);
+            }
+            else
+                log_error("sound: unable to create voice for Music 5000 at %uHz", new_freq);
+        }
+    }
 }
 
 FILE *music5000_rec_start(const char *filename)
@@ -224,6 +238,46 @@ void music5000_close(void)
 {
     if (music5000_fp)
         music5000_rec_stop();
+    if (music5000_stream) {
+        al_destroy_audio_stream(music5000_stream);
+        music5000_stream = NULL;
+    }
+    if (music5000_mixer) {
+        al_destroy_mixer(music5000_mixer);
+        music5000_mixer = NULL;
+    }
+    if (music5000_voice) {
+        al_destroy_voice(music5000_voice);
+        music5000_voice = NULL;
+    }
+    music5000_freq = 0;
+}
+
+void music5000_loadstate(FILE *f) {
+    int ch, pc;
+
+    if ((ch = getc_unlocked(f)) != EOF) {
+        if (ch == 'M') {
+            if (!sound_music5000) {
+                sound_music5000 = true;
+                music5000_init(emuspeed);
+            }
+            pc = savestate_load_var(f);
+            if (pc == 9) {
+                synth_loadstate(&m5000, f);
+                synth_loadstate(&m3000, f);
+            }
+            else
+                log_warn("music5000: old, unsupported Music 5000 state");
+        } else if (ch == 'm') {
+            if (sound_music5000) {
+                music5000_close();
+                sound_music5000 = false;
+            }
+        }
+        else
+            log_warn("music5000: invalid Music 5000 state from savestate file");
+    }
 }
 
 static uint8_t page = 0;
@@ -495,7 +549,7 @@ void music5000_poll(int cycles)
         music5000_time -= cycles;
         if (music5000_time < 0) {
             if (!music5000_buf) {
-                music5000_buf = al_get_audio_stream_fragment(stream);
+                music5000_buf = al_get_audio_stream_fragment(music5000_stream);
                 log_debug("music5000: late buffer allocation %s", music5000_buf ? "worked" : "failed");
             }
             if (music5000_buf) {
@@ -504,9 +558,9 @@ void music5000_poll(int cycles)
                 music5000_get_sample(fcp);
                 music5000_get_sample(fcp);
                 if (music5000_bufpos >= (buflen_m5*2)) {
-                    al_set_audio_stream_fragment(stream, music5000_buf);
-                    al_set_audio_stream_playing(stream, true);
-                    music5000_buf = al_get_audio_stream_fragment(stream);
+                    al_set_audio_stream_fragment(music5000_stream, music5000_buf);
+                    al_set_audio_stream_playing(music5000_stream, true);
+                    music5000_buf = al_get_audio_stream_fragment(music5000_stream);
                     music5000_bufpos = 0;
                 }
             }
@@ -518,7 +572,7 @@ void music5000_poll(int cycles)
 bool music5000_ok(void)
 {
     if (sound_music5000) {
-        unsigned frags = al_get_available_audio_stream_fragments(stream);
+        unsigned frags = al_get_available_audio_stream_fragments(music5000_stream);
         if (frags < 2)
             return false;
         if (frags >= 8)

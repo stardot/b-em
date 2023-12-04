@@ -307,7 +307,7 @@ void main_init(int argc, char *argv[])
     sound_init();
     sid_init();
     sid_settype(sidmethod, cursid);
-    music5000_init(queue);
+    music5000_init(EMU_SPEED_NORMAL);
     paula_init();
     ddnoise_init();
     tapenoise_init(queue);
@@ -637,6 +637,7 @@ void main_setspeed(int speed)
             al_set_timer_speed(timer, main_calc_timer(speed));
             vid_fskipmax = emu_speeds[speed].fskipmax;
             log_debug("main: main_setspeed: vid_fskipmax=%d", vid_fskipmax);
+            music5000_init(speed);
             al_start_timer(timer);
         }
     }

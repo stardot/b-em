@@ -1236,6 +1236,18 @@ static void change_mode7_font(ALLEGRO_EVENT *event)
         mode7_font_index = newix;
 }
 
+static void toggle_music5000(void)
+{
+    if (sound_music5000) {
+        sound_music5000 = false;
+        music5000_close();
+    }
+    else {
+        sound_music5000 = true;
+        music5000_init(emuspeed);
+    }
+}    
+
 static const char all_dext[] = "*.ssd;*.dsd;*.img;*.adf;*.ads;*.adm;*.adl;*.sdd;*.ddd;*.fdi;*.imd;*.hfe"
                                "*.SSD;*.DSD;*.IMG;*.ADF;*.ADS;*.ADM;*.ADL;*.SDD;*.DDD;*.FDI;*.IMD;*.HFE";
 
@@ -1421,7 +1433,7 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             sound_beebsid = !sound_beebsid;
             break;
         case IDM_SOUND_MUSIC5000:
-            sound_music5000 = !sound_music5000;
+            toggle_music5000();
             break;
         case IDM_SOUND_MFILT:
             music5000_fno = radio_event_with_deselect(event, music5000_fno);
