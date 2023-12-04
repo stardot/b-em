@@ -1,3 +1,4 @@
+#define _DEBUG
 /*B-em v2.2 by Tom Walker
   Main loop + start/finish code*/
 
@@ -96,16 +97,16 @@ static fspeed_type_t fullspeed = FSPEED_NONE;
 static bool bempause  = false;
 
 const emu_speed_t emu_speeds[NUM_EMU_SPEEDS] = {
-    {  "10%", 50.0 * 0.10, 1 },
-    {  "25%", 50.0 * 0.25, 1 },
-    {  "50%", 50.0 * 0.50, 1 },
-    {  "75%", 50.0 * 0.75, 1 },
-    { "100%", 50.0,        1 },
-    { "150%", 50.0 * 1.50, 2 },
-    { "200%", 50.0 * 2.00, 2 },
-    { "300%", 50.0 * 3.00, 3 },
-    { "400%", 50.0 * 4.00, 4 },
-    { "500%", 50.0 * 5.00, 5 }
+    {  "10%", 0.10, 1 },
+    {  "25%", 0.25, 1 },
+    {  "50%", 0.50, 1 },
+    {  "75%", 0.75, 1 },
+    { "100%",    1, 1 },
+    { "150%", 1.50, 3 },
+    { "200%", 2.00, 2 },
+    { "300%", 3.00, 3 },
+    { "400%", 4.00, 4 },
+    { "500%", 5.00, 5 }
 };
 
 void main_reset()
@@ -150,10 +151,12 @@ static const char helptext[] =
     "-vroot host-dir - set the VDFS root\n"
     "-vdir guest-dir - set the initial (boot) dir in VDFS\n\n";
 
-static double calc_speed(double divider)
+static double main_calc_timer(int speed)
 {
-    double secs = ((double)slice / 2000000.0) / divider;
+    double multiplier = emu_speeds[speed].multiplier;
+    double secs = ((double)slice / 2000000.0) / multiplier;
     time_limit = secs * 2.0;
+    log_debug("main: main_calc_timer for speed#%d, multiplier %g timer %gs", speed, multiplier, secs);
     return secs;
 }
 
@@ -330,7 +333,7 @@ void main_init(int argc, char *argv[])
 
     gui_allegro_init(queue, display);
 
-    if (!(timer = al_create_timer(calc_speed(1.0)))) {
+    if (!(timer = al_create_timer(main_calc_timer(EMU_SPEED_NORMAL)))) {
         log_fatal("main: unable to create timer");
         exit(1);
     }
@@ -631,9 +634,9 @@ void main_setspeed(int speed)
                 log_warn("main: speed #%d out of range, defaulting to 100%%", speed);
                 speed = 4;
             }
-            al_set_timer_speed(timer, calc_speed(emu_speeds[speed].timer_interval));
+            al_set_timer_speed(timer, main_calc_timer(speed));
             vid_fskipmax = emu_speeds[speed].fskipmax;
-            log_debug("main: new speed#%d, timer interval=%g, vid_fskipmax=%d", speed, emu_speeds[speed].timer_interval, vid_fskipmax);
+            log_debug("main: main_setspeed: vid_fskipmax=%d", vid_fskipmax);
             al_start_timer(timer);
         }
     }

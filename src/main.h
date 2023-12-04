@@ -2,12 +2,13 @@
 #define __INC_MAIN_H
 
 #define NUM_EMU_SPEEDS   10
+#define EMU_SPEED_NORMAL  4
 #define EMU_SPEED_FULL   255
 #define EMU_SPEED_PAUSED 254
 
 typedef struct {
     const char *name;
-    float timer_interval;
+    float multiplier;
     int fskipmax;
 } emu_speed_t;
 
