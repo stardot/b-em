@@ -1,3 +1,4 @@
+#define _DEBUG
 /*B-em v2.2 by Tom Walker
   Main loop + start/finish code*/
 
@@ -71,6 +72,8 @@
 bool quitting = false;
 bool keydefining = false;
 bool autopause = false;
+bool autoskip = true;
+bool skipover = false;
 int autoboot=0;
 int joybutton[4];
 float joyaxes[4];
@@ -211,9 +214,13 @@ void main_init(int argc, char *argv[])
         else if (!strcasecmp(argv[c], "-autoboot"))
             autoboot = 150;
         else if (argv[c][0] == '-' && (argv[c][1] == 'f' || argv[c][1]=='F')) {
-            sscanf(&argv[c][2], "%i", &vid_fskipmax);
-            if (vid_fskipmax < 1) vid_fskipmax = 1;
-            if (vid_fskipmax > 9) vid_fskipmax = 9;
+            if (sscanf(&argv[c][2], "%i", &vid_fskipmax) == 1) {
+                if (vid_fskipmax < 1) vid_fskipmax = 1;
+                if (vid_fskipmax > 9) vid_fskipmax = 9;
+                skipover = true;
+            }
+            else
+                fprintf(stderr, "invalid frame skip '%s'\n", &argv[c][2]);
         }
         else if (argv[c][0] == '-' && (argv[c][1] == 's' || argv[c][1] == 'S'))
             vid_dtype_user = VDT_SCANLINES;
@@ -446,9 +453,10 @@ void main_key_pause(void)
     }
 }
 
-double prev_time = 0;
-int execs = 0;
-double spd = 0;
+static double prev_time = 0;
+static int execs = 0;
+static double spd = 0;
+static int slow_count = 0;
 
 static void main_timer(ALLEGRO_EVENT *event)
 {
@@ -486,19 +494,28 @@ static void main_timer(ALLEGRO_EVENT *event)
             al_emit_user_event(&evsrc, event, NULL);
 
         if (now - prev_time > 0.1) {
-
             double speed = execs * slice / (now - prev_time);
 
-            if (spd < 0.01)
-                spd = 100.0 * speed / 2000000;
+            if (spd < 0.0001)
+                spd = speed / 2000000;
             else
-                spd = spd * 0.75 + 0.25 * (100.0 * speed / 2000000);
-
+                spd = spd * 0.75 + 0.25 * speed / 2000000;
 
             char buf[120];
-            snprintf(buf, 120, "%s %.3fMHz %.1f%%", VERSION_STR, speed / 1000000, spd);
+            snprintf(buf, sizeof(buf), "%s %.3fMHz %.1f%%", VERSION_STR, speed / 1000000, spd * 100.0);
             al_set_window_title(tmp_display, buf);
 
+            if (autoskip && !skipover) {
+                if (spd < (emu_speeds[emuspeed].multiplier * 0.95)) {
+                    if (++slow_count >= 6) {
+                        slow_count = 0;
+                        ++vid_fskipmax;
+                        log_debug("main: going slow, spd=%g, new vid_fskipmax=%d", spd, vid_fskipmax);
+                    }
+                }
+                else
+                    slow_count = 0;
+            }
             execs = 0;
             prev_time = now;
         }
@@ -634,8 +651,11 @@ void main_setspeed(int speed)
                 speed = 4;
             }
             al_set_timer_speed(timer, main_calc_timer(speed));
-            vid_fskipmax = emu_speeds[speed].fskipmax;
-            log_debug("main: main_setspeed: vid_fskipmax=%d", vid_fskipmax);
+            spd = emu_speeds[speed].multiplier;
+            if (!skipover) {
+                vid_fskipmax = autoskip ? 1 : emu_speeds[speed].fskipmax;
+                log_debug("main: main_setspeed: vid_fskipmax=%d", vid_fskipmax);
+            }
             music5000_init(speed);
             al_start_timer(timer);
         }

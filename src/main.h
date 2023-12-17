@@ -19,6 +19,8 @@ extern int framesrun;
 extern bool quitting;
 extern bool keydefining;
 extern bool autopause;
+extern bool autoskip;
+extern bool skipover;
 
 void main_init(int argc, char *argv[]);
 void main_softreset(void);

@@ -188,6 +188,8 @@ void config_load(void)
     ddnoise_vol      = get_config_int("sound", "ddvol",         2);
     ddnoise_type     = get_config_int("sound", "ddtype",        0);
 
+    autoskip         = get_config_bool(NULL, "autoskip",        true);
+
     vid_fullborders  = get_config_int("video", "fullborders",   1);
     vid_win_multiplier = get_config_int("video", "winmultipler", 1);
     winsizex         = get_config_int("video", "winsizex", 800);
@@ -340,6 +342,8 @@ void config_save(void)
 
         set_config_int("sound", "ddvol", ddnoise_vol);
         set_config_int("sound", "ddtype", ddnoise_type);
+
+        set_config_bool(NULL, "autoskip", autoskip);
 
         set_config_int("video", "fullborders", vid_fullborders);
         set_config_int("video", "winmultipler", vid_win_multiplier);
