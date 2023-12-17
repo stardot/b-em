@@ -384,10 +384,21 @@ void main_restart()
 
 int resetting = 0;
 int framesrun = 0;
+static double spd = 0;
 
 void main_cleardrawit()
 {
     fcount = 0;
+}
+
+static void main_newspeed(int speed)
+{
+    spd = emu_speeds[speed].multiplier;
+    if (!skipover) {
+        vid_fskipmax = autoskip ? 1 : emu_speeds[speed].fskipmax;
+        log_debug("main: main_setspeed: vid_fskipmax=%d", vid_fskipmax);
+    }
+    music5000_init(speed);
 }
 
 void main_start_fullspeed(void)
@@ -398,6 +409,8 @@ void main_start_fullspeed(void)
         log_debug("main: starting full-speed");
         al_stop_timer(timer);
         fullspeed = FSPEED_RUNNING;
+        emuspeed = NUM_EMU_SPEEDS-1;
+        main_newspeed(emuspeed);
         event.type = ALLEGRO_EVENT_TIMER;
         al_emit_user_event(&evsrc, &event, NULL);
     }
@@ -455,7 +468,6 @@ void main_key_pause(void)
 
 static double prev_time = 0;
 static int execs = 0;
-static double spd = 0;
 static int slow_count = 0;
 
 static void main_timer(ALLEGRO_EVENT *event)
@@ -490,8 +502,6 @@ static void main_timer(ALLEGRO_EVENT *event)
             savestate_doload();
         if (savestate_wantsave)
             savestate_dosave();
-        if (fullspeed == FSPEED_RUNNING)
-            al_emit_user_event(&evsrc, event, NULL);
 
         if (now - prev_time > 0.1) {
             double speed = execs * slice / (now - prev_time);
@@ -510,7 +520,7 @@ static void main_timer(ALLEGRO_EVENT *event)
                     if (++slow_count >= 6) {
                         slow_count = 0;
                         ++vid_fskipmax;
-                        log_debug("main: going slow, spd=%g, new vid_fskipmax=%d", spd, vid_fskipmax);
+                        log_debug("main: going slow, target=%g, spd=%g, new vid_fskipmax=%d", emu_speeds[emuspeed].multiplier, spd, vid_fskipmax);
                     }
                 }
                 else
@@ -519,6 +529,11 @@ static void main_timer(ALLEGRO_EVENT *event)
             execs = 0;
             prev_time = now;
         }
+    }
+    if (fullspeed == FSPEED_RUNNING) {
+        ALLEGRO_EVENT event;
+        event.type = ALLEGRO_EVENT_TIMER;
+        al_emit_user_event(&evsrc, &event, NULL);
     }
 }
 
@@ -651,16 +666,11 @@ void main_setspeed(int speed)
                 speed = 4;
             }
             al_set_timer_speed(timer, main_calc_timer(speed));
-            spd = emu_speeds[speed].multiplier;
-            if (!skipover) {
-                vid_fskipmax = autoskip ? 1 : emu_speeds[speed].fskipmax;
-                log_debug("main: main_setspeed: vid_fskipmax=%d", vid_fskipmax);
-            }
-            music5000_init(speed);
+            main_newspeed(speed);
             al_start_timer(timer);
         }
+        emuspeed = speed;
     }
-    emuspeed = speed;
 }
 
 void main_pause(const char *why)
