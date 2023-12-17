@@ -385,6 +385,7 @@ void main_restart()
 int resetting = 0;
 int framesrun = 0;
 static double spd = 0;
+static double prev_spd = 0;
 
 void main_cleardrawit()
 {
@@ -409,8 +410,8 @@ void main_start_fullspeed(void)
         log_debug("main: starting full-speed");
         al_stop_timer(timer);
         fullspeed = FSPEED_RUNNING;
-        emuspeed = NUM_EMU_SPEEDS-1;
-        main_newspeed(emuspeed);
+        main_newspeed(NUM_EMU_SPEEDS-1);
+        prev_spd = 0.0;
         event.type = ALLEGRO_EVENT_TIMER;
         al_emit_user_event(&evsrc, &event, NULL);
     }
@@ -421,8 +422,10 @@ void main_stop_fullspeed(bool hostshift)
     if (emuspeed != EMU_SPEED_FULL) {
         if (!hostshift) {
             log_debug("main: stopping fullspeed (PgUp)");
-            if (fullspeed == FSPEED_RUNNING && emuspeed != EMU_SPEED_PAUSED)
+            if (fullspeed == FSPEED_RUNNING && emuspeed != EMU_SPEED_PAUSED) {
+                main_newspeed(emuspeed);
                 al_start_timer(timer);
+            }
             fullspeed = FSPEED_NONE;
         }
         else
@@ -516,7 +519,15 @@ static void main_timer(ALLEGRO_EVENT *event)
             al_set_window_title(tmp_display, buf);
 
             if (autoskip && !skipover) {
-                if (spd < (emu_speeds[emuspeed].multiplier * 0.95)) {
+                if (fullspeed != FSPEED_NONE) {
+                    if (spd > prev_spd && ++slow_count >= 6) {
+                        slow_count = 0;
+                        ++vid_fskipmax;
+                        log_debug("main: full-speed, speed increased from %g to %g, increasing vid_fskipmax to %d", prev_spd, spd, vid_fskipmax);
+                        prev_spd = spd;
+                    }
+                }
+                else if (spd < (emu_speeds[emuspeed].multiplier * 0.95)) {
                     if (++slow_count >= 6) {
                         slow_count = 0;
                         ++vid_fskipmax;
