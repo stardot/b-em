@@ -700,12 +700,11 @@ static void list_points(cpu_debug_t *cpu, break_type type, const char *desc)
 
 void debug_paste(const char *iptr)
 {
-    int ch;
-    char *str, *dptr;
-
-    if ((ch = *iptr++)) {
-        if ((str = al_malloc(strlen(iptr) + 1))) {
-            dptr = str;
+    int ch = *iptr++;
+    if (ch) {
+        char *str = al_malloc(strlen(iptr) + 1);
+        if (str) {
+            char *dptr = str;
             do {
                 if (ch == '|') {
                     if (!(ch = *iptr++))
