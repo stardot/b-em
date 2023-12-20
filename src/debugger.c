@@ -702,19 +702,31 @@ static void list_points(cpu_debug_t *cpu, break_type type, const char *desc)
             print_point(cpu, bp, desc, "");
 }
 
-static void debug_paste(const char *iptr)
+void debug_paste(const char *iptr)
 {
-    int ch;
-    char *str, *dptr;
-
-    if ((ch = *iptr++)) {
-        if ((str = al_malloc(strlen(iptr) + 1))) {
-            dptr = str;
+    int ch = *iptr++;
+    if (ch) {
+        char *str = al_malloc(strlen(iptr) + 1);
+        if (str) {
+            char *dptr = str;
             do {
                 if (ch == '|') {
                     if (!(ch = *iptr++))
                         break;
-                    if (ch != '|')
+                    if (ch =='?')
+                        ch = 0x7f;
+                    else if (ch == '!') {
+                        if (!(ch = *iptr++))
+                            break;
+                        if (ch == '|') {
+                            if (ch =='?')
+                                ch = 0x7f;
+                            else if (ch != '"')
+                                ch &= 0x1f;
+                        }
+                        ch |= 0x80;
+                    }
+                    else if (ch != '"')
                         ch &= 0x1f;
                 }
                 *dptr++ = ch;

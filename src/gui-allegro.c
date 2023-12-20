@@ -570,9 +570,10 @@ static ALLEGRO_MENU *create_speed_menu(void)
 
     ALLEGRO_MENU *menu = al_create_menu();
     add_radio_item(menu, "Paused", IDM_SPEED, EMU_SPEED_PAUSED, emuspeed);
-    for (i = 0; i < NUM_EMU_SPEEDS; i++)
+    for (i = 0; i < num_emu_speeds; i++)
         add_radio_item(menu, emu_speeds[i].name, IDM_SPEED, i, emuspeed);
     add_radio_item(menu, "Full-speed", IDM_SPEED, EMU_SPEED_FULL, emuspeed);
+    add_checkbox_item(menu, "Auto Frameskip", IDM_AUTOSKIP, autoskip);
     return menu;
 }
 
@@ -1236,6 +1237,18 @@ static void change_mode7_font(ALLEGRO_EVENT *event)
         mode7_font_index = newix;
 }
 
+static void toggle_music5000(void)
+{
+    if (sound_music5000) {
+        sound_music5000 = false;
+        music5000_close();
+    }
+    else {
+        sound_music5000 = true;
+        music5000_init(emuspeed);
+    }
+}    
+
 static const char all_dext[] = "*.ssd;*.dsd;*.img;*.adf;*.ads;*.adm;*.adl;*.sdd;*.ddd;*.fdi;*.imd;*.hfe"
                                "*.SSD;*.DSD;*.IMG;*.ADF;*.ADS;*.ADM;*.ADL;*.SDD;*.DDD;*.FDI;*.IMD;*.HFE";
 
@@ -1421,7 +1434,7 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             sound_beebsid = !sound_beebsid;
             break;
         case IDM_SOUND_MUSIC5000:
-            sound_music5000 = !sound_music5000;
+            toggle_music5000();
             break;
         case IDM_SOUND_MFILT:
             music5000_fno = radio_event_with_deselect(event, music5000_fno);
@@ -1498,6 +1511,9 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
 #endif
         case IDM_SPEED:
             main_setspeed(radio_event_simple(event, emuspeed));
+            break;
+        case IDM_AUTOSKIP:
+            autoskip = !autoskip;
             break;
         case IDM_DEBUGGER:
             debug_toggle_core();

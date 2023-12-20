@@ -6,6 +6,7 @@
 #include <allegro5/allegro_primitives.h>
 #include "b-em.h"
 
+#include "config.h"
 #include "mem.h"
 #include "model.h"
 #include "serial.h"
@@ -766,20 +767,19 @@ ALLEGRO_COLOR border_col;
 
 ALLEGRO_DISPLAY *video_init(void)
 {
-    int c;
-    int temp, temp2, left;
-
 #ifdef ALLEGRO_GTK_TOPLEVEL
     al_set_new_display_flags(ALLEGRO_WINDOWED | ALLEGRO_GTK_TOPLEVEL | ALLEGRO_RESIZABLE);
 #else
     al_set_new_display_flags(ALLEGRO_WINDOWED | ALLEGRO_RESIZABLE);
 #endif
-    al_set_new_display_option(ALLEGRO_VSYNC, 2, ALLEGRO_REQUIRE);
-    log_debug("video: vsync=%d", al_get_new_display_option(ALLEGRO_VSYNC, &temp));
-
+    int vsync = get_config_int("video", "allegro_vsync", -1);
+    if (vsync >= 0) {
+        int temp;
+        al_set_new_display_option(ALLEGRO_VSYNC, 2, ALLEGRO_SUGGEST);
+        log_debug("video: config vsync=%d, actual=%d", vsync, al_get_new_display_option(ALLEGRO_VSYNC, &temp));
+    }
     video_set_window_size(true);
 
-    al_set_new_display_option(ALLEGRO_VSYNC, 2, ALLEGRO_SUGGEST);
     if ((display = al_create_display(winsizex, winsizey)) == NULL) {
         log_fatal("video: unable to create display");
         exit(1);
@@ -795,12 +795,12 @@ ALLEGRO_DISPLAY *video_init(void)
 
     nula_default_palette();
 
-    for (c = 0; c < 8; c++)
+    for (int c = 0; c < 8; c++)
         nula_flash[c] = 1;
-    for (temp = 0; temp < 256; temp++) {
-        temp2 = temp;
-        for (c = 0; c < 16; c++) {
-            left = 0;
+    for (int temp = 0; temp < 256; temp++) {
+        int temp2 = temp;
+        for (int c = 0; c < 16; c++) {
+            int left = 0;
             if (temp2 & 2)
                 left |= 1;
             if (temp2 & 8)
@@ -813,7 +813,7 @@ ALLEGRO_DISPLAY *video_init(void)
             temp2 <<= 1;
             temp2 |= 1;
         }
-        for (c = 0; c < 16; c++) {
+        for (int c = 0; c < 16; c++) {
             table4bpp[2][temp][c] = table4bpp[3][temp][c >> 1];
             table4bpp[1][temp][c] = table4bpp[3][temp][c >> 2];
             table4bpp[0][temp][c] = table4bpp[3][temp][c >> 3];

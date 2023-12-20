@@ -1,3 +1,4 @@
+#define _DEBUG
 /*B-em v2.2 by Tom Walker
   Main loop + start/finish code*/
 
@@ -71,6 +72,8 @@
 bool quitting = false;
 bool keydefining = false;
 bool autopause = false;
+bool autoskip = true;
+bool skipover = false;
 int autoboot=0;
 int joybutton[4];
 float joyaxes[4];
@@ -95,18 +98,24 @@ static int fcount = 0;
 static fspeed_type_t fullspeed = FSPEED_NONE;
 static bool bempause  = false;
 
-const emu_speed_t emu_speeds[NUM_EMU_SPEEDS] = {
-    {  "10%", 50.0 * 0.10, 1 },
-    {  "25%", 50.0 * 0.25, 1 },
-    {  "50%", 50.0 * 0.50, 1 },
-    {  "75%", 50.0 * 0.75, 1 },
-    { "100%", 50.0,        1 },
-    { "150%", 50.0 * 1.50, 2 },
-    { "200%", 50.0 * 2.00, 2 },
-    { "300%", 50.0 * 3.00, 3 },
-    { "400%", 50.0 * 4.00, 4 },
-    { "500%", 50.0 * 5.00, 5 }
+#define NUM_DEFAULT_SPEEDS 10
+
+static const emu_speed_t default_speeds[NUM_DEFAULT_SPEEDS] = {
+    {  "10%", 0.10, 1 },
+    {  "25%", 0.25, 1 },
+    {  "50%", 0.50, 1 },
+    {  "75%", 0.75, 1 },
+    { "100%",    1, 1 },
+    { "150%", 1.50, 2 },
+    { "200%", 2.00, 2 },
+    { "300%", 3.00, 3 },
+    { "400%", 4.00, 4 },
+    { "500%", 5.00, 5 }
 };
+
+const emu_speed_t *emu_speeds = default_speeds;
+int num_emu_speeds = NUM_DEFAULT_SPEEDS;
+static int emu_speed_normal = 4;
 
 void main_reset()
 {
@@ -150,11 +159,66 @@ static const char helptext[] =
     "-vroot host-dir - set the VDFS root\n"
     "-vdir guest-dir - set the initial (boot) dir in VDFS\n\n";
 
-static double calc_speed(double divider)
+static double main_calc_timer(int speed)
 {
-    double secs = ((double)slice / 2000000.0) / divider;
+    double multiplier = emu_speeds[speed].multiplier;
+    double secs = ((double)slice / 2000000.0) / multiplier;
     time_limit = secs * 2.0;
+    log_debug("main: main_calc_timer for speed#%d, multiplier %g timer %gs", speed, multiplier, secs);
     return secs;
+}
+
+static int main_speed_cmp(const void *va, const void *vb)
+{
+    return ((const emu_speed_t *)va)->multiplier - ((const emu_speed_t *)vb)->multiplier;
+}
+
+static void main_load_speeds(void)
+{
+    ALLEGRO_CONFIG_ENTRY *iter;
+    int num_speed = 0;
+    for (char const *name = al_get_first_config_entry(bem_cfg, "speeds", &iter); name; name = al_get_next_config_entry(&iter))
+        ++num_speed;
+    if (num_speed > 0) {
+        log_info("main: %d speeds found in config file", num_speed);
+        emu_speed_t *speeds = malloc(num_speed * sizeof(emu_speed_t));
+        if (speeds) {
+            bool worked = true;
+            emu_speed_t *ptr = speeds;
+            for (char const *name = al_get_first_config_entry(bem_cfg, "speeds", &iter); name; name = al_get_next_config_entry(&iter)) {
+                const char *str = al_get_config_value(bem_cfg, "speeds", name);
+                char *end;
+                double multiplier = strtod(str, &end);
+                if (multiplier <= 0 || *end != ',') {
+                    log_error("main: speed '%s': invalid multiplier '%s'", name, str);
+                    worked = false;
+                    break;
+                }
+                str = end + 1;
+                int fskipmax = strtol(str, &end, 0);
+                if (fskipmax < 0 || *end) {
+                    log_error("main: speed '%s': invalid fskipmax '%s'", name, str);
+                    worked = false;
+                    break;
+                }
+                ptr->name = name;
+                ptr->multiplier = multiplier;
+                ptr->fskipmax = fskipmax;
+                ++ptr;
+            }
+            if (worked) {
+                qsort(speeds, num_speed, sizeof(emu_speed_t), main_speed_cmp);
+                emu_speeds = speeds;
+                num_emu_speeds = num_speed;
+                if (emu_speed_normal >= num_speed)
+                    emu_speed_normal = num_speed - 1;
+            }
+            else {
+                log_error("main: reverting to default speeds");
+                free(speeds);
+            }
+        }
+    }
 }
 
 void main_init(int argc, char *argv[])
@@ -182,6 +246,7 @@ void main_init(int argc, char *argv[])
     log_open();
     log_info("main: starting %s", VERSION_STR);
 
+    main_load_speeds();
     model_loadcfg();
 
     for (int c = 1; c < argc; c++) {
@@ -191,7 +256,7 @@ void main_init(int argc, char *argv[])
         }
         else if (!strncasecmp(argv[c], "-sp", 3)) {
             sscanf(&argv[c][3], "%i", &emuspeed);
-            if(!(emuspeed < NUM_EMU_SPEEDS))
+            if(!(emuspeed < num_emu_speeds))
                 emuspeed = 4;
         }
         else if (!strcasecmp(argv[c], "-tape"))
@@ -209,9 +274,13 @@ void main_init(int argc, char *argv[])
         else if (!strcasecmp(argv[c], "-autoboot"))
             autoboot = 150;
         else if (argv[c][0] == '-' && (argv[c][1] == 'f' || argv[c][1]=='F')) {
-            sscanf(&argv[c][2], "%i", &vid_fskipmax);
-            if (vid_fskipmax < 1) vid_fskipmax = 1;
-            if (vid_fskipmax > 9) vid_fskipmax = 9;
+            if (sscanf(&argv[c][2], "%i", &vid_fskipmax) == 1) {
+                if (vid_fskipmax < 1) vid_fskipmax = 1;
+                if (vid_fskipmax > 9) vid_fskipmax = 9;
+                skipover = true;
+            }
+            else
+                fprintf(stderr, "invalid frame skip '%s'\n", &argv[c][2]);
         }
         else if (argv[c][0] == '-' && (argv[c][1] == 's' || argv[c][1] == 'S'))
             vid_dtype_user = VDT_SCANLINES;
@@ -252,7 +321,7 @@ void main_init(int argc, char *argv[])
             vdfsnext = 0;
         }
         else if (pastenext)
-            os_paste_start(strdup(argv[c]));
+            debug_paste(argv[c]);
         else {
             path = al_create_path(argv[c]);
             ext = al_get_path_extension(path);
@@ -304,7 +373,7 @@ void main_init(int argc, char *argv[])
     sound_init();
     sid_init();
     sid_settype(sidmethod, cursid);
-    music5000_init(queue);
+    music5000_init(emu_speed_normal);
     paula_init();
     ddnoise_init();
     tapenoise_init(queue);
@@ -330,7 +399,7 @@ void main_init(int argc, char *argv[])
 
     gui_allegro_init(queue, display);
 
-    if (!(timer = al_create_timer(calc_speed(1.0)))) {
+    if (!(timer = al_create_timer(main_calc_timer(emu_speed_normal)))) {
         log_fatal("main: unable to create timer");
         exit(1);
     }
@@ -375,10 +444,22 @@ void main_restart()
 
 int resetting = 0;
 int framesrun = 0;
+static double spd = 0;
+static double prev_spd = 0;
 
 void main_cleardrawit()
 {
     fcount = 0;
+}
+
+static void main_newspeed(int speed)
+{
+    spd = emu_speeds[speed].multiplier;
+    if (!skipover) {
+        vid_fskipmax = autoskip ? 1 : emu_speeds[speed].fskipmax;
+        log_debug("main: main_setspeed: vid_fskipmax=%d", vid_fskipmax);
+    }
+    music5000_init(speed);
 }
 
 void main_start_fullspeed(void)
@@ -389,6 +470,8 @@ void main_start_fullspeed(void)
         log_debug("main: starting full-speed");
         al_stop_timer(timer);
         fullspeed = FSPEED_RUNNING;
+        main_newspeed(num_emu_speeds-1);
+        prev_spd = 0.0;
         event.type = ALLEGRO_EVENT_TIMER;
         al_emit_user_event(&evsrc, &event, NULL);
     }
@@ -399,8 +482,10 @@ void main_stop_fullspeed(bool hostshift)
     if (emuspeed != EMU_SPEED_FULL) {
         if (!hostshift) {
             log_debug("main: stopping fullspeed (PgUp)");
-            if (fullspeed == FSPEED_RUNNING && emuspeed != EMU_SPEED_PAUSED)
+            if (fullspeed == FSPEED_RUNNING && emuspeed != EMU_SPEED_PAUSED) {
+                main_newspeed(emuspeed);
                 al_start_timer(timer);
+            }
             fullspeed = FSPEED_NONE;
         }
         else
@@ -444,9 +529,9 @@ void main_key_pause(void)
     }
 }
 
-double prev_time = 0;
-int execs = 0;
-double spd = 0;
+static double prev_time = 0;
+static int execs = 0;
+static int slow_count = 0;
 
 static void main_timer(ALLEGRO_EVENT *event)
 {
@@ -480,26 +565,46 @@ static void main_timer(ALLEGRO_EVENT *event)
             savestate_doload();
         if (savestate_wantsave)
             savestate_dosave();
-        if (fullspeed == FSPEED_RUNNING)
-            al_emit_user_event(&evsrc, event, NULL);
 
         if (now - prev_time > 0.1) {
-
             double speed = execs * slice / (now - prev_time);
 
-            if (spd < 0.01)
-                spd = 100.0 * speed / 2000000;
+            if (spd < 0.0001)
+                spd = speed / 2000000;
             else
-                spd = spd * 0.75 + 0.25 * (100.0 * speed / 2000000);
-
+                spd = spd * 0.75 + 0.25 * speed / 2000000;
 
             char buf[120];
-            snprintf(buf, 120, "%s %.3fMHz %.1f%%", VERSION_STR, speed / 1000000, spd);
+            snprintf(buf, sizeof(buf), "%s %.3fMHz %.1f%%", VERSION_STR, speed / 1000000, spd * 100.0);
             al_set_window_title(tmp_display, buf);
 
+            if (autoskip && !skipover) {
+                if (fullspeed != FSPEED_NONE) {
+                    if (spd > prev_spd && ++slow_count >= 6) {
+                        slow_count = 0;
+                        ++vid_fskipmax;
+                        log_debug("main: full-speed, speed increased from %g to %g, increasing vid_fskipmax to %d", prev_spd, spd, vid_fskipmax);
+                        prev_spd = spd;
+                    }
+                }
+                else if (spd < (emu_speeds[emuspeed].multiplier * 0.95)) {
+                    if (++slow_count >= 6) {
+                        slow_count = 0;
+                        ++vid_fskipmax;
+                        log_debug("main: going slow, target=%g, spd=%g, new vid_fskipmax=%d", emu_speeds[emuspeed].multiplier, spd, vid_fskipmax);
+                    }
+                }
+                else
+                    slow_count = 0;
+            }
             execs = 0;
             prev_time = now;
         }
+    }
+    if (fullspeed == FSPEED_RUNNING) {
+        ALLEGRO_EVENT event;
+        event.type = ALLEGRO_EVENT_TIMER;
+        al_emit_user_event(&evsrc, &event, NULL);
     }
 }
 
@@ -627,17 +732,16 @@ void main_setspeed(int speed)
         al_stop_timer(timer);
         fullspeed = FSPEED_NONE;
         if (speed != EMU_SPEED_PAUSED) {
-            if (speed >= NUM_EMU_SPEEDS) {
+            if (speed >= num_emu_speeds) {
                 log_warn("main: speed #%d out of range, defaulting to 100%%", speed);
                 speed = 4;
             }
-            al_set_timer_speed(timer, calc_speed(emu_speeds[speed].timer_interval));
-            vid_fskipmax = emu_speeds[speed].fskipmax;
-            log_debug("main: new speed#%d, timer interval=%g, vid_fskipmax=%d", speed, emu_speeds[speed].timer_interval, vid_fskipmax);
+            al_set_timer_speed(timer, main_calc_timer(speed));
+            main_newspeed(speed);
             al_start_timer(timer);
         }
+        emuspeed = speed;
     }
-    emuspeed = speed;
 }
 
 void main_pause(const char *why)

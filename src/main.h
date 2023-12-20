@@ -1,23 +1,25 @@
 #ifndef __INC_MAIN_H
 #define __INC_MAIN_H
 
-#define NUM_EMU_SPEEDS   10
 #define EMU_SPEED_FULL   255
 #define EMU_SPEED_PAUSED 254
 
 typedef struct {
     const char *name;
-    float timer_interval;
+    float multiplier;
     int fskipmax;
 } emu_speed_t;
 
-extern const emu_speed_t emu_speeds[NUM_EMU_SPEEDS];
+extern const emu_speed_t *emu_speeds;
+extern int num_emu_speeds;
 extern int emuspeed;
 extern int framesrun;
 
 extern bool quitting;
 extern bool keydefining;
 extern bool autopause;
+extern bool autoskip;
+extern bool skipover;
 
 void main_init(int argc, char *argv[]);
 void main_softreset(void);
