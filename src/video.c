@@ -584,7 +584,7 @@ static void mode7_gen_nula_lookup(void)
     mode7_need_new_lookup = 0;
 }
 
-static inline void mode7_render(ALLEGRO_LOCKED_REGION *region, uint8_t dat)
+static void mode7_render(ALLEGRO_LOCKED_REGION *region, uint8_t dat)
 {
     if (scrx < (1280-32)) {
         int mcolx = mode7_col;
@@ -899,11 +899,8 @@ void video_poll(int clocks, int timer_enable)
                 scrx = 128 - ((crtc[3] & 15) * 4);
             else
                 scrx = 128 - ((crtc[3] & 15) * 8);
-            scry++;
-            if (scry >= 384) {
-                scry = 0;
-                video_doblit(crtc_mode, crtc[4]);
-            }
+            if (scry < 384)
+                ++scry;
         }
 
         switch(vid_dtype_intern) {
