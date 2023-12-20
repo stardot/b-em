@@ -6,6 +6,7 @@
 #include <allegro5/allegro_primitives.h>
 #include "b-em.h"
 
+#include "config.h"
 #include "mem.h"
 #include "model.h"
 #include "serial.h"
@@ -774,12 +775,14 @@ ALLEGRO_DISPLAY *video_init(void)
 #else
     al_set_new_display_flags(ALLEGRO_WINDOWED | ALLEGRO_RESIZABLE);
 #endif
-    al_set_new_display_option(ALLEGRO_VSYNC, 2, ALLEGRO_REQUIRE);
-    log_debug("video: vsync=%d", al_get_new_display_option(ALLEGRO_VSYNC, &temp));
-
+    int vsync = get_config_int("video", "allegro_vsync", -1);
+    if (vsync >= 0) {
+        int temp;
+        al_set_new_display_option(ALLEGRO_VSYNC, 2, ALLEGRO_SUGGEST);
+        log_debug("video: config vsync=%d, actual=%d", vsync, al_get_new_display_option(ALLEGRO_VSYNC, &temp));
+    }
     video_set_window_size(true);
 
-    al_set_new_display_option(ALLEGRO_VSYNC, 2, ALLEGRO_SUGGEST);
     if ((display = al_create_display(winsizex, winsizey)) == NULL) {
         log_fatal("video: unable to create display");
         exit(1);
