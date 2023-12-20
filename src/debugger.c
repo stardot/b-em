@@ -710,7 +710,20 @@ static void debug_paste(const char *iptr)
                 if (ch == '|') {
                     if (!(ch = *iptr++))
                         break;
-                    if (ch != '|')
+                    if (ch =='?')
+                        ch = 0x7f;
+                    else if (ch == '!') {
+                        if (!(ch = *iptr++))
+                            break;
+                        if (ch == '|') {
+                            if (ch =='?')
+                                ch = 0x7f;
+                            else if (ch != '"')
+                                ch &= 0x1f;
+                        }
+                        ch |= 0x80;
+                    }
+                    else if (ch != '"')
                         ch &= 0x1f;
                 }
                 *dptr++ = ch;
