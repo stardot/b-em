@@ -570,7 +570,7 @@ static ALLEGRO_MENU *create_speed_menu(void)
 
     ALLEGRO_MENU *menu = al_create_menu();
     add_radio_item(menu, "Paused", IDM_SPEED, EMU_SPEED_PAUSED, emuspeed);
-    for (i = 0; i < NUM_EMU_SPEEDS; i++)
+    for (i = 0; i < num_emu_speeds; i++)
         add_radio_item(menu, emu_speeds[i].name, IDM_SPEED, i, emuspeed);
     add_radio_item(menu, "Full-speed", IDM_SPEED, EMU_SPEED_FULL, emuspeed);
     add_checkbox_item(menu, "Auto Frameskip", IDM_AUTOSKIP, autoskip);

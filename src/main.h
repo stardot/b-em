@@ -1,8 +1,6 @@
 #ifndef __INC_MAIN_H
 #define __INC_MAIN_H
 
-#define NUM_EMU_SPEEDS   10
-#define EMU_SPEED_NORMAL  4
 #define EMU_SPEED_FULL   255
 #define EMU_SPEED_PAUSED 254
 
@@ -12,7 +10,8 @@ typedef struct {
     int fskipmax;
 } emu_speed_t;
 
-extern const emu_speed_t emu_speeds[NUM_EMU_SPEEDS];
+extern const emu_speed_t *emu_speeds;
+extern int num_emu_speeds;
 extern int emuspeed;
 extern int framesrun;
 

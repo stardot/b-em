@@ -126,7 +126,7 @@ void music5000_init(int speed)
 {
     if (sound_music5000) {
         unsigned new_freq = FREQ_M5;
-        if (speed < NUM_EMU_SPEEDS)
+        if (speed < num_emu_speeds)
             new_freq *= emu_speeds[speed].multiplier;
         if (new_freq != music5000_freq) {
             ALLEGRO_VOICE *new_voice = al_create_voice(new_freq, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_2);
