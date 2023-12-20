@@ -321,7 +321,7 @@ void main_init(int argc, char *argv[])
             vdfsnext = 0;
         }
         else if (pastenext)
-            os_paste_start(strdup(argv[c]));
+            debug_paste(argv[c]);
         else {
             path = al_create_path(argv[c]);
             ext = al_get_path_extension(path);

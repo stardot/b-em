@@ -698,7 +698,7 @@ static void list_points(cpu_debug_t *cpu, break_type type, const char *desc)
             print_point(cpu, bp, desc, "");
 }
 
-static void debug_paste(const char *iptr)
+void debug_paste(const char *iptr)
 {
     int ch;
     char *str, *dptr;
