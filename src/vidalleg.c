@@ -408,7 +408,6 @@ static inline void blit_screen(void)
                 al_unlock_bitmap(b);
                 upscale_only(b, firstx, firsty << 1, xsize, ysize  << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
         }
-        al_set_target_bitmap(b);
         region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_WRITEONLY);
     }
 }
@@ -477,6 +476,7 @@ void video_doblit(bool non_ttx, uint8_t vtotal)
             fill_letterbox();
 
         render_leds();
+        al_set_target_bitmap(b);
         al_flip_display();
     }
     firstx = firsty = 65535;
