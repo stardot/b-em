@@ -541,8 +541,6 @@ static void main_timer(ALLEGRO_EVENT *event)
     if (delay < time_limit && music5000_ok()) {
         if (autoboot)
             autoboot--;
-        framesrun++;
-
         if (x65c02)
             m65c02_exec(slice);
         else
@@ -558,8 +556,6 @@ static void main_timer(ALLEGRO_EVENT *event)
                 led_update(LED_CASSETTE_MOTOR, 0, 0);
             }
         }
-        if (led_ticks > 0 && --led_ticks == 0)
-            led_timer_fired();
 
         if (savestate_wantload)
             savestate_doload();

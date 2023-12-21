@@ -431,6 +431,8 @@ static inline void fill_letterbox(void)
 static void render_leds(void)
 {
     if (vid_ledlocation > LED_LOC_NONE) {
+        if (led_ticks > 0 && --led_ticks == 0)
+            led_timer_fired();
         float w = al_get_bitmap_width(led_bitmap);
         float h = al_get_bitmap_height(led_bitmap);
         if (vid_ledvisibility == LED_VIS_ALWAYS || (vid_ledvisibility == LED_VIS_TRANSIENT && led_any_transient_led_on())) {
@@ -465,6 +467,7 @@ void video_doblit(bool non_ttx, uint8_t vtotal)
     if (vid_savescrshot)
         save_screenshot();
 
+    ++framesrun;
     if (++fskipcount >= ((motor && fasttape) ? 5 : vid_fskipmax)) {
         lasty++;
         calc_limits(non_ttx, vtotal);
