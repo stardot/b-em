@@ -74,7 +74,18 @@ static void video_calc_fullscreen(ALLEGRO_DISPLAY *display)
 
 static int fullscreen_pending = 0;
 
- void video_enterfullscreen()
+static void video_startfullscreen(ALLEGRO_DISPLAY *display)
+{
+    winsizex = al_get_display_width(display);
+    winsizey = al_get_display_height(display);
+    video_calc_fullscreen(display);
+    if (winsizex == save_winsizex || winsizey == save_winsizey) {
+        log_debug("vidalleg: video_enterfullscreen, no immediate change of size, setting fullscreen_pending");
+        fullscreen_pending = 500;
+    }
+}
+
+void video_enterfullscreen()
 {
     ALLEGRO_DISPLAY *display = al_get_current_display();
     save_winsizex = al_get_display_width(display);
@@ -85,13 +96,17 @@ static int fullscreen_pending = 0;
         al_set_display_flag(display, ALLEGRO_FULLSCREEN_WINDOW, false);
         al_set_display_flag(display, ALLEGRO_FULLSCREEN_WINDOW, true);
 #endif
-        winsizex = al_get_display_width(display);
-        winsizey = al_get_display_height(display);
-        video_calc_fullscreen(display);
-        if (winsizex == save_winsizex || winsizey == save_winsizey) {
-            log_debug("vidalleg: video_enterfullscreen, no immediate change of size, setting fullscreen_pending");
-            fullscreen_pending = 500;
+        video_startfullscreen(display);
+    }
+    else if (al_set_display_flag(display, ALLEGRO_FRAMELESS, true)) {
+        if (al_set_display_flag(display, ALLEGRO_MAXIMIZED, true)) {
+            video_startfullscreen(display);
+            fullscreen = 2;
         }
+        else {
+            log_error("vidalleg: could not set graphics mode to full-screen");
+            fullscreen = 0;
+        }            
     }
     else {
         log_error("vidalleg: could not set graphics mode to full-screen");
@@ -191,11 +206,21 @@ void video_leavefullscreen(void)
     ALLEGRO_DISPLAY *display;
 
     display = al_get_current_display();
-
     //try and restore size to pre fullscreen size
     al_resize_display(display, save_winsizex, save_winsizey);
 
-    al_set_display_flag(display, ALLEGRO_FULLSCREEN_WINDOW, false);
+    if (fullscreen == 2) {
+        log_debug("vidalleg: video_leavefullscreen, cancelling ALLEGRO_FRAMELESS");
+        al_set_display_flag(display, ALLEGRO_MAXIMIZED, false);
+        al_set_display_flag(display, ALLEGRO_FRAMELESS, false);
+    }
+    else if (fullscreen == 1) {
+        log_debug("vidalleg: video_leavefullscreen, cancelling ALLEGRO_FULLSCREEN_WINDOW");
+        al_set_display_flag(display, ALLEGRO_FULLSCREEN_WINDOW, false);
+    }
+    else
+        log_debug("vidalleg: video_leavefullscreen, called with fullscreen=%d", fullscreen);
+
     scr_x_start = 0;
     scr_x_size = winsizex = al_get_display_width(display);
     scr_y_start = 0;
