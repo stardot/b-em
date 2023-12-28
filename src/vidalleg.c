@@ -41,45 +41,59 @@ static const int y_fudge = 0;
 static const int y_fudge = 28;
 #endif
 
-void video_enterfullscreen()
+static void video_calc_fullscreen(ALLEGRO_DISPLAY *display)
+{
+    ALLEGRO_COLOR black = al_map_rgb(0, 0, 0);
+    double aspect = (double)winsizex / (double)winsizey;
+    log_debug("vidalleg: video_enterfullscreen, new winsizex=%d, winsizey=%d, aspect=%g", winsizex, winsizey, aspect);
+    if (aspect > (4.0 / 3.0)) {
+        int value = 4 * winsizey / 3;
+        scr_x_start = (winsizex - value) / 2;
+        scr_y_start = 0;
+        scr_x_size = value;
+        scr_y_size = winsizey;
+        al_set_target_backbuffer(display);
+        // fill the gap between the left screen edge and the BBC image.
+        al_draw_filled_rectangle(0, 0, scr_x_start, scr_y_size, black);
+        // fill the gap between the BBC image and the right screen edge.
+        al_draw_filled_rectangle(scr_x_start + value, 0, winsizex, winsizey, black);
+    }
+    else {
+        int value = 3 * winsizex / 4;
+        scr_x_start = 0;
+        scr_y_start = (winsizey - value) / 2;
+        scr_x_size = winsizex;
+        scr_y_size = value;
+        // fill the gap between the top of the screen and the BBC image.
+        al_draw_filled_rectangle(0, 0, scr_x_size, scr_y_start, black);
+        // fill the gap between the BBC image and the bottom of the screen.
+        al_draw_filled_rectangle(0, scr_y_start + value, winsizex, winsizey, black);
+    }
+    log_debug("vidalleg: video_enterfullscreen, scr_x_start=%d, scr_y_start=%d, scr_x_size=%d, scr_y_size=%d", scr_x_start, scr_y_start, scr_x_size, scr_y_size);
+}
+
+static int fullscreen_pending = 0;
+
+ void video_enterfullscreen()
 {
     ALLEGRO_DISPLAY *display = al_get_current_display();
     save_winsizex = al_get_display_width(display);
     save_winsizey = al_get_display_height(display);
+    log_debug("vidalleg: video_enterfullscreen, save_winsizex=%d, save_winsizey=%d", save_winsizex, save_winsizey);
     if (al_set_display_flag(display, ALLEGRO_FULLSCREEN_WINDOW, true)) {
-
-        //no we really do mean it
+#ifdef WIN32
         al_set_display_flag(display, ALLEGRO_FULLSCREEN_WINDOW, false);
         al_set_display_flag(display, ALLEGRO_FULLSCREEN_WINDOW, true);
-
-        ALLEGRO_COLOR black = al_map_rgb(0, 0, 0);
+#endif
         winsizex = al_get_display_width(display);
         winsizey = al_get_display_height(display);
-        double aspect = (double)winsizex / (double)winsizey;
-        if (aspect > (4.0 / 3.0)) {
-            int value = 4 * winsizey / 3;
-            scr_x_start = (winsizex - value) / 2;
-            scr_y_start = 0;
-            scr_x_size = value;
-            scr_y_size = winsizey;
-            al_set_target_backbuffer(display);
-            // fill the gap between the left screen edge and the BBC image.
-            al_draw_filled_rectangle(0, 0, scr_x_start, scr_y_size, black);
-            // fill the gap between the BBC image and the right screen edge.
-            al_draw_filled_rectangle(scr_x_start + value, 0, winsizex, winsizey, black);
+        video_calc_fullscreen(display);
+        if (winsizex == save_winsizex || winsizey == save_winsizey) {
+            log_debug("vidalleg: video_enterfullscreen, no immediate change of size, setting fullscreen_pending");
+            fullscreen_pending = 500;
         }
-        else {
-            int value = 3 * winsizex / 4;
-            scr_x_start = 0;
-            scr_y_start = (winsizey - value) / 2;
-            scr_x_size = winsizex;
-            scr_y_size = value;
-            // fill the gap between the top of the screen and the BBC image.
-            al_draw_filled_rectangle(0, 0, scr_x_size, scr_y_start, black);
-            // fill the gap between the BBC image and the bottom of the screen.
-            al_draw_filled_rectangle(0, scr_y_start + value, winsizex, winsizey, black);
-        }
-    } else {
+    }
+    else {
         log_error("vidalleg: could not set graphics mode to full-screen");
         fullscreen = 0;
     }
@@ -461,6 +475,19 @@ void video_doblit(bool non_ttx, uint8_t vtotal)
         save_screenshot();
 
     if (++fskipcount >= ((motor && fasttape) ? 5 : vid_fskipmax)) {
+        if (fullscreen_pending) {
+            ALLEGRO_DISPLAY *display = al_get_current_display();
+            int newsizex = al_get_display_width(display);
+            int newsizey = al_get_display_height(display);
+            log_debug("vidalleg: fullscreen_pending=%d, newsizex=%d, newsizey=%d", fullscreen_pending, newsizex, newsizey);
+            --fullscreen_pending;
+            if (newsizex > winsizex || newsizey > winsizey) {
+                winsizex = newsizex;
+                winsizey = newsizey;
+                video_calc_fullscreen(display);
+                fullscreen_pending = 0;
+            }
+        }
         lasty++;
         calc_limits(non_ttx, vtotal);
         fskipcount = 0;
