@@ -151,6 +151,9 @@ static const char helptext[] =
     "-Fx             - set maximum video frames skipped\n"
     "-s              - scanlines display mode\n"
     "-i              - interlace display mode\n"
+// lovebug
+    "-fullscreen     - fullscreen display mode\n"
+// lovebug end
     "-spx            - Emulation speed x from 0 to 9 (default 4)\n"
     "-debug          - start debugger\n"
     "-debugtube      - start debugging tube processor\n"
@@ -259,6 +262,10 @@ void main_init(int argc, char *argv[])
             if(!(emuspeed < num_emu_speeds))
                 emuspeed = 4;
         }
+	// lovebug
+        else if (!strcasecmp(argv[c], "-fullscreen"))
+            fullscreen = 1;
+	// lovebug end
         else if (!strcasecmp(argv[c], "-tape"))
             tapenext = 2;
         else if (!strcasecmp(argv[c], "-disc") || !strcasecmp(argv[c], "-disk"))
@@ -430,6 +437,10 @@ void main_init(int argc, char *argv[])
         gui_set_disc_wprot(1, writeprot[1]);
     main_setspeed(emuspeed);
     debug_start(exec_fn);
+    // lovebug
+    if (fullscreen)
+        video_enterfullscreen();
+    // lovebug end
 }
 
 void main_restart()
@@ -541,8 +552,6 @@ static void main_timer(ALLEGRO_EVENT *event)
     if (delay < time_limit && music5000_ok()) {
         if (autoboot)
             autoboot--;
-        framesrun++;
-
         if (x65c02)
             m65c02_exec(slice);
         else
@@ -558,8 +567,6 @@ static void main_timer(ALLEGRO_EVENT *event)
                 led_update(LED_CASSETTE_MOTOR, 0, 0);
             }
         }
-        if (led_ticks > 0 && --led_ticks == 0)
-            led_timer_fired();
 
         if (savestate_wantload)
             savestate_doload();
