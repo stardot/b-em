@@ -43,12 +43,7 @@ static const int y_fudge = 28;
 
 void video_enterfullscreen()
 {
-    ALLEGRO_DISPLAY *display;
-    ALLEGRO_COLOR black;
-    int value;
-    double aspect;
-
-    display = al_get_current_display();
+    ALLEGRO_DISPLAY *display = al_get_current_display();
     save_winsizex = al_get_display_width(display);
     save_winsizey = al_get_display_height(display);
     if (al_set_display_flag(display, ALLEGRO_FULLSCREEN_WINDOW, true)) {
@@ -57,12 +52,12 @@ void video_enterfullscreen()
         al_set_display_flag(display, ALLEGRO_FULLSCREEN_WINDOW, false);
         al_set_display_flag(display, ALLEGRO_FULLSCREEN_WINDOW, true);
 
-        black = al_map_rgb(0, 0, 0);
+        ALLEGRO_COLOR black = al_map_rgb(0, 0, 0);
         winsizex = al_get_display_width(display);
         winsizey = al_get_display_height(display);
-        aspect = (double)winsizex / (double)winsizey;
+        double aspect = (double)winsizex / (double)winsizey;
         if (aspect > (4.0 / 3.0)) {
-            value = 4 * winsizey / 3;
+            int value = 4 * winsizey / 3;
             scr_x_start = (winsizex - value) / 2;
             scr_y_start = 0;
             scr_x_size = value;
@@ -74,7 +69,7 @@ void video_enterfullscreen()
             al_draw_filled_rectangle(scr_x_start + value, 0, winsizex, winsizey, black);
         }
         else {
-            value = 3 * winsizex / 4;
+            int value = 3 * winsizex / 4;
             scr_x_start = 0;
             scr_y_start = (winsizey - value) / 2;
             scr_x_size = winsizex;
