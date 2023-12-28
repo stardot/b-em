@@ -4,15 +4,7 @@
 #include "gui-allegro.h"
 extern ALLEGRO_EVENT_QUEUE *queue;
 extern ALLEGRO_DISPLAY *tmp_display;
-void enter_fullscreen()
-{
-}
 
-void leave_fullscreen()
-{
-    gui_allegro_init(queue, tmp_display);
-    video_leavefullscreen();
-}
 void toggle_fullscreen_menu()
 {
     if (fullscreen) {
