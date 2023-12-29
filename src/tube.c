@@ -51,16 +51,26 @@ tubetype tube_type=TUBEX86;
 bool tube_resetting;
 tube_ula tubeula;
 
+enum tube_status {
+    TUBE_STAT_T = 0x40,
+    TUBE_STAT_P = 0x20,
+    TUBE_STAT_V = 0x10,
+    TUBE_STAT_M = 0x08,
+    TUBE_STAT_J = 0x04,
+    TUBE_STAT_I = 0x02,
+    TUBE_STAT_Q = 0x01
+};
+
 void tube_updateints()
 {
     int new_irq = 0;
 
     interrupt &= ~8;
 
-    if ((tubeula.r1stat & 1) && (tubeula.hstat[3] & 128))
+    if ((tubeula.r1stat & TUBE_STAT_Q) && (tubeula.hstat[3] & 128))
         interrupt |= 8;
 
-    if (((tubeula.r1stat & 2) && (tubeula.pstat[0] & 128)) || ((tubeula.r1stat & 4) && (tubeula.pstat[3] & 128))) {
+    if (((tubeula.r1stat & TUBE_STAT_I) && (tubeula.pstat[0] & 128)) || ((tubeula.r1stat & TUBE_STAT_J) && (tubeula.pstat[3] & 128))) {
         new_irq |= 1;
         if (!(tube_irq & 1)) {
             log_debug("tube: parasite IRQ asserted");
@@ -80,7 +90,7 @@ void tube_updateints()
             m68k_set_virq(2, 0);
     }
 
-    if (tubeula.r1stat & 8 && (tubeula.ph3pos == 0 || tubeula.hp3pos > ((tubeula.r1stat & 16) ? 1 : 0))) {
+    if (tubeula.r1stat & TUBE_STAT_M && (tubeula.ph3pos == 0 || tubeula.hp3pos > ((tubeula.r1stat & TUBE_STAT_V) ? 1 : 0))) {
         new_irq |= 2;
         if (!(tube_irq & 2)) {
             log_debug("tube: parasite NMI asserted");
@@ -170,7 +180,7 @@ void tube_host_write(uint16_t addr, uint8_t val)
             case 0: /*Register 1 stat*/
                 if (val & 0x80)
                     tubeula.r1stat |= val & 0x3F;
-                else if (tubeula.r1stat & 0x20) {
+                else if (tubeula.r1stat & TUBE_STAT_P) {
                     tube_reset();
                     if (curtube != -1)
                         tubes[curtube].cpu->reset();
@@ -194,7 +204,7 @@ void tube_host_write(uint16_t addr, uint8_t val)
                 break;
             case 5: /*Register 3*/
                 log_debug("tube: host write R%c=%02X", '3', val);
-                if (tubeula.r1stat & 16)
+                if (tubeula.r1stat & TUBE_STAT_V)
                 {
                         if (tubeula.hp3pos < 2)
                            tubeula.hp3[tubeula.hp3pos++] = val;
@@ -309,7 +319,7 @@ void tube_parasite_write(uint32_t addr, uint8_t val)
                 break;
             case 5: /*Register 3*/
                 log_debug("tube: parasite write R%c=%02X", '3', val);
-                if (tubeula.r1stat & 16)
+                if (tubeula.r1stat & TUBE_STAT_V)
                 {
                         if (tubeula.ph3pos < 2)
                            tubeula.ph3[tubeula.ph3pos++] = val;
