@@ -61,6 +61,23 @@ enum tube_status {
     TUBE_STAT_Q = 0x01
 };
 
+static void tube_reset_most(void)
+{
+    tubeula.ph1count = tubeula.ph1head = tubeula.ph1tail = 0;
+    tubeula.ph3pos = 1;
+    tubeula.hstat[0] = tubeula.hstat[1] = tubeula.hstat[3] = 0x40;
+    tubeula.pstat[0] = 0x40;
+    tubeula.pstat[1] = tubeula.pstat[3] = 0x7f;
+    tubeula.pstat[2] = 0x3f;
+    tubeula.hstat[2] = 0xC0;
+}
+
+void tube_reset(void)
+{
+    tube_reset_most();
+    tubeula.r1stat = 0;
+}
+
 void tube_updateints()
 {
     int new_irq = 0;
@@ -178,15 +195,17 @@ void tube_host_write(uint16_t addr, uint8_t val)
         switch (addr & 7)
         {
             case 0: /*Register 1 stat*/
-                if (val & 0x80)
+                if (val & 0x80) {
+                    if (val & TUBE_STAT_T && !(tubeula.r1stat & TUBE_STAT_T))
+                        tube_reset_most();
                     tubeula.r1stat |= val & 0x3F;
-                else if (tubeula.r1stat & TUBE_STAT_P) {
-                    tube_reset();
-                    if (curtube != -1)
-                        tubes[curtube].cpu->reset();
                 }
-                else
+                else {
+                    if (!(val & TUBE_STAT_P) && tubeula.r1stat & TUBE_STAT_P && curtube != -1)
+                        tubes[curtube].cpu->reset();
                     tubeula.r1stat &= ~(val&0x3F);
+
+                }
                 log_debug("tube: host write S1=%02X->%02X", val, tubeula.r1stat);
                 tubeula.hstat[0] = (tubeula.hstat[0] & 0xC0) | (val & 0x3F);
                 break;
@@ -363,17 +382,6 @@ bool tube_32016_init(void *rom)
         tube_proc_savestate = NULL;
         tube_proc_loadstate = NULL;
         return true;
-}
-
-void tube_reset(void)
-{
-        tubeula.ph1count = tubeula.ph1head = tubeula.ph1tail = 0;
-        tubeula.ph3pos = 1;
-        tubeula.r1stat = 0;
-        tubeula.hstat[0] = tubeula.hstat[1] = tubeula.hstat[3] = 0x40;
-        tubeula.pstat[0] = 0x40;
-        tubeula.pstat[1] = tubeula.pstat[2] = tubeula.pstat[3] = 0x7f;
-        tubeula.hstat[2] = 0xC0;
 }
 
 void tube_ula_savestate(FILE *f)
