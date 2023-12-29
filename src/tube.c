@@ -168,7 +168,8 @@ uint8_t tube_host_read(uint16_t addr)
                     log_debug("tube: host read R%c=%02X", '3', temp);
                     tubeula.ph3[0] = tubeula.ph3[1];
                     tubeula.ph3pos--;
-                    tubeula.pstat[2] |= 0xc0;
+                    if (!tubeula.ph3pos || (tubeula.r1stat & TUBE_STAT_V))
+                        tubeula.pstat[2] |= 0xc0;
                     if (!tubeula.ph3pos)
                         tubeula.hstat[2] &= ~0x80;
                 }
@@ -339,22 +340,17 @@ void tube_parasite_write(uint32_t addr, uint8_t val)
                 break;
             case 5: /*Register 3*/
                 log_debug("tube: parasite write R%c=%02X", '3', val);
-                if (tubeula.r1stat & TUBE_STAT_V)
-                {
-                        if (tubeula.ph3pos < 2)
-                           tubeula.ph3[tubeula.ph3pos++] = val;
-                        if (tubeula.ph3pos == 2)
-                        {
-                                tubeula.hstat[2] |=  0x80;
-                                tubeula.pstat[2] &= ~0x40;
-                        }
-                }
-                else
-                {
-                        tubeula.ph3[0] = val;
-                        tubeula.ph3pos = 1;
-                        tubeula.hstat[2] |=  0x80;
-                        tubeula.pstat[2] &= ~0xc0;
+                if (tubeula.ph3pos < 2) {
+                    tubeula.ph3[tubeula.ph3pos++] = val;
+                    tubeula.hstat[2] |=  0x80; /* data available to host */
+                    if (tubeula.r1stat & TUBE_STAT_V) {
+                        if (tubeula.ph3pos >= 2)
+                            tubeula.pstat[2] &= ~0x40; /* no space for parasite */
+                    }
+                    else {
+                        if (tubeula.ph3pos >= 1)
+                            tubeula.pstat[2] &= ~0xc0; /* no space for parasite */
+                    }
                 }
                 break;
             case 7: /*Register 4*/
