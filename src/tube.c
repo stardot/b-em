@@ -162,14 +162,15 @@ uint8_t tube_host_read(uint16_t addr)
                 temp = tubeula.hstat[2];
                 break;
             case 5: /*Register 3*/
-                temp = tubeula.ph3[0];
-                log_debug("tube: host read R%c=%02X", '3', temp);
-                if (tubeula.ph3pos > 0)
-                {
-                        tubeula.ph3[0] = tubeula.ph3[1];
-                        tubeula.ph3pos--;
-                        tubeula.pstat[2] |= 0xc0;
-                        if (!tubeula.ph3pos) tubeula.hstat[2] &= ~0x80;
+                temp = 0x96;
+                if (tubeula.ph3pos > 0) {
+                    temp = tubeula.ph3[0];
+                    log_debug("tube: host read R%c=%02X", '3', temp);
+                    tubeula.ph3[0] = tubeula.ph3[1];
+                    tubeula.ph3pos--;
+                    tubeula.pstat[2] |= 0xc0;
+                    if (!tubeula.ph3pos)
+                        tubeula.hstat[2] &= ~0x80;
                 }
                 break;
             case 6: /*Register 4 Stat*/
