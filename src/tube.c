@@ -227,9 +227,10 @@ void tube_host_write(uint16_t addr, uint8_t val)
             case 5: /*Register 3*/
                 if (tubeula.hp3pos < 2) {
                     tubeula.hp3[tubeula.hp3pos++] = val;
-                    tubeula.pstat[2] |=  0x80; /* data available to parasite */
-                    if (tubeula.hp3pos >= ((tubeula.r1stat & TUBE_STAT_V) ? 2 : 1))
+                    if (tubeula.hp3pos >= ((tubeula.r1stat & TUBE_STAT_V) ? 2 : 1)) {
+                        tubeula.pstat[2] |=  0x80; /* data available to parasite */
                         tubeula.hstat[2] &= ~0x40; /* no space for host */
+                    }
                 }
                 break;
             case 7: /*Register 4*/
