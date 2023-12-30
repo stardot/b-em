@@ -48,7 +48,6 @@ tube_speed_t tube_speeds[NUM_TUBE_SPEEDS] =
 
 int tube_irq=0;
 tubetype tube_type=TUBEX86;
-bool tube_resetting;
 tube_ula tubeula;
 
 static void tube_reset_most(void)
