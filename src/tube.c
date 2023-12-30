@@ -51,17 +51,6 @@ tubetype tube_type=TUBEX86;
 bool tube_resetting;
 tube_ula tubeula;
 
-enum tube_status {
-    TUBE_STAT_Q = 0x01, // enable HIRQ from register 4
-    TUBE_STAT_I = 0x02, // enable PIRQ from register 1
-    TUBE_STAT_J = 0x04, // enable PIRQ from register 4
-    TUBE_STAT_M = 0x08, // enable PNMI from register 3
-    TUBE_STAT_V = 0x10, // two byte operation of register 3
-    TUBE_STAT_P = 0x20, // activate PRST (reset parasite procoessor)
-    TUBE_STAT_T = 0x40, // clear all Tube registers (except r1stat).
-    TUBE_STAT_S = 0x80, // set control flag(s) indicated by mask
-};
-
 static void tube_reset_most(void)
 {
     tubeula.ph1count = tubeula.ph1head = tubeula.ph1tail = 0;
