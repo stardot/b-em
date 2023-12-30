@@ -108,7 +108,7 @@ void tube_updateints()
             m68k_set_virq(2, 0);
     }
 
-    if (tubeula.r1stat & TUBE_STAT_M && (tubeula.ph3pos == 0 || tubeula.hp3pos > ((tubeula.r1stat & TUBE_STAT_V) ? 1 : 0))) {
+    if (tubeula.r1stat & TUBE_STAT_M && (tubeula.ph3pos == 0 || (tubeula.pstat[2] & 0x80))) {
         new_irq |= 2;
         if (!(tube_irq & 2)) {
             log_debug("tube: parasite NMI asserted");
