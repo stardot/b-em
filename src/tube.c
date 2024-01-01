@@ -131,14 +131,18 @@ uint8_t tube_host_read(uint16_t addr)
                 temp = (tubeula.hstat[0] & TUBE_BOTH_AVAIL) | tubeula.r1stat;
                 break;
             case 1: /*Register 1*/
-                temp = tubeula.ph1[tubeula.ph1head];
-                log_debug("tube: host read R%c=%02X", '1', temp);
-                if (tubeula.ph1count > 0) {
+                if (tubeula.ph1count > 0) {              
+                    temp = tubeula.ph1[tubeula.ph1head];
                     if (--tubeula.ph1count == 0)
                         tubeula.hstat[0] &= ~TUBE_DATA_AVAIL;
                     if (++tubeula.ph1head == TUBE_PH1_SIZE)
                         tubeula.ph1head = 0;
                     tubeula.pstat[0] |= TUBE_SPACE_AVAIL;
+                    log_debug("tube: host read R%c=%02X from FIFO", '1', temp);
+                }
+                else {
+                    temp = 0x01;
+                    log_debug("tube: host read R%c=%02X fixed default", '1', temp);
                 }
                 break;
             case 2: /*Register 2 Stat*/
@@ -147,26 +151,26 @@ uint8_t tube_host_read(uint16_t addr)
             case 3: /*Register 2*/
                 temp = tubeula.ph2;
                 log_debug("tube: host read R%c=%02X", '2', temp);
-                if (tubeula.hstat[1] & TUBE_DATA_AVAIL)
-                {
-                        tubeula.hstat[1] &= ~TUBE_DATA_AVAIL;
-                        tubeula.pstat[1] |=  TUBE_SPACE_AVAIL;
-                }
+                tubeula.hstat[1] &= ~TUBE_DATA_AVAIL;
+                tubeula.pstat[1] |=  TUBE_SPACE_AVAIL;
                 break;
             case 4: /*Register 3 Stat*/
                 temp = tubeula.hstat[2];
                 break;
             case 5: /*Register 3*/
-                temp = 0x96;
                 if (tubeula.ph3pos > 0) {
                     temp = tubeula.ph3[0];
-                    log_debug("tube: host read R%c=%02X", '3', temp);
                     tubeula.ph3[0] = tubeula.ph3[1];
                     tubeula.ph3pos--;
                     if (!tubeula.ph3pos) {
                         tubeula.hstat[2] &= ~TUBE_DATA_AVAIL;
                         tubeula.pstat[2] |=  TUBE_BOTH_AVAIL;
                     }
+                    log_debug("tube: host read R%c=%02X from FIFO", '3', temp);
+                }
+                else {
+                    temp = 0x96;
+                    log_debug("tube: host read R%c=%02X fixed default", '3', temp);
                 }
                 break;
             case 6: /*Register 4 Stat*/
@@ -175,11 +179,8 @@ uint8_t tube_host_read(uint16_t addr)
             case 7: /*Register 4*/
                 temp = tubeula.ph4;
                 log_debug("tube: host read R%c=%02X", '4', temp);
-                if (tubeula.hstat[3] & TUBE_DATA_AVAIL)
-                {
-                        tubeula.hstat[3] &= ~TUBE_DATA_AVAIL;
-                        tubeula.pstat[3] |=  TUBE_SPACE_AVAIL;
-                }
+                tubeula.hstat[3] &= ~TUBE_DATA_AVAIL;
+                tubeula.pstat[3] |=  TUBE_SPACE_AVAIL;
                 break;
         }
         tube_updateints();
@@ -221,11 +222,14 @@ void tube_host_write(uint16_t addr, uint8_t val)
             case 5: /*Register 3*/
                 if (tubeula.hp3pos < 2) {
                     tubeula.hp3[tubeula.hp3pos++] = val;
+                    log_debug("tube: host write R3=%02X (sucessful)", val);
                     if (tubeula.hp3pos >= ((tubeula.r1stat & TUBE_STAT_V) ? 2 : 1)) {
                         tubeula.pstat[2] |=  TUBE_DATA_AVAIL; /* data available to parasite */
                         tubeula.hstat[2] &= ~TUBE_SPACE_AVAIL; /* no space for host */
                     }
                 }
+                else
+                    log_debug("tube: host write R3=%02X (overrun)", val);
                 break;
             case 7: /*Register 4*/
                 log_debug("tube: host write R%c=%02X", '4', val);
@@ -249,11 +253,8 @@ uint8_t tube_parasite_read(uint32_t addr)
             case 1: /*Register 1*/
                 temp = tubeula.hp1;
                 log_debug("tube: parasite read R%c=%02X", '1', temp);
-                if (tubeula.pstat[0] & TUBE_DATA_AVAIL)
-                {
-                        tubeula.pstat[0] &= ~TUBE_DATA_AVAIL;
-                        tubeula.hstat[0] |=  TUBE_SPACE_AVAIL;
-                }
+                tubeula.pstat[0] &= ~TUBE_DATA_AVAIL;
+                tubeula.hstat[0] |=  TUBE_SPACE_AVAIL;
                 break;
             case 2: /*Register 2 stat*/
                 temp = tubeula.pstat[1];
@@ -261,26 +262,26 @@ uint8_t tube_parasite_read(uint32_t addr)
             case 3: /*Register 2*/
                 temp = tubeula.hp2;
                 log_debug("tube: parasite read R%c=%02X", '2', temp);
-                if (tubeula.pstat[1] & TUBE_DATA_AVAIL)
-                {
-                        tubeula.pstat[1] &= ~TUBE_DATA_AVAIL;
-                        tubeula.hstat[1] |=  TUBE_SPACE_AVAIL;
-                }
+                tubeula.pstat[1] &= ~TUBE_DATA_AVAIL;
+                tubeula.hstat[1] |=  TUBE_SPACE_AVAIL;
                 break;
             case 4: /*Register 3 stat*/
                 temp = tubeula.pstat[2];
                 break;
             case 5: /*Register 3*/
-                temp = 0xe4;
                 if (tubeula.hp3pos > 0) {
                     temp = tubeula.hp3[0];
-                    log_debug("tube: parasite read R%c=%02X", '3', temp);
+                    log_debug("tube: parasite read R%c=%02X from FIFO", '3', temp);
                     tubeula.hp3[0] = tubeula.hp3[1];
                     tubeula.hp3pos--;
                     if (!tubeula.hp3pos) {
                         tubeula.hstat[2] |=  TUBE_SPACE_AVAIL;
                         tubeula.pstat[2] &= ~TUBE_DATA_AVAIL;
                     }
+                }
+                else {
+                    temp = 0xe4;
+                    log_debug("tube: parasite read R%c=%02X fixed default", '3', temp);
                 }
                 break;
             case 6: /*Register 4 stat*/
@@ -289,11 +290,8 @@ uint8_t tube_parasite_read(uint32_t addr)
             case 7: /*Register 4*/
                 temp = tubeula.hp4;
                 log_debug("tube: parasite read R%c=%02X", '4', temp);
-                if (tubeula.pstat[3] & TUBE_DATA_AVAIL)
-                {
-                        tubeula.pstat[3] &= ~TUBE_DATA_AVAIL;
-                        tubeula.hstat[3] |=  TUBE_SPACE_AVAIL;
-                }
+                tubeula.pstat[3] &= ~TUBE_DATA_AVAIL;
+                tubeula.hstat[3] |=  TUBE_SPACE_AVAIL;
                 break;
         }
         tube_updateints();
@@ -305,8 +303,8 @@ void tube_parasite_write(uint32_t addr, uint8_t val)
         switch (addr & 7)
         {
             case 1: /*Register 1*/
-                log_debug("tube: parasite write R%c=%02X", '1', val);
                 if (tubeula.ph1count < TUBE_PH1_SIZE) {
+                    log_debug("tube: parasite write R%c=%02X (sucessful)", '1', val);
                     tubeula.ph1[tubeula.ph1tail++] = val;
                     tubeula.hstat[0] |= TUBE_DATA_AVAIL;
                     if (tubeula.ph1tail == TUBE_PH1_SIZE)
@@ -314,6 +312,8 @@ void tube_parasite_write(uint32_t addr, uint8_t val)
                     if (++tubeula.ph1count == TUBE_PH1_SIZE)
                         tubeula.pstat[0] &= ~TUBE_SPACE_AVAIL;
                 }
+                else
+                    log_debug("tube: parasite write R%c=%02X (overrun)", '1', val);
                 break;
             case 3: /*Register 2*/
                 log_debug("tube: parasite write R%c=%02X", '2', val);
@@ -322,14 +322,16 @@ void tube_parasite_write(uint32_t addr, uint8_t val)
                 tubeula.pstat[1] &= ~TUBE_SPACE_AVAIL;
                 break;
             case 5: /*Register 3*/
-                log_debug("tube: parasite write R%c=%02X", '3', val);
                 if (tubeula.ph3pos < 2) {
+                    log_debug("tube: parasite write R%c=%02X (sucessful)", '3', val);
                     tubeula.ph3[tubeula.ph3pos++] = val;
                     if (tubeula.ph3pos >= ((tubeula.r1stat & TUBE_STAT_V) ? 2 : 1)) {
                         tubeula.hstat[2] |=  TUBE_DATA_AVAIL; /* data available to host */
                         tubeula.pstat[2] &= ~TUBE_BOTH_AVAIL; /* no space for parasite */
                     }
                 }
+                else
+                    log_debug("tube: parasite write R%c=%02X (overrun)", '3', val);
                 break;
             case 7: /*Register 4*/
                 log_debug("tube: parasite write R%c=%02X", '4', val);
