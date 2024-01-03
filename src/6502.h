@@ -5,7 +5,6 @@
 
 extern uint8_t a,x,y,s;
 extern uint16_t pc;
-extern uint_least32_t cycles_6502;
 
 extern PREG p;
 
@@ -23,6 +22,7 @@ extern int interrupt;
  */
 extern int nmi;
 
+extern uint64_t stopwatch;
 extern int romsel;
 extern uint8_t ram1k, ram4k, ram8k;
 

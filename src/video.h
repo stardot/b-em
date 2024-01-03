@@ -17,6 +17,7 @@ extern int crtc_i;
 
 extern int hc, vc, sc;
 extern uint16_t ma;
+extern uint64_t stopwatch_vblank;
 
 /*Video ULA (VIDPROC)*/
 void videoula_write(uint16_t addr, uint8_t val);

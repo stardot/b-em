@@ -75,6 +75,9 @@ static int contcount = 0;
 
 static const char time_fmt[] = "%d/%m/%Y %H:%M:%S";
 
+static uint64_t user_stopwatches[] = { ~0, ~0, ~0, ~0, ~0, ~0, ~0, ~0, ~0, ~0 };
+static const int user_stopwatch_count = sizeof(user_stopwatches)/sizeof(*user_stopwatches);
+
 static void close_trace(const char *why)
 {
     if (trace_fp) {
@@ -394,6 +397,9 @@ void debug_reset()
         fprintf(trace_fp, "Processor reset at %s\n", when);
         fflush(trace_fp);
     }
+    for (int i=0; i<user_stopwatch_count; i++) {
+        user_stopwatches[i] = ~0;
+    }
 }
 
 static const char helptext[] =
@@ -429,6 +435,7 @@ static const char helptext[] =
     "    ruler [s [c]] - draw a ruler to help with hexdumps.\n"
     "                 starts at 's' for 'c' bytes\n"
     "    s [n]      - step n instructions (or 1 if no parameter)\n"
+    "    swatch [n] - start/clear/print stopwatches\n"
     "    symbol name=[rom:]addr\n"
     "               - add debugger symbol\n"
     "    symlist    - list all symbols\n"
@@ -763,6 +770,41 @@ static void debugger_save(cpu_debug_t *cpu, char *iptr)
     }
     else
         debug_outf("Nothing to save (no breakpoints)\n");
+}
+
+static void debugger_stopwatch(cpu_debug_t *cpu, const char* iptr)
+{
+    if (*iptr) {
+        int user = atoi(iptr);
+        if (user >= 0 && user < user_stopwatch_count) {
+            if (user_stopwatches[user] < ~0) {
+                user_stopwatches[user] = ~0;
+                debug_outf("User stopwatch %d cleared.\n", user);
+            }
+            else {
+                user_stopwatches[user] = stopwatch;
+                debug_outf("User stopwatch %d started.\n", user);
+            }
+        }
+        else {
+            debug_outf("User stopwatches IDs must be in the range 0 to %d.\n",
+                user_stopwatch_count-1);
+        }
+    }
+    else {
+        debug_outf("%" PRIu64 " cycles since reset (%.3f s)\n", stopwatch, (double)stopwatch / 2000000.0);
+        if (stopwatch_vblank) {
+            uint64_t delta = stopwatch - stopwatch_vblank;
+            debug_outf("%" PRIu64 " cycles since vertical blank (%.3f s)\n", delta, (double)delta / 2000000.0);
+        }
+        for (int i=0; i<user_stopwatch_count; i++) {
+            if (user_stopwatches[i] < ~0) {
+                uint64_t delta = stopwatch - user_stopwatches[i];
+                debug_outf("%" PRIu64 " cycles since user stopwatch %d (%.3f s)\n",
+                    delta, i, (double)delta / 2000000.0);
+            }
+        }
+    }
 }
 
 void trimnl(char *buf) {
@@ -1516,6 +1558,8 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                         else
                             debug_outf("Missing filename\n");
                     }
+                    else if (!strncmp(cmd, "swatch", cmdlen))
+                        debugger_stopwatch(cpu, iptr);
                     else
                         badcmd = true;
                     break;
