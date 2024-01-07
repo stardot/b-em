@@ -79,10 +79,10 @@ void tube_updateints()
 
     interrupt &= ~8;
 
-    if ((tubeula.r1stat & TUBE_STAT_Q) && (tubeula.hstat[3] & 128))
+    if ((tubeula.r1stat & TUBE_STAT_Q) && (tubeula.hstat[3] & TUBE_DATA_AVAIL))
         interrupt |= 8;
 
-    if (((tubeula.r1stat & TUBE_STAT_I) && (tubeula.pstat[0] & 128)) || ((tubeula.r1stat & TUBE_STAT_J) && (tubeula.pstat[3] & 128))) {
+    if (((tubeula.r1stat & TUBE_STAT_I) && (tubeula.pstat[0] & TUBE_DATA_AVAIL)) || ((tubeula.r1stat & TUBE_STAT_J) && (tubeula.pstat[3] & TUBE_DATA_AVAIL))) {
         new_irq |= 1;
         if (!(tube_irq & 1)) {
             log_debug("tube: parasite IRQ asserted");
