@@ -45,10 +45,10 @@ enum tube_status {
 
 typedef struct
 {
-    uint8_t ph1[TUBE_PH1_SIZE],ph2,ph3[2],ph4;
-    uint8_t hp1,hp2,hp3[2],hp4;
+    uint8_t ph1[TUBE_PH1_SIZE],ph2,ph3[2],ph4,phl;
+    uint8_t hp1,hp2,hp3[2],hp4,hpl;
     uint8_t hstat[4],pstat[4],r1stat;
-    int ph1tail,ph1head,ph1count,ph3pos,hp3pos;
+    int8_t ph1tail,ph1head,ph1count,ph3pos,hp3pos;
 } tube_ula;
 
 extern tube_ula tubeula;

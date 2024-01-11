@@ -141,8 +141,8 @@ uint8_t tube_host_read(uint16_t addr)
                     log_debug("tube: host read R%c=%02X from FIFO", '1', temp);
                 }
                 else {
-                    temp = 0x01;
-                    log_debug("tube: host read R%c=%02X fixed default", '1', temp);
+                    temp = tubeula.phl;
+                    log_debug("tube: host read R%c=%02X from latch", '1', temp);
                 }
                 break;
             case 2: /*Register 2 Stat*/
@@ -169,8 +169,8 @@ uint8_t tube_host_read(uint16_t addr)
                     log_debug("tube: host read R%c=%02X from FIFO", '3', temp);
                 }
                 else {
-                    temp = 0x96;
-                    log_debug("tube: host read R%c=%02X fixed default", '3', temp);
+                    temp = tubeula.phl;
+                    log_debug("tube: host read R%c=%02X from latch", '3', temp);
                 }
                 break;
             case 6: /*Register 4 Stat*/
@@ -190,6 +190,8 @@ uint8_t tube_host_read(uint16_t addr)
 void tube_host_write(uint16_t addr, uint8_t val)
 {
         if (!tube_exec) return;
+        tubeula.hpl = val;
+
         switch (addr & 7)
         {
             case 0: /*Register 1 stat*/
@@ -280,8 +282,8 @@ uint8_t tube_parasite_read(uint32_t addr)
                     }
                 }
                 else {
-                    temp = 0xe4;
-                    log_debug("tube: parasite read R%c=%02X fixed default", '3', temp);
+                    temp = tubeula.hpl;
+                    log_debug("tube: parasite read R%c=%02X from latch", '3', temp);
                 }
                 break;
             case 6: /*Register 4 stat*/
@@ -300,6 +302,8 @@ uint8_t tube_parasite_read(uint32_t addr)
 
 void tube_parasite_write(uint32_t addr, uint8_t val)
 {
+    tubeula.phl = val;
+
         switch (addr & 7)
         {
             case 1: /*Register 1*/
