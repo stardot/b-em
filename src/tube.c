@@ -1,3 +1,4 @@
+#define _DEBUG
 /*B-em v2.2 by Tom Walker
   Tube ULA emulation*/
 
@@ -367,13 +368,52 @@ bool tube_32016_init(void *rom)
 
 void tube_ula_savestate(FILE *f)
 {
-    putc(tube_6502_rom_in, f);
+    uint8_t bytes[2];
+    bytes[0] = 2; // version two.
+    bytes[1] = tube_6502_rom_in;
+    fwrite(bytes, 2, 1, f);
     fwrite(&tubeula, sizeof tubeula, 1, f);
 }
 
 void tube_ula_loadstate(FILE *f)
 {
-    tube_6502_rom_in = getc(f);
-    fread(&tubeula, sizeof tubeula, 1, f);
+    int byte = getc(f);
+    if (byte == 2) {  // version two.
+        log_debug("tube: loading new tube ULA structure");
+        tube_6502_rom_in = getc(f);
+        fread(&tubeula, sizeof tubeula, 1, f);
+    }
+    else {
+        struct {
+            uint8_t ph1[TUBE_PH1_SIZE],ph2,ph3[2],ph4;
+            uint8_t hp1,hp2,hp3[2],hp4;
+            uint8_t hstat[4],pstat[4],r1stat;
+            int ph1tail,ph1head,ph1count,ph3pos,hp3pos;
+        } old_ula;
+        log_debug("tube: loading old tube ULA structure");
+        tube_6502_rom_in = byte;
+        fread(&old_ula, sizeof(old_ula), 1, f);
+        for (int i = 0; i < TUBE_PH1_SIZE; ++i)
+            tubeula.ph1[i] = old_ula.ph1[i];
+        tubeula.ph2    = old_ula.ph2;
+        tubeula.ph3[0] = old_ula.ph3[0];
+        tubeula.ph3[1] = old_ula.ph3[1];
+        tubeula.ph4    = old_ula.ph4;
+        tubeula.hp1    = old_ula.hp1;
+        tubeula.hp2    = old_ula.hp2;
+        tubeula.hp3[0] = old_ula.hp3[0];
+        tubeula.hp3[1] = old_ula.hp3[1];
+        tubeula.hp4    = old_ula.hp4;
+        for (int i = 0; i < 4; ++i) {
+            tubeula.hstat[i] = old_ula.hstat[i];
+            tubeula.pstat[i] = old_ula.pstat[i];
+        }
+        tubeula.r1stat   = old_ula.r1stat;
+        tubeula.ph1tail  = old_ula.ph1tail;
+        tubeula.ph1head  = old_ula.ph1head;
+        tubeula.ph1count = old_ula.ph1count;
+        tubeula.ph3pos   = old_ula.ph3pos;
+        tubeula.hp3pos   = old_ula.hp3pos;
+    }
     tube_updateints();
 }
