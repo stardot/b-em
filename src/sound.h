@@ -32,6 +32,8 @@ typedef struct {
     uint32_t samp_rate;
     uint16_t bits_samp;
 } sound_rec_t;
+
+extern sound_rec_t sound_rec;
     
 bool sound_start_rec(sound_rec_t *rec, const char *filename);
 void sound_stop_rec(sound_rec_t *rec);

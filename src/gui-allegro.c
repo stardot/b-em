@@ -128,6 +128,7 @@ static ALLEGRO_MENU *create_file_menu(void)
     add_checkbox_item(menu, "Serial to file", IDM_FILE_SERIAL, sysacia_fp);
     add_checkbox_item(menu, music5000_rec.prompt, IDM_FILE_M5000, music5000_rec.fp);
     add_checkbox_item(menu, paula_rec.prompt, IDM_FILE_PAULAREC, paula_rec.fp);
+    add_checkbox_item(menu, sound_rec.prompt, IDM_FILE_SOUNDREC, sound_rec.fp);
     al_append_menu_item(menu, "Exit", IDM_FILE_EXIT, 0, NULL, NULL);
     return menu;
 }
@@ -1266,6 +1267,9 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             break;
         case IDM_FILE_PAULAREC:
             toggle_record(event, &paula_rec);
+            break;
+        case IDM_FILE_SOUNDREC:
+            toggle_record(event, &sound_rec);
             break;
         case IDM_FILE_EXIT:
             quitting = true;

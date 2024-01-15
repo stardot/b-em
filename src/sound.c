@@ -1,3 +1,4 @@
+#define _DEBUG
 /*B-em v2.2 by Tom Walker
   Internal SN sound chip emulation*/
 
@@ -60,6 +61,54 @@ static float iir(float NewSample) {
     return y[0];
 }
 
+static void sound_rec_float(float *buf)
+{
+    if (sound_rec.fp) {
+        if (!sound_rec.rec_started) {
+            for (int c = 0; c < BUFLEN_SO; ++c) {
+                if (buf[c]) {
+                    sound_rec.rec_started = true;
+                    break;
+                }
+            }
+        }
+        if (sound_rec.rec_started) {
+            unsigned char tmp[BUFLEN_SO * 2];
+            unsigned char *ptr = tmp;
+            for (int c = 0; c < BUFLEN_SO; ++c) {
+                int value = 32767 * buf[c];
+                *ptr++ = value;
+                *ptr++ = value >> 8;
+            }
+            fwrite(tmp, sizeof(tmp), 1, sound_rec.fp);
+        }
+    }
+}
+
+static void sound_rec_int(short *buf)
+{
+    if (sound_rec.fp) {
+        if (!sound_rec.rec_started) {
+            for (int c = 0; c < BUFLEN_SO; ++c) {
+                if (buf[c]) {
+                    sound_rec.rec_started = true;
+                    break;
+                }
+            }
+        }
+        if (sound_rec.rec_started) {
+            unsigned char tmp[BUFLEN_SO * 2];
+            unsigned char *ptr = tmp;
+            for (int c = 0; c < BUFLEN_SO; ++c) {
+                int value = buf[c];
+                *ptr++ = value;
+                *ptr++ = value >> 8;
+            }
+            fwrite(tmp, sizeof(tmp), 1, sound_rec.fp);
+        }
+    }
+}
+
 static void sound_poll_all(void)
 {
     float *buf;
@@ -88,9 +137,11 @@ static void sound_poll_all(void)
                 if (sound_filter) {
                     for (c = 0; c < BUFLEN_SO; c++)
                         buf[c] = iir((float)sound_buffer[c] / 32767.0);
+                    sound_rec_float(buf);
                 } else {
                     for (c = 0; c < BUFLEN_SO; c++)
                         buf[c] = (float)sound_buffer[c] / 32767.0;
+                    sound_rec_int(sound_buffer);
                 }
                 al_set_audio_stream_fragment(stream, buf);
                 al_set_audio_stream_playing(stream, true);
@@ -258,3 +309,13 @@ void sound_stop_rec(sound_rec_t *rec)
     rec->fp = NULL;
     rec->rec_started = false;
 }
+
+sound_rec_t sound_rec = {
+    NULL,    // fp
+    false,   // rec_started
+    "Record SN76489 to file",
+    1,       // WAVE type
+    1,       // channels
+    FREQ_SO, // sample rate
+    16       // bits/sample
+};
