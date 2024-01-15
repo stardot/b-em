@@ -26,14 +26,7 @@
 #include "sound.h"
 #include "savestate.h"
 
-
 #include "paula.h"
-
-
-FILE *paula_fp;
-
-static bool rec_started;
-
 
 #define RAM_SIZE				(512*1024)
 #define NUM_CHANNELS			4
@@ -41,10 +34,8 @@ static bool rec_started;
 #define JIM_PAGE				0xFEFC
 #define REG_BASE				0x80
 
-
 static uint8_t jimDev;
 static uint16_t jimPage;		//fcfe,fcfd  - big endian
-
 
 typedef struct
 {
@@ -127,62 +118,20 @@ void paula_init()
 
 }
 
-FILE *paula_rec_start(const char *filename)
-{
-    static const char zeros[] = { 0, 0, 0, 0, 0, 0 };
-
-    FILE *fp = fopen(filename, "wb");
-    if (fp) {
-        fseek(fp, 44, SEEK_SET);
-        fwrite(zeros, 6, 1, fp);
-        paula_fp = fp;
-        rec_started = false;
-    }
-    else
-        log_error("unable to open %s for writing: %s", filename, strerror(errno));
-    return fp;
-}
-
-static void fput32le(uint32_t v, FILE *fp)
-{
-    putc(v & 0xff, fp);
-    putc((v >> 8) & 0xff, fp);
-    putc((v >> 16) & 0xff, fp);
-    putc((v >> 24) & 0xff, fp);
-}
-
-
-void paula_rec_stop(void)
-{
-    static const char wavfmt[] = {
-        0x57, 0x41, 0x56, 0x45, // "WAVE"
-        0x66, 0x6D, 0x74, 0x20, // "fmt "
-        0x10, 0x00, 0x00, 0x00, // format chunk size
-        0x01, 0x00,             // format 1=PCM
-        0x01, 0x00,             // channels 2=mono
-        0x12, 0x7A, 0x00, 0x00, // sample rate 31250.
-        0x24, 0xF4, 0x00, 0x00, // byte rate 6250.
-        0x02, 0x00,             // block align 2.
-        0x10, 0x00,             // bits per sample 16.
-        0x64, 0x61, 0x74, 0x61  // "DATA".
-    };
-
-    FILE *fp = paula_fp;
-    long size = ftell(fp) - 8;
-    fseek(fp, 0, SEEK_SET);
-    fwrite("RIFF", 4, 1, fp);
-    fput32le(size, fp);
-    fwrite(wavfmt, sizeof wavfmt, 1, fp);
-    size -= 36;
-    fput32le(size, fp);        // data size.
-    fclose(fp);
-    paula_fp = NULL;
-}
+sound_rec_t paula_rec = {
+    NULL,   // fp
+    false,  // rec_started
+    "Record Paula to file",
+    1,      // WAVE type
+    1,      // channels
+    31250,  // sample rate
+    16      // bits/sample
+};
 
 void paula_close(void)
 {
-    if (paula_fp)
-        paula_rec_stop();
+    if (paula_rec.fp)
+        sound_stop_rec(&paula_rec);
 }
 
 
@@ -423,7 +372,7 @@ static void fput_samples(FILE *fp, int16_t s)
     bytes[0] = s;
     bytes[1] = s >> 8;
     fwrite(bytes, 2, 1, fp);
-    rec_started = true;
+    paula_rec.rec_started = true;
 }
 
 
@@ -455,8 +404,8 @@ void paula_fillbuf(int16_t *buffer, int len) {
         }
         int16_t s = paula_get_sample();
 
-        if (paula_fp)
-            fput_samples(paula_fp, s);
+        if (paula_rec.fp)
+            fput_samples(paula_rec.fp, s);
         *bufptr++ += s;
     }
 }

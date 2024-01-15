@@ -126,8 +126,8 @@ static ALLEGRO_MENU *create_file_menu(void)
     add_checkbox_item(menu, "Print to file", IDM_FILE_PRINT, print_dest == PDEST_FILE);
     add_checkbox_item(menu, "Print to command", IDM_FILE_PCMD, print_dest == PDEST_PIPE);
     add_checkbox_item(menu, "Serial to file", IDM_FILE_SERIAL, sysacia_fp);
-    add_checkbox_item(menu, "Record Music 5000 to file", IDM_FILE_M5000, music5000_fp);
-    add_checkbox_item(menu, "Record Paula to file", IDM_FILE_PAULAREC, paula_fp);
+    add_checkbox_item(menu, music5000_rec.prompt, IDM_FILE_M5000, music5000_rec.fp);
+    add_checkbox_item(menu, paula_rec.prompt, IDM_FILE_PAULAREC, paula_rec.fp);
     al_append_menu_item(menu, "Exit", IDM_FILE_EXIT, 0, NULL, NULL);
     return menu;
 }
@@ -770,41 +770,22 @@ static void serial_rec(ALLEGRO_EVENT *event)
     }
 }
 
-static void m5000_rec(ALLEGRO_EVENT *event)
+static void toggle_record(ALLEGRO_EVENT *event, sound_rec_t *rec)
 {
-    ALLEGRO_FILECHOOSER *chooser;
-    ALLEGRO_DISPLAY *display;
-
-    if (music5000_fp)
-        music5000_rec_stop();
-    else if ((chooser = al_create_native_file_dialog(savestate_name, "Record Music 5000 to file", "*.wav", ALLEGRO_FILECHOOSER_SAVE))) {
-        display = (ALLEGRO_DISPLAY *)(event->user.data2);
-        while (al_show_native_file_dialog(display, chooser)) {
-            if (al_get_native_file_dialog_count(chooser) <= 0)
-                break;
-            if (music5000_rec_start(al_get_native_file_dialog_path(chooser, 0)))
-                break;
+    if (rec->fp)
+        sound_stop_rec(rec);
+    else {
+        ALLEGRO_FILECHOOSER *chooser = al_create_native_file_dialog(savestate_name, rec->prompt, "*.wav", ALLEGRO_FILECHOOSER_SAVE);
+        if (chooser) {
+            ALLEGRO_DISPLAY *display = (ALLEGRO_DISPLAY *)(event->user.data2);
+            while (al_show_native_file_dialog(display, chooser)) {
+                if (al_get_native_file_dialog_count(chooser) <= 0)
+                    break;
+                if (sound_start_rec(rec, al_get_native_file_dialog_path(chooser, 0)))
+                    break;
+            }
+            al_destroy_native_file_dialog(chooser);
         }
-        al_destroy_native_file_dialog(chooser);
-    }
-}
-
-static void paula_rec(ALLEGRO_EVENT *event)
-{
-    ALLEGRO_FILECHOOSER *chooser;
-    ALLEGRO_DISPLAY *display;
-
-    if (paula_fp)
-        paula_rec_stop();
-    else if ((chooser = al_create_native_file_dialog(savestate_name, "Record Paula to file", "*.wav", ALLEGRO_FILECHOOSER_SAVE))) {
-        display = (ALLEGRO_DISPLAY *)(event->user.data2);
-        while (al_show_native_file_dialog(display, chooser)) {
-            if (al_get_native_file_dialog_count(chooser) <= 0)
-                break;
-            if (paula_rec_start(al_get_native_file_dialog_path(chooser, 0)))
-                break;
-        }
-        al_destroy_native_file_dialog(chooser);
     }
 }
 
@@ -1281,10 +1262,10 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             serial_rec(event);
             break;
         case IDM_FILE_M5000:
-            m5000_rec(event);
+            toggle_record(event, &music5000_rec);
             break;
         case IDM_FILE_PAULAREC:
-            paula_rec(event);
+            toggle_record(event, &paula_rec);
             break;
         case IDM_FILE_EXIT:
             quitting = true;
