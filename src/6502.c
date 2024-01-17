@@ -226,6 +226,7 @@ int output = 0;
 static int timetolive = 0;
 
 int cycles;
+uint64_t stopwatch;
 static int otherstuffcount = 0;
 int romsel;
 
@@ -237,6 +238,7 @@ static void polltime(int c)
     video_poll(c, 1);
     sound_poll(c);
     music5000_poll(c);
+    stopwatch += c;
     otherstuffcount -= c;
     if (motoron) {
         if (fdc_time) {
@@ -1032,6 +1034,7 @@ void m6502_reset(void)
         nmi = oldnmi = 0;
         output = 0;
         tubecycle = tubecycles = 0;
+        stopwatch = 0;
         log_debug("PC : %04X\n", pc);
 }
 

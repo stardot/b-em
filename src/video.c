@@ -7,6 +7,7 @@
 #include "b-em.h"
 
 #include "config.h"
+#include "6502.h"
 #include "mem.h"
 #include "model.h"
 #include "serial.h"
@@ -41,10 +42,13 @@ static enum {
     CRTC_LOFREQ
 } crtc_mode;
 
+uint64_t stopwatch_vblank;
+
 void crtc_reset()
 {
     hc = vc = sc = vadj = 0;
     crtc[9] = 10;
+    stopwatch_vblank = 0;
 }
 
 static void set_intern_dtype(enum vid_disptype dtype)
@@ -1123,8 +1127,9 @@ void video_poll(int clocks, int timer_enable)
         }
         if (hvblcount) {
             hvblcount--;
-            if (!hvblcount && timer_enable)
+            if (!hvblcount && timer_enable) {
                 sysvia_set_ca1(0);
+            }
         }
 
         if (interline && hc == (crtc[0] >> 1)) {
@@ -1237,8 +1242,10 @@ void video_poll(int clocks, int timer_enable)
                     if (ccount == 10 || ((!motor || !fasttape) && !is_free_run()))
                         ccount = 0;
                     scry = 0;
-                    if (timer_enable)
+                    if (timer_enable) {
+                        stopwatch_vblank = stopwatch;
                         sysvia_set_ca1(1);
+                    }
 
                     vsynctime = (crtc[3] >> 4) + 1;
                     if (!(crtc[3] >> 4))
