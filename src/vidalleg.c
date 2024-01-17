@@ -465,8 +465,10 @@ static inline void fill_letterbox(void)
 static void render_leds(void)
 {
     if (vid_ledlocation > LED_LOC_NONE) {
-        if (led_ticks > 0 && --led_ticks == 0)
+        if (led_ticks > 0 && --led_ticks == 0) {
             led_timer_fired();
+            al_set_target_backbuffer(al_get_current_display());
+        }
         float w = al_get_bitmap_width(led_bitmap);
         float h = al_get_bitmap_height(led_bitmap);
         if (vid_ledvisibility == LED_VIS_ALWAYS || (vid_ledvisibility == LED_VIS_TRANSIENT && led_any_transient_led_on())) {
