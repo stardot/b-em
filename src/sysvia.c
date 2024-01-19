@@ -84,12 +84,17 @@ static void sysvia_update_sdb()
 
 static void sysvia_write_IC32(uint8_t val)
 {
+    uint8_t oldIC32 = IC32;
+
         if (val & 8)
            IC32 |=  (1 << (val & 7));
         else
            IC32 &= ~(1 << (val & 7));
 
         sysvia_update_sdb();
+
+        if (!(IC32 & 1) && (oldIC32 & 1))
+            sn_write(sdbval);
 
         scrsize = ((IC32 & 0x10) ? 2 : 0) | ((IC32 & 0x20) ? 1 : 0);
 
