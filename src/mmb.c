@@ -255,7 +255,6 @@ static bool mmb_check_pick(unsigned drive, unsigned disc)
         case 2:
         case 3:
             drive &= 1;
-            disc--;
             side = 1;
             break;
         default:
