@@ -30,6 +30,8 @@ static unsigned mmb_cat_size;
 static char *mmb_cat;
 unsigned mmb_ndisc;
 char *mmb_fn;
+static int mmb_dcat_posn;
+static int mmb_dcat_count;
 
 static void mmb_read_error(const char *fn, FILE *fp)
 {
@@ -306,4 +308,51 @@ void mmb_cmd_dabout(void)
 {
     memcpy(vdfs_split_addr(), mmb_about_str, sizeof(mmb_about_str));
     vdfs_split_go(0);
+}
+
+void mmb_cmd_dcat_cont(void)
+{
+    if (readmem(0xff) & 0x80)
+        vdfs_error("\x17" "Escape");
+    else {
+        uint8_t *dest = vdfs_split_addr();
+        const char *cat_ptr = mmb_cat + mmb_dcat_posn * 16;
+        const char *cat_end = mmb_cat + mmb_cat_size;
+        while (cat_ptr < cat_end) {
+            if (*cat_ptr) {
+                ++mmb_dcat_count;
+                dest += snprintf((char *)dest, 80, "%5d ", mmb_dcat_posn++);
+                for (int i = 0; i < 12; ++i) {
+                    int ch = cat_ptr[i] & 0x7f;
+                    if (ch < ' ' || ch > 0x7e)
+                        ch = ' ';
+                    *dest++ = ch;
+                }
+                *dest++ = ' ';
+                int flag = cat_ptr[15];
+                if (flag == 0xf0)
+                    flag = 'U';
+                else if (flag == 0)
+                    flag = 'P';
+                else
+                    flag = ' ';
+                *dest++ = flag;
+                *dest = 0;
+                vdfs_split_go(0x16);
+                return;
+            }
+            cat_ptr += MMB_NAME_SIZE;
+            ++mmb_dcat_posn;
+        }
+        snprintf((char *)dest, 20, "\r\n%d disks found\r\n", mmb_dcat_count);
+        vdfs_split_go(0);
+    }
+}
+
+void mmb_cmd_dcat_start(uint16_t addr)
+{
+    log_debug("mmb: begin dcat, mmb_cat_size=%d", mmb_cat_size);
+    mmb_dcat_count = 0;
+    mmb_dcat_posn = 0;
+    mmb_cmd_dcat_cont();
 }

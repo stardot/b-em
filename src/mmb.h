@@ -18,5 +18,7 @@ void mmb_reset(void);
 
 void mmb_cmd_dabout(void);
 void mmb_cmd_din(uint16_t addr);
+void mmb_cmd_dcat_start(uint16_t addr);
+void mmb_cmd_dcat_cont(void);
 
 #endif

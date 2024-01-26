@@ -282,6 +282,7 @@ enum vdfs_action {
     VDFS_ACT_OSW7F_WAT5,
     VDFS_ACT_MMBDABT,
     VDFS_ACT_MMBDIN,
+    VDFS_ACT_MMBDCAT,
     VDFS_ACT_DRIVE,
     VDFS_ACT_ACCESS,
     VDFS_ACT_COPY,
@@ -4709,6 +4710,9 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
     case VDFS_ACT_MMBDIN:
         mmb_cmd_din(addr);
         break;
+    case VDFS_ACT_MMBDCAT:
+        mmb_cmd_dcat_start(addr);
+        break;
     case VDFS_ACT_DRIVE:
         cmd_drive(addr);
         break;
@@ -4961,7 +4965,8 @@ static const struct cmdent ctab_always[] = {
 
 static const struct cmdent ctab_mmb[] = {
     { "DAbout",  VDFS_ACT_MMBDABT },
-    { "Din",     VDFS_ACT_MMBDIN  }
+    { "Din",     VDFS_ACT_MMBDIN  },
+    { "DCat",    VDFS_ACT_MMBDCAT }
 };
 
 static const struct cmdent ctab_enabled[] = {
@@ -5149,6 +5154,7 @@ static inline void dispatch(uint8_t value)
         case 0x13: rest_ram();  break;
         case 0x14: info_next(); break;
         case 0x15: log_time();  break;
+        case 0x16: mmb_cmd_dcat_cont(); break;
         default: log_warn("vdfs: function code %d not recognised", value);
     }
 }
