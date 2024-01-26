@@ -19,19 +19,23 @@
 #include "vdfs.h"
 
 #define MMB_DISC_SIZE      (200*1024)
-#define MMB_NAME_SIZE      16
+#define MMB_ENTRY_SIZE     16
 #define MMB_ZONE_DISCS     511
-#define MMB_ZONE_CAT_SIZE  (MMB_ZONE_DISCS*MMB_NAME_SIZE)
-#define MMB_ZONE_FULL_SIZE (MMB_ZONE_CAT_SIZE+MMB_NAME_SIZE+MMB_ZONE_DISCS*MMB_DISC_SIZE)
-#define MMB_ZONE_SKIP_SIZE (MMB_ZONE_DISCS*MMB_DISC_SIZE+MMB_NAME_SIZE)
+#define MMB_ZONE_CAT_SIZE  (MMB_ZONE_DISCS*MMB_ENTRY_SIZE)
+#define MMB_ZONE_FULL_SIZE (MMB_ZONE_CAT_SIZE+MMB_ENTRY_SIZE+MMB_ZONE_DISCS*MMB_DISC_SIZE)
+#define MMB_ZONE_SKIP_SIZE (MMB_ZONE_DISCS*MMB_DISC_SIZE+MMB_ENTRY_SIZE)
+#define MMB_NAME_SIZE      12
 
 static unsigned mmb_boot_discs[4];
 static unsigned mmb_cat_size;
 static char *mmb_cat;
 unsigned mmb_ndisc;
 char *mmb_fn;
-static int mmb_dcat_posn;
-static int mmb_dcat_count;
+static unsigned mmb_dcat_posn;
+static unsigned mmb_dcat_end;
+static unsigned mmb_dcat_count;
+static unsigned mmb_dcat_pat_len;
+static char mmb_dcat_pattern[MMB_NAME_SIZE];
 
 static void mmb_read_error(const char *fn, FILE *fp)
 {
@@ -46,7 +50,7 @@ static unsigned mmb_calc_offset(unsigned disc)
 {
     unsigned zone_start = disc / MMB_ZONE_DISCS;
     unsigned zone_index = disc % MMB_ZONE_DISCS;
-    unsigned offset = zone_start * MMB_ZONE_FULL_SIZE + MMB_ZONE_CAT_SIZE + MMB_NAME_SIZE + zone_index * MMB_DISC_SIZE;
+    unsigned offset = zone_start * MMB_ZONE_FULL_SIZE + MMB_ZONE_CAT_SIZE + MMB_ENTRY_SIZE + zone_index * MMB_DISC_SIZE;
     log_debug("mmb: mmb_calc_offset(%u) -> zone_start=%u, zone_index=%u, offset=%u", disc, zone_start, zone_index, offset);
     return offset;
 }
@@ -317,12 +321,11 @@ void mmb_cmd_dcat_cont(void)
     else {
         uint8_t *dest = vdfs_split_addr();
         const char *cat_ptr = mmb_cat + mmb_dcat_posn * 16;
-        const char *cat_end = mmb_cat + mmb_cat_size;
-        while (cat_ptr < cat_end) {
-            if (*cat_ptr) {
+        while (mmb_dcat_posn < mmb_dcat_end) {
+            if (*cat_ptr && vdfs_wildmat(mmb_dcat_pattern, mmb_dcat_pat_len, cat_ptr, MMB_NAME_SIZE)) {
                 ++mmb_dcat_count;
                 dest += snprintf((char *)dest, 80, "%5d ", mmb_dcat_posn++);
-                for (int i = 0; i < 12; ++i) {
+                for (int i = 0; i < MMB_NAME_SIZE; ++i) {
                     int ch = cat_ptr[i] & 0x7f;
                     if (ch < ' ' || ch > 0x7e)
                         ch = ' ';
@@ -341,7 +344,7 @@ void mmb_cmd_dcat_cont(void)
                 vdfs_split_go(0x16);
                 return;
             }
-            cat_ptr += MMB_NAME_SIZE;
+            cat_ptr += MMB_ENTRY_SIZE;
             ++mmb_dcat_posn;
         }
         snprintf((char *)dest, 20, "\r\n%d disks found\r\n", mmb_dcat_count);
@@ -351,8 +354,60 @@ void mmb_cmd_dcat_cont(void)
 
 void mmb_cmd_dcat_start(uint16_t addr)
 {
-    log_debug("mmb: begin dcat, mmb_cat_size=%d", mmb_cat_size);
+    /* Defaults for an unfiltered list */
     mmb_dcat_count = 0;
     mmb_dcat_posn = 0;
+    mmb_dcat_end = mmb_cat_size / MMB_ENTRY_SIZE;
+    mmb_dcat_pattern[0] = '*';
+    mmb_dcat_pat_len = 1;
+
+    int ch = readmem(addr++);
+    while (ch == ' ' || ch == '\t')
+        ch = readmem(addr++);
+    if (ch != '\r') {
+        unsigned value1 = 0;
+        uint16_t addr2 = addr;
+        while (ch >= '0' && ch <= '9') {
+            value1 = (value1 * 10) + (ch - '0');
+            ch = readmem(addr2++);
+        }
+        if (ch == ' ' || ch == '\t' || ch == '\r') {
+            log_debug("mmb: mmb_cmd_dcat_start, found 1st number=%u", value1);
+            unsigned max_value = mmb_dcat_end;
+            if (value1 > max_value)
+                value1 = max_value;
+            mmb_dcat_end = value1;
+            while (ch == ' ' || ch == '\t')
+                ch = readmem(addr2++);
+            addr = addr2;
+            if (ch != '\r') {
+                unsigned value2 = 0;
+                while (ch >= '0' && ch <= '9') {
+                    value2 = (value2 * 10) + (ch - '0');
+                    ch = readmem(addr2++);
+                }
+                if (ch == ' ' || ch == '\t' || ch == '\r') {
+                    log_debug("mmb: mmb_cmd_dcat_start, found 2nd number=%u", value2);
+                    if (value2 > max_value)
+                        value2 = max_value;
+                    mmb_dcat_posn = value1;
+                    mmb_dcat_end = value2;
+                    while (ch == ' ' || ch == '\t')
+                        ch = readmem(addr2++);
+                    addr = addr2;
+                }
+            }
+        }
+        if (ch != '\r') {
+            log_debug("mmb: mmb_cmd_dcat_start, pattern found");
+            unsigned pat_ix = 0;
+            do {
+                mmb_dcat_pattern[pat_ix++] = ch;
+                ch = readmem(addr++);
+            } while (pat_ix < MMB_NAME_SIZE && ch != ' ' && ch != '\t' && ch != '\r');
+            mmb_dcat_pat_len = pat_ix;
+            log_debug("mmb: mmb_cmd_dcat_start, pattern=%.*s", pat_ix, mmb_dcat_pattern);
+        }
+    }
     mmb_cmd_dcat_cont();
 }

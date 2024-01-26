@@ -1144,7 +1144,7 @@ static vdfs_entry *acorn_search(vdfs_entry *dir, vdfs_entry *obj)
     return NULL;
 }
 
-static bool vdfs_wildmat(const char *pattern, unsigned pat_len, const char *candidate, unsigned can_len)
+bool vdfs_wildmat(const char *pattern, unsigned pat_len, const char *candidate, unsigned can_len)
 {
     log_debug("vdfs: vdfs_wildmat, pattern=%.*s, candidate=%.*s", pat_len, pattern, can_len, candidate);
     while (pat_len) {
