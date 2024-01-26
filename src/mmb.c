@@ -15,6 +15,7 @@
 #include "mmb.h"
 #include "sdf.h"
 #include "6502.h"
+#include "main.h"
 #include "mem.h"
 #include "vdfs.h"
 
@@ -266,8 +267,9 @@ static bool mmb_check_pick(unsigned drive, unsigned disc)
     return true;
 }
 
-void mmb_cmd_din(uint16_t addr)
+bool mmb_cmd_din(uint16_t addr)
 {
+    bool worked = false;
     int num1 = 0, num2 = 0;
     uint16_t addr2 = addr;
     int ch = readmem(addr2);
@@ -279,7 +281,7 @@ void mmb_cmd_din(uint16_t addr)
         while (ch == ' ')
             ch = readmem(++addr2);
         if (ch == '\r')
-            mmb_check_pick(0, num1);
+            worked = mmb_check_pick(0, num1);
         else {
             addr = addr2;
             while (ch >= '0' && ch <= '9') {
@@ -290,20 +292,29 @@ void mmb_cmd_din(uint16_t addr)
                 while (ch == ' ')
                     ch = readmem(++addr2);
                 if (ch == '\r' && num1 >= 0 && num1 <= 3)
-                    mmb_check_pick(num1, num2);
+                    worked = mmb_check_pick(num1, num2);
                 else
                     vdfs_error(err_bad_drive_id);
             }
             else if ((num2 = mmb_parse_find(addr)) >= 0) {
                 if (num1 >= 0 && num1 <= 3)
-                    mmb_check_pick(num1, num2);
+                    worked = mmb_check_pick(num1, num2);
                 else
                     vdfs_error(err_bad_drive_id);
             }
         }
     }
     else if ((num1 = mmb_parse_find(addr)) >= 0)
-        mmb_check_pick(0, num1);
+        worked = mmb_check_pick(0, num1);
+    return worked;
+}
+
+void mmb_cmd_dboot(uint16_t addr)
+{
+    if (mmb_cmd_din(addr)) {
+        autoboot = 150;
+        main_key_break();
+    }
 }
 
 static const char mmb_about_str[] = "B-Em internal MMB\r\n";
