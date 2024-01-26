@@ -14,6 +14,8 @@ extern void vdfs_set_root(const char *dir);
 extern void vdfs_loadstate(FILE *f);
 extern void vdfs_savestate(FILE *f);
 
+extern void vdfs_error(const char *msg);
+
 extern const char *vdfs_cfg_root;
 
 #endif

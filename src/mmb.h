@@ -15,6 +15,6 @@ void mmb_load(char *fn);
 void mmb_eject(void);
 void mmb_pick(unsigned drive, unsigned side, unsigned disc);
 void mmb_reset(void);
-int mmb_find(const char *name);
+void mmb_cmd_din(uint16_t addr);
 
 #endif

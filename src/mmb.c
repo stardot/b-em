@@ -192,7 +192,7 @@ static inline int cat_name_cmp(const char *nam_ptr, const char *cat_ptr, const c
     return (cat_nxt - mmb_cat) / 16 - 1;
 }
 
-int mmb_find(const char *name)
+static int mmb_find(const char *name)
 {
     const char *cat_ptr = mmb_cat;
     const char *cat_end = mmb_cat + mmb_cat_size;
@@ -207,4 +207,95 @@ int mmb_find(const char *name)
         cat_ptr = cat_nxt;
     } while (cat_ptr < cat_end);
     return -1;
+}
+
+static const char err_disc_not_fnd[] = "\xd6" "Disk not found in MMB file";
+static const char err_bad_drive_id[] = "\x94" "Bad drive ID";
+
+static int mmb_parse_find(uint16_t addr)
+{
+    char name[17];
+    int ch = readmem(addr++);
+    int i = 0;
+    bool quote = false;
+
+    if (ch == '"') {
+        quote = true;
+        ch = readmem(addr++);
+    }
+    while (ch != '\r' && i < sizeof(name) && ((quote && ch != '"') || (!quote && ch != ' '))) {
+        name[i++] = ch;
+        ch = readmem(addr++);
+    }
+    name[i] = 0;
+    if ((i = mmb_find(name)) < 0)
+        vdfs_error(err_disc_not_fnd);
+    return i;
+}
+
+static bool mmb_check_pick(unsigned drive, unsigned disc)
+{
+    if (disc >= mmb_ndisc) {
+        vdfs_error(err_disc_not_fnd);
+        return false;
+    }
+    unsigned side;
+    switch(drive) {
+        case 0:
+        case 1:
+            side = 0;
+            break;
+        case 2:
+        case 3:
+            drive &= 1;
+            disc--;
+            side = 1;
+            break;
+        default:
+            log_debug("vdfs: mmb_check_pick: invalid logical drive %d", drive);
+            vdfs_error(err_bad_drive_id);
+            return false;
+    }
+    mmb_pick(drive, side, disc);
+    return true;
+}
+
+void mmb_cmd_din(uint16_t addr)
+{
+    int num1 = 0, num2 = 0;
+    uint16_t addr2 = addr;
+    int ch = readmem(addr2);
+    while (ch >= '0' && ch <= '9') {
+        num1 = num1 * 10 + ch - '0';
+        ch = readmem(++addr2);
+    }
+    if (ch == ' ' || ch == '\r') {
+        while (ch == ' ')
+            ch = readmem(++addr2);
+        if (ch == '\r')
+            mmb_check_pick(0, num1);
+        else {
+            addr = addr2;
+            while (ch >= '0' && ch <= '9') {
+                num2 = num2 * 10 + ch - '0';
+                ch = readmem(++addr2);
+            }
+            if (ch == ' ' || ch == '\r') {
+                while (ch == ' ')
+                    ch = readmem(++addr2);
+                if (ch == '\r' && num1 >= 0 && num1 <= 3)
+                    mmb_check_pick(num1, num2);
+                else
+                    vdfs_error(err_bad_drive_id);
+            }
+            else if ((num2 = mmb_parse_find(addr)) >= 0) {
+                if (num1 >= 0 && num1 <= 3)
+                    mmb_check_pick(num1, num2);
+                else
+                    vdfs_error(err_bad_drive_id);
+            }
+        }
+    }
+    else if ((num1 = mmb_parse_find(addr)) >= 0)
+        mmb_check_pick(0, num1);
 }
