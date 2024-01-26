@@ -37,6 +37,7 @@ static unsigned mmb_dcat_end;
 static unsigned mmb_dcat_count;
 static unsigned mmb_dcat_pat_len;
 static char mmb_dcat_pattern[MMB_NAME_SIZE];
+static int mmb_loaded_discs[4] = { -1, -1, -1, -1 };
 
 static void mmb_read_error(const char *fn, FILE *fp)
 {
@@ -117,11 +118,15 @@ void mmb_load(char *fn)
             writeprot[1] = writeprot[0];
             mmb_offset[1][0] = mmb_calc_offset(mmb_boot_discs[2]);
             mmb_offset[1][1] = mmb_calc_offset(mmb_boot_discs[3]);
+            mmb_loaded_discs[2] = mmb_boot_discs[2];
+            mmb_loaded_discs[3] = mmb_boot_discs[3];
         }
     }
     sdf_mount(0, fn, fp, &sdf_geometries.dfs_10s_seq_80t);
     mmb_offset[0][0] = mmb_calc_offset(mmb_boot_discs[0]);
     mmb_offset[0][1] = mmb_calc_offset(mmb_boot_discs[1]);
+    mmb_loaded_discs[0] = mmb_boot_discs[0];
+    mmb_loaded_discs[1] = mmb_boot_discs[1];
     mmb_fp = fp;
     mmb_fn = fn;
     mmb_ndisc = (extra_zones + 1) * MMB_ZONE_DISCS;
@@ -250,10 +255,12 @@ static bool mmb_check_pick(unsigned drive, unsigned disc)
     switch(drive) {
         case 0:
         case 1:
+            mmb_loaded_discs[drive] = disc;
             side = 0;
             break;
         case 2:
         case 3:
+            mmb_loaded_discs[drive] = disc;
             drive &= 1;
             side = 1;
             break;
@@ -324,6 +331,26 @@ void mmb_cmd_dabout(void)
     vdfs_split_go(0);
 }
 
+static uint8_t *mmb_name_flag(uint8_t *dest, const char *cat_ptr)
+{
+    for (int i = 0; i < MMB_NAME_SIZE; ++i) {
+        int ch = cat_ptr[i] & 0x7f;
+        if (ch < ' ' || ch > 0x7e)
+            ch = ' ';
+        *dest++ = ch;
+    }
+    *dest++ = ' ';
+    int flag = cat_ptr[15];
+    if (flag == 0xf0)
+        flag = 'U';
+    else if (flag == 0)
+        flag = 'P';
+    else
+        flag = ' ';
+    *dest++ = flag;
+    return dest;
+}
+
 void mmb_cmd_dcat_cont(void)
 {
     if (readmem(0xff) & 0x80)
@@ -335,21 +362,7 @@ void mmb_cmd_dcat_cont(void)
             if (*cat_ptr && vdfs_wildmat(mmb_dcat_pattern, mmb_dcat_pat_len, cat_ptr, MMB_NAME_SIZE)) {
                 ++mmb_dcat_count;
                 dest += snprintf((char *)dest, 80, "%5d ", mmb_dcat_posn++);
-                for (int i = 0; i < MMB_NAME_SIZE; ++i) {
-                    int ch = cat_ptr[i] & 0x7f;
-                    if (ch < ' ' || ch > 0x7e)
-                        ch = ' ';
-                    *dest++ = ch;
-                }
-                *dest++ = ' ';
-                int flag = cat_ptr[15];
-                if (flag == 0xf0)
-                    flag = 'U';
-                else if (flag == 0)
-                    flag = 'P';
-                else
-                    flag = ' ';
-                *dest++ = flag;
+                dest = mmb_name_flag(dest, cat_ptr);
                 *dest = 0;
                 vdfs_split_go(0x16);
                 return;
@@ -420,4 +433,26 @@ void mmb_cmd_dcat_start(uint16_t addr)
         }
     }
     mmb_cmd_dcat_cont();
+}
+
+static const char mmb_no_discs[] = "No discs loaded\r\n";
+
+void mmb_cmd_ddrive(uint16_t addr)
+{
+    uint8_t *dest = vdfs_split_addr();
+    bool loaded = false;
+    for (int drive = 0; drive < 4; ++drive) {
+        int disc = mmb_loaded_discs[drive];
+        if (disc >= 0) {
+            dest += sprintf((char *)dest, "%u: %5u ", drive, disc);
+            dest = mmb_name_flag(dest, mmb_cat + disc * MMB_ENTRY_SIZE);
+            *dest++ = '\r';
+            *dest++ = '\n';
+            loaded = true;
+        }
+        *dest = 0;
+    }
+    if (!loaded)
+        memcpy(dest, mmb_no_discs, sizeof(mmb_no_discs));
+    vdfs_split_go(0);    
 }

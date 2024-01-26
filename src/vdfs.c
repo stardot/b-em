@@ -284,6 +284,7 @@ enum vdfs_action {
     VDFS_ACT_MMBDIN,
     VDFS_ACT_MMBDBOT,
     VDFS_ACT_MMBDCAT,
+    VDFS_ACT_MMBDDRV,
     VDFS_ACT_DRIVE,
     VDFS_ACT_ACCESS,
     VDFS_ACT_COPY,
@@ -4717,6 +4718,9 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
     case VDFS_ACT_MMBDCAT:
         mmb_cmd_dcat_start(addr);
         break;
+    case VDFS_ACT_MMBDDRV:
+        mmb_cmd_ddrive(addr);
+        break;
     case VDFS_ACT_DRIVE:
         cmd_drive(addr);
         break;
@@ -4971,7 +4975,8 @@ static const struct cmdent ctab_mmb[] = {
     { "DAbout",  VDFS_ACT_MMBDABT },
     { "Din",     VDFS_ACT_MMBDIN  },
     { "DBoot",   VDFS_ACT_MMBDBOT },
-    { "DCat",    VDFS_ACT_MMBDCAT }
+    { "DCat",    VDFS_ACT_MMBDCAT },
+    { "DDrive",  VDFS_ACT_MMBDDRV }
 };
 
 static const struct cmdent ctab_enabled[] = {
