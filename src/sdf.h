@@ -50,8 +50,7 @@ struct sdf_geometry_set {
 
 extern const struct sdf_geometry_set sdf_geometries;
 
-extern char *mmb_fn;
-extern unsigned mmb_ndisc;
+extern FILE *sdf_fp[];
 
 // In sdf-geo.c
 const struct sdf_geometry *sdf_find_geo(const char *fn, const char *ext, FILE *fp);
@@ -60,15 +59,9 @@ const char *sdf_desc_dens(const struct sdf_geometry *geo);
 
 // In sdf-acc.c
 void sdf_new_disc(int drive, ALLEGRO_PATH *fn, const struct sdf_geometry *geo);
+void sdf_mount(int drive, const char *fn, FILE *fp, const struct sdf_geometry *geo);
 void sdf_load(int drive, const char *fn, const char *ext);
 FILE *sdf_owseek(uint8_t drive, uint8_t sector, uint8_t track, uint8_t side, uint16_t ssize);
-
-// Functions for MMB files.
-void mmb_load(char *fn);
-void mmb_eject(void);
-void mmb_pick(unsigned drive, unsigned side, unsigned disc);
-void mmb_reset(void);
-int mmb_find(const char *name);
 
 //DB: bodge for VS
 #ifdef _MSC_VER

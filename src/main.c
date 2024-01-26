@@ -30,6 +30,7 @@
 #include "main.h"
 #include "6809tube.h"
 #include "mem.h"
+#include "mmb.h"
 #include "mouse.h"
 #include "midi.h"
 #include "music4000.h"

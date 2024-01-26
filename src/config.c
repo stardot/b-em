@@ -9,6 +9,7 @@
 #include "keyboard.h"
 #include "main.h"
 #include "mem.h"
+#include "mmb.h"
 #include "model.h"
 #include "mouse.h"
 #include "mmccard.h"
