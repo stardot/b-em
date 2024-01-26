@@ -3907,6 +3907,7 @@ static void cmd_pwd(void)
         writemem(addr-1, 0x0d);
         writemem(addr, 0x0a);
         writemem(addr+1, 0);
+        x = 0;
         rom_dispatch(VDFS_ROM_PRINT_SPLIT);
     }
 }

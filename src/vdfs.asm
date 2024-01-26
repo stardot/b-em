@@ -677,7 +677,10 @@ prtextws    =   &A8
             bne     loop
             inc     &a9
             bne     loop
-.done       rts
+.done       txa
+            bne     more
+            rts
+.more       sta     port_cmd
 }
 
 ; The *DUMP command.
