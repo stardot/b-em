@@ -152,7 +152,7 @@ void mmb_eject(void)
     mmb_ndisc = 0;
 }
 
-static void reset_one(int drive)
+static void mmb_reset_one(int drive)
 {
     if (sdf_fp[drive] == mmb_fp) {
         mmb_offset[drive][0] = mmb_calc_offset(0);
@@ -163,8 +163,8 @@ static void reset_one(int drive)
 void mmb_reset(void)
 {
     if (mmb_fp) {
-        reset_one(0);
-        reset_one(1);
+        mmb_reset_one(0);
+        mmb_reset_one(1);
     }
 }
 
@@ -181,7 +181,7 @@ void mmb_pick(unsigned drive, unsigned side, unsigned disc)
         fdc_spindown();
 }
 
-static inline int cat_name_cmp(const char *nam_ptr, const char *cat_ptr, const char *cat_nxt)
+static inline int mmb_cat_name_cmp(const char *nam_ptr, const char *cat_ptr, const char *cat_nxt)
 {
     do {
         char cat_ch = *cat_ptr++;
@@ -205,7 +205,7 @@ static int mmb_find(const char *name)
 
     do {
         const char *cat_nxt = cat_ptr + 16;
-        int i = cat_name_cmp(name, cat_ptr, cat_nxt);
+        int i = mmb_cat_name_cmp(name, cat_ptr, cat_nxt);
         if (i >= 0) {
             log_debug("mmb: found MMB SSD '%s' at %d", name, i);
             return i;
