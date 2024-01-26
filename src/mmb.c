@@ -299,3 +299,11 @@ void mmb_cmd_din(uint16_t addr)
     else if ((num1 = mmb_parse_find(addr)) >= 0)
         mmb_check_pick(0, num1);
 }
+
+static const char mmb_about_str[] = "B-Em internal MMB\r\n";
+
+void mmb_cmd_dabout(void)
+{
+    memcpy(vdfs_split_addr(), mmb_about_str, sizeof(mmb_about_str));
+    vdfs_split_go(0);
+}

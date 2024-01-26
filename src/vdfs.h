@@ -15,6 +15,8 @@ extern void vdfs_loadstate(FILE *f);
 extern void vdfs_savestate(FILE *f);
 
 extern void vdfs_error(const char *msg);
+extern uint8_t *vdfs_split_addr(void);
+extern void vdfs_split_go(unsigned after);
 
 extern const char *vdfs_cfg_root;
 

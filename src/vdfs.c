@@ -280,6 +280,7 @@ enum vdfs_action {
     VDFS_ACT_OSW7F_AC2,
     VDFS_ACT_OSW7F_WATF,
     VDFS_ACT_OSW7F_WAT5,
+    VDFS_ACT_MMBDABT,
     VDFS_ACT_MMBDIN,
     VDFS_ACT_DRIVE,
     VDFS_ACT_ACCESS,
@@ -3885,31 +3886,41 @@ static void cmd_drive(uint16_t addr)
         vdfs_error(err_badparms);
 }
 
-static uint16_t cmd_pwd_recurse(uint16_t addr, vdfs_entry *ent)
+uint8_t *vdfs_split_addr(void)
+{
+    unsigned romno = readmem(0xf4);
+    unsigned page = rom_slots[romno & 0x0f].split;
+    writemem(0xa8, 0);
+    writemem(0xa9, page);
+    return rom + (romno * ROM_SIZE) + ((page - 0x80) << 8);
+}
+
+void vdfs_split_go(unsigned after)
+{
+    x = after;
+    rom_dispatch(VDFS_ROM_PRINT_SPLIT);
+}
+
+static uint8_t *cmd_pwd_recurse(uint8_t *dptr, vdfs_entry *ent)
 {
     vdfs_entry *parent = ent->parent;
     if (parent && parent != ent)
-        addr = cmd_pwd_recurse(addr, parent);
-    const char *ptr = ent->acorn_fn;
-    for (int len = ent->acorn_len; len; --len)
-        writemem(addr++, *ptr++);
-    writemem(addr++, '.');
-    return addr;
+        dptr = cmd_pwd_recurse(dptr, parent);
+    unsigned len = ent->acorn_len;
+    memcpy(dptr, ent->acorn_fn, len);
+    dptr+= len;
+    *dptr++ = '.';
+    return dptr;
 }
 
 static void cmd_pwd(void)
 {
     if (check_valid_dir(&cur_dir)) {
-        int romno = readmem(0xf4);
-        uint16_t addr = (rom_slots[romno & 0x0f].split) << 8;
-        log_debug("vdfs: cmd_pwd, addr=%04X\n", addr);
-        writemem16(0xa8, addr);
-        addr = cmd_pwd_recurse(addr, cur_dir.dir);
-        writemem(addr-1, 0x0d);
-        writemem(addr, 0x0a);
-        writemem(addr+1, 0);
-        x = 0;
-        rom_dispatch(VDFS_ROM_PRINT_SPLIT);
+        uint8_t *ptr = cmd_pwd_recurse(vdfs_split_addr(), cur_dir.dir);
+        ptr[-1] = 0x0d;
+        ptr[0]  = 0x0a;
+        ptr[1]  = 0x00;
+        vdfs_split_go(0);
     }
 }
 
@@ -4692,6 +4703,9 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
     case VDFS_ACT_OSW7F:
         cmd_osw7f(addr);
         break;
+    case VDFS_ACT_MMBDABT:
+        mmb_cmd_dabout();
+        break;
     case VDFS_ACT_MMBDIN:
         mmb_cmd_din(addr);
         break;
@@ -4946,7 +4960,7 @@ static const struct cmdent ctab_always[] = {
 };
 
 static const struct cmdent ctab_mmb[] = {
-    { "DAbout",  VDFS_ACT_NOP     },
+    { "DAbout",  VDFS_ACT_MMBDABT },
     { "Din",     VDFS_ACT_MMBDIN  }
 };
 
