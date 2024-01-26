@@ -22,5 +22,6 @@ void mmb_cmd_dboot(uint16_t addr);
 void mmb_cmd_dcat_start(uint16_t addr);
 void mmb_cmd_dcat_cont(void);
 void mmb_cmd_ddrive(uint16_t addr);
+void mmb_cmd_dfree(void);
 
 #endif

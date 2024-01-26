@@ -29,7 +29,7 @@
 
 static unsigned mmb_boot_discs[4];
 static unsigned mmb_cat_size;
-static char *mmb_cat;
+static unsigned char *mmb_cat;
 unsigned mmb_ndisc;
 char *mmb_fn;
 static unsigned mmb_dcat_posn;
@@ -94,8 +94,8 @@ void mmb_load(char *fn)
         mmb_read_error(fn, fp);
         return;
     }
-    char *mmb_ptr = mmb_cat + MMB_ZONE_CAT_SIZE;
-    char *mmb_end = mmb_cat + reqd_cat_size;
+    unsigned char *mmb_ptr = mmb_cat + MMB_ZONE_CAT_SIZE;
+    unsigned char *mmb_end = mmb_cat + reqd_cat_size;
     while (mmb_ptr < mmb_end) {
         if (fseek(fp, MMB_ZONE_SKIP_SIZE, SEEK_CUR)) {
             log_error("mmb: seek error on MMB file %s: %s", fn, strerror(errno));
@@ -187,7 +187,7 @@ void mmb_pick(unsigned drive, unsigned side, unsigned disc)
         fdc_spindown();
 }
 
-static inline int mmb_cat_name_cmp(const char *nam_ptr, const char *cat_ptr, const char *cat_nxt)
+static inline int mmb_cat_name_cmp(const char *nam_ptr, const unsigned char *cat_ptr, const unsigned char *cat_nxt)
 {
     do {
         char cat_ch = *cat_ptr++;
@@ -206,11 +206,11 @@ static inline int mmb_cat_name_cmp(const char *nam_ptr, const char *cat_ptr, con
 
 static int mmb_find(const char *name)
 {
-    const char *cat_ptr = mmb_cat;
-    const char *cat_end = mmb_cat + mmb_cat_size;
+    const unsigned char *cat_ptr = mmb_cat;
+    const unsigned char *cat_end = mmb_cat + mmb_cat_size;
 
     do {
-        const char *cat_nxt = cat_ptr + 16;
+        const unsigned char *cat_nxt = cat_ptr + 16;
         int i = mmb_cat_name_cmp(name, cat_ptr, cat_nxt);
         if (i >= 0) {
             log_debug("mmb: found MMB SSD '%s' at %d", name, i);
@@ -331,7 +331,7 @@ void mmb_cmd_dabout(void)
     vdfs_split_go(0);
 }
 
-static uint8_t *mmb_name_flag(uint8_t *dest, const char *cat_ptr)
+static uint8_t *mmb_name_flag(uint8_t *dest, const unsigned char *cat_ptr)
 {
     for (int i = 0; i < MMB_NAME_SIZE; ++i) {
         int ch = cat_ptr[i] & 0x7f;
@@ -357,9 +357,9 @@ void mmb_cmd_dcat_cont(void)
         vdfs_error("\x17" "Escape");
     else {
         uint8_t *dest = vdfs_split_addr();
-        const char *cat_ptr = mmb_cat + mmb_dcat_posn * 16;
+        const unsigned char *cat_ptr = mmb_cat + mmb_dcat_posn * 16;
         while (mmb_dcat_posn < mmb_dcat_end) {
-            if (*cat_ptr && vdfs_wildmat(mmb_dcat_pattern, mmb_dcat_pat_len, cat_ptr, MMB_NAME_SIZE)) {
+            if (*cat_ptr && vdfs_wildmat(mmb_dcat_pattern, mmb_dcat_pat_len, (char *)cat_ptr, MMB_NAME_SIZE)) {
                 ++mmb_dcat_count;
                 dest += snprintf((char *)dest, 80, "%5d ", mmb_dcat_posn++);
                 dest = mmb_name_flag(dest, cat_ptr);
@@ -454,5 +454,24 @@ void mmb_cmd_ddrive(uint16_t addr)
     }
     if (!loaded)
         memcpy(dest, mmb_no_discs, sizeof(mmb_no_discs));
-    vdfs_split_go(0);    
+    vdfs_split_go(0);
+}
+
+void mmb_cmd_dfree(void)
+{
+    unsigned total = 0;
+    unsigned unform = 0;
+    const unsigned char *ptr = mmb_cat;
+    const unsigned char *end = ptr + mmb_cat_size;
+    while (ptr < end) {
+        if (ptr[15] == 0xf0) {
+            ++unform;
+            ++total;
+        }
+        else if (ptr[0])
+            ++total;
+        ptr += MMB_ENTRY_SIZE;
+    }
+    sprintf((char *)vdfs_split_addr(), "%u of %u disks free (unformatted)\r\n", unform, total);
+    vdfs_split_go(0);
 }
