@@ -1,3 +1,4 @@
+#define _DEBUG
 /*B-em v2.2 by Tom Walker
   Master 128 CMOS emulation*/
 
@@ -161,8 +162,10 @@ static uint8_t get_cmos(unsigned addr)
             else if (curtube == 9)
                 value = cmos_fix_tube_lang(value, 7);
         }
-        else if (addr == 0x1e && autoboot)
-            value |= 0x10;
+        else if (addr == 0x1e && autoboot) {
+            log_debug("cmos: faking boot option for autoboot");
+            value &= ~0x10;
+        }
         return value;
     }
 }

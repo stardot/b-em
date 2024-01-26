@@ -1,3 +1,4 @@
+#define _DEBUG
 #include "b-em.h"
 #include "main.h"
 #include "via.h"
@@ -1187,13 +1188,15 @@ void key_scan(int row, int col) {
 }
 
 bool key_is_down(void) {
-    if (keyrow == 0 && keycol >= 2 && keycol <= 9) {
-        if (keycol == 6 && autoboot > 0)
+    if (keyrow == 0) {
+        if (keycol == 0 && autoboot > 0) {
+            log_debug("keyboard: return shift is down (autoboot=%d), pc=%04X", autoboot, pc);
             return true;
-        return kbdips & (1 << (9 - keycol));
+        }
+        else if (keycol >= 2 && keycol <= 9)
+            return kbdips & (1 << (9 - keycol));
     }
-    else
-        return bbcmatrix[keycol][keyrow];
+    return bbcmatrix[keycol][keyrow];
 }
 
 bool key_any_down(void)
