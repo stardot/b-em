@@ -585,7 +585,7 @@ void vdfs_error(const char *err)
     pc = 0x100;          // jump to BRK sequence just created.
 }
 
-static void adfs_hosterr(int errnum)
+static void vdfs_hosterr(int errnum)
 {
     const char *msg;
 
@@ -1943,7 +1943,7 @@ static void exec_swr_fs(uint8_t flags, uint16_t fname, int8_t romid, uint32_t st
                                 fclose(fp);
                             } else {
                                 log_warn("vdfs: unable to load file '%s': %s", ent->host_fn, strerror(errno));
-                                adfs_hosterr(errno);
+                                vdfs_hosterr(errno);
                             }
                         } else
                             vdfs_error(res.errmsg);
@@ -2422,7 +2422,7 @@ static void osfile_write(uint32_t pb, const vdfs_path *path, uint32_t (*callback
         else {
             int err = errno;
             log_warn("vdfs: unable to create file '%s': %s", ent->host_fn, strerror(err));
-            adfs_hosterr(err);
+            vdfs_hosterr(err);
         }
     }
 }
@@ -2626,14 +2626,14 @@ static void delete_file(vdfs_entry *ent)
             delete_inf(ent);
             a = 2;
         } else
-            adfs_hosterr(errno);
+            vdfs_hosterr(errno);
     } else {
         if (unlink(ent->host_path) == 0) {
             ent->attribs &= ~ATTR_EXISTS;
             delete_inf(ent);
             a = 1;
         } else
-            adfs_hosterr(errno);
+            vdfs_hosterr(errno);
     }
 }
 
@@ -2665,7 +2665,7 @@ static void create_dir(vdfs_entry *ent)
         a = 2;
     }
     else {
-        adfs_hosterr(errno);
+        vdfs_hosterr(errno);
         log_debug("vdfs: unable to mkdir '%s': %s", ent->host_path, strerror(errno));
     }
 }
@@ -2775,7 +2775,7 @@ static void osfile_load(uint32_t pb, const vdfs_path *path)
                 }
             } else {
                 log_warn("vdfs: unable to load file '%s': %s", ent->host_fn, strerror(errno));
-                adfs_hosterr(errno);
+                vdfs_hosterr(errno);
             }
         }
     } else
@@ -3572,7 +3572,7 @@ static bool copy_file(vdfs_entry *old_ent, vdfs_entry *new_ent)
 {
     BOOL res = CopyFile(old_ent->host_path, new_ent->host_path, FALSE);
     if (!res)
-        adfs_hosterr(errno);
+        vdfs_hosterr(errno);
     return res;
 }
 
@@ -3586,14 +3586,14 @@ static bool copy_loop(const char *old_fn, int old_fd, const char *new_fn, int ne
     while (bytes > 0) {
         if (write(new_fd, buf, bytes) != bytes) {
             int err = errno;
-            adfs_hosterr(err);
+            vdfs_hosterr(err);
             log_warn("vdfs: error writing %s: %s", new_fn, strerror(err));
             return false;
         }
     }
     if (bytes < 0) {
         int err = errno;
-        adfs_hosterr(err);
+        vdfs_hosterr(err);
         log_warn("vdfs: error reading %s: %s", old_fn, strerror(err));
         return false;
     }
@@ -3617,13 +3617,13 @@ static bool copy_file(vdfs_entry *old_ent, vdfs_entry *new_ent)
                     res = copy_loop(old_ent->host_path, old_fd, new_ent->host_path, new_fd);
                 else {
                     int err = errno;
-                    adfs_hosterr(err);
+                    vdfs_hosterr(err);
                     log_warn("vdfs: copy_file_range failed %s to %s: %s", old_ent->host_path, new_ent->host_path, strerror(err));
                 }
             }
             else {
                 int err = errno;
-                adfs_hosterr(err);
+                vdfs_hosterr(err);
                 log_warn("vdfs: unable to fstat '%s': %s", old_ent->host_path, strerror(err));
             }
 #else
@@ -3633,14 +3633,14 @@ static bool copy_file(vdfs_entry *old_ent, vdfs_entry *new_ent)
         }
         else {
             int err = errno;
-            adfs_hosterr(err);
+            vdfs_hosterr(err);
             log_warn("vdfs: unable to open %s for writing: %s", new_ent->host_path, strerror(err));
         }
         close(old_fd);
     }
     else {
         int err = errno;
-        adfs_hosterr(err);
+        vdfs_hosterr(err);
         log_warn("vdfs: unable to open %s for reading: %s", old_ent->host_path, strerror(err));
     }
     return res;
@@ -3661,33 +3661,33 @@ static bool copy_file(vdfs_entry *old_ent, vdfs_entry *new_ent)
                 ch = getc(old_fp);
             if (ferror(old_fp)) {
                 int err = errno;
-                adfs_hosterr(err);
+                vdfs_hosterr(err);
                 log_warn("vdfs: read error on %s: %s", old_ent->host_path, strerror(err));
                 res = false;
             }
             if (ferror(new_fp)) {
                 int err = errno;
-                adfs_hosterr(err);
+                vdfs_hosterr(err);
                 log_warn("vdfs: write error on %s: %s", new_ent->host_path, strerror(err));
                 res = false;
             }
             if (fclose(new_fp)) {
                 int err = errno;
-                adfs_hosterr(err);
+                vdfs_hosterr(err);
                 log_warn("vdfs: write error on %s: %s", new_ent->host_path, strerror(err));
                 res = false;
             }
         }
         else {
             int err = errno;
-            adfs_hosterr(err);
+            vdfs_hosterr(err);
             log_warn("vdfs: unable to open %s for writing: %s", new_ent->host_path, strerror(err));
         }
         fclose(old_fp);
     }
     else {
         int err = errno;
-        adfs_hosterr(err);
+        vdfs_hosterr(err);
         log_warn("vdfs: unable to open %s for reading: %s", old_ent->host_path, strerror(err));
     }
     return res;
@@ -3971,7 +3971,7 @@ static void run_file(const char *err)
                         fclose(fp);
                     } else {
                         log_warn("vdfs: unable to run file '%s': %s", ent->host_path, strerror(errno));
-                        adfs_hosterr(errno);
+                        vdfs_hosterr(errno);
                     }
                 }
             }
@@ -4004,7 +4004,7 @@ static void rename_tail(vdfs_entry *old_ent, vdfs_entry *new_ent)
         delete_inf(old_ent);
         write_back(new_ent);
     } else {
-        adfs_hosterr(errno);
+        vdfs_hosterr(errno);
         log_debug("vdfs: failed to rename '%s' to '%s': %s", old_ent->host_path, new_ent->host_path, strerror(errno));
     }
 }
