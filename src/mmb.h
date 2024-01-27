@@ -17,7 +17,7 @@ void mmb_pick(unsigned drive, unsigned side, unsigned disc);
 void mmb_reset(void);
 
 void mmb_cmd_dabout(void);
-bool mmb_cmd_din(uint16_t addr);
+void mmb_cmd_din(uint16_t addr);
 void mmb_cmd_dboot(uint16_t addr);
 void mmb_cmd_dcat_start(uint16_t addr);
 void mmb_cmd_dcat_cont(void);

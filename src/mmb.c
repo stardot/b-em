@@ -273,7 +273,7 @@ static bool mmb_check_pick(unsigned drive, unsigned disc)
     return true;
 }
 
-bool mmb_cmd_din(uint16_t addr)
+bool mmb_din_common(uint16_t addr, unsigned default_drive)
 {
     bool worked = false;
     int num1 = 0, num2 = 0;
@@ -287,7 +287,7 @@ bool mmb_cmd_din(uint16_t addr)
         while (ch == ' ')
             ch = readmem(++addr2);
         if (ch == '\r')
-            worked = mmb_check_pick(x, num1);
+            worked = mmb_check_pick(default_drive, num1);
         else {
             addr = addr2;
             while (ch >= '0' && ch <= '9') {
@@ -311,13 +311,18 @@ bool mmb_cmd_din(uint16_t addr)
         }
     }
     else if ((num1 = mmb_parse_find(addr)) >= 0)
-        worked = mmb_check_pick(x, num1);
+        worked = mmb_check_pick(default_drive, num1);
     return worked;
+}
+
+void mmb_cmd_din(uint16_t addr)
+{
+    mmb_din_common(addr, x);
 }
 
 void mmb_cmd_dboot(uint16_t addr)
 {
-    if (mmb_cmd_din(addr)) {
+    if (mmb_din_common(addr, 0)) {
         autoboot = 150;
         main_key_break();
     }
@@ -480,6 +485,7 @@ static const char err_disc_not_loaded[] = "\xd6" "Disk not loaded in that drive"
 static const char err_bad_dop_oper[]    = "\x94" "Bad DOP operation";
 static const char err_no_unformatted[]  = "\xd6" "No unformatted discs";
 static const char err_wprotect[]        = "\xc1" "MMB file not open for update";
+static const char err_write_err[]       = "\xc7" "Error writing to MMB file";
 
 static void mmb_dop_find_unformatted(unsigned drive)
 {
@@ -522,10 +528,14 @@ static void mmb_dop_flags(unsigned drive, int op)
             unsigned zone_start = disc / MMB_ZONE_DISCS;
             unsigned zone_index = disc % MMB_ZONE_DISCS;
             unsigned offset = zone_start * MMB_ZONE_FULL_SIZE + (zone_index + 1) * MMB_ENTRY_SIZE;
-            if (fseek(mmb_fp, offset, SEEK_SET) == -1)
+            if (fseek(mmb_fp, offset, SEEK_SET) == -1) {
                 log_error("unable to seek on MMB file: %s", strerror(errno));
-            else if (fwrite(cat_ptr, MMB_ENTRY_SIZE, 1, mmb_fp) != 1 || fflush(mmb_fp))
+                vdfs_error(err_write_err);
+            }
+            else if (fwrite(cat_ptr, MMB_ENTRY_SIZE, 1, mmb_fp) != 1 || fflush(mmb_fp)) {
                 log_error("unable to write back to MMB file: %s", strerror(errno));
+                vdfs_error(err_write_err);
+            }
         }
     }
 }
