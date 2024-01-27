@@ -250,6 +250,8 @@ enum vdfs_action {
     VDFS_ROM_APPEND,
     VDFS_ROM_OPT1,
     VDFS_ROM_PRINT_SPLIT,
+    VDFS_ROM_MMBDIN,
+    VDFS_ROM_MMBDOP,
     VDFS_ACT_NOP,
     VDFS_ACT_QUIT,
     VDFS_ACT_SRLOAD,
@@ -281,7 +283,6 @@ enum vdfs_action {
     VDFS_ACT_OSW7F_WATF,
     VDFS_ACT_OSW7F_WAT5,
     VDFS_ACT_MMBDABT,
-    VDFS_ACT_MMBDIN,
     VDFS_ACT_MMBDBOT,
     VDFS_ACT_MMBDCAT,
     VDFS_ACT_MMBDDRV,
@@ -4710,9 +4711,6 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
     case VDFS_ACT_MMBDABT:
         mmb_cmd_dabout();
         break;
-    case VDFS_ACT_MMBDIN:
-        mmb_cmd_din(addr);
-        break;
     case VDFS_ACT_MMBDBOT:
         mmb_cmd_dboot(addr);
         break;
@@ -4735,6 +4733,7 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
         cmd_copy(addr);
         break;
     default:
+        cmd_tail = addr;
         rom_dispatch(act);
     }
     return true;
@@ -4977,11 +4976,12 @@ static const struct cmdent ctab_always[] = {
 
 static const struct cmdent ctab_mmb[] = {
     { "DAbout",  VDFS_ACT_MMBDABT },
-    { "Din",     VDFS_ACT_MMBDIN  },
+    { "Din",     VDFS_ROM_MMBDIN  },
     { "DBoot",   VDFS_ACT_MMBDBOT },
     { "DCat",    VDFS_ACT_MMBDCAT },
     { "DDrive",  VDFS_ACT_MMBDDRV },
-    { "DFree",   VDFS_ACT_MMBDFRE }
+    { "DFree",   VDFS_ACT_MMBDFRE },
+    { "DOP",     VDFS_ROM_MMBDOP  }
 };
 
 static const struct cmdent ctab_enabled[] = {
@@ -5169,7 +5169,9 @@ static inline void dispatch(uint8_t value)
         case 0x13: rest_ram();  break;
         case 0x14: info_next(); break;
         case 0x15: log_time();  break;
-        case 0x16: mmb_cmd_dcat_cont(); break;
+        case 0x16: mmb_cmd_din(cmd_tail); break;
+        case 0x17: mmb_cmd_dcat_cont();   break;
+        case 0x18: mmb_cmd_dop(cmd_tail); break;
         default: log_warn("vdfs: function code %d not recognised", value);
     }
 }
