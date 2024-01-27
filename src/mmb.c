@@ -48,12 +48,12 @@ static void mmb_read_error(const char *fn, FILE *fp)
     fclose(fp);
 }
 
-static unsigned mmb_calc_offset(unsigned disc)
+static long mmb_calc_offset(unsigned disc)
 {
     unsigned zone_start = disc / MMB_ZONE_DISCS;
     unsigned zone_index = disc % MMB_ZONE_DISCS;
-    unsigned offset = zone_start * MMB_ZONE_FULL_SIZE + MMB_ZONE_CAT_SIZE + MMB_ENTRY_SIZE + zone_index * MMB_DISC_SIZE;
-    log_debug("mmb: mmb_calc_offset(%u) -> zone_start=%u, zone_index=%u, offset=%u", disc, zone_start, zone_index, offset);
+    long offset = zone_start * MMB_ZONE_FULL_SIZE + MMB_ZONE_CAT_SIZE + MMB_ENTRY_SIZE + zone_index * MMB_DISC_SIZE;
+    log_debug("mmb: mmb_calc_offset(%u) -> zone_start=%u, zone_index=%u, offset=%08lx", disc, zone_start, zone_index, offset);
     return offset;
 }
 
@@ -117,14 +117,14 @@ void mmb_load(char *fn)
             sdf_mount(1, fn, fp, &sdf_geometries.dfs_10s_seq_80t);
             writeprot[1] = writeprot[0];
             mmb_offset[1][0] = mmb_calc_offset(mmb_boot_discs[2]);
-            mmb_offset[1][1] = mmb_calc_offset(mmb_boot_discs[3]);
+            mmb_offset[1][1] = mmb_calc_offset(mmb_boot_discs[3]) - MMB_DISC_SIZE;
             mmb_loaded_discs[2] = mmb_boot_discs[2];
             mmb_loaded_discs[3] = mmb_boot_discs[3];
         }
     }
     sdf_mount(0, fn, fp, &sdf_geometries.dfs_10s_seq_80t);
     mmb_offset[0][0] = mmb_calc_offset(mmb_boot_discs[0]);
-    mmb_offset[0][1] = mmb_calc_offset(mmb_boot_discs[1]);
+    mmb_offset[0][1] = mmb_calc_offset(mmb_boot_discs[1]) - MMB_DISC_SIZE;
     mmb_loaded_discs[0] = mmb_boot_discs[0];
     mmb_loaded_discs[1] = mmb_boot_discs[1];
     mmb_fp = fp;
@@ -162,7 +162,7 @@ static void mmb_reset_one(int drive)
 {
     if (sdf_fp[drive] == mmb_fp) {
         mmb_offset[drive][0] = mmb_calc_offset(0);
-        mmb_offset[drive][1] = mmb_calc_offset(1);
+        mmb_offset[drive][1] = mmb_calc_offset(1) - MMB_DISC_SIZE;
     }
 }
 
@@ -182,7 +182,10 @@ void mmb_pick(unsigned drive, unsigned side, unsigned disc)
         disc_close(drive);
         sdf_mount(drive, mmb_fn, mmb_fp, &sdf_geometries.dfs_10s_seq_80t);
     }
-    mmb_offset[drive][side] = mmb_calc_offset(disc);
+    long offset = mmb_calc_offset(disc);
+    if (side)
+        offset -= MMB_DISC_SIZE;
+    mmb_offset[drive][side] = offset;
     if (fdc_spindown)
         fdc_spindown();
 }
@@ -565,6 +568,7 @@ void mmb_cmd_dop(uint16_t addr)
 
 void mmb_cmd_drecat(void)
 {
+    log_debug("mmb: sdf_fp[0]=%p, sdf_fp[1]=%p, mmb_fp=%p", sdf_fp[0], sdf_fp[1], mmb_fp);
     if (writeprot[0])
         vdfs_error(err_wprotect);
     else {
