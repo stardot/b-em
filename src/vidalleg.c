@@ -260,7 +260,7 @@ static inline void save_screenshot(void)
     vid_savescrshot--;
     if (!vid_savescrshot) {
         int xsize = lastx - firstx;
-        int ysize = lasty - firsty;
+        int ysize = lasty - firsty + 1;
         ALLEGRO_BITMAP *scrshotb  = al_create_bitmap(xsize, ysize << 1);
         int c;
 
