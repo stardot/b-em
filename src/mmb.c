@@ -615,52 +615,44 @@ void mmb_cmd_dop(uint16_t addr)
 
 void mmb_cmd_drecat(void)
 {
-    log_debug("mmb: sdf_fp[0]=%p, sdf_fp[1]=%p, mmb_fp=%p", sdf_fp[0], sdf_fp[1], mmb_fp);
-    if (writeprot[0])
+    if (mmb_writeprot)
         vdfs_error(err_wprotect);
     else {
-        unsigned char *cat_zone = mmb_cat;
-        unsigned char *cat_end = cat_zone + mmb_cat_size;
-        off_t zone_start = 0;
-        unsigned zone_num = 0;
-        while (cat_zone < cat_end) {
-            unsigned char *cat_ptr = cat_zone;
-            off_t zone_ptr = zone_start + MMB_ZONE_CAT_SIZE + MMB_ENTRY_SIZE;
-            off_t zone_end = zone_start + MMB_ZONE_FULL_SIZE;
+        log_debug("mmb: begin recatalogue");
+        for (unsigned zone = mmb_base_zone; zone < mmb_num_zones; ++zone) {
+            long zone_start = zone * MMB_ZONE_FULL_SIZE;
+            long offset = zone_start + MMB_ZONE_CAT_SIZE;
             bool dirty = false;
-            while (cat_ptr < cat_end && zone_ptr < zone_end) {
-                unsigned char title[MMB_NAME_SIZE];
-                if (fseek(mmb_fp, zone_ptr, SEEK_SET) == -1      ||
-                    fread(title, 8, 1, mmb_fp) != 1              ||
-                    fseek(mmb_fp, zone_ptr+0x100, SEEK_SET) ==-1 ||
-                    fread(title+8, 4, 1, mmb_fp) != 1)
-                {
-                    log_error("mmb: read error on MMB file %s: %s", mmb_fn, strerror(errno));
-                    vdfs_error(err_read_err);
-                    return;
+            for (unsigned disc = 0; disc < mmb_zones[zone].num_discs; ++disc) {
+                if (mmb_zones[zone].index[disc][15] != 0xf0) {
+                    unsigned char title[MMB_NAME_SIZE];
+                    if (fseek(mmb_fp, offset, SEEK_SET) == -1      ||
+                        fread(title, 8, 1, mmb_fp) != 1            ||
+                        fseek(mmb_fp, offset+0x100, SEEK_SET) ==-1 ||
+                        fread(title+8, 4, 1, mmb_fp) != 1)
+                    {
+                        log_error("mmb: read error on MMB file %s: %s", mmb_fn, strerror(errno));
+                        vdfs_error(err_read_err);
+                        return;
+                    }
+                    if (memcmp(mmb_zones[zone].index[disc], title, MMB_NAME_SIZE)) {
+                        memcpy(mmb_zones[zone].index[disc], title, MMB_NAME_SIZE);
+                        dirty = true;
+                    }
                 }
-                if (memcmp(cat_ptr, title, MMB_NAME_SIZE)) {
-                    memcpy(cat_ptr, title, MMB_NAME_SIZE);
-                    dirty = true;
-                }
-                cat_ptr += MMB_ENTRY_SIZE;
-                zone_ptr += MMB_DISC_SIZE;
+                offset += MMB_DISC_SIZE;
             }
             if (dirty) {
-                off_t offset = zone_start + MMB_ENTRY_SIZE;
-                log_debug("mmb: zone #%u dirty, writing to %08lx", zone_num, offset);
-                if (fseek(mmb_fp, offset, SEEK_SET) == -1 ||
-                    fwrite(cat_zone, MMB_ZONE_CAT_SIZE, 1, mmb_fp) != 1)
+                log_debug("mmb: zone #%u dirty, writing to %08lx", zone, zone_start);
+                if (fseek(mmb_fp, zone_start, SEEK_SET) == -1 ||
+                    fwrite(mmb_zones[zone].header, MMB_ZONE_CAT_SIZE, 1, mmb_fp) != 1)
                 {
                     log_error("mmb: write error on MMB file %s: %s", mmb_fn, strerror(errno));
                     vdfs_error(err_write_err);
                     return;
                 }
             }
-            log_debug("mmb: zone end, zone: %u, zone_start=%08lx, dirty=%d", zone_num, zone_start, dirty);
-            ++zone_num;
-            zone_start = zone_ptr;
-            cat_zone = cat_ptr;
         }
+        log_debug("mmb: recatalogue finished");
     }
 }
