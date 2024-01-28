@@ -260,7 +260,8 @@ static bool mmb_pick(unsigned drive, unsigned disc)
         unsigned side = (drive & 0x02) >> 1;
         if (side)
             offset -= MMB_DISC_SIZE;
-        mmb_offset[drive & 0x01][side] = mmb_calc_offset(disc);
+        mmb_offset[drive & 0x01][side] = offset;
+        mmb_loaded_discs[drive] = disc;
         if (fdc_spindown)
             fdc_spindown();
         return true;
