@@ -19,15 +19,31 @@
 #include "mem.h"
 #include "vdfs.h"
 
-#define MMB_DISC_SIZE      (200*1024)
 #define MMB_ENTRY_SIZE     16
+#define MMB_NAME_SIZE      12
+#define MMB_DISC_SIZE      (200*1024)
 #define MMB_ZONE_DISCS     511
-#define MMB_ZONE_CAT_SIZE  (MMB_ZONE_DISCS*MMB_ENTRY_SIZE)
-#define MMB_ZONE_FULL_SIZE (MMB_ZONE_CAT_SIZE+MMB_ENTRY_SIZE+MMB_ZONE_DISCS*MMB_DISC_SIZE)
+#define MMB_ZONE_CAT_SIZE  ((MMB_ZONE_DISCS+1)*MMB_ENTRY_SIZE)
+#define MMB_ZONE_FULL_SIZE (MMB_ZONE_CAT_SIZE+MMB_ZONE_DISCS*MMB_DISC_SIZE)
+
+struct mmb_zone {
+    unsigned num_discs;
+    unsigned char header[MMB_ENTRY_SIZE];
+    unsigned char index[MMB_ZONE_DISCS][MMB_ENTRY_SIZE];
+};
+
+/*
+#define MMB_ENTRY_SIZE     16
 #define MMB_ZONE_SKIP_SIZE (MMB_ZONE_DISCS*MMB_DISC_SIZE+MMB_ENTRY_SIZE)
 #define MMB_NAME_SIZE      12
+*/
 
+static bool mmb_writeprot;
+static unsigned mmb_num_zones;
+static unsigned mmb_base_zone;
+static struct mmb_zone *mmb_zones;
 static unsigned mmb_boot_discs[4];
+
 static unsigned mmb_cat_size;
 static unsigned char *mmb_cat;
 unsigned mmb_ndisc;
@@ -39,6 +55,9 @@ static unsigned mmb_dcat_pat_len;
 static char mmb_dcat_pattern[MMB_NAME_SIZE];
 static int mmb_loaded_discs[4] = { -1, -1, -1, -1 };
 
+static const char err_disc_not_fnd[] = "\xd6" "Disk not found in MMB file";
+static const char err_bad_drive_id[] = "\x94" "Bad drive ID";
+
 static void mmb_read_error(const char *fn, FILE *fp)
 {
     if (ferror(fp))
@@ -48,99 +67,141 @@ static void mmb_read_error(const char *fn, FILE *fp)
     fclose(fp);
 }
 
-static unsigned mmb_calc_offset(unsigned disc)
+static long mmb_boot_offset(unsigned drive)
 {
-    unsigned zone_start = disc / MMB_ZONE_DISCS;
-    unsigned zone_index = disc % MMB_ZONE_DISCS;
-    unsigned offset = zone_start * MMB_ZONE_FULL_SIZE + MMB_ZONE_CAT_SIZE + MMB_ENTRY_SIZE + zone_index * MMB_DISC_SIZE;
-    log_debug("mmb: mmb_calc_offset(%u) -> zone_start=%u, zone_index=%u, offset=%u", disc, zone_start, zone_index, offset);
-    return offset;
+    unsigned disc = mmb_boot_discs[drive];
+    unsigned zone = mmb_base_zone;
+    if (disc < mmb_zones[zone].num_discs) {
+        long offset = zone * MMB_ZONE_FULL_SIZE + MMB_ZONE_CAT_SIZE + disc * MMB_DISC_SIZE;
+        log_debug("mmb: mmb_boot_offset, drive=%u, disc=%u -> offset=%08lx", drive, disc, offset);
+        return offset;
+    }
+    else {
+        log_debug("mmb: mmb_boot_offset, drive=%u, disc=%u -> invalid disc", drive, disc);
+        return 0;
+    }
+}
+
+static void mmb_boot_drive(unsigned drive)
+{
+    long sideA = mmb_boot_offset(drive);
+    long sideB = mmb_boot_offset(drive+2);
+    if (sideA || sideB) {
+        if (sdf_fp[drive] != mmb_fp) {
+            disc_close(drive);
+            sdf_mount(drive, mmb_fn, mmb_fp, &sdf_geometries.dfs_10s_seq_80t);
+        }
+        writeprot[drive] = mmb_writeprot;
+        if (sideA) {
+            mmb_offset[drive][0] = sideA;
+            mmb_loaded_discs[drive] = mmb_boot_discs[drive];
+        }
+        if (sideB) {
+            mmb_offset[drive][1] = sideB - MMB_DISC_SIZE;
+            mmb_loaded_discs[drive+2] = mmb_boot_discs[drive+2];
+        }
+    }
+}
+
+void mmb_reset(void)
+{
+    if (mmb_fp) {
+        mmb_boot_drive(0);
+        mmb_boot_drive(1);
+        if (fdc_spindown)
+            fdc_spindown();
+    }
 }
 
 void mmb_load(char *fn)
 {
-    writeprot[0] = 0;
+    log_info("mmb: load file '%s'", fn);
+    /*
+     * Start by reading the new MMB file into local variables and
+     * freshly malloced memory so as not to disturb any file already
+     * open.
+     */
+    bool new_writeprot = false;
     FILE *fp = fopen(fn, "rb+");
     if (fp == NULL) {
         if ((fp = fopen(fn, "rb")) == NULL) {
             log_error("Unable to open file '%s' for reading - %s", fn, strerror(errno));
             return;
         }
-        writeprot[0] = 1;
+        new_writeprot = true;
     }
     unsigned char header[16];
     if (fread(header, sizeof(header), 1, fp) != 1) {
         mmb_read_error(fn, fp);
         return;
     }
-    mmb_boot_discs[0] = header[0] | (header[4] << 8);
-    mmb_boot_discs[1] = header[1] | (header[5] << 8);
-    mmb_boot_discs[2] = header[2] | (header[6] << 8);
-    mmb_boot_discs[3] = header[3] | (header[7] << 8);
-    unsigned extra_zones = header[8];
-    extra_zones = ((extra_zones & 0xf0) == 0xa0) ? extra_zones & 0x0f : 0;
-    unsigned reqd_cat_size = (extra_zones + 1) * MMB_ZONE_CAT_SIZE;
-    log_debug("mmb: mmb extra zones=%u, mmb cat total size=%u", extra_zones, reqd_cat_size);
-    if (reqd_cat_size != mmb_cat_size) {
-        if (mmb_cat)
-            free(mmb_cat);
-        if (!(mmb_cat = malloc(reqd_cat_size))) {
-            log_error("mmb: out of memory allocating MMB catalogue");
-            return;
-        }
-        mmb_cat_size = reqd_cat_size;
+    log_dump("mmb header: ", header, 16);
+    unsigned new_num_zones = 1;
+    unsigned new_base_zone = 0;
+    unsigned zone_byte = header[8];
+    if ((zone_byte & 0xf0) == 0xa0) {
+        new_num_zones = (zone_byte & 0x0f) + 1;
+        new_base_zone = (header[9] & 0x0f);
+        if (new_base_zone >= new_num_zones)
+            new_base_zone = 0;
     }
-    if (fread(mmb_cat, MMB_ZONE_CAT_SIZE, 1, fp) != 1) {
-        mmb_read_error(fn, fp);
+    log_info("mmb: num_zones=%u, base_zone=%u", new_num_zones, new_base_zone);
+    struct mmb_zone *new_zones = malloc(new_num_zones * sizeof(struct mmb_zone));
+    if (!new_zones) {
+        log_error("mmb: out of memory allocating MMB catalogue");
+        fclose(fp);
         return;
     }
-    unsigned char *mmb_ptr = mmb_cat + MMB_ZONE_CAT_SIZE;
-    unsigned char *mmb_end = mmb_cat + reqd_cat_size;
-    while (mmb_ptr < mmb_end) {
-        if (fseek(fp, MMB_ZONE_SKIP_SIZE, SEEK_CUR)) {
+    for (unsigned zone_no = 0; zone_no < new_num_zones; ++zone_no) {
+        if (fseek(fp, zone_no * MMB_ZONE_FULL_SIZE, SEEK_SET)) {
             log_error("mmb: seek error on MMB file %s: %s", fn, strerror(errno));
+            free(new_zones);
             fclose(fp);
             return;
         }
-        if (fread(mmb_ptr, MMB_ZONE_CAT_SIZE, 1, fp) != 1) {
+        if (fread(new_zones[zone_no].header, MMB_ZONE_CAT_SIZE, 1, fp) != 1) {
             mmb_read_error(fn, fp);
+            free(new_zones);
             return;
         }
-        mmb_ptr += MMB_ZONE_CAT_SIZE;
-    }
-    unsigned i = 0;
-    for (mmb_ptr = mmb_cat; mmb_ptr < mmb_end; mmb_ptr += 16)
-        log_debug("mmb: mmb#%04u=%-12.12s", i++, mmb_ptr);
-    if (mmb_fp) {
-        fclose(mmb_fp);
-        if (sdf_fp[1] == mmb_fp) {
-            sdf_mount(1, fn, fp, &sdf_geometries.dfs_10s_seq_80t);
-            writeprot[1] = writeprot[0];
-            mmb_offset[1][0] = mmb_calc_offset(mmb_boot_discs[2]);
-            mmb_offset[1][1] = mmb_calc_offset(mmb_boot_discs[3]);
-            mmb_loaded_discs[2] = mmb_boot_discs[2];
-            mmb_loaded_discs[3] = mmb_boot_discs[3];
+        new_zones[zone_no].num_discs = MMB_ZONE_DISCS;
+        for (unsigned discno = 0; discno < MMB_ZONE_DISCS; ++discno) {
+            if (new_zones[zone_no].index[discno][15] == 0xff) {
+                new_zones[zone_no].num_discs = discno;
+                break;
+            }
         }
     }
-    sdf_mount(0, fn, fp, &sdf_geometries.dfs_10s_seq_80t);
-    mmb_offset[0][0] = mmb_calc_offset(mmb_boot_discs[0]);
-    mmb_offset[0][1] = mmb_calc_offset(mmb_boot_discs[1]);
-    mmb_loaded_discs[0] = mmb_boot_discs[0];
-    mmb_loaded_discs[1] = mmb_boot_discs[1];
+    /*
+     * Now the file has been read successfully, replace the static
+     * variables for the current file with the new one and free any
+     * malloced memory.
+     */
+    if (mmb_zones)
+        free(mmb_zones);
+    mmb_zones = new_zones;
+    if (mmb_fp)
+        fclose(mmb_fp);
     mmb_fp = fp;
     mmb_fn = fn;
-    mmb_ndisc = (extra_zones + 1) * MMB_ZONE_DISCS;
-    if (fdc_spindown)
-        fdc_spindown();
+    mmb_writeprot = new_writeprot;
+    mmb_num_zones = new_num_zones;
+    mmb_base_zone = new_base_zone;
+
+    const unsigned char *zone_hdr = new_zones[new_base_zone].header;
+    mmb_boot_discs[0] = zone_hdr[0] | (zone_hdr[4] << 8);
+    mmb_boot_discs[1] = zone_hdr[1] | (zone_hdr[5] << 8);
+    mmb_boot_discs[2] = zone_hdr[2] | (zone_hdr[6] << 8);
+    mmb_boot_discs[3] = zone_hdr[3] | (zone_hdr[7] << 8);
+    mmb_reset();
 }
 
 static void mmb_eject_one(int drive)
 {
-    ALLEGRO_PATH *path;
-
     if (sdf_fp[drive] == mmb_fp) {
         disc_close(drive);
-        if ((path = discfns[drive]))
+        ALLEGRO_PATH *path = discfns[drive];
+        if (path)
             disc_load(drive, path);
     }
 }
@@ -150,41 +211,60 @@ void mmb_eject(void)
     if (mmb_fp) {
         mmb_eject_one(0);
         mmb_eject_one(1);
+        fclose(mmb_fp);
+        mmb_fp = NULL;
+    }
+    if (mmb_zones) {
+        free(mmb_zones);
+        mmb_zones = NULL;
     }
     if (mmb_fn) {
         free(mmb_fn);
         mmb_fn = NULL;
     }
-    mmb_ndisc = 0;
 }
 
-static void mmb_reset_one(int drive)
+static long mmb_calc_offset(unsigned disc)
 {
-    if (sdf_fp[drive] == mmb_fp) {
-        mmb_offset[drive][0] = mmb_calc_offset(0);
-        mmb_offset[drive][1] = mmb_calc_offset(1);
+    unsigned zone = disc / MMB_ZONE_DISCS;
+    unsigned posn = disc % MMB_ZONE_DISCS;
+    if (posn < mmb_zones[zone].num_discs) {
+        long offset = zone * MMB_ZONE_FULL_SIZE + MMB_ZONE_CAT_SIZE + posn * MMB_DISC_SIZE;
+        log_debug("mmb: mmb_calc_offset(%u) -> zone=%u, posn=%u, offset=%08lx", disc, zone, posn, offset);
+        return offset;
+    }
+    else {
+        log_debug("mmb: mmb_calc_offset(%u) -> invalid disc", disc);
+        return 0;
     }
 }
 
-void mmb_reset(void)
+static bool mmb_pick(unsigned drive, unsigned disc)
 {
-    if (mmb_fp) {
-        mmb_reset_one(0);
-        mmb_reset_one(1);
+    log_debug("mmb: picking MMB disc, drive=%d, disc=%d", drive, disc);
+    if (drive & ~0x03) {
+        log_debug("vdfs: mmb_check_pick: invalid logical drive");
+        vdfs_error(err_bad_drive_id);
+        return false;
     }
-}
-
-void mmb_pick(unsigned drive, unsigned side, unsigned disc)
-{
-    log_debug("mmb: picking MMB disc, drive=%d, side=%d, disc=%d", drive, side, disc);
-
-    if (sdf_fp[drive] != mmb_fp) {
-        disc_close(drive);
-        sdf_mount(drive, mmb_fn, mmb_fp, &sdf_geometries.dfs_10s_seq_80t);
+    long offset = mmb_calc_offset(disc);
+    if (offset) {
+        if (sdf_fp[drive] != mmb_fp) {
+            disc_close(drive);
+            sdf_mount(drive, mmb_fn, mmb_fp, &sdf_geometries.dfs_10s_seq_80t);
+        }
+        unsigned side = (drive & 0x02) >> 1;
+        if (side)
+            offset -= MMB_DISC_SIZE;
+        mmb_offset[drive & 0x01][side] = mmb_calc_offset(disc);
+        if (fdc_spindown)
+            fdc_spindown();
+        return true;
     }
-    mmb_offset[drive][side] = mmb_calc_offset(disc);
-    if (fdc_spindown)
-        fdc_spindown();
+    else {
+        vdfs_error(err_disc_not_fnd);
+        return false;
+    }
 }
 
 static inline int mmb_cat_name_cmp(const char *nam_ptr, const unsigned char *cat_ptr, const unsigned char *cat_nxt)
@@ -221,9 +301,6 @@ static int mmb_find(const char *name)
     return -1;
 }
 
-static const char err_disc_not_fnd[] = "\xd6" "Disk not found in MMB file";
-static const char err_bad_drive_id[] = "\x94" "Bad drive ID";
-
 static int mmb_parse_find(uint16_t addr)
 {
     char name[17];
@@ -245,34 +322,6 @@ static int mmb_parse_find(uint16_t addr)
     return i;
 }
 
-static bool mmb_check_pick(unsigned drive, unsigned disc)
-{
-    if (disc >= mmb_ndisc) {
-        vdfs_error(err_disc_not_fnd);
-        return false;
-    }
-    unsigned side;
-    switch(drive) {
-        case 0:
-        case 1:
-            mmb_loaded_discs[drive] = disc;
-            side = 0;
-            break;
-        case 2:
-        case 3:
-            mmb_loaded_discs[drive] = disc;
-            drive &= 1;
-            side = 1;
-            break;
-        default:
-            log_debug("vdfs: mmb_check_pick: invalid logical drive %d", drive);
-            vdfs_error(err_bad_drive_id);
-            return false;
-    }
-    mmb_pick(drive, side, disc);
-    return true;
-}
-
 bool mmb_din_common(uint16_t addr, unsigned default_drive)
 {
     bool worked = false;
@@ -287,7 +336,7 @@ bool mmb_din_common(uint16_t addr, unsigned default_drive)
         while (ch == ' ')
             ch = readmem(++addr2);
         if (ch == '\r')
-            worked = mmb_check_pick(default_drive, num1);
+            worked = mmb_pick(default_drive, num1);
         else {
             addr = addr2;
             while (ch >= '0' && ch <= '9') {
@@ -298,20 +347,20 @@ bool mmb_din_common(uint16_t addr, unsigned default_drive)
                 while (ch == ' ')
                     ch = readmem(++addr2);
                 if (ch == '\r' && num1 >= 0 && num1 <= 3)
-                    worked = mmb_check_pick(num1, num2);
+                    worked = mmb_pick(num1, num2);
                 else
                     vdfs_error(err_bad_drive_id);
             }
             else if ((num2 = mmb_parse_find(addr)) >= 0) {
                 if (num1 >= 0 && num1 <= 3)
-                    worked = mmb_check_pick(num1, num2);
+                    worked = mmb_pick(num1, num2);
                 else
                     vdfs_error(err_bad_drive_id);
             }
         }
     }
     else if ((num1 = mmb_parse_find(addr)) >= 0)
-        worked = mmb_check_pick(default_drive, num1);
+        worked = mmb_pick(default_drive, num1);
     return worked;
 }
 
@@ -495,7 +544,7 @@ static void mmb_dop_find_unformatted(unsigned drive)
     while (ptr < end) {
         if (ptr[15] == 0xf0) {
             int disc = (ptr - mmb_cat) / MMB_ENTRY_SIZE;
-            mmb_check_pick(drive, disc);
+            mmb_pick(drive, disc);
             return;
         }
         ptr += MMB_ENTRY_SIZE;
@@ -565,6 +614,7 @@ void mmb_cmd_dop(uint16_t addr)
 
 void mmb_cmd_drecat(void)
 {
+    log_debug("mmb: sdf_fp[0]=%p, sdf_fp[1]=%p, mmb_fp=%p", sdf_fp[0], sdf_fp[1], mmb_fp);
     if (writeprot[0])
         vdfs_error(err_wprotect);
     else {
