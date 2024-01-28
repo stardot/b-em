@@ -524,16 +524,11 @@ void mmb_cmd_dfree(void)
 {
     unsigned total = 0;
     unsigned unform = 0;
-    const unsigned char *ptr = mmb_cat;
-    const unsigned char *end = ptr + mmb_cat_size;
-    while (ptr < end) {
-        if (ptr[15] == 0xf0) {
-            ++unform;
-            ++total;
-        }
-        else if (ptr[0])
-            ++total;
-        ptr += MMB_ENTRY_SIZE;
+    for (unsigned zone_no = 0; zone_no < mmb_num_zones; ++zone_no) {
+        for (unsigned disc = 0; disc < mmb_zones[zone_no].num_discs; ++disc)
+            if (mmb_zones[zone_no].index[disc][15] == 0xf0)
+                ++unform;
+        total += mmb_zones[zone_no].num_discs;
     }
     sprintf((char *)vdfs_split_addr(), "%u of %u disks free (unformatted)\r\n", unform, total);
     vdfs_split_go(0);
