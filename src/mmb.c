@@ -222,11 +222,15 @@ void mmb_eject(void)
         free(mmb_fn);
         mmb_fn = NULL;
     }
+    mmb_loaded_discs[0] = -1;
+    mmb_loaded_discs[1] = -1;
+    mmb_loaded_discs[2] = -1;
+    mmb_loaded_discs[3] = -1;
 }
 
 static long mmb_calc_offset(unsigned disc)
 {
-    unsigned zone = disc / MMB_ZONE_DISCS;
+    unsigned zone = disc / MMB_ZONE_DISCS + mmb_base_zone;
     unsigned posn = disc % MMB_ZONE_DISCS;
     if (posn < mmb_zones[zone].num_discs) {
         long offset = zone * MMB_ZONE_FULL_SIZE + MMB_ZONE_CAT_SIZE + posn * MMB_DISC_SIZE;
@@ -498,11 +502,15 @@ void mmb_cmd_ddrive(uint16_t addr)
     for (int drive = 0; drive < 4; ++drive) {
         int disc = mmb_loaded_discs[drive];
         if (disc >= 0) {
-            dest += sprintf((char *)dest, "%u: %5u ", drive, disc);
-            dest = mmb_name_flag(dest, mmb_cat + disc * MMB_ENTRY_SIZE);
-            *dest++ = '\r';
-            *dest++ = '\n';
-            loaded = true;
+            unsigned zone = disc / MMB_ZONE_DISCS + mmb_base_zone;
+            unsigned posn = disc % MMB_ZONE_DISCS;
+            if (posn < mmb_zones[zone].num_discs) {
+                dest += sprintf((char *)dest, ":%u %4u ", drive, disc);
+                dest = mmb_name_flag(dest, mmb_zones[zone].index[posn]);
+                *dest++ = '\r';
+                *dest++ = '\n';
+                loaded = true;
+            }
         }
         *dest = 0;
     }
