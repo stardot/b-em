@@ -416,17 +416,20 @@ void mmb_cmd_dcat_cont(void)
         vdfs_error("\x17" "Escape");
     else {
         uint8_t *dest = vdfs_split_addr();
-        const unsigned char *cat_ptr = mmb_cat + mmb_dcat_posn * 16;
         while (mmb_dcat_posn < mmb_dcat_end) {
-            if (*cat_ptr && vdfs_wildmat(mmb_dcat_pattern, mmb_dcat_pat_len, (char *)cat_ptr, MMB_NAME_SIZE)) {
-                ++mmb_dcat_count;
-                dest += snprintf((char *)dest, 80, "%5d ", mmb_dcat_posn++);
-                dest = mmb_name_flag(dest, cat_ptr);
-                *dest = 0;
-                vdfs_split_go(0x17);
-                return;
+            unsigned zone = mmb_dcat_posn / MMB_ZONE_DISCS;
+            unsigned posn = mmb_dcat_posn % MMB_ZONE_DISCS;
+            if (posn < mmb_zones[zone].num_discs) {
+                const unsigned char *ptr = mmb_zones[zone].index[posn];
+                if (vdfs_wildmat(mmb_dcat_pattern, mmb_dcat_pat_len, (const char *)ptr, MMB_NAME_SIZE)) {
+                    ++mmb_dcat_count;
+                    dest += snprintf((char *)dest, 80, "%5d ", mmb_dcat_posn++);
+                    dest = mmb_name_flag(dest, ptr);
+                    *dest = 0;
+                    vdfs_split_go(0x17);
+                    return;
+                }
             }
-            cat_ptr += MMB_ENTRY_SIZE;
             ++mmb_dcat_posn;
         }
         snprintf((char *)dest, 20, "\r\n%d disks found\r\n", mmb_dcat_count);
@@ -439,7 +442,7 @@ void mmb_cmd_dcat_start(uint16_t addr)
     /* Defaults for an unfiltered list */
     mmb_dcat_count = 0;
     mmb_dcat_posn = 0;
-    mmb_dcat_end = mmb_cat_size / MMB_ENTRY_SIZE;
+    mmb_dcat_end = mmb_num_zones * MMB_ZONE_DISCS;
     mmb_dcat_pattern[0] = '*';
     mmb_dcat_pat_len = 1;
 
@@ -491,6 +494,7 @@ void mmb_cmd_dcat_start(uint16_t addr)
             log_debug("mmb: mmb_cmd_dcat_start, pattern=%.*s", pat_ix, mmb_dcat_pattern);
         }
     }
+    mmb_dcat_posn += mmb_base_zone * MMB_ZONE_DISCS;
     mmb_cmd_dcat_cont();
 }
 
