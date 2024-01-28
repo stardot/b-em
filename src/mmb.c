@@ -152,22 +152,22 @@ void mmb_load(char *fn)
         fclose(fp);
         return;
     }
-    for (unsigned zone_no = 0; zone_no < new_num_zones; ++zone_no) {
-        if (fseek(fp, zone_no * MMB_ZONE_FULL_SIZE, SEEK_SET)) {
+    for (unsigned zone = 0; zone < new_num_zones; ++zone) {
+        if (fseek(fp, zone * MMB_ZONE_FULL_SIZE, SEEK_SET)) {
             log_error("mmb: seek error on MMB file %s: %s", fn, strerror(errno));
             free(new_zones);
             fclose(fp);
             return;
         }
-        if (fread(new_zones[zone_no].header, MMB_ZONE_CAT_SIZE, 1, fp) != 1) {
+        if (fread(new_zones[zone].header, MMB_ZONE_CAT_SIZE, 1, fp) != 1) {
             mmb_read_error(fn, fp);
             free(new_zones);
             return;
         }
-        new_zones[zone_no].num_discs = MMB_ZONE_DISCS;
+        new_zones[zone].num_discs = MMB_ZONE_DISCS;
         for (unsigned discno = 0; discno < MMB_ZONE_DISCS; ++discno) {
-            if (new_zones[zone_no].index[discno][15] == 0xff) {
-                new_zones[zone_no].num_discs = discno;
+            if (new_zones[zone].index[discno][15] == 0xff) {
+                new_zones[zone].num_discs = discno;
                 break;
             }
         }
@@ -228,19 +228,19 @@ void mmb_eject(void)
     mmb_loaded_discs[3] = -1;
 }
 
-static long mmb_calc_offset(unsigned disc)
+static void mmb_mount(unsigned drive, unsigned zone, unsigned posn)
 {
-    unsigned zone = disc / MMB_ZONE_DISCS + mmb_base_zone;
-    unsigned posn = disc % MMB_ZONE_DISCS;
-    if (posn < mmb_zones[zone].num_discs) {
-        long offset = zone * MMB_ZONE_FULL_SIZE + MMB_ZONE_CAT_SIZE + posn * MMB_DISC_SIZE;
-        log_debug("mmb: mmb_calc_offset(%u) -> zone=%u, posn=%u, offset=%08lx", disc, zone, posn, offset);
-        return offset;
+    if (sdf_fp[drive] != mmb_fp) {
+        disc_close(drive);
+        sdf_mount(drive, mmb_fn, mmb_fp, &sdf_geometries.dfs_10s_seq_80t);
     }
-    else {
-        log_debug("mmb: mmb_calc_offset(%u) -> invalid disc", disc);
-        return 0;
-    }
+    unsigned side = (drive & 0x02) >> 1;
+    long offset = zone * MMB_ZONE_FULL_SIZE + MMB_ZONE_CAT_SIZE + posn * MMB_DISC_SIZE;;
+    if (side)
+        offset -= MMB_DISC_SIZE;
+    mmb_offset[drive & 0x01][side] = offset;
+    if (fdc_spindown)
+        fdc_spindown();
 }
 
 static bool mmb_pick(unsigned drive, unsigned disc)
@@ -251,19 +251,11 @@ static bool mmb_pick(unsigned drive, unsigned disc)
         vdfs_error(err_bad_drive_id);
         return false;
     }
-    long offset = mmb_calc_offset(disc);
-    if (offset) {
-        if (sdf_fp[drive] != mmb_fp) {
-            disc_close(drive);
-            sdf_mount(drive, mmb_fn, mmb_fp, &sdf_geometries.dfs_10s_seq_80t);
-        }
-        unsigned side = (drive & 0x02) >> 1;
-        if (side)
-            offset -= MMB_DISC_SIZE;
-        mmb_offset[drive & 0x01][side] = offset;
+    unsigned zone = disc / MMB_ZONE_DISCS + mmb_base_zone;
+    unsigned posn = disc % MMB_ZONE_DISCS;
+    if (posn < mmb_zones[zone].num_discs) {
+        mmb_mount(drive, zone, posn);
         mmb_loaded_discs[drive] = disc;
-        if (fdc_spindown)
-            fdc_spindown();
         return true;
     }
     else {
@@ -528,11 +520,11 @@ void mmb_cmd_dfree(void)
 {
     unsigned total = 0;
     unsigned unform = 0;
-    for (unsigned zone_no = 0; zone_no < mmb_num_zones; ++zone_no) {
-        for (unsigned disc = 0; disc < mmb_zones[zone_no].num_discs; ++disc)
-            if (mmb_zones[zone_no].index[disc][15] == 0xf0)
+    for (unsigned zone = mmb_base_zone; zone < mmb_num_zones; ++zone) {
+        for (unsigned disc = 0; disc < mmb_zones[zone].num_discs; ++disc)
+            if (mmb_zones[zone].index[disc][15] == 0xf0)
                 ++unform;
-        total += mmb_zones[zone_no].num_discs;
+        total += mmb_zones[zone].num_discs;
     }
     sprintf((char *)vdfs_split_addr(), "%u of %u disks free (unformatted)\r\n", unform, total);
     vdfs_split_go(0);
@@ -547,15 +539,14 @@ static const char err_write_err[]       = "\xc7" "Error writing to MMB file";
 
 static void mmb_dop_find_unformatted(unsigned drive)
 {
-    const unsigned char *ptr = mmb_cat;
-    const unsigned char *end = ptr + mmb_cat_size;
-    while (ptr < end) {
-        if (ptr[15] == 0xf0) {
-            int disc = (ptr - mmb_cat) / MMB_ENTRY_SIZE;
-            mmb_pick(drive, disc);
-            return;
+    for (unsigned zone = mmb_base_zone; zone < mmb_num_zones; ++zone) {
+        for (unsigned disc = 0; disc < mmb_zones[zone].num_discs; ++disc) {
+            if (mmb_zones[zone].index[disc][15] == 0xf0) {
+                mmb_mount(drive, zone, disc);
+                mmb_loaded_discs[drive] = disc + (zone - mmb_base_zone) * MMB_ZONE_DISCS;
+                return;
+            }
         }
-        ptr += MMB_ENTRY_SIZE;
     }
     vdfs_error(err_no_unformatted);
 }
@@ -569,30 +560,32 @@ static void mmb_dop_flags(unsigned drive, int op)
         if (disc < 0)
             vdfs_error(err_disc_not_loaded);
         else {
-            unsigned char *cat_ptr = mmb_cat + disc * MMB_ENTRY_SIZE;
-            if (op == 'P')
-                cat_ptr[15] &= 0xf0;
-            else if (op == 'U')
-                cat_ptr[15] |= 0x0f;
-            else if (op == 'K')
-                cat_ptr[15] |= 0xf0;
-            else if (op == 'R')
-                cat_ptr[15] &= 0x0f;
-            else {
-                vdfs_error(err_bad_dop_oper);
-                return;
-            }
-            /* write changed entry back to disk */
-            unsigned zone_start = disc / MMB_ZONE_DISCS;
-            unsigned zone_index = disc % MMB_ZONE_DISCS;
-            unsigned offset = zone_start * MMB_ZONE_FULL_SIZE + (zone_index + 1) * MMB_ENTRY_SIZE;
-            if (fseek(mmb_fp, offset, SEEK_SET) == -1) {
-                log_error("unable to seek on MMB file: %s", strerror(errno));
-                vdfs_error(err_write_err);
-            }
-            else if (fwrite(cat_ptr, MMB_ENTRY_SIZE, 1, mmb_fp) != 1 || fflush(mmb_fp)) {
-                log_error("unable to write back to MMB file: %s", strerror(errno));
-                vdfs_error(err_write_err);
+            unsigned zone = disc / MMB_ZONE_DISCS + mmb_base_zone;
+            unsigned posn = disc % MMB_ZONE_DISCS;
+            if (posn < mmb_zones[zone].num_discs) {
+                unsigned char *ptr = mmb_zones[zone].index[posn];
+                if (op == 'P' && ptr[15] != 0xf0)
+                    ptr[15] = 0;
+                else if (op == 'U' && ptr[15] != 0xf0)
+                    ptr[15] = 0x0f;
+                else if (op == 'K')
+                    ptr[15] = 0xf0;
+                else if (op == 'R')
+                    ptr[15] &= 0x0f;
+                else {
+                    vdfs_error(err_bad_dop_oper);
+                    return;
+                }
+                /* write changed entry back to disk */
+                unsigned offset = zone * MMB_ZONE_FULL_SIZE + (posn + 1) * MMB_ENTRY_SIZE;
+                if (fseek(mmb_fp, offset, SEEK_SET) == -1) {
+                    log_error("unable to seek on MMB file: %s", strerror(errno));
+                    vdfs_error(err_write_err);
+                }
+                else if (fwrite(ptr, MMB_ENTRY_SIZE, 1, mmb_fp) != 1 || fflush(mmb_fp)) {
+                    log_error("unable to write back to MMB file: %s", strerror(errno));
+                    vdfs_error(err_write_err);
+                }
             }
         }
     }
