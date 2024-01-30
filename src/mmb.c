@@ -441,7 +441,7 @@ static int mmb_parse_drive(uint16_t addr, int drive)
 void mmb_cmd_dout(uint16_t addr)
 {
     int drive = mmb_parse_drive(addr, x);
-    log_debug("mmb: dout, ldrive=%d", drive);
+    log_debug("mmb: dout, drive=%d", drive);
     if (drive >= 0) {
         if (mmb_loaded_discs[drive] >= 0) {
             mmb_loaded_discs[drive] = -1;
