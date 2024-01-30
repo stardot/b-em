@@ -233,11 +233,12 @@ void mmb_eject(void)
 
 static void mmb_mount(unsigned drive, unsigned zone, unsigned posn)
 {
+    unsigned side = (drive & 0x02) >> 1;
+    drive &= 1;
     if (sdf_fp[drive] != mmb_fp) {
         disc_close(drive);
         sdf_mount(drive, mmb_fn, mmb_fp, &sdf_geometries.dfs_10s_seq_80t);
     }
-    unsigned side = (drive & 0x02) >> 1;
     long offset = zone * MMB_ZONE_FULL_SIZE + MMB_ZONE_CAT_SIZE + posn * MMB_DISC_SIZE;;
     if (side)
         offset -= MMB_DISC_SIZE;
