@@ -65,10 +65,23 @@ static const char err_bad_zone[]     = "\x94" "Not that many zones in MMB file";
 static void mmb_read_error(const char *fn, FILE *fp)
 {
     if (ferror(fp))
-        log_error("mmb: read error on MMB file %s: %s", fn, strerror(errno));
+        log_error("mmb: error reading MMB file %s: %s", fn, strerror(errno));
     else
         log_error("mmb: unexpected EOF on MMB file %s", fn);
     fclose(fp);
+}
+
+static bool mmb_write(long offset, void *ptr, size_t size)
+{
+    if (fseek(mmb_fp, offset, SEEK_SET) < 0) {
+        log_error("mmb: error seeking on MMB file %s: %s", mmb_fn, strerror(errno));
+        return false;
+    }
+    if (fwrite(ptr, size, 1, mmb_fp) != 1) {
+        log_error("mmb: error writing on MMB file %s: %s", mmb_fn, strerror(errno));
+        return false;
+    }
+    return true;
 }
 
 static long mmb_boot_offset(unsigned drive)
@@ -392,10 +405,7 @@ static bool mmb_onboot_act(unsigned drive, unsigned disc)
     else {
         mmb_zones[mmb_base_zone].header[drive] = disc;
         long zone_start = mmb_base_zone * MMB_ZONE_FULL_SIZE;
-        if (fseek(mmb_fp, zone_start, SEEK_SET) == -1 ||
-            fwrite(mmb_zones[mmb_base_zone].header, MMB_ZONE_CAT_SIZE, 1, mmb_fp) != 1)
-        {
-            log_error("mmb: write error on MMB file %s: %s", mmb_fn, strerror(errno));
+        if (!mmb_write(zone_start, mmb_zones[mmb_base_zone].header, MMB_ZONE_CAT_SIZE)) {
             vdfs_error(err_write_err);
             return false;
         }
@@ -642,14 +652,8 @@ static void mmb_dop_flags(unsigned drive, int op)
                 }
                 /* write changed entry back to disk */
                 unsigned offset = zone * MMB_ZONE_FULL_SIZE + (posn + 1) * MMB_ENTRY_SIZE;
-                if (fseek(mmb_fp, offset, SEEK_SET) == -1) {
-                    log_error("unable to seek on MMB file: %s", strerror(errno));
+                if (!mmb_write(offset, ptr, MMB_ENTRY_SIZE))
                     vdfs_error(err_write_err);
-                }
-                else if (fwrite(ptr, MMB_ENTRY_SIZE, 1, mmb_fp) != 1 || fflush(mmb_fp)) {
-                    log_error("unable to write back to MMB file: %s", strerror(errno));
-                    vdfs_error(err_write_err);
-                }
             }
         }
     }
@@ -685,7 +689,7 @@ void mmb_cmd_drecat(void)
                         fseek(mmb_fp, offset+0x100, SEEK_SET) ==-1 ||
                         fread(title+8, 4, 1, mmb_fp) != 1)
                     {
-                        log_error("mmb: read error on MMB file %s: %s", mmb_fn, strerror(errno));
+                        log_error("mmb: error reading MMB file %s: %s", mmb_fn, strerror(errno));
                         vdfs_error(err_read_err);
                         return;
                     }
@@ -698,10 +702,7 @@ void mmb_cmd_drecat(void)
             }
             if (dirty) {
                 log_debug("mmb: zone #%u dirty, writing to %08lx", zone, zone_start);
-                if (fseek(mmb_fp, zone_start, SEEK_SET) == -1 ||
-                    fwrite(mmb_zones[zone].header, MMB_ZONE_CAT_SIZE, 1, mmb_fp) != 1)
-                {
-                    log_error("mmb: write error on MMB file %s: %s", mmb_fn, strerror(errno));
+                if (!mmb_write(zone_start, mmb_zones[zone].header, MMB_ZONE_CAT_SIZE)) {
                     vdfs_error(err_write_err);
                     return;
                 }
@@ -736,12 +737,8 @@ void mmb_cmd_dbase(uint16_t addr)
             vdfs_error(err_wprotect);
         else if (zone < mmb_num_zones) {
             mmb_zones[0].header[9] = zone;
-            if (fseek(mmb_fp, 0, SEEK_SET) == -1 ||
-                fwrite(mmb_zones[0].header, MMB_ENTRY_SIZE, 1, mmb_fp) != 1)
-            {
-                log_error("mmb: write error on MMB file %s: %s", mmb_fn, strerror(errno));
+            if (!mmb_write(0, mmb_zones[0].header, MMB_ENTRY_SIZE))
                 vdfs_error(err_write_err);
-            }
             mmb_base_zone = zone;
             mmb_rebase(0);
             mmb_rebase(1);
