@@ -252,6 +252,8 @@ enum vdfs_action {
     VDFS_ROM_PRINT_SPLIT,
     VDFS_ROM_MMBDIN,
     VDFS_ROM_MMBDOP,
+    VDFS_ROM_MMBONBT,
+    VDFS_ROM_MMBDOUT,
     VDFS_ACT_NOP,
     VDFS_ACT_QUIT,
     VDFS_ACT_SRLOAD,
@@ -4986,7 +4988,9 @@ static const struct cmdent ctab_mmb[] = {
     { "DDrive",  VDFS_ACT_MMBDDRV },
     { "DFree",   VDFS_ACT_MMBDFRE },
     { "DOP",     VDFS_ROM_MMBDOP  },
-    { "DRECAT",  VDFS_ACT_MMBRCAT }
+    { "DONboot", VDFS_ROM_MMBONBT },
+    { "DOUt",    VDFS_ROM_MMBDOUT },
+    { "DREcat",  VDFS_ACT_MMBRCAT }
 };
 
 static const struct cmdent ctab_enabled[] = {
@@ -5177,6 +5181,8 @@ static inline void dispatch(uint8_t value)
         case 0x16: mmb_cmd_din(cmd_tail); break;
         case 0x17: mmb_cmd_dcat_cont();   break;
         case 0x18: mmb_cmd_dop(cmd_tail); break;
+        case 0x19: mmb_cmd_donboot(cmd_tail); break;
+        case 0x1a: mmb_cmd_dout(cmd_tail);    break;
         default: log_warn("vdfs: function code %d not recognised", value);
     }
 }

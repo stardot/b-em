@@ -24,5 +24,7 @@ void mmb_cmd_ddrive(uint16_t addr);
 void mmb_cmd_dfree(void);
 void mmb_cmd_dop(uint16_t addr);
 void mmb_cmd_drecat(void);
+void mmb_cmd_donboot(uint16_t addr);
+void mmb_cmd_dout(uint16_t addr);
 
 #endif

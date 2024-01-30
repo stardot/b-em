@@ -57,6 +57,9 @@ static int mmb_loaded_discs[4] = { -1, -1, -1, -1 };
 
 static const char err_disc_not_fnd[] = "\xd6" "Disk not found in MMB file";
 static const char err_bad_drive_id[] = "\x94" "Bad drive ID";
+static const char err_wprotect[]     = "\xc1" "MMB file not open for update";
+static const char err_read_err[]     = "\xc7" "Error reading MMB file";
+static const char err_write_err[]    = "\xc7" "Error writing to MMB file";
 
 static void mmb_read_error(const char *fn, FILE *fp)
 {
@@ -319,9 +322,8 @@ static int mmb_parse_find(uint16_t addr)
     return i;
 }
 
-bool mmb_din_common(uint16_t addr, unsigned default_drive)
+static void mmb_twoargs(uint16_t addr, unsigned default_drive, bool (*action)(unsigned drive, unsigned disc))
 {
-    bool worked = false;
     int num1 = 0, num2 = 0;
     uint16_t addr2 = addr;
     int ch = readmem(addr2);
@@ -333,7 +335,7 @@ bool mmb_din_common(uint16_t addr, unsigned default_drive)
         while (ch == ' ')
             ch = readmem(++addr2);
         if (ch == '\r')
-            worked = mmb_pick(default_drive, num1);
+            action(default_drive, num1);
         else {
             addr = addr2;
             while (ch >= '0' && ch <= '9') {
@@ -344,33 +346,97 @@ bool mmb_din_common(uint16_t addr, unsigned default_drive)
                 while (ch == ' ')
                     ch = readmem(++addr2);
                 if (ch == '\r' && num1 >= 0 && num1 <= 3)
-                    worked = mmb_pick(num1, num2);
+                    action(num1, num2);
                 else
                     vdfs_error(err_bad_drive_id);
             }
             else if ((num2 = mmb_parse_find(addr)) >= 0) {
                 if (num1 >= 0 && num1 <= 3)
-                    worked = mmb_pick(num1, num2);
+                    action(num1, num2);
                 else
                     vdfs_error(err_bad_drive_id);
             }
         }
     }
     else if ((num1 = mmb_parse_find(addr)) >= 0)
-        worked = mmb_pick(default_drive, num1);
-    return worked;
+        action(default_drive, num1);
 }
 
 void mmb_cmd_din(uint16_t addr)
 {
-    mmb_din_common(addr, x);
+    mmb_twoargs(addr, x, mmb_pick);
 }
 
 void mmb_cmd_dboot(uint16_t addr)
 {
-    if (mmb_din_common(addr, 0)) {
+    unsigned disc = mmb_parse_find(addr);
+    if (disc >= 0 && mmb_pick(0, disc)) {
         autoboot = 150;
         main_key_break();
+    }
+}
+
+static bool mmb_onboot_act(unsigned drive, unsigned disc)
+{
+    if (mmb_writeprot) {
+        vdfs_error(err_wprotect);
+        return false;
+    }
+    else {
+        mmb_zones[mmb_base_zone].header[drive] = disc;
+        long zone_start = mmb_base_zone * MMB_ZONE_FULL_SIZE;
+        if (fseek(mmb_fp, zone_start, SEEK_SET) == -1 ||
+            fwrite(mmb_zones[mmb_base_zone].header, MMB_ZONE_CAT_SIZE, 1, mmb_fp) != 1)
+        {
+            log_error("mmb: write error on MMB file %s: %s", mmb_fn, strerror(errno));
+            vdfs_error(err_write_err);
+            return false;
+        }
+        return true;
+    }
+}
+
+void mmb_cmd_donboot(uint16_t addr)
+{
+    mmb_twoargs(addr, x, mmb_onboot_act);
+}
+
+static int mmb_parse_drive(uint16_t addr, int drive)
+{
+    int ch = readmem(addr++);
+    while (ch == ' ' || ch == '\t')
+        ch = readmem(addr++);
+    if (ch >= '0' && ch <= '9') {
+        drive = 0;
+        do {
+            drive = (drive * 10) + (ch & 0x0f);
+            ch = readmem(addr++);
+        } while (ch >= '0' && ch <= '9');
+    }
+    if (drive >= 4) {
+        vdfs_error(err_bad_drive_id);
+        drive = -1;
+    }
+    return drive;
+}
+
+void mmb_cmd_dout(uint16_t addr)
+{
+    int drive = mmb_parse_drive(addr, x);
+    log_debug("mmb: dout, ldrive=%d", drive);
+    if (drive >= 0) {
+        if (mmb_loaded_discs[drive] >= 0) {
+            mmb_loaded_discs[drive] = -1;
+            int oside = drive ^ 0x02;
+            if (mmb_loaded_discs[oside] < 0) {
+                drive &= 1;
+                mmb_offset[drive][0] = 0;
+                mmb_offset[drive][1] = 0;
+                sdf_fp[drive] = NULL;
+                if (discfns[drive])
+                    disc_load(drive, discfns[drive]);
+            }
+        }
     }
 }
 
@@ -533,9 +599,6 @@ void mmb_cmd_dfree(void)
 static const char err_disc_not_loaded[] = "\xd6" "Disk not loaded in that drive";
 static const char err_bad_dop_oper[]    = "\x94" "Bad DOP operation";
 static const char err_no_unformatted[]  = "\xd6" "No unformatted discs";
-static const char err_wprotect[]        = "\xc1" "MMB file not open for update";
-static const char err_read_err[]        = "\xc7" "Error reading MMB file";
-static const char err_write_err[]       = "\xc7" "Error writing to MMB file";
 
 static void mmb_dop_find_unformatted(unsigned drive)
 {
@@ -593,24 +656,14 @@ static void mmb_dop_flags(unsigned drive, int op)
 
 void mmb_cmd_dop(uint16_t addr)
 {
-    unsigned drive = x;
     int op = readmem(addr++) & 0x5f;
-    int ch = readmem(addr++);
-    while (ch == ' ' || ch == '\t')
-        ch = readmem(addr++);
-    if (ch >= '0' && ch <= '9') {
-        drive = 0;
-        do {
-            drive = (drive * 10) + (ch & 0x0f);
-            ch = readmem(addr++);
-        } while (ch >= '0' && ch <= '9');
+    int drive = mmb_parse_drive(addr, x);
+    if (drive >= 0) {
+        if (op == 'N')
+            mmb_dop_find_unformatted(drive);
+        else
+            mmb_dop_flags(drive, op);
     }
-    if (drive >= 4)
-        vdfs_error(err_bad_drive_id);
-    else if (op == 'N')
-        mmb_dop_find_unformatted(drive);
-    else
-        mmb_dop_flags(drive, op);
 }
 
 void mmb_cmd_drecat(void)

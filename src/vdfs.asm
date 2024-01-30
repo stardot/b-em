@@ -160,6 +160,8 @@ prtextws    =   &A8
             equw    print_split
             equw    mmb_din
             equw    mmb_dop
+            equw    mmb_onboot
+            equw    mmb_dout
 .dispend
 
 ; Stubs to transfer control to the vdfs.c module.
@@ -653,6 +655,10 @@ prtextws    =   &A8
 .mmb_din    lda     #&16
             bne     mmb_common
 .mmb_dop    lda     #&18
+            bne     mmb_common
+.mmb_onboot lda     #&19
+            bne     mmb_common
+.mmb_dout   lda     #&1a
 .mmb_common pha
             lda     #&00
             tay
