@@ -60,6 +60,7 @@ static const char err_bad_drive_id[] = "\x94" "Bad drive ID";
 static const char err_wprotect[]     = "\xc1" "MMB file not open for update";
 static const char err_read_err[]     = "\xc7" "Error reading MMB file";
 static const char err_write_err[]    = "\xc7" "Error writing to MMB file";
+static const char err_bad_zone[]     = "\x94" "Not that many zones in MMB file";
 
 static void mmb_read_error(const char *fn, FILE *fp)
 {
@@ -249,12 +250,6 @@ static void mmb_mount(unsigned drive, unsigned zone, unsigned posn)
 
 static bool mmb_pick(unsigned drive, unsigned disc)
 {
-    log_debug("mmb: picking MMB disc, drive=%d, disc=%d", drive, disc);
-    if (drive & ~0x03) {
-        log_debug("vdfs: mmb_check_pick: invalid logical drive");
-        vdfs_error(err_bad_drive_id);
-        return false;
-    }
     unsigned zone = disc / MMB_ZONE_DISCS + mmb_base_zone;
     unsigned posn = disc % MMB_ZONE_DISCS;
     if (posn < mmb_zones[zone].num_discs) {
@@ -262,10 +257,21 @@ static bool mmb_pick(unsigned drive, unsigned disc)
         mmb_loaded_discs[drive] = disc;
         return true;
     }
-    else {
-        vdfs_error(err_disc_not_fnd);
+    return false;
+}
+
+static bool mmb_check_pick(unsigned drive, unsigned disc)
+{
+    log_debug("mmb: picking MMB disc, drive=%d, disc=%d", drive, disc);
+    if (drive & ~0x03) {
+        log_debug("vdfs: mmb_check_pick: invalid logical drive");
+        vdfs_error(err_bad_drive_id);
         return false;
     }
+    if (mmb_pick(drive, disc))
+        return true;
+    vdfs_error(err_disc_not_fnd);
+    return false;
 }
 
 static inline int mmb_cat_name_cmp(const char *nam_ptr, const unsigned char *cat_ptr, const unsigned char *cat_nxt)
@@ -365,13 +371,13 @@ static void mmb_twoargs(uint16_t addr, unsigned default_drive, bool (*action)(un
 
 void mmb_cmd_din(uint16_t addr)
 {
-    mmb_twoargs(addr, x, mmb_pick);
+    mmb_twoargs(addr, x, mmb_check_pick);
 }
 
 void mmb_cmd_dboot(uint16_t addr)
 {
     unsigned disc = mmb_parse_find(addr);
-    if (disc >= 0 && mmb_pick(0, disc)) {
+    if (disc >= 0 && mmb_check_pick(0, disc)) {
         autoboot = 150;
         main_key_break();
     }
@@ -702,5 +708,49 @@ void mmb_cmd_drecat(void)
             }
         }
         log_debug("mmb: recatalogue finished");
+    }
+}
+
+static void mmb_rebase(unsigned drive)
+{
+    if (!mmb_pick(drive, mmb_loaded_discs[drive]))
+        mmb_loaded_discs[drive] = -1;
+    unsigned oside = drive + 2;
+    if (!mmb_pick(oside, mmb_loaded_discs[oside]))
+        mmb_loaded_discs[oside] = -1;
+    if (mmb_loaded_discs[drive] == -1 && mmb_loaded_discs[oside] == -1)
+        mmb_eject_one(drive);
+}
+
+void mmb_cmd_dbase(uint16_t addr)
+{
+    int ch = readmem(addr++);
+    if (ch >= '0' && ch <= '9') {
+        unsigned zone = 0;
+        do {
+            zone = zone * 10 + (ch & 0x0f);
+            ch = readmem(addr++);
+        } while (ch >= '0' && ch <= '9');
+
+        if (mmb_writeprot)
+            vdfs_error(err_wprotect);
+        else if (zone < mmb_num_zones) {
+            mmb_zones[0].header[9] = zone;
+            if (fseek(mmb_fp, 0, SEEK_SET) == -1 ||
+                fwrite(mmb_zones[0].header, MMB_ENTRY_SIZE, 1, mmb_fp) != 1)
+            {
+                log_error("mmb: write error on MMB file %s: %s", mmb_fn, strerror(errno));
+                vdfs_error(err_write_err);
+            }
+            mmb_base_zone = zone;
+            mmb_rebase(0);
+            mmb_rebase(1);
+        }
+        else
+            vdfs_error(err_bad_zone);
+    }
+    else if (ch == '\r') {
+        sprintf((char *)vdfs_split_addr(), "MMB Base: %2u\r\nMMB Size: %2u\r\n", mmb_base_zone, mmb_num_zones);
+        vdfs_split_go(0);
     }
 }
