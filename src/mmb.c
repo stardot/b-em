@@ -428,14 +428,8 @@ void mmb_cmd_dout(uint16_t addr)
         if (mmb_loaded_discs[drive] >= 0) {
             mmb_loaded_discs[drive] = -1;
             int oside = drive ^ 0x02;
-            if (mmb_loaded_discs[oside] < 0) {
-                drive &= 1;
-                mmb_offset[drive][0] = 0;
-                mmb_offset[drive][1] = 0;
-                sdf_fp[drive] = NULL;
-                if (discfns[drive])
-                    disc_load(drive, discfns[drive]);
-            }
+            if (mmb_loaded_discs[oside] < 0)
+                mmb_eject_one(drive & 1);
         }
     }
 }
