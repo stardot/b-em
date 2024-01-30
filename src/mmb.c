@@ -62,13 +62,20 @@ static const char err_read_err[]     = "\xc7" "Error reading MMB file";
 static const char err_write_err[]    = "\xc7" "Error writing to MMB file";
 static const char err_bad_zone[]     = "\x94" "Not that many zones in MMB file";
 
-static void mmb_read_error(const char *fn, FILE *fp)
+static bool mmb_read(const char *fn, FILE *fp, long offset, void *ptr, size_t size)
 {
-    if (ferror(fp))
-        log_error("mmb: error reading MMB file %s: %s", fn, strerror(errno));
-    else
-        log_error("mmb: unexpected EOF on MMB file %s", fn);
-    fclose(fp);
+    if (fseek(fp, offset, SEEK_SET) < 0) {
+        log_error("mmb: error seeking on MMB file %s: %s", fn, strerror(errno));
+        return false;
+    }
+    if (fread(ptr, size, 1, fp) != 1) {
+        if (ferror(fp))
+            log_error("mmb: error reading MMB file %s: %s", fn, strerror(errno));
+        else
+            log_error("mmb: unexpected EOF on MMB file %s", fn);
+        return false;
+    }
+    return true;
 }
 
 static bool mmb_write(long offset, void *ptr, size_t size)
@@ -148,8 +155,8 @@ void mmb_load(char *fn)
         new_writeprot = true;
     }
     unsigned char header[16];
-    if (fread(header, sizeof(header), 1, fp) != 1) {
-        mmb_read_error(fn, fp);
+    if (!mmb_read(fn, fp, 0, header, sizeof(header))) {
+        fclose(fp);
         return;
     }
     log_dump("mmb header: ", header, 16);
@@ -170,15 +177,9 @@ void mmb_load(char *fn)
         return;
     }
     for (unsigned zone = 0; zone < new_num_zones; ++zone) {
-        if (fseek(fp, zone * MMB_ZONE_FULL_SIZE, SEEK_SET)) {
-            log_error("mmb: seek error on MMB file %s: %s", fn, strerror(errno));
+        if (!mmb_read(fn, fp, zone * MMB_ZONE_FULL_SIZE, new_zones[zone].header, MMB_ZONE_CAT_SIZE)) {
             free(new_zones);
             fclose(fp);
-            return;
-        }
-        if (fread(new_zones[zone].header, MMB_ZONE_CAT_SIZE, 1, fp) != 1) {
-            mmb_read_error(fn, fp);
-            free(new_zones);
             return;
         }
         new_zones[zone].num_discs = MMB_ZONE_DISCS;
@@ -684,12 +685,9 @@ void mmb_cmd_drecat(void)
             for (unsigned disc = 0; disc < mmb_zones[zone].num_discs; ++disc) {
                 if (mmb_zones[zone].index[disc][15] != 0xf0) {
                     unsigned char title[MMB_NAME_SIZE];
-                    if (fseek(mmb_fp, offset, SEEK_SET) == -1      ||
-                        fread(title, 8, 1, mmb_fp) != 1            ||
-                        fseek(mmb_fp, offset+0x100, SEEK_SET) ==-1 ||
-                        fread(title+8, 4, 1, mmb_fp) != 1)
+                    if (!mmb_read(mmb_fn, mmb_fp, offset, title, 8) ||
+                        !mmb_read(mmb_fn, mmb_fp, offset+0x100, title+8, 4))
                     {
-                        log_error("mmb: error reading MMB file %s: %s", mmb_fn, strerror(errno));
                         vdfs_error(err_read_err);
                         return;
                     }
