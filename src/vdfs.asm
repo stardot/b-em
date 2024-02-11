@@ -158,6 +158,10 @@ prtextws    =   &A8
             equw    cmd_append      ; *APPEND.
             equw    opt1_print
             equw    print_split
+            equw    mmb_din
+            equw    mmb_dop
+            equw    mmb_onboot
+            equw    mmb_dout
 .dispend
 
 ; Stubs to transfer control to the vdfs.c module.
@@ -648,6 +652,63 @@ prtextws    =   &A8
             bcc     dir_info
             rts
 
+.mmb_din    lda     #&16
+            bne     mmb_common
+.mmb_dop    lda     #&18
+            bne     mmb_common
+.mmb_onboot lda     #&19
+            bne     mmb_common
+.mmb_dout   lda     #&1a
+.mmb_common pha
+            lda     #&00
+            tay
+            jsr     OSARGS
+            cmp     #&04
+            beq     mmb_dfs
+.mmb_baddrv ldx     #&00
+            beq     mmb_tail
+.mmb_dfs    lda     #&0d
+            sta     &0101
+            sta     &0105
+            ldy     #&01
+            sty     &0102
+            lda     #&ff
+            sta     &0103
+            sta     &0104
+            lda     #&00
+            ldx     #&08
+.mmb_clear  sta     &0107,X
+            dex
+            bne     mmb_clear
+            lda     #&06
+            jsr     OSGBPB
+            lda     &010d
+            cmp     #&01
+            bne     mmb_baddrv
+            lda     &010e
+            and     #&03
+            tax
+.mmb_tail   pla
+            sta     port_cmd
+            lda     #&00
+            rts
+
+.print_split
+{
+            ldy     #0
+.loop       lda     (&a8),y
+            beq     done
+            jsr     OSWRCH
+            iny
+            bne     loop
+            inc     &a9
+            bne     loop
+.done       txa
+            bne     more
+            rts
+.more       sta     port_cmd
+}
+
 .not_found
 {
             ldx     #end-msg
@@ -666,19 +727,6 @@ prtextws    =   &A8
 .opt1_print jsr     pr_all
             lda     #&01
             rts
-
-.print_split
-{
-            ldy     #0
-.loop       lda     (&a8),y
-            beq     done
-            jsr     OSWRCH
-            iny
-            bne     loop
-            inc     &a9
-            bne     loop
-.done       rts
-}
 
 ; The *DUMP command.
 

@@ -83,6 +83,7 @@ b_em_SOURCES = \
     mc6809nc/mc6809_dis.c \
 	main.c \
 	mem.c \
+	mmb.c \
 	model.c \
 	mouse.c \
     mmccard.c \
