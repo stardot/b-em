@@ -1,4 +1,3 @@
-#define _DEBUG
 /*B-em v2.2 by Tom Walker
   Main loop + start/finish code*/
 
@@ -43,7 +42,6 @@
 #include "serial.h"
 #include "sid_b-em.h"
 #include "sn76489.h"
-#include "sound.h"
 #include "sysacia.h"
 #include "tape.h"
 #include "tapecat-allegro.h"

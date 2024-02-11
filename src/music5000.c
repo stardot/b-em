@@ -67,12 +67,10 @@ static struct synth m5000, m3000;
 static const uint8_t PanArray[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 6, 6, 6, 5, 4, 3, 2, 1 };
 
 size_t buflen_m5 = BUFLEN_M5;
-FILE *music5000_fp;
 
 static ALLEGRO_VOICE *music5000_voice;
 static ALLEGRO_MIXER *music5000_mixer;
 static ALLEGRO_AUDIO_STREAM *music5000_stream;
-static bool rec_started;
 
 static ushort antilogtable[128];
 
@@ -183,61 +181,20 @@ void music5000_init(int speed)
     }
 }
 
-FILE *music5000_rec_start(const char *filename)
-{
-    static const char zeros[] = { 0, 0, 0, 0, 0, 0 };
-
-    FILE *fp = fopen(filename, "wb");
-    if (fp) {
-        fseek(fp, 44, SEEK_SET);
-        fwrite_unlocked(zeros, 6, 1, fp);
-        music5000_fp = fp;
-        rec_started = false;
-    }
-    else
-        log_error("unable to open %s for writing: %s", filename, strerror(errno));
-    return fp;
-}
-
-static void fput32le(uint32_t v, FILE *fp)
-{
-    putc_unlocked(v & 0xff, fp);
-    putc_unlocked((v >> 8) & 0xff, fp);
-    putc_unlocked((v >> 16) & 0xff, fp);
-    putc_unlocked((v >> 24) & 0xff, fp);
-}
-
-void music5000_rec_stop(void)
-{
-    static const char wavfmt[] = {
-        0x57, 0x41, 0x56, 0x45, // "WAVE"
-        0x66, 0x6D, 0x74, 0x20, // "fmt "
-        0x10, 0x00, 0x00, 0x00, // format chunk size
-        0x01, 0x00,             // format 1=PCM
-        0x02, 0x00,             // channels 2=stereo
-        0x1B, 0xB7, 0x00, 0x00, // sample rate.
-        0xA2, 0x4A, 0x04, 0x00, // byte rate.
-        0x06, 0x00,             // block align.
-        0x18, 0x00,             // bits per sample.
-        0x64, 0x61, 0x74, 0x61  // "DATA".
-    };
-
-    FILE *fp = music5000_fp;
-    long size = ftell(fp) - 8;
-    fseek(fp, 0, SEEK_SET);
-    fwrite_unlocked("RIFF", 4, 1, fp);
-    fput32le(size, fp);
-    fwrite_unlocked(wavfmt, sizeof wavfmt, 1, fp);
-    size -= 36;
-    fput32le(size, fp);        // data size.
-    fclose(fp);
-    music5000_fp = NULL;
-}
+sound_rec_t music5000_rec = {
+    NULL,    // fp
+    false,   // rec_started
+    "Record Music 5000 to file",
+    1,       // WAVE type
+    2,       // channels
+    FREQ_M5, // sample rate
+    24       // bits/sample
+};
 
 void music5000_close(void)
 {
-    if (music5000_fp)
-        music5000_rec_stop();
+    if (music5000_rec.fp)
+        sound_stop_rec(&music5000_rec);
     if (music5000_stream) {
         al_destroy_audio_stream(music5000_stream);
         music5000_stream = NULL;
@@ -389,9 +346,9 @@ static void update_channels(struct synth *s)
     s->sright = sright / 6;
 }
 
-static void fput_samples(FILE *fp, int sl, int sr)
+static void fput_samples(int sl, int sr)
 {
-    if (fp && (rec_started || sl || sr)) {
+    if (music5000_rec.fp && (music5000_rec.rec_started || sl || sr)) {
         char bytes[6];
         bytes[0] = sl << 6;
         bytes[1] = sl >> 2;
@@ -399,8 +356,8 @@ static void fput_samples(FILE *fp, int sl, int sr)
         bytes[3] = sr << 6;
         bytes[4] = sr >> 2;
         bytes[5] = sr >> 10;
-        fwrite_unlocked(bytes, 6, 1, fp);
-        rec_started = true;
+        fwrite_unlocked(bytes, 6, 1, music5000_rec.fp);
+        music5000_rec.rec_started = true;
     }
 }
 
@@ -472,7 +429,7 @@ static void music5000_get_sample(const m5000_fcoeff *fcp)
         sr = applyfilter(fcp, xyv_r, (double)sr);
     }
     
-    fput_samples(music5000_fp, sl, sr);
+    fput_samples(sl, sr);
 
 #ifdef LOG_LEVELS
     if (sl < min_l) {
