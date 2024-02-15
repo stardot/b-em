@@ -347,7 +347,7 @@ static int dbg_debug_enable(int newvalue)
 };
 
 static const char *dbg_z80_reg_names[] =
-    { "A", "F", "BC", "DE", "HL", "IX", "IY", "SP", "PC" };
+    { "A", "F", "BC", "DE", "HL", "IX", "IY", "SP", "PC", NULL };
 
 enum { REG_A, REG_F, REG_BC, REG_DE, REG_HL, REG_IX, REG_IY, REG_SP,
     REG_PC
