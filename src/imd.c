@@ -220,6 +220,8 @@ static void imd_free(struct imd_file *imd)
         free(trk);
         trk = trk_next;
     }
+    imd->track_head = NULL;
+    imd->track_tail = NULL;
 }
 
 /*
