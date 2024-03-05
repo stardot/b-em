@@ -276,7 +276,7 @@ static void tube_init(void)
 {
     if (curtube!=-1) {
         TUBE_MODEL *tube = &tubes[curtube];
-        if (!tube->bootrom[0]) { // no boot ROM needed
+        if (!(tube->bootrom && tube->bootrom[0])) { // no boot ROM needed
             tube->cpu->init(NULL);
             tube_updatespeed();
             tube_reset();
