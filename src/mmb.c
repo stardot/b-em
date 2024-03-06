@@ -44,8 +44,6 @@ static unsigned mmb_base_zone;
 static struct mmb_zone *mmb_zones;
 static unsigned mmb_boot_discs[4];
 
-static unsigned mmb_cat_size;
-static unsigned char *mmb_cat;
 unsigned mmb_ndisc;
 char *mmb_fn;
 static unsigned mmb_dcat_posn;
@@ -288,8 +286,9 @@ static bool mmb_check_pick(unsigned drive, unsigned disc)
     return false;
 }
 
-static inline int mmb_cat_name_cmp(const char *nam_ptr, const unsigned char *cat_ptr, const unsigned char *cat_nxt)
+static inline bool mmb_cat_name_cmp(const char *nam_ptr, const unsigned char *cat_ptr)
 {
+    const unsigned char *cat_end = cat_ptr + MMB_NAME_SIZE;
     do {
         char cat_ch = *cat_ptr++;
         char nam_ch = *nam_ptr++;
@@ -297,28 +296,33 @@ static inline int mmb_cat_name_cmp(const char *nam_ptr, const unsigned char *cat
             if (!cat_ch)
                 break;
             else
-                return -1;
+                return false;
         }
         if ((cat_ch ^ nam_ch) & 0x5f)
-            return -1;
-    } while (cat_nxt != cat_ptr);
-    return (cat_nxt - mmb_cat) / 16 - 1;
+            return false;
+    } while (cat_ptr < cat_end);
+    return true;
 }
 
 static int mmb_find(const char *name)
 {
-    const unsigned char *cat_ptr = mmb_cat;
-    const unsigned char *cat_end = mmb_cat + mmb_cat_size;
-
-    do {
-        const unsigned char *cat_nxt = cat_ptr + 16;
-        int i = mmb_cat_name_cmp(name, cat_ptr, cat_nxt);
-        if (i >= 0) {
-            log_debug("mmb: found MMB SSD '%s' at %d", name, i);
-            return i;
+    log_debug("mmb: mmb_find('%s')", name);
+    for (unsigned zone = mmb_base_zone; zone < mmb_num_zones; ++zone) {
+        for (unsigned disc = 0; disc < mmb_zones[zone].num_discs; ++disc) {
+            if (mmb_cat_name_cmp(name, mmb_zones[zone].index[disc])) {
+                log_debug("mmb: found MMB SSD '%s' at zone %u, disc %u", name, zone, disc);
+                return zone * MMB_ZONE_DISCS + disc;
+            }
         }
-        cat_ptr = cat_nxt;
-    } while (cat_ptr < cat_end);
+    }
+    for (unsigned zone = 0; zone < mmb_base_zone; ++zone) {
+        for (unsigned disc = 0; disc < mmb_zones[zone].num_discs; ++disc) {
+            if (mmb_cat_name_cmp(name, mmb_zones[zone].index[disc])) {
+                log_debug("mmb: found MMB SSD '%s' at zone %u, disc %u", name, zone, disc);
+                return zone * MMB_ZONE_DISCS + disc;
+            }
+        }
+    }
     return -1;
 }
 
