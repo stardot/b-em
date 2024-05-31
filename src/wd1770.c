@@ -267,7 +267,6 @@ static void wd1770_wctl_stl(uint8_t val)
 static void wd1770_wctl_watford(uint8_t val)
 {
     log_debug("wd1770: write watford-style ctrl %02X", val);
-    wd1770_maybe_reset(val & 0x08);
     wd1770_wctl_sdrive(val & 0x04);
     wd1770.curside =  (val & 0x02) ? 1 : 0;
     wd1770.density = !(val & 0x01);
