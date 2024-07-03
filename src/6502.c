@@ -470,6 +470,11 @@ static uint32_t do_readmem(uint32_t addr)
                         return wd1770_read((uint16_t)addr);
                 break;
 
+        case 0xFE30:
+            if (MASTER)
+                return ram_fe30;
+            break;
+
         case 0xFE34:
                 if (MASTER)
                         return acccon;
