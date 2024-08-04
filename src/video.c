@@ -162,6 +162,9 @@ static const uint8_t nula_spect_colours[] =
     7  // 111 White.
 };
 
+ALLEGRO_COLOR border_col;
+static ALLEGRO_COLOR clear_col;
+
 static inline uint32_t makecol(int red, int green, int blue)
 {
     return 0xff000000 | (red << 16) | (green << 8) | blue;
@@ -273,6 +276,15 @@ void nula_reset(void)
         nula_flash[c] = 1;
 }
 
+static void video_set_colour(ALLEGRO_COLOR *colp, const char *desc, unsigned rgba)
+{
+    unsigned red = (rgba & 0xff0000) >> 16;
+    unsigned grn = (rgba & 0x00ff00) >> 8;
+    unsigned blu = (rgba & 0x0000ff);
+    *colp = al_map_rgb(red, grn, blu);
+    log_debug("video: %s colour set to #%08X (%u,%u,%u)", desc, rgba, red, grn, blu);
+}
+
 void videoula_write(uint16_t addr, uint8_t val)
 {
     int c;
@@ -369,6 +381,15 @@ void videoula_write(uint16_t addr, uint8_t val)
                 nula_flash[5] = param & 4;
                 nula_flash[6] = param & 2;
                 nula_flash[7] = param & 1;
+                break;
+
+            case 14:
+                video_set_colour(&border_col, "outer border", nula_collook[param]);
+                break;
+
+            case 15:
+                colblack = nula_collook[param];
+                video_set_colour(&clear_col, "video blank", colblack);
                 break;
 
             default:
