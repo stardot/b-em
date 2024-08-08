@@ -4,10 +4,16 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define DIR_SECTORS     5
-#define INITIAL_SECTORS (DIR_SECTORS+2)
+#define DIR_SECTORS             5
+#define INITIAL_SECTORS         (DIR_SECTORS+2)
 
-static int parse_size(const char *size)
+#define DSC_LEN                 22
+
+#define SECTOR_SIZE             256
+#define SECTORS_PER_TRACK       33
+#define HEADS                   4
+
+static int parse_size_and_adjust(const char *size)
 {
         int value;
         char *end;
@@ -27,6 +33,11 @@ static int parse_size(const char *size)
                         value *= 1024 * 1024 * 1024;
                         break;
         }
+
+        // adjust size of the created volume to match the expected geometry which is
+        // a size evenly dividable as given below
+        value = value - (value % (SECTOR_SIZE * SECTORS_PER_TRACK * HEADS));
+
         return value;
 }
 
@@ -93,6 +104,13 @@ static int adfs_format(const char *fn, FILE *fp, int sectors)
                        fprintf(stderr, "hdfmt: error writing to %s: %s\n", fn, strerror(errno));
                        status = 2;
                 }
+
+                // fill the rest of the image with 0x00
+                uint8_t *fill = calloc(1,256);
+                memset(fill,0,256);
+                for(int cs=INITIAL_SECTORS;cs<sectors;cs++)
+                        fwrite(fill,256,1,fp);
+                free(fill);
         }
         return status;
 }
@@ -102,12 +120,15 @@ int main(int argc, char **argv)
         const char *fn;
         int status, len, size, sectors, cyl;
         char *dat_fn, *dsc_fn;
-        unsigned char geom[22];
+        unsigned char geom[DSC_LEN];
         FILE *dat_fp, *dsc_fp;
+
+        // we don't want random stuff in the dsc-file
+        memset(geom,0,DSC_LEN);
 
         if (argc == 3)
         {
-                size = parse_size(argv[2]);
+                size = parse_size_and_adjust(argv[2]);
                 if (size > 0)
                 {
                         fn = argv[1];
@@ -121,12 +142,15 @@ int main(int argc, char **argv)
                         {
                                 if ((dsc_fp = fopen(dsc_fn, "wb")))
                                 {
-                                        sectors = size / 256;
-                                        cyl = 1 + ((sectors - 1) / (33 * 255));
-                                        printf("size=%d, sectors=%d, cyl=%d\n", size, sectors, cyl);
-                                        geom[13] = cyl % 256;
-                                        geom[14] = cyl / 256;
-                                        geom[15] = 255;
+                                        sectors = size / SECTOR_SIZE;
+                                        cyl = size / (SECTOR_SIZE * SECTORS_PER_TRACK * HEADS);
+	                                geom[13] = (unsigned char) ((((unsigned short) cyl) & 0xFF00) >> 8);
+	                                geom[14] = (unsigned char) (((unsigned short) cyl) & 0x00FF);
+	                                geom[15] = (unsigned char) (((unsigned short) HEADS) & 0x00FF);
+
+                                        fprintf(stdout,"hdfmt: size=%d sectors=%d sector_size=%d sectors_per_track=%d heads=%d cylinders=%d\n",
+                                                size, sectors, SECTOR_SIZE, SECTORS_PER_TRACK, HEADS, cyl);
+
                                         if (fwrite(geom, sizeof geom, 1, dsc_fp) != 1)
                                         {
                                                 fprintf(stderr, "hdfmt: unable to write to dsc file %s: %s\n", dsc_fn, strerror(errno));
