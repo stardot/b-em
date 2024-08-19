@@ -301,15 +301,24 @@ static void arm_loadstate(ZFILE *zfp)
 
 static int endtimeslice=0;
 
+enum trap_codes {
+    TRAP_BAD_READ_LONG,
+    TRAP_BAD_READ_BYTE,
+    TRAP_BAD_WRITE_LONG,
+    TRAP_BAD_WRITE_BYTE
+};
+
+static const char *arm_trap_names[] = { "Bad read long", "Bad read byte", "Bad write long", "Bad write byte", NULL };
+
 static inline uint32_t readarmfl(uint32_t addr)
 {
         if (addr<0x400000) return armram[addr>>2];
         if (addr<0x400010) return 0xFFFFFFFF;
         if ((addr>=0x3000000) && (addr<0x3004000)) return armrom[(addr&0x3FFC)>>2];
+        log_debug("arm: bad ARM read long of %08X at %08X", addr, PC-8);
+        if (arm_debug_enabled)
+            debug_trap(&tubearm_cpu_debug, PC-8, TRAP_BAD_READ_LONG);
         return 0xFFFFFFFF;
-/*        log_debug("Bad ARM read long %08X\n",addr);
-        dumparmregs();
-        exit(-1);*/
 }
 
 extern cpu_debug_t tubearm_cpu_debug;
@@ -339,10 +348,10 @@ static inline uint8_t do_readarmb(uint32_t addr)
                 return tube_parasite_read((addr&0x1C)>>2);
         }
         if ((addr>=0x3000000) && (addr<0x3004000)) return armromb[addr&0x3FFF];
+        log_debug("arm: bad ARM read byte of %08X at %08X", addr, PC-8);
+        if (arm_debug_enabled)
+            debug_trap(&tubearm_cpu_debug, PC-8, TRAP_BAD_READ_BYTE);
         return 0xFF;
-/*        log_debug("Bad ARM read byte %08X\n",addr);
-        dumparmregs();
-        exit(-1);*/
 }
 
 static uint8_t readarmb(uint32_t addr)
@@ -367,9 +376,9 @@ static inline void do_writearmb(uint32_t addr, uint8_t val)
                 endtimeslice=1;
                 return;
         }
-/*        log_debug("Bad ARM write byte %08X %02X\n",addr,val);
-        dumparmregs();
-        exit(-1);*/
+        log_debug("arm: bad ARM write byte %02X to %08X at %08X", val, addr, PC-8);
+        if (arm_debug_enabled)
+            debug_trap(&tubearm_cpu_debug, PC-8, TRAP_BAD_WRITE_BYTE);
 }
 
 static void writearmb(uint32_t addr, uint8_t val)
@@ -388,10 +397,10 @@ static void writearml(uint32_t addr, uint32_t val)
                 armram[addr>>2]=val;
                 return;
         }
-/*        if (addr<0x400010) return;
-        log_debug("Bad ARM write long %08X %08X\n",addr,val);
-        dumparmregs();
-        exit(-1);*/
+        if (addr<0x400010) return;
+        log_debug("arm: bad ARM write long of %08X to %08X at %08X", val, addr, PC-8);
+        if (arm_debug_enabled)
+            debug_trap(&tubearm_cpu_debug, PC, TRAP_BAD_WRITE_LONG);
 }
 
 /*****************************************************
@@ -620,8 +629,6 @@ static void arm_dbg_reg_parse(int which, const char *strval) {
 static uint32_t arm_dbg_get_instr_addr(void) {
     return PC;
 }
-
-static const char *arm_trap_names[] = { NULL };
 
 cpu_debug_t tubearm_cpu_debug = {
    .cpu_name       = "ARM",
