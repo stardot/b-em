@@ -915,7 +915,6 @@ static void refillpipeline2()
         opcode3=readarml(PC-4);
 }
 
-int accc=0;
 void arm_exec()
 {
         uint32_t opcode,templ,templ2,mask,addr,addr2;
