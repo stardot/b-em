@@ -54,12 +54,13 @@ static rom_setup_t rom_setups[NUM_ROM_SETUP] =
 
 extern cpu_debug_t n32016_cpu_debug;
 
-#define NUM_TUBE_CPUS 12
+#define NUM_TUBE_CPUS 13
 
 static const TUBE_CPU tube_cpus[NUM_TUBE_CPUS] =
 {
     {"6502",           tube_6502_init,     tube_6502_reset, &tube6502_cpu_debug  },
-    {"ARM",            arm_init,           arm_reset,       &tubearm_cpu_debug   },
+    {"ARM",            arm1_init,          arm_reset,       &tubearm_cpu_debug   },
+    {"ARM2",           arm2_init,          arm_reset,       &tubearm_cpu_debug   },
     {"Z80",            z80_init,           z80_reset,       &tubez80_cpu_debug   },
     {"80186",          x86_init,           x86_reset,       &tubex86_cpu_debug   },
     {"65816",          w65816_init_recoco, w65816_reset,    &tube65816_cpu_debug },

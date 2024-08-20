@@ -14,7 +14,8 @@
 //void dumparmregs();
 //int databort;
 
-bool arm_init(void *rom);
+bool arm1_init(void *rom);
+bool arm2_init(void *rom);
 void arm_reset(void);
 void arm_exec(void);
 void arm_close(void);
