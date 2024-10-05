@@ -381,7 +381,7 @@ static uint32_t do_readmem(uint32_t addr)
         else
             readc[addr] = 31;
 
-        if (memstat[vis20k][addr >> 8])
+        if (memstat[vis20k][addr >> 8]) // Anything except I/O.
                 return memlook[vis20k][addr >> 8][addr];
         if (MASTER && (acccon & 0x40) && addr >= 0xFC00)
                 return os[addr & 0x3FFF];
@@ -777,7 +777,7 @@ static void do_writemem(uint32_t addr, uint32_t val)
         writec[addr] = 31;
 
         c = memstat[vis20k][addr >> 8];
-        if (c == 1) {
+        if (c == MSTAT_RAM) {
             memlook[vis20k][addr >> 8][addr] = (uint8_t)val;
             switch(addr) {
                     case 0x022c:
@@ -795,8 +795,8 @@ static void do_writemem(uint32_t addr, uint32_t val)
                 }
                 return;
         }
-        else if (c >= 2) {
-            if (c == 3) {
+        else if (c >= MSTAT_ROM) {
+            if (c == MSTAT_WSPLIT) {
                 /* Watform RAM/ROM board writing to a different bank
                  * than the one selected by ROMSEL.
                  */
