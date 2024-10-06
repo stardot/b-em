@@ -26,10 +26,14 @@ static inline int tx_int(ACIA *acia) {
 }
 
 static void acia_updateint(ACIA *acia) {
-    if (rx_int(acia) || tx_int(acia))
+    if (rx_int(acia) || tx_int(acia)) {
+        log_debug("acia: %s, interrupt asserted", acia->name);
         interrupt |= acia->intnum;
-    else
+    }
+    else {
+        log_debug("acia: %s, interrupt de-asserted", acia->name);
         interrupt &= ~acia->intnum;
+    }
 }
 
 uint8_t acia_read(ACIA *acia, uint16_t addr) {
@@ -62,8 +66,10 @@ void acia_write(ACIA *acia, uint16_t addr, uint8_t val) {
             if (acia->tx_end)
                 acia->tx_end(acia);
         acia->control_reg = val;
-        if (val == 3)
+        if (val == 3) {
+            log_debug("acia: %s, master reset", acia->name);
             acia->status_reg &= ~(CTS|DCD);
+        }
         if (acia->set_params)
             acia->set_params(acia, val);
         acia_updateint(acia);
@@ -101,6 +107,7 @@ void acia_ctsoff(ACIA *acia)
 void acia_poll(ACIA *acia)
 {
     if ((acia->status_reg & (TXD_REG_EMP|CTS)) == CTS) {
+        log_debug("acia: %s, setting TXDR empty flag", acia->name);
         acia->status_reg |= TXD_REG_EMP;
         acia_updateint(acia);
     }
