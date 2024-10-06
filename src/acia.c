@@ -37,16 +37,14 @@ static void acia_updateint(ACIA *acia) {
 }
 
 uint8_t acia_read(ACIA *acia, uint16_t addr) {
-    uint8_t temp;
-
     if (addr & 1) {
-        temp = acia->rx_data_reg;
+        uint8_t temp = acia->rx_data_reg;
         acia->status_reg &= ~(INTERUPT | RXD_REG_FUL);
         acia_updateint(acia);
         return temp;
     }
     else {
-        temp = acia->status_reg & ~INTERUPT;
+        uint8_t temp = acia->status_reg & ~INTERUPT;
         if (rx_int(acia) || tx_int(acia))
             temp |= INTERUPT;
         return temp;
@@ -68,7 +66,9 @@ void acia_write(ACIA *acia, uint16_t addr, uint8_t val) {
         acia->control_reg = val;
         if (val == 3) {
             log_debug("acia: %s, master reset", acia->name);
-            acia->status_reg &= ~(CTS|DCD);
+            acia->status_reg &= CTS|DCD;
+            if (!(acia->status_reg & CTS))
+                acia->status_reg |= TXD_REG_EMP;
         }
         if (acia->set_params)
             acia->set_params(acia, val);
@@ -90,23 +90,23 @@ void acia_dcdlow(ACIA *acia) {
 
 void acia_ctson(ACIA *acia)
 {
-    if (!(acia->status_reg & CTS)) {
-        acia->status_reg |= CTS|TXD_REG_EMP;
+    if (acia->status_reg & CTS) {
+        acia->status_reg = (acia->status_reg & ~CTS) | TXD_REG_EMP;
         acia_updateint(acia);
     }
 }
 
 void acia_ctsoff(ACIA *acia)
 {
-    if (acia->status_reg & CTS) {
-        acia->status_reg &= ~(CTS|TXD_REG_EMP);
+    if (!(acia->status_reg & CTS)) {
+        acia->status_reg = (acia->status_reg & ~TXD_REG_EMP) | CTS;
         acia_updateint(acia);
     }
 }
 
 void acia_poll(ACIA *acia)
 {
-    if ((acia->status_reg & (TXD_REG_EMP|CTS)) == CTS) {
+    if (!(acia->status_reg & (TXD_REG_EMP|CTS))) {
         log_debug("acia: %s, setting TXDR empty flag", acia->name);
         acia->status_reg |= TXD_REG_EMP;
         acia_updateint(acia);
