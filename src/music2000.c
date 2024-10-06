@@ -88,17 +88,20 @@ static void acia_tx(ACIA *acia, uint8_t data) {
 
 static ACIA music2000_acia1 = {
     .tx_hook = acia_tx,
-    .udata   = &m2000_out1
+    .udata   = &m2000_out1,
+    .intnum  = 0x100
 };
 
 static ACIA music2000_acia2 = {
     .tx_hook = acia_tx,
-    .udata   = &m2000_out2
+    .udata   = &m2000_out2,
+    .intnum  = 0x200
 };
 
 static ACIA music2000_acia3 = {
     .tx_hook = acia_tx,
-    .udata   = &m2000_out3
+    .udata   = &m2000_out3,
+    .intnum  = 0x300
 };
 
 uint8_t music2000_read(uint32_t addr) {

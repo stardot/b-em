@@ -13,6 +13,7 @@ struct acia {
     void (*tx_hook)(ACIA *acia, uint8_t byte);
     void (*tx_end)(ACIA *acia);
     void *udata;
+    unsigned intnum;
 };
 
 uint8_t acia_read(ACIA *acia, uint16_t addr);

@@ -27,9 +27,9 @@ static inline int tx_int(ACIA *acia) {
 
 static void acia_updateint(ACIA *acia) {
     if (rx_int(acia) || tx_int(acia))
-       interrupt|=4;
+        interrupt |= acia->intnum;
     else
-       interrupt&=~4;
+        interrupt &= ~acia->intnum;
 }
 
 uint8_t acia_read(ACIA *acia, uint16_t addr) {
