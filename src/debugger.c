@@ -1751,7 +1751,9 @@ static void debug_trace_write(cpu_debug_t *cpu, uint32_t addr, FILE *fp)
         *(sym++) = '\0';
     }
 
-    fputs("\t", fp);
+    while(strlen(buf) < 52)
+      strcat(buf, " ");
+
     fputs(buf, fp);
     *buf = ' ';
 
