@@ -291,7 +291,7 @@ static size_t dbg_reg_print(int which, char *buf, size_t bufsize)
   if (which == 17)  // Status register
       return dbg_decode_flags(value, buf, bufsize);
 
-    return snprintf(buf, bufsize, "%s:%08X", reg_names[which], value);
+    return snprintf(buf, bufsize, "%08X", value);
 }
 
 static void dbg_reg_parse(int which, const char *strval)
