@@ -1751,16 +1751,20 @@ static void debug_trace_write(cpu_debug_t *cpu, uint32_t addr, FILE *fp)
         *(sym++) = '\0';
     }
 
-    fputs("\t", fp);
+    while(strlen(buf) < 52)
+      strcat(buf, " ");
+
     fputs(buf, fp);
-    *buf = ' ';
 
     const char **np = cpu->reg_names;
     const char *name;
     int r = 0;
     while ((name = *np++)) {
-        size_t len = cpu->reg_print(r++, buf + 1, sizeof buf - 1);
-        fwrite(buf, len + 1, 1, fp);
+        fputs(" ", fp);
+        fputs(name, fp);
+        fputs("=", fp);
+        size_t len = cpu->reg_print(r++, buf, sizeof buf);
+        fwrite(buf, len, 1, fp);
     }
 
     if (sym)

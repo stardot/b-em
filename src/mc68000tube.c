@@ -260,9 +260,38 @@ static void dbg_reg_set(int which, uint32_t value)
     return m68k_set_reg(which, value);
 }
 
+static size_t dbg_decode_flags(uint32_t flags, char *buf, size_t bufsize)
+{
+    if (bufsize >= 16) {
+        buf[0] = flags & 0x8000 ? 'T' : '-';
+        buf[1] = '.';
+        buf[2] = flags & 0x2000 ? 'S' : '-';
+        buf[3] = '.';
+        buf[4] = '.';
+        buf[5] = flags & 0x400 ? '2' : '-';
+        buf[6] = flags & 0x200 ? '1' : '-';
+        buf[7] = flags & 0x100 ? '0' : '-';
+        buf[8] = '.';
+        buf[9] = '.';
+        buf[10] = '.';
+        buf[11] = flags & 0x10 ? 'X' : '-';
+        buf[12] = flags & 0x08 ? 'N' : '-';
+        buf[13] = flags & 0x04 ? 'Z' : '-';
+        buf[14] = flags & 0x02 ? 'V' : '-';
+        buf[15] = flags & 0x01 ? 'C' : '-';
+        return 16;
+    }
+    return 0;
+}
+
 static size_t dbg_reg_print(int which, char *buf, size_t bufsize)
 {
-    return snprintf(buf, bufsize, "%08X", m68k_get_reg(NULL, which));
+  uint32_t value = m68k_get_reg(NULL, which);
+
+  if (which == 17)  // Status register
+      return dbg_decode_flags(value, buf, bufsize);
+
+    return snprintf(buf, bufsize, "%08X", value);
 }
 
 static void dbg_reg_parse(int which, const char *strval)
