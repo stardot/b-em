@@ -172,7 +172,8 @@ static double main_calc_timer(int speed)
 
 static int main_speed_cmp(const void *va, const void *vb)
 {
-    return ((const emu_speed_t *)va)->multiplier - ((const emu_speed_t *)vb)->multiplier;
+    double res = ((const emu_speed_t *)va)->multiplier - ((const emu_speed_t *)vb)->multiplier;
+    return (int)round(res);
 }
 
 static void main_load_speeds(void)
