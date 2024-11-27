@@ -128,6 +128,12 @@ static const uint8_t mode_rows[8] = { 32, 32, 32, 25, 32, 32, 25, 25 };
 static const uint8_t mode_cols[8] = { 80, 40, 20, 80, 40, 20, 40, 40 };
 static const uint8_t mode_pfmt[8] = {  0,  1,  2,  0,  0,  1,  0,  0 };
 
+/*
+ * Function to process one byte of memory in a 2bbp, four colour mode
+ * working out the equivalent monochrome pixels and shifting into the
+ * set being accumulated for the whole character.
+ */
+
 static uint64_t textsave_fcbits(uint64_t chbits, uint_least8_t bgmask, uint_least32_t cell_addr)
 {
     uint_least8_t byte = (ram[(cell_addr & 0x7FFF) | vidbank]) ^ bgmask;
@@ -138,6 +144,12 @@ static uint64_t textsave_fcbits(uint64_t chbits, uint_least8_t bgmask, uint_leas
     return chbits;
 }
 
+/*
+ * Function to process one byte of memory in a 4bbp, sixteen colour
+ * mode working out the equivalent monochrome pixels and shifting into
+ * the set being accumulated for the whole character.
+ */
+
 static uint64_t textsave_scbits(uint64_t chbits, uint_least8_t bgmask, uint_least32_t cell_addr)
 {
     uint_least8_t byte = (ram[(cell_addr & 0x7FFF) | vidbank]) ^ bgmask;
@@ -145,6 +157,14 @@ static uint64_t textsave_scbits(uint64_t chbits, uint_least8_t bgmask, uint_leas
     chbits = (chbits << 1) | ((byte & 0x55) ? 1 : 0);
     return chbits;
 }
+
+/* Non-teletext modes.
+ *
+ * This does the same scan over rows and columns as for teletext but
+ * instead of reading the character from the screen memmory a bitmap
+ * is built up representing the character cell on screen which is then
+ * compared with the character set in the table above.
+ */
 
 static void textsave_bitmap(const char *filename, FILE *fp, uint_least16_t mem_addr)
 {
@@ -217,6 +237,12 @@ static void textsave_bitmap(const char *filename, FILE *fp, uint_least16_t mem_a
     if (newlines)
         putc('\n', fp);
 }
+
+/*
+ * Main function.  This opens the file and then calls the
+ * appropriate teletext or non-teletext function based on
+ * the teletext bit in the Video ULA.
+ */
 
 void textsave(const char *filename)
 {
