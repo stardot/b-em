@@ -29,6 +29,7 @@
 #include "sysacia.h"
 #include "tape.h"
 #include "tapecat-allegro.h"
+#include "textsave.h"
 #include "tube.h"
 #include "uservia.h"
 #include "video.h"
@@ -124,6 +125,7 @@ static ALLEGRO_MENU *create_file_menu(void)
     al_append_menu_item(menu, "Load state...", IDM_FILE_LOAD_STATE, 0, NULL, NULL);
     al_append_menu_item(menu, "Save State...", IDM_FILE_SAVE_STATE, 0, NULL, NULL);
     al_append_menu_item(menu, "Save Screenshot...", IDM_FILE_SCREEN_SHOT, 0, NULL, NULL);
+    al_append_menu_item(menu, "Save Screen as Text...", IDM_FILE_SCREEN_TEXT, 0, NULL, NULL);
     add_checkbox_item(menu, "Print to file", IDM_FILE_PRINT, print_dest == PDEST_FILE);
     add_checkbox_item(menu, "Print to command", IDM_FILE_PCMD, print_dest == PDEST_PIPE);
     add_checkbox_item(menu, "Serial to file", IDM_FILE_SERIAL, sysacia_fp);
@@ -675,6 +677,21 @@ static void file_save_scrshot(ALLEGRO_EVENT *event)
                 vid_scrshotname[sizeof vid_scrshotname-1] = 0;
                 vid_savescrshot = 2;
             }
+        }
+        al_destroy_native_file_dialog(chooser);
+    }
+}
+
+static void file_save_scrtext(ALLEGRO_EVENT *event)
+{
+    ALLEGRO_FILECHOOSER *chooser;
+    ALLEGRO_DISPLAY *display;
+
+    if ((chooser = al_create_native_file_dialog(savestate_name, "Save screen as text to file", "*.txt", ALLEGRO_FILECHOOSER_SAVE))) {
+        display = (ALLEGRO_DISPLAY *)(event->user.data2);
+        if (al_show_native_file_dialog(display, chooser)) {
+            if (al_get_native_file_dialog_count(chooser) > 0)
+                textsave(al_get_native_file_dialog_path(chooser, 0));
         }
         al_destroy_native_file_dialog(chooser);
     }
@@ -1253,6 +1270,9 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             break;
         case IDM_FILE_SCREEN_SHOT:
             file_save_scrshot(event);
+            break;
+        case IDM_FILE_SCREEN_TEXT:
+            file_save_scrtext(event);
             break;
         case IDM_FILE_PRINT:
             file_print(event);

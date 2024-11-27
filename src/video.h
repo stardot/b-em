@@ -16,7 +16,7 @@ extern uint8_t crtc[32];
 extern int crtc_i;
 
 extern int hc, vc, sc;
-extern uint16_t ma;
+extern uint16_t ma, ttxbank;
 extern uint64_t stopwatch_vblank;
 
 /*Video ULA (VIDPROC)*/
@@ -45,6 +45,7 @@ void video_loadstate(FILE *f);
 void nula_reset(void);
 
 extern uint16_t vidbank;
+extern const uint_least16_t screenlen[4];
 
 void mode7_makechars(void);
 bool mode7_loadchars(const char *fn);

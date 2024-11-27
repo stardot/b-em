@@ -108,6 +108,7 @@ b_em_SOURCES = \
 	tapenoise.c \
     pdp11/pdp11.c \
     pdp11/pdp11_debug.c \
+    textsave.c \
 	tube.c \
 	uef.c \
 	uservia.c \
