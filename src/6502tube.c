@@ -593,8 +593,8 @@ void tube_6502_exec()
                 case 0x02:
                         if (dbg_tube6502)
                             debug_trap(&tube6502_cpu_debug, oldtpc, 1);
-                        else
-                            polltime(1);
+                        polltime(2);
+                        readmem(pc++);
                         break;
 
                 case 0x04:      /*TSB zp */
