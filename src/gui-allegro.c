@@ -273,14 +273,53 @@ static void update_rom_menu(void)
 
 static ALLEGRO_MENU *create_model_menu(void)
 {
-    ALLEGRO_MENU *menu = al_create_menu();
-    menu_map_t *map = malloc(model_count * sizeof(menu_map_t));
+    menu_map_t *map = calloc(model_count * 2, sizeof(menu_map_t));
     if (map) {
-        for (int i = 0; i < model_count; i++) {
-            map[i].label = models[i].name;
-            map[i].itemno = i;
+        ALLEGRO_MENU *menu = al_create_menu();
+        menu_map_t *groups = map + model_count;
+        int ngroup = 0;
+        for (int model_no = 0; model_no < model_count; ++model_no) {
+            const char *group = models[model_no].group;
+            if (group) {
+                bool found = false;
+                for (int group_no = 0; group_no < ngroup; ++group_no) {
+                    if (!strcmp(group, groups[group_no].label)) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    groups[ngroup].label = group;
+                    groups[ngroup].itemno = ngroup;
+                    ++ngroup;
+                }
+            }
         }
-        add_sorted_set(menu, map, model_count, IDM_MODEL, curmodel);
+        qsort(groups, ngroup, sizeof(menu_map_t), menu_cmp);
+        for (int group_no = 0; group_no < ngroup; ++group_no) {
+            const char *group_label = groups[group_no].label;
+            int item_no = 0;
+            for (int model_no = 0; model_no < model_count; ++model_no) {
+                const char *model_group = models[model_no].group;
+                if (model_group && !strcmp(model_group, group_label)) {
+                    map[item_no].label = models[model_no].name;
+                    map[item_no].itemno = model_no;
+                    ++item_no;
+                }
+            }
+            ALLEGRO_MENU *sub = al_create_menu();
+            add_sorted_set(sub, map, item_no, IDM_MODEL, curmodel);
+            al_append_menu_item(menu, groups[group_no].label, 0, 0, NULL, sub);
+        }
+        int item_no = 0;
+        for (int model_no = 0; model_no < model_count; ++model_no) {
+            if (!models[model_no].group) {
+                map[item_no].label = models[model_no].name;
+                map[item_no].itemno = model_no;
+                ++item_no;
+            }
+        }
+        add_sorted_set(menu, map, item_no, IDM_MODEL, curmodel);
         free(map);
         return menu;
     }

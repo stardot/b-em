@@ -236,6 +236,7 @@ void model_loadcfg(void)
             MODEL *ptr = models + num;
             ptr->cfgsect = sect;
             ptr->name = get_config_string(sect, "name", sect);
+            ptr->group = al_get_config_value(bem_cfg, sect, "group");
             ptr->fdc_type = model_find_fdc(get_config_string(sect, "fdc", "none"), ptr->name);
             ptr->x65c02  = get_config_bool(sect, "65c02",  false);
             ptr->bplus   = get_config_bool(sect, "b+",   false);
