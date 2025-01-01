@@ -617,59 +617,24 @@ static int radio_event_with_deselect(ALLEGRO_EVENT *event, int current)
     return num;
 }
 
-static void file_load_state(ALLEGRO_EVENT *event)
+static void file_chooser_generic(ALLEGRO_EVENT *event, const char *initial_path, const char *title, const char *patterns, int flags, void (*callback)(const char *))
 {
-    ALLEGRO_FILECHOOSER *chooser = al_create_native_file_dialog(savestate_name, "Load state from file", "*.snp", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST);
+    ALLEGRO_FILECHOOSER *chooser = al_create_native_file_dialog(initial_path, title, patterns, flags);
     if (chooser) {
         ALLEGRO_DISPLAY *display = (ALLEGRO_DISPLAY *)(event->user.data2);
         if (al_show_native_file_dialog(display, chooser)) {
             if (al_get_native_file_dialog_count(chooser) > 0)
-                savestate_load(al_get_native_file_dialog_path(chooser, 0));
+                callback(al_get_native_file_dialog_path(chooser, 0));
         }
         al_destroy_native_file_dialog(chooser);
     }
 }
 
-static void file_save_state(ALLEGRO_EVENT *event)
+static void file_save_scrshot(const char *path)
 {
-    ALLEGRO_FILECHOOSER *chooser = al_create_native_file_dialog(savestate_name, "Save state to file", "*.snp", ALLEGRO_FILECHOOSER_SAVE);
-    if (chooser) {
-        ALLEGRO_DISPLAY *display = (ALLEGRO_DISPLAY *)(event->user.data2);
-        if (al_show_native_file_dialog(display, chooser)) {
-            if (al_get_native_file_dialog_count(chooser) > 0)
-                savestate_save(al_get_native_file_dialog_path(chooser, 0));
-        }
-        al_destroy_native_file_dialog(chooser);
-    }
-}
-
-static void file_save_scrshot(ALLEGRO_EVENT *event)
-{
-    ALLEGRO_FILECHOOSER *chooser = al_create_native_file_dialog(vid_scrshotname, "Save screenshot to file", "*.bmp;*.pcx;*.tga;*.png;*.jpg", ALLEGRO_FILECHOOSER_SAVE);
-    if (chooser) {
-        ALLEGRO_DISPLAY *display = (ALLEGRO_DISPLAY *)(event->user.data2);
-        if (al_show_native_file_dialog(display, chooser)) {
-            if (al_get_native_file_dialog_count(chooser) > 0) {
-                strncpy(vid_scrshotname, al_get_native_file_dialog_path(chooser, 0), sizeof vid_scrshotname-1);
-                vid_scrshotname[sizeof vid_scrshotname-1] = 0;
-                vid_savescrshot = 2;
-            }
-        }
-        al_destroy_native_file_dialog(chooser);
-    }
-}
-
-static void file_save_scrtext(ALLEGRO_EVENT *event)
-{
-    ALLEGRO_FILECHOOSER *chooser = al_create_native_file_dialog(savestate_name, "Save screen as text to file", "*.txt", ALLEGRO_FILECHOOSER_SAVE);
-    if (chooser) {
-        ALLEGRO_DISPLAY *display = (ALLEGRO_DISPLAY *)(event->user.data2);
-        if (al_show_native_file_dialog(display, chooser)) {
-            if (al_get_native_file_dialog_count(chooser) > 0)
-                textsave(al_get_native_file_dialog_path(chooser, 0));
-        }
-        al_destroy_native_file_dialog(chooser);
-    }
+    strncpy(vid_scrshotname, path, sizeof vid_scrshotname-1);
+    vid_scrshotname[sizeof vid_scrshotname-1] = 0;
+    vid_savescrshot = 2;
 }
 
 static void file_print_close_file(void)
@@ -954,38 +919,18 @@ static void disc_wprot(ALLEGRO_EVENT *event)
     writeprot[drive] = !writeprot[drive];
 }
 
-static void disc_mmb_load(ALLEGRO_EVENT *event)
+static void disc_mmb_load(const char *path)
 {
-    const char *fpath = mmb_fn ? mmb_fn : ".";
-    ALLEGRO_FILECHOOSER *chooser = al_create_native_file_dialog(fpath, "Choose an MMB file", "*.mmb", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST);
-    if (chooser) {
-        ALLEGRO_DISPLAY *display = (ALLEGRO_DISPLAY *)(event->user.data2);
-        if (al_show_native_file_dialog(display, chooser)) {
-            if (al_get_native_file_dialog_count(chooser) > 0) {
-                char *fn = strdup(al_get_native_file_dialog_path(chooser, 0));
-                mmb_eject();
-                mmb_load(fn);
-            }
-        }
-        al_destroy_native_file_dialog(chooser);
-    }
+    char *fn = strdup(path);
+    mmb_eject();
+    mmb_load(fn);
 }
 
-static void disc_mmc_load(ALLEGRO_EVENT *event)
+static void disc_mmc_load(const char *path)
 {
-    const char *fpath = mmccard_fn ? mmccard_fn : ".";
-    ALLEGRO_FILECHOOSER *chooser = al_create_native_file_dialog(fpath, "Choose an MMC card image", "*", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST);
-    if (chooser) {
-        ALLEGRO_DISPLAY *display = (ALLEGRO_DISPLAY *)(event->user.data2);
-        if (al_show_native_file_dialog(display, chooser)) {
-            if (al_get_native_file_dialog_count(chooser) > 0) {
-                char *fn = strdup(al_get_native_file_dialog_path(chooser, 0));
-                mmccard_eject();
-                mmccard_load(fn);
-            }
-        }
-        al_destroy_native_file_dialog(chooser);
-    }
+    char *fn = strdup(path);
+    mmccard_eject();
+    mmccard_load(fn);
 }
 
 static void disc_toggle_ide(ALLEGRO_EVENT *event)
@@ -1026,18 +971,10 @@ static void disc_toggle_scsi(ALLEGRO_EVENT *event)
     }
 }
 
-static void disc_vdfs_root(ALLEGRO_EVENT *event)
+static void disc_vdfs_root(const char *path)
 {
-    ALLEGRO_FILECHOOSER *chooser = al_create_native_file_dialog(vdfs_get_root(), "Choose a folder to be the VDFS root", "*", ALLEGRO_FILECHOOSER_FOLDER);
-    if (chooser) {
-        ALLEGRO_DISPLAY *display = (ALLEGRO_DISPLAY *)(event->user.data2);
-        if (al_show_native_file_dialog(display, chooser)) {
-            if (al_get_native_file_dialog_count(chooser) > 0) {
-                vdfs_set_root(al_get_native_file_dialog_path(chooser, 0));
-                config_save();
-            }
-        }
-    }
+    vdfs_set_root(path);
+    config_save();
 }
 
 static void tape_load_ui(ALLEGRO_EVENT *event)
@@ -1229,16 +1166,16 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             update_rom_menu();
             break;
         case IDM_FILE_LOAD_STATE:
-            file_load_state(event);
+            file_chooser_generic(event, savestate_name, "Load state from file", "*.snp", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST, savestate_load);
             break;
         case IDM_FILE_SAVE_STATE:
-            file_save_state(event);
+            file_chooser_generic(event, savestate_name, "Save state to file", "*.snp", ALLEGRO_FILECHOOSER_SAVE, savestate_save);
             break;
         case IDM_FILE_SCREEN_SHOT:
-            file_save_scrshot(event);
+            file_chooser_generic(event, vid_scrshotname, "Save screenshot to file", "*.bmp;*.pcx;*.tga;*.png;*.jpg", ALLEGRO_FILECHOOSER_SAVE, file_save_scrshot);
             break;
         case IDM_FILE_SCREEN_TEXT:
-            file_save_scrtext(event);
+            file_chooser_generic(event, savestate_name, "Save screen as text to file", "*.txt", ALLEGRO_FILECHOOSER_SAVE, textsave);
             break;
         case IDM_FILE_PRINT:
             file_print_file(event);
@@ -1274,7 +1211,7 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             disc_choose(event, "load into", all_dext, ALLEGRO_FILECHOOSER_FILE_MUST_EXIST);
             break;
         case IDM_DISC_MMB_LOAD:
-            disc_mmb_load(event);
+            file_chooser_generic(event, mmb_fn ? mmb_fn : ".", "Choose an MMB file", "*.mmb", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST, disc_mmb_load);
             break;
         case IDM_DISC_EJECT:
             disc_eject(event);
@@ -1283,7 +1220,7 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             mmb_eject();
             break;
         case IDM_DISC_MMC_LOAD:
-            disc_mmc_load(event);
+            file_chooser_generic(event, mmccard_fn ? mmccard_fn : ".", "Choose an MMC card image", "*", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST, disc_mmc_load);
             break;
         case IDM_DISC_MMC_EJECT:
             mmccard_eject();
@@ -1331,7 +1268,7 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             vdfs_enabled = !vdfs_enabled;
             break;
         case IDM_DISC_VDFS_ROOT:
-            disc_vdfs_root(event);
+            file_chooser_generic(event, vdfs_get_root(), "Choose a folder to be the VDFS root", "*", ALLEGRO_FILECHOOSER_FOLDER, disc_vdfs_root);
             break;
         case IDM_TAPE_LOAD:
             tape_load_ui(event);
