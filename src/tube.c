@@ -110,10 +110,16 @@ void tube_updateints()
                 pdp11_interrupt(0x80, 7);
             else if (tube_type == TUBESPROW)
                 sprow_interrupt(2);
+            else if (tube_type == TUBE68000)
+                m68k_set_virq(5, 1);
         }
     }
     else if (tube_irq & 2)
+    {
         log_debug("tube: parasite NMI de-asserted");
+        if (tube_type == TUBE68000)
+            m68k_set_virq(5, 0);
+    }
 
     if (new_irq != tube_irq && tube_type == TUBE6809)
         tube_6809_int(new_irq);

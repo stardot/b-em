@@ -28,6 +28,7 @@ typedef struct
     const char *name;
     const char *os;
     const char *cmos;
+    const char *group;
     rom_setup_t *romsetup;
     fdc_type_t fdc_type;
     uint8_t x65c02:1;
@@ -43,6 +44,8 @@ typedef struct
 
 extern MODEL *models;
 extern int model_count;
+extern const char **model_groups;
+extern int model_ngroup;
 
 typedef struct
 {

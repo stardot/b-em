@@ -4102,8 +4102,8 @@ void m65c02_exec(int slice)
                 case 0x02:
                         if (dbg_core6502)
                             debug_trap(&core6502_cpu_debug, debug_addr(oldpc), 1);
-                        else
-                            polltime(1);
+                        polltime(2);
+                        (void)readmem(pc++);
                         break;
 
                 case 0x04:      /*TSB zp */

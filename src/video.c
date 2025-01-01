@@ -764,7 +764,7 @@ static void mode7_render(ALLEGRO_LOCKED_REGION *region, uint8_t dat)
 }
 
 uint16_t vidbank;
-static const int screenlen[4] = { 0x4000, 0x5000, 0x2000, 0x2800 };
+const uint_least16_t screenlen[4] = { 0x4000, 0x5000, 0x2000, 0x2800 };
 
 static int vsynctime;
 static int interline;
