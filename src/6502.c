@@ -1010,6 +1010,20 @@ void writemem(uint16_t addr, uint8_t val)
 
 int nmi, oldnmi, interrupt, takeint;
 
+/*
+ * Note interrupt flags in the above interrupt variable:
+ *
+ * 0x001: System VIA.
+ * 0x002: User VIA
+ * 0x004: System ACIA
+ * 0x008: Tube ULA
+ * 0x010: SCSI
+ * 0x080: Bodge flag.
+ * 0x100: Music 2000 ACIA 1
+ * 0x200: Music 2000 ACIA 2
+ * 0x400: Music 2000 ACIA 3
+ */
+
 void m6502_reset(void)
 {
         int c;
