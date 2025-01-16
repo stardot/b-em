@@ -106,11 +106,10 @@ static int adfs_format(const char *fn, FILE *fp, int sectors)
                 }
 
                 // fill the rest of the image with 0x00
-                uint8_t *fill = calloc(1,256);
-                memset(fill,0,256);
+                memset(data, 0, 256);
                 for(int cs=INITIAL_SECTORS;cs<sectors;cs++)
-                        fwrite(fill,256,1,fp);
-                free(fill);
+                        fwrite(data,256,1,fp);
+                free(data);
         }
         return status;
 }
@@ -144,9 +143,9 @@ int main(int argc, char **argv)
                                 {
                                         sectors = size / SECTOR_SIZE;
                                         cyl = size / (SECTOR_SIZE * SECTORS_PER_TRACK * HEADS);
-	                                geom[13] = (unsigned char) ((((unsigned short) cyl) & 0xFF00) >> 8);
-	                                geom[14] = (unsigned char) (((unsigned short) cyl) & 0x00FF);
-	                                geom[15] = (unsigned char) (((unsigned short) HEADS) & 0x00FF);
+                                        geom[13] = (unsigned char) ((((unsigned short) cyl) & 0xFF00) >> 8);
+                                        geom[14] = (unsigned char) (((unsigned short) cyl) & 0x00FF);
+                                        geom[15] = (unsigned char) (((unsigned short) HEADS) & 0x00FF);
 
                                         fprintf(stdout,"hdfmt: size=%d sectors=%d sector_size=%d sectors_per_track=%d heads=%d cylinders=%d\n",
                                                 size, sectors, SECTOR_SIZE, SECTORS_PER_TRACK, HEADS, cyl);
