@@ -17,6 +17,7 @@
 #include "b-em.h"
 #include "disc.h"
 #include "sdf.h"
+#include "gui-allegro.h"
 
 FILE *sdf_fp[NUM_DRIVES], *mmb_fp;
 off_t mmb_offset[NUM_DRIVES][2];
@@ -672,6 +673,7 @@ void sdf_new_disc(int drive, ALLEGRO_PATH *fn, const struct sdf_geometry *geo)
             writeprot[drive] = 0;
             geo->new_disc(f, geo);
             sdf_mount(drive, cpath, f, geo);
+            gui_allegro_set_eject_text(drive, fn);
         }
         else
             log_error("sdf: drive %d: unable to open disk image %s for writing: %s", drive, cpath, strerror(errno));
