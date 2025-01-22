@@ -35,35 +35,40 @@ void (*fdc_headercrcerror)();
 void (*fdc_writeprotect)();
 int  (*fdc_getdata)(int last);
 
-void disc_load(int drive, ALLEGRO_PATH *fn)
+int disc_load(int drive, ALLEGRO_PATH *fn)
 {
-    const char *ext;
-    const char *cpath;
-
-    if (!fn)
-        return;
-    gui_allegro_set_eject_text(drive, fn);
-    cpath = al_path_cstr(fn, ALLEGRO_NATIVE_PATH_SEP);
-    if ((ext = al_get_path_extension(fn))) {
-        if (*ext == '.')
-            ext++;
-        if (strcasecmp(ext, "fdi") == 0) {
-            log_debug("Loading %i: %s as FDI", drive, cpath);
-            fdi_load(drive, cpath);
-            return;
-        }
-        if (strcasecmp(ext, "hfe") == 0) {
-            log_debug("Loading %i: %s as HFE", drive, cpath);
-            hfe_load(drive, cpath);
-            return;
-        }
-        if (strcasecmp(ext, "imd") == 0) {
-            log_debug("Loading %i: %s as IMD", drive, cpath);
-            imd_load(drive, cpath);
-            return;
+    int status = -1;
+    if (fn) {
+        const char *cpath = al_path_cstr(fn, ALLEGRO_NATIVE_PATH_SEP);
+        if (cpath) {
+            const char *ext = al_get_path_extension(fn);
+            if (ext) {
+                if (*ext == '.')
+                    ext++;
+                if (strcasecmp(ext, "fdi") == 0) {
+                    log_debug("Loading %i: %s as FDI", drive, cpath);
+                    status = fdi_load(drive, cpath);
+                }
+                else if (strcasecmp(ext, "hfe") == 0) {
+                    log_debug("Loading %i: %s as HFE", drive, cpath);
+                    status =  hfe_load(drive, cpath);
+                }
+                else if (strcasecmp(ext, "imd") == 0) {
+                    log_debug("Loading %i: %s as IMD", drive, cpath);
+                    status = imd_load(drive, cpath);
+                }
+                else
+                    status = sdf_load(drive, cpath, ext);
+            }
+            else
+                status = sdf_load(drive, cpath, ext);
         }
     }
-    sdf_load(drive, cpath, ext);
+    if (!status)
+        gui_allegro_set_eject_text(drive, fn);
+    else
+        gui_allegro_set_eject_text(drive, NULL);
+    return status;
 }
 
 void disc_close(int drive)

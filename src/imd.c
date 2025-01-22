@@ -1472,7 +1472,7 @@ static void imd_dump(struct imd_file *imd)
  * interface.
  */
 
-void imd_load(int drive, const char *fn)
+int imd_load(int drive, const char *fn)
 {
     log_debug("imd: loading IMD image file '%s' into drive %d", fn, drive);
     if (drive >= 0 && drive < NUM_DRIVES) {
@@ -1481,7 +1481,7 @@ void imd_load(int drive, const char *fn)
         if (!fp) {
             if (!(fp = fopen(fn, "rb"))) {
                 log_error("Unable to open file '%s' for reading - %s", fn, strerror(errno));
-                return;
+                return -1;
             }
             wprot = 1;
         }
@@ -1506,11 +1506,12 @@ void imd_load(int drive, const char *fn)
                 drives[drive].abort       = imd_abort;
                 drives[drive].writetrack  = imd_writetrack;
                 drives[drive].readtrack   = imd_readtrack;
-                return;
+                return 0;
             }
         }
         else
             log_error("File '%s' does not have a valid IMD header", fn);
         fclose(fp);
     }
+    return -1;
 }

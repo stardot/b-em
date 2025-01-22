@@ -359,13 +359,13 @@ void fdi_init()
         fdi_setupcrc(0x1021, 0xcdb4);
 }
 
-void fdi_load(int drive, const char *fn)
+int fdi_load(int drive, const char *fn)
 {
         writeprot[drive] = fwriteprot[drive] = 1;
         fdi_f[drive] = fopen(fn, "rb");
         if (!fdi_f[drive])  {
             log_warn("fdi: unable to open FDI disc image '%s': %s", fn, strerror(errno));
-            return;
+            return -1;
         }
         fdi_h[drive] = fdi2raw_header(fdi_f[drive]);
 //        if (!fdih[drive]) printf("Failed to load!\n");
@@ -382,5 +382,6 @@ void fdi_load(int drive, const char *fn)
         drives[drive].abort       = fdi_abort;
         drives[drive].spinup      = NULL;
         drives[drive].spindown    = NULL;
+        return 0;
 }
 

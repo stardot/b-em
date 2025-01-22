@@ -1775,7 +1775,7 @@ static void hfe_spindown(int drive)
   hfe_info[drive]->state.motor_running = false;
 }
 
-void hfe_load(int drive, const char *fn)
+int hfe_load(int drive, const char *fn)
 {
   log_info("hfe: drive %d: loading file %s", drive, fn);
   writeprot[drive] = fwriteprot[drive] = 1;
@@ -1784,7 +1784,7 @@ void hfe_load(int drive, const char *fn)
     if (!f)
       {
         log_error("hfe: unable to open HFE disc image '%s': %s", fn, strerror(errno));
-        return;
+        return -1;
       }
 
     free(hfe_info[drive]);
@@ -1802,7 +1802,7 @@ void hfe_load(int drive, const char *fn)
       log_warn("hfe: drive %d: hfe_load setting hfe_info[%d] to NULL (after failing to load %s)",
                drive, drive, fn);
       hfe_info[drive] = NULL;
-      return;
+      return -1;
     }
   drives[drive].close       = hfe_close;
   drives[drive].seek        = hfe_seek;
@@ -1814,4 +1814,5 @@ void hfe_load(int drive, const char *fn)
   drives[drive].abort       = hfe_abort;
   drives[drive].spinup      = hfe_spinup;
   drives[drive].spindown    = hfe_spindown;
+  return 0;
 }

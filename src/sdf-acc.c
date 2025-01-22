@@ -613,24 +613,51 @@ void sdf_mount(int drive, const char *fn, FILE *fp, const struct sdf_geometry *g
 
 }
 
-void sdf_load(int drive, const char *fn, const char *ext)
+int sdf_load(int this_drive, const char *fn, const char *ext)
 {
-    FILE *fp;
-    const struct sdf_geometry *geo;
-
-    writeprot[drive] = 0;
-    if ((fp = fopen(fn, "rb+")) == NULL) {
-        if ((fp = fopen(fn, "rb")) == NULL) {
+    writeprot[this_drive] = 0;
+    FILE *this_fp = fopen(fn, "rb+");
+    if (this_fp == NULL) {
+        if ((this_fp = fopen(fn, "rb")) == NULL) {
             log_error("Unable to open file '%s' for reading - %s", fn, strerror(errno));
-            return;
+            return -1;
         }
-        writeprot[drive] = 1;
+        writeprot[this_drive] = 1;
     }
-    if ((geo = sdf_find_geo(fn, ext, fp)))
-        sdf_mount(drive, fn, fp, geo);
+#ifdef linux
+#include <sys/stat.h>
+    /* On linux only we check if the disc about to be loaded is already
+     * loaded in the other drive.
+     */
+    int that_drive = this_drive ? 0 : 1;
+    FILE *that_fp = sdf_fp[that_drive];
+    if (that_fp) {
+        /* There is a disc in the other drive. */
+        struct stat this_stb;
+        if (fstat(fileno(this_fp), &this_stb) == -1) {
+            log_error("Unable to stat file '%s' - %s", fn, strerror(errno));
+            return -1;
+        }
+        struct stat that_stb;
+        if (fstat(fileno(that_fp), &that_stb) == -1) {
+            log_error("Unable to stat file '%s' - %s", al_path_cstr(discfns[that_drive], ALLEGRO_NATIVE_PATH_SEP), strerror(errno));
+            return -1;
+        }
+        if (this_stb.st_ino == that_stb.st_ino && this_stb.st_dev == that_stb.st_dev) {
+            log_error("Disc %s is already loaded in drive %d", fn, that_drive);
+            return -1;
+        }
+    }
+#endif
+    const struct sdf_geometry *geo = sdf_find_geo(fn, ext, this_fp);
+    if (geo) {
+        sdf_mount(this_drive, fn, this_fp, geo);
+        return 0;
+    }
     else {
-        log_error("sdf: drive %d: unable to determine geometry for %s", drive, fn);
-        fclose(fp);
+        log_error("sdf: drive %d: unable to determine geometry for %s", this_drive, fn);
+        fclose(this_fp);
+        return -1;
     }
 }
 

@@ -189,11 +189,12 @@ static ALLEGRO_MENU *create_disc_menu(void)
 
 void gui_allegro_set_eject_text(int drive, ALLEGRO_PATH *path)
 {
-    if (path) {
-        char temp[256];
+    char temp[256];
+    if (path)
         snprintf(temp, sizeof temp, "Eject drive %s: %s", drive ? "1/3" : "0/2", al_get_path_filename(path));
-        al_set_menu_item_caption(disc_menu, menu_id_num(IDM_DISC_EJECT, drive), temp);
-    }
+    else
+        snprintf(temp, sizeof temp, "Eject drive %s", drive ? "1/3" : "0/2");
+    al_set_menu_item_caption(disc_menu, menu_id_num(IDM_DISC_EJECT, drive), temp);
 }
 
 static ALLEGRO_MENU *create_tape_menu(void)
@@ -927,9 +928,14 @@ static void disc_choose(ALLEGRO_EVENT *event, const char *opname, const char *ex
                         autoboot = 150;
                         /* FALLTHROUGH */
                     case IDM_DISC_LOAD:
-                        disc_load(drive, path);
-                        if (defaultwriteprot)
-                            writeprot[drive] = 1;
+                        if (!disc_load(drive, path)) {
+                            if (defaultwriteprot)
+                                writeprot[drive] = 1;
+                        }
+                        else {
+                            al_destroy_path(path);
+                            discfns[drive] = NULL;
+                        }
                         break;
                     default:
                         break;

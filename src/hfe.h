@@ -2,6 +2,6 @@
 #define INC_HFE_H
 
 void hfe_init(void);
-void hfe_load(int, const char *);
+int hfe_load(int, const char *);
 
 #endif
