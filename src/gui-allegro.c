@@ -519,7 +519,9 @@ static ALLEGRO_MENU *create_keyboard_menu(void)
     ALLEGRO_MENU *menu = al_create_menu();
     al_append_menu_item(menu, "Remap Keyboard", IDM_KEY_REDEFINE, 0, NULL, NULL);
     add_checkbox_item(menu, "Map CAPS/CTRL to A/S", IDM_KEY_AS, keyas);
-    add_checkbox_item(menu, "Logical keyboard", IDM_KEY_LOGICAL, keylogical);
+    ALLEGRO_MENU *sub = al_create_menu();
+    add_radio_set(sub, bem_key_modes, IDM_KEY_MODE, key_mode);
+    al_append_menu_item(menu, "Keyboard Mode", 0, 0, NULL, sub);
     add_checkbox_item(menu, "PC/XT Keypad Mode", IDM_KEY_PAD, keypad);
     return menu;
 }
@@ -1478,8 +1480,8 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
         case IDM_KEY_AS:
             keyas = !keyas;
             break;
-        case IDM_KEY_LOGICAL:
-            keylogical = !keylogical;
+        case IDM_KEY_MODE:
+            key_mode = radio_event_simple(event, key_mode);
             key_reset();
             break;
         case IDM_KEY_PAD:

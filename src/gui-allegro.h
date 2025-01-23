@@ -97,7 +97,7 @@ typedef enum {
 #endif
     IDM_KEY_REDEFINE,
     IDM_KEY_AS,
-    IDM_KEY_LOGICAL,
+    IDM_KEY_MODE,
     IDM_KEY_PAD,
     IDM_JIM_SIZE,
     IDM_AUTO_PAUSE,

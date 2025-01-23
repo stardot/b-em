@@ -683,7 +683,9 @@ uint8_t keylookup[ALLEGRO_KEY_MAX];
 struct key_act_lookup keyactions[KEY_ACTION_MAX];
 bool keyas  = false;
 bool keypad = false;
-bool keylogical = false;
+bem_key_mode key_mode = BKM_PHYSICAL;
+
+const char *bem_key_modes[4] = { "Physical", "Hybrid", "Logical", NULL };
 
 typedef enum {
     KP_IDLE,
@@ -892,7 +894,7 @@ static void set_key_logical(int keycode, int unichar, int state)
 
     log_debug("keyboard: set_key_logical keycode=%d, unichar=%d, state=%d", keycode, unichar, state);
 
-    uint8_t vkey = allegro2bbclogical[keycode];
+    uint8_t vkey = (key_mode == BKM_LOGICAL && unichar > ' ') ? 0xaa : allegro2bbclogical[keycode];
     if (vkey == 0xbb) // ignore the key
         return;
 
@@ -900,7 +902,8 @@ static void set_key_logical(int keycode, int unichar, int state)
         bool shift = hostshift;
         bool ctrl = hostctrl;
 
-        if (vkey == 0xaa) { // type the ASCII character corresponding to the key
+        if (vkey == 0xaa) {
+            // type the ASCII character corresponding to the key
             if (unichar == 96) // unicode backtick
                 return;
             if (unichar == 163) // unicode pound currency symbol
@@ -1005,7 +1008,7 @@ void key_down_event(const ALLEGRO_EVENT *event)
             shiftctrl = true;
         }
         if (shiftctrl) {
-            if (keylogical)
+            if (key_mode != BKM_PHYSICAL)
                 set_logical_shift_ctrl_if_idle();
             else
                 key_down(keylookup[keycode]);
@@ -1015,7 +1018,7 @@ void key_down_event(const ALLEGRO_EVENT *event)
 
 static int map_keypad_intern(int keycode, int unichar)
 {
-    if (keypad || keylogical) {
+    if (keypad || key_mode != BKM_PHYSICAL) {
         if (keycode >= ALLEGRO_KEY_PAD_0 && keycode <= ALLEGRO_KEY_PAD_9 && (unichar < '0' || unichar > '9')) {
             int newcode = map_keypad[keycode-ALLEGRO_KEY_PAD_0];
             log_debug("keyboard: mapping keypad key %d:%s to %d:%s", keycode, al_keycode_to_name(keycode), newcode, al_keycode_to_name(newcode));
@@ -1043,9 +1046,9 @@ void key_char_event(const ALLEGRO_EVENT *event)
     if ((!event->keyboard.repeat || unichar != last_unichar[keycode]) && keycode < ALLEGRO_KEY_MAX) {
         last_unichar[keycode] = unichar;
         keycode = map_keypad_intern(keycode, unichar);
-        if (keycode == ALLEGRO_KEY_A && keyas && !keylogical)
+        if (keycode == ALLEGRO_KEY_A && keyas && key_mode == BKM_PHYSICAL)
             keycode = ALLEGRO_KEY_CAPSLOCK;
-        else if (keycode == ALLEGRO_KEY_S && keyas && !keylogical)
+        else if (keycode == ALLEGRO_KEY_S && keyas && key_mode == BKM_PHYSICAL)
             keycode = ALLEGRO_KEY_LCTRL;
         for (int act = 0; act < KEY_ACTION_MAX; act++) {
             log_debug("keyboard: checking key action %d:%s codes %d<>%d, alt %d<>%d", act, keyact_const[act].name, keycode, keyactions[act].keycode, hostalt, keyactions[act].altstate);
@@ -1054,7 +1057,7 @@ void key_char_event(const ALLEGRO_EVENT *event)
                 return;
             }
         }
-        if (keylogical)
+        if (key_mode != BKM_PHYSICAL)
             set_key_logical(keycode, unichar, true);
         else
             key_down(keylookup[keycode]);
@@ -1090,11 +1093,11 @@ void key_up_event(const ALLEGRO_EVENT *event)
                 hostctrl = false;
                 shiftctrl = true;
             }
-            else if (keycode == ALLEGRO_KEY_A && keyas && !keylogical)
+            else if (keycode == ALLEGRO_KEY_A && keyas && key_mode == BKM_PHYSICAL)
                 keycode = ALLEGRO_KEY_CAPSLOCK;
-            else if (keycode == ALLEGRO_KEY_S && keyas && !keylogical)
+            else if (keycode == ALLEGRO_KEY_S && keyas && key_mode == BKM_PHYSICAL)
                 keycode = ALLEGRO_KEY_LCTRL;
-            if (shiftctrl && keylogical)
+            if (shiftctrl && key_mode != BKM_PHYSICAL)
                 set_logical_shift_ctrl_if_idle();
             keycode = map_keypad_intern(keycode, unichar);
             for (int act = 0; act < KEY_ACTION_MAX; act++) {
@@ -1104,7 +1107,7 @@ void key_up_event(const ALLEGRO_EVENT *event)
                     return;
                 }
             }
-            if (keylogical)
+            if (key_mode != BKM_PHYSICAL)
                 set_key_logical(keycode, unichar, false);
             else
                 key_up(keylookup[keycode]);
@@ -1200,7 +1203,7 @@ bool key_is_down(void) {
 
 bool key_any_down(void)
 {
-    if (!keylogical) {
+    if (key_mode != BKM_PHYSICAL) {
         for (int c = 0; c < 16; c++)
             for (int r = 1; r < 16; r++)
                 if (bbcmatrix[c][r])
@@ -1216,7 +1219,7 @@ bool key_code_down(int code)
     if (code < ALLEGRO_KEY_MAX) {
         code = key_allegro2bbc[code];
         assert((code != 0x00) && (code != 0x01)); // not SHIFT or CTRL
-        if (!keylogical)
+        if (key_mode != BKM_PHYSICAL)
             return bbcmatrix[code & 0x0f][code >> 4];
         else
             return (key_paste_vkey_down != 0) && (key_paste_vkey_down == code);
