@@ -11,8 +11,8 @@
 #include "video.h"
 #include "video_render.h"
 
-static const uint_least32_t mono_green = 0x0cc10c;
-static const uint_least32_t mono_amber = 0xfdcc13;
+static const uint_least32_t mono_green = 0x00ff62;
+static const uint_least32_t mono_amber = 0xff9100;
 static const uint_least32_t mono_white = 0xffffff;
 
 enum vid_disptype vid_dtype_user, vid_dtype_intern;
