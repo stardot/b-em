@@ -45,7 +45,14 @@ extern enum vid_disptype {
     VDT_LINEDOUBLE,
 } vid_dtype_user, vid_dtype_intern;
 
-extern bool vid_pal;
+extern enum vid_coltype {
+    VDC_RGB,
+    VDC_PAL,
+    VDC_GREEN,
+    VDC_AMBER,
+    VDC_WHITE
+} vid_colour_out;
+
 extern int vid_fskipmax, vid_fullborders;
 extern int vid_ledlocation, vid_ledvisibility;
 extern bool vid_print_mode;

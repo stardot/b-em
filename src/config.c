@@ -200,9 +200,11 @@ void config_load(void)
     vid_ledvisibility = get_config_int("video", "ledvisibility", 2);
 
     c                = get_config_int("video", "displaymode",   0);
+    vid_colour_out   = get_config_int("video", "colourtype",  0);
     if (c >= 4) {
         c -= 4;
-        vid_pal = 1;
+        if (vid_colour_out == VDC_RGB)
+            vid_colour_out = VDC_PAL;
     }
     video_set_disptype(c);
 
@@ -296,7 +298,6 @@ void config_save(void)
 {
     ALLEGRO_PATH *path;
     const char *cpath;
-    int c;
 
     if ((path = find_cfg_dest("b-em", ".cfg"))) {
         cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
@@ -351,10 +352,8 @@ void config_save(void)
         set_config_int("video", "winsizex", winsizex);
         set_config_int("video", "winsizey", winsizey);
 
-        c = vid_dtype_user;
-        if (vid_pal)
-            c += 4;
-        set_config_int("video", "displaymode", c);
+        set_config_int("video", "displaymode", vid_dtype_user);
+        set_config_int("video", "colourtype", vid_colour_out);
         if (vid_ledlocation >= 0)
             set_config_int("video", "ledlocation", vid_ledlocation);
         set_config_int("video", "ledvisibility", vid_ledvisibility);
