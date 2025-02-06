@@ -3,7 +3,7 @@
 
 extern ALLEGRO_BITMAP *b, *b16, *b32;
 extern ALLEGRO_LOCKED_REGION *region;
-extern ALLEGRO_COLOR border_col;
+extern ALLEGRO_COLOR border_col, mono_green_col, mono_amber_col, mono_white_col;
 
 #define BORDER_NONE_X_START_GRA 336
 #define BORDER_NONE_X_END_GRA   976

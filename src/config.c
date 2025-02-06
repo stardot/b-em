@@ -207,6 +207,9 @@ void config_load(void)
             vid_colour_out = VDC_PAL;
     }
     video_set_disptype(c);
+    mono_green_col = get_config_colour("video", "mono_green", al_map_rgb(0, 255, 98));
+    mono_amber_col = get_config_colour("video", "mono_amber", al_map_rgb(255, 145, 0));
+    mono_white_col = get_config_colour("video", "mono_white", al_map_rgb(255, 255, 255));
 
     mode7_fontfile   = get_config_string("video", "mode7font", "saa5050");
 

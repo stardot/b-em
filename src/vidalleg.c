@@ -11,13 +11,9 @@
 #include "video.h"
 #include "video_render.h"
 
-static const uint_least32_t mono_green = 0x00ff62;
-static const uint_least32_t mono_amber = 0xff9100;
-static const uint_least32_t mono_white = 0xffffff;
-
 enum vid_disptype vid_dtype_user, vid_dtype_intern;
 enum vid_coltype vid_colour_out;
-bool vid_pal;
+ALLEGRO_COLOR mono_green_col, mono_amber_col, mono_white_col;
 int vid_fskipmax = 1;
 int vid_fullborders = 1;
 int vid_ledlocation = LED_LOC_NONE;
@@ -261,12 +257,11 @@ static void line_double(void)
     }
 }
 
-static void mono_convert(int x1, int y1, int x2, int y2, uint_least32_t mono_rgb)
+static void mono_convert(int x1, int y1, int x2, int y2, ALLEGRO_COLOR mono_col)
 {
-    double mono_r = (double)((mono_rgb >> 16) & 0xff);
-    double mono_g = (double)((mono_rgb >> 8) & 0xff);
-    double mono_b = (double)(mono_rgb & 0xff);
-    log_debug("mono_convert: mono_rgb=%06x, mono_r=%g, mono_g=%g, mono_b=%g", mono_rgb, mono_r, mono_g, mono_b);
+    float mono_r, mono_g, mono_b;
+    al_unmap_rgb_f(mono_col, &mono_r, &mono_g, &mono_b);
+    log_debug("mono_convert: mono_r=%g, mono_g=%g, mono_b=%g", mono_r, mono_g, mono_b);
     ALLEGRO_LOCKED_REGION *dest_region = al_lock_bitmap(b32, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_WRITEONLY);
     for (int y = y1; y < y2; ++y) {
         char *src_row = (char *)region->data + region->pitch * y;
@@ -277,7 +272,7 @@ static void mono_convert(int x1, int y1, int x2, int y2, uint_least32_t mono_rgb
             double pix_r = (double)((pixel >> 16) & 0xff);
             double pix_g = (double)((pixel >> 8) & 0xff);
             double pix_b = (double)(pixel & 0xff);
-            double pix_l = 3.06028802710843373 * (pix_r/(470+2200) + pix_g/(470+1000) + pix_b/(470+3900));
+            double pix_l = 780.37344691265060115 * (pix_r/(470+2200) + pix_g/(470+1000) + pix_b/(470+3900));
             uint32_t new_r = (uint32_t)(mono_r * pix_l);
             uint32_t new_g = (uint32_t)(mono_g * pix_l);
             uint32_t new_b = (uint32_t)(mono_b * pix_l);
@@ -294,7 +289,7 @@ static inline void save_screenshot(void)
         int xsize = lastx - firstx;
         int ysize = lasty - firsty + 1;
         ALLEGRO_BITMAP *scrshotb  = al_create_bitmap(xsize, ysize << 1);
-        uint_least32_t mono_rgb;
+        ALLEGRO_COLOR mono_col;
 
         switch(vid_colour_out) {
             case VDC_RGB:
@@ -351,34 +346,34 @@ static inline void save_screenshot(void)
                 }
                 break;
             case VDC_GREEN:
-                mono_rgb = mono_green;
+                mono_col = mono_green_col;
                 goto mono_screenshot;
             case VDC_AMBER:
-                mono_rgb = mono_amber;
+                mono_col = mono_amber_col;
                 goto mono_screenshot;
             case VDC_WHITE:
-                mono_rgb = mono_white;
+                mono_col = mono_white_col;
             mono_screenshot:
                 switch(vid_dtype_intern) {
                     case VDT_SCALE:
-                        mono_convert(firstx, firsty, lastx, lasty, mono_rgb);
+                        mono_convert(firstx, firsty, lastx, lasty, mono_col);
                         al_set_target_bitmap(scrshotb);
                         al_draw_scaled_bitmap(b32, firstx, firsty, xsize, ysize, 0, 0, xsize, ysize << 1, 0);
                         break;
                     case VDT_INTERLACE:
-                        mono_convert(firstx, firsty << 1, lastx, lasty << 1, mono_rgb);
+                        mono_convert(firstx, firsty << 1, lastx, lasty << 1, mono_col);
                         al_set_target_bitmap(scrshotb);
                         al_draw_bitmap_region(b32, firstx, firsty << 1, xsize, ysize << 1, 0, 0, 0);
                         break;
                     case VDT_SCANLINES:
-                        mono_convert(firstx, firsty, lastx, lasty, mono_rgb);
+                        mono_convert(firstx, firsty, lastx, lasty, mono_col);
                         al_set_target_bitmap(scrshotb);
                         for (int c = 0, y = firsty; y < lasty; y++, c += 2)
                             al_draw_bitmap_region(b32, firstx, y, xsize, 1, 0, c, 0);
                         break;
                     case VDT_LINEDOUBLE:
                         line_double();
-                        mono_convert(firstx, firsty << 1, lastx, lasty << 1, mono_rgb);
+                        mono_convert(firstx, firsty << 1, lastx, lasty << 1, mono_col);
                         al_set_target_bitmap(scrshotb);
                         al_draw_bitmap_region(b32, firstx, firsty << 1, xsize, ysize << 1, 0, 0, 0);
                         break;
@@ -453,7 +448,7 @@ static inline void blit_screen(void)
 {
     int xsize = lastx - firstx;
     int ysize = lasty - firsty + 1;
-    uint_least32_t mono_rgb;
+    ALLEGRO_COLOR mono_col;
 
     switch(vid_colour_out) {
         case VDC_RGB:
@@ -509,26 +504,26 @@ static inline void blit_screen(void)
             }
             break;
         case VDC_GREEN:
-            mono_rgb = mono_green;
+            mono_col = mono_green_col;
             goto mono_common;
         case VDC_AMBER:
-            mono_rgb = mono_amber;
+            mono_col = mono_amber_col;
             goto mono_common;
         case VDC_WHITE:
-            mono_rgb = mono_white;
+            mono_col = mono_white_col;
         mono_common:
             switch(vid_dtype_intern) {
                 case VDT_SCALE:
-                    mono_convert(firstx, firsty, lastx, lasty, mono_rgb);
+                    mono_convert(firstx, firsty, lastx, lasty, mono_col);
                     al_set_target_backbuffer(al_get_current_display());
                     al_draw_scaled_bitmap(b32, firstx, firsty, xsize, ysize, scr_x_start, scr_y_start, scr_x_size, scr_y_size, 0);
                     break;
                 case VDT_INTERLACE:
-                    mono_convert(firstx, firsty << 1, lastx, lasty << 1, mono_rgb);
+                    mono_convert(firstx, firsty << 1, lastx, lasty << 1, mono_col);
                     upscale_only(b32, firstx, firsty << 1, xsize, ysize << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
                     break;
                 case VDT_SCANLINES:
-                    mono_convert(firstx, firsty, lastx, lasty, mono_rgb);
+                    mono_convert(firstx, firsty, lastx, lasty, mono_col);
                     al_set_target_bitmap(b16);
                     al_clear_to_color(al_map_rgb(0, 0,0));
                     for (int c = firsty; c < lasty; c++)
@@ -537,7 +532,7 @@ static inline void blit_screen(void)
                     break;
                 case VDT_LINEDOUBLE:
                     line_double();
-                    mono_convert(firstx, firsty << 1, lastx, lasty << 1, mono_rgb);
+                    mono_convert(firstx, firsty << 1, lastx, lasty << 1, mono_col);
                     upscale_only(b32, firstx, firsty << 1, xsize, ysize << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
                     break;
 
