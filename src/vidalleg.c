@@ -297,17 +297,14 @@ static inline void save_screenshot(void)
                 switch(vid_dtype_intern) {
                     case VDT_SCALE:
                         al_unlock_bitmap(b);
-                        al_set_target_bitmap(scrshotb);
                         al_draw_scaled_bitmap(b, firstx, firsty, xsize, ysize, 0, 0, xsize, ysize << 1, 0);
                         break;
                     case VDT_INTERLACE:
                         al_unlock_bitmap(b);
-                        al_set_target_bitmap(scrshotb);
                         al_draw_bitmap_region(b, firstx, firsty << 1, xsize, ysize << 1, 0, 0, 0);
                         break;
                     case VDT_SCANLINES:
                         al_unlock_bitmap(b);
-                        al_set_target_bitmap(scrshotb);
                         for (int c = 0, y = firsty; y < lasty; y++, c += 2)
                             al_draw_bitmap_region(b, firstx, y, xsize, 1, 0, c, 0);
                         break;
