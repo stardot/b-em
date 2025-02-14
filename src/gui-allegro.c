@@ -374,6 +374,7 @@ static ALLEGRO_MENU *create_m7font_menu(void)
 
 static const char *border_names[] = { "None", "Medium", "Full", NULL };
 static const char *vmode_names[] = { "Scaled", "Interlace", "Scanlines", "Line doubling", NULL };
+static const char *colout_names[] = { "RGB", "PAL", "Green Mono", "Amber Mono", "White Mono", NULL };
 static const char *win_mult_names[] = { "Freeform", "1x", "2x", "3x", NULL };
 static const char *led_location_names[] = { "None", "Overlapped", "Separate", NULL };
 static const char *led_visibility_names[] = { "When changed", "When changed or transient", "Always", NULL };
@@ -385,6 +386,9 @@ static ALLEGRO_MENU *create_video_menu(void)
     add_radio_set(sub, vmode_names, IDM_VIDEO_DISPTYPE, vid_dtype_user);
     al_append_menu_item(menu, "Display type...", 0, 0, NULL, sub);
     sub = al_create_menu();
+    add_radio_set(sub, colout_names, IDM_VIDEO_COLTYPE, vid_colour_out);
+    al_append_menu_item(menu, "Colour type...", 0, 0, NULL, sub);
+    sub = al_create_menu();
     add_radio_set(sub, border_names, IDM_VIDEO_BORDERS, vid_fullborders);
     al_append_menu_item(menu, "Borders...", 0, 0, NULL, sub);
     sub = al_create_menu();
@@ -393,7 +397,6 @@ static ALLEGRO_MENU *create_video_menu(void)
     al_append_menu_item(menu, "Reset Window Size", IDM_VIDEO_WINSIZE, 0, NULL, NULL);
     add_checkbox_item(menu, "Fullscreen", IDM_VIDEO_FULLSCR, fullscreen);
     add_checkbox_item(menu, "NuLA", IDM_VIDEO_NULA, !nula_disable);
-    add_checkbox_item(menu, "PAL Emulation", IDM_VIDEO_PAL, vid_pal);
     sub = al_create_menu();
     al_append_menu_item(menu, "LED location...", 0, 0, NULL, sub);
     add_radio_set(sub, led_location_names, IDM_VIDEO_LED_LOCATION, vid_ledlocation);
@@ -1356,6 +1359,9 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
         case IDM_VIDEO_DISPTYPE:
             video_set_disptype(radio_event_simple(event, vid_dtype_user));
             break;
+        case IDM_VIDEO_COLTYPE:
+            vid_colour_out = radio_event_simple(event, vid_colour_out);
+            break;
         case IDM_VIDEO_BORDERS:
             video_set_borders(radio_event_simple(event, vid_fullborders));
             break;
@@ -1367,9 +1373,6 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             break;
         case IDM_VIDEO_FULLSCR:
             toggle_fullscreen();
-            break;
-        case IDM_VIDEO_PAL:
-            vid_pal = !vid_pal;
             break;
         case IDM_VIDEO_NULA:
             nula_disable = !nula_disable;

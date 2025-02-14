@@ -1,5 +1,6 @@
 /*B-em v2.2 by Tom Walker
   Allegro video code*/
+#define _DEBUG
 #include <allegro5/allegro_primitives.h>
 #include "b-em.h"
 #include "led.h"
@@ -11,7 +12,8 @@
 #include "video_render.h"
 
 enum vid_disptype vid_dtype_user, vid_dtype_intern;
-bool vid_pal;
+enum vid_coltype vid_colour_out;
+ALLEGRO_COLOR mono_green_col, mono_amber_col, mono_white_col;
 int vid_fskipmax = 1;
 int vid_fullborders = 1;
 int vid_ledlocation = LED_LOC_NONE;
@@ -255,73 +257,125 @@ static void line_double(void)
     }
 }
 
+static void mono_convert(int x1, int y1, int x2, int y2, ALLEGRO_COLOR mono_col)
+{
+    float mono_r, mono_g, mono_b;
+    al_unmap_rgb_f(mono_col, &mono_r, &mono_g, &mono_b);
+    log_debug("mono_convert: mono_r=%g, mono_g=%g, mono_b=%g", mono_r, mono_g, mono_b);
+    ALLEGRO_LOCKED_REGION *dest_region = al_lock_bitmap(b32, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_WRITEONLY);
+    for (int y = y1; y < y2; ++y) {
+        char *src_row = (char *)region->data + region->pitch * y;
+        char *dest_row = (char *)dest_region->data + dest_region->pitch * y;
+        for (int x = x1; x < x2; ++x) {
+            uint32_t *src_addr = (uint32_t *)(src_row + x * region->pixel_size);
+            uint32_t pixel = *src_addr;
+            double pix_r = (double)((pixel >> 16) & 0xff);
+            double pix_g = (double)((pixel >> 8) & 0xff);
+            double pix_b = (double)(pixel & 0xff);
+            double pix_l = 780.37344691265060115 * (pix_r/(470+2200) + pix_g/(470+1000) + pix_b/(470+3900));
+            uint32_t new_r = (uint32_t)(mono_r * pix_l);
+            uint32_t new_g = (uint32_t)(mono_g * pix_l);
+            uint32_t new_b = (uint32_t)(mono_b * pix_l);
+            uint32_t *dest_addr = (uint32_t *)(dest_row + + x * dest_region->pixel_size);
+            *dest_addr = (pixel & 0xff000000) | (new_r << 16) | (new_g << 8) | new_b;
+        }
+    }
+    al_unlock_bitmap(b32);
+}
+
 static inline void save_screenshot(void)
 {
-    vid_savescrshot--;
-    if (!vid_savescrshot) {
+    if (!--vid_savescrshot) {
         int xsize = lastx - firstx;
         int ysize = lasty - firsty + 1;
         ALLEGRO_BITMAP *scrshotb  = al_create_bitmap(xsize, ysize << 1);
-        int c;
+        ALLEGRO_COLOR mono_col;
 
-        if (vid_pal) {
-            switch(vid_dtype_intern) {
-                case VDT_SCALE:
-                    pal_convert(firstx, firsty, lastx, lasty, 1);
-                    al_set_target_bitmap(scrshotb);
-                    al_draw_scaled_bitmap(b32, firstx, firsty, xsize, ysize, 0, 0, xsize, ysize << 1, 0);
-                    break;
-                case VDT_INTERLACE:
-                    pal_convert(firstx, firsty << 1, lastx, lasty << 1, 1);
-                    al_set_target_bitmap(scrshotb);
-                    al_draw_bitmap_region(b32, firstx, firsty << 1, xsize, ysize << 1, 0, 0, 0);
-                    break;
-                case VDT_SCANLINES:
-                    pal_convert(firstx, firsty, lastx, lasty, 1);
-                    al_set_target_bitmap(scrshotb);
-                    c = 0;
-                    for (int y = firsty; y < lasty; y++) {
-                        al_draw_bitmap_region(b32, firstx, y, xsize, 1, 0, c, 0);
-                        c += 2;
-                    }
-                    break;
-                case VDT_LINEDOUBLE:
-                    line_double();
-                    pal_convert(firstx, firsty << 1, lastx, lasty << 1, 1);
-                    al_set_target_bitmap(scrshotb);
-                    al_draw_bitmap_region(b32, firstx, firsty << 1, xsize, ysize << 1, 0, 0, 0);
-                    break;
-            }
-        }
-        else {
-            al_set_target_bitmap(scrshotb);
-            switch(vid_dtype_intern) {
-                case VDT_SCALE:
-                    al_unlock_bitmap(b);
-                    al_set_target_bitmap(scrshotb);
-                    al_draw_scaled_bitmap(b, firstx, firsty, xsize, ysize, 0, 0, xsize, ysize << 1, 0);
-                    break;
-                case VDT_INTERLACE:
-                    al_unlock_bitmap(b);
-                    al_set_target_bitmap(scrshotb);
-                    al_draw_bitmap_region(b, firstx, firsty << 1, xsize, ysize << 1, 0, 0, 0);
-                    break;
-                case VDT_SCANLINES:
-                    al_unlock_bitmap(b);
-                    al_set_target_bitmap(scrshotb);
-                    c = 0;
-                    for (int y = firsty; y < lasty; y++) {
-                        al_draw_bitmap_region(b, firstx, y, xsize, 1, 0, c, 0);
-                        c += 2;
-                    }
-                    break;
-                case VDT_LINEDOUBLE:
-                    line_double();
-                    al_unlock_bitmap(b);
-                    al_draw_scaled_bitmap(b, firstx, firsty << 1, xsize, ysize << 1, 0, 0, xsize, ysize << 1, 0);
-                    break;
-            }
-            region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_WRITEONLY);
+        switch(vid_colour_out) {
+            case VDC_RGB:
+                al_set_target_bitmap(scrshotb);
+                switch(vid_dtype_intern) {
+                    case VDT_SCALE:
+                        al_unlock_bitmap(b);
+                        al_draw_scaled_bitmap(b, firstx, firsty, xsize, ysize, 0, 0, xsize, ysize << 1, 0);
+                        break;
+                    case VDT_INTERLACE:
+                        al_unlock_bitmap(b);
+                        al_draw_bitmap_region(b, firstx, firsty << 1, xsize, ysize << 1, 0, 0, 0);
+                        break;
+                    case VDT_SCANLINES:
+                        al_unlock_bitmap(b);
+                        for (int c = 0, y = firsty; y < lasty; y++, c += 2)
+                            al_draw_bitmap_region(b, firstx, y, xsize, 1, 0, c, 0);
+                        break;
+                    case VDT_LINEDOUBLE:
+                        line_double();
+                        al_unlock_bitmap(b);
+                        al_draw_scaled_bitmap(b, firstx, firsty << 1, xsize, ysize << 1, 0, 0, xsize, ysize << 1, 0);
+                        break;
+                }
+                region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_WRITEONLY);
+                break;
+            case VDC_PAL:
+                switch(vid_dtype_intern) {
+                    case VDT_SCALE+VDC_RGB:
+                        pal_convert(firstx, firsty, lastx, lasty, 1);
+                        al_set_target_bitmap(scrshotb);
+                        al_draw_scaled_bitmap(b32, firstx, firsty, xsize, ysize, 0, 0, xsize, ysize << 1, 0);
+                        break;
+                    case VDT_INTERLACE:
+                        pal_convert(firstx, firsty << 1, lastx, lasty << 1, 1);
+                        al_set_target_bitmap(scrshotb);
+                        al_draw_bitmap_region(b32, firstx, firsty << 1, xsize, ysize << 1, 0, 0, 0);
+                        break;
+                    case VDT_SCANLINES:
+                        pal_convert(firstx, firsty, lastx, lasty, 1);
+                        al_set_target_bitmap(scrshotb);
+                        for (int c = 0, y = firsty; y < lasty; y++, c += 2)
+                            al_draw_bitmap_region(b32, firstx, y, xsize, 1, 0, c, 0);
+                        break;
+                    case VDT_LINEDOUBLE:
+                        line_double();
+                        pal_convert(firstx, firsty << 1, lastx, lasty << 1, 1);
+                        al_set_target_bitmap(scrshotb);
+                        al_draw_bitmap_region(b32, firstx, firsty << 1, xsize, ysize << 1, 0, 0, 0);
+                        break;
+                }
+                break;
+            case VDC_GREEN:
+                mono_col = mono_green_col;
+                goto mono_screenshot;
+            case VDC_AMBER:
+                mono_col = mono_amber_col;
+                goto mono_screenshot;
+            case VDC_WHITE:
+                mono_col = mono_white_col;
+            mono_screenshot:
+                switch(vid_dtype_intern) {
+                    case VDT_SCALE:
+                        mono_convert(firstx, firsty, lastx, lasty, mono_col);
+                        al_set_target_bitmap(scrshotb);
+                        al_draw_scaled_bitmap(b32, firstx, firsty, xsize, ysize, 0, 0, xsize, ysize << 1, 0);
+                        break;
+                    case VDT_INTERLACE:
+                        mono_convert(firstx, firsty << 1, lastx, lasty << 1, mono_col);
+                        al_set_target_bitmap(scrshotb);
+                        al_draw_bitmap_region(b32, firstx, firsty << 1, xsize, ysize << 1, 0, 0, 0);
+                        break;
+                    case VDT_SCANLINES:
+                        mono_convert(firstx, firsty, lastx, lasty, mono_col);
+                        al_set_target_bitmap(scrshotb);
+                        for (int c = 0, y = firsty; y < lasty; y++, c += 2)
+                            al_draw_bitmap_region(b32, firstx, y, xsize, 1, 0, c, 0);
+                        break;
+                    case VDT_LINEDOUBLE:
+                        line_double();
+                        mono_convert(firstx, firsty << 1, lastx, lasty << 1, mono_col);
+                        al_set_target_bitmap(scrshotb);
+                        al_draw_bitmap_region(b32, firstx, firsty << 1, xsize, ysize << 1, 0, 0, 0);
+                        break;
+                }
+                break;
         }
         al_save_bitmap(vid_scrshotname, scrshotb);
         al_destroy_bitmap(scrshotb);
@@ -391,58 +445,95 @@ static inline void blit_screen(void)
 {
     int xsize = lastx - firstx;
     int ysize = lasty - firsty + 1;
+    ALLEGRO_COLOR mono_col;
 
-    if (vid_pal) {
-        switch(vid_dtype_intern) {
-            case VDT_SCALE:
-                pal_convert(firstx, firsty, lastx, lasty, 1);
-                al_set_target_backbuffer(al_get_current_display());
-                al_draw_scaled_bitmap(b32, firstx, firsty, xsize, ysize, scr_x_start, scr_y_start, scr_x_size, scr_y_size, 0);
-                break;
-            case VDT_INTERLACE:
-                pal_convert(firstx, firsty << 1, lastx, lasty << 1, 1);
-                upscale_only(b32, firstx, firsty << 1, xsize, ysize << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
-                break;
-            case VDT_SCANLINES:
-                pal_convert(firstx, firsty, lastx, lasty, 1);
-                al_set_target_bitmap(b16);
-                al_clear_to_color(al_map_rgb(0, 0,0));
-                for (int c = firsty; c < lasty; c++)
-                    al_draw_bitmap_region(b32, firstx, c, lastx - firstx, 1, 0, c << 1, 0);
-                upscale_only(b16, 0, firsty << 1, xsize, ysize << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
-                break;
-            case VDT_LINEDOUBLE:
-                line_double();
-                pal_convert(firstx, firsty << 1, lastx, lasty << 1, 1);
-                upscale_only(b32, firstx, firsty << 1, xsize, ysize << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
-                break;
-        }
-    }
-    else {
-        switch(vid_dtype_intern) {
-            case VDT_SCALE:
-                al_unlock_bitmap(b);
-                al_set_target_backbuffer(al_get_current_display());
-                al_draw_scaled_bitmap(b, firstx, firsty, xsize, ysize, scr_x_start, scr_y_start, scr_x_size, scr_y_size, 0);
-                break;
-            case VDT_INTERLACE:
-                al_unlock_bitmap(b);
-                upscale_only(b, firstx, firsty << 1, lastx - firstx, (lasty - firsty) << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
-                break;
-            case VDT_SCANLINES:
-                al_unlock_bitmap(b);
-                al_set_target_bitmap(b16);
-                al_clear_to_color(border_col);
-                for (int c = firsty; c < lasty; c++)
-                    al_draw_bitmap_region(b, firstx, c, xsize, 1, 0, c << 1, 0);
-                upscale_only(b16, 0, firsty << 1, lastx - firstx, (lasty - firsty) << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
-                break;
-            case VDT_LINEDOUBLE:
-                line_double();
-                al_unlock_bitmap(b);
-                upscale_only(b, firstx, firsty << 1, xsize, ysize  << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
-        }
-        region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_WRITEONLY);
+    switch(vid_colour_out) {
+        case VDC_RGB:
+            switch(vid_dtype_intern) {
+                case VDT_SCALE:
+                    al_unlock_bitmap(b);
+                    al_set_target_backbuffer(al_get_current_display());
+                    al_draw_scaled_bitmap(b, firstx, firsty, xsize, ysize, scr_x_start, scr_y_start, scr_x_size, scr_y_size, 0);
+                    break;
+                case VDT_INTERLACE:
+                    al_unlock_bitmap(b);
+                    upscale_only(b, firstx, firsty << 1, lastx - firstx, (lasty - firsty) << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
+                    break;
+                case VDT_SCANLINES:
+                    al_unlock_bitmap(b);
+                    al_set_target_bitmap(b16);
+                    al_clear_to_color(border_col);
+                    for (int c = firsty; c < lasty; c++)
+                        al_draw_bitmap_region(b, firstx, c, xsize, 1, 0, c << 1, 0);
+                    upscale_only(b16, 0, firsty << 1, lastx - firstx, (lasty - firsty) << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
+                    break;
+                case VDT_LINEDOUBLE:
+                    line_double();
+                    al_unlock_bitmap(b);
+                    upscale_only(b, firstx, firsty << 1, xsize, ysize  << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
+            }
+            region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_WRITEONLY);
+            break;
+        case VDC_PAL:
+            switch(vid_dtype_intern) {
+                case VDT_SCALE:
+                    pal_convert(firstx, firsty, lastx, lasty, 1);
+                    al_set_target_backbuffer(al_get_current_display());
+                    al_draw_scaled_bitmap(b32, firstx, firsty, xsize, ysize, scr_x_start, scr_y_start, scr_x_size, scr_y_size, 0);
+                    break;
+                case VDT_INTERLACE:
+                    pal_convert(firstx, firsty << 1, lastx, lasty << 1, 1);
+                    upscale_only(b32, firstx, firsty << 1, xsize, ysize << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
+                    break;
+                case VDT_SCANLINES:
+                    pal_convert(firstx, firsty, lastx, lasty, 1);
+                    al_set_target_bitmap(b16);
+                    al_clear_to_color(al_map_rgb(0, 0,0));
+                    for (int c = firsty; c < lasty; c++)
+                        al_draw_bitmap_region(b32, firstx, c, lastx - firstx, 1, 0, c << 1, 0);
+                    upscale_only(b16, 0, firsty << 1, xsize, ysize << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
+                    break;
+                case VDT_LINEDOUBLE:
+                    line_double();
+                    pal_convert(firstx, firsty << 1, lastx, lasty << 1, 1);
+                    upscale_only(b32, firstx, firsty << 1, xsize, ysize << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
+                    break;
+            }
+            break;
+        case VDC_GREEN:
+            mono_col = mono_green_col;
+            goto mono_common;
+        case VDC_AMBER:
+            mono_col = mono_amber_col;
+            goto mono_common;
+        case VDC_WHITE:
+            mono_col = mono_white_col;
+        mono_common:
+            switch(vid_dtype_intern) {
+                case VDT_SCALE:
+                    mono_convert(firstx, firsty, lastx, lasty, mono_col);
+                    al_set_target_backbuffer(al_get_current_display());
+                    al_draw_scaled_bitmap(b32, firstx, firsty, xsize, ysize, scr_x_start, scr_y_start, scr_x_size, scr_y_size, 0);
+                    break;
+                case VDT_INTERLACE:
+                    mono_convert(firstx, firsty << 1, lastx, lasty << 1, mono_col);
+                    upscale_only(b32, firstx, firsty << 1, xsize, ysize << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
+                    break;
+                case VDT_SCANLINES:
+                    mono_convert(firstx, firsty, lastx, lasty, mono_col);
+                    al_set_target_bitmap(b16);
+                    al_clear_to_color(al_map_rgb(0, 0,0));
+                    for (int c = firsty; c < lasty; c++)
+                        al_draw_bitmap_region(b32, firstx, c, lastx - firstx, 1, 0, c << 1, 0);
+                    upscale_only(b16, 0, firsty << 1, xsize, ysize << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
+                    break;
+                case VDT_LINEDOUBLE:
+                    line_double();
+                    mono_convert(firstx, firsty << 1, lastx, lasty << 1, mono_col);
+                    upscale_only(b32, firstx, firsty << 1, xsize, ysize << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
+                    break;
+
+            }
     }
 }
 
