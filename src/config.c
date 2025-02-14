@@ -215,8 +215,7 @@ void config_load(void)
     vdfs_enabled     = get_config_bool("disc", "vdfsenable", 0);
     vdfs_cfg_root    = get_config_string("disc", "vdfs_root", 0);
 
-    keyas            = get_config_bool(NULL, "key_as",        0);
-    keylogical       = get_config_bool(NULL, "key_logical",   0);
+    keyas            = get_config_bool(NULL, "key_as", 0);
     keypad           = get_config_bool(NULL, "keypad", false);
 
     mem_jim_setsize(get_config_int(NULL, "jim_mem_size", 0));
@@ -225,6 +224,9 @@ void config_load(void)
     mouse_stick      = get_config_bool(NULL, "mouse_stick",   0);
     kbdips           = get_config_int(NULL, "kbdips", 0);
 
+    key_mode         = get_config_int(NULL, "key_mode", -1);
+    if (key_mode  == -1)
+        key_mode = get_config_bool(NULL, "key_logical", false) ? BKM_HYBRID : BKM_PHYSICAL;
     for (int act = 0; act < KEY_ACTION_MAX; act++) {
         const char *str = al_get_config_value(bem_cfg, "key_actions", keyact_const[act].name);
         if (str) {
@@ -370,8 +372,8 @@ void config_save(void)
             set_config_string("disc", "vdfs_root", vdfs_root);
 
         set_config_bool(NULL, "key_as", keyas);
-        set_config_bool(NULL, "key_logical", keylogical);
         set_config_bool(NULL, "keypad", keypad);
+        set_config_int(NULL, "key_mode", key_mode);
         set_config_int(NULL, "jim_mem_size", mem_jim_size);
 
         set_config_bool(NULL, "mouse_amx", mouse_amx);

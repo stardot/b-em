@@ -24,8 +24,16 @@ extern struct key_act_lookup keyactions[KEY_ACTION_MAX];
 extern const uint8_t key_allegro2bbc[ALLEGRO_KEY_MAX];
 extern uint8_t keylookup[ALLEGRO_KEY_MAX];
 extern bool keyas;
-extern bool keylogical;
 extern bool keypad;
+
+typedef enum {
+    BKM_PHYSICAL,
+    BKM_HYBRID,
+    BKM_LOGICAL
+} bem_key_mode;
+
+extern bem_key_mode key_mode;
+extern const char *bem_key_modes[4];
 
 extern int key_map_keypad(const ALLEGRO_EVENT *event);
 extern void key_down_event(const ALLEGRO_EVENT *event);
