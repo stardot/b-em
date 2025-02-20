@@ -111,7 +111,7 @@ static void *mem_thread_proc(ALLEGRO_THREAD *thread, void *data)
     if ((mem_disp = al_create_display(256, 256))) {
         al_set_new_bitmap_flags(ALLEGRO_VIDEO_BITMAP);
         if ((bitmap = al_create_bitmap(256, 256))) {
-            while (!quitting && !al_get_thread_should_stop(thread)) {
+            while (!al_get_thread_should_stop(thread)) {
                 al_rest(0.02);
                 al_set_target_bitmap(bitmap);
                 if ((region = al_lock_bitmap(bitmap, ALLEGRO_PIXEL_FORMAT_ANY, ALLEGRO_LOCK_WRITEONLY))) {
