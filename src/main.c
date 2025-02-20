@@ -767,7 +767,7 @@ void main_resume(void)
 
 void main_setquit(void)
 {
-    quitting = 1;
+    quitting = true;
 }
 
 int main(int argc, char **argv)
