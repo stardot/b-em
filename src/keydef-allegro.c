@@ -231,6 +231,7 @@ static const key_dlg_t master_kbd_dlg = { kcaps_master, kcaps_master + MASTER_NK
 #define BTN_OK_X  201
 #define BTN_CAN_X 267
 
+static ALLEGRO_THREAD *keydef_thread;
 static ALLEGRO_FONT *font;
 static ALLEGRO_EVENT_SOURCE uevsrc;
 
@@ -319,7 +320,7 @@ static bool mouse_within(ALLEGRO_EVENT *event, int x, int y, int w, int h)
     return event->mouse.x >= x && event->mouse.x <= x+w && event->mouse.y >= y && event->mouse.y <= y+h;
 }
 
-static void *keydef_thread(ALLEGRO_THREAD *thread, void *tdata)
+static void *keydef_thread_proc(ALLEGRO_THREAD *thread, void *tdata)
 {
     const key_dlg_t *key_dlg;
     ALLEGRO_DISPLAY *display;
@@ -432,20 +433,24 @@ static void *keydef_thread(ALLEGRO_THREAD *thread, void *tdata)
 
 void gui_keydefine_open(void)
 {
-    ALLEGRO_THREAD *thread;
-
-    if ((thread = al_create_thread(keydef_thread, NULL))) {
-        keydefining = true;
-        al_start_thread(thread);
+    if (!keydef_thread) {
+        if ((keydef_thread = al_create_thread(keydef_thread_proc, NULL))) {
+            keydefining = true;
+            al_start_thread(keydef_thread);
+        }
     }
 }
 
 void gui_keydefine_close(void)
 {
-    ALLEGRO_EVENT event;
+    if (keydef_thread) {
+        ALLEGRO_EVENT event;
 
-    event.type = ALLEGRO_EVENT_DISPLAY_CLOSE;
-    al_emit_user_event(&uevsrc, &event, NULL);
+        event.type = ALLEGRO_EVENT_DISPLAY_CLOSE;
+        al_emit_user_event(&uevsrc, &event, NULL);
+        al_join_thread(keydef_thread, NULL);
+        keydef_thread = NULL;
+    }
 }
 
 int keydef_lookup_name(const char *name)
