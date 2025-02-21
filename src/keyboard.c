@@ -36,9 +36,18 @@
  * 0x60  Tab       Z     SPC   V    B    M    <,   >.   /?   Copy    KP 0   KP 1   KP 3
  * 0x70  ESC       f1    f2    f3   f5   f6   f8   f9   \    Right   KP 4   KP 5   KP 2
  *
-*/
+ * In the two keymaps that follow, one for physical mode and one for
+ * hybrid/physical mode, the matrix values are encoded as in the
+ * above table, i.e. the upper 4 bits are the row number and the
+ * lower 4 bits are the column number.
+ */
 
-/* This keymap is used for physical mode. */
+/* This keymap is used for physical mode.
+ *
+ * This uses a single rogue value, 0xaa, that cannot correspond
+ * to a real key, to indicate that the key event from Allegro
+ * should be ignored rather than translating to a BBC micro keypress.
+ */
 
 const uint8_t key_allegro2bbc[ALLEGRO_KEY_MAX] =
 {
@@ -271,16 +280,17 @@ const uint8_t key_allegro2bbc[ALLEGRO_KEY_MAX] =
     0x40,   // 226  ALLEGRO_KEY_CAPSLOCK
 };
 
-// Mapping from Allegro to BBC keycodes for logical keyboard mode. We
-// use two invalid keycodes to indicate special actions:
-// - 0xaa causes us to fake the necessary keypresses to type the ASCII
-//   character we got from the ALLEGRO_EVENT_KEY_CHAR event.
-// - 0xbb causes us to ignore the key.
-// Valid keycodes cause the logical keyboard code to press and release
-// the key for that keycode.
-//
-// Note that not all keys generate an ALLEGRO_EVENT_KEY_CHAR, so some
-// of the entries in this table can never be accessed.
+/* Mapping from Allegro to BBC keycodes for logical and hybrid keyboard
+ * modes.  We use two invalid keycodes to indicate special actions:
+ * - 0xaa causes us to fake the necessary keypresses to type the ASCII
+ *        character we got from the ALLEGRO_EVENT_KEY_CHAR event.
+ * - 0xbb causes us to ignore the key.
+ * Valid keycodes cause the logical keyboard code to press and release
+ * the key for that keycode.
+
+ * Note that not all keys generate an ALLEGRO_EVENT_KEY_CHAR, so some
+ * of the entries in this table can never be accessed.
+ */
 
 static const uint8_t allegro2bbclogical[ALLEGRO_KEY_MAX] =
 {
@@ -581,7 +591,7 @@ static const uint16_t ascii2bbc[] =
     0x24,           // 0x37 7
     0x15,           // 0x38 8
     0x26,           // 0x39 9
-    0x48,           // 0x3a *
+    0x48,           // 0x3a :
     0x57,           // 0x3b ;
     0x66|A2B_SHIFT, // 0x3c <
     0x17|A2B_SHIFT, // 0x3D =
