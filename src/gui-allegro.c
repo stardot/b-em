@@ -136,7 +136,8 @@ static ALLEGRO_MENU *create_file_menu(void)
 static ALLEGRO_MENU *create_edit_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
-    al_append_menu_item(menu, "Paste via keyboard", IDM_EDIT_PASTE, 0, NULL, NULL);
+    al_append_menu_item(menu, "Paste via OS", IDM_EDIT_PASTE_OS, 0, NULL, NULL);
+    al_append_menu_item(menu, "Paste via keyboard", IDM_EDIT_PASTE_KB, 0, NULL, NULL);
     add_checkbox_item(menu, "Printer to clipboard", IDM_EDIT_COPY, prt_clip_str);
     return menu;
 }
@@ -800,7 +801,7 @@ static void toggle_record(ALLEGRO_EVENT *event, sound_rec_t *rec)
     }
 }
 
-static void edit_paste_start(ALLEGRO_EVENT *event)
+static void edit_paste_start(ALLEGRO_EVENT *event, void (*paste_start)(char *str))
 {
     ALLEGRO_DISPLAY *display = (ALLEGRO_DISPLAY *)(event->user.data2);
     char *text = al_get_clipboard_text(display);
@@ -811,7 +812,7 @@ static void edit_paste_start(ALLEGRO_EVENT *event)
     }
 #endif
     if (text)
-        os_paste_start(text);
+        paste_start(text);
 }
 
 static void edit_print_clip(ALLEGRO_EVENT *event)
@@ -1248,8 +1249,11 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
         case IDM_FILE_EXIT:
             quitting = true;
             break;
-        case IDM_EDIT_PASTE:
-            edit_paste_start(event);
+        case IDM_EDIT_PASTE_OS:
+            edit_paste_start(event, os_paste_start);
+            break;
+        case IDM_EDIT_PASTE_KB:
+            edit_paste_start(event, key_paste_start);
             break;
         case IDM_EDIT_COPY:
             edit_print_clip(event);

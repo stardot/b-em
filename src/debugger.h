@@ -6,7 +6,7 @@ extern void debug_kill(void);
 extern void debug_end(void);
 extern void debug_toggle_core(void);
 extern void debug_toggle_tube(void);
-extern void debug_paste(const char *str);
+extern void debug_paste(const char *str, void (*paste_start)(char *str));
 
 extern int readc[65536], writec[65536], fetchc[65536];
 

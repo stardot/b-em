@@ -14,6 +14,7 @@
 #include "mem.h"
 #include "model.h"
 #include "6502.h"
+#include "keyboard.h"
 #include "debugger_symbols.h"
 
 #include <allegro5/allegro_primitives.h>
@@ -709,7 +710,7 @@ static void list_points(cpu_debug_t *cpu, break_type type, const char *desc)
             print_point(cpu, bp, desc, "");
 }
 
-void debug_paste(const char *iptr)
+void debug_paste(const char *iptr, void (*paste_start)(char *str))
 {
     int ch = *iptr++;
     if (ch) {
@@ -740,7 +741,7 @@ void debug_paste(const char *iptr)
                 ch = *iptr++;
             } while (ch);
             *dptr = '\0';
-            os_paste_start(str);
+            paste_start(str);
         }
     }
 }
@@ -1466,7 +1467,9 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
 
             case 'p':
                 if (!strncmp(cmd, "paste", cmdlen))
-                    debug_paste(iptr);
+                    debug_paste(iptr, os_paste_start);
+                else if (!strncmp(cmd, "pastek", cmdlen))
+                    debug_paste(iptr, key_paste_start);
                 else if (!strncmp(cmd, "profile", cmdlen))
                     debugger_profile(cpu, iptr);
                 else

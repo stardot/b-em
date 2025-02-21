@@ -40,6 +40,7 @@ extern void key_down_event(const ALLEGRO_EVENT *event);
 extern void key_char_event(const ALLEGRO_EVENT *event);
 extern void key_up_event(const ALLEGRO_EVENT *event);
 extern void key_lost_focus(void);
+extern void key_paste_start(char *str);
 
 extern void key_down(uint8_t code);
 extern void key_up(uint8_t code);

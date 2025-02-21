@@ -157,7 +157,8 @@ static const char helptext[] =
     "-debug          - start debugger\n"
     "-debugtube      - start debugging tube processor\n"
     "-exec file      - debugger to execute file\n"
-    "-paste string   - paste string in as if typed\n"
+    "-paste string   - paste string in as if typed (via OS)\n"
+    "-pastek string  - paste string in as if typed (via KB)\n"
     "-vroot host-dir - set the VDFS root\n"
     "-vdir guest-dir - set the initial (boot) dir in VDFS\n\n";
 
@@ -305,6 +306,8 @@ void main_init(int argc, char *argv[])
             vdfsnext = 2;
         else if (!strcasecmp(argv[c], "-paste"))
             pastenext = 1;
+        else if (!strcasecmp(argv[c], "-pastek"))
+            pastenext = 2;
         else if (tapenext) {
             if (tape_fn)
                 al_destroy_path(tape_fn);
@@ -328,7 +331,7 @@ void main_init(int argc, char *argv[])
             vdfsnext = 0;
         }
         else if (pastenext)
-            debug_paste(argv[c]);
+            debug_paste(argv[c], pastenext == 2 ? key_paste_start : os_paste_start);
         else {
             path = al_create_path(argv[c]);
             ext = al_get_path_extension(path);
