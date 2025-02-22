@@ -1,4 +1,3 @@
-#define _DEBUG
 #include "b-em.h"
 #include "main.h"
 #include "via.h"
@@ -908,7 +907,7 @@ static char *key_paste_chars(char *ptr, size_t len)
                 uint_least8_t vkey = bbc_keys & 0xff;
                 key_paste_add_combo(vkey, bbc_keys & A2B_SHIFT, bbc_keys & A2B_CTRL);
                 key_paste_add_vkey_up(vkey);
-                log_debug("keyboardkey_paste_chars, new key_paste_buf_size=%ld", key_paste_buf_size);
+                log_debug("keyboard: key_paste_chars, new key_paste_buf_size=%ld", key_paste_buf_size);
             }
         }
     }
@@ -1188,8 +1187,13 @@ void key_up_event(const ALLEGRO_EVENT *event)
     }
 }
 
+static int key_paste_count;
+
 void key_paste_poll(void)
 {
+    if (OS01 && key_paste_count++ & 1)
+        return;
+
     uint8_t vkey;
     //log_debug("keyboard: key_paste_poll kp_state=%d", kp_state);
 
