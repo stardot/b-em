@@ -714,7 +714,7 @@ void debug_paste(const char *iptr, void (*paste_start)(char *str))
 {
     int ch = *iptr++;
     if (ch) {
-        char *str = al_malloc(strlen(iptr) + 1);
+        char *str = al_malloc(strlen(iptr) + 2);
         if (str) {
             char *dptr = str;
             do {
@@ -727,6 +727,7 @@ void debug_paste(const char *iptr, void (*paste_start)(char *str))
                         if (!(ch = *iptr++))
                             break;
                         if (ch == '|') {
+
                             if (ch =='?')
                                 ch = 0x7f;
                             else if (ch != '"')
