@@ -727,7 +727,7 @@ void debug_paste(const char *iptr, void (*paste_start)(char *str))
                         if (!(ch = *iptr++))
                             break;
                         if (ch == '|') {
-
+                            ch = *iptr++;
                             if (ch =='?')
                                 ch = 0x7f;
                             else if (ch != '"')
