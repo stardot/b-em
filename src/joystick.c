@@ -1,3 +1,4 @@
+#define _DEBUG
 /*
  * B-Em Joystick Mapping
  *
@@ -46,7 +47,6 @@ int joymap_index[2] = {0, 0};
 int joystick_count;
 int joystick_index[2] = {-1, -1};
 const char ** joystick_names;
-
 
 static void *js_malloc(size_t size)
 {
@@ -214,14 +214,13 @@ static void free_joysticks()
 
 static void init_joysticks(void)
 {
-    int js_num, js_used = 0;
-    joystick_map_t *jsptr;
-    ALLEGRO_JOYSTICK *js;
+    int js_used = 0;
 
-    jsptr = joystick_map = js_malloc(joystick_count * sizeof(joystick_map_t));
+    joystick_map_t *jsptr = joystick_map = js_malloc(joystick_count * sizeof(joystick_map_t));
     joystick_names = js_malloc(joystick_count * sizeof(joystick_names[0]));
-    for (js_num = 0; js_num < joystick_count; js_num++) {
-        if ((js = al_get_joystick(js_num)) && al_get_joystick_active(js)) {
+    for (int js_num = 0; js_num < joystick_count; js_num++) {
+        ALLEGRO_JOYSTICK *js = al_get_joystick(js_num);
+        if (js && al_get_joystick_active(js)) {
             jsptr->js_id = js;
             joystick_names[js_num] = al_get_joystick_name(js);
             if (!strncmp(joystick_names[js_num], hori_fighting_stick_allegro_name, 63)) // name seems t be meaningless!
@@ -338,20 +337,21 @@ void joystick_init(ALLEGRO_EVENT_QUEUE *queue)
 void joystick_rescan_sticks()
 {
     ALLEGRO_JOYSTICK * ids[2] = {-1 == joystick_index[0] ? NULL : joystick_map[joystick_index[0]].js_id, -1 == joystick_index[1] ? NULL : joystick_map[joystick_index[1]].js_id};
-    int j;
     if (!al_reconfigure_joysticks()) return;
     free_joysticks();
-    init_joysticks();
-    joystick_index[0] = joystick_index[1] = -1;
-    for (j = 0; j < joystick_count; ++j)
-    {
-        if (joystick_map[j].js_id == ids[0])
-            joystick_index[0] = j;
-        if (joystick_map[j].js_id == ids[1])
-            joystick_index[1] = j;
+    if ((joystick_count = al_get_num_joysticks())) {
+        init_joysticks();
+        joystick_index[0] = joystick_index[1] = -1;
+        for (int j = 0; j < joystick_count; ++j)
+        {
+            if (joystick_map[j].js_id == ids[0])
+                joystick_index[0] = j;
+            if (joystick_map[j].js_id == ids[1])
+                joystick_index[1] = j;
+        }
+        remap_joystick(0);
+        remap_joystick(1);
     }
-    remap_joystick(0);
-    remap_joystick(1);
 }
 
 void joystick_axis(ALLEGRO_EVENT *event)
