@@ -202,14 +202,15 @@ static void free_joysticks()
 {
     while (joystick_map != joystick_end--)
     {
-        int j;
         free(joystick_end->js_btns);
-        for (j = 0; j < joystick_end->num_stick; ++j)
+        for (int j = 0; j < joystick_end->num_stick; ++j)
             free(joystick_end->js_sticks[j].axes_map);
         free(joystick_end->js_sticks);
     }
     free(joystick_map);
     joystick_map = joystick_end = NULL;
+    joystick_index[0] = -1;
+    joystick_index[1] = -1;
 }
 
 static void init_joysticks(void)
