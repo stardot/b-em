@@ -1413,8 +1413,9 @@ static void hfe_poll_drive(int drive, bool is_selected)
     }
 
   struct hfe_poll_state *state = &hfe_info[drive]->state;
-  if (--state->poll_calls_until_next_action)
+  if (state->poll_calls_until_next_action)
     {
+      --state->poll_calls_until_next_action;
       return;
     }
   else
