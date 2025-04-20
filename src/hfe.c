@@ -305,27 +305,6 @@ static int hfe_selected_drive;
    once. */
 static bool write_warning_issued = false;
 
-
-#ifdef DUMP_TRACK
-void dump_memory(unsigned char *p, size_t len, size_t location)
-{
-  enum { STRIDE = 32 };
-  while (len)
-    {
-      int bytes_to_dump = (len > STRIDE) ? STRIDE : len;
-      printf("%08lX ", (unsigned long)location);
-      location += bytes_to_dump;
-
-      while (bytes_to_dump--)
-        {
-          printf("%02X", (unsigned)*p++);
-          --len;
-        }
-      printf("\n");
-    }
-}
-#endif
-
 static unsigned short le_word(const unsigned char** pp)
 {
   const unsigned char *p = *pp;
@@ -878,7 +857,7 @@ static void hfe_seek(int drive, int track)
       return;
     }
 #ifdef DUMP_TRACK
-  dump_memory(trackbits, track_len, 0);
+  log_dump("hfe: track", trackbits, track_len);
 #endif
   if (hfe_info[drive]->track_data)
     {
@@ -1071,7 +1050,7 @@ static void hfe_readaddress(int drive, int track, int side, int density)
   addr.side = side;
   addr.sector = SECTOR_ACCEPT_ANY;
   start_sector_op(drive, density, ROP_READ_JUST_ADDR, addr, "readaddress",
-  set_up_for_sector_id_scan);
+                  set_up_for_sector_id_scan);
 }
 
 unsigned long crc_cycle(unsigned long crc)

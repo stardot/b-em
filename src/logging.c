@@ -136,14 +136,22 @@ void log_debug(const char *fmt, ...)
 static char dmp_malloc[] = "log_dump: out of space, data dump omitted";
 static const char xdigs[] = "0123456789ABCDEF";
 
+static void log_dump_offset(char *ptr, size_t offset)
+{
+    for (int dig = 0; dig < 8; ++dig) {
+        *--ptr = xdigs[offset & 0x0f];
+        offset >>= 4;
+    }
+}
+
 void log_dump(const char *prefix, uint8_t *data, size_t size)
 {
     unsigned opt = log_options & ll_debug.mask;
     if (opt) {
         unsigned dest = opt >> ll_debug.shift;
         size_t pfxlen = strlen(prefix);
-        size_t totlen = pfxlen + 64;
-        char buf[100], *buffer = buf, *hexbase, *ascbase;
+        size_t totlen = pfxlen + 75;
+        char buf[100], *buffer = buf;
         if (totlen > sizeof(buf)) {
             buffer = malloc(totlen);
             if (!buffer) {
@@ -152,9 +160,15 @@ void log_dump(const char *prefix, uint8_t *data, size_t size)
             }
         }
         memcpy(buffer, prefix, pfxlen);
-        hexbase = buffer + pfxlen;
-        ascbase = hexbase + 48;
+        buffer[pfxlen] = ' ';
+        size_t offset = 0;
+        char *offbase = buffer + pfxlen + 9;
+        char *hexbase = offbase;
+        *hexbase++ = ':';
+        *hexbase++ = ' ';
+        char *ascbase = hexbase + 48;
         while (size >= 16) {
+            log_dump_offset(offbase, offset);
             char *hexptr = hexbase;
             char *ascptr = ascbase;
             for (int i = 0; i < 16; i++) {
@@ -168,8 +182,10 @@ void log_dump(const char *prefix, uint8_t *data, size_t size)
             }
             log_common(dest, ll_debug.name, buffer, totlen);
             size -= 16;
+            offset += 16;
         }
         if (size > 0) {
+            log_dump_offset(offbase, offset);
             char *hexptr = hexbase;
             char *ascptr = ascbase;
             size_t pad = 16 - size;
