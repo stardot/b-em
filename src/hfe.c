@@ -1,3 +1,4 @@
+#define _DEBUG
 /*
   HFE disc support
 
@@ -1120,8 +1121,8 @@ static void handle_sector_id_byte(int drive, unsigned char value, bool yield_byt
                 drive, value, state->target.track, (ok ? "yes" : "no"));
       if (!ok)
         {
-          log_warn("hfe: found sector address for track %u when looking for track %d",
-                   (unsigned int)value, state->target.track);
+          log_warn("hfe: found sector address for track %u when looking for track %d, track_data=%p",
+                   (unsigned int)value, state->target.track, hfe_info[drive]->track_data);
         }
       break;
 
@@ -1269,7 +1270,7 @@ static void handle_sector_data_byte(int drive, unsigned char value)
   if (offset == 0)
     {
       /* This is the address mark. */
-      if (value == ADDRESS_MARK_DATA_REC)
+      if (value == ADDRESS_MARK_DATA_REC || value == ADDRESS_MARK_CONTROL_REC)
         {
           /* All good.  We don't pass this byte back to the FDC, so
              just note that we read it already and return. */
@@ -1277,25 +1278,14 @@ static void handle_sector_data_byte(int drive, unsigned char value)
           return;
         }
 
-      if (value == ADDRESS_MARK_CONTROL_REC)
-        {
-          log_warn("hfe: drive %d: side %d track %2d sector %d: "
-                   "foud a control record; scanning again for the same "
-                   "address.",
-                   drive, state->target.side, state->target.track,
-                   state->target.sector);
-        }
-      else
-        {
-          /* This can (in principle) happen because the scan_mask
-             value we used to scan for the address mark had some zero
-             bits in the least significant nibble. */
-          log_warn("hfe: drive %d: side %d track %2d sector %d: "
-                   "unexpected address mark 0x%02X; scanning again "
-                   "for the same address.",
-                   drive, state->target.side, state->target.track,
-                   state->target.sector, (unsigned)value);
-        }
+      /* This can (in principle) happen because the scan_mask
+         value we used to scan for the address mark had some zero
+         bits in the least significant nibble. */
+      log_warn("hfe: drive %d: side %d track %2d sector %d: "
+               "unexpected address mark 0x%02X; scanning again "
+               "for the same address.",
+               drive, state->target.side, state->target.track,
+               state->target.sector, (unsigned)value);
       /* We need to go back to scanning for a sector.  The address
          and density setting will be unchanged since we're still
          scanning for the same sector that we were before. */
