@@ -1,4 +1,3 @@
-#define _DEBUG
 /*
   HFE disc support
 
