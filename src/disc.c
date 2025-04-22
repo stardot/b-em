@@ -11,11 +11,11 @@
 
 #include "ddnoise.h"
 
-DRIVE drives[2];
+DRIVE drives[NUM_DRIVES];
 
 int curdrive = 0;
 
-ALLEGRO_PATH *discfns[2] = { NULL, NULL };
+ALLEGRO_PATH *discfns[NUM_DRIVES] = { NULL, NULL };
 bool defaultwriteprot = false;
 int writeprot[NUM_DRIVES], fwriteprot[NUM_DRIVES];
 
@@ -119,7 +119,7 @@ void disc_poll()
         }
 }
 
-int oldtrack[2] = {0, 0};
+int oldtrack[NUM_DRIVES] = {0, 0};
 void disc_seek(int drive, int track)
 {
         if (drives[drive].seek)
