@@ -3,26 +3,31 @@
 
 #define NUM_DRIVES 2
 
-/*
- * The following structure defines the interface between this disc module
- * and the modules that implement specifc disc file formats.
- */
-
 typedef struct
 {
-        void (*close)(int drive);
-        void (*seek)(int drive, int track);
-        void (*readsector)(int drive, int sector, int track, int side, int density);
-        void (*writesector)(int drive, int sector, int track, int side, int density);
-        void (*readaddress)(int drive, int track, int side, int density);
-        void (*format)(int drive, int track, int side, unsigned par2);
-        void (*writetrack)(int drive, int track, int side, int density);
-        void (*readtrack)(int drive, int track, int side, int density);
-        void (*poll)(void);
-        void (*abort)(int drive);
-        void (*spinup)(int drive);
-        void (*spindown)(int drive);
-        int (*verify)(int drive, int track, int density);
+    /*
+     * The following function pointers defines the interface between this disc
+     * odule and the modules that implement specifc disc file formats.
+     */
+    void (*close)(int drive);
+    void (*seek)(int drive, int track);
+    void (*readsector)(int drive, int sector, int track, int side, int density);
+    void (*writesector)(int drive, int sector, int track, int side, int density);
+    void (*readaddress)(int drive, int track, int side, int density);
+    void (*format)(int drive, int track, int side, unsigned par2);
+    void (*writetrack)(int drive, int track, int side, int density);
+    void (*readtrack)(int drive, int track, int side, int density);
+    void (*poll)(void);
+    void (*abort)(int drive);
+    void (*spinup)(int drive);
+    void (*spindown)(int drive);
+    int (*verify)(int drive, int track, int density);
+    /*
+     * The following fields hold the state for each drive.
+     */
+    ALLEGRO_PATH *discfn;
+    unsigned writeprot:1;
+    unsigned fwriteprot:1;
 } DRIVE;
 
 extern DRIVE drives[NUM_DRIVES];
@@ -70,8 +75,5 @@ extern int motorspin;
 extern int motoron;
 
 extern bool defaultwriteprot;
-extern ALLEGRO_PATH *discfns[NUM_DRIVES];
-
-extern int writeprot[NUM_DRIVES], fwriteprot[NUM_DRIVES];
 
 #endif

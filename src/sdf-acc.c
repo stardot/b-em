@@ -1,3 +1,4 @@
+#define _DEBUG
 /*
  * B-EM SDF - Simple Disk Formats - Access
  *
@@ -411,7 +412,7 @@ static void sdf_poll()
             break;
 
         case ST_WRITESECTOR:
-            if (writeprot[sdf_drive]) {
+            if (drives[sdf_drive].writeprot) {
                 log_debug("sdf: poll, write protected during write sector");
                 fdc_writeprotect();
                 state = ST_IDLE;
@@ -473,7 +474,7 @@ static void sdf_poll()
             break;
 
         case ST_FORMAT_CYLID:
-            if (writeprot[sdf_drive]) {
+            if (drives[sdf_drive].writeprot) {
                 log_debug("sdf: poll, write protected during format");
                 fdc_writeprotect();
                 state = ST_IDLE;
@@ -616,14 +617,14 @@ void sdf_mount(int drive, const char *fn, FILE *fp, const struct sdf_geometry *g
 
 int sdf_load(int this_drive, const char *fn, const char *ext)
 {
-    writeprot[this_drive] = 0;
+    drives[this_drive].writeprot = 0;
     FILE *this_fp = fopen(fn, "rb+");
     if (this_fp == NULL) {
         if ((this_fp = fopen(fn, "rb")) == NULL) {
             log_error("Unable to open file '%s' for reading - %s", fn, strerror(errno));
             return -1;
         }
-        writeprot[this_drive] = 1;
+        drives[this_drive].writeprot = 1;
     }
 #ifdef linux
 #include <sys/stat.h>
@@ -641,7 +642,7 @@ int sdf_load(int this_drive, const char *fn, const char *ext)
         }
         struct stat that_stb;
         if (fstat(fileno(that_fp), &that_stb) == -1) {
-            log_error("Unable to stat file '%s' - %s", al_path_cstr(discfns[that_drive], ALLEGRO_NATIVE_PATH_SEP), strerror(errno));
+            log_error("Unable to stat file '%s' - %s", al_path_cstr(drives[that_drive].discfn, ALLEGRO_NATIVE_PATH_SEP), strerror(errno));
             return -1;
         }
         if (this_stb.st_ino == that_stb.st_ino && this_stb.st_dev == that_stb.st_dev) {
@@ -670,7 +671,7 @@ void sdf_new_disc(int drive, ALLEGRO_PATH *fn, const struct sdf_geometry *geo)
         const char *cpath = al_path_cstr(fn, ALLEGRO_NATIVE_PATH_SEP);
         FILE *f = fopen(cpath, "wb+");
         if (f) {
-            writeprot[drive] = 0;
+            drives[drive].writeprot = 0;
             geo->new_disc(f, geo);
             sdf_mount(drive, cpath, f, geo);
             gui_allegro_set_eject_text(drive, fn);

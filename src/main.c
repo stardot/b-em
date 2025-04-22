@@ -314,9 +314,9 @@ void main_init(int argc, char *argv[])
             tape_fn = al_create_path(argv[c]);
         }
         else if (discnext) {
-            if (discfns[discnext-1])
-                al_destroy_path(discfns[discnext-1]);
-            discfns[discnext-1] = al_create_path(argv[c]);
+            if (drives[discnext-1].discfn)
+                al_destroy_path(drives[discnext-1].discfn);
+            drives[discnext-1].discfn = al_create_path(argv[c]);
             discnext = 0;
         }
         else if (execnext) {
@@ -344,9 +344,9 @@ void main_init(int argc, char *argv[])
                 tapenext = 0;
             }
             else {
-                if (discfns[0])
-                    al_destroy_path(discfns[0]);
-                discfns[0] = path;
+                if (drives[0].discfn)
+                    al_destroy_path(drives[0].discfn);
+                drives[0].discfn = path;
                 discnext = 0;
                 autoboot = 150;
             }
@@ -427,17 +427,17 @@ void main_init(int argc, char *argv[])
     if (mmb_fn)
         mmb_load(mmb_fn);
     else
-        disc_load(0, discfns[0]);
-    disc_load(1, discfns[1]);
+        disc_load(0, drives[0].discfn);
+    disc_load(1, drives[1].discfn);
     tape_load(tape_fn);
     if (mmccard_fn)
         mmccard_load(mmccard_fn);
     if (defaultwriteprot)
-        writeprot[0] = writeprot[1] = 1;
-    if (discfns[0])
-        gui_set_disc_wprot(0, writeprot[0]);
-    if (discfns[1])
-        gui_set_disc_wprot(1, writeprot[1]);
+        drives[0].writeprot = drives[1].writeprot = 1;
+    if (drives[0].discfn)
+        gui_set_disc_wprot(0, drives[0].writeprot);
+    if (drives[1].discfn)
+        gui_set_disc_wprot(1, drives[1].writeprot);
     main_setspeed(emuspeed);
     debug_start(exec_fn);
     // lovebug

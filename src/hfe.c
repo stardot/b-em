@@ -1747,7 +1747,7 @@ static void hfe_spindown(int drive)
 int hfe_load(int drive, const char *fn)
 {
   log_info("hfe: drive %d: loading file %s", drive, fn);
-  writeprot[drive] = fwriteprot[drive] = 1;
+  drives[drive].writeprot = drives[drive].fwriteprot = 1;
   {
     FILE *f = fopen(fn, "rb");
     if (!f)

@@ -113,7 +113,7 @@ static void mmb_boot_drive(unsigned drive)
             disc_close(drive);
             sdf_mount(drive, mmb_fn, mmb_fp, &sdf_geometries.dfs_10s_seq_80t);
         }
-        writeprot[drive] = mmb_writeprot;
+        drives[drive].writeprot = mmb_writeprot;
         if (sideA) {
             mmb_offset[drive][0] = sideA;
             mmb_loaded_discs[drive] = mmb_boot_discs[drive];
@@ -216,7 +216,7 @@ static void mmb_eject_one(int drive)
 {
     if (sdf_fp[drive] == mmb_fp) {
         disc_close(drive);
-        ALLEGRO_PATH *path = discfns[drive];
+        ALLEGRO_PATH *path = drives[drive].discfn;
         if (path)
             disc_load(drive, path);
     }
@@ -304,18 +304,9 @@ static inline bool mmb_cat_name_cmp(const char *nam_ptr, const unsigned char *ca
     return true;
 }
 
-static int mmb_find(const char *name)
+static int mmb_search_zones(const char *name, unsigned min_zone, unsigned max_zone)
 {
-    log_debug("mmb: mmb_find('%s')", name);
-    for (unsigned zone = mmb_base_zone; zone < mmb_num_zones; ++zone) {
-        for (unsigned disc = 0; disc < mmb_zones[zone].num_discs; ++disc) {
-            if (mmb_cat_name_cmp(name, mmb_zones[zone].index[disc])) {
-                log_debug("mmb: found MMB SSD '%s' at zone %u, disc %u", name, zone, disc);
-                return zone * MMB_ZONE_DISCS + disc;
-            }
-        }
-    }
-    for (unsigned zone = 0; zone < mmb_base_zone; ++zone) {
+    for (unsigned zone = min_zone; zone < max_zone; ++zone) {
         for (unsigned disc = 0; disc < mmb_zones[zone].num_discs; ++disc) {
             if (mmb_cat_name_cmp(name, mmb_zones[zone].index[disc])) {
                 log_debug("mmb: found MMB SSD '%s' at zone %u, disc %u", name, zone, disc);
@@ -342,8 +333,9 @@ static int mmb_parse_find(uint16_t addr)
         ch = readmem(addr++);
     }
     name[i] = 0;
-    if ((i = mmb_find(name)) < 0)
-        vdfs_error(err_disc_not_fnd);
+    if ((i = mmb_search_zones(name, mmb_base_zone, mmb_num_zones)) < 0)
+        if ((i = mmb_search_zones(name, 0, mmb_base_zone)) < 0)
+            vdfs_error(err_disc_not_fnd);
     return i;
 }
 
@@ -632,7 +624,7 @@ static void mmb_dop_find_unformatted(unsigned drive)
 
 static void mmb_dop_flags(unsigned drive, int op)
 {
-    if (writeprot[0])
+    if (drives[0].writeprot)
         vdfs_error(err_wprotect);
     else {
         int disc = mmb_loaded_discs[drive];

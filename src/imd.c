@@ -400,7 +400,7 @@ static void imd_writesector(int drive, int sector, int track, int side, int dens
         if (trk) {
             struct imd_sect *sect = imd_find_sector(drive, track, side, sector, trk);
             if (sect) {
-                if (writeprot[drive]) {
+                if (drives[drive].writeprot) {
                     count = 1;
                     state = ST_WRITEPROT;
                 }
@@ -456,7 +456,7 @@ static void imd_readaddress(int drive, int track, int side, int density)
 static bool imd_begin_format(int drive, int track, int side, int density)
 {
     if (drive >= 0 && drive < NUM_DRIVES) {
-        if (writeprot[drive]) {
+        if (drives[drive].writeprot) {
             count = 1;
             state = ST_WRITEPROT;
             return false;
@@ -1494,7 +1494,7 @@ int imd_load(int drive, const char *fn)
                 imd->track0 = track0;
                 imd->trackno = 0;
                 imd_dump(imd);
-                writeprot[drive] = wprot;
+                drives[drive].writeprot = wprot;
                 drives[drive].close       = imd_close;
                 drives[drive].seek        = imd_seek;
                 drives[drive].verify      = imd_verify;

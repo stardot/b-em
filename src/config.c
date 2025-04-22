@@ -115,6 +115,16 @@ ALLEGRO_COLOR get_config_colour(const char *sect, const char *key, ALLEGRO_COLOR
     return cdefault;
 }
 
+static void get_config_discfn(const char *key, int drive)
+{
+    const char *cpath = get_config_string("disc", key, NULL);
+    if (cpath) {
+        if (drives[drive].discfn)
+            al_destroy_path(drives[drive].discfn);
+        drives[drive].discfn = al_create_path(cpath);
+    }
+}
+
 void config_load(void)
 {
     ALLEGRO_PATH *path;
@@ -136,16 +146,9 @@ void config_load(void)
         exit(1);
     }
 
-    if ((p = get_config_string("disc", "disc0", NULL))) {
-        if (discfns[0])
-            al_destroy_path(discfns[0]);
-        discfns[0] = al_create_path(p);
-    }
-    if ((p = get_config_string("disc", "disc1", NULL))) {
-        if (discfns[1])
-            al_destroy_path(discfns[1]);
-        discfns[1] = al_create_path(p);
-    }
+    get_config_discfn("disc0", 0);
+    get_config_discfn("disc1", 1);
+
     if ((p = get_config_string("disc", "mmb", NULL))) {
         if (mmb_fn)
             free(mmb_fn);
@@ -315,8 +318,8 @@ void config_save(void)
         }
         model_savecfg();
 
-        set_config_path("disc", "disc0", discfns[0]);
-        set_config_path("disc", "disc1", discfns[1]);
+        set_config_path("disc", "disc0", drives[0].discfn);
+        set_config_path("disc", "disc1", drives[1].discfn);
         set_config_string("disc", "mmb", mmb_fn);
         set_config_string("disc", "mmccard", mmccard_fn);
         set_config_bool("disc", "defaultwriteprotect", defaultwriteprot);

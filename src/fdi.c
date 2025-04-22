@@ -361,7 +361,7 @@ void fdi_init()
 
 int fdi_load(int drive, const char *fn)
 {
-        writeprot[drive] = fwriteprot[drive] = 1;
+        drives[drive].writeprot = drives[drive].fwriteprot = 1;
         fdi_f[drive] = fopen(fn, "rb");
         if (!fdi_f[drive])  {
             log_warn("fdi: unable to open FDI disc image '%s': %s", fn, strerror(errno));

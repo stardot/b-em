@@ -177,8 +177,8 @@ static ALLEGRO_MENU *create_disc_menu(void)
     al_append_menu_item(menu, "Eject SD Card", IDM_DISC_MMC_EJECT, 0, NULL, NULL);
     al_append_menu_item(menu, "New disc :0/2...", 0, 0, NULL, create_disc_new_menu(0));
     al_append_menu_item(menu, "New disc :1/3...", 0, 0, NULL, create_disc_new_menu(1));
-    add_checkbox_item(menu, "Write protect disc :0/2", menu_id_num(IDM_DISC_WPROT, 0), writeprot[0]);
-    add_checkbox_item(menu, "Write protect disc :1/3", menu_id_num(IDM_DISC_WPROT, 1), writeprot[1]);
+    add_checkbox_item(menu, "Write protect disc :0/2", menu_id_num(IDM_DISC_WPROT, 0), drives[0].writeprot);
+    add_checkbox_item(menu, "Write protect disc :1/3", menu_id_num(IDM_DISC_WPROT, 1), drives[1].writeprot);
     add_checkbox_item(menu, "Default write protect", IDM_DISC_WPROT_D, defaultwriteprot);
     add_checkbox_item(menu, "IDE hard disc", IDM_DISC_HARD_IDE, ide_enable);
     add_checkbox_item(menu, "SCSI hard disc", IDM_DISC_HARD_SCSI, scsi_enabled);
@@ -835,7 +835,7 @@ void gui_set_disc_wprot(int drive, bool enabled)
 static void disc_choose_new(ALLEGRO_EVENT *event, const char *ext)
 {
     int drive = menu_get_num(event);
-    ALLEGRO_PATH *apath = discfns[drive];
+    ALLEGRO_PATH *apath = drives[drive].discfn;
     ALLEGRO_FILECHOOSER *chooser;
     const char *fpath;
     char name[20], title[70];
@@ -854,9 +854,9 @@ static void disc_choose_new(ALLEGRO_EVENT *event, const char *ext)
             if (al_get_native_file_dialog_count(chooser) > 0) {
                 ALLEGRO_PATH *path = al_create_path(al_get_native_file_dialog_path(chooser, 0));
                 disc_close(drive);
-                if (discfns[drive])
-                    al_destroy_path(discfns[drive]);
-                discfns[drive] = path;
+                if (drives[drive].discfn)
+                    al_destroy_path(drives[drive].discfn);
+                drives[drive].discfn = path;
                 switch(menu_get_id(event)) {
                     case IDM_DISC_NEW_ADFS_S:
                         sdf_new_disc(drive, path, &sdf_geometries.adfs_s);
@@ -900,7 +900,7 @@ static void disc_choose_new(ALLEGRO_EVENT *event, const char *ext)
                     default:
                         break;
                 }
-                gui_set_disc_wprot(drive, writeprot[drive]);
+                gui_set_disc_wprot(drive, drives[drive].writeprot);
             }
         }
         al_destroy_native_file_dialog(chooser);
@@ -914,7 +914,7 @@ static void disc_choose(ALLEGRO_EVENT *event, const char *opname, const char *ex
     int drive = menu_get_num(event);
     ALLEGRO_PATH *apath;
     const char *fpath;
-    if (!(apath = discfns[drive]) || !(fpath = al_path_cstr(apath, ALLEGRO_NATIVE_PATH_SEP)))
+    if (!(apath = drives[drive].discfn) || !(fpath = al_path_cstr(apath, ALLEGRO_NATIVE_PATH_SEP)))
         fpath = ".";
     char title[70];
     snprintf(title, sizeof title, "Choose a disc to %s drive %d/%d", opname, drive, drive+2);
@@ -925,9 +925,9 @@ static void disc_choose(ALLEGRO_EVENT *event, const char *opname, const char *ex
             if (al_get_native_file_dialog_count(chooser) > 0) {
                 ALLEGRO_PATH *path = al_create_path(al_get_native_file_dialog_path(chooser, 0));
                 disc_close(drive);
-                if (discfns[drive])
-                    al_destroy_path(discfns[drive]);
-                discfns[drive] = path;
+                if (drives[drive].discfn)
+                    al_destroy_path(drives[drive].discfn);
+                drives[drive].discfn = path;
                 switch(menu_get_id(event)) {
                     case IDM_DISC_AUTOBOOT:
                         main_reset();
@@ -936,17 +936,17 @@ static void disc_choose(ALLEGRO_EVENT *event, const char *opname, const char *ex
                     case IDM_DISC_LOAD:
                         if (!disc_load(drive, path)) {
                             if (defaultwriteprot)
-                                writeprot[drive] = 1;
+                                drives[drive].writeprot = 1;
                         }
                         else {
                             al_destroy_path(path);
-                            discfns[drive] = NULL;
+                            drives[drive].discfn = NULL;
                         }
                         break;
                     default:
                         break;
                 }
-                gui_set_disc_wprot(drive, writeprot[drive]);
+                gui_set_disc_wprot(drive, drives[drive].writeprot);
             }
         }
         al_destroy_native_file_dialog(chooser);
@@ -957,9 +957,9 @@ static void disc_eject(ALLEGRO_EVENT *event)
 {
     int drive = menu_get_num(event);
     disc_close(drive);
-    if (discfns[drive]) {
-        al_destroy_path(discfns[drive]);
-        discfns[drive] = NULL;
+    if (drives[drive].discfn) {
+        al_destroy_path(drives[drive].discfn);
+        drives[drive].discfn = NULL;
     }
     al_set_menu_item_caption(disc_menu, menu_id_num(IDM_DISC_EJECT, drive), drive ? "Eject disc :1/3" : "Eject disc :0/2");
 }
@@ -967,7 +967,7 @@ static void disc_eject(ALLEGRO_EVENT *event)
 static void disc_wprot(ALLEGRO_EVENT *event)
 {
     int drive = menu_get_num(event);
-    writeprot[drive] = !writeprot[drive];
+    drives[drive].writeprot = !drives[drive].writeprot;
 }
 
 static void disc_mmb_load(const char *path)
