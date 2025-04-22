@@ -23,7 +23,6 @@
 FILE *sdf_fp[NUM_DRIVES], *mmb_fp;
 off_t mmb_offset[NUM_DRIVES][2];
 static const struct sdf_geometry *geometry[NUM_DRIVES];
-static uint8_t current_track[NUM_DRIVES];
 
 typedef enum {
     ST_IDLE,
@@ -71,12 +70,6 @@ static void sdf_close(int drive)
             sdf_fp[drive] = NULL;
         }
     }
-}
-
-static void sdf_seek(int drive, int track)
-{
-    if (drive < NUM_DRIVES)
-        current_track[drive] = track;
 }
 
 static int sdf_verify(int drive, int track, int density)
@@ -159,12 +152,12 @@ static const struct sdf_geometry *check_seek(int drive, int sector, int track, i
     if (drive < NUM_DRIVES) {
         if ((geo = geometry[drive])) {
             if ((!density && geo->density == SDF_DENS_SINGLE) || (density && geo->density == SDF_DENS_DOUBLE)) {
-                if (track == current_track[drive]) {
+                if (track == drives[drive].curtrack) {
                     if (io_seek(geo, drive, sector, track, side))
                         return geo;
                 }
                 else
-                    log_debug("sdf: drive %u: invalid track: %d should be %d", drive, track, current_track[drive]);
+                    log_debug("sdf: drive %u: invalid track: %d should be %d", drive, track, drives[drive].curtrack);
             }
             else
                 log_debug("sdf: drive %u: invalid density", drive);
@@ -343,7 +336,7 @@ static void sdf_poll_wrtrack_hdrcrc(void)
     int b = fdc_getdata(0);
     log_debug("sdf: sdf_poll_wrtrack_hdrcrc byte=%02X", b);
     if (b == 0xfb) {
-        io_seek(geometry[sdf_drive], sdf_drive, sdf_sector, current_track[sdf_drive], sdf_side);
+        io_seek(geometry[sdf_drive], sdf_drive, sdf_sector, drives[sdf_drive].curtrack, sdf_side);
         state = ST_WRTRACK_DATA;
     }
 }
@@ -601,7 +594,7 @@ void sdf_mount(int drive, const char *fn, FILE *fp, const struct sdf_geometry *g
     geometry[drive] = geo;
     mmb_offset[drive][0] = mmb_offset[drive][1] = 0;
     drives[drive].close       = sdf_close;
-    drives[drive].seek        = sdf_seek;
+    drives[drive].seek        = NULL;
     drives[drive].verify      = sdf_verify;
     drives[drive].readsector  = sdf_readsector;
     drives[drive].writesector = sdf_writesector;

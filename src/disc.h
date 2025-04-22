@@ -28,6 +28,8 @@ typedef struct
     ALLEGRO_PATH *discfn;
     unsigned writeprot:1;
     unsigned fwriteprot:1;
+    unsigned newdisk:1;
+    int curtrack;
 } DRIVE;
 
 extern DRIVE drives[NUM_DRIVES];
@@ -42,7 +44,8 @@ int disc_load(int drive, ALLEGRO_PATH *fn);
 void disc_close(int drive);
 void disc_init(void);
 void disc_poll(void);
-void disc_seek(int drive, int track);
+void disc_seek0(int drive, uint32_t step_time, uint32_t settle_time);
+void disc_seekrelative(int drive, int tracks, uint32_t step_time, uint32_t settle_time);
 void disc_readsector(int drive, int sector, int track, int side, int density);
 void disc_writesector(int drive, int sector, int track, int side, int density);
 void disc_readaddress(int drive, int track, int side, int density);

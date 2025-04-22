@@ -1,3 +1,4 @@
+#define _DEBUG
 /*B-em v2.2 by Tom Walker
   1770 FDC emulation*/
 #include <stdio.h>
@@ -10,13 +11,10 @@
 #include "led.h"
 #include "model.h"
 
-#define ABS(x) (((x)>0)?(x):-(x))
-
 struct
 {
     uint8_t command, oldcmd, sector, track, status, data, resetting;
     int curside;
-    int curtrack;
     int density;
     int stepdir;
     uint8_t cmd_started, in_gap;
@@ -31,6 +29,7 @@ static const uint8_t nmi_on_completion[5] = {
 };
 
 static const unsigned step_times[4] = { 6000, 12000, 20000, 30000 };
+#define SETTLE_TIME (15 * 2000) /* 15ms in 2Mhz clock pulses */
 
 static int bytenum;
 
@@ -74,19 +73,13 @@ static void wd1770_spindown()
     }
 }
 
-#define track0 (wd1770.curtrack ? 0 : 4)
+#define track0 (drives[curdrive].curtrack ? 0 : 4)
 
-static void wd1770_begin_seek(unsigned cmd, const char *cmd_desc, int target)
+static void wd1770_begin_seek(unsigned cmd, const char *cmd_desc, int tracks)
 {
-    log_debug("wd1770: begin %s to track %d", cmd_desc, target);
-    if (target < 0) {
-        log_debug("wd1770: refusing to step out beyond track 0");
-        target = 0;
-    }
-    wd1770.curtrack = target;
+    log_debug("wd1770: begin %s of %d tracks", cmd_desc, tracks);
+    disc_seekrelative(curdrive, tracks, step_times[cmd & 3], (cmd & 0x04) ? SETTLE_TIME : 0);
     wd1770.status = 0xa1 | track0;
-    disc_seek(curdrive, target);
-    fdc_time = step_times[cmd & 3];
 }
 
 static int data_count = 0;
@@ -387,7 +380,7 @@ static void wd1770_cmd_next(unsigned cmd)
         case 0x3: /*Step*/
         case 0x5: /*Step in*/
         case 0x7: /*Step out*/
-            wd1770.track = wd1770.curtrack;
+            wd1770.track = drives[curdrive].curtrack;
             // FALLTHROUGH
         case 0x2: /*Step*/
         case 0x4: /*Step in*/
@@ -459,28 +452,29 @@ static void wd1770_cmd_start(unsigned cmd)
 {
     switch(cmd >> 4) {
         case 0x0: /*Restore*/
-            wd1770_begin_seek(cmd, "restore", 0);
+            wd1770.status = 0xa5;
+            disc_seek0(curdrive, step_times[cmd & 3], (cmd & 0x04) ? SETTLE_TIME : 0);
             break;
 
         case 0x1: /*Seek*/
-            wd1770_begin_seek(cmd, "seek", wd1770.data);
+            wd1770_begin_seek(cmd, "seek", wd1770.data - wd1770.track);
             break;
 
         case 0x2:
         case 0x3: /*Step*/
-            wd1770_begin_seek(cmd, "step", wd1770.curtrack + wd1770.stepdir);
+            wd1770_begin_seek(cmd, "step", wd1770.stepdir);
             break;
 
         case 0x4:
         case 0x5: /*Step in*/
             wd1770.stepdir = 1;
-            wd1770_begin_seek(cmd, "step in", wd1770.curtrack+1);
+            wd1770_begin_seek(cmd, "step in", 1);
             break;
 
         case 0x6:
         case 0x7: /*Step out*/
             wd1770.stepdir = -1;
-            wd1770_begin_seek(cmd, "step out", wd1770.curtrack-1);
+            wd1770_begin_seek(cmd, "step out", -1);
             break;
 
         case 0x8: /*Read sector*/
@@ -616,13 +610,13 @@ static void wd1770_writeprotect()
 
 void wd1770_reset()
 {
-    log_debug("wd1770: reset 1770");
-    nmi = 0;
-    wd1770.status = 0;
-    wd1770.sector = 1;
-    motorspin = 0;
-    fdc_time = 0;
-    if (fdc_type >= FDC_ACORN) {
+    if (fdc_type >= FDC_ACORN) { /* if FDC is a 1770 */
+        log_debug("wd1770: reset 1770");
+        nmi = 0;
+        wd1770.status = 0;
+        wd1770.sector = 1;
+        motorspin = 0;
+        fdc_time = 0;
         fdc_callback       = wd1770_callback;
         fdc_data           = wd1770_data;
         fdc_spindown       = wd1770_spindown;

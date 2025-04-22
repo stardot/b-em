@@ -1,3 +1,4 @@
+#define _DEBUG
 /*B-em v2.2 by Tom Walker
   8271 FDC emulation*/
 
@@ -27,13 +28,16 @@ struct
         uint8_t status;
         uint8_t result;
         int curtrack[2], cursector;
-        int realtrack[2];
         int sectorsleft;
         uint8_t data;
         int phase;
         int written;
 
         uint8_t drvout;
+    uint8_t unload_revs;
+    uint32_t step_time;
+    uint32_t settle_time;
+    uint32_t load_time;
 } i8271;
 
 static void short_spindown(void)
@@ -134,9 +138,18 @@ uint8_t i8271_read(uint16_t addr)
 
 void i8271_seek()
 {
-        int diff = i8271.params[0] - i8271.curtrack[curdrive];
-        i8271.realtrack[curdrive] += diff;
-        disc_seek(curdrive, i8271.realtrack[curdrive]);
+    int new_track = i8271.params[0];
+    if (new_track)
+        disc_seekrelative(curdrive, new_track - i8271.curtrack[curdrive], i8271.step_time, i8271.settle_time);
+    else
+        disc_seek0(curdrive, i8271.step_time, i8271.settle_time);
+}
+
+static uint32_t time_to_2Mhz(unsigned value, unsigned multiplier, const char *name)
+{
+    uint32_t cycles = value * multiplier;
+    log_info("i8271: %s set to %u native units, %'u 2Mhz cycles", name, value, cycles);
+    return cycles;
 }
 
 void i8271_write(uint16_t addr, uint8_t val)
@@ -145,7 +158,10 @@ void i8271_write(uint16_t addr, uint8_t val)
         switch (addr&7)
         {
             case 0: /*Command register*/
-                if (i8271.status & 0x80) return;
+                if (i8271.status & 0x80) {
+                   log_debug("i8271: command register written while busy");
+                   return;
+                }
                 i8271.command = val & 0x3F;
                 log_debug("i8271: command %02X", i8271.command);
                 if (i8271.command == 0x17) i8271.command = 0x13;
@@ -243,6 +259,12 @@ void i8271_write(uint16_t addr, uint8_t val)
                                 i8271_spinup();
                                 break;
                             case 0x35: /*Specify*/
+                                if (i8271.params[0] == 0x0d) {
+                                    i8271.step_time   = time_to_2Mhz(i8271.params[1], 2000, "step time");
+                                    i8271.settle_time = time_to_2Mhz(i8271.params[2], 2000, "head settle time");
+                                    i8271.unload_revs = i8271.params[3] >> 4;
+                                    i8271.load_time = time_to_2Mhz(i8271.params[3] & 0x0f, 4000, "head load time");
+                                }
                                 i8271.status = 0;
                                 break;
                             case 0x3A: /*Write special register*/
@@ -356,9 +378,6 @@ static void i8271_callback(void)
                 {
 //                        printf("Seek to %i\n",i8271.params[0]);
                         i8271.curtrack[curdrive] = i8271.params[0];
-//                        i8271.realtrack+=diff;
-//                        disc_seek(0,i8271.realtrack);
-//                        printf("Re-seeking - track now %i %i\n",i8271.curtrack,i8271.realtrack);
                         disc_readsector(curdrive, i8271.cursector, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, 0);
                         i8271.phase = 1;
                         return;
@@ -383,8 +402,6 @@ static void i8271_callback(void)
                 if (!i8271.phase)
                 {
                         i8271.curtrack[curdrive] = i8271.params[0];
-//                        i8271.realtrack+=diff;
-//                        disc_seek(0,i8271.realtrack);
                         disc_readaddress(curdrive, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, 0);
                         i8271.phase = 1;
                         return;
@@ -423,12 +440,9 @@ static void i8271_callback(void)
 
             case 0x29: /*Seek*/
                 i8271.curtrack[curdrive] = i8271.params[0];
-//                i8271.realtrack+=diff;
                 i8271.status = 0x18;
                 i8271.result = 0;
                 i8271_NMI();
-//                disc_seek(0,i8271.realtrack);
-//                printf("Seek done!\n");
                 i8271_setspindown();
                 break;
 
@@ -528,12 +542,11 @@ void i8271_reset()
         fdc_writeprotect   = i8271_writeprotect;
         fdc_getdata        = i8271_getdata;
         motorspin = 45000;
+        i8271.paramnum = i8271.paramreq = 0;
+        i8271.status = 0;
+        log_debug("i8271: reset 8271");
+        fdc_time = 0;
+        i8271.curtrack[0] = i8271.curtrack[1] = 0;
+        i8271.command = 0xFF;
     }
-    i8271.paramnum = i8271.paramreq = 0;
-    i8271.status = 0;
-    log_debug("i8271: reset 8271");
-    fdc_time = 0;
-    i8271.curtrack[0] = i8271.curtrack[1] = 0;
-    i8271.command = 0xFF;
-    i8271.realtrack[0] = i8271.realtrack[1] = 0;
 }
