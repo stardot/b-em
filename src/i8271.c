@@ -87,7 +87,8 @@ static void i8271_spindown()
 void i8271_setspindown(void)
 {
     log_debug("i8271: set spindown");
-    motorspin = 45000;
+    motorspin = i8271.unload_revs * 3125; /* into units of 2Mhz/128 */
+    log_debug("i8271: set motorspin=%'d", motorspin);
 }
 
 int params[][2]=
@@ -263,6 +264,7 @@ void i8271_write(uint16_t addr, uint8_t val)
                                     i8271.step_time   = time_to_2Mhz(i8271.params[1], 2000, "step time");
                                     i8271.settle_time = time_to_2Mhz(i8271.params[2], 2000, "head settle time");
                                     i8271.unload_revs = i8271.params[3] >> 4;
+                                    log_debug("i8271: unload revs set to %d", i8271.unload_revs);
                                     i8271.load_time = time_to_2Mhz(i8271.params[3] & 0x0f, 4000, "head load time");
                                 }
                                 i8271.status = 0;
