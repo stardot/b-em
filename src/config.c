@@ -36,10 +36,8 @@ ALLEGRO_CONFIG *bem_cfg;
 int get_config_int(const char *sect, const char *key, int ival)
 {
     const char *str = al_get_config_value(bem_cfg, sect, key);
-    if (!str && sect) {
-        if ((str = al_get_config_value(bem_cfg, NULL, key)))
-            al_remove_config_key(bem_cfg, "", key);
-    }
+    if (!str && sect)
+        str = al_get_config_value(bem_cfg, NULL, key);
     if (str) {
         char *end;
         long nval = strtol(str, &end, 0);

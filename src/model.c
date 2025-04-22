@@ -1,8 +1,10 @@
+#define _DEBUG
 #include "b-em.h"
 
 #include "main.h"
 #include "model.h"
 #include "config.h"
+#include "keyboard.h"
 #include "cmos.h"
 #include "6809tube.h"
 #include "mc6809nc/mc6809_debug.h"
@@ -250,6 +252,7 @@ void model_loadcfg(void)
             ptr->romsetup = model_find_romsetup(get_config_string(sect, "romsetup", "swram"), ptr->name);
             ptr->tube = model_find_tube(get_config_string(sect, "tube", "none"), ptr->name);
             ptr->boot_logo = get_config_int(sect, "boot_logo", 255);
+            ptr->kbdips = get_config_int(sect, "kbdips", kbdips);
         }
     }
     model_count = max_model;
@@ -365,6 +368,7 @@ void model_init()
     OS01        = models[curmodel].os01;
     compactcmos = models[curmodel].compact;
     weramrom    = false; /* set in the WE rom setup when needed */
+    kbdips      = models[curmodel].kbdips;
 
     mem_clearroms();
     models[curmodel].romsetup->func();
@@ -374,7 +378,7 @@ void model_init()
 
 void model_savestate(FILE *f)
 {
-    unsigned char bytes[6];
+    unsigned char bytes[8];
     MODEL *model = models + curmodel;
     savestate_save_var(curmodel, f);
     savestate_save_str(model->name, f);
@@ -390,17 +394,18 @@ void model_savestate(FILE *f)
     bytes[5] = model->compact;
     if (model->integra)
         bytes[0] |= 0x80;
-    fwrite(bytes, sizeof(bytes), 1, f);
-    if (model->tube >= 0) {
-        putc(1, f);
-        savestate_save_str(tubes[model->tube].name, f);
-    }
-    else if (curtube >= 0) {
-        putc(2, f);
-        savestate_save_str(tubes[curtube].name, f);
-    }
+    if (model->tube >= 0)
+        bytes[6] = 0x81;
+    else if (curtube >= 0)
+        bytes[6] = 0x82;
     else
-        putc(0, f);
+        bytes[6] = 0x80;
+    bytes[7] = kbdips;
+    fwrite(bytes, sizeof(bytes), 1, f);
+    if (model->tube >= 0)
+        savestate_save_str(tubes[model->tube].name, f);
+    else if (curtube >= 0)
+        savestate_save_str(tubes[curtube].name, f);
 }
 
 static bool model_cmp(int modelno, MODEL *nmodel)
@@ -443,7 +448,12 @@ void model_loadstate(FILE *f)
     model.os01    = bytes[4];
     model.compact = bytes[5];
 
-    switch(bytes[6]) {
+    if (bytes[6] & 0x80) {
+        kbdips = getc(f);
+        log_debug("model: kbdips=%02x", kbdips);
+    }
+
+    switch(bytes[6] & 0x7f) {
         case 1:
             tube_name = savestate_load_str(f);
             model.tube = model_find_tube(tube_name, model.name);
