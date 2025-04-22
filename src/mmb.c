@@ -1,4 +1,3 @@
-#define _DEBUG
 /*
  * B-EM MMB - Support for MMB files.
  *

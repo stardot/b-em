@@ -1,4 +1,3 @@
-#define _DEBUG
 /*B-em v2.2 by Tom Walker
   Master 128 CMOS emulation*/
 
