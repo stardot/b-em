@@ -3,6 +3,11 @@
 
 #define NUM_DRIVES 2
 
+/*
+ * The following structure defines the interface between this disc module
+ * and the modules that implement specifc disc file formats.
+ */
+
 typedef struct
 {
         void (*close)(int drive);
@@ -24,6 +29,10 @@ extern DRIVE drives[NUM_DRIVES];
 
 extern int curdrive;
 
+/*
+ * The following functions are the external interface to this disc module.
+ */
+
 int disc_load(int drive, ALLEGRO_PATH *fn);
 void disc_close(int drive);
 void disc_init(void);
@@ -39,6 +48,12 @@ void disc_abort(int drive);
 int disc_verify(int drive, int track, int density);
 
 extern int disc_time;
+
+/*
+ * The following functions are callback to the FDC that may be made by
+ * either this module or any of the disc file format modules when various
+ * onditions occur.
+ */
 
 extern void (*fdc_callback)(void);
 extern void (*fdc_data)(uint8_t dat);
