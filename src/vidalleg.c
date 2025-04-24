@@ -1,6 +1,5 @@
 /*B-em v2.2 by Tom Walker
   Allegro video code*/
-#define _DEBUG
 #include <allegro5/allegro_primitives.h>
 #include "b-em.h"
 #include "led.h"
