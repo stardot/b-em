@@ -304,18 +304,9 @@ static inline bool mmb_cat_name_cmp(const char *nam_ptr, const unsigned char *ca
     return true;
 }
 
-static int mmb_find(const char *name)
+static int mmb_search_zones(const char *name, unsigned min_zone, unsigned max_zone)
 {
-    log_debug("mmb: mmb_find('%s')", name);
-    for (unsigned zone = mmb_base_zone; zone < mmb_num_zones; ++zone) {
-        for (unsigned disc = 0; disc < mmb_zones[zone].num_discs; ++disc) {
-            if (mmb_cat_name_cmp(name, mmb_zones[zone].index[disc])) {
-                log_debug("mmb: found MMB SSD '%s' at zone %u, disc %u", name, zone, disc);
-                return zone * MMB_ZONE_DISCS + disc;
-            }
-        }
-    }
-    for (unsigned zone = 0; zone < mmb_base_zone; ++zone) {
+    for (unsigned zone = min_zone; zone < max_zone; ++zone) {
         for (unsigned disc = 0; disc < mmb_zones[zone].num_discs; ++disc) {
             if (mmb_cat_name_cmp(name, mmb_zones[zone].index[disc])) {
                 log_debug("mmb: found MMB SSD '%s' at zone %u, disc %u", name, zone, disc);
@@ -342,8 +333,9 @@ static int mmb_parse_find(uint16_t addr)
         ch = readmem(addr++);
     }
     name[i] = 0;
-    if ((i = mmb_find(name)) < 0)
-        vdfs_error(err_disc_not_fnd);
+    if ((i = mmb_search_zones(name, mmb_base_zone, mmb_num_zones)) < 0)
+        if ((i = mmb_search_zones(name, 0, mmb_base_zone)) < 0)
+            vdfs_error(err_disc_not_fnd);
     return i;
 }
 
