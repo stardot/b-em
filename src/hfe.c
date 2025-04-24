@@ -406,7 +406,6 @@ static void start_op(int drive, bool mfm, enum OpType op_type, const char *op_na
   p->bits_avail_to_decode = 0;
   p->shift_register = p->shift_register_prevbits = 0;
   p->scan_value = p->scan_mask = 0;
-  hfe_info[drive]->state.revolutions_this_op = 0;
 }
 
 static void start_sector_op(int drive, bool mfm, enum OpType op_type,
@@ -1088,7 +1087,7 @@ static void crc_reset(int drive)
   hfe_info[drive]->state.crc = 0xFFFF;
 }
 
-static void handle_sector_id_byte(int drive, unsigned char value, bool yield_byte)
+static void handle_id_byte_sector(int drive, unsigned char value)
 {
   bool ok = true;
   struct hfe_poll_state *state = &hfe_info[drive]->state;
@@ -1185,10 +1184,6 @@ static void handle_sector_id_byte(int drive, unsigned char value, bool yield_byt
     case 6:                    /* second CRC byte */
       log_debug("hfe: drive %d: sector id: second CRC byte is 0x%02X",
                 drive, (unsigned int)value);
-      if (yield_byte)
-        {
-          fdc_data(value);
-        }
       if (state->crc)
         {
           log_warn("hfe: drive %d: CRC mismatch in sector address; "
@@ -1196,7 +1191,7 @@ static void handle_sector_id_byte(int drive, unsigned char value, bool yield_byt
                    drive, (unsigned int)state->crc);
           set_up_for_sector_id_scan(drive);
         }
-      else if (state->current_op == ROP_READ_ADDR_FOR_SECTOR)
+      else
         {
           /* CRC was correct, and the sector address matched; set up to read the sector. */
           log_debug("hfe: drive %d: CRC OK for sector address "
@@ -1205,15 +1200,6 @@ static void handle_sector_id_byte(int drive, unsigned char value, bool yield_byt
                     state->target.sector);
           state->current_op = ROP_READ_SECTOR;
           set_up_for_sector_read(drive, state->sector_bytes_to_read);
-        }
-      else if (state->current_op == ROP_READ_JUST_ADDR)
-        {
-          log_debug("hfe: drive %d: finished reading sector id "
-                    "(current_op_name=%s)",
-                    drive, state->current_op_name);
-          state->bytes_to_read = 0;
-          fdc_finishread(false);
-          clear_op_state(state);
         }
       /* We already dispatched the byte and perhaps reset for the next oprtation,
          so we're done. */
@@ -1225,18 +1211,9 @@ static void handle_sector_id_byte(int drive, unsigned char value, bool yield_byt
                 drive, hfe_info[drive]->current_track,
                 (unsigned long)sector_address_bytes_read);
       ok = false;
-      yield_byte = false;
       break;
     }
   --state->bytes_to_read;
-  if (yield_byte)
-    {
-      fdc_data(value);
-      if (state->bytes_to_read == 0)
-        {
-          fdc_finishread(false);
-        }
-    }
   if (state->bytes_to_read == 0)
     {
       if (ok)
@@ -1263,6 +1240,21 @@ static void handle_sector_id_byte(int drive, unsigned char value, bool yield_byt
     }
 }
 
+static void handle_id_byte_addr(int drive, unsigned char value)
+{
+  struct hfe_poll_state *state = &hfe_info[drive]->state;
+  log_debug("hfe: drive %d: handling sector ID byte 0x%02x with bytes_to_read=%lu "
+            "and current_op_name=%s",
+            drive, (unsigned)value, (unsigned long)state->bytes_to_read,
+            state->current_op_name);
+  crc_byte(state, value);
+  if (state->bytes_to_read <= 6)
+    fdc_data(value);
+  if (--state->bytes_to_read == 0) {
+    fdc_finishread(false);
+    clear_op_state(state);
+  }
+}
 
 static void handle_sector_data_byte(int drive, unsigned char value)
 {
@@ -1624,11 +1616,11 @@ static void hfe_poll_drive(int drive, bool is_selected)
   switch (state->current_op)
     {
     case ROP_READ_ADDR_FOR_SECTOR:
-      handle_sector_id_byte(drive, value, false);
+      handle_id_byte_sector(drive, value);
       break;
 
     case ROP_READ_JUST_ADDR:
-      handle_sector_id_byte(drive, value, true);
+      handle_id_byte_addr(drive, value);
       break;
 
     case ROP_READ_SECTOR:
