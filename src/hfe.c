@@ -193,6 +193,8 @@ struct hfe_poll_state
   */
   bool mfm_mode;
 
+  bool deleted_mark; /* sector AM2 was for deleted data. */
+
   /* our current bit position within the track data. */
   long track_bit_pos;
 
@@ -398,6 +400,7 @@ static void start_op(int drive, bool mfm, enum OpType op_type, const char *op_na
   p->current_op_name = op_name;
   p->target.sector = p->target.side = p->target.track = 0;
   p->mfm_mode = mfm;
+  p->deleted_mark = false;
   p->revolutions_this_op = 0;
   p->bytes_to_read = 0;
   p->bits_avail_to_decode = 0;
@@ -1269,10 +1272,18 @@ static void handle_sector_data_byte(int drive, unsigned char value)
   if (offset == 0)
     {
       /* This is the address mark. */
-      if (value == ADDRESS_MARK_DATA_REC || value == ADDRESS_MARK_CONTROL_REC)
+      if (value == ADDRESS_MARK_DATA_REC)
         {
           /* All good.  We don't pass this byte back to the FDC, so
              just note that we read it already and return. */
+          --state->bytes_to_read;
+          return;
+        }
+      else if (value == ADDRESS_MARK_CONTROL_REC)
+        {
+          /* All good.  We don't pass this byte back to the FDC, so
+             just note that we read it already and return. */
+          state->deleted_mark = true;
           --state->bytes_to_read;
           return;
         }
@@ -1308,7 +1319,7 @@ static void handle_sector_data_byte(int drive, unsigned char value)
     {
       if (state->crc)
         {
-          fdc_datacrcerror(false);
+          fdc_datacrcerror(state->deleted_mark);
           log_warn("hfe: drive %d: side %d track %2d sector %d: "
                    "CRC error on sector data: got 0x%02X, expected 0x00",
                    drive, state->target.side, state->target.track,
@@ -1316,7 +1327,7 @@ static void handle_sector_data_byte(int drive, unsigned char value)
         }
       else
         {
-          fdc_finishread(false);
+          fdc_finishread(state->deleted_mark);
         }
       clear_op_state(state);
     }
