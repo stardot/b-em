@@ -11,9 +11,6 @@
 #include "led.h"
 #include "model.h"
 
-static int bytenum;
-static int i8271_verify = 0;
-
 // Output Port bit definitions in i8271.drvout
 #define SIDESEL   0x20
 #define DRIVESEL0 0x40
@@ -28,6 +25,7 @@ struct
         uint8_t result;
         int curtrack[2], cursector;
         int sectorsleft;
+        int bytesleft;
         uint8_t data;
         int phase;
         int written;
@@ -222,6 +220,7 @@ void i8271_write(uint16_t addr, uint8_t val)
                                 break;
                             case 0x13: /*Read sector*/
                                 i8271.sectorsleft = i8271.params[2] & 31;
+                                i8271.bytesleft = 128 << ((i8271.params[2] >> 5) & 0x07);
                                 i8271.cursector = i8271.params[1];
                                 i8271_spinup();
                                 i8271.phase = 0;
@@ -231,16 +230,17 @@ void i8271_write(uint16_t addr, uint8_t val)
                                 break;
                             case 0x1F: /*Verify sector*/
                                 i8271.sectorsleft = i8271.params[2] & 31;
+                                i8271.bytesleft = 0;
                                 i8271.cursector = i8271.params[1];
                                 i8271_spinup();
                                 i8271.phase = 0;
                                 if (i8271.curtrack[curdrive] != i8271.params[0]) i8271_seek();
                                 else                                             fdc_time = 200;
-                                i8271_verify = 1;
                                 break;
                             case 0x1B: /*Read ID*/
 //                                printf("8271 : Read ID start\n");
                                 i8271.sectorsleft = i8271.params[2] & 31;
+                                i8271.bytesleft = 4;
                                 i8271_spinup();
                                 i8271.phase = 0;
                                 if (i8271.curtrack[curdrive] != i8271.params[0]) i8271_seek();
@@ -311,7 +311,7 @@ void i8271_write(uint16_t addr, uint8_t val)
                                 }
                                 break;
 
-                                default:
+                            default:
                                 i8271.result = 0x18;
                                 i8271.status = 0x18;
                                 i8271_NMI();
@@ -362,12 +362,10 @@ static void i8271_callback(void)
                         i8271.result = 0;
                         i8271_NMI();
                         i8271_setspindown();
-                        i8271_verify=0;
                         return;
                 }
                 i8271.cursector++;
                 disc_writesector(curdrive, i8271.cursector, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, 0);
-                bytenum = 0;
                 i8271.status = 0x8C;
                 i8271.result = 0;
                 i8271_NMI();
@@ -390,12 +388,12 @@ static void i8271_callback(void)
                         i8271.result = 0;
                         i8271_NMI();
                         i8271_setspindown();
-                        i8271_verify=0;
                         return;
                 }
                 i8271.cursector++;
+                if (i8271.command != 0x1f)
+                    i8271.bytesleft = 128 << ((i8271.params[2] >> 5) & 0x07);
                 disc_readsector(curdrive, i8271.cursector, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, 0);
-                bytenum = 0;
                 break;
 
             case 0x1B: /*Read ID*/
@@ -419,8 +417,8 @@ static void i8271_callback(void)
                         return;
                 }
                 i8271.cursector++;
+                i8271.bytesleft = 4;
                 disc_readaddress(curdrive, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, 0);
-                bytenum = 0;
                 break;
 
             case 0x23: /*Format*/
@@ -460,13 +458,13 @@ static void i8271_callback(void)
 
 static void i8271_data(uint8_t dat)
 {
-    if (i8271_verify)
-        return;
-    i8271.data = dat;
-    i8271.status = 0x8C;
-    i8271.result = 0;
-    i8271_NMI();
-    bytenum++;
+    if (i8271.bytesleft) {
+        --i8271.bytesleft;
+        i8271.data = dat;
+        i8271.status = 0x8C;
+        i8271.result = 0;
+        i8271_NMI();
+    }
 }
 
 static void i8271_finishread(bool deleted)
@@ -518,7 +516,6 @@ static void i8271_writeprotect(void)
 int i8271_getdata(int last)
 {
 //        printf("Disc get data %i\n",bytenum);
-        bytenum++;
         if (!i8271.written) return -1;
         if (!last)
         {
