@@ -89,7 +89,7 @@ static void wd1770_begin_read_sector(const char *variant)
     data_count = 0;
     wd1770.status = 0x81;
     wd1770.in_gap = 0;
-    disc_readsector(curdrive, wd1770.sector, wd1770.track, wd1770.curside, wd1770.density);
+    disc_readsector(curdrive, wd1770.sector, wd1770.track, wd1770.curside, wd1770.density|DISC_FLAG_DELD);
     bytenum = 0;
 }
 
@@ -384,7 +384,7 @@ static void wd1770_cmd_next(unsigned cmd)
         case 0x2: /*Step*/
         case 0x4: /*Step in*/
         case 0x6: /*Step out*/
-            if (cmd & 0x04 && !disc_verify(curdrive, wd1770.track, wd1770.density))
+            if (cmd & 0x04 && !disc_verify(curdrive, wd1770.track, wd1770.density|DISC_FLAG_DELD))
                 wd1770.status = 0x90 | track0;
             else
                 wd1770.status = 0x80 | track0;
