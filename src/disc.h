@@ -3,6 +3,12 @@
 
 #define NUM_DRIVES 2
 
+enum {
+    DISC_FLAG_MFM  = 0x01,
+    DISC_FLAG_DELD = 0x02,
+    DISC_FLAG_GAPS = 0x04
+};
+
 typedef struct
 {
     /*
@@ -11,17 +17,17 @@ typedef struct
      */
     void (*close)(int drive);
     void (*seek)(int drive, int track);
-    void (*readsector)(int drive, int sector, int track, int side, int density);
-    void (*writesector)(int drive, int sector, int track, int side, int density);
-    void (*readaddress)(int drive, int track, int side, int density);
+    void (*readsector)(int drive, int sector, int track, int side, unsigned flags);
+    void (*writesector)(int drive, int sector, int track, int side, unsigned flags);
+    void (*readaddress)(int drive, int track, int side, unsigned flags);
     void (*format)(int drive, int track, int side, unsigned par2);
-    void (*writetrack)(int drive, int track, int side, int density);
-    void (*readtrack)(int drive, int track, int side, int density);
+    void (*writetrack)(int drive, int track, int side, unsigned flags);
+    void (*readtrack)(int drive, int track, int side, unsigned flags);
     void (*poll)(void);
     void (*abort)(int drive);
     void (*spinup)(int drive);
     void (*spindown)(int drive);
-    int (*verify)(int drive, int track, int density);
+    int (*verify)(int drive, int track, unsigned flags);
     /*
      * The following fields hold the state for each drive.
      */
@@ -46,14 +52,14 @@ void disc_init(void);
 void disc_poll(void);
 void disc_seek0(int drive, uint32_t step_time, uint32_t settle_time);
 void disc_seekrelative(int drive, int tracks, uint32_t step_time, uint32_t settle_time);
-void disc_readsector(int drive, int sector, int track, int side, int density);
-void disc_writesector(int drive, int sector, int track, int side, int density);
-void disc_readaddress(int drive, int track, int side, int density);
-void disc_format(int drive, int track, int side, int density);
-void disc_writetrack(int drive, int track, int side, int density);
-void disc_readtrack(int drive, int track, int side, int density);
+void disc_readsector(int drive, int sector, int track, int side, unsigned flags);
+void disc_writesector(int drive, int sector, int track, int side, unsigned flags);
+void disc_readaddress(int drive, int track, int side, unsigned flags);
+void disc_format(int drive, int track, int side, unsigned flags);
+void disc_writetrack(int drive, int track, int side, unsigned flags);
+void disc_readtrack(int drive, int track, int side, unsigned flags);
 void disc_abort(int drive);
-int disc_verify(int drive, int track, int density);
+int disc_verify(int drive, int track, unsigned flags);
 
 extern int disc_time;
 

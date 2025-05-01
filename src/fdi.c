@@ -82,21 +82,21 @@ static void fdi_seek(int drive, int track)
 //        printf("DD Track %i Len %i Index %i %i\n",track,ftracklen[drive][0][1],ftrackindex[drive][0][1],c);
 }
 
-static void fdi_readsector(int drive, int sector, int track, int side, int density)
+static void fdi_readsector(int drive, int sector, int track, int side, unsigned flags)
 {
         fdi_revs = 0;
         fdi_sector  = sector;
         fdi_track   = track;
         fdi_side    = side;
         fdi_drive   = drive;
-        fdi_density = density;
+        fdi_density = flags & DISC_FLAG_MFM;
 //        printf("Read sector %i %i %i %i\n",drive,side,track,sector);
 
         fdi_inread  = 1;
         fdi_readpos = 0;
 }
 
-static void fdi_writesector(int drive, int sector, int track, int side, int density)
+static void fdi_writesector(int drive, int sector, int track, int side, unsigned flags)
 {
         fdi_revs = 0;
         fdi_sector = sector;
@@ -105,7 +105,7 @@ static void fdi_writesector(int drive, int sector, int track, int side, int dens
         fdi_drive  = drive;
 //        printf("Write sector %i %i %i %i\n",drive,side,track,sector);
 
-        if (!fdi_f[drive] || (side && !fdi_ds[drive]) || density)
+        if (!fdi_f[drive] || (side && !fdi_ds[drive]) || (flags & DISC_FLAG_MFM))
         {
                 fdi_notfound = 500;
                 return;
@@ -114,12 +114,12 @@ static void fdi_writesector(int drive, int sector, int track, int side, int dens
         fdi_readpos = 0;
 }
 
-static void fdi_readaddress(int drive, int track, int side, int density)
+static void fdi_readaddress(int drive, int track, int side, unsigned flags)
 {
         fdi_revs = 0;
         fdi_track   = track;
         fdi_side    = side;
-        fdi_density = density;
+        fdi_density = (flags & DISC_FLAG_MFM);
         fdi_drive   = drive;
 //        printf("Read address %i %i %i\n",drive,side,track);
 

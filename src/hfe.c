@@ -1019,39 +1019,39 @@ static void set_up_for_sector_id_scan(int drive)
   state->bits_avail_to_decode = 0;
 }
 
-static void hfe_readsector(int drive, int sector, int track, int side, int density)
+static void hfe_readsector(int drive, int sector, int track, int side, unsigned flags)
 {
   log_debug("hfe: drive %d: readsector track %d side %d sector %d (%s)",
-            drive, track, side, sector, (density ? "MFM" : "FM"));
+            drive, track, side, sector, ((flags & DISC_FLAG_MFM) ? "MFM" : "FM"));
   struct sector_address addr;
   addr.track = track;
   addr.side = side;
   addr.sector = sector;
-  start_sector_op(drive, density, ROP_READ_ADDR_FOR_SECTOR, addr, "readsector",
+  start_sector_op(drive, (flags & DISC_FLAG_MFM), ROP_READ_ADDR_FOR_SECTOR, addr, "readsector",
                   set_up_for_sector_id_scan);
 }
 
-static void hfe_writesector(int drive, int sector, int track, int side, int density)
+static void hfe_writesector(int drive, int sector, int track, int side, unsigned flags)
 {
   log_info("hfe: drive %d: writesector track %d side %d sector %d (%s)",
-           drive, track, side, sector, (density ? "MFM" : "FM"));
+           drive, track, side, sector, ((flags & DISC_FLAG_MFM) ? "MFM" : "FM"));
   struct sector_address addr;
   addr.track = track;
   addr.side = side;
   addr.sector = sector;
-  start_sector_op(drive, density, WOP_WRITE_SECTOR, addr, "writesector",
+  start_sector_op(drive, (flags & DISC_FLAG_MFM), WOP_WRITE_SECTOR, addr, "writesector",
                   set_up_for_sector_id_scan);
 }
 
-static void hfe_readaddress(int drive, int track, int side, int density)
+static void hfe_readaddress(int drive, int track, int side, unsigned flags)
 {
   log_debug("hfe: drive %d: readaddress track %d side %d (%s)",
-            drive, track, side, (density ? "MFM" : "FM"));
+            drive, track, side, ((flags & DISC_FLAG_MFM) ? "MFM" : "FM"));
   struct sector_address addr;
   addr.track = track;
   addr.side = side;
   addr.sector = SECTOR_ACCEPT_ANY;
-  start_sector_op(drive, density, ROP_READ_JUST_ADDR, addr, "readaddress",
+  start_sector_op(drive, (flags & DISC_FLAG_MFM), ROP_READ_JUST_ADDR, addr, "readaddress",
                   set_up_for_sector_id_scan);
 }
 

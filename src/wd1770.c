@@ -185,7 +185,7 @@ static void wd1770_wctl_acorn(uint8_t val)
     wd1770_maybe_reset(val & 0x20);
     wd1770_wctl_adrive(val);
     wd1770.curside =  (val & 0x04) ? 1 : 0;
-    wd1770.density = !(val & 0x08);
+    wd1770.density = (val & 0x08) ? 0 : DISC_FLAG_MFM;
 }
 
 /*
@@ -199,7 +199,7 @@ static void wd1770_wctl_master(uint8_t val)
     wd1770_maybe_reset(val & 0x04);
     wd1770_wctl_adrive(val);
     wd1770.curside =  (val & 0x10) ? 1 : 0;
-    wd1770.density = !(val & 0x20);
+    wd1770.density = (val & 0x20) ? 0 : DISC_FLAG_MFM;
 }
 
 /*
@@ -235,20 +235,20 @@ static void wd1770_wctl_opus(uint8_t val)
     log_debug("wd1770: write opus-style ctrl %02X", val);
     wd1770_wctl_sdrive(val & 0x01);
     wd1770.curside =  (val & 0x02) ? 1 : 0;
-    wd1770.density = (val & 0x40);
+    wd1770.density = (val & 0x40) ? DISC_FLAG_MFM : 0;
 }
 
 /*
  * Process a write to the control latch for the Solidisk WD1770
  * interface.
  */
-
+;
 static void wd1770_wctl_stl(uint8_t val)
 {
     log_debug("wd1770: write solidisk-style ctrl %02X", val);
     wd1770_wctl_sdrive(val & 0x01);
     wd1770.curside =  (val & 0x02) ? 1 : 0;
-    wd1770.density = !(val & 0x04);
+    wd1770.density = (val & 0x04) ? 0 : DISC_FLAG_MFM;
 }
 
 /*
@@ -262,7 +262,7 @@ static void wd1770_wctl_watford(uint8_t val)
     wd1770_maybe_reset(val & 0x08);
     wd1770_wctl_sdrive(val & 0x04);
     wd1770.curside =  (val & 0x02) ? 1 : 0;
-    wd1770.density = !(val & 0x01);
+    wd1770.density = (val & 0x01) ? 0 : DISC_FLAG_MFM;
 }
 
 void wd1770_write(uint16_t addr, uint8_t val)

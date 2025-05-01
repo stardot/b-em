@@ -165,52 +165,52 @@ void disc_seekrelative(int drive, int tracks, uint32_t step_time, uint32_t settl
     }
 }
 
-void disc_readsector(int drive, int sector, int track, int side, int density)
+void disc_readsector(int drive, int sector, int track, int side, unsigned flags)
 {
         if (drives[drive].readsector) {
             autoboot = 0;
-            drives[drive].readsector(drive, sector, track, side, density);
+            drives[drive].readsector(drive, sector, track, side, flags);
         }
         else
            disc_notfound = 10000;
 }
 
-void disc_writesector(int drive, int sector, int track, int side, int density)
+void disc_writesector(int drive, int sector, int track, int side, unsigned flags)
 {
         if (drives[drive].writesector)
-           drives[drive].writesector(drive, sector, track, side, density);
+           drives[drive].writesector(drive, sector, track, side, flags);
         else
            disc_notfound = 10000;
 }
 
-void disc_readaddress(int drive, int track, int side, int density)
+void disc_readaddress(int drive, int track, int side, unsigned flags)
 {
         if (drives[drive].readaddress)
-           drives[drive].readaddress(drive, track, side, density);
+           drives[drive].readaddress(drive, track, side, flags);
         else
            disc_notfound = 10000;
 }
 
-void disc_format(int drive, int track, int side, int density)
+void disc_format(int drive, int track, int side, unsigned flags)
 {
         if (drives[drive].format)
-           drives[drive].format(drive, track, side, density);
+           drives[drive].format(drive, track, side, flags);
         else
            disc_notfound = 10000;
 }
 
-void disc_writetrack(int drive, int track, int side, int density)
+void disc_writetrack(int drive, int track, int side, unsigned flags)
 {
     if (drives[drive].writetrack)
-        drives[drive].writetrack(drive, track, side, density);
+        drives[drive].writetrack(drive, track, side, flags);
     else
-        disc_format(drive, track, side, density);
+        disc_format(drive, track, side, flags);
 }
 
-void disc_readtrack(int drive, int track, int side, int density)
+void disc_readtrack(int drive, int track, int side, unsigned flags)
 {
     if (drives[drive].readtrack)
-        drives[drive].readtrack(drive, track, side, density);
+        drives[drive].readtrack(drive, track, side, flags);
     else
        disc_notfound = 10000;
 }
@@ -223,10 +223,10 @@ void disc_abort(int drive)
            disc_notfound = 10000;
 }
 
-int disc_verify(int drive, int track, int density)
+int disc_verify(int drive, int track, unsigned flags)
 {
         if (drives[drive].verify)
-            return drives[drive].verify(drive, track, density);
+            return drives[drive].verify(drive, track, flags);
         else
             return 1;
 }

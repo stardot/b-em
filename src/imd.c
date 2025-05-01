@@ -268,8 +268,9 @@ static void imd_seek(int drive, int track)
  * the density requested from the controller.
  */
 
-static int imd_density_ok(struct imd_track *trk, int density)
+static int imd_density_ok(struct imd_track *trk, unsigned flags)
 {
+    unsigned density = flags & DISC_FLAG_MFM;
     return (density && trk->mode >= 3) || (!density && trk->mode <= 2);
 }
 
@@ -279,7 +280,7 @@ static int imd_density_ok(struct imd_track *trk, int density)
  * check only examines the first sector it can find on either surface.
  */
 
-static int imd_verify(int drive, int track, int density)
+static int imd_verify(int drive, int track, unsigned flags)
 {
     if (state == ST_IDLE && drive >= 0 && drive < NUM_DRIVES) {
         struct imd_file *imd = &imd_discs[drive];
@@ -295,7 +296,7 @@ static int imd_verify(int drive, int track, int density)
                 }
             }
         }
-        int res = trk && trk->sect_head->cylinder == track && imd_density_ok(trk, density);
+        int res = trk && trk->sect_head->cylinder == track && imd_density_ok(trk, flags);
         log_debug("imd: drive %d: verify result=%d", drive, res);
         return res;
     }
@@ -311,18 +312,18 @@ static int imd_verify(int drive, int track, int density)
  * the same as the cylinder encoded within sector headers.
  */
 
-static struct imd_track *imd_find_track(int drive, int track, int side, int density)
+static struct imd_track *imd_find_track(int drive, int track, int side, unsigned flags)
 {
     if (drive >= 0 && drive < NUM_DRIVES) {
         struct imd_file *imd = &imd_discs[drive];
         struct imd_track *trk = imd->track_cur;
-        if (!trk || !imd_density_ok(trk, density)) {
+        if (!trk || !imd_density_ok(trk, flags)) {
             log_debug("imd: drive %d: searching for track", drive);
             if (track > imd->maxcyl)
                 track = imd->maxcyl;
             for (trk = imd->track_head; trk; trk = trk->next) {
                 log_debug("imd: drive %d: cyl %u<>%u, head %u<>%u", drive, trk->cylinder, imd->trackno, trk->head, side);
-                if (trk->cylinder == track && trk->head == side && imd_density_ok(trk, density)) {
+                if (trk->cylinder == track && trk->head == side && imd_density_ok(trk, flags)) {
                     log_debug("imd: drive %d: found track", drive);
                     imd->track_cur = trk;
                     imd->headno = side;
@@ -358,11 +359,11 @@ static struct imd_sect *imd_find_sector(int drive, int track, int side, int sect
  * imd_poll function and associated state machine.
  */
 
-static void imd_readsector(int drive, int sector, int track, int side, int density)
+static void imd_readsector(int drive, int sector, int track, int side, unsigned flags)
 {
-    log_debug("imd: drive %d: readsector sector=%d, track=%d, side=%d, density=%d", drive, sector, track, side, density);
+    log_debug("imd: drive %d: readsector sector=%d, track=%d, side=%d, flags=%x", drive, sector, track, side, flags);
     if (state == ST_IDLE) {
-        struct imd_track *trk = imd_find_track(drive, track, side, density);
+        struct imd_track *trk = imd_find_track(drive, track, side, flags);
         if (trk) {
             struct imd_sect *sect = imd_find_sector(drive, track, side, sector, trk);
             if (sect) {
@@ -392,11 +393,11 @@ static void imd_readsector(int drive, int sector, int track, int side, int densi
  * imd_poll function and associated state machine.
  */
 
-static void imd_writesector(int drive, int sector, int track, int side, int density)
+static void imd_writesector(int drive, int sector, int track, int side, unsigned flags)
 {
-    log_debug("imd: drive %d: writesector sector=%d, track=%d, side=%d, density=%d", drive, sector, track, side, density);
+    log_debug("imd: drive %d: writesector sector=%d, track=%d, side=%d, flags=%d", drive, sector, track, side, flags);
     if (state == ST_IDLE) {
-        struct imd_track *trk = imd_find_track(drive, track, side, density);
+        struct imd_track *trk = imd_find_track(drive, track, side, flags);
         if (trk) {
             struct imd_sect *sect = imd_find_sector(drive, track, side, sector, trk);
             if (sect) {
@@ -426,17 +427,17 @@ static void imd_writesector(int drive, int sector, int track, int side, int dens
  * via the imd_poll function and associated state machine.
  */
 
-static void imd_readaddress(int drive, int track, int side, int density)
+static void imd_readaddress(int drive, int track, int side, unsigned flags)
 {
-    log_debug("imd: drive %d: readaddress track=%d, side=%d, density=%d", drive, track, side, density);
+    log_debug("imd: drive %d: readaddress track=%d, side=%d, flags=%d", drive, track, side, flags);
     if (state == ST_IDLE) {
         struct imd_track *trk = cur_trk;
-        if (trk && trk->cylinder == track && trk->head == side && imd_density_ok(trk, density)) {
+        if (trk && trk->cylinder == track && trk->head == side && imd_density_ok(trk, flags)) {
             if (!(cur_sect = cur_sect->next))
                 cur_sect = trk->sect_head;
             state = ST_READ_ADDR0;
         }
-        else if ((trk = imd_find_track(drive, track, side, density))) {
+        else if ((trk = imd_find_track(drive, track, side, flags))) {
             cur_trk = trk;
             cur_sect = trk->sect_head;
             state = ST_READ_ADDR0;
@@ -453,7 +454,7 @@ static void imd_readaddress(int drive, int track, int side, int density)
  * and the WD1770 write track command.
  */
 
-static bool imd_begin_format(int drive, int track, int side, int density)
+static bool imd_begin_format(int drive, int track, int side, unsigned flags)
 {
     if (drive >= 0 && drive < NUM_DRIVES) {
         if (drives[drive].writeprot) {
@@ -495,7 +496,7 @@ static bool imd_begin_format(int drive, int track, int side, int density)
         }
         trk->sect_head = NULL;
         trk->sect_tail = NULL;
-        trk->mode      = density ? 0x05 : 0x02;
+        trk->mode      = (flags & DISC_FLAG_MFM) ? 0x05 : 0x02;
         trk->cylinder  = track;
         trk->head      = side;
         cur_trk = trk;
@@ -530,9 +531,9 @@ static void imd_format(int drive, int track, int side, unsigned par2)
  * than the i2871.  Unlike the i8271, the WD1770 sends the whole track.
  */
 
-static void imd_writetrack(int drive, int track, int side, int density)
+static void imd_writetrack(int drive, int track, int side, unsigned flags)
 {
-    if (imd_begin_format(drive, track, side, density)) {
+    if (imd_begin_format(drive, track, side, flags)) {
         cur_trk->nsect = 0;
         cur_trk->sectsize = 0xfe;
         state = ST_WRTRACK_INITIAL;
@@ -543,9 +544,9 @@ static void imd_writetrack(int drive, int track, int side, int density)
  * the i2871.  This sends the whole track including gaps and IDs.
  */
 
-static void imd_readtrack(int drive, int track, int side, int density)
+static void imd_readtrack(int drive, int track, int side, unsigned flags)
 {
-    struct imd_track *trk = imd_find_track(drive, track, side, density);
+    struct imd_track *trk = imd_find_track(drive, track, side, flags);
     if (trk) {
         cur_sect = trk->sect_head;
         count = 16;
