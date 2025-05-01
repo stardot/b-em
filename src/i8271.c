@@ -25,11 +25,12 @@ struct
         uint8_t result;
         int curtrack[2], cursector;
         int sectorsleft;
+        int sectorsize;
         int bytesleft;
+        unsigned discflags;
         uint8_t data;
         int phase;
         int written;
-
         uint8_t drvout;
     uint8_t unload_revs;
     uint32_t step_time;
@@ -88,26 +89,6 @@ void i8271_setspindown(void)
     log_debug("i8271: set motorspin=%'d", motorspin);
 }
 
-int params[][2]=
-{
-        {0x35, 4}, {0x29, 1}, {0x2C, 0}, {0x3D, 1}, {0x3A, 2}, {0x13, 3}, {0x0B, 3}, {0x1B, 3}, {0x1F, 3}, {0x23, 5}, {-1, -1}
-};
-
-int i8271_getparams()
-{
-        int c = 0;
-        while (params[c][0] != -1)
-        {
-                if (params[c][0] == i8271.command)
-                   return params[c][1];
-                c++;
-        }
-        return 0;
-/*        printf("Unknown 8271 command %02X\n",i8271.command);
-        dumpregs();
-        exit(-1);*/
-}
-
 uint8_t i8271_read(uint16_t addr)
 {
 //        printf("Read 8271 %04X\n",addr);
@@ -150,9 +131,19 @@ static uint32_t time_to_2Mhz(unsigned value, unsigned multiplier, const char *na
     return cycles;
 }
 
+static void i8271_prep_op(int sectors, int sectorsize, unsigned flags)
+{
+    i8271.cursector = i8271.params[1];
+    i8271.sectorsleft = sectors;
+    i8271.sectorsize = sectorsize;
+    i8271.discflags = flags;
+    i8271_spinup();
+    i8271.phase = 0;
+    i8271_seek();
+}
+
 void i8271_write(uint16_t addr, uint8_t val)
 {
-//        printf("Write 8271 %04X %02X\n",addr,val);
         switch (addr&7)
         {
             case 0: /*Command register*/
@@ -176,30 +167,52 @@ void i8271_write(uint16_t addr, uint8_t val)
                     led_update((curdrive == 0) ? LED_DRIVE_1 : LED_DRIVE_0, false, 0);
                 }
                 i8271.paramnum = 0;
-                i8271.paramreq = i8271_getparams();
                 i8271.status = 0x80;
-                if (!i8271.paramreq)
-                {
-                        switch (i8271.command)
-                        {
-                            case 0x2C: /*Read drive status*/
-                                i8271.status = 0x10;
-                                i8271.result = 0x80 | 8 | track0;
-                                if (i8271.drvout & DRIVESEL0) i8271.result |= 0x04;
-                                if (i8271.drvout & DRIVESEL1) i8271.result |= 0x40;
-//                                printf("Status %02X\n",i8271.result);
-                                break;
-
-                            default:
-                                i8271.result = 0x18;
-                                i8271.status = 0x18;
-                                i8271_NMI();
-                                fdc_time = 0;
-                                break;
-//                                printf("Unknown 8271 command %02X 3\n",i8271.command);
-//                                dumpregs();
-//                                exit(-1);
-                        }
+                switch (i8271.command) {
+                    case 0x2c:
+                        i8271.paramreq = 0;
+                        i8271.status = 0x10;
+                        i8271.result = 0x80 | 8 | track0;
+                        if (i8271.drvout & DRIVESEL0)
+                            i8271.result |= 0x04;
+                        if (i8271.drvout & DRIVESEL1)
+                            i8271.result |= 0x40;
+                        break;
+                    case 0x29: /* seek */
+                    case 0x3d: /* read special register */
+                        i8271.paramreq = 1;
+                        break;
+                    case 0x0a: /* write data (single 128 byte sector) */
+                    case 0x0e: /* write deleted data (single 128 byte sector) */
+                    case 0x12: /* read data (single 128 byte sector) */
+                    case 0x16: /* read data and deleted data (single 128 byte sector) */
+                    case 0x1e: /* verify data and deleted data (single 128 byte sector) */
+                    case 0x3a: /* write special register */
+                        i8271.paramreq = 2;
+                        break;
+                    case 0x0b: /* write data (variable length/multi-sector) */
+                    case 0x0f: /* write deleted data (variable length/multi-sector) */
+                    case 0x13: /* read data (variable length/multi-sector) */
+                    case 0x17: /* read data and deleted data (variable length/multi-sector) */
+                    case 0x1f: /* verify data (variable length/multi-sector) */
+                    case 0x1b: /* read ID */
+                        i8271.paramreq = 3;
+                        break;
+                    case 0x35: /* specify */
+                        i8271.paramreq = 4;
+                        break;
+                    case 0x00: /* scan data (variable length/multi-sector) */
+                    case 0x04: /* scan data and deleted data (variable length/multi-sector) */
+                    case 0x23: /* format track */
+                        i8271.paramreq = 5;
+                        break;
+                    default:
+                        log_warn("i8271: unrecognised command %02x on write to command register", i8271.command);
+                        i8271.paramreq = 0;
+                        i8271.result = 0x18;
+                        i8271.status = 0x18;
+                        i8271_NMI();
+                        fdc_time = 0;
                 }
                 break;
             case 1: /*Parameter register*/
@@ -208,119 +221,110 @@ void i8271_write(uint16_t addr, uint8_t val)
                    i8271.params[i8271.paramnum++] = val;
                 if (i8271.paramnum == i8271.paramreq)
                 {
-                        switch (i8271.command)
-                        {
-                            case 0x0B: /*Write sector*/
-                                i8271.sectorsleft = i8271.params[2] & 31;
-                                i8271.cursector = i8271.params[1];
-                                i8271_spinup();
-                                i8271.phase = 0;
-                                if (i8271.curtrack[curdrive] != i8271.params[0]) i8271_seek();
-                                else                                             fdc_time = 200;
-                                break;
-                            case 0x13: /*Read sector*/
-                                i8271.sectorsleft = i8271.params[2] & 31;
-                                i8271.bytesleft = 128 << ((i8271.params[2] >> 5) & 0x07);
-                                i8271.cursector = i8271.params[1];
-                                i8271_spinup();
-                                i8271.phase = 0;
-                                if (i8271.curtrack[curdrive] != i8271.params[0])
-                                    i8271_seek();
-                                fdc_time = 200;
-                                break;
-                            case 0x1F: /*Verify sector*/
-                                i8271.sectorsleft = i8271.params[2] & 31;
-                                i8271.bytesleft = 0;
-                                i8271.cursector = i8271.params[1];
-                                i8271_spinup();
-                                i8271.phase = 0;
-                                if (i8271.curtrack[curdrive] != i8271.params[0]) i8271_seek();
-                                else                                             fdc_time = 200;
-                                break;
-                            case 0x1B: /*Read ID*/
-//                                printf("8271 : Read ID start\n");
-                                i8271.sectorsleft = i8271.params[2] & 31;
-                                i8271.bytesleft = 4;
-                                i8271_spinup();
-                                i8271.phase = 0;
-                                if (i8271.curtrack[curdrive] != i8271.params[0]) i8271_seek();
-                                else                                             fdc_time = 200;
-                                break;
-                            case 0x23: /*Format track*/
-                                i8271_spinup();
-                                i8271.phase = 0;
-                                if (i8271.curtrack[curdrive] != i8271.params[0]) i8271_seek();
-                                else                                             fdc_time = 200;
-                                break;
-                                break;
-                            case 0x29: /*Seek*/
-//                                fdc_time=10000;
-                                i8271_seek();
-                                i8271_spinup();
-                                break;
-                            case 0x35: /*Specify*/
-                                if (i8271.params[0] == 0x0d) {
-                                    i8271.step_time   = time_to_2Mhz(i8271.params[1], 2000, "step time");
-                                    i8271.settle_time = time_to_2Mhz(i8271.params[2], 2000, "head settle time");
-                                    i8271.unload_revs = i8271.params[3] >> 4;
-                                    log_debug("i8271: unload revs set to %d", i8271.unload_revs);
-                                    i8271.load_time = time_to_2Mhz(i8271.params[3] & 0x0f, 4000, "head load time");
-                                }
-                                i8271.status = 0;
-                                break;
-                            case 0x3A: /*Write special register*/
-                                i8271.status = 0;
-//                                printf("Write special %02X\n",i8271.params[0]);
-                                switch (i8271.params[0])
-                                {
-                                    case 0x12: i8271.curtrack[0] = val; /*printf("Write real track now %i\n",val);*/ break;
-                                    case 0x17: break; /*Mode register*/
-                                    case 0x1A: i8271.curtrack[1] = val; /*printf("Write real track now %i\n",val);*/ break;
-                                    case 0x23: i8271.drvout = i8271.params[1]; break;
-                                    default:
-                                        i8271.result = 0x18;
-                                        i8271.status = 0x18;
-                                        i8271_NMI();
-                                        fdc_time = 0;
-                                        break;
-//                                        default:
-//                                        printf("8271 Write bad special register %02X\n",i8271.params[0]);
-//                                        dumpregs();
-//                                        exit(-1);
-                                }
-                                break;
-                            case 0x3D: /*Read special register*/
-                                i8271.status = 0x10;
-                                i8271.result = 0;
-                                switch (i8271.params[0])
-                                {
-                                        case 0x06: i8271.result = 0; break;
-                                        case 0x12: i8271.result = i8271.curtrack[0]; break;
-                                        case 0x1A: i8271.result = i8271.curtrack[1]; break;
-                                        case 0x23: i8271.result = i8271.drvout; break;
-                                        default:
-                                        i8271.result = 0x18;
-                                        i8271.status = 0x18;
-                                        i8271_NMI();
-                                        fdc_time = 0;
-                                        break;
-//                                        default:
-//                                        printf("8271 Read bad special register %02X\n",i8271.params[0]);
-//                                        dumpregs();
-//                                        exit(-1);
-                                }
-                                break;
+                    switch (i8271.command)
+                    {
+                        case 0x0a: /* Write 128-byte single sector */
+                        case 0x12: /* Read 128-byte single sector */
+                            i8271_prep_op(1, 128, 0);
+                            break;
+                        case 0x0b: /* Write variable/multiple sector */
+                        case 0x13: /* Read variable/multiple sector */
+                            i8271_prep_op(i8271.params[2] & 31, 128 << ((i8271.params[2] >> 5) & 0x07), 0);
+                            break;
+                        case 0x0e: /* Write 128-byte single sector with deleted data */
+                        case 0x16: /* Read 128-byte single sector including deleted data */
+                            i8271_prep_op(1, 128, DISC_FLAG_DELD);
+                            break;
+                        case 0x0f: /* Write variable/multiple sector with deleted data */
+                        case 0x17: /* Read variable/multiple sector including deleted data */
+                            i8271_prep_op(i8271.params[2] & 31, 128 << ((i8271.params[2] >> 5) & 0x07), DISC_FLAG_DELD);
+                            break;
+                        case 0x1e: /* Verify 128-byte single sector */
+                            i8271_prep_op(1, 0, DISC_FLAG_DELD);
+                            break;
+                        case 0x1f: /* Verify variable/multiple sector */
+                            i8271_prep_op(i8271.params[2] & 31, 0, DISC_FLAG_DELD);
+                            break;
+                        case 0x1B: /*Read ID*/
+                            i8271_prep_op(i8271.params[2] & 31, 4, 0);
+                            break;
+                        case 0x23: /*Format track*/
+                            i8271_spinup();
+                            i8271.phase = 0;
+                            i8271_seek();
+                            break;
+                        case 0x29: /*Seek*/
+                            i8271_seek();
+                            i8271_spinup();
+                            break;
+                        case 0x35: /*Specify*/
+                            if (i8271.params[0] == 0x0d) {
+                                i8271.step_time   = time_to_2Mhz(i8271.params[1], 2000, "step time");
+                                i8271.settle_time = time_to_2Mhz(i8271.params[2], 2000, "head settle time");
+                                i8271.unload_revs = i8271.params[3] >> 4;
+                                log_debug("i8271: unload revs set to %d", i8271.unload_revs);
+                                i8271.load_time = time_to_2Mhz(i8271.params[3] & 0x0f, 4000, "head load time");
+                            }
+                            i8271.status = 0;
+                            break;
+                        case 0x3a: /* Write special register */
+                            i8271.status = 0;
+                            switch (i8271.params[0])
+                            {
+                                case 0x12: /* Current track for surface 0 */
+                                    i8271.curtrack[0] = val;
+                                    break;
+                                case 0x17: /* Mode register */
+                                    break;
+                                case 0x1A: /* Current track for surface 1 */
+                                    i8271.curtrack[1] = val;
+                                    break;
+                                case 0x23: /* Drive control output */
+                                    i8271.drvout = i8271.params[1];
+                                    break;
+                                default:
+                                    log_warn("i8271: write to unrecognised special register %02x", i8271.params[0]);
+                                    i8271.result = 0x18;
+                                    i8271.status = 0x18;
+                                    i8271_NMI();
+                                    fdc_time = 0;
+                            }
+                            break;
+                        case 0x3d: /*Read special register*/
+                            i8271.status = 0x10;
+                            i8271.result = 0;
+                            switch (i8271.params[0])
+                            {
+                                case 0x06: /* Scan sector number */
+                                    i8271.result = 0;
+                                    break;
+                                case 0x12: /* Current track for surface 0 */
+                                    i8271.result = i8271.curtrack[0];
+                                    break;
+                                case 0x1a: /* Current track for surface 1 */
+                                    i8271.result = i8271.curtrack[1];
+                                    break;
+                                case 0x23: /* Drive control input */
+                                    i8271.result = i8271.drvout;
+                                    break;
+                                default:
+                                    log_warn("i8271: read from unrecognised special register %02x", i8271.params[0]);
+                                    i8271.result = 0x18;
+                                    i8271.status = 0x18;
+                                    i8271_NMI();
+                                    fdc_time = 0;
+                                    break;
+                            }
+                            break;
 
-                            default:
-                                i8271.result = 0x18;
-                                i8271.status = 0x18;
-                                i8271_NMI();
-                                fdc_time = 0;
-                                break;
-//                                printf("Unknown 8271 command %02X 2\n",i8271.command);
-//                                dumpregs();
-//                                exit(-1);
-                        }
+                        default:
+                            log_warn("i8271: unrecognised command %02x after paramaters", i8271.command);
+                            i8271.result = 0x18;
+                            i8271.status = 0x18;
+                            i8271_NMI();
+                            fdc_time = 0;
+                            break;
+                    }
                 }
                 break;
             case 2: /*Reset register*/
@@ -339,88 +343,84 @@ void i8271_write(uint16_t addr, uint8_t val)
 
 static void i8271_callback(void)
 {
-        fdc_time = 0;
-        log_debug("i8271: fdc_callback, cmd=%02X", i8271.command);
-        switch (i8271.command)
-        {
-            case 0x0B: /*Write*/
-                if (!i8271.phase)
-                {
-                        i8271.curtrack[curdrive] = i8271.params[0];
-                        disc_writesector(curdrive, i8271.cursector, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, 0);
-                        i8271.phase = 1;
-
-                        i8271.status = 0x8C;
-                        i8271.result = 0;
-                        i8271_NMI();
-                        return;
+    fdc_time = 0;
+    log_debug("i8271: fdc_callback, cmd=%02X", i8271.command);
+    switch (i8271.command)
+    {
+        case 0x0a: /* Write 128-byte single sector */
+        case 0x0b: /* Write variable/multiple sector */
+        case 0x0e: /* Write 128-byte single sector with deleted data */
+        case 0x0f: /* Write variable/multiple sector with deleted data */
+            if (!i8271.phase) {
+                    i8271.curtrack[curdrive] = i8271.params[0];
+                    disc_writesector(curdrive, i8271.cursector, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, i8271.discflags);
+                    i8271.phase = 1;
+                    i8271.status = 0x8C;
+                    i8271.result = 0;
+                    i8271_NMI();
+                    return;
                 }
                 i8271.sectorsleft--;
                 if (!i8271.sectorsleft)
                 {
-                        i8271.status = 0x18;
-                        i8271.result = 0;
-                        i8271_NMI();
-                        i8271_setspindown();
-                        return;
+                    i8271.status = 0x18;
+                    i8271.result = 0;
+                    i8271_NMI();
+                    i8271_setspindown();
+                    return;
                 }
                 i8271.cursector++;
-                disc_writesector(curdrive, i8271.cursector, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, 0);
+                i8271.bytesleft = i8271.sectorsize;
+                disc_writesector(curdrive, i8271.cursector, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, i8271.discflags);
                 i8271.status = 0x8C;
                 i8271.result = 0;
                 i8271_NMI();
                 break;
 
-            case 0x13: /*Read*/
-            case 0x1F: /*Verify*/
-                if (!i8271.phase)
-                {
-//                        printf("Seek to %i\n",i8271.params[0]);
-                        i8271.curtrack[curdrive] = i8271.params[0];
-                        disc_readsector(curdrive, i8271.cursector, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, 0);
-                        i8271.phase = 1;
-                        return;
+            case 0x12: /* Read 128-byte single sector */
+            case 0x13: /* Read variable/multiple sector */
+            case 0x16: /* Read 128-byte single sector including deleted data */
+            case 0x17: /* Read variable/multiple sector including deleted data */
+            case 0x1e: /* Verify 128-byte single sector */
+            case 0x1f: /* Verify variable/multiple sector */
+                if (!i8271.phase) {
+                    i8271.curtrack[curdrive] = i8271.params[0];
+                    i8271.bytesleft = i8271.sectorsize;
+                    disc_readsector(curdrive, i8271.cursector, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, i8271.discflags);
+                    i8271.phase = 1;
+                    return;
                 }
                 i8271.sectorsleft--;
-                if (!i8271.sectorsleft)
-                {
-                        i8271.status = 0x18;
-                        i8271.result = 0;
-                        i8271_NMI();
-                        i8271_setspindown();
-                        return;
+                if (!i8271.sectorsleft) {
+                    i8271.status = 0x18;
+                    i8271.result = 0;
+                    i8271_NMI();
+                    i8271_setspindown();
+                    return;
                 }
                 i8271.cursector++;
-                if (i8271.command != 0x1f)
-                    i8271.bytesleft = 128 << ((i8271.params[2] >> 5) & 0x07);
-                disc_readsector(curdrive, i8271.cursector, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, 0);
+                i8271.bytesleft = i8271.sectorsize;
+                disc_readsector(curdrive, i8271.cursector, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, i8271.discflags);
                 break;
-
-            case 0x1B: /*Read ID*/
-//                printf("Read ID callback %i\n",i8271.phase);
-                if (!i8271.phase)
-                {
-                        i8271.curtrack[curdrive] = i8271.params[0];
-                        disc_readaddress(curdrive, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, 0);
-                        i8271.phase = 1;
-                        return;
+            case 0x1B: /* Read ID */
+                if (!i8271.phase) {
+                    i8271.curtrack[curdrive] = i8271.params[0];
+                    disc_readaddress(curdrive, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, 0);
+                    i8271.phase = 1;
+                    return;
                 }
-//                printf("Read ID track %i %i\n",i8271.params[0],i8271.sectorsleft);
                 i8271.sectorsleft--;
-                if (!i8271.sectorsleft)
-                {
-                        i8271.status = 0x18;
-                        i8271.result = 0;
-                        i8271_NMI();
-//                        printf("8271 : ID read done!\n");
-                        i8271_setspindown();
-                        return;
+                if (!i8271.sectorsleft) {
+                    i8271.status = 0x18;
+                    i8271.result = 0;
+                    i8271_NMI();
+                    i8271_setspindown();
+                    return;
                 }
                 i8271.cursector++;
                 i8271.bytesleft = 4;
                 disc_readaddress(curdrive, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, 0);
                 break;
-
             case 0x23: /*Format*/
                 if (!i8271.phase) {
                     log_debug("i8271: callback for format, initiate");
@@ -436,7 +436,6 @@ static void i8271_callback(void)
                 }
                 i8271_NMI();
                 break;
-
             case 0x29: /*Seek*/
                 i8271.curtrack[curdrive] = i8271.params[0];
                 i8271.status = 0x18;
@@ -444,16 +443,12 @@ static void i8271_callback(void)
                 i8271_NMI();
                 i8271_setspindown();
                 break;
+            case 0xFF:
+                break;
 
-            case 0xFF: break;
-
-            default: break;
-                /* TODO: DB: check is this the intent?
-                printf("Unknown 8271 command %02X 3\n", i8271.command);
-                dumpregs();
-                exit(-1);
-                */
-        }
+            default:
+                log_warn("i8271: unrecognised command %02x in callback", i8271.command);
+    }
 }
 
 static void i8271_data(uint8_t dat)
