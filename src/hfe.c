@@ -1043,12 +1043,12 @@ static void hfe_writesector(int drive, int sector, int track, int side, unsigned
                   set_up_for_sector_id_scan);
 }
 
-static void hfe_readaddress(int drive, int track, int side, unsigned flags)
+static void hfe_readaddress(int drive, int side, unsigned flags)
 {
-  log_debug("hfe: drive %d: readaddress track %d side %d (%s)",
-            drive, track, side, ((flags & DISC_FLAG_MFM) ? "MFM" : "FM"));
+  log_debug("hfe: drive %d: readaddress side %d (%s)",
+            drive, side, ((flags & DISC_FLAG_MFM) ? "MFM" : "FM"));
   struct sector_address addr;
-  addr.track = track;
+  addr.track = drives[drive].curtrack;
   addr.side = side;
   addr.sector = SECTOR_ACCEPT_ANY;
   start_sector_op(drive, (flags & DISC_FLAG_MFM), ROP_READ_JUST_ADDR, addr, "readaddress",
@@ -1655,12 +1655,12 @@ static void hfe_poll(void)
     }
 }
 
-static void hfe_format(int drive, int track, int side, unsigned par2)
+static void hfe_format(int drive, int side, unsigned par2)
 {
-  log_warn("hfe: drive %d: format side %d track %d par2=%02X",
-           drive, side, track, par2);
+  log_warn("hfe: drive %d: format side %d par2=%02X",
+           drive, side, par2);
   start_op(drive, par2, WOP_FORMAT, "format");
-  hfe_info[drive]->state.target.track = track;
+  hfe_info[drive]->state.target.track = drives[drive].curtrack;
   hfe_info[drive]->state.target.side = side;
   hfe_info[drive]->state.target.sector = SECTOR_ACCEPT_ANY;
   hfe_info[drive]->state.scan_value = 0;

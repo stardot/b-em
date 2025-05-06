@@ -114,10 +114,10 @@ static void fdi_writesector(int drive, int sector, int track, int side, unsigned
         fdi_readpos = 0;
 }
 
-static void fdi_readaddress(int drive, int track, int side, unsigned flags)
+static void fdi_readaddress(int drive, int side, unsigned flags)
 {
         fdi_revs = 0;
-        fdi_track   = track;
+        fdi_track   = drives[drive].curtrack;
         fdi_side    = side;
         fdi_density = (flags & DISC_FLAG_MFM);
         fdi_drive   = drive;
@@ -127,10 +127,10 @@ static void fdi_readaddress(int drive, int track, int side, unsigned flags)
         fdi_readpos    = 0;
 }
 
-static void fdi_format(int drive, int track, int side, unsigned par2)
+static void fdi_format(int drive, int side, unsigned par2)
 {
         fdi_revs = 0;
-        fdi_track   = track;
+        fdi_track   = drives[drive].curtrack;;
         fdi_side    = side;
         fdi_density = 0;
         fdi_drive   = drive;

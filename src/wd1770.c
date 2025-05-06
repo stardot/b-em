@@ -495,7 +495,7 @@ static void wd1770_cmd_start(unsigned cmd)
         case 0xC: /*Read address*/
             log_debug("wd1770: read address side=%d track=%d dens=%d", wd1770.curside, wd1770.track, wd1770.density);
             wd1770.status = 0x80 | 0x1;
-            disc_readaddress(curdrive, wd1770.track, wd1770.curside, wd1770.density);
+            disc_readaddress(curdrive, wd1770.curside, wd1770.density);
             bytenum = 0;
             break;
 
@@ -509,14 +509,14 @@ static void wd1770_cmd_start(unsigned cmd)
             log_debug("wd1770: read track side=%d track=%d dens=%d\n", wd1770.curside, wd1770.track, wd1770.density);
             wd1770.status = 0x83;
             nmi |= 2;
-            disc_readtrack(curdrive, wd1770.track, wd1770.curside, wd1770.density);
+            disc_readtrack(curdrive, wd1770.curside, wd1770.density);
             break;
 
         case 0xF: /*Write track*/
             log_debug("wd1770: write track side=%d track=%d dens=%d\n", wd1770.curside, wd1770.track, wd1770.density);
             wd1770.status = 0x83;
             nmi |= 2;
-            disc_writetrack(curdrive, wd1770.track, wd1770.curside, wd1770.density);
+            disc_writetrack(curdrive, wd1770.curside, wd1770.density);
             break;
     }
     wd1770.oldcmd = wd1770.command;

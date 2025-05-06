@@ -183,34 +183,34 @@ void disc_writesector(int drive, int sector, int track, int side, unsigned flags
            disc_notfound = 10000;
 }
 
-void disc_readaddress(int drive, int track, int side, unsigned flags)
+void disc_readaddress(int drive, int side, unsigned flags)
 {
-        if (drives[drive].readaddress)
-           drives[drive].readaddress(drive, track, side, flags);
-        else
-           disc_notfound = 10000;
+    if (drives[drive].readaddress)
+       drives[drive].readaddress(drive, side, flags);
+    else
+       disc_notfound = 10000;
 }
 
-void disc_format(int drive, int track, int side, unsigned flags)
+void disc_format(int drive, int side, unsigned flags)
 {
-        if (drives[drive].format)
-           drives[drive].format(drive, track, side, flags);
-        else
-           disc_notfound = 10000;
+    if (drives[drive].format)
+       drives[drive].format(drive, side, flags);
+    else
+       fdc_writeprotect();
 }
 
-void disc_writetrack(int drive, int track, int side, unsigned flags)
+void disc_writetrack(int drive, int side, unsigned flags)
 {
     if (drives[drive].writetrack)
-        drives[drive].writetrack(drive, track, side, flags);
+        drives[drive].writetrack(drive, side, flags);
     else
-        disc_format(drive, track, side, flags);
+        fdc_writeprotect();
 }
 
-void disc_readtrack(int drive, int track, int side, unsigned flags)
+void disc_readtrack(int drive, int side, unsigned flags)
 {
     if (drives[drive].readtrack)
-        drives[drive].readtrack(drive, track, side, flags);
+        drives[drive].readtrack(drive, side, flags);
     else
        disc_notfound = 10000;
 }

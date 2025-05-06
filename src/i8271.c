@@ -405,7 +405,7 @@ static void i8271_callback(void)
             case 0x1B: /* Read ID */
                 if (!i8271.phase) {
                     i8271.curtrack[curdrive] = i8271.params[0];
-                    disc_readaddress(curdrive, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, 0);
+                    disc_readaddress(curdrive, (i8271.drvout & SIDESEL) ? 1 : 0, 0);
                     i8271.phase = 1;
                     return;
                 }
@@ -419,13 +419,13 @@ static void i8271_callback(void)
                 }
                 i8271.cursector++;
                 i8271.bytesleft = 4;
-                disc_readaddress(curdrive, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, 0);
+                disc_readaddress(curdrive, (i8271.drvout & SIDESEL) ? 1 : 0, 0);
                 break;
             case 0x23: /*Format*/
                 if (!i8271.phase) {
                     log_debug("i8271: callback for format, initiate");
                     i8271.curtrack[curdrive] = i8271.params[0];
-                    disc_format(curdrive, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, i8271.params[2]);
+                    disc_format(curdrive, (i8271.drvout & SIDESEL) ? 1 : 0, i8271.params[2]);
                     i8271.status = 0x8C;
                     i8271.phase = 1;
                 }

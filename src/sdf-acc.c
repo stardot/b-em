@@ -204,7 +204,7 @@ static void sdf_writesector(int drive, int sector, int track, int side, unsigned
     }
 }
 
-static void sdf_readaddress(int drive, int track, int side, unsigned flags)
+static void sdf_readaddress(int drive, int side, unsigned flags)
 {
     const struct sdf_geometry *geo;
 
@@ -215,7 +215,6 @@ static void sdf_readaddress(int drive, int track, int side, unsigned flags)
                     if (side == 0 || geo->sides != SDF_SIDES_SINGLE) {
                         sdf_drive = drive;
                         sdf_side = side;
-                        sdf_track = track;
                         state = ST_READ_ADDR0;
                         return;
                     }
@@ -227,35 +226,39 @@ static void sdf_readaddress(int drive, int track, int side, unsigned flags)
     }
 }
 
-static void sdf_format(int drive, int track, int side, unsigned par2)
+static void sdf_format(int drive, int side, unsigned par2)
 {
-    const struct sdf_geometry *geo;
-
-    if (state == ST_IDLE && (geo = check_seek(drive, 0, track, side, 0))) {
-        sdf_drive = drive;
-        sdf_side = side;
-        sdf_track = track;
-        sdf_sector = 0;
-        count = par2 & 0x1f; // sectors per track.
-        state = ST_FORMAT_CYLID;
+    if (state == ST_IDLE) {
+        unsigned track = drives[drive].curtrack;
+        const struct sdf_geometry *geo = check_seek(drive, 0, track, side, 0);
+        if (geo) {
+            sdf_drive = drive;
+            sdf_side = side;
+            sdf_track = track;
+            sdf_sector = 0;
+            count = par2 & 0x1f; // sectors per track.
+            state = ST_FORMAT_CYLID;
+        }
     }
 }
 
-static void sdf_writetrack(int drive, int track, int side, unsigned flags)
+static void sdf_writetrack(int drive, int side, unsigned flags)
 {
-    const struct sdf_geometry *geo;
-
-    if (state == ST_IDLE && (geo = check_seek(drive, 0, track, side, flags))) {
-        sdf_drive = drive;
-        sdf_side = side;
-        sdf_track = track;
-        sdf_sector = 0;
-        count = 120;
-        state = ST_WRTRACK_INITIAL;
-    }
-    else {
-        fdc_writeprotect();
-        state = ST_IDLE;
+    if (state == ST_IDLE) {
+        unsigned track = drives[drive].curtrack;
+        const struct sdf_geometry *geo = check_seek(drive, 0, track, side, flags);
+        if (geo) {
+            sdf_drive = drive;
+            sdf_side = side;
+            sdf_track = track;
+            sdf_sector = 0;
+            count = 120;
+            state = ST_WRTRACK_INITIAL;
+        }
+        else {
+            fdc_writeprotect();
+            state = ST_IDLE;
+        }
     }
 }
 

@@ -312,11 +312,12 @@ static int imd_verify(int drive, int track, unsigned flags)
  * the same as the cylinder encoded within sector headers.
  */
 
-static struct imd_track *imd_find_track(int drive, int track, int side, unsigned flags)
+static struct imd_track *imd_find_track(int drive, int side, unsigned flags)
 {
     if (drive >= 0 && drive < NUM_DRIVES) {
         struct imd_file *imd = &imd_discs[drive];
         struct imd_track *trk = imd->track_cur;
+        unsigned track = imd->trackno;
         if (!trk || !imd_density_ok(trk, flags)) {
             log_debug("imd: drive %d: searching for track", drive);
             if (track > imd->maxcyl)
@@ -363,7 +364,7 @@ static void imd_readsector(int drive, int sector, int track, int side, unsigned 
 {
     log_debug("imd: drive %d: readsector sector=%d, track=%d, side=%d, flags=%x", drive, sector, track, side, flags);
     if (state == ST_IDLE) {
-        struct imd_track *trk = imd_find_track(drive, track, side, flags);
+        struct imd_track *trk = imd_find_track(drive, side, flags);
         if (trk) {
             struct imd_sect *sect = imd_find_sector(drive, track, side, sector, trk);
             if (sect) {
@@ -397,7 +398,7 @@ static void imd_writesector(int drive, int sector, int track, int side, unsigned
 {
     log_debug("imd: drive %d: writesector sector=%d, track=%d, side=%d, flags=%d", drive, sector, track, side, flags);
     if (state == ST_IDLE) {
-        struct imd_track *trk = imd_find_track(drive, track, side, flags);
+        struct imd_track *trk = imd_find_track(drive, side, flags);
         if (trk) {
             struct imd_sect *sect = imd_find_sector(drive, track, side, sector, trk);
             if (sect) {
@@ -427,17 +428,12 @@ static void imd_writesector(int drive, int sector, int track, int side, unsigned
  * via the imd_poll function and associated state machine.
  */
 
-static void imd_readaddress(int drive, int track, int side, unsigned flags)
+static void imd_readaddress(int drive, int side, unsigned flags)
 {
-    log_debug("imd: drive %d: readaddress track=%d, side=%d, flags=%d", drive, track, side, flags);
+    log_debug("imd: drive %d: readaddress side=%d, flags=%d", drive, side, flags);
     if (state == ST_IDLE) {
         struct imd_track *trk = cur_trk;
-        if (trk && trk->cylinder == track && trk->head == side && imd_density_ok(trk, flags)) {
-            if (!(cur_sect = cur_sect->next))
-                cur_sect = trk->sect_head;
-            state = ST_READ_ADDR0;
-        }
-        else if ((trk = imd_find_track(drive, track, side, flags))) {
+        if ((trk = imd_find_track(drive, side, flags))) {
             cur_trk = trk;
             cur_sect = trk->sect_head;
             state = ST_READ_ADDR0;
@@ -454,7 +450,7 @@ static void imd_readaddress(int drive, int track, int side, unsigned flags)
  * and the WD1770 write track command.
  */
 
-static bool imd_begin_format(int drive, int track, int side, unsigned flags)
+static bool imd_begin_format(int drive, int side, unsigned flags)
 {
     if (drive >= 0 && drive < NUM_DRIVES) {
         if (drives[drive].writeprot) {
@@ -464,6 +460,7 @@ static bool imd_begin_format(int drive, int track, int side, unsigned flags)
         }
         struct imd_file *imd = &imd_discs[drive];
         struct imd_track *trk = imd->track_head;
+        unsigned track = imd->trackno;
         while (trk) {
             if (trk->cylinder == track && trk->head == side) {
                 imd_free_sectors(trk);
@@ -515,9 +512,9 @@ static bool imd_begin_format(int drive, int track, int side, unsigned flags)
  * the WD1770.  The difference is that the i8271 sends only ID fields.
  */
 
-static void imd_format(int drive, int track, int side, unsigned par2)
+static void imd_format(int drive, int side, unsigned par2)
 {
-    if (imd_begin_format(drive, track, side, 0)) {
+    if (imd_begin_format(drive, side, 0)) {
         unsigned nsect = par2 & 0x1f;
         cur_trk->nsect = nsect;
         cur_trk->sectsize  = par2 >> 5;
@@ -531,9 +528,9 @@ static void imd_format(int drive, int track, int side, unsigned par2)
  * than the i2871.  Unlike the i8271, the WD1770 sends the whole track.
  */
 
-static void imd_writetrack(int drive, int track, int side, unsigned flags)
+static void imd_writetrack(int drive, int side, unsigned flags)
 {
-    if (imd_begin_format(drive, track, side, flags)) {
+    if (imd_begin_format(drive, side, flags)) {
         cur_trk->nsect = 0;
         cur_trk->sectsize = 0xfe;
         state = ST_WRTRACK_INITIAL;
@@ -544,9 +541,9 @@ static void imd_writetrack(int drive, int track, int side, unsigned flags)
  * the i2871.  This sends the whole track including gaps and IDs.
  */
 
-static void imd_readtrack(int drive, int track, int side, unsigned flags)
+static void imd_readtrack(int drive, int side, unsigned flags)
 {
-    struct imd_track *trk = imd_find_track(drive, track, side, flags);
+    struct imd_track *trk = imd_find_track(drive, side, flags);
     if (trk) {
         cur_sect = trk->sect_head;
         count = 16;
