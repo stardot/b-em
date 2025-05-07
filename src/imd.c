@@ -243,9 +243,11 @@ static void imd_close(int drive)
 }
 
 /*
- * This function implements the seek command, i.e. it moves the
- * virtual head to the specified cylinder.  It does not check that
- * the ID fields match this track number.
+ * This function implements the seek command, i.e. it should move the
+ * virtual head to the specified cylinder.  As the IMD format is track
+ * rather than cyldinder oriented, we can't search for the new cylinder
+ * immediately.  It does not check that the ID fields match this track
+ * number.
  */
 
 static void imd_seek(int drive, int track)
@@ -305,8 +307,10 @@ static int imd_verify(int drive, int track, unsigned flags)
 
 /*
  * This is an internal function to find a track prior to reading from
- * it or writing to it. This has to search the list for IDs rather
- * than counting as tracks in the image file can be in any order.
+ * it or writing to it. It uses the current track pointer to avoid a
+ * search where possible but, if this doesn't match, it has to search
+ * the list for IDs rather than counting as tracks in the image file
+ * can be in any order.
  *
  * Note that this searches for the physical cylinder ID which is not
  * the same as the cylinder encoded within sector headers.
@@ -318,12 +322,12 @@ static struct imd_track *imd_find_track(int drive, int side, unsigned flags)
         struct imd_file *imd = &imd_discs[drive];
         struct imd_track *trk = imd->track_cur;
         unsigned track = imd->trackno;
-        if (!trk || !imd_density_ok(trk, flags)) {
-            log_debug("imd: drive %d: searching for track", drive);
+        if (!trk || trk->head != side || !imd_density_ok(trk, flags)) {
             if (track > imd->maxcyl)
                 track = imd->maxcyl;
+            log_debug("imd: drive %d: searching for track %d side %d", drive, track, side);
             for (trk = imd->track_head; trk; trk = trk->next) {
-                log_debug("imd: drive %d: cyl %u<>%u, head %u<>%u", drive, trk->cylinder, imd->trackno, trk->head, side);
+                log_debug("imd: drive %d: cyl %u<>%u, head %u<>%u", drive, trk->cylinder, track, trk->head, side);
                 if (trk->cylinder == track && trk->head == side && imd_density_ok(trk, flags)) {
                     log_debug("imd: drive %d: found track", drive);
                     imd->track_cur = trk;
