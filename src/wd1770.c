@@ -98,7 +98,10 @@ static void wd1770_begin_write_sector(const char *variant)
     log_debug("wd1770: %s write sector drive=%d side=%d track=%d sector=%d dens=%d", variant, curdrive, wd1770.curside, wd1770.track, wd1770.sector, wd1770.density);
     wd1770.status = 0x83;
     wd1770.in_gap = 0;
-    disc_writesector(curdrive, wd1770.sector, wd1770.track, wd1770.curside, wd1770.density);
+    unsigned flags = wd1770.density;
+    if (wd1770.command & 1) /* write deleted data */
+        flags |= DISC_FLAG_DELD;
+    disc_writesector(curdrive, wd1770.sector, wd1770.track, wd1770.curside, flags);
     bytenum = 0;
     nmi |= 2;
 }
