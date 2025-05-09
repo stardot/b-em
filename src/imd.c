@@ -630,12 +630,15 @@ static void imd_poll_finish_read(void)
         case 3:
         case 4:
             fdc_finishread(true);
+            break;
         case 5:
         case 6:
             fdc_datacrcerror(false);
+            break;
         case 7:
         case 8:
             fdc_datacrcerror(true);
+            break;
         default:
             fdc_finishread(false);
     }
