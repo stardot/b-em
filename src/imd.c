@@ -656,7 +656,6 @@ static void imd_poll_finish_read(void)
 static void imd_poll_writesect0(void)
 {
     int b = fdc_getdata(0);
-    log_debug("imd: imd_poll_writesect0 byte=%02X", b);
     if (b != -1) {
         cdata = b;
         count--;
@@ -675,7 +674,6 @@ static void imd_poll_writesect0(void)
 static void imd_poll_writesect1(void)
 {
     int b = fdc_getdata(--count == 0);
-    log_debug("imd: imd_poll_writesect1 byte=%02X", b);
     if (b == -1)
         count++;
     else {
@@ -745,7 +743,6 @@ static void imd_poll_writesect2(void)
         count++;
     }
     else {
-        log_debug("imd: imd_poll_writesect2 byte=%02X", c);
         *data++ = c;
         if (count == 0) {
             fdc_finishread(false);
@@ -809,7 +806,7 @@ static void imd_poll_format_cylid(void)
 /*
  * This function is part of the state machine to implement the format
  * command as used by the i8271.  It reveives and records the head
- * ID  of the sector being formatted.
+ * ID of the sector being formatted.
  */
 
 static void imd_poll_format_headid(void)
@@ -823,7 +820,7 @@ static void imd_poll_format_headid(void)
 /*
  * This function is part of the state machine to implement the format
  * command as used by the i8271.  It reveives and records the sector
- * ID  of the sector being formatted.
+ * ID of the sector being formatted.
  */
 
 static void imd_poll_format_sectid(void)
@@ -833,8 +830,6 @@ static void imd_poll_format_sectid(void)
     cur_sect->sectid = sectid;
     state = ST_FORMAT_SECTSZ;
 }
-
-static void imd_dump(struct imd_file *imd);
 
 /*
  * This function is part of the state machine to implement the format
@@ -854,7 +849,6 @@ static void imd_poll_format_sectsz(void)
     else {
         fdc_finishread(false);
         state = ST_IDLE;
-        imd_dump(&imd_discs[0]);
     }
 }
 
