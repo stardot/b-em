@@ -144,39 +144,61 @@ static void imd_save(struct imd_file *imd)
 {
     fseek(imd->fp, imd->track0, SEEK_SET);
     for (struct imd_track *trk = imd->track_head; trk; trk = trk->next) {
-        uint8_t buf[5+IMD_MAX_SECTS];
+        uint8_t buf[5+2*IMD_MAX_SECTS];
+        bool varisect = false;
+        if (trk->sectsize == 0xff) {
+            const struct imd_sect *sect = trk->sect_head;
+            if (sect) {
+                unsigned size = sect->sectsize;
+                const struct imd_sect *next = sect->next;
+                while (next) {
+                    sect = next;
+                    next = sect->next;
+                    if (sect->sectsize != size) {
+                        varisect = true;
+                        break;
+                    }
+                }
+                if (!varisect)
+                    trk->sectsize = size;
+            }
+        }
         buf[0] = trk->mode;
         buf[1] = trk->cylinder;
         buf[2] = trk->head;
         buf[3] = trk->nsect;
         buf[4] = trk->sectsize;
         uint8_t *ptr = buf+5;
-        bool cylmap = false;
-        bool headmap = false;
         for (struct imd_sect *sect = trk->sect_head; sect; sect = sect->next) {
             *ptr++ = sect->sectid;
             if (sect->cylinder != trk->cylinder)
-                cylmap = true;
+                buf[2] |= 0x80; /* cylinder map needed */
             if (sect->head != trk->head)
-                headmap = true;
+                buf[2] |= 0x40; /* head map needed */
         }
         fwrite(buf, ptr-buf, 1, imd->fp);
-        if (cylmap) {
+        if (buf[2] & 0x80) {
+            /* cylinder map needed */
             ptr = buf;
             for (struct imd_sect *sect = trk->sect_head; sect; sect = sect->next)
                 *ptr++ = sect->cylinder;
             fwrite(buf, ptr-buf, 1, imd->fp);
         }
-        if (headmap) {
+        if (buf[2] & 0x40) {
+            /* head map needed */
             ptr = buf;
             for (struct imd_sect *sect = trk->sect_head; sect; sect = sect->next)
                 *ptr++ = sect->head;
             fwrite(buf, ptr-buf, 1, imd->fp);
         }
-        if (trk->sectsize == 0xff) {
+        if (varisect) {
+            /* variable sector lengths */
             ptr = buf;
-            for (struct imd_sect *sect = trk->sect_head; sect; sect = sect->next)
-                *ptr++ = sect->sectsize;
+            for (const struct imd_sect *sect = trk->sect_head; sect; sect = sect->next) {
+                unsigned sectsize = 128 << sect->sectsize;
+                *ptr++ = sectsize & 0xff;
+                *ptr++ = sectsize >> 8;
+            }
             fwrite(buf, ptr-buf, 1, imd->fp);
         }
         for (struct imd_sect *sect = trk->sect_head; sect; sect = sect->next) {
@@ -1334,7 +1356,7 @@ static void imd_sect_err(const char *fn, FILE *fp, int trackno, int sectno)
  * assembles them into a doubly linked list.
  */
 
-static bool imd_load_sectors(const char *fn, FILE *fp, struct imd_track *trk, int trackno, struct imd_maps *mp)
+static bool imd_load_sectors(const char *fn, FILE *fp, struct imd_track *trk, int trackno, struct imd_maps *mp, unsigned flags)
 {
     for (int sectno = 0; sectno < trk->nsect; sectno++) {
         unsigned ssize = (trk->sectsize == 0xff) ? mp->ssize_map[sectno] : trk->sectsize;
@@ -1358,8 +1380,8 @@ static bool imd_load_sectors(const char *fn, FILE *fp, struct imd_track *trk, in
         trk->sect_tail = sect;
 
         sect->mode = mode;
-        sect->cylinder = (trk->head & 0x80) ? mp->cyl_map[sectno]  : trk->cylinder;
-        sect->head     = (trk->head & 0x40) ? mp->head_map[sectno] : trk->head & ~0xc0;
+        sect->cylinder = (flags & 0x80) ? mp->cyl_map[sectno]  : trk->cylinder;
+        sect->head     = (flags & 0x40) ? mp->head_map[sectno] : trk->head;
         sect->sectid   = mp->snum_map[sectno];
         sect->sectsize = ssize;
         if (mode == 0)
@@ -1443,7 +1465,7 @@ static bool imd_load_tracks(const char *fn, FILE *fp, struct imd_file *imd)
             return false;
         if ((trk->sectsize == 0xff) && !imd_load_map(fn, fp, trk->nsect, maps.ssize_map, trackno, "sector size"))
             return false;
-        if (!imd_load_sectors(fn, fp, trk, trackno, &maps))
+        if (!imd_load_sectors(fn, fp, trk, trackno, &maps, hdr[2]))
             return false;
         trackno++;
     }
