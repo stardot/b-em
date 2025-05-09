@@ -120,6 +120,7 @@ enum imd_state {
 
 static enum imd_state state;
 static unsigned count;
+static unsigned imd_flags;
 static int      imd_time;
 static unsigned char *data, cdata;
 struct imd_track *cur_trk;
@@ -394,21 +395,34 @@ static void imd_readsector(int drive, int sector, int track, int side, unsigned 
         if (trk) {
             struct imd_sect *sect = imd_find_sector(drive, track, side, sector, trk);
             if (sect) {
-                count = 128 << sect->sectsize;
-                cur_sect = sect;
-                if (sect->mode & 1) {
-                    log_debug("imd: drive %d: found full sector", drive);
-                    data = sect->data;
-                    state = ST_READSECTOR;
+                unsigned mode = sect->mode;
+                if (mode) {
+                    if (!(flags & DISC_FLAG_DELD) || (mode != 3 && mode != 4)) {
+                        count = 128 << sect->sectsize;
+                        cur_sect = sect;
+                        if (sect->mode & 1) {
+                            log_debug("imd: drive %d: found full sector", drive);
+                            data = sect->data;
+                            state = ST_READSECTOR;
+                        }
+                        else {
+                            log_debug("imd: drive %d: found compressed sector", drive);
+                            cdata = sect->data[0];
+                            state = ST_READCOMPR;
+                        }
+                        return;
+                    }
+                    else
+                        log_debug("imd: drive %d: readsector, deleted data found, ignoring as DISC_FLAG_DELD not set", drive);
                 }
-                else {
-                    log_debug("imd: drive %d: found compressed sector", drive);
-                    cdata = sect->data[0];
-                    state = ST_READCOMPR;
-                }
-                return;
+                else
+                    log_debug("imd: drive %d: readsector, sector data unavailable", drive);
             }
+            else
+                log_debug("imd: drive %d: readsector, sector not found", drive);
         }
+        else
+            log_debug("imd: drive %d: readsector, track not found", drive);
         count = 500;
         state = ST_NOTFOUND;
     }
@@ -436,6 +450,7 @@ static void imd_writesector(int drive, int sector, int track, int side, unsigned
                     cur_trk = trk;
                     cur_sect = sect;
                     count = 128 << sect->sectsize;
+                    imd_flags = flags;
                     imd_discs[drive].dirty = true;
                     imd_time = -20;
                     state = ST_WRITESECTOR0;
@@ -522,6 +537,7 @@ static bool imd_begin_format(int drive, int side, unsigned flags)
         trk->mode      = (flags & DISC_FLAG_MFM) ? 0x05 : 0x02;
         trk->cylinder  = track;
         trk->head      = side;
+        imd->track_cur = trk;
         cur_trk = trk;
         cur_sect = NULL;
         imd_time = -20;
@@ -653,24 +669,6 @@ static void imd_poll_writesect0(void)
  * to an uncompressed sector format.
  */
 
-static unsigned mode_compressed(unsigned mode)
-{
-    if (mode == 0)
-        return 2;
-    if (mode & 1)
-        return mode+1;
-    return mode;
-}
-
-static unsigned mode_full(unsigned mode)
-{
-    if (mode == 0)
-        return 1;
-    if (mode & 1)
-        return mode;
-    return mode-1;
-}
-
 static void imd_poll_writesect1(void)
 {
     int b = fdc_getdata(--count == 0);
@@ -701,13 +699,14 @@ static void imd_poll_writesect1(void)
                 if (prev)
                     prev->next = new_sect;
                 new_sect->sectsize = cur_sect->sectsize;
-                new_sect->mode     = mode_full(cur_sect->mode);
                 new_sect->cylinder = cur_sect->cylinder;
                 new_sect->head     = cur_sect->head;
                 new_sect->sectid   = cur_sect->sectid;
                 free(cur_sect);
                 cur_sect = new_sect;
             }
+            cur_sect->mode = (imd_flags & DISC_FLAG_DELD) ? 3 : 1;
+            log_debug("imd: imd_poll_writesect1, set mode=%d, flags=%02x", cur_sect->mode, imd_flags);
             unsigned used = (128 << cur_sect->sectsize) - count - 1;
             log_debug("imd: imd_poll_writesect1 used=%u", used);
             memset(cur_sect->data, cdata, used);
@@ -723,7 +722,8 @@ static void imd_poll_writesect1(void)
             cur_sect->data[0] = cdata;
             fdc_finishread(false);
             state = ST_IDLE;
-            cur_sect->mode = mode_compressed(cur_sect->mode);
+            cur_sect->mode = (imd_flags & DISC_FLAG_DELD) ? 4 : 2;
+            log_debug("imd: imd_poll_writesect1, set mode=%d", cur_sect->mode);
         }
     }
 }
