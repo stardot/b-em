@@ -35,6 +35,7 @@ typedef struct
     unsigned writeprot:1;
     unsigned fwriteprot:1;
     unsigned newdisk:1;
+    unsigned isindex:1;
     int curtrack;
 } DRIVE;
 

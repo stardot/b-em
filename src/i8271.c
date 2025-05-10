@@ -113,8 +113,6 @@ uint8_t i8271_read(uint16_t addr)
         return 0;
 }
 
-#define track0 (i8271.curtrack[curdrive] ? 0 : 2)
-
 void i8271_seek()
 {
     int new_track = i8271.params[0];
@@ -140,6 +138,23 @@ static void i8271_prep_op(int sectors, int sectorsize, unsigned flags)
     i8271_spinup();
     i8271.phase = 0;
     i8271_seek();
+}
+
+static void i8271_drive_status(void)
+{
+    unsigned result = 0x80;
+    if (i8271.drvout & DRIVESEL1)
+        result |= 0x40;
+    if (motoron && drives[curdrive].isindex)
+        result |= 0x10;
+    if (drives[curdrive].writeprot)
+        result |= 0x08;
+    if (i8271.drvout & DRIVESEL0)
+        result |= 0x04;
+    if (drives[curdrive].curtrack == 0)
+        result |= 0x02;
+    i8271.paramreq = 0;
+    i8271.result = result;
 }
 
 void i8271_write(uint16_t addr, uint8_t val)
@@ -170,13 +185,7 @@ void i8271_write(uint16_t addr, uint8_t val)
                 i8271.status = 0x80;
                 switch (i8271.command) {
                     case 0x2c:
-                        i8271.paramreq = 0;
-                        i8271.status = 0x10;
-                        i8271.result = 0x80 | 8 | track0;
-                        if (i8271.drvout & DRIVESEL0)
-                            i8271.result |= 0x04;
-                        if (i8271.drvout & DRIVESEL1)
-                            i8271.result |= 0x40;
+                        i8271_drive_status();
                         break;
                     case 0x29: /* seek */
                     case 0x3d: /* read special register */

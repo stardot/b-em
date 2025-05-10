@@ -72,13 +72,11 @@ static void wd1770_spindown()
     }
 }
 
-#define track0 (drives[curdrive].curtrack ? 0 : 4)
-
 static void wd1770_begin_seek(unsigned cmd, const char *cmd_desc, int tracks)
 {
     log_debug("wd1770: begin %s of %d tracks", cmd_desc, tracks);
     disc_seekrelative(curdrive, tracks, step_times[cmd & 3], (cmd & 0x04) ? SETTLE_TIME : 0);
-    wd1770.status = 0xa1 | track0;
+    wd1770.status = 0xa1;
 }
 
 static int data_count = 0;
@@ -311,6 +309,18 @@ void wd1770_write(uint16_t addr, uint8_t val)
     }
 }
 
+static uint8_t wd1770_status(void)
+{
+    uint8_t status = wd1770.status;
+    if (!(wd1770.command & 0x80)) { /* TYpe 1 commands. */
+        if (drives[curdrive].curtrack == 0)
+            status |= 0x04; /* track0 signal */
+        if (motoron && drives[curdrive].isindex)
+            status |= 0x02; /* index signal */
+    }
+    return status;
+}
+
 static uint8_t wd1770_read_fdc(uint16_t addr)
 {
     switch (addr & 0x03)
@@ -318,7 +328,7 @@ static uint8_t wd1770_read_fdc(uint16_t addr)
     case 0: // Status register.
         nmi &= ~1;
         //log_debug("wd1770: status %02X", wd1770.status);
-        return wd1770.status;
+        return wd1770_status();
 
     case 1: // Track register.
         return wd1770.track;
@@ -388,9 +398,9 @@ static void wd1770_cmd_next(unsigned cmd)
         case 0x4: /*Step in*/
         case 0x6: /*Step out*/
             if (cmd & 0x04 && !disc_verify(curdrive, wd1770.track, wd1770.density|DISC_FLAG_DELD))
-                wd1770.status = 0x90 | track0;
+                wd1770.status = 0x90; /* motor on, not verified, idle */
             else
-                wd1770.status = 0x80 | track0;
+                wd1770.status = 0x80; /* motor on, verified, idle */
             wd1770_setspindown();
             if (nmi_on_completion[fdc_type - FDC_ACORN])
                 nmi |= 1;
@@ -440,7 +450,7 @@ static void wd1770_cmd_next(unsigned cmd)
             if (wd1770.status & 0x01)
                 wd1770.status &= ~1;
             else
-                wd1770.status = 0x80 | 0x20 | track0;
+                wd1770.status = 0x80 | 0x20;
             if ((wd1770.oldcmd & 0xc) && nmi_on_completion[fdc_type - FDC_ACORN])
                 nmi |= 1;
             //if ((wd1770.oldcmd >> 4) == 0xB)
@@ -454,7 +464,7 @@ static void wd1770_cmd_start(unsigned cmd)
 {
     switch(cmd >> 4) {
         case 0x0: /*Restore*/
-            wd1770.status = 0xa5;
+            wd1770.status = 0xa1; /* motor on, not verified, busy */
             disc_seek0(curdrive, step_times[cmd & 3], (cmd & 0x04) ? SETTLE_TIME : 0);
             break;
 
@@ -615,6 +625,7 @@ void wd1770_reset()
     if (fdc_type >= FDC_ACORN) { /* if FDC is a 1770 */
         log_debug("wd1770: reset 1770");
         nmi = 0;
+        wd1770.command = 0;
         wd1770.status = 0;
         wd1770.sector = 1;
         motorspin = 0;
