@@ -17,6 +17,18 @@
 #define DRIVESEL1 0x80
 #define DRIVESEL (DRIVESEL0 | DRIVESEL1)
 
+/*
+ * Bits in the i8271 status register.
+ */
+enum {
+    I8S_BUSY         = 0x80,
+    I8S_CMD_REG_FULL = 0x40,
+    I8S_PAR_REG_FULL = 0x20,
+    I8S_RES_REG_FULL = 0x10,
+    I8S_INTERRUPT    = 0x08,
+    I8S_NON_DMA      = 0x04
+};
+
 struct
 {
         uint8_t command, params[5];
@@ -47,7 +59,7 @@ static void short_spindown(void)
 
 static void i8271_NMI(void)
 {
-    if (i8271.status & 8)
+    if (i8271.status & I8S_INTERRUPT)
         nmi = 1;
     else
         nmi = 0;
@@ -99,13 +111,13 @@ uint8_t i8271_read(uint16_t addr)
                 return i8271.status;
             case 1: /*Result register*/
                 log_debug("i8271: Read result reg %04X %02X\n",pc,i8271.result);
-                i8271.status &= ~0x18;
+                i8271.status &= ~(I8S_RES_REG_FULL|I8S_INTERRUPT);
                 i8271_NMI();
   //              output=1; timetolive=50;
                 return i8271.result;
             case 4: /*Data register*/
                 //log_debug("i8271: Read data reg %04X %02X\n",pc,i8271.data);
-                i8271.status &= ~0xC;
+                i8271.status &= ~(I8S_BUSY|I8S_CMD_REG_FULL);
                 i8271_NMI();
 //                printf("Read data reg %04X %02X\n",pc,i8271.status);
                 return i8271.data;
@@ -162,7 +174,7 @@ void i8271_write(uint16_t addr, uint8_t val)
         switch (addr&7)
         {
             case 0: /*Command register*/
-                if (i8271.status & 0x80) {
+                if (i8271.status & I8S_BUSY) {
                    log_debug("i8271: command register written while busy");
                    return;
                 }
@@ -182,7 +194,7 @@ void i8271_write(uint16_t addr, uint8_t val)
                     led_update((curdrive == 0) ? LED_DRIVE_1 : LED_DRIVE_0, false, 0);
                 }
                 i8271.paramnum = 0;
-                i8271.status = 0x80;
+                i8271.status = I8S_BUSY;
                 switch (i8271.command) {
                     case 0x2c:
                         i8271_drive_status();
@@ -219,7 +231,7 @@ void i8271_write(uint16_t addr, uint8_t val)
                         log_warn("i8271: unrecognised command %02x on write to command register", i8271.command);
                         i8271.paramreq = 0;
                         i8271.result = 0x18;
-                        i8271.status = 0x18;
+                        i8271.status = I8S_RES_REG_FULL|I8S_INTERRUPT;
                         i8271_NMI();
                         fdc_time = 0;
                 }
@@ -294,13 +306,13 @@ void i8271_write(uint16_t addr, uint8_t val)
                                 default:
                                     log_warn("i8271: write to unrecognised special register %02x", i8271.params[0]);
                                     i8271.result = 0x18;
-                                    i8271.status = 0x18;
+                                    i8271.status = I8S_RES_REG_FULL|I8S_INTERRUPT;
                                     i8271_NMI();
                                     fdc_time = 0;
                             }
                             break;
                         case 0x3d: /*Read special register*/
-                            i8271.status = 0x10;
+                            i8271.status = I8S_RES_REG_FULL;
                             i8271.result = 0;
                             switch (i8271.params[0])
                             {
@@ -319,7 +331,7 @@ void i8271_write(uint16_t addr, uint8_t val)
                                 default:
                                     log_warn("i8271: read from unrecognised special register %02x", i8271.params[0]);
                                     i8271.result = 0x18;
-                                    i8271.status = 0x18;
+                                    i8271.status = I8S_RES_REG_FULL|I8S_INTERRUPT;
                                     i8271_NMI();
                                     fdc_time = 0;
                                     break;
@@ -329,7 +341,7 @@ void i8271_write(uint16_t addr, uint8_t val)
                         default:
                             log_warn("i8271: unrecognised command %02x after paramaters", i8271.command);
                             i8271.result = 0x18;
-                            i8271.status = 0x18;
+                            i8271.status = I8S_RES_REG_FULL|I8S_INTERRUPT;
                             i8271_NMI();
                             fdc_time = 0;
                             break;
@@ -344,7 +356,7 @@ void i8271_write(uint16_t addr, uint8_t val)
             case 4: /*Data register*/
                 i8271.data = val;
                 i8271.written = 1;
-                i8271.status &= ~0xC;
+                i8271.status &= ~(I8S_BUSY|I8S_CMD_REG_FULL);
                 i8271_NMI();
                 break;
         }
@@ -364,7 +376,7 @@ static void i8271_callback(void)
                     i8271.curtrack[curdrive] = i8271.params[0];
                     disc_writesector(curdrive, i8271.cursector, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, i8271.discflags);
                     i8271.phase = 1;
-                    i8271.status = 0x8C;
+                    i8271.status = I8S_BUSY|I8S_INTERRUPT|I8S_NON_DMA;
                     i8271.result = 0;
                     i8271_NMI();
                     return;
@@ -372,7 +384,7 @@ static void i8271_callback(void)
                 i8271.sectorsleft--;
                 if (!i8271.sectorsleft)
                 {
-                    i8271.status = 0x18;
+                    i8271.status = I8S_RES_REG_FULL|I8S_INTERRUPT;
                     i8271.result = 0;
                     i8271_NMI();
                     i8271_setspindown();
@@ -381,7 +393,7 @@ static void i8271_callback(void)
                 i8271.cursector++;
                 i8271.bytesleft = i8271.sectorsize;
                 disc_writesector(curdrive, i8271.cursector, i8271.params[0], (i8271.drvout & SIDESEL) ? 1 : 0, i8271.discflags);
-                i8271.status = 0x8C;
+                i8271.status = I8S_BUSY|I8S_INTERRUPT|I8S_NON_DMA;
                 i8271.result = 0;
                 i8271_NMI();
                 break;
@@ -401,7 +413,7 @@ static void i8271_callback(void)
                 }
                 i8271.sectorsleft--;
                 if (!i8271.sectorsleft) {
-                    i8271.status = 0x18;
+                    i8271.status = I8S_RES_REG_FULL|I8S_INTERRUPT;
                     i8271.result = 0;
                     i8271_NMI();
                     i8271_setspindown();
@@ -420,7 +432,7 @@ static void i8271_callback(void)
                 }
                 i8271.sectorsleft--;
                 if (!i8271.sectorsleft) {
-                    i8271.status = 0x18;
+                    i8271.status = I8S_RES_REG_FULL|I8S_INTERRUPT;
                     i8271.result = 0;
                     i8271_NMI();
                     i8271_setspindown();
@@ -435,19 +447,19 @@ static void i8271_callback(void)
                     log_debug("i8271: callback for format, initiate");
                     i8271.curtrack[curdrive] = i8271.params[0];
                     disc_format(curdrive, (i8271.drvout & SIDESEL) ? 1 : 0, i8271.params[2]);
-                    i8271.status = 0x8C;
+                    i8271.status = I8S_BUSY|I8S_INTERRUPT|I8S_NON_DMA;
                     i8271.phase = 1;
                 }
                 else {
                     log_debug("i8271: callback for format, completed");
-                    i8271.status = 0x18;
+                    i8271.status = I8S_RES_REG_FULL|I8S_INTERRUPT;
                     i8271.result = 0;
                 }
                 i8271_NMI();
                 break;
             case 0x29: /*Seek*/
                 i8271.curtrack[curdrive] = i8271.params[0];
-                i8271.status = 0x18;
+                i8271.status = I8S_RES_REG_FULL|I8S_INTERRUPT;
                 i8271.result = 0;
                 i8271_NMI();
                 i8271_setspindown();
@@ -465,7 +477,7 @@ static void i8271_data(uint8_t dat)
     if (i8271.bytesleft) {
         --i8271.bytesleft;
         i8271.data = dat;
-        i8271.status = 0x8C;
+        i8271.status = I8S_BUSY|I8S_INTERRUPT|I8S_NON_DMA;
         i8271.result = 0;
         i8271_NMI();
     }
@@ -483,7 +495,7 @@ static void i8271_notfound(void)
 {
     log_debug("i8271: not found");
     i8271.result = 0x18;
-    i8271.status = 0x18;
+    i8271.status = I8S_RES_REG_FULL|I8S_INTERRUPT;
     i8271_NMI();
     short_spindown();
 }
@@ -494,7 +506,7 @@ static void i8271_datacrcerror(bool deleted)
     i8271.result = 0x0E;
     if (deleted)
         i8271.result |= 0x20;
-    i8271.status = 0x18;
+    i8271.status = I8S_RES_REG_FULL|I8S_INTERRUPT;
     i8271_NMI();
     short_spindown();
 }
@@ -503,7 +515,7 @@ static void i8271_headercrcerror(void)
 {
     log_debug("i8271: header CRC error");
     i8271.result = 0x0C;
-    i8271.status = 0x18;
+    i8271.status = I8S_RES_REG_FULL|I8S_INTERRUPT;
     i8271_NMI();
     short_spindown();
 }
@@ -512,7 +524,7 @@ static void i8271_writeprotect(void)
 {
     log_debug("i8271: write-protect");
     i8271.result = 0x12;
-    i8271.status = 0x18;
+    i8271.status = I8S_RES_REG_FULL|I8S_INTERRUPT;
     i8271_NMI();
     short_spindown();
 }
@@ -523,7 +535,7 @@ int i8271_getdata(int last)
         if (!i8271.written) return -1;
         if (!last)
         {
-                i8271.status = 0x8C;
+                i8271.status = I8S_BUSY|I8S_INTERRUPT|I8S_NON_DMA;
                 i8271.result = 0;
                 i8271_NMI();
         }
