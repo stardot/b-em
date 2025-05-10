@@ -10,6 +10,26 @@
 #include "led.h"
 #include "model.h"
 
+/*
+ * WD1770 status regsiter flags.  There are sometimes more than two names
+ * for the same value because there are variations between the type 1
+ * commands (seeks and steps) and the others.
+ */
+enum {
+    WDS_MOTOR_ON      = 0x80,
+    WDS_WRITE_PROTECT = 0x40,
+    WDS_SPUN_UP       = 0x20,
+    WDS_DELETED_DATA  = 0x20,
+    WDS_SEEK_ERROR    = 0x10,
+    WDS_NOT_FOUND     = 0x10,
+    WDS_CRC_ERROR     = 0x08,
+    WDS_TRACK0        = 0x04,
+    WDS_LOST_DATA     = 0x04,
+    WDS_DATA_REQ      = 0x02,
+    WDS_INDEX_PULSE   = 0x02,
+    WDS_BUSY          = 0x01
+};
+
 struct
 {
     uint8_t command, oldcmd, sector, track, status, data, resetting;
@@ -45,7 +65,7 @@ void wd1770_setspindown()
 
 void wd1770_spinup()
 {
-    wd1770.status |= 0x80;
+    wd1770.status |= WDS_MOTOR_ON;
     if (!motoron) {
         motoron = 1;
         motorspin = 0;
@@ -60,7 +80,7 @@ void wd1770_spinup()
 
 static void wd1770_spindown()
 {
-    wd1770.status &= ~0x80;
+    wd1770.status &= ~WDS_MOTOR_ON;
     if (motoron) {
         motoron = 0;
         led_update(LED_DRIVE_0, false, 0);
@@ -76,7 +96,7 @@ static void wd1770_begin_seek(unsigned cmd, const char *cmd_desc, int tracks)
 {
     log_debug("wd1770: begin %s of %d tracks", cmd_desc, tracks);
     disc_seekrelative(curdrive, tracks, step_times[cmd & 3], (cmd & 0x04) ? SETTLE_TIME : 0);
-    wd1770.status = 0xa1;
+    wd1770.status |= WDS_SPUN_UP;
 }
 
 static int data_count = 0;
@@ -85,7 +105,7 @@ static void wd1770_begin_read_sector(const char *variant)
 {
     log_debug("wd1770: %s read sector drive=%d side=%d track=%d sector=%d dens=%d", variant, curdrive, wd1770.curside, wd1770.track, wd1770.sector, wd1770.density);
     data_count = 0;
-    wd1770.status = 0x81;
+    wd1770.status = WDS_MOTOR_ON|WDS_BUSY;
     wd1770.in_gap = 0;
     disc_readsector(curdrive, wd1770.sector, wd1770.track, wd1770.curside, wd1770.density|DISC_FLAG_DELD);
     bytenum = 0;
@@ -94,7 +114,7 @@ static void wd1770_begin_read_sector(const char *variant)
 static void wd1770_begin_write_sector(const char *variant)
 {
     log_debug("wd1770: %s write sector drive=%d side=%d track=%d sector=%d dens=%d", variant, curdrive, wd1770.curside, wd1770.track, wd1770.sector, wd1770.density);
-    wd1770.status = 0x83;
+    wd1770.status = WDS_MOTOR_ON|WDS_DATA_REQ|WDS_BUSY;
     wd1770.in_gap = 0;
     unsigned flags = wd1770.density;
     if (wd1770.command & 1) /* write deleted data */
@@ -110,11 +130,11 @@ static void wd1770_write_fdc(uint16_t addr, uint8_t val)
     {
     case 0: // Command register.
         if ((val & 0xf0) != 0xd0) {
-            if (wd1770.status & 1) {
+            if (wd1770.status & WDS_BUSY) {
                 log_warn("wd1770: attempt to write %s register with %02X when device busy rejected", "command", val);
                 break;
             }
-            wd1770.status |= 0x01;
+            wd1770.status |= WDS_BUSY;
             wd1770_spinup();
         }
         log_debug("wd1770: write command register, cmd=%02X", val);
@@ -125,7 +145,7 @@ static void wd1770_write_fdc(uint16_t addr, uint8_t val)
         break;
 
     case 1: // Track register
-        if (wd1770.status & 0x01)
+        if (wd1770.status & WDS_BUSY)
             log_warn("wd1770: attempt to write %s register with %02X when device busy rejected", "track", val);
         else {
             log_debug("wd1770: write track register, track=%02x", val);
@@ -134,7 +154,7 @@ static void wd1770_write_fdc(uint16_t addr, uint8_t val)
         break;
 
     case 2: // Sector register
-        if (wd1770.status & 0x01)
+        if (wd1770.status & WDS_BUSY)
             log_warn("wd1770: attempt to write %s register with %02X when device busy rejected", "sector", val);
         else {
             log_debug("wd1770: write sector register, sector=%02x", val);
@@ -144,7 +164,7 @@ static void wd1770_write_fdc(uint16_t addr, uint8_t val)
 
     case 3: // Data register
         nmi &= ~2;
-        wd1770.status &= ~2;
+        wd1770.status &= ~WDS_DATA_REQ;
         wd1770.data = val;
         break;
     }
@@ -314,10 +334,11 @@ static uint8_t wd1770_status(void)
     uint8_t status = wd1770.status;
     if (!(wd1770.command & 0x80)) { /* TYpe 1 commands. */
         if (drives[curdrive].curtrack == 0)
-            status |= 0x04; /* track0 signal */
+            status |= WDS_TRACK0; /* track0 signal */
         if (motoron && drives[curdrive].isindex)
-            status |= 0x02; /* index signal */
+            status |= WDS_INDEX_PULSE; /* index signal */
     }
+    //log_debug("wd1770: status %02X", status);
     return status;
 }
 
@@ -327,7 +348,6 @@ static uint8_t wd1770_read_fdc(uint16_t addr)
     {
     case 0: // Status register.
         nmi &= ~1;
-        //log_debug("wd1770: status %02X", wd1770.status);
         return wd1770_status();
 
     case 1: // Track register.
@@ -338,8 +358,7 @@ static uint8_t wd1770_read_fdc(uint16_t addr)
 
     case 3: // Data register.
         nmi &= ~2;
-        wd1770.status &= ~2;
-//        log_debug("wd1770: read data %02X %04X\n",wd1770.data,pc);
+        wd1770.status &= ~WDS_DATA_REQ;
         return wd1770.data;
     }
     log_debug("wd1770: returning unmapped status");
@@ -378,7 +397,7 @@ uint8_t wd1770_read(uint16_t addr)
 
 static void wd1770_completed(void)
 {
-    wd1770.status &= 0xfe;
+    wd1770.status &= ~WDS_BUSY;
     wd1770_setspindown();
     if (nmi_on_completion[fdc_type - FDC_ACORN])
         nmi |= 1;
@@ -397,10 +416,9 @@ static void wd1770_cmd_next(unsigned cmd)
         case 0x2: /*Step*/
         case 0x4: /*Step in*/
         case 0x6: /*Step out*/
+            wd1770.status &= ~WDS_BUSY;
             if (cmd & 0x04 && !disc_verify(curdrive, wd1770.track, wd1770.density|DISC_FLAG_DELD))
-                wd1770.status = 0x90; /* motor on, not verified, idle */
-            else
-                wd1770.status = 0x80; /* motor on, verified, idle */
+                wd1770.status |= WDS_SEEK_ERROR; /* not verified */
             wd1770_setspindown();
             if (nmi_on_completion[fdc_type - FDC_ACORN])
                 nmi |= 1;
@@ -414,7 +432,7 @@ static void wd1770_cmd_next(unsigned cmd)
             break;
 
         case 0x9:
-            if (wd1770.status & 0x58)
+            if (wd1770.status & (WDS_WRITE_PROTECT|WDS_NOT_FOUND|WDS_CRC_ERROR)) /* error */
                 wd1770_completed();
             else if (wd1770.in_gap) {
                 wd1770.sector++;
@@ -428,7 +446,7 @@ static void wd1770_cmd_next(unsigned cmd)
             break;
 
         case 0xB:
-            if (wd1770.status & 0x58)
+            if (wd1770.status & (WDS_WRITE_PROTECT|WDS_NOT_FOUND|WDS_CRC_ERROR)) /* error */
                 wd1770_completed();
             else if (wd1770.in_gap) {
                 wd1770.sector++;
@@ -447,14 +465,14 @@ static void wd1770_cmd_next(unsigned cmd)
             break;
 
         case 0xD:
-            if (wd1770.status & 0x01)
-                wd1770.status &= ~1;
+            if (wd1770.status & WDS_BUSY)
+                wd1770.status &= ~WDS_BUSY;
+            else if (motoron)
+                wd1770.status = WDS_MOTOR_ON|WDS_SPUN_UP;
             else
-                wd1770.status = 0x80 | 0x20;
+                wd1770.status = 0;
             if ((wd1770.oldcmd & 0xc) && nmi_on_completion[fdc_type - FDC_ACORN])
                 nmi |= 1;
-            //if ((wd1770.oldcmd >> 4) == 0xB)
-                //nmi |= 2;
             wd1770_setspindown();
             break;
     }
@@ -464,7 +482,7 @@ static void wd1770_cmd_start(unsigned cmd)
 {
     switch(cmd >> 4) {
         case 0x0: /*Restore*/
-            wd1770.status = 0xa1; /* motor on, not verified, busy */
+            wd1770.status = WDS_MOTOR_ON|WDS_SPUN_UP|WDS_BUSY;
             disc_seek0(curdrive, step_times[cmd & 3], (cmd & 0x04) ? SETTLE_TIME : 0);
             break;
 
@@ -507,7 +525,7 @@ static void wd1770_cmd_start(unsigned cmd)
 
         case 0xC: /*Read address*/
             log_debug("wd1770: read address side=%d track=%d dens=%d", wd1770.curside, wd1770.track, wd1770.density);
-            wd1770.status = 0x80 | 0x1;
+            wd1770.status = WDS_MOTOR_ON|WDS_BUSY;
             disc_readaddress(curdrive, wd1770.curside, wd1770.density);
             bytenum = 0;
             break;
@@ -520,14 +538,14 @@ static void wd1770_cmd_start(unsigned cmd)
 
         case 0xE: /* read track */
             log_debug("wd1770: read track side=%d track=%d dens=%d\n", wd1770.curside, wd1770.track, wd1770.density);
-            wd1770.status = 0x83;
+            wd1770.status = WDS_MOTOR_ON|WDS_DATA_REQ|WDS_BUSY;
             nmi |= 2;
             disc_readtrack(curdrive, wd1770.curside, wd1770.density);
             break;
 
         case 0xF: /*Write track*/
             log_debug("wd1770: write track side=%d track=%d dens=%d\n", wd1770.curside, wd1770.track, wd1770.density);
-            wd1770.status = 0x83;
+            wd1770.status = WDS_MOTOR_ON|WDS_DATA_REQ|WDS_BUSY;
             nmi |= 2;
             disc_writetrack(curdrive, wd1770.curside, wd1770.density);
             break;
@@ -550,14 +568,14 @@ static void wd1770_callback()
 
 void wd1770_data(uint8_t dat)
 {
-    if (wd1770.status & 0x01) {
-        if (wd1770.status & 0x02) { // Register already full.
+    if (wd1770.status & WDS_BUSY) {
+        if (wd1770.status & WDS_DATA_REQ) { // Register already full.
             log_debug("wd1770: data overrun, %02X discarded", dat);
-            wd1770.status |= 0x04; // Set lost data (overrun).
+            wd1770.status |= WDS_LOST_DATA; // Set lost data (overrun).
         }
         else {
             wd1770.data = dat;
-            wd1770.status |= 0x02;
+            wd1770.status |= WDS_DATA_REQ;
             nmi |= 0x02;
         }
     }
@@ -566,9 +584,9 @@ void wd1770_data(uint8_t dat)
 static void wd1770_finishread(bool deleted)
 {
     log_debug("wd1770: data i/o finished, deleted=%u, nmi=%02X", deleted, nmi);
-    wd1770.status &= 0x83;
+    wd1770.status &= WDS_MOTOR_ON|WDS_DATA_REQ|WDS_BUSY;
     if (deleted)
-        wd1770.status |= 0x20;
+        wd1770.status |= WDS_DELETED_DATA;
     fdc_time = 100;
 }
 
@@ -580,36 +598,39 @@ static void wd1770_fault(uint8_t flags, const char *desc)
         fdc_time = 200;
     else {
         wd1770_short_spindown();
-        wd1770.status &= 0xfe;
+        wd1770.status &= ~WDS_BUSY;
     }
 }
 
 static void wd1770_notfound()
 {
-    wd1770_fault(0x10, "not found");
+    wd1770_fault(WDS_NOT_FOUND, "not found");
 }
 
 static void wd1770_datacrcerror(bool deleted)
 {
-    wd1770_fault(deleted ? 0x28: 0x08, "data CRC error");
+    uint8_t flags = WDS_CRC_ERROR;
+    if (deleted)
+        flags |= WDS_DELETED_DATA;
+    wd1770_fault(flags, "data CRC error");
 }
 
 static void wd1770_headercrcerror()
 {
-    wd1770_fault(0x18, "header CRC error");
+    wd1770_fault(WDS_NOT_FOUND|WDS_CRC_ERROR, "header CRC error");
 }
 
 static int wd1770_getdata(int last)
 {
-    if (wd1770.status & 0x02) {
+    if (wd1770.status & WDS_DATA_REQ) {
         log_debug("wd1770: getdata: no data in register (underrun)");
-        wd1770.status |= 0x04;
+        wd1770.status |= WDS_LOST_DATA;
         return -1;
     }
     else {
         if (!last) {
             nmi |= 0x02;
-            wd1770.status |= 0x02;
+            wd1770.status |= WDS_DATA_REQ;
         }
         return wd1770.data;
     }
@@ -617,7 +638,7 @@ static int wd1770_getdata(int last)
 
 static void wd1770_writeprotect()
 {
-    wd1770_fault(0x40, "write protect");
+    wd1770_fault(WDS_WRITE_PROTECT, "write protect");
 }
 
 void wd1770_reset()
@@ -641,6 +662,6 @@ void wd1770_reset()
         fdc_getdata        = wd1770_getdata;
         motorspin = 45000;
         if (motoron)
-            wd1770.status |= 0x80;
+            wd1770.status |= WDS_MOTOR_ON;
     }
 }
