@@ -172,7 +172,12 @@ static void calccrc(uint8_t byte)
 
 static void fdi_poll(void)
 {
-        int tempi, c;
+    if (fdi_pos == 0)
+        drives[fdi_drive].isindex = 1;
+    else if (fdi_pos == 50)
+        drives[fdi_drive].isindex = 0;
+
+    int tempi, c;
         if (fdi_pos >= fdi_tracklen[fdi_drive][fdi_side][fdi_density])
         {
 //                printf("Looping! %i\n",fdipos);

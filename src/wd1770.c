@@ -338,7 +338,6 @@ static uint8_t wd1770_status(void)
         if (motoron && drives[curdrive].isindex)
             status |= WDS_INDEX_PULSE; /* index signal */
     }
-    //log_debug("wd1770: status %02X", status);
     return status;
 }
 

@@ -1,3 +1,4 @@
+#define _DEBUG
 /*
  * B-EM SDF - Simple Disk Formats - Access
  *
@@ -54,6 +55,7 @@ state_t state = ST_IDLE;
 static uint16_t count = 0;
 
 static int     sdf_time;
+static int     sdf_posn;
 static uint8_t sdf_drive;
 static uint8_t sdf_side;
 static uint8_t sdf_track;
@@ -390,6 +392,23 @@ static void sdf_poll()
     if (++sdf_time <= 16)
         return;
     sdf_time = 0;
+
+    if (++sdf_posn == 1) {
+        log_debug("sdf: begin index pulse");
+        if (sdf_fp[0])
+            drives[0].isindex = 1;
+        if (sdf_fp[1])
+            drives[1].isindex = 1;
+    }
+    else if (sdf_posn == 4) {
+        log_debug("sdf: end index pulse");
+        if (sdf_fp[0])
+            drives[0].isindex = 0;
+        if (sdf_fp[1])
+            drives[1].isindex = 0;
+    }
+    else if (sdf_posn >= 1600)
+        sdf_posn = 0;
 
     switch(state) {
         case ST_IDLE:

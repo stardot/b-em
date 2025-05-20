@@ -122,6 +122,7 @@ static enum imd_state state;
 static unsigned count;
 static unsigned imd_flags;
 static int      imd_time;
+static int      imd_posn;
 static unsigned char *data, cdata;
 struct imd_track *cur_trk;
 struct imd_sect  *cur_sect;
@@ -1077,6 +1078,19 @@ static void imd_poll(void)
     if (++imd_time <= 16)
         return;
     imd_time = 0;
+
+    if (++imd_posn == 1) {
+        if (imd_discs[0].fp)
+            drives[0].isindex = 1;
+        if (imd_discs[1].fp)
+            drives[1].isindex = 1;
+    }
+    else if (imd_posn == 50) {
+        if (imd_discs[0].fp)
+            drives[0].isindex = 0;
+        if (imd_discs[1].fp)
+            drives[1].isindex = 0;
+    }
 
     switch(state) {
         case ST_IDLE:

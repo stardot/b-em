@@ -1378,12 +1378,17 @@ static void handle_badclock(int drive)
 
 static void hfe_poll_drive(int drive, bool is_selected)
 {
+  struct hfe_poll_state *state = &hfe_info[drive]->state;
+  if (state->track_bit_pos == 0)
+      drives[drive].isindex = 1;
+  else if (state->track_bit_pos == 50)
+      drives[drive].isindex = 0;
+
   if (NULL == hfe_info[drive]->track_data)
     {
       return;
     }
 
-  struct hfe_poll_state *state = &hfe_info[drive]->state;
   if (state->poll_calls_until_next_action)
     {
       --state->poll_calls_until_next_action;
