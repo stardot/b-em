@@ -19,7 +19,7 @@
 #include "musahi/m68k.h"
 #include "sprow.h"
 
-int tube_multipler = 1;
+double tube_multiplier = 1.0;
 int tube_speed_num = 0;
 int tubecycles = 0;
 
@@ -355,7 +355,7 @@ void tube_parasite_write(uint32_t addr, uint8_t val)
 
 void tube_updatespeed()
 {
-    tube_multipler = tube_speeds[tube_speed_num].multipler * tubes[curtube].speed_multiplier;
+    tube_multiplier = (double)(tube_speeds[tube_speed_num].multipler) * tubes[curtube].speed_multiplier / 2.0;
 }
 
 bool tube_32016_init(void *rom)

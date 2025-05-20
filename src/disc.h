@@ -49,6 +49,7 @@ extern int curdrive;
 
 int disc_load(int drive, ALLEGRO_PATH *fn);
 void disc_close(int drive);
+void disc_free(int drive);
 void disc_init(void);
 void disc_poll(void);
 void disc_seek0(int drive, uint32_t step_time, uint32_t settle_time);

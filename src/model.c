@@ -89,7 +89,7 @@ typedef struct
     char cpu[32];
     uint_least32_t rom_size;
     char bootrom[16];
-    int  speed_multiplier;
+    double speed_multiplier;
 } TUBE_DEFAULT;
 
 #define NUM_DFLT_TUBE 13
@@ -97,7 +97,7 @@ typedef struct
 static const TUBE_DEFAULT tube_defaults[] =
 {
     {"6502 Internal",  "6502",       0x0800, "6502Intern",       4 },
-    {"ARM",            "ARM",        0x4000, "ARMeval_100",      4 },
+    {"ARM",            "ARM",        0x4000, "ARMeval_100",   4.83 },
     {"Z80 ROM 1.21",   "Z80",        0x1000, "Z80_121",          6 },
     {"80186",          "80186",      0x4000, "BIOS",             8 },
     {"65816",          "65816",      0x8000, "ReCo6502ROM_816", 16 },
@@ -222,7 +222,7 @@ void model_loadcfg(void)
                 ptr->name = get_config_string(sect, "name", NULL);
                 ptr->rom_size = get_config_int(sect, "romsize", 0);
                 ptr->bootrom = get_config_string(sect, "bootrom", NULL);
-                ptr->speed_multiplier = get_config_int(sect, "speed", 1);
+                ptr->speed_multiplier = get_config_float(sect, "speed", 1.0);
             }
         }
     }
@@ -510,9 +510,20 @@ void model_loadstate(FILE *f)
     main_restart();
 }
 
-void model_savecfg(void) {
+void model_savecfg(void)
+{
     const char *sect = models[curmodel].cfgsect;
 
     al_set_config_value(bem_cfg, sect, "name", models[curmodel].name);
     mem_save_romcfg(sect);
+}
+
+void model_close(void)
+{
+    if (models)
+        free(models);
+    if (tubes)
+        free(tubes);
+    if (tube_dir)
+        free(tube_dir);
 }

@@ -15,11 +15,10 @@ void cataddname(char *s)
 
 static void *tapecat_thread(ALLEGRO_THREAD *thread, void *tdata)
 {
-    ALLEGRO_TEXTLOG *ltxtlog = (ALLEGRO_TEXTLOG *)tdata;
-    ALLEGRO_EVENT_QUEUE *queue;
-    ALLEGRO_EVENT event;
-
-    if ((queue = al_create_event_queue())) {
+    ALLEGRO_EVENT_QUEUE *queue = al_create_event_queue();
+    if (queue) {
+        ALLEGRO_EVENT event;
+        ALLEGRO_TEXTLOG *ltxtlog = (ALLEGRO_TEXTLOG *)tdata;
         al_init_user_event_source(&uevsrc);
         al_register_event_source(queue, &uevsrc);
         al_register_event_source(queue, al_get_native_text_log_event_source(ltxtlog));
@@ -43,28 +42,27 @@ static void start_cat(void)
 
 void gui_tapecat_start(void)
 {
-    ALLEGRO_TEXTLOG *ltxtlog;
-    ALLEGRO_THREAD *thread;
-
     if (textlog)
         start_cat();
-    else if ((ltxtlog = al_open_native_text_log("B-Em Tape Catalogue", ALLEGRO_TEXTLOG_MONOSPACE))) {
-        if ((thread = al_create_thread(tapecat_thread, ltxtlog))) {
-            al_start_thread(thread);
-            textlog = ltxtlog; // open to writes from cataddname.
-            start_cat();
-            return;
+    else {
+        ALLEGRO_TEXTLOG *ltxtlog = al_open_native_text_log("B-Em Tape Catalogue", ALLEGRO_TEXTLOG_MONOSPACE);
+        if (ltxtlog) {
+            ALLEGRO_THREAD *thread = al_create_thread(tapecat_thread, ltxtlog);
+            if (thread) {
+                al_start_thread(thread);
+                textlog = ltxtlog; // open to writes from cataddname.
+                start_cat();
+                return;
+            }
+            al_close_native_text_log(ltxtlog);
         }
-        al_close_native_text_log(textlog);
-        textlog = NULL;
     }
 }
 
 void gui_tapecat_close(void)
 {
-    ALLEGRO_EVENT event;
-
     if (textlog) {
+        ALLEGRO_EVENT event;
         event.type = ALLEGRO_EVENT_NATIVE_DIALOG_CLOSE;
         al_emit_user_event(&uevsrc, &event, NULL);
     }

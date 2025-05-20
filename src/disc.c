@@ -73,13 +73,23 @@ int disc_load(int drive, ALLEGRO_PATH *fn)
 
 void disc_close(int drive)
 {
-        if (drives[drive].close)
-            drives[drive].close(drive);
-        // Force the drive to spin down (i.e. become not-ready) when the disk is unloaded
-        // This prevents the file system (e.g DFS) caching the old disk catalogue
-        if (fdc_spindown)
-            fdc_spindown();
+    if (drives[drive].close)
+        drives[drive].close(drive);
+    // Force the drive to spin down (i.e. become not-ready) when the disk is unloaded
+    // This prevents the file system (e.g DFS) caching the old disk catalogue
+    if (fdc_spindown)
+        fdc_spindown();
 
+}
+
+void disc_free(int drive)
+{
+    disc_close(drive);
+    ALLEGRO_PATH *path = drives[drive].discfn;
+    if (path) {
+        al_destroy_path(path);
+        drives[drive].discfn = NULL;
+    }
 }
 
 int disc_notfound=0;

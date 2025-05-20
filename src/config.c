@@ -51,6 +51,24 @@ int get_config_int(const char *sect, const char *key, int ival)
     return ival;
 }
 
+double get_config_float(const char *sect, const char *key, double ival)
+{
+    const char *str = al_get_config_value(bem_cfg, sect, key);
+    if (!str && sect)
+        str = al_get_config_value(bem_cfg, NULL, key);
+    if (str) {
+        char *end;
+        double nval = strtod(str, &end);
+        if (end > str && !end[0])
+            ival = nval;
+        else if (sect)
+            log_warn("config: section '%s', key '%s': invalid number %s", sect, key, str);
+        else
+            log_warn("config: global section, key '%s': invalid number %s", key, str);
+    }
+    return ival;
+}
+
 bool get_config_bool(const char *sect, const char *key, bool bval)
 {
     const char *str = al_get_config_value(bem_cfg, sect, key);

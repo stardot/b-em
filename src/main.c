@@ -698,6 +698,14 @@ void main_run()
     log_debug("main: end loop");
 }
 
+static void tape_free(void)
+{
+    if (tape_fn) {
+        al_destroy_path(tape_fn);
+        tape_fn = NULL;
+    }
+}
+
 void main_close()
 {
     gui_tapecat_close();
@@ -720,16 +728,20 @@ void main_close()
     n32016_close();
     mc6809nc_close();
     sprow_close();
-    disc_close(0);
-    disc_close(1);
+    disc_free(0);
+    disc_free(1);
     scsi_close();
     ide_close();
     vdfs_close();
     music5000_close();
     ddnoise_close();
     tapenoise_close();
-
+    tape_free();
+    al_destroy_timer(timer);
+    al_destroy_event_queue(queue);
+    led_close();
     video_close();
+    model_close();
     log_close();
 }
 

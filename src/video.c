@@ -851,6 +851,16 @@ ALLEGRO_DISPLAY *video_init(void)
     return display;
 }
 
+void video_close()
+{
+    al_destroy_bitmap(b32);
+    al_destroy_bitmap(b16);
+    al_destroy_bitmap(b);
+    al_destroy_display(display);
+    if (font_dir)
+        al_destroy_path(font_dir);
+}
+
 void video_set_disptype(enum vid_disptype dtype)
 {
     vid_dtype_user = dtype;

@@ -43,16 +43,27 @@ static const char slotkeys[16][6] = {
     "rom12", "rom13", "rom14", "rom15"
 };
 
-void mem_init() {
+void mem_init()
+{
     log_debug("mem: mem_init");
-    ram = (uint8_t *)malloc(RAM_SIZE);
-    rom = (uint8_t *)malloc(ROM_NSLOT * ROM_SIZE);
-    os  = (uint8_t *)malloc(ROM_SIZE);
-    os_dir  = al_create_path_for_directory("roms/os");
-    rom_dir = al_create_path_for_directory("roms/general");
+    size_t size = RAM_SIZE + ROM_SIZE + ROM_NSLOT * ROM_SIZE;
+    uint8_t *ptr = malloc(size);
+    if (ptr) {
+        memset(ptr, 0xff, size);
+        ram = ptr;
+        os  = ptr + RAM_SIZE;
+        rom = ptr + RAM_SIZE + ROM_SIZE;
+        os_dir  = al_create_path_for_directory("roms/os");
+        rom_dir = al_create_path_for_directory("roms/general");
+    }
+    else {
+        log_fatal("mem: unable to allocate memory for BBC Micro: %m");
+        exit(1);
+    }
 }
 
-static void rom_free(int slot) {
+static void rom_free(int slot)
+{
     if (rom_slots[slot].alloc) {
         if (rom_slots[slot].name)
             free(rom_slots[slot].name);
@@ -62,14 +73,13 @@ static void rom_free(int slot) {
 }
 
 void mem_close() {
-    int slot;
-
-    for (slot = 0; slot < ROM_NSLOT; slot++)
+    for (int slot = 0; slot < ROM_NSLOT; slot++)
         rom_free(slot);
-
-    if (ram) free(ram);
-    if (rom) free(rom);
-    if (os)  free(os);
+    free(ram);
+    if (os_dir)
+        al_destroy_path(os_dir);
+    if (rom_dir)
+        al_destroy_path(rom_dir);
 }
 
 static void dump_mem(void *start, size_t size, const char *which, const char *file) {

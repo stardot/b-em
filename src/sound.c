@@ -28,7 +28,8 @@ static short sound_buffer[BUFLEN_SO];
 static int sound_sn76489_cycles = 0, sound_poll_cycles = 0;
 
 #define NCoef 2
-static float iir(float NewSample) {
+static float iir(float NewSample)
+{
     static const float ACoef[NCoef+1] = {
         0.9844825527642453,
         -1.9689651055284907,
@@ -110,9 +111,6 @@ static void sound_rec_int(short *buf)
 
 static void sound_poll_all(void)
 {
-    float *buf;
-    int c;
-
     if ((sound_internal || sound_beebsid) && stream) {
         int16_t temp_buffer[2] = {0};
 
@@ -125,20 +123,21 @@ static void sound_poll_all(void)
             temp_buffer[1] += (((int)lpt_dac - 0x80) * 32);
         }
 
-        for (c = 0; c < 8/2; c++) {
+        for (int c = 0; c < 8/2; c++) {
             sound_buffer[sound_pos + c] += temp_buffer[0];
             sound_buffer[sound_pos + c + 4] += temp_buffer[1];
         }
         // skip forward 8 mono samples
         sound_pos += 8;
         if (sound_pos == BUFLEN_SO) {
-            if ((buf = al_get_audio_stream_fragment(stream))) {
+            float *buf = al_get_audio_stream_fragment(stream);
+            if (buf) {
                 if (sound_filter) {
-                    for (c = 0; c < BUFLEN_SO; c++)
+                    for (int c = 0; c < BUFLEN_SO; c++)
                         buf[c] = iir((float)sound_buffer[c] / 32767.0);
                     sound_rec_float(buf);
                 } else {
-                    for (c = 0; c < BUFLEN_SO; c++)
+                    for (int c = 0; c < BUFLEN_SO; c++)
                         buf[c] = (float)sound_buffer[c] / 32767.0;
                     sound_rec_int(sound_buffer);
                 }
@@ -221,16 +220,6 @@ void sound_init(void)
             log_error("sound: unable to create mixer for internal/SID/DAC sound");
     } else
         log_error("sound: unable to create voice for internal/SID/DAC sound");
-}
-
-void sound_close(void)
-{
-    if (stream)
-        al_destroy_audio_stream(stream);
-    if (mixer)
-        al_destroy_mixer(mixer);
-    if (voice)
-        al_destroy_voice(voice);
 }
 
 bool sound_start_rec(sound_rec_t *rec, const char *filename)
@@ -318,3 +307,15 @@ sound_rec_t sound_rec = {
     FREQ_SO, // sample rate
     16       // bits/sample
 };
+
+void sound_close(void)
+{
+    if (sound_rec.fp)
+        sound_stop_rec(&sound_rec);
+    if (stream)
+        al_destroy_audio_stream(stream);
+    if (mixer)
+        al_destroy_mixer(mixer);
+    if (voice)
+        al_destroy_voice(voice);
+}

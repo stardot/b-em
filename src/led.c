@@ -106,6 +106,14 @@ void led_init(void)
     vid_ledlocation = LED_LOC_UNDEFINED;
 }
 
+void led_close(void)
+{
+    if (led_bitmap)
+        al_destroy_bitmap(led_bitmap);
+    if (font)
+        al_destroy_font(font);
+}
+
 void led_update(led_name_t led_name, bool b, int ticks)
 {
     if (vid_ledlocation > LED_LOC_NONE && led_name < LED_MAX) {

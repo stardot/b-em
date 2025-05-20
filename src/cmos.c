@@ -282,10 +282,6 @@ static size_t load_integra(FILE *f, const char *fn)
 
 void cmos_load(const MODEL *m)
 {
-    FILE *f;
-    ALLEGRO_PATH *path;
-    const char *cpath;
-
     if (!m->cmos[0])
         return;
     if (m->compact)
@@ -293,9 +289,11 @@ void cmos_load(const MODEL *m)
     else {
         memset(cmos, 0, sizeof cmos);
         rtc_epoc_ref = rtc_epoc_adj = 0;
-        if ((path = find_cfg_file(m->cmos, ".bin"))) {
-            cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
-            if ((f = fopen(cpath, "rb"))) {
+        ALLEGRO_PATH *path = find_cfg_file(m->cmos, ".bin");
+        if (path) {
+            const char *cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+            FILE *f = fopen(cpath, "rb");
+            if (f) {
                 size_t nbytes = m->integra ? load_integra(f, cpath) : fread(cmos, 1, sizeof cmos, f);
                 fclose(f);
                 if (nbytes < sizeof cmos)
@@ -340,19 +338,18 @@ static void save_integra(FILE *f)
             fwrite(rom + slot * ROM_SIZE, ROM_SIZE, 1, f);
 }
 
-void cmos_save(const MODEL *m) {
-    FILE *f;
-    ALLEGRO_PATH *path;
-    const char *cpath;
-
+void cmos_save(const MODEL *m)
+{
     if (!m->cmos[0])
         return;
     if (m->compact)
         compactcmos_save(m);
     else {
-        if ((path = find_cfg_dest(m->cmos, ".bin"))) {
-            cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
-            if ((f = fopen(cpath, "wb"))) {
+        ALLEGRO_PATH *path = find_cfg_dest(m->cmos, ".bin");
+        if (path) {
+            const char *cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+            FILE *f = fopen(cpath, "wb");
+            if (f) {
                 log_debug("cmos: saving to %s", cpath);
                 /* Save into the date/time fields of the CMOS RAM the
                  * Epoch to which standard system time can be added
