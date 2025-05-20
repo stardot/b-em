@@ -29,13 +29,6 @@ int scr_x_start, scr_x_size, scr_y_start, scr_y_size;
 
 bool vid_print_mode = false;
 
-void video_close()
-{
-    al_destroy_bitmap(b32);
-    al_destroy_bitmap(b16);
-    al_destroy_bitmap(b);
-}
-
 #ifdef WIN32
 static const int y_fudge = 0;
 #else

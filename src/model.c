@@ -510,9 +510,20 @@ void model_loadstate(FILE *f)
     main_restart();
 }
 
-void model_savecfg(void) {
+void model_savecfg(void)
+{
     const char *sect = models[curmodel].cfgsect;
 
     al_set_config_value(bem_cfg, sect, "name", models[curmodel].name);
     mem_save_romcfg(sect);
+}
+
+void model_close(void)
+{
+    if (models)
+        free(models);
+    if (tubes)
+        free(tubes);
+    if (tube_dir)
+        free(tube_dir);
 }

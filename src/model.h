@@ -79,5 +79,6 @@ void model_init(void);
 void model_savestate(FILE *f);
 void model_loadstate(FILE *f);
 void model_savecfg(void);
+void model_close(void);
 
 #endif

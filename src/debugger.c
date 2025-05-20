@@ -164,7 +164,7 @@ static void debug_memview_open(void)
 static void debug_memview_close(void)
 {
     if (mem_thread) {
-        al_join_thread(mem_thread, NULL);
+        al_destroy_thread(mem_thread);
         mem_thread = NULL;
     }
 }
