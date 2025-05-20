@@ -220,7 +220,7 @@ static uint32_t dbg_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size
   return dbg6502_disassemble(cpu, addr, buf, bufsize, x65c02 ? M65C02 : M6502);
 }
 
-int tubecycle;
+static double tubecycle;
 
 int output = 0;
 static int timetolive = 0;
@@ -252,7 +252,7 @@ static void polltime(int c)
             disc_poll();
         }
     }
-    tubecycle += c;
+    tubecycle += c * tube_multiplier;
 }
 
 static int FEslowdown[8] = { 1, 0, 1, 1, 0, 0, 1, 0 };
@@ -4043,11 +4043,11 @@ void m6502_exec(int slice)
 
                 if (otherstuffcount <= 0)
                     otherstuff_poll();
-                if (tube_exec && tubecycle) {
-                        tubecycles += (tubecycle * tube_multipler) >> 1;
-                        if (tubecycles > 3)
-                                tube_exec();
-                        tubecycle = 0;
+                if (tube_exec && tubecycle > 3.0) {
+                    int whole_cycles = (int)tubecycle;
+                    tubecycles += whole_cycles;
+                    tubecycle -= whole_cycles;
+                    tube_exec();
                 }
 
                 if (nmi && !oldnmi) {
@@ -5877,12 +5877,11 @@ void m65c02_exec(int slice)
 //                        printf("INT\n");
                 }
                 interrupt &= ~128;
-                if (tube_exec && tubecycle && !(tubeula.r1stat & TUBE_STAT_P)) {
-//                        log_debug("tubeexec %i %i %i\n",tubecycles,tubecycle,tube_shift);
-                        tubecycles += (tubecycle * tube_multipler) >> 1;
-                        if (tubecycles > 3)
-                                tube_exec();
-                        tubecycle = 0;
+                if (tube_exec && tubecycle >= 3.0 && !(tubeula.r1stat & TUBE_STAT_P)) {
+                    int whole_cycles = (int)tubecycle;
+                    tubecycles += whole_cycles;
+                    tubecycle -= whole_cycles;
+                    tube_exec();
                 }
 
                 if (otherstuffcount <= 0)

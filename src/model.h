@@ -63,7 +63,7 @@ typedef struct
     const char *name;
     uint_least32_t rom_size;
     const char *bootrom;
-    int  speed_multiplier;
+    double speed_multiplier;
 } TUBE_MODEL;
 
 extern TUBE_MODEL *tubes;
