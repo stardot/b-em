@@ -117,7 +117,7 @@ uint8_t i8271_read(uint16_t addr)
                 return i8271.result;
             case 4: /*Data register*/
                 //log_debug("i8271: Read data reg %04X %02X\n",pc,i8271.data);
-                i8271.status &= ~(I8S_BUSY|I8S_CMD_REG_FULL);
+                i8271.status &= ~(I8S_INTERRUPT|I8S_NON_DMA);
                 i8271_NMI();
 //                printf("Read data reg %04X %02X\n",pc,i8271.status);
                 return i8271.data;
@@ -143,6 +143,7 @@ static uint32_t time_to_2Mhz(unsigned value, unsigned multiplier, const char *na
 
 static void i8271_prep_op(int sectors, int sectorsize, unsigned flags)
 {
+    log_debug("i8271: preparing for sector read/rite, sectors=%d, sectorsize=%d, flags=%02X", sectors, sectorsize, flags);
     i8271.cursector = i8271.params[1];
     i8271.sectorsleft = sectors;
     i8271.sectorsize = sectorsize;
@@ -167,6 +168,7 @@ static void i8271_drive_status(void)
         result |= 0x02;
     i8271.paramreq = 0;
     i8271.result = result;
+    i8271.status = I8S_RES_REG_FULL;
 }
 
 void i8271_write(uint16_t addr, uint8_t val)
@@ -356,7 +358,7 @@ void i8271_write(uint16_t addr, uint8_t val)
             case 4: /*Data register*/
                 i8271.data = val;
                 i8271.written = 1;
-                i8271.status &= ~(I8S_BUSY|I8S_CMD_REG_FULL);
+                i8271.status &= ~(I8S_INTERRUPT|I8S_NON_DMA);
                 i8271_NMI();
                 break;
         }
