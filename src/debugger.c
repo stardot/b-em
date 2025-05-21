@@ -425,6 +425,7 @@ static const char helptext[] =
     "    d [n]      - disassemble from address n\n"
     "    exec f     - take commands from file f\n"
     "    n          - step, but treat a called subroutine as one step\n"
+    "    nmi        - raise an NMI\n"
     "    m [n]      - memory dump from address n\n"
     "    paste s    - paste string s as keyboard input\n"
     "    profile... - various profile sub-commands\n"
@@ -1460,10 +1461,14 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 break;
 
             case 'n':
-                cpu->tbreak = next_addr;
-                debug_lastcommand = 'n';
-                indebug = 0;
-                main_resume();
+                if (cmdlen == 1) {
+                    cpu->tbreak = next_addr;
+                    debug_lastcommand = 'n';
+                    indebug = 0;
+                    main_resume();
+                }
+                else if (!strncmp(cmd, "nmi", cmdlen))
+                    nmi = 1;
                 return;
 
             case 'p':
