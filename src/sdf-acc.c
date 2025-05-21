@@ -81,25 +81,24 @@ static int sdf_density_ok(const struct sdf_geometry *geo, unsigned flags)
 
 static int sdf_verify(int drive, int track, unsigned flags)
 {
-    const struct sdf_geometry *geo;
-
-    if (drive < NUM_DRIVES)
-        if ((geo = geometry[drive]))
+    if (drive < NUM_DRIVES) {
+        const struct sdf_geometry *geo = geometry[drive];
+        if (geo)
             if (track >= 0 && track < geo->tracks)
                 if (sdf_density_ok(geo, flags))
                     return 1;
+    }
     return 0;
 }
 
 static bool io_seek(const struct sdf_geometry *geo, uint8_t drive, uint8_t sector, uint8_t track, uint8_t side)
 {
-    uint32_t track_bytes, offset;
-
     if (track >= 0 && track < geo->tracks) {
         if (geo->sector_size > 256)
             sector--;
         if (sector >= 0 && sector <= geo->sectors_per_track ) {
-            track_bytes = geo->sectors_per_track * geo->sector_size;
+            uint32_t track_bytes = geo->sectors_per_track * geo->sector_size;
+            uint32_t offset;
             if (side == 0) {
                 offset = track * track_bytes;
                 if (geo->sides == SDF_SIDES_INTERLEAVED)
@@ -133,10 +132,9 @@ static bool io_seek(const struct sdf_geometry *geo, uint8_t drive, uint8_t secto
 
 FILE *sdf_owseek(uint8_t drive, uint8_t sector, uint8_t track, uint8_t side, uint16_t ssize)
 {
-    const struct sdf_geometry *geo;
-
     if (drive < NUM_DRIVES) {
-        if ((geo = geometry[drive])) {
+        const struct sdf_geometry *geo = geometry[drive];
+        if (geo) {
             if (ssize == geo->sector_size) {
                 if (io_seek(geo, drive, sector, track, side))
                     return sdf_fp[drive];
@@ -154,17 +152,14 @@ FILE *sdf_owseek(uint8_t drive, uint8_t sector, uint8_t track, uint8_t side, uin
 
 static const struct sdf_geometry *check_seek(int drive, int sector, int track, int side, unsigned flags)
 {
-    const struct sdf_geometry *geo;
-
     if (drive < NUM_DRIVES) {
-        if ((geo = geometry[drive])) {
+        const struct sdf_geometry *geo = geometry[drive];
+        if (geo) {
             if (sdf_density_ok(geo, flags)) {
-                if (track == drives[drive].curtrack) {
-                    if (io_seek(geo, drive, sector, track, side))
-                        return geo;
-                }
-                else
+                if (track != drives[drive].curtrack)
                     log_debug("sdf: drive %u: invalid track: %d should be %d", drive, track, drives[drive].curtrack);
+                if (io_seek(geo, drive, sector, track, side))
+                    return geo;
             }
             else
                 log_debug("sdf: drive %u: invalid density", drive);
@@ -182,37 +177,38 @@ static const struct sdf_geometry *check_seek(int drive, int sector, int track, i
 
 static void sdf_readsector(int drive, int sector, int track, int side, unsigned flags)
 {
-    const struct sdf_geometry *geo;
-
-    if (state == ST_IDLE && (geo = check_seek(drive, sector, track, side, flags))) {
-        count = geo->sector_size;
-        sdf_drive = drive;
-        state = ST_READSECTOR;
+    if (state == ST_IDLE) {
+        const struct sdf_geometry *geo = check_seek(drive, sector, track, side, flags);
+        if (geo) {
+            count = geo->sector_size;
+            sdf_drive = drive;
+            state = ST_READSECTOR;
+        }
     }
 }
 
 static void sdf_writesector(int drive, int sector, int track, int side, unsigned flags)
 {
-    const struct sdf_geometry *geo;
-
-    if (state == ST_IDLE && (geo = check_seek(drive, sector, track, side, flags))) {
-        count = geo->sector_size;
-        sdf_drive = drive;
-        sdf_side = side;
-        sdf_track = track;
-        sdf_sector = sector;
-        sdf_time = -20;
-        state = ST_WRITESECTOR;
+    if (state == ST_IDLE) {
+        const struct sdf_geometry *geo = check_seek(drive, sector, track, side, flags);
+        if (geo) {
+            count = geo->sector_size;
+            sdf_drive = drive;
+            sdf_side = side;
+            sdf_track = track;
+            sdf_sector = sector;
+            sdf_time = -20;
+            state = ST_WRITESECTOR;
+        }
     }
 }
 
 static void sdf_readaddress(int drive, int side, unsigned flags)
 {
-    const struct sdf_geometry *geo;
-
     if (state == ST_IDLE) {
         if (drive < NUM_DRIVES) {
-            if ((geo = geometry[drive])) {
+            const struct sdf_geometry *geo = geometry[drive];
+            if (geo) {
                 if (sdf_density_ok(geo, flags)) {
                     if (side == 0 || geo->sides != SDF_SIDES_SINGLE) {
                         sdf_drive = drive;
