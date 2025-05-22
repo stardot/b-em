@@ -51,8 +51,6 @@ static const uint8_t nmi_on_completion[5] = {
 static const unsigned step_times[4] = { 6000, 12000, 20000, 30000 };
 #define SETTLE_TIME (15 * 2000) /* 15ms in 2Mhz clock pulses */
 
-static int bytenum;
-
 static void wd1770_short_spindown(void)
 {
     motorspin = 15000;
@@ -109,7 +107,6 @@ static void wd1770_begin_read_sector(const char *variant)
     wd1770.in_gap = 0;
     wd1770.type1_status = false;
     disc_readsector(curdrive, wd1770.sector, wd1770.track, wd1770.curside, wd1770.density|DISC_FLAG_DELD);
-    bytenum = 0;
 }
 
 static void wd1770_begin_write_sector(const char *variant)
@@ -122,7 +119,6 @@ static void wd1770_begin_write_sector(const char *variant)
     if (wd1770.command & 1) /* write deleted data */
         flags |= DISC_FLAG_DELD;
     disc_writesector(curdrive, wd1770.sector, wd1770.track, wd1770.curside, flags);
-    bytenum = 0;
     nmi |= 2;
 }
 
@@ -536,7 +532,6 @@ static void wd1770_cmd_start(unsigned cmd)
             wd1770.status = WDS_MOTOR_ON|WDS_BUSY;
             wd1770.type1_status = false;
             disc_readaddress(curdrive, wd1770.curside, wd1770.density);
-            bytenum = 0;
             break;
 
         case 0xD:
