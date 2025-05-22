@@ -33,10 +33,7 @@ enum {
 struct
 {
     uint8_t command, sector, track, status, data, resetting;
-    int curside;
-    int density;
-    int stepdir;
-    int seek_delta;
+    int8_t  curside, density, stepdir, seek_delta;
     uint8_t cmd_started, in_gap, type1_status;
 } wd1770;
 
