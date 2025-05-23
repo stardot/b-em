@@ -1,3 +1,4 @@
+#define _DEBUG
 /*B-em v2.2 by Tom Walker
   Disc support*/
 
@@ -129,50 +130,38 @@ void disc_poll()
         }
 }
 
-void disc_seek0(int drive, uint32_t step_time, uint32_t settle_time)
+static void disc_seek_common(int drive, DRIVE *dp, const char *desc, int tracks, uint32_t step_time, int32_t settle_time)
 {
-    DRIVE *dp = &drives[drive];
-    if (dp->curtrack) {
-        if (dp->seek)
-            dp->seek(drive, 0);
-        ddnoise_seek(-dp->curtrack);
-        fdc_time = dp->curtrack * step_time + settle_time;
-        log_debug("disc: drive %d: seek track zero, steps=%d, step_time=%'u, settle_time=%'u, fdc_time=%'d", drive, dp->curtrack, step_time, settle_time, fdc_time);
-        dp->curtrack = 0;
-    }
-    else if (dp->newdisk) {
-        log_debug("disc: drive %d: seek track zero, new disk", drive);
-        if (dp->seek)
-            dp->seek(drive, 0);
+    if (tracks || dp->newdisk) {
         dp->newdisk = 0;
-        fdc_time = 200;
-    }
-    else {
-        log_debug("disc: drive %d: seek track zero, already there", drive);
-        fdc_time = 200;
-    }
-}
-
-void disc_seekrelative(int drive, int tracks, uint32_t step_time, uint32_t settle_time)
-{
-    if (tracks) {
-        DRIVE *dp = &drives[drive];
+        fdc_time = (tracks < 0 ? -tracks : tracks) * step_time + settle_time;
+        if (fdc_time <= 0)
+            fdc_time = 200;
         int newtrack = dp->curtrack + tracks;
+        log_debug("disc: drive %d: seek %s %+d tracks to %d, step_time=%'d, settle_time=%'d, calculated fdc_time=%'d", drive, desc, tracks, newtrack, step_time, settle_time, fdc_time);
         if (newtrack < 0) {
             log_warn("disc: drive %d: attempt to seek out beyond track zero", drive);
             newtrack = 0;
         }
         ddnoise_seek(tracks);
-        dp->curtrack = newtrack;
-        fdc_time = ((tracks < 0) ? -tracks : tracks) * step_time + settle_time;
-        log_debug("disc: drive %d: seek of %+d tracks, step_time=%'u, settle_time=%'u, fdc_time=%'d", drive, tracks, step_time, settle_time, fdc_time);
         if (dp->seek)
             dp->seek(drive, newtrack);
+        dp->curtrack = newtrack;
     }
-    else {
+    else 
         fdc_time = 200;
-        log_debug("disc: drive %d: seek of zero tracks", drive);
-    }
+}
+
+void disc_seek0(int drive, uint32_t step_time, int32_t settle_time)
+{
+    DRIVE *dp = &drives[drive];
+    disc_seek_common(drive, dp, "track zero", -dp->curtrack, step_time, settle_time);
+}
+
+void disc_seekrelative(int drive, int tracks, uint32_t step_time, int32_t settle_time)
+{
+    DRIVE *dp = &drives[drive];
+    disc_seek_common(drive, dp, "relative", tracks, step_time, settle_time);
 }
 
 void disc_readsector(int drive, int sector, int track, int side, unsigned flags)
