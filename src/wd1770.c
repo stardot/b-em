@@ -420,7 +420,7 @@ static void wd1770_cmd_next(unsigned cmd)
                 }
                 else {
                     wd1770.status &= ~WDS_BUSY;
-                    log_debug("wd1770: seek ignored as data register empty");
+                    log_warn("wd1770: seek ignored as data register empty");
                 }
             }
             else {
@@ -510,7 +510,7 @@ static void wd1770_cmd_start(unsigned cmd)
             break;
 
         case 0x1: /*Seek*/
-            fdc_time = step_times[cmd & 3];
+            fdc_time = 800; /* Allow time for Opus DDOS to cancel */
             break;
 
         case 0x2:
