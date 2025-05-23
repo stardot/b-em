@@ -1409,7 +1409,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 break;
 
             case 'q':
-                main_setquit();
+                quitting = 1;
                 /* FALLTHOUGH */
 
             case 'c':

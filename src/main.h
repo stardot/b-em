@@ -14,8 +14,8 @@ extern const emu_speed_t *emu_speeds;
 extern int num_emu_speeds;
 extern int emuspeed;
 extern int framesrun;
+extern int quitting;
 
-extern bool quitting;
 extern bool keydefining;
 extern bool autopause;
 extern bool autoskip;
@@ -30,7 +30,6 @@ void main_close(void);
 void main_pause(const char *why);
 void main_resume(void);
 void main_setspeed(int speed);
-void main_setquit(void);
 void main_start_fullspeed(void);
 void main_stop_fullspeed(bool hostshift);
 

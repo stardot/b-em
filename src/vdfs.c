@@ -4615,6 +4615,17 @@ static void cmd_dump(uint16_t addr)
     rom_dispatch(VDFS_ROM_DUMP);
 }
 
+static void cmd_quit(uint16_t addr)
+{
+    int exit_status = 0;
+    int ch = readmem(addr);
+    while (ch >= '0' && ch <= '9') {
+        exit_status = exit_status * 10 + (ch & 0x0f);
+        ch = readmem(++addr);
+    }
+    quitting = 1+exit_status;
+}
+
 static bool vdfs_do(enum vdfs_action act, uint16_t addr)
 {
     log_debug("vdfs: vdfs_do, act=%d, addr=%04X", act, addr);
@@ -4633,7 +4644,7 @@ static bool vdfs_do(enum vdfs_action act, uint16_t addr)
     case VDFS_ACT_NOP:
         break;
     case VDFS_ACT_QUIT:
-        main_setquit();
+        cmd_quit(addr);
         break;
     case VDFS_ACT_SRLOAD:
         return cmd_srload(addr);

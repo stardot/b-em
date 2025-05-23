@@ -68,7 +68,7 @@
 
 #undef printf
 
-bool quitting = false;
+int quitting = 0;
 bool keydefining = false;
 bool autopause = false;
 bool autoskip = true;
@@ -725,7 +725,7 @@ void main_run()
                 break;
             case ALLEGRO_EVENT_DISPLAY_CLOSE:
                 log_debug("main: event display close - quitting");
-                quitting = true;
+                quitting = 1;
                 break;
             case ALLEGRO_EVENT_TIMER:
                 main_timer(&event);
@@ -837,15 +837,10 @@ void main_resume(void)
         al_start_timer(timer);
 }
 
-void main_setquit(void)
-{
-    quitting = true;
-}
-
 int main(int argc, char **argv)
 {
     main_init(argc, argv);
     main_run();
     main_close();
-    return 0;
+    return quitting-1;
 }
