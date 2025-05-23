@@ -1,3 +1,4 @@
+#define _DEBUG
 /*B-em v2.2 by Tom Walker
   1770 FDC emulation*/
 #include <stdio.h>
@@ -34,7 +35,7 @@ struct
 {
     uint8_t command, sector, track, status, data, resetting;
     int8_t  curside, density, stepdir, seek_delta;
-    uint8_t cmd_started, in_gap, type1_status;
+    uint8_t cmd_started, in_gap, type1_status, seek_ok;
 } wd1770;
 
 static const uint8_t nmi_on_completion[5] = {
@@ -161,6 +162,7 @@ static void wd1770_write_fdc(uint16_t addr, uint8_t val)
         nmi &= ~2;
         wd1770.status &= ~WDS_DATA_REQ;
         wd1770.data = val;
+        wd1770.seek_ok = true;
         break;
     }
 }
@@ -395,18 +397,41 @@ static void wd1770_completed(void)
 {
     wd1770.status &= ~WDS_BUSY;
     wd1770_setspindown();
+    wd1770.seek_ok = false;
     if (nmi_on_completion[fdc_type - FDC_ACORN])
         nmi |= 1;
+}
+
+static void wd1770_seek_done(unsigned cmd)
+{
+    if (cmd & 0x04 && !disc_verify(curdrive, wd1770.track, wd1770.density))
+        wd1770.status |= WDS_SEEK_ERROR;
+    wd1770_completed();
 }
 
 static void wd1770_cmd_next(unsigned cmd)
 {
     switch(cmd >> 4) {
+        case 0x01: /* Seek */
+            if (wd1770.cmd_started == 1) {
+                if (wd1770.seek_ok) {
+                    wd1770_begin_seek(cmd, "seek", wd1770.data - wd1770.track);
+                    wd1770.cmd_started = 2;
+                }
+                else {
+                    wd1770.status &= ~WDS_BUSY;
+                    log_debug("wd1770: seek ignored as data register empty");
+                }
+            }
+            else {
+                wd1770.track += wd1770.seek_delta;
+                wd1770_seek_done(cmd);
+            }
+            break;
         case 0x0: /*Restore*/
             wd1770.track = 0;
             wd1770.seek_delta = 0;
             // FALLTHROUGH
-        case 0x1: /*Seek*/
         case 0x3: /*Step*/
         case 0x5: /*Step in*/
         case 0x7: /*Step out*/
@@ -415,11 +440,7 @@ static void wd1770_cmd_next(unsigned cmd)
         case 0x2: /*Step*/
         case 0x4: /*Step in*/
         case 0x6: /*Step out*/
-            wd1770.status = WDS_MOTOR_ON;
-            if (cmd & 0x04 && !disc_verify(curdrive, wd1770.track, wd1770.density))
-                wd1770.status |= WDS_SEEK_ERROR;
-            if (nmi_on_completion[fdc_type - FDC_ACORN])
-                nmi |= 1;
+            wd1770_seek_done(cmd);
             break;
 
         case 0x8: /* Read single sector */
@@ -472,6 +493,7 @@ static void wd1770_cmd_next(unsigned cmd)
                 nmi |= 1;
             log_debug("force interrupt, nmi=%02X", nmi);
             wd1770_setspindown();
+            wd1770.seek_ok = false;
             break;
     }
 }
@@ -488,7 +510,7 @@ static void wd1770_cmd_start(unsigned cmd)
             break;
 
         case 0x1: /*Seek*/
-            wd1770_begin_seek(cmd, "seek", wd1770.data - wd1770.track);
+            fdc_time = step_times[cmd & 3];
             break;
 
         case 0x2:
@@ -630,7 +652,7 @@ static int wd1770_getdata(int last)
     if (wd1770.status & WDS_DATA_REQ) {
         log_debug("wd1770: getdata: no data in register (underrun)");
         wd1770.status |= WDS_LOST_DATA;
-        return -1;
+        return 0;
     }
     else {
         if (!last) {
@@ -656,6 +678,7 @@ void wd1770_reset()
             wd1770.status |= WDS_MOTOR_ON;
         wd1770.sector = 1;
         wd1770.type1_status = true;
+        wd1770.seek_ok = false;
         motorspin = 0;
         fdc_time = 0;
         fdc_callback       = wd1770_callback;
