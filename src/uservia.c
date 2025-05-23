@@ -5,6 +5,7 @@
 #include "b-em.h"
 #include "via.h"
 #include "uservia.h"
+#include "config.h"
 #include "model.h"
 #include "compact_joystick.h"
 #include "mouse.h"
@@ -15,7 +16,10 @@ VIA uservia;
 
 uint8_t lpt_dac;
 ALLEGRO_USTR *prt_clip_str;
-FILE *prt_fp;
+enum print_dest_type print_dest;
+char *print_filename;
+const char *print_cmd;
+FILE *print_fp;
 
 void uservia_set_ca1(int level)
 {
@@ -34,17 +38,74 @@ void uservia_set_cb2(int level)
         via_set_cb2(&uservia, level);
 }
 
+static void printer_open(unsigned val)
+{
+    switch(print_dest) {
+        case PDEST_NONE:
+            return;
+        case PDEST_STDOUT:
+            print_fp = stdout;
+            break;
+        case PDEST_FILE:
+            if ((print_fp = fopen(print_filename, "w")) == NULL) {
+                log_error("unable to open print file %s: %s", print_filename, strerror(errno));
+                print_dest = PDEST_NONE;
+                return;
+            }
+            break;
+        case PDEST_PIPE:
+            if (!print_cmd)
+                print_cmd = get_config_string(NULL, "printcmd", "lp");
+            if ((print_fp = popen(print_cmd, "w")) == NULL) {
+                log_error("unable to start print command %s: %s", print_filename, strerror(errno));
+                print_dest = PDEST_NONE;
+                return;
+            }
+            break;
+    }
+    putc(val, print_fp);
+}
+
+static void print_close_pipe(void)
+{
+    int ecode = pclose(print_fp);
+    if (ecode == -1)
+        log_error("error waiting for print command: %s", strerror(errno));
+    else if (ecode > 0)
+        log_error("print command failed, exit status=%d", ecode);
+}
+
+void printer_close(void)
+{
+    switch(print_dest) {
+        case PDEST_NONE:
+            return;
+        case PDEST_STDOUT:
+            fflush(stdout);
+            break;
+        case PDEST_FILE:
+            if (fclose(print_fp))
+                log_error("error closing print file: %s",  strerror(errno));
+            break;
+        case PDEST_PIPE:
+            print_close_pipe();
+    }
+    print_dest = PDEST_NONE;
+    print_fp = NULL;
+}
+
 void uservia_write_portA(uint8_t val)
 {
-    if (prt_clip_str || prt_fp) {
+    if (print_dest != PDEST_NONE || prt_clip_str) {
         // Printer output.
-        if (prt_fp)
-            putc(val, prt_fp);
-        if (prt_clip_str) {
-            if (val == 0x60)
-                val = 0xa3; // pound sign.
+        if (val == 0x60)
+            val = 0xa3; // pound sign.
+        if (print_fp)
+            putc(val, print_fp);
+        else if (print_dest != PDEST_NONE)
+            printer_open(val);
+        if (prt_clip_str)
             al_ustr_append_chr(prt_clip_str, val);
-        }
         via_set_ca1(&uservia, 1);
         log_debug("uservia: set CA1 low for printer");
     }
@@ -54,7 +115,7 @@ void uservia_write_portA(uint8_t val)
 
 void printer_set_ca2(int level)
 {
-    if (level && (prt_clip_str || prt_fp)) {
+    if (level && (prt_clip_str || print_dest != PDEST_NONE)) {
         via_set_ca1(&uservia, 0);
         log_debug("uservia: set CA1 high for printer");
     }

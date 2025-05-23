@@ -238,6 +238,8 @@ typedef enum {
     OPT_VDFS_DIR,
     OPT_PASTE_OS,
     OPT_PASTE_KBD,
+    OPT_PRINT_FILE,
+    OPT_PRINT_PIPE,
     OPT_GROUND,
 } opt_state;
 
@@ -311,6 +313,12 @@ void main_init(int argc, char *argv[])
                         state = OPT_PASTE_OS;
                     else if (!strcasecmp(arg, "pastek"))
                         state = OPT_PASTE_KBD;
+                    else if (!strcasecmp(arg, "printstdout"))
+                        print_dest = PDEST_STDOUT;
+                    else if (!strcasecmp(arg, "printfile"))
+                        state = OPT_PRINT_FILE;
+                    else if (!strcasecmp(arg, "printfile"))
+                        state = OPT_PRINT_PIPE;
                     else {
                         if (*arg != 'h' && *arg != '?')
                             fprintf(stderr, "b-em: unrecognised option '-%s'\n", arg);
@@ -373,6 +381,13 @@ void main_init(int argc, char *argv[])
             case OPT_PASTE_KBD:
                 debug_paste(arg, key_paste_start);
                 break;
+            case OPT_PRINT_FILE:
+                print_dest = PDEST_FILE;
+                print_filename = strdup(arg);
+                break;
+            case OPT_PRINT_PIPE:
+                print_dest = PDEST_PIPE;
+                print_filename = strdup(arg);
         }
         state = OPT_GROUND;
     }

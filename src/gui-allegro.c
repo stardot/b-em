@@ -1,3 +1,4 @@
+#define _DEBUG
 #include "b-em.h"
 #include <allegro5/allegro_native_dialog.h>
 #include "gui-allegro.h"
@@ -53,12 +54,6 @@ typedef struct {
     const char *label;
     int itemno;
 } menu_map_t;
-
-static enum pdest {
-    PDEST_NONE,
-    PDEST_FILE,
-    PDEST_PIPE
-} print_dest;
 
 static ALLEGRO_MENU *disc_menu;
 static ALLEGRO_MENU *rom_menu;
@@ -123,8 +118,9 @@ static ALLEGRO_MENU *create_file_menu(void)
     al_append_menu_item(menu, "Save State...", IDM_FILE_SAVE_STATE, 0, NULL, NULL);
     al_append_menu_item(menu, "Save Screenshot...", IDM_FILE_SCREEN_SHOT, 0, NULL, NULL);
     al_append_menu_item(menu, "Save Screen as Text...", IDM_FILE_SCREEN_TEXT, 0, NULL, NULL);
-    add_checkbox_item(menu, "Print to file", IDM_FILE_PRINT, print_dest == PDEST_FILE);
-    add_checkbox_item(menu, "Print to command", IDM_FILE_PCMD, print_dest == PDEST_PIPE);
+    add_radio_item(menu, "Print to stdout", IDM_FILE_PRINT, PDEST_STDOUT, print_dest);
+    add_radio_item(menu, "Print to file", IDM_FILE_PRINT, PDEST_FILE, print_dest);
+    add_radio_item(menu, "Print to command", IDM_FILE_PRINT, PDEST_PIPE, print_dest);
     add_checkbox_item(menu, "Serial to file", IDM_FILE_SERIAL, sysacia_fp);
     add_checkbox_item(menu, music5000_rec.prompt, IDM_FILE_M5000, music5000_rec.fp);
     add_checkbox_item(menu, paula_rec.prompt, IDM_FILE_PAULAREC, paula_rec.fp);
@@ -683,82 +679,32 @@ static void file_save_scrshot(const char *path)
     vid_savescrshot = 2;
 }
 
-static void file_print_close_file(void)
-{
-    if (fclose(prt_fp))
-        log_error("error closing print file: %s",  strerror(errno));
-    prt_fp = NULL;
-    print_dest = PDEST_NONE;
-}
-
-static void file_print_close_pipe(void)
-{
-    int ecode = pclose(prt_fp);
-    if (ecode == -1)
-        log_error("error waiting for print command: %s", strerror(errno));
-    else if (ecode > 0)
-        log_error("print command failed, exit status=%d", ecode);
-    prt_fp = NULL;
-    print_dest = PDEST_NONE;
-}
-
-static void file_print_open(ALLEGRO_EVENT *event)
+static void file_print_chooser(ALLEGRO_EVENT *event)
 {
     ALLEGRO_FILECHOOSER *chooser = al_create_native_file_dialog(savestate_name, "Print to file", "*.prn", ALLEGRO_FILECHOOSER_SAVE);
     if (chooser) {
         ALLEGRO_DISPLAY *display = (ALLEGRO_DISPLAY *)(event->user.data2);
-        while (al_show_native_file_dialog(display, chooser)) {
-            if (al_get_native_file_dialog_count(chooser) <= 0)
-                break;
-            if ((prt_fp = fopen(al_get_native_file_dialog_path(chooser, 0), "wb")))
-                break;
-        }
+        if (al_show_native_file_dialog(display, chooser))
+            if (al_get_native_file_dialog_count(chooser) > 0)
+                if ((print_filename = strdup(al_get_native_file_dialog_path(chooser, 0))))
+                    print_dest = PDEST_FILE;
         al_destroy_native_file_dialog(chooser);
     }
-    if (prt_fp)
-        print_dest = PDEST_FILE;
     else
-        al_set_menu_item_flags((ALLEGRO_MENU *)(event->user.data3), IDM_FILE_PRINT, 0);
+        al_set_menu_item_flags((ALLEGRO_MENU *)(event->user.data3), menu_id_num(IDM_FILE_PRINT, PDEST_FILE), 0);
 }
 
-static void file_print_file(ALLEGRO_EVENT *event)
+static void file_print_change(ALLEGRO_EVENT *event)
 {
-    switch(print_dest) {
-        case PDEST_PIPE:
-            file_print_close_pipe();
-            al_set_menu_item_flags((ALLEGRO_MENU *)(event->user.data3), IDM_FILE_PCMD, 0);
-            /* FALL THROUGH */
-        case PDEST_NONE:
-            file_print_open(event);
-            break;
-        case PDEST_FILE:
-            file_print_close_file();
-    }
-}
-
-static void file_print_open_pipe(ALLEGRO_EVENT *event)
-{
-    const char *pcmd = get_config_string(NULL, "printcmd", "lp");
-    if ((prt_fp = popen(pcmd, "w")))
-        print_dest = PDEST_PIPE;
-    else {
-        log_error("unable to start print command '%s': %s", pcmd, strerror(errno));
-        al_set_menu_item_flags((ALLEGRO_MENU *)(event->user.data3), IDM_FILE_PCMD, 0);
-    }
-}
-
-static void file_print_pipe(ALLEGRO_EVENT *event)
-{
-    switch(print_dest) {
-        case PDEST_FILE:
-            file_print_close_file();
-            al_set_menu_item_flags((ALLEGRO_MENU *)(event->user.data3), IDM_FILE_PRINT, 0);
-            /* FALL THROUGH */
-        case PDEST_NONE:
-            file_print_open_pipe(event);
-            break;
-        case PDEST_PIPE:
-            file_print_close_pipe();
+    enum print_dest_type new_dest = menu_get_num(event);
+    enum print_dest_type old_dest = print_dest;
+    printer_close();
+    if (new_dest != old_dest) {
+        if (new_dest == PDEST_FILE)
+            file_print_chooser(event);
+        else
+            print_dest = new_dest;
+        al_set_menu_item_flags((ALLEGRO_MENU *)(event->user.data3), menu_id_num(IDM_FILE_PRINT, old_dest), 0);
     }
 }
 
@@ -1229,10 +1175,7 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             file_chooser_generic(event, savestate_name, "Save screen as text to file", "*.txt", ALLEGRO_FILECHOOSER_SAVE, textsave);
             break;
         case IDM_FILE_PRINT:
-            file_print_file(event);
-            break;
-        case IDM_FILE_PCMD:
-            file_print_pipe(event);
+            file_print_change(event);
             break;
         case IDM_FILE_SERIAL:
             serial_rec(event);
