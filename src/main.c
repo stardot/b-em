@@ -140,6 +140,8 @@ void main_reset()
 
 static const char helptext[] =
     VERSION_STR " command line options:\n\n"
+    "-cfg file.cfg   - use the specified config file\n"
+    "-log file.log   - use the specified log file\n"
     "-mx             - start as model x (see readme.txt for models)\n"
     "-tx             - start with tube x (see readme.txt for tubes)\n"
     "-disc disc.ssd  - load disc.ssd into drives :0/:2\n"
@@ -225,16 +227,157 @@ static void main_load_speeds(void)
     }
 }
 
+typedef enum {
+    OPT_DISC1,
+    OPT_DISC2,
+    OPT_CFGFILE,
+    OPT_LOGFILE,
+    OPT_TAPE,
+    OPT_EXEC,
+    OPT_VDFS_ROOT,
+    OPT_VDFS_DIR,
+    OPT_PASTE_OS,
+    OPT_PASTE_KBD,
+    OPT_GROUND,
+} opt_state;
+
 void main_init(int argc, char *argv[])
 {
-    int tapenext = 0, discnext = 0, execnext = 0, vdfsnext = 0, pastenext = 0;
-    ALLEGRO_DISPLAY *display;
-    ALLEGRO_PATH *path;
-    const char *ext, *exec_fn = NULL;
+    if (!al_init()) {
+        fputs("b-em: Failed to initialise Allegro!\n", stderr);
+        exit(1);
+    }
+
+    opt_state state = OPT_GROUND;
+    ALLEGRO_PATH *snap_fn = NULL;
+    ALLEGRO_PATH *cfg_fn = NULL;
+    const char *ext, *exec_fn = NULL, *log_file = NULL;
     const char *vroot = NULL, *vdir = NULL;
 
-    if (!al_init()) {
-        fputs("Failed to initialise Allegro!\n", stderr);
+    while (--argc) {
+        const char *arg = *++argv;
+        switch (state) {
+            case OPT_GROUND:
+                if (*arg == '-') {
+                    if (!strcasecmp(++arg, "cfg"))
+                        state = OPT_CFGFILE;
+                    else if (!strcasecmp(arg, "log"))
+                        state = OPT_LOGFILE;
+                    else if (!strncasecmp(arg, "sp", 2)) {
+                        sscanf(&arg[2], "%i", &emuspeed);
+                        if(!(emuspeed < num_emu_speeds))
+                            emuspeed = 4;
+                    }
+                    else if (!strcasecmp(arg, "fullscreen"))
+                        fullscreen = 1;
+                    else if (!strcasecmp(arg, "tape"))
+                        state = OPT_TAPE;
+                    else if (!strcasecmp(arg, "disc") || !strcasecmp(arg, "-disk"))
+                        state = OPT_DISC1;
+                    else if (!strcasecmp(arg, "disc1"))
+                        state = OPT_DISC2;
+                    else if (arg[0] == 'm' || arg[0] == 'M')
+                        sscanf(&arg[1], "%i", &curmodel);
+                    else if (arg[0] == 't' || arg[0] == 'T')
+                        sscanf(&arg[1], "%i", &curtube);
+                    else if (!strcasecmp(arg, "fasttape"))
+                        fasttape = true;
+                    else if (!strcasecmp(arg, "autoboot"))
+                        autoboot = 150;
+                    else if (arg[0] == 'f' || arg[0]=='F') {
+                        if (sscanf(&arg[1], "%i", &vid_fskipmax) == 1) {
+                            if (vid_fskipmax < 1) vid_fskipmax = 1;
+                            if (vid_fskipmax > 9) vid_fskipmax = 9;
+                            skipover = true;
+                        }
+                        else
+                            fprintf(stderr, "invalid frame skip '%s'\n", &arg[2]);
+                    }
+                    else if (arg[0] == 's' || arg[0] == 'S')
+                        vid_dtype_user = VDT_SCANLINES;
+                    else if (!strcasecmp(arg, "debug"))
+                        debug_core = 1;
+                    else if (!strcasecmp(arg, "debugtube"))
+                        debug_tube = 1;
+                    else if (arg[0] == 'i' || arg[0] == 'I')
+                        vid_dtype_user = VDT_INTERLACE;
+                    else if (!strcasecmp(arg, "exec"))
+                        state = OPT_EXEC;
+                    else if (!strcasecmp(arg, "vroot"))
+                        state = OPT_VDFS_ROOT;
+                    else if (!strcasecmp(arg, "vdir"))
+                        state = OPT_VDFS_DIR;
+                    else if (!strcasecmp(arg, "paste"))
+                        state = OPT_PASTE_OS;
+                    else if (!strcasecmp(arg, "pastek"))
+                        state = OPT_PASTE_KBD;
+                    else {
+                        if (*arg != 'h' && *arg != '?')
+                            fprintf(stderr, "b-em: unrecognised option '-%s'\n", arg);
+                        fwrite(helptext, sizeof helptext-1, 1, stdout);
+                        exit(1);
+                    }
+                }
+                else {
+                    ALLEGRO_PATH *path = al_create_path(arg);
+                    ext = al_get_path_extension(path);
+                    if (ext && !strcasecmp(ext, ".snp")) {
+                        if (snap_fn)
+                            al_destroy_path(snap_fn);
+                        snap_fn = path;
+                    }
+                    else if (ext && (!strcasecmp(ext, ".uef") || !strcasecmp(ext, ".csw"))) {
+                        if (tape_fn)
+                            al_destroy_path(tape_fn);
+                        tape_fn = path;
+                    }
+                    else {
+                        if (drives[0].discfn)
+                            al_destroy_path(drives[0].discfn);
+                        drives[0].discfn = path;
+                        autoboot = 150;
+                    }
+                }
+                continue;
+            case OPT_DISC1:
+            case OPT_DISC2:
+                if (drives[state].discfn)
+                    al_destroy_path(drives[state].discfn);
+                drives[state].discfn = al_create_path(arg);
+                break;
+            case OPT_CFGFILE:
+                if (cfg_fn)
+                    al_destroy_path(cfg_fn);
+                cfg_fn = al_create_path(arg);
+                break;
+            case OPT_LOGFILE:
+                log_file = arg;
+                break;
+            case OPT_TAPE:
+                if (tape_fn)
+                    al_destroy_path(tape_fn);
+                tape_fn = al_create_path(arg);
+                break;
+            case OPT_EXEC:
+                exec_fn = arg;
+                break;
+            case OPT_VDFS_ROOT:
+                vroot = arg;
+                break;
+            case OPT_VDFS_DIR:
+                vdir = arg;
+                break;
+            case OPT_PASTE_OS:
+                debug_paste(arg, os_paste_start);
+                break;
+            case OPT_PASTE_KBD:
+                debug_paste(arg, key_paste_start);
+                break;
+        }
+        state = OPT_GROUND;
+    }
+    if (state != OPT_GROUND) {
+        fputs("b-em: missing argument\n", stderr);
         exit(1);
     }
 
@@ -246,115 +389,14 @@ void main_init(int argc, char *argv[])
         exit(1);
     }
     key_init();
-    config_load();
-    log_open();
+    config_load(cfg_fn);
+    log_open(log_file);
     log_info("main: starting %s", VERSION_STR);
 
     main_load_speeds();
     model_loadcfg();
 
-    for (int c = 1; c < argc; c++) {
-        if (!strcasecmp(argv[c], "--help") || !strcmp(argv[c], "-?") || !strcasecmp(argv[c], "-h")) {
-            fwrite(helptext, sizeof helptext-1, 1, stdout);
-            exit(1);
-        }
-        else if (!strncasecmp(argv[c], "-sp", 3)) {
-            sscanf(&argv[c][3], "%i", &emuspeed);
-            if(!(emuspeed < num_emu_speeds))
-                emuspeed = 4;
-        }
-	// lovebug
-        else if (!strcasecmp(argv[c], "-fullscreen"))
-            fullscreen = 1;
-	// lovebug end
-        else if (!strcasecmp(argv[c], "-tape"))
-            tapenext = 2;
-        else if (!strcasecmp(argv[c], "-disc") || !strcasecmp(argv[c], "-disk"))
-            discnext = 1;
-        else if (!strcasecmp(argv[c], "-disc1"))
-            discnext = 2;
-        else if (argv[c][0] == '-' && (argv[c][1] == 'm' || argv[c][1] == 'M'))
-            sscanf(&argv[c][2], "%i", &curmodel);
-        else if (argv[c][0] == '-' && (argv[c][1] == 't' || argv[c][1] == 'T'))
-            sscanf(&argv[c][2], "%i", &curtube);
-        else if (!strcasecmp(argv[c], "-fasttape"))
-            fasttape = true;
-        else if (!strcasecmp(argv[c], "-autoboot"))
-            autoboot = 150;
-        else if (argv[c][0] == '-' && (argv[c][1] == 'f' || argv[c][1]=='F')) {
-            if (sscanf(&argv[c][2], "%i", &vid_fskipmax) == 1) {
-                if (vid_fskipmax < 1) vid_fskipmax = 1;
-                if (vid_fskipmax > 9) vid_fskipmax = 9;
-                skipover = true;
-            }
-            else
-                fprintf(stderr, "invalid frame skip '%s'\n", &argv[c][2]);
-        }
-        else if (argv[c][0] == '-' && (argv[c][1] == 's' || argv[c][1] == 'S'))
-            vid_dtype_user = VDT_SCANLINES;
-        else if (!strcasecmp(argv[c], "-debug"))
-            debug_core = 1;
-        else if (!strcasecmp(argv[c], "-debugtube"))
-            debug_tube = 1;
-        else if (argv[c][0] == '-' && (argv[c][1] == 'i' || argv[c][1] == 'I'))
-            vid_dtype_user = VDT_INTERLACE;
-        else if (!strcasecmp(argv[c], "-exec"))
-            execnext = 1;
-        else if (!strcasecmp(argv[c], "-vroot"))
-            vdfsnext = 1;
-        else if (!strcasecmp(argv[c], "-vdir"))
-            vdfsnext = 2;
-        else if (!strcasecmp(argv[c], "-paste"))
-            pastenext = 1;
-        else if (!strcasecmp(argv[c], "-pastek"))
-            pastenext = 2;
-        else if (tapenext) {
-            if (tape_fn)
-                al_destroy_path(tape_fn);
-            tape_fn = al_create_path(argv[c]);
-        }
-        else if (discnext) {
-            if (drives[discnext-1].discfn)
-                al_destroy_path(drives[discnext-1].discfn);
-            drives[discnext-1].discfn = al_create_path(argv[c]);
-            discnext = 0;
-        }
-        else if (execnext) {
-            exec_fn = argv[c];
-            execnext = 0;
-        }
-        else if (vdfsnext) {
-            if (vdfsnext == 2)
-                vdir = argv[c];
-            else
-                vroot = argv[c];
-            vdfsnext = 0;
-        }
-        else if (pastenext)
-            debug_paste(argv[c], pastenext == 2 ? key_paste_start : os_paste_start);
-        else {
-            path = al_create_path(argv[c]);
-            ext = al_get_path_extension(path);
-            if (ext && !strcasecmp(ext, ".snp"))
-                savestate_load(argv[c]);
-            else if (ext && (!strcasecmp(ext, ".uef") || !strcasecmp(ext, ".csw"))) {
-                if (tape_fn)
-                    al_destroy_path(tape_fn);
-                tape_fn = path;
-                tapenext = 0;
-            }
-            else {
-                if (drives[0].discfn)
-                    al_destroy_path(drives[0].discfn);
-                drives[0].discfn = path;
-                discnext = 0;
-                autoboot = 150;
-            }
-        }
-        if (tapenext) tapenext--;
-    }
-
-    display = video_init();
+    ALLEGRO_DISPLAY *display = video_init();
     mode7_makechars();
     al_init_image_addon();
     led_init();

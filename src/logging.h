@@ -7,7 +7,7 @@
 #define printflike
 #endif
 
-extern void log_open(void);
+extern void log_open(const char *log_fn);
 extern void log_close(void);
 extern void log_fatal(const char *fmt, ...) printflike;
 extern void log_error(const char *fmt, ...) printflike;

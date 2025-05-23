@@ -3,7 +3,7 @@
 
 extern ALLEGRO_CONFIG *bem_cfg;
 
-void config_load(void);
+void config_load(ALLEGRO_PATH *path);
 void config_save(void);
 
 int get_config_int(const char *sect, const char *key, int idefault);

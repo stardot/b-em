@@ -293,20 +293,20 @@ static int contains(const char *haystack, const char *needle)
     return 0;
 }
 
-static void log_open_file(void) {
-    const char *log_fn;
+static void log_open_file(const char *log_fn)
+{
     ALLEGRO_PATH *path = NULL;
-    int append;
-
-    log_fn = get_config_string(log_section, "log_filename", NULL);
     if (!log_fn) {
-        if ((path = find_cfg_dest(log_default_fn, ".txt")))
-            log_fn = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
-        else
-            log_warn("log_open: unable to find suitable destination for log file");
+        log_fn = get_config_string(log_section, "log_filename", NULL);
+        if (!log_fn) {
+            if ((path = find_cfg_dest(log_default_fn, ".txt")))
+                log_fn = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+            else
+                log_warn("log_open: unable to find suitable destination for log file");
+        }
     }
     if (log_fn) {
-        append = get_config_bool(log_section, "append", 1);
+        bool append = get_config_bool(log_section, "append", 1);
         if ((log_fp = fopen(log_fn, append ? "at" : "wt")) == NULL)
             log_warn("log_open: unable to open log %s: %s", log_fn, strerror(errno));
     }
@@ -314,7 +314,7 @@ static void log_open_file(void) {
         al_destroy_path(path);
 }
 
-void log_open(void)
+void log_open(const char *log_fn)
 {
     const char *to_file, *to_stderr, *to_msgbox;
     unsigned new_opt;
@@ -338,7 +338,7 @@ void log_open(void)
     }
     log_options = new_opt;
     if (open_file)
-        log_open_file();
+        log_open_file(log_fn);
     log_debug("log_open: log options=%x", log_options);
 }
 

@@ -43,6 +43,7 @@ extern enum vid_disptype {
     VDT_INTERLACE,
     VDT_SCANLINES,
     VDT_LINEDOUBLE,
+    VDT_UNSET
 } vid_dtype_user, vid_dtype_intern;
 
 extern enum vid_coltype {
@@ -50,7 +51,7 @@ extern enum vid_coltype {
     VDC_PAL,
     VDC_GREEN,
     VDC_AMBER,
-    VDC_WHITE
+    VDC_WHITE,
 } vid_colour_out;
 
 extern int vid_fskipmax, vid_fullborders;
