@@ -552,7 +552,7 @@ static void wd1770_cmd_next(unsigned cmd)
             else
                 wd1770.status = WDS_MOTOR_ON;
             //if ((wd1770.oldcmd & 0xc) && nmi_on_completion[fdc_type - FDC_ACORN])
-            if (nmi_on_completion[fdc_type - FDC_ACORN])
+            if (nmi_on_completion[fdc_type - FDC_ACORN] & 0x04)
                 nmi |= 1;
             log_debug("wd1770: force interrupt, nmi=%02X", nmi);
             wd1770_setspindown();
