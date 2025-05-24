@@ -409,8 +409,71 @@ static void wd1770_seek_done(unsigned cmd)
     wd1770_completed();
 }
 
+#ifdef _DEBUG
+
+static const char *wd1770_cmd_names[] = {
+    /* 0 */ "Restore",
+    /* 1 */ "Seek",
+    /* 2 */ "Step (no update)",
+    /* 3 */ "Step (with update)",
+    /* 4 */ "Step in (no update)",
+    /* 5 */ "Step in (with update)",
+    /* 6 */ "Step out (no update)",
+    /* 7 */ "Step out (with update)",
+    /* 8 */ "Read single sector",
+    /* 9 */ "Read multiple sector",
+    /* A */ "Write single sector",
+    /* B */ "Write multiple sector",
+    /* C */ "Read address",
+    /* D */ "Force interrupt",
+    /* E */ "Read track",
+    /* F */ "Write track"
+};
+
+static void wd1770_log_cmd(unsigned cmd, const char *desc)
+{
+    unsigned op_code = cmd >> 4;
+    const char *name = wd1770_cmd_names[op_code];
+    if (op_code & 8) {
+        /* non-type 1 */
+        char flags[30], *ptr = flags;
+        if (op_code == 0x0d) {
+            if (cmd & 0x08)
+                ptr = stpcpy(ptr, ",intindex");
+            if (cmd & 0x04)
+                ptr = stpcpy(ptr, ",intimmed");
+        }
+        else {
+            if (!(cmd & 0x08))
+                ptr = stpcpy(ptr, ",spin-up");
+            if (cmd & 0x04)
+                ptr = stpcpy(ptr, ",delay");
+            if (cmd & 0x02)
+                ptr = stpcpy(ptr, ",no-precomp");
+        }
+        *ptr = 0;
+        log_debug("wd1770: %s cmd %02X, %s%s", desc, cmd, name, flags);
+    }
+    else {
+        /* type 1 */
+        char flags[30], *ptr = flags;
+        if (!(cmd & 0x08))
+            ptr = stpcpy(ptr, ",spin-up");
+        if (cmd & 0x04)
+            ptr = stpcpy(ptr, ",verify");
+        *ptr = 0;
+        log_debug("wd1770: %s cmd %02X, %s%s, step=%d", desc, cmd, name, flags, cmd & 0x03);
+    }
+}
+
+#else
+static void wd1770_log_cmd(unsigned cmd, const char *desc) {}
+#endif
+
 static void wd1770_cmd_next(unsigned cmd)
 {
+    wd1770_log_cmd(cmd, "next callback for");
+
     switch(cmd >> 4) {
         case 0x01: /* Seek */
             if (wd1770.cmd_started == 1) {
@@ -491,7 +554,7 @@ static void wd1770_cmd_next(unsigned cmd)
             //if ((wd1770.oldcmd & 0xc) && nmi_on_completion[fdc_type - FDC_ACORN])
             if (nmi_on_completion[fdc_type - FDC_ACORN])
                 nmi |= 1;
-            log_debug("force interrupt, nmi=%02X", nmi);
+            log_debug("wd1770: force interrupt, nmi=%02X", nmi);
             wd1770_setspindown();
             wd1770.seek_ok = false;
             break;
@@ -500,6 +563,8 @@ static void wd1770_cmd_next(unsigned cmd)
 
 static void wd1770_cmd_start(unsigned cmd)
 {
+    wd1770_log_cmd(cmd, "start callback for");
+
     switch(cmd >> 4) {
         case 0x0: /*Restore*/
             wd1770.status = WDS_MOTOR_ON|WDS_BUSY;
@@ -554,7 +619,6 @@ static void wd1770_cmd_start(unsigned cmd)
             break;
 
         case 0xD:
-            log_debug("wd1770: force interrupt");
             disc_abort(curdrive);
             fdc_time = 200;
             break;
@@ -581,14 +645,10 @@ static void wd1770_cmd_start(unsigned cmd)
 static void wd1770_callback()
 {
     fdc_time = 0;
-    if (wd1770.cmd_started) {
-        log_debug("wd1770: next callback for cmd %02X, status=%02X", wd1770.command, wd1770.status);
+    if (wd1770.cmd_started)
         wd1770_cmd_next(wd1770.command);
-    }
-    else {
-        log_debug("wd1770: start callback for cmd %02X, status=%02X", wd1770.command, wd1770.status);
+    else
         wd1770_cmd_start(wd1770.command);
-    }
 }
 
 void wd1770_data(uint8_t dat)
