@@ -1,4 +1,3 @@
-#define _DEBUG
 /*
  * B-EM SDF - Simple Disk Formats - Access
  *
