@@ -2,6 +2,7 @@
   User VIA + Master 512 mouse emulation*/
 
 #include <stdio.h>
+#include <wchar.h>
 #include "b-em.h"
 #include "via.h"
 #include "uservia.h"
@@ -18,6 +19,7 @@ uint8_t lpt_dac;
 ALLEGRO_USTR *prt_clip_str;
 enum print_dest_type print_dest;
 char *print_filename;
+bool print_filename_alloc;
 const char *print_cmd;
 FILE *print_fp;
 
@@ -38,34 +40,6 @@ void uservia_set_cb2(int level)
         via_set_cb2(&uservia, level);
 }
 
-static void printer_open(unsigned val)
-{
-    switch(print_dest) {
-        case PDEST_NONE:
-            return;
-        case PDEST_STDOUT:
-            print_fp = stdout;
-            break;
-        case PDEST_FILE:
-            if ((print_fp = fopen(print_filename, "w")) == NULL) {
-                log_error("unable to open print file %s: %s", print_filename, strerror(errno));
-                print_dest = PDEST_NONE;
-                return;
-            }
-            break;
-        case PDEST_PIPE:
-            if (!print_cmd)
-                print_cmd = get_config_string(NULL, "printcmd", "lp");
-            if ((print_fp = popen(print_cmd, "w")) == NULL) {
-                log_error("unable to start print command %s: %s", print_filename, strerror(errno));
-                print_dest = PDEST_NONE;
-                return;
-            }
-            break;
-    }
-    putc(val, print_fp);
-}
-
 static void print_close_pipe(void)
 {
     int ecode = pclose(print_fp);
@@ -83,29 +57,129 @@ void printer_close(void)
         case PDEST_STDOUT:
             fflush(stdout);
             break;
-        case PDEST_FILE:
+        case PDEST_FILE_TEXT:
+        case PDEST_FILE_BIN:
             if (fclose(print_fp))
                 log_error("error closing print file: %s",  strerror(errno));
             break;
-        case PDEST_PIPE:
+        case PDEST_PIPE_TEXT:
+        case PDEST_PIPE_BIN:
             print_close_pipe();
     }
     print_dest = PDEST_NONE;
     print_fp = NULL;
 }
 
+/*
+ * printer_outchar
+ *
+ * This is called for every character sent to the virtual printer.
+ */
+static void printer_outchar(unsigned val, FILE *fp)
+{
+    if (print_dest == PDEST_FILE_BIN || print_dest == PDEST_PIPE_BIN) {
+        /*
+         * For binary printing, the file with have been opened with the
+         * 'b' flag and we use the stream is narrow (byte-oriented) mode
+         */
+        if (putc(val, fp) != EOF)
+            return;
+    }
+    else if (val != '\n') {
+        /*
+         * For text printing, we assume the guest printer ignore character
+         * is set to the default LF, so we only get CR characters for end
+         * of line.
+         *
+         * We also translate character code 0x60 into the Unicode code
+         * point for the pound sign and hope that the encoding of wide
+         * characters is Unicode.
+         */
+        if (val == '\r')
+            val = '\n';
+        else if (val == 0x60)
+            val = 0xa3; // pound sign.
+        if (fputwc(val, fp) != WEOF)
+            return;
+    }
+    log_error("unable to send to print file/command: %s", strerror(errno));
+    printer_close();
+}
+
+static void printer_open_file(unsigned val, const char *mode)
+{
+    FILE *fp = fopen(print_filename, mode);
+    if (fp) {
+        print_fp = fp;
+        printer_outchar(val, fp);
+    }
+    else {
+        log_error("unable to open print file %s: %s", print_filename, strerror(errno));
+        print_dest = PDEST_NONE;
+    }
+}
+
+static void printer_open_pipe(unsigned val, const char *mode)
+{
+    if (!print_cmd)
+        print_cmd = get_config_string(NULL, "printcmd", "lp");
+    if (print_cmd) {
+        FILE *fp = popen(print_cmd, mode);
+        if (fp) {
+            print_fp = fp;
+            printer_outchar(val, fp);
+        }
+        else {
+            log_error("unable to start print command %s: %s", print_filename, strerror(errno));
+            print_dest = PDEST_NONE;
+        }
+    }
+    else {
+        log_error("no print command defined: specify on command line or in config file");
+        print_dest = PDEST_NONE;
+    }
+}
+
+static void printer_open(unsigned val)
+{
+    switch(print_dest) {
+        case PDEST_NONE:
+            break;
+        case PDEST_STDOUT:
+            if (val) {
+                print_fp = stdout;
+                printer_outchar(val, print_fp);
+            }
+            break;
+        case PDEST_FILE_TEXT:
+            if (val)
+                printer_open_file(val, "wt");
+            break;
+        case PDEST_FILE_BIN:
+            printer_open_file(val, "rb");
+            break;
+        case PDEST_PIPE_TEXT:
+            if (val)
+                printer_open_pipe(val, "rt");
+            break;
+        case PDEST_PIPE_BIN:
+            printer_open_pipe(val, "rb");
+    }
+}
+
 void uservia_write_portA(uint8_t val)
 {
     if (print_dest != PDEST_NONE || prt_clip_str) {
         // Printer output.
-        if (val == 0x60)
-            val = 0xa3; // pound sign.
         if (print_fp)
-            putc(val, print_fp);
+            printer_outchar(val, print_fp);
         else if (print_dest != PDEST_NONE)
             printer_open(val);
-        if (prt_clip_str)
+        if (prt_clip_str) {
+            if (val == 0x60)
+                val = 0xa3; // pound sign.
             al_ustr_append_chr(prt_clip_str, val);
+        }
         via_set_ca1(&uservia, 1);
         log_debug("uservia: set CA1 low for printer");
     }

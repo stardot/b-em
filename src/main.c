@@ -238,8 +238,7 @@ typedef enum {
     OPT_VDFS_DIR,
     OPT_PASTE_OS,
     OPT_PASTE_KBD,
-    OPT_PRINT_FILE,
-    OPT_PRINT_PIPE,
+    OPT_PRINT,
     OPT_GROUND,
 } opt_state;
 
@@ -257,7 +256,7 @@ void main_init(int argc, char *argv[])
     const char *vroot = NULL, *vdir = NULL;
 
     while (--argc) {
-        const char *arg = *++argv;
+        char *arg = *++argv;
         switch (state) {
             case OPT_GROUND:
                 if (*arg == '-') {
@@ -315,10 +314,22 @@ void main_init(int argc, char *argv[])
                         state = OPT_PASTE_KBD;
                     else if (!strcasecmp(arg, "printstdout"))
                         print_dest = PDEST_STDOUT;
-                    else if (!strcasecmp(arg, "printfile"))
-                        state = OPT_PRINT_FILE;
-                    else if (!strcasecmp(arg, "printfile"))
-                        state = OPT_PRINT_PIPE;
+                    else if (!strcasecmp(arg, "printfile")) {
+                        print_dest = PDEST_FILE_TEXT;
+                        state = OPT_PRINT;
+                    }
+                    else if (!strcasecmp(arg, "printfilebin")) {
+                        print_dest = PDEST_FILE_BIN;
+                        state = OPT_PRINT;
+                    }
+                    else if (!strcasecmp(arg, "printcmd")) {
+                        print_dest = PDEST_PIPE_TEXT;
+                        state = OPT_PRINT;
+                    }
+                    else if (!strcasecmp(arg, "printcmdbin")) {
+                        print_dest = PDEST_PIPE_BIN;
+                        state = OPT_PRINT;
+                    }
                     else {
                         if (*arg != 'h' && *arg != '?')
                             fprintf(stderr, "b-em: unrecognised option '-%s'\n", arg);
@@ -381,13 +392,9 @@ void main_init(int argc, char *argv[])
             case OPT_PASTE_KBD:
                 debug_paste(arg, key_paste_start);
                 break;
-            case OPT_PRINT_FILE:
-                print_dest = PDEST_FILE;
-                print_filename = strdup(arg);
-                break;
-            case OPT_PRINT_PIPE:
-                print_dest = PDEST_PIPE;
-                print_filename = strdup(arg);
+            case OPT_PRINT:
+                print_filename = arg;
+                print_filename_alloc = false;
         }
         state = OPT_GROUND;
     }

@@ -1,4 +1,3 @@
-#define _DEBUG
 #include "b-em.h"
 #include <allegro5/allegro_native_dialog.h>
 #include "gui-allegro.h"
@@ -110,6 +109,17 @@ static void add_sorted_set(ALLEGRO_MENU *parent, menu_map_t *map, size_t items, 
     }
 }
 
+static ALLEGRO_MENU *create_print_menu(void)
+{
+    ALLEGRO_MENU *menu = al_create_menu();
+    add_radio_item(menu, "Print to stdout (text)", IDM_FILE_PRINT, PDEST_STDOUT, print_dest);
+    add_radio_item(menu, "Print to file (text)", IDM_FILE_PRINT, PDEST_FILE_TEXT, print_dest);
+    add_radio_item(menu, "Print to file (binary)", IDM_FILE_PRINT, PDEST_FILE_BIN, print_dest);
+    add_radio_item(menu, "Print to command (text)", IDM_FILE_PRINT, PDEST_PIPE_TEXT, print_dest);
+    add_radio_item(menu, "Print to command (binary)", IDM_FILE_PRINT, PDEST_PIPE_BIN, print_dest);
+    return menu;
+}
+
 static ALLEGRO_MENU *create_file_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
@@ -118,9 +128,7 @@ static ALLEGRO_MENU *create_file_menu(void)
     al_append_menu_item(menu, "Save State...", IDM_FILE_SAVE_STATE, 0, NULL, NULL);
     al_append_menu_item(menu, "Save Screenshot...", IDM_FILE_SCREEN_SHOT, 0, NULL, NULL);
     al_append_menu_item(menu, "Save Screen as Text...", IDM_FILE_SCREEN_TEXT, 0, NULL, NULL);
-    add_radio_item(menu, "Print to stdout", IDM_FILE_PRINT, PDEST_STDOUT, print_dest);
-    add_radio_item(menu, "Print to file", IDM_FILE_PRINT, PDEST_FILE, print_dest);
-    add_radio_item(menu, "Print to command", IDM_FILE_PRINT, PDEST_PIPE, print_dest);
+    al_append_menu_item(menu, "Printing...", 0, 0, NULL, create_print_menu());
     add_checkbox_item(menu, "Serial to file", IDM_FILE_SERIAL, sysacia_fp);
     add_checkbox_item(menu, music5000_rec.prompt, IDM_FILE_M5000, music5000_rec.fp);
     add_checkbox_item(menu, paula_rec.prompt, IDM_FILE_PAULAREC, paula_rec.fp);
@@ -679,19 +687,30 @@ static void file_save_scrshot(const char *path)
     vid_savescrshot = 2;
 }
 
-static void file_print_chooser(ALLEGRO_EVENT *event)
+static void file_print_chooser(ALLEGRO_EVENT *event, enum print_dest_type new_dest)
 {
     ALLEGRO_FILECHOOSER *chooser = al_create_native_file_dialog(savestate_name, "Print to file", "*.prn", ALLEGRO_FILECHOOSER_SAVE);
     if (chooser) {
         ALLEGRO_DISPLAY *display = (ALLEGRO_DISPLAY *)(event->user.data2);
-        if (al_show_native_file_dialog(display, chooser))
-            if (al_get_native_file_dialog_count(chooser) > 0)
-                if ((print_filename = strdup(al_get_native_file_dialog_path(chooser, 0))))
-                    print_dest = PDEST_FILE;
+        if (al_show_native_file_dialog(display, chooser)) {
+            if (al_get_native_file_dialog_count(chooser) > 0) {
+                const char *new_name = al_get_native_file_dialog_path(chooser, 0);
+                if (new_name) {
+                    char *new_copy = strdup(new_name);
+                    if (new_copy) {
+                        if (print_filename_alloc)
+                            free(print_filename);
+                        print_filename = new_copy;
+                        print_filename_alloc = true;
+                        print_dest = new_dest;
+                    }
+                }
+            }
+        }
         al_destroy_native_file_dialog(chooser);
     }
     else
-        al_set_menu_item_flags((ALLEGRO_MENU *)(event->user.data3), menu_id_num(IDM_FILE_PRINT, PDEST_FILE), 0);
+        al_set_menu_item_flags((ALLEGRO_MENU *)(event->user.data3), new_dest, 0);
 }
 
 static void file_print_change(ALLEGRO_EVENT *event)
@@ -700,8 +719,8 @@ static void file_print_change(ALLEGRO_EVENT *event)
     enum print_dest_type old_dest = print_dest;
     printer_close();
     if (new_dest != old_dest) {
-        if (new_dest == PDEST_FILE)
-            file_print_chooser(event);
+        if (new_dest == PDEST_FILE_TEXT || new_dest == PDEST_FILE_BIN)
+            file_print_chooser(event, new_dest);
         else
             print_dest = new_dest;
         al_set_menu_item_flags((ALLEGRO_MENU *)(event->user.data3), menu_id_num(IDM_FILE_PRINT, old_dest), 0);

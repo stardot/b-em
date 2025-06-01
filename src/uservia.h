@@ -24,12 +24,15 @@ void uservia_set_cb2(int level);
 enum print_dest_type {
     PDEST_NONE,
     PDEST_STDOUT,
-    PDEST_FILE,
-    PDEST_PIPE
+    PDEST_FILE_TEXT,
+    PDEST_FILE_BIN,
+    PDEST_PIPE_TEXT,
+    PDEST_PIPE_BIN
 };
 
 extern enum print_dest_type print_dest;
 extern char *print_filename;
+extern bool print_filename_alloc;
 extern FILE *print_fp;
 void printer_close(void);
 
