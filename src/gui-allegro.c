@@ -1441,7 +1441,7 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             autoskip = !autoskip;
             break;
         case IDM_DEBUGGER:
-            debug_toggle_core();
+            debug_toggle_core(true);
             break;
         case IDM_DEBUG_TUBE:
             debug_toggle_tube();

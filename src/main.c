@@ -66,9 +66,13 @@
 #include "z80.h"
 #include "sprow.h"
 
+#ifndef WIN32
+#include <unistd.h>
+#endif
+
 #undef printf
 
-int quitting = 0;
+bool quitting = false;
 bool keydefining = false;
 bool autopause = false;
 bool autoskip = true;
@@ -78,6 +82,9 @@ int joybutton[4];
 float joyaxes[4];
 int emuspeed = 4;
 bool tricky_sega_adapter = false;
+/* TOHv3: although C exit code is an int, Unix shells don't safely allow
+   you to use values > 125, so this is limited to a signed 8-bit value >:( */
+int8_t shutdown_exit_code = SHUTDOWN_OK;
 
 static ALLEGRO_TIMER *timer;
 ALLEGRO_EVENT_QUEUE *queue;
@@ -507,7 +514,7 @@ void main_init(int argc, char *argv[])
     if (drives[1].discfn)
         gui_set_disc_wprot(1, drives[1].writeprot);
     main_setspeed(emuspeed);
-    debug_start(exec_fn);
+    debug_start(exec_fn, true);
     // lovebug
     if (fullscreen)
         video_enterfullscreen();
@@ -736,7 +743,7 @@ void main_run()
                 break;
             case ALLEGRO_EVENT_DISPLAY_CLOSE:
                 log_debug("main: event display close - quitting");
-                quitting = 1;
+                quitting = true;
                 break;
             case ALLEGRO_EVENT_TIMER:
                 main_timer(&event);
@@ -848,10 +855,20 @@ void main_resume(void)
         al_start_timer(timer);
 }
 
+/* TOHv3 */
+void set_shutdown_exit_code (uint8_t c) {
+    /* prevent a new error from scribbling an older one */
+    /* TOHv4-rc1: except SHUTDOWN_EXPIRED which always overrides anything prior */
+    if (    (SHUTDOWN_OK == shutdown_exit_code)
+         || (SHUTDOWN_EXPIRED == c)) {
+        shutdown_exit_code = 0x7f & c;
+    }
+}
+
 int main(int argc, char **argv)
 {
     main_init(argc, argv);
     main_run();
     main_close();
-    return quitting-1;
+    return shutdown_exit_code;
 }

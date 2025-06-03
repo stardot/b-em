@@ -57,6 +57,7 @@ struct breakpoint {
     uint32_t   end;
     break_type type;
     int        num;
+    uint8_t    shutdown_on_hit; /* TOHv3 */
 };
 
 int debug_core = 0;
@@ -82,6 +83,14 @@ static const char time_fmt[] = "%d/%m/%Y %H:%M:%S";
 
 static uint64_t user_stopwatches[] = { ~0, ~0, ~0, ~0, ~0, ~0, ~0, ~0, ~0, ~0 };
 static const int user_stopwatch_count = sizeof(user_stopwatches)/sizeof(*user_stopwatches);
+
+/* TOHv3 */
+static uint8_t find_breakpoint_by_address_or_index (cpu_debug_t *cpu,
+                                                    uint8_t match_any_type,
+                                                    break_type type,
+                                                    char *arg,
+                                                    breakpoint **out_found,
+                                                    breakpoint **out_prev);
 
 static void close_trace(const char *why)
 {
@@ -286,10 +295,10 @@ void debug_kill()
     debug_cons_close();
 }
 
-static void enable_core_debug(void)
+static void enable_core_debug (uint8_t spawn_memview)
 {
     debug_cons_open();
-    debug_memview_open();
+    if (spawn_memview) { debug_memview_open(); }
     debug_step = 1;
     debug_core = 1;
     log_info("debugger: debugging of core 6502 enabled");
@@ -352,10 +361,10 @@ static void pop_exec(void)
     free(cur);
 }
 
-void debug_start(const char *exec_fn)
+void debug_start(const char *exec_fn, uint8_t spawn_memview) /* TOHv4: spawn_memview */
 {
     if (debug_core)
-        enable_core_debug();
+        enable_core_debug(spawn_memview);
     if (debug_tube)
         enable_tube_debug();
     if (exec_fn)
@@ -370,12 +379,12 @@ void debug_end(void)
         disable_core_debug();
 }
 
-void debug_toggle_core(void)
+void debug_toggle_core(uint8_t spawn_memview) /* TOHv4: spawn_memview */
 {
     if (debug_core)
         disable_core_debug();
     else
-        enable_core_debug();
+        enable_core_debug(spawn_memview);
 }
 
 void debug_toggle_tube(void)
@@ -420,6 +429,7 @@ static const char helptext[] =
     "    breakw n   - break on writes to address n\n"
     "    breaki n   - break on input from I/O port\n"
     "    breako n   - break on output to I/O port\n"
+    "    bx     n   - shut down emulator if breakpoint n is hit\n" /* TOHv3 */
     "    c          - continue running until breakpoint\n"
     "    c n        - continue until the nth breakpoint\n"
     "    d [n]      - disassemble from address n\n"
@@ -606,13 +616,18 @@ static void list_syms(cpu_debug_t *cpu, const char *arg) {
 static void print_point(cpu_debug_t *cpu, const breakpoint *bp, const char *desc, const char *tail)
 {
     char start_buf[17 + SYM_MAX];
+    /* TOHv3 */
+    const char *bx_msg = "";
+    if (bp->shutdown_on_hit) {
+      bx_msg = " (exit on hit)";
+    }
     cpu->print_addr(cpu, bp->start, start_buf, sizeof(start_buf), true);
     if (bp->start == bp->end)
-        debug_outf("    %s %i at %s%s\n", desc, bp->num, start_buf, tail);
+        debug_outf("    %s %i at %s%s%s\n", desc, bp->num, start_buf, tail, bx_msg);
     else {
         char end_buf[17 + SYM_MAX];
         cpu->print_addr(cpu, bp->end, end_buf, sizeof(end_buf), true);
-        debug_outf("    %s %i %s to %s%s\n", desc, bp->num, start_buf, end_buf, tail);
+        debug_outf("    %s %i %s to %s%s%s\n", desc, bp->num, start_buf, end_buf, tail, bx_msg);
     }
 }
 
@@ -635,6 +650,7 @@ static void set_point(cpu_debug_t *cpu, break_type type, const char *desc, uint3
         bp->end = end;
         bp->type = type;
         bp->num = breakpseq++;
+        bp->shutdown_on_hit = 0; /* TOHv3 */
         cpu->breakpoints = bp;
         print_point(cpu, bp, desc, " set");
     }
@@ -664,35 +680,16 @@ static void parse_setpnt(cpu_debug_t *cpu, break_type type, char *arg, const cha
         debug_outf("    '%s' is not a valid address\n", arg);
 }
 
+/* TOHv3: search part now farmed out to separate function. */
 static void parse_clrpnt(cpu_debug_t *cpu, break_type type, char *arg, const char *desc)
 {
-    const char *end1;
-    uint32_t a = parse_address_or_symbol(cpu, arg, &end1);
-    if (end1 > arg) {
-        //DB: changed this to search by address first then by index.
-        breakpoint *found = NULL;
-        breakpoint *prev = NULL;
-        for (breakpoint *bp = cpu->breakpoints; bp; bp = bp->next) {
-            if (bp->start == a && bp->type == type) {
-                found = bp;
-                break;
-            }
-            prev = bp;
-        }
-        if (!found) {
-            prev = NULL;
-            for (breakpoint *bp = cpu->breakpoints; bp; bp = bp->next) {
-                if (bp->num == a && bp->type == type) {
-                    found = bp;
-                    break;
-                }
-                prev = bp;
-            }
-            if (!found) {
-                debug_outf("    Can't find that breakpoint\n");
-                return;
-            }
-        }
+    uint8_t e;
+    breakpoint *found, *prev;
+    found = NULL;
+    prev = NULL;
+    e = find_breakpoint_by_address_or_index (cpu, 0, type, arg, &found, &prev);
+    if ( e ) {
+        /* found breakpoint; now clear it. */
         if (prev)
             prev->next = found->next;
         else
@@ -700,8 +697,48 @@ static void parse_clrpnt(cpu_debug_t *cpu, break_type type, char *arg, const cha
         print_point(cpu, found, desc, " cleared");
         free(found);
     }
-    else
+}
+
+/* TOHv3: This is most of the old parse_clrpnt() function;
+          this code is also now needed by "bx <bp>" command */
+static uint8_t find_breakpoint_by_address_or_index (cpu_debug_t *cpu,
+                                                    uint8_t match_any_type,
+                                                    break_type type,
+                                                    char *arg,
+                                                    breakpoint **out_found,
+                                                    breakpoint **out_prev) {
+    const char *end1;
+    uint32_t a = parse_address_or_symbol(cpu, arg, &end1);
+    *out_found = NULL;
+    *out_prev = NULL;
+    if (end1 > arg) {
+        //DB: changed this to search by address first then by index.
+        for (breakpoint *bp = cpu->breakpoints; bp; bp = bp->next) {
+            if (bp->start == a && ((bp->type == type) || match_any_type)) {
+                *out_found = bp;
+                break;
+            }
+            *out_prev = bp;
+        }
+        if (!*out_found) {
+            *out_prev = NULL;
+            for (breakpoint *bp = cpu->breakpoints; bp; bp = bp->next) {
+                if (bp->num == a && ((bp->type == type) || match_any_type)) {
+                    *out_found = bp;
+                    break;
+                }
+                *out_prev = bp;
+            }
+            if (!*out_found) {
+                debug_outf("    Can't find that breakpoint\n");
+                return 0; /* failure */
+            }
+        }
+    } else {
         debug_outf("    '%s' is not a valid address or number\n", arg);
+        return 0; /* failure */
+    }
+    return 1; /* OK */
 }
 
 static void list_points(cpu_debug_t *cpu, break_type type, const char *desc)
@@ -1327,6 +1364,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
         size_t cmdlen;
         int c;
         bool badcmd = false;
+        breakpoint *bp_found, *bp_prev; /* TOHv3 */
 
         if (exec_stack) {
             if (!fgets(ins, sizeof ins, exec_stack->fp)) {
@@ -1404,7 +1442,11 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                     parse_clrpnt(cpu, BREAK_READ, iptr, "Read breakpoint");
                 else if (!strncmp(cmd, "bclearw", cmdlen))
                     parse_clrpnt(cpu, BREAK_WRITE, iptr, "Write breakpoint");
-                else
+                else if (!strncmp(cmd, "bx", cmdlen)) { /* TOHv3 */
+                    if (find_breakpoint_by_address_or_index (cpu, 1, BREAK_EXEC, iptr, &bp_found, &bp_prev)) {
+                        bp_found->shutdown_on_hit = 1;
+                    }
+                } else
                     badcmd = true;
                 break;
 
@@ -1787,7 +1829,13 @@ static void debug_trace_write(cpu_debug_t *cpu, uint32_t addr, FILE *fp)
 
 void debug_preexec(cpu_debug_t *cpu, uint32_t addr)
 {
+    int bp_num; /* TOHv3 */
+    uint8_t shut_it_down; /* TOHv3 */
+    
     bool enter = false;
+    
+    /* TOHv3 */
+    bp_num = -1;
 
     if (cpu->prof_counts && addr >= cpu->prof_start && addr < cpu->prof_end)
         cpu->prof_counts[addr - cpu->prof_start]++;
@@ -1804,6 +1852,8 @@ void debug_preexec(cpu_debug_t *cpu, uint32_t addr)
         enter = true;
     }
 
+    shut_it_down = 0; /* TOHv3 */
+
     for (breakpoint *bp = cpu->breakpoints; bp; bp = bp->next) {
         if (addr >= bp->start && addr <= bp->end) {
             if (bp->type == BREAK_EXEC) {
@@ -1812,7 +1862,7 @@ void debug_preexec(cpu_debug_t *cpu, uint32_t addr)
                 debug_outf("cpu %s: Break at %s\n", cpu->cpu_name, addr_str);
                 if (contcount) {
                     contcount--;
-                    return;
+                    if ( ! bp->shutdown_on_hit ) { return; }
                 }
                 log_debug("debugger; enter for CPU %s on breakpoint at %s", cpu->cpu_name, addr_str);
                 enter = 1;
@@ -1827,8 +1877,22 @@ void debug_preexec(cpu_debug_t *cpu, uint32_t addr)
                 break; /* in case of more than one match, only trace once */
             }
         }
+        /* TOHv3 */
+        /* record first hit only */
+        if (enter && (-1 == bp_num)) {
+            bp_num = bp->num;
+            shut_it_down = bp->shutdown_on_hit;
+            if (shut_it_down) { break; } /* TOHv4 */
+        }
     }
-    if (enter) {
+    /* TOHv3: */
+    if (shut_it_down) {
+        quitting = 1;
+        if (bp_num > 8) {
+            bp_num = 8; /* force generic SHUTDOWN_BREAKPOINT_X code for points 8 and up */
+        }
+        set_shutdown_exit_code(SHUTDOWN_BREAKPOINT_0 + bp_num);
+    } else if (enter) {
         cpu->tbreak = -1;
         debugger_do(cpu, addr);
     }

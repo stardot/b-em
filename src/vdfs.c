@@ -4623,7 +4623,8 @@ static void cmd_quit(uint16_t addr)
         exit_status = exit_status * 10 + (ch & 0x0f);
         ch = readmem(++addr);
     }
-    quitting = 1+exit_status;
+    set_shutdown_exit_code(exit_status);
+    quitting = true;
 }
 
 static bool vdfs_do(enum vdfs_action act, uint16_t addr)
