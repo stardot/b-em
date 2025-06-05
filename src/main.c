@@ -743,7 +743,7 @@ void main_run()
                 break;
             case ALLEGRO_EVENT_DISPLAY_CLOSE:
                 log_debug("main: event display close - quitting");
-                quitting = true;
+                set_quit();
                 break;
             case ALLEGRO_EVENT_TIMER:
                 main_timer(&event);
@@ -853,6 +853,13 @@ void main_resume(void)
 {
     if (emuspeed != EMU_SPEED_PAUSED && emuspeed != EMU_SPEED_FULL)
         al_start_timer(timer);
+}
+
+void set_quit(void)
+{
+    quitting = true; /* for outer loops */
+    cycles = 0;      /* stop the host (I/O) processor */
+    tubecycles = 0;  /* stop the tube processor */
 }
 
 /* TOHv3 */

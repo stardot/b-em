@@ -1209,7 +1209,7 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             toggle_record(event, &sound_rec);
             break;
         case IDM_FILE_EXIT:
-            quitting = true;
+            set_quit();
             break;
         case IDM_EDIT_PASTE_OS:
             edit_paste_start(event, os_paste_start);
