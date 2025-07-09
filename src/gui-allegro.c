@@ -409,6 +409,7 @@ static ALLEGRO_MENU *create_video_menu(void)
     al_append_menu_item(menu, "LED visibility...", 0, 0, NULL, sub);
     add_radio_set(sub, led_visibility_names, IDM_VIDEO_LED_VISIBILITY, vid_ledvisibility);
     al_append_menu_item(menu, "Mode 7 Font...", 0, 0, NULL, create_m7font_menu());
+    add_checkbox_item(menu, "Write-only Bitmaps", IDM_VIDEO_LOCK, vid_lock_type == ALLEGRO_LOCK_WRITEONLY);
     return menu;
 }
 
@@ -1156,6 +1157,17 @@ static void change_mode7_font(ALLEGRO_EVENT *event)
         mode7_font_index = newix;
 }
 
+static void change_video_lock(ALLEGRO_EVENT *event)
+{
+    ALLEGRO_MENU *menu = (ALLEGRO_MENU *)event->user.data3;
+    int flags = al_get_menu_item_flags(menu, IDM_VIDEO_LOCK);
+    log_debug("gui-allegro: menu_id=%p, flags=%04x", menu, flags);
+    if (flags & ALLEGRO_MENU_ITEM_CHECKED)
+        vid_lock_type = ALLEGRO_LOCK_WRITEONLY;
+    else
+        vid_lock_type = ALLEGRO_LOCK_READWRITE;
+}
+
 static void toggle_music5000(void)
 {
     if (sound_music5000) {
@@ -1351,6 +1363,9 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             break;
         case IDM_VIDEO_MODE7_FONT:
             change_mode7_font(event);
+            break;
+        case IDM_VIDEO_LOCK:
+            change_video_lock(event);
             break;
         case IDM_SOUND_INTERNAL:
             sound_internal = !sound_internal;
