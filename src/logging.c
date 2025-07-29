@@ -44,14 +44,14 @@ static FILE *log_fp;
 static char   tmstr[20];
 static time_t last = 0;
 
-static void log_msgbox(const char *level, char *msg)
+static void log_msgbox(const char *level, char *msg, size_t len)
 {
-    const int max_len = 80;
+    const size_t max_len = 80;
     char *max_ptr, *new_split, *cur_split;
     ALLEGRO_DISPLAY *display;
 
     display = al_get_current_display();
-    if (strlen(msg) < max_len)
+    if (len < max_len)
         al_show_native_message_box(display, level, msg, "", NULL, 0);
     else
     {
@@ -93,7 +93,7 @@ static void log_common(unsigned dest, const char *level, char *msg, size_t len)
         putc('\n', stderr);
     }
     if (dest & LOG_DEST_MSGBOX)
-        log_msgbox(level, msg);
+        log_msgbox(level, msg, len);
 }
 
 static char msg_malloc[] = "log_format: out of space - following message truncated";
