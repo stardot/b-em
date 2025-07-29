@@ -214,6 +214,7 @@ void config_load(ALLEGRO_PATH *path)
 
     vid_ledlocation  = get_config_int("video", "ledlocation",   0);
     vid_ledvisibility = get_config_int("video", "ledvisibility", 2);
+    vid_lock_type    = get_config_int("video", "videolocktype", ALLEGRO_LOCK_READWRITE);
 
     int displaymode = get_config_int("video", "displaymode", 0);
     if (vid_dtype_user == VDT_UNSET)
