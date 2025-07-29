@@ -429,7 +429,7 @@ static void textsave_bitmap(const char *filename, FILE *fp, uint_least16_t mem_a
                     ++line_addr;
                 }
             }
-            log_debug("textsave: chbits=%016lx", chbits);
+            log_debug("textsave: chbits=%016lx", (unsigned long)chbits);
             int ch = 0;
             for (int i = 0; i < sizeof(charcodes); ++i) {
                 if (chbits == charset[i]) {

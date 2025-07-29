@@ -907,7 +907,7 @@ static char *key_paste_chars(char *ptr, size_t len)
                 uint_least8_t vkey = bbc_keys & 0xff;
                 key_paste_add_combo(vkey, bbc_keys & A2B_SHIFT, bbc_keys & A2B_CTRL);
                 key_paste_add_vkey_up(vkey);
-                log_debug("keyboard: key_paste_chars, new key_paste_buf_size=%ld", key_paste_buf_size);
+                log_debug("keyboard: key_paste_chars, new key_paste_buf_size=%lu", (unsigned long)key_paste_buf_size);
             }
         }
     }
@@ -920,12 +920,12 @@ void key_paste_start(char *str)
         size_t len = strlen(str);
         if (len) {
             if (len <= KEY_PASTE_SEGLEN) {
-                log_debug("keyboard: key_paste_start, len=%ld, under threshold", len);
+                log_debug("keyboard: key_paste_start, len=%ld, under threshold", (unsigned long)len);
                 key_paste_chars(str, len);
                 al_free(str);
             }
             else {
-                log_debug("keyboard: key_paste_start, len=%ld, over threshold", len);
+                log_debug("keyboard: key_paste_start, len=%ld, over threshold", (unsigned long)len);
                 key_paste_tail = key_paste_chars(str, KEY_PASTE_SEGLEN);
                 key_paste_str = str;
                 key_paste_tail_size = len - KEY_PASTE_SEGLEN;
@@ -944,12 +944,12 @@ static void key_paste_nextseg(void)
 {
     size_t len = key_paste_tail_size;
     if (len <= KEY_PASTE_SEGLEN) {
-        log_debug("keyboard: key_paste_nextseg, len=%ld, under threshold", len);
+        log_debug("keyboard: key_paste_nextseg, len=%ld, under threshold", (unsigned long)len);
         key_paste_chars(key_paste_tail, len);
         key_paste_stop();
     }
     else {
-        log_debug("keyboard: key_paste_nextseg, len=%ld, over threshold", len);
+        log_debug("keyboard: key_paste_nextseg, len=%ld, over threshold", (unsigned long)len);
         key_paste_tail = key_paste_chars(key_paste_tail, KEY_PASTE_SEGLEN);
         key_paste_tail_size = len - KEY_PASTE_SEGLEN;
     }
