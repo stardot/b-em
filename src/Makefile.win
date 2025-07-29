@@ -55,6 +55,7 @@ OBJ = \
     main.o \
     mem.o \
     midi-windows.o \
+    mmb.o \
     mmccard.o \
     model.o \
     mouse.o \
@@ -76,6 +77,7 @@ OBJ = \
     tape.o \
     tapecat-allegro.o \
     tapenoise.o \
+    textsave.o \
     tsearch.o \
     tube.o \
     uef.o \

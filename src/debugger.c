@@ -222,7 +222,7 @@ static HINSTANCE hinst;
 
 BOOL CtrlHandler(DWORD fdwCtrlType)
 {
-    main_setquit();
+    quitting = true;
     return TRUE;
 }
 
