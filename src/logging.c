@@ -83,14 +83,33 @@ static void log_common(unsigned dest, const char *level, char *msg, size_t len)
             strftime(tmstr, sizeof(tmstr), "%d/%m/%Y %H:%M:%S", localtime(&now));
             last = now;
         }
+#ifdef WIN32
+        _lock_file(log_fp);
         fprintf(log_fp, "%s %s ", tmstr, level);
-        fwrite(msg, len, 1, log_fp);
-        putc('\n', log_fp);
-        fflush(log_fp);
+        _fwrite_nolock(msg, len, 1, log_fp);
+        _fputc_nolock('\n', log_fp);
+        _fflush_nolock(log_fp);
+        _unlock_file(log_fp);
     }
     if (dest & LOG_DEST_STDERR) {
-        fwrite(msg, len, 1, stderr);
-        putc('\n', stderr);
+        _lock_file(stderr);
+        _fwrite_nolock(msg, len, 1, stderr);
+        _fputc_nolock('\n', stderr);
+        _unlock_file(stderr);
+#else
+        flockfile(log_fp);
+        fprintf(log_fp, "%s %s ", tmstr, level);
+        fwrite_unlocked(msg, len, 1, log_fp);
+        fputc_unlocked('\n', log_fp);
+        fflush_unlocked(log_fp);
+        funlockfile(log_fp);
+    }
+    if (dest & LOG_DEST_STDERR) {
+        flockfile(stderr);
+        fwrite_unlocked(msg, len, 1, stderr);
+        fputc_unlocked('\n', stderr);
+        funlockfile(stderr);
+#endif
     }
     if (dest & LOG_DEST_MSGBOX)
         log_msgbox(level, msg, len);
