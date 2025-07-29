@@ -653,10 +653,17 @@ static void mode7_render(ALLEGRO_LOCKED_REGION *region, uint8_t dat)
                 mode7_flash = 0;
                 break;
             case 12: /* 140: normal height */
+                if (mode7_dbl) {
+                    mode7_dbl = 0;
+                    mode7_heldchar = 0;
+                }
+                break;
             case 13: /* 141: double height */
-                mode7_dbl = dat & 1;
-                if (mode7_dbl)
+                if (!mode7_dbl) {
+                    mode7_dbl = 1;
                     mode7_wasdbl = 1;
+                    mode7_heldchar = 0;
+                }
                 break;
             case 17: /* 145: graphics red     */
             case 18: /* 146: graphics green   */
