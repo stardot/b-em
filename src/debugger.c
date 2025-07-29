@@ -222,7 +222,7 @@ static HINSTANCE hinst;
 
 BOOL CtrlHandler(DWORD fdwCtrlType)
 {
-    quitting = true;
+    set_quit();
     return TRUE;
 }
 
@@ -1451,7 +1451,7 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                 break;
 
             case 'q':
-                quitting = 1;
+                set_quit();
                 /* FALLTHOUGH */
 
             case 'c':
@@ -1887,7 +1887,7 @@ void debug_preexec(cpu_debug_t *cpu, uint32_t addr)
     }
     /* TOHv3: */
     if (shut_it_down) {
-        quitting = 1;
+        set_quit();
         if (bp_num > 8) {
             bp_num = 8; /* force generic SHUTDOWN_BREAKPOINT_X code for points 8 and up */
         }

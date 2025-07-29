@@ -63,6 +63,7 @@ void main_key_pause(void);
 void main_cleardrawit(void);
 void main_setmouse(void);
 
+void set_quit(void);
 void set_shutdown_exit_code (uint8_t c); /* TOHv3 */
 
 #endif
