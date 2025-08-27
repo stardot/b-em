@@ -99,15 +99,15 @@ static void log_common(unsigned dest, const char *level, char *msg, size_t len)
 #else
         flockfile(log_fp);
         fprintf(log_fp, "%s %s ", tmstr, level);
-        fwrite_unlocked(msg, len, 1, log_fp);
-        fputc_unlocked('\n', log_fp);
-        fflush_unlocked(log_fp);
+        fwrite(msg, len, 1, log_fp);
+        putc_unlocked('\n', log_fp);
+        fflush(log_fp);
         funlockfile(log_fp);
     }
     if (dest & LOG_DEST_STDERR) {
         flockfile(stderr);
-        fwrite_unlocked(msg, len, 1, stderr);
-        fputc_unlocked('\n', stderr);
+        fwrite(msg, len, 1, stderr);
+        putc_unlocked('\n', stderr);
         funlockfile(stderr);
 #endif
     }
