@@ -307,6 +307,7 @@ static inline void save_screenshot(void)
                         al_draw_scaled_bitmap(b, firstx, firsty << 1, xsize, ysize << 1, 0, 0, xsize, ysize << 1, 0);
                         break;
                     case VDT_UNSET:
+                        break;
                 }
                 region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, vid_lock_type);
                 break;
@@ -335,6 +336,7 @@ static inline void save_screenshot(void)
                         al_draw_bitmap_region(b32, firstx, firsty << 1, xsize, ysize << 1, 0, 0, 0);
                         break;
                     case VDT_UNSET:
+                        break;
                 }
                 break;
             case VDC_GREEN:
@@ -370,6 +372,7 @@ static inline void save_screenshot(void)
                         al_draw_bitmap_region(b32, firstx, firsty << 1, xsize, ysize << 1, 0, 0, 0);
                         break;
                     case VDT_UNSET:
+                        break;
                 }
                 break;
         }
@@ -468,6 +471,7 @@ static inline void blit_screen(void)
                     al_unlock_bitmap(b);
                     upscale_only(b, firstx, firsty << 1, xsize, ysize  << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
                 case VDT_UNSET:
+                    break;
             }
             region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, vid_lock_type);
             break;
@@ -496,6 +500,7 @@ static inline void blit_screen(void)
                     upscale_only(b32, firstx, firsty << 1, xsize, ysize << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
                     break;
                 case VDT_UNSET:
+                    break;
             }
             break;
         case VDC_GREEN:
@@ -531,6 +536,7 @@ static inline void blit_screen(void)
                     upscale_only(b32, firstx, firsty << 1, xsize, ysize << 1, scr_x_start, scr_y_start, scr_x_size, scr_y_size);
                     break;
                 case VDT_UNSET:
+                    break;
 
             }
     }
