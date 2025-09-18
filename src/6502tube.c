@@ -629,8 +629,8 @@ void tube_6502_exec()
                         rmb(0x01);
                         break;
 
-                case 0x08:
-                /*PHP*/ temp = pack_flags(0x30);
+                case 0x08:      /*PHP*/
+                        temp = pack_flags(0x30);
                         push(temp);
                         polltime(3);
                         break;
@@ -858,7 +858,7 @@ void tube_6502_exec()
 
                 case 0x28:
                         /*PLP*/ temp = pull();
-                unpack_flags(temp);
+                        unpack_flags(temp);
                         polltime(4);
                         break;
 
@@ -976,8 +976,8 @@ void tube_6502_exec()
                         rmb(0x08);
                         break;
 
-                case 0x38:
-                        /*SEC*/ tubep.c = 1;
+                case 0x38:      /*SEC*/
+                        tubep.c = 1;
                         polltime(2);
                         break;
 
@@ -1335,8 +1335,8 @@ void tube_6502_exec()
                         bbr(0x40);
                         break;
 
-                case 0x70:
-                        /*BVS*/ offset = (int8_t) readmem(pc);
+                case 0x70:      /*BVS*/
+                        offset = (int8_t) readmem(pc);
                         pc++;
                         temp = 2;
                         if (tubep.v) {
@@ -1389,8 +1389,8 @@ void tube_6502_exec()
                         rmb(0x80);
                         break;
 
-                case 0x78:
-                        /*SEI*/ tubep.i = 1;
+                case 0x78:      /*SEI*/
+                        tubep.i = 1;
                         polltime(2);
 //                                if (output2) printf("SEI at line %i %04X %02X %02X\n",lines,pc,tuberam[0x103+s],tuberam[0x104+s]);
                         break;
@@ -1445,8 +1445,8 @@ void tube_6502_exec()
                         bbr(0x80);
                         break;
 
-                case 0x80:
-                        /*BRA*/ offset = (int8_t) readmem(pc);
+                case 0x80:      /*BRA*/
+                        offset = (int8_t) readmem(pc);
                         pc++;
                         temp = 3;
                         if ((pc & 0xFF00) ^ ((pc + offset) & 0xFF00))
@@ -1485,8 +1485,8 @@ void tube_6502_exec()
                         smb(0x01);
                         break;
 
-                case 0x88:
-                        /*DEY*/ y--;
+                case 0x88:      /*DEY*/
+                        y--;
                         setzn(y);
                         polltime(2);
                         break;
@@ -1526,8 +1526,8 @@ void tube_6502_exec()
                         bbs(0x01);
                         break;
 
-                case 0x90:
-                        /*BCC*/ offset = (int8_t) readmem(pc);
+                case 0x90:      /*BCC*/
+                        offset = (int8_t) readmem(pc);
                         pc++;
                         temp = 2;
                         if (!tubep.c) {
@@ -1571,8 +1571,8 @@ void tube_6502_exec()
                         smb(0x02);
                         break;
 
-                case 0x98:
-                        /*TYA*/ a = y;
+                case 0x98:      /*TYA*/
+                        a = y;
                         setzn(a);
                         polltime(2);
                         break;
@@ -1663,8 +1663,8 @@ void tube_6502_exec()
                         smb(0x04);
                         break;
 
-                case 0xA8:
-                        /*TAY*/ y = a;
+                case 0xA8:      /*TAY*/
+                        y = a;
                         setzn(y);
                         break;
 
@@ -1675,8 +1675,8 @@ void tube_6502_exec()
                         polltime(2);
                         break;
 
-                case 0xAA:
-                        /*TAX*/ x = a;
+                case 0xAA:      /*TAX*/
+                        x = a;
                         setzn(x);
                         polltime(2);
                         break;
@@ -1954,8 +1954,8 @@ void tube_6502_exec()
                         smb(0x20);
                         break;
 
-                case 0xD8:
-                        /*CLD*/ tubep.d = 0;
+                case 0xD8:      /*CLD*/
+                        tubep.d = 0;
                         polltime(2);
                         break;
 
@@ -1969,8 +1969,8 @@ void tube_6502_exec()
                         polltime(4);
                         break;
 
-                case 0xDA:
-                        /*PHX*/ push(x);
+                case 0xDA:      /*PHX*/
+                        push(x);
                         polltime(3);
                         break;
 
@@ -2049,8 +2049,8 @@ void tube_6502_exec()
                         smb(0x40);
                         break;
 
-                case 0xE8:
-                        /*INX*/ x++;
+                case 0xE8:      /*INX*/
+                        x++;
                         setzn(x);
                         polltime(2);
                         break;
@@ -2096,8 +2096,8 @@ void tube_6502_exec()
                         bbs(0x40);
                         break;
 
-                case 0xF0:
-                        /*BEQ*/ offset = (int8_t) readmem(pc);
+                case 0xF0:      /*BEQ*/
+                        offset = (int8_t) readmem(pc);
                         pc++;
                         temp = 2;
                         if (tubep.z) {
@@ -2139,8 +2139,8 @@ void tube_6502_exec()
                         smb(0x80);
                         break;
 
-                case 0xF8:
-                        /*SED*/ tubep.d = 1;
+                case 0xF8:      /*SED*/
+                        tubep.d = 1;
                         polltime(2);
                         break;
 
