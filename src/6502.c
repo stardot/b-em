@@ -4334,6 +4334,17 @@ void m65c02_exec(int slice)
                         takeint = (interrupt && !p.i);
                         break;
 
+                case 0x22:
+                case 0x42:
+                case 0x62:
+                case 0x82:
+                case 0xC2:
+                case 0xE2:
+                        pc++;
+                        polltime(2);
+                        takeint = (interrupt && !p.i);
+                        break;
+
                 case 0x24:      /*BIT zp */
                         addr = readmem(pc);
                         pc++;
@@ -4690,6 +4701,14 @@ void m65c02_exec(int slice)
                         a ^= readmem(addr);
                         setzn(a);
                         polltime(5);
+                        break;
+
+                case 0x54:
+                case 0xD4:
+                case 0xF4:
+                        pc++;
+                        polltime(4);
+                        takeint = (interrupt && !p.i);
                         break;
 
                 case 0x55:      /*EOR zp,x */
@@ -5591,6 +5610,13 @@ void m65c02_exec(int slice)
                         polltime(3);
                         break;
 
+                case 0xDC:
+                case 0xFC:
+                        pc += 2;
+                        polltime(4);
+                        takeint = (interrupt && !p.i);
+                        break;
+
                 case 0xDD:      /*CMP abs,x */
                         addr = getw();
                         if ((addr & 0xFF00) ^ ((addr + x) & 0xFF00))
@@ -5809,35 +5835,9 @@ void m65c02_exec(int slice)
                         break;
 
                 default:
-                        switch (opcode & 0xF) {
-                        case 2:
-                                pc++;
-                                polltime(2);
-                                break;
-                        case 3:
-                        case 7:
-                        case 0xB:
-                        case 0xF:
-                                polltime(1);
-                                break;
-                        case 4:
-                                pc++;
-                                polltime(4);
-                                break;
-                        case 0xC:
-                                pc += 2;
-                                polltime(4);
-                                break;
-                        }
-                        takeint = (interrupt && !p.i);
+                        polltime(1);
+                        /* Note: no interrupt check! */
                         break;
-
-                        /* TODO: DB: was this intentionally excluded
-                        printf("Found bad opcode %02X\n", opcode);
-                        dumpregs();
-                        mem_dump();
-                        exit(-1);
-                        */
                 }
 /*                if (output | 1)
                 {
