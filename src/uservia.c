@@ -79,8 +79,8 @@ static void printer_outchar(unsigned val, FILE *fp)
 {
     if (print_dest == PDEST_FILE_BIN || print_dest == PDEST_PIPE_BIN) {
         /*
-         * For binary printing, the file with have been opened with the
-         * 'b' flag and we use the stream is narrow (byte-oriented) mode
+         * For binary printing, the file will have been opened with the
+         * 'b' flag and we use the stream in narrow (byte-oriented) mode
          */
         if (putc(val, fp) != EOF)
             return;
@@ -153,17 +153,17 @@ static void printer_open(unsigned val)
             break;
         case PDEST_FILE_TEXT:
             if (val)
-                printer_open_file(val, "wt");
+                printer_open_file(val, "a");
             break;
         case PDEST_FILE_BIN:
-            printer_open_file(val, "rb");
+            printer_open_file(val, "ab");
             break;
         case PDEST_PIPE_TEXT:
             if (val)
-                printer_open_pipe(val, "rt");
+                printer_open_pipe(val, "a");
             break;
         case PDEST_PIPE_BIN:
-            printer_open_pipe(val, "rb");
+            printer_open_pipe(val, "ab");
     }
 }
 
