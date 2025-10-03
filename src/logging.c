@@ -16,14 +16,15 @@
 typedef struct {
     uint32_t   mask;
     uint32_t   shift;
-    const char *name;
+    const char name[8];
+    int        msgbox_flags;
 } log_level_t;
 
-static const log_level_t ll_fatal = { 0xf0000, 16, "FATAL"   };
-static const log_level_t ll_error = { 0x0f000, 12, "ERROR"   };
-static const log_level_t ll_warn  = { 0x00f00,  8, "WARNING" };
-static const log_level_t ll_info  = { 0x000f0,  4, "INFO"    };
-static const log_level_t ll_debug = { 0x0000f,  0, "DEBUG"   };
+static const log_level_t ll_fatal = { 0xf0000, 16, "FATAL",   ALLEGRO_MESSAGEBOX_ERROR };
+static const log_level_t ll_error = { 0x0f000, 12, "ERROR",   ALLEGRO_MESSAGEBOX_ERROR };
+static const log_level_t ll_warn  = { 0x00f00,  8, "WARNING", ALLEGRO_MESSAGEBOX_WARN  };
+static const log_level_t ll_info  = { 0x000f0,  4, "INFO",    0 };
+static const log_level_t ll_debug = { 0x0000f,  0, "DEBUG",   0 };
 
 static const log_level_t *log_levels[] =
 {
@@ -44,34 +45,7 @@ static FILE *log_fp;
 static char   tmstr[20];
 static time_t last = 0;
 
-static void log_msgbox(const char *level, char *msg, size_t len)
-{
-    const size_t max_len = 80;
-    char *max_ptr, *new_split, *cur_split;
-    ALLEGRO_DISPLAY *display;
-
-    display = al_get_current_display();
-    if (len < max_len)
-        al_show_native_message_box(display, level, msg, "", NULL, 0);
-    else
-    {
-        max_ptr = msg + max_len;
-        cur_split = msg;
-        while ((new_split = strchr(cur_split+1, ' ')) && new_split < max_ptr)
-            cur_split = new_split;
-
-        if (cur_split > msg)
-        {
-            *cur_split = '\0';
-            al_show_native_message_box(display, level, msg, cur_split+1, NULL, 0);
-            *cur_split = ' ';
-        }
-        else
-            al_show_native_message_box(display, level, msg, "", NULL, 0);
-    }
-}
-
-static void log_common(unsigned dest, const char *level, char *msg, size_t len)
+static void log_common(const log_level_t *ll, unsigned dest, char *msg, size_t len)
 {
     time_t now;
 
@@ -85,7 +59,7 @@ static void log_common(unsigned dest, const char *level, char *msg, size_t len)
         }
 #ifdef WIN32
         _lock_file(log_fp);
-        fprintf(log_fp, "%s %s ", tmstr, level);
+        fprintf(log_fp, "%s %s ", tmstr, ll->name);
         _fwrite_nolock(msg, len, 1, log_fp);
         _fputc_nolock('\n', log_fp);
         _fflush_nolock(log_fp);
@@ -98,21 +72,24 @@ static void log_common(unsigned dest, const char *level, char *msg, size_t len)
         _unlock_file(stderr);
 #else
         flockfile(log_fp);
-        fprintf(log_fp, "%s %s ", tmstr, level);
-        fwrite_unlocked(msg, len, 1, log_fp);
-        fputc_unlocked('\n', log_fp);
-        fflush_unlocked(log_fp);
+        fprintf(log_fp, "%s %s ", tmstr, ll->name);
+        fwrite(msg, len, 1, log_fp);
+        putc_unlocked('\n', log_fp);
+        fflush(log_fp);
         funlockfile(log_fp);
     }
     if (dest & LOG_DEST_STDERR) {
         flockfile(stderr);
-        fwrite_unlocked(msg, len, 1, stderr);
-        fputc_unlocked('\n', stderr);
+        fwrite(msg, len, 1, stderr);
+        putc_unlocked('\n', stderr);
         funlockfile(stderr);
 #endif
     }
-    if (dest & LOG_DEST_MSGBOX)
-        log_msgbox(level, msg, len);
+    if (dest & LOG_DEST_MSGBOX) {
+        ALLEGRO_DISPLAY *display = al_get_current_display();
+        const char *level = ll->name;
+        al_show_native_message_box(display, "B-Em", level, msg, NULL, ll->msgbox_flags);
+    }
 }
 
 static char msg_malloc[] = "log_format: out of space - following message truncated";
@@ -129,14 +106,14 @@ static void log_format(const log_level_t *ll, const char *fmt, va_list ap)
         va_copy(apc, ap);
         len = vsnprintf(abuf, sizeof abuf, fmt, ap);
         if (len < sizeof abuf)
-            log_common(dest, ll->name, abuf, len);
+            log_common(ll, dest, abuf, len);
         else if ((mbuf = malloc(len + 1))) {
             vsnprintf(mbuf, len+1, fmt, apc);
-            log_common(dest, ll->name, mbuf, len);
+            log_common(ll, dest, mbuf, len);
             free(mbuf);
         } else {
-            log_common(dest, ll->name, msg_malloc, sizeof msg_malloc);
-            log_common(dest, ll->name, abuf, len);
+            log_common(ll, dest, msg_malloc, sizeof msg_malloc);
+            log_common(ll, dest, abuf, len);
         }
     }
 }
@@ -174,7 +151,7 @@ void log_dump(const char *prefix, uint8_t *data, size_t size)
         if (totlen > sizeof(buf)) {
             buffer = malloc(totlen);
             if (!buffer) {
-                log_common(dest, ll_debug.name, dmp_malloc, sizeof dmp_malloc);
+                log_common(&ll_debug, dest, dmp_malloc, sizeof dmp_malloc);
                 return;
             }
         }
@@ -199,7 +176,7 @@ void log_dump(const char *prefix, uint8_t *data, size_t size)
                     byte = '.';
                 *ascptr++ = byte;
             }
-            log_common(dest, ll_debug.name, buffer, totlen);
+            log_common(&ll_debug, dest, buffer, totlen);
             size -= 16;
             offset += 16;
         }
@@ -222,7 +199,7 @@ void log_dump(const char *prefix, uint8_t *data, size_t size)
                 *hexptr++ = '*';
                 *hexptr++ = ' ';
             } while (--pad);
-            log_common(dest, ll_debug.name, buffer, ascptr - buffer);
+            log_common(&ll_debug, dest, buffer, ascptr - buffer);
         }
         if (buffer != buf)
             free(buffer);
