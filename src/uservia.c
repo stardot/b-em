@@ -85,16 +85,19 @@ static void printer_outchar(unsigned val, FILE *fp)
         if (putc(val, fp) != EOF)
             return;
     }
-    else if (val != '\n') {
+    else {
         /*
          * For text printing, we assume the guest printer ignore character
          * is set to the default LF, so we only get CR characters for end
-         * of line.
+         * of line.  If we do get an LF, because someone has changed the
+         * printer ignore charcter, we ignore it anyway.
          *
          * We also translate character code 0x60 into the Unicode code
          * point for the pound sign and hope that the encoding of wide
          * characters is Unicode.
          */
+        if (val == '\n')
+            return;
         if (val == '\r')
             val = '\n';
         else if (val == 0x60)
