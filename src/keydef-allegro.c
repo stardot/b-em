@@ -1,3 +1,4 @@
+#define _DEBUG
 #include "b-em.h"
 #include "keyboard.h"
 #include "main.h"
@@ -237,6 +238,12 @@ static ALLEGRO_EVENT_SOURCE uevsrc;
 
 static void draw_button(int x, int y, int w, int h, ALLEGRO_COLOR bcol, ALLEGRO_COLOR tcol, const char *text)
 {
+    if (hiresdisplay) {
+        x *= 2;
+        y *= 2;
+        w *= 2;
+        h *= 2;
+    }
     al_draw_filled_rectangle(x, y, x+w, y+h, bcol);
     al_draw_text(font, tcol, x+(w/2), y+(h/2)-2, ALLEGRO_ALIGN_CENTRE, text);
 }
@@ -288,6 +295,12 @@ static void redef_message(const key_dlg_t *key_dlg, const key_cap_t *kptr, uint8
 
     log_debug("keydef-allegro: BBC key %s (%s), code %d clicked", kptr->cap, kptr->name, kptr->keycode);
 
+    if (hiresdisplay) {
+        mid_x  *= 2;
+        left_x *= 2;
+        mid_y  *= 2;
+        top_y  *= 2;
+    }
     al_draw_filled_rectangle(left_x, top_y, left_x + 400, top_y + 72, navy);
     snprintf(s, sizeof s, "Redefining %s", kptr->name);
     al_draw_text(font, white, left_x+24, top_y+16, ALLEGRO_ALIGN_LEFT, s);
@@ -317,22 +330,18 @@ static void redef_message(const key_dlg_t *key_dlg, const key_cap_t *kptr, uint8
 
 static bool mouse_within(ALLEGRO_EVENT *event, int x, int y, int w, int h)
 {
+    if (hiresdisplay) {
+        x *= 2;
+        y *= 2;
+        w *= 2;
+        h *= 2;
+    }
     return event->mouse.x >= x && event->mouse.x <= x+w && event->mouse.y >= y && event->mouse.y <= y+h;
 }
 
 static void *keydef_thread_proc(ALLEGRO_THREAD *thread, void *tdata)
 {
-    const key_dlg_t *key_dlg;
-    ALLEGRO_DISPLAY *display;
-    ALLEGRO_EVENT_QUEUE *queue;
-    ALLEGRO_EVENT event;
-    state_t state;
-    uint8_t keylookcpy[ALLEGRO_KEY_MAX];
-    struct key_act_lookup keyactioncpy[KEY_ACTION_MAX];
-    const key_cap_t *kptr = NULL;
-    int mid_x, ok_x, can_x;
-    bool alt_down = false;
-
+    log_debug("keydef-allegro: key define thread started");
     if (!font) {
         al_init_font_addon();
         font = al_create_builtin_font();
@@ -340,22 +349,35 @@ static void *keydef_thread_proc(ALLEGRO_THREAD *thread, void *tdata)
             return NULL;
     }
 
-    key_dlg = MASTER ? &master_kbd_dlg : &bbc_kbd_dlg;
-    if ((display = al_create_display(key_dlg->disp_x, key_dlg->disp_y))) {
-        if ((queue = al_create_event_queue())) {
+    const key_dlg_t *key_dlg = MASTER ? &master_kbd_dlg : &bbc_kbd_dlg;
+    unsigned disp_x = key_dlg->disp_x;
+    unsigned disp_y = key_dlg->disp_y;
+    if (hiresdisplay) {
+        disp_x *= 2;
+        disp_y *= 2;
+    }
+    ALLEGRO_DISPLAY *display = al_create_display(disp_x, disp_y);
+    if (display) {
+        ALLEGRO_EVENT_QUEUE *queue = al_create_event_queue();
+        if (queue) {
+            state_t state = ST_BBC_KEY;
+            uint8_t keylookcpy[ALLEGRO_KEY_MAX];
+            struct key_act_lookup keyactioncpy[KEY_ACTION_MAX];
+            const key_cap_t *kptr = NULL;
+            bool alt_down = false;
+            int mid_x = key_dlg->disp_x/2;
+            int ok_x = mid_x-3-BTNS_W;
+            int can_x = mid_x+3;
             al_init_user_event_source(&uevsrc);
             al_register_event_source(queue, &uevsrc);
             al_register_event_source(queue, al_get_display_event_source(display));
             al_register_event_source(queue, al_get_mouse_event_source());
             al_register_event_source(queue, al_get_keyboard_event_source());
-            mid_x = key_dlg->disp_x/2;
-            ok_x = mid_x-3-BTNS_W;
-            can_x = mid_x+3;
-            state = ST_BBC_KEY;
             memcpy(keylookcpy, keylookup, ALLEGRO_KEY_MAX);
             memcpy(keyactioncpy, keyactions, KEY_ACTION_MAX * sizeof(struct key_act_lookup));
             draw_keyboard(key_dlg, ok_x, can_x);
             while (state != ST_DONE) {
+                ALLEGRO_EVENT event;
                 al_wait_for_event(queue, &event);
                 switch(event.type) {
                     case ALLEGRO_EVENT_MOUSE_BUTTON_DOWN:
@@ -422,12 +444,14 @@ static void *keydef_thread_proc(ALLEGRO_THREAD *thread, void *tdata)
                 }
             }
             al_destroy_event_queue(queue);
+            keydef_thread = NULL;
         } else
             log_error("keydef-allegro: unable to create event queue");
         al_destroy_display(display);
     } else
         log_error("keydef-allegro: unable to create display");
     keydefining = false;
+    log_debug("keydef-allegro: key define thread finished");
     return NULL;
 }
 
