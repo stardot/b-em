@@ -1,3 +1,4 @@
+#define _DEBUG
 /*B-em v2.2 by Tom Walker
   Debugger*/
 
@@ -109,7 +110,7 @@ static void close_trace(const char *why)
 
 static ALLEGRO_THREAD  *mem_thread;
 #define MEM_BITMAP_SIZE 256
-static int mem_disp_width = MEM_BITMAP_SIZE, mem_disp_height = MEM_BITMAP_SIZE;
+static int mem_disp_width, mem_disp_height;
 
 static int mem_thread_colour(int *counts, int addr)
 {
@@ -146,8 +147,11 @@ static void *mem_thread_proc(ALLEGRO_THREAD *thread, void *data)
     log_debug("debugger: memory view thread started");
     al_set_new_window_title("B-Em Memory View");
     al_set_new_display_flags(ALLEGRO_WINDOWED | ALLEGRO_RESIZABLE);
-    ALLEGRO_DISPLAY *mem_disp = al_create_display(MEM_BITMAP_SIZE, MEM_BITMAP_SIZE);
+    int mem_disp_size = hiresdisplay ? MEM_BITMAP_SIZE * 2 : MEM_BITMAP_SIZE;
+    ALLEGRO_DISPLAY *mem_disp = al_create_display(mem_disp_size, mem_disp_size);
     if (mem_disp) {
+        mem_disp_width = mem_disp_size;
+        mem_disp_height = mem_disp_size;
         al_set_new_bitmap_flags(ALLEGRO_VIDEO_BITMAP);
         ALLEGRO_BITMAP *mem_bitmap = al_create_bitmap(MEM_BITMAP_SIZE, MEM_BITMAP_SIZE);
         if (mem_bitmap) {

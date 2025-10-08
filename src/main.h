@@ -41,6 +41,7 @@ extern bool keydefining;
 extern bool autopause;
 extern bool autoskip;
 extern bool skipover;
+extern bool hiresdisplay;
 
 /* TOHv3: although C exit code is an int, Unix shells don't safely allow
    you to use values > 125, so this is limited to a signed 8-bit value >:( */
