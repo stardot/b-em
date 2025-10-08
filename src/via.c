@@ -115,7 +115,7 @@ void via_write(VIA *v, uint16_t addr, uint8_t val)
                 v->orb=val;
                 val = (val & v->ddrb) | ~v->ddrb;
                 if (v->acr & 0x80)
-                    val = (val & 0x8f) | v->t1pb7;
+                    val = (val & 0x7f) | v->t1pb7;
                 v->write_portB(val);
 
                 if ((v->pcr & 0xE0) == 0x80) /*Handshake mode*/
@@ -139,7 +139,7 @@ void via_write(VIA *v, uint16_t addr, uint8_t val)
                 v->ddrb = val;
                 val = (v->orb & val) | ~val; // val is now output data.
                 if (v->acr & 0x80)
-                    val = (val & 0x8f) | v->t1pb7;
+                    val = (val & 0x7f) | v->t1pb7;
                 v->write_portB(val);
                 break;
             case ACR:
