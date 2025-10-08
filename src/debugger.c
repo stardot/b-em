@@ -1,3 +1,4 @@
+#define _DEBUG
 /*B-em v2.2 by Tom Walker
   Debugger*/
 
@@ -108,53 +109,92 @@ static void close_trace(const char *why)
 }
 
 static ALLEGRO_THREAD  *mem_thread;
+#define MEM_BITMAP_SIZE 256
+static int mem_disp_width, mem_disp_height;
+
+static int mem_thread_colour(int *counts, int addr)
+{
+    int colour = 0;
+    int cnt = counts[addr];
+    if (cnt) {
+        colour = cnt * 8;
+        counts[addr] = cnt - 1;
+    }
+    return colour;
+}
+
+static void mem_thread_draw(ALLEGRO_DISPLAY *mem_disp, ALLEGRO_BITMAP *bitmap)
+{
+    al_set_target_bitmap(bitmap);
+    ALLEGRO_LOCKED_REGION *region = al_lock_bitmap(bitmap, ALLEGRO_PIXEL_FORMAT_ANY, ALLEGRO_LOCK_WRITEONLY);
+    if (region) {
+        int addr = 0;
+        for (int row = 0; row < MEM_BITMAP_SIZE; row++) {
+            for (int col = 0; col < MEM_BITMAP_SIZE; col++) {
+                al_put_pixel(col, row, al_map_rgb(mem_thread_colour(writec, addr), mem_thread_colour(readc, addr), mem_thread_colour(fetchc, addr)));
+                addr++;
+            }
+        }
+        al_unlock_bitmap(bitmap);
+        al_set_target_backbuffer(mem_disp);
+        al_draw_scaled_bitmap(bitmap, 0.0, 0.0, MEM_BITMAP_SIZE, MEM_BITMAP_SIZE, 0.0, 0.0, mem_disp_width, mem_disp_height, 0);
+        al_flip_display();
+    }
+}
 
 static void *mem_thread_proc(ALLEGRO_THREAD *thread, void *data)
 {
-    ALLEGRO_DISPLAY *mem_disp;
-    ALLEGRO_BITMAP *bitmap;
-    ALLEGRO_LOCKED_REGION *region;
-    int row, col, addr, cnt, red, grn, blu;
-
     log_debug("debugger: memory view thread started");
     al_set_new_window_title("B-Em Memory View");
-    if ((mem_disp = al_create_display(256, 256))) {
+    al_set_new_display_flags(ALLEGRO_WINDOWED | ALLEGRO_RESIZABLE);
+    int mem_disp_size = hiresdisplay ? MEM_BITMAP_SIZE * 2 : MEM_BITMAP_SIZE;
+    ALLEGRO_DISPLAY *mem_disp = al_create_display(mem_disp_size, mem_disp_size);
+    if (mem_disp) {
+        mem_disp_width = mem_disp_size;
+        mem_disp_height = mem_disp_size;
         al_set_new_bitmap_flags(ALLEGRO_VIDEO_BITMAP);
-        if ((bitmap = al_create_bitmap(256, 256))) {
-            while (!al_get_thread_should_stop(thread)) {
-                al_rest(0.02);
-                al_set_target_bitmap(bitmap);
-                if ((region = al_lock_bitmap(bitmap, ALLEGRO_PIXEL_FORMAT_ANY, ALLEGRO_LOCK_WRITEONLY))) {
-                    addr = 0;
-                    for (row = 0; row < 256; row++) {
-                        for (col = 0; col < 256; col++) {
-                            red = grn = blu = 0;
-                            if ((cnt = writec[addr])) {
-                                red = cnt * 8;
-                                writec[addr] = cnt - 1;
-                            }
-                            if ((cnt = readc[addr])) {
-                                grn = cnt * 8;
-                                readc[addr] = cnt - 1;
-                            }
-                            if ((cnt = fetchc[addr])) {
-                                blu = cnt * 8;
-                                fetchc[addr] = cnt - 1;
-                            }
-                            al_put_pixel(col, row, al_map_rgb(red, grn, blu));
-                            addr++;
+        ALLEGRO_BITMAP *mem_bitmap = al_create_bitmap(MEM_BITMAP_SIZE, MEM_BITMAP_SIZE);
+        if (mem_bitmap) {
+            ALLEGRO_EVENT_QUEUE *mem_queue = al_create_event_queue();
+            if (mem_queue) {
+                al_register_event_source(mem_queue, al_get_display_event_source(mem_disp));
+                ALLEGRO_TIMER *mem_timer = al_create_timer(0.02);
+                if (mem_timer) {
+                    al_register_event_source(mem_queue, al_get_timer_event_source(mem_timer));
+                    al_start_timer(mem_timer);
+                    while (!al_get_thread_should_stop(thread)) {
+                        ALLEGRO_EVENT event;
+                        al_wait_for_event(mem_queue, &event);
+                        switch(event.type) {
+                            case ALLEGRO_EVENT_TIMER:
+                                mem_thread_draw(mem_disp, mem_bitmap);
+                                break;
+                            case ALLEGRO_EVENT_DISPLAY_RESIZE:
+                                al_acknowledge_resize(mem_disp);
+                                mem_disp_width = al_get_display_width(mem_disp);
+                                mem_disp_height = al_get_display_height(mem_disp);
+                                log_debug("debugger: resize event, width=%d, height=%d", mem_disp_width, mem_disp_height);
+                                break;
+                            case ALLEGRO_EVENT_DISPLAY_CLOSE:
+                                goto mem_thread_close;
                         }
                     }
-                    al_unlock_bitmap(bitmap);
-                    al_set_target_backbuffer(mem_disp);
-                    al_draw_bitmap(bitmap, 0.0, 0.0, 0);
-                    al_flip_display();
+mem_thread_close:   al_destroy_timer(mem_timer);
                 }
+                else
+                    log_error("debugger: unable to create timer");
+                al_destroy_event_queue(mem_queue);
             }
-            al_destroy_bitmap(bitmap);
+            else
+                log_error("debugger: unable to create queue");
+            al_destroy_bitmap(mem_bitmap);
         }
+        else
+            log_error("debugger: unable to create bitmap");
         al_destroy_display(mem_disp);
     }
+    else
+        log_error("debugger: unable to create display");
     return NULL;
 }
 

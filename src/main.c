@@ -1,3 +1,4 @@
+#define _DEBUG
 /*B-em v2.2 by Tom Walker
   Main loop + start/finish code*/
 
@@ -77,6 +78,7 @@ bool keydefining = false;
 bool autopause = false;
 bool autoskip = true;
 bool skipover = false;
+bool hiresdisplay = false;
 int autoboot=0;
 int joybutton[4];
 float joyaxes[4];
@@ -166,6 +168,7 @@ static const char helptext[] =
     "-debug          - start debugger\n"
     "-debugtube      - start debugging tube processor\n"
     "-exec file      - debugger to execute file\n"
+    "-hires          - enable Hi-Res display mode\n"
     "-paste string   - paste string in as if typed (via OS)\n"
     "-pastek string  - paste string in as if typed (via KB)\n"
     "-printfile f    - printer output to file as text\n"
@@ -341,6 +344,8 @@ void main_init(int argc, char *argv[])
                         print_dest = PDEST_PIPE_BIN;
                         state = OPT_PRINT;
                     }
+                    else if (!strcasecmp(arg, "hires"))
+                        hiresdisplay = true;
                     else {
                         if (*arg != 'h' && *arg != '?')
                             fprintf(stderr, "b-em: unrecognised option '-%s'\n", arg);
