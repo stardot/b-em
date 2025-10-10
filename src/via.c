@@ -71,6 +71,13 @@ void via_poll(VIA *v, int cycles)
         via_shift(v, cycles);
 }
 
+static void via_set_acr(VIA *v, uint8_t val)
+{
+    v->acr = val;
+    if (!(val & 0x80))
+        v->t1pb7 = 0x80;
+}
+
 void via_write(VIA *v, uint16_t addr, uint8_t val)
 {
         switch (addr&0xF)
@@ -108,7 +115,7 @@ void via_write(VIA *v, uint16_t addr, uint8_t val)
                 v->orb=val;
                 val = (val & v->ddrb) | ~v->ddrb;
                 if (v->acr & 0x80)
-                    val = (val & 0x8f) | v->t1pb7;
+                    val = (val & 0x7f) | v->t1pb7;
                 v->write_portB(val);
 
                 if ((v->pcr & 0xE0) == 0x80) /*Handshake mode*/
@@ -132,11 +139,11 @@ void via_write(VIA *v, uint16_t addr, uint8_t val)
                 v->ddrb = val;
                 val = (v->orb & val) | ~val; // val is now output data.
                 if (v->acr & 0x80)
-                    val = (val & 0x8f) | v->t1pb7;
+                    val = (val & 0x7f) | v->t1pb7;
                 v->write_portB(val);
                 break;
             case ACR:
-                v->acr  = val;
+                via_set_acr(v, val);
                 break;
             case PCR:
                 v->pcr  = val;
@@ -407,7 +414,7 @@ void via_reset(VIA *v)
         v->ora   = v->orb   = 0;
         v->ddra  = v->ddrb  = 0;
         v->ifr   = v->ier   = 0;
-        v->t1pb7            = 0;
+        v->t1pb7            = 0x80;
         v->t1c   = v->t1l   = 0x1FFFE;
         v->t2c   = v->t2l   = 0x1FFFE;
         v->t1hit = v->t2hit = 1;
@@ -455,7 +462,7 @@ void via_loadstate(VIA *v, FILE *f)
         v->ddra=getc(f);
         v->ddrb=getc(f);
         v->sr=getc(f);
-        v->acr=getc(f);
+        via_set_acr(v, getc(f));
         v->pcr=getc(f);
         v->ifr=getc(f);
         v->ier=getc(f);
