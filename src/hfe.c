@@ -1583,7 +1583,6 @@ static void hfe_poll_drive(int drive, bool is_selected)
      shift_register & (1 << 15) is the first clock bit
      shift_register & (1 << 16) is the previous data bit
   */
-  unsigned int prev_data_bit = (state->shift_register & (1u << 16)) >> 16;
   unsigned int value = 0;
   unsigned int mask = 1 << 15;
 
@@ -1599,16 +1598,10 @@ static void hfe_poll_drive(int drive, bool is_selected)
         {
           --state->ignore_clocking;
         }
-      else
+      else if (!state->mfm_mode && !clock)
         {
-          /* The clock bit in MFM encoding is data-dependent, but the
-             clock bit in FM is always 1. */
-          const bool mfm_expected_clock = (prev_data_bit || data) ? 0 : 1;
-          if (clock != (state->mfm_mode ? mfm_expected_clock : true))
-            {
-              handle_badclock(drive);
-              return;
-            }
+          handle_badclock(drive);
+          return;
         }
       value <<= 1;
       if (data)
