@@ -78,7 +78,7 @@ bool keydefining = false;
 bool autopause = false;
 bool autoskip = true;
 bool skipover = false;
-bool hiresdisplay = false;
+unsigned hiresdisplay = BOOL_USE_CONFIG;
 int autoboot=0;
 int joybutton[4];
 float joyaxes[4];
@@ -169,6 +169,7 @@ static const char helptext[] =
     "-debugtube      - start debugging tube processor\n"
     "-exec file      - debugger to execute file\n"
     "-hires          - enable Hi-Res display mode\n"
+    "-lores          - disable Hi-Res display mode\n"
     "-paste string   - paste string in as if typed (via OS)\n"
     "-pastek string  - paste string in as if typed (via KB)\n"
     "-printfile f    - printer output to file as text\n"
@@ -346,6 +347,8 @@ void main_init(int argc, char *argv[])
                     }
                     else if (!strcasecmp(arg, "hires"))
                         hiresdisplay = true;
+                    else if (!strcasecmp(arg, "lores"))
+                        hiresdisplay = false;
                     else {
                         if (*arg != 'h' && *arg != '?')
                             fprintf(stderr, "b-em: unrecognised option '-%s'\n", arg);

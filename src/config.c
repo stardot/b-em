@@ -180,7 +180,8 @@ void config_load(ALLEGRO_PATH *path)
     defaultwriteprot = get_config_bool("disc", "defaultwriteprotect", 1);
 
     autopause        = get_config_bool(NULL, "autopause", false);
-    hiresdisplay     = get_config_bool(NULL, "hiresdisplay", hiresdisplay);
+    if (hiresdisplay & BOOL_USE_CONFIG)
+        hiresdisplay = get_config_bool(NULL, "hiresdisplay", hiresdisplay & 1);
 
     if (curmodel == -1)
         curmodel = get_config_int(NULL, "model", 3);
