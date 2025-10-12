@@ -752,9 +752,6 @@ static void scan_attr(vdfs_entry *ent)
     ent->attribs = attribs;
 }
 
-static const char c_esc_bin[] = "\a\b\e\f\n\r\t\v\\\"";
-static const char c_esc_asc[] = "abefnrtv\\\"";
-
 static const char *scan_inf_start(vdfs_entry *ent, char inf_line[MAX_INF_LINE])
 {
     *ent->host_inf = '.';
@@ -764,44 +761,33 @@ static const char *scan_inf_start(vdfs_entry *ent, char inf_line[MAX_INF_LINE])
         const char *lptr = fgets(inf_line, MAX_INF_LINE, fp);
         fclose(fp);
         if (lptr) {
-            int ch;
-            while ((ch = *lptr++) == ' ' || ch == '\t')
-                ;
+            int ch = *lptr;
+            while (ch == ' ' || ch == '\t')
+                ch = *++lptr;
+            if (!strncasecmp(lptr, "TAPE", 4)) {
+                lptr += 4;
+                ch = *lptr;
+                while (ch == ' ' || ch == '\t')
+                    ch = *++lptr;
+            }
             if (ch == '"') {
                 char tmp[MAX_FILE_NAME+2];
                 char *name = tmp;
                 char *ptr = tmp;
                 char *end = ptr + MAX_FILE_NAME + 2;
-                while ((ch = *lptr++) && ch != '"' && ch != '\n') {
-                    log_debug("vdfs: scan_inf_start, encoded, ch=%02X", ch);
-                    if (ch == '\\') {
-                        int nc = *lptr++;
-                        log_debug("vdfs: scan_inf_start, escape, nc=%02X", nc);
-                        if (nc >= '0' && nc <= '9') {
-                            ch = nc & 7;
-                            nc = *lptr;
-                            log_debug("vdfs: scan_inf_start, numeric1, ch=%02X, nc=%02X", ch, nc);
-                            if (nc >= '0' && nc <= '9') {
-                                ch = (ch << 3) | (nc & 7);
-                                nc = *++lptr;
-                                log_debug("vdfs: scan_inf_start, numeric2, ch=%02X, nc=%02X", ch, nc);
-                                if (nc >= '0' && nc <= '9') {
-                                    ch = (ch << 3) | (nc & 7);
-                                    log_debug("vdfs: scan_inf_start, numeric3, ch=%02X, nc=%02X", ch, nc);
-                                    ++lptr;
-                                }
-                            }
-                        }
-                        else {
-                            const char *pos = strchr(c_esc_asc, nc);
-                            if (pos)
-                                ch = c_esc_bin[pos-c_esc_asc];
-                            else
-                                ch = nc;
+                ch = *++lptr;
+                while (ch && ch != '"' && ch != '\n') {
+                    if (ch == '%') {
+                        int hi = hex2nyb(lptr[1]);
+                        int lo = hex2nyb(lptr[2]);
+                        if (hi >= 0 && lo >= 0) {
+                            ch = hi << 4 | lo;
+                            lptr += 2;
                         }
                     }
                     if (ptr < end)
                         *ptr++ = ch;
+                    ch = *++lptr;
                 }
                 int len = ptr - name;
                 log_dump("vdfs: scan_inf_start, encoded name: ", (uint8_t *)name, len);
@@ -816,26 +802,26 @@ static const char *scan_inf_start(vdfs_entry *ent, char inf_line[MAX_INF_LINE])
                 memcpy(ent->acorn_fn, name, len);
             }
             else {
-                log_debug("vdfs: scan_inf_start: ch=%02X, 0=%02X, 1=%02X", ch, lptr[0], lptr[1]);
+                log_debug("vdfs: scan_inf_start: ch=%02X, 1=%02X, 2=%02X", ch, lptr[1], lptr[2]);
                 char *ptr = ent->acorn_fn;
                 char *end = ptr + MAX_FILE_NAME;
-                if (*lptr == '.') {
+                if (lptr[1] == '.') {
                     ent->dfs_dir = ch;
-                    ++lptr;
-                    ch = *lptr++;
+                    lptr += 2;
+                    ch = *lptr;
                 }
                 else
                     ent->dfs_dir = '$';
                 while (ch && ch != ' ' && ch != '\t' && ch != '\n') {
                     if (ptr < end)
                         *ptr++ = ch;
-                    ch = *lptr++;
+                    ch = *++lptr;
                 }
                 ent->acorn_len = ptr - ent->acorn_fn;
                 log_debug("vdfs: scan_inf_start, simple_name %c.%.*s", ent->dfs_dir, ent->acorn_len, ent->acorn_fn);
             }
-            if (ch != '\n')
-                return lptr;
+            if (ch && ch != '\n')
+                return lptr+1;
         }
     }
     return NULL;
@@ -1000,15 +986,29 @@ static void scan_inf_dir_new(vdfs_entry *dir, const char *lptr, const char *eptr
                     // Parse title.
                     char *ptr = dir->u.dir.title;
                     char *end = dir->u.dir.title + MAX_TITLE;
-                    int quote= 0;
 
                     if (ch == '"') {
-                        quote = 1;
                         ch = *++aptr;
+                        while (ch && ch != '"' && ch != '\n') {
+                            if (ch == '%') {
+                                int hi = hex2nyb(aptr[1]);
+                                int lo = hex2nyb(aptr[2]);
+                                if (hi >= 0 && lo >= 0) {
+                                    ch = hi << 4 | lo;
+                                    lptr += 2;
+                                }
+                            }
+                            if (ptr < end)
+                                *ptr++ = ch;
+                            ch = *++aptr;
+                        }
                     }
-                    while (ptr < end && ch && ch != '\n' && (ch != '"' || !quote) && ((ch != ' ' && ch != '\t') || quote)) {
-                        *ptr++ = ch & 0x7f;
-                        ch = *++aptr;
+                    else {
+                        while (ch && ch != ' ' && ch != '\t' && ch != '\n') {
+                            if (ptr < end)
+                                *ptr++ = ch;
+                            ch = *++aptr;
+                        }
                     }
                     dir->u.dir.title_len = ptr - dir->u.dir.title;
                 }
@@ -1593,6 +1593,8 @@ static unsigned unix_time_acorn(const struct tm *tp)
     return atime;
 }
 
+const char xdigs[16] = "0123456789ABCDEF";
+
 static void write_back_name(vdfs_entry *ent, FILE *fp)
 {
     unsigned char tmp[MAX_FILE_NAME+2];
@@ -1605,29 +1607,24 @@ static void write_back_name(vdfs_entry *ent, FILE *fp)
     log_dump("vdfs: write_back_name, tmp=", (uint8_t *)tmp, len);
     for (unsigned char *ptr = tmp; len; --len) {
         int ch = *ptr++;
-        if (ch <= ' ' || ch >= 0x7f || ch == '"')
+        if (ch <= ' ' || ch >= 0x7f || ch == '"') {
             quote = true;
+            break;
+        }
     }
     len = ent->acorn_len+2;
     if (quote) {
-        char encoded[MAX_FILE_NAME*4+2];
+        char encoded[MAX_FILE_NAME*3+2];
         char *enc = encoded;
         *enc++ = '"';
         for (unsigned char *ptr = tmp; len; --len) {
             int ch = *ptr++;
-            if (ch >= ' ' && ch <= 0x7e && ch != '\\' && ch != '\"')
-                *enc++ = ch;
-            else {
-                *enc++ = '\\';
-                const char *pos;
-                if (ch && (pos = strchr(c_esc_bin, ch)))
-                    *enc++ = c_esc_asc[pos-c_esc_bin];
-                else {
-                    *enc++ = '0' + ((ch >> 6) & 0x07);
-                    *enc++ = '0' + ((ch >> 3) & 0x07);
-                    *enc++ = '0' + (ch & 0x07);
-                }
+            if (ch < ' ' || ch > 0x7e || ch == '%' || ch == '"') {
+                *enc++ = '%';
+                *enc++ = xdigs[ch>>4];
+                ch = xdigs[ch&0xf];
             }
+            *enc++ = ch;
         }
         *enc++ = '"';
         len = enc-encoded;
@@ -1656,10 +1653,32 @@ static void write_back(vdfs_entry *ent)
             }
             if (ent->u.dir.title_len) {
                 fputs(" TITLE=", fp);
-                if (strpbrk(ent->u.dir.title, " \t")) {
-                    putc('"', fp);
-                    fwrite(ent->u.dir.title, ent->u.dir.title_len, 1, fp);
-                    putc('"', fp);
+                bool quote = false;
+                const char *ptr = ent->u.dir.title;
+                const char *end = ptr + ent->u.dir.title_len;
+                while (ptr < end) {
+                    int ch = *ptr++;
+                    if (ch < 0x20 || ch > 0x7e || ch == '%' || ch == '"') {
+                        quote = true;
+                        break;
+                    }
+                }
+                if (quote) {
+                    char tmp[MAX_TITLE*3+2];
+                    char *tptr = tmp;
+                    *tptr++ = '"';
+                    ptr = ent->u.dir.title;
+                    while (ptr < end) {
+                        int ch = *ptr++;
+                        if (ch < 0x20 || ch > 0x7e || ch == '%' || ch == '"') {
+                            *tptr++ = '%';
+                            *tptr++ = xdigs[ch>>4];
+                            ch = xdigs[ch&0xf];
+                        }
+                        *tptr++ = ch;
+                    }
+                    *tptr++ = '"';
+                    fwrite(tmp, tptr-tmp, 1, fp);
                 }
                 else
                     fwrite(ent->u.dir.title, ent->u.dir.title_len, 1, fp);
