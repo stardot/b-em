@@ -6,6 +6,7 @@
 
 bool tube_6502_init(void *rom);
 bool tube_6502_iturb(void *rom);
+bool tube_6502_inmos(void *rom);
 void tube_6502_reset(void);
 void tube_6502_exec(void);
 void tube_6502_close(void);

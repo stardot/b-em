@@ -285,7 +285,7 @@ void tube_6502_reset()
         tube_6502_skipint = 0;
 }
 
-static bool common_init(void *rom, size_t memsize)
+static bool common_init(void *rom, size_t memsize, void (*exec_func)(void))
 {
     if (tuberamsize != memsize) {
         if (tuberam) {
@@ -304,7 +304,7 @@ static bool common_init(void *rom, size_t memsize)
     tube_type = TUBE6502;
     tube_readmem = tube_6502_readmem;
     tube_writemem = tube_6502_writemem;
-    tube_exec  = tube_6502_exec;
+    tube_exec = exec_func;
     tube_proc_savestate = tube_6502_savestate;
     tube_proc_loadstate = tube_6502_loadstate;
     tube_6502_reset();
@@ -394,7 +394,7 @@ static void enable_turbo(void)
 
 bool tube_6502_init(void *rom)
 {
-    if (common_init(rom, TUBE_6502_RAM_SIZE)) {
+    if (common_init(rom, TUBE_6502_RAM_SIZE, tube_6502_exec)) {
         disable_turbo();
         return true;
     }
@@ -403,7 +403,7 @@ bool tube_6502_init(void *rom)
 
 bool tube_6502_iturb(void *rom)
 {
-    if (common_init(rom, TURBO_6502_RAM_SIZE)) {
+    if (common_init(rom, TURBO_6502_RAM_SIZE, tube_6502_exec)) {
         enable_turbo();
         return true;
     }
@@ -545,7 +545,7 @@ static INLINE void tube_6502_trace(uint8_t opcode)
 }
 #endif
 
-void tube_6502_exec()
+void tube_6502_exec(void)
 {
         uint8_t opcode;
         uint16_t addr;
@@ -2224,4 +2224,2819 @@ void tube_6502_exec()
                                 }
                         }*/
         }
+}
+
+static int tube_takeint = 0;
+
+static void branchcycles(int temp)
+{
+    if (temp > 2) {
+            polltime(temp - 1);
+            tube_takeint = (tube_irq && !tubep.i);
+            polltime(1);
+    } else {
+            polltime(2);
+            tube_takeint = (tube_irq && !tubep.i);
+    }
+}
+
+static inline void nmos_arr(void)
+{
+    uint_fast8_t s = readmem(pc++);
+    uint_fast8_t t = a & s;                 /* Perform the AND. */
+    if (tubep.d) {
+        uint_fast8_t ah = t >> 4;               /* Separate the high */
+        uint_fast8_t al = t & 15;               /* and low nybbles. */
+        a = t >> 1;
+        if (tubep.c)
+            a |= 0x80;
+        tubep.n = tubep.c;                          /* Set the N and */
+        tubep.z = !a;                           /* Z flags traditionally */
+        tubep.v = (t ^ a) & 64;                 /* and V flag in a weird way. */
+
+        if (al + (al & 1) > 5)              /* BCD "fixup" for low nybble. */
+            a = (a & 0xF0) | ((a + 6) & 0xF);
+        if ((tubep.c = ah + (ah & 1) > 5))      /* Set the Carry flag. */
+            a = (a + 0x60) & 0xFF;          /* BCD "fixup" for high nybble. */
+    }
+    else {        /*V & C flag behaviours in 64doc.txt are backwards */
+        a = t >> 1;
+        if (tubep.c)
+            a |= 0x80;
+        tubep.n = tubep.c;                          /* Set the N and */
+        tubep.z = !a;                           /* Z flags traditionally */
+        tubep.v = (t ^ a) & 64;                 /* and V flag in a weird way. */
+        tubep.c = a & 64;
+    }
+    polltime(2);
+    tube_takeint = (tube_irq && !tubep.i);
+}
+
+static inline void adc_nmos(uint8_t temp)
+{
+    int al, ah;
+    uint8_t tempb;
+    int16_t tempw;
+
+    if (tubep.d) {
+        ah = 0;
+        tubep.z = tubep.n = 0;
+        tempb = a + temp + (tubep.c ? 1:0);
+        if (!tempb)
+           tubep.z = 1;
+        al = (a & 0xF) + (temp & 0xF) + (tubep.c ? 1 : 0);
+        if (al > 9) {
+            al -= 10;
+            al &= 0xF;
+            ah = 1;
+        }
+        ah += ((a >> 4) + (temp >> 4));
+        if (ah & 8)
+            tubep.n = 1;
+        tubep.v = (((ah << 4) ^ a) & 128) && !((a ^ temp) & 128);
+        tubep.c = 0;
+        if (ah > 9) {
+            tubep.c = 1;
+            ah -= 10;
+            ah &= 0xF;
+        }
+        a = (al & 0xF) | (ah << 4);                              \
+    }
+    else {
+        tempw = (a + temp + (tubep.c ? 1 : 0));
+        tubep.v = (!((a ^ temp) & 0x80) && ((a ^ tempw) & 0x80));
+        a = tempw & 0xFF;
+        tubep.c = tempw & 0x100;
+        setzn(a);
+    }
+}
+
+static inline void sbc_nmos(uint8_t temp)
+{
+    int hc6, al, ah, tempv;
+    uint8_t tempb;
+    int16_t tempw;
+
+    if (tubep.d) {
+        hc6 = 0;
+        tubep.z = tubep.n = 0;
+        tempb = a - temp - ((tubep.c) ? 0 : 1);
+        if (!(tempb))
+           tubep.z = 1;
+        al = (a & 15) - (temp & 15) - (tubep.c ? 0 : 1);
+        if (al & 16) {
+            al -= 6;
+            al &= 0xF;
+            hc6 = 1;
+        }
+        ah = (a >> 4) - (temp >> 4);
+        if (hc6)
+            ah--;                       \
+        if ((a - (temp + (tubep.c ? 0 : 1))) & 0x80)
+           tubep.n = 1;
+        tubep.v = ((a ^ temp) & 0x80) && ((a ^ tempb) & 0x80);
+        tubep.c = 1;
+        if (ah & 16) {
+            tubep.c = 0;
+            ah -= 6;
+            ah &= 0xF;
+        }
+        a = (al & 0xF) | ((ah & 0xF) << 4);
+    }
+    else {
+        tempw = a-temp-(tubep.c ? 0 : 1);
+        tempv = (signed char)a -(signed char)temp-(tubep.c ? 0 : 1);
+        tubep.v = ((tempw & 0x80) > 0) ^ ((tempv & 0x100) != 0);
+        tubep.c = tempw >= 0;
+        a = tempw & 0xFF;
+        setzn(a);
+    }
+}
+
+void tube_nmos_exec(void)
+{
+        uint16_t addr;
+        uint8_t temp;
+        int tempi;
+        int8_t offset;
+
+        while (tubecycles > 0) {
+            oldtpc2 = oldtpc;
+            oldtpc = pc;
+            if (dbg_tube6502)
+                debug_preexec(&tube6502_cpu_debug, pc);
+            unsigned opcode = readmem(pc++);
+            switch (opcode) {
+                case 0x00:      /* BRK */
+                        if (dbg_tube6502)
+                            debug_trap(&tube6502_cpu_debug, oldtpc, 0);
+                        pc++;
+                        push(pc >> 8);
+                        push(pc & 0xFF);
+                        push(pack_flags(0x30));
+                        pc = readmem(0xFFFE) | (readmem(0xFFFF) << 8);
+                        tubep.i = 1;
+                        polltime(7);
+                        tube_takeint = 0;
+                        break;
+
+                case 0x01:      /*ORA (,x) */
+                        temp = readmem(pc) + x;
+                        pc++;
+                        addr = read_zp_indirect(temp);
+                        polltime(6);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        a |= readmem(addr);
+                        setzn(a);
+                        break;
+
+                case 0x02:
+                        if (dbg_tube6502)
+                            debug_trap(&tube6502_cpu_debug, oldtpc, 1);
+                        break;
+
+                case 0x03:      /*Undocumented - SLO (,x) */
+                        temp = readmem(pc) + x;
+                        pc++;
+                        addr = read_zp_indirect(temp);
+                        polltime(6);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        polltime(1);
+                        tubep.c = temp & 0x80;
+                        temp <<= 1;
+                        writemem(addr, temp);
+                        a |= temp;
+                        setzn(a);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x04:      /*Undocumented - NOP zp */
+                        addr = readmem(pc);
+                        pc++;
+                        polltime(3);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x05:      /*ORA zp */
+                        addr = readmem(pc);
+                        pc++;
+                        a |= readmem(addr);
+                        setzn(a);
+                        polltime(3);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x06:      /*ASL zp */
+                        addr = readmem(pc);
+                        pc++;
+                        temp = readmem(addr);
+                        tubep.c = temp & 0x80;
+                        temp <<= 1;
+                        setzn(temp);
+                        writemem(addr, temp);
+                        polltime(5);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x07:      /*Undocumented - SLO zp */
+                        addr = readmem(pc);
+                        pc++;
+                        temp = readmem(addr);
+                        tubep.c = temp & 0x80;
+                        temp <<= 1;
+                        writemem(addr, temp);
+                        a |= temp;
+                        setzn(a);
+                        polltime(5);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x08:
+                        /*PHP*/
+                        temp = pack_flags(0x30);
+                        push(temp);
+                        polltime(3);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x09:      /*ORA imm */
+                        a |= readmem(pc);
+                        pc++;
+                        setzn(a);
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x0A:      /*ASL A */
+                        tubep.c = a & 0x80;
+                        a <<= 1;
+                        setzn(a);
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x0B:      /*Undocumented - ANC imm */
+                        a &= readmem(pc);
+                        pc++;
+                        setzn(a);
+                        tubep.c = tubep.n;
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x0C:      /*Undocumented - NOP abs */
+                        addr = getw();
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x0D:      /*ORA abs */
+                        addr = getw();
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        a |= readmem(addr);
+                        setzn(a);
+                        break;
+
+                case 0x0E:      /*ASL abs */
+                        addr = getw();
+                        polltime(4);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        polltime(1);
+                        tubep.c = temp & 0x80;
+                        temp <<= 1;
+                        setzn(temp);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        writemem(addr, temp);
+                        break;
+
+                case 0x0F:      /*Undocumented - SLO abs */
+                        addr = getw();
+                        polltime(4);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        polltime(1);
+                        tubep.c = temp & 0x80;
+                        temp <<= 1;
+                        writemem(addr, temp);
+                        a |= temp;
+                        setzn(a);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x10:
+                        /*BPL*/ offset = (int8_t) readmem(pc);
+                        pc++;
+                        temp = 2;
+                        if (!tubep.n) {
+                                temp++;
+                                if ((pc & 0xFF00) ^ ((pc + offset) & 0xFF00))
+                                        temp++;
+                                pc += offset;
+                        }
+                        branchcycles(temp);
+                        break;
+
+                case 0x11:      /*ORA (),y */
+                        temp = readmem(pc);
+                        pc++;
+                        addr = read_zp_indirect(temp);
+                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
+                                polltime(1);
+                        a |= readmem(addr + y);
+                        setzn(a);
+                        polltime(5);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x13:      /*Undocumented - SLO (),y */
+                        temp = readmem(pc);
+                        pc++;
+                        addr = read_zp_indirect(temp);
+                        polltime(6);
+                        temp = readmem(addr + y);
+                        polltime(1);
+                        writemem(addr + y, temp);
+                        polltime(1);
+                        tubep.c = temp & 0x80;
+                        temp <<= 1;
+                        writemem(addr + y, temp);
+                        a |= temp;
+                        setzn(a);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x14:      /*Undocumented - NOP zp,x */
+                        addr = readmem(pc);
+                        pc++;
+                        readmem((addr + x) & 0xFF);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x15:      /*ORA zp,x */
+                        addr = readmem(pc);
+                        pc++;
+                        a |= readmem((addr + x) & 0xFF);
+                        setzn(a);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x16:      /*ASL zp,x */
+                        addr = (readmem(pc) + x) & 0xFF;
+                        pc++;
+                        temp = readmem(addr);
+                        tubep.c = temp & 0x80;
+                        temp <<= 1;
+                        setzn(temp);
+                        writemem(addr, temp);
+                        polltime(6);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x17:      /*Undocumented - SLO zp,x */
+                        addr = (readmem(pc) + x) & 0xFF;
+                        pc++;
+                        polltime(3);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        polltime(1);
+                        tubep.c = temp & 0x80;
+                        temp <<= 1;
+                        writemem(addr, temp);
+                        polltime(1);
+                        a |= temp;
+                        setzn(a);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x18:
+                        /*CLC*/ tubep.c = 0;
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x19:      /*ORA abs,y */
+                        addr = getw();
+                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
+                                polltime(1);
+                        a |= readmem(addr + y);
+                        setzn(a);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x1A:      /*Undocumented - NOP */
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x1B:      /*Undocumented - SLO abs,y */
+                        addr = getw() + y;
+                        polltime(5);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        polltime(1);
+                        tubep.c = temp & 0x80;
+                        temp <<= 1;
+                        writemem(addr, temp);
+                        a |= temp;
+                        setzn(a);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x1C:      /*Undocumented - NOP abs,x */
+                        addr = getw();
+                        if ((addr & 0xFF00) ^ ((addr + x) & 0xFF00))
+                                polltime(1);
+                        readmem(addr);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x1D:      /*ORA abs,x */
+                        addr = getw();
+                        if ((addr & 0xFF00) ^ ((addr + x) & 0xFF00))
+                                polltime(1);
+                        addr += x;
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        a |= readmem(addr);
+                        setzn(a);
+                        break;
+
+                case 0x1E:      /*ASL abs,x */
+                        addr = getw();
+                        readmem((addr & 0xFF00) | ((addr + x) & 0xFF));
+                        addr += x;
+                        temp = readmem(addr);
+                        writemem(addr, temp);
+                        tubep.c = temp & 0x80;
+                        temp <<= 1;
+                        tube_takeint = (tube_irq && !tubep.i);
+                        writemem(addr, temp);
+                        setzn(temp);
+                        polltime(7);
+                        break;
+
+                case 0x1F:      /*Undocumented - SLO abs,x */
+                        addr = getw() + x;
+                        polltime(5);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        polltime(1);
+                        tubep.c = temp & 0x80;
+                        temp <<= 1;
+                        writemem(addr, temp);
+                        a |= temp;
+                        setzn(a);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x20:      /*JSR*/
+                        addr = readmem(pc++);
+                        push(pc >> 8);
+                        push((uint8_t)pc);
+                        pc = addr | (readmem(pc) << 8);
+                        polltime(5);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        polltime(1);
+                        break;
+
+                case 0x21:      /*AND (,x) */
+                        temp = readmem(pc) + x;
+                        pc++;
+                        addr = read_zp_indirect(temp);
+                        a &= readmem(addr);
+                        setzn(a);
+                        polltime(6);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x23:      /*Undocumented - RLA (,x) */
+                        temp = readmem(pc) + x;
+                        pc++;
+                        addr = read_zp_indirect(temp);
+                        polltime(6);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        polltime(1);
+                        tempi = tubep.c;
+                        tubep.c = temp & 0x80;
+                        temp <<= 1;
+                        if (tempi)
+                                temp |= 1;
+                        writemem(addr, temp);
+                        a &= temp;
+                        setzn(a);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x24:      /*BIT zp */
+                        addr = readmem(pc);
+                        pc++;
+                        temp = readmem(addr);
+                        tubep.z = !(a & temp);
+                        tubep.v = temp & 0x40;
+                        tubep.n = temp & 0x80;
+                        polltime(3);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x25:      /*AND zp */
+                        addr = readmem(pc);
+                        pc++;
+                        a &= readmem(addr);
+                        setzn(a);
+                        polltime(3);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x26:      /*ROL zp */
+                        addr = readmem(pc);
+                        pc++;
+                        temp = readmem(addr);
+                        tempi = tubep.c;
+                        tubep.c = temp & 0x80;
+                        temp <<= 1;
+                        if (tempi)
+                                temp |= 1;
+                        setzn(temp);
+                        writemem(addr, temp);
+                        polltime(5);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x27:      /*Undocumented - RLA zp */
+                        addr = readmem(pc);
+                        pc++;
+                        temp = readmem(addr);
+                        tempi = tubep.c;
+                        tubep.c = temp & 0x80;
+                        temp <<= 1;
+                        if (tempi)
+                                temp |= 1;
+                        writemem(addr, temp);
+                        a &= temp;
+                        setzn(a);
+                        polltime(5);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x28:
+                        /*PLP*/ temp = pull();
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        unpack_flags(temp);
+                        break;
+
+                case 0x29:
+                        /*AND*/ a &= readmem(pc);
+                        pc++;
+                        setzn(a);
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x2A:      /*ROL A */
+                        tempi = tubep.c;
+                        tubep.c = a & 0x80;
+                        a <<= 1;
+                        if (tempi)
+                                a |= 1;
+                        setzn(a);
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x2B:      /*Undocumented - ANC imm */
+                        a &= readmem(pc);
+                        pc++;
+                        setzn(a);
+                        tubep.c = tubep.n;
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x2C:      /*BIT abs */
+                        addr = getw();
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        temp = readmem(addr);
+                        tubep.z = !(a & temp);
+                        tubep.v = temp & 0x40;
+                        tubep.n = temp & 0x80;
+                        break;
+
+                case 0x2D:      /*AND abs */
+                        addr = getw();
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        a &= readmem(addr);
+                        setzn(a);
+                        break;
+
+                case 0x2E:      /*ROL abs */
+                        addr = getw();
+                        polltime(4);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        tempi = tubep.c;
+                        tubep.c = temp & 0x80;
+                        temp <<= 1;
+                        if (tempi)
+                                temp |= 1;
+                        tube_takeint = ((tube_irq & 128) && !tubep.i);  // tube_takeint=1;
+                        polltime(1);
+                        if (!tube_takeint)
+                                tube_takeint = (tube_irq && !tubep.i);
+                        writemem(addr, temp);
+                        setzn(temp);
+                        break;
+
+                case 0x2F:      /*Undocumented - RLA abs */
+                        addr = getw();  /*Found in The Hobbit */
+                        temp = readmem(addr);
+                        tempi = tubep.c;
+                        tubep.c = temp & 0x80;
+                        temp <<= 1;
+                        if (tempi)
+                                temp |= 1;
+                        writemem(addr, temp);
+                        a &= temp;
+                        setzn(a);
+                        polltime(6);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x30:
+                        /*BMI*/ offset = (int8_t) readmem(pc);
+                        pc++;
+                        temp = 2;
+                        if (tubep.n) {
+                                temp++;
+                                if ((pc & 0xFF00) ^ ((pc + offset) & 0xFF00))
+                                        temp++;
+                                pc += offset;
+                        }
+                        branchcycles(temp);
+                        break;
+
+                case 0x31:      /*AND (),y */
+                        temp = readmem(pc);
+                        pc++;
+                        addr = read_zp_indirect(temp);
+                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
+                                polltime(1);
+                        a &= readmem(addr + y);
+                        setzn(a);
+                        polltime(5);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x33:      /*Undocumented - RLA (),y */
+                        temp = readmem(pc);
+                        pc++;
+                        addr = read_zp_indirect(temp);
+                        polltime(6);
+                        temp = readmem(addr + y);
+                        polltime(1);
+                        writemem(addr + y, temp);
+                        tempi = tubep.c;
+                        tubep.c = temp & 0x80;
+                        temp <<= 1;
+                        if (tempi)
+                                temp |= 1;
+                        polltime(1);
+                        writemem(addr + y, temp);
+                        a &= temp;
+                        setzn(a);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x34:      /*Undocumented - NOP zp,x */
+                        addr = readmem(pc);
+                        pc++;
+                        readmem((addr + x) & 0xFF);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x35:      /*AND zp,x */
+                        addr = readmem(pc);
+                        pc++;
+                        a &= readmem((addr + x) & 0xFF);
+                        setzn(a);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x36:      /*ROL zp,x */
+                        addr = readmem(pc);
+                        pc++;
+                        addr += x;
+                        addr &= 0xFF;
+                        temp = readmem(addr);
+                        tempi = tubep.c;
+                        tubep.c = temp & 0x80;
+                        temp <<= 1;
+                        if (tempi)
+                                temp |= 1;
+                        setzn(temp);
+                        writemem(addr, temp);
+                        polltime(6);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x37:      /*Undocumented - RLA zp,x */
+                        addr = (readmem(pc) + x) & 0xFF;
+                        pc++;
+                        temp = readmem(addr);
+                        tempi = tubep.c;
+                        tubep.c = temp & 0x80;
+                        temp <<= 1;
+                        if (tempi)
+                                temp |= 1;
+                        writemem(addr, temp);
+                        a &= temp;
+                        setzn(a);
+                        polltime(6);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x38:
+                        /*SEC*/ tubep.c = 1;
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x39:      /*AND abs,y */
+                        addr = getw();
+                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
+                                polltime(1);
+                        a &= readmem(addr + y);
+                        setzn(a);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x3A:      /*Undocumented - NOP */
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x3B:      /*Undocumented - RLA abs,y */
+                        addr = getw() + y;
+                        polltime(5);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        tempi = tubep.c;
+                        tubep.c = temp & 0x80;
+                        temp <<= 1;
+                        if (tempi)
+                                temp |= 1;
+                        polltime(1);
+                        writemem(addr, temp);
+                        a &= temp;
+                        setzn(a);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x3C:      /*Undocumented - NOP abs,x */
+                        addr = getw();
+                        if ((addr & 0xFF00) ^ ((addr + x) & 0xFF00))
+                                polltime(1);
+                        readmem(addr + x);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x3D:      /*AND abs,x */
+                        addr = getw();
+                        if ((addr & 0xFF00) ^ ((addr + x) & 0xFF00))
+                                polltime(1);
+                        addr += x;
+                        a &= readmem(addr);
+                        setzn(a);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x3E:      /*ROL abs,x */
+                        addr = getw();
+                        readmem((addr & 0xFF00) | ((addr + x) & 0xFF));
+                        addr += x;
+                        temp = readmem(addr);
+                        writemem(addr, temp);
+                        tempi = tubep.c;
+                        tubep.c = temp & 0x80;
+                        temp <<= 1;
+                        if (tempi)
+                                temp |= 1;
+                        writemem(addr, temp);
+                        setzn(temp);
+                        polltime(7);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x3F:      /*Undocumented - RLA abs,x */
+                        addr = getw() + x;
+                        polltime(5);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        tempi = tubep.c;
+                        tubep.c = temp & 0x80;
+                        temp <<= 1;
+                        if (tempi)
+                                temp |= 1;
+                        polltime(1);
+                        writemem(addr, temp);
+                        a &= temp;
+                        setzn(a);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x40:      /*RTI*/
+                        temp = pull();
+                        unpack_flags(temp);
+                        pc = pull();
+                        pc |= (pull() << 8);
+                        polltime(6);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x41:      /*EOR (,x) */
+                        temp = readmem(pc) + x;
+                        pc++;
+                        addr = read_zp_indirect(temp);
+                        a ^= readmem(addr);
+                        setzn(a);
+                        polltime(6);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x43:      /*Undocumented - SRE (,x) */
+                        temp = readmem(pc) + x;
+                        pc++;
+                        addr = read_zp_indirect(temp);
+                        polltime(6);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        tubep.c = temp & 1;
+                        temp >>= 1;
+                        polltime(1);
+                        writemem(addr, temp);
+                        a ^= temp;
+                        setzn(a);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x44:      /*Undocumented - NOP zp */
+                        addr = readmem(pc);
+                        pc++;
+                        readmem(addr);
+                        polltime(3);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x45:      /*EOR zp */
+                        addr = readmem(pc);
+                        pc++;
+                        a ^= readmem(addr);
+                        setzn(a);
+                        polltime(3);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x46:      /*LSR zp */
+                        addr = readmem(pc);
+                        pc++;
+                        temp = readmem(addr);
+                        tubep.c = temp & 1;
+                        temp >>= 1;
+                        setzn(temp);
+                        writemem(addr, temp);
+                        polltime(5);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x47:      /*Undocumented - SRE zp */
+                        addr = readmem(pc);
+                        pc++;
+                        polltime(3);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        tubep.c = temp & 1;
+                        temp >>= 1;
+                        polltime(1);
+                        writemem(addr, temp);
+                        a ^= temp;
+                        setzn(a);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x48:
+                        /*PHA*/ push(a);
+                        polltime(3);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x49:      /*EOR imm */
+                        a ^= readmem(pc);
+                        pc++;
+                        setzn(a);
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x4A:      /*LSR A */
+                        tubep.c = a & 1;
+                        a >>= 1;
+                        setzn(a);
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x4B:      /*Undocumented - ASR imm */
+                        a &= readmem(pc);
+                        pc++;
+                        tubep.c = a & 1;
+                        a >>= 1;
+                        setzn(a);
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x4C:
+                        /*JMP*/ addr = getw();
+                        pc = addr;
+                        polltime(3);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x4D:      /*EOR abs */
+                        addr = getw();
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        a ^= readmem(addr);
+                        setzn(a);
+                        break;
+
+                case 0x4E:      /*LSR abs */
+                        addr = getw();
+                        polltime(4);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        tube_takeint = ((tube_irq & 128) && !tubep.i);  // tube_takeint=1;
+                        polltime(1);
+                        if (!tube_takeint)
+                                tube_takeint = (tube_irq && !tubep.i);
+                        tubep.c = temp & 1;
+                        temp >>= 1;
+                        setzn(temp);
+                        writemem(addr, temp);
+                        break;
+
+                case 0x4F:      /*Undocumented - SRE abs */
+                        addr = getw();
+                        polltime(4);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        tubep.c = temp & 1;
+                        temp >>= 1;
+                        polltime(1);
+                        writemem(addr, temp);
+                        a ^= temp;
+                        setzn(a);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x50:
+                        /*BVC*/ offset = (int8_t) readmem(pc);
+                        pc++;
+                        temp = 2;
+                        if (!tubep.v) {
+                                temp++;
+                                if ((pc & 0xFF00) ^ ((pc + offset) & 0xFF00))
+                                        temp++;
+                                pc += offset;
+                        }
+                        branchcycles(temp);
+                        break;
+
+                case 0x51:      /*EOR (),y */
+                        temp = readmem(pc);
+                        pc++;
+                        addr = read_zp_indirect(temp);
+                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
+                                polltime(1);
+                        a ^= readmem(addr + y);
+                        setzn(a);
+                        polltime(5);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x53:      /*Undocumented - SRE (),y */
+                        temp = readmem(pc);
+                        pc++;
+                        addr = read_zp_indirect(temp) + y;
+                        polltime(6);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        tubep.c = temp & 1;
+                        temp >>= 1;
+                        polltime(1);
+                        writemem(addr, temp);
+                        a ^= temp;
+                        setzn(a);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x54:      /*Undocumented - NOP zp,x */
+                        addr = readmem(pc);
+                        pc++;
+                        readmem((addr + x) & 0xFF);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x55:      /*EOR zp,x */
+                        addr = readmem(pc);
+                        pc++;
+                        a ^= readmem((addr + x) & 0xFF);
+                        setzn(a);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x56:      /*LSR zp,x */
+                        addr = (readmem(pc) + x) & 0xFF;
+                        pc++;
+                        temp = readmem(addr);
+                        tubep.c = temp & 1;
+                        temp >>= 1;
+                        setzn(temp);
+                        writemem(addr, temp);
+                        polltime(6);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x57:      /*Undocumented - SRE zp,x */
+                        addr = (readmem(pc) + x) & 0xFF;
+                        pc++;
+                        polltime(3);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        tubep.c = temp & 1;
+                        temp >>= 1;
+                        polltime(1);
+                        writemem(addr, temp);
+                        polltime(1);
+                        a ^= temp;
+                        setzn(a);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x58:
+                        /*CLI*/ polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        tubep.i = 0;
+                        break;
+
+                case 0x59:      /*EOR abs,y */
+                        addr = getw();
+                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
+                                polltime(1);
+                        a ^= readmem(addr + y);
+                        setzn(a);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x5A:      /*Undocumented - NOP */
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x5B:      /*Undocumented - SRE abs,y */
+                        addr = getw() + y;
+                        polltime(5);
+                        temp = readmem(addr + y);
+                        polltime(1);
+                        writemem(addr, temp);
+                        tubep.c = temp & 1;
+                        temp >>= 1;
+                        polltime(1);
+                        writemem(addr, temp);
+                        a ^= temp;
+                        setzn(a);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x5C:      /*Undocumented - NOP abs,x */
+                        addr = getw();
+                        polltime(4);
+                        if ((addr & 0xFF00) ^ ((addr + x) & 0xFF00)) {
+                                readmem((addr & 0xFF00) | ((addr + x) & 0xFF));
+                                polltime(1);
+                        }
+                        readmem(addr + x);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x5D:      /*EOR abs,x */
+                        addr = getw();
+                        polltime(4);
+                        if ((addr & 0xFF00) ^ ((addr + x) & 0xFF00)) {
+                                readmem((addr & 0xFF00) | ((addr + x) & 0xFF));
+                                polltime(1);
+                        }
+                        addr += x;
+                        a ^= readmem(addr);
+                        setzn(a);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x5E:      /*LSR abs,x */
+                        addr = getw();
+                        readmem((addr & 0xFF00) | ((addr + x) & 0xFF));
+                        addr += x;
+                        temp = readmem(addr);
+                        writemem(addr, temp);
+                        tubep.c = temp & 1;
+                        temp >>= 1;
+                        writemem(addr, temp);
+                        setzn(temp);
+                        polltime(7);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x5F:      /*Undocumented - SRE abs,x */
+                        addr = getw() + x;
+                        polltime(5);
+                        temp = readmem(addr + x);
+                        polltime(1);
+                        writemem(addr, temp);
+                        tubep.c = temp & 1;
+                        temp >>= 1;
+                        polltime(1);
+                        writemem(addr, temp);
+                        a ^= temp;
+                        setzn(a);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x60:
+                        /*RTS*/ pc = pull();
+                        pc |= (pull() << 8);
+                        pc++;
+                        polltime(5);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        polltime(1);
+                        break;
+
+                case 0x61:      /*ADC (,x) */
+                        temp = readmem(pc) + x;
+                        pc++;
+                        addr = read_zp_indirect(temp);
+                        temp = readmem(addr);
+                        adc_nmos(temp);
+                        polltime(6);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x63:      /*Undocumented - RRA (,x) */
+                        temp = readmem(pc) + x;
+                        pc++;
+                        addr = read_zp_indirect(temp);
+                        polltime(6);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        tempi = temp & 1;
+                        temp >>= 1;
+                        if (tubep.c)
+                            temp |= 0x80;
+                        tubep.c = tempi;
+                        polltime(1);
+                        writemem(addr, temp);
+                        adc_nmos(temp);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x64:      /*Undocumented - NOP zp */
+                        addr = readmem(pc);
+                        pc++;
+                        readmem(addr);
+                        polltime(3);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x65:      /*ADC zp */
+                        addr = readmem(pc);
+                        pc++;
+                        temp = readmem(addr);
+                        adc_nmos(temp);
+                        polltime(3);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x66:      /*ROR zp */
+                        addr = readmem(pc);
+                        pc++;
+                        temp = readmem(addr);
+                        tempi = tubep.c;
+                        tubep.c = temp & 1;
+                        temp >>= 1;
+                        if (tempi)
+                                temp |= 0x80;
+                        setzn(temp);
+                        writemem(addr, temp);
+                        polltime(5);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x67:      /*Undocumented - RRA zp */
+                        addr = readmem(pc);
+                        pc++;
+                        polltime(3);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        tempi = temp & 1;
+                        temp >>= 1;
+                        if (tubep.c)
+                            temp |= 0x80;
+                        tubep.c = tempi;
+                        polltime(1);
+                        writemem(addr, temp);
+                        adc_nmos(temp);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x68:
+                        /*PLA*/ a = pull();
+                        setzn(a);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x69:      /*ADC imm */
+                        temp = readmem(pc);
+                        pc++;
+                        adc_nmos(temp);
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x6A:      /*ROR A */
+                        tempi = tubep.c;
+                        tubep.c = a & 1;
+                        a >>= 1;
+                        if (tempi)
+                                a |= 0x80;
+                        setzn(a);
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x6B:      /*Undocumented - ARR */
+                    nmos_arr();
+                    break;
+
+                case 0x6C:      /*JMP () */
+                        addr = getw();
+                        if ((addr & 0xFF) == 0xFF)
+                                pc = readmem(addr) | (readmem(addr - 0xFF) <<
+                                                      8);
+                        else
+                                pc = readmem(addr) | (readmem(addr + 1) << 8);
+                        polltime(5);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x6D:      /*ADC abs */
+                        addr = getw();
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        temp = readmem(addr);
+                        adc_nmos(temp);
+                        break;
+
+                case 0x6E:      /*ROR abs */
+                        addr = getw();
+                        polltime(4);
+                        temp = readmem(addr);
+                        polltime(1);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        writemem(addr, temp);
+                        if ((tube_irq & 128) && !tubep.i)
+                                tube_takeint = 1;
+                        polltime(1);
+                        if (tube_irq && !tubep.i)
+                                tube_takeint = 1;
+                        tempi = tubep.c;
+                        tubep.c = temp & 1;
+                        temp >>= 1;
+                        if (tempi)
+                                temp |= 0x80;
+                        setzn(temp);
+                        writemem(addr, temp);
+                        break;
+
+                case 0x6F:      /*Undocumented - RRA abs */
+                        addr = getw();
+                        polltime(4);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        tempi = temp & 1;
+                        temp >>= 1;
+                        if (tubep.c)
+                            temp |= 0x80;
+                        tubep.c = tempi;
+                        polltime(1);
+                        writemem(addr, temp);
+                        adc_nmos(temp);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x70:
+                        /*BVS*/ offset = (int8_t) readmem(pc);
+                        pc++;
+                        temp = 2;
+                        if (tubep.v) {
+                                temp++;
+                                if ((pc & 0xFF00) ^ ((pc + offset) & 0xFF00))
+                                        temp++;
+                                pc += offset;
+                        }
+                        branchcycles(temp);
+                        break;
+
+                case 0x71:      /*ADC (),y */
+                        temp = readmem(pc);
+                        pc++;
+                        addr = read_zp_indirect(temp);
+                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
+                                polltime(1);
+                        temp = readmem(addr + y);
+                        adc_nmos(temp);
+                        polltime(5);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x73:      /*Undocumented - RRA (,y) */
+                        temp = readmem(pc);
+                        pc++;
+                        addr = read_zp_indirect(temp);
+                        polltime(6);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        tempi = temp & 1;
+                        temp >>= 1;
+                        if (tubep.c)
+                            temp |= 0x80;
+                        tubep.c = tempi;
+                        polltime(1);
+                        writemem(addr, temp);
+                        adc_nmos(temp);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x74:      /*Undocumented - NOP zp,x */
+                        addr = readmem(pc);
+                        pc++;
+                        readmem((addr + x) & 0xFF);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x75:      /*ADC zp,x */
+                        addr = readmem(pc);
+                        pc++;
+                        temp = readmem((addr + x) & 0xFF);
+                        adc_nmos(temp);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x76:      /*ROR zp,x */
+                        addr = readmem(pc);
+                        pc++;
+                        addr += x;
+                        addr &= 0xFF;
+                        temp = readmem(addr);
+                        tempi = tubep.c;
+                        tubep.c = temp & 1;
+                        temp >>= 1;
+                        if (tempi)
+                                temp |= 0x80;
+                        setzn(temp);
+                        writemem(addr, temp);
+                        polltime(6);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x77:      /*Undocumented - RRA zp,x */
+                        addr = (readmem(pc) + x) & 0xFF;
+                        pc++;
+                        polltime(3);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        tempi = temp & 1;
+                        temp >>= 1;
+                        if (tubep.c)
+                            temp |= 0x80;
+                        tubep.c = tempi;
+                        polltime(1);
+                        writemem(addr, temp);
+                        polltime(1);
+                        adc_nmos(temp);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x78:
+                        /*SEI*/ polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        tubep.i = 1;
+                        break;
+
+                case 0x79:      /*ADC abs,y */
+                        addr = getw();
+                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
+                                polltime(1);
+                        temp = readmem(addr + y);
+                        adc_nmos(temp);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x7A:      /*Undocumented - NOP */
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x7B:      /*Undocumented - RRA abs,y */
+                        addr = getw() + y;
+                        polltime(5);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        tempi = temp & 1;
+                        temp >>= 1;
+                        if (tubep.c)
+                            temp |= 0x80;
+                        tubep.c = tempi;
+                        polltime(1);
+                        writemem(addr, temp);
+                        adc_nmos(temp);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x7C:      /*Undocumented - NOP abs,x */
+                        addr = getw();
+                        if ((addr & 0xFF00) ^ ((addr + x) & 0xFF00))
+                                polltime(1);
+                        readmem(addr);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x7D:      /*ADC abs,x */
+                        addr = getw();
+                        if ((addr & 0xFF00) ^ ((addr + x) & 0xFF00))
+                                polltime(1);
+                        addr += x;
+                        temp = readmem(addr);
+                        adc_nmos(temp);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x7E:      /*ROR abs,x */
+                        addr = getw();
+                        readmem((addr & 0xFF00) | ((addr + x) & 0xFF));
+                        addr += x;
+                        temp = readmem(addr);
+                        writemem(addr, temp);
+                        tempi = tubep.c;
+                        tubep.c = temp & 1;
+                        temp >>= 1;
+                        if (tempi)
+                                temp |= 0x80;
+                        writemem(addr, temp);
+                        setzn(temp);
+                        polltime(7);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x7F:      /*Undocumented - RRA abs,x */
+                        addr = getw();
+                        polltime(5);
+                        temp = readmem(addr + x);
+                        polltime(1);
+                        writemem(addr + x, temp);
+                        tempi = temp & 1;
+                        temp >>= 1;
+                        if (tubep.c)
+                            temp |= 0x80;
+                        tubep.c = tempi;
+                        polltime(1);
+                        writemem(addr + x, temp);
+                        adc_nmos(temp);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x80:      /*Undocumented - NOP imm */
+                        readmem(pc);
+                        pc++;
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x81:      /*STA (,x) */
+                        temp = readmem(pc) + x;
+                        pc++;
+                        addr = read_zp_indirect(temp);
+                        writemem(addr, a);
+                        polltime(6);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x82:      /*Undocumented - NOP imm *//*Should sometimes lock up the machine */
+                        readmem(pc);
+                        pc++;
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x83:      /*Undocumented - SAX (,x) */
+                        temp = readmem(pc) + x;
+                        pc++;
+                        addr = read_zp_indirect(temp);
+                        writemem(addr, a & x);
+                        polltime(6);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x84:      /*STY zp */
+                        addr = readmem(pc);
+                        pc++;
+                        writemem(addr, y);
+                        polltime(3);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x85:      /*STA zp */
+                        addr = readmem(pc);
+                        pc++;
+                        writemem(addr, a);
+                        polltime(3);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x86:      /*STX zp */
+                        addr = readmem(pc);
+                        pc++;
+                        writemem(addr, x);
+                        polltime(3);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x87:      /*Undocumented - SAX zp */
+                        addr = readmem(pc);
+                        pc++;
+                        writemem(addr, a & x);
+                        polltime(3);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x88:
+                        /*DEY*/ y--;
+                        setzn(y);
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x89:      /*Undocumented - NOP imm */
+                        readmem(pc);
+                        pc++;
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x8A:
+                        /*TXA*/ a = x;
+                        setzn(a);
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x8B:      /*Undocumented - ANE */
+                        temp = readmem(pc);
+                        pc++;
+                        a = (a | 0xEE) & x & temp;      /*Internal parameter always 0xEE on BBC, always 0xFF on Electron */
+                        setzn(a);
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x8C:      /*STY abs */
+                        addr = getw();
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        writemem(addr, y);
+                        break;
+
+                case 0x8D:      /*STA abs */
+                        addr = getw();
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        writemem(addr, a);
+                        break;
+
+                case 0x8E:      /*STX abs */
+                        addr = getw();
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        writemem(addr, x);
+                        break;
+
+                case 0x8F:      /*Undocumented - SAX abs */
+                        addr = getw();
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        writemem(addr, a & x);
+                        break;
+
+                case 0x90:
+                        /*BCC*/ offset = (int8_t) readmem(pc);
+                        pc++;
+                        temp = 2;
+                        if (!tubep.c) {
+                                temp++;
+                                if ((pc & 0xFF00) ^ ((pc + offset) & 0xFF00))
+                                        temp++;
+                                pc += offset;
+                        }
+                        branchcycles(temp);
+                        break;
+
+                case 0x91:      /*STA (),y */
+                        temp = readmem(pc);
+                        pc++;
+                        addr = read_zp_indirect(temp) + y;
+                        writemem(addr, a);
+                        polltime(6);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x93:      /*Undocumented - SHA (),y */
+                        temp = readmem(pc);
+                        pc++;
+                        addr = read_zp_indirect(temp);
+                        writemem(addr + y, a & x & ((addr >> 8) + 1));
+                        polltime(6);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x94:      /*STY zp,x */
+                        addr = readmem(pc);
+                        pc++;
+                        writemem((addr + x) & 0xFF, y);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x95:      /*STA zp,x */
+                        addr = readmem(pc);
+                        pc++;
+                        writemem((addr + x) & 0xFF, a);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x96:      /*STX zp,y */
+                        addr = readmem(pc);
+                        pc++;
+                        writemem((addr + y) & 0xFF, x);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x97:      /*Undocumented - SAX zp,y */
+                        addr = readmem(pc);
+                        pc++;
+                        writemem((addr + y) & 0xFF, a & x);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x98:
+                        /*TYA*/ a = y;
+                        setzn(a);
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x99:      /*STA abs,y */
+                        addr = getw();
+                        polltime(4);
+                        readmem((addr & 0xFF00) | ((addr + y) & 0xFF));
+                        polltime(1);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        writemem(addr + y, a);
+                        break;
+
+                case 0x9A:
+                        /*TXS*/ s = x;
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x9B:      /*Undocumented - SHS abs,y */
+                        addr = getw();
+                        readmem((addr & 0xFF00) + ((addr + y) & 0xFF));
+                        writemem(addr + y, a & x & ((addr >> 8) + 1));
+                        s = a & x;
+                        polltime(5);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x9C:      /*Undocumented - SHY abs,x */
+                        addr = getw();
+                        readmem((addr & 0xFF00) + ((addr + x) & 0xFF));
+                        writemem(addr + x, y & ((addr >> 8) + 1));
+                        polltime(5);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0x9D:      /*STA abs,x */
+                        addr = getw();
+                        polltime(4);
+                        readmem((addr & 0xFF00) | ((addr + x) & 0xFF));
+                        polltime(1);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        writemem(addr + x, a);
+                        break;
+
+                case 0x9E:      /*Undocumented - SHX abs,y */
+                        addr = getw();
+                        polltime(4);
+                        readmem((addr & 0xFF00) | ((addr + x) & 0xFF));
+                        polltime(1);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        writemem(addr + y, x & ((addr >> 8) + 1));
+                        break;
+
+                case 0x9F:      /*Undocumented - SHA abs,y */
+                        addr = getw();
+                        polltime(4);
+                        readmem((addr & 0xFF00) | ((addr + x) & 0xFF));
+                        polltime(1);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        writemem(addr + y, a & x & ((addr >> 8) + 1));
+                        break;
+
+                case 0xA0:      /*LDY imm */
+                        y = readmem(pc);
+                        pc++;
+                        setzn(y);
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xA1:      /*LDA (,x) */
+                        temp = readmem(pc) + x;
+                        pc++;
+                        addr = read_zp_indirect(temp);
+                        a = readmem(addr);
+                        setzn(a);
+                        polltime(6);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xA2:      /*LDX imm */
+                        x = readmem(pc);
+                        pc++;
+                        setzn(x);
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xA3:      /*Undocumented - LAX (,y) */
+                        temp = readmem(pc) + x;
+                        pc++;
+                        addr = read_zp_indirect(temp);
+                        a = x = readmem(addr);
+                        setzn(a);
+                        polltime(6);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xA4:      /*LDY zp */
+                        addr = readmem(pc);
+                        pc++;
+                        y = readmem(addr);
+                        setzn(y);
+                        polltime(3);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xA5:      /*LDA zp */
+                        addr = readmem(pc);
+                        pc++;
+                        a = readmem(addr);
+                        setzn(a);
+                        polltime(3);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xA6:      /*LDX zp */
+                        addr = readmem(pc);
+                        pc++;
+                        x = readmem(addr);
+                        setzn(x);
+                        polltime(3);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xA7:      /*Undocumented - LAX zp */
+                        addr = readmem(pc);
+                        pc++;
+                        a = x = readmem(addr);
+                        setzn(a);
+                        polltime(3);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xA8:
+                        /*TAY*/ y = a;
+                        setzn(y);
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xA9:      /*LDA imm */
+                        a = readmem(pc);
+                        pc++;
+                        setzn(a);
+                        polltime(1);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        polltime(1);
+                        break;
+
+                case 0xAA:
+                        /*TAX*/ x = a;
+                        setzn(x);
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xAB:      /*Undocumented - LAX */
+                        temp = readmem(pc);
+                        pc++;
+                        a = x = ((a | 0xEE) & temp);    /*WAAAAY more complicated than this, but it varies from machine to machine anyway */
+                        setzn(a);
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xAC:      /*LDY abs */
+                        addr = getw();
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        y = readmem(addr);
+                        setzn(y);
+                        break;
+
+                case 0xAD:      /*LDA abs */
+                        addr = getw();
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        a = readmem(addr);
+                        setzn(a);
+                        break;
+
+                case 0xAE:      /*LDX abs */
+                        addr = getw();
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        x = readmem(addr);
+                        setzn(x);
+                        break;
+
+                case 0xAF:      /*LAX abs */
+                        addr = getw();
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        a = x = readmem(addr);
+                        setzn(a);
+                        break;
+
+                case 0xB0:
+                        /*BCS*/ offset = (int8_t) readmem(pc);
+                        pc++;
+                        temp = 2;
+                        if (tubep.c) {
+                                temp++;
+                                if ((pc & 0xFF00) ^ ((pc + offset) & 0xFF00))
+                                        temp++;
+                                pc += offset;
+                        }
+                        branchcycles(temp);
+                        break;
+
+                case 0xB1:      /*LDA (),y */
+                        temp = readmem(pc);
+                        pc++;
+                        addr = read_zp_indirect(temp);
+                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
+                                polltime(1);
+                        a = readmem(addr + y);
+                        setzn(a);
+                        polltime(5);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xB3:      /*LAX (),y */
+                        temp = readmem(pc);
+                        pc++;
+                        addr = read_zp_indirect(temp);
+                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
+                                polltime(1);
+                        a = x = readmem(addr + y);
+                        setzn(a);
+                        polltime(5);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xB4:      /*LDY zp,x */
+                        addr = readmem(pc);
+                        pc++;
+                        y = readmem((addr + x) & 0xFF);
+                        setzn(y);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xB5:      /*LDA zp,x */
+                        addr = readmem(pc);
+                        pc++;
+                        a = readmem((addr + x) & 0xFF);
+                        setzn(a);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xB6:      /*LDX zp,y */
+                        addr = readmem(pc);
+                        pc++;
+                        x = readmem((addr + y) & 0xFF);
+                        setzn(x);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xB7:      /*LAX zp,y */
+                        addr = readmem(pc);
+                        pc++;
+                        a = x = readmem((addr + y) & 0xFF);
+                        setzn(a);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xB8:
+                        /*CLV*/ tubep.v = 0;
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xB9:      /*LDA abs,y */
+                        addr = getw();
+                        polltime(3);
+                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
+                                polltime(1);
+                        a = readmem(addr + y);
+                        setzn(a);
+                        polltime(1);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xBA:
+                        /*TSX*/ x = s;
+                        setzn(x);
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xBB:      /*Undocumented - LAS abs,y */
+                        addr = getw();
+                        polltime(3);
+                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
+                                polltime(1);
+                        a = x = s = s & readmem(addr + y);      /*No, really! */
+                        setzn(a);
+                        polltime(1);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xBC:      /*LDY abs,x */
+                        addr = getw();
+                        if ((addr & 0xFF00) ^ ((addr + x) & 0xFF00))
+                                polltime(1);
+                        y = readmem(addr + x);
+                        setzn(y);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xBD:      /*LDA abs,x */
+                        addr = getw();
+                        if ((addr & 0xFF00) ^ ((addr + x) & 0xFF00))
+                                polltime(1);
+                        a = readmem(addr + x);
+                        setzn(a);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xBE:      /*LDX abs,y */
+                        addr = getw();
+                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
+                                polltime(1);
+                        x = readmem(addr + y);
+                        setzn(x);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xBF:      /*LAX abs,y */
+                        addr = getw();
+                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
+                                polltime(1);
+                        a = x = readmem(addr + y);
+                        setzn(a);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xC0:      /*CPY imm */
+                        temp = readmem(pc);
+                        pc++;
+                        setzn(y - temp);
+                        tubep.c = (y >= temp);
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xC1:      /*CMP (,x) */
+                        temp = readmem(pc) + x;
+                        pc++;
+                        addr = read_zp_indirect(temp);
+                        temp = readmem(addr);
+                        setzn(a - temp);
+                        tubep.c = (a >= temp);
+                        polltime(6);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xC2:      /*Undocumented - NOP imm *//*Should sometimes lock up the machine */
+                        readmem(pc);
+                        pc++;
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xC3:      /*Undocumented - DCP (,x) */
+                        temp = readmem(pc) + x;
+                        pc++;
+                        addr = read_zp_indirect(temp);
+                        polltime(6);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        temp--;
+                        polltime(1);
+                        writemem(addr, temp);
+                        setzn(a - temp);
+                        tubep.c = (a >= temp);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xC4:      /*CPY zp */
+                        addr = readmem(pc);
+                        pc++;
+                        temp = readmem(addr);
+                        setzn(y - temp);
+                        tubep.c = (y >= temp);
+                        polltime(3);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xC5:      /*CMP zp */
+                        addr = readmem(pc);
+                        pc++;
+                        temp = readmem(addr);
+                        setzn(a - temp);
+                        tubep.c = (a >= temp);
+                        polltime(3);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xC6:      /*DEC zp */
+                        addr = readmem(pc);
+                        pc++;
+                        temp = readmem(addr) - 1;
+                        writemem(addr, temp);
+                        setzn(temp);
+                        polltime(5);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xC7:      /*Undocumented - DCP zp */
+                        addr = readmem(pc);
+                        pc++;
+                        temp = readmem(addr) - 1;
+                        writemem(addr, temp);
+                        setzn(a - temp);
+                        tubep.c = (a >= temp);
+                        polltime(5);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xC8:
+                        /*INY*/ y++;
+                        setzn(y);
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xC9:      /*CMP imm */
+                        temp = readmem(pc);
+                        pc++;
+                        setzn(a - temp);
+                        tubep.c = (a >= temp);
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xCA:
+                        /*DEX*/ x--;
+                        setzn(x);
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xCB:      /*Undocumented - SBX imm */
+                        temp = readmem(pc);
+                        pc++;
+                        setzn((a & x) - temp);
+                        tubep.c = ((a & x) >= temp);
+                        x = (a & x) - temp;
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xCC:      /*CPY abs */
+                        addr = getw();
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        temp = readmem(addr);
+                        setzn(y - temp);
+                        tubep.c = (y >= temp);
+                        break;
+
+                case 0xCD:      /*CMP abs */
+                        addr = getw();
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        temp = readmem(addr);
+                        setzn(a - temp);
+                        tubep.c = (a >= temp);
+                        break;
+
+                case 0xCE:      /*DEC abs */
+                        addr = getw();
+                        polltime(4);
+                        temp = readmem(addr) - 1;
+                        polltime(1);
+//                                tube_takeint=(tube_irq && !tubep.i);
+                        writemem(addr, temp + 1);
+                        tube_takeint = ((tube_irq & 128) && !tubep.i);  // tube_takeint=1;
+                        polltime(1);
+                        if (!tube_takeint)
+                                tube_takeint = (tube_irq && !tubep.i);
+                        writemem(addr, temp);
+                        setzn(temp);
+                        break;
+
+                case 0xCF:      /*Undocumented - DCP abs */
+                        addr = getw();
+                        temp = readmem(addr) - 1;
+                        writemem(addr, temp);
+                        setzn(a - temp);
+                        tubep.c = (a >= temp);
+                        polltime(6);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xD0:
+                        /*BNE*/ offset = (int8_t) readmem(pc);
+                        pc++;
+                        temp = 2;
+                        if (!tubep.z) {
+                                temp++;
+                                if ((pc & 0xFF00) ^ ((pc + offset) & 0xFF00))
+                                        temp++;
+                                pc += offset;
+                        }
+                        branchcycles(temp);
+                        break;
+
+                case 0xD1:      /*CMP (),y */
+                        temp = readmem(pc);
+                        pc++;
+                        addr = read_zp_indirect(temp);
+                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
+                                polltime(1);
+                        temp = readmem(addr + y);
+                        setzn(a - temp);
+                        tubep.c = (a >= temp);
+                        polltime(5);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xD3:      /*Undocumented - DCP (),y */
+                        temp = readmem(pc);
+                        pc++;
+                        addr = read_zp_indirect(temp) + y;
+                        polltime(6);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        polltime(1);
+                        writemem(addr, --temp);
+                        setzn(a - temp);
+                        tubep.c = (a >= temp);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xD4:      /*Undocumented - NOP zp,x */
+                        addr = readmem(pc);
+                        pc++;
+                        readmem((addr + x) & 0xFF);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xD5:      /*CMP zp,x */
+                        addr = readmem(pc);
+                        pc++;
+                        temp = readmem((addr + x) & 0xFF);
+                        setzn(a - temp);
+                        tubep.c = (a >= temp);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xD6:      /*DEC zp,x */
+                        addr = readmem(pc);
+                        pc++;
+                        temp = readmem((addr + x) & 0xFF) - 1;
+                        setzn(temp);
+                        writemem((addr + x) & 0xFF, temp);
+                        polltime(6);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xD7:      /*Undocumented - DCP zp,x */
+                        addr = (readmem(pc) + x) & 0xFF;
+                        pc++;
+                        temp = readmem(addr) - 1;
+                        writemem(addr, temp);
+                        setzn(a - temp);
+                        tubep.c = (a >= temp);
+                        polltime(6);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xD8:
+                        /*CLD*/ tubep.d = 0;
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xD9:      /*CMP abs,y */
+                        addr = getw();
+                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
+                                polltime(1);
+                        temp = readmem(addr + y);
+                        setzn(a - temp);
+                        tubep.c = (a >= temp);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xDA:      /*Undocumented - NOP */
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xDB:      /*Undocumented - DCP abs,y */
+                        addr = getw();
+                        readmem((addr & 0xFF00) | ((addr + x) & 0xFF));
+                        addr += y;
+                        polltime(5);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        polltime(1);
+                        writemem(addr, --temp);
+                        setzn(a - temp);
+                        tubep.c = (a >= temp);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xDC:      /*Undocumented - NOP abs,x */
+                        addr = getw();
+                        if ((addr & 0xFF00) ^ ((addr + x) & 0xFF00))
+                                polltime(1);
+                        readmem(addr + x);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xDD:      /*CMP abs,x */
+                        addr = getw();
+                        if ((addr & 0xFF00) ^ ((addr + x) & 0xFF00))
+                                polltime(1);
+                        temp = readmem(addr + x);
+                        setzn(a - temp);
+                        tubep.c = (a >= temp);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xDE:      /*DEC abs,x */
+                        addr = getw();
+                        readmem((addr & 0xFF00) | ((addr + x) & 0xFF));
+                        addr += x;
+                        polltime(5);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        polltime(1);
+                        writemem(addr, --temp);
+                        setzn(temp);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xDF:      /*Undocumented - DCP abs,x */
+                        addr = getw();
+                        readmem((addr & 0xFF00) | ((addr + x) & 0xFF));
+                        addr += x;
+                        polltime(5);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        polltime(1);
+                        writemem(addr, --temp);
+                        setzn(a - temp);
+                        tubep.c = (a >= temp);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xE0:      /*CPX imm */
+                        temp = readmem(pc);
+                        pc++;
+                        setzn(x - temp);
+                        tubep.c = (x >= temp);
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xE1:      /*SBC (,x) *//*This was missed out of every B-em version since 0.6 as it was never used! */
+                        temp = readmem(pc) + x;
+                        pc++;
+                        addr = read_zp_indirect(temp);
+                        temp = readmem(addr);
+                        sbc_nmos(temp);
+                        polltime(6);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xE2:      /*Undocumented - NOP imm *//*Should sometimes lock up the machine */
+                        readmem(pc);
+                        pc++;
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xE3:      /*Undocumented - ISB (,x) */
+                        temp = readmem(pc) + x;
+                        pc++;
+                        addr = read_zp_indirect(temp);
+                        polltime(6);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        temp++;
+                        polltime(1);
+                        writemem(addr, temp);
+                        sbc_nmos(temp);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xE4:      /*CPX zp */
+                        addr = readmem(pc);
+                        pc++;
+                        temp = readmem(addr);
+                        setzn(x - temp);
+                        tubep.c = (x >= temp);
+                        polltime(3);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xE5:      /*SBC zp */
+                        addr = readmem(pc);
+                        pc++;
+                        temp = readmem(addr);
+                        sbc_nmos(temp);
+                        polltime(3);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xE6:      /*INC zp */
+                        addr = readmem(pc);
+                        pc++;
+                        temp = readmem(addr) + 1;
+                        writemem(addr, temp);
+                        setzn(temp);
+                        polltime(5);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xE7:      /*Undocumented - ISB zp */
+                        addr = readmem(pc);
+                        pc++;
+                        polltime(3);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        temp++;
+                        polltime(1);
+                        writemem(addr, temp);
+                        sbc_nmos(temp);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xE8:
+                        /*INX*/ x++;
+                        setzn(x);
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xE9:      /*SBC imm */
+                        temp = readmem(pc);
+                        pc++;
+                        sbc_nmos(temp);
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xEA:
+                        /*NOP*/ polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xEB:      /*Undocumented - SBC imm */
+                        temp = readmem(pc);
+                        pc++;
+                        sbc_nmos(temp);
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xEC:      /*CPX abs */
+                        addr = getw();
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        temp = readmem(addr);
+                        setzn(x - temp);
+                        tubep.c = (x >= temp);
+                        break;
+
+                case 0xED:      /*SBC abs */
+                        addr = getw();
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        temp = readmem(addr);
+                        sbc_nmos(temp);
+                        break;
+
+                case 0xEE:      /*INC abs */
+                        addr = getw();
+                        polltime(4);
+                        temp = readmem(addr) + 1;
+                        polltime(1);
+                        writemem(addr, temp - 1);
+                        if ((tube_irq & 128) && !tubep.i)
+                                tube_takeint = 1;
+                        polltime(1);
+                        if (tube_irq && !tubep.i)
+                                tube_takeint = 1;
+                        writemem(addr, temp);
+                        setzn(temp);
+                        break;
+
+                case 0xEF:      /*Undocumented - ISB abs */
+                        addr = getw();
+                        polltime(4);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        temp++;
+                        polltime(1);
+                        writemem(addr, temp);
+                        sbc_nmos(temp);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xF0:
+                        /*BEQ*/ offset = (int8_t) readmem(pc);
+                        pc++;
+                        temp = 2;
+                        if (tubep.z) {
+                                temp++;
+                                if ((pc & 0xFF00) ^ ((pc + offset) & 0xFF00))
+                                        temp++;
+//                                        if (pc<0x8000) printf("%04X %02X\n",(pc&0xFF00)^((pc+offset)&0xFF00),temp);
+                                pc += offset;
+                        }
+                        branchcycles(temp);
+                        break;
+
+                case 0xF1:      /*SBC (),y */
+                        temp = readmem(pc);
+                        pc++;
+                        addr = read_zp_indirect(temp);
+                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
+                                polltime(1);
+                        temp = readmem(addr + y);
+                        sbc_nmos(temp);
+                        polltime(5);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xF3:      /*Undocumented - ISB (),y */
+                        temp = readmem(pc);
+                        pc++;
+                        addr = read_zp_indirect(temp) + y;
+                        polltime(6);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        temp++;
+                        polltime(1);
+                        writemem(addr, temp);
+                        sbc_nmos(temp);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xF4:      /*Undocumented - NOP zpx */
+                        addr = readmem(pc);
+                        pc++;
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xF5:      /*SBC zp,x */
+                        addr = readmem(pc);
+                        pc++;
+                        temp = readmem((addr + x) & 0xFF);
+                        sbc_nmos(temp);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xF6:      /*INC zp,x */
+                        addr = readmem(pc);
+                        pc++;
+                        temp = readmem((addr + x) & 0xFF) + 1;
+                        writemem((addr + x) & 0xFF, temp);
+                        setzn(temp);
+                        polltime(6);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xF7:      /*Undocumented - ISB zp,x */
+                        addr = (readmem(pc) + x) & 0xFF;
+                        pc++;
+                        polltime(3);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        temp++;
+                        polltime(1);
+                        writemem(addr, temp);
+                        polltime(1);
+                        sbc_nmos(temp);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xF8:
+                        /*SED*/ tubep.d = 1;
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xF9:      /*SBC abs,y */
+                        addr = getw();
+                        if ((addr & 0xFF00) ^ ((addr + y) & 0xFF00))
+                                polltime(1);
+                        temp = readmem(addr + y);
+                        sbc_nmos(temp);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xFA:      /*Undocumented - NOP */
+                        polltime(2);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xFB:      /*Undocumented - ISB abs,y */
+                        addr = getw() + y;
+                        polltime(5);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        temp++;
+                        polltime(1);
+                        writemem(addr, temp);
+                        sbc_nmos(temp);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xFC:      /*Undocumented - NOP abs,x */
+                        addr = getw();
+                        if ((addr & 0xFF00) ^ ((addr + x) & 0xFF00))
+                                polltime(1);
+                        readmem(addr + x);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xFD:      /*SBC abs,x */
+                        addr = getw();
+                        if ((addr & 0xFF00) ^ ((addr + x) & 0xFF00))
+                                polltime(1);
+                        temp = readmem(addr + x);
+                        sbc_nmos(temp);
+                        polltime(4);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xFE:      /*INC abs,x */
+                        addr = getw();
+                        readmem((addr & 0xFF00) | ((addr + x) & 0xFF));
+                        addr += x;
+                        temp = readmem(addr) + 1;
+                        writemem(addr, temp - 1);
+                        writemem(addr, temp);
+                        setzn(temp);
+                        polltime(7);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+                case 0xFF:      /*Undocumented - ISB abs,x */
+                        addr = getw() + x;
+                        polltime(5);
+                        temp = readmem(addr);
+                        polltime(1);
+                        writemem(addr, temp);
+                        temp++;
+                        polltime(1);
+                        writemem(addr, temp);
+                        sbc_nmos(temp);
+                        tube_takeint = (tube_irq && !tubep.i);
+                        break;
+
+#if 0
+                case 0x02:      /*TFS opcode - OSFSC */
+/*                                if (uefena)
+                                {
+                                        pc+=2;
+                                }
+                                else
+                                {*/
+                        printf("OSFSC!\n");
+                        c = OSFSC();
+                        if (c == 6 || c == 8 || c == 0 || c == 5) {
+                                pc = pull();
+                                pc += (pull() << 8) + 1;
+                        }
+                        if (c == 0x80) {
+                                temp = ram[pc++];
+                                tubep.c = (a >= temp);
+                                setzn(a - temp);
+                        }
+//                                }*/
+//                                pc+=2;
+                        break;
+
+                case 0x92:      /*TFS opcode - OSFILE */
+/*                                if (uefena)
+                                {
+                                        pc+=2;
+                                }
+                                else
+                                {*/
+                        printf("OSFILE!\n");
+                        a = OSFILE();
+                        if (a == 0x80) {
+                                push(a);
+                        } else if (a != 0x7F) {
+                                pc = pull();
+                                pc += (pull() << 8) + 1;
+                        }
+//                                }*/
+//                                pc+=2;
+                        break;
+#endif
+                default:        /*Halt! */
+//                                printf("HALT\n");
+//                                dumpregs();
+//                                exit(-1);
+                        pc--;   /*PC never moves on */
+                        tube_takeint = 0;    /*Interrupts never occur */
+                        polltime(100000);       /*Actually lasts forever, but the above code keeps executing HLT forever */
+                        break;
+//                                printf("Found bad opcode %02X\n",opcode);
+/*                                switch (opcode&0xF)
+                                {
+                                        case 0xA:
+                                        break;
+                                        case 0x0:
+                                        case 0x2:
+                                        case 0x3:
+                                        case 0x4:
+                                        case 0x7:
+                                        case 0x9:
+                                        case 0xB:
+                                        pc++;
+                                        break;
+                                        case 0xC:
+                                        case 0xE:
+                                        case 0xF:
+                                        pc+=2;
+                                        break;
+                                }*/
+                }
+                if (tube_takeint) {
+                        tube_irq &= ~128;
+                        tube_takeint = 0;
+                        push(pc >> 8);
+                        push(pc & 0xFF);
+                        push(pack_flags(0x20));
+                        pc = readmem(0xFFFE) | (readmem(0xFFFF) << 8);
+                        tubep.i = 1;
+                        polltime(7);
+                }
+                tube_irq &= ~128;
+        }
+}
+
+bool tube_6502_inmos(void *rom)
+{
+    if (common_init(rom, TUBE_6502_RAM_SIZE, tube_nmos_exec)) {
+        disable_turbo();
+        return true;
+    }
+    return false;
 }
