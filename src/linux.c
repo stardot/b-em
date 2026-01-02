@@ -10,10 +10,6 @@
 
 #include <sys/stat.h>
 
-#ifndef PATH_MAX
-#define PATH_MAX 512
-#endif
-
 void setejecttext(int drive, const char *fn) {};
 
 static bool try_file(ALLEGRO_PATH *path, const char *name, const char *ext)

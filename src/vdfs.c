@@ -49,7 +49,10 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <dirent.h>
-//#include <unistd.h>
+
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
 
 #include <sys/stat.h>
 
@@ -695,7 +698,7 @@ static void scan_attr(vdfs_entry *ent)
 static void scan_attr(vdfs_entry *ent)
 {
     uint16_t attribs = ent->attribs;
-#if defined(linux) && ((__GLIBC__ == 2 && __GLIBC_MINOR__ >= 28) || __GLIBC__ > 2)
+#ifdef HAVE_STATX
 #define size_field stx.stx_size
     struct statx stx;
 
@@ -3342,10 +3345,6 @@ static void osgbpb(void)
  * OSARGS
  */
 
-#ifdef WIN32
-extern int ftruncate(int fd, off_t length);
-#endif
-
 static void osargs_set_ptr(vdfs_open_file *cp)
 {
     FILE *fp = cp->fp;
@@ -3617,7 +3616,7 @@ static bool copy_file(vdfs_entry *old_ent, vdfs_entry *new_ent)
     if (old_fd >= 0) {
         int new_fd = open(new_ent->host_path, O_WRONLY|O_CREAT, 0666);
         if (new_fd >= 0) {
-#ifdef linux
+#ifdef HAVE_COPY_FILE_RANGE
             struct stat stb;
             if (!fstat(old_fd, &stb)) {
                 ssize_t bytes = copy_file_range(old_fd, NULL, new_fd, NULL, stb.st_size, 0);

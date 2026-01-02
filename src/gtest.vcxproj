@@ -162,10 +162,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="compat_wrappers.c" />
     <ClCompile Include="sdf-geo.c" />
     <ClCompile Include="sdf-gtest.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="compat_wrappers.h" />
     <ClInclude Include="logging.h" />
     <ClInclude Include="sdf.h" />
   </ItemGroup>

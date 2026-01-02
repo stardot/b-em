@@ -4,9 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef _MSC_VER
-#define alloca _alloca
-#endif
+#include "compat_wrappers.h"
 
 #define DIR_SECTORS             5
 #define INITIAL_SECTORS         (DIR_SECTORS+2)

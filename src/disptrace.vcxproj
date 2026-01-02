@@ -158,7 +158,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="compat_wrappers.c" />
     <ClCompile Include="disptrace.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="compat_wrappers.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

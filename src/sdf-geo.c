@@ -18,6 +18,8 @@
 #include "logging.h"
 #include "sdf.h"
 
+#include "compat_wrappers.h"
+
 #define SSD_SIDE_SIZE (80 * 10 * 256)
 
 /* Functions to create various disc image types. */

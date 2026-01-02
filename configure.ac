@@ -123,7 +123,7 @@ AC_FUNC_MKTIME
 AC_FUNC_REALLOC
 AC_FUNC_STRTOD
 AC_CHECK_FUNCS([atexit floor ftruncate memmove memset mkdir pow rmdir sqrt stpcpy strcasecmp strchr strcspn strdup \
-                strerror strncasecmp strpbrk strrchr strspn strstr strtol strtoul])
+                strerror strncasecmp strpbrk strrchr strspn strstr strtol strtoul copy_file_range statx])
 
 AC_SUBST([AM_CFLAGS])
 AC_SUBST([AM_CXXFLAGS])

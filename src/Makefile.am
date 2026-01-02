@@ -166,24 +166,24 @@ endif
 
 m7makechars_SOURCES = m7makechars.c
 
-hdfmt_SOURCES = hdfmt.c
+hdfmt_SOURCES = hdfmt.c compat_wrappers.c
 
 jstest_SOURCES = jstest.c
 
 jstest_LDADD = $(LIBS_ALLEGRO)
 
-gtest_SOURCES = sdf-gtest.c sdf-geo.c
+gtest_SOURCES = sdf-gtest.c sdf-geo.c compat_wrappers.c
 
-sdf2imd_SOURCES = sdf2imd.c sdf-geo.c
+sdf2imd_SOURCES = sdf2imd.c sdf-geo.c compat_wrappers.c
 
 bsnapdump_SOURCES = bsnapdump.c
 
 bsnapdump_LDADD = $(LIBS_ZLIB)
 
-disptrace_SOURCES = disptrace.c
+disptrace_SOURCES = disptrace.c compat_wrappers.c
 
 fsmap_SOURCES = fsmap.c
 
-hdresize_SOURCES = hdresize.c
+hdresize_SOURCES = hdresize.c compat_wrappers.c
 
 wildtest_SOURCES = wildtest.c

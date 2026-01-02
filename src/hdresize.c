@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "compat_wrappers.h"
+
 static int parse_size(const char *size)
 {
     int value;

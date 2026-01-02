@@ -178,26 +178,26 @@ clean :
 b-em.exe : $(OBJ) $(SIDOBJ) $(NS32KOBJ) $(MC6809OBJ) $(PDP11OBJ)  $(M68000OBJ) $(ARMEMUOBJ) $(DARMOBJ) b-em.res
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $^ -o $@ $(LIBS)
 
-hdfmt.exe : hdfmt.o
+hdfmt.exe : hdfmt.o compat_wrappers.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
 
 jstest.exe : jstest.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@ -lallegro -lallegro_main
 
-gtest.exe : sdf-gtest.o sdf-geo.o
+gtest.exe : sdf-gtest.o sdf-geo.o compat_wrappers.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
 
-sdf2imd.exe : sdf2imd.o sdf-geo.o
+sdf2imd.exe : sdf2imd.o sdf-geo.o compat_wrappers.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
 
 bsnapdump.exe : bsnapdump.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@ -lz
 
-disptrace.exe : disptrace.o
+disptrace.exe : disptrace.o compat_wrappers.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
 
 fsmap.exe : fsmap.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
 
-hdresize.exe : hdresize.o
+hdresize.exe : hdresize.o compat_wrappers.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
