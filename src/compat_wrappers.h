@@ -18,10 +18,6 @@ FILE *x_fopen(const char *, const char *);
 int asprintf(char **, const char *, ...);
 #endif
 
-#ifndef HAVE_TDESTROY
-void tdestroy(void *, void (*)(void *));
-#endif
-
 #ifndef HAVE_STPCPY
 extern char *stpcpy(char *dest, const char *src);
 #endif

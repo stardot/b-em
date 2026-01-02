@@ -369,9 +369,6 @@
     <ClInclude Include="z80.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="resources.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="disc.h">
       <Filter>Header Files</Filter>
     </ClInclude>

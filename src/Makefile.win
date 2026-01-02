@@ -75,7 +75,6 @@ OBJ = \
     tapecat-allegro.o \
     tapenoise.o \
     textsave.o \
-    tsearch.o \
     tube.o \
     uef.o \
     uservia.o \

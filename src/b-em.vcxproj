@@ -280,7 +280,6 @@
     <ClInclude Include="resid-fp\siddefs-fp.h" />
     <ClInclude Include="resid-fp\voice.h" />
     <ClInclude Include="resid-fp\wave.h" />
-    <ClInclude Include="resources.h" />
     <ClInclude Include="savestate.h" />
     <ClInclude Include="scsi.h" />
     <ClInclude Include="sdf.h" />

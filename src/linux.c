@@ -5,7 +5,6 @@
 #include "b-em.h"
 #include <allegro5/allegro_native_dialog.h>
 #include "config.h"
-#include "linux-gui.h"
 #include "main.h"
 #include "video_render.h"
 

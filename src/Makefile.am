@@ -147,10 +147,6 @@ b_em_SOURCES = \
 	map.c \
 	sprow.c
 
-if NO_TSEARCH
-b_em_SOURCES += tsearch.c
-endif
-
 hdfmt_SOURCES = hdfmt.c
 
 jstest_SOURCES = jstest.c
