@@ -48,12 +48,12 @@ MAP_removefromlist (MAP_Hashentry ** p, int first)
   while (*p)
     {
       if ((*p)->first == first)
-	{
-	  q = (*p)->next;
-	  free (*p);
-	  *p = q;
-	  return;
-	}
+        {
+          q = (*p)->next;
+          free (*p);
+          *p = q;
+          return;
+        }
       p = &((*p)->next);
     }
 }
@@ -78,8 +78,8 @@ MAP_getfirst (int *first, int second)
   while (look)
     if (look->second == second)
       {
-	*first = look->first;
-	return MAP_NO_ERROR;
+        *first = look->first;
+        return MAP_NO_ERROR;
       }
   return MAP_NO_SUCH_PAIR;
 }
@@ -93,10 +93,10 @@ MAP_getsecond (int first, int *second)
   while (look)
     {
       if (look->first == first)
-	{
-	  *second = look->second;
-	  return MAP_NO_ERROR;
-	}
+        {
+          *second = look->second;
+          return MAP_NO_ERROR;
+        }
       look = look->next;
     }
   return MAP_NO_SUCH_PAIR;

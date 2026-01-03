@@ -25,8 +25,8 @@ static ARMword ModeToBank (ARMword);
 static void    EnvokeList (ARMul_State *, unsigned long, unsigned long);
 
 struct EventNode
-{					/* An event list node.  */
-    unsigned (*func) (ARMul_State *);	/* The function to call.  */
+{                                       /* An event list node.  */
+    unsigned (*func) (ARMul_State *);   /* The function to call.  */
     struct EventNode *next;
 };
 
@@ -743,8 +743,8 @@ ARMul_Align (ARMul_State *state ATTRIBUTE_UNUSED, ARMword address, ARMword data)
     /* This code assumes the address is really unaligned,
     as a shift by 32 is undefined in C.  */
 
-    address = (address & 3) << 3;	/* Get the word address.  */
-    return ((data >> address) | (data << (32 - address)));	/* rot right */
+    address = (address & 3) << 3;       /* Get the word address.  */
+    return ((data >> address) | (data << (32 - address)));      /* rot right */
 }
 
 /* This routine is used to call another routine after a certain number of

@@ -25,56 +25,56 @@ b_em_LDADD = -lallegro_audio -lallegro_acodec -lallegro_primitives -lallegro_dia
 endif
 
 b_em_SOURCES = \
-	6502.c \
-	6502debug.c \
-	6502tube.c \
-	65816.c \
+    6502.c \
+    6502debug.c \
+    6502tube.c \
+    65816.c \
     6809tube.c \
-	NS32016/32016.c \
-	NS32016/32016_debug.c \
-	NS32016/Decode.c \
-	NS32016/NSDis.c \
-	NS32016/Profile.c \
-	NS32016/Trap.c \
-	NS32016/mem32016.c \
-	z80.c \
-	z80dis.c \
-	acia.c \
-	adc.c \
-	arm.c \
-	darm/darm.c \
-	darm/darm-tbl.c \
-	darm/armv7.c \
-	darm/armv7-tbl.c \
-	darm/thumb.c \
-	darm/thumb-tbl.c \
-	darm/thumb2.c \
-	darm/thumb2-decoder.c \
-	darm/thumb2-tbl.c \
-	cmos.c \
-	compact_joystick.c \
-	compactcmos.c \
-	compat_wrappers.c \
-	config.c \
+    NS32016/32016.c \
+    NS32016/32016_debug.c \
+    NS32016/Decode.c \
+    NS32016/NSDis.c \
+    NS32016/Profile.c \
+    NS32016/Trap.c \
+    NS32016/mem32016.c \
+    z80.c \
+    z80dis.c \
+    acia.c \
+    adc.c \
+    arm.c \
+    darm/darm.c \
+    darm/darm-tbl.c \
+    darm/armv7.c \
+    darm/armv7-tbl.c \
+    darm/thumb.c \
+    darm/thumb-tbl.c \
+    darm/thumb2.c \
+    darm/thumb2-decoder.c \
+    darm/thumb2-tbl.c \
+    cmos.c \
+    compact_joystick.c \
+    compactcmos.c \
+    compat_wrappers.c \
+    config.c \
     copro-pdp11.c \
-	csw.c \
-	ddnoise.c \
-	debugger.c \
-	debugger_symbols.cpp \
-	disc.c fdi.c \
-	fdi2raw.c \
-	fullscreen.c \
-	gui-allegro.c\
-	hfe.c \
-	i8271.c \
-	ide.c \
-	imd.c \
-	joystick.c \
-	keyboard.c \
-	keydef-allegro.c \
-	led.c \
-	linux.c \
-	logging.c \
+    csw.c \
+    ddnoise.c \
+    debugger.c \
+    debugger_symbols.cpp \
+    disc.c fdi.c \
+    fdi2raw.c \
+    fullscreen.c \
+    gui-allegro.c\
+    hfe.c \
+    i8271.c \
+    ide.c \
+    imd.c \
+    joystick.c \
+    keyboard.c \
+    keydef-allegro.c \
+    led.c \
+    linux.c \
+    logging.c \
     musahi/m68kcpu.c \
     musahi/m68kops.c \
     musahi/m68kdasm.c \
@@ -82,71 +82,71 @@ b_em_SOURCES = \
     mc6809nc/mc6809nc.c \
     mc6809nc/mc6809_debug.c \
     mc6809nc/mc6809_dis.c \
-	main.c \
-	mem.c \
-	mmb.c \
-	model.c \
-	mouse.c \
+    main.c \
+    mem.c \
+    mmb.c \
+    model.c \
+    mouse.c \
     mmccard.c \
-	midi-linux.c \
-	music2000.c \
-	music4000.c \
-	music5000.c \
-	paula.c \
-	pal.c\
-	resid.cc \
-	savestate.c \
-	scsi.c \
-	sdf-acc.c \
-	sdf-geo.c \
-	serial.c \
-	sn76489.c \
-	sound.c \
-	sysacia.c \
-	sysvia.c \
-	tape.c \
-	tapecat-allegro.c \
-	tapenoise.c \
+    midi-linux.c \
+    music2000.c \
+    music4000.c \
+    music5000.c \
+    paula.c \
+    pal.c\
+    resid.cc \
+    savestate.c \
+    scsi.c \
+    sdf-acc.c \
+    sdf-geo.c \
+    serial.c \
+    sn76489.c \
+    sound.c \
+    sysacia.c \
+    sysvia.c \
+    tape.c \
+    tapecat-allegro.c \
+    tapenoise.c \
     pdp11/pdp11.c \
     pdp11/pdp11_debug.c \
     textsave.c \
-	tube.c \
-	uef.c \
-	uservia.c \
-	vdfs.c \
-	via.c \
-	vidalleg.c \
-	video.c \
-	wd1770.c \
-	win.c \
-	x86.c \
-	x86dasm.c \
-	resid-fp/convolve-sse.cc \
-	resid-fp/convolve.cc \
-	resid-fp/envelope.cc \
-	resid-fp/extfilt.cc \
-	resid-fp/filter.cc \
-	resid-fp/pot.cc \
-	resid-fp/sid.cc \
-	resid-fp/voice.cc \
-	resid-fp/wave.cc \
-	resid-fp/wave6581_PST.cc \
-	resid-fp/wave6581_PS_.cc \
-	resid-fp/wave6581_P_T.cc \
-	resid-fp/wave6581__ST.cc \
-	resid-fp/wave8580_PST.cc \
-	resid-fp/wave8580_PS_.cc \
-	resid-fp/wave8580_P_T.cc \
-	resid-fp/wave8580__ST.cc \
-	ARMulator/armemu.c \
-	ARMulator/arminit.c \
-	ARMulator/armmem.c \
-	ARMulator/armsupp.c \
-	ARMulator/bag.c \
-	ARMulator/thumbemu.c \
-	ARMulator/armdis.cpp \
-	map.c \
-	sprow.c
+    tube.c \
+    uef.c \
+    uservia.c \
+    vdfs.c \
+    via.c \
+    vidalleg.c \
+    video.c \
+    wd1770.c \
+    win.c \
+    x86.c \
+    x86dasm.c \
+    resid-fp/convolve-sse.cc \
+    resid-fp/convolve.cc \
+    resid-fp/envelope.cc \
+    resid-fp/extfilt.cc \
+    resid-fp/filter.cc \
+    resid-fp/pot.cc \
+    resid-fp/sid.cc \
+    resid-fp/voice.cc \
+    resid-fp/wave.cc \
+    resid-fp/wave6581_PST.cc \
+    resid-fp/wave6581_PS_.cc \
+    resid-fp/wave6581_P_T.cc \
+    resid-fp/wave6581__ST.cc \
+    resid-fp/wave8580_PST.cc \
+    resid-fp/wave8580_PS_.cc \
+    resid-fp/wave8580_P_T.cc \
+    resid-fp/wave8580__ST.cc \
+    ARMulator/armemu.c \
+    ARMulator/arminit.c \
+    ARMulator/armmem.c \
+    ARMulator/armsupp.c \
+    ARMulator/bag.c \
+    ARMulator/thumbemu.c \
+    ARMulator/armdis.cpp \
+    map.c \
+    sprow.c
 
 if NO_TSEARCH
 b_em_SOURCES += tsearch.c

@@ -112,11 +112,11 @@
 *                            Other RDI values                               *
 \***************************************************************************/
 
-#define RDISex_Little           0	/* the byte sex of the debuggee */
+#define RDISex_Little           0       /* the byte sex of the debuggee */
 #define RDISex_Big              1
 #define RDISex_DontCare         2
 
-#define RDIPoint_EQ             0	/* the different types of break/watchpoints */
+#define RDIPoint_EQ             0       /* the different types of break/watchpoints */
 #define RDIPoint_GT             1
 #define RDIPoint_GE             2
 #define RDIPoint_LT             3
@@ -125,29 +125,29 @@
 #define RDIPoint_OUT            6
 #define RDIPoint_MASK           7
 
-#define RDIPoint_Inquiry        64	/* ORRed with point type in extended RDP */
-#define RDIPoint_Handle         128	/* messages                              */
+#define RDIPoint_Inquiry        64      /* ORRed with point type in extended RDP */
+#define RDIPoint_Handle         128     /* messages                              */
 
-#define RDIWatch_ByteRead       1	/* types of data accesses to watch for */
+#define RDIWatch_ByteRead       1       /* types of data accesses to watch for */
 #define RDIWatch_HalfRead       2
 #define RDIWatch_WordRead       4
 #define RDIWatch_ByteWrite      8
 #define RDIWatch_HalfWrite      16
 #define RDIWatch_WordWrite      32
 
-#define RDIReg_R15              (1L << 15)	/* mask values for CPU */
+#define RDIReg_R15              (1L << 15)      /* mask values for CPU */
 #define RDIReg_PC               (1L << 16)
 #define RDIReg_CPSR             (1L << 17)
 #define RDIReg_SPSR             (1L << 18)
 #define RDINumCPURegs           19
 
-#define RDINumCPRegs            10	/* current maximum */
+#define RDINumCPRegs            10      /* current maximum */
 
 #define RDIMode_Curr            255
 
 /* Bits set in return value from RDIInfo_Target */
 #define RDITarget_LogSpeed              0x0f
-#define RDITarget_HW                    0x10	/* else emulator */
+#define RDITarget_HW                    0x10    /* else emulator */
 #define RDITarget_AgentMaxLevel         0xe0
 #define RDITarget_AgentLevelShift       5
 #define RDITarget_DebuggerMinLevel      0x700
@@ -165,22 +165,22 @@
 #define RDIPointCapability_Range        2
 /* 4 to 128 are RDIWatch_xx{Read,Write} left-shifted by two */
 #define RDIPointCapability_Mask         256
-#define RDIPointCapability_Status       512	/* Point status enquiries available */
+#define RDIPointCapability_Status       512     /* Point status enquiries available */
 
 /* RDI_Info subcodes */
 #define RDIInfo_Target          0
 #define RDIInfo_Points          1
 #define RDIInfo_Step            2
 #define RDIInfo_MMU             3
-#define RDIInfo_DownLoad        4	/* Inquires whether configuration download
-					   and selection is available.
-					 */
-#define RDIInfo_SemiHosting     5	/* Inquires whether RDISemiHosting_* RDI_Info
-					   calls are available.
-					 */
-#define RDIInfo_CoPro           6	/* Inquires whether CoPro RDI_Info calls are
-					   available.
-					 */
+#define RDIInfo_DownLoad        4       /* Inquires whether configuration download
+                                           and selection is available.
+                                         */
+#define RDIInfo_SemiHosting     5       /* Inquires whether RDISemiHosting_* RDI_Info
+                                           calls are available.
+                                         */
+#define RDIInfo_CoPro           6       /* Inquires whether CoPro RDI_Info calls are
+                                           available.
+                                         */
 #define RDIInfo_Icebreaker      7
 
 /* The next two are only to be used if the value returned by RDIInfo_Points */
@@ -229,33 +229,33 @@ struct Dbg_ConfigBlock;
 struct Dbg_HostosInterface;
 struct Dbg_MCState;
 typedef int rdi_open_proc (unsigned type,
-			   struct Dbg_ConfigBlock const *config,
-			   struct Dbg_HostosInterface const *i,
-			   struct Dbg_MCState *dbg_state);
+                           struct Dbg_ConfigBlock const *config,
+                           struct Dbg_HostosInterface const *i,
+                           struct Dbg_MCState *dbg_state);
 typedef int rdi_close_proc (void);
 typedef int rdi_read_proc (ARMword source, void *dest, unsigned *nbytes);
 typedef int rdi_write_proc (const void *source, ARMword dest,
-			    unsigned *nbytes);
+                            unsigned *nbytes);
 typedef int rdi_CPUread_proc (unsigned mode, unsigned long mask,
-			      ARMword * state);
+                              ARMword * state);
 typedef int rdi_CPUwrite_proc (unsigned mode, unsigned long mask,
-			       ARMword const *state);
+                               ARMword const *state);
 typedef int rdi_CPread_proc (unsigned CPnum, unsigned long mask,
-			     ARMword * state);
+                             ARMword * state);
 typedef int rdi_CPwrite_proc (unsigned CPnum, unsigned long mask,
-			      ARMword const *state);
+                              ARMword const *state);
 typedef int rdi_setbreak_proc (ARMword address, unsigned type, ARMword bound,
-			       PointHandle * handle);
+                               PointHandle * handle);
 typedef int rdi_clearbreak_proc (PointHandle handle);
 typedef int rdi_setwatch_proc (ARMword address, unsigned type,
-			       unsigned datatype, ARMword bound,
-			       PointHandle * handle);
+                               unsigned datatype, ARMword bound,
+                               PointHandle * handle);
 typedef int rdi_clearwatch_proc (PointHandle handle);
 typedef int rdi_execute_proc (PointHandle * handle);
 typedef int rdi_step_proc (unsigned ninstr, PointHandle * handle);
 typedef int rdi_info_proc (unsigned type, ARMword * arg1, ARMword * arg2);
 typedef int rdi_pointinq_proc (ARMword * address, unsigned type,
-			       unsigned datatype, ARMword * bound);
+                               unsigned datatype, ARMword * bound);
 
 typedef enum
 {
@@ -275,12 +275,12 @@ RDI_ConfigMatchType;
 typedef int rdi_addconfig_proc (unsigned long nbytes);
 typedef int rdi_loadconfigdata_proc (unsigned long nbytes, char const *data);
 typedef int rdi_selectconfig_proc (RDI_ConfigAspect aspect, char const *name,
-				   RDI_ConfigMatchType matchtype,
-				   unsigned versionreq, unsigned *versionp);
+                                   RDI_ConfigMatchType matchtype,
+                                   unsigned versionreq, unsigned *versionp);
 
 typedef char *getbufferproc (void *getbarg, unsigned long *sizep);
 typedef int rdi_loadagentproc (ARMword dest, unsigned long size,
-			       getbufferproc * getb, void *getbarg);
+                               getbufferproc * getb, void *getbarg);
 
 typedef struct
 {
@@ -333,6 +333,6 @@ struct RDIProcVec
 
 extern unsigned int swi_mask;
 
-#define SWI_MASK_DEMON		(1 << 0)
-#define SWI_MASK_ANGEL		(1 << 1)
-#define SWI_MASK_REDBOOT	(1 << 2)
+#define SWI_MASK_DEMON          (1 << 0)
+#define SWI_MASK_ANGEL          (1 << 1)
+#define SWI_MASK_REDBOOT        (1 << 2)

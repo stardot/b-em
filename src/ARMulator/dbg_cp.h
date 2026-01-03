@@ -21,7 +21,7 @@
 
 #define Dbg_Access_Readable  1
 #define Dbg_Access_Writable  2
-#define Dbg_Access_CPDT      4	/* else CPRT */
+#define Dbg_Access_CPDT      4  /* else CPRT */
 
 typedef struct
 {
@@ -29,15 +29,15 @@ typedef struct
   /* a single description can be used for a range of registers with
      the same properties *accessed via CPDT instructions*
    */
-  unsigned char nbytes;		/* size of register */
-  unsigned char access;		/* see above (Access_xxx) */
+  unsigned char nbytes;         /* size of register */
+  unsigned char access;         /* see above (Access_xxx) */
   union
   {
     struct
     {
       /* CPDT instructions do not allow the coprocessor much freedom:
-	 only bit 22 ('N') and 12-15 ('CRd') are free for the
-	 coprocessor to use as it sees fit.  */
+         only bit 22 ('N') and 12-15 ('CRd') are free for the
+         coprocessor to use as it sees fit.  */
       unsigned char nbit;
       unsigned char rdbits;
     }
@@ -45,12 +45,12 @@ typedef struct
     struct
     {
       /* CPRT instructions have much more latitude.  The bits fixed
-	 by the ARM are  24..31 (condition mask & opcode)
-	 20 (direction)
-	 8..15 (cpnum, arm register)
-	 4 (CPRT not CPDO)
-	 leaving 14 bits free to the coprocessor (fortunately
-	 falling within two bytes).  */
+         by the ARM are  24..31 (condition mask & opcode)
+         20 (direction)
+         8..15 (cpnum, arm register)
+         4 (CPRT not CPDO)
+         leaving 14 bits free to the coprocessor (fortunately
+         falling within two bytes).  */
       unsigned char read_b0, read_b1, write_b0, write_b1;
     }
     cprt;

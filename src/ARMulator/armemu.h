@@ -57,7 +57,7 @@ extern ARMword isize;
 #define POS(i) ( (~(i)) >> 31 )
 #define NEG(i) ( (i) >> 31 )
 
-#ifdef MODET			/* Thumb support.  */
+#ifdef MODET                    /* Thumb support.  */
 /* ??? This bit is actually in the low order bit of the PC in the hardware.
    It isn't clear if the simulator needs to model that or not.  */
 #define TBIT (1L << 5)
@@ -173,35 +173,35 @@ extern ARMword isize;
 #define SETPSR_X(d,s) d = ((d) & ~PSR_XBITS) | ((s) & PSR_XBITS)
 #define SETPSR_C(d,s) d = ((d) & ~PSR_CBITS) | ((s) & PSR_CBITS)
 
-#define SETR15PSR(s) 								\
-  do										\
-    {										\
-      if (state->Mode == USER26MODE)						\
-        {									\
-          state->Reg[15] = ((s) & CCBITS) | R15PC | ER15INT | EMODE;		\
-          ASSIGNN ((state->Reg[15] & NBIT) != 0);				\
-          ASSIGNZ ((state->Reg[15] & ZBIT) != 0);				\
-          ASSIGNC ((state->Reg[15] & CBIT) != 0);				\
-          ASSIGNV ((state->Reg[15] & VBIT) != 0);				\
-        }									\
-      else									\
-        {									\
-          state->Reg[15] = R15PC | ((s) & (CCBITS | R15INTBITS | R15MODEBITS));	\
-          ARMul_R15Altered (state);						\
-       }									\
-    }										\
+#define SETR15PSR(s)                                                            \
+  do                                                                            \
+    {                                                                           \
+      if (state->Mode == USER26MODE)                                            \
+        {                                                                       \
+          state->Reg[15] = ((s) & CCBITS) | R15PC | ER15INT | EMODE;            \
+          ASSIGNN ((state->Reg[15] & NBIT) != 0);                               \
+          ASSIGNZ ((state->Reg[15] & ZBIT) != 0);                               \
+          ASSIGNC ((state->Reg[15] & CBIT) != 0);                               \
+          ASSIGNV ((state->Reg[15] & VBIT) != 0);                               \
+        }                                                                       \
+      else                                                                      \
+        {                                                                       \
+          state->Reg[15] = R15PC | ((s) & (CCBITS | R15INTBITS | R15MODEBITS)); \
+          ARMul_R15Altered (state);                                             \
+       }                                                                        \
+    }                                                                           \
   while (0)
 
-#define SETABORT(i, m, d)						\
-  do									\
-    { 									\
-      int SETABORT_mode = (m);						\
-									\
-      ARMul_SetSPSR (state, SETABORT_mode, ARMul_GetCPSR (state));	\
-      ARMul_SetCPSR (state, ((ARMul_GetCPSR (state) & ~(EMODE | TBIT))	\
-			     | (i) | SETABORT_mode));			\
-      state->Reg[14] = temp - (d);					\
-    }									\
+#define SETABORT(i, m, d)                                               \
+  do                                                                    \
+    {                                                                   \
+      int SETABORT_mode = (m);                                          \
+                                                                        \
+      ARMul_SetSPSR (state, SETABORT_mode, ARMul_GetCPSR (state));      \
+      ARMul_SetCPSR (state, ((ARMul_GetCPSR (state) & ~(EMODE | TBIT))  \
+                             | (i) | SETABORT_mode));                   \
+      state->Reg[14] = temp - (d);                                      \
+    }                                                                   \
   while (0)
 
 #ifndef MODE32
@@ -211,40 +211,40 @@ extern ARMword isize;
 #define ADDREXCEPT(address)   (address > LEGALADDR && !state->data32Sig)
 #endif
 
-#define INTERNALABORT(address)			\
-  do						\
-    {						\
-      if (address < VECTORS)			\
-	state->Aborted = ARMul_DataAbortV;	\
-      else					\
-	state->Aborted = ARMul_AddrExceptnV;	\
-    }						\
+#define INTERNALABORT(address)                  \
+  do                                            \
+    {                                           \
+      if (address < VECTORS)                    \
+        state->Aborted = ARMul_DataAbortV;      \
+      else                                      \
+        state->Aborted = ARMul_AddrExceptnV;    \
+    }                                           \
   while (0)
 
 #ifdef MODE32
 #define TAKEABORT ARMul_Abort (state, ARMul_DataAbortV)
 #else
-#define TAKEABORT 					\
-  do							\
-    {							\
-      if (state->Aborted == ARMul_AddrExceptnV) 	\
-	ARMul_Abort (state, ARMul_AddrExceptnV); 	\
-      else 						\
-	ARMul_Abort (state, ARMul_DataAbortV);		\
-    }							\
+#define TAKEABORT                                       \
+  do                                                    \
+    {                                                   \
+      if (state->Aborted == ARMul_AddrExceptnV)         \
+        ARMul_Abort (state, ARMul_AddrExceptnV);        \
+      else                                              \
+        ARMul_Abort (state, ARMul_DataAbortV);          \
+    }                                                   \
   while (0)
 #endif
 
-#define CPTAKEABORT					\
-  do							\
-    {							\
-      if (!state->Aborted)				\
-	ARMul_Abort (state, ARMul_UndefinedInstrV); 	\
-      else if (state->Aborted == ARMul_AddrExceptnV) 	\
-	ARMul_Abort (state, ARMul_AddrExceptnV); 	\
-      else 						\
-	ARMul_Abort (state, ARMul_DataAbortV);		\
-    }							\
+#define CPTAKEABORT                                     \
+  do                                                    \
+    {                                                   \
+      if (!state->Aborted)                              \
+        ARMul_Abort (state, ARMul_UndefinedInstrV);     \
+      else if (state->Aborted == ARMul_AddrExceptnV)    \
+        ARMul_Abort (state, ARMul_AddrExceptnV);        \
+      else                                              \
+        ARMul_Abort (state, ARMul_DataAbortV);          \
+    }                                                   \
   while (0);
 
 
@@ -258,39 +258,39 @@ extern ARMword isize;
 
 #define NORMALCYCLE state->NextInstr = 0
 #define BUSUSEDN    state->NextInstr |= 1  /* The next fetch will be an N cycle.  */
-#define BUSUSEDINCPCS						\
-  do								\
-    {								\
-      if (! state->is_v4)					\
-        {							\
-	  /* A standard PC inc and an S cycle.  */		\
-	  state->Reg[15] += isize;				\
-	  state->NextInstr = (state->NextInstr & 0xff) | 2;	\
-	}							\
-    }								\
+#define BUSUSEDINCPCS                                           \
+  do                                                            \
+    {                                                           \
+      if (! state->is_v4)                                       \
+        {                                                       \
+          /* A standard PC inc and an S cycle.  */              \
+          state->Reg[15] += isize;                              \
+          state->NextInstr = (state->NextInstr & 0xff) | 2;     \
+        }                                                       \
+    }                                                           \
   while (0)
 
-#define BUSUSEDINCPCN					\
-  do							\
-    {							\
-      if (state->is_v4)					\
-	BUSUSEDN;					\
-      else						\
-	{						\
-	  /* A standard PC inc and an N cycle.  */	\
-	  state->Reg[15] += isize;			\
-	  state->NextInstr |= 3;			\
-	}						\
-    }							\
+#define BUSUSEDINCPCN                                   \
+  do                                                    \
+    {                                                   \
+      if (state->is_v4)                                 \
+        BUSUSEDN;                                       \
+      else                                              \
+        {                                               \
+          /* A standard PC inc and an N cycle.  */      \
+          state->Reg[15] += isize;                      \
+          state->NextInstr |= 3;                        \
+        }                                               \
+    }                                                   \
   while (0)
 
-#define INCPC 			\
-  do				\
-    {				\
-      /* A standard PC inc.  */	\
-      state->Reg[15] += isize;	\
-      state->NextInstr |= 2;	\
-    }				\
+#define INCPC                   \
+  do                            \
+    {                           \
+      /* A standard PC inc.  */ \
+      state->Reg[15] += isize;  \
+      state->NextInstr |= 2;    \
+    }                           \
   while (0)
 
 #define FLUSHPIPE state->NextInstr |= PRIMEPIPE
@@ -368,9 +368,9 @@ extern ARMword isize;
 #ifndef BEEBEM
 /* Determine if access to coprocessor CP is permitted.
    The XScale has a register in CP15 which controls access to CP0 - CP13.  */
-#define CP_ACCESS_ALLOWED(STATE, CP)			\
-    (   ((CP) >= 14)					\
-     || (! (STATE)->is_XScale)				\
+#define CP_ACCESS_ALLOWED(STATE, CP)                    \
+    (   ((CP) >= 14)                                    \
+     || (! (STATE)->is_XScale)                          \
      || (read_cp15_reg (15, 0, 1) & (1 << (CP))))
 #else
 #define CP_ACCESS_ALLOWED(STATE, CP) 0
@@ -380,37 +380,37 @@ extern ARMword isize;
 #define ROTATER(n, b) (((n) >> (b)) | ((n) << (32 - (b))))
 
 /* Macros to store results of instructions.  */
-#define WRITEDEST(d)				\
-  do						\
-    {						\
-      if (DESTReg == 15) 			\
-	WriteR15 (state, d); 			\
-      else 					\
-	DEST = d;				\
-    }						\
+#define WRITEDEST(d)                            \
+  do                                            \
+    {                                           \
+      if (DESTReg == 15)                        \
+        WriteR15 (state, d);                    \
+      else                                      \
+        DEST = d;                               \
+    }                                           \
   while (0)
 
-#define WRITESDEST(d)				\
-  do						\
-    {						\
-      if (DESTReg == 15)			\
-	WriteSR15 (state, d);			\
-      else					\
-	{					\
-	  DEST = d;				\
-	  ARMul_NegZero (state, d);		\
-	}					\
-    }						\
+#define WRITESDEST(d)                           \
+  do                                            \
+    {                                           \
+      if (DESTReg == 15)                        \
+        WriteSR15 (state, d);                   \
+      else                                      \
+        {                                       \
+          DEST = d;                             \
+          ARMul_NegZero (state, d);             \
+        }                                       \
+    }                                           \
   while (0)
 
-#define WRITEDESTB(d)				\
-  do						\
-    {						\
-      if (DESTReg == 15)			\
-	WriteR15Branch (state, d);		\
-      else					\
-	DEST = d;				\
-    }						\
+#define WRITEDESTB(d)                           \
+  do                                            \
+    {                                           \
+      if (DESTReg == 15)                        \
+        WriteR15Branch (state, d);              \
+      else                                      \
+        DEST = d;                               \
+    }                                           \
   while (0)
 
 #define BYTETOBUS(data) ((data & 0xff) | \
@@ -418,14 +418,14 @@ extern ARMword isize;
                         ((data & 0xff) << 16) | \
                         ((data & 0xff) << 24))
 
-#define BUSTOBYTE(address, data)				\
-  do								\
-    {								\
-      if (state->bigendSig) 					\
-	temp = (data >> (((address ^ 3) & 3) << 3)) & 0xff;	\
-      else							\
-	temp = (data >> ((address & 3) << 3)) & 0xff;		\
-    }								\
+#define BUSTOBYTE(address, data)                                \
+  do                                                            \
+    {                                                           \
+      if (state->bigendSig)                                     \
+        temp = (data >> (((address ^ 3) & 3) << 3)) & 0xff;     \
+      else                                                      \
+        temp = (data >> ((address & 3) << 3)) & 0xff;           \
+    }                                                           \
   while (0)
 
 #define LOADMULT(instr,   address, wb)  LoadMult   (state, instr, address, wb)
@@ -438,24 +438,24 @@ extern ARMword isize;
 
 
 /* Values for Emulate.  */
-#define STOP            0	/* stop */
-#define CHANGEMODE      1	/* change mode */
-#define ONCE            2	/* execute just one interation */
-#define RUN             3	/* continuous execution */
+#define STOP            0       /* stop */
+#define CHANGEMODE      1       /* change mode */
+#define ONCE            2       /* execute just one interation */
+#define RUN             3       /* continuous execution */
 
 /* Stuff that is shared across modes.  */
 extern const unsigned ARMul_MultTable[]; /* Number of I cycles for a mult.  */
-extern ARMword  ARMul_ImmedTable[];	/* Immediate DP LHS values.  */
-extern char     ARMul_BitList[];	/* Number of bits in a byte table.  */
+extern ARMword  ARMul_ImmedTable[];     /* Immediate DP LHS values.  */
+extern char     ARMul_BitList[];        /* Number of bits in a byte table.  */
 
 #define EVENTLISTSIZE 1024L
 
 /* Thumb support.  */
 typedef enum
 {
-  t_undefined,		/* Undefined Thumb instruction.  */
-  t_decoded,		/* Instruction decoded to ARM equivalent.  */
-  t_branch		/* Thumb branch (already processed).  */
+  t_undefined,          /* Undefined Thumb instruction.  */
+  t_decoded,            /* Instruction decoded to ARM equivalent.  */
+  t_branch              /* Thumb branch (already processed).  */
 }
 tdstate;
 
@@ -529,21 +529,21 @@ extern void     ARMul_ScheduleEvent (ARMul_State *, unsigned long, unsigned (*) 
 extern unsigned ARMul_CoProInit     (ARMul_State *);
 extern void     ARMul_CoProExit     (ARMul_State *);
 extern void     ARMul_CoProAttach   (ARMul_State *, unsigned, ARMul_CPInits *, ARMul_CPExits *,
-				     ARMul_LDCs *, ARMul_STCs *, ARMul_MRCs *, ARMul_MCRs *,
-				     ARMul_CDPs *, ARMul_CPReads *, ARMul_CPWrites *);
+                                     ARMul_LDCs *, ARMul_STCs *, ARMul_MRCs *, ARMul_MCRs *,
+                                     ARMul_CDPs *, ARMul_CPReads *, ARMul_CPWrites *);
 extern void     ARMul_CoProDetach   (ARMul_State *, unsigned);
 extern ARMword  read_cp15_reg       (unsigned, unsigned, unsigned);
 
 extern unsigned DSPLDC4 (ARMul_State *, unsigned, ARMword, ARMword);
 extern unsigned DSPMCR4 (ARMul_State *, unsigned, ARMword, ARMword);
 extern unsigned DSPMRC4 (ARMul_State *, unsigned, ARMword, ARMword *);
-extern unsigned	DSPSTC4 (ARMul_State *, unsigned, ARMword, ARMword *);
-extern unsigned	DSPCDP4 (ARMul_State *, unsigned, ARMword);
+extern unsigned DSPSTC4 (ARMul_State *, unsigned, ARMword, ARMword *);
+extern unsigned DSPCDP4 (ARMul_State *, unsigned, ARMword);
 extern unsigned DSPMCR5 (ARMul_State *, unsigned, ARMword, ARMword);
 extern unsigned DSPMRC5 (ARMul_State *, unsigned, ARMword, ARMword *);
 extern unsigned DSPLDC5 (ARMul_State *, unsigned, ARMword, ARMword);
-extern unsigned	DSPSTC5 (ARMul_State *, unsigned, ARMword, ARMword *);
-extern unsigned	DSPCDP5 (ARMul_State *, unsigned, ARMword);
+extern unsigned DSPSTC5 (ARMul_State *, unsigned, ARMword, ARMword *);
+extern unsigned DSPCDP5 (ARMul_State *, unsigned, ARMword);
 extern unsigned DSPMCR6 (ARMul_State *, unsigned, ARMword, ARMword);
 extern unsigned DSPMRC6 (ARMul_State *, unsigned, ARMword, ARMword *);
-extern unsigned	DSPCDP6 (ARMul_State *, unsigned, ARMword);
+extern unsigned DSPCDP6 (ARMul_State *, unsigned, ARMword);

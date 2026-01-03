@@ -28,45 +28,45 @@
 
 #include "paula.h"
 
-#define RAM_SIZE				(512*1024)
-#define NUM_CHANNELS			4
-#define JIM_DEV					0xD0
-#define JIM_PAGE				0xFEFC
-#define REG_BASE				0x80
+#define RAM_SIZE                (512*1024)
+#define NUM_CHANNELS            4
+#define JIM_DEV                 0xD0
+#define JIM_PAGE                0xFEFC
+#define REG_BASE                0x80
 
 static uint8_t jimDev;
-static uint16_t jimPage;		//fcfe,fcfd  - big endian
+static uint16_t jimPage;        //fcfe,fcfd  - big endian
 
 typedef struct
 {
 
     //user facing registers
-    int8_t	    data;
-    uint8_t	    addr_bank;
-    uint16_t	addr;
+    int8_t      data;
+    uint8_t     addr_bank;
+    uint16_t    addr;
 
     uint8_t     period_h_latch;
-    uint16_t	period;
-    uint16_t	len;
-    bool	    act;
-    bool	    repeat;
-    uint8_t	    vol;
-    uint16_t	repoff;
-    uint8_t	    peak;
+    uint16_t    period;
+    uint16_t    len;
+    bool        act;
+    bool        repeat;
+    uint8_t     vol;
+    uint16_t    repoff;
+    uint8_t     peak;
 
     //internal registers
-    bool	    act_prev;
-    uint16_t	samper_ctr;
-    int8_t	    data_next;
-    uint16_t	sam_ctr;
+    bool        act_prev;
+    uint16_t    samper_ctr;
+    int8_t      data_next;
+    uint16_t    sam_ctr;
 
 
 } CHANNELREGS;
 
-static uint8_t	ChipRam[RAM_SIZE];
-CHANNELREGS		ChannelRegs[NUM_CHANNELS];
-uint8_t			ChannelSel;
-uint8_t			Volume;
+static uint8_t  ChipRam[RAM_SIZE];
+CHANNELREGS     ChannelRegs[NUM_CHANNELS];
+uint8_t         ChannelSel;
+uint8_t         Volume;
 
 #define H1M_STREAM_RATE 31250
 

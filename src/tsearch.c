@@ -169,11 +169,11 @@ typedef struct node_t
 #define SETRED(N) (N)->left_node |= ((uintptr_t) 0x1)
 #define SETBLACK(N) (N)->left_node &= ~((uintptr_t) 0x1)
 #define SETNODEPTR(NP,P) (*NP) = (node)((((uintptr_t)(*NP)) \
-					 & (uintptr_t) 0x1) | (uintptr_t)(P))
+                                         & (uintptr_t) 0x1) | (uintptr_t)(P))
 #define LEFT(N) (node)((N)->left_node & ~((uintptr_t) 0x1))
 #define LEFTPTR(N) (node *)(&(N)->left_node)
 #define SETLEFT(N,L) (N)->left_node = (((N)->left_node & (uintptr_t) 0x1) \
-				       | (uintptr_t)(L))
+                                       | (uintptr_t)(L))
 #define RIGHT(N) (node)((N)->right_node)
 #define RIGHTPTR(N) (node *)(&(N)->right_node)
 #define SETRIGHT(N,R) (N)->right_node = (uintptr_t)(R)
@@ -200,9 +200,9 @@ check_tree_recurse (node p, int d_sofar, int d_total)
     }
 
   check_tree_recurse (LEFT(p), d_sofar + (LEFT(p) && !RED(LEFT(p))),
-		      d_total);
+                      d_total);
   check_tree_recurse (RIGHT(p), d_sofar + (RIGHT(p) && !RED(RIGHT(p))),
-		      d_total);
+                      d_total);
   if (LEFT(p))
     assert (!(RED(LEFT(p)) && RED(p)));
   if (RIGHT(p))
@@ -236,7 +236,7 @@ check_tree (node root)
    edges between GPARENTP and ROOTP.  */
 static void
 maybe_split_for_insert (node *rootp, node *parentp, node *gparentp,
-			int p_r, int gp_r, int mode)
+                        int p_r, int gp_r, int mode)
 {
   node root = DEREFNODEPTR(rootp);
   node *rp, *lp;
@@ -253,67 +253,67 @@ maybe_split_for_insert (node *rootp, node *parentp, node *gparentp,
       /* This node becomes red, its successors black.  */
       SETRED(root);
       if (rpn)
-	SETBLACK(rpn);
+        SETBLACK(rpn);
       if (lpn)
-	SETBLACK(lpn);
+        SETBLACK(lpn);
 
       /* If the parent of this node is also red, we have to do
-	 rotations.  */
+         rotations.  */
       if (parentp != NULL && RED(DEREFNODEPTR(parentp)))
-	{
-	  node gp = DEREFNODEPTR(gparentp);
-	  node p = DEREFNODEPTR(parentp);
-	  /* There are two main cases:
-	     1. The edge types (left or right) of the two red edges differ.
-	     2. Both red edges are of the same type.
-	     There exist two symmetries of each case, so there is a total of
-	     4 cases.  */
-	  if ((p_r > 0) != (gp_r > 0))
-	    {
-	      /* Put the child at the top of the tree, with its parent
-		 and grandparent as successors.  */
-	      SETRED(p);
-	      SETRED(gp);
-	      SETBLACK(root);
-	      if (p_r < 0)
-		{
-		  /* Child is left of parent.  */
-		  SETLEFT(p,rpn);
-		  SETNODEPTR(rp,p);
-		  SETRIGHT(gp,lpn);
-		  SETNODEPTR(lp,gp);
-		}
-	      else
-		{
-		  /* Child is right of parent.  */
-		  SETRIGHT(p,lpn);
-		  SETNODEPTR(lp,p);
-		  SETLEFT(gp,rpn);
-		  SETNODEPTR(rp,gp);
-		}
-	      SETNODEPTR(gparentp,root);
-	    }
-	  else
-	    {
-	      SETNODEPTR(gparentp,p);
-	      /* Parent becomes the top of the tree, grandparent and
-		 child are its successors.  */
-	      SETBLACK(p);
-	      SETRED(gp);
-	      if (p_r < 0)
-		{
-		  /* Left edges.  */
-		  SETLEFT(gp,RIGHT(p));
-		  SETRIGHT(p,gp);
-		}
-	      else
-		{
-		  /* Right edges.  */
-		  SETRIGHT(gp,LEFT(p));
-		  SETLEFT(p,gp);
-		}
-	    }
-	}
+        {
+          node gp = DEREFNODEPTR(gparentp);
+          node p = DEREFNODEPTR(parentp);
+          /* There are two main cases:
+             1. The edge types (left or right) of the two red edges differ.
+             2. Both red edges are of the same type.
+             There exist two symmetries of each case, so there is a total of
+             4 cases.  */
+          if ((p_r > 0) != (gp_r > 0))
+            {
+              /* Put the child at the top of the tree, with its parent
+                 and grandparent as successors.  */
+              SETRED(p);
+              SETRED(gp);
+              SETBLACK(root);
+              if (p_r < 0)
+                {
+                  /* Child is left of parent.  */
+                  SETLEFT(p,rpn);
+                  SETNODEPTR(rp,p);
+                  SETRIGHT(gp,lpn);
+                  SETNODEPTR(lp,gp);
+                }
+              else
+                {
+                  /* Child is right of parent.  */
+                  SETRIGHT(p,lpn);
+                  SETNODEPTR(lp,p);
+                  SETLEFT(gp,rpn);
+                  SETNODEPTR(rp,gp);
+                }
+              SETNODEPTR(gparentp,root);
+            }
+          else
+            {
+              SETNODEPTR(gparentp,p);
+              /* Parent becomes the top of the tree, grandparent and
+                 child are its successors.  */
+              SETBLACK(p);
+              SETRED(gp);
+              if (p_r < 0)
+                {
+                  /* Left edges.  */
+                  SETLEFT(gp,RIGHT(p));
+                  SETRIGHT(p,gp);
+                }
+              else
+                {
+                  /* Right edges.  */
+                  SETRIGHT(gp,LEFT(p));
+                  SETLEFT(p,gp);
+                }
+            }
+        }
     }
 }
 
@@ -349,16 +349,16 @@ tsearch (const void *key, void **vrootp, __compar_fn_t compar)
       root = DEREFNODEPTR(rootp);
       r = (*compar) (key, root->key);
       if (r == 0)
-	return root;
+        return root;
 
       maybe_split_for_insert (rootp, parentp, gparentp, p_r, gp_r, 0);
       /* If that did any rotations, parentp and gparentp are now garbage.
-	 That doesn't matter, because the values they contain are never
-	 used again in that case.  */
+         That doesn't matter, because the values they contain are never
+         used again in that case.  */
 
       nextp = r < 0 ? LEFTPTR(root) : RIGHTPTR(root);
       if (DEREFNODEPTR(nextp) == NULL)
-	break;
+        break;
 
       gparentp = parentp;
       parentp = rootp;
@@ -372,24 +372,24 @@ tsearch (const void *key, void **vrootp, __compar_fn_t compar)
   if (q != NULL)
     {
       /* Make sure the malloc implementation returns naturally aligned
-	 memory blocks when expected.  Or at least even pointers, so we
-	 can use the low bit as red/black flag.  Even though we have a
-	 static_assert to make sure alignof (max_align_t) > 1 there could
-	 be an interposed malloc implementation that might cause havoc by
-	 not obeying the malloc contract.  */
+         memory blocks when expected.  Or at least even pointers, so we
+         can use the low bit as red/black flag.  Even though we have a
+         static_assert to make sure alignof (max_align_t) > 1 there could
+         be an interposed malloc implementation that might cause havoc by
+         not obeying the malloc contract.  */
 #ifdef USE_MALLOC_LOW_BIT
       assert (((uintptr_t) q & (uintptr_t) 0x1) == 0);
 #endif
-      SETNODEPTR(nextp,q);		/* link new node to old */
-      q->key = key;			/* initialize new node */
+      SETNODEPTR(nextp,q);              /* link new node to old */
+      q->key = key;                     /* initialize new node */
       SETRED(q);
       SETLEFT(q,NULL);
       SETRIGHT(q,NULL);
 
       if (nextp != rootp)
-	/* There may be two red edges in a row now, which we must avoid by
-	   rotating the tree.  */
-	maybe_split_for_insert (nextp, rootp, parentp, r, p_r, 1);
+        /* There may be two red edges in a row now, which we must avoid by
+           rotating the tree.  */
+        maybe_split_for_insert (nextp, rootp, parentp, r, p_r, 1);
     }
 
   return q;
@@ -418,7 +418,7 @@ tfind (const void *key, void *const *vrootp, __compar_fn_t compar)
 
       r = (*compar) (key, root->key);
       if (r == 0)
-	return root;
+        return root;
 
       rootp = r < 0 ? LEFTPTR(root) : RIGHTPTR(root);
     }
@@ -455,27 +455,27 @@ tdelete (const void *key, void **vrootp, __compar_fn_t compar)
   while ((cmp = (*compar) (key, root->key)) != 0)
     {
       if (sp == stacksize)
-	{
-	  node **newstack;
-	  stacksize += 20;
-	  newstack = alloca (sizeof (node *) * stacksize);
-	  nodestack = memcpy (newstack, nodestack, sp * sizeof (node *));
-	}
+        {
+          node **newstack;
+          stacksize += 20;
+          newstack = alloca (sizeof (node *) * stacksize);
+          nodestack = memcpy (newstack, nodestack, sp * sizeof (node *));
+        }
 
       nodestack[sp++] = rootp;
       p = DEREFNODEPTR(rootp);
       if (cmp < 0)
-	{
-	  rootp = LEFTPTR(p);
-	  root = LEFT(p);
-	}
+        {
+          rootp = LEFTPTR(p);
+          root = LEFT(p);
+        }
       else
-	{
-	  rootp = RIGHTPTR(p);
-	  root = RIGHT(p);
-	}
+        {
+          rootp = RIGHTPTR(p);
+          root = RIGHT(p);
+        }
       if (root == NULL)
-	return NULL;
+        return NULL;
     }
 
   /* This is bogus if the node to be deleted is the root... this routine
@@ -499,21 +499,21 @@ tdelete (const void *key, void **vrootp, __compar_fn_t compar)
       node *parentp = rootp, *up = RIGHTPTR(root);
       node upn;
       for (;;)
-	{
-	  if (sp == stacksize)
-	    {
-	      node **newstack;
-	      stacksize += 20;
-	      newstack = alloca (sizeof (node *) * stacksize);
-	      nodestack = memcpy (newstack, nodestack, sp * sizeof (node *));
-	    }
-	  nodestack[sp++] = parentp;
-	  parentp = up;
-	  upn = DEREFNODEPTR(up);
-	  if (LEFT(upn) == NULL)
-	    break;
-	  up = LEFTPTR(upn);
-	}
+        {
+          if (sp == stacksize)
+            {
+              node **newstack;
+              stacksize += 20;
+              newstack = alloca (sizeof (node *) * stacksize);
+              nodestack = memcpy (newstack, nodestack, sp * sizeof (node *));
+            }
+          nodestack[sp++] = parentp;
+          parentp = up;
+          upn = DEREFNODEPTR(up);
+          if (LEFT(upn) == NULL)
+            break;
+          up = LEFTPTR(upn);
+        }
       unchained = DEREFNODEPTR(up);
     }
 
@@ -528,9 +528,9 @@ tdelete (const void *key, void **vrootp, __compar_fn_t compar)
     {
       q = DEREFNODEPTR(nodestack[sp-1]);
       if (unchained == RIGHT(q))
-	SETRIGHT(q,r);
+        SETRIGHT(q,r);
       else
-	SETLEFT(q,r);
+        SETLEFT(q,r);
     }
 
   if (unchained != root)
@@ -538,168 +538,168 @@ tdelete (const void *key, void **vrootp, __compar_fn_t compar)
   if (!RED(unchained))
     {
       /* Now we lost a black edge, which means that the number of black
-	 edges on every path is no longer constant.  We must balance the
-	 tree.  */
+         edges on every path is no longer constant.  We must balance the
+         tree.  */
       /* NODESTACK now contains all parents of R.  R is likely to be NULL
-	 in the first iteration.  */
+         in the first iteration.  */
       /* NULL nodes are considered black throughout - this is necessary for
-	 correctness.  */
+         correctness.  */
       while (sp > 0 && (r == NULL || !RED(r)))
-	{
-	  node *pp = nodestack[sp - 1];
-	  p = DEREFNODEPTR(pp);
-	  /* Two symmetric cases.  */
-	  if (r == LEFT(p))
-	    {
-	      /* Q is R's brother, P is R's parent.  The subtree with root
-		 R has one black edge less than the subtree with root Q.  */
-	      q = RIGHT(p);
-	      if (RED(q))
-		{
-		  /* If Q is red, we know that P is black. We rotate P left
-		     so that Q becomes the top node in the tree, with P below
-		     it.  P is colored red, Q is colored black.
-		     This action does not change the black edge count for any
-		     leaf in the tree, but we will be able to recognize one
-		     of the following situations, which all require that Q
-		     is black.  */
-		  SETBLACK(q);
-		  SETRED(p);
-		  /* Left rotate p.  */
-		  SETRIGHT(p,LEFT(q));
-		  SETLEFT(q,p);
-		  SETNODEPTR(pp,q);
-		  /* Make sure pp is right if the case below tries to use
-		     it.  */
-		  nodestack[sp++] = pp = LEFTPTR(q);
-		  q = RIGHT(p);
-		}
-	      /* We know that Q can't be NULL here.  We also know that Q is
-		 black.  */
-	      if ((LEFT(q) == NULL || !RED(LEFT(q)))
-		  && (RIGHT(q) == NULL || !RED(RIGHT(q))))
-		{
-		  /* Q has two black successors.  We can simply color Q red.
-		     The whole subtree with root P is now missing one black
-		     edge.  Note that this action can temporarily make the
-		     tree invalid (if P is red).  But we will exit the loop
-		     in that case and set P black, which both makes the tree
-		     valid and also makes the black edge count come out
-		     right.  If P is black, we are at least one step closer
-		     to the root and we'll try again the next iteration.  */
-		  SETRED(q);
-		  r = p;
-		}
-	      else
-		{
-		  /* Q is black, one of Q's successors is red.  We can
-		     repair the tree with one operation and will exit the
-		     loop afterwards.  */
-		  if (RIGHT(q) == NULL || !RED(RIGHT(q)))
-		    {
-		      /* The left one is red.  We perform the same action as
-			 in maybe_split_for_insert where two red edges are
-			 adjacent but point in different directions:
-			 Q's left successor (let's call it Q2) becomes the
-			 top of the subtree we are looking at, its parent (Q)
-			 and grandparent (P) become its successors. The former
-			 successors of Q2 are placed below P and Q.
-			 P becomes black, and Q2 gets the color that P had.
-			 This changes the black edge count only for node R and
-			 its successors.  */
-		      node q2 = LEFT(q);
-		      if (RED(p))
-			SETRED(q2);
-		      else
-			SETBLACK(q2);
-		      SETRIGHT(p,LEFT(q2));
-		      SETLEFT(q,RIGHT(q2));
-		      SETRIGHT(q2,q);
-		      SETLEFT(q2,p);
-		      SETNODEPTR(pp,q2);
-		      SETBLACK(p);
-		    }
-		  else
-		    {
-		      /* It's the right one.  Rotate P left. P becomes black,
-			 and Q gets the color that P had.  Q's right successor
-			 also becomes black.  This changes the black edge
-			 count only for node R and its successors.  */
-		      if (RED(p))
-			SETRED(q);
-		      else
-			SETBLACK(q);
-		      SETBLACK(p);
+        {
+          node *pp = nodestack[sp - 1];
+          p = DEREFNODEPTR(pp);
+          /* Two symmetric cases.  */
+          if (r == LEFT(p))
+            {
+              /* Q is R's brother, P is R's parent.  The subtree with root
+                 R has one black edge less than the subtree with root Q.  */
+              q = RIGHT(p);
+              if (RED(q))
+                {
+                  /* If Q is red, we know that P is black. We rotate P left
+                     so that Q becomes the top node in the tree, with P below
+                     it.  P is colored red, Q is colored black.
+                     This action does not change the black edge count for any
+                     leaf in the tree, but we will be able to recognize one
+                     of the following situations, which all require that Q
+                     is black.  */
+                  SETBLACK(q);
+                  SETRED(p);
+                  /* Left rotate p.  */
+                  SETRIGHT(p,LEFT(q));
+                  SETLEFT(q,p);
+                  SETNODEPTR(pp,q);
+                  /* Make sure pp is right if the case below tries to use
+                     it.  */
+                  nodestack[sp++] = pp = LEFTPTR(q);
+                  q = RIGHT(p);
+                }
+              /* We know that Q can't be NULL here.  We also know that Q is
+                 black.  */
+              if ((LEFT(q) == NULL || !RED(LEFT(q)))
+                  && (RIGHT(q) == NULL || !RED(RIGHT(q))))
+                {
+                  /* Q has two black successors.  We can simply color Q red.
+                     The whole subtree with root P is now missing one black
+                     edge.  Note that this action can temporarily make the
+                     tree invalid (if P is red).  But we will exit the loop
+                     in that case and set P black, which both makes the tree
+                     valid and also makes the black edge count come out
+                     right.  If P is black, we are at least one step closer
+                     to the root and we'll try again the next iteration.  */
+                  SETRED(q);
+                  r = p;
+                }
+              else
+                {
+                  /* Q is black, one of Q's successors is red.  We can
+                     repair the tree with one operation and will exit the
+                     loop afterwards.  */
+                  if (RIGHT(q) == NULL || !RED(RIGHT(q)))
+                    {
+                      /* The left one is red.  We perform the same action as
+                         in maybe_split_for_insert where two red edges are
+                         adjacent but point in different directions:
+                         Q's left successor (let's call it Q2) becomes the
+                         top of the subtree we are looking at, its parent (Q)
+                         and grandparent (P) become its successors. The former
+                         successors of Q2 are placed below P and Q.
+                         P becomes black, and Q2 gets the color that P had.
+                         This changes the black edge count only for node R and
+                         its successors.  */
+                      node q2 = LEFT(q);
+                      if (RED(p))
+                        SETRED(q2);
+                      else
+                        SETBLACK(q2);
+                      SETRIGHT(p,LEFT(q2));
+                      SETLEFT(q,RIGHT(q2));
+                      SETRIGHT(q2,q);
+                      SETLEFT(q2,p);
+                      SETNODEPTR(pp,q2);
+                      SETBLACK(p);
+                    }
+                  else
+                    {
+                      /* It's the right one.  Rotate P left. P becomes black,
+                         and Q gets the color that P had.  Q's right successor
+                         also becomes black.  This changes the black edge
+                         count only for node R and its successors.  */
+                      if (RED(p))
+                        SETRED(q);
+                      else
+                        SETBLACK(q);
+                      SETBLACK(p);
 
-		      SETBLACK(RIGHT(q));
+                      SETBLACK(RIGHT(q));
 
-		      /* left rotate p */
-		      SETRIGHT(p,LEFT(q));
-		      SETLEFT(q,p);
-		      SETNODEPTR(pp,q);
-		    }
+                      /* left rotate p */
+                      SETRIGHT(p,LEFT(q));
+                      SETLEFT(q,p);
+                      SETNODEPTR(pp,q);
+                    }
 
-		  /* We're done.  */
-		  sp = 1;
-		  r = NULL;
-		}
-	    }
-	  else
-	    {
-	      /* Comments: see above.  */
-	      q = LEFT(p);
-	      if (RED(q))
-		{
-		  SETBLACK(q);
-		  SETRED(p);
-		  SETLEFT(p,RIGHT(q));
-		  SETRIGHT(q,p);
-		  SETNODEPTR(pp,q);
-		  nodestack[sp++] = pp = RIGHTPTR(q);
-		  q = LEFT(p);
-		}
-	      if ((RIGHT(q) == NULL || !RED(RIGHT(q)))
-		  && (LEFT(q) == NULL || !RED(LEFT(q))))
-		{
-		  SETRED(q);
-		  r = p;
-		}
-	      else
-		{
-		  if (LEFT(q) == NULL || !RED(LEFT(q)))
-		    {
-		      node q2 = RIGHT(q);
-		      if (RED(p))
-			SETRED(q2);
-		      else
-			SETBLACK(q2);
-		      SETLEFT(p,RIGHT(q2));
-		      SETRIGHT(q,LEFT(q2));
-		      SETLEFT(q2,q);
-		      SETRIGHT(q2,p);
-		      SETNODEPTR(pp,q2);
-		      SETBLACK(p);
-		    }
-		  else
-		    {
-		      if (RED(p))
-			SETRED(q);
-		      else
-			SETBLACK(q);
-		      SETBLACK(p);
-		      SETBLACK(LEFT(q));
-		      SETLEFT(p,RIGHT(q));
-		      SETRIGHT(q,p);
-		      SETNODEPTR(pp,q);
-		    }
-		  sp = 1;
-		  r = NULL;
-		}
-	    }
-	  --sp;
-	}
+                  /* We're done.  */
+                  sp = 1;
+                  r = NULL;
+                }
+            }
+          else
+            {
+              /* Comments: see above.  */
+              q = LEFT(p);
+              if (RED(q))
+                {
+                  SETBLACK(q);
+                  SETRED(p);
+                  SETLEFT(p,RIGHT(q));
+                  SETRIGHT(q,p);
+                  SETNODEPTR(pp,q);
+                  nodestack[sp++] = pp = RIGHTPTR(q);
+                  q = LEFT(p);
+                }
+              if ((RIGHT(q) == NULL || !RED(RIGHT(q)))
+                  && (LEFT(q) == NULL || !RED(LEFT(q))))
+                {
+                  SETRED(q);
+                  r = p;
+                }
+              else
+                {
+                  if (LEFT(q) == NULL || !RED(LEFT(q)))
+                    {
+                      node q2 = RIGHT(q);
+                      if (RED(p))
+                        SETRED(q2);
+                      else
+                        SETBLACK(q2);
+                      SETLEFT(p,RIGHT(q2));
+                      SETRIGHT(q,LEFT(q2));
+                      SETLEFT(q2,q);
+                      SETRIGHT(q2,p);
+                      SETNODEPTR(pp,q2);
+                      SETBLACK(p);
+                    }
+                  else
+                    {
+                      if (RED(p))
+                        SETRED(q);
+                      else
+                        SETBLACK(q);
+                      SETBLACK(p);
+                      SETBLACK(LEFT(q));
+                      SETLEFT(p,RIGHT(q));
+                      SETRIGHT(q,p);
+                      SETNODEPTR(pp,q);
+                    }
+                  sp = 1;
+                  r = NULL;
+                }
+            }
+          --sp;
+        }
       if (r != NULL)
-	SETBLACK(r);
+        SETBLACK(r);
     }
 
   free (unchained);
@@ -721,10 +721,10 @@ trecurse (const void *vroot, __action_fn_t action, int level)
     {
       (*action) (root, preorder, level);
       if (LEFT(root) != NULL)
-	trecurse (LEFT(root), action, level + 1);
+        trecurse (LEFT(root), action, level + 1);
       (*action) (root, postorder, level);
       if (RIGHT(root) != NULL)
-	trecurse (RIGHT(root), action, level + 1);
+        trecurse (RIGHT(root), action, level + 1);
       (*action) (root, endorder, level);
     }
 }

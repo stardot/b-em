@@ -8,28 +8,28 @@
 FILE *
 x_fopen(const char *path, const char *mode)
 {
-	/* Check to see if the path exists.  If it does, return the resultant
-	 * FILE * pointer, otherwise bail out.
-	 */
+        /* Check to see if the path exists.  If it does, return the resultant
+         * FILE * pointer, otherwise bail out.
+         */
 
-	FILE	*fp = NULL;
-	char	*err;
+        FILE    *fp = NULL;
+        char    *err;
 
-	if (path == NULL || path[0] == '\0')
-		return (NULL);
+        if (path == NULL || path[0] == '\0')
+                return (NULL);
 
-	if ((fp = fopen(path, mode)) == NULL) {
-		if ((asprintf(&err, "Failed to load '%s' - %s\n", path,
-			strerror(errno))) == -1) {
+        if ((fp = fopen(path, mode)) == NULL) {
+                if ((asprintf(&err, "Failed to load '%s' - %s\n", path,
+                        strerror(errno))) == -1) {
 
-			exit(-1);
-		}
-		log_error(err);
-		free(err);
-		exit(-1);
-	}
+                        exit(-1);
+                }
+                log_error(err);
+                free(err);
+                exit(-1);
+        }
 
-	return (fp);
+        return (fp);
 }
 
 #ifndef HAVE_ASPRINTF
@@ -42,44 +42,44 @@ x_fopen(const char *path, const char *mode)
 int
 vasprintf(char **ret, const char *fmt, va_list ap)
 {
-	int	 n;
-	va_list  ap2;
+        int      n;
+        va_list  ap2;
 
-	va_copy(ap2, ap);
+        va_copy(ap2, ap);
 
-	if ((n = vsnprintf(NULL, 0, fmt, ap)) < 0)
-		goto error;
+        if ((n = vsnprintf(NULL, 0, fmt, ap)) < 0)
+                goto error;
 
-	if ((*ret = malloc(n + 1)) == NULL) {
-		fprintf(stderr, "malloc failed: %s\n", strerror(errno));
-		exit(1);
-	}
+        if ((*ret = malloc(n + 1)) == NULL) {
+                fprintf(stderr, "malloc failed: %s\n", strerror(errno));
+                exit(1);
+        }
 
-	if ((n = vsnprintf(*ret, n + 1, fmt, ap2)) < 0) {
-		free(*ret);
-		goto error;
-	}
-	va_end(ap2);
+        if ((n = vsnprintf(*ret, n + 1, fmt, ap2)) < 0) {
+                free(*ret);
+                goto error;
+        }
+        va_end(ap2);
 
-	return (n);
+        return (n);
 
 error:
-	va_end(ap2);
-	*ret = NULL;
-	return (-1);
+        va_end(ap2);
+        *ret = NULL;
+        return (-1);
 }
 
 int
 asprintf(char **ret, const char *fmt, ...)
 {
-	va_list	ap;
-	int	n;
+        va_list ap;
+        int     n;
 
-	va_start(ap, fmt);
-	n = vasprintf(ret, fmt, ap);
-	va_end(ap);
+        va_start(ap, fmt);
+        n = vasprintf(ret, fmt, ap);
+        va_end(ap);
 
-	return (n);
+        return (n);
 }
 
 #endif
@@ -90,7 +90,7 @@ char *stpcpy(char *dest, const char *src)
     int c;
 
     while ((c = *src++))
-	*dest++ = c;
+        *dest++ = c;
     *dest = 0;
     return dest;
 }

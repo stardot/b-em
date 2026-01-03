@@ -1,8 +1,8 @@
 # configure.ac for B-em
 
 AC_INIT([B-em],
-	m4_esyscmd_s([utils/b-em-version-str.sh]),
-	[thomas@xteddy.org])
+        m4_esyscmd_s([utils/b-em-version-str.sh]),
+        [thomas@xteddy.org])
 
 AC_CONFIG_AUX_DIR(etc)
 AM_INIT_AUTOMAKE([-Wall -Werror foreign subdir-objects])
@@ -21,7 +21,7 @@ ISRELEASED="no"
 
 AC_MSG_CHECKING([whether to enable debugging])
 AC_ARG_ENABLE(debug,
-	      AC_HELP_STRING([--enable-debug], [build debug executable]))
+              AC_HELP_STRING([--enable-debug], [build debug executable]))
 
 CF_WARNINGS="-Wall -Wno-format-security"
 CFLAGS="$CFLAGS $CF_WARNINGS -std=gnu11 -D_GNU_SOURCE"
@@ -49,7 +49,7 @@ AC_CHECK_LIB([z], [gzopen])
 # Checks for header files.
 AC_CHECK_HEADERS([inttypes.h limits.h malloc.h stddef.h stdint.h stdlib.h string.h unistd.h])
 AC_CHECK_HEADER([allegro5/allegro.h],[],
-	[AC_MSG_FAILURE([The Allegro version 5 library is needed but not installed], 1)],[])
+        [AC_MSG_FAILURE([The Allegro version 5 library is needed but not installed], 1)],[])
 
 AM_CONDITIONAL(OS_WIN, test "$host_os" = "win")
 
@@ -81,7 +81,7 @@ AC_CHECK_FUNCS([asprintf atexit floor memset mkdir pow rmdir sqrt stpcpy strcase
 # Check tsearch for tdestroy and include that for non-GNU systems.
 AC_CHECK_FUNC(tdestroy, found_tdestroy=yes, found_tdestroy=no)
 if test "x$found_tdestroy" = xyes; then
-	AC_DEFINE(HAVE_TDESTROY)
+        AC_DEFINE(HAVE_TDESTROY)
 fi
 
 AM_CONDITIONAL(NO_TSEARCH, [test x"$found_tdestroy" = xno ])

@@ -55,9 +55,9 @@
   <style
      type="text/css"
      id="style3037">
-		rect { fill: #240202; stroke: none; }
-		circle, path { fill: #FFFFD6; stroke: none; }
-	</style>
+    rect { fill: #240202; stroke: none; }
+    circle, path { fill: #FFFFD6; stroke: none; }
+  </style>
   <rect
      width="570"
      height="570"

@@ -11,14 +11,14 @@
 
 #include "../tube.h"
 
-#ifdef VALIDATE			/* for running the validate suite */
-#define TUBE 48 * 1024 * 1024	/* write a char on the screen */
+#ifdef VALIDATE                 /* for running the validate suite */
+#define TUBE 48 * 1024 * 1024   /* write a char on the screen */
 #define ABORTS 1
 #endif
 
 /* #define ABORTS */
 
-#ifdef ABORTS			/* the memory system will abort */
+#ifdef ABORTS                   /* the memory system will abort */
 /* For the old test suite Abort between 32 Kbytes and 32 Mbytes
    For the new test suite Abort between 8 Mbytes and 26 Mbytes */
 /* #define LOWABORT 32 * 1024
@@ -362,9 +362,9 @@ ARMul_WriteByte (ARMul_State * state, ARMword address, ARMword data)
 
   if ((address & ~0x1f) == 0xF000000)
   {
-//		WriteLog("Write byte %02x (%c) to tube %08x, reg %d\n", value,
-//			((value & 127) > 31) && ((value & 127) != 127) ? value & 127 : '.',
-//			address, (address & 0x1c) >> 2);
+//              WriteLog("Write byte %02x (%c) to tube %08x, reg %d\n", value,
+//                      ((value & 127) > 31) && ((value & 127) != 127) ? value & 127 : '.',
+//                      address, (address & 0x1c) >> 2);
     tube_parasite_write((address & 0x1c) >> 2, data & 0xFF);
     //WriteTubeFromParasiteSide((address & 0x1c) >> 2, data & 0xFF);
   }

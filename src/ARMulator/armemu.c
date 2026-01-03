@@ -47,10 +47,10 @@ static unsigned MultiplyAdd64       (ARMul_State *, ARMword, int, int);
 static void     Handle_Load_Double  (ARMul_State *, ARMword);
 static void     Handle_Store_Double (ARMul_State *, ARMword);
 
-#define LUNSIGNED (0)		/* unsigned operation */
-#define LSIGNED   (1)		/* signed operation */
-#define LDEFAULT  (0)		/* default : do nothing */
-#define LSCC      (1)		/* set condition codes on result */
+#define LUNSIGNED (0)           /* unsigned operation */
+#define LSIGNED   (1)           /* signed operation */
+#define LDEFAULT  (0)           /* default : do nothing */
+#define LSCC      (1)           /* set condition codes on result */
 
 #ifdef NEED_UI_LOOP_HOOK
 /* How often to run the ui_loop update, when in use.  */
@@ -102,175 +102,175 @@ extern int stop_simulator;
 /* Load post decrement writeback.  */
 #define LHPOSTDOWN()                                    \
 {                                                       \
-    int done = 1;                                        	\
-    lhs = LHS;						\
-    temp = lhs - GetLS7RHS (state, instr);		\
+    int done = 1;                                               \
+    lhs = LHS;                                          \
+    temp = lhs - GetLS7RHS (state, instr);              \
     \
-    switch (AEBITS (5, 6))					\
-{                                  			\
+    switch (AEBITS (5, 6))                                      \
+{                                                       \
     case 1: /* H */                                     \
     if (LoadHalfWord (state, instr, lhs, LUNSIGNED))  \
-    LSBase = temp;        				\
-    break;                                           	\
+    LSBase = temp;                                      \
+    break;                                              \
     case 2: /* SB */                                    \
     if (LoadByte (state, instr, lhs, LSIGNED))        \
-    LSBase = temp;        				\
-    break;                                           	\
+    LSBase = temp;                                      \
+    break;                                              \
     case 3: /* SH */                                    \
     if (LoadHalfWord (state, instr, lhs, LSIGNED))    \
-    LSBase = temp;        				\
-    break;                                           	\
+    LSBase = temp;                                      \
+    break;                                              \
     case 0: /* SWP handled elsewhere.  */               \
     default:                                            \
-    done = 0;                                        	\
-    break;                                           	\
+    done = 0;                                           \
+    break;                                              \
 }                                                   \
     if (done)                                             \
-    break;                                            	\
+    break;                                              \
 }
 
 /* Load post increment writeback.  */
 #define LHPOSTUP()                                      \
 {                                                       \
-    int done = 1;                                        	\
-    lhs = LHS;                                           	\
-    temp = lhs + GetLS7RHS (state, instr);		\
+    int done = 1;                                               \
+    lhs = LHS;                                                  \
+    temp = lhs + GetLS7RHS (state, instr);              \
     \
-    switch (AEBITS (5, 6))					\
-{                                  			\
+    switch (AEBITS (5, 6))                                      \
+{                                                       \
     case 1: /* H */                                     \
     if (LoadHalfWord (state, instr, lhs, LUNSIGNED))  \
-    LSBase = temp;        				\
-    break;                                           	\
+    LSBase = temp;                                      \
+    break;                                              \
     case 2: /* SB */                                    \
     if (LoadByte (state, instr, lhs, LSIGNED))        \
-    LSBase = temp;        				\
-    break;                                           	\
+    LSBase = temp;                                      \
+    break;                                              \
     case 3: /* SH */                                    \
     if (LoadHalfWord (state, instr, lhs, LSIGNED))    \
-    LSBase = temp;        				\
-    break;                                           	\
+    LSBase = temp;                                      \
+    break;                                              \
     case 0: /* SWP handled elsewhere.  */               \
     default:                                            \
-    done = 0;                                        	\
-    break;                                           	\
+    done = 0;                                           \
+    break;                                              \
 }                                                   \
     if (done)                                             \
-    break;                                            	\
+    break;                                              \
 }
 
 /* Load pre decrement.  */
-#define LHPREDOWN()                                     	\
-{                                                       	\
-    int done = 1;                                        		\
+#define LHPREDOWN()                                             \
+{                                                               \
+    int done = 1;                                                       \
     \
-    temp = LHS - GetLS7RHS (state, instr);                 	\
-    switch (AEBITS (5, 6))						\
-{                                  				\
-    case 1: /* H */                                     	\
-    (void) LoadHalfWord (state, instr, temp, LUNSIGNED);  	\
-    break;                                           		\
-    case 2: /* SB */                                    	\
-    (void) LoadByte (state, instr, temp, LSIGNED);        	\
-    break;                                           		\
-    case 3: /* SH */                                    	\
-    (void) LoadHalfWord (state, instr, temp, LSIGNED);    	\
-    break;                                           		\
-    case 0:							\
-    /* SWP handled elsewhere.  */                 		\
-    default:                                            	\
-    done = 0;                                        		\
-    break;                                           		\
-}                                                   	\
-    if (done)                                             	\
-    break;                                            		\
+    temp = LHS - GetLS7RHS (state, instr);                      \
+    switch (AEBITS (5, 6))                                              \
+{                                                               \
+    case 1: /* H */                                             \
+    (void) LoadHalfWord (state, instr, temp, LUNSIGNED);        \
+    break;                                                      \
+    case 2: /* SB */                                            \
+    (void) LoadByte (state, instr, temp, LSIGNED);              \
+    break;                                                      \
+    case 3: /* SH */                                            \
+    (void) LoadHalfWord (state, instr, temp, LSIGNED);          \
+    break;                                                      \
+    case 0:                                                     \
+    /* SWP handled elsewhere.  */                               \
+    default:                                                    \
+    done = 0;                                                   \
+    break;                                                      \
+}                                                       \
+    if (done)                                                   \
+    break;                                                      \
 }
 
 /* Load pre decrement writeback.  */
-#define LHPREDOWNWB()                                   	\
-{                                                       	\
-    int done = 1;                                        		\
+#define LHPREDOWNWB()                                           \
+{                                                               \
+    int done = 1;                                                       \
     \
-    temp = LHS - GetLS7RHS (state, instr);                	\
-    switch (AEBITS (5, 6))						\
-{                                  				\
-    case 1: /* H */                                     	\
-    if (LoadHalfWord (state, instr, temp, LUNSIGNED))     	\
-    LSBase = temp;                                		\
-    break;                                           		\
-    case 2: /* SB */                                    	\
-    if (LoadByte (state, instr, temp, LSIGNED))           	\
-    LSBase = temp;                                		\
-    break;                                           		\
-    case 3: /* SH */                                    	\
-    if (LoadHalfWord (state, instr, temp, LSIGNED))       	\
-    LSBase = temp;                                		\
-    break;                                           		\
-    case 0:							\
-    /* SWP handled elsewhere.  */                 		\
-    default:                                            	\
-    done = 0;                                        		\
-    break;                                           		\
-}                                                   	\
-    if (done)                                             	\
-    break;                                            		\
+    temp = LHS - GetLS7RHS (state, instr);                      \
+    switch (AEBITS (5, 6))                                              \
+{                                                               \
+    case 1: /* H */                                             \
+    if (LoadHalfWord (state, instr, temp, LUNSIGNED))           \
+    LSBase = temp;                                              \
+    break;                                                      \
+    case 2: /* SB */                                            \
+    if (LoadByte (state, instr, temp, LSIGNED))                 \
+    LSBase = temp;                                              \
+    break;                                                      \
+    case 3: /* SH */                                            \
+    if (LoadHalfWord (state, instr, temp, LSIGNED))             \
+    LSBase = temp;                                              \
+    break;                                                      \
+    case 0:                                                     \
+    /* SWP handled elsewhere.  */                               \
+    default:                                                    \
+    done = 0;                                                   \
+    break;                                                      \
+}                                                       \
+    if (done)                                                   \
+    break;                                                      \
 }
 
 /* Load pre increment.  */
-#define LHPREUP()                                       	\
-{                                                       	\
-    int done = 1;                                        		\
+#define LHPREUP()                                               \
+{                                                               \
+    int done = 1;                                                       \
     \
-    temp = LHS + GetLS7RHS (state, instr);                 	\
-    switch (AEBITS (5, 6))						\
-{                                  				\
-    case 1: /* H */                                     	\
-    (void) LoadHalfWord (state, instr, temp, LUNSIGNED);  	\
-    break;                                           		\
-    case 2: /* SB */                                    	\
-    (void) LoadByte (state, instr, temp, LSIGNED);        	\
-    break;                                           		\
-    case 3: /* SH */                                    	\
-    (void) LoadHalfWord (state, instr, temp, LSIGNED);    	\
-    break;                                           		\
-    case 0:							\
-    /* SWP handled elsewhere.  */                 		\
-    default:                                            	\
-    done = 0;                                        		\
-    break;                                           		\
-}                                                   	\
-    if (done)                                             	\
-    break;                                            		\
+    temp = LHS + GetLS7RHS (state, instr);                      \
+    switch (AEBITS (5, 6))                                              \
+{                                                               \
+    case 1: /* H */                                             \
+    (void) LoadHalfWord (state, instr, temp, LUNSIGNED);        \
+    break;                                                      \
+    case 2: /* SB */                                            \
+    (void) LoadByte (state, instr, temp, LSIGNED);              \
+    break;                                                      \
+    case 3: /* SH */                                            \
+    (void) LoadHalfWord (state, instr, temp, LSIGNED);          \
+    break;                                                      \
+    case 0:                                                     \
+    /* SWP handled elsewhere.  */                               \
+    default:                                                    \
+    done = 0;                                                   \
+    break;                                                      \
+}                                                       \
+    if (done)                                                   \
+    break;                                                      \
 }
 
 /* Load pre increment writeback.  */
-#define LHPREUPWB()                                     	\
-{                                                       	\
-    int done = 1;                                        		\
+#define LHPREUPWB()                                             \
+{                                                               \
+    int done = 1;                                                       \
     \
-    temp = LHS + GetLS7RHS (state, instr);                	\
-    switch (AEBITS (5, 6))						\
-{                                  				\
-    case 1: /* H */                                     	\
-    if (LoadHalfWord (state, instr, temp, LUNSIGNED))     	\
-    LSBase = temp;                                		\
-    break;                                           		\
-    case 2: /* SB */                                    	\
-    if (LoadByte (state, instr, temp, LSIGNED))           	\
-    LSBase = temp;                                		\
-    break;                                           		\
-    case 3: /* SH */                                    	\
-    if (LoadHalfWord (state, instr, temp, LSIGNED))       	\
-    LSBase = temp;                                		\
-    break;                                           		\
-    case 0:							\
-    /* SWP handled elsewhere.  */                 		\
-    default:                                            	\
-    done = 0;                                        		\
-    break;                                           		\
-}                                                   	\
-    if (done)                                             	\
-    break;                                            		\
+    temp = LHS + GetLS7RHS (state, instr);                      \
+    switch (AEBITS (5, 6))                                              \
+{                                                               \
+    case 1: /* H */                                             \
+    if (LoadHalfWord (state, instr, temp, LUNSIGNED))           \
+    LSBase = temp;                                              \
+    break;                                                      \
+    case 2: /* SB */                                            \
+    if (LoadByte (state, instr, temp, LSIGNED))                 \
+    LSBase = temp;                                              \
+    break;                                                      \
+    case 3: /* SH */                                            \
+    if (LoadHalfWord (state, instr, temp, LSIGNED))             \
+    LSBase = temp;                                              \
+    break;                                                      \
+    case 0:                                                     \
+    /* SWP handled elsewhere.  */                               \
+    default:                                                    \
+    done = 0;                                                   \
+    break;                                                      \
+}                                                       \
+    if (done)                                                   \
+    break;                                                      \
 }
 
 /* Attempt to emulate an ARMv6 instruction.
@@ -491,13 +491,13 @@ ARMul_Emulate32 (ARMul_State * state)
 ARMul_Emulate26 (ARMul_State * state)
 #endif
 {
-    ARMword instr;	/* The current instruction.  */
-    ARMword dest = 0;	/* Almost the DestBus.  */
-    ARMword temp;		/* Ubiquitous third hand.  */
-    ARMword pc = 0;	/* The address of the current instruction.  */
-    ARMword lhs;		/* Almost the ABus and BBus.  */
+    ARMword instr;      /* The current instruction.  */
+    ARMword dest = 0;   /* Almost the DestBus.  */
+    ARMword temp;               /* Ubiquitous third hand.  */
+    ARMword pc = 0;     /* The address of the current instruction.  */
+    ARMword lhs;                /* Almost the ABus and BBus.  */
     ARMword rhs;
-    ARMword decoded = 0;	/* Instruction pipeline.  */
+    ARMword decoded = 0;        /* Instruction pipeline.  */
     ARMword loaded = 0;
 
     /* Execute the next instruction.  */
@@ -776,7 +776,7 @@ ARMul_Emulate26 (ARMul_State * state)
         case LE:
             temp = ((NFLAG && !VFLAG) || (!NFLAG && VFLAG)) || ZFLAG;
             break;
-        }			/* cc check */
+        }                       /* cc check */
 
         /* Handle the Clock counter here.  */
         if (state->is_XScale)
@@ -935,7 +935,7 @@ mainswitch:
             {
                 /* Data Processing Register RHS Instructions.  */
 
-            case 0x00:		/* AND reg and MUL */
+            case 0x00:          /* AND reg and MUL */
 #ifdef MODET
                 if (AEBITS (4, 11) == 0xB)
                 {
@@ -984,7 +984,7 @@ mainswitch:
                 }
                 break;
 
-            case 0x01:		/* ANDS reg and MULS */
+            case 0x01:          /* ANDS reg and MULS */
 #ifdef MODET
                 if ((AEBITS (4, 11) & 0xF9) == 0x9)
                     /* LDR register offset, no write-back, down, post indexed.  */
@@ -1028,7 +1028,7 @@ mainswitch:
                 }
                 break;
 
-            case 0x02:		/* EOR reg and MLA */
+            case 0x02:          /* EOR reg and MLA */
 #ifdef MODET
                 if (AEBITS (4, 11) == 0xB)
                 {
@@ -1038,7 +1038,7 @@ mainswitch:
                 }
 #endif
                 if (AEBITS (4, 7) == 9)
-                {		/* MLA */
+                {               /* MLA */
                     rhs = state->Reg[MULRHSReg];
                     if (MULLHSReg == MULDESTReg)
                     {
@@ -1066,7 +1066,7 @@ mainswitch:
                 }
                 break;
 
-            case 0x03:		/* EORS reg and MLAS */
+            case 0x03:          /* EORS reg and MLAS */
 #ifdef MODET
                 if ((AEBITS (4, 11) & 0xF9) == 0x9)
                     /* LDR register offset, write-back, down, post-indexed.  */
@@ -1111,7 +1111,7 @@ mainswitch:
                 }
                 break;
 
-            case 0x04:		/* SUB reg */
+            case 0x04:          /* SUB reg */
 #ifdef MODET
                 if (AEBITS (4, 7) == 0xB)
                 {
@@ -1135,7 +1135,7 @@ mainswitch:
                 WRITEDEST (dest);
                 break;
 
-            case 0x05:		/* SUBS reg */
+            case 0x05:          /* SUBS reg */
 #ifdef MODET
                 if ((AEBITS (4, 7) & 0x9) == 0x9)
                     /* LDR immediate offset, no write-back, down, post indexed.  */
@@ -1159,7 +1159,7 @@ mainswitch:
                 WRITESDEST (dest);
                 break;
 
-            case 0x06:		/* RSB reg */
+            case 0x06:          /* RSB reg */
 #ifdef MODET
                 if (AEBITS (4, 7) == 0xB)
                 {
@@ -1173,7 +1173,7 @@ mainswitch:
                 WRITEDEST (dest);
                 break;
 
-            case 0x07:		/* RSBS reg */
+            case 0x07:          /* RSBS reg */
 #ifdef MODET
                 if ((AEBITS (4, 7) & 0x9) == 0x9)
                     /* LDR immediate offset, write-back, down, post indexed.  */
@@ -1197,7 +1197,7 @@ mainswitch:
                 WRITESDEST (dest);
                 break;
 
-            case 0x08:		/* ADD reg */
+            case 0x08:          /* ADD reg */
 #ifdef MODET
                 if (AEBITS (4, 11) == 0xB)
                 {
@@ -1232,7 +1232,7 @@ mainswitch:
                 WRITEDEST (dest);
                 break;
 
-            case 0x09:		/* ADDS reg */
+            case 0x09:          /* ADDS reg */
 #ifdef MODET
                 if ((AEBITS (4, 11) & 0xF9) == 0x9)
                     /* LDR register offset, no write-back, up, post indexed.  */
@@ -1270,7 +1270,7 @@ mainswitch:
                 WRITESDEST (dest);
                 break;
 
-            case 0x0a:		/* ADC reg */
+            case 0x0a:          /* ADC reg */
 #ifdef MODET
                 if (AEBITS (4, 11) == 0xB)
                 {
@@ -1293,7 +1293,7 @@ mainswitch:
                 WRITEDEST (dest);
                 break;
 
-            case 0x0b:		/* ADCS reg */
+            case 0x0b:          /* ADCS reg */
 #ifdef MODET
                 if ((AEBITS (4, 11) & 0xF9) == 0x9)
                     /* LDR register offset, write-back, up, post indexed.  */
@@ -1329,7 +1329,7 @@ mainswitch:
                 WRITESDEST (dest);
                 break;
 
-            case 0x0c:		/* SBC reg */
+            case 0x0c:          /* SBC reg */
 #ifdef MODET
                 if (AEBITS (4, 7) == 0xB)
                 {
@@ -1362,7 +1362,7 @@ mainswitch:
                 WRITEDEST (dest);
                 break;
 
-            case 0x0d:		/* SBCS reg */
+            case 0x0d:          /* SBCS reg */
 #ifdef MODET
                 if ((AEBITS (4, 7) & 0x9) == 0x9)
                     /* LDR immediate offset, no write-back, up, post indexed.  */
@@ -1394,7 +1394,7 @@ mainswitch:
                 WRITESDEST (dest);
                 break;
 
-            case 0x0e:		/* RSC reg */
+            case 0x0e:          /* RSC reg */
 #ifdef MODET
                 if (AEBITS (4, 7) == 0xB)
                 {
@@ -1418,7 +1418,7 @@ mainswitch:
                 WRITEDEST (dest);
                 break;
 
-            case 0x0f:		/* RSCS reg */
+            case 0x0f:          /* RSCS reg */
 #ifdef MODET
                 if ((AEBITS (4, 7) & 0x9) == 0x9)
                     /* LDR immediate offset, write-back, up, post indexed.  */
@@ -1452,7 +1452,7 @@ mainswitch:
                 WRITESDEST (dest);
                 break;
 
-            case 0x10:		/* TST reg and MRS CPSR and SWP word.  */
+            case 0x10:          /* TST reg and MRS CPSR and SWP word.  */
                 if (state->is_v5e)
                 {
                     if (AEBIT (4) == 0 && AEBIT (7) == 1)
@@ -1537,7 +1537,7 @@ mainswitch:
                         TAKEABORT;
                 }
                 else if ((AEBITS (0, 11) == 0) && (LHSReg == 15))
-                {		/* MRS CPSR */
+                {               /* MRS CPSR */
                     UNDEF_MRSPC;
                     DEST = ECC | EINT | EMODE;
                 }
@@ -1547,7 +1547,7 @@ mainswitch:
                 }
                 break;
 
-            case 0x11:		/* TSTP reg */
+            case 0x11:          /* TSTP reg */
 #ifdef MODET
                 if ((AEBITS (4, 11) & 0xF9) == 0x9)
                     /* LDR register offset, no write-back, down, pre indexed.  */
@@ -1575,7 +1575,7 @@ mainswitch:
                 }
                 break;
 
-            case 0x12:		/* TEQ reg and MSR reg to CPSR (ARM6).  */
+            case 0x12:          /* TEQ reg and MSR reg to CPSR (ARM6).  */
                 if (state->is_v5)
                 {
                     if (AEBITS (4, 7) == 3)
@@ -1681,7 +1681,7 @@ mainswitch:
                         Thumb mode it does).  So intercept the instruction here
                         and generate a breakpoint SWI instead.  */
 #ifndef BEEBEM
-						extern int SWI_vector_installed;
+                                                extern int SWI_vector_installed;
 
                         if (! SWI_vector_installed)
                             ARMul_OSHandleSWI (state, SWI_Breakpoint);
@@ -1715,7 +1715,7 @@ mainswitch:
 
                 break;
 
-            case 0x13:		/* TEQP reg */
+            case 0x13:          /* TEQP reg */
 #ifdef MODET
                 if ((AEBITS (4, 11) & 0xF9) == 0x9)
                     /* LDR register offset, write-back, down, pre indexed.  */
@@ -1743,7 +1743,7 @@ mainswitch:
                 }
                 break;
 
-            case 0x14:		/* CMP reg and MRS SPSR and SWP byte.  */
+            case 0x14:          /* CMP reg and MRS SPSR and SWP byte.  */
                 if (state->is_v5e)
                 {
                     if (AEBIT (4) == 0 && AEBIT (7) == 1)
@@ -1845,7 +1845,7 @@ mainswitch:
 
                 break;
 
-            case 0x15:		/* CMPP reg.  */
+            case 0x15:          /* CMPP reg.  */
 #ifdef MODET
                 if ((AEBITS (4, 7) & 0x9) == 0x9)
                     /* LDR immediate offset, no write-back, down, pre indexed.  */
@@ -1884,7 +1884,7 @@ mainswitch:
                 }
                 break;
 
-            case 0x16:		/* CMN reg and MSR reg to SPSR */
+            case 0x16:          /* CMN reg and MSR reg to SPSR */
                 if (state->is_v5e)
                 {
                     if (AEBIT (4) == 0 && AEBIT (7) == 1 && AEBITS (12, 15) == 0)
@@ -1981,7 +1981,7 @@ mainswitch:
                 }
                 break;
 
-            case 0x17:		/* CMNP reg */
+            case 0x17:          /* CMNP reg */
 #ifdef MODET
                 if ((AEBITS (4, 7) & 0x9) == 0x9)
                     /* LDR immediate offset, write-back, down, pre indexed.  */
@@ -2023,7 +2023,7 @@ mainswitch:
                 }
                 break;
 
-            case 0x18:		/* ORR reg */
+            case 0x18:          /* ORR reg */
 #ifdef MODET
                 if (AEBITS (4, 11) == 0xB)
                 {
@@ -2047,7 +2047,7 @@ mainswitch:
                 WRITEDEST (dest);
                 break;
 
-            case 0x19:		/* ORRS reg */
+            case 0x19:          /* ORRS reg */
 #ifdef MODET
                 if ((AEBITS (4, 11) & 0xF9) == 0x9)
                     /* LDR register offset, no write-back, up, pre indexed.  */
@@ -2059,7 +2059,7 @@ mainswitch:
                 WRITESDEST (dest);
                 break;
 
-            case 0x1a:		/* MOV reg */
+            case 0x1a:          /* MOV reg */
 #ifdef MODET
                 if (AEBITS (4, 11) == 0xB)
                 {
@@ -2082,7 +2082,7 @@ mainswitch:
                 WRITEDEST (dest);
                 break;
 
-            case 0x1b:		/* MOVS reg */
+            case 0x1b:          /* MOVS reg */
 #ifdef MODET
                 if ((AEBITS (4, 11) & 0xF9) == 0x9)
                     /* LDR register offset, write-back, up, pre indexed.  */
@@ -2093,7 +2093,7 @@ mainswitch:
                 WRITESDEST (dest);
                 break;
 
-            case 0x1c:		/* BIC reg */
+            case 0x1c:          /* BIC reg */
 #ifdef MODET
                 if (AEBITS (4, 7) == 0xB)
                 {
@@ -2117,7 +2117,7 @@ mainswitch:
                 WRITEDEST (dest);
                 break;
 
-            case 0x1d:		/* BICS reg */
+            case 0x1d:          /* BICS reg */
 #ifdef MODET
                 if ((AEBITS (4, 7) & 0x9) == 0x9)
                     /* LDR immediate offset, no write-back, up, pre indexed.  */
@@ -2129,7 +2129,7 @@ mainswitch:
                 WRITESDEST (dest);
                 break;
 
-            case 0x1e:		/* MVN reg */
+            case 0x1e:          /* MVN reg */
 #ifdef MODET
                 if (AEBITS (4, 7) == 0xB)
                 {
@@ -2152,7 +2152,7 @@ mainswitch:
                 WRITEDEST (dest);
                 break;
 
-            case 0x1f:		/* MVNS reg */
+            case 0x1f:          /* MVNS reg */
 #ifdef MODET
                 if ((AEBITS (4, 7) & 0x9) == 0x9)
                     /* LDR immediate offset, write-back, up, pre indexed.  */
@@ -2166,34 +2166,34 @@ mainswitch:
 
                 /* Data Processing Immediate RHS Instructions.  */
 
-            case 0x20:		/* AND immed */
+            case 0x20:          /* AND immed */
                 dest = LHS & DPImmRHS;
                 WRITEDEST (dest);
                 break;
 
-            case 0x21:		/* ANDS immed */
+            case 0x21:          /* ANDS immed */
                 DPSImmRHS;
                 dest = LHS & rhs;
                 WRITESDEST (dest);
                 break;
 
-            case 0x22:		/* EOR immed */
+            case 0x22:          /* EOR immed */
                 dest = LHS ^ DPImmRHS;
                 WRITEDEST (dest);
                 break;
 
-            case 0x23:		/* EORS immed */
+            case 0x23:          /* EORS immed */
                 DPSImmRHS;
                 dest = LHS ^ rhs;
                 WRITESDEST (dest);
                 break;
 
-            case 0x24:		/* SUB immed */
+            case 0x24:          /* SUB immed */
                 dest = LHS - DPImmRHS;
                 WRITEDEST (dest);
                 break;
 
-            case 0x25:		/* SUBS immed */
+            case 0x25:          /* SUBS immed */
                 lhs = LHS;
                 rhs = DPImmRHS;
                 dest = lhs - rhs;
@@ -2211,12 +2211,12 @@ mainswitch:
                 WRITESDEST (dest);
                 break;
 
-            case 0x26:		/* RSB immed */
+            case 0x26:          /* RSB immed */
                 dest = DPImmRHS - LHS;
                 WRITEDEST (dest);
                 break;
 
-            case 0x27:		/* RSBS immed */
+            case 0x27:          /* RSBS immed */
                 lhs = LHS;
                 rhs = DPImmRHS;
                 dest = rhs - lhs;
@@ -2234,12 +2234,12 @@ mainswitch:
                 WRITESDEST (dest);
                 break;
 
-            case 0x28:		/* ADD immed */
+            case 0x28:          /* ADD immed */
                 dest = LHS + DPImmRHS;
                 WRITEDEST (dest);
                 break;
 
-            case 0x29:		/* ADDS immed */
+            case 0x29:          /* ADDS immed */
                 lhs = LHS;
                 rhs = DPImmRHS;
                 dest = lhs + rhs;
@@ -2261,12 +2261,12 @@ mainswitch:
                 WRITESDEST (dest);
                 break;
 
-            case 0x2a:		/* ADC immed */
+            case 0x2a:          /* ADC immed */
                 dest = LHS + DPImmRHS + CFLAG;
                 WRITEDEST (dest);
                 break;
 
-            case 0x2b:		/* ADCS immed */
+            case 0x2b:          /* ADCS immed */
                 lhs = LHS;
                 rhs = DPImmRHS;
                 dest = lhs + rhs + CFLAG;
@@ -2287,12 +2287,12 @@ mainswitch:
                 WRITESDEST (dest);
                 break;
 
-            case 0x2c:		/* SBC immed */
+            case 0x2c:          /* SBC immed */
                 dest = LHS - DPImmRHS - !CFLAG;
                 WRITEDEST (dest);
                 break;
 
-            case 0x2d:		/* SBCS immed */
+            case 0x2d:          /* SBCS immed */
                 lhs = LHS;
                 rhs = DPImmRHS;
                 dest = lhs - rhs - !CFLAG;
@@ -2309,12 +2309,12 @@ mainswitch:
                 WRITESDEST (dest);
                 break;
 
-            case 0x2e:		/* RSC immed */
+            case 0x2e:          /* RSC immed */
                 dest = DPImmRHS - LHS - !CFLAG;
                 WRITEDEST (dest);
                 break;
 
-            case 0x2f:		/* RSCS immed */
+            case 0x2f:          /* RSCS immed */
                 lhs = LHS;
                 rhs = DPImmRHS;
                 dest = rhs - lhs - !CFLAG;
@@ -2331,11 +2331,11 @@ mainswitch:
                 WRITESDEST (dest);
                 break;
 
-            case 0x30:		/* TST immed */
+            case 0x30:          /* TST immed */
                 UNDEF_Test;
                 break;
 
-            case 0x31:		/* TSTP immed */
+            case 0x31:          /* TSTP immed */
                 if (DESTReg == 15)
                 {
                     /* TSTP immed.  */
@@ -2356,7 +2356,7 @@ mainswitch:
                 }
                 break;
 
-            case 0x32:		/* TEQ immed and MSR immed to CPSR */
+            case 0x32:          /* TEQ immed and MSR immed to CPSR */
                 if (DESTReg == 15)
                     /* MSR immed to CPSR.  */
                     ARMul_FixCPSR (state, instr, DPImmRHS);
@@ -2364,7 +2364,7 @@ mainswitch:
                     UNDEF_Test;
                 break;
 
-            case 0x33:		/* TEQP immed */
+            case 0x33:          /* TEQP immed */
                 if (DESTReg == 15)
                 {
                     /* TEQP immed.  */
@@ -2378,17 +2378,17 @@ mainswitch:
                 }
                 else
                 {
-                    DPSImmRHS;	/* TEQ immed */
+                    DPSImmRHS;  /* TEQ immed */
                     dest = LHS ^ rhs;
                     ARMul_NegZero (state, dest);
                 }
                 break;
 
-            case 0x34:		/* CMP immed */
+            case 0x34:          /* CMP immed */
                 UNDEF_Test;
                 break;
 
-            case 0x35:		/* CMPP immed */
+            case 0x35:          /* CMPP immed */
                 if (DESTReg == 15)
                 {
                     /* CMPP immed.  */
@@ -2422,14 +2422,14 @@ mainswitch:
                 }
                 break;
 
-            case 0x36:		/* CMN immed and MSR immed to SPSR */
+            case 0x36:          /* CMN immed and MSR immed to SPSR */
                 if (DESTReg == 15)
                     ARMul_FixSPSR (state, instr, DPImmRHS);
                 else
                     UNDEF_Test;
                 break;
 
-            case 0x37:		/* CMNP immed.  */
+            case 0x37:          /* CMNP immed.  */
                 if (DESTReg == 15)
                 {
                     /* CMNP immed.  */
@@ -2465,44 +2465,44 @@ mainswitch:
                 }
                 break;
 
-            case 0x38:		/* ORR immed.  */
+            case 0x38:          /* ORR immed.  */
                 dest = LHS | DPImmRHS;
                 WRITEDEST (dest);
                 break;
 
-            case 0x39:		/* ORRS immed.  */
+            case 0x39:          /* ORRS immed.  */
                 DPSImmRHS;
                 dest = LHS | rhs;
                 WRITESDEST (dest);
                 break;
 
-            case 0x3a:		/* MOV immed.  */
+            case 0x3a:          /* MOV immed.  */
                 dest = DPImmRHS;
                 WRITEDEST (dest);
                 break;
 
-            case 0x3b:		/* MOVS immed.  */
+            case 0x3b:          /* MOVS immed.  */
                 DPSImmRHS;
                 WRITESDEST (rhs);
                 break;
 
-            case 0x3c:		/* BIC immed.  */
+            case 0x3c:          /* BIC immed.  */
                 dest = LHS & ~DPImmRHS;
                 WRITEDEST (dest);
                 break;
 
-            case 0x3d:		/* BICS immed.  */
+            case 0x3d:          /* BICS immed.  */
                 DPSImmRHS;
                 dest = LHS & ~rhs;
                 WRITESDEST (dest);
                 break;
 
-            case 0x3e:		/* MVN immed.  */
+            case 0x3e:          /* MVN immed.  */
                 dest = ~DPImmRHS;
                 WRITEDEST (dest);
                 break;
 
-            case 0x3f:		/* MVNS immed.  */
+            case 0x3f:          /* MVNS immed.  */
                 DPSImmRHS;
                 WRITESDEST (~rhs);
                 break;
@@ -2510,19 +2510,19 @@ mainswitch:
 
                 /* Single Data Transfer Immediate RHS Instructions.  */
 
-            case 0x40:		/* Store Word, No WriteBack, Post Dec, Immed.  */
+            case 0x40:          /* Store Word, No WriteBack, Post Dec, Immed.  */
                 lhs = LHS;
                 if (StoreWord (state, instr, lhs))
                     LSBase = lhs - LSImmRHS;
                 break;
 
-            case 0x41:		/* Load Word, No WriteBack, Post Dec, Immed.  */
+            case 0x41:          /* Load Word, No WriteBack, Post Dec, Immed.  */
                 lhs = LHS;
                 if (LoadWord (state, instr, lhs))
                     LSBase = lhs - LSImmRHS;
                 break;
 
-            case 0x42:		/* Store Word, WriteBack, Post Dec, Immed.  */
+            case 0x42:          /* Store Word, WriteBack, Post Dec, Immed.  */
                 UNDEF_LSRBaseEQDestWb;
                 UNDEF_LSRPCBaseWb;
                 lhs = LHS;
@@ -2533,7 +2533,7 @@ mainswitch:
                 state->NtransSig = (state->Mode & 3) ? HIGH : LOW;
                 break;
 
-            case 0x43:		/* Load Word, WriteBack, Post Dec, Immed.  */
+            case 0x43:          /* Load Word, WriteBack, Post Dec, Immed.  */
                 UNDEF_LSRBaseEQDestWb;
                 UNDEF_LSRPCBaseWb;
                 lhs = LHS;
@@ -2543,19 +2543,19 @@ mainswitch:
                 state->NtransSig = (state->Mode & 3) ? HIGH : LOW;
                 break;
 
-            case 0x44:		/* Store Byte, No WriteBack, Post Dec, Immed.  */
+            case 0x44:          /* Store Byte, No WriteBack, Post Dec, Immed.  */
                 lhs = LHS;
                 if (StoreByte (state, instr, lhs))
                     LSBase = lhs - LSImmRHS;
                 break;
 
-            case 0x45:		/* Load Byte, No WriteBack, Post Dec, Immed.  */
+            case 0x45:          /* Load Byte, No WriteBack, Post Dec, Immed.  */
                 lhs = LHS;
                 if (LoadByte (state, instr, lhs, LUNSIGNED))
                     LSBase = lhs - LSImmRHS;
                 break;
 
-            case 0x46:		/* Store Byte, WriteBack, Post Dec, Immed.  */
+            case 0x46:          /* Store Byte, WriteBack, Post Dec, Immed.  */
                 UNDEF_LSRBaseEQDestWb;
                 UNDEF_LSRPCBaseWb;
                 lhs = LHS;
@@ -2565,7 +2565,7 @@ mainswitch:
                 state->NtransSig = (state->Mode & 3) ? HIGH : LOW;
                 break;
 
-            case 0x47:		/* Load Byte, WriteBack, Post Dec, Immed.  */
+            case 0x47:          /* Load Byte, WriteBack, Post Dec, Immed.  */
                 UNDEF_LSRBaseEQDestWb;
                 UNDEF_LSRPCBaseWb;
                 lhs = LHS;
@@ -2575,19 +2575,19 @@ mainswitch:
                 state->NtransSig = (state->Mode & 3) ? HIGH : LOW;
                 break;
 
-            case 0x48:		/* Store Word, No WriteBack, Post Inc, Immed.  */
+            case 0x48:          /* Store Word, No WriteBack, Post Inc, Immed.  */
                 lhs = LHS;
                 if (StoreWord (state, instr, lhs))
                     LSBase = lhs + LSImmRHS;
                 break;
 
-            case 0x49:		/* Load Word, No WriteBack, Post Inc, Immed.  */
+            case 0x49:          /* Load Word, No WriteBack, Post Inc, Immed.  */
                 lhs = LHS;
                 if (LoadWord (state, instr, lhs))
                     LSBase = lhs + LSImmRHS;
                 break;
 
-            case 0x4a:		/* Store Word, WriteBack, Post Inc, Immed.  */
+            case 0x4a:          /* Store Word, WriteBack, Post Inc, Immed.  */
                 UNDEF_LSRBaseEQDestWb;
                 UNDEF_LSRPCBaseWb;
                 lhs = LHS;
@@ -2597,7 +2597,7 @@ mainswitch:
                 state->NtransSig = (state->Mode & 3) ? HIGH : LOW;
                 break;
 
-            case 0x4b:		/* Load Word, WriteBack, Post Inc, Immed.  */
+            case 0x4b:          /* Load Word, WriteBack, Post Inc, Immed.  */
                 UNDEF_LSRBaseEQDestWb;
                 UNDEF_LSRPCBaseWb;
                 lhs = LHS;
@@ -2607,19 +2607,19 @@ mainswitch:
                 state->NtransSig = (state->Mode & 3) ? HIGH : LOW;
                 break;
 
-            case 0x4c:		/* Store Byte, No WriteBack, Post Inc, Immed.  */
+            case 0x4c:          /* Store Byte, No WriteBack, Post Inc, Immed.  */
                 lhs = LHS;
                 if (StoreByte (state, instr, lhs))
                     LSBase = lhs + LSImmRHS;
                 break;
 
-            case 0x4d:		/* Load Byte, No WriteBack, Post Inc, Immed.  */
+            case 0x4d:          /* Load Byte, No WriteBack, Post Inc, Immed.  */
                 lhs = LHS;
                 if (LoadByte (state, instr, lhs, LUNSIGNED))
                     LSBase = lhs + LSImmRHS;
                 break;
 
-            case 0x4e:		/* Store Byte, WriteBack, Post Inc, Immed.  */
+            case 0x4e:          /* Store Byte, WriteBack, Post Inc, Immed.  */
                 UNDEF_LSRBaseEQDestWb;
                 UNDEF_LSRPCBaseWb;
                 lhs = LHS;
@@ -2629,7 +2629,7 @@ mainswitch:
                 state->NtransSig = (state->Mode & 3) ? HIGH : LOW;
                 break;
 
-            case 0x4f:		/* Load Byte, WriteBack, Post Inc, Immed.  */
+            case 0x4f:          /* Load Byte, WriteBack, Post Inc, Immed.  */
                 UNDEF_LSRBaseEQDestWb;
                 UNDEF_LSRPCBaseWb;
                 lhs = LHS;
@@ -2640,15 +2640,15 @@ mainswitch:
                 break;
 
 
-            case 0x50:		/* Store Word, No WriteBack, Pre Dec, Immed.  */
+            case 0x50:          /* Store Word, No WriteBack, Pre Dec, Immed.  */
                 (void) StoreWord (state, instr, LHS - LSImmRHS);
                 break;
 
-            case 0x51:		/* Load Word, No WriteBack, Pre Dec, Immed.  */
+            case 0x51:          /* Load Word, No WriteBack, Pre Dec, Immed.  */
                 (void) LoadWord (state, instr, LHS - LSImmRHS);
                 break;
 
-            case 0x52:		/* Store Word, WriteBack, Pre Dec, Immed.  */
+            case 0x52:          /* Store Word, WriteBack, Pre Dec, Immed.  */
                 UNDEF_LSRBaseEQDestWb;
                 UNDEF_LSRPCBaseWb;
                 temp = LHS - LSImmRHS;
@@ -2656,7 +2656,7 @@ mainswitch:
                     LSBase = temp;
                 break;
 
-            case 0x53:		/* Load Word, WriteBack, Pre Dec, Immed.  */
+            case 0x53:          /* Load Word, WriteBack, Pre Dec, Immed.  */
                 UNDEF_LSRBaseEQDestWb;
                 UNDEF_LSRPCBaseWb;
                 temp = LHS - LSImmRHS;
@@ -2664,15 +2664,15 @@ mainswitch:
                     LSBase = temp;
                 break;
 
-            case 0x54:		/* Store Byte, No WriteBack, Pre Dec, Immed.  */
+            case 0x54:          /* Store Byte, No WriteBack, Pre Dec, Immed.  */
                 (void) StoreByte (state, instr, LHS - LSImmRHS);
                 break;
 
-            case 0x55:		/* Load Byte, No WriteBack, Pre Dec, Immed.  */
+            case 0x55:          /* Load Byte, No WriteBack, Pre Dec, Immed.  */
                 (void) LoadByte (state, instr, LHS - LSImmRHS, LUNSIGNED);
                 break;
 
-            case 0x56:		/* Store Byte, WriteBack, Pre Dec, Immed.  */
+            case 0x56:          /* Store Byte, WriteBack, Pre Dec, Immed.  */
                 UNDEF_LSRBaseEQDestWb;
                 UNDEF_LSRPCBaseWb;
                 temp = LHS - LSImmRHS;
@@ -2680,7 +2680,7 @@ mainswitch:
                     LSBase = temp;
                 break;
 
-            case 0x57:		/* Load Byte, WriteBack, Pre Dec, Immed.  */
+            case 0x57:          /* Load Byte, WriteBack, Pre Dec, Immed.  */
                 UNDEF_LSRBaseEQDestWb;
                 UNDEF_LSRPCBaseWb;
                 temp = LHS - LSImmRHS;
@@ -2688,15 +2688,15 @@ mainswitch:
                     LSBase = temp;
                 break;
 
-            case 0x58:		/* Store Word, No WriteBack, Pre Inc, Immed.  */
+            case 0x58:          /* Store Word, No WriteBack, Pre Inc, Immed.  */
                 (void) StoreWord (state, instr, LHS + LSImmRHS);
                 break;
 
-            case 0x59:		/* Load Word, No WriteBack, Pre Inc, Immed.  */
+            case 0x59:          /* Load Word, No WriteBack, Pre Inc, Immed.  */
                 (void) LoadWord (state, instr, LHS + LSImmRHS);
                 break;
 
-            case 0x5a:		/* Store Word, WriteBack, Pre Inc, Immed.  */
+            case 0x5a:          /* Store Word, WriteBack, Pre Inc, Immed.  */
                 UNDEF_LSRBaseEQDestWb;
                 UNDEF_LSRPCBaseWb;
                 temp = LHS + LSImmRHS;
@@ -2704,7 +2704,7 @@ mainswitch:
                     LSBase = temp;
                 break;
 
-            case 0x5b:		/* Load Word, WriteBack, Pre Inc, Immed.  */
+            case 0x5b:          /* Load Word, WriteBack, Pre Inc, Immed.  */
                 UNDEF_LSRBaseEQDestWb;
                 UNDEF_LSRPCBaseWb;
                 temp = LHS + LSImmRHS;
@@ -2712,15 +2712,15 @@ mainswitch:
                     LSBase = temp;
                 break;
 
-            case 0x5c:		/* Store Byte, No WriteBack, Pre Inc, Immed.  */
+            case 0x5c:          /* Store Byte, No WriteBack, Pre Inc, Immed.  */
                 (void) StoreByte (state, instr, LHS + LSImmRHS);
                 break;
 
-            case 0x5d:		/* Load Byte, No WriteBack, Pre Inc, Immed.  */
+            case 0x5d:          /* Load Byte, No WriteBack, Pre Inc, Immed.  */
                 (void) LoadByte (state, instr, LHS + LSImmRHS, LUNSIGNED);
                 break;
 
-            case 0x5e:		/* Store Byte, WriteBack, Pre Inc, Immed.  */
+            case 0x5e:          /* Store Byte, WriteBack, Pre Inc, Immed.  */
                 UNDEF_LSRBaseEQDestWb;
                 UNDEF_LSRPCBaseWb;
                 temp = LHS + LSImmRHS;
@@ -2728,7 +2728,7 @@ mainswitch:
                     LSBase = temp;
                 break;
 
-            case 0x5f:		/* Load Byte, WriteBack, Pre Inc, Immed.  */
+            case 0x5f:          /* Load Byte, WriteBack, Pre Inc, Immed.  */
                 UNDEF_LSRBaseEQDestWb;
                 UNDEF_LSRPCBaseWb;
                 temp = LHS + LSImmRHS;
@@ -2739,7 +2739,7 @@ mainswitch:
 
                 /* Single Data Transfer Register RHS Instructions.  */
 
-            case 0x60:		/* Store Word, No WriteBack, Post Dec, Reg.  */
+            case 0x60:          /* Store Word, No WriteBack, Post Dec, Reg.  */
                 if (AEBIT (4))
                 {
                     ARMul_UndefInstr (state, instr);
@@ -2754,7 +2754,7 @@ mainswitch:
                     LSBase = lhs - LSRegRHS;
                 break;
 
-            case 0x61:		/* Load Word, No WriteBack, Post Dec, Reg.  */
+            case 0x61:          /* Load Word, No WriteBack, Post Dec, Reg.  */
                 if (AEBIT (4))
                 {
 #ifdef MODE32
@@ -2775,7 +2775,7 @@ mainswitch:
                     LSBase = temp;
                 break;
 
-            case 0x62:		/* Store Word, WriteBack, Post Dec, Reg.  */
+            case 0x62:          /* Store Word, WriteBack, Post Dec, Reg.  */
                 if (AEBIT (4))
                 {
 #ifdef MODE32
@@ -2797,7 +2797,7 @@ mainswitch:
                 state->NtransSig = (state->Mode & 3) ? HIGH : LOW;
                 break;
 
-            case 0x63:		/* Load Word, WriteBack, Post Dec, Reg.  */
+            case 0x63:          /* Load Word, WriteBack, Post Dec, Reg.  */
                 if (AEBIT (4))
                 {
 #ifdef MODE32
@@ -2820,7 +2820,7 @@ mainswitch:
                 state->NtransSig = (state->Mode & 3) ? HIGH : LOW;
                 break;
 
-            case 0x64:		/* Store Byte, No WriteBack, Post Dec, Reg.  */
+            case 0x64:          /* Store Byte, No WriteBack, Post Dec, Reg.  */
                 if (AEBIT (4))
                 {
                     ARMul_UndefInstr (state, instr);
@@ -2835,7 +2835,7 @@ mainswitch:
                     LSBase = lhs - LSRegRHS;
                 break;
 
-            case 0x65:		/* Load Byte, No WriteBack, Post Dec, Reg.  */
+            case 0x65:          /* Load Byte, No WriteBack, Post Dec, Reg.  */
                 if (AEBIT (4))
                 {
 #ifdef MODE32
@@ -2856,7 +2856,7 @@ mainswitch:
                     LSBase = temp;
                 break;
 
-            case 0x66:		/* Store Byte, WriteBack, Post Dec, Reg.  */
+            case 0x66:          /* Store Byte, WriteBack, Post Dec, Reg.  */
                 if (AEBIT (4))
                 {
 #ifdef MODE32
@@ -2878,7 +2878,7 @@ mainswitch:
                 state->NtransSig = (state->Mode & 3) ? HIGH : LOW;
                 break;
 
-            case 0x67:		/* Load Byte, WriteBack, Post Dec, Reg.  */
+            case 0x67:          /* Load Byte, WriteBack, Post Dec, Reg.  */
                 if (AEBIT (4))
                 {
 #ifdef MODE32
@@ -2901,7 +2901,7 @@ mainswitch:
                 state->NtransSig = (state->Mode & 3) ? HIGH : LOW;
                 break;
 
-            case 0x68:		/* Store Word, No WriteBack, Post Inc, Reg.  */
+            case 0x68:          /* Store Word, No WriteBack, Post Inc, Reg.  */
                 if (AEBIT (4))
                 {
 #ifdef MODE32
@@ -2921,7 +2921,7 @@ mainswitch:
                     LSBase = lhs + LSRegRHS;
                 break;
 
-            case 0x69:		/* Load Word, No WriteBack, Post Inc, Reg.  */
+            case 0x69:          /* Load Word, No WriteBack, Post Inc, Reg.  */
                 if (AEBIT (4))
                 {
                     ARMul_UndefInstr (state, instr);
@@ -2937,7 +2937,7 @@ mainswitch:
                     LSBase = temp;
                 break;
 
-            case 0x6a:		/* Store Word, WriteBack, Post Inc, Reg.  */
+            case 0x6a:          /* Store Word, WriteBack, Post Inc, Reg.  */
                 if (AEBIT (4))
                 {
 #ifdef MODE32
@@ -2959,7 +2959,7 @@ mainswitch:
                 state->NtransSig = (state->Mode & 3) ? HIGH : LOW;
                 break;
 
-            case 0x6b:		/* Load Word, WriteBack, Post Inc, Reg.  */
+            case 0x6b:          /* Load Word, WriteBack, Post Inc, Reg.  */
                 if (AEBIT (4))
                 {
 #ifdef MODE32
@@ -2982,7 +2982,7 @@ mainswitch:
                 state->NtransSig = (state->Mode & 3) ? HIGH : LOW;
                 break;
 
-            case 0x6c:		/* Store Byte, No WriteBack, Post Inc, Reg.  */
+            case 0x6c:          /* Store Byte, No WriteBack, Post Inc, Reg.  */
                 if (AEBIT (4))
                 {
 #ifdef MODE32
@@ -3002,7 +3002,7 @@ mainswitch:
                     LSBase = lhs + LSRegRHS;
                 break;
 
-            case 0x6d:		/* Load Byte, No WriteBack, Post Inc, Reg.  */
+            case 0x6d:          /* Load Byte, No WriteBack, Post Inc, Reg.  */
                 if (AEBIT (4))
                 {
                     ARMul_UndefInstr (state, instr);
@@ -3018,7 +3018,7 @@ mainswitch:
                     LSBase = temp;
                 break;
 
-            case 0x6e:		/* Store Byte, WriteBack, Post Inc, Reg.  */
+            case 0x6e:          /* Store Byte, WriteBack, Post Inc, Reg.  */
                 if (AEBIT (4))
                 {
 #ifdef MODE32
@@ -3040,7 +3040,7 @@ mainswitch:
                 state->NtransSig = (state->Mode & 3) ? HIGH : LOW;
                 break;
 
-            case 0x6f:		/* Load Byte, WriteBack, Post Inc, Reg.  */
+            case 0x6f:          /* Load Byte, WriteBack, Post Inc, Reg.  */
                 if (AEBIT (4))
                 {
 #ifdef MODE32
@@ -3064,7 +3064,7 @@ mainswitch:
                 break;
 
 
-            case 0x70:		/* Store Word, No WriteBack, Pre Dec, Reg.  */
+            case 0x70:          /* Store Word, No WriteBack, Pre Dec, Reg.  */
                 if (AEBIT (4))
                 {
 #ifdef MODE32
@@ -3078,7 +3078,7 @@ mainswitch:
                 (void) StoreWord (state, instr, LHS - LSRegRHS);
                 break;
 
-            case 0x71:		/* Load Word, No WriteBack, Pre Dec, Reg.  */
+            case 0x71:          /* Load Word, No WriteBack, Pre Dec, Reg.  */
                 if (AEBIT (4))
                 {
                     ARMul_UndefInstr (state, instr);
@@ -3087,7 +3087,7 @@ mainswitch:
                 (void) LoadWord (state, instr, LHS - LSRegRHS);
                 break;
 
-            case 0x72:		/* Store Word, WriteBack, Pre Dec, Reg.  */
+            case 0x72:          /* Store Word, WriteBack, Pre Dec, Reg.  */
                 if (AEBIT (4))
                 {
                     ARMul_UndefInstr (state, instr);
@@ -3102,7 +3102,7 @@ mainswitch:
                     LSBase = temp;
                 break;
 
-            case 0x73:		/* Load Word, WriteBack, Pre Dec, Reg.  */
+            case 0x73:          /* Load Word, WriteBack, Pre Dec, Reg.  */
                 if (AEBIT (4))
                 {
                     ARMul_UndefInstr (state, instr);
@@ -3117,7 +3117,7 @@ mainswitch:
                     LSBase = temp;
                 break;
 
-            case 0x74:		/* Store Byte, No WriteBack, Pre Dec, Reg.  */
+            case 0x74:          /* Store Byte, No WriteBack, Pre Dec, Reg.  */
                 if (AEBIT (4))
                 {
 #ifdef MODE32
@@ -3131,7 +3131,7 @@ mainswitch:
                 (void) StoreByte (state, instr, LHS - LSRegRHS);
                 break;
 
-            case 0x75:		/* Load Byte, No WriteBack, Pre Dec, Reg.  */
+            case 0x75:          /* Load Byte, No WriteBack, Pre Dec, Reg.  */
                 if (AEBIT (4))
                 {
 #ifdef MODE32
@@ -3145,7 +3145,7 @@ mainswitch:
                 (void) LoadByte (state, instr, LHS - LSRegRHS, LUNSIGNED);
                 break;
 
-            case 0x76:		/* Store Byte, WriteBack, Pre Dec, Reg.  */
+            case 0x76:          /* Store Byte, WriteBack, Pre Dec, Reg.  */
                 if (AEBIT (4))
                 {
                     ARMul_UndefInstr (state, instr);
@@ -3160,7 +3160,7 @@ mainswitch:
                     LSBase = temp;
                 break;
 
-            case 0x77:		/* Load Byte, WriteBack, Pre Dec, Reg.  */
+            case 0x77:          /* Load Byte, WriteBack, Pre Dec, Reg.  */
                 if (AEBIT (4))
                 {
                     ARMul_UndefInstr (state, instr);
@@ -3175,7 +3175,7 @@ mainswitch:
                     LSBase = temp;
                 break;
 
-            case 0x78:		/* Store Word, No WriteBack, Pre Inc, Reg.  */
+            case 0x78:          /* Store Word, No WriteBack, Pre Inc, Reg.  */
                 if (AEBIT (4))
                 {
 #ifdef MODE32
@@ -3189,7 +3189,7 @@ mainswitch:
                 (void) StoreWord (state, instr, LHS + LSRegRHS);
                 break;
 
-            case 0x79:		/* Load Word, No WriteBack, Pre Inc, Reg.  */
+            case 0x79:          /* Load Word, No WriteBack, Pre Inc, Reg.  */
                 if (AEBIT (4))
                 {
                     ARMul_UndefInstr (state, instr);
@@ -3198,7 +3198,7 @@ mainswitch:
                 (void) LoadWord (state, instr, LHS + LSRegRHS);
                 break;
 
-            case 0x7a:		/* Store Word, WriteBack, Pre Inc, Reg.  */
+            case 0x7a:          /* Store Word, WriteBack, Pre Inc, Reg.  */
                 if (AEBIT (4))
                 {
 #ifdef MODE32
@@ -3218,7 +3218,7 @@ mainswitch:
                     LSBase = temp;
                 break;
 
-            case 0x7b:		/* Load Word, WriteBack, Pre Inc, Reg.  */
+            case 0x7b:          /* Load Word, WriteBack, Pre Inc, Reg.  */
                 if (AEBIT (4))
                 {
                     ARMul_UndefInstr (state, instr);
@@ -3233,7 +3233,7 @@ mainswitch:
                     LSBase = temp;
                 break;
 
-            case 0x7c:		/* Store Byte, No WriteBack, Pre Inc, Reg.  */
+            case 0x7c:          /* Store Byte, No WriteBack, Pre Inc, Reg.  */
                 if (AEBIT (4))
                 {
 #ifdef MODE32
@@ -3247,7 +3247,7 @@ mainswitch:
                 (void) StoreByte (state, instr, LHS + LSRegRHS);
                 break;
 
-            case 0x7d:		/* Load Byte, No WriteBack, Pre Inc, Reg.  */
+            case 0x7d:          /* Load Byte, No WriteBack, Pre Inc, Reg.  */
                 if (AEBIT (4))
                 {
                     ARMul_UndefInstr (state, instr);
@@ -3256,7 +3256,7 @@ mainswitch:
                 (void) LoadByte (state, instr, LHS + LSRegRHS, LUNSIGNED);
                 break;
 
-            case 0x7e:		/* Store Byte, WriteBack, Pre Inc, Reg.  */
+            case 0x7e:          /* Store Byte, WriteBack, Pre Inc, Reg.  */
                 if (AEBIT (4))
                 {
                     ARMul_UndefInstr (state, instr);
@@ -3271,7 +3271,7 @@ mainswitch:
                     LSBase = temp;
                 break;
 
-            case 0x7f:		/* Load Byte, WriteBack, Pre Inc, Reg.  */
+            case 0x7f:          /* Load Byte, WriteBack, Pre Inc, Reg.  */
                 if (AEBIT (4))
                 {
                     /* Check for the special breakpoint opcode.
@@ -3300,146 +3300,146 @@ mainswitch:
 
                 /* Multiple Data Transfer Instructions.  */
 
-            case 0x80:		/* Store, No WriteBack, Post Dec.  */
+            case 0x80:          /* Store, No WriteBack, Post Dec.  */
                 STOREMULT (instr, LSBase - LSMNumRegs + 4L, 0L);
                 break;
 
-            case 0x81:		/* Load, No WriteBack, Post Dec.  */
+            case 0x81:          /* Load, No WriteBack, Post Dec.  */
                 LOADMULT (instr, LSBase - LSMNumRegs + 4L, 0L);
                 break;
 
-            case 0x82:		/* Store, WriteBack, Post Dec.  */
+            case 0x82:          /* Store, WriteBack, Post Dec.  */
                 temp = LSBase - LSMNumRegs;
                 STOREMULT (instr, temp + 4L, temp);
                 break;
 
-            case 0x83:		/* Load, WriteBack, Post Dec.  */
+            case 0x83:          /* Load, WriteBack, Post Dec.  */
                 temp = LSBase - LSMNumRegs;
                 LOADMULT (instr, temp + 4L, temp);
                 break;
 
-            case 0x84:		/* Store, Flags, No WriteBack, Post Dec.  */
+            case 0x84:          /* Store, Flags, No WriteBack, Post Dec.  */
                 STORESMULT (instr, LSBase - LSMNumRegs + 4L, 0L);
                 break;
 
-            case 0x85:		/* Load, Flags, No WriteBack, Post Dec.  */
+            case 0x85:          /* Load, Flags, No WriteBack, Post Dec.  */
                 LOADSMULT (instr, LSBase - LSMNumRegs + 4L, 0L);
                 break;
 
-            case 0x86:		/* Store, Flags, WriteBack, Post Dec.  */
+            case 0x86:          /* Store, Flags, WriteBack, Post Dec.  */
                 temp = LSBase - LSMNumRegs;
                 STORESMULT (instr, temp + 4L, temp);
                 break;
 
-            case 0x87:		/* Load, Flags, WriteBack, Post Dec.  */
+            case 0x87:          /* Load, Flags, WriteBack, Post Dec.  */
                 temp = LSBase - LSMNumRegs;
                 LOADSMULT (instr, temp + 4L, temp);
                 break;
 
-            case 0x88:		/* Store, No WriteBack, Post Inc.  */
+            case 0x88:          /* Store, No WriteBack, Post Inc.  */
                 STOREMULT (instr, LSBase, 0L);
                 break;
 
-            case 0x89:		/* Load, No WriteBack, Post Inc.  */
+            case 0x89:          /* Load, No WriteBack, Post Inc.  */
                 LOADMULT (instr, LSBase, 0L);
                 break;
 
-            case 0x8a:		/* Store, WriteBack, Post Inc.  */
+            case 0x8a:          /* Store, WriteBack, Post Inc.  */
                 temp = LSBase;
                 STOREMULT (instr, temp, temp + LSMNumRegs);
                 break;
 
-            case 0x8b:		/* Load, WriteBack, Post Inc.  */
+            case 0x8b:          /* Load, WriteBack, Post Inc.  */
                 temp = LSBase;
                 LOADMULT (instr, temp, temp + LSMNumRegs);
                 break;
 
-            case 0x8c:		/* Store, Flags, No WriteBack, Post Inc.  */
+            case 0x8c:          /* Store, Flags, No WriteBack, Post Inc.  */
                 STORESMULT (instr, LSBase, 0L);
                 break;
 
-            case 0x8d:		/* Load, Flags, No WriteBack, Post Inc.  */
+            case 0x8d:          /* Load, Flags, No WriteBack, Post Inc.  */
                 LOADSMULT (instr, LSBase, 0L);
                 break;
 
-            case 0x8e:		/* Store, Flags, WriteBack, Post Inc.  */
+            case 0x8e:          /* Store, Flags, WriteBack, Post Inc.  */
                 temp = LSBase;
                 STORESMULT (instr, temp, temp + LSMNumRegs);
                 break;
 
-            case 0x8f:		/* Load, Flags, WriteBack, Post Inc.  */
+            case 0x8f:          /* Load, Flags, WriteBack, Post Inc.  */
                 temp = LSBase;
                 LOADSMULT (instr, temp, temp + LSMNumRegs);
                 break;
 
-            case 0x90:		/* Store, No WriteBack, Pre Dec.  */
+            case 0x90:          /* Store, No WriteBack, Pre Dec.  */
                 STOREMULT (instr, LSBase - LSMNumRegs, 0L);
                 break;
 
-            case 0x91:		/* Load, No WriteBack, Pre Dec.  */
+            case 0x91:          /* Load, No WriteBack, Pre Dec.  */
                 LOADMULT (instr, LSBase - LSMNumRegs, 0L);
                 break;
 
-            case 0x92:		/* Store, WriteBack, Pre Dec.  */
+            case 0x92:          /* Store, WriteBack, Pre Dec.  */
                 temp = LSBase - LSMNumRegs;
                 STOREMULT (instr, temp, temp);
                 break;
 
-            case 0x93:		/* Load, WriteBack, Pre Dec.  */
+            case 0x93:          /* Load, WriteBack, Pre Dec.  */
                 temp = LSBase - LSMNumRegs;
                 LOADMULT (instr, temp, temp);
                 break;
 
-            case 0x94:		/* Store, Flags, No WriteBack, Pre Dec.  */
+            case 0x94:          /* Store, Flags, No WriteBack, Pre Dec.  */
                 STORESMULT (instr, LSBase - LSMNumRegs, 0L);
                 break;
 
-            case 0x95:		/* Load, Flags, No WriteBack, Pre Dec.  */
+            case 0x95:          /* Load, Flags, No WriteBack, Pre Dec.  */
                 LOADSMULT (instr, LSBase - LSMNumRegs, 0L);
                 break;
 
-            case 0x96:		/* Store, Flags, WriteBack, Pre Dec.  */
+            case 0x96:          /* Store, Flags, WriteBack, Pre Dec.  */
                 temp = LSBase - LSMNumRegs;
                 STORESMULT (instr, temp, temp);
                 break;
 
-            case 0x97:		/* Load, Flags, WriteBack, Pre Dec.  */
+            case 0x97:          /* Load, Flags, WriteBack, Pre Dec.  */
                 temp = LSBase - LSMNumRegs;
                 LOADSMULT (instr, temp, temp);
                 break;
 
-            case 0x98:		/* Store, No WriteBack, Pre Inc.  */
+            case 0x98:          /* Store, No WriteBack, Pre Inc.  */
                 STOREMULT (instr, LSBase + 4L, 0L);
                 break;
 
-            case 0x99:		/* Load, No WriteBack, Pre Inc.  */
+            case 0x99:          /* Load, No WriteBack, Pre Inc.  */
                 LOADMULT (instr, LSBase + 4L, 0L);
                 break;
 
-            case 0x9a:		/* Store, WriteBack, Pre Inc.  */
+            case 0x9a:          /* Store, WriteBack, Pre Inc.  */
                 temp = LSBase;
                 STOREMULT (instr, temp + 4L, temp + LSMNumRegs);
                 break;
 
-            case 0x9b:		/* Load, WriteBack, Pre Inc.  */
+            case 0x9b:          /* Load, WriteBack, Pre Inc.  */
                 temp = LSBase;
                 LOADMULT (instr, temp + 4L, temp + LSMNumRegs);
                 break;
 
-            case 0x9c:		/* Store, Flags, No WriteBack, Pre Inc.  */
+            case 0x9c:          /* Store, Flags, No WriteBack, Pre Inc.  */
                 STORESMULT (instr, LSBase + 4L, 0L);
                 break;
 
-            case 0x9d:		/* Load, Flags, No WriteBack, Pre Inc.  */
+            case 0x9d:          /* Load, Flags, No WriteBack, Pre Inc.  */
                 LOADSMULT (instr, LSBase + 4L, 0L);
                 break;
 
-            case 0x9e:		/* Store, Flags, WriteBack, Pre Inc.  */
+            case 0x9e:          /* Store, Flags, WriteBack, Pre Inc.  */
                 temp = LSBase;
                 STORESMULT (instr, temp + 4L, temp + LSMNumRegs);
                 break;
 
-            case 0x9f:		/* Load, Flags, WriteBack, Pre Inc.  */
+            case 0x9f:          /* Load, Flags, WriteBack, Pre Inc.  */
                 temp = LSBase;
                 LOADSMULT (instr, temp + 4L, temp + LSMNumRegs);
                 break;
@@ -3549,7 +3549,7 @@ mainswitch:
                 }
                 /* Drop through.  */
 
-            case 0xc0:		/* Store , No WriteBack , Post Dec.  */
+            case 0xc0:          /* Store , No WriteBack , Post Dec.  */
                 ARMul_STC (state, instr, LHS);
                 break;
 
@@ -3594,91 +3594,91 @@ mainswitch:
                 }
                 /* Drop through.  */
 
-            case 0xc1:		/* Load , No WriteBack , Post Dec.  */
+            case 0xc1:          /* Load , No WriteBack , Post Dec.  */
                 ARMul_LDC (state, instr, LHS);
                 break;
 
             case 0xc2:
-            case 0xc6:		/* Store , WriteBack , Post Dec.  */
+            case 0xc6:          /* Store , WriteBack , Post Dec.  */
                 lhs = LHS;
                 state->Base = lhs - LSCOff;
                 ARMul_STC (state, instr, lhs);
                 break;
 
             case 0xc3:
-            case 0xc7:		/* Load , WriteBack , Post Dec.  */
+            case 0xc7:          /* Load , WriteBack , Post Dec.  */
                 lhs = LHS;
                 state->Base = lhs - LSCOff;
                 ARMul_LDC (state, instr, lhs);
                 break;
 
             case 0xc8:
-            case 0xcc:		/* Store , No WriteBack , Post Inc.  */
+            case 0xcc:          /* Store , No WriteBack , Post Inc.  */
                 ARMul_STC (state, instr, LHS);
                 break;
 
             case 0xc9:
-            case 0xcd:		/* Load , No WriteBack , Post Inc.  */
+            case 0xcd:          /* Load , No WriteBack , Post Inc.  */
                 ARMul_LDC (state, instr, LHS);
                 break;
 
             case 0xca:
-            case 0xce:		/* Store , WriteBack , Post Inc.  */
+            case 0xce:          /* Store , WriteBack , Post Inc.  */
                 lhs = LHS;
                 state->Base = lhs + LSCOff;
                 ARMul_STC (state, instr, LHS);
                 break;
 
             case 0xcb:
-            case 0xcf:		/* Load , WriteBack , Post Inc.  */
+            case 0xcf:          /* Load , WriteBack , Post Inc.  */
                 lhs = LHS;
                 state->Base = lhs + LSCOff;
                 ARMul_LDC (state, instr, LHS);
                 break;
 
             case 0xd0:
-            case 0xd4:		/* Store , No WriteBack , Pre Dec.  */
+            case 0xd4:          /* Store , No WriteBack , Pre Dec.  */
                 ARMul_STC (state, instr, LHS - LSCOff);
                 break;
 
             case 0xd1:
-            case 0xd5:		/* Load , No WriteBack , Pre Dec.  */
+            case 0xd5:          /* Load , No WriteBack , Pre Dec.  */
                 ARMul_LDC (state, instr, LHS - LSCOff);
                 break;
 
             case 0xd2:
-            case 0xd6:		/* Store , WriteBack , Pre Dec.  */
+            case 0xd6:          /* Store , WriteBack , Pre Dec.  */
                 lhs = LHS - LSCOff;
                 state->Base = lhs;
                 ARMul_STC (state, instr, lhs);
                 break;
 
             case 0xd3:
-            case 0xd7:		/* Load , WriteBack , Pre Dec.  */
+            case 0xd7:          /* Load , WriteBack , Pre Dec.  */
                 lhs = LHS - LSCOff;
                 state->Base = lhs;
                 ARMul_LDC (state, instr, lhs);
                 break;
 
             case 0xd8:
-            case 0xdc:		/* Store , No WriteBack , Pre Inc.  */
+            case 0xdc:          /* Store , No WriteBack , Pre Inc.  */
                 ARMul_STC (state, instr, LHS + LSCOff);
                 break;
 
             case 0xd9:
-            case 0xdd:		/* Load , No WriteBack , Pre Inc.  */
+            case 0xdd:          /* Load , No WriteBack , Pre Inc.  */
                 ARMul_LDC (state, instr, LHS + LSCOff);
                 break;
 
             case 0xda:
-            case 0xde:		/* Store , WriteBack , Pre Inc.  */
+            case 0xde:          /* Store , WriteBack , Pre Inc.  */
                 lhs = LHS + LSCOff;
                 state->Base = lhs;
                 ARMul_STC (state, instr, lhs);
                 break;
 
             case 0xdb:
-            case 0xdf:		/* Load , WriteBack , Pre Inc.  */
+            case 0xdf:          /* Load , WriteBack , Pre Inc.  */
                 lhs = LHS + LSCOff;
                 state->Base = lhs;
                 ARMul_LDC (state, instr, lhs);
@@ -4993,7 +4993,7 @@ StoreSMult (ARMul_State * state,
     }
 
     for (temp = 0; !AEBIT (temp); temp++)
-        ;	/* N cycle first.  */
+        ;       /* N cycle first.  */
 
 #ifdef MODE32
     ARMul_StoreWordN (state, address, state->Reg[temp++]);

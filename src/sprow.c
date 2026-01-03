@@ -766,7 +766,7 @@ ARMword ARMul_LoadHalfWord (ARMul_State * state, ARMword address)
     state->NumNcycles++;
 
     ARMword temp = ARMul_ReadWord (state, address);
-    ARMword offset = (((ARMword) state->bigendSig * 2) ^ (address & 2)) << 3;	/* bit offset into the word */
+    ARMword offset = (((ARMword) state->bigendSig * 2) ^ (address & 2)) << 3;   /* bit offset into the word */
 
     return (temp >> offset) & 0xffff;
     //ARMword temp = ARMul_ReadWord (state, address);
@@ -794,7 +794,7 @@ ARMword ARMul_ReadByte (ARMul_State * state, ARMword address)
     }
 
     ARMword temp = ARMul_ReadWord (state, address);
-    ARMword offset = (((ARMword) state->bigendSig * 3) ^ (address & 3)) << 3;	/* bit offset into the word */
+    ARMword offset = (((ARMword) state->bigendSig * 3) ^ (address & 3)) << 3;   /* bit offset into the word */
 
     return (temp >> offset & 0xffL);
     //return temp & 0xffL;
@@ -874,13 +874,13 @@ ARMul_StoreHalfWord (ARMul_State * state, ARMword address, ARMword data)
         if (data == 4)
             state->Emulate = FALSE;
         else
-            (void) putc ((char) data, stderr);	/* Write Char */
+            (void) putc ((char) data, stderr);  /* Write Char */
         return;
     }
 #endif
 
     temp = ARMul_ReadWord (state, address);
-    ARMword offset = (((ARMword) state->bigendSig * 2) ^ (address & 2)) << 3;	/* bit offset into the word */
+    ARMword offset = (((ARMword) state->bigendSig * 2) ^ (address & 2)) << 3;   /* bit offset into the word */
     PutWord (state, address,
         (temp & ~(0xffffL << offset)) | ((data & 0xffffL) << offset),
         TRUE);
@@ -913,7 +913,7 @@ ARMul_WriteByte (ARMul_State * state, ARMword address, ARMword data)
     }
 
     ARMword temp = ARMul_ReadWord (state, address);
-    ARMword offset = (((ARMword) state->bigendSig * 3) ^ (address & 3)) << 3;	/* bit offset into the word */
+    ARMword offset = (((ARMword) state->bigendSig * 3) ^ (address & 3)) << 3;   /* bit offset into the word */
 
     PutWord (state, address,
         (temp & ~(0xffL << offset)) | ((data & 0xffL) << offset),
@@ -938,7 +938,7 @@ ARMul_StoreByte (ARMul_State * state, ARMword address, ARMword data)
         if (data == 4)
             state->Emulate = FALSE;
         else
-            (void) putc ((char) data, stderr);	/* Write Char */
+            (void) putc ((char) data, stderr);  /* Write Char */
         return;
     }
 #endif

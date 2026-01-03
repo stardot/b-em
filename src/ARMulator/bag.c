@@ -74,12 +74,12 @@ removefromlist (Hashentry ** p, long first)
   while (*p)
     {
       if ((*p)->first == first)
-	{
-	  q = (*p)->next;
-	  free (*p);
-	  *p = q;
-	  return;
-	}
+        {
+          q = (*p)->next;
+          free (*p);
+          *p = q;
+          return;
+        }
       p = &((*p)->next);
     }
 }
@@ -104,8 +104,8 @@ BAG_getfirst (long *first, long second)
   while (look)
     if (look->second == second)
       {
-	*first = look->first;
-	return NO_ERROR;
+        *first = look->first;
+        return NO_ERROR;
       }
   return NO_SUCH_PAIR;
 }
@@ -119,10 +119,10 @@ BAG_getsecond (long first, long *second)
   while (look)
     {
       if (look->first == first)
-	{
-	  *second = look->second;
-	  return NO_ERROR;
-	}
+        {
+          *second = look->second;
+          return NO_ERROR;
+        }
       look = look->next;
     }
   return NO_SUCH_PAIR;

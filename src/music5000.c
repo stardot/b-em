@@ -388,19 +388,19 @@ int music5000_fno;
 
 static double applyfilter(const m5000_fcoeff *fcp, double *xyv, double v)
 {
-	int i,b,xp=0,yp=3,bqp=0;
-	double out=v/fcp->gain;
-	for (i=8; i>0; i--) {xyv[i]=xyv[i-1];}
-	for (b=0; b<NBQ; b++)
-	{
-		int len=(b==NBQ-1)?1:2;
-		xyv[xp]=out;
-		for(i=0; i<len; i++) { out+=xyv[xp+len-i]*fcp->biquadb[bqp+i]-xyv[yp+len-i]*fcp->biquada[bqp+i]; }
-		bqp+=len;
-		xyv[yp]=out;
-		xp=yp; yp+=len+1;
-	}
-	return out;
+    int i,b,xp=0,yp=3,bqp=0;
+    double out=v/fcp->gain;
+    for (i=8; i>0; i--) {xyv[i]=xyv[i-1];}
+    for (b=0; b<NBQ; b++)
+    {
+        int len=(b==NBQ-1)?1:2;
+        xyv[xp]=out;
+        for(i=0; i<len; i++) { out+=xyv[xp+len-i]*fcp->biquadb[bqp+i]-xyv[yp+len-i]*fcp->biquada[bqp+i]; }
+        bqp+=len;
+        xyv[yp]=out;
+        xp=yp; yp+=len+1;
+    }
+    return out;
 }
 
 static void music5000_get_sample(const m5000_fcoeff *fcp)

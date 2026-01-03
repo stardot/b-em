@@ -41,15 +41,15 @@ void n32016_warn(char * fmt, ...);
 
 enum Formats
 {
-	Format0,
-	Format1,
-	Format2,
-	Format3,
-	Format4,
-	Format5,
-	Format6,
-	Format7,
-	Format8,
+   Format0,
+   Format1,
+   Format2,
+   Format3,
+   Format4,
+   Format5,
+   Format6,
+   Format7,
+   Format8,
    Format9,
    Format10,
    Format11,
@@ -57,7 +57,7 @@ enum Formats
    Format13,
    Format14,
    FormatCount,
-	FormatBad = 0xFF
+   FormatBad = 0xFF
 };
 
 enum RegType
@@ -127,11 +127,11 @@ enum OperandsPostitions
 enum DataSize
 {
    szVaries = 0,
-	sz8 = 1,
-	sz16 = 2,
+   sz8 = 1,
+   sz16 = 2,
    Translating = 3,
-	sz32 = 4,
-	sz64 = 8,
+   sz32 = 4,
+   sz64 = 8,
 };
 
 typedef union

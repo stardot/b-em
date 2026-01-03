@@ -299,7 +299,7 @@ menu is always supplied with a 2nd processor, for example the Master
 | Line Doubling | stretch the BBC screen by doubling every line.|
 | Scanlines     | stretch the BBC screen by blanking every other line|
 | Interlaced    | emulate an interlaced display (useful for a handful of demos).  Allows high resolution mode 7. |
-| PAL	      | use PAL filter!
+| PAL           | use PAL filter!
 | PAL interlaced | use PAL filter, with interlacing. Slow! Allows high resolution mode 7.|
 
 #### Borders
@@ -475,10 +475,10 @@ Hardware emulated
 | The User VIA      | Emulated.|
 | 8271 FDC          | Double disc, double sided, 40/80 tracks, read/write. With authentic noise. Supports read-only access of protected FDI images.|
 | 1770 FDC          | Double disc, double sided, 40/80 tracks, read/write. With authentic noise. Supports read-only access of protected FDI images.|
-| IDE hard disc	    | Emulates 2 discs. Emulation from Arculator.|
-| SCSI hard disc	| Emulates 4 discs. Emulation from BeebEm.|
+| IDE hard disc     | Emulates 2 discs. Emulation from Arculator.|
+| SCSI hard disc    | Emulates 4 discs. Emulation from BeebEm.|
 | Sound             | All channels emulated, with sample support and some undocumented behaviour (Crazee Rider).  With optional bandpass filter.|
-| BeebSID |  Emulated using resid-fp, so should be pretty accurate. Is only emulated when accessed, to reduce CPU load.|
+| BeebSID           |  Emulated using resid-fp, so should be pretty accurate. Is only emulated when accessed, to reduce CPU load.|
 | ADC               | Real joystick emulation, supporting both joysticks.|
 | 6850 ACIA         | Emulated for cassettes. Read only.|
 | Serial ULA        | Emulated.|

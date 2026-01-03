@@ -89,132 +89,132 @@ static int dopaddrnmos[256]=
 };
 
 static inline void disassemble(int cmos, uint16_t addr, uint8_t op, uint8_t p1, uint8_t p2, FILE *out) {
-	unsigned temp;
-	const char *opname = cmos ? dopname[op] : dopnamenmos[op];
+    unsigned temp;
+    const char *opname = cmos ? dopname[op] : dopnamenmos[op];
     fprintf(out, "%04X : %02X ", addr, op);
-	switch (cmos ? dopaddr[op] : dopaddrnmos[op])
-	{
-		case IMP:
-			fprintf(out, "      %s         ", opname);
-			break;
-		case IMPA:
-			fprintf(out, "      %s A       ", opname);
-			break;
-		case IMM:
-			fprintf(out, "%02X    %s #%02X     ", p1, opname, p1);
-			break;
-		case ZP:
-			fprintf(out, "%02X    %s %02X      ", p1, opname, p1);
-			break;
-		case ZPX:
-			fprintf(out, "%02X    %s %02X,X    ", p1, opname, p1);
-			break;
-		case ZPY:
-			fprintf(out, "%02X    %s %02X,Y    ", p1, opname, p1);
-			break;
-		case IND:
-			fprintf(out, "%02X    %s (%02X)    ", p1, opname, p1);
-			break;
-		case INDX:
-			fprintf(out, "%02X    %s (%02X,X)  ", p1, opname, p1);
-			break;
-		case INDY:
-			fprintf(out, "%02X    %s (%02X),Y  ", p1, opname, p1);
-			break;
-		case ABS:
-			fprintf(out, "%02X %02X %s %02X%02X    ", p1, p2, opname, p2, p1);
-			break;
-		case ABSX:
-			fprintf(out, "%02X %02X %s %02X%02X,X  ", p1, p2, opname, p2, p1);
-			break;
-		case ABSY:
-			fprintf(out, "%02X %02X %s %02X%02X,Y  ", p1, p2, opname, p2, p1);
-			break;
-		case IND16:
-			fprintf(out, "%02X %02X %s (%02X%02X)  ", p1, p2, opname, p2, p1);
-			break;
-		case IND1X:
-			fprintf(out, "%02X %02X %s (%02X%02X,X)", p1, p2, opname, p2, p1);
-			break;
-		case BRA:
-			temp = addr + 2 + (signed char)p1;
-			fprintf(out, "%02X    %s %04X    ", p1, opname, temp);
-			break;
-	}
+    switch (cmos ? dopaddr[op] : dopaddrnmos[op])
+    {
+        case IMP:
+            fprintf(out, "      %s         ", opname);
+            break;
+        case IMPA:
+            fprintf(out, "      %s A       ", opname);
+            break;
+        case IMM:
+            fprintf(out, "%02X    %s #%02X     ", p1, opname, p1);
+            break;
+        case ZP:
+            fprintf(out, "%02X    %s %02X      ", p1, opname, p1);
+            break;
+        case ZPX:
+            fprintf(out, "%02X    %s %02X,X    ", p1, opname, p1);
+            break;
+        case ZPY:
+            fprintf(out, "%02X    %s %02X,Y    ", p1, opname, p1);
+            break;
+        case IND:
+            fprintf(out, "%02X    %s (%02X)    ", p1, opname, p1);
+            break;
+        case INDX:
+            fprintf(out, "%02X    %s (%02X,X)  ", p1, opname, p1);
+            break;
+        case INDY:
+            fprintf(out, "%02X    %s (%02X),Y  ", p1, opname, p1);
+            break;
+        case ABS:
+            fprintf(out, "%02X %02X %s %02X%02X    ", p1, p2, opname, p2, p1);
+            break;
+        case ABSX:
+            fprintf(out, "%02X %02X %s %02X%02X,X  ", p1, p2, opname, p2, p1);
+            break;
+        case ABSY:
+            fprintf(out, "%02X %02X %s %02X%02X,Y  ", p1, p2, opname, p2, p1);
+            break;
+        case IND16:
+            fprintf(out, "%02X %02X %s (%02X%02X)  ", p1, p2, opname, p2, p1);
+            break;
+        case IND1X:
+            fprintf(out, "%02X %02X %s (%02X%02X,X)", p1, p2, opname, p2, p1);
+            break;
+        case BRA:
+            temp = addr + 2 + (signed char)p1;
+            fprintf(out, "%02X    %s %04X    ", p1, opname, temp);
+            break;
+    }
 }
 
 
 static void display_trace(const char *filename, FILE *fp) {
     char magic[8];
     time_t secs;
-	int nmos, cmos, tickcount;
-	char tmstr[20];
-	uint16_t pc, ppc = 0;
-	uint8_t op, p1, p2, a, x, y, s, f;
+    int nmos, cmos, tickcount;
+    char tmstr[20];
+    uint16_t pc, ppc = 0;
+    uint8_t op, p1, p2, a, x, y, s, f;
 
-	nmos = cmos = 0;
-	if (fread(magic, 8, 1, fp) == 1) {
-		if (strncmp(magic, "6502NMOS", 8) == 0)
-			nmos = 1;
-		else if (strncmp(magic, "6502CMOS", 8) == 0)
-			cmos = 1;
-	}
-	if (nmos || cmos) {
-		if (fread(&secs, sizeof(secs), 1, fp) == 1) {
-			strftime(tmstr, sizeof tmstr, "%d/%m/%Y %H:%M:%S", localtime(&secs));
-			printf("6502 trace starts %s\n", tmstr);
-			while ((tickcount = getc_unlocked(fp)) != EOF) {
-				pc = getc_unlocked(fp);
-				pc |= getc_unlocked(fp) << 8;
-				pc--;
-				op = getc_unlocked(fp);
-				p1 = getc_unlocked(fp);
-				p2 = getc_unlocked(fp);
-				a = getc_unlocked(fp);
-				x = getc_unlocked(fp);
-				y = getc_unlocked(fp);
-				s = getc_unlocked(fp);
-				f = getc_unlocked(fp);
-				if (pc >= 0xf800 && ppc < 0xf800)
-					puts("call to OS ROM");
-				else if (pc < 0xf800) {
-					printf("%02d ", tickcount);
-					disassemble(cmos, pc, op, p1, p2, stdout);
-					printf(" %02X %02X %02X %02X ", a, x, y, s);
-					putc_unlocked((f & 0x80) ? 'N' : '.', stdout);
-					putc_unlocked((f & 0x40) ? 'V' : '.', stdout);
-					putc_unlocked((f & 0x08) ? 'D' : '.', stdout);
-					putc_unlocked((f & 0x04) ? 'I' : '.', stdout);
-					putc_unlocked((f & 0x02) ? 'Z' : '.', stdout);
-					putc_unlocked((f & 0x01) ? 'C' : '.', stdout);
-					putc_unlocked('\n', stdout);
-				}
-				ppc = pc;
-			}
-		} else
-			fprintf(stderr, "disptrace: unexpected end of file on %s\n", filename);
-	} else
-		fprintf(stderr, "disptrace: %s not a 6502 trace file\n", filename);
+    nmos = cmos = 0;
+    if (fread(magic, 8, 1, fp) == 1) {
+        if (strncmp(magic, "6502NMOS", 8) == 0)
+            nmos = 1;
+        else if (strncmp(magic, "6502CMOS", 8) == 0)
+            cmos = 1;
+    }
+    if (nmos || cmos) {
+        if (fread(&secs, sizeof(secs), 1, fp) == 1) {
+            strftime(tmstr, sizeof tmstr, "%d/%m/%Y %H:%M:%S", localtime(&secs));
+            printf("6502 trace starts %s\n", tmstr);
+            while ((tickcount = getc_unlocked(fp)) != EOF) {
+                pc = getc_unlocked(fp);
+                pc |= getc_unlocked(fp) << 8;
+                pc--;
+                op = getc_unlocked(fp);
+                p1 = getc_unlocked(fp);
+                p2 = getc_unlocked(fp);
+                a = getc_unlocked(fp);
+                x = getc_unlocked(fp);
+                y = getc_unlocked(fp);
+                s = getc_unlocked(fp);
+                f = getc_unlocked(fp);
+                if (pc >= 0xf800 && ppc < 0xf800)
+                    puts("call to OS ROM");
+                else if (pc < 0xf800) {
+                    printf("%02d ", tickcount);
+                    disassemble(cmos, pc, op, p1, p2, stdout);
+                    printf(" %02X %02X %02X %02X ", a, x, y, s);
+                    putc_unlocked((f & 0x80) ? 'N' : '.', stdout);
+                    putc_unlocked((f & 0x40) ? 'V' : '.', stdout);
+                    putc_unlocked((f & 0x08) ? 'D' : '.', stdout);
+                    putc_unlocked((f & 0x04) ? 'I' : '.', stdout);
+                    putc_unlocked((f & 0x02) ? 'Z' : '.', stdout);
+                    putc_unlocked((f & 0x01) ? 'C' : '.', stdout);
+                    putc_unlocked('\n', stdout);
+                }
+                ppc = pc;
+            }
+        } else
+            fprintf(stderr, "disptrace: unexpected end of file on %s\n", filename);
+    } else
+        fprintf(stderr, "disptrace: %s not a 6502 trace file\n", filename);
 }
 
 int main(int argc, char **argv) {
-	int status = 0;
-	const char *filename;
-	FILE *fp;
+    int status = 0;
+    const char *filename;
+    FILE *fp;
 
-	if (argc == 1)
-		display_trace("<stdin>", stdin);
-	else {
-		while (--argc) {
-			filename = *++argv;
-			if ((fp = fopen(filename, "rb"))) {
-				display_trace(filename, fp);
-				fclose(fp);
-			} else {
-				fprintf(stderr, "disptrace: unable to open %s: %m\n", filename);
-				status++;
-			}
-		}
-	}
-	return status;
+    if (argc == 1)
+        display_trace("<stdin>", stdin);
+    else {
+        while (--argc) {
+            filename = *++argv;
+            if ((fp = fopen(filename, "rb"))) {
+                display_trace(filename, fp);
+                fclose(fp);
+            } else {
+                fprintf(stderr, "disptrace: unable to open %s: %m\n", filename);
+                status++;
+            }
+        }
+    }
+    return status;
 }

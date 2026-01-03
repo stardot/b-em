@@ -3,8 +3,8 @@
 export ACLOCAL_PATH="$(pwd)"
 
 if [ "x$(uname)" = "xOpenBSD" ]; then
-	[ -z "$AUTOMAKE_VERSION" ] && export AUTOMAKE_VERSION=1.10
-	[ -z "$AUTOCONF_VERSION" ] && export AUTOCONF_VERSION=2.65
+    [ -z "$AUTOMAKE_VERSION" ] && export AUTOMAKE_VERSION=1.10
+    [ -z "$AUTOCONF_VERSION" ] && export AUTOCONF_VERSION=2.65
 fi
 
 die()
