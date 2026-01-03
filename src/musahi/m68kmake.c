@@ -826,7 +826,7 @@ void write_table_entry(FILE* filep, opcode_struct* op)
 {
     int i;
 
-    fprintf(filep, "\t{%-28s, 0x%04x, 0x%04x, {",
+    fprintf(filep, "    {%-28s, 0x%04x, 0x%04x, {",
         op->name, op->op_mask, op->op_match);
 
     for(i=0;i<NUM_CPUS;i++)
