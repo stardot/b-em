@@ -280,17 +280,17 @@ static uint32_t sprow_dbg_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf
   return addr + 4;
 };
 
-static uint32_t sprow_dbg_reg_get(int which) 
+static uint32_t sprow_dbg_reg_get(int which)
 {
-  if (which == i_PC) 
+  if (which == i_PC)
   {
     return ARMul_GetPC (m_State);
   }
-  else if (which == i_PSR) 
+  else if (which == i_PSR)
   {
     return ARMul_GetSPSR (m_State, m_State->Mode);
   }
-  else 
+  else
   {
     return ARMul_GetReg(m_State, m_State->Mode, which);
   }
@@ -303,19 +303,19 @@ static uint32_t sprow_dbg_reg_get(int which)
 
 // Set a register.
 static void  sprow_dbg_reg_set(int which, uint32_t value) {
-  if (which <= i_LR) 
+  if (which <= i_LR)
   {
     return ARMul_SetReg(m_State, m_State->Mode, which, value);
-  } 
-  else if (which == i_PC) 
+  }
+  else if (which == i_PC)
   {
     return ARMul_SetPC (m_State, value);
   }
-  else if (which == i_PSR) 
+  else if (which == i_PSR)
   {
     return ARMul_SetSPSR (m_State, m_State->Mode, value);
   }
-  else 
+  else
   {
     log_warn("sprow: unrecognised register %d", which);
   }
@@ -380,14 +380,14 @@ static size_t sprow_dbg_reg_print(int which, char *buf, size_t bufsize) {
 };
 
 // Parse a value into a register.
-static void sprow_dbg_reg_parse(int which, const char *strval) 
+static void sprow_dbg_reg_parse(int which, const char *strval)
 {
  uint32_t val = 0;
  sscanf(strval, "%"SCNx32, &val);
  sprow_dbg_reg_set(which, val);
 };
 
-static uint32_t sprow_dbg_get_instr_addr(void) 
+static uint32_t sprow_dbg_get_instr_addr(void)
 {
   return(m_State->Reg[15] & PCMASK);
 }
@@ -1027,12 +1027,10 @@ void sprow_interrupt(int type)
       m_State->NfiqSig = LOW;
       m_State->Exception = TRUE;
   }
-  else 
+  else
   {
       PutRegister(m_State, IRN, INT_EX3);
       m_State->NirqSig = LOW;
       m_State->Exception = TRUE;
   }
 }
-
-

@@ -14,7 +14,7 @@ void music4000_shift(int value) {
         block++;
     //log_debug("m4000: block is now #%d", block);
     //count1++;
-        
+
 }
 
 uint8_t music4000_read(void) {

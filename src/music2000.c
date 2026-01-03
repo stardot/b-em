@@ -144,4 +144,4 @@ void music2000_init(midi_dev_t *out1, midi_dev_t *out2, midi_dev_t *out3) {
     m2000_out1.dev = out1;
     m2000_out2.dev = out2;
     m2000_out3.dev = out3;
-}    
+}

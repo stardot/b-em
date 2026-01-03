@@ -231,7 +231,7 @@ siddefs-fp.h: $(top_builddir)/config.status $(srcdir)/siddefs-fp.h.in
 
 clean-noinstLIBRARIES:
 	-test -z "$(noinst_LIBRARIES)" || rm -f $(noinst_LIBRARIES)
-libresidfp.a: $(libresidfp_a_OBJECTS) $(libresidfp_a_DEPENDENCIES) 
+libresidfp.a: $(libresidfp_a_OBJECTS) $(libresidfp_a_DEPENDENCIES)
 	-rm -f libresidfp.a
 	$(libresidfp_a_AR) libresidfp.a $(libresidfp_a_OBJECTS) $(libresidfp_a_LIBADD)
 	$(RANLIB) libresidfp.a

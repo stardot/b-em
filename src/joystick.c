@@ -159,7 +159,7 @@ static void apply_button_map(int joystick)
     js_btn_map_t *butn = jsptr->js_btns;
     const char *value;
     char key[50];
-    
+
     for (butn_num = 0; butn_num < jsptr->num_butn; butn_num++) {
         snprintf(key, sizeof key, "button%dbtn", butn_num);
         if ((value = al_get_config_value(bem_cfg, joymap->sect, key)))

@@ -24,4 +24,3 @@ float convolve(const float *a, const float *b, int n)
         out += (*(a ++)) * (*(b ++));
     return out;
 }
-

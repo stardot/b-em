@@ -428,7 +428,7 @@ static void music5000_get_sample(const m5000_fcoeff *fcp)
         sl = applyfilter(fcp, xyv_l, (double)sl);
         sr = applyfilter(fcp, xyv_r, (double)sr);
     }
-    
+
     fput_samples(sl, sr);
 
 #ifdef LOG_LEVELS

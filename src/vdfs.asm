@@ -1610,7 +1610,7 @@ prtextws    =   &A8
             stx     port_a
             lda     #&09
             ldx     &f4             ; get our own ROM number.
-            ldy     #>gbpbpb        ; get page number of ROM/RAM split.            
+            ldy     #>gbpbpb        ; get page number of ROM/RAM split.
             sta     port_cmd
             rts
 }

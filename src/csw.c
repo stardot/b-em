@@ -314,4 +314,3 @@ void csw_findfilenames()
         csw_point   = temp;
         csw_loop = 0;
 }
-

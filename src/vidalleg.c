@@ -101,7 +101,7 @@ void video_enterfullscreen()
         else {
             log_error("vidalleg: could not set graphics mode to full-screen");
             fullscreen = 0;
-        }            
+        }
     }
     else {
         log_error("vidalleg: could not set graphics mode to full-screen");

@@ -80,14 +80,14 @@ int d_getkey(int msg, DIALOG *d, int cd)
                 }
 
                 textprintf_ex(screen,font,x+8,y+40,makecol(255,255,255),makecol(0,0,0),s);
-                
+
                 textprintf_ex(screen,font,x+8,y+56,makecol(255,255,255),makecol(0,0,0),"Please press new key...");
 getnewkey:
                 while (!keypressed());
                 k2=readkey()>>8;
                 if (k2==KEY_F11 || k2==KEY_F12) goto getnewkey;
                 keylookup[k2]=k;
-                
+
                 blit(b,screen,0,0,x,y,200,72);
                 destroy_bitmap(b);
                 while (key[KEY_SPACE]);
@@ -177,7 +177,7 @@ DIALOG bemdefinegui[]=
         {d_getkey, 458,138,28,28, 15,15,0,D_EXIT, 0,0,"DEL", (void *)KEY_DEL,"DELETE"},
         {d_getkey, 490,138,28,28, 15,15,0,D_EXIT, 0,0,"CPY", (void *)KEY_END,"COPY"},//72
         {d_getkey, 122,170,256,28, 15,15,0,D_EXIT, 0,0,"SPACE", (void *)KEY_SPACE,NULL},
-        
+
         {d_yield_proc},
         {0,0,0,0,0,0,0,0,0,0,0,NULL,NULL,NULL}
 };

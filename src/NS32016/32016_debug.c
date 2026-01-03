@@ -229,4 +229,3 @@ cpu_debug_t n32016_cpu_debug = {
    .print_addr     = debug_print_addr32,
    .parse_addr     = debug_parse_addr
 };
-

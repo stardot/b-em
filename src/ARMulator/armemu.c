@@ -498,7 +498,7 @@ ARMul_Emulate26 (ARMul_State * state)
     ARMword lhs;		/* Almost the ABus and BBus.  */
     ARMword rhs;
     ARMword decoded = 0;	/* Instruction pipeline.  */
-    ARMword loaded = 0;	
+    ARMword loaded = 0;
 
     /* Execute the next instruction.  */
 
@@ -3544,7 +3544,7 @@ mainswitch:
                     }
                     else
                         /* FIXME: Not sure what to do for other v5 processors.  */
-                        ARMul_UndefInstr (state, instr);		    
+                        ARMul_UndefInstr (state, instr);
                     break;
                 }
                 /* Drop through.  */
@@ -4389,7 +4389,7 @@ Handle_Load_Double (ARMul_State * state, ARMword instr)
     ARMword addr_reg;
     ARMword write_back  = AEBIT (21);
     ARMword immediate   = AEBIT (22);
-    ARMword add_to_base = AEBIT (23);        
+    ARMword add_to_base = AEBIT (23);
     ARMword pre_indexed = AEBIT (24);
     ARMword offset;
     ARMword addr;
@@ -4496,7 +4496,7 @@ Handle_Store_Double (ARMul_State * state, ARMword instr)
     ARMword addr_reg;
     ARMword write_back  = AEBIT (21);
     ARMword immediate   = AEBIT (22);
-    ARMword add_to_base = AEBIT (23);        
+    ARMword add_to_base = AEBIT (23);
     ARMword pre_indexed = AEBIT (24);
     ARMword offset;
     ARMword addr;
@@ -5170,7 +5170,7 @@ Multiply64 (ARMul_State * state, ARMword instr, int msigned, int scc)
     unsigned multiply, and what bits are clear in the multiplier.  */
     if (msigned && (Rm & ((unsigned) 1 << 31)))
         /* Invert the bits to make the check against zero.  */
-        Rm = ~Rm;			
+        Rm = ~Rm;
 
     if ((Rm & 0xFFFFFF00) == 0)
         scount = 1;

@@ -2204,4 +2204,3 @@ int fdi2raw_loadtrack (FDI *fdi, uae_u16 *mfmbuf, uae_u16 *tracktiming, int trac
 	}
 	return outlen;
 }
-

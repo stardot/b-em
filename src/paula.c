@@ -409,4 +409,3 @@ void paula_fillbuf(int16_t *buffer, int len) {
         *bufptr++ += s;
     }
 }
-

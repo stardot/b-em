@@ -13,4 +13,3 @@ extern int readc[65536], writec[65536], fetchc[65536];
 extern int debug_core,debug_tube,debug_step;
 
 #endif
-

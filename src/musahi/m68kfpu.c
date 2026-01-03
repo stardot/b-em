@@ -846,5 +846,3 @@ void m68040_fpu_op1(void)
         default:    fatalerror("m68040_fpu_op1: unimplemented op %d at %08X\n", (REG_IR >> 6) & 0x3, REG_PC-2);
     }
 }
-
-

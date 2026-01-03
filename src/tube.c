@@ -137,7 +137,7 @@ uint8_t tube_host_read(uint16_t addr)
                 temp = (tubeula.hstat[0] & TUBE_BOTH_AVAIL) | tubeula.r1stat;
                 break;
             case 1: /*Register 1*/
-                if (tubeula.ph1count > 0) {              
+                if (tubeula.ph1count > 0) {
                     temp = tubeula.ph1[tubeula.ph1head];
                     if (--tubeula.ph1count == 0)
                         tubeula.hstat[0] &= ~TUBE_DATA_AVAIL;

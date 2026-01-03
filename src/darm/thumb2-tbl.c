@@ -86,4 +86,3 @@ const char *thumb2_instruction_strings[] = {
     "RSB", "SBC", "PLD", "SMMLA", "QSAX", "SMLAL", "LDRSH", "MOV", "LDRSHT",
     "LDRSH", "MRS"
 };
-

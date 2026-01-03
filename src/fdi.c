@@ -389,4 +389,3 @@ int fdi_load(int drive, const char *fn)
         drives[drive].spindown    = NULL;
         return 0;
 }
-

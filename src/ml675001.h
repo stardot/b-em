@@ -446,7 +446,7 @@ extern "C" {
 #define PWCON_CLK16 (0x0004)    /* 1/16 CPUCLK */
 #define PWCON_CLK32 (0x0006)    /* 1/32 CPUCLK */
 #define PWCON_INTIE (0x0040)    /* enable interrupt */
-#define PWCON_PWCOV (0x0080)    
+#define PWCON_PWCOV (0x0080)
 
 /* bit field of PWINTSTS register */
 #define PWINTSTS_INT1S      (0x0200)    /* CH1 interrupt generated */

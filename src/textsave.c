@@ -483,7 +483,7 @@ void textsave(const char *filename)
 {
     FILE *fp = fopen(filename, "w");
     if (fp) {
-        uint_least16_t mem_addr = crtc[13] | (crtc[12] << 8);            
+        uint_least16_t mem_addr = crtc[13] | (crtc[12] << 8);
         if (ula_ctrl & 2)
             textsave_teletext(filename, fp, mem_addr);
         else
@@ -494,4 +494,3 @@ void textsave(const char *filename)
         log_error("unable to open file %s: %s\n", filename, strerror(errno));
     }
 }
-

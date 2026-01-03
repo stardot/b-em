@@ -1774,7 +1774,7 @@ const char *vdfs_get_root(void)
 
 static vdfs_entry *ss_spec_path(FILE *f, const char *which)
 {
-    vdfs_path path;    
+    vdfs_path path;
     vdfs_findres res;
     int len = savestate_load_var(f);
     if (len < MAX_ACORN_PATH) {

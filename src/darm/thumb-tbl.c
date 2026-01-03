@@ -142,4 +142,3 @@ darm_instr_t type_extend_instr_lookup[] = {
 darm_instr_t type_rev_instr_lookup[] = {
     I_REV, I_REV16, I_INVLD, I_REVSH
 };
-

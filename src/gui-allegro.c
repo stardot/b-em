@@ -256,7 +256,7 @@ static ALLEGRO_MENU *create_rom_menu(void)
 static void update_rom_menu(void)
 {
     ALLEGRO_MENU *menu = rom_menu;
-    
+
     for (int slot = ROM_NSLOT-1; slot >= 0; slot--) {
         char label[ROM_LABEL_LEN];
         gen_rom_label(slot, label);
@@ -1172,7 +1172,7 @@ static void toggle_music5000(void)
         sound_music5000 = true;
         music5000_init(emuspeed);
     }
-}    
+}
 
 static const char all_dext[] = "*.ssd;*.dsd;*.img;*.adf;*.ads;*.adm;*.adl;*.sdd;*.ddd;*.fdi;*.imd;*.hfe;"
                                "*.SSD;*.DSD;*.IMG;*.ADF;*.ADS;*.ADM;*.ADL;*.SDD;*.DDD;*.FDI;*.IMD;*.HFE";

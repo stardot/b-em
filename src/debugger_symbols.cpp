@@ -155,4 +155,3 @@ void symbol_list(symbol_table *symtab, cpu_debug_t *cpu, debug_outf_t debug_outf
         debug_outf("No symbols loaded");
     symtab->symbol_list(cpu, debug_outf);
 }
-

@@ -486,4 +486,3 @@ ARMul_SafeWriteByte (ARMul_State * state, ARMword address, ARMword data)
      FALSE);
 }
 #endif
-

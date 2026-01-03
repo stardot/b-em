@@ -163,7 +163,7 @@ So instead we use the macro below and test it against specific values.
 #define VA_OPEN(AP, VAR)        { va_list AP; va_start(AP, VAR); { struct Qdmy
 #define VA_CLOSE(AP)            } va_end(AP); }
 #define VA_FIXEDARG(AP, T, N)   struct Qdmy
- 
+
 #undef const
 #undef volatile
 #undef signed
@@ -367,5 +367,3 @@ So instead we use the macro below and test it against specific values.
 #endif
 
 #endif  /* ansidecl.h    */
-
-
