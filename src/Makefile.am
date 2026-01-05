@@ -174,11 +174,7 @@ jstest_LDADD = -lallegro -lallegro_main
 
 gtest_SOURCES = sdf-gtest.c sdf-geo.c
 
-gtest_LDADD = -lallegro_main
-
 sdf2imd_SOURCES = sdf2imd.c sdf-geo.c
-
-sdf2imd_LDADD = -lallegro_main
 
 bsnapdump_SOURCES = bsnapdump.c
 
