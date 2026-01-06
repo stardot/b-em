@@ -22,6 +22,11 @@ if OS_WIN
 b_em_LDFLAGS = $(AM_LDFLAGS) -mwindows
 endif
 
+if OS_MACOS
+LIBS_ALLEGRO += -lallegro_main
+LIBS_ALLEGRO_FULL += -lallegro_main
+endif
+
 # The following flags are used by PiTubeDirect Co Pros:
 #                BEM - fixes for compilation in B-Em envorinment
 #   INCLUDE_DEBUGGER - include the cpu_debug implementation
@@ -29,12 +34,7 @@ endif
 
 b_em_CPPFLAGS = $(AM_CPPFLAGS) -DBEM -DINCLUDE_DEBUGGER -DUSE_MEMORY_POINTER -DMODET -DMODE32 -DBEEBEM
 
-# workaround for Win32 Allegro, which has `allegro-config' missing
-if OS_WIN
-b_em_LDADD = -lallegro_audio -lallegro_acodec -lallegro_primitives -lallegro_dialog -lallegro_image -lallegro_font -lallegro -lz -lm
-else
-b_em_LDADD = -lallegro_audio -lallegro_acodec -lallegro_primitives -lallegro_dialog -lallegro_image -lallegro_font -lallegro_main -lallegro -lz -lm -lpthread
-endif
+b_em_LDADD = $(LIBS_ZLIB) $(LIBS_ALLEGRO_FULL) $(LIBS_MIDI)
 
 b_em_SOURCES = \
     6502.c \
@@ -170,7 +170,7 @@ hdfmt_SOURCES = hdfmt.c
 
 jstest_SOURCES = jstest.c
 
-jstest_LDADD = -lallegro -lallegro_main
+jstest_LDADD = $(LIBS_ALLEGRO)
 
 gtest_SOURCES = sdf-gtest.c sdf-geo.c
 
@@ -178,7 +178,7 @@ sdf2imd_SOURCES = sdf2imd.c sdf-geo.c
 
 bsnapdump_SOURCES = bsnapdump.c
 
-bsnapdump_LDADD = -lz
+bsnapdump_LDADD = $(LIBS_ZLIB)
 
 disptrace_SOURCES = disptrace.c
 

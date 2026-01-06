@@ -70,19 +70,28 @@ AC_USE_SYSTEM_EXTENSIONS
 # Checks for libraries.
 AC_SEARCH_LIBS([sin], [m])
 AC_SEARCH_LIBS([pthread_create], [pthread])
+tmp_save_LIBS="$LIBS"
+LIBS=""
 AC_SEARCH_LIBS([al_install_system], [allegro], [],
                [AC_MSG_FAILURE([The Allegro version 5 library is needed but not installed], 1)])
+LIBS_ALLEGRO="$LIBS"
 AC_SEARCH_LIBS([al_init_acodec_addon], [allegro_acodec], [], [AC_MSG_FAILURE([allegro_acodec not found], 1)])
 AC_SEARCH_LIBS([al_install_audio], [allegro_audio], [], [AC_MSG_FAILURE([allegro_audio not found], 1)])
 AC_SEARCH_LIBS([al_init_native_dialog_addon], [allegro_dialog], [], [AC_MSG_FAILURE([allegro_dialog not found], 1)])
 AC_SEARCH_LIBS([al_init_font_addon], [allegro_font], [], [AC_MSG_FAILURE([allegro_font not found], 1)])
 AC_SEARCH_LIBS([al_init_image_addon], [allegro_image], [], [AC_MSG_FAILURE([allegro_image not found], 1)])
 AC_SEARCH_LIBS([al_init_primitives_addon], [allegro_primitives], [], [AC_MSG_FAILURE([allegro_primitives not found], 1)])
+LIBS_ALLEGRO_FULL="$LIBS"
+LIBS=""
 AC_SEARCH_LIBS([gzopen], [zlib z], [], [AC_MSG_FAILURE([zlib not found], 1)])
+LIBS_ZLIB="$LIBS"
+LIBS=""
 AC_SEARCH_LIBS([jack_port_register], [jack jack2])
 AC_SEARCH_LIBS([snd_rawmidi_open], [asound])
 # Can't use AC_SEARCH_LIBS for win32 api due to __stdcall
 AS_IF([test "$os_win" = "1"],[LIBS="-lwinmm $LIBS"])
+LIBS_MIDI="$LIBS"
+LIBS="$tmp_save_LIBS"
 
 # Checks for header files.
 AC_HEADER_STDBOOL
@@ -120,6 +129,10 @@ AC_SUBST([AM_CFLAGS])
 AC_SUBST([AM_CXXFLAGS])
 AC_SUBST([AM_CPPFLAGS])
 AC_SUBST([AM_LDFLAGS])
+AC_SUBST([LIBS_ALLEGRO])
+AC_SUBST([LIBS_ALLEGRO_FULL])
+AC_SUBST([LIBS_ZLIB])
+AC_SUBST([LIBS_MIDI])
 
 AC_CONFIG_FILES([Makefile src/Makefile])
 AC_OUTPUT
