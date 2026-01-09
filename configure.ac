@@ -72,7 +72,7 @@ AC_FUNC_ALLOCA
 AC_FUNC_ERROR_AT_LINE
 AC_FUNC_MALLOC
 AC_FUNC_MKTIME
-AC_CHECK_FUNCS([asprintf atexit floor memset mkdir pow rmdir sqrt stpcpy strcasecmp strchr strdup strerror strncasecmp strrchr strtol])
+AC_CHECK_FUNCS([atexit floor memset mkdir pow rmdir sqrt stpcpy strcasecmp strchr strdup strerror strncasecmp strrchr strtol])
 
 # Checks for Linux MIDI implementations.
 AC_CHECK_HEADERS(jack/jack.h alsa/asoundlib.h)
