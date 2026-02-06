@@ -25,7 +25,9 @@ typedef enum {
     CAM_BIND,   // one byte follows, relative to PC, indirect
     CAM_GLB0,   // one byte global number follows, globals 0-255
     CAM_GLB1,   // one byte global number follows, globals 256-511
-    CAM_GLB2    // one byte global number follows, globals 512-767
+    CAM_GLB2,   // one byte global number follows, globals 512-767
+    CAM_SWB,    // especially for the SWB instruction.
+    CAM_SWL     // especially for the SWL instruction.
 } cintcode_am;
 
 /* CINTCODE instruction types.  Only the ones needed for tracing
@@ -37,6 +39,7 @@ typedef enum {
     CIT_UJMP,   // unconitional jump.
     CIT_CALL,   // call.
     CIT_RETN,   // return.
+    CIT_MCOD,   // switch to machine code.
     CIT_OTHR    // anything that does not affect control flow.
 } cintocde_it;
 

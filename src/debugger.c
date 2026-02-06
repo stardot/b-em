@@ -515,7 +515,7 @@ static uint32_t cintcode_dis(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
 
     uint8_t b1, b2;
     uint8_t opcode;
-    uint16_t global = 0;
+    uint16_t global = 0, w;
     const cintcode_op *op;
 
     assert(bufsize > 34);
@@ -529,6 +529,7 @@ static uint32_t cintcode_dis(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
 
     switch(op->cc_am) {
         case CAM_IMP:
+        case CAM_SWB:
             break;
         case CAM_BYTE:
             b1 = cpu->memread(addr++);
@@ -544,10 +545,15 @@ static uint32_t cintcode_dis(cpu_debug_t *cpu, uint32_t addr, char *buf, size_t 
             hexbyte(buf+23, b1);
             break;
         case CAM_BREL:
-        case CAM_BIND:
             b1 = cpu->memread(addr++);
             hexbyte(buf+9, b1);
             hexword(buf+21, addr + b1 - 0x80);
+            break;
+        case CAM_BIND:
+            b1 = cpu->memread(addr++);
+            hexbyte(buf+9, b1);
+            w = (addr + ((b1<<1)|1)) & 0xfffe;
+            hexword(buf+21, cpu->memread(w));
             break;
         case CAM_GLB2:
             global += 256;
@@ -720,6 +726,24 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
             case 'H':
             case '?':
                 debug_out(helptext, sizeof helptext - 1);
+                break;
+
+            case 'g':
+            case 'G':
+                if (bcpl_mode) {
+                    uint16_t gvec = (cpu->memread(0x0e) << 1) | (cpu->memread(0x0f) << 9);
+                    for (int i = 0; i < CINTCODE_NGLOB; i++) {
+                        char label[15];
+                        uint16_t val = cpu->memread(gvec) | (cpu->memread(gvec+1) << 8);
+                        if (val == 0xfc88 || val < 0x4000)
+                            val = 0;
+                        else
+                            val <<= 1;
+                        snprintf(label, sizeof(label), "\"%s\"", cintocde_globs[i]);
+                        printf("    /* %03d */ { 0x%04X, %-14s },\n", i, val, label);
+                        gvec += 2;
+                    }
+                }
                 break;
 
             case 'm':
@@ -973,6 +997,11 @@ static void native_trace(cpu_debug_t *cpu, uint32_t addr)
     putc('\n', trace_fp);
 }
 
+static uint32_t cpc;
+static uint32_t ind;
+static uint32_t fval;
+static uint8_t dbyte;
+
 void debug_preexec (cpu_debug_t *cpu, uint32_t addr)
 {
     bool enter = false;
@@ -980,6 +1009,31 @@ void debug_preexec (cpu_debug_t *cpu, uint32_t addr)
     const char *cc;
 
     if (bcpl_mode) {
+        if (addr == 0x87e8) {
+            dbyte = a;
+            cpc = x;
+        }
+        else if (addr == 0x87ec)
+            cpc |= (x << 8);
+#if 0
+        else if (addr == 0x87fe) {
+            uint32_t dest = cpu->memread(0x56) | (cpu->memread(0x57) << 8);
+            uint32_t pdest = dpc + dbyte - 0x80;
+            printf("rel jump, orig pc=%04X, byte=%02X, new pc=%04X, calc pc=%04X %s\n", dpc, dbyte, dest, pdest, pdest == dest ? "worked" : "failed");
+        }
+#endif
+        else if (addr == 0x8810)
+            ind = cpu->memread(0x56) | (cpu->memread(0x57) << 8);
+        else if (addr == 0x8818)
+            fval = a | (x << 8);
+        else if (addr == 0x8821) {
+            uint32_t pind = (cpc + ((dbyte<<1)|1)) & 0xfffffffe;
+            uint32_t fin = cpu->memread(0x56) | (cpu->memread(0x57) << 8);
+            uint32_t offs = cpu->memread(pind) | (cpu->memread(pind+1) << 8);
+            uint32_t calc = (pind + offs) & 0xffff;
+            printf("ind jump, orig pc=%04X, byte=%02X, indirect=%04X, putatuve=%04X %s, fetched=%04X, final=%04X, calc=%04X %s\n", cpc, dbyte, ind, pind, (pind == ind) ? "worked" : "failed", fval, fin, calc, (calc == fin) ? "worked" : "failed");
+        }
+
         if (addr != 0x416)
             return;
         eaddr = cpu->memread(6)|(cpu->memread(7)<<8);

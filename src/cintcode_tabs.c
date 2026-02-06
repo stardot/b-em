@@ -1,5 +1,5 @@
 /* Tables to enable disassembling the CINTCODE used as an intermediate
- * code for BCPL on the RCP implementation for the BC Micro.
+ * code for BCPL on the RCP implementation for the BBC Micro.
  */
 
 #include "cintcode_tabs.h"
@@ -9,7 +9,7 @@
 const cintcode_op cintcode_ops[256] = {
     /* 00 */ { "--",    CAM_IMP,  CIT_OTHR }, /* 8776 */
     /* 01 */ { "--",    CAM_IMP,  CIT_OTHR }, /* 8776 */
-    /* 02 */ { "BRK",   CAM_IMP,  CIT_OTHR }, /* 826A */
+    /* 02 */ { "BRK",   CAM_IMP,  CIT_UJMP }, /* 826A */
     /* 03 */ { "K3",    CAM_IMP,  CIT_CALL }, /* 82F2 */
     /* 04 */ { "K4",    CAM_IMP,  CIT_CALL }, /* 82F2 */
     /* 05 */ { "K5",    CAM_IMP,  CIT_CALL }, /* 82F2 */
@@ -20,7 +20,7 @@ const cintcode_op cintcode_ops[256] = {
     /* 0A */ { "K10",   CAM_IMP,  CIT_CALL }, /* 82F2 */
     /* 0B */ { "K11",   CAM_IMP,  CIT_CALL }, /* 82F2 */
     /* 0C */ { "K12",   CAM_IMP,  CIT_CALL }, /* 82F2 */
-    /* 0D */ { "CODE1", CAM_IMP,  CIT_OTHR }, /* 871A */
+    /* 0D */ { "CODE1", CAM_IMP,  CIT_MCOD }, /* 871A */
     /* 0E */ { "LM",    CAM_BYTE, CIT_OTHR }, /* 8678 */
     /* 0F */ { "LM1",   CAM_IMP,  CIT_OTHR }, /* 83D3 */
     /* 10 */ { "L0",    CAM_IMP,  CIT_OTHR }, /* 831E */
@@ -153,8 +153,8 @@ const cintcode_op cintcode_ops[256] = {
     /* 8F */ { "LP15",  CAM_IMP,  CIT_OTHR }, /* 8600 */
     /* 90 */ { "LP16",  CAM_IMP,  CIT_OTHR }, /* 8600 */
     /* 91 */ { "--",    CAM_IMP,  CIT_OTHR }, /* 865E */
-    /* 92 */ { "SWB",   CAM_IMP,  CIT_OTHR }, /* 84C3 */
-    /* 93 */ { "SWL",   CAM_IMP,  CIT_OTHR }, /* 84F5 */
+    /* 92 */ { "SWB",   CAM_SWB,  CIT_UJMP }, /* 84C3 */
+    /* 93 */ { "SWL",   CAM_SWL,  CIT_UJMP }, /* 84F5 */
     /* 94 */ { "ST",    CAM_IMP,  CIT_OTHR }, /* 85A1 */
     /* 95 */ { "ST1",   CAM_IMP,  CIT_OTHR }, /* 85A1 */
     /* 96 */ { "ST2",   CAM_IMP,  CIT_OTHR }, /* 85A1 */
@@ -214,7 +214,7 @@ const cintcode_op cintcode_ops[256] = {
     /* CC */ { "AP12",  CAM_IMP,  CIT_OTHR }, /* 86B6 */
     /* CD */ { "--",    CAM_IMP,  CIT_OTHR }, /* 8776 */
     /* CE */ { "--",    CAM_IMP,  CIT_OTHR }, /* 8776 */
-    /* CF */ { "CODE2", CAM_IMP,  CIT_OTHR }, /* 8701 */
+    /* CF */ { "CODE2", CAM_IMP,  CIT_MCOD }, /* 8701 */
     /* D0 */ { "NOP",   CAM_IMP,  CIT_OTHR }, /* 8697 */
     /* D1 */ { "A1",    CAM_IMP,  CIT_OTHR }, /* 868C */
     /* D2 */ { "A2",    CAM_IMP,  CIT_OTHR }, /* 868C */
