@@ -120,7 +120,9 @@ enum imd_state {
 
 static enum imd_state state;
 static unsigned count;
+static unsigned imd_flags;
 static int      imd_time;
+static int      imd_posn;
 static unsigned char *data, cdata;
 struct imd_track *cur_trk;
 struct imd_sect  *cur_sect;
@@ -144,39 +146,61 @@ static void imd_save(struct imd_file *imd)
 {
     fseek(imd->fp, imd->track0, SEEK_SET);
     for (struct imd_track *trk = imd->track_head; trk; trk = trk->next) {
-        uint8_t buf[5+IMD_MAX_SECTS];
+        uint8_t buf[5+2*IMD_MAX_SECTS];
+        bool varisect = false;
+        if (trk->sectsize == 0xff) {
+            const struct imd_sect *sect = trk->sect_head;
+            if (sect) {
+                unsigned size = sect->sectsize;
+                const struct imd_sect *next = sect->next;
+                while (next) {
+                    sect = next;
+                    next = sect->next;
+                    if (sect->sectsize != size) {
+                        varisect = true;
+                        break;
+                    }
+                }
+                if (!varisect)
+                    trk->sectsize = size;
+            }
+        }
         buf[0] = trk->mode;
         buf[1] = trk->cylinder;
         buf[2] = trk->head;
         buf[3] = trk->nsect;
         buf[4] = trk->sectsize;
         uint8_t *ptr = buf+5;
-        bool cylmap = false;
-        bool headmap = false;
         for (struct imd_sect *sect = trk->sect_head; sect; sect = sect->next) {
             *ptr++ = sect->sectid;
             if (sect->cylinder != trk->cylinder)
-                cylmap = true;
+                buf[2] |= 0x80; /* cylinder map needed */
             if (sect->head != trk->head)
-                headmap = true;
+                buf[2] |= 0x40; /* head map needed */
         }
         fwrite(buf, ptr-buf, 1, imd->fp);
-        if (cylmap) {
+        if (buf[2] & 0x80) {
+            /* cylinder map needed */
             ptr = buf;
             for (struct imd_sect *sect = trk->sect_head; sect; sect = sect->next)
                 *ptr++ = sect->cylinder;
             fwrite(buf, ptr-buf, 1, imd->fp);
         }
-        if (headmap) {
+        if (buf[2] & 0x40) {
+            /* head map needed */
             ptr = buf;
             for (struct imd_sect *sect = trk->sect_head; sect; sect = sect->next)
                 *ptr++ = sect->head;
             fwrite(buf, ptr-buf, 1, imd->fp);
         }
-        if (trk->sectsize == 0xff) {
+        if (varisect) {
+            /* variable sector lengths */
             ptr = buf;
-            for (struct imd_sect *sect = trk->sect_head; sect; sect = sect->next)
-                *ptr++ = sect->sectsize;
+            for (const struct imd_sect *sect = trk->sect_head; sect; sect = sect->next) {
+                unsigned sectsize = 128 << sect->sectsize;
+                *ptr++ = sectsize & 0xff;
+                *ptr++ = sectsize >> 8;
+            }
             fwrite(buf, ptr-buf, 1, imd->fp);
         }
         for (struct imd_sect *sect = trk->sect_head; sect; sect = sect->next) {
@@ -243,9 +267,11 @@ static void imd_close(int drive)
 }
 
 /*
- * This function implements the seek command, i.e. it moves the
- * virtual head to the specified cylinder.  It does not check that
- * the ID fields match this track number.
+ * This function implements the seek command, i.e. it should move the
+ * virtual head to the specified cylinder.  As the IMD format is track
+ * rather than cyldinder oriented, we can't search for the new cylinder
+ * immediately.  It does not check that the ID fields match this track
+ * number.
  */
 
 static void imd_seek(int drive, int track)
@@ -268,8 +294,9 @@ static void imd_seek(int drive, int track)
  * the density requested from the controller.
  */
 
-static int imd_density_ok(struct imd_track *trk, int density)
+static int imd_density_ok(struct imd_track *trk, unsigned flags)
 {
+    unsigned density = flags & DISC_FLAG_MFM;
     return (density && trk->mode >= 3) || (!density && trk->mode <= 2);
 }
 
@@ -279,7 +306,7 @@ static int imd_density_ok(struct imd_track *trk, int density)
  * check only examines the first sector it can find on either surface.
  */
 
-static int imd_verify(int drive, int track, int density)
+static int imd_verify(int drive, int track, unsigned flags)
 {
     if (state == ST_IDLE && drive >= 0 && drive < NUM_DRIVES) {
         struct imd_file *imd = &imd_discs[drive];
@@ -295,7 +322,7 @@ static int imd_verify(int drive, int track, int density)
                 }
             }
         }
-        int res = trk && trk->sect_head->cylinder == track && imd_density_ok(trk, density);
+        int res = trk && trk->sect_head->cylinder == track && imd_density_ok(trk, flags);
         log_debug("imd: drive %d: verify result=%d", drive, res);
         return res;
     }
@@ -304,25 +331,28 @@ static int imd_verify(int drive, int track, int density)
 
 /*
  * This is an internal function to find a track prior to reading from
- * it or writing to it. This has to search the list for IDs rather
- * than counting as tracks in the image file can be in any order.
+ * it or writing to it. It uses the current track pointer to avoid a
+ * search where possible but, if this doesn't match, it has to search
+ * the list for IDs rather than counting as tracks in the image file
+ * can be in any order.
  *
  * Note that this searches for the physical cylinder ID which is not
  * the same as the cylinder encoded within sector headers.
  */
 
-static struct imd_track *imd_find_track(int drive, int track, int side, int density)
+static struct imd_track *imd_find_track(int drive, int side, unsigned flags)
 {
     if (drive >= 0 && drive < NUM_DRIVES) {
         struct imd_file *imd = &imd_discs[drive];
         struct imd_track *trk = imd->track_cur;
-        if (!trk || !imd_density_ok(trk, density)) {
-            log_debug("imd: drive %d: searching for track", drive);
+        unsigned track = imd->trackno;
+        if (!trk || trk->head != side || !imd_density_ok(trk, flags)) {
             if (track > imd->maxcyl)
                 track = imd->maxcyl;
+            log_debug("imd: drive %d: searching for track %d side %d", drive, track, side);
             for (trk = imd->track_head; trk; trk = trk->next) {
-                log_debug("imd: drive %d: cyl %u<>%u, head %u<>%u", drive, trk->cylinder, imd->trackno, trk->head, side);
-                if (trk->cylinder == track && trk->head == side && imd_density_ok(trk, density)) {
+                log_debug("imd: drive %d: cyl %u<>%u, head %u<>%u", drive, trk->cylinder, track, trk->head, side);
+                if (trk->cylinder == track && trk->head == side && imd_density_ok(trk, flags)) {
                     log_debug("imd: drive %d: found track", drive);
                     imd->track_cur = trk;
                     imd->headno = side;
@@ -358,29 +388,42 @@ static struct imd_sect *imd_find_sector(int drive, int track, int side, int sect
  * imd_poll function and associated state machine.
  */
 
-static void imd_readsector(int drive, int sector, int track, int side, int density)
+static void imd_readsector(int drive, int sector, int track, int side, unsigned flags)
 {
-    log_debug("imd: drive %d: readsector sector=%d, track=%d, side=%d, density=%d", drive, sector, track, side, density);
+    log_debug("imd: drive %d: readsector sector=%d, track=%d, side=%d, flags=%x", drive, sector, track, side, flags);
     if (state == ST_IDLE) {
-        struct imd_track *trk = imd_find_track(drive, track, side, density);
+        struct imd_track *trk = imd_find_track(drive, side, flags);
         if (trk) {
             struct imd_sect *sect = imd_find_sector(drive, track, side, sector, trk);
             if (sect) {
-                count = 128 << sect->sectsize;
-                cur_sect = sect;
-                if (sect->mode & 1) {
-                    log_debug("imd: drive %d: found full sector", drive);
-                    data = sect->data;
-                    state = ST_READSECTOR;
+                unsigned mode = sect->mode;
+                if (mode) {
+                    if (!(flags & DISC_FLAG_DELD) || (mode != 3 && mode != 4)) {
+                        count = 128 << sect->sectsize;
+                        cur_sect = sect;
+                        if (sect->mode & 1) {
+                            log_debug("imd: drive %d: found full sector", drive);
+                            data = sect->data;
+                            state = ST_READSECTOR;
+                        }
+                        else {
+                            log_debug("imd: drive %d: found compressed sector", drive);
+                            cdata = sect->data[0];
+                            state = ST_READCOMPR;
+                        }
+                        return;
+                    }
+                    else
+                        log_debug("imd: drive %d: readsector, deleted data found, ignoring as DISC_FLAG_DELD not set", drive);
                 }
-                else {
-                    log_debug("imd: drive %d: found compressed sector", drive);
-                    cdata = sect->data[0];
-                    state = ST_READCOMPR;
-                }
-                return;
+                else
+                    log_debug("imd: drive %d: readsector, sector data unavailable", drive);
             }
+            else
+                log_debug("imd: drive %d: readsector, sector not found", drive);
         }
+        else
+            log_debug("imd: drive %d: readsector, track not found", drive);
         count = 500;
         state = ST_NOTFOUND;
     }
@@ -392,15 +435,15 @@ static void imd_readsector(int drive, int sector, int track, int side, int densi
  * imd_poll function and associated state machine.
  */
 
-static void imd_writesector(int drive, int sector, int track, int side, int density)
+static void imd_writesector(int drive, int sector, int track, int side, unsigned flags)
 {
-    log_debug("imd: drive %d: writesector sector=%d, track=%d, side=%d, density=%d", drive, sector, track, side, density);
+    log_debug("imd: drive %d: writesector sector=%d, track=%d, side=%d, flags=%d", drive, sector, track, side, flags);
     if (state == ST_IDLE) {
-        struct imd_track *trk = imd_find_track(drive, track, side, density);
+        struct imd_track *trk = imd_find_track(drive, side, flags);
         if (trk) {
             struct imd_sect *sect = imd_find_sector(drive, track, side, sector, trk);
             if (sect) {
-                if (writeprot[drive]) {
+                if (drives[drive].writeprot) {
                     count = 1;
                     state = ST_WRITEPROT;
                 }
@@ -408,6 +451,7 @@ static void imd_writesector(int drive, int sector, int track, int side, int dens
                     cur_trk = trk;
                     cur_sect = sect;
                     count = 128 << sect->sectsize;
+                    imd_flags = flags;
                     imd_discs[drive].dirty = true;
                     imd_time = -20;
                     state = ST_WRITESECTOR0;
@@ -426,17 +470,12 @@ static void imd_writesector(int drive, int sector, int track, int side, int dens
  * via the imd_poll function and associated state machine.
  */
 
-static void imd_readaddress(int drive, int track, int side, int density)
+static void imd_readaddress(int drive, int side, unsigned flags)
 {
-    log_debug("imd: drive %d: readaddress track=%d, side=%d, density=%d", drive, track, side, density);
+    log_debug("imd: drive %d: readaddress side=%d, flags=%d", drive, side, flags);
     if (state == ST_IDLE) {
         struct imd_track *trk = cur_trk;
-        if (trk && trk->cylinder == track && trk->head == side && imd_density_ok(trk, density)) {
-            if (!(cur_sect = cur_sect->next))
-                cur_sect = trk->sect_head;
-            state = ST_READ_ADDR0;
-        }
-        else if ((trk = imd_find_track(drive, track, side, density))) {
+        if ((trk = imd_find_track(drive, side, flags))) {
             cur_trk = trk;
             cur_sect = trk->sect_head;
             state = ST_READ_ADDR0;
@@ -453,16 +492,17 @@ static void imd_readaddress(int drive, int track, int side, int density)
  * and the WD1770 write track command.
  */
 
-static bool imd_begin_format(int drive, int track, int side, int density)
+static bool imd_begin_format(int drive, int side, unsigned flags)
 {
     if (drive >= 0 && drive < NUM_DRIVES) {
-        if (writeprot[drive]) {
+        if (drives[drive].writeprot) {
             count = 1;
             state = ST_WRITEPROT;
             return false;
         }
         struct imd_file *imd = &imd_discs[drive];
         struct imd_track *trk = imd->track_head;
+        unsigned track = imd->trackno;
         while (trk) {
             if (trk->cylinder == track && trk->head == side) {
                 imd_free_sectors(trk);
@@ -495,9 +535,10 @@ static bool imd_begin_format(int drive, int track, int side, int density)
         }
         trk->sect_head = NULL;
         trk->sect_tail = NULL;
-        trk->mode      = density ? 0x05 : 0x02;
+        trk->mode      = (flags & DISC_FLAG_MFM) ? 0x05 : 0x02;
         trk->cylinder  = track;
         trk->head      = side;
+        imd->track_cur = trk;
         cur_trk = trk;
         cur_sect = NULL;
         imd_time = -20;
@@ -514,9 +555,9 @@ static bool imd_begin_format(int drive, int track, int side, int density)
  * the WD1770.  The difference is that the i8271 sends only ID fields.
  */
 
-static void imd_format(int drive, int track, int side, unsigned par2)
+static void imd_format(int drive, int side, unsigned par2)
 {
-    if (imd_begin_format(drive, track, side, 0)) {
+    if (imd_begin_format(drive, side, 0)) {
         unsigned nsect = par2 & 0x1f;
         cur_trk->nsect = nsect;
         cur_trk->sectsize  = par2 >> 5;
@@ -530,9 +571,9 @@ static void imd_format(int drive, int track, int side, unsigned par2)
  * than the i2871.  Unlike the i8271, the WD1770 sends the whole track.
  */
 
-static void imd_writetrack(int drive, int track, int side, int density)
+static void imd_writetrack(int drive, int side, unsigned flags)
 {
-    if (imd_begin_format(drive, track, side, density)) {
+    if (imd_begin_format(drive, side, flags)) {
         cur_trk->nsect = 0;
         cur_trk->sectsize = 0xfe;
         state = ST_WRTRACK_INITIAL;
@@ -543,9 +584,9 @@ static void imd_writetrack(int drive, int track, int side, int density)
  * the i2871.  This sends the whole track including gaps and IDs.
  */
 
-static void imd_readtrack(int drive, int track, int side, int density)
+static void imd_readtrack(int drive, int side, unsigned flags)
 {
-    struct imd_track *trk = imd_find_track(drive, track, side, density);
+    struct imd_track *trk = imd_find_track(drive, side, flags);
     if (trk) {
         cur_sect = trk->sect_head;
         count = 16;
@@ -590,12 +631,15 @@ static void imd_poll_finish_read(void)
         case 3:
         case 4:
             fdc_finishread(true);
+            break;
         case 5:
         case 6:
             fdc_datacrcerror(false);
+            break;
         case 7:
         case 8:
             fdc_datacrcerror(true);
+            break;
         default:
             fdc_finishread(false);
     }
@@ -613,7 +657,6 @@ static void imd_poll_finish_read(void)
 static void imd_poll_writesect0(void)
 {
     int b = fdc_getdata(0);
-    log_debug("imd: imd_poll_writesect0 byte=%02X", b);
     if (b != -1) {
         cdata = b;
         count--;
@@ -629,28 +672,9 @@ static void imd_poll_writesect0(void)
  * to an uncompressed sector format.
  */
 
-static unsigned mode_compressed(unsigned mode)
-{
-    if (mode == 0)
-        return 2;
-    if (mode & 1)
-        return mode+1;
-    return mode;
-}
-
-static unsigned mode_full(unsigned mode)
-{
-    if (mode == 0)
-        return 1;
-    if (mode & 1)
-        return mode;
-    return mode-1;
-}
-
 static void imd_poll_writesect1(void)
 {
     int b = fdc_getdata(--count == 0);
-    log_debug("imd: imd_poll_writesect1 byte=%02X", b);
     if (b == -1)
         count++;
     else {
@@ -677,13 +701,14 @@ static void imd_poll_writesect1(void)
                 if (prev)
                     prev->next = new_sect;
                 new_sect->sectsize = cur_sect->sectsize;
-                new_sect->mode     = mode_full(cur_sect->mode);
                 new_sect->cylinder = cur_sect->cylinder;
                 new_sect->head     = cur_sect->head;
                 new_sect->sectid   = cur_sect->sectid;
                 free(cur_sect);
                 cur_sect = new_sect;
             }
+            cur_sect->mode = (imd_flags & DISC_FLAG_DELD) ? 3 : 1;
+            log_debug("imd: imd_poll_writesect1, set mode=%d, flags=%02x", cur_sect->mode, imd_flags);
             unsigned used = (128 << cur_sect->sectsize) - count - 1;
             log_debug("imd: imd_poll_writesect1 used=%u", used);
             memset(cur_sect->data, cdata, used);
@@ -699,7 +724,8 @@ static void imd_poll_writesect1(void)
             cur_sect->data[0] = cdata;
             fdc_finishread(false);
             state = ST_IDLE;
-            cur_sect->mode = mode_compressed(cur_sect->mode);
+            cur_sect->mode = (imd_flags & DISC_FLAG_DELD) ? 4 : 2;
+            log_debug("imd: imd_poll_writesect1, set mode=%d", cur_sect->mode);
         }
     }
 }
@@ -718,7 +744,6 @@ static void imd_poll_writesect2(void)
         count++;
     }
     else {
-        log_debug("imd: imd_poll_writesect2 byte=%02X", c);
         *data++ = c;
         if (count == 0) {
             fdc_finishread(false);
@@ -782,7 +807,7 @@ static void imd_poll_format_cylid(void)
 /*
  * This function is part of the state machine to implement the format
  * command as used by the i8271.  It reveives and records the head
- * ID  of the sector being formatted.
+ * ID of the sector being formatted.
  */
 
 static void imd_poll_format_headid(void)
@@ -796,7 +821,7 @@ static void imd_poll_format_headid(void)
 /*
  * This function is part of the state machine to implement the format
  * command as used by the i8271.  It reveives and records the sector
- * ID  of the sector being formatted.
+ * ID of the sector being formatted.
  */
 
 static void imd_poll_format_sectid(void)
@@ -806,8 +831,6 @@ static void imd_poll_format_sectid(void)
     cur_sect->sectid = sectid;
     state = ST_FORMAT_SECTSZ;
 }
-
-static void imd_dump(struct imd_file *imd);
 
 /*
  * This function is part of the state machine to implement the format
@@ -827,7 +850,6 @@ static void imd_poll_format_sectsz(void)
     else {
         fdc_finishread(false);
         state = ST_IDLE;
-        imd_dump(&imd_discs[0]);
     }
 }
 
@@ -1056,6 +1078,19 @@ static void imd_poll(void)
     if (++imd_time <= 16)
         return;
     imd_time = 0;
+
+    if (++imd_posn == 1) {
+        if (imd_discs[0].fp)
+            drives[0].isindex = 1;
+        if (imd_discs[1].fp)
+            drives[1].isindex = 1;
+    }
+    else if (imd_posn == 50) {
+        if (imd_discs[0].fp)
+            drives[0].isindex = 0;
+        if (imd_discs[1].fp)
+            drives[1].isindex = 0;
+    }
 
     switch(state) {
         case ST_IDLE:
@@ -1332,7 +1367,7 @@ static void imd_sect_err(const char *fn, FILE *fp, int trackno, int sectno)
  * assembles them into a doubly linked list.
  */
 
-static bool imd_load_sectors(const char *fn, FILE *fp, struct imd_track *trk, int trackno, struct imd_maps *mp)
+static bool imd_load_sectors(const char *fn, FILE *fp, struct imd_track *trk, int trackno, struct imd_maps *mp, unsigned flags)
 {
     for (int sectno = 0; sectno < trk->nsect; sectno++) {
         unsigned ssize = (trk->sectsize == 0xff) ? mp->ssize_map[sectno] : trk->sectsize;
@@ -1356,8 +1391,8 @@ static bool imd_load_sectors(const char *fn, FILE *fp, struct imd_track *trk, in
         trk->sect_tail = sect;
 
         sect->mode = mode;
-        sect->cylinder = (trk->head & 0x80) ? mp->cyl_map[sectno]  : trk->cylinder;
-        sect->head     = (trk->head & 0x40) ? mp->head_map[sectno] : trk->head & ~0xc0;
+        sect->cylinder = (flags & 0x80) ? mp->cyl_map[sectno]  : trk->cylinder;
+        sect->head     = (flags & 0x40) ? mp->head_map[sectno] : trk->head;
         sect->sectid   = mp->snum_map[sectno];
         sect->sectsize = ssize;
         if (mode == 0)
@@ -1441,7 +1476,7 @@ static bool imd_load_tracks(const char *fn, FILE *fp, struct imd_file *imd)
             return false;
         if ((trk->sectsize == 0xff) && !imd_load_map(fn, fp, trk->nsect, maps.ssize_map, trackno, "sector size"))
             return false;
-        if (!imd_load_sectors(fn, fp, trk, trackno, &maps))
+        if (!imd_load_sectors(fn, fp, trk, trackno, &maps, hdr[2]))
             return false;
         trackno++;
     }
@@ -1472,7 +1507,7 @@ static void imd_dump(struct imd_file *imd)
  * interface.
  */
 
-void imd_load(int drive, const char *fn)
+int imd_load(int drive, const char *fn)
 {
     log_debug("imd: loading IMD image file '%s' into drive %d", fn, drive);
     if (drive >= 0 && drive < NUM_DRIVES) {
@@ -1481,7 +1516,7 @@ void imd_load(int drive, const char *fn)
         if (!fp) {
             if (!(fp = fopen(fn, "rb"))) {
                 log_error("Unable to open file '%s' for reading - %s", fn, strerror(errno));
-                return;
+                return -1;
             }
             wprot = 1;
         }
@@ -1494,7 +1529,7 @@ void imd_load(int drive, const char *fn)
                 imd->track0 = track0;
                 imd->trackno = 0;
                 imd_dump(imd);
-                writeprot[drive] = wprot;
+                drives[drive].writeprot = wprot;
                 drives[drive].close       = imd_close;
                 drives[drive].seek        = imd_seek;
                 drives[drive].verify      = imd_verify;
@@ -1506,11 +1541,12 @@ void imd_load(int drive, const char *fn)
                 drives[drive].abort       = imd_abort;
                 drives[drive].writetrack  = imd_writetrack;
                 drives[drive].readtrack   = imd_readtrack;
-                return;
+                return 0;
             }
         }
         else
             log_error("File '%s' does not have a valid IMD header", fn);
         fclose(fp);
     }
+    return -1;
 }

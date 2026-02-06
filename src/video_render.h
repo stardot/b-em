@@ -3,7 +3,7 @@
 
 extern ALLEGRO_BITMAP *b, *b16, *b32;
 extern ALLEGRO_LOCKED_REGION *region;
-extern ALLEGRO_COLOR border_col;
+extern ALLEGRO_COLOR border_col, mono_green_col, mono_amber_col, mono_white_col;
 
 #define BORDER_NONE_X_START_GRA 336
 #define BORDER_NONE_X_END_GRA   976
@@ -43,12 +43,21 @@ extern enum vid_disptype {
     VDT_INTERLACE,
     VDT_SCANLINES,
     VDT_LINEDOUBLE,
+    VDT_UNSET
 } vid_dtype_user, vid_dtype_intern;
 
-extern bool vid_pal;
+extern enum vid_coltype {
+    VDC_RGB,
+    VDC_PAL,
+    VDC_GREEN,
+    VDC_AMBER,
+    VDC_WHITE,
+} vid_colour_out;
+
 extern int vid_fskipmax, vid_fullborders;
 extern int vid_ledlocation, vid_ledvisibility;
 extern bool vid_print_mode;
+extern int vid_lock_type;
 
 extern int vid_savescrshot;
 extern char vid_scrshotname[260];

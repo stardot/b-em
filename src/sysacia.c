@@ -34,7 +34,9 @@ ACIA sysacia = {
     .set_params = sysvia_set_params,
     .rx_hook    = tape_receive,
     .tx_hook    = sysacia_tx_hook,
-    .tx_end     = sysacia_tx_end
+    .tx_end     = sysacia_tx_end,
+    .intnum     = 0x04,
+    .name       = "sysacia"
 };
 
 void sysacia_rec_stop(void)

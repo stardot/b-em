@@ -1414,6 +1414,7 @@ void pdp11_interrupt(uint8_t vec, uint8_t pri) {
    if (i >= ITABN) {
       printf("interrupt table full\r\n");
       panic();
+      return;
    }
    uint8_t j;
    for (j = ITABN - 1; j >= i + 1; j--) {

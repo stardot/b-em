@@ -28,6 +28,7 @@ typedef struct
     const char *name;
     const char *os;
     const char *cmos;
+    const char *group;
     rom_setup_t *romsetup;
     fdc_type_t fdc_type;
     uint8_t x65c02:1;
@@ -38,11 +39,14 @@ typedef struct
     uint8_t compact:1;
     uint8_t integra:1;
     uint8_t boot_logo;
+    uint8_t kbdips;
     int tube;
 } MODEL;
 
 extern MODEL *models;
 extern int model_count;
+extern const char **model_groups;
+extern int model_ngroup;
 
 typedef struct
 {
@@ -59,7 +63,7 @@ typedef struct
     const char *name;
     uint_least32_t rom_size;
     const char *bootrom;
-    int  speed_multiplier;
+    double speed_multiplier;
 } TUBE_MODEL;
 
 extern TUBE_MODEL *tubes;
@@ -75,5 +79,6 @@ void model_init(void);
 void model_savestate(FILE *f);
 void model_loadstate(FILE *f);
 void model_savecfg(void);
+void model_close(void);
 
 #endif

@@ -1,16 +1,25 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
       <Configuration>Debug</Configuration>
       <Platform>Win32</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="Release|Win32">
       <Configuration>Release</Configuration>
       <Platform>Win32</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
     <ProjectGuid>{28E2DE55-0A88-47FA-92DC-3F96D72608F9}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>bem</RootNamespace>
@@ -20,29 +29,46 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <CharacterSet>Unicode</CharacterSet>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <WholeProgramOptimization>true</WholeProgramOptimization>
-    <CharacterSet>Unicode</CharacterSet>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <PlatformToolset>v143</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
   </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <Allegro_LibraryType>StaticMonolithRelease</Allegro_LibraryType>
+    <Allegro_LibraryType>DynamicDebug</Allegro_LibraryType>
     <Allegro_AddonAudio>true</Allegro_AddonAudio>
     <Allegro_AddonFont>true</Allegro_AddonFont>
     <Allegro_AddonAcodec>true</Allegro_AddonAcodec>
@@ -50,6 +76,19 @@
     <Allegro_AddonImage>true</Allegro_AddonImage>
     <Allegro_AddonPrimitives>true</Allegro_AddonPrimitives>
     <OutDir>$(SolutionDir)</OutDir>
+    <IntDir>$(Configuration)\$(Platform)\$(ProjectName)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <Allegro_LibraryType>DynamicDebug</Allegro_LibraryType>
+    <Allegro_AddonAudio>true</Allegro_AddonAudio>
+    <Allegro_AddonFont>true</Allegro_AddonFont>
+    <Allegro_AddonAcodec>true</Allegro_AddonAcodec>
+    <Allegro_AddonDialog>true</Allegro_AddonDialog>
+    <Allegro_AddonImage>true</Allegro_AddonImage>
+    <Allegro_AddonPrimitives>true</Allegro_AddonPrimitives>
+    <OutDir>$(SolutionDir)</OutDir>
+    <IntDir>$(Configuration)\$(Platform)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
@@ -61,48 +100,90 @@
     <Allegro_AddonImage>true</Allegro_AddonImage>
     <Allegro_AddonPrimitives>true</Allegro_AddonPrimitives>
     <OutDir>$(SolutionDir)</OutDir>
+    <IntDir>$(Configuration)\$(Platform)\$(ProjectName)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <Allegro_LibraryType>StaticMonolithRelease</Allegro_LibraryType>
+    <Allegro_AddonAudio>true</Allegro_AddonAudio>
+    <Allegro_AddonFont>true</Allegro_AddonFont>
+    <Allegro_AddonAcodec>true</Allegro_AddonAcodec>
+    <Allegro_AddonDialog>true</Allegro_AddonDialog>
+    <Allegro_AddonImage>true</Allegro_AddonImage>
+    <Allegro_AddonPrimitives>true</Allegro_AddonPrimitives>
+    <OutDir>$(SolutionDir)</OutDir>
+    <IntDir>$(Configuration)\$(Platform)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
-      <PrecompiledHeader>
-      </PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS=1;VERSION="vsX";USE_MEMORY_POINTER;BEM;MODET;MODE32;BEEBEM;WIN32;INCLUDE_DEBUGGER;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <UndefinePreprocessorDefinitions>UNICODE;_UNICODE;%(UndefinePreprocessorDefinitions)</UndefinePreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\packages\Allegro.5.2.6\build\native\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <DisableSpecificWarnings>4456;4459;4113;4100;4389;4146;4245;4996;4706;4701;4244;4018;4702;4703;4005;4201;4127;4098;4267;4047;4024;4716;4458</DisableSpecificWarnings>
+      <PreprocessorDefinitions>VERSION="vsX";BEM;INCLUDE_DEBUGGER;USE_MEMORY_POINTER;MODET;MODE32;BEEBEM;_CRT_SECURE_NO_WARNINGS=1;WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <DisableSpecificWarnings>4456;4459;4113;4100;4389;4146;4245;4996;4706;4701;4244;4018;4702;4703;4005;4201;4127;4098;4267;4047;4024;4716;4458;4457</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>zlib.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>..\packages\AllegroDeps.1.11.0\build\native\v141\win32\deps\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\packages\AllegroDeps.1.16.0\build\native\v143\win32\deps\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalOptions>/ignore:4099 %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>VERSION="vsX";BEM;INCLUDE_DEBUGGER;USE_MEMORY_POINTER;MODET;MODE32;BEEBEM;_CRT_SECURE_NO_WARNINGS=1;WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <DisableSpecificWarnings>4456;4459;4113;4100;4389;4146;4245;4996;4706;4701;4244;4018;4702;4703;4005;4201;4127;4098;4267;4047;4024;4716;4458;4457</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>zlib.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\packages\AllegroDeps.1.16.0\build\native\v143\x64\deps\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalOptions>/ignore:4099 %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
-      <PrecompiledHeader>
-      </PrecompiledHeader>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS=1;VERSION="vsX";USE_MEMORY_POINTER;BEM;WIN32;MODET;MODE32;BEEBEM;INCLUDE_DEBUGGER;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <UndefinePreprocessorDefinitions>UNICODE;_UNICODE;%(UndefinePreprocessorDefinitions)</UndefinePreprocessorDefinitions>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <AdditionalIncludeDirectories>..\packages\Allegro.5.2.6\build\native\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <DisableSpecificWarnings>4456;4459;4113;4100;4389;4146;4245;4996;4706;4701;4244;4018;4702;4703;4005;4201;4127;4098;4267;4047;4024;4716;4458</DisableSpecificWarnings>
+      <PreprocessorDefinitions>VERSION="vsX";BEM;INCLUDE_DEBUGGER;USE_MEMORY_POINTER;MODET;MODE32;BEEBEM;_CRT_SECURE_NO_WARNINGS=1;WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <DisableSpecificWarnings>4456;4459;4113;4100;4389;4146;4245;4996;4706;4701;4244;4018;4702;4703;4005;4201;4127;4098;4267;4047;4024;4716;4458;4457</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalDependencies>zlib.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <IgnoreSpecificDefaultLibraries>MSVCRTD.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
-      <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
-      <AdditionalLibraryDirectories>..\packages\AllegroDeps.1.11.0\build\native\v141\win32\deps\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\packages\AllegroDeps.1.16.0\build\native\v143\win32\deps\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalOptions>/ignore:4099 %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>VERSION="vsX";BEM;INCLUDE_DEBUGGER;USE_MEMORY_POINTER;MODET;MODE32;BEEBEM;_CRT_SECURE_NO_WARNINGS=1;WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <DisableSpecificWarnings>4456;4459;4113;4100;4389;4146;4245;4996;4706;4701;4244;4018;4702;4703;4005;4201;4127;4098;4267;4047;4024;4716;4458;4457</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>zlib.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\packages\AllegroDeps.1.16.0\build\native\v143\x64\deps\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalOptions>/ignore:4099 %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -114,6 +195,7 @@
     <ClInclude Include="acia.h" />
     <ClInclude Include="adc.h" />
     <ClInclude Include="arm.h" />
+    <ClInclude Include="armulator.h" />
     <ClInclude Include="ARMulator\acconfig.h" />
     <ClInclude Include="ARMulator\ansidecl.h" />
     <ClInclude Include="ARMulator\armdefs.h" />
@@ -131,7 +213,6 @@
     <ClInclude Include="ARMulator\gdbhost.h" />
     <ClInclude Include="ARMulator\iwmmxt.h" />
     <ClInclude Include="b-em.h" />
-    <ClInclude Include="bbctext.h" />
     <ClInclude Include="cmos.h" />
     <ClInclude Include="compactcmos.h" />
     <ClInclude Include="compact_joystick.h" />
@@ -167,14 +248,21 @@
     <ClInclude Include="logging.h" />
     <ClInclude Include="main.h" />
     <ClInclude Include="map.h" />
+    <ClInclude Include="mc68000tube.h" />
     <ClInclude Include="mc6809nc\mc6809.h" />
     <ClInclude Include="mc6809nc\mc6809_debug.h" />
     <ClInclude Include="mc6809nc\mc6809_dis.h" />
     <ClInclude Include="mem.h" />
     <ClInclude Include="midi.h" />
+    <ClInclude Include="ml675001.h" />
+    <ClInclude Include="mmb.h" />
     <ClInclude Include="mmccard.h" />
     <ClInclude Include="model.h" />
     <ClInclude Include="mouse.h" />
+    <ClInclude Include="musahi\m68k.h" />
+    <ClInclude Include="musahi\m68kconf.h" />
+    <ClInclude Include="musahi\m68kcpu.h" />
+    <ClInclude Include="musahi\m68kops.h" />
     <ClInclude Include="music2000.h" />
     <ClInclude Include="music4000.h" />
     <ClInclude Include="music5000.h" />
@@ -184,6 +272,7 @@
     <ClInclude Include="NS32016\defs.h" />
     <ClInclude Include="NS32016\mem32016.h" />
     <ClInclude Include="NS32016\NSDis.h" />
+    <ClInclude Include="NS32016\pandora\PandoraV2_00.h" />
     <ClInclude Include="NS32016\Profile.h" />
     <ClInclude Include="NS32016\Trap.h" />
     <ClInclude Include="pal.h" />
@@ -214,6 +303,7 @@
     <ClInclude Include="tape.h" />
     <ClInclude Include="tapecat-allegro.h" />
     <ClInclude Include="tapenoise.h" />
+    <ClInclude Include="textsave.h" />
     <ClInclude Include="tube.h" />
     <ClInclude Include="uef.h" />
     <ClInclude Include="uservia.h" />
@@ -281,14 +371,19 @@
     <ClCompile Include="logging.c" />
     <ClCompile Include="main.c" />
     <ClCompile Include="map.c" />
+    <ClCompile Include="mc68000tube.c" />
     <ClCompile Include="mc6809nc\mc6809nc.c" />
     <ClCompile Include="mc6809nc\mc6809_debug.c" />
     <ClCompile Include="mc6809nc\mc6809_dis.c" />
     <ClCompile Include="mem.c" />
     <ClCompile Include="midi-windows.c" />
+    <ClCompile Include="mmb.c" />
     <ClCompile Include="mmccard.c" />
     <ClCompile Include="model.c" />
     <ClCompile Include="mouse.c" />
+    <ClCompile Include="musahi\m68kcpu.c" />
+    <ClCompile Include="musahi\m68kdasm.c" />
+    <ClCompile Include="musahi\m68kops.c" />
     <ClCompile Include="music2000.c" />
     <ClCompile Include="music4000.c" />
     <ClCompile Include="music5000.c" />
@@ -334,6 +429,7 @@
     <ClCompile Include="tape.c" />
     <ClCompile Include="tapecat-allegro.c" />
     <ClCompile Include="tapenoise.c" />
+    <ClCompile Include="textsave.c" />
     <ClCompile Include="tube.c" />
     <ClCompile Include="uef.c" />
     <ClCompile Include="uservia.c" />
@@ -345,25 +441,27 @@
     <ClCompile Include="win.c" />
     <ClCompile Include="x86.c" />
     <ClCompile Include="x86dasm.c" />
-    <ClCompile Include="Z80.c" />
+    <ClCompile Include="z80.c" />
     <ClCompile Include="z80dis.c" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="b-em.ico" />
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="b-em.ico" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
-    <Import Project="..\packages\AllegroDeps.1.11.0\build\native\AllegroDeps.targets" Condition="Exists('..\packages\AllegroDeps.1.11.0\build\native\AllegroDeps.targets')" />
-    <Import Project="..\packages\Allegro.5.2.6\build\native\Allegro.targets" Condition="Exists('..\packages\Allegro.5.2.6\build\native\Allegro.targets')" />
     <Import Project="..\packages\dirent.1.13.1\build\native\dirent.targets" Condition="Exists('..\packages\dirent.1.13.1\build\native\dirent.targets')" />
+    <Import Project="..\packages\AllegroDeps.1.16.0\build\native\AllegroDeps.targets" Condition="Exists('..\packages\AllegroDeps.1.16.0\build\native\AllegroDeps.targets')" />
+    <Import Project="..\packages\Allegro.5.2.11.1\build\native\Allegro.targets" Condition="Exists('..\packages\Allegro.5.2.11.1\build\native\Allegro.targets')" />
   </ImportGroup>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
     </PropertyGroup>
-    <Error Condition="!Exists('..\packages\AllegroDeps.1.11.0\build\native\AllegroDeps.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\AllegroDeps.1.11.0\build\native\AllegroDeps.targets'))" />
-    <Error Condition="!Exists('..\packages\Allegro.5.2.6\build\native\Allegro.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Allegro.5.2.6\build\native\Allegro.targets'))" />
     <Error Condition="!Exists('..\packages\dirent.1.13.1\build\native\dirent.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\dirent.1.13.1\build\native\dirent.targets'))" />
+    <Error Condition="!Exists('..\packages\AllegroDeps.1.16.0\build\native\AllegroDeps.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\AllegroDeps.1.16.0\build\native\AllegroDeps.targets'))" />
+    <Error Condition="!Exists('..\packages\Allegro.5.2.11.1\build\native\Allegro.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Allegro.5.2.11.1\build\native\Allegro.targets'))" />
   </Target>
 </Project>

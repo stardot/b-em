@@ -36,10 +36,12 @@ configure text
 *.dsp text eol=crlf
 *.dsw text eol=crlf
 *.rc text eol=crlf
-*.sln text eol=crlf filter=utf8bom
-*.vcproj text eol=crlf filter=utf8bom
-*.vcxproj text eol=crlf filter=utf8bom
-*.vcxproj.filters text eol=crlf filter=utf8bom
+*.sln text eol=crlf
+*.vcproj text eol=crlf
+*.vcxproj text eol=crlf
+*.vcxproj.filters text eol=crlf
+*.vcxproj.user text eol=crlf
+packages.config text eol=crlf
 
 # BBC files.
 *.adl binary

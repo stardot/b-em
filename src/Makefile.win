@@ -5,10 +5,16 @@ VPATH = . resid-fp NS32016 darm mc6809nc pdp11 musahi ARMulator
 #   INCLUDE_DEBUGGER - include the cpu_debug implementation
 # USE_MEMORY_POINTER - do not assume Co Pro memory starts at address 0
 
-COMMON_FLAGS = -O3 -Wall -DBEM -DVERSION=\"$(VERSION)\" -DINCLUDE_DEBUGGER -DUSE_MEMORY_POINTER -DMODET -DMODE32 -DBEEBEM -I ../src -I /usr/i686-w64-mingw32/include $(ALLEGRO_INC)
+COMMON_FLAGS = -O3 -Wall
+CPPFLAGS     = -DBEM -DVERSION=\"$(VERSION)\" -DINCLUDE_DEBUGGER -DUSE_MEMORY_POINTER -DMODET -DMODE32 -DBEEBEM $(ALLEGRO_INC)
 CFLAGS       = -std=gnu99 $(COMMON_FLAGS)
-CXXFLAGS     = $(COMMON_FLAGS)
-LDFLAGS	     = $(ALLEGRO_LIB)
+CXXFLAGS     = -std=gnu++11 $(COMMON_FLAGS)
+LDFLAGS      = $(ALLEGRO_LIB)
+
+CC           = cc
+CXX          = c++
+WINDRES      = windres
+RM           = del /f
 
 OBJ = \
     6502.o \
@@ -19,15 +25,6 @@ OBJ = \
     acia.o \
     adc.o \
     arm.o \
-    darm.o \
-    darm-tbl.o \
-    armv7.o \
-    armv7-tbl.o \
-    thumb.o \
-    thumb-tbl.o \
-    thumb2.o \
-    thumb2-decoder.o \
-    thumb2-tbl.o \
     cmos.o \
     compact_joystick.o \
     compactcmos.o \
@@ -40,7 +37,7 @@ OBJ = \
     disc.o \
     fdi2raw.o \
     fdi.o \
-    fullscreen.o\
+    fullscreen.o \
     gui-allegro.o \
     hfe.o \
     i8271.o \
@@ -55,6 +52,7 @@ OBJ = \
     main.o \
     mem.o \
     midi-windows.o \
+    mmb.o \
     mmccard.o \
     model.o \
     mouse.o \
@@ -76,6 +74,7 @@ OBJ = \
     tape.o \
     tapecat-allegro.o \
     tapenoise.o \
+    textsave.o \
     tsearch.o \
     tube.o \
     uef.o \
@@ -120,7 +119,10 @@ SIDOBJ = \
     wave8580_PST.o \
     wave.o
 
-MC6809OBJ = mc6809_debug.o mc6809_dis.o mc6809nc.o
+MC6809OBJ = \
+    mc6809_debug.o \
+    mc6809_dis.o \
+    mc6809nc.o
 
 PDP11OBJ = \
     pdp11.o \
@@ -133,7 +135,8 @@ M68000OBJ = \
     m68kcpu.o \
     m68kdasm.o
 
-ARMEMUOBJ = armdis.o \
+ARMEMUOBJ = \
+    armdis.o \
     armemu.o \
     arminit.o \
     armmem.o \
@@ -141,32 +144,52 @@ ARMEMUOBJ = armdis.o \
     bag.o \
     thumbemu.o
 
-LIBS = -lz -lallegro_audio -lallegro_acodec -lallegro_primitives -lallegro_dialog -lallegro_image -lallegro_font -lallegro -mwindows -lgdi32 -lwinmm -lstdc++
+DARMOBJ = \
+    darm.o \
+    darm-tbl.o \
+    armv7.o \
+    armv7-tbl.o \
+    thumb.o \
+    thumb-tbl.o \
+    thumb2.o \
+    thumb2-decoder.o \
+    thumb2-tbl.o
 
-all : b-em.exe hdfmt.exe jstest.exe gtest.exe
+LIBS = -lz -lallegro_audio -lallegro_acodec -lallegro_primitives -lallegro_dialog -lallegro_image -lallegro_font -lallegro -lallegro_main -lwinmm -mwindows
 
-b-em.exe: $(OBJ) $(SIDOBJ) $(NS32KOBJ) $(MC6809OBJ) $(PDP11OBJ)  $(M68000OBJ) $(ARMEMUOBJ)
-	$(CC) $(LDFLAGS) $(OBJ) $(SIDOBJ) $(NS32KOBJ) $(MC6809OBJ) $(PDP11OBJ) $(M68000OBJ) $(ARMEMUOBJ) -o "b-em.exe" $(LIBS)
+all : b-em.exe hdfmt.exe jstest.exe gtest.exe sdf2imd.exe bsnapdump.exe
 
 clean :
-	del *.o *.exe *.res
+	-$(RM) *.o
+	-$(RM) *.exe
+	-$(RM) *.res
 
 %.o : %.c
-	$(CC) $(CFLAGS) -c $<
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
 
 %.o : %.cc
-	$(CPP) $(CXXFLAGS) -c $<
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $<
 
-b-em.res: b-em.rc
-	$(WINDRES) -i $< --input-format=rc -o b-em.res -O coff
+%.o : %.cpp
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $<
 
-hdfmt.exe: hdfmt.c
-	$(CC) $(CFLAGS) $(LDFLAGS) -o hdfmt.exe hdfmt.c
+%.res : %.rc
+	$(WINDRES) -i $< --input-format=rc -o $@ -O coff
 
-jstest.exe: jstest.c
-	$(CC) $(CFLAGS) $(LDFLAGS) -o jstest $(LIBS) -lallegro_main
+b-em.exe : $(OBJ) $(SIDOBJ) $(NS32KOBJ) $(MC6809OBJ) $(PDP11OBJ)  $(M68000OBJ) $(ARMEMUOBJ) $(DARMOBJ) b-em.res
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $^ -o $@ $(LIBS)
 
-GTEST_OBJ = gtest.o sdf-geo.o sdf-acc.o
+hdfmt.exe : hdfmt.o
+	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
 
-gtest.exe: $(GTEST_OBJ)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o gtest $(GTEST_OBJ)
+jstest.exe : jstest.o
+	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@ -lallegro -lallegro_main
+
+gtest.exe : sdf-gtest.o sdf-geo.o
+	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
+
+sdf2imd.exe : sdf2imd.o sdf-geo.o
+	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
+
+bsnapdump.exe : bsnapdump.o
+	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@ -lz

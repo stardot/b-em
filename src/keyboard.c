@@ -36,9 +36,18 @@
  * 0x60  Tab       Z     SPC   V    B    M    <,   >.   /?   Copy    KP 0   KP 1   KP 3
  * 0x70  ESC       f1    f2    f3   f5   f6   f8   f9   \    Right   KP 4   KP 5   KP 2
  *
-*/
+ * In the two keymaps that follow, one for physical mode and one for
+ * hybrid/physical mode, the matrix values are encoded as in the
+ * above table, i.e. the upper 4 bits are the row number and the
+ * lower 4 bits are the column number.
+ */
 
-/* This keymap is used for physical mode. */
+/* This keymap is used for physical mode.
+ *
+ * This uses a single rogue value, 0xaa, that cannot correspond
+ * to a real key, to indicate that the key event from Allegro
+ * should be ignored rather than translating to a BBC micro keypress.
+ */
 
 const uint8_t key_allegro2bbc[ALLEGRO_KEY_MAX] =
 {
@@ -271,16 +280,17 @@ const uint8_t key_allegro2bbc[ALLEGRO_KEY_MAX] =
     0x40,   // 226  ALLEGRO_KEY_CAPSLOCK
 };
 
-// Mapping from Allegro to BBC keycodes for logical keyboard mode. We
-// use two invalid keycodes to indicate special actions:
-// - 0xaa causes us to fake the necessary keypresses to type the ASCII
-//   character we got from the ALLEGRO_EVENT_KEY_CHAR event.
-// - 0xbb causes us to ignore the key.
-// Valid keycodes cause the logical keyboard code to press and release
-// the key for that keycode.
-//
-// Note that not all keys generate an ALLEGRO_EVENT_KEY_CHAR, so some
-// of the entries in this table can never be accessed.
+/* Mapping from Allegro to BBC keycodes for logical and hybrid keyboard
+ * modes.  We use two invalid keycodes to indicate special actions:
+ * - 0xaa causes us to fake the necessary keypresses to type the ASCII
+ *        character we got from the ALLEGRO_EVENT_KEY_CHAR event.
+ * - 0xbb causes us to ignore the key.
+ * Valid keycodes cause the logical keyboard code to press and release
+ * the key for that keycode.
+
+ * Note that not all keys generate an ALLEGRO_EVENT_KEY_CHAR, so some
+ * of the entries in this table can never be accessed.
+ */
 
 static const uint8_t allegro2bbclogical[ALLEGRO_KEY_MAX] =
 {
@@ -581,7 +591,7 @@ static const uint16_t ascii2bbc[] =
     0x24,           // 0x37 7
     0x15,           // 0x38 8
     0x26,           // 0x39 9
-    0x48,           // 0x3a *
+    0x48,           // 0x3a :
     0x57,           // 0x3b ;
     0x66|A2B_SHIFT, // 0x3c <
     0x17|A2B_SHIFT, // 0x3D =
@@ -683,7 +693,9 @@ uint8_t keylookup[ALLEGRO_KEY_MAX];
 struct key_act_lookup keyactions[KEY_ACTION_MAX];
 bool keyas  = false;
 bool keypad = false;
-bool keylogical = false;
+bem_key_mode key_mode = BKM_PHYSICAL;
+
+const char *bem_key_modes[4] = { "Physical", "Hybrid", "Logical", NULL };
 
 typedef enum {
     KP_IDLE,
@@ -706,11 +718,14 @@ typedef enum {
 #define VKEY_CTRL_EVENT  (0xf0)
 
 static kp_state_t kp_state = KP_IDLE;
-#define KEY_PASTE_STR_CAPACITY (1024)
-#define KEY_PASTE_THRESHOLD (32)
-static unsigned char key_paste_str[KEY_PASTE_STR_CAPACITY];
-static size_t key_paste_str_size;
+#define KEY_PASTE_BUF_CAPACITY (256)
+#define KEY_PASTE_THRESHOLD (128)
+#define KEY_PASTE_SEGLEN (KEY_PASTE_THRESHOLD/8)
+static unsigned char key_paste_buf[KEY_PASTE_BUF_CAPACITY];
+static size_t key_paste_buf_size;
 static unsigned char *key_paste_ptr;
+static char *key_paste_str, *key_paste_tail;
+static size_t key_paste_tail_size;
 static uint8_t key_paste_vkey_down;
 static bool key_paste_shift;
 static bool key_paste_ctrl;
@@ -722,9 +737,6 @@ void key_reset()
         for (int r = 0; r < 16; r++)
             bbcmatrix[c][r] = 0;
     sysvia_set_ca2(0);
-    kp_state = KP_IDLE;
-    key_paste_str_size = 0;
-    key_paste_ptr = 0;
     key_paste_vkey_down = 0;
     key_paste_shift = false;
     key_paste_ctrl = false;
@@ -793,22 +805,22 @@ static void key_paste_add_vkey(uint8_t vkey1, uint8_t vkey2)
 {
     log_debug("keyboard: key_paste_add_vkey, vkey1=&%02x, vkey2=&%02x", vkey1, vkey2);
 
-    size_t new_size = key_paste_str_size + 1 + ((vkey2 != 0xaa) ? 1 : 0);
-    if (new_size >= KEY_PASTE_STR_CAPACITY) {
+    size_t new_size = key_paste_buf_size + 1 + ((vkey2 != 0xaa) ? 1 : 0);
+    if (new_size >= KEY_PASTE_BUF_CAPACITY) {
         assert(key_paste_ptr);
-        if (key_paste_ptr > key_paste_str) {
+        if (key_paste_ptr > key_paste_buf) {
             log_debug("keyboard: key_paste_add_vkey moving down");
-            size_t vkeys_left = key_paste_str_size - (key_paste_ptr - key_paste_str);
-            memmove(key_paste_str, key_paste_ptr, vkeys_left);
-            key_paste_ptr = key_paste_str;
-            key_paste_str_size = vkeys_left;
+            size_t vkeys_left = key_paste_buf_size - (key_paste_ptr - key_paste_buf);
+            memmove(key_paste_buf, key_paste_ptr, vkeys_left);
+            key_paste_ptr = key_paste_buf;
+            key_paste_buf_size = vkeys_left;
         }
-        new_size = key_paste_str_size + 1 + ((vkey2 != 0xaa) ? 1 : 0);
-        if (new_size >= KEY_PASTE_STR_CAPACITY) {
+        new_size = key_paste_buf_size + 1 + ((vkey2 != 0xaa) ? 1 : 0);
+        if (new_size >= KEY_PASTE_BUF_CAPACITY) {
             // We really don't want this case to happen; it could cause annoying
             // side effects like keys being stuck down because the VKEY_DOWN
             // event made it into the buffer but the corresponding VKEY_UP event
-            // didn't. This is why KEY_PASTE_STR_CAPACITY is significantly
+            // didn't. This is why KEY_PASTE_BUF_CAPACITY is significantly
             // larger than KEY_PASTE_THRESHOLD.
             log_warn("keyboard: out of memory adding key to paste, key discarded");
             return;
@@ -822,20 +834,20 @@ static void key_paste_add_vkey(uint8_t vkey1, uint8_t vkey2)
     // ahead so much that there's a significant amount of activity after they
     // actually stop typing.
 
-    size_t vkeys_left = key_paste_ptr ? (key_paste_str_size - (key_paste_ptr - key_paste_str)) : 0;
+    size_t vkeys_left = key_paste_ptr ? (key_paste_buf_size - (key_paste_ptr - key_paste_buf)) : 0;
     if ((vkey1 == VKEY_DOWN) && (vkeys_left >= KEY_PASTE_THRESHOLD)) {
         log_debug("keyboard: discarding key down as buffer over threshold");
         return;
     }
 
     if (kp_state == KP_IDLE) {
-        key_paste_ptr = key_paste_str;
+        key_paste_ptr = key_paste_buf;
         kp_state = KP_NEXT;
     }
 
-    key_paste_str[key_paste_str_size++] = vkey1;
+    key_paste_buf[key_paste_buf_size++] = vkey1;
     if (vkey2 != 0xaa)
-        key_paste_str[key_paste_str_size++] = vkey2;
+        key_paste_buf[key_paste_buf_size++] = vkey2;
 }
 
 static void key_paste_add_vkey_up(uint8_t vkey)
@@ -883,6 +895,66 @@ static void key_paste_add_combo(uint8_t vkey, bool shift, bool ctrl)
         key_paste_add_vkey_down(vkey);
 }
 
+static char *key_paste_chars(char *ptr, size_t len)
+{
+    while (len--) {
+        int ch = *(const unsigned char *)ptr++;
+        if (ch != 96) {     // Unicode backtick
+            if (ch == 163)  // Unicode pound sign.
+                ch = 96;    // Translate to back-tick
+            if (ch < sizeof(ascii2bbc)) {
+                uint16_t bbc_keys = ascii2bbc[ch];
+                uint_least8_t vkey = bbc_keys & 0xff;
+                key_paste_add_combo(vkey, bbc_keys & A2B_SHIFT, bbc_keys & A2B_CTRL);
+                key_paste_add_vkey_up(vkey);
+                log_debug("keyboard: key_paste_chars, new key_paste_buf_size=%lu", (unsigned long)key_paste_buf_size);
+            }
+        }
+    }
+    return ptr;
+}
+
+void key_paste_start(char *str)
+{
+    if (str) {
+        size_t len = strlen(str);
+        if (len) {
+            if (len <= KEY_PASTE_SEGLEN) {
+                log_debug("keyboard: key_paste_start, len=%ld, under threshold", (unsigned long)len);
+                key_paste_chars(str, len);
+                al_free(str);
+            }
+            else {
+                log_debug("keyboard: key_paste_start, len=%ld, over threshold", (unsigned long)len);
+                key_paste_tail = key_paste_chars(str, KEY_PASTE_SEGLEN);
+                key_paste_str = str;
+                key_paste_tail_size = len - KEY_PASTE_SEGLEN;
+            }
+        }
+    }
+}
+
+static void key_paste_stop(void)
+{
+    al_free(key_paste_str);
+    key_paste_str = NULL;
+}
+
+static void key_paste_nextseg(void)
+{
+    size_t len = key_paste_tail_size;
+    if (len <= KEY_PASTE_SEGLEN) {
+        log_debug("keyboard: key_paste_nextseg, len=%ld, under threshold", (unsigned long)len);
+        key_paste_chars(key_paste_tail, len);
+        key_paste_stop();
+    }
+    else {
+        log_debug("keyboard: key_paste_nextseg, len=%ld, over threshold", (unsigned long)len);
+        key_paste_tail = key_paste_chars(key_paste_tail, KEY_PASTE_SEGLEN);
+        key_paste_tail_size = len - KEY_PASTE_SEGLEN;
+    }
+}
+
 // Called on (derived) host key down and host key up events in logical keyboard
 // mode; unichar is only meaningful on key down events (state==1).
 
@@ -892,7 +964,7 @@ static void set_key_logical(int keycode, int unichar, int state)
 
     log_debug("keyboard: set_key_logical keycode=%d, unichar=%d, state=%d", keycode, unichar, state);
 
-    uint8_t vkey = allegro2bbclogical[keycode];
+    uint8_t vkey = (key_mode == BKM_LOGICAL && unichar > ' ') ? 0xaa : allegro2bbclogical[keycode];
     if (vkey == 0xbb) // ignore the key
         return;
 
@@ -900,7 +972,8 @@ static void set_key_logical(int keycode, int unichar, int state)
         bool shift = hostshift;
         bool ctrl = hostctrl;
 
-        if (vkey == 0xaa) { // type the ASCII character corresponding to the key
+        if (vkey == 0xaa) {
+            // type the ASCII character corresponding to the key
             if (unichar == 96) // unicode backtick
                 return;
             if (unichar == 163) // unicode pound currency symbol
@@ -994,6 +1067,8 @@ void key_down_event(const ALLEGRO_EVENT *event)
         hostalt = true;
     else if (keycode == ALLEGRO_KEY_CAPSLOCK)
             key_down(keylookup[keycode]);
+    else if (keycode == ALLEGRO_KEY_ESCAPE && key_paste_str)
+        key_paste_stop();
     else {
         bool shiftctrl = false;
         if (keycode == ALLEGRO_KEY_LSHIFT || keycode == ALLEGRO_KEY_RSHIFT) {
@@ -1005,7 +1080,7 @@ void key_down_event(const ALLEGRO_EVENT *event)
             shiftctrl = true;
         }
         if (shiftctrl) {
-            if (keylogical)
+            if (key_mode != BKM_PHYSICAL)
                 set_logical_shift_ctrl_if_idle();
             else
                 key_down(keylookup[keycode]);
@@ -1015,7 +1090,7 @@ void key_down_event(const ALLEGRO_EVENT *event)
 
 static int map_keypad_intern(int keycode, int unichar)
 {
-    if (keypad || keylogical) {
+    if (keypad || key_mode != BKM_PHYSICAL) {
         if (keycode >= ALLEGRO_KEY_PAD_0 && keycode <= ALLEGRO_KEY_PAD_9 && (unichar < '0' || unichar > '9')) {
             int newcode = map_keypad[keycode-ALLEGRO_KEY_PAD_0];
             log_debug("keyboard: mapping keypad key %d:%s to %d:%s", keycode, al_keycode_to_name(keycode), newcode, al_keycode_to_name(newcode));
@@ -1043,9 +1118,9 @@ void key_char_event(const ALLEGRO_EVENT *event)
     if ((!event->keyboard.repeat || unichar != last_unichar[keycode]) && keycode < ALLEGRO_KEY_MAX) {
         last_unichar[keycode] = unichar;
         keycode = map_keypad_intern(keycode, unichar);
-        if (keycode == ALLEGRO_KEY_A && keyas && !keylogical)
+        if (keycode == ALLEGRO_KEY_A && keyas && key_mode == BKM_PHYSICAL)
             keycode = ALLEGRO_KEY_CAPSLOCK;
-        else if (keycode == ALLEGRO_KEY_S && keyas && !keylogical)
+        else if (keycode == ALLEGRO_KEY_S && keyas && key_mode == BKM_PHYSICAL)
             keycode = ALLEGRO_KEY_LCTRL;
         for (int act = 0; act < KEY_ACTION_MAX; act++) {
             log_debug("keyboard: checking key action %d:%s codes %d<>%d, alt %d<>%d", act, keyact_const[act].name, keycode, keyactions[act].keycode, hostalt, keyactions[act].altstate);
@@ -1054,7 +1129,7 @@ void key_char_event(const ALLEGRO_EVENT *event)
                 return;
             }
         }
-        if (keylogical)
+        if (key_mode != BKM_PHYSICAL)
             set_key_logical(keycode, unichar, true);
         else
             key_down(keylookup[keycode]);
@@ -1090,11 +1165,11 @@ void key_up_event(const ALLEGRO_EVENT *event)
                 hostctrl = false;
                 shiftctrl = true;
             }
-            else if (keycode == ALLEGRO_KEY_A && keyas && !keylogical)
+            else if (keycode == ALLEGRO_KEY_A && keyas && key_mode == BKM_PHYSICAL)
                 keycode = ALLEGRO_KEY_CAPSLOCK;
-            else if (keycode == ALLEGRO_KEY_S && keyas && !keylogical)
+            else if (keycode == ALLEGRO_KEY_S && keyas && key_mode == BKM_PHYSICAL)
                 keycode = ALLEGRO_KEY_LCTRL;
-            if (shiftctrl && keylogical)
+            if (shiftctrl && key_mode != BKM_PHYSICAL)
                 set_logical_shift_ctrl_if_idle();
             keycode = map_keypad_intern(keycode, unichar);
             for (int act = 0; act < KEY_ACTION_MAX; act++) {
@@ -1104,7 +1179,7 @@ void key_up_event(const ALLEGRO_EVENT *event)
                     return;
                 }
             }
-            if (keylogical)
+            if (key_mode != BKM_PHYSICAL)
                 set_key_logical(keycode, unichar, false);
             else
                 key_up(keylookup[keycode]);
@@ -1112,8 +1187,13 @@ void key_up_event(const ALLEGRO_EVENT *event)
     }
 }
 
+static int key_paste_count;
+
 void key_paste_poll(void)
 {
+    if (OS01 && key_paste_count++ & 1)
+        return;
+
     uint8_t vkey;
     //log_debug("keyboard: key_paste_poll kp_state=%d", kp_state);
 
@@ -1122,7 +1202,7 @@ void key_paste_poll(void)
             break;
 
         case KP_NEXT:
-            if ((key_paste_ptr - key_paste_str) < key_paste_str_size) {
+            if ((key_paste_ptr - key_paste_buf) < key_paste_buf_size) {
                 vkey = *key_paste_ptr++;
                 int col = 1;
                 log_debug("keyboard: key_paste_poll next vkey=&%02x", vkey);
@@ -1154,15 +1234,19 @@ void key_paste_poll(void)
                 }
             }
             else {
-                key_paste_str_size = 0;
+                key_paste_buf_size = 0;
                 key_paste_ptr = 0;
                 kp_state = KP_IDLE;
 
-                // Now we've finished, make the emulated machine's SHIFT/CTRL
-                // state agree with the host's state. This doesn't cause an
-                // infinite loop because this is a no-op if the state already
-                // matches.
-                set_logical_shift_ctrl_if_idle();
+                if (key_paste_str)
+                    key_paste_nextseg();
+                else {
+                    // Now we've finished, make the emulated machine's SHIFT/CTRL
+                    // state agree with the host's state. This doesn't cause an
+                    // infinite loop because this is a no-op if the state already
+                    // matches.
+                    set_logical_shift_ctrl_if_idle();
+                }
             }
             break;
 
@@ -1200,7 +1284,7 @@ bool key_is_down(void) {
 
 bool key_any_down(void)
 {
-    if (!keylogical) {
+    if (key_mode != BKM_PHYSICAL) {
         for (int c = 0; c < 16; c++)
             for (int r = 1; r < 16; r++)
                 if (bbcmatrix[c][r])
@@ -1216,7 +1300,7 @@ bool key_code_down(int code)
     if (code < ALLEGRO_KEY_MAX) {
         code = key_allegro2bbc[code];
         assert((code != 0x00) && (code != 0x01)); // not SHIFT or CTRL
-        if (!keylogical)
+        if (key_mode != BKM_PHYSICAL)
             return bbcmatrix[code & 0x0f][code >> 4];
         else
             return (key_paste_vkey_down != 0) && (key_paste_vkey_down == code);

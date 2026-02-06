@@ -29,6 +29,7 @@
 #include "sysacia.h"
 #include "tape.h"
 #include "tapecat-allegro.h"
+#include "textsave.h"
 #include "tube.h"
 #include "uservia.h"
 #include "video.h"
@@ -42,22 +43,10 @@
 
 #define ROM_LABEL_LEN 50
 
-/* pclose() and popen() on Windows are _pclose() and _popen() */
-#ifdef _WIN32
-#  define pclose _pclose
-#  define popen _popen
-#endif
-
 typedef struct {
     const char *label;
     int itemno;
 } menu_map_t;
-
-static enum pdest {
-    PDEST_NONE,
-    PDEST_FILE,
-    PDEST_PIPE
-} print_dest;
 
 static ALLEGRO_MENU *disc_menu;
 static ALLEGRO_MENU *rom_menu;
@@ -92,10 +81,9 @@ static void add_radio_item(ALLEGRO_MENU *parent, char const *title, uint16_t id,
 
 static void add_radio_set(ALLEGRO_MENU *parent, char const **labels, uint16_t id, int cur_value)
 {
-    int i;
     const char *label;
 
-    for (i = 0; (label = *labels++); i++)
+    for (int i = 0; (label = *labels++); i++)
         add_checkbox_item(parent, label, menu_id_num(id, i), i == cur_value);
 }
 
@@ -108,13 +96,22 @@ static int menu_cmp(const void *va, const void *vb)
 
 static void add_sorted_set(ALLEGRO_MENU *parent, menu_map_t *map, size_t items, uint16_t id, int cur_value)
 {
-    int i, ino;
-
     qsort(map, items, sizeof(menu_map_t), menu_cmp);
-    for (i = 0; i < items; i++) {
-        ino = map[i].itemno;
+    for (int i = 0; i < items; i++) {
+        int ino = map[i].itemno;
         add_checkbox_item(parent, map[i].label, menu_id_num(id, ino), ino == cur_value);
     }
+}
+
+static ALLEGRO_MENU *create_print_menu(void)
+{
+    ALLEGRO_MENU *menu = al_create_menu();
+    add_radio_item(menu, "Print to stdout (text)", IDM_FILE_PRINT, PDEST_STDOUT, print_dest);
+    add_radio_item(menu, "Print to file (text)", IDM_FILE_PRINT, PDEST_FILE_TEXT, print_dest);
+    add_radio_item(menu, "Print to file (binary)", IDM_FILE_PRINT, PDEST_FILE_BIN, print_dest);
+    add_radio_item(menu, "Print to command (text)", IDM_FILE_PRINT, PDEST_PIPE_TEXT, print_dest);
+    add_radio_item(menu, "Print to command (binary)", IDM_FILE_PRINT, PDEST_PIPE_BIN, print_dest);
+    return menu;
 }
 
 static ALLEGRO_MENU *create_file_menu(void)
@@ -124,8 +121,8 @@ static ALLEGRO_MENU *create_file_menu(void)
     al_append_menu_item(menu, "Load state...", IDM_FILE_LOAD_STATE, 0, NULL, NULL);
     al_append_menu_item(menu, "Save State...", IDM_FILE_SAVE_STATE, 0, NULL, NULL);
     al_append_menu_item(menu, "Save Screenshot...", IDM_FILE_SCREEN_SHOT, 0, NULL, NULL);
-    add_checkbox_item(menu, "Print to file", IDM_FILE_PRINT, print_dest == PDEST_FILE);
-    add_checkbox_item(menu, "Print to command", IDM_FILE_PCMD, print_dest == PDEST_PIPE);
+    al_append_menu_item(menu, "Save Screen as Text...", IDM_FILE_SCREEN_TEXT, 0, NULL, NULL);
+    al_append_menu_item(menu, "Printing...", 0, 0, NULL, create_print_menu());
     add_checkbox_item(menu, "Serial to file", IDM_FILE_SERIAL, sysacia_fp);
     add_checkbox_item(menu, music5000_rec.prompt, IDM_FILE_M5000, music5000_rec.fp);
     add_checkbox_item(menu, paula_rec.prompt, IDM_FILE_PAULAREC, paula_rec.fp);
@@ -137,7 +134,8 @@ static ALLEGRO_MENU *create_file_menu(void)
 static ALLEGRO_MENU *create_edit_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
-    al_append_menu_item(menu, "Paste via keyboard", IDM_EDIT_PASTE, 0, NULL, NULL);
+    al_append_menu_item(menu, "Paste via OS", IDM_EDIT_PASTE_OS, 0, NULL, NULL);
+    al_append_menu_item(menu, "Paste via keyboard", IDM_EDIT_PASTE_KB, 0, NULL, NULL);
     add_checkbox_item(menu, "Printer to clipboard", IDM_EDIT_COPY, prt_clip_str);
     return menu;
 }
@@ -177,8 +175,8 @@ static ALLEGRO_MENU *create_disc_menu(void)
     al_append_menu_item(menu, "Eject SD Card", IDM_DISC_MMC_EJECT, 0, NULL, NULL);
     al_append_menu_item(menu, "New disc :0/2...", 0, 0, NULL, create_disc_new_menu(0));
     al_append_menu_item(menu, "New disc :1/3...", 0, 0, NULL, create_disc_new_menu(1));
-    add_checkbox_item(menu, "Write protect disc :0/2", menu_id_num(IDM_DISC_WPROT, 0), writeprot[0]);
-    add_checkbox_item(menu, "Write protect disc :1/3", menu_id_num(IDM_DISC_WPROT, 1), writeprot[1]);
+    add_checkbox_item(menu, "Write protect disc :0/2", menu_id_num(IDM_DISC_WPROT, 0), drives[0].writeprot);
+    add_checkbox_item(menu, "Write protect disc :1/3", menu_id_num(IDM_DISC_WPROT, 1), drives[1].writeprot);
     add_checkbox_item(menu, "Default write protect", IDM_DISC_WPROT_D, defaultwriteprot);
     add_checkbox_item(menu, "IDE hard disc", IDM_DISC_HARD_IDE, ide_enable);
     add_checkbox_item(menu, "SCSI hard disc", IDM_DISC_HARD_SCSI, scsi_enabled);
@@ -191,11 +189,11 @@ static ALLEGRO_MENU *create_disc_menu(void)
 void gui_allegro_set_eject_text(int drive, ALLEGRO_PATH *path)
 {
     char temp[256];
-
-    if (path) {
+    if (path)
         snprintf(temp, sizeof temp, "Eject drive %s: %s", drive ? "1/3" : "0/2", al_get_path_filename(path));
-        al_set_menu_item_caption(disc_menu, menu_id_num(IDM_DISC_EJECT, drive), temp);
-    }
+    else
+        snprintf(temp, sizeof temp, "Eject drive %s", drive ? "1/3" : "0/2");
+    al_set_menu_item_caption(disc_menu, menu_id_num(IDM_DISC_EJECT, drive), temp);
 }
 
 static ALLEGRO_MENU *create_tape_menu(void)
@@ -222,15 +220,11 @@ static ALLEGRO_MENU *create_tape_menu(void)
 
 static void gen_rom_label(int slot, char *dest)
 {
-    int ver;
-    const uint8_t *detail;
-    const char *rr, *name;
-
-    rr = rom_slots[slot].swram ? "RAM" : "ROM";
-    detail = mem_romdetail(slot);
-    name = rom_slots[slot].name;
+    const char *rr = rom_slots[slot].swram ? "RAM" : "ROM";
+    const uint8_t *detail = mem_romdetail(slot);
+    const char *name = rom_slots[slot].name;
     if (detail) {
-        ver = *detail++;
+        int ver = *detail++;
         if (name)
             snprintf(dest, ROM_LABEL_LEN, "%02d %s: %s %02X (%s)", slot, rr, detail, ver, name);
         else
@@ -245,14 +239,11 @@ static void gen_rom_label(int slot, char *dest)
 
 static ALLEGRO_MENU *create_rom_menu(void)
 {
-    ALLEGRO_MENU *menu, *sub;
-    int slot;
-    char label[ROM_LABEL_LEN];
-
-    menu =  al_create_menu();
-    for (slot = ROM_NSLOT-1; slot >= 0; slot--) {
+    ALLEGRO_MENU *menu = al_create_menu();
+    for (int slot = ROM_NSLOT-1; slot >= 0; slot--) {
+        char label[ROM_LABEL_LEN];
         gen_rom_label(slot, label);
-        sub = al_create_menu();
+        ALLEGRO_MENU *sub = al_create_menu();
         al_append_menu_item(sub, "Load...", menu_id_num(IDM_ROMS_LOAD, slot), 0, NULL, NULL);
         al_append_menu_item(sub, "Clear", menu_id_num(IDM_ROMS_CLEAR, slot), 0, NULL, NULL);
         add_checkbox_item(sub, "RAM", menu_id_num(IDM_ROMS_RAM, slot), rom_slots[slot].swram);
@@ -265,16 +256,14 @@ static ALLEGRO_MENU *create_rom_menu(void)
 static void update_rom_menu(void)
 {
     ALLEGRO_MENU *menu = rom_menu;
-    ALLEGRO_MENU *sub;
-    int slot, flags;
-    char label[ROM_LABEL_LEN];
-
-    for (slot = ROM_NSLOT-1; slot >= 0; slot--) {
+    
+    for (int slot = ROM_NSLOT-1; slot >= 0; slot--) {
+        char label[ROM_LABEL_LEN];
         gen_rom_label(slot, label);
         al_set_menu_item_caption(menu, slot-ROM_NSLOT+1, label);
-        sub = al_find_menu(menu, slot+1);
+        ALLEGRO_MENU *sub = al_find_menu(menu, slot+1);
         if (sub) {
-            flags = rom_slots[slot].swram ? ALLEGRO_MENU_ITEM_CHECKBOX|ALLEGRO_MENU_ITEM_CHECKED : ALLEGRO_MENU_ITEM_CHECKBOX;
+            int flags = rom_slots[slot].swram ? ALLEGRO_MENU_ITEM_CHECKBOX|ALLEGRO_MENU_ITEM_CHECKED : ALLEGRO_MENU_ITEM_CHECKBOX;
             al_set_menu_item_flags(sub, menu_id_num(IDM_ROMS_RAM, slot), flags);
         }
         else
@@ -284,16 +273,53 @@ static void update_rom_menu(void)
 
 static ALLEGRO_MENU *create_model_menu(void)
 {
-    ALLEGRO_MENU *menu = al_create_menu();
-    menu_map_t *map;
-    int i;
-
-    if ((map = malloc(model_count * sizeof(menu_map_t)))) {
-        for (i = 0; i < model_count; i++) {
-            map[i].label = models[i].name;
-            map[i].itemno = i;
+    menu_map_t *map = calloc(model_count * 2, sizeof(menu_map_t));
+    if (map) {
+        ALLEGRO_MENU *menu = al_create_menu();
+        menu_map_t *groups = map + model_count;
+        int ngroup = 0;
+        for (int model_no = 0; model_no < model_count; ++model_no) {
+            const char *group = models[model_no].group;
+            if (group) {
+                bool found = false;
+                for (int group_no = 0; group_no < ngroup; ++group_no) {
+                    if (!strcmp(group, groups[group_no].label)) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    groups[ngroup].label = group;
+                    groups[ngroup].itemno = ngroup;
+                    ++ngroup;
+                }
+            }
         }
-        add_sorted_set(menu, map, model_count, IDM_MODEL, curmodel);
+        qsort(groups, ngroup, sizeof(menu_map_t), menu_cmp);
+        for (int group_no = 0; group_no < ngroup; ++group_no) {
+            const char *group_label = groups[group_no].label;
+            int item_no = 0;
+            for (int model_no = 0; model_no < model_count; ++model_no) {
+                const char *model_group = models[model_no].group;
+                if (model_group && !strcmp(model_group, group_label)) {
+                    map[item_no].label = models[model_no].name;
+                    map[item_no].itemno = model_no;
+                    ++item_no;
+                }
+            }
+            ALLEGRO_MENU *sub = al_create_menu();
+            add_sorted_set(sub, map, item_no, IDM_MODEL, curmodel);
+            al_append_menu_item(menu, groups[group_no].label, 0, 0, NULL, sub);
+        }
+        int item_no = 0;
+        for (int model_no = 0; model_no < model_count; ++model_no) {
+            if (!models[model_no].group) {
+                map[item_no].label = models[model_no].name;
+                map[item_no].itemno = model_no;
+                ++item_no;
+            }
+        }
+        add_sorted_set(menu, map, item_no, IDM_MODEL, curmodel);
         free(map);
         return menu;
     }
@@ -308,19 +334,21 @@ static ALLEGRO_MENU *create_tube_menu(void)
     ALLEGRO_MENU *menu = al_create_menu();
     ALLEGRO_MENU *sub = al_create_menu();
     menu_map_t *map = malloc(num_tubes * sizeof(menu_map_t));
-    if (!map) {
-        log_error("gui: unable to allocate tube menu");
-        return NULL;
+    if (map) {
+        for (int i = 0; i < num_tubes; ++i) {
+            map[i].label = tubes[i].name;
+            map[i].itemno = i;
+        }
+        add_sorted_set(menu, map, num_tubes, IDM_TUBE, curtube);
+        for (int i = 0; i < NUM_TUBE_SPEEDS; i++)
+            add_radio_item(sub, tube_speeds[i].name, IDM_TUBE_SPEED, i, tube_speed_num);
+        al_append_menu_item(menu, "Tube speed", 0, 0, NULL, sub);
+        return menu;
     }
-    for (int i = 0; i < num_tubes; ++i) {
-        map[i].label = tubes[i].name;
-        map[i].itemno = i;
+    else {
+        log_fatal("gui-allegro: out of memory");
+        exit(1);
     }
-    add_sorted_set(menu, map, num_tubes, IDM_TUBE, curtube);
-    for (int i = 0; i < NUM_TUBE_SPEEDS; i++)
-        add_radio_item(sub, tube_speeds[i].name, IDM_TUBE_SPEED, i, tube_speed_num);
-    al_append_menu_item(menu, "Tube speed", 0, 0, NULL, sub);
-    return menu;
 }
 
 static const char *mode7_font_files[] = { "saa5050", "brandy", "basicsdl", "original", NULL };
@@ -345,6 +373,7 @@ static ALLEGRO_MENU *create_m7font_menu(void)
 
 static const char *border_names[] = { "None", "Medium", "Full", NULL };
 static const char *vmode_names[] = { "Scaled", "Interlace", "Scanlines", "Line doubling", NULL };
+static const char *colout_names[] = { "RGB", "PAL", "Green Mono", "Amber Mono", "White Mono", NULL };
 static const char *win_mult_names[] = { "Freeform", "1x", "2x", "3x", NULL };
 static const char *led_location_names[] = { "None", "Overlapped", "Separate", NULL };
 static const char *led_visibility_names[] = { "When changed", "When changed or transient", "Always", NULL };
@@ -356,6 +385,9 @@ static ALLEGRO_MENU *create_video_menu(void)
     add_radio_set(sub, vmode_names, IDM_VIDEO_DISPTYPE, vid_dtype_user);
     al_append_menu_item(menu, "Display type...", 0, 0, NULL, sub);
     sub = al_create_menu();
+    add_radio_set(sub, colout_names, IDM_VIDEO_COLTYPE, vid_colour_out);
+    al_append_menu_item(menu, "Colour type...", 0, 0, NULL, sub);
+    sub = al_create_menu();
     add_radio_set(sub, border_names, IDM_VIDEO_BORDERS, vid_fullborders);
     al_append_menu_item(menu, "Borders...", 0, 0, NULL, sub);
     sub = al_create_menu();
@@ -364,7 +396,6 @@ static ALLEGRO_MENU *create_video_menu(void)
     al_append_menu_item(menu, "Reset Window Size", IDM_VIDEO_WINSIZE, 0, NULL, NULL);
     add_checkbox_item(menu, "Fullscreen", IDM_VIDEO_FULLSCR, fullscreen);
     add_checkbox_item(menu, "NuLA", IDM_VIDEO_NULA, !nula_disable);
-    add_checkbox_item(menu, "PAL Emulation", IDM_VIDEO_PAL, vid_pal);
     sub = al_create_menu();
     al_append_menu_item(menu, "LED location...", 0, 0, NULL, sub);
     add_radio_set(sub, led_location_names, IDM_VIDEO_LED_LOCATION, vid_ledlocation);
@@ -372,6 +403,7 @@ static ALLEGRO_MENU *create_video_menu(void)
     al_append_menu_item(menu, "LED visibility...", 0, 0, NULL, sub);
     add_radio_set(sub, led_visibility_names, IDM_VIDEO_LED_VISIBILITY, vid_ledvisibility);
     al_append_menu_item(menu, "Mode 7 Font...", 0, 0, NULL, create_m7font_menu());
+    add_checkbox_item(menu, "Write-only Bitmaps", IDM_VIDEO_LOCK, vid_lock_type == ALLEGRO_LOCK_WRITEONLY);
     return menu;
 }
 
@@ -489,19 +521,19 @@ static ALLEGRO_MENU *create_midi_menu(void)
 static ALLEGRO_MENU *create_keyboard_menu(void)
 {
     ALLEGRO_MENU *menu = al_create_menu();
-    al_append_menu_item(menu, "Remap Keyboard", IDM_KEY_REDEFINE, 0, NULL, NULL);
+    ALLEGRO_MENU *sub = al_create_menu();
+    add_radio_set(sub, bem_key_modes, IDM_KEY_MODE, key_mode);
+    al_append_menu_item(menu, "Keyboard Mode", 0, 0, NULL, sub);
     add_checkbox_item(menu, "Map CAPS/CTRL to A/S", IDM_KEY_AS, keyas);
-    add_checkbox_item(menu, "Logical keyboard", IDM_KEY_LOGICAL, keylogical);
     add_checkbox_item(menu, "PC/XT Keypad Mode", IDM_KEY_PAD, keypad);
+    al_append_menu_item(menu, "Remap Keyboard", IDM_KEY_REDEFINE, 0, NULL, NULL);
     return menu;
 }
 
 static ALLEGRO_MENU *create_joystick_menu(int joystick)
 {
     ALLEGRO_MENU *menu = al_create_menu();
-    int i;
-
-    for (i = 0; i < joystick_count; i++) if (joystick_names[i])
+    for (int i = 0; i < joystick_count; i++) if (joystick_names[i])
         add_checkbox_item(menu, joystick_names[i], menu_id_num(IDM_JOYSTICK + joystick, i), i == joystick_index[joystick]);
     return menu;
 }
@@ -509,9 +541,7 @@ static ALLEGRO_MENU *create_joystick_menu(int joystick)
 static ALLEGRO_MENU *create_joymap_menu(int joystick)
 {
     ALLEGRO_MENU *menu = al_create_menu();
-    int i;
-
-    for (i = 0; i < joymap_count; i++)
+    for (int i = 0; i < joymap_count; i++)
         add_checkbox_item(menu, joymaps[i].name, menu_id_num(IDM_JOYMAP + joystick, i), i == joymap_index[joystick]);
     return menu;
 }
@@ -568,11 +598,9 @@ static ALLEGRO_MENU *create_settings_menu(void)
 
 static ALLEGRO_MENU *create_speed_menu(void)
 {
-    int i;
-
     ALLEGRO_MENU *menu = al_create_menu();
     add_radio_item(menu, "Paused", IDM_SPEED, EMU_SPEED_PAUSED, emuspeed);
-    for (i = 0; i < num_emu_speeds; i++)
+    for (int i = 0; i < num_emu_speeds; i++)
         add_radio_item(menu, emu_speeds[i].name, IDM_SPEED, i, emuspeed);
     add_radio_item(menu, "Full-speed", IDM_SPEED, EMU_SPEED_FULL, emuspeed);
     add_checkbox_item(menu, "Auto Frameskip", IDM_AUTOSKIP, autoskip);
@@ -634,141 +662,83 @@ static int radio_event_with_deselect(ALLEGRO_EVENT *event, int current)
     return num;
 }
 
-static void file_load_state(ALLEGRO_EVENT *event)
+static void file_chooser_generic(ALLEGRO_EVENT *event, const char *initial_path, const char *title, const char *patterns, int flags, void (*callback)(const char *))
 {
-    ALLEGRO_DISPLAY *display = (ALLEGRO_DISPLAY *)(event->user.data2);
-    ALLEGRO_FILECHOOSER *chooser = al_create_native_file_dialog(savestate_name, "Load state from file", "*.snp", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST);
+    ALLEGRO_FILECHOOSER *chooser = al_create_native_file_dialog(initial_path, title, patterns, flags);
     if (chooser) {
+        ALLEGRO_DISPLAY *display = (ALLEGRO_DISPLAY *)(event->user.data2);
         if (al_show_native_file_dialog(display, chooser)) {
             if (al_get_native_file_dialog_count(chooser) > 0)
-                savestate_load(al_get_native_file_dialog_path(chooser, 0));
+                callback(al_get_native_file_dialog_path(chooser, 0));
         }
         al_destroy_native_file_dialog(chooser);
     }
 }
 
-static void file_save_state(ALLEGRO_EVENT *event)
+static void file_save_scrshot(const char *path)
 {
-    ALLEGRO_FILECHOOSER *chooser;
-    ALLEGRO_DISPLAY *display;
-
-    if ((chooser = al_create_native_file_dialog(savestate_name, "Save state to file", "*.snp", ALLEGRO_FILECHOOSER_SAVE))) {
-        display = (ALLEGRO_DISPLAY *)(event->user.data2);
-        if (al_show_native_file_dialog(display, chooser)) {
-            if (al_get_native_file_dialog_count(chooser) > 0)
-                savestate_save(al_get_native_file_dialog_path(chooser, 0));
-        }
-        al_destroy_native_file_dialog(chooser);
-    }
+    strncpy(vid_scrshotname, path, sizeof vid_scrshotname-1);
+    vid_scrshotname[sizeof vid_scrshotname-1] = 0;
+    vid_savescrshot = 2;
 }
 
-static void file_save_scrshot(ALLEGRO_EVENT *event)
+static void file_print_chooser(ALLEGRO_EVENT *event, enum print_dest_type new_dest)
 {
-    ALLEGRO_FILECHOOSER *chooser;
-    ALLEGRO_DISPLAY *display;
-
-    if ((chooser = al_create_native_file_dialog(savestate_name, "Save screenshot to file", "*.bmp;*.pcx;*.tga;*.png;*.jpg", ALLEGRO_FILECHOOSER_SAVE))) {
-        display = (ALLEGRO_DISPLAY *)(event->user.data2);
+    ALLEGRO_FILECHOOSER *chooser = al_create_native_file_dialog(savestate_name, "Print to file", "*.prn", ALLEGRO_FILECHOOSER_SAVE);
+    if (chooser) {
+        ALLEGRO_DISPLAY *display = (ALLEGRO_DISPLAY *)(event->user.data2);
         if (al_show_native_file_dialog(display, chooser)) {
             if (al_get_native_file_dialog_count(chooser) > 0) {
-                strncpy(vid_scrshotname, al_get_native_file_dialog_path(chooser, 0), sizeof vid_scrshotname-1);
-                vid_scrshotname[sizeof vid_scrshotname-1] = 0;
-                vid_savescrshot = 2;
+                const char *new_name = al_get_native_file_dialog_path(chooser, 0);
+                if (new_name) {
+                    char *new_copy = strdup(new_name);
+                    if (new_copy) {
+                        if (print_filename_alloc)
+                            free(print_filename);
+                        print_filename = new_copy;
+                        print_filename_alloc = true;
+                        print_dest = new_dest;
+                    }
+                }
             }
         }
         al_destroy_native_file_dialog(chooser);
     }
+    else
+        al_set_menu_item_flags((ALLEGRO_MENU *)(event->user.data3), new_dest, 0);
 }
 
-static void file_print_close_file(void)
+static void file_print_change(ALLEGRO_EVENT *event)
 {
-    if (fclose(prt_fp))
-        log_error("error closing print file: %s",  strerror(errno));
-    prt_fp = NULL;
-    print_dest = PDEST_NONE;
-}
-
-static void file_print_close_pipe(void)
-{
-    int ecode = pclose(prt_fp);
-    if (ecode == -1)
-        log_error("error waiting for print command: %s", strerror(errno));
-    else if (ecode > 0)
-        log_error("print command failed, exit status=%d", ecode);
-    prt_fp = NULL;
-    print_dest = PDEST_NONE;
-}
-
-static void file_print(ALLEGRO_EVENT *event)
-{
-    ALLEGRO_FILECHOOSER *chooser;
-    ALLEGRO_DISPLAY *display;
-
-    switch(print_dest) {
-        case PDEST_PIPE:
-            file_print_close_pipe();
-            al_set_menu_item_flags((ALLEGRO_MENU *)(event->user.data3), IDM_FILE_PCMD, 0);
-            /* FALL THROUGH */
-        case PDEST_NONE:
-            if ((chooser = al_create_native_file_dialog(savestate_name, "Print to file", "*.prn", ALLEGRO_FILECHOOSER_SAVE))) {
-                display = (ALLEGRO_DISPLAY *)(event->user.data2);
-                while (al_show_native_file_dialog(display, chooser)) {
-                    if (al_get_native_file_dialog_count(chooser) <= 0)
-                        break;
-                    if ((prt_fp = fopen(al_get_native_file_dialog_path(chooser, 0), "wb")))
-                        break;
-                }
-                al_destroy_native_file_dialog(chooser);
-            }
-            if (prt_fp)
-                print_dest = PDEST_FILE;
-            else
-                al_set_menu_item_flags((ALLEGRO_MENU *)(event->user.data3), IDM_FILE_PRINT, 0);
-            break;
-        case PDEST_FILE:
-            file_print_close_file();
-    }
-}
-
-static void file_print_pipe(ALLEGRO_EVENT *event)
-{
-    const char *pcmd;
-
-    switch(print_dest) {
-        case PDEST_FILE:
-            file_print_close_file();
-            al_set_menu_item_flags((ALLEGRO_MENU *)(event->user.data3), IDM_FILE_PRINT, 0);
-            /* FALL THROUGH */
-        case PDEST_NONE:
-            pcmd = get_config_string(NULL, "printcmd", "lp");
-            if ((prt_fp = popen(pcmd, "w")))
-                print_dest = PDEST_PIPE;
-            else {
-                log_error("unable to start print command '%s': %s", pcmd, strerror(errno));
-                al_set_menu_item_flags((ALLEGRO_MENU *)(event->user.data3), IDM_FILE_PCMD, 0);
-            }
-            break;
-        case PDEST_PIPE:
-            file_print_close_pipe();
+    enum print_dest_type new_dest = menu_get_num(event);
+    enum print_dest_type old_dest = print_dest;
+    printer_close();
+    if (new_dest != old_dest) {
+        if (new_dest == PDEST_FILE_TEXT || new_dest == PDEST_FILE_BIN)
+            file_print_chooser(event, new_dest);
+        else
+            print_dest = new_dest;
+        al_set_menu_item_flags((ALLEGRO_MENU *)(event->user.data3), menu_id_num(IDM_FILE_PRINT, old_dest), 0);
     }
 }
 
 static void serial_rec(ALLEGRO_EVENT *event)
 {
-    ALLEGRO_FILECHOOSER *chooser;
-    ALLEGRO_DISPLAY *display;
 
     if (sysacia_fp)
         sysacia_rec_stop();
-    else if ((chooser = al_create_native_file_dialog(savestate_name, "Record serial to file", "*.txt", ALLEGRO_FILECHOOSER_SAVE))) {
-        display = (ALLEGRO_DISPLAY *)(event->user.data2);
-        while (al_show_native_file_dialog(display, chooser)) {
-            if (al_get_native_file_dialog_count(chooser) <= 0)
-                break;
-            if (sysacia_rec_start(al_get_native_file_dialog_path(chooser, 0)))
-                break;
+    else {
+        ALLEGRO_FILECHOOSER *chooser = al_create_native_file_dialog(savestate_name, "Record serial to file", "*.txt", ALLEGRO_FILECHOOSER_SAVE);
+        if (chooser) {
+            ALLEGRO_DISPLAY *display = (ALLEGRO_DISPLAY *)(event->user.data2);
+            while (al_show_native_file_dialog(display, chooser)) {
+                if (al_get_native_file_dialog_count(chooser) <= 0)
+                    break;
+                if (sysacia_rec_start(al_get_native_file_dialog_path(chooser, 0)))
+                    break;
+            }
+            al_destroy_native_file_dialog(chooser);
         }
-        al_destroy_native_file_dialog(chooser);
     }
 }
 
@@ -791,7 +761,7 @@ static void toggle_record(ALLEGRO_EVENT *event, sound_rec_t *rec)
     }
 }
 
-static void edit_paste_start(ALLEGRO_EVENT *event)
+static void edit_paste_start(ALLEGRO_EVENT *event, void (*paste_start)(char *str))
 {
     ALLEGRO_DISPLAY *display = (ALLEGRO_DISPLAY *)(event->user.data2);
     char *text = al_get_clipboard_text(display);
@@ -802,15 +772,13 @@ static void edit_paste_start(ALLEGRO_EVENT *event)
     }
 #endif
     if (text)
-        os_paste_start(text);
+        paste_start(text);
 }
 
 static void edit_print_clip(ALLEGRO_EVENT *event)
 {
-    ALLEGRO_DISPLAY *display;
-
     if (prt_clip_str) {
-        display = (ALLEGRO_DISPLAY *)(event->user.data2);
+        ALLEGRO_DISPLAY *display = (ALLEGRO_DISPLAY *)(event->user.data2);
         al_set_clipboard_text(display, al_cstr(prt_clip_str));
         al_ustr_free(prt_clip_str);
         prt_clip_str = NULL;
@@ -827,7 +795,7 @@ void gui_set_disc_wprot(int drive, bool enabled)
 static void disc_choose_new(ALLEGRO_EVENT *event, const char *ext)
 {
     int drive = menu_get_num(event);
-    ALLEGRO_PATH *apath = discfns[drive];
+    ALLEGRO_PATH *apath = drives[drive].discfn;
     ALLEGRO_FILECHOOSER *chooser;
     const char *fpath;
     char name[20], title[70];
@@ -846,9 +814,9 @@ static void disc_choose_new(ALLEGRO_EVENT *event, const char *ext)
             if (al_get_native_file_dialog_count(chooser) > 0) {
                 ALLEGRO_PATH *path = al_create_path(al_get_native_file_dialog_path(chooser, 0));
                 disc_close(drive);
-                if (discfns[drive])
-                    al_destroy_path(discfns[drive]);
-                discfns[drive] = path;
+                if (drives[drive].discfn)
+                    al_destroy_path(drives[drive].discfn);
+                drives[drive].discfn = path;
                 switch(menu_get_id(event)) {
                     case IDM_DISC_NEW_ADFS_S:
                         sdf_new_disc(drive, path, &sdf_geometries.adfs_s);
@@ -892,7 +860,7 @@ static void disc_choose_new(ALLEGRO_EVENT *event, const char *ext)
                     default:
                         break;
                 }
-                gui_set_disc_wprot(drive, writeprot[drive]);
+                gui_set_disc_wprot(drive, drives[drive].writeprot);
             }
         }
         al_destroy_native_file_dialog(chooser);
@@ -903,40 +871,42 @@ static void disc_choose_new(ALLEGRO_EVENT *event, const char *ext)
 
 static void disc_choose(ALLEGRO_EVENT *event, const char *opname, const char *exts, int flags)
 {
-    ALLEGRO_FILECHOOSER *chooser;
-    ALLEGRO_DISPLAY *display;
+    int drive = menu_get_num(event);
     ALLEGRO_PATH *apath;
-    int drive;
     const char *fpath;
-    char title[70];
-
-    drive = menu_get_num(event);
-    if (!(apath = discfns[drive]) || !(fpath = al_path_cstr(apath, ALLEGRO_NATIVE_PATH_SEP)))
+    if (!(apath = drives[drive].discfn) || !(fpath = al_path_cstr(apath, ALLEGRO_NATIVE_PATH_SEP)))
         fpath = ".";
+    char title[70];
     snprintf(title, sizeof title, "Choose a disc to %s drive %d/%d", opname, drive, drive+2);
-    if ((chooser = al_create_native_file_dialog(fpath, title, exts, flags))) {
-        display = (ALLEGRO_DISPLAY *)(event->user.data2);
+    ALLEGRO_FILECHOOSER *chooser = al_create_native_file_dialog(fpath, title, exts, flags);
+    if (chooser) {
+        ALLEGRO_DISPLAY *display = (ALLEGRO_DISPLAY *)(event->user.data2);
         if (al_show_native_file_dialog(display, chooser)) {
             if (al_get_native_file_dialog_count(chooser) > 0) {
                 ALLEGRO_PATH *path = al_create_path(al_get_native_file_dialog_path(chooser, 0));
                 disc_close(drive);
-                if (discfns[drive])
-                    al_destroy_path(discfns[drive]);
-                discfns[drive] = path;
+                if (drives[drive].discfn)
+                    al_destroy_path(drives[drive].discfn);
+                drives[drive].discfn = path;
                 switch(menu_get_id(event)) {
                     case IDM_DISC_AUTOBOOT:
                         main_reset();
                         autoboot = 150;
                         /* FALLTHROUGH */
                     case IDM_DISC_LOAD:
-                        disc_load(drive, path);
-                        if (defaultwriteprot)
-                            writeprot[drive] = 1;
+                        if (!disc_load(drive, path)) {
+                            if (defaultwriteprot)
+                                drives[drive].writeprot = 1;
+                        }
+                        else {
+                            al_destroy_path(path);
+                            drives[drive].discfn = NULL;
+                        }
                         break;
                     default:
                         break;
                 }
-                gui_set_disc_wprot(drive, writeprot[drive]);
+                gui_set_disc_wprot(drive, drives[drive].writeprot);
             }
         }
         al_destroy_native_file_dialog(chooser);
@@ -947,9 +917,9 @@ static void disc_eject(ALLEGRO_EVENT *event)
 {
     int drive = menu_get_num(event);
     disc_close(drive);
-    if (discfns[drive]) {
-        al_destroy_path(discfns[drive]);
-        discfns[drive] = NULL;
+    if (drives[drive].discfn) {
+        al_destroy_path(drives[drive].discfn);
+        drives[drive].discfn = NULL;
     }
     al_set_menu_item_caption(disc_menu, menu_id_num(IDM_DISC_EJECT, drive), drive ? "Eject disc :1/3" : "Eject disc :0/2");
 }
@@ -957,45 +927,21 @@ static void disc_eject(ALLEGRO_EVENT *event)
 static void disc_wprot(ALLEGRO_EVENT *event)
 {
     int drive = menu_get_num(event);
-    writeprot[drive] = !writeprot[drive];
+    drives[drive].writeprot = !drives[drive].writeprot;
 }
 
-static void disc_mmb_load(ALLEGRO_EVENT *event)
+static void disc_mmb_load(const char *path)
 {
-    ALLEGRO_FILECHOOSER *chooser;
-    ALLEGRO_DISPLAY *display;
-    const char *fpath = mmb_fn ? mmb_fn : ".";
-
-    if ((chooser = al_create_native_file_dialog(fpath, "Choose an MMB file", "*.mmb", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST))) {
-        display = (ALLEGRO_DISPLAY *)(event->user.data2);
-        if (al_show_native_file_dialog(display, chooser)) {
-            if (al_get_native_file_dialog_count(chooser) > 0) {
-                char *fn = strdup(al_get_native_file_dialog_path(chooser, 0));
-                mmb_eject();
-                mmb_load(fn);
-            }
-        }
-        al_destroy_native_file_dialog(chooser);
-    }
+    char *fn = strdup(path);
+    mmb_eject();
+    mmb_load(fn);
 }
 
-static void disc_mmc_load(ALLEGRO_EVENT *event)
+static void disc_mmc_load(const char *path)
 {
-    ALLEGRO_FILECHOOSER *chooser;
-    ALLEGRO_DISPLAY *display;
-    const char *fpath = mmccard_fn ? mmccard_fn : ".";
-
-    if ((chooser = al_create_native_file_dialog(fpath, "Choose an MMC card image", "*", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST))) {
-        display = (ALLEGRO_DISPLAY *)(event->user.data2);
-        if (al_show_native_file_dialog(display, chooser)) {
-            if (al_get_native_file_dialog_count(chooser) > 0) {
-                char *fn = strdup(al_get_native_file_dialog_path(chooser, 0));
-                mmccard_eject();
-                mmccard_load(fn);
-            }
-        }
-        al_destroy_native_file_dialog(chooser);
-    }
+    char *fn = strdup(path);
+    mmccard_eject();
+    mmccard_load(fn);
 }
 
 static void disc_toggle_ide(ALLEGRO_EVENT *event)
@@ -1036,32 +982,20 @@ static void disc_toggle_scsi(ALLEGRO_EVENT *event)
     }
 }
 
-static void disc_vdfs_root(ALLEGRO_EVENT *event)
+static void disc_vdfs_root(const char *path)
 {
-    ALLEGRO_FILECHOOSER *chooser;
-    ALLEGRO_DISPLAY *display;
-
-    if ((chooser = al_create_native_file_dialog(vdfs_get_root(), "Choose a folder to be the VDFS root", "*", ALLEGRO_FILECHOOSER_FOLDER))) {
-        display = (ALLEGRO_DISPLAY *)(event->user.data2);
-        if (al_show_native_file_dialog(display, chooser)) {
-            if (al_get_native_file_dialog_count(chooser) > 0) {
-                vdfs_set_root(al_get_native_file_dialog_path(chooser, 0));
-                config_save();
-            }
-        }
-    }
+    vdfs_set_root(path);
+    config_save();
 }
 
 static void tape_load_ui(ALLEGRO_EVENT *event)
 {
-    ALLEGRO_FILECHOOSER *chooser;
-    ALLEGRO_DISPLAY *display;
     const char *fpath;
-
     if (!tape_fn || !(fpath = al_path_cstr(tape_fn, ALLEGRO_NATIVE_PATH_SEP)))
         fpath = ".";
-    if ((chooser = al_create_native_file_dialog(fpath, "Choose a tape to load", "*.uef;*.csw", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST))) {
-        display = (ALLEGRO_DISPLAY *)(event->user.data2);
+    ALLEGRO_FILECHOOSER *chooser = al_create_native_file_dialog(fpath, "Choose a tape to load", "*.uef;*.csw", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST);
+    if (chooser) {
+        ALLEGRO_DISPLAY *display = (ALLEGRO_DISPLAY *)(event->user.data2);
         if (al_show_native_file_dialog(display, chooser)) {
             if (al_get_native_file_dialog_count(chooser) > 0) {
                 tape_close();
@@ -1108,23 +1042,20 @@ static void tape_fast(ALLEGRO_EVENT *event)
 
 static void rom_load(ALLEGRO_EVENT *event)
 {
-    rom_slot_t *slotp;
-    int slot;
-    char tempname[PATH_MAX], label[ROM_LABEL_LEN];
-    ALLEGRO_FILECHOOSER *chooser;
-    ALLEGRO_DISPLAY *display;
-
-    slot = menu_get_num(event);
-    slotp = rom_slots + slot;
+    int slot = menu_get_num(event);
+    rom_slot_t *slotp = rom_slots + slot;
     if (!slotp->locked) {
+        char tempname[PATH_MAX];
         if (slotp->name)
             strncpy(tempname, slotp->name, sizeof tempname-1);
         else
             tempname[0] = 0;
-        if ((chooser = al_create_native_file_dialog(tempname, "Choose a ROM to load", "*.rom", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST))) {
-            display = (ALLEGRO_DISPLAY *)(event->user.data2);
+        ALLEGRO_FILECHOOSER *chooser = al_create_native_file_dialog(tempname, "Choose a ROM to load", "*.rom", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST);
+        if (chooser) {
+            ALLEGRO_DISPLAY *display = (ALLEGRO_DISPLAY *)(event->user.data2);
             if (al_show_native_file_dialog(display, chooser)) {
                 if (al_get_native_file_dialog_count(chooser) > 0) {
+                    char label[ROM_LABEL_LEN];
                     ALLEGRO_PATH *path = al_create_path(al_get_native_file_dialog_path(chooser, 0));
                     mem_clearrom(slot);
                     mem_loadrom(slot, al_get_path_filename(path), al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP), 0);
@@ -1220,6 +1151,17 @@ static void change_mode7_font(ALLEGRO_EVENT *event)
         mode7_font_index = newix;
 }
 
+static void change_video_lock(ALLEGRO_EVENT *event)
+{
+    ALLEGRO_MENU *menu = (ALLEGRO_MENU *)event->user.data3;
+    int flags = al_get_menu_item_flags(menu, IDM_VIDEO_LOCK);
+    log_debug("gui-allegro: menu_id=%p, flags=%04x", menu, flags);
+    if (flags & ALLEGRO_MENU_ITEM_CHECKED)
+        vid_lock_type = ALLEGRO_LOCK_WRITEONLY;
+    else
+        vid_lock_type = ALLEGRO_LOCK_READWRITE;
+}
+
 static void toggle_music5000(void)
 {
     if (sound_music5000) {
@@ -1246,19 +1188,19 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             update_rom_menu();
             break;
         case IDM_FILE_LOAD_STATE:
-            file_load_state(event);
+            file_chooser_generic(event, savestate_name, "Load state from file", "*.snp", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST, savestate_load);
             break;
         case IDM_FILE_SAVE_STATE:
-            file_save_state(event);
+            file_chooser_generic(event, savestate_name, "Save state to file", "*.snp", ALLEGRO_FILECHOOSER_SAVE, savestate_save);
             break;
         case IDM_FILE_SCREEN_SHOT:
-            file_save_scrshot(event);
+            file_chooser_generic(event, vid_scrshotname, "Save screenshot to file", "*.bmp;*.pcx;*.tga;*.png;*.jpg", ALLEGRO_FILECHOOSER_SAVE, file_save_scrshot);
+            break;
+        case IDM_FILE_SCREEN_TEXT:
+            file_chooser_generic(event, savestate_name, "Save screen as text to file", "*.txt", ALLEGRO_FILECHOOSER_SAVE, textsave);
             break;
         case IDM_FILE_PRINT:
-            file_print(event);
-            break;
-        case IDM_FILE_PCMD:
-            file_print_pipe(event);
+            file_print_change(event);
             break;
         case IDM_FILE_SERIAL:
             serial_rec(event);
@@ -1273,10 +1215,13 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             toggle_record(event, &sound_rec);
             break;
         case IDM_FILE_EXIT:
-            quitting = true;
+            set_quit();
             break;
-        case IDM_EDIT_PASTE:
-            edit_paste_start(event);
+        case IDM_EDIT_PASTE_OS:
+            edit_paste_start(event, os_paste_start);
+            break;
+        case IDM_EDIT_PASTE_KB:
+            edit_paste_start(event, key_paste_start);
             break;
         case IDM_EDIT_COPY:
             edit_print_clip(event);
@@ -1288,7 +1233,7 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             disc_choose(event, "load into", all_dext, ALLEGRO_FILECHOOSER_FILE_MUST_EXIST);
             break;
         case IDM_DISC_MMB_LOAD:
-            disc_mmb_load(event);
+            file_chooser_generic(event, mmb_fn ? mmb_fn : ".", "Choose an MMB file", "*.mmb", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST, disc_mmb_load);
             break;
         case IDM_DISC_EJECT:
             disc_eject(event);
@@ -1297,7 +1242,7 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             mmb_eject();
             break;
         case IDM_DISC_MMC_LOAD:
-            disc_mmc_load(event);
+            file_chooser_generic(event, mmccard_fn ? mmccard_fn : ".", "Choose an MMC card image", "*", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST, disc_mmc_load);
             break;
         case IDM_DISC_MMC_EJECT:
             mmccard_eject();
@@ -1345,7 +1290,7 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             vdfs_enabled = !vdfs_enabled;
             break;
         case IDM_DISC_VDFS_ROOT:
-            disc_vdfs_root(event);
+            file_chooser_generic(event, vdfs_get_root(), "Choose a folder to be the VDFS root", "*", ALLEGRO_FILECHOOSER_FOLDER, disc_vdfs_root);
             break;
         case IDM_TAPE_LOAD:
             tape_load_ui(event);
@@ -1386,6 +1331,9 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
         case IDM_VIDEO_DISPTYPE:
             video_set_disptype(radio_event_simple(event, vid_dtype_user));
             break;
+        case IDM_VIDEO_COLTYPE:
+            vid_colour_out = radio_event_simple(event, vid_colour_out);
+            break;
         case IDM_VIDEO_BORDERS:
             video_set_borders(radio_event_simple(event, vid_fullborders));
             break;
@@ -1398,9 +1346,6 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
         case IDM_VIDEO_FULLSCR:
             toggle_fullscreen();
             break;
-        case IDM_VIDEO_PAL:
-            vid_pal = !vid_pal;
-            break;
         case IDM_VIDEO_NULA:
             nula_disable = !nula_disable;
             break;
@@ -1412,6 +1357,9 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             break;
         case IDM_VIDEO_MODE7_FONT:
             change_mode7_font(event);
+            break;
+        case IDM_VIDEO_LOCK:
+            change_video_lock(event);
             break;
         case IDM_SOUND_INTERNAL:
             sound_internal = !sound_internal;
@@ -1502,7 +1450,7 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             autoskip = !autoskip;
             break;
         case IDM_DEBUGGER:
-            debug_toggle_core();
+            debug_toggle_core(true);
             break;
         case IDM_DEBUG_TUBE:
             debug_toggle_tube();
@@ -1516,8 +1464,8 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
         case IDM_KEY_AS:
             keyas = !keyas;
             break;
-        case IDM_KEY_LOGICAL:
-            keylogical = !keylogical;
+        case IDM_KEY_MODE:
+            key_mode = radio_event_simple(event, key_mode);
             key_reset();
             break;
         case IDM_KEY_PAD:

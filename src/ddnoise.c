@@ -119,7 +119,6 @@ void ddnoise_seek(int len)
 
     log_debug("ddnoise: seek %i tracks", len);
 
-    fdc_time = 200;
     if (sound_ddnoise && len) {
         if (len < 0) {
             ddnoise_sdir = 1;
@@ -136,10 +135,9 @@ void ddnoise_seek(int len)
         if ((smp = seeksmp[ddnoise_sstat][ddnoise_sdir])) {
             al_stop_sample(&seek_smp_id);
             al_play_sample(smp, map_ddnoise_vol(), 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, &seek_smp_id);
-            fdc_time = 64000 * len;
         }
     }
-    log_debug("ddnoise: begin seek, fdc_time=%d", fdc_time);
+    log_debug("ddnoise: begin seek");
 }
 
 void ddnoise_spinup(void)

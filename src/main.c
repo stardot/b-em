@@ -1,3 +1,4 @@
+#define _DEBUG
 /*B-em v2.2 by Tom Walker
   Main loop + start/finish code*/
 
@@ -66,6 +67,10 @@
 #include "z80.h"
 #include "sprow.h"
 
+#ifndef WIN32
+#include <unistd.h>
+#endif
+
 #undef printf
 
 bool quitting = false;
@@ -73,11 +78,15 @@ bool keydefining = false;
 bool autopause = false;
 bool autoskip = true;
 bool skipover = false;
+unsigned hiresdisplay = BOOL_USE_CONFIG;
 int autoboot=0;
 int joybutton[4];
 float joyaxes[4];
 int emuspeed = 4;
 bool tricky_sega_adapter = false;
+/* TOHv3: although C exit code is an int, Unix shells don't safely allow
+   you to use values > 125, so this is limited to a signed 8-bit value >:( */
+int8_t shutdown_exit_code = SHUTDOWN_OK;
 
 static ALLEGRO_TIMER *timer;
 ALLEGRO_EVENT_QUEUE *queue;
@@ -140,6 +149,8 @@ void main_reset()
 
 static const char helptext[] =
     VERSION_STR " command line options:\n\n"
+    "-cfg file.cfg   - use the specified config file\n"
+    "-log file.log   - use the specified log file\n"
     "-mx             - start as model x (see readme.txt for models)\n"
     "-tx             - start with tube x (see readme.txt for tubes)\n"
     "-disc disc.ssd  - load disc.ssd into drives :0/:2\n"
@@ -157,7 +168,14 @@ static const char helptext[] =
     "-debug          - start debugger\n"
     "-debugtube      - start debugging tube processor\n"
     "-exec file      - debugger to execute file\n"
-    "-paste string   - paste string in as if typed\n"
+    "-hires          - enable Hi-Res display mode\n"
+    "-lores          - disable Hi-Res display mode\n"
+    "-paste string   - paste string in as if typed (via OS)\n"
+    "-pastek string  - paste string in as if typed (via KB)\n"
+    "-printfile f    - printer output to file as text\n"
+    "-printfilebin f - printer output to file as text\n"
+    "-printcmd c     - printer output via command as text\n"
+    "-printcmdbin c  - printer output via command as binary\n"
     "-vroot host-dir - set the VDFS root\n"
     "-vdir guest-dir - set the initial (boot) dir in VDFS\n\n";
 
@@ -172,7 +190,8 @@ static double main_calc_timer(int speed)
 
 static int main_speed_cmp(const void *va, const void *vb)
 {
-    return ((const emu_speed_t *)va)->multiplier - ((const emu_speed_t *)vb)->multiplier;
+    double res = ((const emu_speed_t *)va)->multiplier - ((const emu_speed_t *)vb)->multiplier;
+    return (int)round(res);
 }
 
 static void main_load_speeds(void)
@@ -223,16 +242,183 @@ static void main_load_speeds(void)
     }
 }
 
+typedef enum {
+    OPT_DISC1,
+    OPT_DISC2,
+    OPT_CFGFILE,
+    OPT_LOGFILE,
+    OPT_TAPE,
+    OPT_EXEC,
+    OPT_VDFS_ROOT,
+    OPT_VDFS_DIR,
+    OPT_PASTE_OS,
+    OPT_PASTE_KBD,
+    OPT_PRINT,
+    OPT_GROUND,
+} opt_state;
+
 void main_init(int argc, char *argv[])
 {
-    int tapenext = 0, discnext = 0, execnext = 0, vdfsnext = 0, pastenext = 0;
-    ALLEGRO_DISPLAY *display;
-    ALLEGRO_PATH *path;
-    const char *ext, *exec_fn = NULL;
+    if (!al_init()) {
+        fputs("b-em: Failed to initialise Allegro!\n", stderr);
+        exit(1);
+    }
+
+    opt_state state = OPT_GROUND;
+    ALLEGRO_PATH *snap_fn = NULL;
+    ALLEGRO_PATH *cfg_fn = NULL;
+    const char *ext, *exec_fn = NULL, *log_file = NULL;
     const char *vroot = NULL, *vdir = NULL;
 
-    if (!al_init()) {
-        fputs("Failed to initialise Allegro!\n", stderr);
+    while (--argc) {
+        char *arg = *++argv;
+        switch (state) {
+            case OPT_GROUND:
+                if (*arg == '-') {
+                    if (!strcasecmp(++arg, "cfg"))
+                        state = OPT_CFGFILE;
+                    else if (!strcasecmp(arg, "log"))
+                        state = OPT_LOGFILE;
+                    else if (!strncasecmp(arg, "sp", 2)) {
+                        sscanf(&arg[2], "%i", &emuspeed);
+                        if(!(emuspeed < num_emu_speeds))
+                            emuspeed = 4;
+                    }
+                    else if (!strcasecmp(arg, "fullscreen"))
+                        fullscreen = 1;
+                    else if (!strcasecmp(arg, "tape"))
+                        state = OPT_TAPE;
+                    else if (!strcasecmp(arg, "disc") || !strcasecmp(arg, "-disk"))
+                        state = OPT_DISC1;
+                    else if (!strcasecmp(arg, "disc1"))
+                        state = OPT_DISC2;
+                    else if (arg[0] == 'm' || arg[0] == 'M')
+                        sscanf(&arg[1], "%i", &curmodel);
+                    else if (arg[0] == 't' || arg[0] == 'T')
+                        sscanf(&arg[1], "%i", &curtube);
+                    else if (!strcasecmp(arg, "fasttape"))
+                        fasttape = true;
+                    else if (!strcasecmp(arg, "autoboot"))
+                        autoboot = 150;
+                    else if (arg[0] == 'f' || arg[0]=='F') {
+                        if (sscanf(&arg[1], "%i", &vid_fskipmax) == 1) {
+                            if (vid_fskipmax < 1) vid_fskipmax = 1;
+                            if (vid_fskipmax > 9) vid_fskipmax = 9;
+                            skipover = true;
+                        }
+                        else
+                            fprintf(stderr, "invalid frame skip '%s'\n", &arg[2]);
+                    }
+                    else if (arg[0] == 's' || arg[0] == 'S')
+                        vid_dtype_user = VDT_SCANLINES;
+                    else if (!strcasecmp(arg, "debug"))
+                        debug_core = 1;
+                    else if (!strcasecmp(arg, "debugtube"))
+                        debug_tube = 1;
+                    else if (arg[0] == 'i' || arg[0] == 'I')
+                        vid_dtype_user = VDT_INTERLACE;
+                    else if (!strcasecmp(arg, "exec"))
+                        state = OPT_EXEC;
+                    else if (!strcasecmp(arg, "vroot"))
+                        state = OPT_VDFS_ROOT;
+                    else if (!strcasecmp(arg, "vdir"))
+                        state = OPT_VDFS_DIR;
+                    else if (!strcasecmp(arg, "paste"))
+                        state = OPT_PASTE_OS;
+                    else if (!strcasecmp(arg, "pastek"))
+                        state = OPT_PASTE_KBD;
+                    else if (!strcasecmp(arg, "printstdout"))
+                        print_dest = PDEST_STDOUT;
+                    else if (!strcasecmp(arg, "printfile")) {
+                        print_dest = PDEST_FILE_TEXT;
+                        state = OPT_PRINT;
+                    }
+                    else if (!strcasecmp(arg, "printfilebin")) {
+                        print_dest = PDEST_FILE_BIN;
+                        state = OPT_PRINT;
+                    }
+                    else if (!strcasecmp(arg, "printcmd")) {
+                        print_dest = PDEST_PIPE_TEXT;
+                        state = OPT_PRINT;
+                    }
+                    else if (!strcasecmp(arg, "printcmdbin")) {
+                        print_dest = PDEST_PIPE_BIN;
+                        state = OPT_PRINT;
+                    }
+                    else if (!strcasecmp(arg, "hires"))
+                        hiresdisplay = true;
+                    else if (!strcasecmp(arg, "lores"))
+                        hiresdisplay = false;
+                    else {
+                        if (*arg != 'h' && *arg != '?')
+                            fprintf(stderr, "b-em: unrecognised option '-%s'\n", arg);
+                        fwrite(helptext, sizeof helptext-1, 1, stdout);
+                        exit(1);
+                    }
+                }
+                else {
+                    ALLEGRO_PATH *path = al_create_path(arg);
+                    ext = al_get_path_extension(path);
+                    if (ext && !strcasecmp(ext, ".snp")) {
+                        if (snap_fn)
+                            al_destroy_path(snap_fn);
+                        snap_fn = path;
+                    }
+                    else if (ext && (!strcasecmp(ext, ".uef") || !strcasecmp(ext, ".csw"))) {
+                        if (tape_fn)
+                            al_destroy_path(tape_fn);
+                        tape_fn = path;
+                    }
+                    else {
+                        if (drives[0].discfn)
+                            al_destroy_path(drives[0].discfn);
+                        drives[0].discfn = path;
+                        autoboot = 150;
+                    }
+                }
+                continue;
+            case OPT_DISC1:
+            case OPT_DISC2:
+                if (drives[state].discfn)
+                    al_destroy_path(drives[state].discfn);
+                drives[state].discfn = al_create_path(arg);
+                break;
+            case OPT_CFGFILE:
+                if (cfg_fn)
+                    al_destroy_path(cfg_fn);
+                cfg_fn = al_create_path(arg);
+                break;
+            case OPT_LOGFILE:
+                log_file = arg;
+                break;
+            case OPT_TAPE:
+                if (tape_fn)
+                    al_destroy_path(tape_fn);
+                tape_fn = al_create_path(arg);
+                break;
+            case OPT_EXEC:
+                exec_fn = arg;
+                break;
+            case OPT_VDFS_ROOT:
+                vroot = arg;
+                break;
+            case OPT_VDFS_DIR:
+                vdir = arg;
+                break;
+            case OPT_PASTE_OS:
+                debug_paste(arg, os_paste_start);
+                break;
+            case OPT_PASTE_KBD:
+                debug_paste(arg, key_paste_start);
+                break;
+            case OPT_PRINT:
+                print_filename = arg;
+                print_filename_alloc = false;
+        }
+        state = OPT_GROUND;
+    }
+    if (state != OPT_GROUND) {
+        fputs("b-em: missing argument\n", stderr);
         exit(1);
     }
 
@@ -244,113 +430,14 @@ void main_init(int argc, char *argv[])
         exit(1);
     }
     key_init();
-    config_load();
-    log_open();
+    config_load(cfg_fn);
+    log_open(log_file);
     log_info("main: starting %s", VERSION_STR);
 
     main_load_speeds();
     model_loadcfg();
 
-    for (int c = 1; c < argc; c++) {
-        if (!strcasecmp(argv[c], "--help") || !strcmp(argv[c], "-?") || !strcasecmp(argv[c], "-h")) {
-            fwrite(helptext, sizeof helptext-1, 1, stdout);
-            exit(1);
-        }
-        else if (!strncasecmp(argv[c], "-sp", 3)) {
-            sscanf(&argv[c][3], "%i", &emuspeed);
-            if(!(emuspeed < num_emu_speeds))
-                emuspeed = 4;
-        }
-	// lovebug
-        else if (!strcasecmp(argv[c], "-fullscreen"))
-            fullscreen = 1;
-	// lovebug end
-        else if (!strcasecmp(argv[c], "-tape"))
-            tapenext = 2;
-        else if (!strcasecmp(argv[c], "-disc") || !strcasecmp(argv[c], "-disk"))
-            discnext = 1;
-        else if (!strcasecmp(argv[c], "-disc1"))
-            discnext = 2;
-        else if (argv[c][0] == '-' && (argv[c][1] == 'm' || argv[c][1] == 'M'))
-            sscanf(&argv[c][2], "%i", &curmodel);
-        else if (argv[c][0] == '-' && (argv[c][1] == 't' || argv[c][1] == 'T'))
-            sscanf(&argv[c][2], "%i", &curtube);
-        else if (!strcasecmp(argv[c], "-fasttape"))
-            fasttape = true;
-        else if (!strcasecmp(argv[c], "-autoboot"))
-            autoboot = 150;
-        else if (argv[c][0] == '-' && (argv[c][1] == 'f' || argv[c][1]=='F')) {
-            if (sscanf(&argv[c][2], "%i", &vid_fskipmax) == 1) {
-                if (vid_fskipmax < 1) vid_fskipmax = 1;
-                if (vid_fskipmax > 9) vid_fskipmax = 9;
-                skipover = true;
-            }
-            else
-                fprintf(stderr, "invalid frame skip '%s'\n", &argv[c][2]);
-        }
-        else if (argv[c][0] == '-' && (argv[c][1] == 's' || argv[c][1] == 'S'))
-            vid_dtype_user = VDT_SCANLINES;
-        else if (!strcasecmp(argv[c], "-debug"))
-            debug_core = 1;
-        else if (!strcasecmp(argv[c], "-debugtube"))
-            debug_tube = 1;
-        else if (argv[c][0] == '-' && (argv[c][1] == 'i' || argv[c][1] == 'I'))
-            vid_dtype_user = VDT_INTERLACE;
-        else if (!strcasecmp(argv[c], "-exec"))
-            execnext = 1;
-        else if (!strcasecmp(argv[c], "-vroot"))
-            vdfsnext = 1;
-        else if (!strcasecmp(argv[c], "-vdir"))
-            vdfsnext = 2;
-        else if (!strcasecmp(argv[c], "-paste"))
-            pastenext = 1;
-        else if (tapenext) {
-            if (tape_fn)
-                al_destroy_path(tape_fn);
-            tape_fn = al_create_path(argv[c]);
-        }
-        else if (discnext) {
-            if (discfns[discnext-1])
-                al_destroy_path(discfns[discnext-1]);
-            discfns[discnext-1] = al_create_path(argv[c]);
-            discnext = 0;
-        }
-        else if (execnext) {
-            exec_fn = argv[c];
-            execnext = 0;
-        }
-        else if (vdfsnext) {
-            if (vdfsnext == 2)
-                vdir = argv[c];
-            else
-                vroot = argv[c];
-            vdfsnext = 0;
-        }
-        else if (pastenext)
-            debug_paste(argv[c]);
-        else {
-            path = al_create_path(argv[c]);
-            ext = al_get_path_extension(path);
-            if (ext && !strcasecmp(ext, ".snp"))
-                savestate_load(argv[c]);
-            else if (ext && (!strcasecmp(ext, ".uef") || !strcasecmp(ext, ".csw"))) {
-                if (tape_fn)
-                    al_destroy_path(tape_fn);
-                tape_fn = path;
-                tapenext = 0;
-            }
-            else {
-                if (discfns[0])
-                    al_destroy_path(discfns[0]);
-                discfns[0] = path;
-                discnext = 0;
-                autoboot = 150;
-            }
-        }
-        if (tapenext) tapenext--;
-    }
-
-    display = video_init();
+    ALLEGRO_DISPLAY *display = video_init();
     mode7_makechars();
     al_init_image_addon();
     led_init();
@@ -423,19 +510,19 @@ void main_init(int argc, char *argv[])
     if (mmb_fn)
         mmb_load(mmb_fn);
     else
-        disc_load(0, discfns[0]);
-    disc_load(1, discfns[1]);
+        disc_load(0, drives[0].discfn);
+    disc_load(1, drives[1].discfn);
     tape_load(tape_fn);
     if (mmccard_fn)
         mmccard_load(mmccard_fn);
     if (defaultwriteprot)
-        writeprot[0] = writeprot[1] = 1;
-    if (discfns[0])
-        gui_set_disc_wprot(0, writeprot[0]);
-    if (discfns[1])
-        gui_set_disc_wprot(1, writeprot[1]);
+        drives[0].writeprot = drives[1].writeprot = 1;
+    if (drives[0].discfn)
+        gui_set_disc_wprot(0, drives[0].writeprot);
+    if (drives[1].discfn)
+        gui_set_disc_wprot(1, drives[1].writeprot);
     main_setspeed(emuspeed);
-    debug_start(exec_fn);
+    debug_start(exec_fn, true);
     // lovebug
     if (fullscreen)
         video_enterfullscreen();
@@ -664,7 +751,7 @@ void main_run()
                 break;
             case ALLEGRO_EVENT_DISPLAY_CLOSE:
                 log_debug("main: event display close - quitting");
-                quitting = true;
+                set_quit();
                 break;
             case ALLEGRO_EVENT_TIMER:
                 main_timer(&event);
@@ -694,6 +781,14 @@ void main_run()
     log_debug("main: end loop");
 }
 
+static void tape_free(void)
+{
+    if (tape_fn) {
+        al_destroy_path(tape_fn);
+        tape_fn = NULL;
+    }
+}
+
 void main_close()
 {
     gui_tapecat_close();
@@ -716,16 +811,20 @@ void main_close()
     n32016_close();
     mc6809nc_close();
     sprow_close();
-    disc_close(0);
-    disc_close(1);
+    disc_free(0);
+    disc_free(1);
     scsi_close();
     ide_close();
     vdfs_close();
     music5000_close();
     ddnoise_close();
     tapenoise_close();
-
+    tape_free();
+    al_destroy_timer(timer);
+    al_destroy_event_queue(queue);
+    led_close();
     video_close();
+    model_close();
     log_close();
 }
 
@@ -764,9 +863,21 @@ void main_resume(void)
         al_start_timer(timer);
 }
 
-void main_setquit(void)
+void set_quit(void)
 {
-    quitting = 1;
+    quitting = true; /* for outer loops */
+    cycles = 0;      /* stop the host (I/O) processor */
+    tubecycles = 0;  /* stop the tube processor */
+}
+
+/* TOHv3 */
+void set_shutdown_exit_code (uint8_t c) {
+    /* prevent a new error from scribbling an older one */
+    /* TOHv4-rc1: except SHUTDOWN_EXPIRED which always overrides anything prior */
+    if (    (SHUTDOWN_OK == shutdown_exit_code)
+         || (SHUTDOWN_EXPIRED == c)) {
+        shutdown_exit_code = 0x7f & c;
+    }
 }
 
 int main(int argc, char **argv)
@@ -774,5 +885,5 @@ int main(int argc, char **argv)
     main_init(argc, argv);
     main_run();
     main_close();
-    return 0;
+    return shutdown_exit_code;
 }

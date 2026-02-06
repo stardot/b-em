@@ -23,6 +23,7 @@ extern int interrupt;
 extern int nmi;
 
 extern uint64_t stopwatch;
+extern int cycles;
 extern int romsel;
 extern uint8_t ram1k, ram4k, ram8k;
 

@@ -145,7 +145,7 @@ static inline void disassemble(int cmos, uint16_t addr, uint8_t op, uint8_t p1, 
 
 
 static void display_trace(const char *filename, FILE *fp) {
-    char magic[4];
+    char magic[8];
     time_t secs;
 	int nmos, cmos, tickcount;
 	char tmstr[20];

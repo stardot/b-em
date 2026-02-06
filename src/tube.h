@@ -28,7 +28,8 @@ typedef struct {
 
 #define NUM_TUBE_SPEEDS 7
 extern tube_speed_t tube_speeds[NUM_TUBE_SPEEDS];
-extern int tube_speed_num, tube_multipler;
+extern int tube_speed_num;
+extern double tube_multiplier;
 
 #define TUBE_PH1_SIZE 24
 

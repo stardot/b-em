@@ -3,6 +3,7 @@
 #include "main.h"
 #include "model.h"
 #include "config.h"
+#include "keyboard.h"
 #include "cmos.h"
 #include "6809tube.h"
 #include "mc6809nc/mc6809_debug.h"
@@ -88,7 +89,7 @@ typedef struct
     char cpu[32];
     uint_least32_t rom_size;
     char bootrom[16];
-    int  speed_multiplier;
+    double speed_multiplier;
 } TUBE_DEFAULT;
 
 #define NUM_DFLT_TUBE 13
@@ -96,7 +97,7 @@ typedef struct
 static const TUBE_DEFAULT tube_defaults[] =
 {
     {"6502 Internal",  "6502",       0x0800, "6502Intern",       4 },
-    {"ARM",            "ARM",        0x4000, "ARMeval_100",      4 },
+    {"ARM",            "ARM",        0x4000, "ARMeval_100",   4.83 },
     {"Z80 ROM 1.21",   "Z80",        0x1000, "Z80_121",          6 },
     {"80186",          "80186",      0x4000, "BIOS",             8 },
     {"65816",          "65816",      0x8000, "ReCo6502ROM_816", 16 },
@@ -221,7 +222,7 @@ void model_loadcfg(void)
                 ptr->name = get_config_string(sect, "name", NULL);
                 ptr->rom_size = get_config_int(sect, "romsize", 0);
                 ptr->bootrom = get_config_string(sect, "bootrom", NULL);
-                ptr->speed_multiplier = get_config_int(sect, "speed", 1);
+                ptr->speed_multiplier = get_config_float(sect, "speed", 1.0);
             }
         }
     }
@@ -236,6 +237,7 @@ void model_loadcfg(void)
             MODEL *ptr = models + num;
             ptr->cfgsect = sect;
             ptr->name = get_config_string(sect, "name", sect);
+            ptr->group = al_get_config_value(bem_cfg, sect, "group");
             ptr->fdc_type = model_find_fdc(get_config_string(sect, "fdc", "none"), ptr->name);
             ptr->x65c02  = get_config_bool(sect, "65c02",  false);
             ptr->bplus   = get_config_bool(sect, "b+",   false);
@@ -249,6 +251,7 @@ void model_loadcfg(void)
             ptr->romsetup = model_find_romsetup(get_config_string(sect, "romsetup", "swram"), ptr->name);
             ptr->tube = model_find_tube(get_config_string(sect, "tube", "none"), ptr->name);
             ptr->boot_logo = get_config_int(sect, "boot_logo", 255);
+            ptr->kbdips = get_config_int(sect, "kbdips", kbdips);
         }
     }
     model_count = max_model;
@@ -364,6 +367,7 @@ void model_init()
     OS01        = models[curmodel].os01;
     compactcmos = models[curmodel].compact;
     weramrom    = false; /* set in the WE rom setup when needed */
+    kbdips      = models[curmodel].kbdips;
 
     mem_clearroms();
     models[curmodel].romsetup->func();
@@ -373,7 +377,7 @@ void model_init()
 
 void model_savestate(FILE *f)
 {
-    unsigned char bytes[6];
+    unsigned char bytes[8];
     MODEL *model = models + curmodel;
     savestate_save_var(curmodel, f);
     savestate_save_str(model->name, f);
@@ -389,17 +393,18 @@ void model_savestate(FILE *f)
     bytes[5] = model->compact;
     if (model->integra)
         bytes[0] |= 0x80;
-    fwrite(bytes, sizeof(bytes), 1, f);
-    if (model->tube >= 0) {
-        putc(1, f);
-        savestate_save_str(tubes[model->tube].name, f);
-    }
-    else if (curtube >= 0) {
-        putc(2, f);
-        savestate_save_str(tubes[curtube].name, f);
-    }
+    if (model->tube >= 0)
+        bytes[6] = 0x81;
+    else if (curtube >= 0)
+        bytes[6] = 0x82;
     else
-        putc(0, f);
+        bytes[6] = 0x80;
+    bytes[7] = kbdips;
+    fwrite(bytes, sizeof(bytes), 1, f);
+    if (model->tube >= 0)
+        savestate_save_str(tubes[model->tube].name, f);
+    else if (curtube >= 0)
+        savestate_save_str(tubes[curtube].name, f);
 }
 
 static bool model_cmp(int modelno, MODEL *nmodel)
@@ -442,7 +447,12 @@ void model_loadstate(FILE *f)
     model.os01    = bytes[4];
     model.compact = bytes[5];
 
-    switch(bytes[6]) {
+    if (bytes[6] & 0x80) {
+        kbdips = getc(f);
+        log_debug("model: kbdips=%02x", kbdips);
+    }
+
+    switch(bytes[6] & 0x7f) {
         case 1:
             tube_name = savestate_load_str(f);
             model.tube = model_find_tube(tube_name, model.name);
@@ -500,9 +510,20 @@ void model_loadstate(FILE *f)
     main_restart();
 }
 
-void model_savecfg(void) {
+void model_savecfg(void)
+{
     const char *sect = models[curmodel].cfgsect;
 
     al_set_config_value(bem_cfg, sect, "name", models[curmodel].name);
     mem_save_romcfg(sect);
+}
+
+void model_close(void)
+{
+    if (models)
+        free(models);
+    if (tubes)
+        free(tubes);
+    if (tube_dir)
+        free(tube_dir);
 }

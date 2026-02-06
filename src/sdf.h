@@ -60,7 +60,7 @@ const char *sdf_desc_dens(const struct sdf_geometry *geo);
 // In sdf-acc.c
 void sdf_new_disc(int drive, ALLEGRO_PATH *fn, const struct sdf_geometry *geo);
 void sdf_mount(int drive, const char *fn, FILE *fp, const struct sdf_geometry *geo);
-void sdf_load(int drive, const char *fn, const char *ext);
+int sdf_load(int drive, const char *fn, const char *ext);
 FILE *sdf_owseek(uint8_t drive, uint8_t sector, uint8_t track, uint8_t side, uint16_t ssize);
 
 //DB: bodge for VS

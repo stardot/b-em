@@ -3,10 +3,13 @@
 
 extern ALLEGRO_CONFIG *bem_cfg;
 
-void config_load(void);
+void config_load(ALLEGRO_PATH *path);
 void config_save(void);
 
+#define BOOL_USE_CONFIG 0x02
+
 int get_config_int(const char *sect, const char *key, int idefault);
+double get_config_float(const char *sect, const char *key, double fdefault);
 bool get_config_bool(const char *sect, const char *key, bool bdefault);
 const char *get_config_string(const char *sect, const char *key, const char *sdefault);
 ALLEGRO_COLOR get_config_colour(const char *sect, const char *key, ALLEGRO_COLOR cdefault);

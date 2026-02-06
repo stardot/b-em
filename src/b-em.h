@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include "compat_wrappers.h"
 
@@ -20,27 +21,41 @@
 
 #define inline __inline
 
+#define pclose _pclose
+#define popen  _popen
+
 #define strcasecmp  _stricmp
 #define strncasecmp _strnicmp
 
-#define fflush_unlocked _fflush_nolock
+#define flockfile       _lock_file
+#define funlockfile     _unlock_file
 #define getc_unlocked   _getc_nolock
 #define putc_unlocked   _putc_nolock
 #define fread_unlocked  _fread_nolock
 #define fwrite_unlocked _fwrite_nolock
+#define fflush_unlocked _fflush_nolock
 
 #else
 
 #ifdef WIN32
-#define fflush_unlocked fflush
-#define getc_unlocked   getc
-#define putc_unlocked   putc
+#define flockfile       _lock_file
+#define funlockfile     _unlock_file
+#define getc_unlocked   _getc_nolock
+#define putc_unlocked   _putc_nolock
+#if __MSVCRT_VERSION__ >= 0x800
+#define fread_unlocked  _fread_nolock
+#define fwrite_unlocked _fwrite_nolock
+#define fflush_unlocked _fflush_nolock
+#else
 #define fread_unlocked  fread
 #define fwrite_unlocked fwrite
+#define fflush_unlocked fflush
+#endif
 #else
 #ifdef __APPLE__
-#define fread_unlocked fread
+#define fread_unlocked  fread
 #define fwrite_unlocked fwrite
+#define fflush_unlocked fflush
 #endif
 #endif
 

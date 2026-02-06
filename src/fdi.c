@@ -82,21 +82,21 @@ static void fdi_seek(int drive, int track)
 //        printf("DD Track %i Len %i Index %i %i\n",track,ftracklen[drive][0][1],ftrackindex[drive][0][1],c);
 }
 
-static void fdi_readsector(int drive, int sector, int track, int side, int density)
+static void fdi_readsector(int drive, int sector, int track, int side, unsigned flags)
 {
         fdi_revs = 0;
         fdi_sector  = sector;
         fdi_track   = track;
         fdi_side    = side;
         fdi_drive   = drive;
-        fdi_density = density;
+        fdi_density = flags & DISC_FLAG_MFM;
 //        printf("Read sector %i %i %i %i\n",drive,side,track,sector);
 
         fdi_inread  = 1;
         fdi_readpos = 0;
 }
 
-static void fdi_writesector(int drive, int sector, int track, int side, int density)
+static void fdi_writesector(int drive, int sector, int track, int side, unsigned flags)
 {
         fdi_revs = 0;
         fdi_sector = sector;
@@ -105,7 +105,7 @@ static void fdi_writesector(int drive, int sector, int track, int side, int dens
         fdi_drive  = drive;
 //        printf("Write sector %i %i %i %i\n",drive,side,track,sector);
 
-        if (!fdi_f[drive] || (side && !fdi_ds[drive]) || density)
+        if (!fdi_f[drive] || (side && !fdi_ds[drive]) || (flags & DISC_FLAG_MFM))
         {
                 fdi_notfound = 500;
                 return;
@@ -114,12 +114,12 @@ static void fdi_writesector(int drive, int sector, int track, int side, int dens
         fdi_readpos = 0;
 }
 
-static void fdi_readaddress(int drive, int track, int side, int density)
+static void fdi_readaddress(int drive, int side, unsigned flags)
 {
         fdi_revs = 0;
-        fdi_track   = track;
+        fdi_track   = drives[drive].curtrack;
         fdi_side    = side;
-        fdi_density = density;
+        fdi_density = (flags & DISC_FLAG_MFM);
         fdi_drive   = drive;
 //        printf("Read address %i %i %i\n",drive,side,track);
 
@@ -127,10 +127,10 @@ static void fdi_readaddress(int drive, int track, int side, int density)
         fdi_readpos    = 0;
 }
 
-static void fdi_format(int drive, int track, int side, unsigned par2)
+static void fdi_format(int drive, int side, unsigned par2)
 {
         fdi_revs = 0;
-        fdi_track   = track;
+        fdi_track   = drives[drive].curtrack;;
         fdi_side    = side;
         fdi_density = 0;
         fdi_drive   = drive;
@@ -172,7 +172,12 @@ static void calccrc(uint8_t byte)
 
 static void fdi_poll(void)
 {
-        int tempi, c;
+    if (fdi_pos == 0)
+        drives[fdi_drive].isindex = 1;
+    else if (fdi_pos == 50)
+        drives[fdi_drive].isindex = 0;
+
+    int tempi, c;
         if (fdi_pos >= fdi_tracklen[fdi_drive][fdi_side][fdi_density])
         {
 //                printf("Looping! %i\n",fdipos);
@@ -359,13 +364,13 @@ void fdi_init()
         fdi_setupcrc(0x1021, 0xcdb4);
 }
 
-void fdi_load(int drive, const char *fn)
+int fdi_load(int drive, const char *fn)
 {
-        writeprot[drive] = fwriteprot[drive] = 1;
+        drives[drive].writeprot = drives[drive].fwriteprot = 1;
         fdi_f[drive] = fopen(fn, "rb");
         if (!fdi_f[drive])  {
             log_warn("fdi: unable to open FDI disc image '%s': %s", fn, strerror(errno));
-            return;
+            return -1;
         }
         fdi_h[drive] = fdi2raw_header(fdi_f[drive]);
 //        if (!fdih[drive]) printf("Failed to load!\n");
@@ -382,5 +387,6 @@ void fdi_load(int drive, const char *fn)
         drives[drive].abort       = fdi_abort;
         drives[drive].spinup      = NULL;
         drives[drive].spindown    = NULL;
+        return 0;
 }
 

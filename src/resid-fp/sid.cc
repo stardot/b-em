@@ -31,6 +31,12 @@ enum host_cpu_feature {
 /* This code is appropriate for 32-bit and 64-bit x86 CPUs. */
 #if defined(__x86_64__) || defined(__i386__) || defined(_MSC_VER)
 
+#if defined(_MSC_VER)
+#include <intrin.h>
+#else
+#include <cpuid.h>
+#endif
+
 struct cpu_x86_regs_s {
   unsigned int eax;
   unsigned int ebx;
@@ -41,28 +47,18 @@ typedef struct cpu_x86_regs_s cpu_x86_regs_t;
 
 static cpu_x86_regs_t get_cpuid_regs(unsigned int index)
 {
-  cpu_x86_regs_t retval;
+  union {
+    cpu_x86_regs_t retval;
+    int regs[4];
+  } data;
 
-#if defined(_MSC_VER) /* MSVC assembly */
-  __asm {
-    mov eax, [index]
-    cpuid
-    mov [retval.eax], eax
-    mov [retval.ebx], ebx
-    mov [retval.ecx], ecx
-    mov [retval.edx], edx
-  }
-#else /* GNU assembly */
-  asm("movl %4, %%eax; cpuid; movl %%eax, %0; movl %%ebx, %1; movl %%ecx, %2; movl %%edx, %3;"
-      : "=m" (retval.eax),
-        "=m" (retval.ebx),
-        "=m" (retval.ecx),
-        "=m" (retval.edx)
-      : "r"  (index)
-      : "eax", "ebx", "ecx", "edx");
+#if defined(_MSC_VER)
+  __cpuid(data.regs, index);
+#else
+  __cpuid(index, data.retval.eax, data.retval.ebx, data.retval.ecx, data.retval.edx);
 #endif
 
-  return retval;
+  return data.retval;
 }
 
 static int host_cpu_features_by_cpuid(void)
@@ -86,46 +82,10 @@ static int host_cpu_features(void)
 {
   static int features = 0;
   static int features_detected = 0;
-/* 32-bit only */
-#if defined(__i386__) || (defined(_MSC_VER) && defined(_WIN32))
-  unsigned long temp1, temp2;
-#endif
 
   if (features_detected)
     return features;
   features_detected = 1;
-
-#if defined(_MSC_VER) && defined(_WIN32) /* MSVC compatible assembly appropriate for 32-bit Windows */
-  /* see if we are dealing with a cpu that has the cpuid instruction */
-  __asm {
-    pushf
-    pop eax
-    mov [temp1], eax
-    xor eax, 0x200000
-    push eax
-    popf
-    pushf
-    pop eax
-    mov [temp2], eax
-    push [temp1]
-    popf
-  }
-#endif
-#if defined(__i386__) /* GNU assembly */
-  asm("pushfl; popl %%eax; movl %%eax, %0; xorl $0x200000, %%eax; pushl %%eax; popfl; pushfl; popl %%eax; movl %%eax, %1; pushl %0; popfl "
-      : "=r" (temp1),
-      "=r" (temp2)
-      :
-      : "eax");
-#endif
-#if defined(__i386__) || (defined(_MSC_VER) && defined(_WIN32))
-  temp1 &= 0x200000;
-  temp2 &= 0x200000;
-  if (temp1 == temp2) {
-    /* no cpuid support, so we can't test for SSE availability -> false */
-    return 0;
-  }
-#endif
 
   /* find the highest supported cpuid function, returned in %eax */
   if (get_cpuid_regs(0).eax < 1) {

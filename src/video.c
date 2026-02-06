@@ -653,10 +653,17 @@ static void mode7_render(ALLEGRO_LOCKED_REGION *region, uint8_t dat)
                 mode7_flash = 0;
                 break;
             case 12: /* 140: normal height */
+                if (mode7_dbl) {
+                    mode7_dbl = 0;
+                    mode7_heldchar = 0;
+                }
+                break;
             case 13: /* 141: double height */
-                mode7_dbl = dat & 1;
-                if (mode7_dbl)
+                if (!mode7_dbl) {
+                    mode7_dbl = 1;
                     mode7_wasdbl = 1;
+                    mode7_heldchar = 0;
+                }
                 break;
             case 17: /* 145: graphics red     */
             case 18: /* 146: graphics green   */
@@ -764,7 +771,7 @@ static void mode7_render(ALLEGRO_LOCKED_REGION *region, uint8_t dat)
 }
 
 uint16_t vidbank;
-static const int screenlen[4] = { 0x4000, 0x5000, 0x2000, 0x2800 };
+const uint_least16_t screenlen[4] = { 0x4000, 0x5000, 0x2000, 0x2800 };
 
 static int vsynctime;
 static int interline;
@@ -849,6 +856,16 @@ ALLEGRO_DISPLAY *video_init(void)
     al_clear_to_color(al_map_rgb(0, 0,0));
     region = al_lock_bitmap(b, ALLEGRO_PIXEL_FORMAT_ARGB_8888, ALLEGRO_LOCK_WRITEONLY);
     return display;
+}
+
+void video_close()
+{
+    al_destroy_bitmap(b32);
+    al_destroy_bitmap(b16);
+    al_destroy_bitmap(b);
+    al_destroy_display(display);
+    if (font_dir)
+        al_destroy_path(font_dir);
 }
 
 void video_set_disptype(enum vid_disptype dtype)

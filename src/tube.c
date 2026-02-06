@@ -19,7 +19,7 @@
 #include "musahi/m68k.h"
 #include "sprow.h"
 
-int tube_multipler = 1;
+double tube_multiplier = 1.0;
 int tube_speed_num = 0;
 int tubecycles = 0;
 
@@ -110,10 +110,16 @@ void tube_updateints()
                 pdp11_interrupt(0x80, 7);
             else if (tube_type == TUBESPROW)
                 sprow_interrupt(2);
+            else if (tube_type == TUBE68000)
+                m68k_set_virq(5, 1);
         }
     }
     else if (tube_irq & 2)
+    {
         log_debug("tube: parasite NMI de-asserted");
+        if (tube_type == TUBE68000)
+            m68k_set_virq(5, 0);
+    }
 
     if (new_irq != tube_irq && tube_type == TUBE6809)
         tube_6809_int(new_irq);
@@ -349,7 +355,7 @@ void tube_parasite_write(uint32_t addr, uint8_t val)
 
 void tube_updatespeed()
 {
-    tube_multipler = tube_speeds[tube_speed_num].multipler * tubes[curtube].speed_multiplier;
+    tube_multiplier = (double)(tube_speeds[tube_speed_num].multipler) * tubes[curtube].speed_multiplier / 2.0;
 }
 
 bool tube_32016_init(void *rom)

@@ -25,20 +25,17 @@ static ALLEGRO_SAMPLE *tsamples[2];
 
 void tapenoise_init(ALLEGRO_EVENT_QUEUE *queue)
 {
-    ALLEGRO_PATH *dir;
-    int c;
-
     log_debug("tapenoise: tapenoise_init");
     if ((voice = al_create_voice(FREQ_DD, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_1))) {
         if ((mixer = al_create_mixer(FREQ_DD, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_1))) {
             if (al_attach_mixer_to_voice(mixer, voice)) {
                 if ((stream = al_create_audio_stream(4, BUFLEN_DD, FREQ_DD, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_1))) {
                     if (al_attach_audio_stream_to_mixer(stream, mixer)) {
-                        dir = al_create_path_for_directory("ddnoise");
+                        ALLEGRO_PATH *dir = al_create_path_for_directory("ddnoise");
                         tsamples[0] = find_load_wav(dir, "motoron");
                         tsamples[1] = find_load_wav(dir, "motoroff");
                         al_destroy_path(dir);
-                        for (c = 0; c < 32; c++)
+                        for (int c = 0; c < 32; c++)
                             sinewave[c] = (int)(sin((float)c * ((2.0 * PI) / 32.0)) * 128.0);
                     } else
                         log_error("sound: unable to attach stream to mixer for tape noise");
@@ -61,6 +58,12 @@ void tapenoise_close()
         al_destroy_sample(smp);
     if ((smp = tsamples[1]))
         al_destroy_sample(smp);
+    if (stream)
+        al_destroy_audio_stream(stream);
+    if (mixer)
+        al_destroy_mixer(mixer);
+    if (voice)
+        al_destroy_voice(voice);
 }
 
 static void send_buffer(void)

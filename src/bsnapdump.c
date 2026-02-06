@@ -273,20 +273,23 @@ static void dump_iomem(char *hexout, const char *fn, FILE *fp, long size)
 {
     ZFILE zf;
     unsigned char mem[0x8000];
+    memset(mem, 0, sizeof(mem));
     zinit(&zf, fp, size);
-    zread(&zf, mem, 2);
-    printf("I/O Processor memory:\n"
-           "  FE30 (ROMSEL)=%02X, FE34 (ACCCON)=%02X\n  Main RAM:\n", mem[0], mem[1]);
-    dump_region(&zf, mem, 0x8000, 0xffff0000, hexout);
-    fputs("  VDU workspace\n", stdout);
-    dump_region(&zf, mem, 0x1000, 0xff808000, hexout);
-    fputs("  Hazel Workspace\n", stdout);
-    dump_region(&zf, mem, 0x2000, 0xff80c000, hexout);
-    fputs("  Shdadow RAM\n", stdout);
-    dump_region(&zf, mem, 0x5000, 0xfffd3000, hexout);
-    for (int r = 0; r <= 15; ++r) {
-        printf("  ROM %d\n", r);
-        dump_region(&zf, mem, 0x4000, 0xfff08000|(r<<16), hexout);
+    int res = zread(&zf, mem, 2);
+    if (res == Z_OK) {
+        printf("I/O Processor memory:\n"
+               "  FE30 (ROMSEL)=%02X, FE34 (ACCCON)=%02X\n  Main RAM:\n", mem[0], mem[1]);
+        dump_region(&zf, mem, 0x8000, 0xffff0000, hexout);
+        fputs("  VDU workspace\n", stdout);
+        dump_region(&zf, mem, 0x1000, 0xff808000, hexout);
+        fputs("  Hazel Workspace\n", stdout);
+        dump_region(&zf, mem, 0x2000, 0xff80c000, hexout);
+        fputs("  Shdadow RAM\n", stdout);
+        dump_region(&zf, mem, 0x5000, 0xfffd3000, hexout);
+        for (int r = 0; r <= 15; ++r) {
+            printf("  ROM %d\n", r);
+            dump_region(&zf, mem, 0x4000, 0xfff08000|(r<<16), hexout);
+        }
     }
     inflateEnd(&zf.zs);
 }

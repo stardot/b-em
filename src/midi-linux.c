@@ -165,7 +165,7 @@ static inline void midi_jack_send_msg(midi_dev_t *midi, uint8_t *buffer, size_t 
 
 #ifdef HAVE_ALSA_ASOUNDLIB_H
 
-extern int quitting;
+extern bool quitting;
 
 static pthread_t alsa_seq_thread;
 static snd_seq_t *midi_seq = NULL;

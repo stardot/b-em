@@ -14,7 +14,7 @@ static const char *cond[8]  = { "NZ", "Z", "NC", "C", "PO", "PE", "P", "M"};
 static const char *arith[8] = { "ADD   A,", "ADC   A,", "SUB   ", "SBC   A,",
                                 "AND   ", "XOR   ", "OR    ","CP    "};
 static const char *ins1[8]  = { "RLCA","RRCA","RLA","RRA","DAA","CPL","SCF","CCF"};
-static const char *ins2[4]  = { "RET", "EXX", "JP  (HL)", "LD  SP,HL" };
+static const char *ins2[4]  = { "RET", "EXX", "JP    (HL)", "LD    SP,HL" };
 static const char *ins3[8]  = { "RLC","RRC","RL ","RR ","SLA","SRA","???","SRL"};
 static const char *ins4[8]  = { "NEG","???","???","???","???","???","???","???"};
 static const char *ins5[8]  = { "RETN","RETI","???","???","???","???","???","???"};

@@ -26,7 +26,7 @@
 #include "video.h"
 #include "video_render.h"
 
-int curmodel;
+int curmodel = -1;
 int selecttube = -1;
 int cursid = 0;
 int sidmethod = 0;
@@ -36,10 +36,8 @@ ALLEGRO_CONFIG *bem_cfg;
 int get_config_int(const char *sect, const char *key, int ival)
 {
     const char *str = al_get_config_value(bem_cfg, sect, key);
-    if (!str && sect) {
-        if ((str = al_get_config_value(bem_cfg, NULL, key)))
-            al_remove_config_key(bem_cfg, "", key);
-    }
+    if (!str && sect)
+        str = al_get_config_value(bem_cfg, NULL, key);
     if (str) {
         char *end;
         long nval = strtol(str, &end, 0);
@@ -49,6 +47,24 @@ int get_config_int(const char *sect, const char *key, int ival)
             log_warn("config: section '%s', key '%s': invalid integer %s", sect, key, str);
         else
             log_warn("config: global section, key '%s': invalid integer %s", key, str);
+    }
+    return ival;
+}
+
+double get_config_float(const char *sect, const char *key, double ival)
+{
+    const char *str = al_get_config_value(bem_cfg, sect, key);
+    if (!str && sect)
+        str = al_get_config_value(bem_cfg, NULL, key);
+    if (str) {
+        char *end;
+        double nval = strtod(str, &end);
+        if (end > str && !end[0])
+            ival = nval;
+        else if (sect)
+            log_warn("config: section '%s', key '%s': invalid number %s", sect, key, str);
+        else
+            log_warn("config: global section, key '%s': invalid number %s", key, str);
     }
     return ival;
 }
@@ -92,6 +108,22 @@ const char *get_config_string(const char *sect, const char *key, const char *sva
     return sval;
 }
 
+static ALLEGRO_PATH *get_config_path(const char *sect, const char *key)
+{
+    const char *str = al_get_config_value(bem_cfg, sect, key);
+    if (str)
+        return al_create_path(str);
+    return NULL;
+}
+
+static char *get_config_strdup(const char *sect, const char *key)
+{
+    const char *str = al_get_config_value(bem_cfg, sect, key);
+    if (str)
+        return strdup(str);
+    return NULL;
+}
+
 ALLEGRO_COLOR get_config_colour(const char *sect, const char *key, ALLEGRO_COLOR cdefault)
 {
     const char *str = al_get_config_value(bem_cfg, sect, key);
@@ -115,14 +147,10 @@ ALLEGRO_COLOR get_config_colour(const char *sect, const char *key, ALLEGRO_COLOR
     return cdefault;
 }
 
-void config_load(void)
+void config_load(ALLEGRO_PATH *path)
 {
-    ALLEGRO_PATH *path;
-    const char *cpath, *p;
-    int c;
-
-    if ((path = find_cfg_file("b-em", ".cfg"))) {
-        cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
+    if (path || (path = find_cfg_file("b-em", ".cfg"))) {
+        const char *cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
         if (bem_cfg)
             al_destroy_config(bem_cfg);
         if (!(bem_cfg = al_load_config_file(cpath))) {
@@ -136,38 +164,28 @@ void config_load(void)
         exit(1);
     }
 
-    if ((p = get_config_string("disc", "disc0", NULL))) {
-        if (discfns[0])
-            al_destroy_path(discfns[0]);
-        discfns[0] = al_create_path(p);
-    }
-    if ((p = get_config_string("disc", "disc1", NULL))) {
-        if (discfns[1])
-            al_destroy_path(discfns[1]);
-        discfns[1] = al_create_path(p);
-    }
-    if ((p = get_config_string("disc", "mmb", NULL))) {
-        if (mmb_fn)
-            free(mmb_fn);
-        mmb_fn = strdup(p);
-    }
-    if ((p = get_config_string("disc", "mmccard", NULL))) {
-        if (mmccard_fn)
-            free(mmccard_fn);
-        mmccard_fn = strdup(p);
-    }
-    if ((p = get_config_string("tape", "tape", NULL))) {
-        if (tape_fn)
-            al_destroy_path(tape_fn);
-        tape_fn = al_create_path(p);
-    }
+    if (!drives[0].discfn)
+        drives[0].discfn = get_config_path("disc", "disc0");
+    if (!drives[1].discfn)
+        drives[1].discfn =  get_config_path("disc", "disc1");
+    if (!mmb_fn)
+        mmb_fn = get_config_strdup("disc", "mmb");
+    if (!mmccard_fn)
+        mmccard_fn = get_config_strdup("disc", "mmcard");
+    if (!tape_fn)
+        tape_fn = get_config_path("tape", "tape");
+
     al_remove_config_key(bem_cfg, "", "video_resize");
     al_remove_config_key(bem_cfg, "", "tube6502speed");
     defaultwriteprot = get_config_bool("disc", "defaultwriteprotect", 1);
 
     autopause        = get_config_bool(NULL, "autopause", false);
+    if (hiresdisplay & BOOL_USE_CONFIG)
+        hiresdisplay = get_config_bool(NULL, "hiresdisplay", hiresdisplay & 1);
 
-    curmodel         = get_config_int(NULL, "model",         3);
+    if (curmodel == -1)
+        curmodel = get_config_int(NULL, "model", 3);
+
     selecttube       = get_config_int(NULL, "tube",         -1);
     tube_speed_num   = get_config_int(NULL, "tubespeed",     0);
 
@@ -198,25 +216,31 @@ void config_load(void)
 
     vid_ledlocation  = get_config_int("video", "ledlocation",   0);
     vid_ledvisibility = get_config_int("video", "ledvisibility", 2);
+    vid_lock_type    = get_config_int("video", "videolocktype", ALLEGRO_LOCK_READWRITE);
 
-    c                = get_config_int("video", "displaymode",   0);
-    if (c >= 4) {
-        c -= 4;
-        vid_pal = 1;
-    }
-    video_set_disptype(c);
+    int displaymode = get_config_int("video", "displaymode", 0);
+    if (vid_dtype_user == VDT_UNSET)
+        vid_dtype_user = displaymode & 3;
+    vid_colour_out = get_config_int("video", "colourtype",  0);
+    if (displaymode >= 4 && vid_colour_out == VDC_RGB)
+        vid_colour_out = VDC_PAL;
+    video_set_disptype(vid_dtype_user);
+
+    mono_green_col = get_config_colour("video", "mono_green", al_map_rgb(0, 255, 98));
+    mono_amber_col = get_config_colour("video", "mono_amber", al_map_rgb(255, 145, 0));
+    mono_white_col = get_config_colour("video", "mono_white", al_map_rgb(255, 255, 255));
 
     mode7_fontfile   = get_config_string("video", "mode7font", "saa5050");
 
-    fasttape         = get_config_bool("tape", "fasttape",      0);
+    if (!fasttape && get_config_bool("tape", "fasttape", false))
+        fasttape = true;
 
     scsi_enabled     = get_config_bool("disc", "scsienable", 0);
-    ide_enable       = get_config_bool("disc", "ideenable",     0);
+    ide_enable       = get_config_bool("disc", "ideenable", 0);
     vdfs_enabled     = get_config_bool("disc", "vdfsenable", 0);
     vdfs_cfg_root    = get_config_string("disc", "vdfs_root", 0);
 
-    keyas            = get_config_bool(NULL, "key_as",        0);
-    keylogical       = get_config_bool(NULL, "key_logical",   0);
+    keyas            = get_config_bool(NULL, "key_as", 0);
     keypad           = get_config_bool(NULL, "keypad", false);
 
     mem_jim_setsize(get_config_int(NULL, "jim_mem_size", 0));
@@ -225,6 +249,9 @@ void config_load(void)
     mouse_stick      = get_config_bool(NULL, "mouse_stick",   0);
     kbdips           = get_config_int(NULL, "kbdips", 0);
 
+    key_mode         = get_config_int(NULL, "key_mode", -1);
+    if (key_mode == -1)
+        key_mode = get_config_bool(NULL, "key_logical", false) ? BKM_HYBRID : BKM_PHYSICAL;
     for (int act = 0; act < KEY_ACTION_MAX; act++) {
         const char *str = al_get_config_value(bem_cfg, "key_actions", keyact_const[act].name);
         if (str) {
@@ -244,12 +271,12 @@ void config_load(void)
         }
     }
 
-    for (c = 0; c < ALLEGRO_KEY_MAX; c++) {
-        const char *str = al_get_config_value(bem_cfg, "user_keyboard", al_keycode_to_name(c));
+    for (int key = 0; key < ALLEGRO_KEY_MAX; ++key) {
+        const char *str = al_get_config_value(bem_cfg, "user_keyboard", al_keycode_to_name(key));
         if (str) {
             unsigned bbckey = strtoul(str, NULL, 16);
             if (bbckey)
-                keylookup[c] = bbckey;
+                keylookup[key] = bbckey;
         }
     }
     midi_load_config();
@@ -296,7 +323,6 @@ void config_save(void)
 {
     ALLEGRO_PATH *path;
     const char *cpath;
-    int c;
 
     if ((path = find_cfg_dest("b-em", ".cfg"))) {
         cpath = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
@@ -309,8 +335,8 @@ void config_save(void)
         }
         model_savecfg();
 
-        set_config_path("disc", "disc0", discfns[0]);
-        set_config_path("disc", "disc1", discfns[1]);
+        set_config_path("disc", "disc0", drives[0].discfn);
+        set_config_path("disc", "disc1", drives[1].discfn);
         set_config_string("disc", "mmb", mmb_fn);
         set_config_string("disc", "mmccard", mmccard_fn);
         set_config_bool("disc", "defaultwriteprotect", defaultwriteprot);
@@ -321,6 +347,7 @@ void config_save(void)
             al_remove_config_key(bem_cfg, "tape", "tape");
 
         set_config_bool(NULL, "autopause", autopause);
+        set_config_bool(NULL, "hiresdisplay", hiresdisplay);
 
         set_config_int(NULL, "model", curmodel);
         set_config_int(NULL, "tube", selecttube);
@@ -351,10 +378,8 @@ void config_save(void)
         set_config_int("video", "winsizex", winsizex);
         set_config_int("video", "winsizey", winsizey);
 
-        c = vid_dtype_user;
-        if (vid_pal)
-            c += 4;
-        set_config_int("video", "displaymode", c);
+        set_config_int("video", "displaymode", vid_dtype_user);
+        set_config_int("video", "colourtype", vid_colour_out);
         if (vid_ledlocation >= 0)
             set_config_int("video", "ledlocation", vid_ledlocation);
         set_config_int("video", "ledvisibility", vid_ledvisibility);
@@ -370,8 +395,8 @@ void config_save(void)
             set_config_string("disc", "vdfs_root", vdfs_root);
 
         set_config_bool(NULL, "key_as", keyas);
-        set_config_bool(NULL, "key_logical", keylogical);
         set_config_bool(NULL, "keypad", keypad);
+        set_config_int(NULL, "key_mode", key_mode);
         set_config_int(NULL, "jim_mem_size", mem_jim_size);
 
         set_config_bool(NULL, "mouse_amx", mouse_amx);

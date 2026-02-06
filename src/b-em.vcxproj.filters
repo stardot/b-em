@@ -39,147 +39,6 @@
     <ClInclude Include="resid-fp\wave.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="6502.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="6502tube.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="65816.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="acia.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="adc.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="arm.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="bbctext.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="b-em.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="cmos.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="compact_joystick.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="compactcmos.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="config.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="csw.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="daa.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ddnoise.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="debugger.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="disc.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="fdi2raw.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="fdi.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="i8271.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ide.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="keyboard.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="main.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="mem.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="model.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="mouse.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="pal.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="resources.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="savestate.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="serial.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="sid_b-em.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="sidtypes.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="sn76489.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="sound.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="sysvia.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="tape.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="tapenoise.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="tube.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="uef.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="uservia.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="via.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="video.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="video_render.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="wd1770.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="x86.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="x86_tube.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="z80.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="6502debug.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -375,6 +234,174 @@
     <ClInclude Include="fullscreen.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="mc68000tube.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mmb.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="musahi\m68kops.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="musahi\m68kcpu.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ml675001.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="armulator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="textsave.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="musahi\m68k.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="musahi\m68kconf.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="6502.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="6502tube.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="65816.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="acia.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="adc.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="arm.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="b-em.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cmos.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="compact_joystick.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="compactcmos.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="config.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="csw.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="daa.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ddnoise.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="debugger.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="fdi.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="fdi2raw.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="i8271.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ide.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="keyboard.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="main.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="model.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mouse.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="savestate.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="serial.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sid_b-em.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sidtypes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sn76489.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sound.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sysvia.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="tape.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="tapenoise.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="tube.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="uef.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="uservia.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="via.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="video.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="video_render.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="wd1770.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="x86.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="x86_tube.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="z80.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="resources.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="disc.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pal.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="NS32016\pandora\PandoraV2_00.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="b-em.rc">
@@ -505,7 +532,7 @@
     <ClCompile Include="x86.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Z80.c">
+    <ClCompile Include="z80.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="resid-fp\convolve.cc">
@@ -730,11 +757,31 @@
     <ClCompile Include="fullscreen.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="mc68000tube.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="mmb.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="musahi\m68kops.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="musahi\m68kcpu.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="musahi\m68kdasm.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="textsave.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="b-em.ico">
-      <Filter>Source Files</Filter>
-    </None>
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="b-em.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
 </Project>

@@ -38,9 +38,9 @@ src/fdresize
 src/m7makechars
 src/vdfs6
 src/wildtest
-packages/*
-src/Debug/*
-src/Release/*
+packages/
+src/Debug/
+src/Release/
 b-em.iobj
 b-em.ipdb
 b-em.iobj
@@ -60,3 +60,8 @@ src/b-em.aps
 *.bak
 build-w32/
 build-w64/
+*.dll
+*.pdb
+.vs/
+src/x64/Debug/
+src/x64/Release/

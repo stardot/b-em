@@ -220,7 +220,7 @@ static uint32_t dbg_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size
   return dbg6502_disassemble(cpu, addr, buf, bufsize, x65c02 ? M65C02 : M6502);
 }
 
-int tubecycle;
+static double tubecycle;
 
 int output = 0;
 static int timetolive = 0;
@@ -252,7 +252,7 @@ static void polltime(int c)
             disc_poll();
         }
     }
-    tubecycle += c;
+    tubecycle += c * tube_multiplier;
 }
 
 static int FEslowdown[8] = { 1, 0, 1, 1, 0, 0, 1, 0 };
@@ -381,7 +381,7 @@ static uint32_t do_readmem(uint32_t addr)
         else
             readc[addr] = 31;
 
-        if (memstat[vis20k][addr >> 8])
+        if (memstat[vis20k][addr >> 8]) // Anything except I/O.
                 return memlook[vis20k][addr >> 8][addr];
         if (MASTER && (acccon & 0x40) && addr >= 0xFC00)
                 return os[addr & 0x3FFF];
@@ -777,7 +777,7 @@ static void do_writemem(uint32_t addr, uint32_t val)
         writec[addr] = 31;
 
         c = memstat[vis20k][addr >> 8];
-        if (c == 1) {
+        if (c == MSTAT_RAM) {
             memlook[vis20k][addr >> 8][addr] = (uint8_t)val;
             switch(addr) {
                     case 0x022c:
@@ -795,8 +795,8 @@ static void do_writemem(uint32_t addr, uint32_t val)
                 }
                 return;
         }
-        else if (c >= 2) {
-            if (c == 3) {
+        else if (c >= MSTAT_ROM) {
+            if (c == MSTAT_WSPLIT) {
                 /* Watform RAM/ROM board writing to a different bank
                  * than the one selected by ROMSEL.
                  */
@@ -1009,6 +1009,20 @@ void writemem(uint16_t addr, uint8_t val)
 }
 
 int nmi, oldnmi, interrupt, takeint;
+
+/*
+ * Note interrupt flags in the above interrupt variable:
+ *
+ * 0x001: System VIA.
+ * 0x002: User VIA
+ * 0x004: System ACIA
+ * 0x008: Tube ULA
+ * 0x010: SCSI
+ * 0x080: Bodge flag.
+ * 0x100: Music 2000 ACIA 1
+ * 0x200: Music 2000 ACIA 2
+ * 0x400: Music 2000 ACIA 3
+ */
 
 void m6502_reset(void)
 {
@@ -4029,11 +4043,11 @@ void m6502_exec(int slice)
 
                 if (otherstuffcount <= 0)
                     otherstuff_poll();
-                if (tube_exec && tubecycle) {
-                        tubecycles += (tubecycle * tube_multipler) >> 1;
-                        if (tubecycles > 3)
-                                tube_exec();
-                        tubecycle = 0;
+                if (tube_exec && tubecycle > 3.0) {
+                    int whole_cycles = (int)tubecycle;
+                    tubecycles += whole_cycles;
+                    tubecycle -= whole_cycles;
+                    tube_exec();
                 }
 
                 if (nmi && !oldnmi) {
@@ -4088,8 +4102,8 @@ void m65c02_exec(int slice)
                 case 0x02:
                         if (dbg_core6502)
                             debug_trap(&core6502_cpu_debug, debug_addr(oldpc), 1);
-                        else
-                            polltime(1);
+                        polltime(2);
+                        (void)readmem(pc++);
                         break;
 
                 case 0x04:      /*TSB zp */
@@ -4317,6 +4331,17 @@ void m65c02_exec(int slice)
                         a &= readmem(addr);
                         setzn(a);
                         polltime(6);
+                        takeint = (interrupt && !p.i);
+                        break;
+
+                case 0x22:
+                case 0x42:
+                case 0x62:
+                case 0x82:
+                case 0xC2:
+                case 0xE2:
+                        pc++;
+                        polltime(2);
                         takeint = (interrupt && !p.i);
                         break;
 
@@ -4676,6 +4701,14 @@ void m65c02_exec(int slice)
                         a ^= readmem(addr);
                         setzn(a);
                         polltime(5);
+                        break;
+
+                case 0x54:
+                case 0xD4:
+                case 0xF4:
+                        pc++;
+                        polltime(4);
+                        takeint = (interrupt && !p.i);
                         break;
 
                 case 0x55:      /*EOR zp,x */
@@ -5577,6 +5610,13 @@ void m65c02_exec(int slice)
                         polltime(3);
                         break;
 
+                case 0xDC:
+                case 0xFC:
+                        pc += 2;
+                        polltime(4);
+                        takeint = (interrupt && !p.i);
+                        break;
+
                 case 0xDD:      /*CMP abs,x */
                         addr = getw();
                         if ((addr & 0xFF00) ^ ((addr + x) & 0xFF00))
@@ -5795,35 +5835,9 @@ void m65c02_exec(int slice)
                         break;
 
                 default:
-                        switch (opcode & 0xF) {
-                        case 2:
-                                pc++;
-                                polltime(2);
-                                break;
-                        case 3:
-                        case 7:
-                        case 0xB:
-                        case 0xF:
-                                polltime(1);
-                                break;
-                        case 4:
-                                pc++;
-                                polltime(4);
-                                break;
-                        case 0xC:
-                                pc += 2;
-                                polltime(4);
-                                break;
-                        }
-                        takeint = (interrupt && !p.i);
+                        polltime(1);
+                        /* Note: no interrupt check! */
                         break;
-
-                        /* TODO: DB: was this intentionally excluded
-                        printf("Found bad opcode %02X\n", opcode);
-                        dumpregs();
-                        mem_dump();
-                        exit(-1);
-                        */
                 }
 /*                if (output | 1)
                 {
@@ -5863,12 +5877,11 @@ void m65c02_exec(int slice)
 //                        printf("INT\n");
                 }
                 interrupt &= ~128;
-                if (tube_exec && tubecycle && !(tubeula.r1stat & TUBE_STAT_P)) {
-//                        log_debug("tubeexec %i %i %i\n",tubecycles,tubecycle,tube_shift);
-                        tubecycles += (tubecycle * tube_multipler) >> 1;
-                        if (tubecycles > 3)
-                                tube_exec();
-                        tubecycle = 0;
+                if (tube_exec && tubecycle >= 3.0 && !(tubeula.r1stat & TUBE_STAT_P)) {
+                    int whole_cycles = (int)tubecycle;
+                    tubecycles += whole_cycles;
+                    tubecycle -= whole_cycles;
+                    tube_exec();
                 }
 
                 if (otherstuffcount <= 0)

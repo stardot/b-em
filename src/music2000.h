@@ -1,5 +1,5 @@
-#ifndef __MUSIC_4000_H
-#define __MUSIC_4000_H
+#ifndef __MUSIC_2000_H
+#define __MUSIC_2000_H
 
 #include "b-em.h"
 #include "acia.h"
