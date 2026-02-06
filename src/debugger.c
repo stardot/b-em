@@ -1,3 +1,4 @@
+#define _DEBUG
 /*B-em v2.2 by Tom Walker
   Debugger*/
 
@@ -15,6 +16,7 @@
 #include "model.h"
 #include "6502.h"
 #include "debugger_symbols.h"
+#include "cintcode.h"
 
 #include <allegro5/allegro_primitives.h>
 
@@ -31,7 +33,8 @@ typedef enum {
     WATCH_CHANGE,
     WATCH_INPUT,
     WATCH_OUTPUT,
-    TRACE_EXEC
+    TRACE_EXEC,
+    TRACE_CC
 } break_type;
 
 static const char break_names[][8] = {
@@ -57,6 +60,12 @@ struct breakpoint {
     break_type type;
     int        num;
 };
+
+enum bcpl_mode {
+    BCPL_OFF,
+    BCPL_ON,
+    BCPL_CODE
+} bcpl_mode;
 
 int debug_core = 0;
 int debug_tube = 0;
@@ -1250,15 +1259,16 @@ static void debug_tracecmd(cpu_debug_t *cpu, const char *iptr)
                 time(&now);
                 strftime(when, sizeof(when), "%d/%m/%Y %H:%M:%S", localtime(&now));
                 fprintf(fp, "trace file %s opened at %s\n", iptr, when);
+                break_type btype = bcpl_mode ? TRACE_CC : TRACE_EXEC;
                 for (breakpoint *bp = cpu->breakpoints; bp; bp = bp->next) {
-                    if (bp->type == TRACE_EXEC) {
+                    if (bp->type == btype) {
                         found = bp;
                         break;
                     }
                 }
                 if (!found) {
                     log_debug("debug: setting default trace range bp");
-                    set_point(cpu, TRACE_EXEC, "execution trace", 0, UINT32_MAX);
+                    set_point(cpu, btype, "execution trace", 0, UINT32_MAX);
                 }
                 debug_outf("Tracing to %s\n", iptr);
                 trace_fp = fp;
@@ -1300,6 +1310,20 @@ static void debug_trange(cpu_debug_t *cpu, char *iptr)
     }
     else
         debug_outf("missing address");
+}
+
+static const char debug_bcpl_on[]  = "BCPL mode turned on\n";
+static const char debug_bcpl_off[] = "BCPL mode turned off\n";
+
+static void debug_toggle_bcpl(void) {
+    if (bcpl_mode == BCPL_OFF) {
+        bcpl_mode = BCPL_ON;
+        debug_out(debug_bcpl_on, sizeof(debug_bcpl_on)-1);
+    }
+    else {
+        bcpl_mode = BCPL_OFF;
+        debug_out(debug_bcpl_off, sizeof(debug_bcpl_off)-1);
+    }
 }
 
 void debugger_do(cpu_debug_t *cpu, uint32_t addr)
@@ -1401,6 +1425,8 @@ void debugger_do(cpu_debug_t *cpu, uint32_t addr)
                     parse_clrpnt(cpu, BREAK_READ, iptr, "Read breakpoint");
                 else if (!strncmp(cmd, "bclearw", cmdlen))
                     parse_clrpnt(cpu, BREAK_WRITE, iptr, "Write breakpoint");
+                else if (!strcasecmp(ins, "bcpl"))
+                    debug_toggle_bcpl();
                 else
                     badcmd = true;
                 break;
@@ -1815,6 +1841,18 @@ void debug_preexec(cpu_debug_t *cpu, uint32_t addr)
             }
         }
     }
+
+    if (addr == 0x0416 && bcpl_mode) {
+        /* Trace CINTCODE? */
+        uint32_t cc_addr = cpu->memread(0x06) | (cpu->memread(0x07) << 8);
+        for (breakpoint *bp = cpu->breakpoints; bp; bp = bp->next) {
+            if (addr >= bp->start && addr <= bp->end) {
+                if (bp->type == TRACE_CC && trace_fp)
+                    cintcode_trace(cpu, cc_addr, trace_fp);
+            }
+        }
+    }
+
     if (enter) {
         cpu->tbreak = -1;
         debugger_do(cpu, addr);

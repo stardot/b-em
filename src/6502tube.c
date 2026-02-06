@@ -177,6 +177,8 @@ static void dbg_reg_parse(int which, const char *str) {
 
 static uint32_t do_readmem(uint32_t addr)
 {
+    addr &= 0xffff;
+
     if ((addr & ~7) == 0xFEF8)
         return tube_parasite_read(addr);
     if ((addr & ~0xFFF) == 0xF000 && tube_6502_rom_in)
@@ -191,6 +193,8 @@ static void enable_turbo(void);
 
 static void do_writemem(uint32_t addr, uint32_t value)
 {
+    addr &= 0xffff;
+
     if ((addr & ~7) == 0xFEF8) {
         tube_parasite_write(addr, value);
         endtimeslice = 1;

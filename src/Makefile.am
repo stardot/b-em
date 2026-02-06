@@ -51,6 +51,7 @@ b_em_SOURCES = \
 	darm/thumb2-decoder.c \
 	darm/thumb2-tbl.c \
 	cmos.c \
+        cintcode.c \
 	compact_joystick.c \
 	compactcmos.c \
 	compat_wrappers.c \
