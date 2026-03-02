@@ -17,14 +17,16 @@
 #include "32016_debug.h"
 #endif
 
-static uint32_t RAM_SIZE;
-
 #ifdef BEM
+
+#define RAM_SIZE MEG1
 
 #include "../tube.h"
 static uint8_t ns32016ram[MEG16];
 
 #else
+
+static uint32_t RAM_SIZE;
 
 #include "../tube-client.h"
 #include "../tube-ula.h"
@@ -52,6 +54,7 @@ static uint8_t * ns32016ram;
 
 void init_ram(void)
 {
+#ifndef BEM
    if (copro_memory_size > 0)
    {
       // Ensure RAM size is multiple of 128KB, or the Client ROM memory test gets confused
@@ -63,7 +66,6 @@ void init_ram(void)
    } else {
       RAM_SIZE = MEG1;
    }
-#ifndef BEM
    ns32016ram = copro_mem_reset(RAM_SIZE);
 #endif
 #ifdef TEST_SUITE
