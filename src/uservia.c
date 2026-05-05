@@ -42,11 +42,13 @@ void uservia_set_cb2(int level)
 
 static void print_close_pipe(void)
 {
-    int ecode = pclose(print_fp);
-    if (ecode == -1)
-        log_error("error waiting for print command: %s", strerror(errno));
-    else if (ecode > 0)
-        log_error("print command failed, exit status=%d", ecode);
+    if (print_fp) {
+        int ecode = pclose(print_fp);
+        if (ecode == -1)
+            log_error("error waiting for print command: %s", strerror(errno));
+        else if (ecode > 0)
+            log_error("print command failed, exit status=%d", ecode);
+    }
 }
 
 void printer_close(void)
@@ -59,7 +61,7 @@ void printer_close(void)
             break;
         case PDEST_FILE_TEXT:
         case PDEST_FILE_BIN:
-            if (fclose(print_fp))
+            if (print_fp && fclose(print_fp))
                 log_error("error closing print file: %s",  strerror(errno));
             break;
         case PDEST_PIPE_TEXT:
