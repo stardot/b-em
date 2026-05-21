@@ -108,7 +108,7 @@ Features
 - All documented and undocumented 6502 instructions
 - 8271 Floppy Disc Controller emulated (double drive, double sided,
   80 track, read/write)
-- 1770-based Floppy Disc Controllers from various manufacters emulated
+- 1770-based Floppy Disc Controllers from various manufacturers emulated
   including Acorn, Opus, Solidisk, Watford Electronics
   (double drive, double sided, 80 track, read/write)
 - Supports following disc formats - .ssd, .dsd, .adf, .adl, .img, .fdi
@@ -122,7 +122,7 @@ Features
   Music 4000 (keyboard, emulated via MIDI) and Music 2000 (MIDI).
 - Lots of video tricks, such as overscan, raster splitting, rupture,
   interlace, mid-line palette and mode splits, etc.
-- Video NuLA extended pallete ULA emulation.
+- Video NuLA extended palette ULA emulation.
 - Sideways RAM emulation
 - Joystick emulation
 - AMX Mouse emulation
@@ -185,14 +185,14 @@ New Features
 * Unix: Fix fullscreen handling
 * Add missing SBC zero page indirect X on tube 6502
 * Fix SBC overflow (V) in binary mode on main and tube 6502
-* Fix aparent error with carry flag in undocumented instructions.
+* Fix apparent error with carry flag in undocumented instructions.
 * i8271: fix emulation always reporting drive as ready
 * i8271: ensure spindown happens on disk fault and on closing a disk image.
 * 65816: Fix failure to remember 65816 is enabled
 * mouse: Fix not working Y direction in 80186 co-pro Gem.
 * 6502: fix BCD errors on both main and tube 6502 (but not 65C02)
 * 65c02: Added missing BIT zp,X (0x34) instruction
-* 65c02 core/tube: Correted NOP lengths
+* 65c02 core/tube: Corrected NOP lengths
 * 65c02 core/tube: Fixed ZP wrapping issue with inditect addressing
 * 6502tube: implement Rockwell instructions RMB/SMB and BBR/BBS
 * debugging: fix disassembly of 6502 opcode 24, BIT zp
