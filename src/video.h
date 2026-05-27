@@ -52,4 +52,7 @@ bool mode7_loadchars(const char *fn);
 extern int interlline;
 extern const char *mode7_fontfile;
 
+/* workaround for Allegro resize crash on Macs */
+extern bool main_window_suppress_painting;
+
 #endif

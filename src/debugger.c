@@ -85,6 +85,12 @@ static const char time_fmt[] = "%d/%m/%Y %H:%M:%S";
 static uint64_t user_stopwatches[] = { ~0, ~0, ~0, ~0, ~0, ~0, ~0, ~0, ~0, ~0 };
 static const int user_stopwatch_count = sizeof(user_stopwatches)/sizeof(*user_stopwatches);
 
+ALLEGRO_DISPLAY *mem_window_display; /* macOS resize crash workaround */
+
+#if defined __APPLE__ && defined BUILD_MAC_WINDOW_RESIZE_HACK
+bool mem_window_suppress_painting = false;
+#endif
+
 /* TOHv3 */
 static uint8_t find_breakpoint_by_address_or_index (cpu_debug_t *cpu,
                                                     uint8_t match_any_type,
@@ -125,6 +131,9 @@ static int mem_thread_colour(int *counts, int addr)
 
 static void mem_thread_draw(ALLEGRO_DISPLAY *mem_disp, ALLEGRO_BITMAP *bitmap)
 {
+#if defined __APPLE__ && defined BUILD_MAC_WINDOW_RESIZE_HACK
+    if (mem_window_suppress_painting) { return; }
+#endif
     al_set_target_bitmap(bitmap);
     ALLEGRO_LOCKED_REGION *region = al_lock_bitmap(bitmap, ALLEGRO_PIXEL_FORMAT_ANY, ALLEGRO_LOCK_WRITEONLY);
     if (region) {
@@ -141,7 +150,7 @@ static void mem_thread_draw(ALLEGRO_DISPLAY *mem_disp, ALLEGRO_BITMAP *bitmap)
         al_flip_display();
     }
 }
-
+#include "main.h"
 static void *mem_thread_proc(ALLEGRO_THREAD *thread, void *data)
 {
     log_debug("debugger: memory view thread started");
@@ -162,6 +171,7 @@ static void *mem_thread_proc(ALLEGRO_THREAD *thread, void *data)
                 if (mem_timer) {
                     al_register_event_source(mem_queue, al_get_timer_event_source(mem_timer));
                     al_start_timer(mem_timer);
+                    mem_window_display = mem_disp;
                     while (!al_get_thread_should_stop(thread)) {
                         ALLEGRO_EVENT event;
                         al_wait_for_event(mem_queue, &event);
@@ -177,6 +187,21 @@ static void *mem_thread_proc(ALLEGRO_THREAD *thread, void *data)
                                 break;
                             case ALLEGRO_EVENT_DISPLAY_CLOSE:
                                 goto mem_thread_close;
+#if defined __APPLE__ && defined BUILD_MAC_WINDOW_RESIZE_HACK
+                            /* Allegro macOS resize crash workaround ... */
+                            case ALLEGRO_EVENT_DISPLAY_HALT_DRAWING:
+                                if (event.display.source == mem_window_display) {
+                                    mem_window_suppress_painting = true;
+                                }
+                                al_acknowledge_drawing_halt(event.display.source);
+                                break;
+                            case ALLEGRO_EVENT_DISPLAY_RESUME_DRAWING:
+                                if (event.display.source == mem_window_display) {
+                                    mem_window_suppress_painting = false;
+                                }
+                                al_acknowledge_drawing_resume(event.display.source);
+                                break;
+#endif
                         }
                     }
 mem_thread_close:   al_destroy_timer(mem_timer);
@@ -195,6 +220,7 @@ mem_thread_close:   al_destroy_timer(mem_timer);
     }
     else
         log_error("debugger: unable to create display");
+    mem_window_display = NULL;
     return NULL;
 }
 

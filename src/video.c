@@ -44,6 +44,9 @@ static enum {
 
 uint64_t stopwatch_vblank;
 
+/* workaround for Allegro resize crash on Macs */
+bool main_window_suppress_painting = false;
+
 void crtc_reset()
 {
     hc = vc = sc = vadj = 0;
@@ -799,6 +802,9 @@ ALLEGRO_COLOR border_col;
 
 ALLEGRO_DISPLAY *video_init(void)
 {
+#if defined __APPLE__ && defined BUILD_MAC_WINDOW_RESIZE_HACK
+    main_window_suppress_painting = true;
+#endif
 #ifdef ALLEGRO_GTK_TOPLEVEL
     al_set_new_display_flags(ALLEGRO_WINDOWED | ALLEGRO_GTK_TOPLEVEL | ALLEGRO_RESIZABLE);
 #else

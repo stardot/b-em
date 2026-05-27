@@ -617,15 +617,17 @@ void video_doblit(bool non_ttx, uint8_t vtotal)
         lasty++;
         calc_limits(non_ttx, vtotal);
         fskipcount = 0;
-        blit_screen();
-        if (scr_x_start > 0)
-            fill_pillarbox();
-        else if (scr_y_start > 0)
-            fill_letterbox();
-
-        render_leds();
-        al_set_target_bitmap(b);
-        al_flip_display();
+        /* workaround for Allegro resize crash on Macs */
+        if ( ! main_window_suppress_painting ) {
+            blit_screen();
+            if (scr_x_start > 0)
+                fill_pillarbox();
+            else if (scr_y_start > 0)
+                fill_letterbox();
+            render_leds();
+            al_set_target_bitmap(b);
+            al_flip_display();
+        }
     }
     firstx = firsty = 65535;
     lastx  = lasty  = 0;

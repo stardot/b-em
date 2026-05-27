@@ -125,6 +125,10 @@ const emu_speed_t *emu_speeds = default_speeds;
 int num_emu_speeds = NUM_DEFAULT_SPEEDS;
 static int emu_speed_normal = 4;
 
+/* we now need an accessible pointer to the main window
+   so we can check it against events that come in on different windows */
+ALLEGRO_DISPLAY *main_window_display = NULL;
+
 void main_reset()
 {
     m6502_reset();
@@ -259,6 +263,16 @@ typedef enum {
 
 void main_init(int argc, char *argv[])
 {
+
+    /* workaround for Allegro resize crash on Macs */
+#ifdef __APPLE__
+#ifdef BUILD_MAC_WINDOW_RESIZE_HACK
+    al_set_config_value(al_get_system_config(), "osx", "allow_live_resize", "false");
+#else
+    al_set_config_value(al_get_system_config(), "osx", "allow_live_resize", "true");
+#endif
+#endif
+
     if (!al_init()) {
         fputs("b-em: Failed to initialise Allegro!\n", stderr);
         exit(1);
@@ -527,6 +541,8 @@ void main_init(int argc, char *argv[])
     if (fullscreen)
         video_enterfullscreen();
     // lovebug end
+    
+    main_window_display = display; /* accessible copy of this is now needed */
 }
 
 void main_restart()
@@ -669,8 +685,10 @@ static void main_timer(ALLEGRO_EVENT *event)
 
             char buf[120];
             snprintf(buf, sizeof(buf), "%s %.3fMHz %.1f%%", VERSION_STR, speed / 1000000, spd * 100.0);
+            /* Don't rewrite title on macOS window resize or it will softlock >:/ */
+#if ( ! defined __APPLE__ ) || ( ! defined BUILD_MAC_WINDOW_RESIZE_HACK )
             al_set_window_title(tmp_display, buf);
-
+#endif
             if (autoskip && !skipover) {
                 if (fullspeed != FSPEED_NONE) {
                     if (spd > prev_spd && ++slow_count >= 6) {
@@ -700,6 +718,8 @@ static void main_timer(ALLEGRO_EVENT *event)
         al_emit_user_event(&evsrc, &event, NULL);
     }
 }
+
+#include "video.h" /* macOS resize crash workaround */
 
 static double last_switch_in = 0.0;
 
@@ -776,6 +796,22 @@ void main_run()
                 last_switch_in = event.any.timestamp;
                 if (autopause)
                     main_resume();
+                break;
+#if ( defined __APPLE__ ) && ( defined BUILD_MAC_WINDOW_RESIZE_HACK )
+            /* Allegro macOS resize crash workaround */
+            case ALLEGRO_EVENT_DISPLAY_HALT_DRAWING:
+                if (event.display.source == main_window_display) {
+                    main_window_suppress_painting = true;
+                }
+                al_acknowledge_drawing_halt(event.display.source);
+                break;
+            case ALLEGRO_EVENT_DISPLAY_RESUME_DRAWING:
+                if (event.display.source == main_window_display) {
+                    main_window_suppress_painting = false;
+                }
+                al_acknowledge_drawing_resume(event.display.source);
+                break;
+#endif
         }
     }
     log_debug("main: end loop");

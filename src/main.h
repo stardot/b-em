@@ -25,6 +25,10 @@
 #define SHUTDOWN_EXPIRED         21 /* -expire option shut down emulator */
 #define SHUTDOWN_FOPEN           22 /* TOHv4.1: uniquely identify file-not-found */
 
+/* remove this if you have an older Intel mac or some other one
+   that doesn't crash on window resize? */
+#define BUILD_MAC_WINDOW_RESIZE_HACK
+
 typedef struct {
     const char *name;
     float multiplier;

@@ -7,6 +7,10 @@
 #include <allegro5/allegro_primitives.h>
 #include <limits.h>
 
+/* macOS resize crash workarounds */
+static ALLEGRO_DISPLAY *keydef_window_display = NULL;
+static bool keydef_window_suppress_painting = false;
+
 typedef enum {
     COL_BLACK,
     COL_GREY,
@@ -356,6 +360,7 @@ static void *keydef_thread_proc(ALLEGRO_THREAD *thread, void *tdata)
         disp_x *= 2;
         disp_y *= 2;
     }
+    /*al_set_new_display_flags(ALLEGRO_RESIZABLE|ALLEGRO_WINDOWED);*/
     ALLEGRO_DISPLAY *display = al_create_display(disp_x, disp_y);
     if (display) {
         ALLEGRO_EVENT_QUEUE *queue = al_create_event_queue();
@@ -368,6 +373,7 @@ static void *keydef_thread_proc(ALLEGRO_THREAD *thread, void *tdata)
             int mid_x = key_dlg->disp_x/2;
             int ok_x = mid_x-3-BTNS_W;
             int can_x = mid_x+3;
+            keydef_window_display = display; /* macOS resize crash workarounds */
             al_init_user_event_source(&uevsrc);
             al_register_event_source(queue, &uevsrc);
             al_register_event_source(queue, al_get_display_event_source(display));
@@ -441,6 +447,25 @@ static void *keydef_thread_proc(ALLEGRO_THREAD *thread, void *tdata)
                             log_debug("keydef-allegro: alt up");
                             alt_down = false;
                         }
+                    case ALLEGRO_EVENT_DISPLAY_RESIZE:
+                        al_acknowledge_resize(keydef_window_display);
+                        break;
+#if defined __APPLE__ && defined BUILD_MAC_WINDOW_RESIZE_HACK
+                    // Allegro macOS resize crash workaround ...
+                    case ALLEGRO_EVENT_DISPLAY_HALT_DRAWING:
+                        if (event.display.source == keydef_window_display) {
+                            keydef_window_suppress_painting = true;
+                        }
+                        al_acknowledge_drawing_halt(event.display.source);
+                        break;
+                    case ALLEGRO_EVENT_DISPLAY_RESUME_DRAWING:
+                        if (event.display.source == keydef_window_display) {
+                            keydef_window_suppress_painting = false;
+                        }
+                        al_acknowledge_drawing_resume(event.display.source);
+                        draw_keyboard(key_dlg, ok_x, can_x);
+                        break;
+#endif
                 }
             }
             al_destroy_event_queue(queue);
@@ -452,6 +477,8 @@ static void *keydef_thread_proc(ALLEGRO_THREAD *thread, void *tdata)
         log_error("keydef-allegro: unable to create display");
     keydefining = false;
     log_debug("keydef-allegro: key define thread finished");
+    keydef_window_suppress_painting = false; /* macOS resize crash workarounds */
+    keydef_window_display = NULL;
     return NULL;
 }
 
