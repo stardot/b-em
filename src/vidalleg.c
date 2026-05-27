@@ -280,7 +280,7 @@ static inline void save_screenshot(void)
 {
     if (!--vid_savescrshot) {
         int xsize = lastx - firstx;
-        int ysize = lasty - firsty + 1;
+        int ysize = lasty - firsty;
         ALLEGRO_BITMAP *scrshotb  = al_create_bitmap(xsize, ysize << 1);
         ALLEGRO_COLOR mono_col;
 
@@ -443,7 +443,7 @@ static inline void calc_limits(bool non_ttx, uint8_t vtotal)
 static inline void blit_screen(void)
 {
     int xsize = lastx - firstx;
-    int ysize = lasty - firsty + 1;
+    int ysize = lasty - firsty;
     ALLEGRO_COLOR mono_col;
 
     switch(vid_colour_out) {

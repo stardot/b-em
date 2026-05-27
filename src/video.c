@@ -1320,8 +1320,8 @@ void video_poll(int clocks, int timer_enable)
             if (dispen || vadj) {
                 if (scry < firsty)
                     firsty = scry;
-                if ((scry + 1) > lasty)
-                    lasty = scry;
+                if (scry >= lasty)
+                    lasty = scry + 1;
             }
 
             firstdispen = 1;
