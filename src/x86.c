@@ -664,10 +664,13 @@ static void x86dumpregs()
 {
         FILE *f;
         int c;
-        f=x_fopen("x86ram.dmp","wb");
-        fwrite(x86ram,896*1024,1,f);
+        f=fopen("x86ram.dmp","wb");
+        if (f != NULL)
+        {
+                fwrite(x86ram,896*1024,1,f);
                 for (c=0xE0000;c<0x100000;c+=0x4000) fwrite(x86rom,16*1024,1,f);
-        fclose(f);
+                fclose(f);
+        }
         printf("AX=%04X BX=%04X CX=%04X DX=%04X DI=%04X SI=%04X BP=%04X SP=%04X\n",AX,BX,CX,DX,DI,SI,BP,SP);
         printf("PC=%04X CS=%04X DS=%04X ES=%04X SS=%04X FLAGS=%04X\n",pc,CS,DS,ES,SS,flags);
         printf("%04X:%04X %08X %08X %08X\n",oldcs,oldpc,old8,old82,old83);

@@ -196,7 +196,6 @@
     <ClInclude Include="adc.h" />
     <ClInclude Include="arm.h" />
     <ClInclude Include="armulator.h" />
-    <ClInclude Include="ARMulator\acconfig.h" />
     <ClInclude Include="ARMulator\ansidecl.h" />
     <ClInclude Include="ARMulator\armdefs.h" />
     <ClInclude Include="ARMulator\armdis.h" />
@@ -204,13 +203,7 @@
     <ClInclude Include="ARMulator\armfpe.h" />
     <ClInclude Include="ARMulator\armopts.h" />
     <ClInclude Include="ARMulator\armos.h" />
-    <ClInclude Include="ARMulator\bag.h" />
-    <ClInclude Include="ARMulator\config.h" />
-    <ClInclude Include="ARMulator\dbg_conf.h" />
-    <ClInclude Include="ARMulator\dbg_cp.h" />
-    <ClInclude Include="ARMulator\dbg_hif.h" />
     <ClInclude Include="ARMulator\dbg_rdi.h" />
-    <ClInclude Include="ARMulator\gdbhost.h" />
     <ClInclude Include="ARMulator\iwmmxt.h" />
     <ClInclude Include="b-em.h" />
     <ClInclude Include="cmos.h" />
@@ -287,7 +280,6 @@
     <ClInclude Include="resid-fp\siddefs-fp.h" />
     <ClInclude Include="resid-fp\voice.h" />
     <ClInclude Include="resid-fp\wave.h" />
-    <ClInclude Include="resources.h" />
     <ClInclude Include="savestate.h" />
     <ClInclude Include="scsi.h" />
     <ClInclude Include="sdf.h" />
@@ -334,7 +326,6 @@
     <ClCompile Include="ARMulator\arminit.c" />
     <ClCompile Include="ARMulator\armmem.c" />
     <ClCompile Include="ARMulator\armsupp.c" />
-    <ClCompile Include="ARMulator\bag.c" />
     <ClCompile Include="ARMulator\thumbemu.c" />
     <ClCompile Include="cmos.c" />
     <ClCompile Include="compactcmos.c" />

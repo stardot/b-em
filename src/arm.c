@@ -220,9 +220,12 @@ void arm_reset()
 
 void arm_dumpregs()
 {
-        FILE *f=x_fopen("armram.dmp","wb");
-        fwrite(armram,0x10000,1,f);
-        fclose(f);
+        FILE *f=fopen("armram.dmp","wb");
+        if (f != NULL)
+        {
+                fwrite(armram,0x10000,1,f);
+                fclose(f);
+        }
         log_debug("R 0=%08X R 4=%08X R 8=%08X R12=%08X\n",armregs[0],armregs[4],armregs[8],armregs[12]);
         log_debug("R 1=%08X R 5=%08X R 9=%08X R13=%08X\n",armregs[1],armregs[5],armregs[9],armregs[13]);
         log_debug("R 2=%08X R 6=%08X R10=%08X R14=%08X\n",armregs[2],armregs[6],armregs[10],armregs[14]);
@@ -2021,9 +2024,12 @@ void arm_exec()
                                         tubecycles-=4;
 /*                                        if (RD==7)
                                         {
-                                                if (!olog) olog=x_fopen("armlog.txt","wt");
-                                                slog_debug(s,"LDR R7 %08X,%07X\n",armregs[7],PC);
-                                                fputs(s,olog);
+                                                if (!olog) olog=fopen("armlog.txt","wt");
+                                                if (olog != NULL)
+                                                {
+                                                        slog_debug(s,"LDR R7 %08X,%07X\n",armregs[7],PC);
+                                                        fputs(s,olog);
+                                                }
                                         }*/
                                         break;
 
