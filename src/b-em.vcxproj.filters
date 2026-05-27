@@ -177,9 +177,6 @@
     <ClInclude Include="ssinline.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ARMulator\acconfig.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="ARMulator\ansidecl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -201,25 +198,7 @@
     <ClInclude Include="ARMulator\armos.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ARMulator\bag.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ARMulator\config.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ARMulator\dbg_conf.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ARMulator\dbg_cp.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ARMulator\dbg_hif.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="ARMulator\dbg_rdi.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ARMulator\gdbhost.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ARMulator\iwmmxt.h">
@@ -388,9 +367,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="z80.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="resources.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="disc.h">
@@ -740,9 +716,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ARMulator\armsupp.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ARMulator\bag.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ARMulator\thumbemu.c">

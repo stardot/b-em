@@ -75,7 +75,6 @@ OBJ = \
     tapecat-allegro.o \
     tapenoise.o \
     textsave.o \
-    tsearch.o \
     tube.o \
     uef.o \
     uservia.o \
@@ -141,7 +140,6 @@ ARMEMUOBJ = \
     arminit.o \
     armmem.o \
     armsupp.o \
-    bag.o \
     thumbemu.o
 
 DARMOBJ = \

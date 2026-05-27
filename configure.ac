@@ -67,24 +67,12 @@ AC_TYPE_UINT32_T
 AC_TYPE_UINT64_T
 AC_TYPE_UINT8_T
 
-# DB: check if max_align_t is defined
-AC_CHECK_TYPES([max_align_t])
-
-
 # Checks for library functions.
 AC_FUNC_ALLOCA
 AC_FUNC_ERROR_AT_LINE
 AC_FUNC_MALLOC
 AC_FUNC_MKTIME
-AC_CHECK_FUNCS([asprintf atexit floor memset mkdir pow rmdir sqrt stpcpy strcasecmp strchr strdup strerror strncasecmp strrchr strtol tdestroy])
-
-# Check tsearch for tdestroy and include that for non-GNU systems.
-AC_CHECK_FUNC(tdestroy, found_tdestroy=yes, found_tdestroy=no)
-if test "x$found_tdestroy" = xyes; then
-	AC_DEFINE(HAVE_TDESTROY)
-fi
-
-AM_CONDITIONAL(NO_TSEARCH, [test x"$found_tdestroy" = xno ])
+AC_CHECK_FUNCS([atexit floor memset mkdir pow rmdir sqrt stpcpy strcasecmp strchr strdup strerror strncasecmp strrchr strtol])
 
 # Checks for Linux MIDI implementations.
 AC_CHECK_HEADERS(jack/jack.h alsa/asoundlib.h)

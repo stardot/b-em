@@ -142,15 +142,10 @@ b_em_SOURCES = \
 	ARMulator/arminit.c \
 	ARMulator/armmem.c \
 	ARMulator/armsupp.c \
-	ARMulator/bag.c \
 	ARMulator/thumbemu.c \
 	ARMulator/armdis.cpp \
 	map.c \
 	sprow.c
-
-if NO_TSEARCH
-b_em_SOURCES += tsearch.c
-endif
 
 hdfmt_SOURCES = hdfmt.c
 

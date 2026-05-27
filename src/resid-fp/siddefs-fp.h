@@ -62,15 +62,6 @@ enum chip_model { MOS6581FP=1, MOS8580FP };
 
 enum sampling_method { SAMPLE_INTERPOLATE=1, SAMPLE_RESAMPLE_INTERPOLATE };
 
-extern "C"
-{
-#ifndef __VERSION_CC__
-extern const char* resid_version_string;
-#else
-const char* resid_version_string = VERSION;
-#endif
-}
-
 // Inlining on/off.
 #define RESID_INLINE inline
 

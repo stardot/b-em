@@ -239,9 +239,12 @@ static uint32_t dbg_disassemble(cpu_debug_t *cpu, uint32_t addr, char *buf, size
 #undef printf
 /*static void tubedumpregs()
 {
-        FILE *f=x_fopen("tuberam.dmp","wb");
-        fwrite(tuberam,65536,1,f);
-        fclose(f);
+        FILE *f=fopen("tuberam.dmp","wb");
+        if (f != NULL)
+        {
+                fwrite(tuberam,65536,1,f);
+                fclose(f);
+        }
         log_debug("Tube 65c12 registers :\n");
         log_debug("A=%02X X=%02X Y=%02X S=01%02X PC=%04X\n",a,x,y,s,pc);
         log_debug("Status : %c%c%c%c%c%c\n",(tubep.n)?'N':' ',(tubep.v)?'V':' ',(tubep.d)?'D':' ',(tubep.i)?'I':' ',(tubep.z)?'Z':' ',(tubep.c)?'C':' ');

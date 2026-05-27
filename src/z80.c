@@ -610,9 +610,11 @@ void z80_dumpregs()
 
 void z80_mem_dump()
 {
-    FILE *f = x_fopen("z80ram.dmp", "wb");
-    fwrite(z80ram, 0x10000, 1, f);
-    fclose(f);
+    FILE *f = fopen("z80ram.dmp", "wb");
+    if (f != NULL) {
+        fwrite(z80ram, 0x10000, 1, f);
+        fclose(f);
+    }
 }
 
 void z80_reset()
