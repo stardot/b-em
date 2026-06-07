@@ -63,12 +63,12 @@ static const char hori_fighting_stick_display_name[20] = "Hori fighting stick";
 
 static void clear_joystick_map(int joystick)
 {
+    if (-1 == joystick_index[joystick]) return;
     joystick_map_t *jsptr = &joystick_map[joystick_index[joystick]];
     js_stick_t *stick = jsptr->js_sticks;
     js_axis_map_t *axis;
     js_btn_map_t *butn = jsptr->js_btns;
     int stick_num, axis_num, butn_num;
-    if (-1 == joystick_index[joystick]) return;
 
     for (stick_num = 0; stick_num < jsptr->num_stick; stick_num++) {
         axis = stick->axes_map;
@@ -210,6 +210,8 @@ static void free_joysticks()
     }
     free(joystick_map);
     joystick_map = joystick_end = NULL;
+    free(joystick_names);
+    joystick_names = NULL;
 }
 
 static void init_joysticks(void)
@@ -217,6 +219,12 @@ static void init_joysticks(void)
     int js_num, js_used = 0;
     joystick_map_t *jsptr;
     ALLEGRO_JOYSTICK *js;
+
+    if (joystick_count <= 0) {
+        joystick_map = joystick_end = NULL;
+        joystick_names = NULL;
+        return;
+    }
 
     jsptr = joystick_map = js_malloc(joystick_count * sizeof(joystick_map_t));
     joystick_names = js_malloc(joystick_count * sizeof(joystick_names[0]));
@@ -340,6 +348,7 @@ void joystick_rescan_sticks()
     ALLEGRO_JOYSTICK * ids[2] = {-1 == joystick_index[0] ? NULL : joystick_map[joystick_index[0]].js_id, -1 == joystick_index[1] ? NULL : joystick_map[joystick_index[1]].js_id};
     int j;
     if (!al_reconfigure_joysticks()) return;
+    joystick_count = al_get_num_joysticks();
     free_joysticks();
     init_joysticks();
     joystick_index[0] = joystick_index[1] = -1;
@@ -360,6 +369,8 @@ void joystick_axis(ALLEGRO_EVENT *event)
     js_stick_t *stick;
     js_axis_map_t *axis;
     double value;
+
+    if (!joystick_map) return;
 
     log_debug("joystick: js_id=%p, stick=%d, axis=%d, pos=%g", event->joystick.id, event->joystick.stick, event->joystick.axis, event->joystick.pos);
     for (js = joystick_map; js < joystick_end; js++) {
@@ -404,6 +415,8 @@ static void joystick_button(ALLEGRO_EVENT *event, bool value, void (*key_func)(u
 {
     joystick_map_t *js;
     js_btn_map_t *btn;
+
+    if (!joystick_map) return;
 
     log_debug("joystick: js_id=%p, button#%d down", event->joystick.id, event->joystick.button);
     for (js = joystick_map; js < joystick_end; js++) {
