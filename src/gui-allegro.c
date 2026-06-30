@@ -1362,7 +1362,10 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             change_video_lock(event);
             break;
         case IDM_SOUND_INTERNAL:
-            sound_internal = !sound_internal;
+            if (sound_internal == TS_STOPPED)
+                sound_internal = TS_STARTING;
+            else
+                sound_internal = TS_STOPPED;
             break;
         case IDM_SOUND_BEEBSID:
             sound_beebsid = !sound_beebsid;

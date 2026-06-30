@@ -11,7 +11,8 @@
 #include "music5000.h"
 #include "paula.h"
 
-bool sound_internal = false, sound_beebsid = false, sound_dac = false;
+bem_tristate sound_internal = TS_STOPPED;
+bool sound_beebsid = false, sound_dac = false;
 bool sound_ddnoise = false, sound_tape = false;
 bool sound_music5000 = false, sound_filter = false;
 bool sound_paula = false;
@@ -109,9 +110,20 @@ static void sound_rec_int(short *buf)
     }
 }
 
+static void sound_reset_internal(void)
+{
+    sound_pos = 0;
+    sound_sn_pos = 0;
+    memset(sound_buffer, 0, sizeof(sound_buffer));
+}
+
 static void sound_poll_all(void)
 {
     if ((sound_internal || sound_beebsid) && stream) {
+        if (sound_internal == TS_STARTING) {
+            sound_reset_internal();
+            sound_internal = TS_RUNNING;
+        }
         int16_t temp_buffer[2] = {0};
 
         if (sound_beebsid)
@@ -145,9 +157,7 @@ static void sound_poll_all(void)
                 al_set_audio_stream_playing(stream, true);
             } else
                 log_debug("sound: overrun");
-            sound_pos = 0;
-            sound_sn_pos = 0;
-            memset(sound_buffer, 0, sizeof(sound_buffer));
+            sound_reset_internal();
         }
     }
 }

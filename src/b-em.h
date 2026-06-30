@@ -17,6 +17,12 @@
 #define PATH_MAX 512
 #endif
 
+typedef enum {
+    TS_STOPPED,
+    TS_STARTING,
+    TS_RUNNING
+} bem_tristate;
+
 #ifdef _MSC_VER
 
 #define inline __inline

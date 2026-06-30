@@ -7,6 +7,7 @@
 #include "resid-fp/sid.h"
 #include "sidtypes.h"
 #include "sid_b-em.h"
+#include "b-em.h"
 #include "sound.h"
 
 int sidrunning=0;

@@ -95,6 +95,11 @@ bool get_config_bool(const char *sect, const char *key, bool bval)
     return bval;
 }
 
+bem_tristate get_config_ts(const char *sect, const char *key, bool bval)
+{
+    return get_config_bool(sect, key, bval) ? TS_STARTING : TS_STOPPED;
+}
+
 const char *get_config_string(const char *sect, const char *key, const char *sval)
 {
     const char *str = al_get_config_value(bem_cfg, sect, key);
@@ -189,7 +194,7 @@ void config_load(ALLEGRO_PATH *path)
     selecttube       = get_config_int(NULL, "tube",         -1);
     tube_speed_num   = get_config_int(NULL, "tubespeed",     0);
 
-    sound_internal   = get_config_bool("sound", "sndinternal",   true);
+    sound_internal   = get_config_ts("sound", "sndinternal",   true);
     sound_beebsid    = get_config_bool("sound", "sndbeebsid",    true);
     sound_music5000  = get_config_bool("sound", "sndmusic5000",  false);
     sound_dac        = get_config_bool("sound", "snddac",        false);
