@@ -1,6 +1,8 @@
+#define _DEBUG
 #include "b-em.h"
 #include <allegro5/allegro_native_dialog.h>
 #include "gui-allegro.h"
+#include <ctype.h>
 
 #include "6502.h"
 #include "ide.h"
@@ -662,9 +664,59 @@ static int radio_event_with_deselect(ALLEGRO_EVENT *event, int current)
     return num;
 }
 
-static void file_chooser_generic(ALLEGRO_EVENT *event, const char *initial_path, const char *title, const char *patterns, int flags, void (*callback)(const char *))
+/*
+ * How to make the patterns (file extensions) in the file selection
+ * dialog case-insensitive, 
+ */
+#ifdef WIN32
+    /*
+     * Windows is already case-insensitive but it does not support
+     * MIME types in file dialogs so we just ignore that argument.
+     */
+#define file_create_native_dialog_ic(initial_path, title, mime, exts, flags) al_create_native_file_dialog(initial_path, title, exts, flags)
+#else
+    /*
+     * Unix-like systems are case-sensitive so we define a function
+     * that creates a copy of the patterns in both lower and upper
+     * case and uses that instead of the original.  It still
+     * doesn't deal with the file extensions being in mixed case
+     * but it is better than nothing.
+     */
+static ALLEGRO_FILECHOOSER *file_create_native_dialog_ic(const char *initial_path, const char *title, const char *mime, const char *exts, int flags)
 {
-    ALLEGRO_FILECHOOSER *chooser = al_create_native_file_dialog(initial_path, title, patterns, flags);
+    size_t mime_size = 0;
+    if (mime)
+        mime_size = strlen(mime);
+    char *patterns = malloc(mime_size+strlen(exts)*2+3);
+    if (patterns) {
+        char *dptr = patterns;
+        if (mime) {
+            memcpy(dptr, mime, mime_size);
+            dptr += mime_size;
+            *dptr++ = ';';
+        }
+        int ch;
+        for (const char *sptr = exts; (ch = *sptr++); )
+            *dptr++ = tolower(ch);
+        *dptr++ = ';';
+        for (const char *sptr = exts; (ch = *sptr++); )
+            *dptr++ = toupper(ch);
+        *dptr++ = 0;
+        log_debug("gui-allegro: patterns=%s", patterns);
+        ALLEGRO_FILECHOOSER *chooser = al_create_native_file_dialog(initial_path, title, patterns, flags);
+        free(patterns);
+        return chooser;
+    }
+    else {
+        log_error("gui-allegro: out of memory");
+        return al_create_native_file_dialog(initial_path, title, exts, flags);
+    }
+}
+#endif
+
+static void file_chooser_generic(ALLEGRO_EVENT *event, const char *initial_path, const char *title, const char *mime, const char *exts, int flags, void (*callback)(const char *))
+{
+    ALLEGRO_FILECHOOSER *chooser = file_create_native_dialog_ic(initial_path, title, mime, exts, flags);
     if (chooser) {
         ALLEGRO_DISPLAY *display = (ALLEGRO_DISPLAY *)(event->user.data2);
         if (al_show_native_file_dialog(display, chooser)) {
@@ -684,7 +736,7 @@ static void file_save_scrshot(const char *path)
 
 static void file_print_chooser(ALLEGRO_EVENT *event, enum print_dest_type new_dest)
 {
-    ALLEGRO_FILECHOOSER *chooser = al_create_native_file_dialog(savestate_name, "Print to file", "*.prn", ALLEGRO_FILECHOOSER_SAVE);
+    ALLEGRO_FILECHOOSER *chooser = file_create_native_dialog_ic(savestate_name, "Print to file", NULL, "*.prn", ALLEGRO_FILECHOOSER_SAVE);
     if (chooser) {
         ALLEGRO_DISPLAY *display = (ALLEGRO_DISPLAY *)(event->user.data2);
         if (al_show_native_file_dialog(display, chooser)) {
@@ -728,7 +780,7 @@ static void serial_rec(ALLEGRO_EVENT *event)
     if (sysacia_fp)
         sysacia_rec_stop();
     else {
-        ALLEGRO_FILECHOOSER *chooser = al_create_native_file_dialog(savestate_name, "Record serial to file", "*.txt", ALLEGRO_FILECHOOSER_SAVE);
+        ALLEGRO_FILECHOOSER *chooser = file_create_native_dialog_ic(savestate_name, "Record serial to file", "text/plain", "*.txt", ALLEGRO_FILECHOOSER_SAVE);
         if (chooser) {
             ALLEGRO_DISPLAY *display = (ALLEGRO_DISPLAY *)(event->user.data2);
             while (al_show_native_file_dialog(display, chooser)) {
@@ -747,7 +799,7 @@ static void toggle_record(ALLEGRO_EVENT *event, sound_rec_t *rec)
     if (rec->fp)
         sound_stop_rec(rec);
     else {
-        ALLEGRO_FILECHOOSER *chooser = al_create_native_file_dialog(savestate_name, rec->prompt, "*.wav", ALLEGRO_FILECHOOSER_SAVE);
+        ALLEGRO_FILECHOOSER *chooser = file_create_native_dialog_ic(savestate_name, rec->prompt, "audio/wav", "*.wav", ALLEGRO_FILECHOOSER_SAVE);
         if (chooser) {
             ALLEGRO_DISPLAY *display = (ALLEGRO_DISPLAY *)(event->user.data2);
             while (al_show_native_file_dialog(display, chooser)) {
@@ -792,11 +844,10 @@ void gui_set_disc_wprot(int drive, bool enabled)
     al_set_menu_item_flags(disc_menu, menu_id_num(IDM_DISC_WPROT, drive), enabled ? ALLEGRO_MENU_ITEM_CHECKBOX|ALLEGRO_MENU_ITEM_CHECKED : ALLEGRO_MENU_ITEM_CHECKBOX);
 }
 
-static void disc_choose_new(ALLEGRO_EVENT *event, const char *ext)
+static void disc_choose_new(ALLEGRO_EVENT *event, const char *mime, const char *ext)
 {
     int drive = menu_get_num(event);
     ALLEGRO_PATH *apath = drives[drive].discfn;
-    ALLEGRO_FILECHOOSER *chooser;
     const char *fpath;
     char name[20], title[70];
     snprintf(name, sizeof(name), "new%s", strchr(ext, '.'));
@@ -808,7 +859,8 @@ static void disc_choose_new(ALLEGRO_EVENT *event, const char *ext)
     else
         fpath = name;
     snprintf(title, sizeof title, "Choose an image file name to create for drive %d/%d", drive, drive+2);
-    if ((chooser = al_create_native_file_dialog(fpath, title, ext, ALLEGRO_FILECHOOSER_SAVE))) {
+    ALLEGRO_FILECHOOSER *chooser = file_create_native_dialog_ic(fpath, title, mime, ext, ALLEGRO_FILECHOOSER_SAVE);
+    if (chooser) {
         ALLEGRO_DISPLAY *display = (ALLEGRO_DISPLAY *)(event->user.data2);
         if (al_show_native_file_dialog(display, chooser)) {
             if (al_get_native_file_dialog_count(chooser) > 0) {
@@ -869,7 +921,10 @@ static void disc_choose_new(ALLEGRO_EVENT *event, const char *ext)
         al_destroy_path(apath);
 }
 
-static void disc_choose(ALLEGRO_EVENT *event, const char *opname, const char *exts, int flags)
+static const char disc_mimes[] = "application/vnd.acorn.disc-image.*;application/x-hfe-floppy-image";
+static const char disc_exts[]  = "*.ssd;*.dsd;*.img;*.adf;*.ads;*.adm;*.adl;*.sdd;*.ddd;*.fdi;*.imd;*.hfe;";
+
+static void disc_choose(ALLEGRO_EVENT *event, const char *opname)
 {
     int drive = menu_get_num(event);
     ALLEGRO_PATH *apath;
@@ -878,7 +933,7 @@ static void disc_choose(ALLEGRO_EVENT *event, const char *opname, const char *ex
         fpath = ".";
     char title[70];
     snprintf(title, sizeof title, "Choose a disc to %s drive %d/%d", opname, drive, drive+2);
-    ALLEGRO_FILECHOOSER *chooser = al_create_native_file_dialog(fpath, title, exts, flags);
+    ALLEGRO_FILECHOOSER *chooser = file_create_native_dialog_ic(fpath, title, disc_mimes, disc_exts, ALLEGRO_FILECHOOSER_FILE_MUST_EXIST);
     if (chooser) {
         ALLEGRO_DISPLAY *display = (ALLEGRO_DISPLAY *)(event->user.data2);
         if (al_show_native_file_dialog(display, chooser)) {
@@ -993,7 +1048,7 @@ static void tape_load_ui(ALLEGRO_EVENT *event)
     const char *fpath;
     if (!tape_fn || !(fpath = al_path_cstr(tape_fn, ALLEGRO_NATIVE_PATH_SEP)))
         fpath = ".";
-    ALLEGRO_FILECHOOSER *chooser = al_create_native_file_dialog(fpath, "Choose a tape to load", "*.uef;*.csw", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST);
+    ALLEGRO_FILECHOOSER *chooser = file_create_native_dialog_ic(fpath, "Choose a tape to load", NULL, "*.uef;*.csw", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST);
     if (chooser) {
         ALLEGRO_DISPLAY *display = (ALLEGRO_DISPLAY *)(event->user.data2);
         if (al_show_native_file_dialog(display, chooser)) {
@@ -1050,7 +1105,7 @@ static void rom_load(ALLEGRO_EVENT *event)
             strncpy(tempname, slotp->name, sizeof tempname-1);
         else
             tempname[0] = 0;
-        ALLEGRO_FILECHOOSER *chooser = al_create_native_file_dialog(tempname, "Choose a ROM to load", "*.rom", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST);
+        ALLEGRO_FILECHOOSER *chooser = file_create_native_dialog_ic(tempname, "Choose a ROM to load", NULL, "*.rom", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST);
         if (chooser) {
             ALLEGRO_DISPLAY *display = (ALLEGRO_DISPLAY *)(event->user.data2);
             if (al_show_native_file_dialog(display, chooser)) {
@@ -1174,9 +1229,6 @@ static void toggle_music5000(void)
     }
 }    
 
-static const char all_dext[] = "*.ssd;*.dsd;*.img;*.adf;*.ads;*.adm;*.adl;*.sdd;*.ddd;*.fdi;*.imd;*.hfe;"
-                               "*.SSD;*.DSD;*.IMG;*.ADF;*.ADS;*.ADM;*.ADL;*.SDD;*.DDD;*.FDI;*.IMD;*.HFE";
-
 void gui_allegro_event(ALLEGRO_EVENT *event)
 {
     switch(menu_get_id(event)) {
@@ -1188,16 +1240,16 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             update_rom_menu();
             break;
         case IDM_FILE_LOAD_STATE:
-            file_chooser_generic(event, savestate_name, "Load state from file", "*.snp", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST, savestate_load);
+            file_chooser_generic(event, savestate_name, "Load state from file", NULL, "*.snp", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST, savestate_load);
             break;
         case IDM_FILE_SAVE_STATE:
-            file_chooser_generic(event, savestate_name, "Save state to file", "*.snp", ALLEGRO_FILECHOOSER_SAVE, savestate_save);
+            file_chooser_generic(event, savestate_name, "Save state to file", NULL, "*.snp", ALLEGRO_FILECHOOSER_SAVE, savestate_save);
             break;
         case IDM_FILE_SCREEN_SHOT:
-            file_chooser_generic(event, vid_scrshotname, "Save screenshot to file", "*.bmp;*.pcx;*.tga;*.png;*.jpg", ALLEGRO_FILECHOOSER_SAVE, file_save_scrshot);
+            file_chooser_generic(event, vid_scrshotname, "Save screenshot to file", "image/*", "*.bmp;*.pcx;*.tga;*.png;*.jpg", ALLEGRO_FILECHOOSER_SAVE, file_save_scrshot);
             break;
         case IDM_FILE_SCREEN_TEXT:
-            file_chooser_generic(event, savestate_name, "Save screen as text to file", "*.txt", ALLEGRO_FILECHOOSER_SAVE, textsave);
+            file_chooser_generic(event, savestate_name, "Save screen as text to file", "text/plain", "*.txt", ALLEGRO_FILECHOOSER_SAVE, textsave);
             break;
         case IDM_FILE_PRINT:
             file_print_change(event);
@@ -1227,13 +1279,13 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             edit_print_clip(event);
             break;
         case IDM_DISC_AUTOBOOT:
-            disc_choose(event, "autoboot in", all_dext, ALLEGRO_FILECHOOSER_FILE_MUST_EXIST);
+            disc_choose(event, "autoboot in");
             break;
         case IDM_DISC_LOAD:
-            disc_choose(event, "load into", all_dext, ALLEGRO_FILECHOOSER_FILE_MUST_EXIST);
+            disc_choose(event, "load into");
             break;
         case IDM_DISC_MMB_LOAD:
-            file_chooser_generic(event, mmb_fn ? mmb_fn : ".", "Choose an MMB file", "*.mmb", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST, disc_mmb_load);
+            file_chooser_generic(event, mmb_fn ? mmb_fn : ".", "Choose an MMB file", NULL, "*.mmb", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST, disc_mmb_load);
             break;
         case IDM_DISC_EJECT:
             disc_eject(event);
@@ -1242,37 +1294,37 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             mmb_eject();
             break;
         case IDM_DISC_MMC_LOAD:
-            file_chooser_generic(event, mmccard_fn ? mmccard_fn : ".", "Choose an MMC card image", "*", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST, disc_mmc_load);
+            file_chooser_generic(event, mmccard_fn ? mmccard_fn : ".", "Choose an MMC card image", NULL, "*", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST, disc_mmc_load);
             break;
         case IDM_DISC_MMC_EJECT:
             mmccard_eject();
             break;
         case IDM_DISC_NEW_ADFS_S:
-            disc_choose_new(event, "*.ads");
+            disc_choose_new(event, "application/vnd.acorn.disc-image.ads", "*.ads");
             break;
         case IDM_DISC_NEW_ADFS_M:
-            disc_choose_new(event, "*.adm");
+            disc_choose_new(event, "application/vnd.acorn.disc-image.adm", "*.adm");
             break;
         case IDM_DISC_NEW_ADFS_L:
-            disc_choose_new(event, "*.adl");
+            disc_choose_new(event, "application/vnd.acorn.disc-image.adl", "*.adl");
             break;
         case IDM_DISC_NEW_DFS_10S_SIN_40T:
         case IDM_DISC_NEW_DFS_10S_SIN_80T:
-            disc_choose_new(event, "*.ssd");
+            disc_choose_new(event, "application/vnd.acorn.disc-image.ssd", "*.ssd");
             break;
         case IDM_DISC_NEW_DFS_10S_INT_40T:
         case IDM_DISC_NEW_DFS_10S_INT_80T:
-            disc_choose_new(event, "*.dsd");
+            disc_choose_new(event, "application/vnd.acorn.disc-image.dsd", "*.dsd");
             break;
         case IDM_DISC_NEW_DFS_16S_SIN_40T:
         case IDM_DISC_NEW_DFS_16S_SIN_80T:
         case IDM_DISC_NEW_DFS_18S_SIN_40T:
         case IDM_DISC_NEW_DFS_18S_SIN_80T:
-            disc_choose_new(event, "*.sdd");
+            disc_choose_new(event, "application/vnd.acorn.disc-image.sdd", "*.sdd");
             break;
         case IDM_DISC_NEW_DFS_16S_INT_80T:
         case IDM_DISC_NEW_DFS_18S_INT_80T:
-            disc_choose_new(event, "*.ddd");
+            disc_choose_new(event, "application/vnd.acorn.disc-image.ddd", "*.ddd");
             break;
         case IDM_DISC_WPROT:
             disc_wprot(event);
@@ -1290,7 +1342,7 @@ void gui_allegro_event(ALLEGRO_EVENT *event)
             vdfs_enabled = !vdfs_enabled;
             break;
         case IDM_DISC_VDFS_ROOT:
-            file_chooser_generic(event, vdfs_get_root(), "Choose a folder to be the VDFS root", "*", ALLEGRO_FILECHOOSER_FOLDER, disc_vdfs_root);
+            file_chooser_generic(event, vdfs_get_root(), "Choose a folder to be the VDFS root", NULL, "*", ALLEGRO_FILECHOOSER_FOLDER, disc_vdfs_root);
             break;
         case IDM_TAPE_LOAD:
             tape_load_ui(event);
