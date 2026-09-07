@@ -280,6 +280,28 @@ static size_t load_integra(FILE *f, const char *fn)
     return sizeof(cmos);
 }
 
+static const unsigned char cmos_defaults[] = {
+    /* See: https://www.beebwiki.mdfs.net/CMOS_configuration_RAM_allocation */
+    /* User locations (starting at address 14 */
+    /*  0 */ 0x00, /* Econet station number */
+    /*  1 */ 0xfe, /* File server station number */
+    /*  2 */ 0x00, /* File server network number */
+    /*  3 */ 0xeb, /* Print server station number */
+    /*  4 */ 0x00, /* Print server network number */
+    /*  5 */ 0xcd, /* BASIC and ADFS selected */
+    /*  6 */ 0xff, /* ROMs 0-7 inserted */
+    /*  7 */ 0xff, /* ROMs 8-15 inserted */
+    /*  8 */ 0x15, /* EDIT: descriptive, insert */
+    /*  9 */ 0x00, /* Telecoms software */
+    /* 10 */ 0x17, /* Mode 7, TV 0,1 */
+    /* 11 */ 0x48, /* Shift-caps, ADFS hard, no-dir */
+    /* 12 */ 0x32, /* Keyboard repeat delay */
+    /* 13 */ 0x08, /* Keyboard repeat rate */
+    /* 14 */ 0x0a, /* Printer ignore character */
+    /* 15 */ 0x2d, /* Tube, Baud 4, Print 1 */
+    /* 16 */ 0x82, /* No shadow, loud, Data 4 */
+};
+
 void cmos_load(const MODEL *m)
 {
     if (!m->cmos[0])
@@ -288,6 +310,7 @@ void cmos_load(const MODEL *m)
         compactcmos_load(m);
     else {
         memset(cmos, 0, sizeof cmos);
+        memcpy(cmos+14, cmos_defaults, sizeof cmos_defaults);
         rtc_epoc_ref = rtc_epoc_adj = 0;
         ALLEGRO_PATH *path = find_cfg_file(m->cmos, ".bin");
         if (path) {
@@ -304,7 +327,7 @@ void cmos_load(const MODEL *m)
                      */
                     rtc_epoc_adj = cmos[0] | (cmos[2] << 8) | (cmos[4] << 16) | (cmos[6] << 24);
                 }
-                log_debug("cmos: loaded from %s", cpath);
+                log_info("cmos: loaded from %s", cpath);
             }
             else
                 log_warn("cmos: unable to load CMOS file '%s': %s", cpath, strerror(errno));
