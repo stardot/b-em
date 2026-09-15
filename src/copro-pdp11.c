@@ -71,7 +71,7 @@ void copro_pdp11_write16(const uint16_t addr, const uint16_t data)
 bool tube_pdp11_init(void *rom)
 {
     if (!memory) {
-        memory = malloc(2*1024*1024);
+        memory = malloc(0x10000); // 64K
         if (!memory) {
             log_error("copro-pdp11: unable to allocate RAM");
             return false;
