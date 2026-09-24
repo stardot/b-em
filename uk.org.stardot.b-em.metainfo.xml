@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2020 B-Em developers -->
+<component type="desktop-application">
+  <id>uk.org.stardot.b-em</id>
+  <name>B-Em</name>
+  <summary>An opensource BBC Micro emulator</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-2.0</project_license>
+  <launchable type="desktop-id">uk.org.stardot.b-em.desktop</launchable>
+  <content_rating type="oars-1.1"/>
+
+  <description>
+    <p>
+      An opensource BBC Micro emulator for Win32 and Linux
+    </p>
+    <p>
+      B-em is an emulator for various models of BBC Microcomputer as made by Acorn Computers in the 1980s along with a selection of 2nd processors. It is supported for Win32 and Linux/UNIX but may also work on other systems supported by the Allegro library.
+    </p>
+  </description>
+
+  <url type="homepage">https://github.com/stardot/b-em</url>
+  <url type="bugtracker">https://github.com/stardot/b-em/issues</url>
+
+  <releases>
+    <release version="2.2" date="2012-06-03">
+      <description>
+        <p>
+          Improvements and bug fixes.
+        </p>
+        <ul>
+          <li>MOS 3.50 emulation</li>
+          <li>Fixed CRTC bug when programmed with stupid values (MOS 3.50 startup)</li>
+          <li>ADFS disc corruption bug fixed (Carlo Concari)</li>
+          <li>Fixed ACIA bug - Pro Boxing Simulator tape version now works</li>
+          <li>Fixed bug which created endless blank hard disc images</li>
+          <li>Printer port DAC emulation</li>
+          <li>AMX mouse emulation</li>
+          <li>Master 512 mouse now works properly</li>
+          <li>Master Compact joystick emulation</li>
+          <li>IDE emulation available in non-Master models</li>
+          <li>UI fixes (some from Carlo Concari)</li>
+          <li>Improvements to VIA emulation</li>
+          <li>PAL video filter</li>
+          <li>Bugfixes in ARM and 65816 coprocessors</li>
+          <li>Debugger fixes</li>
+          <li>Tidying up of code</li>
+          <li>Windows version can now build on MSVC as well as GCC</li>
+        </ul>
+      </description>
+    </release>
+  </releases>
+</component>
