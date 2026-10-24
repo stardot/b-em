@@ -5,9 +5,10 @@ VPATH = . resid-fp NS32016 darm mc6809nc pdp11 musahi ARMulator
 #   INCLUDE_DEBUGGER - include the cpu_debug implementation
 # USE_MEMORY_POINTER - do not assume Co Pro memory starts at address 0
 
+VERSION      = DEV
 COMMON_FLAGS = -O3 -Wall
-CPPFLAGS     = -DBEM -DVERSION=\"$(VERSION)\" -DINCLUDE_DEBUGGER -DUSE_MEMORY_POINTER -DMODET -DMODE32 -DBEEBEM $(ALLEGRO_INC)
-CFLAGS       = -std=gnu99 $(COMMON_FLAGS)
+CPPFLAGS     = -DVERSION=\"$(VERSION)\" -DBEM -DINCLUDE_DEBUGGER -DUSE_MEMORY_POINTER -DMODET -DMODE32 -DBEEBEM $(ALLEGRO_INC)
+CFLAGS       = -std=gnu11 $(COMMON_FLAGS)
 CXXFLAGS     = -std=gnu++11 $(COMMON_FLAGS)
 LDFLAGS      = $(ALLEGRO_LIB)
 
@@ -155,7 +156,7 @@ DARMOBJ = \
 
 LIBS = -lz -lallegro_audio -lallegro_acodec -lallegro_primitives -lallegro_dialog -lallegro_image -lallegro_font -lallegro -lallegro_main -lwinmm -mwindows
 
-all : b-em.exe hdfmt.exe jstest.exe gtest.exe sdf2imd.exe bsnapdump.exe
+all : b-em.exe hdfmt.exe jstest.exe gtest.exe sdf2imd.exe bsnapdump.exe disptrace.exe fsmap.exe hdresize.exe
 
 clean :
 	-$(RM) *.o
@@ -177,17 +178,26 @@ clean :
 b-em.exe : $(OBJ) $(SIDOBJ) $(NS32KOBJ) $(MC6809OBJ) $(PDP11OBJ)  $(M68000OBJ) $(ARMEMUOBJ) $(DARMOBJ) b-em.res
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $^ -o $@ $(LIBS)
 
-hdfmt.exe : hdfmt.o
+hdfmt.exe : hdfmt.o compat_wrappers.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
 
 jstest.exe : jstest.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@ -lallegro -lallegro_main
 
-gtest.exe : sdf-gtest.o sdf-geo.o
+gtest.exe : sdf-gtest.o sdf-geo.o compat_wrappers.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
 
-sdf2imd.exe : sdf2imd.o sdf-geo.o
+sdf2imd.exe : sdf2imd.o sdf-geo.o compat_wrappers.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
 
 bsnapdump.exe : bsnapdump.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@ -lz
+
+disptrace.exe : disptrace.o compat_wrappers.o
+	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
+
+fsmap.exe : fsmap.o
+	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
+
+hdresize.exe : hdresize.o compat_wrappers.o
+	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@

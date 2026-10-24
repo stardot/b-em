@@ -40,7 +40,7 @@ buildit() {
 
     cd "$dir"
     make -j4 -e -f ../src/Makefile.win b-em.exe
-    zip -q -r "b-em-$VERSION-$1.zip" *.exe b-em.cfg *.dll $dirs
+    zip -q -r "b-em-$VERSION-$1.zip" *.exe b-em.cfg *.dll $cmos $dirs
     cd ..
 }
 

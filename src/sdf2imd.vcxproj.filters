@@ -21,12 +21,18 @@
     <ClCompile Include="sdf-geo.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="compat_wrappers.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="logging.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="sdf.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="compat_wrappers.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -23,6 +23,10 @@
 #include "disc.h"
 #include "imd.h"
 
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+
 #define IMD_MAX_SECTS 36
 
 struct imd_list;
@@ -130,10 +134,6 @@ static uint8_t wt_cylid;
 static uint8_t wt_headid;
 static uint8_t wt_sectid;
 static uint8_t wt_sectsz;
-
-#ifdef WIN32
-extern int ftruncate(int fd, off_t length);
-#endif
 
 /*
  * This function writes the IMD file in memory back to the disc file.

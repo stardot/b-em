@@ -3,6 +3,8 @@
 #include <string.h>
 #include <time.h>
 
+#include "compat_wrappers.h"
+
 enum
 {
         IMP,IMPA,IMM,ZP,ZPX,ZPY,INDX,INDY,IND,ABS,ABSX,ABSY,IND16,IND1X,BRA

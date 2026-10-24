@@ -560,7 +560,7 @@ static void sdf_abort(int drive)
 #ifndef WIN32
 static void sdf_lock(int drive, FILE *fp, int ltype)
 {
-#ifdef linux
+#ifdef F_OFD_SETLKW
 #define LOCK_WAIT F_OFD_SETLKW
 #else
 #define LOCK_WAIT F_SETLKW

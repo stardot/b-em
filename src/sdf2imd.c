@@ -1,3 +1,6 @@
+// Don't require allegro_main
+#define ALLEGRO_NO_MAGIC_MAIN 1
+
 #include <allegro5/allegro.h>
 #include <errno.h>
 #include <stdint.h>

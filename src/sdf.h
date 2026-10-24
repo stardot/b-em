@@ -63,11 +63,4 @@ void sdf_mount(int drive, const char *fn, FILE *fp, const struct sdf_geometry *g
 int sdf_load(int drive, const char *fn, const char *ext);
 FILE *sdf_owseek(uint8_t drive, uint8_t sector, uint8_t track, uint8_t side, uint16_t ssize);
 
-//DB: bodge for VS
-#ifdef _MSC_VER
-//not #if defined(_WIN32) || defined(_WIN64) because we have strncasecmp in mingw
-#define strncasecmp _strnicmp
-#define strcasecmp _stricmp
-#endif
-
 #endif
