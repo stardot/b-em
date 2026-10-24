@@ -19,13 +19,18 @@
 
 #ifdef BEM
 
+#define RAM_SIZE MEG1
+
 #include "../tube.h"
 static uint8_t ns32016ram[MEG16];
 
 #else
 
+static uint32_t RAM_SIZE;
+
 #include "../tube-client.h"
 #include "../tube-ula.h"
+#include "../tube.h"
 static uint8_t * ns32016ram;
 
 #endif
@@ -50,7 +55,18 @@ static uint8_t * ns32016ram;
 void init_ram(void)
 {
 #ifndef BEM
-   ns32016ram = copro_mem_reset(MEG16);
+   if (copro_memory_size > 0)
+   {
+      // Ensure RAM size is multiple of 128KB, or the Client ROM memory test gets confused
+      RAM_SIZE = copro_memory_size  & (uint32_t)~((128*1024)-1);
+      // Limit RAM size to 15MB, so there is space for the tube registers above this
+      if (RAM_SIZE > MEG15) {
+         RAM_SIZE = MEG15;
+      }
+   } else {
+      RAM_SIZE = MEG1;
+   }
+   ns32016ram = copro_mem_reset(RAM_SIZE);
 #endif
 #ifdef TEST_SUITE
    memcpy(ns32016ram, ROM, sizeof(ROM));
@@ -92,7 +108,7 @@ void dump_ram(void)
 uint8_t read_x8(uint32_t addr)
 #ifdef INCLUDE_DEBUGGER
 {
-   uint8_t val = read_x8_internal(addr);   
+   uint8_t val = read_x8_internal(addr);
    if (n32016_debug_enabled)
    {
       debug_memread(&n32016_cpu_debug, addr, val, 1);
@@ -146,7 +162,7 @@ uint16_t read_x16(uint32_t addr)
    }
 #endif
 
-   return read_x8(addr) | (read_x8(addr + 1) << 8);
+   return (uint16_t)(read_x8(addr) | (read_x8(addr + 1) << 8));
 }
 
 uint32_t read_x32(uint32_t addr)
@@ -165,14 +181,14 @@ uint32_t read_x32(uint32_t addr)
 #ifdef INCLUDE_DEBUGGER
       if (n32016_debug_enabled)
       {
-         debug_memread(&n32016_cpu_debug, addr, val, 3);
+         debug_memread(&n32016_cpu_debug, addr, val, 4);
       }
 #endif
       return val;
    }
 #endif
 
-   return read_x8(addr) | (read_x8(addr + 1) << 8) | (read_x8(addr + 2) << 16) | (read_x8(addr + 3) << 24);
+   return (uint32_t)(read_x8(addr) | (read_x8(addr + 1) << 8) | (read_x8(addr + 2) << 16) | (read_x8(addr + 3) << 24));
 }
 
 uint64_t read_x64(uint32_t addr)
@@ -209,7 +225,7 @@ void write_x8(uint32_t addr, uint8_t val)
    {
       debug_memwrite(&n32016_cpu_debug, addr, val, 1);
    }
-   write_x8_internal(addr, val);   
+   write_x8_internal(addr, val);
 }
 void write_x8_internal(uint32_t addr, uint8_t val)
 #endif
@@ -235,7 +251,7 @@ void write_x8_internal(uint32_t addr, uint8_t val)
    if (addr == 0xF90000)
    {
 #ifdef PANDORA_ROM_PAGE_OUT
-      PiTRACE("Pandora ROM no longer occupying the entire memory space!")
+      PiTRACE("Pandora ROM no longer occupying the entire memory space!");
       memset(ns32016ram, 0, RAM_SIZE);
 #else
       PiTRACE("Pandora ROM write to 0xF90000");
@@ -273,8 +289,8 @@ void write_x16(uint32_t addr, uint16_t val)
    }
 #endif
 
-   write_x8(addr++, val & 0xFF);
-   write_x8(addr, val >> 8);
+   write_x8(addr++,(uint8_t) val);
+   write_x8(addr, (uint8_t)(val >> 8));
 }
 
 void write_x32(uint32_t addr, uint32_t val)
@@ -299,10 +315,10 @@ void write_x32(uint32_t addr, uint32_t val)
    }
 #endif
 
-   write_x8(addr++, val);
-   write_x8(addr++, (val >> 8));
-   write_x8(addr++, (val >> 16));
-   write_x8(addr, (val >> 24));
+   write_x8(addr++,(uint8_t) val);
+   write_x8(addr++,(uint8_t) (val >> 8));
+   write_x8(addr++,(uint8_t) (val >> 16));
+   write_x8(addr, (uint8_t) (val >> 24));
 }
 
 void write_x64(uint32_t addr, uint64_t val)
@@ -337,9 +353,9 @@ void write_Arbitary(uint32_t addr, void* pData, uint32_t Size)
 
 #ifdef NS_FAST_RAM
 #ifdef INCLUDE_DEBUGGER
-   if ((addr + Size) <= RAM_SIZE && !n32016_debug_enabled) 
+   if ((addr + Size) <= RAM_SIZE && !n32016_debug_enabled)
 #else
-   if ((addr + Size) <= RAM_SIZE) 
+   if ((addr + Size) <= RAM_SIZE)
 #endif
    {
       memcpy(ns32016ram + addr, pData, Size);
@@ -347,7 +363,7 @@ void write_Arbitary(uint32_t addr, void* pData, uint32_t Size)
    }
 #endif
 
-   register uint8_t* pValue = (uint8_t*) pData;
+   register const uint8_t* pValue = (uint8_t*) pData;
    while (Size--)
    {
       write_x8(addr++, *pValue++);

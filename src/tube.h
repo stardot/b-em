@@ -72,6 +72,7 @@ uint8_t tube_parasite_read(uint32_t addr);
 void    tube_parasite_write(uint32_t addr, uint8_t val);
 
 extern int tube_irq;
+static inline void tube_ack_nmi(void) {tube_irq &= ~2;}
 
 void tube_reset(void);
 void tube_updatespeed(void);
