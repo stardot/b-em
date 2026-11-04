@@ -109,6 +109,7 @@ static ACIA music2000_acia3 = {
 
 uint8_t music2000_read(uint32_t addr) {
     switch(addr & 0xe) {
+        case 0x0: // &FC00/1 also reach ACIA 1
         case 0x8:
             return acia_read(&music2000_acia1, addr);
         case 0xA:
@@ -122,6 +123,7 @@ uint8_t music2000_read(uint32_t addr) {
 
 void music2000_write(uint32_t addr, uint8_t val) {
     switch(addr & 0xe) {
+        case 0x0: // &FC00/1 also reach ACIA 1
         case 0x8:
             acia_write(&music2000_acia1, addr, val);
             break;
