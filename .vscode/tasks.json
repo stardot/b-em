@@ -1,0 +1,43 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build B-em (Linux only)",
+            "type": "process",
+            "command": "make",
+            "args": [
+                "-j4"
+            ],
+            "linux": {
+                "command": "make",
+                "args": [
+                    "-j4"
+                ]
+            },
+            "windows": {
+                // TODO: Validate the Windows guard and batch build workflow on Windows.
+                "command": "cmd.exe",
+                "args": [
+                    "/d",
+                    "/c",
+                    "echo This build task is supported only on Linux. & exit /b 1"
+                ]
+            },
+            "osx": {
+                "command": "sh",
+                "args": [
+                    "-c",
+                    "echo 'This build task is supported only on Linux.' >&2; exit 1"
+                ]
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": "$gcc"
+        }
+    ]
+}

@@ -405,6 +405,7 @@ static uint32_t do_readmem(uint32_t addr)
         }
 
         switch (addr & ~3) {
+            case 0xFC00:
             case 0xFC08:
             case 0xFC0C:
                 if (sound_music5000)
@@ -833,6 +834,7 @@ static void do_writemem(uint32_t addr, uint32_t val)
         }
 
         switch (addr & ~3) {
+            case 0xFC00:
             case 0xFC08:
             case 0xFC0C:
                 if (sound_music5000)
