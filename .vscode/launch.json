@@ -1,0 +1,27 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "B-em (Linux)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/b-em",
+            "cwd": "${workspaceFolder}",
+            "MIMode": "gdb",
+            "externalConsole": false,
+            "preLaunchTask": "Build B-em (Linux only)",
+            "linux": {
+                "program": "${workspaceFolder}/b-em",
+                "cwd": "${workspaceFolder}",
+                "MIMode": "gdb"
+            },
+            "windows": {
+                // TODO: Validate executable path and debugger settings on Windows.
+                "program": "${workspaceFolder}/src/b-em.exe",
+                "cwd": "${workspaceFolder}",
+                "MIMode": "gdb",
+                "preLaunchTask": "Build B-em (Linux only)"
+            }
+        }
+    ]
+}

@@ -1,0 +1,23 @@
+{
+    "files.exclude": {
+        "**/*.o": true,
+        "**/*.a": true,
+        "**/*.so": true,
+        "**/*.dll": true,
+        "**/*.exe": true,
+        "**/*.res": true,
+        "**/*.ilk": true,
+        "**/*.iobj": true,
+        "**/*.ipdb": true,
+        "**/*.pdb": true,
+        "**/b-em": true,
+        "**/.deps": true,
+        "**/autom4te.cache": true,
+        "**/build": true,
+        "**/build-*": true,
+        "**/Debug": true,
+        "**/Release": true,
+        "**/config.log": true,
+        "**/config.status": true
+    }
+}
